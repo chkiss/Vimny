@@ -1,0 +1,297 @@
+# Vimny — Wizard Wisdom Corpus
+# Each quote references commands the player will encounter.
+
+{
+  "levels": [
+    {
+      "level": 0,
+      "name": "home row",
+      "line_count": 4,
+      "quote": [
+        "          h left, l right, j down, k up.        ",
+        "Arrow keys make a long road. Stay by the hearth.",
+        "Each key a step. Conserve them like lantern oil.",
+        "    The cursor is your wand. Keep it steady.    "
+      ]
+    },
+    {
+      "level": 1,
+      "name": "line motions",
+      "line_count": 4,
+      "quote": [
+        " $ jumps to the distant wall—far as eye can see.",
+        "           0 returns you to the start.          ",
+        "            ^ hops to the first rune.           ",
+        "    $, 0, ^. Three steeds run swift and true.   "
+      ]
+    },
+    {
+      "level": 2,
+      "name": "save and quit",
+      "line_count": 4,
+      "quote": [
+        "    : opens the spellbook beneath the glass.    ",
+        "  :w saves your tale in parchment permanence.   ",
+        "     :q winds the scroll, :wq keeps it safe.    ",
+        "    :q! lights it aflame—no record remains.     "
+      ]
+    },
+    {
+      "level": 2,
+      "name": "counts",
+      "line_count": 3,
+      "quote": [
+        "    Numbers are quiet spells. 5j glides.        ",
+        "           Count once, walk once.               ",
+        "      Apprise, your breath steady, and leap!    "
+      ]
+    },
+    {
+      "level": 2,
+      "name": "x",
+      "line_count": 3,
+      "quote": [
+        "      x clears a glyph under your lantern.      ",
+        "   An instant undoing, like dust brushed away.  "
+      ]
+    },
+    {
+      "level": 3,
+      "name": "words",
+      "line_count": 3,
+      "quote": [
+        "  w skips a rune ahead, b back one, e to end.   ",
+        "      Ride  on words like stepping stones,      ",
+        "         Vim to seek the words to bend.         "
+      ]
+    },
+    {
+      "level": 4,
+      "name": "gg / G",
+      "line_count": 4,
+      "quote": [
+        "        gg two gulls, gulping morning air.      ",
+        "               G the cellar grate.              ",
+        "          g_ the gate to the outdoors.          ",
+        "  Go, adventurer! Grok the ends of your world.  "
+      ]
+    },
+    {
+      "level": 5,
+      "name": "paragraphs",
+      "line_count": 3,
+      "quote": [
+        "          { drifts back. } drifts on.           ",
+        "   Paragraphs breathe like the moonlit tide.    ",
+        "   At eagle's height, climb to a wider sight.   "
+      ]
+    },
+    {
+      "level": 6,
+      "name": "delete",
+      "line_count": 4,
+      "quote": [
+        "  d swallows, its appetite unending. dw, dl,    ",
+        "      dx if you count what you're rending.      ",
+        "      d$ and D, brothers of convenience.        ",
+        "  will down a line complete! It's genius.       "
+      ]
+    },
+    {
+      "level": 7,
+      "name": "echoes",
+      "line_count": 3,
+      "quote": [
+        "    d to slash. y to keep. p to paste anew.     ",
+        "       All are moves that help to keep          ",
+        "             the memory with you.               "
+      ]
+    },
+    {
+      "level": 8,
+      "name": "transformation",
+      "line_count": 2,
+      "quote": [
+        "         c can change one for a million,        ",
+        "                 s a single score.              ",
+        "           cc/C for a complete line,            ",
+        "             or ciw just one rune.              "
+      ]
+    },
+    {
+      "level": 9,
+      "name": "dot",
+      "line_count": 2,
+      "quote": [
+        "         . echoes your last whisper.            ",
+        "        Speak once, and spot the echo.          "
+      ]
+    },
+    {
+      "level": 10,
+      "name": "undo",
+      "line_count": 3,
+      "quote": [
+        "  u unwinds the thread. Ctrl-R weaves it back.  ",
+        "       Time bends softly within Vim,            ",
+        "     an amber thread, with endless slack.       "
+      ]
+    },
+    {
+      "level": 11,
+      "name": "visual",
+      "line_count": 3,
+      "quote": [
+        "        v, V, Ctrl-V: choose your frame.        ",
+        "        Hold the world in amber pause.          ",
+        "          Select, assess, then act.             "
+      ]
+    },
+    {
+      "level": 12,
+      "name": "insert",
+      "line_count": 4,
+      "quote": [
+        "    i inserts here. a appends to the rune.      ",
+        "   o below, O above—newlines for new runes.     ",
+        "I to insert where I begin, and A appends an end,",
+        "Esc return to normal, once all is done and said."
+      ]
+    },
+    {
+      "level": 13,
+      "name": "visual buffers",
+      "line_count": 3,
+      "quote": [
+        "     :ls lists all scrolls unrolled, and :e     ",
+        "     unscrolls anew; :bn to skip, :bp returns   ",
+        "           :bd to close like half a q.          "
+      ]
+    },
+    {
+      "level": 13,
+      "name": "settings",
+      "line_count": 3,
+      "quote": [
+        ":set to set a setting, try number for each line ",
+        "     :set nonumber if you decide against it!    ",
+        "           Your scroll is unmaligned.           "
+      ]
+    },
+    {
+      "level": 14,
+      "name": "search",
+      "line_count": 3,
+      "quote": [
+        "      / casts light forward. ? casts back.     ",
+        "      n to go again, or N to retrace back.     ",
+        "        :set hlsearch to light each one:       ",
+        "           light them from the black.          "
+      ]
+    },
+    {
+      "level": 15,
+      "name": "marks",
+      "line_count": 3,
+      "quote": [
+        "ma leaves a waystone hither. 'a lets you return",
+        "       pixel-perfect, where you desire         ",
+        "  waystones a-z glow wherever you left them,   ",
+        "       but what of <>, [], ., ^, and '??       ",
+        "     select, amend/yank, change, leap, see!    "
+      ]
+    },
+
+    {
+      "level": 15,
+      "name": "fFtT",
+      "line_count": 3,
+      "quote": [
+        "fx lands on a future rune. tx stops just before.",
+        "  Fx looks to the past. Tx stops just short.    ",
+        "Every target within grasp of the precise caster."
+      ]
+    },
+    {
+      "level": 16,
+      "name": "%",
+      "line_count": 2,
+      "quote": [
+        "           % finds the mirror rune.             ",
+        "          Every pair hums together.             "
+      ]
+    },
+    {
+      "level": 17,
+      "name": "substitute",
+      "line_count": 2,
+      "quote": [
+        "     :s shifts a shape. :%s shifts the world.   ",
+        "      Rewrite gently—the glass remembers.       "
+      ]
+    },
+    {
+      "level": 18,
+      "name": "macros",
+      "line_count": 3,
+      "quote": [
+        "       qa captures your rhythm. q stills it.    ",
+        "       @a plays it back like a looped tape.     ",
+        "       Motion stored to echo down the halls.    "
+      ]
+    },
+    {
+      "level": 19,
+      "name": "files",
+      "line_count": 3,
+      "quote": [
+        "           :e opens another chamber.            ",
+        "        :set number lights each step.           ",
+        "      Every file glows like a hidden room.      "
+      ]
+    },
+    {
+      "level": 0,
+      "name": "rhythm",
+      "line_count": 2,
+      "quote": [
+        "          Budget is breath. Par is pulse.       ",
+        "    Let the keystrokes flicker, not be rushed.  "
+      ]
+    },
+    {
+      "level": 0,
+      "name": "philosophy",
+      "line_count": 4,
+      "quote": [
+        "           Vim is posture, not tool.            ",
+        "           Clarity warms the hands.             ",
+        "        Hands stay. Mind wanders the map.       ",
+        "        Forget, remember—both are paths.        "
+      ]
+    },
+    {
+      "level": 0,
+      "name": "encouragement",
+      "line_count": 3,
+      "quote": [
+        "         Every mage began with hjkl.            ",
+        "     You’re not slow—you’re tuning the signal.  ",
+        "      The buffer awaits in warm, soft light.    "
+      ]
+    },
+    {
+      "level": 0,
+      "name": "closing",
+      "line_count": 4,
+      "quote": [
+        "     Avaunt, traveler! Keep your glow steady.   ",
+        "      The world is text. You are the light.     ",
+        "          Lost? Esc. Return to stillness.       ",
+        "               Rest at home row.                "
+      ]
+    }
+  ]
+}
+```
+

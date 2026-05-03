@@ -1,12 +1,16 @@
 """Title and save-select screen renderers (read-only; never mutate game state)."""
 from __future__ import annotations
+import json
+import random as _random
+from pathlib import Path
 from blessed import Terminal
 import render.colors as C
 import render.symbols as S
 from content.levels import LEVELS
 
-FRAME_W  = 80
-NAME_MAX = 20   # max adventurer name length
+FRAME_W      = 80
+NAME_MAX     = 20   # max adventurer name length
+_BOX_INNER_W = 48   # inner width of the wizard's quote box
 
 _LOGO = [
     '██╗   ██╗  ██╗  ███╗   ███╗  ███╗   ██╗  ██╗   ██╗',
@@ -27,12 +31,74 @@ _LOGO_COLORS = [
     lambda t: t.color_rgb(100, 75, 35),
 ]
 
-_WIZARD_PLAIN = [
-    '     ▲    ',
-    '    /█\\   ',
-    '   ( ⊙⊙)  ',
-    '    ╲█╱   ',
-]
+# ── Wizard wisdom quotes ────────────────────────────────────────────────────────
+
+_WISDOM_PATH = Path(__file__).parent.parent / 'art' / 'wizard_wisdom.txt'
+
+
+def _load_wisdom() -> list[dict]:
+    try:
+        text  = _WISDOM_PATH.read_text()
+        start = text.index('{')
+        end   = text.rindex('}') + 1
+        return json.loads(text[start:end])['levels']
+    except Exception:
+        return []
+
+
+_QUOTES: list[dict] = _load_wisdom()
+
+
+def select_quote(max_level: int) -> tuple[str, str, str, str]:
+    """Return 4 box-inner strings (each exactly _BOX_INNER_W chars) for the quote box."""
+    pool = [q for q in _QUOTES if q['level'] <= max_level] or _QUOTES
+    if not pool:
+        blank = ' ' * _BOX_INNER_W
+        return (blank, blank, blank, blank)
+    chosen = _random.choice(pool)
+    pad    = ' ' * _BOX_INNER_W
+    lines  = [l.ljust(_BOX_INNER_W)[:_BOX_INNER_W] for l in chosen['quote']]
+    if len(lines) >= 4:
+        return (lines[0], lines[1], lines[2], lines[3])
+    elif len(lines) == 3:
+        return (lines[0], lines[1], lines[2], pad)
+    elif len(lines) == 2:
+        return (pad, lines[0], lines[1], pad)
+    else:
+        return (pad, lines[0], pad, pad)
+
+
+_WIZARD_ART: tuple[str, ...] = (
+    '                                                                         k',
+    '                                                                        h',
+    '                                                                      j  l',
+    '                                                                    j     l',
+    ' ╔════════════════════════════════════════════════╗            ::jj         l',
+    ' ║ vim, vum!                                      ║        :wq               gg',
+    ' ║         h left, l right, j down, k up.         ║         :q     ^ ^      G',
+    ' ║ Arrow keys are a long road. Stay by the hearth.║          :w   0  0  $  e',
+    ' ║Each key a step. Conserve them like lantern oil.║               {        b',
+    ' ║    The cursor is your wand. Keep it steady.    ║              {  }     w',
+    ' ╚════════════════════════════════════════════════╝   a          y        yp',
+    '                                                       i       yy         p p',
+    '                                                        i      u        CTRL-R',
+    '                                                         i    u    u   C  -  V',
+    '                                                          i   A     :e i      i',
+    '                                                           I  o o    :e O    o o',
+    '                                                            :e :e      :e   :set',
+    '                                                             :set relativenumber',
+    '                                                             :set number / ? nn',
+    '                                                              n n        /     N',
+    '                                                             / /    ?   m{a-z)',
+    '                                                             f  f    F   F  tTt',
+    '                                                             (       %       )',
+    '                                                             :s/dungeon/FUN!/g',
+    '                                                            :%s/            /g',
+    '                                                             q               @',
+)
+_EYE_IDX   = 7       # 0-based index of the eye line in _WIZARD_ART
+_EYE_OPEN  = '0  0'
+_EYE_BLINK = '^  ^'
 
 MENU_ITEMS: list[tuple[str, str]] = [
     ('begin new journey', 'new'),
@@ -135,12 +201,15 @@ def _render_frame(term: Terminal, iw: int, content: list[str],
 def render_title(term: Terminal, cursor: int, has_save: bool,
                  cmd_line: str | None = None,
                  name_prompt: str | None = None,
-                 confirm_name: str | None = None) -> None:
+                 confirm_name: str | None = None,
+                 blink: bool = False,
+                 quote_lines: tuple[str, str, str, str] | None = None) -> None:
     """Main title screen.
 
     cmd_line     — when set, show ':' + cmd_line in the hint bar.
     name_prompt  — when set, replace wizard+menu with the name-input UI.
     confirm_name — when set, replace name-input with overwrite confirmation.
+    quote_lines  — 4 box-inner strings (48 chars each) for the wizard's quote.
     """
     iw  = _iw(term)
     rst = term.normal
@@ -199,25 +268,45 @@ def render_title(term: Terminal, cursor: int, has_save: bool,
         hint = 'Enter to begin · Esc to cancel'
 
     else:
-        # Wizard + menu — 8 rows: 4 wizard + 1 blank + 3 menu
-        cyan = term.color_rgb(55, 155, 175)
-        eyes = term.color_rgb(135, 200, 55)
+        # Wizard + menu
+        box_col  = term.color_rgb(200, 140, 30)    # amber box + wizard face
+        wiz_col = term.color_rgb(75,  156, 211)    # cyan robe (lines 11-25)
+        eye_col = term.color_rgb(75, 156, 211)     # carolina blue (eyes)
 
-        wiz_colored = [
-            cyan + _WIZARD_PLAIN[0] + rst,
-            cyan + '    /█\\   ' + rst,
-            cyan + '   ( ' + eyes + '⊙⊙' + rst + cyan + ')  ' + rst,
-            cyan + _WIZARD_PLAIN[3] + rst,
-        ]
-        wiz_hint = '~ the dungeons await ~'
+        _BOX_CLOSE_CHARS = frozenset('╗║╝')
+        _AMBER_CHARS     = frozenset('^${}')
+        _BLUE_CHARS      = frozenset('0')
+        bfg         = C.border_fg()
+        box_ref_len = len(_WIZARD_ART[4])
+        box_pad_l   = max(0, (iw - box_ref_len) // 2)
 
-        for i, (wp, wc) in enumerate(zip(_WIZARD_PLAIN, wiz_colored)):
-            if i == 2:
-                gap = '     '
-                content.append(centred(wp + gap + wiz_hint,
-                                       wc + gap + dim + wiz_hint + rst))
-            else:
-                content.append(centred(wp, wc))
+        for idx, line in enumerate(_WIZARD_ART):
+            # Split at the right-side closing border char so left stays amber
+            # and right side is coloured per-character
+            matches = [i for i, c in enumerate(line) if c in _BOX_CLOSE_CHARS]
+            split_idx = max(matches) if matches else -1
+            left  = line[:split_idx + 1] if split_idx >= 0 else ''
+            right = line[split_idx + 1:] if split_idx >= 0 else line
+            left  = line[:split_idx + 1]
+            right = line[split_idx + 1:]
+            # Substitute dynamic quote text into box content lines 6-9
+            if quote_lines is not None and 6 <= idx <= 9:
+                ql   = quote_lines[idx - 6]
+                left = ' ║' + ql + '║'
+            if idx == _EYE_IDX and blink:
+                right = right.replace(_EYE_OPEN, _EYE_BLINK)
+            colored_right = ''.join((eye_col if ch in _BLUE_CHARS else
+                box_col if ch in _AMBER_CHARS else
+                wiz_col) + ch
+                for ch in right
+            )
+            pad_r = max(0, iw - box_pad_l - len(line))
+            content.append(
+                bfg + S.BOX_V + rst +
+                ' ' * box_pad_l + box_col + left + colored_right + rst +
+                ' ' * pad_r +
+                bfg + S.BOX_V + rst
+            )
 
         content.append(blank())
 

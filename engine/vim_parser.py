@@ -6,7 +6,7 @@ from __future__ import annotations
 from engine.modes import Mode
 
 MOTIONS  = set('hjklwbeGg0^${}')
-OPERATORS = set('dycp')
+OPERATORS = set('dyc')
 COUNTS   = set('123456789')
 
 def parse(buf: str, mode: Mode) -> tuple[dict | None, str]:
@@ -102,6 +102,16 @@ def parse(buf: str, mode: Mode) -> tuple[dict | None, str]:
     if ch in 'DC':
         op = ch.lower()
         return {'type': 'operator', 'op': op, 'motion': '$', 'count': count_n}, buf[i+1:]
+
+    # p / P — paste (standalone commands, not operator+motion)
+    if ch == 'p':
+        return {'type': 'paste', 'before': False, 'count': count_n}, buf[i+1:]
+    if ch == 'P':
+        return {'type': 'paste', 'before': True, 'count': count_n}, buf[i+1:]
+
+    # s — substitute (cut in place, game-loop decides behaviour)
+    if ch == 's':
+        return {'type': 'substitute', 'count': count_n}, buf[i+1:]
 
     # Plain motion
     if ch in MOTIONS:

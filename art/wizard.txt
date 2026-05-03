@@ -1,0 +1,114 @@
+# Resting:
+                                                                         k
+                                                                        h
+                                                                      j  l
+                                                                    j     l
+ ╔════════════════════════════════════════════════╗            ::jj         l
+ ║ hum, hum...                                    ║        :wq               gg
+ ║         h left, l right, j down, k up.         ║         :q     ^ ^      G
+ ║ Arrow keys are a long road. Stay by the hearth.║          :w   0  0  $  e
+ ║Each key a step. Conserve them like lantern oil.║               {        b
+ ║    The cursor is your wand. Keep it steady.    ║              {  }     w
+ ╚════════════════════════════════════════════════╝   a          y        yp
+                                                       i       yy         p p
+                                                        i      u        CTRL-R
+                                                         i    u    u   C  -  V
+                                                          i   A     :e i      i
+                                                           I  o o    :e O    o o
+                                                            :e :e      :e   :set
+                                                             :set relativenumber
+                                                             :set number / ? nn
+                                                              n n        /     N
+                                                             / /    ?   m{a-z)
+                                                             f  f    F   F  tTt
+                                                             (       %       )
+                                                             :s/dungeon/FUN!/g
+                                                            :%s/            /g
+                                                             q               @
+
+# Blinking:
+        
+                                                                         k
+                                                                        h
+                                                                      j  l
+                                                                    j     l
+ ╔════════════════════════════════════════════════╗            ::jj         l
+ ║ hum, hum...                                    ║        :wq               gg
+ ║         h left, l right, j down, k up.         ║         :q     ^ ^      G
+ ║ Arrow keys are a long road. Stay by the hearth.║          :w   ^  ^  $  e
+ ║Each key a step. Conserve them like lantern oil.║               {        b
+ ║    The cursor is your wand. Keep it steady.    ║              {  }     w
+ ╚════════════════════════════════════════════════╝   a          y        yp
+                                                       i       yy         p p
+                                                        i      u        CTRL-R
+                                                         i    u    u   C  -  V
+                                                          i   A     :e i      i
+                                                           I  o o    :e O    o o
+                                                            :e :e      :e   :set
+                                                             :set relativenumber
+                                                             :set number / ? nn
+                                                              n n        /     N
+                                                             / /    ?   m{a-z)
+                                                             f  f    F   F  tTt
+                                                             (       %       )
+                                                             :s/dungeon/FUN!/g
+                                                            :%s/            /g
+                                                             q               @
+                                                                     
+# Blessing-0:
+        
+                    k
+                   h
+                 j  l
+               j     l
+          ::jj         l
+       :wq               gg
+        :q     ^ ^      G
+         :w   0  0  $  e
+             {        b
+            {  }     w
+      a     y        yp
+      i   yy         p p
+      i   u        CTRL-R
+      i  u    u   C  -  V
+      i  A     :e i      i
+      I  o o    :e O    o o
+       :e :e      :e   :set
+        :set relativenumber
+        :set number / ? nn
+         n n        /     N
+        / /    ?   m{a-z)
+        f  f    F   F  tTt
+        (       %       )
+        :s/dungeon/FUN!/g
+       :%s/            /g
+        q               @
+        
+# Blessing-end:
+        
+                    k
+                   h
+                 j  l
+               j     l
+          ::jj         l
+       :wq               gg
+        :q     ^ ^      G
+         :w   0  0  $  e
+             {        b
+            {  }     w
+            y        yp
+          yy         p p
+a         u        CTRL-R
+ i       u        C  -  V     u
+  ii     A        i      i  :e
+    iiI  o o       O    o o:e
+       :e :e      :e   :set
+        :set relativenumber
+        :set number / ? nn
+         n n        /     N
+        / /    ?   m{a-z)
+        f  f    F   F  tTt
+        (       %       )
+        :s/dungeon/FUN!/g
+       :%s/            /g
+        q               @

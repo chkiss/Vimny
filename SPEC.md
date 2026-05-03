@@ -491,7 +491,7 @@ The hint bar always reflects currently known commands.
 | 5 | The Hall of Rooms | `{ }` | No | Dungeon with many chambers; `{ }` jumps between rooms as paragraph boundaries; `hjkl` alone is too slow for inter-room puzzles |
 | 6 | The Sword Temple | `d{motion}` | **MAJOR** | First operator; `dl dw d$ dd D`; combat becomes meaningful |
 | 7 | The Echo Vaults | `y p` | No | Yank (absorb) and paste (deploy); duplication puzzles |
-| 8 | The Transformation Shrine | `c{motion}` | No | Change operator; enemy transformation puzzles |
+| 8 | The Transformation Shrine | `c{motion} s{motion}` | No | Change operator; enemy transformation puzzles |
 | 9 | The Temple of Repetition | `.` | **MAJOR** | Repeat; combo chaining; efficiency is the entire lesson |
 | 10 | The Timekeeper's Domain | `u Ctrl-R` | No | Undo/redo; temporal puzzles; budget-return mechanic taught explicitly |
 | 11 | The Sight Sanctum | `v V Ctrl-V` | No | Visual mode; freeze-and-scan puzzles |
@@ -680,8 +680,8 @@ The 6-row chrome layout is identical in both the dungeon view and the overworld,
 ┌──────────────────────────────────────────────────────────────────────────────┐
 │  ♥♥♥♥♥░░░░░  The Word Mines           -- NORMAL --   Budget: 8   Par: 6      │
 ├──────────────────────────────────────────────────────────────────────────────┤
-│    |123456789|123456789|123456789|123456789|123456789|123456789               │
-│    0         1         2         3         4         5                       │
+│     0         1         2         3         4         5                      │
+│     |123456789|123456789|123456789|123456789|123456789|1                     │
 │  1 ████████████████████████████████████████████████████                      │
 │  2 █  ∘∘∘  ···   ○○  @  ◦◦◦◦   ♟    ···  ○            █                      │
 │  3 █                                                  █                      │
@@ -759,8 +759,6 @@ If the player has found the **Relative Numbers scroll** (§8.2) and toggled `:se
 
 **`:q`**: If unsaved: prompts `Save before quitting? :w / :q! / cancel`. `:q!` force-quits without saving — teaches the `!` modifier.
 
-**Single save slot** for v1. Multiple slots are a future feature.
-
 ---
 
 ## 14. Open Questions / TBD
@@ -773,3 +771,36 @@ If the player has found the **Relative Numbers scroll** (§8.2) and toggled `:se
 | Town of Normalmode | TBD | NPC dialogue, shop inventory, side quests |
 | Named registers (`"a`–`"z`) | TBD | Whether registers have distinct game-mechanic meaning |
 
+---
+
+## Checklist
+
+- Title screen - Done
+- Dungeon level floors, corridors and doors - Done
+- Level 0 - Done
+- Level 1 - Done
+- Level 2 - Done
+- Level 3
+- Level 4
+- Level 5
+- Level 6
+- Level 7
+- Level 8
+- Level 9
+- Level 10
+- Level 11
+- Level 12
+- Level 13
+- Level 14
+- Level 15
+- Level 16
+- Level 17
+- Level 18
+- Level 19
+- Level 20
+- Music
+- Combat
+- Enemy 1
+- Boss dungeon
+- Boss 1
+- Chests

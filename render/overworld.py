@@ -14,12 +14,14 @@ def _iw(term: Terminal) -> int:
 
 
 def render_overworld(term: Terminal, player: Player, progress: dict,
-                     cursor_row: int, cmd_line: str | None = None) -> None:
+                     cursor_row: int, cmd_line: str | None = None,
+                     levels: list | None = None) -> None:
     """
     progress: {level_id (int): {'stars': int, 'complete': bool}}
-    cursor_row: index into LEVELS
+    cursor_row: index into levels (or LEVELS if not supplied)
     cmd_line: if not None, show command line in hint bar (command mode active)
     """
+    visible_levels = levels if levels is not None else LEVELS
     iw  = _iw(term)
     bfg = C.border_fg()
     rst = C.normal_fg()
@@ -69,11 +71,11 @@ def render_overworld(term: Terminal, player: Player, progress: dict,
     out.append(bfg + S.BOX_V + rst + C.hint_fg() + div + rst + bfg + S.BOX_V + rst)
 
     # Dungeon listing
-    for idx, level in enumerate(LEVELS):
+    for idx, level in enumerate(visible_levels):
         prog     = progress.get(level['id'], {})
         complete = prog.get('complete', False)
         stars    = prog.get('stars', 0)
-        unlocked = is_unlocked(level['id'], progress)
+        unlocked = is_unlocked(level['id'], progress, player.name)
 
         if complete:
             star_str  = '★' * stars + '☆' * (2 - stars)
@@ -101,7 +103,7 @@ def render_overworld(term: Terminal, player: Player, progress: dict,
         out.append(bfg + S.BOX_V + rst + colored + bfg + S.BOX_V + rst)
 
     # Fill remaining game-area rows
-    rows_used = len(header_lines) + 1 + len(LEVELS)  # header + divider + levels
+    rows_used = len(header_lines) + 1 + len(visible_levels)
     for _ in range(max(0, game_h - rows_used)):
         out.append(bfg + S.BOX_V + rst + ' ' * iw + bfg + S.BOX_V + rst)
 

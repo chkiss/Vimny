@@ -46,6 +46,7 @@ class Room:
     par: Optional[int]          = None
     seed: Optional[int]         = None
     fog_col: int                = -1   # columns >= fog_col are hidden; -1 = no fog
+    passable_walls: bool        = False  # if True, walls are walkable (editor mode)
 
     def cell(self, r: int, c: int) -> CellType:
         return self.cells[r][c]
@@ -53,6 +54,8 @@ class Room:
     def is_passable(self, r: int, c: int) -> bool:
         if r < 0 or r >= self.rows or c < 0 or c >= self.cols:
             return False
+        if self.passable_walls:
+            return True
         return self.cells[r][c] in (CellType.FLOOR, CellType.CORRIDOR)
 
     def entity_at(self, r: int, c: int) -> Optional[Entity]:

@@ -1,2 +1,5 @@
 __pycache__/
-
+.claude/
+.claudeignore
+CLAUDE.md
+*.swp

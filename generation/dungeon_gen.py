@@ -14,13 +14,21 @@ LEVEL_0_PLAN = [
     (RoomType.EXIT,   10, 16),
 ]
 
-_RUNE_KINDS = ['ancient', 'verdant', 'void', 'ember']
+_RUNE_KINDS      = ['ancient', 'verdant', 'void', 'ember']
+_WORD_RUNE_KINDS = ['ancient', 'verdant', 'ember']   # non-void only
 _RUNE_SYMS  = {
     'ancient': ('∘', '∘', '∘'),
     'verdant': ('·', '·', '·'),
     'void':    ('○', '○'),
     'ember':   ('◦', '◦', '◦', '◦'),
 }
+
+# ── Level 3 layout constants ──────────────────────────────────────────────────
+_L3_CORR_TOP_ROWS = (1, 4, 7, 10, 13)  # top row of each of the 5 corridors
+_L3_TOTAL_ROWS    = 16                  # rows 0-15
+_L3_TOTAL_COLS    = 48                  # cols 0-47
+_L3_CORR_LEFT     = 1
+_L3_CORR_RIGHT    = 46
 
 def _place_runes_in_room(composite, rng, col_offset, room_rows, room_cols,
                           total_rows, density):
@@ -584,5 +592,274 @@ def build_dungeon_2(seed: int) -> Dungeon:
     composite.fog_col = door_cols[0] + 1   # = 20
 
     dungeon.rooms    = [composite]
+    dungeon.current_room = 0
+    return dungeon
+
+
+# ── Level 3 helpers ───────────────────────────────────────────────────────────
+
+def _make_rune_corridor(composite, rng, row_top,
+                        col_start=None, col_end=None, density=0.65):
+    """Carve a 2-row CORRIDOR strip and fill it densely with non-void rune clusters.
+
+    Leaves a 1-cell buffer at each end so runes reach the turn-room entrance.
+    """
+    if col_start is None:
+        col_start = _L3_CORR_LEFT
+    if col_end is None:
+        col_end = _L3_CORR_RIGHT
+
+    for c in range(col_start, col_end + 1):
+        composite.cells[row_top][c]     = CellType.CORRIDOR
+        composite.cells[row_top + 1][c] = CellType.CORRIDOR
+
+    for row in (row_top, row_top + 1):
+        c = col_start + 1
+        while c <= col_end - 1:
+            if rng.random() < density:
+                kind  = rng.choice(_WORD_RUNE_KINDS)
+                syms  = _RUNE_SYMS[kind]
+                width = len(syms)
+                if c + width - 1 <= col_end:
+                    composite.runes.append(
+                        RuneCluster(row=row, col=c, symbols=syms, kind=kind))
+                    c += width + rng.randint(1, 2)
+                    continue
+            c += 1
+
+
+def _dijkstra_par_wbe(composite) -> int | None:
+    """Minimum-keystroke Dijkstra for Level 3: hjkl + w b e + count-hjkl.
+
+    w/b/e are row-scoped and each cost 1 keystroke.  Count-n h/j/k/l cost
+    len(str(n))+1, matching the existing budget model.  Void cells are never
+    chosen as landing targets; count motions may pass through them
+    (matching engine's final-cell-only void check).
+    """
+    from collections import defaultdict
+
+    entry = composite.entry
+    goal  = composite.exit_pos
+    max_n = max(composite.rows, composite.cols)
+
+    clusters_by_row: dict[int, list] = defaultdict(list)
+    for ru in composite.runes:
+        if ru.kind != 'void':
+            clusters_by_row[ru.row].append(ru)
+    for cls in clusters_by_row.values():
+        cls.sort(key=lambda ru: ru.col)
+
+    def _word_at(r, c):
+        ru = composite.rune_at(r, c)
+        return ru if (ru and ru.kind != 'void') else None
+
+    def _w(r, c):
+        cur = _word_at(r, c)
+        scan = (cur.col + len(cur.symbols)) if cur else c + 1
+        for ru in clusters_by_row.get(r, []):
+            if ru.col >= scan and composite.is_passable(r, ru.col):
+                return (r, ru.col)
+        return None
+
+    def _b(r, c):
+        cur = _word_at(r, c)
+        if cur and cur.col < c:
+            return (r, cur.col)
+        limit = cur.col if cur else c
+        for ru in reversed(clusters_by_row.get(r, [])):
+            if ru.col < limit and composite.is_passable(r, ru.col):
+                return (r, ru.col)
+        return None
+
+    def _e(r, c):
+        cur = _word_at(r, c)
+        if cur:
+            end = cur.col + len(cur.symbols) - 1
+            if end > c and composite.is_passable(r, end):
+                return (r, end)
+            scan = end + 1
+        else:
+            scan = c + 1
+        for ru in clusters_by_row.get(r, []):
+            if ru.col >= scan:
+                end = ru.col + len(ru.symbols) - 1
+                if composite.is_passable(r, end):
+                    return (r, end)
+        return None
+
+    dist = {entry: 0}
+    heap = [(0, entry)]
+
+    while heap:
+        cost, (r, c) = heapq.heappop(heap)
+        if (r, c) == goal:
+            return cost
+        if cost > dist.get((r, c), float('inf')):
+            continue
+
+        def _push(nb, mc=1):
+            if nb is None:
+                return
+            nr, nc = nb
+            if not composite.is_passable(nr, nc):
+                return
+            ru = composite.rune_at(nr, nc)
+            if ru and ru.kind == 'void':
+                return
+            g = cost + mc
+            if g < dist.get((nr, nc), float('inf')):
+                dist[(nr, nc)] = g
+                heapq.heappush(heap, (g, (nr, nc)))
+
+        # count h/j/k/l — void blocks landing but count can bypass (engine behaviour)
+        for dr, dc in ((-1, 0), (1, 0), (0, -1), (0, 1)):
+            for n in range(1, max_n + 1):
+                nr, nc = r + dr * n, c + dc * n
+                if not composite.is_passable(nr, nc):
+                    break
+                ru = composite.rune_at(nr, nc)
+                if ru and ru.kind == 'void':
+                    continue  # can't land here; larger n can bypass
+                mc = 1 if n == 1 else len(str(n)) + 1
+                _push((nr, nc), mc)
+
+        # w, b, e (cost 1 each)
+        _push(_w(r, c))
+        _push(_b(r, c))
+        _push(_e(r, c))
+
+    return None
+
+
+def build_dungeon_3(seed: int) -> Dungeon:
+    """The Rune Halls — teaches w b e (word motions over rune clusters).
+
+    Five 2-row rune corridors in a snake pattern:
+      C1 rows 1-2   left→right  (w efficient)
+      C2 rows 4-5   right→left  (b efficient)
+      C3 rows 7-8   left→right
+      C4 rows 10-11 right→left
+      C5 rows 13-14 left→right  (exit = last symbol of anchor rune → use e)
+
+    Turn rooms bridge adjacent corridors at alternating ends:
+      RT1 rows 2-4   cols 45-46  (void at middle row 3)
+      LT1 rows 5-7   cols 1-2   (void at middle row 6)
+      RT2 rows 8-10  cols 45-46  (void at middle row 9)
+      LT2 rows 11-13 cols 1-2   (void at middle row 12)
+
+    Rune clusters fill each corridor from col 2 to col 45 (1-cell margin).
+    Void clusters at each turn-room middle row block straight j/k traversal,
+    forcing count-j to skip them — reinforcing the level-2 count motion.
+    """
+    rng     = random.Random(seed)
+    dungeon = Dungeon(name='The Rune Halls', seed=seed)
+
+    cells = [[CellType.WALL] * _L3_TOTAL_COLS for _ in range(_L3_TOTAL_ROWS)]
+
+    composite = Room(room_type=RoomType.ENTRY,
+                     rows=_L3_TOTAL_ROWS, cols=_L3_TOTAL_COLS)
+    composite.cells = cells
+    composite.seed  = seed
+
+    # ── Carve turn rooms ──────────────────────────────────────────────────────
+    turn_spans = [
+        (2,  4,  45, 46),   # RT1
+        (5,  7,  1,  2),    # LT1
+        (8,  10, 45, 46),   # RT2
+        (11, 13, 1,  2),    # LT2
+    ]
+    for r0, r1, ca, cb in turn_spans:
+        for row in range(r0, r1 + 1):
+            cells[row][ca] = CellType.CORRIDOR
+            cells[row][cb] = CellType.CORRIDOR
+
+    # ── Carve and populate rune corridors (up to 20 attempts for valid par) ──
+    for _attempt in range(20):
+        composite.runes.clear()
+        rune_rng = random.Random(rng.randint(0, 2**31))
+
+        for row_top in _L3_CORR_TOP_ROWS:
+            _make_rune_corridor(composite, rune_rng, row_top)
+
+        # C5 exit area: clear auto-placed runes from cols 40-46, then anchor a
+        # fixed 3-symbol cluster whose last cell is the exit position.
+        composite.runes = [
+            ru for ru in composite.runes
+            if not (ru.row in (13, 14) and ru.col >= 40)
+        ]
+        composite.runes.append(
+            RuneCluster(row=13, col=42, symbols=('∘', '∘', '∘'), kind='ancient'))
+
+        composite.entry    = (1, 1)
+        composite.exit_pos = (13, 44)    # last symbol of anchor rune
+        composite.entities = [Entity(kind='exit', row=13, col=44)]
+
+        # Voids for turns and far end of exit
+        for mid_row, col in ((1,45),(2,45),(4,1),(5,1),(7,45),(8,45),(10,1),(11,1)):
+            composite.runes.append(
+                RuneCluster(row=mid_row, col=col, symbols=('○', '○'), kind='void'))
+        for mid_row, col in ((13,46),(14,46)):
+            composite.runes.append(
+                RuneCluster(row=mid_row, col=col, symbols=('○'), kind='void'))
+
+        par = _dijkstra_par_wbe(composite)
+        if par is not None:
+            break
+    else:
+        par = 80
+
+    composite.par    = par
+    composite.budget = math.ceil(par * 1.4)
+
+    dungeon.rooms        = [composite]
+    dungeon.current_room = 0
+    return dungeon
+
+
+def build_dungeon_dummy(seed: int) -> Dungeon:
+    """Admin editing sandbox — open room containing all editable element types."""
+    ROWS, COLS = 20, 62
+    dungeon = Dungeon(name='Dummy Dungeon', seed=seed)
+    cells   = [[CellType.WALL] * COLS for _ in range(ROWS)]
+
+    for r in range(1, ROWS - 1):
+        for c in range(1, COLS - 1):
+            cells[r][c] = CellType.FLOOR
+
+    # Demo wall strips so the admin can practice cutting/pasting walls
+    for c in range(8, 22):
+        cells[5][c] = CellType.WALL
+    for r in range(9, 16):
+        cells[r][38] = CellType.WALL
+
+    composite = Room(room_type=RoomType.ENTRY, rows=ROWS, cols=COLS)
+    composite.cells = cells
+    composite.seed  = seed
+
+    composite.entry    = (1, 1)
+    composite.exit_pos = (ROWS - 2, COLS - 2)
+
+    composite.entities = [
+        Entity(kind='entry_marker', row=1,        col=1),
+        Entity(kind='exit',         row=ROWS - 2, col=COLS - 2),
+        Entity(kind='door',         row=6,        col=30),
+        Entity(kind='door',         row=7,        col=30),
+    ]
+
+    composite.runes = [
+        RuneCluster(row=2,  col=3,  symbols=('∘', '∘', '∘'),      kind='ancient'),
+        RuneCluster(row=2,  col=8,  symbols=('·', '·', '·'),       kind='verdant'),
+        RuneCluster(row=2,  col=13, symbols=('○', '○'),            kind='void'),
+        RuneCluster(row=2,  col=17, symbols=('◦', '◦', '◦', '◦'), kind='ember'),
+        RuneCluster(row=8,  col=5,  symbols=('∘', '∘'),            kind='ancient'),
+        RuneCluster(row=8,  col=10, symbols=('·', '·'),            kind='verdant'),
+        RuneCluster(row=12, col=15, symbols=('◦', '◦', '◦'),       kind='ember'),
+        RuneCluster(row=15, col=45, symbols=('∘', '∘', '∘'),       kind='ancient'),
+    ]
+
+    composite.par            = None
+    composite.budget         = 99999
+    composite.passable_walls = True
+    dungeon.rooms            = [composite]
     dungeon.current_room = 0
     return dungeon

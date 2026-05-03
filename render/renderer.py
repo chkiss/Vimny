@@ -135,6 +135,8 @@ def render_all(term: Terminal, dungeon: Dungeon, player: Player,
                     elif ent.kind == 'wanderer':
                         efg = C.enemy_frozen() if mode == Mode.VISUAL else C.enemy_fg()
                         line += floor_bg + efg + S.ENEMY_WANDERER + C.normal_fg()
+                    elif ent.kind == 'entry_marker':
+                        line += floor_bg + C.hint_fg() + S.PLAYER + C.normal_fg()
                     else:
                         line += floor_bg + '?' + C.normal_fg()
                     continue
@@ -168,7 +170,9 @@ def render_all(term: Terminal, dungeon: Dungeon, player: Player,
                       ' ' * max(0, term.width - len(cmd_text)) + rst)
     else:
         known = player.known_commands
-        if 'count' in known:
+        if 'editor' in known:
+            hint_text = 'x:cut  s:wall-toggle  dd/yy:cut/yank-row  d/y{m}:range  p/P:paste  :q quit'
+        elif 'count' in known:
             hint_text = '[N]hjkl:count-move  0:line-start  ^:first-rune  $:end  x:open  :w save  :q quit'
         elif '$' in known:
             hint_text = 'hjkl:move  0:line-start  ^:first-rune  $:end  :w save  :q quit'
