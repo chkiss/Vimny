@@ -84,8 +84,8 @@ def render_all(term: Terminal, dungeon: Dungeon, player: Player,
     output.append(border_h(S.BOX_LT, S.BOX_RT))
 
     # ── Game area ─────────────────────────────────────────────────────────
-    # 6 chrome rows: top_border, status, top_sep, bot_sep, hint, bot_border
-    game_h  = term.height - 6
+    # 7 rows: top_border, status, top_sep, [game_h rows], statusline, bot_sep, hint, bot_border
+    game_h  = term.height - 7
     room_display_rows = min(room.rows, game_h)
     room_display_cols = min(room.cols, iw)
 
@@ -160,27 +160,74 @@ def render_all(term: Terminal, dungeon: Dungeon, player: Player,
         line += bfg + S.BOX_V + rst
         output.append(line)
 
-    # ── Bottom separator ───────────────────────────────────────────────────
-    output.append(border_h(S.BOX_LT, S.BOX_RT))
+    # ── Vim statusline / command line ─────────────────────────────────────
+    pos_str  = f'{player.row + 1},{player.col + 1}'
 
-    # ── Hint / command bar ─────────────────────────────────────────────────
-    if mode == Mode.COMMAND:
-        cmd_text = ':' + player.cmd_line
-        output.append(C.mode_command() + cmd_text +
-                      ' ' * max(0, term.width - len(cmd_text)) + rst)
+    if room.rows <= game_h:
+        scroll = 'All'
+    elif vr_start == 0:
+        scroll = 'Top'
+    elif vr_start + game_h >= room.rows:
+        scroll = 'Bot'
     else:
-        known = player.known_commands
-        if 'editor' in known:
-            hint_text = 'x:cut  s:wall-toggle  dd/yy:cut/yank-row  d/y{m}:range  p/P:paste  :q quit'
-        elif 'count' in known:
-            hint_text = '[N]hjkl:count-move  0:line-start  ^:first-rune  $:end  x:open  :w save  :q quit'
-        elif '$' in known:
-            hint_text = 'hjkl:move  0:line-start  ^:first-rune  $:end  :w save  :q quit'
+        pct    = int((vr_start + game_h // 2) / room.rows * 100)
+        scroll = f'{pct}%'
+
+    sl_bg  = C.statusline_bg()
+    sl_fg  = C.statusline_fg()
+    sl_w   = iw + 2
+
+    if player.error:
+        # Vim-style error: red background, white text
+        err_pad = max(0, sl_w - len(player.error) - 1)
+        output.append(C.error_bg() + C.error_fg() + ' ' + player.error +
+                      ' ' * err_pad + rst)
+    elif mode == Mode.COMMAND:
+        # Command line: show typed command flush-left, no ruler
+        cmd_text = ':' + player.cmd_line
+        sl_pad   = max(0, sl_w - len(cmd_text))
+        output.append(sl_bg + C.mode_command() + cmd_text +
+                      sl_fg + ' ' * sl_pad + rst)
+    else:
+        # Statusline: mode label left, position+scroll right
+        sl_label = MODE_LABELS[mode]
+        if mode == Mode.NORMAL:
+            sl_mode_color = C.mode_normal()
+        elif mode == Mode.INSERT:
+            sl_mode_color = C.mode_insert()
         else:
-            hint_text = 'h/j/k/l:move  :w save  :q quit  :q! force-quit'
-        hint = C.hint_fg() + hint_text + rst
-        output.append(bfg + S.BOX_V + rst + hint +
-                      ' ' * max(0, iw - len(hint_text)) + bfg + S.BOX_V + rst)
+            sl_mode_color = C.mode_visual()
+        sl_right = f'{pos_str}   {scroll} '
+        sl_mid   = max(0, sl_w - len(sl_label) - 2 - len(sl_right))
+        output.append(sl_bg + sl_mode_color + ' ' + sl_label + ' ' +
+                      sl_bg + sl_fg + ' ' * sl_mid + sl_right + rst)
+
+    # ── Bottom separator (answer sheet for admin) ─────────────────────────
+    if room.answer:
+        ans_text = f' ▸ {room.answer}'
+        ans_pad  = max(0, iw - len(ans_text))
+        output.append(bfg + S.BOX_LT + rst +
+                      C.budget_ok() + ans_text[:iw] + rst +
+                      ' ' * ans_pad +
+                      bfg + S.BOX_RT + rst)
+    else:
+        output.append(border_h(S.BOX_LT, S.BOX_RT))
+
+    # ── Hint bar ──────────────────────────────────────────────────────────
+    known = player.known_commands
+    if 'editor' in known:
+        hint_text = 'x:cut  s:wall-toggle  dd/yy:cut/yank-row  d/y{m}:range  p/P:paste  :q quit'
+    elif 'count' in known:
+        hint_text = '[N]hjkl:count-move  0:line-start  ^:first-rune  $:end  x:open  :w save  :q quit'
+    elif '$' in known:
+        hint_text = 'hjkl:move  0:line-start  ^:first-rune  $:end  :w save  :q quit'
+    else:
+        hint_text = 'h/j/k/l:move  :w save  :q quit  :q! force-quit'
+    if 'admin' in known:
+        hint_text += '  :e refresh'
+    hint = C.hint_fg() + hint_text + rst
+    output.append(bfg + S.BOX_V + rst + hint +
+                  ' ' * max(0, iw - len(hint_text)) + bfg + S.BOX_V + rst)
 
     # ── Bottom border ──────────────────────────────────────────────────────
     output.append(border_h(S.BOX_BL, S.BOX_BR))
@@ -189,6 +236,6 @@ def render_all(term: Terminal, dungeon: Dungeon, player: Player,
 
     # ── Message overlay (last row of game area, printed separately) ────────
     if message:
-        msg_row = term.height - 4
+        msg_row = term.height - 5
         print(term.move_yx(msg_row, 1) + C.budget_low() + _pad(message, iw) + rst,
               end='', flush=True)

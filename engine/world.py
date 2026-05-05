@@ -47,6 +47,7 @@ class Room:
     seed: Optional[int]         = None
     fog_col: int                = -1   # columns >= fog_col are hidden; -1 = no fog
     passable_walls: bool        = False  # if True, walls are walkable (editor mode)
+    answer: str                 = ''     # keystroke solution shown to admin
 
     def cell(self, r: int, c: int) -> CellType:
         return self.cells[r][c]

@@ -38,3 +38,8 @@ def mode_command():  return _term.white
 def hint_fg():       return _term.color_rgb(90, 90, 90)
 def border_fg():     return _term.color_rgb(80, 80, 100)
 def normal_fg():     return _term.normal
+
+def statusline_bg(): return _term.on_color_rgb(40, 40, 55)
+def statusline_fg(): return _term.color_rgb(180, 180, 200)
+def error_bg():      return _term.on_color_rgb(180, 30, 30)
+def error_fg():      return _term.bright_white

@@ -50,7 +50,7 @@ def render_overworld(term: Terminal, player: Player, progress: dict,
     out.append(border_h(S.BOX_LT, S.BOX_RT))
 
     # ── Game area ────────────────────────────────────────────────────────────
-    game_h = term.height - 6
+    game_h = term.height - 7
 
     # netrw-style header
     header_lines = [
@@ -107,20 +107,36 @@ def render_overworld(term: Terminal, player: Player, progress: dict,
     for _ in range(max(0, game_h - rows_used)):
         out.append(bfg + S.BOX_V + rst + ' ' * iw + bfg + S.BOX_V + rst)
 
+    # ── Vim statusline / command line ─────────────────────────────────────────
+    sl_w  = iw + 2
+    sl_bg = C.statusline_bg()
+    sl_fg = C.statusline_fg()
+
+    if player.error:
+        err_pad = max(0, sl_w - len(player.error) - 1)
+        out.append(C.error_bg() + C.error_fg() + ' ' + player.error +
+                   ' ' * err_pad + rst)
+    elif cmd_line is not None:
+        cmd_text = ':' + cmd_line
+        sl_pad   = max(0, sl_w - len(cmd_text))
+        out.append(sl_bg + C.mode_command() + cmd_text +
+                   sl_fg + ' ' * sl_pad + rst)
+    else:
+        sl_label = '-- OVERWORLD --'
+        sl_right = f'{cursor_row + 1}/{len(visible_levels)} '
+        sl_mid   = max(0, sl_w - len(sl_label) - 2 - len(sl_right))
+        out.append(sl_bg + C.mode_normal() + ' ' + sl_label + ' ' +
+                   sl_bg + sl_fg + ' ' * sl_mid + sl_right + rst)
+
     # ── Bottom separator ──────────────────────────────────────────────────────
     out.append(border_h(S.BOX_LT, S.BOX_RT))
 
-    # ── Hint / command bar ────────────────────────────────────────────────────
-    if cmd_line is not None:
-        cmd_text = ':' + cmd_line
-        out.append(C.mode_command() + cmd_text +
-                   ' ' * max(0, term.width - len(cmd_text)) + rst)
-    else:
-        hint_text = 'j/k:navigate  Enter:open dungeon  :q quit'
-        out.append(bfg + S.BOX_V + rst +
-                   C.hint_fg() + hint_text + rst +
-                   ' ' * max(0, iw - len(hint_text)) +
-                   bfg + S.BOX_V + rst)
+    # ── Hint bar ──────────────────────────────────────────────────────────────
+    hint_text = 'j/k:navigate  Enter:open dungeon  :q quit'
+    out.append(bfg + S.BOX_V + rst +
+               C.hint_fg() + hint_text + rst +
+               ' ' * max(0, iw - len(hint_text)) +
+               bfg + S.BOX_V + rst)
 
     # ── Bottom border ─────────────────────────────────────────────────────────
     out.append(border_h(S.BOX_BL, S.BOX_BR))

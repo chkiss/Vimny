@@ -335,18 +335,6 @@ def _known_commands(level: int) -> list:
     return cmds
 
 
-def _admin_hint(level: int, room) -> str:
-    par_str = f'par={room.par}  budget={room.budget}'
-    strategies = {
-        0: 'l across rooms  j/k between rows  avoid void',
-        1: '$ to corridor end  j/k to turn  ^ to first rune',
-        2: 'count-l past doors  x to open',
-        3: 'w across corridor  2j/2k at turns  b back',
-    }
-    strategy = strategies.get(level, '')
-    return f'[ADMIN] {par_str}  {strategy}' if strategy else f'[ADMIN] {par_str}'
-
-
 def _hint_bar(known: list) -> str:
     if 'w' in known:
         return 'w:next-word  b:prev-word  e:end-word  [N]hjkl  :w save  :q quit'
@@ -506,14 +494,18 @@ def run_dungeon(term: Terminal, level: int, progress: dict,
                 player_name: str = 'Normand') -> dict:
     """Run one dungeon level.
 
-    Returns {'won': bool, 'stars': int, 'action': 'wq'|'quit'|'force_quit'}.
+    Returns {'won': bool, 'stars': int, 'action': 'wq'|'quit'}.
     """
     seed    = random.randint(0, 2**31)
     dungeon = _build_dungeon(level, seed)
     room    = dungeon.room
+    if player_name != 'admin':
+        room.answer = ''
 
     player  = Player(row=room.entry[0], col=room.entry[1])
     player.known_commands = _known_commands(level)
+    if player_name == 'admin':
+        player.known_commands = player.known_commands + ['admin']
     budget  = Budget(room.budget or 20)
 
     key_buf  = ''
@@ -523,6 +515,7 @@ def run_dungeon(term: Terminal, level: int, progress: dict,
     redo_stack: list[tuple[int, int, int]] = []
     count_tutorial_shown = False
     at_exit  = False   # player has stepped on the exit at some point
+    last_saved_stars = progress.get(level, {}).get('stars', 0)
     won      = False   # win animation has been triggered
 
     if level == 1:
@@ -540,17 +533,19 @@ def run_dungeon(term: Terminal, level: int, progress: dict,
     while True:
         key = term.inkey(timeout=0.1)
 
-        if msg_ttl > 0:
+        if player.is_dead:
+            message = '** GAME OVER ** Type  :e  to re-load the dungeon.'
+            msg_ttl = 2
+        elif msg_ttl > 0:
             msg_ttl -= 1
             if msg_ttl == 0:
-                if player_name == 'admin':
-                    message = _admin_hint(level, room)
-                    msg_ttl = -1
-                else:
-                    message = ''
+                message = ''
 
         if not key:
+            render_all(term, dungeon, player, budget, message)
             continue
+
+        player.error = ''   # clear any statusline error on the next keypress
 
         # ── Command mode ──────────────────────────────────────────────────────
         if player.mode == Mode.COMMAND:
@@ -568,6 +563,7 @@ def run_dungeon(term: Terminal, level: int, progress: dict,
                         prev  = progress.get(level, {}).get('stars', 0)
                         progress[level] = {'complete': True,
                                            'stars': max(stars, prev)}
+                        last_saved_stars = max(stars, last_saved_stars)
                     SM.save_progress(progress, player_name)
                     message = 'Saved.'
                     msg_ttl = 30
@@ -578,10 +574,33 @@ def run_dungeon(term: Terminal, level: int, progress: dict,
 
                 elif cmd == 'q':
                     stars = _calc_stars(won, budget, room)
-                    return {'won': won, 'stars': stars, 'action': 'quit'}
+                    if (player_name != 'admin'
+                            and won and stars > last_saved_stars):
+                        player.error = 'E37: No write since last change (add ! to override)'
+                    else:
+                        return {'won': won, 'stars': stars, 'action': 'quit'}
 
                 elif cmd == 'q!':
-                    return {'won': False, 'stars': 0, 'action': 'force_quit'}
+                    return {'won': False, 'stars': 0, 'action': 'quit'}
+
+                elif cmd == 'e' and (player_name == 'admin' or player.is_dead):
+                    seed    = random.randint(0, 2**31)
+                    dungeon = _build_dungeon(level, seed)
+                    room    = dungeon.room
+                    if player_name != 'admin':
+                        room.answer = ''
+                    player  = Player(row=room.entry[0], col=room.entry[1])
+                    player.known_commands = _known_commands(level)
+                    if player_name == 'admin':
+                        player.known_commands = player.known_commands + ['admin']
+                    budget  = Budget(room.budget or 20)
+                    undo_stack.clear()
+                    redo_stack.clear()
+                    key_buf  = ''
+                    at_exit  = False
+                    won      = False
+                    message  = 'Dungeon restarted. Good luck.' if player_name != 'admin' else 'New dungeon loaded.'
+                    msg_ttl  = 30
 
                 else:
                     message = f'Unknown command: :{cmd}'
@@ -609,6 +628,12 @@ def run_dungeon(term: Terminal, level: int, progress: dict,
             render_all(term, dungeon, player, budget, message)
             continue
 
+        # Dead players may only enter command mode to type :e
+        if player.is_dead and not (action['type'] == 'enter_mode'
+                                   and action.get('mode') == 'command'):
+            render_all(term, dungeon, player, budget, message)
+            continue
+
         prev_pos = (player.row, player.col, budget.spent)
 
         if action['type'] == 'motion':
@@ -618,6 +643,12 @@ def run_dungeon(term: Terminal, level: int, progress: dict,
 
             if count > 1 and 'count' not in player.known_commands:
                 message = "You haven't learned count motions yet."
+                msg_ttl = 20
+                render_all(term, dungeon, player, budget, message)
+                continue
+
+            if motion in ('G', 'gg') and 'G' not in player.known_commands and 'admin' not in player.known_commands:
+                message = "You haven't learned G/gg yet."
                 msg_ttl = 20
                 render_all(term, dungeon, player, budget, message)
                 continue
@@ -637,7 +668,7 @@ def run_dungeon(term: Terminal, level: int, progress: dict,
                 ru = room.rune_at(player.row, player.col)
                 if ru and ru.kind == 'void':
                     iw    = _iw(term)
-                    game_h = term.height - 6
+                    game_h = term.height - 7
                     vr_start = max(0, min(player.row - game_h // 2, room.rows - game_h))
                     vc_start = max(0, min(player.col - iw  // 2,    room.cols - iw))
                     scr_r    = player.row - vr_start + 3
@@ -647,25 +678,8 @@ def run_dungeon(term: Terminal, level: int, progress: dict,
                     player.take_damage()
                     player.row, player.col = prev_pos[0], prev_pos[1]
                     if player.is_dead:
-                        message = '** GAME OVER ** You ran out of hearts. Press r to restart.'
-                        render_all(term, dungeon, player, budget, message)
-                        while True:
-                            k = term.inkey(timeout=None)
-                            if k and str(k) == 'r':
-                                break
-                        seed    = random.randint(0, 2**31)
-                        dungeon = _build_dungeon(level, seed)
-                        room    = dungeon.room
-                        player  = Player(row=room.entry[0], col=room.entry[1])
-                        player.known_commands = _known_commands(level)
-                        budget  = Budget(room.budget or 80)
-                        undo_stack.clear()
-                        redo_stack.clear()
-                        key_buf = ''
-                        at_exit = False
-                        won     = False
-                        message = 'Dungeon restarted. Good luck.'
-                        msg_ttl = 20
+                        message = '** GAME OVER ** Type  :e  to re-load the dungeon.'
+                        msg_ttl = 2
                     else:
                         message = f'You fell into the void!  ({player.hp} ♥ remaining)'
                         msg_ttl = 25
@@ -694,15 +708,19 @@ def run_dungeon(term: Terminal, level: int, progress: dict,
                 player.mode     = Mode.COMMAND
                 player.cmd_line = ''
             elif m == 'insert':
-                message = 'INSERT mode — not needed yet. Press Esc.'
-                player.mode = Mode.INSERT
-                msg_ttl = 20
-            elif m == 'visual':
-                player.mode = Mode.VISUAL
-            elif m == 'visual_line':
-                player.mode = Mode.VISUAL_LINE
-            elif m == 'visual_block':
-                player.mode = Mode.VISUAL_BLOCK
+                if 'insert' in player.known_commands or 'admin' in player.known_commands:
+                    player.mode = Mode.INSERT
+                else:
+                    message = 'INSERT mode not learned yet.'
+                    msg_ttl = 20
+            elif m in ('visual', 'visual_line', 'visual_block'):
+                if 'visual' in player.known_commands or 'admin' in player.known_commands:
+                    player.mode = {'visual': Mode.VISUAL,
+                                   'visual_line': Mode.VISUAL_LINE,
+                                   'visual_block': Mode.VISUAL_BLOCK}[m]
+                else:
+                    message = 'VISUAL mode not learned yet.'
+                    msg_ttl = 20
 
         elif action['type'] == 'undo':
             if undo_stack:
@@ -1126,7 +1144,8 @@ def run_overworld(term: Terminal, player: Player, progress: dict) -> dict:
                 cmd_line = cmd_line[:-1]
             else:
                 cmd_line += str(key)
-            render_overworld(term, player, progress, cursor_row, cmd_line)
+            render_overworld(term, player, progress, cursor_row,
+                             cmd_line if cmd_active else None, levels=visible)
             continue
 
         # ── Navigation ────────────────────────────────────────────────────────
@@ -1204,9 +1223,6 @@ def main():
                 }
                 SM.save_progress(progress, player.name)
 
-            # :q! from inside a dungeon exits the whole game
-            if dung_result['action'] == 'force_quit':
-                break
 
 
 if __name__ == '__main__':

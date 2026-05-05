@@ -5,6 +5,40 @@ from collections import deque
 from engine.world import Dungeon, Room, RoomType, CellType, RuneCluster, Entity
 from generation.room_gen import make_room
 
+_DIR_CHAR = {(-1, 0): 'k', (1, 0): 'j', (0, -1): 'h', (0, 1): 'l'}
+
+
+def _join_path(prev: dict, goal, merge_single: bool = True) -> str:
+    """Reconstruct path from predecessor dict and return space-joined keystrokes.
+
+    merge_single=True: compress consecutive single hjkl labels (e.g. 'l l l' → '3l').
+    merge_single=False: labels already include counts; just join them.
+    """
+    labels: list[str] = []
+    node = goal
+    while prev.get(node) is not None:
+        parent, lbl = prev[node]
+        labels.append(lbl)
+        node = parent
+    labels.reverse()
+    if not merge_single:
+        return ' '.join(labels)
+    result: list[str] = []
+    i = 0
+    while i < len(labels):
+        lbl = labels[i]
+        if lbl in ('h', 'j', 'k', 'l'):
+            j = i + 1
+            while j < len(labels) and labels[j] == lbl:
+                j += 1
+            n = j - i
+            result.append(f'{n}{lbl}' if n > 1 else lbl)
+            i = j
+        else:
+            result.append(lbl)
+            i += 1
+    return ' '.join(result)
+
 # ── Level plans ───────────────────────────────────────────────────────────────
 
 # Level 0: Entry → Puzzle → Exit  (hjkl only)
@@ -16,12 +50,18 @@ LEVEL_0_PLAN = [
 
 _RUNE_KINDS      = ['ancient', 'verdant', 'void', 'ember']
 _WORD_RUNE_KINDS = ['ancient', 'verdant', 'ember']   # non-void only
-_RUNE_SYMS  = {
-    'ancient': ('∘', '∘', '∘'),
-    'verdant': ('·', '·', '·'),
-    'void':    ('○', '○'),
-    'ember':   ('◦', '◦', '◦', '◦'),
+_RUNE_CHAR = {
+    'ancient': '∘',
+    'verdant': '·',
+    'void':    '○',
+    'ember':   '◦',
 }
+
+def _make_rune_syms(rng, kind: str) -> tuple:
+    max_len = 2 if kind == 'void' else 7
+    min_len = 1 if kind == 'verdant' else 2
+    ch = _RUNE_CHAR[kind]
+    return tuple(ch for _ in range(rng.randint(min_len,max_len)))
 
 # ── Level 3 layout constants ──────────────────────────────────────────────────
 _L3_CORR_TOP_ROWS = (1, 4, 7, 10, 13)  # top row of each of the 5 corridors
@@ -34,24 +74,30 @@ def _place_runes_in_room(composite, rng, col_offset, room_rows, room_cols,
                           total_rows, density):
     """Scatter rune clusters inside one room of the composite grid."""
     row_offset = (total_rows - room_rows) // 2
+    col_end = col_offset + room_cols - 2
     for r in range(row_offset + 1, row_offset + room_rows - 1):
         c = col_offset + 2
-        while c < col_offset + room_cols - 2:
+        while c < col_end:
             if rng.random() < density:
                 kind = rng.choice(_RUNE_KINDS)
-                syms = _RUNE_SYMS[kind]
-                width = len(syms)
-                if c + width <= col_offset + room_cols - 2:
-                    composite.runes.append(
-                        RuneCluster(row=r, col=c, symbols=syms, kind=kind))
-                    c += width + rng.randint(1, 3)
+                placed = False
+                for _ in range(2):  # one retry for long runes at end
+                    syms = _make_rune_syms(rng, kind)
+                    width = len(syms)
+                    if c + width <= col_end:
+                        composite.runes.append(
+                            RuneCluster(row=r, col=c, symbols=syms, kind=kind))
+                        c += width + rng.randint(1, 3)
+                        placed = True
+                        break
+                if placed:
                     continue
             c += 1
 
 
-def _bfs_par(composite):
+def _bfs_par(composite, return_path: bool = False):
     """Shortest path entry→exit treating void rune cells as impassable.
-    Returns the keystroke count, or None if the exit is unreachable."""
+    Returns cost, or (cost, path_str) when return_path=True."""
     void_cells = {
         (ru.row, ru.col + i)
         for ru in composite.runes if ru.kind == 'void'
@@ -60,16 +106,22 @@ def _bfs_par(composite):
     entry = composite.entry
     goal  = composite.exit_pos
     dist  = {entry: 0}
+    prev  = {entry: None}
     q     = deque([entry])
     while q:
         r, c = q.popleft()
         if (r, c) == goal:
+            if return_path:
+                return dist[goal], _join_path(prev, goal, merge_single=False)
             return dist[goal]
         for dr, dc in ((-1, 0), (1, 0), (0, -1), (0, 1)):
             nb = (r + dr, c + dc)
             if nb not in dist and composite.is_passable(*nb) and nb not in void_cells:
                 dist[nb] = dist[(r, c)] + 1
+                prev[nb] = ((r, c), _DIR_CHAR[(dr, dc)])
                 q.append(nb)
+    if return_path:
+        return None, ''
     return None
 
 # Level 2: Entry → Puzzle → Exit  ([count] prefix with hjkl + ^$0)
@@ -114,7 +166,7 @@ def _dijkstra_par_count(composite) -> int | None:
     return None
 
 
-def _dijkstra_par_level2(composite, door_cols: list) -> int | None:
+def _dijkstra_par_level2(composite, door_cols: list, return_path: bool = False):
     """Full state-space Dijkstra for Level 2.
 
     State: (row, col, closed_mask) — bit i set means door_cols[i] is still closed.
@@ -151,29 +203,36 @@ def _dijkstra_par_level2(composite, door_cols: list) -> int | None:
 
     start = (entry[0], entry[1], all_closed)
     dist  = {start: 0}
+    prev  = {start: None}
     heap  = [(0, start)]
 
     while heap:
         cost, (r, c, closed) = heapq.heappop(heap)
         if (r, c) == goal:
+            if return_path:
+                return cost, _join_path(prev, (r, c, closed), merge_single=False)
             return cost
         if cost > dist.get((r, c, closed), float('inf')):
             continue
 
-        def push(nr, nc, nc2, mc):
+        def push(nr, nc, nc2, mc, lbl=''):
             ns = (nr, nc, nc2)
             g  = cost + mc
             if g < dist.get(ns, float('inf')):
                 dist[ns] = g
+                prev[ns] = ((r, c, closed), lbl)
                 heapq.heappush(heap, (g, ns))
 
         # count h/j/k/l — stop at wall or fog
         for dr, dc in ((-1, 0), (1, 0), (0, -1), (0, 1)):
+            ch = _DIR_CHAR[(dr, dc)]
             for step in range(1, max_n + 1):
                 nr, nc = r + dr * step, c + dc * step
                 if not composite.is_passable(nr, nc) or fog_blocks_col(nc, closed):
                     break
-                push(nr, nc, closed, 1 if step == 1 else len(str(step)) + 1)
+                mc  = 1 if step == 1 else len(str(step)) + 1
+                lbl = ch if step == 1 else f'{step}{ch}'
+                push(nr, nc, closed, mc, lbl)
 
         # $ — rightward to nearest wall/fog
         best = None
@@ -182,7 +241,7 @@ def _dijkstra_par_level2(composite, door_cols: list) -> int | None:
                 break
             best = nc
         if best is not None:
-            push(r, best, closed, 1)
+            push(r, best, closed, 1, '$')
 
         # 0 — leftward to nearest wall
         left = c
@@ -191,7 +250,7 @@ def _dijkstra_par_level2(composite, door_cols: list) -> int | None:
                 break
             left = nc
         if left != c:
-            push(r, left, closed, 1)
+            push(r, left, closed, 1, '0')
 
         # ^ — leftmost rune in wall/fog-bounded segment
         lb = c
@@ -210,13 +269,15 @@ def _dijkstra_par_level2(composite, door_cols: list) -> int | None:
                 tgt = nc
                 break
         if tgt != c:
-            push(r, tgt, closed, 1)
+            push(r, tgt, closed, 1, '^')
 
         # x — open door at current cell (player stays put)
         for i in range(n):
             if (closed >> i) & 1 and (r, c) in trigger[i]:
-                push(r, c, closed ^ (1 << i), 1)
+                push(r, c, closed ^ (1 << i), 1, 'x')
 
+    if return_path:
+        return None, ''
     return None
 
 
@@ -292,6 +353,13 @@ def build_dungeon_0(seed: int) -> Dungeon:
         # Hard-coded void guards: block (2, ex_c) and (3, ex_c) so the player
         # cannot walk straight up from the corridor to the exit.  They must go
         # right into Room 2, up to row 1, then press h to reach the exit.
+        # Remove any random rune that would shadow these hard-coded voids.
+        for void_row in (2, 3):
+            composite.runes = [
+                ru for ru in composite.runes
+                if not (ru.row == void_row
+                        and ru.col <= ex_c < ru.col + len(ru.symbols))
+            ]
         composite.runes.append(RuneCluster(row=2, col=ex_c, symbols=('○',), kind='void'))
         composite.runes.append(RuneCluster(row=3, col=ex_c, symbols=('○',), kind='void'))
 
@@ -306,15 +374,16 @@ def build_dungeon_0(seed: int) -> Dungeon:
             )
         ]
 
-        par = _bfs_par(composite)
+        par, path = _bfs_par(composite, return_path=True)
         if par is not None:
             break
     else:
-        par = 100  # should never happen at these densities
+        par, path = 100, ''
 
     # Budget: ceil(par × 1.4) per spec formula.
     composite.par    = par
     composite.budget = math.ceil(par * 1.4)
+    composite.answer = path
 
     dungeon.rooms = [composite]
     dungeon.current_room = 0
@@ -329,7 +398,7 @@ LEVEL_1_PLAN = [
 ]
 
 
-def _bfs_par_line(composite) -> int | None:
+def _bfs_par_line(composite, return_path: bool = False):
     """BFS par for Level 1: hjkl + $ ^ 0 line-end motions (each costs 1).
 
     $ and ^ are wall-bounded: they stop at the nearest wall in each direction,
@@ -374,21 +443,30 @@ def _bfs_par_line(composite) -> int | None:
                 hat_of[(r, c)]    = hat_dest
 
     dist = {entry: 0}
+    prev = {entry: None}
     q    = deque([entry])
     while q:
         r, c = q.popleft()
         if (r, c) == goal:
+            if return_path:
+                return dist[goal], _join_path(prev, goal, merge_single=False)
             return dist[goal]
         d = dist[(r, c)]
         for dr, dc in ((-1, 0), (1, 0), (0, -1), (0, 1)):
             nb = (r + dr, c + dc)
             if nb not in dist and composite.is_passable(*nb):
                 dist[nb] = d + 1
+                prev[nb] = ((r, c), _DIR_CHAR[(dr, dc)])
                 q.append(nb)
-        for nb in (dollar_of.get((r, c)), zero_of.get((r, c)), hat_of.get((r, c))):
+        for nb, lbl in ((dollar_of.get((r, c)), '$'),
+                        (zero_of.get((r, c)),   '0'),
+                        (hat_of.get((r, c)),    '^')):
             if nb is not None and nb != (r, c) and nb not in dist:
                 dist[nb] = d + 1
+                prev[nb] = ((r, c), lbl)
                 q.append(nb)
+    if return_path:
+        return None, ''
     return None
 
 
@@ -467,14 +545,15 @@ def build_dungeon_1(seed: int) -> Dungeon:
         # Anchor rune at exit position so ^ on row 1 lands exactly on the exit.
         composite.runes.append(
             RuneCluster(row=ex_r, col=ex_c, symbols=('∘',), kind='ancient'))
-        par = _bfs_par_line(composite)
+        par, path = _bfs_par_line(composite, return_path=True)
         if par is not None:
             break
     else:
-        par = 7
+        par, path = 7, ''
 
     composite.par    = par
     composite.budget = math.ceil(par * 1.4)
+    composite.answer = path
     dungeon.rooms    = [composite]
     dungeon.current_room = 0
     return dungeon
@@ -585,7 +664,7 @@ def build_dungeon_2(seed: int) -> Dungeon:
 
     # Full par: state-space Dijkstra with all Level 2 commands and door states.
     # Accounts for door-blocking (breaking $ into segments) and x keystrokes.
-    composite.par    = _dijkstra_par_level2(composite, door_cols)
+    composite.par, composite.answer = _dijkstra_par_level2(composite, door_cols, return_path=True)
     composite.budget = math.ceil(composite.par * 1.4)
 
     # Fog: reveal Room 0 and the first door; hide everything beyond.
@@ -599,10 +678,13 @@ def build_dungeon_2(seed: int) -> Dungeon:
 # ── Level 3 helpers ───────────────────────────────────────────────────────────
 
 def _make_rune_corridor(composite, rng, row_top,
-                        col_start=None, col_end=None, density=0.65):
+                        col_start=None, col_end=None, density=0.65,
+                        blocked: frozenset = frozenset()):
     """Carve a 2-row CORRIDOR strip and fill it densely with non-void rune clusters.
 
     Leaves a 1-cell buffer at each end so runes reach the turn-room entrance.
+    blocked: set of (row, col) cells that random runes must not overlap or
+    touch (1-cell side buffer enforced by the caller via the set contents).
     """
     if col_start is None:
         col_start = _L3_CORR_LEFT
@@ -618,17 +700,24 @@ def _make_rune_corridor(composite, rng, row_top,
         while c <= col_end - 1:
             if rng.random() < density:
                 kind  = rng.choice(_WORD_RUNE_KINDS)
-                syms  = _RUNE_SYMS[kind]
-                width = len(syms)
-                if c + width - 1 <= col_end:
-                    composite.runes.append(
-                        RuneCluster(row=row, col=c, symbols=syms, kind=kind))
-                    c += width + rng.randint(1, 2)
+                placed = False
+                for _ in range(2):  # one retry for long runes at end
+                    syms  = _make_rune_syms(rng, kind)
+                    width = len(syms)
+                    if c + width - 1 <= col_end:
+                        if not any((row, cc) in blocked
+                                   for cc in range(c - 1, c + width + 1)):
+                            composite.runes.append(
+                                RuneCluster(row=row, col=c, symbols=syms, kind=kind))
+                            c += width + rng.randint(1, 2)
+                            placed = True
+                            break
+                if placed:
                     continue
             c += 1
 
 
-def _dijkstra_par_wbe(composite) -> int | None:
+def _dijkstra_par_wbe(composite, return_path: bool = False):
     """Minimum-keystroke Dijkstra for Level 3: hjkl + w b e + count-hjkl.
 
     w/b/e are row-scoped and each cost 1 keystroke.  Count-n h/j/k/l cost
@@ -688,16 +777,19 @@ def _dijkstra_par_wbe(composite) -> int | None:
         return None
 
     dist = {entry: 0}
+    prev = {entry: None}
     heap = [(0, entry)]
 
     while heap:
         cost, (r, c) = heapq.heappop(heap)
         if (r, c) == goal:
+            if return_path:
+                return cost, _join_path(prev, (r, c), merge_single=False)
             return cost
         if cost > dist.get((r, c), float('inf')):
             continue
 
-        def _push(nb, mc=1):
+        def _push(nb, mc=1, lbl=''):
             if nb is None:
                 return
             nr, nc = nb
@@ -709,10 +801,12 @@ def _dijkstra_par_wbe(composite) -> int | None:
             g = cost + mc
             if g < dist.get((nr, nc), float('inf')):
                 dist[(nr, nc)] = g
+                prev[(nr, nc)] = ((r, c), lbl)
                 heapq.heappush(heap, (g, (nr, nc)))
 
         # count h/j/k/l — void blocks landing but count can bypass (engine behaviour)
         for dr, dc in ((-1, 0), (1, 0), (0, -1), (0, 1)):
+            ch = _DIR_CHAR[(dr, dc)]
             for n in range(1, max_n + 1):
                 nr, nc = r + dr * n, c + dc * n
                 if not composite.is_passable(nr, nc):
@@ -720,14 +814,40 @@ def _dijkstra_par_wbe(composite) -> int | None:
                 ru = composite.rune_at(nr, nc)
                 if ru and ru.kind == 'void':
                     continue  # can't land here; larger n can bypass
-                mc = 1 if n == 1 else len(str(n)) + 1
-                _push((nr, nc), mc)
+                mc  = 1 if n == 1 else len(str(n)) + 1
+                lbl = ch if n == 1 else f'{n}{ch}'
+                _push((nr, nc), mc, lbl)
 
-        # w, b, e (cost 1 each)
-        _push(_w(r, c))
-        _push(_b(r, c))
-        _push(_e(r, c))
+        # count-w/b/e: chain calls to model Nw, Nb, Ne
+        pos = (r, c)
+        for n in range(1, max_n):
+            nxt = _w(*pos)
+            if nxt is None:
+                break
+            mc  = 1 if n == 1 else len(str(n)) + 1
+            _push(nxt, mc, 'w' if n == 1 else f'{n}w')
+            pos = nxt
 
+        pos = (r, c)
+        for n in range(1, max_n):
+            nxt = _b(*pos)
+            if nxt is None:
+                break
+            mc  = 1 if n == 1 else len(str(n)) + 1
+            _push(nxt, mc, 'b' if n == 1 else f'{n}b')
+            pos = nxt
+
+        pos = (r, c)
+        for n in range(1, max_n):
+            nxt = _e(*pos)
+            if nxt is None:
+                break
+            mc  = 1 if n == 1 else len(str(n)) + 1
+            _push(nxt, mc, 'e' if n == 1 else f'{n}e')
+            pos = nxt
+
+    if return_path:
+        return None, ''
     return None
 
 
@@ -763,53 +883,68 @@ def build_dungeon_3(seed: int) -> Dungeon:
 
     # ── Carve turn rooms ──────────────────────────────────────────────────────
     turn_spans = [
-        (2,  4,  45, 46),   # RT1
-        (5,  7,  1,  2),    # LT1
-        (8,  10, 45, 46),   # RT2
-        (11, 13, 1,  2),    # LT2
+        (2,  4,  43, 44),   # RT1
+        (5,  7,  1,  3),    # LT1
+        (8,  10, 43, 46),   # RT2
+        (11, 13, 1,  3),    # LT2
     ]
     for r0, r1, ca, cb in turn_spans:
+        c0, c1 = sorted((ca, cb))  # handles ca > cb safely
         for row in range(r0, r1 + 1):
-            cells[row][ca] = CellType.CORRIDOR
-            cells[row][cb] = CellType.CORRIDOR
+            for col in range(c0, c1 + 1):
+                cells[row][col] = CellType.CORRIDOR
+
+    # ── Hard-coded runes (deterministic; placed before random fill) ───────────
+    # All positions are fixed regardless of seed.  Placing them first in the
+    # runes list guarantees rune_at() returns them before any random cluster.
+    _l3_hardcoded = [
+        # Anchor rune at C5 exit — last symbol (col 44) is the exit cell
+        RuneCluster(row=13, col=42, symbols=('∘', '∘', '∘'), kind='ancient'),
+        # Ember at right end of C1 — marks the turn into RT1
+        RuneCluster(row=1,  col=44, symbols=('◦', '◦', '◦'), kind='ember'),
+        # Void guards at turn-room entries/exits
+        RuneCluster(row=1,  col=45, symbols=('○', '○'), kind='void'),
+        RuneCluster(row=2,  col=45, symbols=('○', '○'), kind='void'),
+        RuneCluster(row=4,  col=1,  symbols=('○', '○'), kind='void'),
+        RuneCluster(row=5,  col=1,  symbols=('○',),     kind='void'),
+        RuneCluster(row=7,  col=46, symbols=('○',),     kind='void'),
+        RuneCluster(row=8,  col=45, symbols=('○', '○'), kind='void'),
+        RuneCluster(row=10, col=1,  symbols=('○',),     kind='void'),
+        RuneCluster(row=10, col=2,  symbols=('·','·','·','·'),     kind='verdant'),
+        RuneCluster(row=11, col=1,  symbols=('○', '○'), kind='void'),
+        RuneCluster(row=13, col=46, symbols=('○',),     kind='void'),
+        RuneCluster(row=14, col=46, symbols=('○',),     kind='void'),
+    ]
+
+    # Reserved cells: Random runes must not land in or touch these cells.
+    blocked: frozenset = frozenset(
+        (ru.row, c)
+        for ru in _l3_hardcoded
+        for c in range(ru.col, ru.col + len(ru.symbols))
+    )
+
+    composite.entry    = (1, 1)
+    composite.exit_pos = (13, 44)
+    composite.entities = [Entity(kind='exit', row=13, col=44)]
 
     # ── Carve and populate rune corridors (up to 20 attempts for valid par) ──
     for _attempt in range(20):
-        composite.runes.clear()
+        # Hard-coded runes first so rune_at() always finds them before random ones
+        composite.runes = list(_l3_hardcoded)
         rune_rng = random.Random(rng.randint(0, 2**31))
 
         for row_top in _L3_CORR_TOP_ROWS:
-            _make_rune_corridor(composite, rune_rng, row_top)
+            _make_rune_corridor(composite, rune_rng, row_top, blocked=blocked)
 
-        # C5 exit area: clear auto-placed runes from cols 40-46, then anchor a
-        # fixed 3-symbol cluster whose last cell is the exit position.
-        composite.runes = [
-            ru for ru in composite.runes
-            if not (ru.row in (13, 14) and ru.col >= 40)
-        ]
-        composite.runes.append(
-            RuneCluster(row=13, col=42, symbols=('∘', '∘', '∘'), kind='ancient'))
-
-        composite.entry    = (1, 1)
-        composite.exit_pos = (13, 44)    # last symbol of anchor rune
-        composite.entities = [Entity(kind='exit', row=13, col=44)]
-
-        # Voids for turns and far end of exit
-        for mid_row, col in ((1,45),(2,45),(4,1),(5,1),(7,45),(8,45),(10,1),(11,1)):
-            composite.runes.append(
-                RuneCluster(row=mid_row, col=col, symbols=('○', '○'), kind='void'))
-        for mid_row, col in ((13,46),(14,46)):
-            composite.runes.append(
-                RuneCluster(row=mid_row, col=col, symbols=('○'), kind='void'))
-
-        par = _dijkstra_par_wbe(composite)
+        par, path = _dijkstra_par_wbe(composite, return_path=True)
         if par is not None:
             break
     else:
-        par = 80
+        par, path = 80, ''
 
     composite.par    = par
     composite.budget = math.ceil(par * 1.4)
+    composite.answer = path
 
     dungeon.rooms        = [composite]
     dungeon.current_room = 0
@@ -847,14 +982,10 @@ def build_dungeon_dummy(seed: int) -> Dungeon:
     ]
 
     composite.runes = [
-        RuneCluster(row=2,  col=3,  symbols=('∘', '∘', '∘'),      kind='ancient'),
-        RuneCluster(row=2,  col=8,  symbols=('·', '·', '·'),       kind='verdant'),
-        RuneCluster(row=2,  col=13, symbols=('○', '○'),            kind='void'),
-        RuneCluster(row=2,  col=17, symbols=('◦', '◦', '◦', '◦'), kind='ember'),
-        RuneCluster(row=8,  col=5,  symbols=('∘', '∘'),            kind='ancient'),
-        RuneCluster(row=8,  col=10, symbols=('·', '·'),            kind='verdant'),
-        RuneCluster(row=12, col=15, symbols=('◦', '◦', '◦'),       kind='ember'),
-        RuneCluster(row=15, col=45, symbols=('∘', '∘', '∘'),       kind='ancient'),
+        RuneCluster(row=2,  col=3,  symbols=('∘'), kind='ancient'),
+        RuneCluster(row=2,  col=8,  symbols=('·'), kind='verdant'),
+        RuneCluster(row=2,  col=13, symbols=('○'), kind='void'),
+        RuneCluster(row=2,  col=17, symbols=('◦'), kind='ember'),
     ]
 
     composite.par            = None

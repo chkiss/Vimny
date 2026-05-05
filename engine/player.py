@@ -17,6 +17,8 @@ class Player:
     input_buf: str = ''
     # command-mode line
     cmd_line: str = ''
+    # statusline error (e.g. E37); cleared on next keypress
+    error: str = ''
 
     def move(self, dr: int, dc: int, room_rows: int, room_cols: int) -> bool:
         nr, nc = self.row + dr, self.col + dc

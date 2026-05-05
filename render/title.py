@@ -168,21 +168,31 @@ def _render_frame(term: Terminal, iw: int, content: list[str],
     out.append(border_h(S.BOX_LT, S.BOX_RT))
 
     # Game area: pad/crop content to exactly game_h rows
-    game_h = term.height - 6
+    game_h = term.height - 7
     blank  = _blank(term, iw)
     while len(content) < game_h:
         content.append(blank)
     out.extend(content[:game_h])
 
+    # Vim statusline / command line
+    sl_w  = iw + 2
+    sl_bg = C.statusline_bg()
+    sl_fg = C.statusline_fg()
+    if cmd_line is not None:
+        cmd_text = ':' + cmd_line
+        sl_pad   = max(0, sl_w - len(cmd_text))
+        out.append(sl_bg + C.mode_command() + cmd_text +
+                   sl_fg + ' ' * sl_pad + rst)
+    else:
+        sl_label = '-- VIMNY --'
+        sl_mid   = max(0, sl_w - len(sl_label) - 2)
+        out.append(sl_bg + stamp + ' ' + sl_label + sl_fg + ' ' * sl_mid + rst)
+
     # Bottom separator
     out.append(border_h(S.BOX_LT, S.BOX_RT))
 
-    # Hint bar: command line while typing, otherwise navigation hints
-    if cmd_line is not None:
-        cmd_text = ':' + cmd_line
-        out.append(C.mode_command() + cmd_text +
-                   ' ' * max(0, term.width - len(cmd_text)) + rst)
-    elif hint_text is not None:
+    # Hint bar: always show navigation hints
+    if hint_text is not None:
         out.append(bfg + S.BOX_V + rst +
                    muted + hint_text + rst +
                    ' ' * max(0, iw - len(hint_text)) +
