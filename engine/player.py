@@ -5,8 +5,8 @@ from engine.modes import Mode
 class Player:
     row: int = 0
     col: int = 0
-    hp: int = 3
-    max_hp: int = 3
+    hp: int = 6       # stored in half-hearts (6 = 3 full hearts)
+    max_hp: int = 6
     name: str = 'Normand'
     mode: Mode = Mode.NORMAL
     known_commands: list = field(default_factory=lambda: ['h','j','k','l'])
@@ -27,8 +27,9 @@ class Player:
             return True
         return False
 
-    def take_damage(self, amount: int = 1):
-        self.hp = max(0, self.hp - amount)
+    def take_damage(self, half_hearts: int = 2):
+        """Reduce HP. amount is in half-hearts (2 = 1 full heart)."""
+        self.hp = max(0, self.hp - half_hearts)
 
     @property
     def is_dead(self) -> bool:

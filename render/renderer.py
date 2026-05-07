@@ -1,5 +1,6 @@
 """Pure read-only renderer. Never mutates game state."""
 from __future__ import annotations
+import time
 from blessed import Terminal
 from engine.world import Dungeon, CellType, Room
 from engine.player import Player
@@ -7,11 +8,32 @@ from engine.modes import Mode, MODE_LABELS
 from engine.budget import Budget
 import render.colors as C
 import render.symbols as S
+from render.utils import inner_w as _inner_w
 
-FRAME_W = 80   # minimum; expands up to 120
+# ── Water animation ────────────────────────────────────────────────────────────
+# Each frame: (char, rgb, duration_seconds).
+# ~ frames hold their full duration; ≈ is brief — a passing wave crest.
+_WATER_FRAMES = [
+    ('~',  (30,  95, 200), 8.0),   # calm — mid-blue
+    ('≈',  (50, 130, 230), 0.8),   # passing wave — lighter blue (brief)
+    ('~',  (15,  65, 170), 8.0),   # calm — deeper blue
+    ('∼',  (40, 110, 215), 8.0),   # calm — medium
+]
+_WATER_PERIOD = sum(d for _, _, d in _WATER_FRAMES)  # 24.8 s
 
-def _inner_w(term: Terminal) -> int:
-    return min(max(term.width, FRAME_W), 120) - 2
+
+def _water_glyph(row: int, col: int) -> tuple[str, int, int, int]:
+    """Return (char, r, g, b) for a water cell at the current instant."""
+    # Diagonal spatial offset so adjacent cells are out of phase (÷4 wave density)
+    offset = (row * 0.1375 + col * 0.045) % _WATER_PERIOD
+    phase  = (time.time() + offset) % _WATER_PERIOD
+    t = 0.0
+    for char, rgb, dur in _WATER_FRAMES:
+        t += dur
+        if phase < t:
+            return char, *rgb
+    char, rgb, _ = _WATER_FRAMES[-1]
+    return char, *rgb
 
 def _pad(s: str, width: int) -> str:
     """Pad or truncate s to exactly width visible characters."""
@@ -38,8 +60,12 @@ def render_all(term: Terminal, dungeon: Dungeon, player: Player,
     output.append(border_h(S.BOX_TL, S.BOX_TR))
 
     # ── Row 1: status bar ─────────────────────────────────────────────────
-    hp_str  = (C.heart_full()  + S.HEART_FULL  + rst) * player.hp
-    hp_str += (C.heart_empty() + S.HEART_EMPTY + rst) * (player.max_hp - player.hp)
+    full_h  = player.hp // 2
+    half_h  = player.hp % 2
+    empty_h = player.max_hp // 2 - full_h - half_h
+    hp_str  = (C.heart_full()  + S.HEART_FULL  + rst) * full_h
+    hp_str += (C.heart_half()  + S.HEART_HALF  + rst) * half_h
+    hp_str += (C.heart_empty() + S.HEART_EMPTY + rst) * empty_h
 
     mode    = player.mode
     ml      = MODE_LABELS[mode]
@@ -70,7 +96,7 @@ def render_all(term: Terminal, dungeon: Dungeon, player: Player,
 
     dname = dungeon.name[:24]
     # Build status line (visible chars only for padding, approximate)
-    status_plain = f'  {"♥"*player.hp}{"░"*(player.max_hp-player.hp)}  {dname}  {ml}  Keys:{spent:2d} Budget:{budget.total:2d}  Par:{room.par or "-"}'
+    status_plain = f'  {"♥"*full_h}{"♡"*half_h}{"░"*empty_h}  {dname}  {ml}  Keys:{spent:2d} Budget:{budget.total:2d}  Par:{room.par or "-"}'
     padding = max(0, iw - len(status_plain))
     status_line = (bfg + S.BOX_V + rst +
                    f'  {hp_str}  ' +
@@ -132,6 +158,8 @@ def render_all(term: Terminal, dungeon: Dungeon, player: Player,
                         line += floor_bg + C.chest_fg() + S.CHEST + C.normal_fg()
                     elif ent.kind == 'door':
                         line += floor_bg + C.door_fg() + S.DOOR_LOCKED + C.normal_fg()
+                    elif ent.kind == 'dynamite':
+                        line += floor_bg + C.dynamite_fg() + S.DYNAMITE + C.normal_fg()
                     elif ent.kind == 'wanderer':
                         efg = C.enemy_frozen() if mode == Mode.VISUAL else C.enemy_fg()
                         line += floor_bg + efg + S.ENEMY_WANDERER + C.normal_fg()
@@ -152,7 +180,10 @@ def render_all(term: Terminal, dungeon: Dungeon, player: Player,
                     continue
 
                 # Cell type
-                if ct == CellType.WALL:
+                if ct == CellType.WATER:
+                    ch, wr, wg, wb = _water_glyph(room_r, room_c)
+                    line += C.water_bg() + C.water_fg(wr, wg, wb) + ch + C.normal_fg()
+                elif ct == CellType.WALL:
                     line += wall_bg + ' ' + C.normal_fg()
                 else:
                     line += floor_bg + ' ' + C.normal_fg()
@@ -216,13 +247,13 @@ def render_all(term: Terminal, dungeon: Dungeon, player: Player,
     # ── Hint bar ──────────────────────────────────────────────────────────
     known = player.known_commands
     if 'editor' in known:
-        hint_text = 'x:cut  s:wall-toggle  dd/yy:cut/yank-row  d/y{m}:range  p/P:paste  :q quit'
+        hint_text = 'x:delete (cut) char  s:toggle wall  dd/yy:delete/yank line  d/y{m}:cut/yank range  p/P:put (paste)  :q quit'
     elif 'count' in known:
-        hint_text = '[N]hjkl:count-move  0:line-start  ^:first-rune  $:end  x:open  :w save  :q quit'
+        hint_text = '[N]hjkl:count move  0:jump to start of line  ^:first non-blank  $:jump to end of line  x:delete (cut) char  :w write  :q quit'
     elif '$' in known:
-        hint_text = 'hjkl:move  0:line-start  ^:first-rune  $:end  :w save  :q quit'
+        hint_text = 'hjkl:move cursor  0:jump to start of line  ^:first non-blank  $:jump to end of line  :w write  :q quit'
     else:
-        hint_text = 'h/j/k/l:move  :w save  :q quit  :q! force-quit'
+        hint_text = 'h/j/k/l:move cursor  :w write (save)  :q quit  :q! quit without saving'
     if 'admin' in known:
         hint_text += '  :e refresh'
     hint = C.hint_fg() + hint_text + rst

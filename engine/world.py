@@ -7,6 +7,7 @@ class CellType(Enum):
     WALL     = auto()
     FLOOR    = auto()
     CORRIDOR = auto()
+    WATER    = auto()
 
 class RoomType(Enum):
     ENTRY   = auto()
@@ -49,6 +50,58 @@ class Room:
     passable_walls: bool        = False  # if True, walls are walkable (editor mode)
     answer: str                 = ''     # keystroke solution shown to admin
 
+    def __post_init__(self):
+        self._entity_map: dict = {}
+        self._rune_map:   dict = {}
+
+    # ── Spatial index ──────────────────────────────────────────────────────────
+
+    def rebuild_indexes(self) -> None:
+        """Rebuild O(1) lookup dicts from the current runes/entities lists.
+
+        Call after any wholesale assignment to room.runes or room.entities,
+        and after _ed_restore.  Individual add/remove helpers keep the indexes
+        in sync incrementally and do not require a full rebuild.
+        """
+        self._entity_map = {(e.row, e.col): e for e in self.entities if e.alive}
+        self._rune_map   = {}
+        for ru in self.runes:
+            for i in range(len(ru.symbols)):
+                self._rune_map[(ru.row, ru.col + i)] = ru
+
+    def add_entity(self, e: Entity) -> None:
+        self.entities.append(e)
+        if e.alive:
+            self._entity_map[(e.row, e.col)] = e
+
+    def remove_entity(self, e: Entity) -> None:
+        self.entities.remove(e)
+        self._entity_map.pop((e.row, e.col), None)
+
+    def kill_entity(self, e: Entity) -> None:
+        """Set alive=False and remove from the spatial index."""
+        self._entity_map.pop((e.row, e.col), None)
+        e.alive = False
+
+    def move_entity(self, e: Entity, new_r: int, new_c: int) -> None:
+        """Relocate an entity and keep the spatial index consistent."""
+        self._entity_map.pop((e.row, e.col), None)
+        e.row, e.col = new_r, new_c
+        if e.alive:
+            self._entity_map[(e.row, e.col)] = e
+
+    def add_rune(self, ru: RuneCluster) -> None:
+        self.runes.append(ru)
+        for i in range(len(ru.symbols)):
+            self._rune_map[(ru.row, ru.col + i)] = ru
+
+    def remove_rune(self, ru: RuneCluster) -> None:
+        self.runes.remove(ru)
+        for i in range(len(ru.symbols)):
+            self._rune_map.pop((ru.row, ru.col + i), None)
+
+    # ── Lookup methods (O(1) with indexes built) ───────────────────────────────
+
     def cell(self, r: int, c: int) -> CellType:
         return self.cells[r][c]
 
@@ -60,16 +113,10 @@ class Room:
         return self.cells[r][c] in (CellType.FLOOR, CellType.CORRIDOR)
 
     def entity_at(self, r: int, c: int) -> Optional[Entity]:
-        for e in self.entities:
-            if e.alive and e.row == r and e.col == c:
-                return e
-        return None
+        return self._entity_map.get((r, c))
 
     def rune_at(self, r: int, c: int) -> Optional[RuneCluster]:
-        for ru in self.runes:
-            if ru.row == r and ru.col <= c < ru.col + len(ru.symbols):
-                return ru
-        return None
+        return self._rune_map.get((r, c))
 
 @dataclass
 class Dungeon:

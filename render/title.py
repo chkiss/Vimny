@@ -7,6 +7,7 @@ from blessed import Terminal
 import render.colors as C
 import render.symbols as S
 from content.levels import LEVELS
+from render.utils import inner_w as _iw
 
 FRAME_W      = 80
 NAME_MAX     = 20   # max adventurer name length
@@ -110,10 +111,6 @@ _BOX_INNER = NAME_MAX + 2
 
 
 # ── Shared helpers ─────────────────────────────────────────────────────────────
-
-def _iw(term: Terminal) -> int:
-    return min(max(term.width, FRAME_W), 120) - 2
-
 
 def _blank(term: Terminal, iw: int) -> str:
     bfg = C.border_fg()
@@ -336,7 +333,7 @@ def render_title(term: Terminal, cursor: int, has_save: bool,
 
             content.append(centred(pfx_p + label, pfx_c + label_c))
 
-        hint = 'j/k navigate · enter select · :q quit'
+        hint = 'j/k:move cursor · enter:select · :q quit'
 
     _render_frame(term, iw, content, cmd_line, hint_text=hint)
 
@@ -394,4 +391,4 @@ def render_save_select(term: Terminal, saves: list[dict], cursor: int) -> None:
             content.append(centred(plain, pfx_c + name_c + '  ' + bar_c + '  ' + pct_c))
 
     _render_frame(term, iw, content,
-                  hint_text='j/k navigate · enter select · Esc back')
+                  hint_text='j/k:move cursor · enter:select · Esc:go back')

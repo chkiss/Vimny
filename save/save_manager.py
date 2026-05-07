@@ -2,8 +2,9 @@ import json, re
 from pathlib import Path
 from typing import Optional
 
-SAVE_DIR  = Path.home() / '.Vimny'
-SAVES_DIR = SAVE_DIR / 'saves'
+SAVE_DIR    = Path.home() / '.Vimny'
+SAVES_DIR   = SAVE_DIR / 'saves'
+LAYOUTS_DIR = SAVE_DIR / 'layouts'
 
 
 def _slug(name: str) -> str:
@@ -66,3 +67,15 @@ def load_player_name(data: Optional[dict]) -> str:
     if data is None:
         return 'Normand'
     return data.get('player_name', 'Normand')
+
+
+# ── Layout I/O (admin level-design tool) ──────────────────────────────────────
+
+def save_layout(name: str, data: dict) -> Path:
+    """Write a serialised Room dict to ~/.Vimny/layouts/<slug>.json."""
+    LAYOUTS_DIR.mkdir(parents=True, exist_ok=True)
+    path = LAYOUTS_DIR / f'{_slug(name)}.json'
+    payload = {'layout_name': name, **data}
+    with open(path, 'w') as f:
+        json.dump(payload, f, indent=2)
+    return path

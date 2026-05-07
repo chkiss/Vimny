@@ -5,12 +5,7 @@ from engine.player import Player
 import render.colors as C
 import render.symbols as S
 from content.levels import LEVELS, is_unlocked
-
-FRAME_W = 80
-
-
-def _iw(term: Terminal) -> int:
-    return min(max(term.width, FRAME_W), 120) - 2
+from render.utils import inner_w as _iw
 
 
 def render_overworld(term: Terminal, player: Player, progress: dict,
@@ -132,7 +127,7 @@ def render_overworld(term: Terminal, player: Player, progress: dict,
     out.append(border_h(S.BOX_LT, S.BOX_RT))
 
     # ── Hint bar ──────────────────────────────────────────────────────────────
-    hint_text = 'j/k:navigate  Enter:open dungeon  :q quit'
+    hint_text = 'j/k:move cursor  Enter:open dungeon  :q quit'
     out.append(bfg + S.BOX_V + rst +
                C.hint_fg() + hint_text + rst +
                ' ' * max(0, iw - len(hint_text)) +

@@ -1,211 +1,77 @@
 #!/usr/bin/env python3
 """Vimny — entry point and main game loop."""
-import sys, random, time, argparse, copy
+import sys, random, time, argparse
 from blessed import Terminal
 import render.colors as C
 from render.renderer import render_all
+from render.utils import inner_w as _iw
 from render.overworld import render_overworld
 from render.title import render_title, render_save_select, select_quote, MENU_ITEMS as _TITLE_MENU, NAME_MAX as _NAME_MAX
 from engine.player import Player
 from engine.modes import Mode
 from engine.budget import Budget
 from engine.vim_parser import parse
-from engine.world import CellType, RuneCluster, Entity
+from engine.world import Entity, CellType
+from engine.motion import apply_motion, move_player, _apply_esc, _update_fog, _cell_char
+from engine.editor import (
+    _merge_adjacent_runes, _ed_cut, _ed_snapshot, _ed_restore, _ed_subst,
+    _ed_paste, _ed_row_items, _ed_clear_row, _ed_range_items, _ed_delete_range,
+    _clip_desc, _serialize_room,
+)
 from generation.dungeon_gen import build_dungeon_0, build_dungeon_1, build_dungeon_2, build_dungeon_3, build_dungeon_dummy
-from content.levels import LEVELS, is_unlocked
+from content.levels import LEVELS, is_unlocked, known_commands as _known_commands
 import save.save_manager as SM
 
-# ── Motion / movement helpers ─────────────────────────────────────────────────
 
-def _apply_esc(player: Player) -> None:
-    player.mode = Mode.NORMAL
+_WATER_SETTLE_SECS = 60   # stop animating water after this many idle seconds
 
-
-def move_player(player, dr, dc, room):
-    nr, nc = player.row + dr, player.col + dc
-    if not room.is_passable(nr, nc):
-        return False
-    if room.fog_col >= 0 and nc >= room.fog_col:
-        return False
-    player.row, player.col = nr, nc
-    return True
-
-
-def _update_fog(room) -> None:
-    """Advance fog_col to just past the next closed door, or clear fog if none remain."""
-    closed_cols = sorted(set(e.col for e in room.entities
-                             if e.kind == 'door' and e.alive))
-    room.fog_col = closed_cols[0] + 1 if closed_cols else -1
-
-
-def apply_motion(player, motion, count, room, target=None):
-    moved = False
-    for _ in range(count):
-        if motion == 'h':
-            moved |= move_player(player, 0, -1, room)
-        elif motion == 'j':
-            moved |= move_player(player, 1,  0, room)
-        elif motion == 'k':
-            moved |= move_player(player, -1, 0, room)
-        elif motion == 'l':
-            moved |= move_player(player, 0,  1, room)
-        elif motion == '0':
-            row = player.row
-            left = player.col
-            for c in range(player.col - 1, -1, -1):
-                if not room.is_passable(row, c):
-                    break
-                left = c
-            if left != player.col:
-                player.col = left
-                moved = True
-        elif motion == '$':
-            row = player.row
-            best = None
-            for c in range(player.col + 1, room.cols):
-                if not room.is_passable(row, c):
-                    break
-                if room.fog_col >= 0 and c >= room.fog_col:
-                    break
-                best = c
-            if best is not None:
-                player.col = best
-                moved = True
-        elif motion == '^':
-            row = player.row
-            left = player.col
-            for c in range(player.col - 1, -1, -1):
-                if not room.is_passable(row, c):
-                    break
-                left = c
-            right = player.col
-            for c in range(player.col + 1, room.cols):
-                if not room.is_passable(row, c):
-                    break
-                if room.fog_col >= 0 and c >= room.fog_col:
-                    break
-                right = c
-            target = left
-            for c in range(left, right + 1):
-                if room.rune_at(row, c):
-                    target = c
-                    break
-            if target != player.col:
-                player.col = target
-                moved = True
-        elif motion == 'w':
-            row = player.row
-            cur = room.rune_at(row, player.col)
-            if cur and cur.kind != 'void':
-                scan = cur.col + len(cur.symbols)
-            else:
-                scan = player.col + 1
-            best = None
-            for nc in range(scan, room.cols):
-                if not room.is_passable(row, nc):
-                    break
-                ru = room.rune_at(row, nc)
-                if ru and ru.kind != 'void':
-                    best = ru.col
-                    break
-            if best is not None:
-                player.col = best
-                moved = True
-            else:
-                break
-        elif motion == 'b':
-            row = player.row
-            cur = room.rune_at(row, player.col)
-            if cur and cur.kind != 'void' and cur.col < player.col:
-                player.col = cur.col
-                moved = True
-            else:
-                limit = cur.col if (cur and cur.kind != 'void') else player.col
-                best  = None
-                for nc in range(limit - 1, -1, -1):
-                    if not room.is_passable(row, nc):
-                        break
-                    ru = room.rune_at(row, nc)
-                    if ru and ru.kind != 'void':
-                        best = ru.col
-                        break
-                if best is not None:
-                    player.col = best
-                    moved = True
-                else:
-                    break
-        elif motion == 'e':
-            row = player.row
-            cur = room.rune_at(row, player.col)
-            if cur and cur.kind != 'void':
-                end_col = cur.col + len(cur.symbols) - 1
-                if end_col > player.col:
-                    player.col = end_col
-                    moved = True
-                    continue
-                scan = end_col + 1
-            else:
-                scan = player.col + 1
-            best = None
-            for nc in range(scan, room.cols):
-                if not room.is_passable(row, nc):
-                    break
-                ru = room.rune_at(row, nc)
-                if ru and ru.kind != 'void':
-                    best = ru.col + len(ru.symbols) - 1
-                    break
-            if best is not None:
-                player.col = best
-                moved = True
-            else:
-                break
-        elif motion == 'G':
-            if room.exit_pos:
-                player.row, player.col = room.exit_pos
-                moved = True
-        elif motion == 'gg':
-            player.row, player.col = room.entry
-            moved = True
-        elif motion in ('f', 'F', 't', 'T'):
-            if target is None:
-                break
-            row = player.row
-            fwd  = motion in ('f', 't')
-            scan = range(player.col + 1, room.cols) if fwd else range(player.col - 1, -1, -1)
-            for nc in scan:
-                if not room.is_passable(row, nc):
-                    break
-                if _cell_char(room, row, nc) == target:
-                    if motion == 'f':
-                        dest = nc
-                    elif motion == 'F':
-                        dest = nc
-                    elif motion == 't':
-                        dest = nc - 1
-                    else:  # T
-                        dest = nc + 1
-                    if dest != player.col:
-                        player.col = dest
-                        moved = True
-                    break
-    return moved
-
-
-def _cell_char(room, r: int, c: int) -> str:
-    """Return the printable character at (r, c) for f/F/t/T target matching."""
-    ru = room.rune_at(r, c)
-    if ru:
-        return ru.symbols[c - ru.col]
-    ent = room.entity_at(r, c)
-    if ent:
-        if ent.kind == 'door':         return '+'
-        if ent.kind == 'exit':         return 'E'
-        if ent.kind == 'entry_marker': return '@'
-        return '?'
-    return '#' if room.cells[r][c] == CellType.WALL else '.'
-
+# Explosion damage in half-hearts by Manhattan distance from centre
+_EXPL_DAMAGE = {0: 3, 1: 3, 2: 2, 3: 1}   # 0-1: 1.5♥  2: 1♥  3: 0.5♥
 
 # ── Animations ────────────────────────────────────────────────────────────────
+
+def _explosion_animation(term, room, expl_r, expl_c, scr_r, scr_c, iw, game_h):
+    """Expanding * rings centred on screen position (scr_r, scr_c) = room (expl_r, expl_c).
+
+    Walls stop the visual rings (no * drawn on a wall cell) but do not shift
+    or re-centre the pattern — each ring remains anchored to (expl_r, expl_c).
+    """
+    # Each frame: {distance: color}  — inner rings dim as the wave expands outward
+    frames = [
+        ({0: term.bold + term.bright_white},                                         0.05),
+        ({0: term.color_rgb(255, 200, 50) + term.bold,
+          1: term.bold + term.bright_white},                                          0.07),
+        ({0: term.color_rgb(220,  80, 10),
+          1: term.color_rgb(255, 170, 40) + term.bold,
+          2: term.bold + term.bright_white},                                          0.08),
+        ({0: term.color_rgb(120,  30,  5),
+          1: term.color_rgb(200,  70, 15),
+          2: term.color_rgb(255, 140, 30) + term.bold,
+          3: term.bold + term.bright_white},                                          0.10),
+        ({1: term.color_rgb( 80,  15,  0),
+          2: term.color_rgb(160,  50, 10),
+          3: term.color_rgb(230, 110, 25) + term.bold},                              0.10),
+    ]
+    for colors, delay in frames:
+        max_d = max(colors)
+        for dr in range(-max_d, max_d + 1):
+            for dc in range(-max_d, max_d + 1):
+                dist = abs(dr) + abs(dc)
+                color = colors.get(dist)
+                if not color:
+                    continue
+                rr, rc = expl_r + dr, expl_c + dc
+                if not (0 <= rr < room.rows and 0 <= rc < room.cols):
+                    continue
+                if room.cells[rr][rc] == CellType.WALL:
+                    continue
+                sr, sc = scr_r + dr, scr_c + dc
+                if not (3 <= sr < 3 + game_h and 1 <= sc < 1 + iw):
+                    continue
+                print(term.move_yx(sr, sc) + color + '*' + term.normal,
+                      end='', flush=True)
+        time.sleep(delay)
+
 
 def _void_fall_animation(term, screen_r, screen_c):
     frames = [
@@ -297,10 +163,6 @@ def _fireworks_animation(term, iw):
 
 # ── Small helpers ──────────────────────────────────────────────────────────────
 
-def _iw(term):
-    return min(max(term.width, 80), 120) - 2
-
-
 def _keystroke_cost(count: int) -> int:
     return 1 if count == 1 else len(str(count)) + 1
 
@@ -315,6 +177,8 @@ def _calc_stars(won: bool, budget: Budget, room) -> int:
 
 
 def _build_dungeon(level: int, seed: int):
+    if level == 99:
+        return build_dungeon_dummy(seed)
     if level == 1:
         return build_dungeon_1(seed)
     if level == 2:
@@ -324,168 +188,14 @@ def _build_dungeon(level: int, seed: int):
     return build_dungeon_0(seed)
 
 
-def _known_commands(level: int) -> list:
-    cmds = ['h', 'j', 'k', 'l']
-    if level >= 1:
-        cmds += ['^', '$', '0']
-    if level >= 2:
-        cmds += ['count', 'x']
-    if level >= 3:
-        cmds += ['w', 'b', 'e']
-    return cmds
-
-
 def _hint_bar(known: list) -> str:
     if 'w' in known:
-        return 'w:next-word  b:prev-word  e:end-word  [N]hjkl  :w save  :q quit'
+        return 'w:jump to word start  b:jump back to word  e:jump to word end  [N]hjkl  :w write  :q quit'
     if 'count' in known:
-        return '[N]hjkl:count-move  0:line-start  ^:first-rune  $:end  :w save  :q quit'
+        return '[N]hjkl:count move  0:jump to start of line  ^:first non-blank  $:jump to end of line  x:delete (cut) char  :w write  :q quit'
     if '$' in known:
-        return 'hjkl:move  0:line-start  ^:first-rune  $:end  :w save  :q quit'
-    return 'h/j/k/l:move  :w save  :q quit  :q! force-quit'
-
-
-# ── Dummy dungeon editor helpers ──────────────────────────────────────────────
-
-def _ed_cut(room, r, c):
-    """Remove the rune, entity, or wall at (r, c); return a clip item or None."""
-    ru = room.rune_at(r, c)
-    if ru:
-        room.runes.remove(ru)
-        return {'type': 'rune', 'rune': ru}
-    ent = room.entity_at(r, c)
-    if ent:
-        room.entities.remove(ent)
-        if ent.kind == 'exit':
-            room.exit_pos = None
-        elif ent.kind == 'entry_marker':
-            room.entry = (1, 1)
-        return {'type': 'entity', 'entity': ent}
-    ct = room.cells[r][c]
-    if ct == CellType.WALL:
-        room.cells[r][c] = CellType.FLOOR
-        return {'type': 'cell', 'cell_type': CellType.WALL}
-    return None
-
-
-def _ed_snapshot(room, player) -> dict:
-    return {
-        'cells':    [row[:] for row in room.cells],
-        'runes':    copy.deepcopy(room.runes),
-        'entities': copy.deepcopy(room.entities),
-        'exit_pos': room.exit_pos,
-        'entry':    room.entry,
-        'pr':       player.row,
-        'pc':       player.col,
-    }
-
-
-def _ed_restore(room, player, snap: dict) -> None:
-    room.cells    = snap['cells']
-    room.runes    = snap['runes']
-    room.entities = snap['entities']
-    room.exit_pos = snap['exit_pos']
-    room.entry    = snap['entry']
-    player.row    = snap['pr']
-    player.col    = snap['pc']
-
-
-def _ed_subst(room, r, c):
-    """Toggle wall/floor at (r, c); also cut any rune/entity. Returns clip items."""
-    items = []
-    item = _ed_cut(room, r, c)
-    if item:
-        items.append(item)
-    ct = room.cells[r][c]
-    room.cells[r][c] = CellType.FLOOR if ct == CellType.WALL else CellType.WALL
-    items.append({'type': 'cell', 'cell_type': ct})
-    return items
-
-
-def _ed_paste(room, r, start_c, items):
-    c = start_c
-    for item in items:
-        if c < 0 or c >= room.cols:
-            break
-        if item['type'] == 'rune':
-            ru = item['rune']
-            w  = len(ru.symbols)
-            if c + w <= room.cols:
-                room.runes.append(RuneCluster(row=r, col=c, symbols=ru.symbols, kind=ru.kind))
-                c += w
-        elif item['type'] == 'entity':
-            ent   = item['entity']
-            new_e = Entity(kind=ent.kind, row=r, col=c, hp=ent.hp)
-            room.entities.append(new_e)
-            if ent.kind == 'exit':
-                room.exit_pos = (r, c)
-            elif ent.kind == 'entry_marker':
-                room.entry = (r, c)
-            c += 1
-        elif item['type'] == 'cell':
-            room.cells[r][c] = item['cell_type']
-            c += 1
-
-
-def _ed_row_items(room, r):
-    tagged = []
-    for ru in room.runes:
-        if ru.row == r:
-            tagged.append((ru.col, {'type': 'rune', 'rune': ru}))
-    for e in room.entities:
-        if e.row == r and e.alive:
-            tagged.append((e.col, {'type': 'entity', 'entity': e}))
-    return [item for _, item in sorted(tagged)]
-
-
-def _ed_clear_row(room, r):
-    removed = [e for e in room.entities if e.row == r and e.alive]
-    room.runes    = [ru for ru in room.runes    if ru.row != r]
-    room.entities = [e  for e  in room.entities if not (e.row == r and e.alive)]
-    for e in removed:
-        if e.kind == 'exit':
-            room.exit_pos = None
-        elif e.kind == 'entry_marker':
-            room.entry = (1, 1)
-
-
-def _ed_range_items(room, r1, c1, r2, c2):
-    if r1 == r2:
-        lo, hi = min(c1, c2), max(c1, c2)
-        runes = [{'type': 'rune',   'rune': ru} for ru in room.runes
-                 if ru.row == r1 and lo <= ru.col <= hi]
-        ents  = [{'type': 'entity', 'entity': e} for e in room.entities
-                 if e.row == r1 and e.alive and lo <= e.col <= hi]
-    else:
-        lo, hi = min(r1, r2), max(r1, r2)
-        runes = [{'type': 'rune',   'rune': ru} for ru in room.runes if lo <= ru.row <= hi]
-        ents  = [{'type': 'entity', 'entity': e} for e in room.entities
-                 if e.alive and lo <= e.row <= hi]
-    return runes + ents
-
-
-def _ed_delete_range(room, r1, c1, r2, c2):
-    items    = _ed_range_items(room, r1, c1, r2, c2)
-    rune_ids = {id(i['rune'])   for i in items if i['type'] == 'rune'}
-    ent_ids  = {id(i['entity']) for i in items if i['type'] == 'entity'}
-    removed  = [e for e in room.entities if id(e) in ent_ids]
-    room.runes    = [ru for ru in room.runes    if id(ru) not in rune_ids]
-    room.entities = [e  for e  in room.entities if id(e)  not in ent_ids]
-    for e in removed:
-        if e.kind == 'exit':
-            room.exit_pos = None
-        elif e.kind == 'entry_marker':
-            room.entry = (1, 1)
-    return items
-
-
-def _clip_desc(item) -> str:
-    if item['type'] == 'rune':
-        return f"{item['rune'].kind} rune"
-    if item['type'] == 'entity':
-        return item['entity'].kind
-    ct = item.get('cell_type')
-    return 'wall' if ct == CellType.WALL else 'floor'
+        return 'hjkl:move cursor  0:jump to start of line  ^:first non-blank  $:jump to end of line  :w write  :q quit'
+    return 'h/j/k/l:move cursor  :w write (save)  :q quit  :q! quit without saving'
 
 
 # ── Dungeon game loop ──────────────────────────────────────────────────────────
@@ -513,6 +223,10 @@ def run_dungeon(term: Terminal, level: int, progress: dict,
     msg_ttl  = 0
     undo_stack: list[tuple[int, int, int]] = []
     redo_stack: list[tuple[int, int, int]] = []
+    edit_mode  = False
+    clipboard: list = []
+    ed_undo:   list = []
+    ed_redo:   list = []
     count_tutorial_shown = False
     at_exit  = False   # player has stepped on the exit at some point
     last_saved_stars = progress.get(level, {}).get('stars', 0)
@@ -527,12 +241,19 @@ def run_dungeon(term: Terminal, level: int, progress: dict,
     elif level == 3:
         message = 'The Rune Halls — w:next cluster  b:prev cluster  e:end of cluster'
         msg_ttl = 60
+    elif level == 99:
+        message = 'Sandbox — all mechanics active. Type :edit to enter editor mode.'
+        msg_ttl = 60
+
+    any_water     = any(ct == CellType.WATER for row in room.cells for ct in row)
+    last_activity = time.time()
 
     render_all(term, dungeon, player, budget, message)
 
     while True:
         key = term.inkey(timeout=0.1)
 
+        prev_message = message
         if player.is_dead:
             message = '** GAME OVER ** Type  :e  to re-load the dungeon.'
             msg_ttl = 2
@@ -542,9 +263,12 @@ def run_dungeon(term: Terminal, level: int, progress: dict,
                 message = ''
 
         if not key:
-            render_all(term, dungeon, player, budget, message)
+            water_active = any_water and (time.time() - last_activity < _WATER_SETTLE_SECS)
+            if message != prev_message or water_active:
+                render_all(term, dungeon, player, budget, message)
             continue
 
+        last_activity = time.time()
         player.error = ''   # clear any statusline error on the next keypress
 
         # ── Command mode ──────────────────────────────────────────────────────
@@ -596,11 +320,36 @@ def run_dungeon(term: Terminal, level: int, progress: dict,
                     budget  = Budget(room.budget or 20)
                     undo_stack.clear()
                     redo_stack.clear()
+                    edit_mode = False
+                    clipboard.clear()
+                    ed_undo.clear()
+                    ed_redo.clear()
                     key_buf  = ''
                     at_exit  = False
                     won      = False
                     message  = 'Dungeon restarted. Good luck.' if player_name != 'admin' else 'New dungeon loaded.'
                     msg_ttl  = 30
+
+                elif cmd == 'edit' and player_name == 'admin':
+                    edit_mode = not edit_mode
+                    room.passable_walls = edit_mode
+                    if edit_mode:
+                        if 'editor' not in player.known_commands:
+                            player.known_commands = player.known_commands + ['editor']
+                        message = 'EDIT mode ON — x:cut  s:subst  dd/yy  d/y{m}  p/P  :save <name>'
+                    else:
+                        player.known_commands = [c for c in player.known_commands if c != 'editor']
+                        message = 'EDIT mode OFF.'
+                    msg_ttl = 40
+
+                elif cmd.startswith('save ') and player_name == 'admin':
+                    name = cmd[5:].strip()
+                    if name:
+                        path = SM.save_layout(name, _serialize_room(room))
+                        message = f'Layout saved: {path.name}'
+                    else:
+                        message = 'Usage:  :save <name>'
+                    msg_ttl = 40
 
                 else:
                     message = f'Unknown command: :{cmd}'
@@ -641,7 +390,7 @@ def run_dungeon(term: Terminal, level: int, progress: dict,
             count  = action.get('count', 1)
             target = action.get('target')
 
-            if count > 1 and 'count' not in player.known_commands:
+            if count > 1 and 'count' not in player.known_commands and not edit_mode:
                 message = "You haven't learned count motions yet."
                 msg_ttl = 20
                 render_all(term, dungeon, player, budget, message)
@@ -655,18 +404,19 @@ def run_dungeon(term: Terminal, level: int, progress: dict,
 
             moved = apply_motion(player, motion, count, room, target)
             if moved:
-                budget.spend(_keystroke_cost(count))
-                undo_stack.append(prev_pos)
-                redo_stack.clear()
+                if not edit_mode:
+                    budget.spend(_keystroke_cost(count))
+                    undo_stack.append(prev_pos)
+                    redo_stack.clear()
 
-                if count > 1 and not count_tutorial_shown:
+                if count > 1 and not count_tutorial_shown and not edit_mode:
                     count_tutorial_shown = True
                     message = f'{count}{motion} moved {count} steps in 2 keystrokes — count is efficient!'
                     msg_ttl = 40
 
-                # Void rune: fall animation, lose heart, respawn
+                # Void rune: fall animation, lose heart, respawn (skip in edit mode)
                 ru = room.rune_at(player.row, player.col)
-                if ru and ru.kind == 'void':
+                if not edit_mode and ru and ru.kind == 'void':
                     iw    = _iw(term)
                     game_h = term.height - 7
                     vr_start = max(0, min(player.row - game_h // 2, room.rows - game_h))
@@ -675,19 +425,46 @@ def run_dungeon(term: Terminal, level: int, progress: dict,
                     scr_c    = player.col - vc_start + 1
                     render_all(term, dungeon, player, budget, message)
                     _void_fall_animation(term, scr_r, scr_c)
-                    player.take_damage()
+                    player.take_damage(2)  # 1 full heart
                     player.row, player.col = prev_pos[0], prev_pos[1]
                     if player.is_dead:
                         message = '** GAME OVER ** Type  :e  to re-load the dungeon.'
                         msg_ttl = 2
                     else:
-                        message = f'You fell into the void!  ({player.hp} ♥ remaining)'
+                        h, hh = player.hp // 2, '½' if player.hp % 2 else ''
+                        message = f'You fell into the void!  ({h}{hh} ♥ remaining)'
                         msg_ttl = 25
                     render_all(term, dungeon, player, budget, message)
                     continue
 
-                # Win / exit check
+                # Dynamite: explode if stepped on
                 ent = room.entity_at(player.row, player.col)
+                if not edit_mode and ent and ent.kind == 'dynamite':
+                    expl_r, expl_c = ent.row, ent.col
+                    room.kill_entity(ent)
+                    iw_now     = _iw(term)
+                    game_h_now = term.height - 7
+                    vr = max(0, min(player.row - game_h_now // 2, room.rows - game_h_now))
+                    vc = max(0, min(player.col - iw_now     // 2, room.cols - iw_now))
+                    vr, vc = max(0, vr), max(0, vc)
+                    scr_r = 3 + (expl_r - vr)
+                    scr_c = 1 + (expl_c - vc)
+                    render_all(term, dungeon, player, budget, message)
+                    _explosion_animation(term, room, expl_r, expl_c, scr_r, scr_c, iw_now, game_h_now)
+                    dmg = _EXPL_DAMAGE.get(0, 0)  # player is at the centre
+                    player.take_damage(dmg)
+                    if player.is_dead:
+                        message = 'You set off a dynamite charge!  GAME OVER  (:e to reload)'
+                        msg_ttl = 2
+                    else:
+                        h, hh = player.hp // 2, '½' if player.hp % 2 else ''
+                        message = f'BOOM! Dynamite!  ({h}{hh} ♥ remaining)'
+                        msg_ttl = 30
+                    ent = None  # consumed; fall through to normal render
+
+                # Win / exit check
+                if ent is None:
+                    ent = room.entity_at(player.row, player.col)
                 if ent and ent.kind == 'exit' and not won:
                     won = True
                     at_exit = True
@@ -723,178 +500,116 @@ def run_dungeon(term: Terminal, level: int, progress: dict,
                     msg_ttl = 20
 
         elif action['type'] == 'undo':
-            if undo_stack:
-                redo_stack.append((player.row, player.col, budget.spent))
-                pr, pc, ps = undo_stack.pop()
-                player.row, player.col = pr, pc
-                budget.spent = ps
-                message = 'Undone.'
-                msg_ttl = 15
-            else:
-                message = 'Nothing to undo.'
-                msg_ttl = 15
-
-        elif action['type'] == 'redo':
-            if redo_stack:
-                undo_stack.append((player.row, player.col, budget.spent))
-                pr, pc, ps = redo_stack.pop()
-                player.row, player.col = pr, pc
-                budget.spent = ps
-
-        elif action['type'] == 'interact':
-            interacted = False
-            cur = room.entity_at(player.row, player.col)
-            if cur and cur.kind == 'chest':
-                cur.alive = False
-                budget.spend(1)
-                message = 'You looted the chest!'
-                msg_ttl = 30
-                interacted = True
-            elif cur and cur.kind == 'door':
-                col = cur.col
-                for e in room.entities:
-                    if e.kind == 'door' and e.col == col:
-                        e.alive = False
-                _update_fog(room)
-                budget.spend(1)
-                message = 'Door opened.'
-                msg_ttl = 20
-                interacted = True
-            if not interacted:
-                message = 'Nothing to open here.'
-                msg_ttl = 15
-
-        if budget.is_over:
-            message = 'Over budget! Try a more efficient path. (u to undo)'
-            msg_ttl = 30
-
-        render_all(term, dungeon, player, budget, message)
-
-
-# ── Admin dummy dungeon editor ────────────────────────────────────────────────
-
-def run_dummy_dungeon(term: Terminal, progress: dict, player_name: str) -> dict:
-    """Admin editing sandbox.  Returns same dict shape as run_dungeon."""
-    seed    = random.randint(0, 2**31)
-    dungeon = build_dungeon_dummy(seed)
-    room    = dungeon.room
-    player  = Player(row=room.entry[0], col=room.entry[1])
-    player.known_commands = ['editor']   # renderer picks up the editor hint bar
-    budget  = Budget(99999)
-
-    clipboard:  list = []
-    undo_stack: list = []
-    redo_stack: list = []
-    key_buf  = ''
-    message  = 'Admin Editor — walk on walls  x:cut  s:subst  dd/yy  d/y{m}  p/P  u:undo'
-    msg_ttl  = 120
-
-    render_all(term, dungeon, player, budget, message)
-
-    while True:
-        key = term.inkey(timeout=0.1)
-
-        if msg_ttl > 0:
-            msg_ttl -= 1
-            if msg_ttl == 0:
-                message = ''
-        if not key:
-            continue
-
-        # ── Command mode ──────────────────────────────────────────────────────
-        if player.mode == Mode.COMMAND:
-            if key.name == 'KEY_ESCAPE':
-                player.mode     = Mode.NORMAL
-                player.cmd_line = ''
-            elif key.name == 'KEY_ENTER' or str(key) in ('\n', '\r'):
-                cmd = player.cmd_line.strip()
-                player.mode     = Mode.NORMAL
-                player.cmd_line = ''
-                if cmd in ('q', 'q!'):
-                    return {'won': False, 'stars': 0, 'action': 'quit'}
-                elif cmd == 'wq':
-                    return {'won': False, 'stars': 0, 'action': 'wq'}
-                elif cmd == 'w':
-                    message = 'Saved.'
-                    msg_ttl = 30
+            if edit_mode:
+                if ed_undo:
+                    ed_redo.append(_ed_snapshot(room, player))
+                    _ed_restore(room, player, ed_undo.pop())
+                    message = 'Undone.'
                 else:
-                    message = f'Unknown command: :{cmd}'
-                    msg_ttl = 30
-            elif key.name == 'KEY_BACKSPACE' or str(key) == '\x7f':
-                player.cmd_line = player.cmd_line[:-1]
-            else:
-                player.cmd_line += str(key)
-            render_all(term, dungeon, player, budget, message)
-            continue
-
-        # ── Normal mode ───────────────────────────────────────────────────────
-        if key.name == 'KEY_ESCAPE':
-            player.mode = Mode.NORMAL
-            key_buf = ''
-            render_all(term, dungeon, player, budget, message)
-            continue
-
-        raw      = str(key) if not key.is_sequence else ''
-        key_buf += raw
-        action, key_buf = parse(key_buf, player.mode)
-
-        if action is None:
-            render_all(term, dungeon, player, budget, message)
-            continue
-
-        # All motions are always available — no known_commands gating here.
-        if action['type'] == 'motion':
-            apply_motion(player, action['motion'], action.get('count', 1),
-                         room, action.get('target'))
-
-        elif action['type'] == 'enter_mode' and action['mode'] == 'command':
-            player.mode     = Mode.COMMAND
-            player.cmd_line = ''
-
-        elif action['type'] == 'undo':
-            if undo_stack:
-                redo_stack.append(_ed_snapshot(room, player))
-                _ed_restore(room, player, undo_stack.pop())
+                    message = 'Nothing to undo.'
+                msg_ttl = 15
+            elif undo_stack:
+                item = undo_stack.pop()
+                if isinstance(item, dict):
+                    redo_stack.append({'row': player.row, 'col': player.col,
+                                       'spent': budget.spent,
+                                       'entities': [Entity(kind=e.kind, row=e.row, col=e.col, hp=e.hp, alive=e.alive) for e in room.entities],
+                                       'fog_col': room.fog_col})
+                    player.row, player.col = item['row'], item['col']
+                    budget.spent = item['spent']
+                    room.entities = item['entities']
+                    room.fog_col  = item['fog_col']
+                    room.rebuild_indexes()
+                else:
+                    redo_stack.append((player.row, player.col, budget.spent))
+                    pr, pc, ps = item
+                    player.row, player.col = pr, pc
+                    budget.spent = ps
                 message = 'Undone.'
+                msg_ttl = 15
             else:
                 message = 'Nothing to undo.'
-            msg_ttl = 15
+                msg_ttl = 15
 
         elif action['type'] == 'redo':
-            if redo_stack:
-                undo_stack.append(_ed_snapshot(room, player))
-                _ed_restore(room, player, redo_stack.pop())
-                message = 'Redone.'
-            else:
-                message = 'Nothing to redo.'
-            msg_ttl = 15
+            if edit_mode:
+                if ed_redo:
+                    ed_undo.append(_ed_snapshot(room, player))
+                    _ed_restore(room, player, ed_redo.pop())
+                    message = 'Redone.'
+                else:
+                    message = 'Nothing to redo.'
+                msg_ttl = 15
+            elif redo_stack:
+                item = redo_stack.pop()
+                if isinstance(item, dict):
+                    undo_stack.append({'row': player.row, 'col': player.col,
+                                       'spent': budget.spent,
+                                       'entities': [Entity(kind=e.kind, row=e.row, col=e.col, hp=e.hp, alive=e.alive) for e in room.entities],
+                                       'fog_col': room.fog_col})
+                    player.row, player.col = item['row'], item['col']
+                    budget.spent = item['spent']
+                    room.entities = item['entities']
+                    room.fog_col  = item['fog_col']
+                    room.rebuild_indexes()
+                else:
+                    undo_stack.append((player.row, player.col, budget.spent))
+                    pr, pc, ps = item
+                    player.row, player.col = pr, pc
+                    budget.spent = ps
 
         elif action['type'] == 'interact':
-            # x — cut rune, entity, or wall at cursor
-            undo_stack.append(_ed_snapshot(room, player))
-            redo_stack.clear()
-            item = _ed_cut(room, player.row, player.col)
-            if item:
-                clipboard = [item]
-                message   = f'Cut: {_clip_desc(item)}'
+            if edit_mode:
+                ed_undo.append(_ed_snapshot(room, player))
+                ed_redo.clear()
+                item = _ed_cut(room, player.row, player.col)
+                if item:
+                    clipboard = [item]
+                    message   = f'Cut: {_clip_desc(item)}'
+                else:
+                    ed_undo.pop()
+                    message = 'Nothing to cut here.'
+                msg_ttl = 25
             else:
-                undo_stack.pop()   # nothing changed; don't pollute undo history
-                message = 'Nothing to cut here.'
-            msg_ttl = 25
+                interacted = False
+                cur = room.entity_at(player.row, player.col)
+                if cur and cur.kind == 'chest':
+                    room.kill_entity(cur)
+                    budget.spend(1)
+                    message = 'You looted the chest!'
+                    msg_ttl = 30
+                    interacted = True
+                elif cur and cur.kind == 'door':
+                    undo_stack.append({'row': player.row, 'col': player.col,
+                                       'spent': budget.spent,
+                                       'entities': [Entity(kind=e.kind, row=e.row, col=e.col, hp=e.hp, alive=e.alive) for e in room.entities],
+                                       'fog_col': room.fog_col})
+                    redo_stack.clear()
+                    col = cur.col
+                    for e in room.entities:
+                        if e.kind == 'door' and e.col == col:
+                            room.kill_entity(e)
+                    _update_fog(room)
+                    budget.spend(1)
+                    message = 'Door opened.'
+                    msg_ttl = 20
+                    interacted = True
+                if not interacted:
+                    message = 'Nothing to open here.'
+                    msg_ttl = 15
 
-        elif action['type'] == 'substitute':
-            # s — toggle wall/floor + cut any rune/entity at cursor
-            undo_stack.append(_ed_snapshot(room, player))
-            redo_stack.clear()
+        elif edit_mode and action['type'] == 'substitute':
+            ed_undo.append(_ed_snapshot(room, player))
+            ed_redo.clear()
             items     = _ed_subst(room, player.row, player.col)
             clipboard = items
             message   = 'Substituted: ' + ', '.join(_clip_desc(i) for i in items)
             msg_ttl   = 25
 
-        elif action['type'] == 'paste':
+        elif edit_mode and action['type'] == 'paste':
             if clipboard:
-                undo_stack.append(_ed_snapshot(room, player))
-                redo_stack.clear()
+                ed_undo.append(_ed_snapshot(room, player))
+                ed_redo.clear()
                 before  = action.get('before', False)
                 start_c = player.col if before else player.col + 1
                 _ed_paste(room, player.row, start_c, clipboard)
@@ -903,16 +618,13 @@ def run_dummy_dungeon(term: Terminal, progress: dict, player_name: str) -> dict:
                 message = 'Clipboard is empty.'
             msg_ttl = 20
 
-        elif action['type'] == 'operator':
+        elif edit_mode and action['type'] == 'operator':
             op     = action['op']
             motion = action['motion']
             count  = action.get('count', 1)
-
-            undo_stack.append(_ed_snapshot(room, player))
-            redo_stack.clear()
-
+            ed_undo.append(_ed_snapshot(room, player))
+            ed_redo.clear()
             if motion == 'line':
-                # dd / yy / cc — operate on `count` rows
                 all_items: list = []
                 for dr in range(count):
                     r = player.row + dr
@@ -924,15 +636,12 @@ def run_dummy_dungeon(term: Terminal, progress: dict, player_name: str) -> dict:
                 clipboard = all_items
                 verb    = 'Cut' if op in ('d', 'c') else 'Yanked'
                 message = f'{verb} {len(all_items)} item(s) from {count} row(s).'
-
             else:
-                # d{motion} / y{motion} / c{motion} — range cut/yank
                 orig_r, orig_c = player.row, player.col
                 mc = action.get('motion_count', 1)
                 apply_motion(player, motion, mc, room, action.get('target'))
                 new_r, new_c = player.row, player.col
-                player.row, player.col = orig_r, orig_c  # cursor stays at origin
-
+                player.row, player.col = orig_r, orig_c
                 if op in ('d', 'c'):
                     items = _ed_delete_range(room, orig_r, orig_c, new_r, new_c)
                 else:
@@ -940,11 +649,13 @@ def run_dummy_dungeon(term: Terminal, progress: dict, player_name: str) -> dict:
                 clipboard = items
                 verb    = 'Cut' if op in ('d', 'c') else 'Yanked'
                 message = f'{verb} {len(items)} item(s).'
-
             if op == 'y':
-                undo_stack.pop()   # yank is read-only; don't pollute undo history
-
+                ed_undo.pop()
             msg_ttl = 25
+
+        if not edit_mode and budget.is_over:
+            message = 'Over budget! Try a more efficient path. (u to undo)'
+            msg_ttl = 30
 
         render_all(term, dungeon, player, budget, message)
 
@@ -1208,10 +919,7 @@ def main():
                 break
 
             level = ow_result['level']
-            if level == 99:
-                dung_result = run_dummy_dungeon(term, progress, player.name)
-            else:
-                dung_result = run_dungeon(term, level, progress, player.name)
+            dung_result = run_dungeon(term, level, progress, player.name)
 
             # Persist progress only when the player explicitly saved (:wq).
             # (:w mid-dungeon already updated progress and saved inline.)

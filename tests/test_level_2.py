@@ -151,7 +151,7 @@ def test_entry_and_exit_not_on_void(seed):
     assert room.exit_pos not in void_cells, f"seed={seed}: exit is on a void cell"
 
 
-# ── Known failing tests (bugs to be fixed) ───────────────────────────────────
+# ── Regression tests (previously failing bugs, now fixed) ────────────────────
 
 def test_3j_59l_3k_does_not_beat_par():
     """Fog wall blocks the count-motion shortcut to the exit.
@@ -159,9 +159,9 @@ def test_3j_59l_3k_does_not_beat_par():
     Without fog, '3j 59l 3k' from entry (2,2) would reach exit_pos directly
     by passing through the void wall, coming in far under par.  The fog wall
     at col 20 stops 59l at col 19 (the door), so the player cannot reach the
-    exit via this sequence.
+    exit via this sequence.  Fixed: move_player respects fog_col.
     """
-    from main import apply_motion
+    from engine.motion import apply_motion
     from engine.player import Player
 
     d = build_dungeon_2(1)
@@ -179,21 +179,17 @@ def test_3j_59l_3k_does_not_beat_par():
 
 
 def test_count_with_trailing_zero_not_split_at_zero():
-    """Bug: '30l' is misparsed as motion='0' (go-to-line-start) with count=3.
+    """'30l' must parse as count=30 motion='l', not count=3 motion='0' then 'l'.
 
-    COUNTS = set('123456789') excludes '0', so the parser treats the '0' in
-    '30' as the beginning-of-line motion rather than the second digit of the
-    count.  In real Vim, '0' is only a motion when it appears as the *first*
-    character of a command; after one or more non-zero digits it is always part
-    of the count.
-
-    Fix: allow '0' inside the count-accumulation loop when count is non-empty.
+    COUNTS = set('123456789') excludes '0'.  '0' is only a standalone motion
+    when it appears as the first character of a command; after a non-zero digit
+    it is always part of the count.  Fixed: vim_parser allows '0' inside the
+    count-accumulation loop when count is non-empty via `(count and buf[i]=='0')`.
     """
     from engine.vim_parser import parse
     from engine.modes import Mode
 
     action, remaining = parse('30l', Mode.NORMAL)
-    # FAILS: parser returns {'type': 'motion', 'motion': '0', 'count': 3}
     assert action == {'type': 'motion', 'motion': 'l', 'count': 30}, (
         f"'30l' parsed as {action!r}; expected count=30 motion='l'"
     )

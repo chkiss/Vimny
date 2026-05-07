@@ -48,7 +48,7 @@ def test_parser_returns_none_in_non_normal_modes(mode):
 
 # ── ESC mode exit via _apply_esc helper ──────────────────────────────────────
 
-from main import _apply_esc  # noqa: E402  (import after engine imports)
+from engine.motion import _apply_esc  # noqa: E402  (import after engine imports)
 
 
 @pytest.mark.parametrize("start_mode", [

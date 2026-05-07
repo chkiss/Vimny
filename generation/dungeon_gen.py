@@ -385,6 +385,7 @@ def build_dungeon_0(seed: int) -> Dungeon:
     composite.budget = math.ceil(par * 1.4)
     composite.answer = path
 
+    composite.rebuild_indexes()
     dungeon.rooms = [composite]
     dungeon.current_room = 0
     return dungeon
@@ -554,6 +555,7 @@ def build_dungeon_1(seed: int) -> Dungeon:
     composite.par    = par
     composite.budget = math.ceil(par * 1.4)
     composite.answer = path
+    composite.rebuild_indexes()
     dungeon.rooms    = [composite]
     dungeon.current_room = 0
     return dungeon
@@ -664,6 +666,7 @@ def build_dungeon_2(seed: int) -> Dungeon:
 
     # Full par: state-space Dijkstra with all Level 2 commands and door states.
     # Accounts for door-blocking (breaking $ into segments) and x keystrokes.
+    composite.rebuild_indexes()
     composite.par, composite.answer = _dijkstra_par_level2(composite, door_cols, return_path=True)
     composite.budget = math.ceil(composite.par * 1.4)
 
@@ -936,6 +939,7 @@ def build_dungeon_3(seed: int) -> Dungeon:
         for row_top in _L3_CORR_TOP_ROWS:
             _make_rune_corridor(composite, rune_rng, row_top, blocked=blocked)
 
+        composite.rebuild_indexes()
         par, path = _dijkstra_par_wbe(composite, return_path=True)
         if par is not None:
             break
@@ -967,6 +971,15 @@ def build_dungeon_dummy(seed: int) -> Dungeon:
     for r in range(9, 16):
         cells[r][38] = CellType.WALL
 
+    # Demo corridor strip (structurally distinct from floor; visible to admin)
+    for c in range(25, 36):
+        cells[9][c] = CellType.CORRIDOR
+
+    # Demo water pool so the admin can see the animation and test cut/paste
+    for r in range(11, 17):
+        for c in range(44, 58):
+            cells[r][c] = CellType.WATER
+
     composite = Room(room_type=RoomType.ENTRY, rows=ROWS, cols=COLS)
     composite.cells = cells
     composite.seed  = seed
@@ -979,6 +992,7 @@ def build_dungeon_dummy(seed: int) -> Dungeon:
         Entity(kind='exit',         row=ROWS - 2, col=COLS - 2),
         Entity(kind='door',         row=6,        col=30),
         Entity(kind='door',         row=7,        col=30),
+        Entity(kind='dynamite',     row=3,        col=50),
     ]
 
     composite.runes = [
@@ -990,7 +1004,8 @@ def build_dungeon_dummy(seed: int) -> Dungeon:
 
     composite.par            = None
     composite.budget         = 99999
-    composite.passable_walls = True
+    composite.passable_walls = False
+    composite.rebuild_indexes()
     dungeon.rooms            = [composite]
     dungeon.current_room = 0
     return dungeon

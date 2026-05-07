@@ -16,8 +16,13 @@ def player_fg():     return _term.bright_white
 def enemy_fg():      return _term.color_rgb(220, 120, 20)
 def enemy_frozen():  return _term.color_rgb(100, 180, 255)
 def boss_fg():       return _term.color_rgb(200, 30, 30)
-def heart_full():    return _term.color_rgb(220, 40, 40)
-def heart_empty():   return _term.color_rgb(60, 60, 60)
+def heart_full():    return _term.color_rgb(220, 40,  40)
+def heart_half():    return _term.color_rgb(220, 160,  30)
+def heart_empty():   return _term.color_rgb( 60, 60,  60)
+def dynamite_fg():   return _term.color_rgb(255, 80,   0)
+def expl_near():     return _term.bold + _term.bright_white
+def expl_mid():      return _term.color_rgb(255, 160,  30) + _term.bold
+def expl_far():      return _term.color_rgb(200,  70,  10)
 def exit_fg():       return _term.bright_green
 def chest_fg():      return _term.color_rgb(220, 180, 40)
 def door_fg():       return _term.color_rgb(80, 80, 80)
@@ -43,3 +48,6 @@ def statusline_bg(): return _term.on_color_rgb(40, 40, 55)
 def statusline_fg(): return _term.color_rgb(180, 180, 200)
 def error_bg():      return _term.on_color_rgb(180, 30, 30)
 def error_fg():      return _term.bright_white
+
+def water_bg():          return _term.on_color_rgb(4, 18, 60)
+def water_fg(r, g, b):   return _term.color_rgb(r, g, b)
