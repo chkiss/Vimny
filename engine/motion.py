@@ -38,7 +38,8 @@ def _cell_char(room, r: int, c: int) -> str:
         if ent.kind == 'entry_marker': return '@'
         if ent.kind == 'dynamite':     return '!'
         return '?'
-    return '#' if room.cells[r][c] == CellType.WALL else '.'
+    ct = room.cells[r][c]
+    return '#' if ct in (CellType.WALL, CellType.WOOD_WALL) else '.'
 
 
 def apply_motion(player, motion, count, room, target=None):
@@ -176,7 +177,7 @@ def apply_motion(player, motion, count, room, target=None):
             fwd  = motion in ('f', 't')
             scan = range(player.col + 1, room.cols) if fwd else range(player.col - 1, -1, -1)
             for nc in scan:
-                if room.cells[row][nc] == CellType.WALL:
+                if room.cells[row][nc] in (CellType.WALL, CellType.WOOD_WALL):
                     break  # walls block the scan; water does not
                 if _cell_char(room, row, nc) == target:
                     if motion == 'f':

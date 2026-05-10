@@ -185,6 +185,12 @@ def render_all(term: Terminal, dungeon: Dungeon, player: Player,
                     line += C.water_bg() + C.water_fg(wr, wg, wb) + ch + C.normal_fg()
                 elif ct == CellType.WALL:
                     line += wall_bg + ' ' + C.normal_fg()
+                elif ct == CellType.WOOD_WALL:
+                    if room.wood_damage.get((room_r, room_c), 0):
+                        line += (C.wood_wall_damaged_bg() + C.wood_wall_damaged_fg()
+                                 + S.WOOD_WALL_DAMAGED + C.normal_fg())
+                    else:
+                        line += C.wood_wall_bg() + ' ' + C.normal_fg()
                 else:
                     line += floor_bg + ' ' + C.normal_fg()
 
@@ -256,6 +262,7 @@ def render_all(term: Terminal, dungeon: Dungeon, player: Player,
         hint_text = 'h/j/k/l:move cursor  :w write (save)  :q quit  :q! quit without saving'
     if 'admin' in known:
         hint_text += '  :e refresh'
+    hint_text = hint_text[:iw]
     hint = C.hint_fg() + hint_text + rst
     output.append(bfg + S.BOX_V + rst + hint +
                   ' ' * max(0, iw - len(hint_text)) + bfg + S.BOX_V + rst)

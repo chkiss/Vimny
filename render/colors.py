@@ -49,5 +49,9 @@ def statusline_fg(): return _term.color_rgb(180, 180, 200)
 def error_bg():      return _term.on_color_rgb(180, 30, 30)
 def error_fg():      return _term.bright_white
 
-def water_bg():          return _term.on_color_rgb(4, 18, 60)
-def water_fg(r, g, b):   return _term.color_rgb(r, g, b)
+def water_bg():              return _term.on_color_rgb(4, 18, 60)
+def water_fg(r, g, b):       return _term.color_rgb(r, g, b)
+
+def wood_wall_bg():          return _term.on_color_rgb(90, 52, 18)
+def wood_wall_damaged_bg():  return _term.on_color_rgb(55, 28, 6)
+def wood_wall_damaged_fg():  return _term.color_rgb(160, 105, 45)

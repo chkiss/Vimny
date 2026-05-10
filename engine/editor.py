@@ -3,10 +3,11 @@ from __future__ import annotations
 from engine.world import CellType, RuneCluster, Entity
 
 _SUBST_CYCLE = {
-    CellType.FLOOR:    CellType.WALL,
-    CellType.WALL:     CellType.WATER,
-    CellType.WATER:    CellType.FLOOR,
-    CellType.CORRIDOR: CellType.WALL,
+    CellType.FLOOR:     CellType.WALL,
+    CellType.WALL:      CellType.WOOD_WALL,
+    CellType.WOOD_WALL: CellType.WATER,
+    CellType.WATER:     CellType.FLOOR,
+    CellType.CORRIDOR:  CellType.WALL,
 }
 
 
@@ -62,33 +63,36 @@ def _ed_cut(room, r, c):
             room.entry = (1, 1)
         return {'type': 'entity', 'entity': ent}
     ct = room.cells[r][c]
-    if ct in (CellType.WALL, CellType.WATER):
+    if ct in (CellType.WALL, CellType.WATER, CellType.WOOD_WALL):
         room.cells[r][c] = CellType.FLOOR
+        room.wood_damage.pop((r, c), None)
         return {'type': 'cell', 'cell_type': ct}
     return None
 
 
 def _ed_snapshot(room, player) -> dict:
     return {
-        'cells':    [row[:] for row in room.cells],
-        'runes':    [RuneCluster(ru.row, ru.col, ru.symbols, ru.kind) for ru in room.runes],
-        'entities': [Entity(kind=e.kind, row=e.row, col=e.col, hp=e.hp, alive=e.alive)
-                     for e in room.entities],
-        'exit_pos': room.exit_pos,
-        'entry':    room.entry,
-        'pr':       player.row,
-        'pc':       player.col,
+        'cells':       [row[:] for row in room.cells],
+        'runes':       [RuneCluster(ru.row, ru.col, ru.symbols, ru.kind) for ru in room.runes],
+        'entities':    [Entity(kind=e.kind, row=e.row, col=e.col, hp=e.hp, alive=e.alive)
+                        for e in room.entities],
+        'exit_pos':    room.exit_pos,
+        'entry':       room.entry,
+        'wood_damage': dict(room.wood_damage),
+        'pr':          player.row,
+        'pc':          player.col,
     }
 
 
 def _ed_restore(room, player, snap: dict) -> None:
-    room.cells    = snap['cells']
-    room.runes    = snap['runes']
-    room.entities = snap['entities']
-    room.exit_pos = snap['exit_pos']
-    room.entry    = snap['entry']
-    player.row    = snap['pr']
-    player.col    = snap['pc']
+    room.cells       = snap['cells']
+    room.runes       = snap['runes']
+    room.entities    = snap['entities']
+    room.exit_pos    = snap['exit_pos']
+    room.entry       = snap['entry']
+    room.wood_damage = snap.get('wood_damage', {})
+    player.row       = snap['pr']
+    player.col       = snap['pc']
     room.rebuild_indexes()
 
 
@@ -191,14 +195,16 @@ def _clip_desc(item) -> str:
     if item['type'] == 'entity':
         return item['entity'].kind
     ct = item.get('cell_type')
-    if ct == CellType.WALL:  return 'wall'
-    if ct == CellType.WATER: return 'water'
+    if ct == CellType.WALL:      return 'wall'
+    if ct == CellType.WOOD_WALL: return 'wood wall'
+    if ct == CellType.WATER:     return 'water'
     return 'floor'
 
 
 def _serialize_room(room) -> dict:
     """Serialise a Room to a JSON-safe dict for :save."""
-    cell_map = {CellType.WALL: 'W', CellType.FLOOR: 'F', CellType.CORRIDOR: 'C', CellType.WATER: 'A'}
+    cell_map = {CellType.WALL: 'W', CellType.FLOOR: 'F', CellType.CORRIDOR: 'C',
+                CellType.WATER: 'A', CellType.WOOD_WALL: 'X'}
     return {
         'rows':     room.rows,
         'cols':     room.cols,

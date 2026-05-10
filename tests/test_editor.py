@@ -240,12 +240,20 @@ class TestEdSubst:
         assert room.cells[3][5] == CellType.WALL
         assert any(i['type'] == 'cell' and i['cell_type'] == CellType.FLOOR for i in items)
 
-    def test_wall_subst_cycles_to_water(self):
+    def test_wall_subst_cycles_to_wood_wall(self):
         room = _make_room()
         items = _ed_subst(room, 0, 5)  # border cell is WALL
-        assert room.cells[0][5] == CellType.WATER
+        assert room.cells[0][5] == CellType.WOOD_WALL
         cell_types = [i['cell_type'] for i in items if i['type'] == 'cell']
         assert CellType.WALL in cell_types
+
+    def test_wood_wall_subst_cycles_to_water(self):
+        room = _make_room()
+        room.cells[3][5] = CellType.WOOD_WALL
+        items = _ed_subst(room, 3, 5)
+        assert room.cells[3][5] == CellType.WATER
+        cell_types = [i['cell_type'] for i in items if i['type'] == 'cell']
+        assert CellType.WOOD_WALL in cell_types
 
     def test_water_subst_cycles_to_floor(self):
         room = _make_room()

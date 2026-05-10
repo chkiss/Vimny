@@ -4,10 +4,11 @@ from enum import Enum, auto
 from typing import Optional
 
 class CellType(Enum):
-    WALL     = auto()
-    FLOOR    = auto()
-    CORRIDOR = auto()
-    WATER    = auto()
+    WALL      = auto()
+    FLOOR     = auto()
+    CORRIDOR  = auto()
+    WATER     = auto()
+    WOOD_WALL = auto()  # destructible: 2 half-steps of damage to destroy
 
 class RoomType(Enum):
     ENTRY   = auto()
@@ -49,6 +50,7 @@ class Room:
     fog_col: int                = -1   # columns >= fog_col are hidden; -1 = no fog
     passable_walls: bool        = False  # if True, walls are walkable (editor mode)
     answer: str                 = ''     # keystroke solution shown to admin
+    wood_damage: dict           = field(default_factory=dict)  # (r,c) -> half-steps received (1=cracked)
 
     def __post_init__(self):
         self._entity_map: dict = {}
@@ -111,6 +113,20 @@ class Room:
         if self.passable_walls:
             return True
         return self.cells[r][c] in (CellType.FLOOR, CellType.CORRIDOR)
+
+    def damage_wood_wall(self, r: int, c: int, half_steps: int = 1) -> bool:
+        """Deal half_steps of damage to wood wall at (r, c).
+
+        Returns True if destroyed (cell becomes FLOOR); False if still standing.
+        """
+        current = self.wood_damage.get((r, c), 0)
+        total   = current + half_steps
+        if total >= 2:
+            self.cells[r][c] = CellType.FLOOR
+            self.wood_damage.pop((r, c), None)
+            return True
+        self.wood_damage[(r, c)] = total
+        return False
 
     def entity_at(self, r: int, c: int) -> Optional[Entity]:
         return self._entity_map.get((r, c))

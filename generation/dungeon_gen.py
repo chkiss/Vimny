@@ -965,9 +965,13 @@ def build_dungeon_dummy(seed: int) -> Dungeon:
         for c in range(1, COLS - 1):
             cells[r][c] = CellType.FLOOR
 
-    # Demo wall strips so the admin can practice cutting/pasting walls
-    for c in range(8, 22):
-        cells[5][c] = CellType.WALL
+    # Wood wall block: rows 4-7 and 9-12 span cols 7-21; row 8 is shorter (cols 7-13)
+    for r in range(4, 13):
+        end_c = 14 if r == 8 else 22
+        for c in range(7, end_c):
+            cells[r][c] = CellType.WOOD_WALL
+
+    # Vertical stone wall divider at col 38, rows 9-15
     for r in range(9, 16):
         cells[r][38] = CellType.WALL
 
@@ -992,7 +996,7 @@ def build_dungeon_dummy(seed: int) -> Dungeon:
         Entity(kind='exit',         row=ROWS - 2, col=COLS - 2),
         Entity(kind='door',         row=6,        col=30),
         Entity(kind='door',         row=7,        col=30),
-        Entity(kind='dynamite',     row=3,        col=50),
+        Entity(kind='dynamite',     row=8,        col=14),
     ]
 
     composite.runes = [

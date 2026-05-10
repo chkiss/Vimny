@@ -1,8 +1,21 @@
-import json, re
+import json, os, pwd, re
 from pathlib import Path
 from typing import Optional
 
-SAVE_DIR    = Path.home() / '.Vimny'
+def _home() -> Path:
+    for var in ('SUDO_USER', 'DOAS_USER'):
+        user = os.environ.get(var)
+        if user and user != 'root':
+            return Path(pwd.getpwnam(user).pw_dir)
+    home = Path.home()
+    if home == Path('/root'):
+        raise RuntimeError(
+            'Vimny refuses to write save files to /root/. '
+            'Run as a non-root user or via sudo from a normal account.'
+        )
+    return home
+
+SAVE_DIR    = _home() / '.Vimny'
 SAVES_DIR   = SAVE_DIR / 'saves'
 LAYOUTS_DIR = SAVE_DIR / 'layouts'
 

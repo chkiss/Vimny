@@ -440,6 +440,13 @@ def run_dungeon(term: Terminal, level: int, progress: dict,
                 # Dynamite: explode if stepped on
                 ent = room.entity_at(player.row, player.col)
                 if not edit_mode and ent and ent.kind == 'dynamite':
+                    if undo_stack and isinstance(undo_stack[-1], tuple):
+                        pr, pc, ps = undo_stack.pop()
+                        undo_stack.append({
+                            'row': pr, 'col': pc, 'spent': ps,
+                            'entities': [Entity(kind=e.kind, row=e.row, col=e.col, hp=e.hp, alive=e.alive) for e in room.entities],
+                            'fog_col': room.fog_col,
+                        })
                     expl_r, expl_c = ent.row, ent.col
                     room.kill_entity(ent)
                     iw_now     = _iw(term)
@@ -451,6 +458,15 @@ def run_dungeon(term: Terminal, level: int, progress: dict,
                     scr_c = 1 + (expl_c - vc)
                     render_all(term, dungeon, player, budget, message)
                     _explosion_animation(term, room, expl_r, expl_c, scr_r, scr_c, iw_now, game_h_now)
+                    for _dr in range(-3, 4):
+                        for _dc in range(-3, 4):
+                            _dist = abs(_dr) + abs(_dc)
+                            if _dist not in _EXPL_DAMAGE:
+                                continue
+                            _wr, _wc = expl_r + _dr, expl_c + _dc
+                            if (0 <= _wr < room.rows and 0 <= _wc < room.cols
+                                    and room.cells[_wr][_wc] == CellType.WOOD_WALL):
+                                room.damage_wood_wall(_wr, _wc, _EXPL_DAMAGE[_dist])
                     dmg = _EXPL_DAMAGE.get(0, 0)  # player is at the centre
                     player.take_damage(dmg)
                     if player.is_dead:

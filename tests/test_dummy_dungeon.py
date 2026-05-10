@@ -24,7 +24,7 @@ EXPECTED_RUNE_KINDS   = {'ancient', 'verdant', 'void', 'ember'}
 
 # Cell types where _ed_cut should return a clip and leave FLOOR behind.
 # Structural floor types (FLOOR, CORRIDOR) are pasteable but not cuttable.
-CUTTABLE_TYPES = {CellType.WALL, CellType.WATER}
+CUTTABLE_TYPES = {CellType.WALL, CellType.WATER, CellType.WOOD_WALL}
 
 
 # ── Presence ──────────────────────────────────────────────────────────────────

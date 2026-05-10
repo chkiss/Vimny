@@ -1,7 +1,8 @@
-WALL_SOLID   = '█'
-WALL_SHADE1  = '▓'
-WALL_SHADE2  = '▒'
-WALL_SHADE3  = '░'
+WALL_SOLID        = '█'
+WALL_SHADE1       = '▓'
+WALL_SHADE2       = '▒'
+WALL_SHADE3       = '░'
+WOOD_WALL_DAMAGED = '░'
 
 FLOOR        = ' '
 CORRIDOR     = ' '
