@@ -1,5 +1,6 @@
 """Motion execution: apply_motion, move_player, and related helpers."""
 from __future__ import annotations
+from collections import deque
 from engine.player import Player
 from engine.modes import Mode
 from engine.world import CellType
@@ -13,17 +14,60 @@ def move_player(player, dr, dc, room):
     nr, nc = player.row + dr, player.col + dc
     if not room.is_passable(nr, nc):
         return False
-    if room.fog_col >= 0 and nc >= room.fog_col:
-        return False
     player.row, player.col = nr, nc
     return True
 
 
-def _update_fog(room) -> None:
-    """Advance fog_col to just past the next closed door, or clear fog if none remain."""
-    closed_cols = sorted(set(e.col for e in room.entities
-                             if e.kind == 'door' and e.alive))
-    room.fog_col = closed_cols[0] + 1 if closed_cols else -1
+def _fog_unreachable(room, start_r: int, start_c: int) -> None:
+    """Initialise room.fog_cells: all floor/corridor cells not visible from start.
+
+    Visibility is blocked at door and locked_door entities — BFS includes the
+    door cell itself (it's visible) but does not expand through it.
+    """
+    foggable: set = set()
+    for r in range(room.rows):
+        for c in range(room.cols):
+            if room.cells[r][c] in (CellType.FLOOR, CellType.CORRIDOR, CellType.WATER):
+                foggable.add((r, c))
+
+    reachable: set = set()
+    q = deque([(start_r, start_c)])
+    reachable.add((start_r, start_c))
+    while q:
+        r, c = q.popleft()
+        ent = room.entity_at(r, c)
+        if ent and ent.kind in ('door', 'locked_door'):
+            continue
+        for dr, dc in ((-1, 0), (1, 0), (0, -1), (0, 1)):
+            nb = (r + dr, c + dc)
+            if nb not in reachable and nb in foggable:
+                reachable.add(nb)
+                q.append(nb)
+
+    room.fog_cells = foggable - reachable
+
+
+def _reveal_from(room, player_r: int, player_c: int) -> None:
+    """After a door opens, remove all cells now visible from player from fog_cells."""
+    if not room.fog_cells:
+        return
+
+    reachable: set = set()
+    q = deque([(player_r, player_c)])
+    reachable.add((player_r, player_c))
+    while q:
+        r, c = q.popleft()
+        ent = room.entity_at(r, c)
+        if ent and ent.kind in ('door', 'locked_door'):
+            continue
+        for dr, dc in ((-1, 0), (1, 0), (0, -1), (0, 1)):
+            nr, nc = r + dr, c + dc
+            if (nr, nc) not in reachable:
+                if room.cells[nr][nc] in (CellType.FLOOR, CellType.CORRIDOR, CellType.WATER):
+                    reachable.add((nr, nc))
+                    q.append((nr, nc))
+
+    room.fog_cells -= reachable
 
 
 def _cell_char(room, r: int, c: int) -> str:
@@ -34,6 +78,7 @@ def _cell_char(room, r: int, c: int) -> str:
     ent = room.entity_at(r, c)
     if ent:
         if ent.kind == 'door':         return '+'
+        if ent.kind == 'locked_door':  return '+'
         if ent.kind == 'exit':         return 'E'
         if ent.kind == 'entry_marker': return '@'
         if ent.kind == 'dynamite':     return '!'
@@ -69,8 +114,6 @@ def apply_motion(player, motion, count, room, target=None):
             for c in range(player.col + 1, room.cols):
                 if not room.is_passable(row, c):
                     break
-                if room.fog_col >= 0 and c >= room.fog_col:
-                    break
                 best = c
             if best is not None:
                 player.col = best
@@ -85,8 +128,6 @@ def apply_motion(player, motion, count, room, target=None):
             right = player.col
             for c in range(player.col + 1, room.cols):
                 if not room.is_passable(row, c):
-                    break
-                if room.fog_col >= 0 and c >= room.fog_col:
                     break
                 right = c
             target = left

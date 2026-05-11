@@ -4,6 +4,7 @@ import sys, random, time, argparse
 from blessed import Terminal
 import render.colors as C
 from render.renderer import render_all
+import render.symbols as S
 from render.utils import inner_w as _iw
 from render.overworld import render_overworld
 from render.title import render_title, render_save_select, select_quote, MENU_ITEMS as _TITLE_MENU, NAME_MAX as _NAME_MAX
@@ -12,7 +13,7 @@ from engine.modes import Mode
 from engine.budget import Budget
 from engine.vim_parser import parse
 from engine.world import Entity, CellType
-from engine.motion import apply_motion, move_player, _apply_esc, _update_fog, _cell_char
+from engine.motion import apply_motion, move_player, _apply_esc, _reveal_from, _cell_char
 from engine.editor import (
     _merge_adjacent_runes, _ed_cut, _ed_snapshot, _ed_restore, _ed_subst,
     _ed_paste, _ed_row_items, _ed_clear_row, _ed_range_items, _ed_delete_range,
@@ -27,6 +28,118 @@ _WATER_SETTLE_SECS = 60   # stop animating water after this many idle seconds
 
 # Explosion damage in half-hearts by Manhattan distance from centre
 _EXPL_DAMAGE = {0: 3, 1: 3, 2: 2, 3: 1}   # 0-1: 1.5♥  2: 1♥  3: 0.5♥
+
+def _chest_loot(kind: str) -> str:
+    """Return the item type yielded by looting a chest."""
+    if kind == 'chest_key':
+        return 'key'
+    if kind == 'chest_scroll':
+        return 'scroll'
+    return 'key' if random.random() < 0.6 else 'scroll'
+
+# ── Register tutorial overlay ─────────────────────────────────────────────────
+
+def _show_register_tutorial(term: Terminal, iw: int, game_h: int) -> None:
+    """Amber floating box explaining the \" register. Blocks until any key."""
+    BOX_IW = 54               # visible inner width
+    BOX_BW = BOX_IW + 4      # ║[sp][54][sp]║
+
+    box_bg  = term.on_color_rgb(10, 8, 2)
+    amber_b = term.color_rgb(220, 175, 35) + term.bold
+    amber   = term.color_rgb(220, 175, 35)
+    dim     = term.color_rgb(100, 80, 15)
+    hi      = term.color_rgb(255, 220, 60) + term.bold
+    rst     = term.normal
+
+    col_off = max(1, (iw + 2 - BOX_BW) // 2)
+    row_off = 3 + max(0, (game_h - 17) // 2)
+
+    bdr = box_bg + amber_b   # border: dark bg + bold amber fg
+    inn = box_bg              # inner: dark bg only (fg unchanged)
+
+    def row(vis: int, colored: str) -> str:
+        """Build one box content line. vis = visible width of colored."""
+        return (bdr + '║ ' + rst +
+                inn + colored +
+                inn + ' ' * max(0, BOX_IW - vis) +
+                bdr + ' ║' + rst)
+
+    blank = row(0, '')
+
+    T   = '◈   The Unnamed Register   ◈'
+    lT  = (BOX_IW - len(T)) // 2
+    rT  = BOX_IW - len(T) - lT
+    title = row(BOX_IW, ' ' * lT + hi + T + rst + ' ' * rT)
+
+    def kv(key: str, desc: str) -> str:
+        d25   = desc.ljust(25)[:25]
+        sep   = '  ────→  '   # 9 chars
+        suf   = 'lands in  '  # 10 chars
+        sym   = '"'
+        # visible = 4 + 1 + 9 + 25 + 10 + 1 = 50
+        colored = ('    ' + hi + key + rst +
+                   inn + dim + sep + d25 + suf + rst +
+                   inn + amber + sym + rst + inn)
+        return row(50, colored)
+
+    def dim_row(s: str) -> str:
+        return row(len(s), dim + s + rst)
+
+    # " line — no mention of p (not yet known); tease that a use exists
+    p_plain = ' "  holds all you delete — there must be some use...'
+    p_col   = (dim + ' ' + rst +
+               inn + amber + '"' + rst +
+               inn + dim + '  holds all you delete — there must be some use...' + rst + inn)
+    p_row   = row(len(p_plain), p_col)
+
+    AK   = '[ any key ]'
+    lAK  = (BOX_IW - len(AK)) // 2
+    footer = row(BOX_IW, ' ' * lAK + dim + AK + rst + ' ' * (BOX_IW - len(AK) - lAK))
+
+    sep_h = '═' * (BOX_IW + 2)
+    lines = [
+        bdr + '╔' + sep_h + '╗' + rst,
+        blank,
+        title,
+        blank,
+        dim_row('  Scrawled on the scroll: a revelation.'),
+        blank,
+        kv('x', 'deletes a character  '),
+        kv('d', 'deletes a range      '),
+        kv('c', 'changes text         '),
+        blank,
+        p_row,
+        blank,
+        dim_row('  Your cuts are visible in the statusline.'),
+        blank,
+        footer,
+        blank,
+        bdr + '╚' + sep_h + '╝' + rst,
+    ]
+
+    for i, line in enumerate(lines):
+        print(term.move_yx(row_off + i, col_off) + line, end='', flush=True)
+
+    term.inkey()   # consume keypress; already inside term.cbreak()
+
+
+def _unlock_animation(term: Terminal, room, player,
+                      door_r: int, door_c: int, iw: int, game_h: int) -> None:
+    """Flash key icon at door position, then blank it — door + key both vanish."""
+    vr_start = max(0, min(player.row - game_h // 2, room.rows - game_h))
+    vc_start = max(0, min(player.col - iw    // 2,  room.cols - iw))
+    scr_r = door_r - vr_start + 3
+    scr_c = door_c - vc_start + 1
+    if not (0 <= scr_r < term.height and 0 <= scr_c < iw):
+        return
+    gold = C.key_fg()
+    rst  = term.normal
+    fbg  = C.floor_bg()
+    print(term.move_yx(scr_r, scr_c) + fbg + gold + S.KEY + rst, end='', flush=True)
+    time.sleep(0.35)
+    print(term.move_yx(scr_r, scr_c) + fbg + '  ' + rst, end='', flush=True)
+    time.sleep(0.08)
+
 
 # ── Animations ────────────────────────────────────────────────────────────────
 
@@ -188,6 +301,25 @@ def _build_dungeon(level: int, seed: int):
     return build_dungeon_0(seed)
 
 
+def _snapshot(room, player, budget, *, row=None, col=None, spent=None) -> dict:
+    """Undo/redo snapshot of all mutable game state.
+
+    Pass row/col/spent explicitly only when the player has already moved and
+    the snapshot must record the *previous* position (dynamite upgrade path).
+    All entity-killing actions must call this before mutating state so that
+    'u' can fully restore the world, including player inventory.
+    """
+    return {
+        'row':      player.row  if row   is None else row,
+        'col':      player.col  if col   is None else col,
+        'spent':    budget.spent if spent is None else spent,
+        'entities': [Entity(kind=e.kind, row=e.row, col=e.col, hp=e.hp, alive=e.alive)
+                     for e in room.entities],
+        'fog_cells': set(room.fog_cells),
+        'keys':      player.keys,
+    }
+
+
 def _hint_bar(known: list) -> str:
     if 'w' in known:
         return 'w:jump to word start  b:jump back to word  e:jump to word end  [N]hjkl  :w write  :q quit'
@@ -215,7 +347,7 @@ def run_dungeon(term: Terminal, level: int, progress: dict,
     player  = Player(row=room.entry[0], col=room.entry[1])
     player.known_commands = _known_commands(level)
     if player_name == 'admin':
-        player.known_commands = player.known_commands + ['admin']
+        player.known_commands = player.known_commands + ['admin', 'register']
     budget  = Budget(room.budget or 20)
 
     key_buf  = ''
@@ -224,7 +356,6 @@ def run_dungeon(term: Terminal, level: int, progress: dict,
     undo_stack: list[tuple[int, int, int]] = []
     redo_stack: list[tuple[int, int, int]] = []
     edit_mode  = False
-    clipboard: list = []
     ed_undo:   list = []
     ed_redo:   list = []
     count_tutorial_shown = False
@@ -316,12 +447,12 @@ def run_dungeon(term: Terminal, level: int, progress: dict,
                     player  = Player(row=room.entry[0], col=room.entry[1])
                     player.known_commands = _known_commands(level)
                     if player_name == 'admin':
-                        player.known_commands = player.known_commands + ['admin']
+                        player.known_commands = player.known_commands + ['admin', 'register']
                     budget  = Budget(room.budget or 20)
                     undo_stack.clear()
                     redo_stack.clear()
                     edit_mode = False
-                    clipboard.clear()
+                    player.register.clear()
                     ed_undo.clear()
                     ed_redo.clear()
                     key_buf  = ''
@@ -442,11 +573,8 @@ def run_dungeon(term: Terminal, level: int, progress: dict,
                 if not edit_mode and ent and ent.kind == 'dynamite':
                     if undo_stack and isinstance(undo_stack[-1], tuple):
                         pr, pc, ps = undo_stack.pop()
-                        undo_stack.append({
-                            'row': pr, 'col': pc, 'spent': ps,
-                            'entities': [Entity(kind=e.kind, row=e.row, col=e.col, hp=e.hp, alive=e.alive) for e in room.entities],
-                            'fog_col': room.fog_col,
-                        })
+                        undo_stack.append(_snapshot(room, player, budget,
+                                                    row=pr, col=pc, spent=ps))
                     expl_r, expl_c = ent.row, ent.col
                     room.kill_entity(ent)
                     iw_now     = _iw(term)
@@ -527,14 +655,12 @@ def run_dungeon(term: Terminal, level: int, progress: dict,
             elif undo_stack:
                 item = undo_stack.pop()
                 if isinstance(item, dict):
-                    redo_stack.append({'row': player.row, 'col': player.col,
-                                       'spent': budget.spent,
-                                       'entities': [Entity(kind=e.kind, row=e.row, col=e.col, hp=e.hp, alive=e.alive) for e in room.entities],
-                                       'fog_col': room.fog_col})
+                    redo_stack.append(_snapshot(room, player, budget))
                     player.row, player.col = item['row'], item['col']
                     budget.spent = item['spent']
                     room.entities = item['entities']
-                    room.fog_col  = item['fog_col']
+                    room.fog_cells = item['fog_cells']
+                    player.keys   = item.get('keys', player.keys)
                     room.rebuild_indexes()
                 else:
                     redo_stack.append((player.row, player.col, budget.spent))
@@ -559,14 +685,12 @@ def run_dungeon(term: Terminal, level: int, progress: dict,
             elif redo_stack:
                 item = redo_stack.pop()
                 if isinstance(item, dict):
-                    undo_stack.append({'row': player.row, 'col': player.col,
-                                       'spent': budget.spent,
-                                       'entities': [Entity(kind=e.kind, row=e.row, col=e.col, hp=e.hp, alive=e.alive) for e in room.entities],
-                                       'fog_col': room.fog_col})
+                    undo_stack.append(_snapshot(room, player, budget))
                     player.row, player.col = item['row'], item['col']
                     budget.spent = item['spent']
                     room.entities = item['entities']
-                    room.fog_col  = item['fog_col']
+                    room.fog_cells = item['fog_cells']
+                    player.keys   = item.get('keys', player.keys)
                     room.rebuild_indexes()
                 else:
                     undo_stack.append((player.row, player.col, budget.spent))
@@ -580,7 +704,7 @@ def run_dungeon(term: Terminal, level: int, progress: dict,
                 ed_redo.clear()
                 item = _ed_cut(room, player.row, player.col)
                 if item:
-                    clipboard = [item]
+                    player.register = [item]
                     message   = f'Cut: {_clip_desc(item)}'
                 else:
                     ed_undo.pop()
@@ -589,23 +713,31 @@ def run_dungeon(term: Terminal, level: int, progress: dict,
             else:
                 interacted = False
                 cur = room.entity_at(player.row, player.col)
-                if cur and cur.kind == 'chest':
+                if cur and cur.kind in ('chest', 'chest_key', 'chest_scroll'):
+                    undo_stack.append(_snapshot(room, player, budget))
+                    redo_stack.clear()
+                    item = _chest_loot(cur.kind)
                     room.kill_entity(cur)
                     budget.spend(1)
-                    message = 'You looted the chest!'
+                    if item == 'key':
+                        player.keys += 1
+                        message = 'You found a key!'
+                    else:
+                        message = 'You found a scroll!'
                     msg_ttl = 30
                     interacted = True
+                    if 'register' not in player.known_commands:
+                        player.known_commands = player.known_commands + ['register']
+                        render_all(term, dungeon, player, budget, message)
+                        _show_register_tutorial(term, _iw(term), term.height - 7)
                 elif cur and cur.kind == 'door':
-                    undo_stack.append({'row': player.row, 'col': player.col,
-                                       'spent': budget.spent,
-                                       'entities': [Entity(kind=e.kind, row=e.row, col=e.col, hp=e.hp, alive=e.alive) for e in room.entities],
-                                       'fog_col': room.fog_col})
+                    undo_stack.append(_snapshot(room, player, budget))
                     redo_stack.clear()
                     col = cur.col
                     for e in room.entities:
                         if e.kind == 'door' and e.col == col:
                             room.kill_entity(e)
-                    _update_fog(room)
+                    _reveal_from(room, player.row, player.col)
                     budget.spend(1)
                     message = 'Door opened.'
                     msg_ttl = 20
@@ -618,17 +750,43 @@ def run_dungeon(term: Terminal, level: int, progress: dict,
             ed_undo.append(_ed_snapshot(room, player))
             ed_redo.clear()
             items     = _ed_subst(room, player.row, player.col)
-            clipboard = items
+            player.register = items
             message   = 'Substituted: ' + ', '.join(_clip_desc(i) for i in items)
             msg_ttl   = 25
 
+        elif not edit_mode and action['type'] == 'paste':
+            before = action.get('before', False)
+            dc = -1 if before else 1          # P → left, p → right
+            target = room.entity_at(player.row, player.col + dc)
+            if target and target.kind == 'locked_door':
+                if player.keys > 0:
+                    undo_stack.append(_snapshot(room, player, budget))
+                    redo_stack.clear()
+                    player.keys -= 1
+                    render_all(term, dungeon, player, budget, message)
+                    _unlock_animation(term, room, player,
+                                      target.row, target.col,
+                                      _iw(term), term.height - 7)
+                    for e in room.entities:
+                        if e.kind == 'locked_door' and e.col == target.col:
+                            room.kill_entity(e)
+                    _reveal_from(room, player.row, player.col)
+                    budget.spend(1)
+                    message = 'Door unlocked!'
+                    msg_ttl = 25
+                else:
+                    player.error = 'E: No key in inventory'
+            else:
+                message = 'Nothing to paste here.'
+                msg_ttl = 15
+
         elif edit_mode and action['type'] == 'paste':
-            if clipboard:
+            if player.register:
                 ed_undo.append(_ed_snapshot(room, player))
                 ed_redo.clear()
                 before  = action.get('before', False)
                 start_c = player.col if before else player.col + 1
-                _ed_paste(room, player.row, start_c, clipboard)
+                _ed_paste(room, player.row, start_c, player.register)
                 message = f'Pasted {"before" if before else "after"} cursor.'
             else:
                 message = 'Clipboard is empty.'
@@ -649,7 +807,7 @@ def run_dungeon(term: Terminal, level: int, progress: dict,
                     all_items.extend(_ed_row_items(room, r))
                     if op in ('d', 'c'):
                         _ed_clear_row(room, r)
-                clipboard = all_items
+                player.register = all_items
                 verb    = 'Cut' if op in ('d', 'c') else 'Yanked'
                 message = f'{verb} {len(all_items)} item(s) from {count} row(s).'
             else:
@@ -662,7 +820,7 @@ def run_dungeon(term: Terminal, level: int, progress: dict,
                     items = _ed_delete_range(room, orig_r, orig_c, new_r, new_c)
                 else:
                     items = _ed_range_items(room, orig_r, orig_c, new_r, new_c)
-                clipboard = items
+                player.register = items
                 verb    = 'Cut' if op in ('d', 'c') else 'Yanked'
                 message = f'{verb} {len(items)} item(s).'
             if op == 'y':
@@ -905,6 +1063,7 @@ def main():
 
     term = Terminal()
     C.init(term)
+    S.init(term)
 
     player    = Player()
     progress: dict = {}

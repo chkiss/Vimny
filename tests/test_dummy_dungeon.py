@@ -19,7 +19,12 @@ SEED = 42
 
 # ── Source-of-truth sets — update these when new kinds are introduced ─────────
 
-EXPECTED_ENTITY_KINDS = {'entry_marker', 'exit', 'door', 'dynamite'}
+EXPECTED_ENTITY_KINDS = {
+    'entry_marker', 'exit', 'door', 'dynamite',
+    'wanderer',
+    'chest', 'chest_key', 'chest_scroll',
+    'locked_door',
+}
 EXPECTED_RUNE_KINDS   = {'ancient', 'verdant', 'void', 'ember'}
 
 # Cell types where _ed_cut should return a clip and leave FLOOR behind.

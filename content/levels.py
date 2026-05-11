@@ -45,6 +45,8 @@ def known_commands(level_id: int) -> list:
         cmds += ['count', 'x']
     if level_id >= 3:
         cmds += ['w', 'b', 'e']
+    if level_id >= 4:
+        cmds += ['f', 'F', 't', 'T', 'register']
     return cmds
 
 

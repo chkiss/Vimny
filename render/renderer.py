@@ -35,6 +35,27 @@ def _water_glyph(row: int, col: int) -> tuple[str, int, int, int]:
     char, rgb, _ = _WATER_FRAMES[-1]
     return char, *rgb
 
+def _reg_display(items: list) -> str:
+    """Short visible string of \" register contents for statusline."""
+    if not items:
+        return ''
+    parts = []
+    for item in items:
+        if item['type'] == 'rune':
+            parts.extend(item['rune'].symbols)
+        elif item['type'] == 'entity':
+            k = item['entity'].kind
+            parts.append({'dynamite': '!', 'exit': '◉', 'door': '▬',
+                          'chest': '🞔', 'chest_key': '🞔', 'wanderer': '♟',
+                          'locked_door': '⊞'}.get(k, '?'))
+        elif item['type'] == 'cell':
+            ct = item['cell_type']
+            parts.append({CellType.WALL: '█', CellType.WATER: '~',
+                          CellType.WOOD_WALL: '░'}.get(ct, ' '))
+    s = ''.join(parts)
+    return s[:7] + '…' if len(s) > 8 else s
+
+
 def _pad(s: str, width: int) -> str:
     """Pad or truncate s to exactly width visible characters."""
     # strip ANSI for length calc is complex; use len of raw string for now
@@ -94,12 +115,17 @@ def render_all(term: Terminal, dungeon: Dungeon, player: Player,
     budget_s = C.hint_fg() + f' Budget:{budget.total:2d}' + rst
     par_s    = C.hint_fg() + f' Par:{room.par or "-"}' + rst
 
+    inv_keys = player.keys
+    key_s = (C.key_fg() + S.KEY * inv_keys + rst) if inv_keys else ''
+
     dname = dungeon.name[:24]
     # Build status line (visible chars only for padding, approximate)
-    status_plain = f'  {"♥"*full_h}{"♡"*half_h}{"░"*empty_h}  {dname}  {ml}  Keys:{spent:2d} Budget:{budget.total:2d}  Par:{room.par or "-"}'
+    key_plain = S.KEY * inv_keys if inv_keys else ''
+    status_plain = f'  {"♥"*full_h}{"♡"*half_h}{"░"*empty_h}  {key_plain}  {dname}  {ml}  Keys:{spent:2d} Budget:{budget.total:2d}  Par:{room.par or "-"}'
     padding = max(0, iw - len(status_plain))
     status_line = (bfg + S.BOX_V + rst +
                    f'  {hp_str}  ' +
+                   key_s + ('  ' if inv_keys else '') +
                    C.normal_fg() + dname + '  ' +
                    mode_s + '  ' + keys_s + ' ' + budget_s + par_s +
                    ' ' * padding +
@@ -145,7 +171,7 @@ def render_all(term: Terminal, dungeon: Dungeon, player: Player,
                     continue
 
                 # Fog?
-                if room.fog_col >= 0 and room_c >= room.fog_col:
+                if (room_r, room_c) in room.fog_cells:
                     line += wall_bg + ' ' + C.normal_fg()
                     continue
 
@@ -154,10 +180,12 @@ def render_all(term: Terminal, dungeon: Dungeon, player: Player,
                 if ent:
                     if ent.kind == 'exit':
                         line += floor_bg + C.exit_fg() + S.EXIT + C.normal_fg()
-                    elif ent.kind == 'chest':
+                    elif ent.kind in ('chest', 'chest_key', 'chest_scroll'):
                         line += floor_bg + C.chest_fg() + S.CHEST + C.normal_fg()
                     elif ent.kind == 'door':
                         line += floor_bg + C.door_fg() + S.DOOR_LOCKED + C.normal_fg()
+                    elif ent.kind == 'locked_door':
+                        line += floor_bg + C.locked_door_fg() + S.DOOR_LOCKED_KEY + C.normal_fg()
                     elif ent.kind == 'dynamite':
                         line += floor_bg + C.dynamite_fg() + S.DYNAMITE + C.normal_fg()
                     elif ent.kind == 'wanderer':
@@ -235,9 +263,16 @@ def render_all(term: Terminal, dungeon: Dungeon, player: Player,
         else:
             sl_mode_color = C.mode_visual()
         sl_right = f'{pos_str}   {scroll} '
-        sl_mid   = max(0, sl_w - len(sl_label) - 2 - len(sl_right))
+        if 'register' in player.known_commands:
+            reg_content = _reg_display(player.register)
+            reg_s   = C.key_fg() + f'  "{reg_content}' + sl_fg
+            reg_vis = 3 + len(reg_content)  # len('  "') + content
+        else:
+            reg_s   = ''
+            reg_vis = 0
+        sl_mid   = max(0, sl_w - len(sl_label) - 2 - reg_vis - len(sl_right))
         output.append(sl_bg + sl_mode_color + ' ' + sl_label + ' ' +
-                      sl_bg + sl_fg + ' ' * sl_mid + sl_right + rst)
+                      sl_bg + sl_fg + reg_s + ' ' * sl_mid + sl_right + rst)
 
     # ── Bottom separator (answer sheet for admin) ─────────────────────────
     if room.answer:

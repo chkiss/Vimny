@@ -47,7 +47,7 @@ class Room:
     budget: Optional[int]       = None
     par: Optional[int]          = None
     seed: Optional[int]         = None
-    fog_col: int                = -1   # columns >= fog_col are hidden; -1 = no fog
+    fog_cells: set              = field(default_factory=set)  # (r,c) pairs not yet visible
     passable_walls: bool        = False  # if True, walls are walkable (editor mode)
     answer: str                 = ''     # keystroke solution shown to admin
     wood_damage: dict           = field(default_factory=dict)  # (r,c) -> half-steps received (1=cracked)
@@ -112,7 +112,12 @@ class Room:
             return False
         if self.passable_walls:
             return True
-        return self.cells[r][c] in (CellType.FLOOR, CellType.CORRIDOR)
+        if self.cells[r][c] not in (CellType.FLOOR, CellType.CORRIDOR):
+            return False
+        if (r, c) in self.fog_cells:
+            return False
+        ent = self.entity_at(r, c)
+        return ent is None or ent.kind != 'locked_door'
 
     def damage_wood_wall(self, r: int, c: int, half_steps: int = 1) -> bool:
         """Deal half_steps of damage to wood wall at (r, c).

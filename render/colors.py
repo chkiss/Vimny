@@ -24,8 +24,10 @@ def expl_near():     return _term.bold + _term.bright_white
 def expl_mid():      return _term.color_rgb(255, 160,  30) + _term.bold
 def expl_far():      return _term.color_rgb(200,  70,  10)
 def exit_fg():       return _term.bright_green
-def chest_fg():      return _term.color_rgb(220, 180, 40)
-def door_fg():       return _term.color_rgb(80, 80, 80)
+def chest_fg():        return _term.color_rgb(220, 180, 40)
+def door_fg():         return _term.color_rgb(80, 80, 80)
+def locked_door_fg():  return _term.color_rgb(160, 130, 30)
+def key_fg():          return _term.color_rgb(220, 180, 40)
 def rune_ancient():  return _term.color_rgb(80, 80, 160)
 def rune_verdant():  return _term.color_rgb(60, 130, 60)
 def rune_void():     return _term.color_rgb(110, 60, 160)

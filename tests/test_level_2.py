@@ -43,6 +43,8 @@ def test_exit_is_reachable(seed):
     d = build_dungeon_2(seed)
     room = d.room
     assert room.exit_pos is not None
+    # Clear fog to test structural reachability with all doors open
+    room.fog_cells = set()
     par = _count_optimal_reach(room)
     assert par is not None, f"seed={seed}: exit unreachable with count motions"
 
@@ -53,6 +55,8 @@ def test_par_matches_dijkstra(seed):
     d = build_dungeon_2(seed)
     room = d.room
     door_cols = sorted(set(e.col for e in room.entities if e.kind == 'door' and e.alive))
+    # Clear fog so the solver can navigate the full dungeon (it models fog internally)
+    room.fog_cells = set()
     expected = _dijkstra_par_level2(room, door_cols)
     assert room.par == expected, (
         f"seed={seed}: stored par {room.par} != full Dijkstra {expected}"
@@ -72,6 +76,7 @@ def test_par_includes_keystroke_for_every_action(seed):
     d = build_dungeon_2(seed)
     room = d.room
     door_cols = sorted(set(e.col for e in room.entities if e.kind == 'door' and e.alive))
+    room.fog_cells = set()   # solvers navigate the full dungeon; fog is modelled internally
 
     nav_only = _dijkstra_par_count(room)           # ignores doors: physically impossible
     full_par = _dijkstra_par_level2(room, door_cols)  # all commands + door state
@@ -100,6 +105,7 @@ def test_count_is_necessary(seed):
     from collections import deque
     d = build_dungeon_2(seed)
     room = d.room
+    room.fog_cells = set()   # check structural reachability, not fog state
     void_cells = {
         (ru.row, ru.col + i)
         for ru in room.runes if ru.kind == 'void'
@@ -154,12 +160,12 @@ def test_entry_and_exit_not_on_void(seed):
 # ── Regression tests (previously failing bugs, now fixed) ────────────────────
 
 def test_3j_59l_3k_does_not_beat_par():
-    """Fog wall blocks the count-motion shortcut to the exit.
+    """Room-based fog blocks the count-motion shortcut to the exit.
 
     Without fog, '3j 59l 3k' from entry (2,2) would reach exit_pos directly
-    by passing through the void wall, coming in far under par.  The fog wall
-    at col 20 stops 59l at col 19 (the door), so the player cannot reach the
-    exit via this sequence.  Fixed: move_player respects fog_col.
+    by passing through the void wall, coming in far under par.  Fog cells
+    beyond the first door stop 59l short, so the player cannot reach the
+    exit via this sequence.
     """
     from engine.motion import apply_motion
     from engine.player import Player

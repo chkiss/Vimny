@@ -1,8 +1,8 @@
-"""Tests for engine/motion.py: apply_motion, move_player, _cell_char, _update_fog."""
+"""Tests for engine/motion.py: apply_motion, move_player, _cell_char, _fog_unreachable, _reveal_from."""
 import pytest
 from engine.world import Room, RoomType, CellType, Entity, RuneCluster
 from engine.player import Player
-from engine.motion import apply_motion, move_player, _update_fog, _cell_char
+from engine.motion import apply_motion, move_player, _fog_unreachable, _reveal_from, _cell_char
 
 # ── Shared room fixtures ──────────────────────────────────────────────────────
 
@@ -62,20 +62,20 @@ class TestMovePlayer:
         assert result is False
         assert p.col == 1
 
-    def test_blocked_by_fog(self):
+    def test_blocked_by_fog_cell(self):
         room = _bare_room()
-        room.fog_col = 10
+        room.fog_cells = {(3, 10)}
         p = _player(3, 9)
-        result = move_player(p, 0, 1, room)  # col 10 >= fog_col
+        result = move_player(p, 0, 1, room)
         assert result is False
         assert p.col == 9
 
-    def test_allows_move_up_to_fog_boundary(self):
+    def test_allows_move_to_unfogged_cell(self):
         room = _bare_room()
-        room.fog_col = 10
-        p = _player(3, 8)
-        assert move_player(p, 0, 1, room) is True  # col 9 < fog_col
-        assert p.col == 9
+        room.fog_cells = {(3, 11)}   # col 10 is clear
+        p = _player(3, 9)
+        assert move_player(p, 0, 1, room) is True
+        assert p.col == 10
 
     def test_vertical_movement(self):
         room = _bare_room()
@@ -89,35 +89,76 @@ class TestMovePlayer:
         assert move_player(p, -1, 0, room) is False
 
 
-# ── _update_fog ───────────────────────────────────────────────────────────────
+# ── _fog_unreachable ──────────────────────────────────────────────────────────
 
-class TestUpdateFog:
-    def test_sets_fog_to_first_door_col_plus_one(self):
-        room = _bare_room()
-        room.add_entity(Entity(kind='door', row=3, col=10))
-        _update_fog(room)
-        assert room.fog_col == 11
+def _walled_room():
+    """7×24 room split into two halves by a wall at col 12 with a door at (3,12)."""
+    room = _bare_room()
+    for r in range(1, ROWS - 1):
+        room.cells[r][12] = CellType.WALL
+    # Doorway at row 3, col 12
+    room.cells[3][12] = CellType.FLOOR
+    door = Entity(kind='door', row=3, col=12)
+    room.add_entity(door)
+    return room, door
 
-    def test_multiple_doors_uses_leftmost(self):
-        room = _bare_room()
-        room.add_entity(Entity(kind='door', row=3, col=10))
-        room.add_entity(Entity(kind='door', row=3, col=15))
-        _update_fog(room)
-        assert room.fog_col == 11
 
-    def test_dead_door_ignored(self):
+class TestFogUnreachable:
+    def test_no_doors_no_fog(self):
         room = _bare_room()
-        e = Entity(kind='door', row=3, col=10)
-        room.add_entity(e)
-        room.kill_entity(e)
-        _update_fog(room)
-        assert room.fog_col == -1
+        _fog_unreachable(room, 3, 1)
+        assert room.fog_cells == set()
 
-    def test_no_doors_clears_fog(self):
+    def test_door_creates_fog_for_far_side(self):
+        room, door = _walled_room()
+        _fog_unreachable(room, 3, 1)
+        # All cols 13-22 on floor rows should be fogged
+        assert (3, 15) in room.fog_cells
+        assert (3, 22) in room.fog_cells
+        # Door cell itself is visible (reachable but BFS stops there)
+        assert (3, 12) not in room.fog_cells
+        # Left side is clear
+        assert (3, 5) not in room.fog_cells
+
+    def test_locked_door_creates_fog(self):
         room = _bare_room()
-        room.fog_col = 10
-        _update_fog(room)
-        assert room.fog_col == -1
+        for r in range(1, ROWS - 1):
+            room.cells[r][12] = CellType.WALL
+        room.cells[3][12] = CellType.FLOOR
+        room.add_entity(Entity(kind='locked_door', row=3, col=12))
+        _fog_unreachable(room, 3, 1)
+        assert (3, 15) in room.fog_cells
+        assert (3, 12) not in room.fog_cells   # locked_door cell visible
+
+
+class TestRevealFrom:
+    def test_reveal_opens_far_room_after_door_removed(self):
+        room, door = _walled_room()
+        _fog_unreachable(room, 3, 1)
+        assert (3, 15) in room.fog_cells
+        room.kill_entity(door)
+        _reveal_from(room, 3, 1)
+        assert (3, 15) not in room.fog_cells
+
+    def test_reveal_stops_at_remaining_door(self):
+        room, door = _walled_room()
+        # Add a second door at col 18
+        for r in range(1, ROWS - 1):
+            room.cells[r][18] = CellType.WALL
+        room.cells[3][18] = CellType.FLOOR
+        door2 = Entity(kind='door', row=3, col=18)
+        room.add_entity(door2)
+        _fog_unreachable(room, 3, 1)
+        room.kill_entity(door)
+        _reveal_from(room, 3, 1)
+        # Cols 13-17 revealed; cols 19-22 still fogged
+        assert (3, 15) not in room.fog_cells
+        assert (3, 20) in room.fog_cells
+
+    def test_reveal_noop_when_no_fog(self):
+        room = _bare_room()
+        _reveal_from(room, 3, 1)
+        assert room.fog_cells == set()
 
 
 # ── _cell_char ────────────────────────────────────────────────────────────────
@@ -231,10 +272,11 @@ class TestApplyMotionLineBoundary:
 
     def test_dollar_respects_fog(self):
         room = _bare_room()
-        room.fog_col = 12
+        # Fog cells at cols 12-22 block $ from going past col 11
+        room.fog_cells = {(3, c) for c in range(12, 23)}
         p = _player(3, 5)
         apply_motion(p, '$', 1, room)
-        assert p.col == 11  # rightmost col < fog_col
+        assert p.col == 11  # rightmost passable col before fog boundary
 
     def test_caret_jumps_to_first_rune_start(self):
         room = _rune_room()

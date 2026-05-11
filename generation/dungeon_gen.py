@@ -3,6 +3,7 @@ from __future__ import annotations
 import heapq, math, random
 from collections import deque
 from engine.world import Dungeon, Room, RoomType, CellType, RuneCluster, Entity
+from engine.motion import _fog_unreachable
 from generation.room_gen import make_room
 
 _DIR_CHAR = {(-1, 0): 'k', (1, 0): 'j', (0, -1): 'h', (0, 1): 'l'}
@@ -670,8 +671,7 @@ def build_dungeon_2(seed: int) -> Dungeon:
     composite.par, composite.answer = _dijkstra_par_level2(composite, door_cols, return_path=True)
     composite.budget = math.ceil(composite.par * 1.4)
 
-    # Fog: reveal Room 0 and the first door; hide everything beyond.
-    composite.fog_col = door_cols[0] + 1   # = 20
+    _fog_unreachable(composite, composite.entry[0], composite.entry[1])
 
     dungeon.rooms    = [composite]
     dungeon.current_room = 0
@@ -956,32 +956,57 @@ def build_dungeon_3(seed: int) -> Dungeon:
 
 
 def build_dungeon_dummy(seed: int) -> Dungeon:
-    """Admin editing sandbox — open room containing all editable element types."""
-    ROWS, COLS = 20, 62
+    """Admin editing sandbox — all editable element types, plus two fog-walled rooms.
+
+    Layout (rows 1-18):
+      Main room   cols 1-41  — open area with all entity/cell/rune types
+      Wall divider col 42    — doorway at rows 9-10 (regular door)
+      Room A      cols 43-57 — water pool; accessed by opening the door
+      Wall divider col 58    — doorway at rows 9-10 (locked door)
+      Room B      cols 59-78 — contains the exit; accessed with a key
+    """
+    ROWS, COLS = 20, 80
     dungeon = Dungeon(name='Dummy Dungeon', seed=seed)
     cells   = [[CellType.WALL] * COLS for _ in range(ROWS)]
 
+    # Main room floor
     for r in range(1, ROWS - 1):
-        for c in range(1, COLS - 1):
+        for c in range(1, 42):
             cells[r][c] = CellType.FLOOR
 
-    # Wood wall block: rows 4-7 and 9-12 span cols 7-21; row 8 is shorter (cols 7-13)
+    # Room A floor
+    for r in range(1, ROWS - 1):
+        for c in range(43, 58):
+            cells[r][c] = CellType.FLOOR
+
+    # Room B floor
+    for r in range(1, ROWS - 1):
+        for c in range(59, COLS - 1):
+            cells[r][c] = CellType.FLOOR
+
+    # Doorways carved into the dividing walls
+    cells[9][42]  = CellType.FLOOR   # regular door opening (top)
+    cells[10][42] = CellType.FLOOR   # regular door opening (bottom)
+    cells[9][58]  = CellType.FLOOR   # locked door opening (top)
+    cells[10][58] = CellType.FLOOR   # locked door opening (bottom)
+
+    # Wood wall block in main room: rows 4-12 cols 7-21; row 8 is shorter
     for r in range(4, 13):
         end_c = 14 if r == 8 else 22
         for c in range(7, end_c):
             cells[r][c] = CellType.WOOD_WALL
 
-    # Vertical stone wall divider at col 38, rows 9-15
+    # Vertical stone wall divider in main room at col 38, rows 9-15
     for r in range(9, 16):
         cells[r][38] = CellType.WALL
 
-    # Demo corridor strip (structurally distinct from floor; visible to admin)
+    # Demo corridor strip in main room
     for c in range(25, 36):
         cells[9][c] = CellType.CORRIDOR
 
-    # Demo water pool so the admin can see the animation and test cut/paste
+    # Water pool in Room A
     for r in range(11, 17):
-        for c in range(44, 58):
+        for c in range(44, 57):
             cells[r][c] = CellType.WATER
 
     composite = Room(room_type=RoomType.ENTRY, rows=ROWS, cols=COLS)
@@ -989,27 +1014,40 @@ def build_dungeon_dummy(seed: int) -> Dungeon:
     composite.seed  = seed
 
     composite.entry    = (1, 1)
-    composite.exit_pos = (ROWS - 2, COLS - 2)
+    composite.exit_pos = (9, 70)
 
     composite.entities = [
-        Entity(kind='entry_marker', row=1,        col=1),
-        Entity(kind='exit',         row=ROWS - 2, col=COLS - 2),
-        Entity(kind='door',         row=6,        col=30),
-        Entity(kind='door',         row=7,        col=30),
-        Entity(kind='dynamite',     row=8,        col=14),
+        Entity(kind='entry_marker', row=1,  col=1),
+        Entity(kind='dynamite',     row=8,  col=14),
+        Entity(kind='wanderer',     row=3,  col=35),
+        # Chests in main room
+        Entity(kind='chest',        row=3,  col=25),
+        Entity(kind='chest_key',    row=4,  col=25),
+        Entity(kind='chest_scroll', row=5,  col=25),
+        # Standalone locked door in main room (for p-to-unlock practice)
+        Entity(kind='locked_door',  row=16, col=20),
+        # Room-divider door (fog boundary — opens into Room A)
+        Entity(kind='door',         row=9,  col=42),
+        Entity(kind='door',         row=10, col=42),
+        # Room-divider locked door (fog boundary — opens into Room B)
+        Entity(kind='locked_door',  row=9,  col=58),
+        Entity(kind='locked_door',  row=10, col=58),
+        # Exit at the far end of Room B
+        Entity(kind='exit',         row=9,  col=70),
     ]
 
     composite.runes = [
-        RuneCluster(row=2,  col=3,  symbols=('∘'), kind='ancient'),
-        RuneCluster(row=2,  col=8,  symbols=('·'), kind='verdant'),
-        RuneCluster(row=2,  col=13, symbols=('○'), kind='void'),
-        RuneCluster(row=2,  col=17, symbols=('◦'), kind='ember'),
+        RuneCluster(row=2, col=3,  symbols=('∘',), kind='ancient'),
+        RuneCluster(row=2, col=8,  symbols=('·',), kind='verdant'),
+        RuneCluster(row=2, col=13, symbols=('○',), kind='void'),
+        RuneCluster(row=2, col=17, symbols=('◦',), kind='ember'),
     ]
 
     composite.par            = None
     composite.budget         = 99999
     composite.passable_walls = False
     composite.rebuild_indexes()
-    dungeon.rooms            = [composite]
+    _fog_unreachable(composite, composite.entry[0], composite.entry[1])
+    dungeon.rooms        = [composite]
     dungeon.current_room = 0
     return dungeon
