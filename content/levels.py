@@ -27,6 +27,12 @@ LEVELS = [
         'commands': 'w b e',
     },
     {
+        'id': 4,
+        'key': 'dungeon_04_the_character_cataracts',
+        'name': 'The Character Cataracts',
+        'commands': 'f F t T',
+    },
+    {
         'id': 99,
         'key': 'dummy_dungeon',
         'name': 'Dummy Dungeon',

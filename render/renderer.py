@@ -226,7 +226,7 @@ def render_all(term: Terminal, dungeon: Dungeon, player: Player,
         output.append(line)
 
     # ── Vim statusline / command line ─────────────────────────────────────
-    pos_str  = f'{player.row + 1},{player.col + 1}'
+    pos_str  = f'{player.row},{player.col}'
 
     if room.rows <= game_h:
         scroll = 'All'

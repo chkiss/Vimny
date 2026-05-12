@@ -3,7 +3,7 @@ from __future__ import annotations
 import heapq, math, random
 from collections import deque
 from engine.world import Dungeon, Room, RoomType, CellType, RuneCluster, Entity
-from engine.motion import _fog_unreachable
+from engine.motion import _fog_unreachable, _cell_char
 from generation.room_gen import make_room
 
 _DIR_CHAR = {(-1, 0): 'k', (1, 0): 'j', (0, -1): 'h', (0, 1): 'l'}
@@ -70,6 +70,36 @@ _L3_TOTAL_ROWS    = 16                  # rows 0-15
 _L3_TOTAL_COLS    = 48                  # cols 0-47
 _L3_CORR_LEFT     = 1
 _L3_CORR_RIGHT    = 46
+
+# ── Level 4 layout constants ──────────────────────────────────────────────────
+_L4_CORR_TOP_ROWS = (1, 4, 7, 10, 13)
+_L4_TOTAL_ROWS    = 16
+_L4_TOTAL_COLS    = 72
+_L4_CORR_LEFT     = 1
+_L4_CORR_RIGHT    = 70
+
+_L4_TURN_SPANS = [
+    (2,  4,  69, 69),   # RT1: right side, single col, C1→C2
+    (5,  7,   1,  2),   # LT1: left side,  C2→C3
+    (8,  10, 69, 70),   # RT2: right side, C3→C4
+    (11, 13,  1,  2),   # LT2: left side,  C4→C5
+]
+
+# Water pools per corridor: (row_tuple, col_start, col_end)
+_L4_WATER_SPANS = [
+    ((1, 2),            14, 37),   # C1: Zone A cols 1-13, text cols 38-69
+    ((4, 5),            30, 51),   # C2: text cols 3-29, Zone B cols 52-69
+    ((4, 5, 6, 7),       1,  1),   # Left-edge strip: C2-C3 via LT1 col 2 only
+    ((7, 8),            18, 31),   # C3: Zone A cols 1-17, Zone B cols 32-70
+    ((10, 11),          26, 51),   # C4: Zone B cols 52-70, dynamite at col 1
+    ((1, 2, 3, 4, 5),   70, 70),   # Right-edge strip (narrows RT1 to col 69)
+]
+
+# Visible text strings placed as RuneCluster symbols — f/F/t/T targets
+_L4_TEXT_C1  = "Most files you encounter"             # 'r' at offset 23 → col 67
+_L4_TEXT_C2  = " will be scribed in letters"             # 'w' at offset 1 → col 4
+_L4_TEXT_C3A = "so you can jump"                         # Zone A (cols 2-16)
+_L4_TEXT_C3B = "quite easily to anything you can type"  # t! lands at col 69 before dynamite at 70
 
 def _place_runes_in_room(composite, rng, col_offset, room_rows, room_cols,
                           total_rows, density):
@@ -854,6 +884,213 @@ def _dijkstra_par_wbe(composite, return_path: bool = False):
     return None
 
 
+def _l4_place_zone(composite, rng, rows, col_start, col_end,
+                   density=0.55, blocked=frozenset()):
+    """Fill a rune zone across the given rows between col_start and col_end."""
+    for r in rows:
+        c = col_start
+        while c <= col_end:
+            if rng.random() < density:
+                kind = rng.choice(('ancient', 'verdant'))
+                syms = _make_rune_syms(rng, kind)
+                w    = len(syms)
+                if c + w - 1 <= col_end:
+                    if not any((r, cc) in blocked
+                               for cc in range(c - 1, c + w + 1)):
+                        composite.runes.append(
+                            RuneCluster(row=r, col=c, symbols=syms, kind=kind))
+                        c += w + rng.randint(1, 2)
+                        continue
+            c += 1
+
+
+def _dijkstra_par_ftFT(composite, return_path: bool = False):
+    """Minimum-keystroke Dijkstra for Level 4: hjkl + count + w b e + f F t T.
+
+    f/F/t/T scan includes text-rune chars ('r','w','!') and entity chars
+    ('E','?') as targets.  w/b/e stop at water (non-passable cells), matching
+    apply_motion behaviour.  Scan stops at WALL/WOOD_WALL; water is transparent.
+    """
+    from collections import defaultdict
+
+    ROWS, COLS = composite.rows, composite.cols
+
+    _dynamite_cells: set = {
+        (e.row, e.col) for e in composite.entities if e.kind == 'dynamite'
+    }
+
+    def _is_passable(r, c):
+        if r < 0 or r >= ROWS or c < 0 or c >= COLS:
+            return False
+        return composite.cells[r][c] in (CellType.FLOOR, CellType.CORRIDOR)
+
+    def _scan_stops(r, c):
+        return composite.cells[r][c] in (CellType.WALL, CellType.WOOD_WALL)
+
+    # Include text chars that appear as rune symbols alongside entity chars.
+    _SCAN_CHARS = set('!rw')
+    row_chars: dict[int, list] = defaultdict(list)
+    for r in range(ROWS):
+        for c in range(COLS):
+            if _scan_stops(r, c):
+                continue
+            ch = _cell_char(composite, r, c)
+            if ch in _SCAN_CHARS:
+                row_chars[r].append((c, ch))
+
+    entry = composite.entry
+    goal  = composite.exit_pos
+    max_n = max(ROWS, COLS)
+
+    clusters_by_row: dict[int, list] = defaultdict(list)
+    for ru in composite.runes:
+        if ru.kind != 'void':
+            clusters_by_row[ru.row].append(ru)
+    for cls in clusters_by_row.values():
+        cls.sort(key=lambda ru: ru.col)
+
+    def _word_at(r, c):
+        ru = composite.rune_at(r, c)
+        return ru if (ru and ru.kind != 'void') else None
+
+    def _w(r, c):
+        cur  = _word_at(r, c)
+        scan = (cur.col + len(cur.symbols)) if cur else c + 1
+        for nc in range(scan, COLS):
+            if not _is_passable(r, nc):
+                return None  # water or wall stops w
+            ru = composite.rune_at(r, nc)
+            if ru and ru.kind != 'void':
+                return (r, ru.col) if _is_passable(r, ru.col) else None
+        return None
+
+    def _b(r, c):
+        cur = _word_at(r, c)
+        if cur and cur.col < c:
+            return (r, cur.col) if _is_passable(r, cur.col) else None
+        limit = cur.col if cur else c
+        for nc in range(limit - 1, -1, -1):
+            if not _is_passable(r, nc):
+                return None  # water or wall stops b
+            ru = composite.rune_at(r, nc)
+            if ru and ru.kind != 'void':
+                return (r, ru.col) if _is_passable(r, ru.col) else None
+        return None
+
+    def _e(r, c):
+        cur = _word_at(r, c)
+        if cur:
+            end = cur.col + len(cur.symbols) - 1
+            if end > c and _is_passable(r, end):
+                return (r, end)
+            scan = end + 1
+        else:
+            scan = c + 1
+        for nc in range(scan, COLS):
+            if not _is_passable(r, nc):
+                return None  # water or wall stops e
+            ru = composite.rune_at(r, nc)
+            if ru and ru.kind != 'void':
+                end = ru.col + len(ru.symbols) - 1
+                return (r, end) if _is_passable(r, end) else None
+        return None
+
+    dist = {entry: 0}
+    prev = {entry: None}
+    heap = [(0, entry)]
+
+    while heap:
+        cost, (r, c) = heapq.heappop(heap)
+        if (r, c) == goal:
+            if return_path:
+                return cost, _join_path(prev, (r, c), merge_single=False)
+            return cost
+        if cost > dist.get((r, c), float('inf')):
+            continue
+
+        def _push(nb, mc=1, lbl=''):
+            if nb is None:
+                return
+            nr, nc = nb
+            if not _is_passable(nr, nc):
+                return
+            if (nr, nc) in _dynamite_cells:
+                return
+            ru = composite.rune_at(nr, nc)
+            if ru and ru.kind == 'void':
+                return
+            g = cost + mc
+            if g < dist.get((nr, nc), float('inf')):
+                dist[(nr, nc)] = g
+                prev[(nr, nc)] = ((r, c), lbl)
+                heapq.heappush(heap, (g, (nr, nc)))
+
+        # count h/j/k/l
+        for dr, dc in ((-1, 0), (1, 0), (0, -1), (0, 1)):
+            ch = _DIR_CHAR[(dr, dc)]
+            for n in range(1, max_n + 1):
+                nr, nc = r + dr * n, c + dc * n
+                if not _is_passable(nr, nc):
+                    break
+                ru = composite.rune_at(nr, nc)
+                if ru and ru.kind == 'void':
+                    continue
+                if (nr, nc) in _dynamite_cells:
+                    continue
+                mc  = 1 if n == 1 else len(str(n)) + 1
+                lbl = ch if n == 1 else f'{n}{ch}'
+                _push((nr, nc), mc, lbl)
+
+        # w / b / e (stop at water)
+        pos = (r, c)
+        for n in range(1, max_n):
+            nxt = _w(*pos)
+            if nxt is None:
+                break
+            mc = 1 if n == 1 else len(str(n)) + 1
+            _push(nxt, mc, 'w' if n == 1 else f'{n}w')
+            pos = nxt
+
+        pos = (r, c)
+        for n in range(1, max_n):
+            nxt = _b(*pos)
+            if nxt is None:
+                break
+            mc = 1 if n == 1 else len(str(n)) + 1
+            _push(nxt, mc, 'b' if n == 1 else f'{n}b')
+            pos = nxt
+
+        pos = (r, c)
+        for n in range(1, max_n):
+            nxt = _e(*pos)
+            if nxt is None:
+                break
+            mc = 1 if n == 1 else len(str(n)) + 1
+            _push(nxt, mc, 'e' if n == 1 else f'{n}e')
+            pos = nxt
+
+        # f / F / t / T — row-scoped, water-transparent, wall-stopped
+        pts      = row_chars[r]
+        wall_fwd = next((nc for nc in range(c + 1, COLS) if _scan_stops(r, nc)), COLS)
+        wall_bwd = next((nc for nc in range(c - 1, -1, -1) if _scan_stops(r, nc)), -1)
+
+        for nc, ch in pts:
+            if nc > c and nc < wall_fwd:
+                if _is_passable(r, nc):
+                    _push((r, nc), 1, f'f{ch}')
+                if nc - 1 != c and _is_passable(r, nc - 1):
+                    _push((r, nc - 1), 1, f't{ch}')
+            elif nc < c and nc > wall_bwd:
+                if _is_passable(r, nc):
+                    _push((r, nc), 1, f'F{ch}')
+                if nc + 1 != c and _is_passable(r, nc + 1):
+                    _push((r, nc + 1), 1, f'T{ch}')
+
+    if return_path:
+        return None, ''
+    return None
+
+
 def build_dungeon_3(seed: int) -> Dungeon:
     """The Rune Halls — teaches w b e (word motions over rune clusters).
 
@@ -941,6 +1178,128 @@ def build_dungeon_3(seed: int) -> Dungeon:
 
         composite.rebuild_indexes()
         par, path = _dijkstra_par_wbe(composite, return_path=True)
+        if par is not None:
+            break
+    else:
+        par, path = 80, ''
+
+    composite.par    = par
+    composite.budget = math.ceil(par * 1.4)
+    composite.answer = path
+
+    dungeon.rooms        = [composite]
+    dungeon.current_room = 0
+    return dungeon
+
+
+def build_dungeon_4(seed: int) -> Dungeon:
+    """The Fuse Halls — teaches f F t T (character search over water pools).
+
+    Five 2-row snake corridors (72 cols wide).  Each corridor has a water pool
+    that blocks hjkl/w/b/e but is transparent to f/F/t/T.  Visible text
+    strings on the floor tiles are the jump targets:
+
+      C1 rows 1-2   left→right  fr  "    Most dungeons you traverse" → r at col 61
+      C2 rows 4-5   right→left  Fw  " will be scribed in letters"    → w at col 4
+      C3 rows 7-8   left→right  t!  "so you can jump" + "quite easily…type" + dynamite at col 70
+      C4 rows 10-11 right→left  T!  dynamite at col 1 (F! would explode)
+      C5 rows 13-14 left→right  w/b/e rune navigation + exit
+    """
+    ROWS, COLS = _L4_TOTAL_ROWS, _L4_TOTAL_COLS
+    rng     = random.Random(seed)
+    dungeon = Dungeon(name='The Fuse Halls', seed=seed)
+
+    cells = [[CellType.WALL] * COLS for _ in range(ROWS)]
+    composite = Room(room_type=RoomType.ENTRY, rows=ROWS, cols=COLS)
+    composite.cells = cells
+    composite.seed  = seed
+
+    # ── Carve corridors (2 rows each) ─────────────────────────────────────────
+    for row_top in _L4_CORR_TOP_ROWS:
+        for c in range(_L4_CORR_LEFT, _L4_CORR_RIGHT + 1):
+            cells[row_top][c]     = CellType.CORRIDOR
+            cells[row_top + 1][c] = CellType.CORRIDOR
+
+    # ── Carve turn rooms ──────────────────────────────────────────────────────
+    for r0, r1, ca, cb in _L4_TURN_SPANS:
+        c0, c1 = min(ca, cb), max(ca, cb)
+        for row in range(r0, r1 + 1):
+            for col in range(c0, c1 + 1):
+                cells[row][col] = CellType.CORRIDOR
+
+    # Floor cells widening the turn-room middle rows (matches saved reference layout)
+    for r, c in ((3, 67), (3, 68),           # RT1 middle
+                 (6, 1),  (6, 3), (6, 4),    # LT1 middle
+                 (7, 17), (8, 17),            # C3 Zone A/water boundary
+                 (9, 67), (9, 68)):           # RT2 middle
+        cells[r][c] = CellType.FLOOR
+
+    # ── Water pools ───────────────────────────────────────────────────────────
+    for rows, cs, ce in _L4_WATER_SPANS:
+        for r in rows:
+            for c in range(cs, ce + 1):
+                cells[r][c] = CellType.WATER
+
+    # ── Fixed text rune clusters (visible f/F/t/T targets) ───────────────────
+    # Text chars are individual rune symbols; _cell_char returns each char so
+    # f/F/t/T can find them.  kind='ember' gives a distinctive warm colour.
+    # One row of text per corridor (the other row gets standard random runes).
+    _text_runes = [
+        # C1 row 1: fr jumps to 'r' at offset 23 → col 67
+        RuneCluster(row=1, col=44, symbols=tuple(_L4_TEXT_C1), kind='ember'),
+        # C2 row 5: Fw jumps backward to 'w' at offset 1 → col 4
+        RuneCluster(row=5, col=3,  symbols=tuple(_L4_TEXT_C2), kind='ember'),
+        # C3 row 7 Zone A: walking terrain before the water (cols 2-16)
+        RuneCluster(row=7, col=2,  symbols=tuple(_L4_TEXT_C3A), kind='ember'),
+        # C3 row 7 Zone B: t! lands at col 69 (before dynamite at col 70)
+        RuneCluster(row=7, col=33, symbols=tuple(_L4_TEXT_C3B), kind='ember'),
+        # C5 exit anchor: last symbol at col 65 so `e` lands on the exit
+        RuneCluster(row=13, col=64, symbols=('◦', '◦'), kind='ember'),
+    ]
+
+    # ── Fixed entities ────────────────────────────────────────────────────────
+    _fixed = [
+        # C3: dynamite at col 70 — t! (before, col 69) is safe; f! (on) explodes
+        Entity(kind='dynamite', row=7,  col=70),
+        # C4: dynamite at col 1 — T! (after, col 2) is safe; F! (on) explodes
+        Entity(kind='dynamite', row=10, col=1),
+        Entity(kind='dynamite', row=11, col=1),
+        Entity(kind='exit',  row=13, col=65),
+    ]
+    composite.entities = list(_fixed)
+    composite.entry    = (1, 1)
+    composite.exit_pos = (13, 65)
+
+    # ── Blocked cells: water + text/anchor runes + fixed entities ─────────────
+    _bl: set = {(e.row, e.col) for e in _fixed}
+    for rows, cs, ce in _L4_WATER_SPANS:
+        for r in rows:
+            for c in range(cs, ce + 1):
+                _bl.add((r, c))
+    for ru in _text_runes:
+        for i in range(len(ru.symbols)):
+            _bl.add((ru.row, ru.col + i))
+    blocked = frozenset(_bl)
+
+    for _attempt in range(20):
+        composite.runes = list(_text_runes)
+        rng2 = random.Random(rng.randint(0, 2**31))
+
+        # Fill all corridor zones with standard runes
+        _l4_place_zone(composite, rng2, (1, 2),    2,  13, blocked=blocked)  # C1 Zone A
+        _l4_place_zone(composite, rng2, (1, 2),   38,  68, blocked=blocked)  # C1 Zone B
+        _l4_place_zone(composite, rng2, (4,),      2,  28, blocked=blocked)  # C2 row 4 Zone A
+        _l4_place_zone(composite, rng2, (4, 5),   52,  68, blocked=blocked)  # C2 Zone B
+        _l4_place_zone(composite, rng2, (8,),      2,  16, blocked=blocked)  # C3 row 8 Zone A
+        _l4_place_zone(composite, rng2, (8,),     32,  70, blocked=blocked)  # C3 row 8 Zone B
+        _l4_place_zone(composite, rng2, (10, 11),  2,  24, blocked=blocked)  # C4 Zone A
+        _l4_place_zone(composite, rng2, (10, 11), 52,  68, blocked=blocked)  # C4 Zone B
+        # C5: dense rune corridor for w/b/e practice; chest at col 20, exit anchor at col 64-65
+        _l4_place_zone(composite, rng2, (13, 14),  2,  63,
+                        density=0.60, blocked=blocked)
+
+        composite.rebuild_indexes()
+        par, path = _dijkstra_par_ftFT(composite, return_path=True)
         if par is not None:
             break
     else:

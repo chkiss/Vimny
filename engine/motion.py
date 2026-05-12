@@ -77,14 +77,22 @@ def _cell_char(room, r: int, c: int) -> str:
         return ru.symbols[c - ru.col]
     ent = room.entity_at(r, c)
     if ent:
-        if ent.kind == 'door':         return '+'
-        if ent.kind == 'locked_door':  return '+'
-        if ent.kind == 'exit':         return 'E'
-        if ent.kind == 'entry_marker': return '@'
         if ent.kind == 'dynamite':     return '!'
-        return '?'
+        return '.'
     ct = room.cells[r][c]
     return '#' if ct in (CellType.WALL, CellType.WOOD_WALL) else '.'
+
+
+def _cross_water(room, r: int, c: int) -> bool:
+    """Like is_passable but also allows landing on water (for $, 0, ^ scans)."""
+    if r < 0 or r >= room.rows or c < 0 or c >= room.cols:
+        return False
+    if room.cells[r][c] not in (CellType.FLOOR, CellType.CORRIDOR, CellType.WATER):
+        return False
+    if (r, c) in room.fog_cells:
+        return False
+    ent = room.entity_at(r, c)
+    return ent is None or ent.kind != 'locked_door'
 
 
 def apply_motion(player, motion, count, room, target=None):
@@ -102,7 +110,7 @@ def apply_motion(player, motion, count, room, target=None):
             row = player.row
             left = player.col
             for c in range(player.col - 1, -1, -1):
-                if not room.is_passable(row, c):
+                if not _cross_water(room, row, c):
                     break
                 left = c
             if left != player.col:
@@ -112,7 +120,7 @@ def apply_motion(player, motion, count, room, target=None):
             row = player.row
             best = None
             for c in range(player.col + 1, room.cols):
-                if not room.is_passable(row, c):
+                if not _cross_water(room, row, c):
                     break
                 best = c
             if best is not None:
@@ -122,12 +130,12 @@ def apply_motion(player, motion, count, room, target=None):
             row = player.row
             left = player.col
             for c in range(player.col - 1, -1, -1):
-                if not room.is_passable(row, c):
+                if not _cross_water(room, row, c):
                     break
                 left = c
             right = player.col
             for c in range(player.col + 1, room.cols):
-                if not room.is_passable(row, c):
+                if not _cross_water(room, row, c):
                     break
                 right = c
             target = left

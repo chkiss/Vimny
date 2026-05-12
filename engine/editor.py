@@ -201,6 +201,29 @@ def _clip_desc(item) -> str:
     return 'floor'
 
 
+def _deserialize_room(data: dict):
+    """Reconstruct a Room from a dict produced by _serialize_room / save_layout."""
+    from engine.world import Room, RoomType, CellType, RuneCluster, Entity
+    cell_map = {'W': CellType.WALL, 'F': CellType.FLOOR, 'C': CellType.CORRIDOR,
+                'A': CellType.WATER, 'X': CellType.WOOD_WALL}
+    rows  = data['rows']
+    cols  = data['cols']
+    cells = [[cell_map.get(c, CellType.FLOOR) for c in row] for row in data['cells']]
+    room  = Room(room_type=RoomType.ENTRY, rows=rows, cols=cols)
+    room.cells    = cells
+    room.runes    = [RuneCluster(row=r['row'], col=r['col'],
+                                 symbols=tuple(r['symbols']), kind=r['kind'])
+                     for r in data.get('runes', [])]
+    room.entities = [Entity(kind=e['kind'], row=e['row'], col=e['col'])
+                     for e in data.get('entities', [])]
+    ep = data.get('exit_pos')
+    room.exit_pos = tuple(ep) if ep else None
+    en = data.get('entry', [1, 1])
+    room.entry    = tuple(en)
+    room.rebuild_indexes()
+    return room
+
+
 def _serialize_room(room) -> dict:
     """Serialise a Room to a JSON-safe dict for :save."""
     cell_map = {CellType.WALL: 'W', CellType.FLOOR: 'F', CellType.CORRIDOR: 'C',

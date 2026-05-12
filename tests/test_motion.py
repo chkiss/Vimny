@@ -185,22 +185,22 @@ class TestCellChar:
     def test_exit_entity(self):
         room = _bare_room()
         room.add_entity(Entity(kind='exit', row=3, col=10))
-        assert _cell_char(room, 3, 10) == 'E'
+        assert _cell_char(room, 3, 10) == '.'
 
     def test_door_entity(self):
         room = _bare_room()
         room.add_entity(Entity(kind='door', row=3, col=10))
-        assert _cell_char(room, 3, 10) == '+'
+        assert _cell_char(room, 3, 10) == '.'
 
     def test_entry_marker_entity(self):
         room = _bare_room()
         room.add_entity(Entity(kind='entry_marker', row=3, col=1))
-        assert _cell_char(room, 3, 1) == '@'
+        assert _cell_char(room, 3, 1) == '.'
 
     def test_unknown_entity(self):
         room = _bare_room()
         room.add_entity(Entity(kind='wanderer', row=3, col=5))
-        assert _cell_char(room, 3, 5) == '?'
+        assert _cell_char(room, 3, 5) == '.'
 
 
 # ── apply_motion: basic hjkl ─────────────────────────────────────────────────
@@ -414,11 +414,11 @@ class TestApplyMotionFindChar:
         apply_motion(p, 'f', 1, room, target='∘')
         assert p.col == 9
 
-    def test_f_targets_exit_entity_char(self):
+    def test_f_cannot_target_exit_entity(self):
         room = _rune_room()
         p = _player(3, 1)
         apply_motion(p, 'f', 1, room, target='E')
-        assert p.col == 20
+        assert p.col == 1  # exit no longer returns 'E' from _cell_char; no jump
 
     def test_f_no_target_found_no_move(self):
         room = _bare_room()
@@ -473,12 +473,12 @@ class TestApplyMotionFindChar:
         assert result is False  # rune is on a different row
 
 
-# ── apply_motion: door entity for f+ ─────────────────────────────────────────
+# ── apply_motion: door entity not targetable by f+ ───────────────────────────
 
 class TestApplyMotionDoor:
-    def test_f_plus_finds_door(self):
+    def test_f_plus_cannot_target_door(self):
         room = _bare_room()
         room.add_entity(Entity(kind='door', row=3, col=10))
         p = _player(3, 1)
         apply_motion(p, 'f', 1, room, target='+')
-        assert p.col == 10
+        assert p.col == 1  # door no longer returns '+' from _cell_char; no jump

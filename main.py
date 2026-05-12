@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 """Vimny — entry point and main game loop."""
+from __future__ import annotations
 import sys, random, time, argparse
 from blessed import Terminal
 import render.colors as C
@@ -12,14 +13,14 @@ from engine.player import Player
 from engine.modes import Mode
 from engine.budget import Budget
 from engine.vim_parser import parse
-from engine.world import Entity, CellType
+from engine.world import Entity, CellType, RuneCluster, Dungeon
 from engine.motion import apply_motion, move_player, _apply_esc, _reveal_from, _cell_char
 from engine.editor import (
     _merge_adjacent_runes, _ed_cut, _ed_snapshot, _ed_restore, _ed_subst,
     _ed_paste, _ed_row_items, _ed_clear_row, _ed_range_items, _ed_delete_range,
-    _clip_desc, _serialize_room,
+    _clip_desc, _serialize_room, _deserialize_room,
 )
-from generation.dungeon_gen import build_dungeon_0, build_dungeon_1, build_dungeon_2, build_dungeon_3, build_dungeon_dummy
+from generation.dungeon_gen import build_dungeon_0, build_dungeon_1, build_dungeon_2, build_dungeon_3, build_dungeon_4, build_dungeon_dummy
 from content.levels import LEVELS, is_unlocked, known_commands as _known_commands
 import save.save_manager as SM
 
@@ -35,7 +36,12 @@ def _chest_loot(kind: str) -> str:
         return 'key'
     if kind == 'chest_scroll':
         return 'scroll'
-    return 'key' if random.random() < 0.6 else 'scroll'
+    r = random.random()
+    if r < 0.5:
+        return 'key'
+    if r < 0.8:
+        return 'scroll'
+    return 'heart'
 
 # ── Register tutorial overlay ─────────────────────────────────────────────────
 
@@ -201,6 +207,21 @@ def _void_fall_animation(term, screen_r, screen_c):
         time.sleep(0.12)
 
 
+def _drown_animation(term, screen_r, screen_c):
+    frames = [
+        (term.color_rgb(60, 140, 210) + term.bold, '@'),
+        (term.color_rgb(40, 100, 175) + term.bold, '◉'),
+        (term.color_rgb(20,  70, 145),              'o'),
+        (term.color_rgb(10,  45, 110),              '·'),
+        (term.color_rgb( 5,  25,  75),              '˙'),
+        (term.normal,                               ' '),
+    ]
+    for color, sym in frames:
+        print(term.move_yx(screen_r, screen_c) + color + sym + term.normal,
+              end='', flush=True)
+        time.sleep(0.12)
+
+
 def _win_animation(term, iw):
     rows_text = [
         '✦  ★  ✦  ★  ✦  ★  ✦  ★  ✦',
@@ -280,11 +301,11 @@ def _keystroke_cost(count: int) -> int:
     return 1 if count == 1 else len(str(count)) + 1
 
 
-def _calc_stars(won: bool, budget: Budget, room) -> int:
+def _calc_stars(won: bool, budget: Budget, room, player) -> int:
     if not won:
         return 0
     par = room.par or 0
-    if par > 0 and budget.spent <= par:
+    if par > 0 and budget.spent <= par and player.hp >= 6:
         return 2
     return 1
 
@@ -298,6 +319,8 @@ def _build_dungeon(level: int, seed: int):
         return build_dungeon_2(seed)
     if level == 3:
         return build_dungeon_3(seed)
+    if level == 4:
+        return build_dungeon_4(seed)
     return build_dungeon_0(seed)
 
 
@@ -321,6 +344,8 @@ def _snapshot(room, player, budget, *, row=None, col=None, spent=None) -> dict:
 
 
 def _hint_bar(known: list) -> str:
+    if 'f' in known:
+        return 'f{c}:jump to char  t{c}:jump before char  F/T:backward  w b e  [N]hjkl  :w write  :q quit'
     if 'w' in known:
         return 'w:jump to word start  b:jump back to word  e:jump to word end  [N]hjkl  :w write  :q quit'
     if 'count' in known:
@@ -333,13 +358,21 @@ def _hint_bar(known: list) -> str:
 # ── Dungeon game loop ──────────────────────────────────────────────────────────
 
 def run_dungeon(term: Terminal, level: int, progress: dict,
-                player_name: str = 'Normand') -> dict:
+                player_name: str = 'Normand',
+                _dungeon: Dungeon | None = None,
+                _start_edit: bool = False) -> dict:
     """Run one dungeon level.
 
     Returns {'won': bool, 'stars': int, 'action': 'wq'|'quit'}.
+    _dungeon: pre-built Dungeon (used for custom layouts from the overworld).
+    _start_edit: if True, enter edit mode immediately (admin custom levels).
     """
-    seed    = random.randint(0, 2**31)
-    dungeon = _build_dungeon(level, seed)
+    if _dungeon is not None:
+        dungeon = _dungeon
+        seed    = dungeon.seed or 0
+    else:
+        seed    = random.randint(0, 2**31)
+        dungeon = _build_dungeon(level, seed)
     room    = dungeon.room
     if player_name != 'admin':
         room.answer = ''
@@ -355,13 +388,18 @@ def run_dungeon(term: Terminal, level: int, progress: dict,
     msg_ttl  = 0
     undo_stack: list[tuple[int, int, int]] = []
     redo_stack: list[tuple[int, int, int]] = []
-    edit_mode  = False
+    edit_mode  = _start_edit
     ed_undo:   list = []
     ed_redo:   list = []
     count_tutorial_shown = False
     at_exit  = False   # player has stepped on the exit at some point
     last_saved_stars = progress.get(level, {}).get('stars', 0)
     won      = False   # win animation has been triggered
+
+    if _start_edit:
+        room.passable_walls = True
+        if 'editor' not in player.known_commands:
+            player.known_commands = player.known_commands + ['editor']
 
     if level == 1:
         message = 'The Line Halls — navigate to the corridor, then use $ and ^'
@@ -371,6 +409,9 @@ def run_dungeon(term: Terminal, level: int, progress: dict,
         msg_ttl = 50
     elif level == 3:
         message = 'The Rune Halls — w:next cluster  b:prev cluster  e:end of cluster'
+        msg_ttl = 60
+    elif level == 4:
+        message = 'The Fuse Halls — f{c}:jump to char  t{c}:just before  F/T:backward'
         msg_ttl = 60
     elif level == 99:
         message = 'Sandbox — all mechanics active. Type :edit to enter editor mode.'
@@ -414,7 +455,7 @@ def run_dungeon(term: Terminal, level: int, progress: dict,
 
                 if cmd == 'w':
                     if won:
-                        stars = _calc_stars(won, budget, room)
+                        stars = _calc_stars(won, budget, room, player)
                         prev  = progress.get(level, {}).get('stars', 0)
                         progress[level] = {'complete': True,
                                            'stars': max(stars, prev)}
@@ -424,11 +465,11 @@ def run_dungeon(term: Terminal, level: int, progress: dict,
                     msg_ttl = 30
 
                 elif cmd == 'wq':
-                    stars = _calc_stars(won, budget, room)
+                    stars = _calc_stars(won, budget, room, player)
                     return {'won': won, 'stars': stars, 'action': 'wq'}
 
                 elif cmd == 'q':
-                    stars = _calc_stars(won, budget, room)
+                    stars = _calc_stars(won, budget, room, player)
                     if (player_name != 'admin'
                             and won and stars > last_saved_stars):
                         player.error = 'E37: No write since last change (add ! to override)'
@@ -490,6 +531,32 @@ def run_dungeon(term: Terminal, level: int, progress: dict,
                 player.cmd_line = player.cmd_line[:-1]
             else:
                 player.cmd_line += str(key)
+            render_all(term, dungeon, player, budget, message)
+            continue
+
+        # ── INSERT mode (admin text placement) ───────────────────────────────
+        if player.mode == Mode.INSERT:
+            if key.name == 'KEY_ESCAPE':
+                player.mode = Mode.NORMAL
+                key_buf = ''
+            elif edit_mode:
+                r, c = player.row, player.col
+                if key.name == 'KEY_BACKSPACE' or str(key) == '\x7f':
+                    if c > 0:
+                        ed_undo.append(_ed_snapshot(room, player))
+                        player.col -= 1
+                        _ed_cut(room, r, player.col)
+                        _merge_adjacent_runes(room, r)
+                elif not key.is_sequence:
+                    ch = str(key)
+                    if ch.isprintable() and len(ch) == 1:
+                        ed_undo.append(_ed_snapshot(room, player))
+                        _ed_cut(room, r, c)
+                        room.add_rune(RuneCluster(row=r, col=c,
+                                                  symbols=(ch,), kind='ember'))
+                        _merge_adjacent_runes(room, r)
+                        if c + 1 < room.cols:
+                            player.col += 1
             render_all(term, dungeon, player, budget, message)
             continue
 
@@ -564,6 +631,28 @@ def run_dungeon(term: Terminal, level: int, progress: dict,
                     else:
                         h, hh = player.hp // 2, '½' if player.hp % 2 else ''
                         message = f'You fell into the void!  ({h}{hh} ♥ remaining)'
+                        msg_ttl = 25
+                    render_all(term, dungeon, player, budget, message)
+                    continue
+
+                # Water: drown if landed on water cell (e.g. via $, 0, ^)
+                if not edit_mode and room.cells[player.row][player.col] == CellType.WATER:
+                    iw    = _iw(term)
+                    game_h = term.height - 7
+                    vr_start = max(0, min(player.row - game_h // 2, room.rows - game_h))
+                    vc_start = max(0, min(player.col - iw  // 2,    room.cols - iw))
+                    scr_r    = player.row - vr_start + 3
+                    scr_c    = player.col - vc_start + 1
+                    render_all(term, dungeon, player, budget, message)
+                    _drown_animation(term, scr_r, scr_c)
+                    player.take_damage(2)  # 1 full heart
+                    player.row, player.col = prev_pos[0], prev_pos[1]
+                    if player.is_dead:
+                        message = '** GAME OVER ** Type  :e  to re-load the dungeon.'
+                        msg_ttl = 2
+                    else:
+                        h, hh = player.hp // 2, '½' if player.hp % 2 else ''
+                        message = f'You drowned!  ({h}{hh} ♥ remaining)'
                         msg_ttl = 25
                     render_all(term, dungeon, player, budget, message)
                     continue
@@ -722,6 +811,9 @@ def run_dungeon(term: Terminal, level: int, progress: dict,
                     if item == 'key':
                         player.keys += 1
                         message = 'You found a key!'
+                    elif item == 'heart':
+                        player.heal(2)
+                        message = 'You found a heart! HP restored.'
                     else:
                         message = 'You found a scroll!'
                     msg_ttl = 30
@@ -997,14 +1089,23 @@ def run_title(term: Terminal, has_save: bool) -> tuple[str, str]:
 def run_overworld(term: Terminal, player: Player, progress: dict) -> dict:
     """Show the netrw overworld.
 
-    Returns {'action': 'enter', 'level': N} or {'action': 'quit'}.
+    Returns {'action': 'enter', 'level': N},
+            {'action': 'open_custom', 'layout': dict}, or
+            {'action': 'quit'}.
     """
-    visible    = [l for l in LEVELS if not l.get('admin_only') or player.name == 'admin']
+    visible  = [l for l in LEVELS if not l.get('admin_only') or player.name == 'admin']
+    customs  = SM.list_layouts() if player.name == 'admin' else []
+    total    = len(visible) + len(customs)
     cursor_row = 0
     cmd_active = False
     cmd_line   = ''
 
-    render_overworld(term, player, progress, cursor_row, levels=visible)
+    def _render():
+        render_overworld(term, player, progress, cursor_row,
+                         cmd_line if cmd_active else None,
+                         levels=visible, custom_layouts=customs)
+
+    _render()
 
     while True:
         key = term.inkey(timeout=0.1)
@@ -1029,8 +1130,7 @@ def run_overworld(term: Terminal, player: Player, progress: dict) -> dict:
                 cmd_line = cmd_line[:-1]
             else:
                 cmd_line += str(key)
-            render_overworld(term, player, progress, cursor_row,
-                             cmd_line if cmd_active else None, levels=visible)
+            _render()
             continue
 
         # ── Navigation ────────────────────────────────────────────────────────
@@ -1040,24 +1140,27 @@ def run_overworld(term: Terminal, player: Player, progress: dict) -> dict:
             cmd_active = True
             cmd_line   = ''
         elif raw == 'j':
-            cursor_row = min(cursor_row + 1, len(visible) - 1)
+            cursor_row = min(cursor_row + 1, total - 1)
         elif raw == 'k':
             cursor_row = max(cursor_row - 1, 0)
         elif key.name == 'KEY_ENTER' or raw in ('\n', '\r'):
-            level_id = visible[cursor_row]['id']
-            if is_unlocked(level_id, progress, player.name):
-                return {'action': 'enter', 'level': level_id}
-            # Locked level: flash hint (no action)
+            if cursor_row < len(visible):
+                level_id = visible[cursor_row]['id']
+                if is_unlocked(level_id, progress, player.name):
+                    return {'action': 'enter', 'level': level_id}
+                # Locked level: flash hint (no action)
+            else:
+                layout = customs[cursor_row - len(visible)]
+                return {'action': 'open_custom', 'layout': layout}
 
-        render_overworld(term, player, progress, cursor_row,
-                         cmd_line if cmd_active else None, levels=visible)
+        _render()
 
 
 # ── Main ───────────────────────────────────────────────────────────────────────
 
 def main():
     ap = argparse.ArgumentParser(description='Vimny — Vim dungeon crawler')
-    ap.add_argument('--level', type=int, default=None, choices=[0, 1, 2, 3, 99],
+    ap.add_argument('--level', type=int, default=None, choices=[0, 1, 2, 3, 4, 99],
                     help='skip overworld and start at this level (debug)')
     args = ap.parse_args()
 
@@ -1092,6 +1195,16 @@ def main():
 
             if ow_result['action'] == 'quit':
                 break
+
+            if ow_result['action'] == 'open_custom':
+                layout  = ow_result['layout']
+                room    = _deserialize_room(layout)
+                dungeon = Dungeon(name=layout.get('layout_name', 'Custom'), seed=0)
+                dungeon.rooms        = [room]
+                dungeon.current_room = 0
+                run_dungeon(term, 0, progress, player.name,
+                            _dungeon=dungeon, _start_edit=True)
+                continue
 
             level = ow_result['level']
             dung_result = run_dungeon(term, level, progress, player.name)

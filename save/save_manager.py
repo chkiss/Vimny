@@ -84,6 +84,21 @@ def load_player_name(data: Optional[dict]) -> str:
 
 # ── Layout I/O (admin level-design tool) ──────────────────────────────────────
 
+def list_layouts() -> list[dict]:
+    """All saved layouts sorted alphabetically by layout_name."""
+    if not LAYOUTS_DIR.exists():
+        return []
+    result = []
+    for p in LAYOUTS_DIR.glob('*.json'):
+        try:
+            with open(p) as f:
+                result.append(json.load(f))
+        except (json.JSONDecodeError, OSError):
+            pass
+    result.sort(key=lambda d: d.get('layout_name', '').lower())
+    return result
+
+
 def save_layout(name: str, data: dict) -> Path:
     """Write a serialised Room dict to ~/.Vimny/layouts/<slug>.json."""
     LAYOUTS_DIR.mkdir(parents=True, exist_ok=True)

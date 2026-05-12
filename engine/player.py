@@ -33,6 +33,10 @@ class Player:
         """Reduce HP. amount is in half-hearts (2 = 1 full heart)."""
         self.hp = max(0, self.hp - half_hearts)
 
+    def heal(self, half_hearts: int = 2):
+        """Restore HP, capped at max_hp."""
+        self.hp = min(self.max_hp, self.hp + half_hearts)
+
     @property
     def is_dead(self) -> bool:
         return self.hp <= 0
