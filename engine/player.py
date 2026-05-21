@@ -1,3 +1,4 @@
+from __future__ import annotations
 from dataclasses import dataclass, field
 from engine.modes import Mode
 
@@ -14,6 +15,8 @@ class Player:
     register: list = field(default_factory=list)   # unnamed " register
     inventory: list = field(default_factory=list)
     marks: dict = field(default_factory=dict)   # 'a'-'z' -> (row, col)
+
+    last_f: tuple | None = None   # (motion, target) of most recent f/F/t/T; set by apply_motion
 
     # command input buffer for gg, f{c}, m{c}, `{c}, '{c}
     input_buf: str = ''

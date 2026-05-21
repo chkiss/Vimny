@@ -24,6 +24,7 @@ EXPECTED_ENTITY_KINDS = {
     'wanderer',
     'chest', 'chest_key', 'chest_scroll',
     'locked_door',
+    'goblin', 'warden',
 }
 EXPECTED_RUNE_KINDS   = {'ancient', 'verdant', 'void', 'ember'}
 

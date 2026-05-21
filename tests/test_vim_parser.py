@@ -160,15 +160,27 @@ class TestOperators:
 class TestStandaloneCommands:
     def test_x_interact(self):
         action, _ = parse('x', Mode.NORMAL)
-        assert action == {'type': 'interact'}
+        assert action == {'type': 'interact', 'count': 1}
+
+    def test_x_interact_count(self):
+        action, _ = parse('5x', Mode.NORMAL)
+        assert action == {'type': 'interact', 'count': 5}
 
     def test_u_undo(self):
         action, _ = parse('u', Mode.NORMAL)
-        assert action == {'type': 'undo'}
+        assert action == {'type': 'undo', 'count': 1}
+
+    def test_u_undo_count(self):
+        action, _ = parse('5u', Mode.NORMAL)
+        assert action == {'type': 'undo', 'count': 5}
 
     def test_ctrl_r_redo(self):
         action, _ = parse('\x12', Mode.NORMAL)
-        assert action == {'type': 'redo'}
+        assert action == {'type': 'redo', 'count': 1}
+
+    def test_ctrl_r_redo_count(self):
+        action, _ = parse('3\x12', Mode.NORMAL)
+        assert action == {'type': 'redo', 'count': 3}
 
     def test_p_paste(self):
         action, _ = parse('p', Mode.NORMAL)

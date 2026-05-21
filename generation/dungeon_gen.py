@@ -1193,7 +1193,7 @@ def build_dungeon_3(seed: int) -> Dungeon:
 
 
 def build_dungeon_4(seed: int) -> Dungeon:
-    """The Fuse Halls — teaches f F t T (character search over water pools).
+    """The Character Cataracts — teaches f F t T (character search over water pools).
 
     Five 2-row snake corridors (72 cols wide).  Each corridor has a water pool
     that blocks hjkl/w/b/e but is transparent to f/F/t/T.  Visible text
@@ -1207,7 +1207,7 @@ def build_dungeon_4(seed: int) -> Dungeon:
     """
     ROWS, COLS = _L4_TOTAL_ROWS, _L4_TOTAL_COLS
     rng     = random.Random(seed)
-    dungeon = Dungeon(name='The Fuse Halls', seed=seed)
+    dungeon = Dungeon(name='The Character Cataracts', seed=seed)
 
     cells = [[CellType.WALL] * COLS for _ in range(ROWS)]
     composite = Room(room_type=RoomType.ENTRY, rows=ROWS, cols=COLS)
@@ -1314,6 +1314,62 @@ def build_dungeon_4(seed: int) -> Dungeon:
     return dungeon
 
 
+def build_dungeon_1_1(seed: int) -> Dungeon:
+    """The Reliquary — bonus chest room unlocked alongside level 2.
+
+    Layout (5 rows × 17 cols):
+      Entry room (interior 3r × 2c): rows 0-4, cols 0-3;  floor at rows 1-3, cols 1-2.
+      Corridor   (1r × 8c):          row 2,   cols 3-12   (carves through both room walls).
+      Dest room  (interior 3r × 3c): rows 0-4, cols 12-16; floor at rows 1-3, cols 13-15.
+
+    Chest (scroll) at center of destination interior: (2, 14).
+    Exit at top-right interior corner: (1, 15).
+    Entry at top-left of entry interior: (1, 1).
+
+    No par challenge (par=None).  Budget = 15.
+    Intended path: j  $  h  x  k  l  (6 keystrokes).
+    """
+    dungeon = Dungeon(name='The Reliquary', seed=seed)
+    ROWS, COLS = 5, 17
+
+    cells = [[CellType.WALL] * COLS for _ in range(ROWS)]
+
+    # Entry room interior: rows 1-3, cols 1-2
+    for r in range(1, 4):
+        for c in range(1, 3):
+            cells[r][c] = CellType.FLOOR
+
+    # Single-row corridor: row 2, cols 3-12 (carves entry right wall and dest left wall)
+    for c in range(3, 13):
+        cells[2][c] = CellType.CORRIDOR
+
+    # Destination room interior: rows 1-3, cols 13-15
+    for r in range(1, 4):
+        for c in range(13, 16):
+            cells[r][c] = CellType.FLOOR
+
+    composite = Room(room_type=RoomType.ENTRY, rows=ROWS, cols=COLS)
+    composite.cells = cells
+    composite.seed  = seed
+
+    composite.entry    = (1, 1)
+    composite.exit_pos = (1, 15)
+
+    composite.entities = [
+        Entity(kind='chest_scroll', row=2, col=14),
+        Entity(kind='exit',         row=1, col=15),
+    ]
+
+    composite.par    = None
+    composite.budget = 15
+    composite.answer = 'j $ h x k l'
+
+    composite.rebuild_indexes()
+    dungeon.rooms        = [composite]
+    dungeon.current_room = 0
+    return dungeon
+
+
 def build_dungeon_dummy(seed: int) -> Dungeon:
     """Admin editing sandbox — all editable element types, plus two fog-walled rooms.
 
@@ -1355,10 +1411,6 @@ def build_dungeon_dummy(seed: int) -> Dungeon:
         for c in range(7, end_c):
             cells[r][c] = CellType.WOOD_WALL
 
-    # Vertical stone wall divider in main room at col 38, rows 9-15
-    for r in range(9, 16):
-        cells[r][38] = CellType.WALL
-
     # Demo corridor strip in main room
     for c in range(25, 36):
         cells[9][c] = CellType.CORRIDOR
@@ -1383,8 +1435,9 @@ def build_dungeon_dummy(seed: int) -> Dungeon:
         Entity(kind='chest',        row=3,  col=25),
         Entity(kind='chest_key',    row=4,  col=25),
         Entity(kind='chest_scroll', row=5,  col=25),
-        # Standalone locked door in main room (for p-to-unlock practice)
-        Entity(kind='locked_door',  row=16, col=20),
+        # Combat entities
+        Entity(kind='warden', row=4,  col=50, hp=5, max_hp=5, ai='',      summon_timer=0),
+        Entity(kind='goblin', row=17, col=3,  hp=1, max_hp=1, ai='chase', ai_speed=1),
         # Room-divider door (fog boundary — opens into Room A)
         Entity(kind='door',         row=9,  col=42),
         Entity(kind='door',         row=10, col=42),
@@ -1407,6 +1460,250 @@ def build_dungeon_dummy(seed: int) -> Dungeon:
     composite.passable_walls = False
     composite.rebuild_indexes()
     _fog_unreachable(composite, composite.entry[0], composite.entry[1])
+    dungeon.rooms        = [composite]
+    dungeon.current_room = 0
+    return dungeon
+
+
+# ── Level 5 helpers ────────────────────────────────────────────────────────────
+
+_L5_ROWS = 20
+_L5_COLS = 58
+
+# Snake corridor rows (single-row each)
+_L5_CORR_ROWS    = [1, 3, 5, 7, 9, 11, 13, 15]
+_L5_RIGHT_GOING  = {1, 5, 9, 13}   # player enters from left
+_L5_LEFT_GOING   = {3, 7, 11, 15}  # player enters from right
+
+# Right connector rows (floor at cols 55-56); left connector rows (floor at cols 2-3)
+_L5_RIGHT_CONN_ROWS = [2, 6, 10, 14]
+_L5_LEFT_CONN_ROWS  = [4, 8, 12, 16]
+_L5_RC_COLS = (55, 56)
+_L5_LC_COLS = (2, 3)
+
+
+def _l5_place_near_runes(runes: list, rng, row: int,
+                          col_start: int, col_end: int, n: int) -> None:
+    """Scatter n single-char decorative (non-void) runes on the near side."""
+    available = col_end - col_start + 1
+    if available < 1 or n < 1:
+        return
+    kinds = ('ancient', 'verdant', 'ember')
+    occupied: set = set()
+    placed = 0
+    for _ in range(n * 10):
+        if placed >= n:
+            break
+        c = rng.randint(col_start, col_end)
+        if c in occupied:
+            continue
+        occupied.add(c)
+        kind = rng.choice(kinds)
+        runes.append(RuneCluster(row=row, col=c,
+                                 symbols=(_RUNE_CHAR[kind],), kind=kind))
+        placed += 1
+
+
+def _l5_goblin_positions(rng, far_start: int, far_end: int,
+                          right_to_left: bool) -> list:
+    """Place 2-5 goblins in [far_start, far_end] with >= 3-cell spacing."""
+    space = far_end - far_start + 1
+    if space < 1:
+        return []
+    n = min(5, max(2, space // 5))
+    positions = []
+    step = max(3, space // n)
+    if right_to_left:
+        c = far_end - rng.randint(0, max(0, step - 3))
+        for _ in range(n):
+            if c < far_start:
+                break
+            positions.append(c)
+            c -= rng.randint(3, step)
+    else:
+        c = far_start + rng.randint(0, max(0, step - 3))
+        for _ in range(n):
+            if c > far_end:
+                break
+            positions.append(c)
+            c += rng.randint(3, step)
+    return positions
+
+
+def _l5_move_cost(dist: int) -> int:
+    """Keystrokes for optimal count-hjkl move of dist cells."""
+    if dist <= 0:
+        return 0
+    if dist == 1:
+        return 1
+    return len(str(dist)) + 1
+
+
+def _par_l5(corr_data: list, gobs_17: list) -> int:
+    """Analytical par for Level 5.
+
+    Optimal strategy:
+    - First right-going corridor: fg (2 keys) to establish last_f.
+    - Subsequent right-going corridors: ; (1 key) reuses last_f.
+    - Left-going corridors: , (1 key) reverses last_f.
+    - After each kill chain, $ or 0 reaches the connector in 1 key regardless
+      of distance (both cross water, bounded only by walls).
+    - Row-17 entry: ; (1 key, last_f already set). Approach to locked door via
+      count-hjkl because $ would overshoot past col 53.
+    """
+    total = 0
+    first_right = True
+    for c in corr_data:
+        n = len(c['goblins'])
+        if n == 0:
+            continue
+        if c['right_going']:
+            entry = 2 if first_right else 1   # fg once; subsequent corridors use ;
+            first_right = False
+        else:
+            entry = 1                          # , reverses the stored last_f
+        kill   = entry + 1 + max(0, n - 1) * 2
+        total += kill + 1 + 2                  # $ or 0 (1 key to connector) + 2j
+
+    n17 = len(gobs_17)
+    if n17 > 0:
+        kill17    = 1 + 1 + max(0, n17 - 1) * 2   # ; x ;x… (last_f already set)
+        dist_door = 52 - max(gobs_17)
+        total    += kill17 + _l5_move_cost(dist_door)
+    total += 1 + 1 + 1 + 2   # p door17, j, p door18, fE exit
+
+    return max(total, 10)
+
+
+def build_dungeon_5(seed: int) -> Dungeon:
+    """The Goblin Gauntlet — teaches ; and , (repeat last f/t).
+
+    Eight single-row snake corridors.  Each has a water pool (impassable to
+    hjkl, transparent to f/F/t/T) with goblins on the far side.  The player
+    uses fg to leap the first pool and establish last_f='g', then chains
+    ;x on right-going corridors and ,x on left-going ones.
+    Void runes at col 1 / col 57 punish 0 / $ overshoot.
+    Rows 17-18: goblin gauntlet + door gate + exit.
+    """
+    rng     = random.Random(seed)
+    dungeon = Dungeon(name='The Goblin Gauntlet', seed=seed)
+
+    cells = [[CellType.WALL] * _L5_COLS for _ in range(_L5_ROWS)]
+
+    # Carve corridor floors (single-row each)
+    for row in _L5_CORR_ROWS:
+        for c in range(1, 57):
+            cells[row][c] = CellType.FLOOR
+
+    # Final section: full floor cols 1-56
+    for row in (17, 18):
+        for c in range(1, 57):
+            cells[row][c] = CellType.FLOOR
+
+    # Right connector passages (cols 55-56)
+    for row in _L5_RIGHT_CONN_ROWS:
+        for c in _L5_RC_COLS:
+            cells[row][c] = CellType.FLOOR
+
+    # Left connector passages (cols 2-3)
+    for row in _L5_LEFT_CONN_ROWS:
+        for c in _L5_LC_COLS:
+            cells[row][c] = CellType.FLOOR
+
+    composite = Room(room_type=RoomType.ENTRY, rows=_L5_ROWS, cols=_L5_COLS)
+    composite.cells    = cells
+    composite.seed     = seed
+    composite.entry    = (1, 1)
+    composite.exit_pos = (18, 56)
+
+    entities: list = [Entity(kind='entry_marker', row=1, col=1)]
+    runes:    list = []
+    corr_data      = []
+
+    # Per-corridor randomisation
+    for row in _L5_CORR_ROWS:
+        right_going = row in _L5_RIGHT_GOING
+
+        w_width = rng.randint(3, 6)
+        if right_going:
+            w_start = rng.randint(5, 28)
+        else:
+            w_start = rng.randint(20, max(20, 44 - w_width))
+        w_end = w_start + w_width - 1
+
+        for c in range(w_start, w_end + 1):
+            cells[row][c] = CellType.WATER
+
+        if right_going:
+            far_start = w_end + 2
+            far_end   = _L5_RC_COLS[0] - 2
+            gobs = _l5_goblin_positions(rng, far_start, far_end,
+                                        right_to_left=False)
+        else:
+            far_start = _L5_LC_COLS[1] + 2
+            far_end   = w_start - 2
+            gobs = _l5_goblin_positions(rng, far_start, far_end,
+                                        right_to_left=True)
+
+        for gc in gobs:
+            entities.append(Entity(kind='goblin', row=row, col=gc,
+                                   hp=1, max_hp=1, ai='chase', ai_speed=2))
+
+        # Decorative near-side runes (non-void)
+        if right_going:
+            near_s, near_e = 2, w_start - 2
+        else:
+            near_s, near_e = w_end + 2, 54
+        _l5_place_near_runes(runes, rng, row, near_s, near_e, rng.randint(1, 3))
+
+        # Stone walls at corridor ends (block $ / 0 / ^ overshoot)
+        if row != 1:
+            cells[row][1] = CellType.WALL
+
+        corr_data.append({
+            'row':        row,
+            'right_going': right_going,
+            'goblins':    gobs,
+        })
+
+    # Connector doors
+    for row in _L5_RIGHT_CONN_ROWS:
+        for c in _L5_RC_COLS:
+            entities.append(Entity(kind='door', row=row, col=c))
+    for row in _L5_LEFT_CONN_ROWS:
+        for c in _L5_LC_COLS:
+            entities.append(Entity(kind='door', row=row, col=c))
+
+    # Final section goblins (rows 17, no water)
+    n17   = rng.randint(3, 6)
+    space = 46  # cols 5-50
+    gobs17: list = []
+    c = 5 + rng.randint(0, 3)
+    for _ in range(n17):
+        if c > 50:
+            break
+        gobs17.append(c)
+        c += space // n17 + rng.randint(-1, 2)
+    for gc in gobs17:
+        entities.append(Entity(kind='goblin', row=17, col=gc,
+                               hp=1, max_hp=1, ai='chase', ai_speed=2))
+
+    # Gate doors at col 53 (rows 17 and 18) + exit
+    entities.append(Entity(kind='locked_door', row=17, col=53))
+    entities.append(Entity(kind='locked_door', row=18, col=53))
+    entities.append(Entity(kind='exit', row=18, col=56))
+
+    composite.entities = entities
+    composite.runes    = runes
+
+    par = _par_l5(corr_data, gobs17)
+    composite.par    = par
+    composite.budget = math.ceil(par * 1.4)
+    composite.answer = 'fg ;x chain  , reverses  fE exit'
+
+    composite.rebuild_indexes()
+    _fog_unreachable(composite, composite.entry[0], composite.entry[1])
+
     dungeon.rooms        = [composite]
     dungeon.current_room = 0
     return dungeon

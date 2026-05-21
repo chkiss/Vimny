@@ -77,7 +77,9 @@ def _cell_char(room, r: int, c: int) -> str:
         return ru.symbols[c - ru.col]
     ent = room.entity_at(r, c)
     if ent:
-        if ent.kind == 'dynamite':     return '!'
+        if ent.kind == 'dynamite':  return '!'
+        if ent.kind == 'goblin':    return 'g'
+        if ent.kind == 'warden':    return 'W'
         return '.'
     ct = room.cells[r][c]
     return '#' if ct in (CellType.WALL, CellType.WOOD_WALL) else '.'
@@ -222,23 +224,38 @@ def apply_motion(player, motion, count, room, target=None):
         elif motion in ('f', 'F', 't', 'T'):
             if target is None:
                 break
-            row = player.row
-            fwd  = motion in ('f', 't')
-            scan = range(player.col + 1, room.cols) if fwd else range(player.col - 1, -1, -1)
-            for nc in scan:
-                if room.cells[row][nc] in (CellType.WALL, CellType.WOOD_WALL):
-                    break  # walls block the scan; water does not
-                if _cell_char(room, row, nc) == target:
-                    if motion == 'f':
-                        dest = nc
-                    elif motion == 'F':
-                        dest = nc
-                    elif motion == 't':
-                        dest = nc - 1
-                    else:  # T
-                        dest = nc + 1
-                    if dest != player.col and room.is_passable(row, dest):
-                        player.col = dest
-                        moved = True
-                    break
+            if _apply_find(player, motion, target, room):
+                player.last_f = (motion, target)
+                moved = True
+        elif motion == ';':
+            if player.last_f:
+                m, tgt = player.last_f
+                moved |= _apply_find(player, m, tgt, room)
+        elif motion == ',':
+            if player.last_f:
+                m, tgt = player.last_f
+                rev = {'f': 'F', 'F': 'f', 't': 'T', 'T': 't'}[m]
+                moved |= _apply_find(player, rev, tgt, room)
     return moved
+
+
+def _apply_find(player, motion: str, target: str, room) -> bool:
+    """Raw f/F/t/T scan without updating player.last_f. Used by ; and ,."""
+    row = player.row
+    fwd = motion in ('f', 't')
+    scan = range(player.col + 1, room.cols) if fwd else range(player.col - 1, -1, -1)
+    for nc in scan:
+        if room.cells[row][nc] in (CellType.WALL, CellType.WOOD_WALL):
+            break
+        if _cell_char(room, row, nc) == target:
+            if motion in ('f', 'F'):
+                dest = nc
+            elif motion == 't':
+                dest = nc - 1
+            else:  # T
+                dest = nc + 1
+            if dest != player.col and room.is_passable(row, dest):
+                player.col = dest
+                return True
+            break
+    return False

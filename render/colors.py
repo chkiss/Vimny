@@ -13,7 +13,7 @@ def t():
 def wall_bg():       return _term.on_color_rgb(15, 15, 20)
 def floor_bg():      return _term.on_color_rgb(28, 28, 35)
 def player_fg():     return _term.bright_white
-def enemy_fg():      return _term.color_rgb(220, 120, 20)
+def enemy_fg():      return _term.color_rgb(60, 180, 60)
 def enemy_frozen():  return _term.color_rgb(100, 180, 255)
 def boss_fg():       return _term.color_rgb(200, 30, 30)
 def heart_full():    return _term.color_rgb(220, 40,  40)

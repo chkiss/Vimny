@@ -10,6 +10,19 @@ import render.colors as C
 import render.symbols as S
 from render.utils import inner_w as _inner_w
 
+
+def _is_vertical_door(room: Room, r: int, c: int, kind: str) -> bool:
+    """Return True if the door at (r, c) is part of a vertical wall.
+
+    A door is vertical when it has a same-kind door neighbour directly above or
+    below — i.e. it belongs to a stacked column group blocking east-west movement.
+    """
+    for dr in (-1, 1):
+        nb = room.entity_at(r + dr, c)
+        if nb and nb.kind == kind:
+            return True
+    return False
+
 # ── Water animation ────────────────────────────────────────────────────────────
 # Each frame: (char, rgb, duration_seconds).
 # ~ frames hold their full duration; ≈ is brief — a passing wave crest.
@@ -35,25 +48,55 @@ def _water_glyph(row: int, col: int) -> tuple[str, int, int, int]:
     char, rgb, _ = _WATER_FRAMES[-1]
     return char, *rgb
 
-def _reg_display(items: list) -> str:
-    """Short visible string of \" register contents for statusline."""
+_REG_ENTITY: dict[str, tuple[str, object]] = {
+    'goblin':         ('g',  lambda: C.enemy_fg()),
+    'warden':         ('W',  lambda: C.boss_fg()),
+    'dynamite':       ('!',  lambda: C.dynamite_fg()),
+    'door':           ('▬',  lambda: C.door_fg()),
+    'locked_door':    ('⊞',  lambda: C.locked_door_fg()),
+    'chest':          ('🞔', lambda: C.chest_fg()),
+    'chest_key':      ('🞔', lambda: C.chest_fg()),
+    'chest_scroll':   ('🞔', lambda: C.chest_fg()),
+    'wanderer':       ('♟',  lambda: C.enemy_fg()),
+    'shield':         ('🛡', lambda: C.locked_door_fg()),
+    'heart_container':('♥',  lambda: C.heart_full()),
+    'exit':           ('◉',  None),
+}
+
+
+def _reg_display(items: list) -> tuple[str, int]:
+    """Returns (colored_string, visible_len) for the \" register statusline slot."""
     if not items:
-        return ''
-    parts = []
+        return '', 0
+
+    # Collect (symbol, color_fn_or_None) pairs
+    syms: list[tuple[str, object]] = []
     for item in items:
         if item['type'] == 'rune':
-            parts.extend(item['rune'].symbols)
+            for sym in item['rune'].symbols:
+                syms.append((sym, None))
         elif item['type'] == 'entity':
-            k = item['entity'].kind
-            parts.append({'dynamite': '!', 'exit': '◉', 'door': '▬',
-                          'chest': '🞔', 'chest_key': '🞔', 'wanderer': '♟',
-                          'locked_door': '⊞'}.get(k, '?'))
+            sym, col_fn = _REG_ENTITY.get(item['entity'].kind, ('?', None))
+            syms.append((sym, col_fn))
         elif item['type'] == 'cell':
-            ct = item['cell_type']
-            parts.append({CellType.WALL: '█', CellType.WATER: '~',
-                          CellType.WOOD_WALL: '░'}.get(ct, ' '))
-    s = ''.join(parts)
-    return s[:7] + '…' if len(s) > 8 else s
+            sym = {CellType.WALL: '█', CellType.WATER: '~',
+                   CellType.WOOD_WALL: '░'}.get(item['cell_type'], ' ')
+            syms.append((sym, None))
+
+    truncated = len(syms) > 8
+    display   = syms[:7] if truncated else syms
+
+    parts: list[str] = []
+    for sym, col_fn in display:
+        if col_fn is not None:
+            parts.append(col_fn() + sym + C.key_fg())
+        else:
+            parts.append(sym)
+    if truncated:
+        parts.append('…')
+
+    vis = len(display) + (1 if truncated else 0)
+    return ''.join(parts), vis
 
 
 def _pad(s: str, width: int) -> str:
@@ -65,7 +108,8 @@ def _pad(s: str, width: int) -> str:
     return s[:width]
 
 def render_all(term: Terminal, dungeon: Dungeon, player: Player,
-               budget: Budget, message: str = ''):
+               budget: Budget, message: str = '',
+               attack_pos: tuple | None = None, attack_sym: str = ''):
     room   = dungeon.room
     iw     = _inner_w(term)
     output = []
@@ -177,20 +221,33 @@ def render_all(term: Terminal, dungeon: Dungeon, player: Player,
 
                 # Entity?
                 ent = room.entity_at(room_r, room_c)
+                if ent and attack_sym and attack_pos == (room_r, room_c):
+                    line += floor_bg + term.color_rgb(220, 50, 50) + attack_sym + C.normal_fg()
+                    continue
                 if ent:
                     if ent.kind == 'exit':
                         line += floor_bg + C.exit_fg() + S.EXIT + C.normal_fg()
                     elif ent.kind in ('chest', 'chest_key', 'chest_scroll'):
                         line += floor_bg + C.chest_fg() + S.CHEST + C.normal_fg()
                     elif ent.kind == 'door':
-                        line += floor_bg + C.door_fg() + S.DOOR_LOCKED + C.normal_fg()
+                        sym = S.DOOR_V if _is_vertical_door(room, room_r, room_c, 'door') else S.DOOR_H
+                        line += floor_bg + C.door_fg() + sym + C.normal_fg()
                     elif ent.kind == 'locked_door':
-                        line += floor_bg + C.locked_door_fg() + S.DOOR_LOCKED_KEY + C.normal_fg()
+                        sym = S.DOOR_V if _is_vertical_door(room, room_r, room_c, 'locked_door') else S.DOOR_LOCKED
+                        line += floor_bg + C.locked_door_fg() + sym + C.normal_fg()
                     elif ent.kind == 'dynamite':
                         line += floor_bg + C.dynamite_fg() + S.DYNAMITE + C.normal_fg()
                     elif ent.kind == 'wanderer':
                         efg = C.enemy_frozen() if mode == Mode.VISUAL else C.enemy_fg()
                         line += floor_bg + efg + S.ENEMY_WANDERER + C.normal_fg()
+                    elif ent.kind == 'goblin':
+                        line += floor_bg + C.enemy_fg() + 'g' + C.normal_fg()
+                    elif ent.kind == 'warden':
+                        line += floor_bg + C.boss_fg() + 'W' + C.normal_fg()
+                    elif ent.kind == 'shield':
+                        line += floor_bg + C.locked_door_fg() + '🛡' + C.normal_fg()
+                    elif ent.kind == 'heart_container':
+                        line += floor_bg + C.heart_full() + '♥' + C.normal_fg()
                     elif ent.kind == 'entry_marker':
                         line += floor_bg + C.hint_fg() + S.PLAYER + C.normal_fg()
                     else:
@@ -264,9 +321,9 @@ def render_all(term: Terminal, dungeon: Dungeon, player: Player,
             sl_mode_color = C.mode_visual()
         sl_right = f'{pos_str}   {scroll} '
         if 'register' in player.known_commands:
-            reg_content = _reg_display(player.register)
-            reg_s   = C.key_fg() + f'  "{reg_content}' + sl_fg
-            reg_vis = 3 + len(reg_content)  # len('  "') + content
+            reg_colored, reg_vis_len = _reg_display(player.register)
+            reg_s   = C.key_fg() + '  "' + reg_colored + sl_fg
+            reg_vis = 3 + reg_vis_len  # len('  "') + visible content
         else:
             reg_s   = ''
             reg_vis = 0
@@ -288,7 +345,9 @@ def render_all(term: Terminal, dungeon: Dungeon, player: Player,
     # ── Hint bar ──────────────────────────────────────────────────────────
     known = player.known_commands
     if 'editor' in known:
-        hint_text = 'x:delete (cut) char  s:toggle wall  dd/yy:delete/yank line  d/y{m}:cut/yank range  p/P:put (paste)  :q quit'
+        hint_text = 's:toggle wall  :rune ancient|verdant|void|ember  :entity exit|door|locked_door|chest|dynamite|wanderer|goblin|warden  :save <name>  :wq write+quit'
+    elif ';' in known:
+        hint_text = 'fg:jump to goblin  ;:repeat  ,:reverse  x:attack  [N]hjkl  :w write  :q quit'
     elif 'count' in known:
         hint_text = '[N]hjkl:count move  0:jump to start of line  ^:first non-blank  $:jump to end of line  x:delete (cut) char  :w write  :q quit'
     elif '$' in known:

@@ -340,7 +340,8 @@ def render_title(term: Terminal, cursor: int, has_save: bool,
 
 # ── Save-select screen ─────────────────────────────────────────────────────────
 
-def render_save_select(term: Terminal, saves: list[dict], cursor: int) -> None:
+def render_save_select(term: Terminal, saves: list[dict], cursor: int,
+                       deleting: bool = False) -> None:
     """Show all existing saves with completion % so the player can pick one."""
     iw  = _iw(term)
     rst = term.normal
@@ -390,5 +391,8 @@ def render_save_select(term: Terminal, saves: list[dict], cursor: int) -> None:
 
             content.append(centred(plain, pfx_c + name_c + '  ' + bar_c + '  ' + pct_c))
 
-    _render_frame(term, iw, content,
-                  hint_text='j/k:move cursor · enter:select · Esc:go back')
+    if deleting:
+        hint = term.color_rgb(220, 80, 80) + 'd again to delete · any other key cancels' + term.normal
+    else:
+        hint = 'j/k:move cursor · enter:select · dd:delete · Esc:go back'
+    _render_frame(term, iw, content, hint_text=hint)

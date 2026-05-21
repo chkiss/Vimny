@@ -65,21 +65,39 @@ def list_saves() -> list[dict]:
 def save_progress(progress: dict, player_name: str) -> None:
     existing = load_for(player_name) or {}
     existing['player_name'] = player_name
-    existing['progress'] = {str(k): v for k, v in progress.items()}
+    existing['progress'] = {str(k): v for k, v in progress.items() if isinstance(k, int)}
+    existing['extras']   = progress.get('extras', [])
+    existing['flags']    = progress.get('flags', {})
     save_for(player_name, existing)
 
 
 def load_progress(data: Optional[dict]) -> dict:
     if data is None:
         return {}
-    raw = data.get('progress', {})
-    return {int(k): v for k, v in raw.items()}
+    raw    = data.get('progress', {})
+    result = {int(k): v for k, v in raw.items()}
+    extras = data.get('extras', [])
+    if extras:
+        result['extras'] = extras
+    flags = data.get('flags', {})
+    if flags:
+        result['flags'] = flags
+    return result
 
 
 def load_player_name(data: Optional[dict]) -> str:
     if data is None:
         return 'Normand'
     return data.get('player_name', 'Normand')
+
+
+def delete_save(player_name: str) -> bool:
+    """Delete the save file for player_name. Returns True if deleted."""
+    p = _path(player_name)
+    if p.exists():
+        p.unlink()
+        return True
+    return False
 
 
 # ── Layout I/O (admin level-design tool) ──────────────────────────────────────
@@ -107,3 +125,12 @@ def save_layout(name: str, data: dict) -> Path:
     with open(path, 'w') as f:
         json.dump(payload, f, indent=2)
     return path
+
+
+def delete_layout(name: str) -> bool:
+    """Delete the layout file for the given layout_name. Returns True if deleted."""
+    p = LAYOUTS_DIR / f'{_slug(name)}.json'
+    if p.exists():
+        p.unlink()
+        return True
+    return False

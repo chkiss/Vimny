@@ -5,7 +5,7 @@ Returns action dicts consumed by the game loop.
 from __future__ import annotations
 from engine.modes import Mode
 
-MOTIONS  = set('hjklwbeGg0^${}')
+MOTIONS  = set('hjklwbeGg0^${}' + ';,')
 OPERATORS = set('dyc')
 COUNTS   = set('123456789')
 
@@ -119,13 +119,13 @@ def parse(buf: str, mode: Mode) -> tuple[dict | None, str]:
 
     # x — interact (open door / loot chest)
     if ch == 'x':
-        return {'type': 'interact'}, buf[i+1:]
+        return {'type': 'interact', 'count': count_n}, buf[i+1:]
 
     # u / Ctrl-R
     if ch == 'u':
-        return {'type': 'undo'}, buf[i+1:]
+        return {'type': 'undo', 'count': count_n}, buf[i+1:]
     if ch == '\x12':  # Ctrl-R
-        return {'type': 'redo'}, buf[i+1:]
+        return {'type': 'redo', 'count': count_n}, buf[i+1:]
 
     # : — enter command mode
     if ch == ':':

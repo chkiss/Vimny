@@ -4,14 +4,15 @@ from blessed import Terminal
 from engine.player import Player
 import render.colors as C
 import render.symbols as S
-from content.levels import LEVELS, is_unlocked
+from content.levels import LEVELS, is_unlocked, is_reliquary
 from render.utils import inner_w as _iw
 
 
 def render_overworld(term: Terminal, player: Player, progress: dict,
                      cursor_row: int, cmd_line: str | None = None,
                      levels: list | None = None,
-                     custom_layouts: list | None = None) -> None:
+                     custom_layouts: list | None = None,
+                     deleting: bool = False) -> None:
     """
     progress: {level_id (int): {'stars': int, 'complete': bool}}
     cursor_row: index into combined list (standard levels then custom layouts)
@@ -78,8 +79,11 @@ def render_overworld(term: Terminal, player: Player, progress: dict,
         unlocked = is_unlocked(level['id'], progress, player.name)
 
         if complete:
-            star_str  = '★' * stars + '☆' * (2 - stars)
-            badge     = f'[{star_str} COMPLETE]'
+            if is_reliquary(level['id']):
+                badge = '[COMPLETE]'
+            else:
+                star_str = '★' * stars + '☆' * (2 - stars)
+                badge    = f'[{star_str} COMPLETE]'
             badge_col = C.budget_ok()
         elif unlocked:
             badge     = '[AVAILABLE]'
@@ -163,10 +167,19 @@ def render_overworld(term: Terminal, player: Player, progress: dict,
     out.append(border_h(S.BOX_LT, S.BOX_RT))
 
     # ── Hint bar ──────────────────────────────────────────────────────────────
-    hint_text = 'j/k:move cursor  Enter:open dungeon  :q quit'
+    if deleting:
+        hint_raw  = 'd again to delete · any other key cancels'
+        hint_text = term.color_rgb(220, 80, 80) + hint_raw + rst
+        hint_len  = len(hint_raw)
+    else:
+        n_custom  = len(custom_layouts)
+        hint_raw  = ('j/k:move cursor  Enter:open dungeon  dd:delete  :q quit'
+                     if n_custom else 'j/k:move cursor  Enter:open dungeon  :q quit')
+        hint_text = C.hint_fg() + hint_raw + rst
+        hint_len  = len(hint_raw)
     out.append(bfg + S.BOX_V + rst +
-               C.hint_fg() + hint_text + rst +
-               ' ' * max(0, iw - len(hint_text)) +
+               hint_text +
+               ' ' * max(0, iw - hint_len) +
                bfg + S.BOX_V + rst)
 
     # ── Bottom border ─────────────────────────────────────────────────────────

@@ -24,8 +24,13 @@ class Entity:
     kind: str           # 'wanderer', 'guard', 'chest', 'exit', etc.
     row: int
     col: int
-    hp: int = 1
+    hp: int   = 1
     alive: bool = True
+    max_hp:       int = 0   # 0 = non-combatant; >0 = combatant
+    ai:           str = ''  # 'chase' | '' (stationary/non-combatant)
+    ai_speed:     int = 1   # move every N player turns
+    ai_tick:      int = 0   # counts up; entity moves when ai_tick % ai_speed == 0
+    summon_timer: int = 0   # ticks down each turn; spawns goblin when it hits 0
 
 @dataclass
 class RuneCluster:
@@ -117,7 +122,7 @@ class Room:
         if (r, c) in self.fog_cells:
             return False
         ent = self.entity_at(r, c)
-        return ent is None or ent.kind != 'locked_door'
+        return ent is None or ent.kind not in ('locked_door', 'shield')
 
     def damage_wood_wall(self, r: int, c: int, half_steps: int = 1) -> bool:
         """Deal half_steps of damage to wood wall at (r, c).

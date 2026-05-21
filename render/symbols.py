@@ -19,17 +19,18 @@ KEY          = '🗝'
 DYNAMITE     = '!'
 EXPLOSION    = '*'
 CHEST        = '🞔'
-DOOR_LOCKED  = '▬'
-DOOR_LOCKED_KEY = '🔒'   # may be replaced by init() if terminal renders it as 2-wide
+DOOR_H       = '▬'
+DOOR_V       = '▮'
+DOOR_LOCKED  = '🔒'   # may be replaced by init() if terminal renders it as 2-wide
 DOOR_OPEN    = '░'
 EXIT         = '◉'
 
 
 def init(term) -> None:
     """Replace wide glyphs with single-width fallbacks when the terminal renders them as 2 columns."""
-    global DOOR_LOCKED_KEY
-    if term.length(DOOR_LOCKED_KEY) != 1:
-        DOOR_LOCKED_KEY = '⊠'
+    global DOOR_LOCKED
+    if term.length(DOOR_LOCKED) != 1:
+        DOOR_LOCKED = '⊡'
 
 RUNE_ANCIENT = ('∘', '∘', '∘')
 RUNE_VERDANT = ('·', '·', '·')

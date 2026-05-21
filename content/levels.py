@@ -15,6 +15,15 @@ LEVELS = [
         'commands': '^ $ 0  :w :q :q!',
     },
     {
+        'id': 11,
+        'key': 'dungeon_01.1_the_reliquary',
+        'name': 'The Reliquary',
+        'commands': 'hjkl ^ $ 0',
+        'commands_level': 1,
+        'unlocks_after': 1,
+        'type': 'reliquary',
+    },
+    {
         'id': 2,
         'key': 'dungeon_02_the_counting_crypts',
         'name': 'The Counting Crypts',
@@ -33,6 +42,12 @@ LEVELS = [
         'commands': 'f F t T',
     },
     {
+        'id': 5,
+        'key': 'dungeon_05_the_goblin_gauntlet',
+        'name': 'The Goblin Gauntlet',
+        'commands': '; ,',
+    },
+    {
         'id': 99,
         'key': 'dummy_dungeon',
         'name': 'Dummy Dungeon',
@@ -42,17 +57,31 @@ LEVELS = [
 ]
 
 
+def level_type(level_id: int) -> str:
+    """Returns 'dungeon' or 'reliquary'. Defaults to 'dungeon' if not specified."""
+    level = next((l for l in LEVELS if l['id'] == level_id), None)
+    return (level or {}).get('type', 'dungeon')
+
+
+def is_reliquary(level_id: int) -> bool:
+    return level_type(level_id) == 'reliquary'
+
+
 def known_commands(level_id: int) -> list:
     """All commands available at this level (cumulative)."""
+    level = next((l for l in LEVELS if l['id'] == level_id), None)
+    effective = level.get('commands_level', level_id) if level else level_id
     cmds = ['h', 'j', 'k', 'l']
-    if level_id >= 1:
+    if effective >= 1:
         cmds += ['^', '$', '0']
-    if level_id >= 2:
+    if effective >= 2:
         cmds += ['count', 'x']
-    if level_id >= 3:
+    if effective >= 3:
         cmds += ['w', 'b', 'e']
-    if level_id >= 4:
-        cmds += ['f', 'F', 't', 'T', 'register']
+    if effective >= 4:
+        cmds += ['f', 'F', 't', 'T']
+    if effective >= 5:
+        cmds += [';', ',']
     return cmds
 
 
@@ -64,7 +93,8 @@ def is_unlocked(level_id: int, progress: dict, player_name: str = '') -> bool:
         return True
     if level_id == 0:
         return True
-    return progress.get(level_id - 1, {}).get('complete', False)
+    unlock_after = level.get('unlocks_after', level_id - 1) if level else level_id - 1
+    return progress.get(unlock_after, {}).get('complete', False)
 
 
 def is_visible(level: dict, player_name: str) -> bool:
