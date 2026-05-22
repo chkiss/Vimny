@@ -5,7 +5,7 @@ Returns action dicts consumed by the game loop.
 from __future__ import annotations
 from engine.modes import Mode
 
-MOTIONS  = set('hjklwbeGg0^${}' + ';,')
+MOTIONS  = set('hjklwbeWBEGg0^${}' + ';,')
 OPERATORS = set('dyc')
 COUNTS   = set('123456789')
 
@@ -35,12 +35,15 @@ def parse(buf: str, mode: Mode) -> tuple[dict | None, str]:
     count_n = int(count) if count else 1
     ch = buf[i]
 
-    # gg
+    # gg / ge / gE
     if ch == 'g':
         if i + 1 >= len(buf):
             return None, buf
-        if buf[i+1] == 'g':
+        g2 = buf[i+1]
+        if g2 == 'g':
             return {'type': 'motion', 'motion': 'gg', 'count': count_n}, buf[i+2:]
+        if g2 in 'eE':
+            return {'type': 'motion', 'motion': 'g' + g2, 'count': count_n}, buf[i+2:]
         return {'type': 'unknown'}, buf[i+2:]
 
     # f/F/t/T — need one more char
@@ -83,9 +86,12 @@ def parse(buf: str, mode: Mode) -> tuple[dict | None, str]:
         if motion_ch == 'g':
             if j + 1 >= len(buf):
                 return None, buf
-            if buf[j+1] == 'g':
-                mc = int(motion_count) if motion_count else 1
+            g2 = buf[j+1]
+            mc = int(motion_count) if motion_count else 1
+            if g2 == 'g':
                 return {'type': 'operator', 'op': op, 'motion': 'gg', 'count': count_n, 'motion_count': mc}, buf[j+2:]
+            if g2 in 'eE':
+                return {'type': 'operator', 'op': op, 'motion': 'g' + g2, 'count': count_n, 'motion_count': mc}, buf[j+2:]
             return {'type': 'unknown'}, buf[j+2:]
         if motion_ch in 'fFtT':
             if j + 1 >= len(buf):
@@ -142,5 +148,9 @@ def parse(buf: str, mode: Mode) -> tuple[dict | None, str]:
         return {'type': 'enter_mode', 'mode': 'visual_line'}, buf[i+1:]
     if ch == '\x16':  # Ctrl-V
         return {'type': 'enter_mode', 'mode': 'visual_block'}, buf[i+1:]
+
+    # . — repeat last change
+    if ch == '.':
+        return {'type': 'repeat', 'count': count_n}, buf[i+1:]
 
     return {'type': 'unknown'}, buf[i+1:]

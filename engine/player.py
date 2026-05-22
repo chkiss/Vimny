@@ -11,12 +11,12 @@ class Player:
     name: str = 'Normand'
     mode: Mode = Mode.NORMAL
     known_commands: list = field(default_factory=lambda: ['h','j','k','l'])
-    keys: int = 0
     register: list = field(default_factory=list)   # unnamed " register
     inventory: list = field(default_factory=list)
     marks: dict = field(default_factory=dict)   # 'a'-'z' -> (row, col)
 
     last_f: tuple | None = None   # (motion, target) of most recent f/F/t/T; set by apply_motion
+    last_change: dict | None = None  # last action that mutated the room; re-played by .
 
     # command input buffer for gg, f{c}, m{c}, `{c}, '{c}
     input_buf: str = ''

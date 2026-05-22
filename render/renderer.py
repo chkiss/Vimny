@@ -32,7 +32,8 @@ _WATER_FRAMES = [
     ('~',  (15,  65, 170), 8.0),   # calm — deeper blue
     ('∼',  (40, 110, 215), 8.0),   # calm — medium
 ]
-_WATER_PERIOD = sum(d for _, _, d in _WATER_FRAMES)  # 24.8 s
+_WATER_PERIOD   = sum(d for _, _, d in _WATER_FRAMES)  # 24.8 s
+_OVERLAP_PERIOD = 0.7   # seconds per full blink cycle (player ↔ entity under feet)
 
 
 def _water_glyph(row: int, col: int) -> tuple[str, int, int, int]:
@@ -58,8 +59,9 @@ _REG_ENTITY: dict[str, tuple[str, object]] = {
     'chest_key':      ('🞔', lambda: C.chest_fg()),
     'chest_scroll':   ('🞔', lambda: C.chest_fg()),
     'wanderer':       ('♟',  lambda: C.enemy_fg()),
-    'shield':         ('🛡', lambda: C.locked_door_fg()),
+    'shield':         (S.SHIELD, lambda: C.boss_fg()),
     'heart_container':('♥',  lambda: C.heart_full()),
+    'floor_key':      (S.KEY, lambda: C.key_fg()),
     'exit':           ('◉',  None),
 }
 
@@ -107,9 +109,47 @@ def _pad(s: str, width: int) -> str:
         return s + ' ' * (width - len(s))
     return s[:width]
 
+def _ent_cell_str(ent, room, r: int, c: int, mode, floor_bg: str) -> str:
+    """Return the colored terminal string for one entity cell (no trailing reset needed)."""
+    rst = C.normal_fg()
+    if ent.kind == 'exit':
+        return floor_bg + C.exit_fg() + S.EXIT + rst
+    if ent.kind in ('chest', 'chest_key', 'chest_scroll'):
+        return floor_bg + C.chest_fg() + S.CHEST + rst
+    if ent.kind == 'door':
+        sym = S.DOOR_V if _is_vertical_door(room, r, c, 'door') else S.DOOR_H
+        return floor_bg + C.door_fg() + sym + rst
+    if ent.kind == 'seal_door':
+        return floor_bg + C.door_fg() + S.DOOR_H + rst
+    if ent.kind == 'boss_seal':
+        return floor_bg + C.locked_door_fg() + S.DOOR_LOCKED + rst
+    if ent.kind == 'locked_door':
+        sym = S.DOOR_V if _is_vertical_door(room, r, c, 'locked_door') else S.DOOR_LOCKED
+        return floor_bg + C.locked_door_fg() + sym + rst
+    if ent.kind == 'dynamite':
+        return floor_bg + C.dynamite_fg() + S.DYNAMITE + rst
+    if ent.kind == 'wanderer':
+        efg = C.enemy_frozen() if mode == Mode.VISUAL else C.enemy_fg()
+        return floor_bg + efg + S.ENEMY_WANDERER + rst
+    if ent.kind == 'goblin':
+        return floor_bg + C.enemy_fg() + 'g' + rst
+    if ent.kind == 'warden':
+        return floor_bg + C.boss_fg() + 'W' + rst
+    if ent.kind == 'shield':
+        return floor_bg + C.boss_fg() + S.SHIELD + rst
+    if ent.kind == 'heart_container':
+        return floor_bg + C.heart_full() + '♥' + rst
+    if ent.kind == 'floor_key':
+        return floor_bg + C.key_fg() + S.KEY + rst
+    if ent.kind == 'entry_marker':
+        return floor_bg + C.hint_fg() + S.PLAYER + rst
+    return floor_bg + '?' + rst
+
+
 def render_all(term: Terminal, dungeon: Dungeon, player: Player,
                budget: Budget, message: str = '',
-               attack_pos: tuple | None = None, attack_sym: str = ''):
+               attack_pos: tuple | None = None, attack_sym: str = '',
+               heart_flash: bool = False):
     room   = dungeon.room
     iw     = _inner_w(term)
     output = []
@@ -128,9 +168,15 @@ def render_all(term: Terminal, dungeon: Dungeon, player: Player,
     full_h  = player.hp // 2
     half_h  = player.hp % 2
     empty_h = player.max_hp // 2 - full_h - half_h
-    hp_str  = (C.heart_full()  + S.HEART_FULL  + rst) * full_h
-    hp_str += (C.heart_half()  + S.HEART_HALF  + rst) * half_h
-    hp_str += (C.heart_empty() + S.HEART_EMPTY + rst) * empty_h
+    if heart_flash:
+        gold   = term.color_rgb(255, 210, 0)
+        hp_str  = (gold + S.HEART_FULL  + rst) * full_h
+        hp_str += (gold + S.HEART_HALF  + rst) * half_h
+        hp_str += (gold + S.HEART_EMPTY + rst) * empty_h
+    else:
+        hp_str  = (C.heart_full()  + S.HEART_FULL  + rst) * full_h
+        hp_str += (C.heart_half()  + S.HEART_HALF  + rst) * half_h
+        hp_str += (C.heart_empty() + S.HEART_EMPTY + rst) * empty_h
 
     mode    = player.mode
     ml      = MODE_LABELS[mode]
@@ -159,17 +205,11 @@ def render_all(term: Terminal, dungeon: Dungeon, player: Player,
     budget_s = C.hint_fg() + f' Budget:{budget.total:2d}' + rst
     par_s    = C.hint_fg() + f' Par:{room.par or "-"}' + rst
 
-    inv_keys = player.keys
-    key_s = (C.key_fg() + S.KEY * inv_keys + rst) if inv_keys else ''
-
     dname = dungeon.name[:24]
-    # Build status line (visible chars only for padding, approximate)
-    key_plain = S.KEY * inv_keys if inv_keys else ''
-    status_plain = f'  {"♥"*full_h}{"♡"*half_h}{"░"*empty_h}  {key_plain}  {dname}  {ml}  Keys:{spent:2d} Budget:{budget.total:2d}  Par:{room.par or "-"}'
+    status_plain = f'  {"♥"*full_h}{"♡"*half_h}{"░"*empty_h}  {dname}  {ml}  Keys:{spent:2d} Budget:{budget.total:2d}  Par:{room.par or "-"}'
     padding = max(0, iw - len(status_plain))
     status_line = (bfg + S.BOX_V + rst +
                    f'  {hp_str}  ' +
-                   key_s + ('  ' if inv_keys else '') +
                    C.normal_fg() + dname + '  ' +
                    mode_s + '  ' + keys_s + ' ' + budget_s + par_s +
                    ' ' * padding +
@@ -211,7 +251,14 @@ def render_all(term: Terminal, dungeon: Dungeon, player: Player,
 
                 # Player?
                 if room_r == player.row and room_c == player.col:
-                    line += floor_bg + C.player_fg() + S.PLAYER + C.normal_fg()
+                    ent_under  = room.entity_at(room_r, room_c)
+                    show_under = ent_under and (
+                        time.time() % _OVERLAP_PERIOD >= _OVERLAP_PERIOD / 2
+                    )
+                    if show_under:
+                        line += _ent_cell_str(ent_under, room, room_r, room_c, mode, floor_bg)
+                    else:
+                        line += floor_bg + C.player_fg() + S.PLAYER + C.normal_fg()
                     continue
 
                 # Fog?
@@ -225,33 +272,7 @@ def render_all(term: Terminal, dungeon: Dungeon, player: Player,
                     line += floor_bg + term.color_rgb(220, 50, 50) + attack_sym + C.normal_fg()
                     continue
                 if ent:
-                    if ent.kind == 'exit':
-                        line += floor_bg + C.exit_fg() + S.EXIT + C.normal_fg()
-                    elif ent.kind in ('chest', 'chest_key', 'chest_scroll'):
-                        line += floor_bg + C.chest_fg() + S.CHEST + C.normal_fg()
-                    elif ent.kind == 'door':
-                        sym = S.DOOR_V if _is_vertical_door(room, room_r, room_c, 'door') else S.DOOR_H
-                        line += floor_bg + C.door_fg() + sym + C.normal_fg()
-                    elif ent.kind == 'locked_door':
-                        sym = S.DOOR_V if _is_vertical_door(room, room_r, room_c, 'locked_door') else S.DOOR_LOCKED
-                        line += floor_bg + C.locked_door_fg() + sym + C.normal_fg()
-                    elif ent.kind == 'dynamite':
-                        line += floor_bg + C.dynamite_fg() + S.DYNAMITE + C.normal_fg()
-                    elif ent.kind == 'wanderer':
-                        efg = C.enemy_frozen() if mode == Mode.VISUAL else C.enemy_fg()
-                        line += floor_bg + efg + S.ENEMY_WANDERER + C.normal_fg()
-                    elif ent.kind == 'goblin':
-                        line += floor_bg + C.enemy_fg() + 'g' + C.normal_fg()
-                    elif ent.kind == 'warden':
-                        line += floor_bg + C.boss_fg() + 'W' + C.normal_fg()
-                    elif ent.kind == 'shield':
-                        line += floor_bg + C.locked_door_fg() + '🛡' + C.normal_fg()
-                    elif ent.kind == 'heart_container':
-                        line += floor_bg + C.heart_full() + '♥' + C.normal_fg()
-                    elif ent.kind == 'entry_marker':
-                        line += floor_bg + C.hint_fg() + S.PLAYER + C.normal_fg()
-                    else:
-                        line += floor_bg + '?' + C.normal_fg()
+                    line += _ent_cell_str(ent, room, room_r, room_c, mode, floor_bg)
                     continue
 
                 # Rune cluster?

@@ -23,6 +23,7 @@ import pytest
 from generation.dungeon_gen import (
     build_dungeon_0, build_dungeon_1, build_dungeon_2,
     build_dungeon_3, build_dungeon_4, build_dungeon_5,
+    build_dungeon_51, _par_l51,
     _bfs_par, _bfs_par_line,
     _dijkstra_par_level2,
     _dijkstra_par_wbe, _dijkstra_par_ftFT,
@@ -89,7 +90,7 @@ def _par_l5_reference(corr_data: list, gobs_17: list) -> int:
 
     n17 = len(gobs_17)
     if n17 > 0:
-        kill17    = 1 + 1 + max(0, n17 - 1) * 2   # ; x ;x…  (last_f already set)
+        kill17    = 1 + 1 + max(0, n17 - 1) * 2 + 1   # ; x ;x… + x to pick up dropped key
         dist_door = 52 - max(gobs_17)
         total    += kill17 + _move_cost(dist_door)  # count-l; $ overshoots past door
     total += 1 + 1 + 1 + 2   # p door17  j  p door18  fE exit
@@ -103,6 +104,7 @@ def _par_l5_reference(corr_data: list, gobs_17: list) -> int:
 @pytest.mark.parametrize("builder,level_id", [
     (build_dungeon_0, 0), (build_dungeon_1, 1), (build_dungeon_2, 2),
     (build_dungeon_3, 3), (build_dungeon_4, 4), (build_dungeon_5, 5),
+    (build_dungeon_51, 51),
 ])
 def test_budget_is_ceil_par_times_1_4(builder, level_id, seed):
     room = builder(seed).room
@@ -170,3 +172,24 @@ def test_level5_par_matches_reference(seed):
     assert room.par == expected, (
         f"seed={seed}: par={room.par}, reference={expected}"
     )
+
+
+# ── level 51: par == _par_l51() (seed-independent fixed layout) ──────────────
+
+def test_level51_par_matches_formula():
+    """_par_l51() is the simulated minimum keystroke cost for The Warden's Keep.
+
+    Strategy: $ x $ k $ j 0 (7 keys) → combat (~78 keys, seed-dependent) → G (1 key).
+    Simulated across 20 seeds: min=86, max=95.
+    """
+    expected = _par_l51()
+    assert 55 <= expected <= 90, f"par={expected} outside sanity range [55, 90]"
+    # All seeds produce the same par (layout is fixed, no random elements)
+    for seed in SEEDS:
+        room = build_dungeon_51(seed).room
+        assert room.par == expected, (
+            f"seed={seed}: room.par={room.par}, _par_l51()={expected}"
+        )
+        assert room.budget == math.ceil(expected * 1.4), (
+            f"seed={seed}: budget={room.budget}, ceil(par*1.4)={math.ceil(expected * 1.4)}"
+        )

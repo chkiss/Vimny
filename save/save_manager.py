@@ -18,6 +18,7 @@ def _home() -> Path:
 SAVE_DIR    = _home() / '.Vimny'
 SAVES_DIR   = SAVE_DIR / 'saves'
 LAYOUTS_DIR = SAVE_DIR / 'layouts'
+SCROLLS_DIR = SAVE_DIR / 'scrolls'
 
 
 def _slug(name: str) -> str:
@@ -64,10 +65,12 @@ def list_saves() -> list[dict]:
 
 def save_progress(progress: dict, player_name: str) -> None:
     existing = load_for(player_name) or {}
-    existing['player_name'] = player_name
-    existing['progress'] = {str(k): v for k, v in progress.items() if isinstance(k, int)}
-    existing['extras']   = progress.get('extras', [])
-    existing['flags']    = progress.get('flags', {})
+    existing['player_name']       = player_name
+    existing['progress']          = {str(k): v for k, v in progress.items() if isinstance(k, int)}
+    existing['extras']            = progress.get('extras', [])
+    existing['flags']             = progress.get('flags', {})
+    existing['max_hp']            = progress.get('max_hp', 6)
+    existing['collected_hearts']  = progress.get('collected_hearts', [])
     save_for(player_name, existing)
 
 
@@ -82,6 +85,12 @@ def load_progress(data: Optional[dict]) -> dict:
     flags = data.get('flags', {})
     if flags:
         result['flags'] = flags
+    max_hp = data.get('max_hp', 6)
+    if max_hp != 6:
+        result['max_hp'] = max_hp
+    collected_hearts = data.get('collected_hearts', [])
+    if collected_hearts:
+        result['collected_hearts'] = collected_hearts
     return result
 
 
@@ -134,3 +143,14 @@ def delete_layout(name: str) -> bool:
         p.unlink()
         return True
     return False
+
+
+# ── Scroll text I/O (unsmudged full text, discoverable later) ─────────────────
+
+def save_scroll_text(title: str, text: str) -> Path:
+    """Write full unsmudged scroll text to ~/.Vimny/scrolls/<slug>.txt."""
+    SCROLLS_DIR.mkdir(parents=True, exist_ok=True)
+    path = SCROLLS_DIR / f'{_slug(title)}.txt'
+    with open(path, 'w') as f:
+        f.write(text)
+    return path

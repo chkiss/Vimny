@@ -399,6 +399,67 @@ class TestApplyMotionJumps:
         assert (p.row, p.col) == room.entry
 
 
+# ── apply_motion: ge gE backward word-end (Block E) ──────────────────────────
+
+class TestApplyMotionBackwardWordEnd:
+    # _rune_room row 3 ends: ∘∘@2-3→3, ·@6→6, ∘@9→9, ·@13→13 (all gap-separated)
+
+    def test_ge_from_floor_lands_on_prev_word_end(self):
+        room = _rune_room()
+        p = _player(3, 15)
+        apply_motion(p, 'ge', 1, room)
+        assert p.col == 13  # end of · at col 13
+
+    def test_ge_from_word_end_skips_to_previous(self):
+        room = _rune_room()
+        p = _player(3, 13)  # on ·@13 (its own end)
+        apply_motion(p, 'ge', 1, room)
+        assert p.col == 9   # end of ∘@9
+
+    def test_ge_from_inside_skips_own_word(self):
+        room = _rune_room()
+        p = _player(3, 9)   # on ∘@9
+        apply_motion(p, 'ge', 1, room)
+        assert p.col == 6   # end of ·@6
+
+    def test_ge_multi_symbol_word_end(self):
+        room = _rune_room()
+        p = _player(3, 6)   # on ·@6
+        apply_motion(p, 'ge', 1, room)
+        assert p.col == 3   # end of ∘∘ (spans 2-3)
+
+    def test_ge_no_previous_word_no_move(self):
+        room = _rune_room()
+        p = _player(3, 3)   # end of the first word
+        assert apply_motion(p, 'ge', 1, room) is False
+        assert p.col == 3
+
+    def test_count_ge_chains(self):
+        room = _rune_room()
+        p = _player(3, 15)
+        apply_motion(p, 'ge', 2, room)
+        assert p.col == 9   # 15→13→9
+
+    def test_ge_does_not_land_on_void(self):
+        room = _bare_room()
+        room.add_rune(RuneCluster(row=3, col=5, symbols=('○', '○'), kind='void'))
+        p = _player(3, 9)
+        assert apply_motion(p, 'ge', 1, room) is False  # void is not a word
+        assert p.col == 9
+
+    def test_gE_coalesces_adjacent_clusters(self):
+        # WORD1 = ∘∘@2-3 + ·@4 (adjacent, end 4); gap; WORD2 = ∘@7 (end 7)
+        room = _bare_room()
+        room.add_rune(RuneCluster(row=3, col=2, symbols=('∘', '∘'), kind='ancient'))
+        room.add_rune(RuneCluster(row=3, col=4, symbols=('·',),     kind='verdant'))
+        room.add_rune(RuneCluster(row=3, col=7, symbols=('∘',),     kind='ancient'))
+        p = _player(3, 10)
+        apply_motion(p, 'gE', 1, room)
+        assert p.col == 7   # end of WORD2
+        apply_motion(p, 'gE', 1, room)
+        assert p.col == 4   # coalesced end of WORD1 (∘∘ + ·)
+
+
 # ── apply_motion: f F t T find-char motions ──────────────────────────────────
 
 class TestApplyMotionFindChar:

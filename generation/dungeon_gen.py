@@ -1567,7 +1567,7 @@ def _par_l5(corr_data: list, gobs_17: list) -> int:
 
     n17 = len(gobs_17)
     if n17 > 0:
-        kill17    = 1 + 1 + max(0, n17 - 1) * 2   # ; x ;x… (last_f already set)
+        kill17    = 1 + 1 + max(0, n17 - 1) * 2 + 1   # ; x ;x… + x to pick up dropped key
         dist_door = 52 - max(gobs_17)
         total    += kill17 + _l5_move_cost(dist_door)
     total += 1 + 1 + 1 + 2   # p door17, j, p door18, fE exit
@@ -1703,6 +1703,583 @@ def build_dungeon_5(seed: int) -> Dungeon:
 
     composite.rebuild_indexes()
     _fog_unreachable(composite, composite.entry[0], composite.entry[1])
+
+    dungeon.rooms        = [composite]
+    dungeon.current_room = 0
+    return dungeon
+
+
+# ── Level 5.1 — The Warden's Keep ─────────────────────────────────────────────
+
+_L51_ROWS = 7
+_L51_COLS = 44
+
+# Layout (7 × 44):
+#   Row 0/6 : all wall
+#   Row 3   : open floor 0-42  (entry 0, seal_door 16, Warden 27, boss_seal 38, exit 39)
+#   Rows 1,5: floor 0-15, wall 16, floor 17-37, wall 38, floor 39-42
+#   Rows 2,4: stone columns (wall at even cols 0-16), open floor 17-37, wall 38, floor 39-42
+
+
+def _par_l51() -> int:
+    """Simulated par for Level 5.1 (The Warden's Keep).
+
+    Optimal strategy (layout fixed; combat cost is seed-dependent):
+
+    Phase 1 — Entry (7 keys):
+      $    (1): col 0 → col 16 (seal_door; fog stops $ here).
+      x    (1): open seal_door, reveals boss room.
+      $    (1): col 16 → col 25 (shield at col 26 blocks $).
+      k    (1): row 3 → row 2 (detour above shield).
+      $    (1): col 25 → col 37 (right end of row 2).
+      j    (1): row 2 → row 3.
+      0    (1): col 37 → col 27 (warden; shield at col 26 stops 0).
+
+    Phase 2 — Combat (~55 keys, seed-dependent):
+      Timer wave: kill 1 pre-spawned goblin, navigate to warden.
+      5 warden hits; each of the first 4 spawns 1 goblin on one side.
+      After each goblin clear the warden moves one row; shield flips side.
+      Shortest observed across 20 seeds: 55 keys.
+
+    Phase 3 — Exit (1 key):
+      G    (1): teleport to exit at (3,39).
+
+    Total (best seed): 7 + 55 + 1 = 63.
+    Simulated range across 20 seeds: 63–79 (mean 68).
+    """
+    return 63
+
+
+def build_dungeon_51(seed: int) -> Dungeon:
+    ROWS, COLS = _L51_ROWS, _L51_COLS
+    cells = [[CellType.WALL] * COLS for _ in range(ROWS)]
+
+    # Row 3: full open passage (col 43 stays wall = right border)
+    for c in range(COLS - 1):
+        cells[3][c] = CellType.FLOOR
+
+    # Rows 1, 5: corridor sides + boss room + treasure room
+    for row in (1, 5):
+        for c in range(16):
+            cells[row][c] = CellType.FLOOR
+        # col 16 stays WALL (corridor/boss-room wall separator)
+        for c in range(17, 38):
+            cells[row][c] = CellType.FLOOR
+        # col 38 stays WALL (boss-room/treasure-room wall separator)
+        for c in range(39, COLS - 1):
+            cells[row][c] = CellType.FLOOR
+
+    # Rows 2, 4: stone columns at even cols 0-16, open boss room, treasure room
+    for row in (2, 4):
+        for c in range(COLS - 1):
+            if c <= 16:
+                cells[row][c] = CellType.FLOOR if c % 2 != 0 else CellType.WALL
+            elif c < 38:
+                cells[row][c] = CellType.FLOOR
+            elif c == 38:
+                cells[row][c] = CellType.WALL
+            else:
+                cells[row][c] = CellType.FLOOR
+
+    composite = Room(room_type=RoomType.COMBAT, rows=ROWS, cols=COLS)
+    composite.cells    = cells
+    composite.seed     = seed
+    composite.entry    = (3, 0)
+    composite.exit_pos = (3, 39)
+    composite.entities = [
+        Entity(kind='seal_door',       row=3, col=16),
+        Entity(kind='shield',          row=3, col=26),
+        Entity(kind='warden',          row=3, col=27, hp=5, max_hp=5, ai='',
+               summon_timer=0),
+        Entity(kind='boss_seal',       row=3, col=38),
+        Entity(kind='exit',            row=3, col=39),
+        Entity(kind='heart_container', row=2, col=41),
+        Entity(kind='chest_scroll',    row=4, col=41),
+    ]
+    composite.rebuild_indexes()
+    _fog_unreachable(composite, 3, 0)
+
+    par = _par_l51()
+    composite.par    = par
+    composite.budget = math.ceil(par * 1.4)
+
+    dungeon = Dungeon(name="The Warden's Keep", seed=seed)
+    dungeon.rooms        = [composite]
+    dungeon.current_room = 0
+    return dungeon
+
+
+# ── Level 6 layout constants ──────────────────────────────────────────────────
+
+_L6_TOTAL_ROWS    = 10
+_L6_TOTAL_COLS    = 58
+_L6_CORR_TOP_ROWS = (1, 4, 7)   # top row of each of the 3 corridors
+_L6_CORR_LEFT     = 1
+_L6_CORR_RIGHT    = 55
+
+_L6_TURN_SPANS = [
+    (2, 4, 53, 55),   # RT1: connects C1 to C2 (right side)
+    (5, 7,  1,  3),   # LT1: connects C2 to C3 (left side)
+]
+
+# Untypable punctuation characters: f/F cannot target them (player can't type them).
+# All have isalpha()=False so _is_word_char()=False — treated as punct by w/b/e.
+# Drawn from Latin-1 Supplement, General Punctuation, Mathematical Operators, and
+# Miscellaneous Technical blocks; chosen to be visually distinct from ASCII code chars.
+_L6_UNTYPABLE_PUNCT = (
+    '§',   # U+00A7  Section Sign           Latin-1 Supplement
+    '‽',   # U+203D  Interrobang            General Punctuation
+    '°',   # U+00B0  Degree Sign            Latin-1 Supplement
+    '¶',   # U+00B6  Pilcrow Sign           Latin-1 Supplement
+    '†',   # U+2020  Dagger                 General Punctuation
+    '‡',   # U+2021  Double Dagger          General Punctuation
+    '⁂',   # U+2042  Asterism               General Punctuation
+    '≃',   # U+2243  Asymptotically Equal   Mathematical Operators
+    '≈',   # U+2248  Almost Equal To        Mathematical Operators
+    '∞',   # U+221E  Infinity               Mathematical Operators
+    '∴',   # U+2234  Therefore              Mathematical Operators
+    '⌘',   # U+2318  Place of Interest      Miscellaneous Technical
+)
+
+# (row, col_start, text, kind) — placed as adjacent single-char clusters.
+# w stops at word/punct type boundaries within each group (many steps).
+# W treats the whole adjacent block as one WORD (one step per group).
+# Punctuation chars in code groups force 2-digit w counts (3 ks) vs 1-digit W counts (2 ks).
+# Anchors (W4 at 1,53 and B1 at 4,3) are placed separately per-seed from _L6_UNTYPABLE_PUNCT.
+_L6_CODE_GROUPS = [
+    # C1 (rows 1-2, left→right): W teaching — `4W` from col 1 → col 53 in 2 keystrokes
+    (1,  3, "result=func",         'ember'),   # W1 cols  3-13
+    (1, 16, "(a,b)+val",           'ember'),   # W2 cols 16-24
+    (1, 27, "x=y*2",               'ember'),   # W3 cols 27-31
+    # W4 anchor at (1, 53-54): seed-varying untypable pair (see build_dungeon_6)
+    # C2 (rows 4-5, right→left): B teaching — `4B` from col 53 → col 3 in 2 keystrokes
+    # B1 anchor at (4, 3-4): seed-varying untypable pair (see build_dungeon_6)
+    (4, 25, "x+=y*2",              'ember'),   # B2 cols 25-30
+    (4, 35, "int[]",               'ember'),   # B3 cols 35-39
+    (4, 43, "main()",              'ember'),   # B4 cols 43-48
+    # C3 (rows 7-8, left→right): E teaching — `4E` from col 3 → col 51 (exit) in 2 keystrokes
+    (7,  3, "if",                  'ember'),   # E1 cols  3-4
+    (7,  7, "res",                 'ember'),   # E2 cols  7-9
+    (7, 12, "val",                 'ember'),   # E3 cols 12-14
+    (7, 33, "output=data[n]._key", 'ember'),   # E4 cols 33-51 → exit
+]
+
+# Void guards: landing kills the player.
+# C1 right end voids block $ shortcut; C2 left end voids block ^/0 shortcut.
+_L6_VOID_GUARDS = [
+    (1, 55, 'x'),   # C1 row-1 right end: $ → void
+    (2, 55, 'x'),   # C1 row-2 right end: $ on lower row → void
+    (4,  1, 'x'),   # C2 row-4 left end:  ^/0 → void
+    (5,  1, 'x'),   # C2 row-5 left end:  ^/0 on lower C2 row → void
+]
+
+
+def _l6_place_code_group(runes, row, col_start, text, kind='ember'):
+    """Place text as adjacent single-char RuneClusters (WORD group for W/B/E teaching)."""
+    for i, ch in enumerate(text):
+        runes.append(RuneCluster(row=row, col=col_start + i, symbols=(ch,), kind=kind))
+
+
+def _l6_fill_row(composite, rng, row, col_start, col_end,
+                 density=0.40, blocked=frozenset()):
+    """Fill one corridor row with spaced non-void rune clusters (w ≡ W here)."""
+    c = col_start
+    while c <= col_end:
+        if rng.random() < density:
+            kind = rng.choice(_WORD_RUNE_KINDS)
+            syms = _make_rune_syms(rng, kind)
+            w    = len(syms)
+            if c + w - 1 <= col_end:
+                if not any((row, cc) in blocked
+                           for cc in range(c - 1, c + w + 1)):
+                    composite.runes.append(
+                        RuneCluster(row=row, col=c, symbols=syms, kind=kind))
+                    c += w + rng.randint(2, 3)   # 2-3 cell gap → w ≡ W
+                    continue
+        c += 1
+
+
+def _dijkstra_par_WBE(composite, return_path=False):
+    """Minimum-keystroke Dijkstra for Level 6: count hjkl + w b e + W B E.
+
+    WORD = maximal contiguous cluster sequence (no floor gap between clusters).
+    W: start of next WORD.  B: start of current (or prev) WORD.  E: end of WORD.
+    """
+    ROWS, COLS = composite.rows, composite.cols
+    entry = composite.entry
+    goal  = composite.exit_pos
+    max_n = max(ROWS, COLS)
+
+    def _rune(r, c):
+        ru = composite.rune_at(r, c)
+        return ru if (ru and ru.kind != 'void') else None
+
+    def _ok(r, c):
+        if not composite.is_passable(r, c):
+            return False
+        ru = composite.rune_at(r, c)
+        return not (ru and ru.kind == 'void')
+
+    # -- word/punct type helpers --
+    def _is_wc(ch):
+        return ch.isalpha() or ch.isdigit() or ch == '_'
+
+    def _char_at(r, c):
+        ru = composite.rune_at(r, c)
+        if ru is None or ru.kind == 'void':
+            return None
+        return ru.symbols[c - ru.col]
+
+    # -- cluster-level motions (w/b/e) — word/punct type-boundary aware --
+    def _w(r, c):
+        ch = _char_at(r, c)
+        if ch is not None:
+            t = _is_wc(ch)
+            scan = c + 1
+            while scan < COLS and composite.is_passable(r, scan):
+                ch2 = _char_at(r, scan)
+                if ch2 is None:
+                    break
+                if _is_wc(ch2) != t:
+                    break
+                scan += 1
+        else:
+            scan = c + 1
+        for nc in range(scan, COLS):
+            if not composite.is_passable(r, nc):
+                return None
+            if _rune(r, nc):
+                return (r, nc)
+        return None
+
+    def _b(r, c):
+        ch = _char_at(r, c)
+        if ch is not None:
+            t  = _is_wc(ch)
+            rs = c
+            for sc in range(c - 1, -1, -1):
+                if not composite.is_passable(r, sc):
+                    break
+                ch2 = _char_at(r, sc)
+                if ch2 is None or _is_wc(ch2) != t:
+                    break
+                rs = sc
+            if rs < c:
+                return (r, rs)
+            prev = c - 1
+        else:
+            prev = c - 1
+        while prev >= 0 and composite.is_passable(r, prev) and _char_at(r, prev) is None:
+            prev -= 1
+        if prev >= 0 and composite.is_passable(r, prev) and _char_at(r, prev) is not None:
+            ch2 = _char_at(r, prev)
+            t2  = _is_wc(ch2)
+            rs2 = prev
+            for sc2 in range(prev - 1, -1, -1):
+                if not composite.is_passable(r, sc2):
+                    break
+                ch3 = _char_at(r, sc2)
+                if ch3 is None or _is_wc(ch3) != t2:
+                    break
+                rs2 = sc2
+            return (r, rs2)
+        return None
+
+    def _e(r, c):
+        ch = _char_at(r, c)
+        if ch is not None:
+            t   = _is_wc(ch)
+            pos = c + 1
+            while pos < COLS and composite.is_passable(r, pos):
+                ch2 = _char_at(r, pos)
+                if ch2 is None or _is_wc(ch2) != t:
+                    break
+                pos += 1
+            end = pos - 1
+            if end > c:
+                return (r, end)
+            scan = pos
+        else:
+            scan = c + 1
+        while scan < COLS and composite.is_passable(r, scan) and _char_at(r, scan) is None:
+            scan += 1
+        if scan < COLS and composite.is_passable(r, scan) and _char_at(r, scan) is not None:
+            ch2  = _char_at(r, scan)
+            t2   = _is_wc(ch2)
+            epos = scan + 1
+            while epos < COLS and composite.is_passable(r, epos):
+                ch3 = _char_at(r, epos)
+                if ch3 is None or _is_wc(ch3) != t2:
+                    break
+                epos += 1
+            return (r, epos - 1)
+        return None
+
+    # -- WORD-end / WORD-start helpers --
+    def _word_end(r, c):
+        cur = _rune(r, c)
+        if not cur:
+            return None
+        pos = cur.col + len(cur.symbols)
+        while pos < COLS and composite.is_passable(r, pos):
+            ru = _rune(r, pos)
+            if ru:
+                pos = ru.col + len(ru.symbols)
+            else:
+                break
+        return pos - 1
+
+    def _word_start(r, c):
+        cur = _rune(r, c)
+        if not cur:
+            return None
+        ws    = cur.col
+        check = cur.col - 1
+        while check >= 0 and composite.is_passable(r, check):
+            ru = _rune(r, check)
+            if ru:
+                ws = ru.col
+                check = ru.col - 1
+            else:
+                break
+        return ws
+
+    # -- WORD-level motions (W/B/E) --
+    def _W(r, c):
+        cur  = _rune(r, c)
+        scan = (cur.col + len(cur.symbols)) if cur else c + 1
+        # skip rest of current WORD (adjacent non-void clusters, no floor gap)
+        while scan < COLS and composite.is_passable(r, scan):
+            ru = _rune(r, scan)
+            if ru:
+                scan = ru.col + len(ru.symbols)
+            else:
+                break
+        # skip whitespace (floor gaps) — W stops at walls
+        while scan < COLS and composite.is_passable(r, scan) and not _rune(r, scan):
+            scan += 1
+        if scan < COLS and composite.is_passable(r, scan):
+            ru = _rune(r, scan)
+            if ru:
+                return (r, ru.col)
+        return None
+
+    def _B(r, c):
+        cur = _rune(r, c)
+        if cur:
+            ws = _word_start(r, c)
+            if ws < c:
+                return (r, ws)      # jump to start of current WORD
+            pos = ws - 1            # already at WORD start; go to previous
+        else:
+            pos = c - 1
+        while pos >= 0 and composite.is_passable(r, pos) and not _rune(r, pos):
+            pos -= 1
+        if pos >= 0 and composite.is_passable(r, pos):
+            ru = _rune(r, pos)
+            if ru:
+                return (r, _word_start(r, pos))
+        return None
+
+    def _E(r, c):
+        cur = _rune(r, c)
+        if cur:
+            end = _word_end(r, c)
+            if end > c:
+                return (r, end)
+            pos = end + 1
+        else:
+            pos = c + 1
+        while pos < COLS and composite.is_passable(r, pos) and not _rune(r, pos):
+            pos += 1
+        if pos < COLS and composite.is_passable(r, pos):
+            ru = _rune(r, pos)
+            if ru:
+                return (r, _word_end(r, pos))
+        return None
+
+    dist = {entry: 0}
+    prev = {entry: None}
+    heap = [(0, entry)]
+
+    while heap:
+        cost, (r, c) = heapq.heappop(heap)
+        if (r, c) == goal:
+            if return_path:
+                return cost, _join_path(prev, (r, c), merge_single=False)
+            return cost
+        if cost > dist.get((r, c), float('inf')):
+            continue
+
+        def _push(nb, mc=1, lbl=''):
+            if nb is None:
+                return
+            nr, nc = nb
+            if not _ok(nr, nc):
+                return
+            g = cost + mc
+            if g < dist.get((nr, nc), float('inf')):
+                dist[(nr, nc)] = g
+                prev[(nr, nc)] = ((r, c), lbl)
+                heapq.heappush(heap, (g, (nr, nc)))
+
+        # count h/j/k/l
+        for dr, dc in ((-1, 0), (1, 0), (0, -1), (0, 1)):
+            ch_d = _DIR_CHAR[(dr, dc)]
+            for n in range(1, max_n + 1):
+                nr2, nc2 = r + dr * n, c + dc * n
+                if not _ok(nr2, nc2):
+                    break
+                mc2  = 1 if n == 1 else len(str(n)) + 1
+                lbl2 = ch_d if n == 1 else f'{n}{ch_d}'
+                _push((nr2, nc2), mc2, lbl2)
+
+        # $: scan right via passability (void runes don't stop scan); skip if landing is void
+        best = None
+        for cc in range(c + 1, COLS):
+            if not composite.is_passable(r, cc):
+                break
+            best = cc
+        if best is not None and _ok(r, best):
+            _push((r, best), 1, '$')
+
+        # 0: scan left via passability; skip if landing is void
+        leftmost = c
+        for cc in range(c - 1, -1, -1):
+            if not composite.is_passable(r, cc):
+                break
+            leftmost = cc
+        if leftmost < c and _ok(r, leftmost):
+            _push((r, leftmost), 1, '0')
+
+        # ^: leftmost rune in passability-bounded range; void as first rune = lethal, don't push
+        left_b = c
+        for cc in range(c - 1, -1, -1):
+            if not composite.is_passable(r, cc):
+                break
+            left_b = cc
+        right_b = c
+        for cc in range(c + 1, COLS):
+            if not composite.is_passable(r, cc):
+                break
+            right_b = cc
+        for cc in range(left_b, right_b + 1):
+            ru2 = composite.rune_at(r, cc)
+            if ru2:
+                if _ok(r, cc):
+                    _push((r, cc), 1, '^')
+                break  # first rune (void or not) terminates search
+
+        # chain w/b/e/W/B/E
+        for fn, key in ((_w, 'w'), (_b, 'b'), (_e, 'e'),
+                        (_W, 'W'), (_B, 'B'), (_E, 'E')):
+            pos2 = (r, c)
+            for n in range(1, max_n):
+                nxt = fn(*pos2)
+                if nxt is None:
+                    break
+                mc2  = 1 if n == 1 else len(str(n)) + 1
+                lbl2 = key if n == 1 else f'{n}{key}'
+                _push(nxt, mc2, lbl2)
+                pos2 = nxt
+
+    if return_path:
+        return None, ''
+    return None
+
+
+def build_dungeon_6(seed: int) -> Dungeon:
+    """The WORD Forge — teaches W B E (WORD motions over code-text clusters).
+
+    Three 2-row corridors, snake pattern (10 rows × 58 cols):
+      C1 rows 1-2:  left→right   W teaching: packed adjacent code-char clusters
+      C2 rows 4-5:  right→left   B teaching: packed adjacent code-char clusters
+      C3 rows 7-8:  left→right   E teaching: exit at end of big packed group
+
+    Packed code groups use single-char RuneClusters placed adjacently:
+      w stops at every char (many keystrokes);  W jumps the whole group (one).
+    Spaced rune clusters in filler zones: w ≡ W (both stop cluster-by-cluster).
+    Budget is computed using the W/B/E-optimal path; w/b/e-only far exceeds it.
+    """
+    rng     = random.Random(seed)
+    # Pick 4 distinct untypable chars: first two → W4 anchor, last two → B1 anchor.
+    _four   = rng.sample(_L6_UNTYPABLE_PUNCT, 4)
+    _anchor_W = ''.join(_four[:2])   # W4 at (1, 53-54)
+    _anchor_B = ''.join(_four[2:])   # B1 at (4,  3-4)
+    dungeon = Dungeon(name='The WORD Forge', seed=seed)
+    ROWS, COLS = _L6_TOTAL_ROWS, _L6_TOTAL_COLS
+
+    cells = [[CellType.WALL] * COLS for _ in range(ROWS)]
+    composite = Room(room_type=RoomType.ENTRY, rows=ROWS, cols=COLS)
+    composite.cells = cells
+    composite.seed  = seed
+
+    # ── Carve corridors (2 rows each) ─────────────────────────────────────────
+    for row_top in _L6_CORR_TOP_ROWS:
+        for c in range(_L6_CORR_LEFT, _L6_CORR_RIGHT + 1):
+            cells[row_top][c]     = CellType.CORRIDOR
+            cells[row_top + 1][c] = CellType.CORRIDOR
+
+    # ── Carve turn rooms ─────────────────────────────────────────────────────
+    for r0, r1, c0, c1 in _L6_TURN_SPANS:
+        for row in range(r0, r1 + 1):
+            for col in range(c0, c1 + 1):
+                cells[row][col] = CellType.CORRIDOR
+
+    # ── Entry and exit ────────────────────────────────────────────────────────
+    composite.entry    = (1, 1)
+    composite.exit_pos = (7, 51)   # last char of C3 code group "output=data[n]._key"
+    composite.entities = [Entity(kind='exit', row=7, col=51)]
+
+    # ── Hardcoded code-text clusters ──────────────────────────────────────────
+    _hardcoded: list[RuneCluster] = []
+    for row, col_start, text, kind in _L6_CODE_GROUPS:
+        _l6_place_code_group(_hardcoded, row, col_start, text, kind)
+    # Seed-varying untypable anchors (f/F cannot target these chars)
+    _l6_place_code_group(_hardcoded, 1, 53, _anchor_W, 'ember')  # W4 anchor
+    _l6_place_code_group(_hardcoded, 4,  3, _anchor_B, 'ember')  # B1 anchor
+
+    # ── Void guards (make $ on C1 and ^/0 on C2 lethal) ─────────────────────
+    for row, col, ch in _L6_VOID_GUARDS:
+        _hardcoded.append(RuneCluster(row=row, col=col, symbols=(ch,), kind='void'))
+
+    # ── Blocked cell set (code text + exit — filler must not overlap) ──────────
+    _bl: set = {(7, 51)}
+    for ru in _hardcoded:
+        for i in range(len(ru.symbols)):
+            _bl.add((ru.row, ru.col + i))
+    blocked = frozenset(_bl)
+
+    # ── Random filler rune clusters (secondary rows only; primary rows fixed) ──
+    for _attempt in range(20):
+        composite.runes = list(_hardcoded)
+        rng2 = random.Random(rng.randint(0, 2**31))
+
+        _l6_fill_row(composite, rng2, 2,  3, 52, density=0.45, blocked=blocked)  # C1r2 baseline
+        _l6_fill_row(composite, rng2, 5,  3, 52, density=0.45, blocked=blocked)  # C2r5 baseline
+        _l6_fill_row(composite, rng2, 8,  3, 52, density=0.45, blocked=blocked)  # C3r8 baseline
+
+        # Protect entry and exit from void runes
+        entry_r, entry_c = composite.entry
+        exit_r,  exit_c  = composite.exit_pos
+        composite.runes = [
+            ru for ru in composite.runes
+            if ru.kind != 'void' or not any(
+                ru.row == rr and ru.col <= cc < ru.col + len(ru.symbols)
+                for rr, cc in ((entry_r, entry_c), (exit_r, exit_c))
+            )
+        ]
+
+        composite.rebuild_indexes()
+        par, path = _dijkstra_par_WBE(composite, return_path=True)
+        if par is not None:
+            break
+    else:
+        par, path = 40, ''
+
+    composite.par    = par
+    composite.budget = math.ceil(par * 1.4)
+    composite.answer = path
 
     dungeon.rooms        = [composite]
     dungeon.current_room = 0

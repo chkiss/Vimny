@@ -48,6 +48,58 @@ LEVELS = [
         'commands': '; ,',
     },
     {
+        'id': 51,
+        'key': 'dungeon_05.1_the_wardens_keep',
+        'name': "The Warden's Keep",
+        'commands': '(miniboss)',
+        'commands_level': 5,
+        'unlocks_after': 5,
+        'type': 'boss',
+    },
+    {
+        'id': 6,
+        'key': 'dungeon_06_the_word_forge',
+        'name': 'The WORD Forge',
+        'commands': 'W B E',
+        'unlocks_after': 51,
+    },
+    {
+        'id': 121,
+        'key': 'dungeon_12.1_the_scrivenors_loom',
+        'name': "The Scrivener's Loom",
+        'commands': '(miniboss)',
+        'commands_level': 12,
+        'unlocks_after': 12,
+        'type': 'boss',
+    },
+    {
+        'id': 171,
+        'key': 'dungeon_17.1_the_erasure_engine',
+        'name': 'The Erasure Engine',
+        'commands': '(miniboss)',
+        'commands_level': 17,
+        'unlocks_after': 17,
+        'type': 'boss',
+    },
+    {
+        'id': 231,
+        'key': 'dungeon_23.1_the_palimpsests_chamber',
+        'name': "The Palimpsest's Chamber",
+        'commands': '(miniboss)',
+        'commands_level': 23,
+        'unlocks_after': 23,
+        'type': 'boss',
+    },
+    {
+        'id': 331,
+        'key': 'dungeon_33.1_the_symmetrals_sanctum',
+        'name': "The Symmetral's Sanctum",
+        'commands': '(miniboss)',
+        'commands_level': 33,
+        'unlocks_after': 33,
+        'type': 'boss',
+    },
+    {
         'id': 99,
         'key': 'dummy_dungeon',
         'name': 'Dummy Dungeon',
@@ -82,6 +134,8 @@ def known_commands(level_id: int) -> list:
         cmds += ['f', 'F', 't', 'T']
     if effective >= 5:
         cmds += [';', ',']
+    if effective >= 6:
+        cmds += ['W', 'B', 'E']
     return cmds
 
 

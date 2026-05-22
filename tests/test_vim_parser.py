@@ -97,6 +97,34 @@ class TestGG:
         assert action['motion'] == 'gg'
         assert remaining == 'l'
 
+    def test_ge_motion(self):
+        action, remaining = parse('ge', Mode.NORMAL)
+        assert action == {'type': 'motion', 'motion': 'ge', 'count': 1}
+        assert remaining == ''
+
+    def test_gE_motion(self):
+        action, _ = parse('gE', Mode.NORMAL)
+        assert action == {'type': 'motion', 'motion': 'gE', 'count': 1}
+
+    def test_count_ge(self):
+        action, _ = parse('3ge', Mode.NORMAL)
+        assert action == {'type': 'motion', 'motion': 'ge', 'count': 3}
+
+    def test_unknown_g_sequence(self):
+        action, remaining = parse('gx', Mode.NORMAL)
+        assert action == {'type': 'unknown'}
+        assert remaining == ''
+
+    def test_operator_with_ge_motion(self):
+        action, _ = parse('dge', Mode.NORMAL)
+        assert action['op'] == 'd'
+        assert action['motion'] == 'ge'
+
+    def test_operator_with_gE_motion(self):
+        action, _ = parse('ygE', Mode.NORMAL)
+        assert action['op'] == 'y'
+        assert action['motion'] == 'gE'
+
 
 # ── Operators: d / y / c ─────────────────────────────────────────────────────
 

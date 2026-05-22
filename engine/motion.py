@@ -36,7 +36,7 @@ def _fog_unreachable(room, start_r: int, start_c: int) -> None:
     while q:
         r, c = q.popleft()
         ent = room.entity_at(r, c)
-        if ent and ent.kind in ('door', 'locked_door'):
+        if ent and ent.kind in ('door', 'locked_door', 'seal_door', 'boss_seal'):
             continue
         for dr, dc in ((-1, 0), (1, 0), (0, -1), (0, 1)):
             nb = (r + dr, c + dc)
@@ -58,7 +58,7 @@ def _reveal_from(room, player_r: int, player_c: int) -> None:
     while q:
         r, c = q.popleft()
         ent = room.entity_at(r, c)
-        if ent and ent.kind in ('door', 'locked_door'):
+        if ent and ent.kind in ('door', 'locked_door', 'seal_door', 'boss_seal'):
             continue
         for dr, dc in ((-1, 0), (1, 0), (0, -1), (0, 1)):
             nr, nc = r + dr, c + dc
@@ -85,6 +85,10 @@ def _cell_char(room, r: int, c: int) -> str:
     return '#' if ct in (CellType.WALL, CellType.WOOD_WALL) else '.'
 
 
+def _is_word_char(ch: str) -> bool:
+    return ch.isalpha() or ch.isdigit() or ch == '_'
+
+
 def _cross_water(room, r: int, c: int) -> bool:
     """Like is_passable but also allows landing on water (for $, 0, ^ scans)."""
     if r < 0 or r >= room.rows or c < 0 or c >= room.cols:
@@ -94,7 +98,7 @@ def _cross_water(room, r: int, c: int) -> bool:
     if (r, c) in room.fog_cells:
         return False
     ent = room.entity_at(r, c)
-    return ent is None or ent.kind != 'locked_door'
+    return ent is None or ent.kind not in ('locked_door', 'shield', 'boss_seal')
 
 
 def apply_motion(player, motion, count, room, target=None):
@@ -152,7 +156,17 @@ def apply_motion(player, motion, count, room, target=None):
             row = player.row
             cur = room.rune_at(row, player.col)
             if cur and cur.kind != 'void':
-                scan = cur.col + len(cur.symbols)
+                ch   = cur.symbols[player.col - cur.col]
+                wc   = _is_word_char(ch)
+                scan = player.col + 1
+                while scan < room.cols and room.is_passable(row, scan):
+                    ru2 = room.rune_at(row, scan)
+                    if ru2 is None or ru2.kind == 'void':
+                        break
+                    ch2 = ru2.symbols[scan - ru2.col]
+                    if _is_word_char(ch2) != wc:
+                        break
+                    scan += 1
             else:
                 scan = player.col + 1
             best = None
@@ -161,7 +175,7 @@ def apply_motion(player, motion, count, room, target=None):
                     break
                 ru = room.rune_at(row, nc)
                 if ru and ru.kind != 'void':
-                    best = ru.col
+                    best = nc
                     break
             if best is not None:
                 player.col = best
@@ -171,34 +185,76 @@ def apply_motion(player, motion, count, room, target=None):
         elif motion == 'b':
             row = player.row
             cur = room.rune_at(row, player.col)
-            if cur and cur.kind != 'void' and cur.col < player.col:
-                player.col = cur.col
-                moved = True
+            if cur and cur.kind != 'void':
+                ch  = cur.symbols[player.col - cur.col]
+                wc  = _is_word_char(ch)
+                run_start = player.col
+                for sc in range(player.col - 1, -1, -1):
+                    if not room.is_passable(row, sc):
+                        break
+                    ru2 = room.rune_at(row, sc)
+                    if ru2 is None or ru2.kind == 'void':
+                        break
+                    ch2 = ru2.symbols[sc - ru2.col]
+                    if _is_word_char(ch2) != wc:
+                        break
+                    run_start = sc
+                if run_start < player.col:
+                    player.col = run_start
+                    moved = True
+                    continue
+                prev_scan = player.col - 1
             else:
-                limit = cur.col if (cur and cur.kind != 'void') else player.col
-                best  = None
-                for nc in range(limit - 1, -1, -1):
-                    if not room.is_passable(row, nc):
-                        break
-                    ru = room.rune_at(row, nc)
-                    if ru and ru.kind != 'void':
-                        best = ru.col
-                        break
-                if best is not None:
-                    player.col = best
+                prev_scan = player.col - 1
+            sc = prev_scan
+            while sc >= 0 and room.is_passable(row, sc):
+                ru = room.rune_at(row, sc)
+                if ru and ru.kind != 'void':
+                    break
+                sc -= 1
+            if sc >= 0 and room.is_passable(row, sc):
+                ru = room.rune_at(row, sc)
+                if ru and ru.kind != 'void':
+                    ch2 = ru.symbols[sc - ru.col]
+                    wc2 = _is_word_char(ch2)
+                    rs  = sc
+                    for sc2 in range(sc - 1, -1, -1):
+                        if not room.is_passable(row, sc2):
+                            break
+                        ru2 = room.rune_at(row, sc2)
+                        if ru2 is None or ru2.kind == 'void':
+                            break
+                        ch3 = ru2.symbols[sc2 - ru2.col]
+                        if _is_word_char(ch3) != wc2:
+                            break
+                        rs = sc2
+                    player.col = rs
                     moved = True
                 else:
                     break
+            else:
+                break
         elif motion == 'e':
             row = player.row
             cur = room.rune_at(row, player.col)
             if cur and cur.kind != 'void':
-                end_col = cur.col + len(cur.symbols) - 1
-                if end_col > player.col:
-                    player.col = end_col
+                ch   = cur.symbols[player.col - cur.col]
+                wc   = _is_word_char(ch)
+                pos  = player.col + 1
+                while pos < room.cols and room.is_passable(row, pos):
+                    ru2 = room.rune_at(row, pos)
+                    if ru2 is None or ru2.kind == 'void':
+                        break
+                    ch2 = ru2.symbols[pos - ru2.col]
+                    if _is_word_char(ch2) != wc:
+                        break
+                    pos += 1
+                end = pos - 1
+                if end > player.col:
+                    player.col = end
                     moved = True
                     continue
-                scan = end_col + 1
+                scan = pos
             else:
                 scan = player.col + 1
             best = None
@@ -207,11 +263,133 @@ def apply_motion(player, motion, count, room, target=None):
                     break
                 ru = room.rune_at(row, nc)
                 if ru and ru.kind != 'void':
-                    best = ru.col + len(ru.symbols) - 1
+                    ch2  = ru.symbols[nc - ru.col]
+                    wc2  = _is_word_char(ch2)
+                    epos = nc + 1
+                    while epos < room.cols and room.is_passable(row, epos):
+                        ru3 = room.rune_at(row, epos)
+                        if ru3 is None or ru3.kind == 'void':
+                            break
+                        ch3 = ru3.symbols[epos - ru3.col]
+                        if _is_word_char(ch3) != wc2:
+                            break
+                        epos += 1
+                    best = epos - 1
                     break
             if best is not None:
                 player.col = best
                 moved = True
+            else:
+                break
+        elif motion == 'W':
+            row = player.row
+            cur = room.rune_at(row, player.col)
+            if cur and cur.kind != 'void':
+                scan = cur.col + len(cur.symbols)
+            else:
+                scan = player.col + 1
+            # skip rest of current WORD (adjacent non-void clusters, no floor gap)
+            while scan < room.cols and room.is_passable(row, scan):
+                ru = room.rune_at(row, scan)
+                if ru and ru.kind != 'void':
+                    scan = ru.col + len(ru.symbols)
+                else:
+                    break
+            # skip whitespace (floor gaps) — W stops at walls
+            while scan < room.cols and room.is_passable(row, scan) and not room.rune_at(row, scan):
+                scan += 1
+            found = None
+            if scan < room.cols and room.is_passable(row, scan):
+                ru = room.rune_at(row, scan)
+                if ru and ru.kind != 'void':
+                    found = ru.col
+            if found is not None:
+                player.col = found
+                moved = True
+            else:
+                break
+        elif motion == 'B':
+            row = player.row
+            pos = player.col
+            cur = room.rune_at(row, pos)
+            if cur and cur.kind != 'void':
+                # Find start of current WORD (leftmost adjacent cluster)
+                word_start = cur.col
+                check = cur.col - 1
+                while check >= 0 and room.is_passable(row, check):
+                    prev_ru = room.rune_at(row, check)
+                    if prev_ru and prev_ru.kind != 'void':
+                        word_start = prev_ru.col
+                        check = prev_ru.col - 1
+                    else:
+                        break
+                if word_start < pos:
+                    # Inside WORD: jump to its start
+                    player.col = word_start
+                    moved = True
+                    continue
+                # At start of WORD: jump to previous WORD
+                pos = word_start - 1
+            else:
+                pos = pos - 1
+            # Skip whitespace backward
+            while pos >= 0 and room.is_passable(row, pos) and not room.rune_at(row, pos):
+                pos -= 1
+            if pos >= 0 and room.is_passable(row, pos):
+                ru = room.rune_at(row, pos)
+                if ru and ru.kind != 'void':
+                    word_start = ru.col
+                    check = ru.col - 1
+                    while check >= 0 and room.is_passable(row, check):
+                        prev_ru = room.rune_at(row, check)
+                        if prev_ru and prev_ru.kind != 'void':
+                            word_start = prev_ru.col
+                            check = prev_ru.col - 1
+                        else:
+                            break
+                    player.col = word_start
+                    moved = True
+                else:
+                    break
+            else:
+                break
+        elif motion == 'E':
+            row = player.row
+            cur = room.rune_at(row, player.col)
+            if cur and cur.kind != 'void':
+                # Find end of current WORD (last char of last adjacent cluster)
+                pos = cur.col + len(cur.symbols)
+                while pos < room.cols and room.is_passable(row, pos):
+                    ru = room.rune_at(row, pos)
+                    if ru and ru.kind != 'void':
+                        pos = ru.col + len(ru.symbols)
+                    else:
+                        break
+                end = pos - 1
+                if end > player.col:
+                    player.col = end
+                    moved = True
+                    continue
+                pos = end + 1
+            else:
+                pos = player.col + 1
+            # Skip whitespace
+            while pos < room.cols and room.is_passable(row, pos) and not room.rune_at(row, pos):
+                pos += 1
+            if pos < room.cols and room.is_passable(row, pos):
+                ru = room.rune_at(row, pos)
+                if ru and ru.kind != 'void':
+                    pos = ru.col + len(ru.symbols)
+                    while pos < room.cols and room.is_passable(row, pos):
+                        ru2 = room.rune_at(row, pos)
+                        if ru2 and ru2.kind != 'void':
+                            pos = ru2.col + len(ru2.symbols)
+                        else:
+                            break
+                    player.col = pos - 1
+                    moved = True
+                else:
+                    break
             else:
                 break
         elif motion == 'G':
@@ -221,6 +399,59 @@ def apply_motion(player, motion, count, room, target=None):
         elif motion == 'gg':
             player.row, player.col = room.entry
             moved = True
+        elif motion == 'ge':
+            # Backward to the end of the previous word (a non-void RuneCluster).
+            row = player.row
+            best = None
+            nc = player.col - 1
+            while nc >= 0:
+                if not room.is_passable(row, nc):
+                    break
+                ru = room.rune_at(row, nc)
+                if ru and ru.kind != 'void':
+                    end_col = ru.col + len(ru.symbols) - 1
+                    if end_col < player.col:
+                        best = end_col
+                        break
+                    nc = ru.col - 1   # cursor at/within this word: skip left of its start
+                    continue
+                nc -= 1
+            if best is not None:
+                player.col = best
+                moved = True
+            else:
+                break
+        elif motion == 'gE':
+            # Backward to the end of the previous WORD (maximal run of adjacent
+            # non-void clusters, delimited by a floor gap or wall).
+            row = player.row
+            best = None
+            nc = player.col - 1
+            while nc >= 0:
+                if not room.is_passable(row, nc):
+                    break
+                ru = room.rune_at(row, nc)
+                if ru and ru.kind != 'void':
+                    end = ru.col + len(ru.symbols) - 1   # extend right to WORD end
+                    cc = end + 1
+                    while cc < room.cols and room.is_passable(row, cc):
+                        r2 = room.rune_at(row, cc)
+                        if r2 and r2.kind != 'void':
+                            end = r2.col + len(r2.symbols) - 1
+                            cc = end + 1
+                        else:
+                            break
+                    if end < player.col:
+                        best = end
+                        break
+                    nc = ru.col - 1   # cursor within this WORD: skip left of its start
+                    continue
+                nc -= 1
+            if best is not None:
+                player.col = best
+                moved = True
+            else:
+                break
         elif motion in ('f', 'F', 't', 'T'):
             if target is None:
                 break
@@ -244,8 +475,12 @@ def _apply_find(player, motion: str, target: str, room) -> bool:
     row = player.row
     fwd = motion in ('f', 't')
     scan = range(player.col + 1, room.cols) if fwd else range(player.col - 1, -1, -1)
+    _SCAN_BLOCK = frozenset(('shield', 'locked_door', 'seal_door', 'boss_seal'))
     for nc in scan:
         if room.cells[row][nc] in (CellType.WALL, CellType.WOOD_WALL):
+            break
+        ent = room.entity_at(row, nc)
+        if ent and ent.kind in _SCAN_BLOCK:
             break
         if _cell_char(room, row, nc) == target:
             if motion in ('f', 'F'):

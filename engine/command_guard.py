@@ -10,9 +10,11 @@ from __future__ import annotations
 _MOTION_GUARD: dict[str, str] = {
     '^': '^',  '$': '$',  '0': '0',
     'w': 'w',  'b': 'b',  'e': 'e',
+    'W': 'W',  'B': 'B',  'E': 'E',
     'f': 'f',  'F': 'F',  't': 't',  'T': 'T',
     ';': ';',  ',': ',',
     'G': 'G',  'gg': 'G',
+    'ge': 'ge', 'gE': 'gE',
     '{': '{',  '}': '}',
 }
 
@@ -47,17 +49,21 @@ def action_allowed(action: dict, known: list | set, edit_mode: bool = False) -> 
         if m in ('visual', 'visual_line', 'visual_block'):
             return 'visual' in known_set
 
+    if t == 'repeat':
+        return 'dot' in known_set
+
     # interact (x), undo (u), redo (^R), command (:), mark — always allowed
     return True
 
 
-def guard_message(action: dict) -> str:
+def guard_message(action: dict, known: list | set = ()) -> str:
     """Human-readable reason why action_allowed returned False."""
     t = action['type']
     if t == 'motion':
-        if action.get('count', 1) > 1:
-            return "You haven't learned count motions yet."
+        known_set = set(known)
         m = action['motion']
+        if action.get('count', 1) > 1 and 'count' not in known_set:
+            return "You haven't learned count motions yet."
         if m in ('G', 'gg'):
             return "You haven't learned G/gg yet."
         return f"You haven't learned '{m}' yet."
@@ -67,4 +73,6 @@ def guard_message(action: dict) -> str:
         return f"You haven't learned {action.get('mode', '')} mode yet."
     if t in ('operator', 'substitute'):
         return 'Editor commands require :edit mode.'
+    if t == 'repeat':
+        return "You haven't learned . yet."
     return 'Command not available.'

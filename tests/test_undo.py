@@ -4,10 +4,11 @@ dict (entity snapshot) onto the undo stack via _snapshot(), not a positional
 tuple.
 
 Covered actions
-  chest x       — dict format with 'keys' field (loot may grant a key)
+  chest x       — dict format (entity restored on undo)
+  chest_key x   — floor_key added to register; chest restored on undo
   door x        — dict format (interact handler)
   dynamite step — dict format (motion handler, upgraded from tuple at explosion time)
-  locked_door p — dict format with 'keys' field (paste handler)
+  locked_door p — dict format; floor_key consumed from register, door restored on undo
 
 Why an action can be missed
   test_all_entity_mutations_undoable hardcodes every entity-killing action.
@@ -15,9 +16,7 @@ Why an action can be missed
   edit mode, so the test guards against the omission.
 
 Required dict fields (all produced by _snapshot() in main.py)
-  row, col, spent, entities, fog_cells, keys
-  _snapshot() always includes 'keys' so inventory is restored for any action
-  that grants or removes items, even if the caller doesn't think about it.
+  row, col, spent, entities, fog_cells
 """
 from engine.world import Room, Entity, CellType, RoomType
 from engine.player import Player
@@ -47,7 +46,6 @@ def _apply_undo(item, room, player, budget):
         budget.spent = item['spent']
         room.entities = item['entities']
         room.fog_cells = item['fog_cells']
-        player.keys = item.get('keys', player.keys)
         room.rebuild_indexes()
     else:
         pr, pc, ps = item
@@ -67,8 +65,7 @@ def test_chest_x_undo_restores_entity():
     budget = Budget(20)
 
     undo_item = {'row': player.row, 'col': player.col, 'spent': budget.spent,
-                 'entities': _snap(room), 'fog_cells': set(room.fog_cells),
-                 'keys': player.keys}
+                 'entities': _snap(room), 'fog_cells': set(room.fog_cells)}
     room.kill_entity(chest)
     budget.spend(1)
 
@@ -80,27 +77,43 @@ def test_chest_x_undo_restores_entity():
     assert restored.kind == 'chest'
 
 
-def test_chest_key_undo_restores_key():
-    """When a chest_key grants a key, undoing must revert player.keys too."""
+def test_chest_key_adds_floor_key_to_register():
+    """Opening a chest_key puts a floor_key into the player register."""
     room = _corridor()
     chest = Entity(kind='chest_key', row=2, col=5)
     room.add_entity(chest)
     player = Player(row=2, col=5)
-    player.keys = 0
+
+    # Simulate what main.py does on chest_key loot
+    player.register = [{'type': 'entity',
+                        'entity': Entity(kind='floor_key', row=chest.row, col=chest.col)}]
+    room.kill_entity(chest)
+
+    assert any(
+        it.get('type') == 'entity' and
+        it.get('entity') and it['entity'].kind == 'floor_key'
+        for it in player.register
+    ), "register must hold a floor_key after looting chest_key"
+
+
+def test_chest_key_undo_restores_chest():
+    """Undoing a chest_key pickup restores the chest entity."""
+    room = _corridor()
+    chest = Entity(kind='chest_key', row=2, col=5)
+    room.add_entity(chest)
+    player = Player(row=2, col=5)
     budget = Budget(20)
 
     undo_item = {'row': player.row, 'col': player.col, 'spent': budget.spent,
-                 'entities': _snap(room), 'fog_cells': set(room.fog_cells),
-                 'keys': player.keys}
-    player.keys += 1    # loot grants a key
+                 'entities': _snap(room), 'fog_cells': set(room.fog_cells)}
+    player.register = [{'type': 'entity',
+                        'entity': Entity(kind='floor_key', row=chest.row, col=chest.col)}]
     room.kill_entity(chest)
     budget.spend(1)
 
-    assert player.keys == 1
     _apply_undo(undo_item, room, player, budget)
 
-    assert player.keys == 0, "key grant must be reverted by undo"
-    assert room.entity_at(2, 5) is not None, "chest_key must be restored"
+    assert room.entity_at(2, 5) is not None, "chest_key must be restored after undo"
 
 
 # ── Door x ────────────────────────────────────────────────────────────────────
@@ -114,8 +127,7 @@ def test_door_x_undo_restores_entity():
     budget = Budget(20)
 
     undo_item = {'row': player.row, 'col': player.col, 'spent': budget.spent,
-                 'entities': _snap(room), 'fog_cells': set(room.fog_cells),
-                 'keys': player.keys}
+                 'entities': _snap(room), 'fog_cells': set(room.fog_cells)}
     room.kill_entity(door)
     budget.spend(1)
 
@@ -142,8 +154,7 @@ def test_dynamite_step_undo_restores_entity():
     player.row, player.col = 2, 5
 
     undo_stack = [{'row': prev_pos[0], 'col': prev_pos[1], 'spent': prev_pos[2],
-                   'entities': _snap(room), 'fog_cells': set(room.fog_cells),
-                   'keys': player.keys}]
+                   'entities': _snap(room), 'fog_cells': set(room.fog_cells)}]
     room.kill_entity(dyn)
 
     _apply_undo(undo_stack.pop(), room, player, budget)
@@ -156,43 +167,40 @@ def test_dynamite_step_undo_restores_entity():
 
 # ── Locked door p ─────────────────────────────────────────────────────────────
 
-def test_locked_door_p_undo_restores_entity_and_key():
-    """p on a locked_door pushes a dict undo entry that restores the door and the key."""
+def test_locked_door_p_undo_restores_door():
+    """p on a locked_door pushes a dict undo entry that restores the door."""
     room = _corridor()
     ldoor = Entity(kind='locked_door', row=2, col=6)
     room.add_entity(ldoor)
     player = Player(row=2, col=5)
-    player.keys = 1
+    floor_key = Entity(kind='floor_key', row=2, col=5)
+    player.register = [{'type': 'entity', 'entity': floor_key}]
     budget = Budget(20)
 
     undo_item = {'row': player.row, 'col': player.col, 'spent': budget.spent,
-                 'entities': _snap(room), 'fog_cells': set(room.fog_cells),
-                 'keys': player.keys}
-    player.keys -= 1
+                 'entities': _snap(room), 'fog_cells': set(room.fog_cells)}
+    # Consume key from register and unlock door
+    player.register.pop(0)
     room.kill_entity(ldoor)
     budget.spend(1)
 
-    assert player.keys == 0
     assert room.entity_at(2, 6) is None
 
     _apply_undo(undo_item, room, player, budget)
 
-    assert player.keys == 1, "key must be restored after undo"
     restored = room.entity_at(2, 6)
     assert restored is not None, "locked_door must be present after undo"
     assert restored.alive
     assert restored.kind == 'locked_door'
 
 
-# ── Combined: all entity-mutating actions restore entities on undo ─────────────
+# ── Combined: all entity-mutating actions use dict undo entries ───────────────
 
 def test_all_entity_mutations_undoable():
-    """Every entity-killing action must push a dict undo entry with all fields.
+    """Every entity-killing action must push a dict undo entry.
 
     Add new entries here whenever a new action calls room.kill_entity() outside
-    edit mode.  Every entry must include 'keys' (produced automatically by
-    _snapshot() in main.py) so inventory is restored regardless of whether the
-    specific action grants items.
+    edit mode, so the test guards against the omission.
     """
     room = _corridor()
     chest = Entity(kind='chest',       row=2, col=2)
@@ -203,23 +211,20 @@ def test_all_entity_mutations_undoable():
         room.add_entity(e)
 
     player = Player(row=2, col=1)
-    player.keys = 1
     budget = Budget(20)
 
     entity_actions = []
 
     # --- chest x ---
     chest_undo = {'row': player.row, 'col': player.col, 'spent': budget.spent,
-                  'entities': _snap(room), 'fog_cells': set(room.fog_cells),
-                  'keys': player.keys}
+                  'entities': _snap(room), 'fog_cells': set(room.fog_cells)}
     room.kill_entity(chest)
     budget.spend(1)
     entity_actions.append(('chest', chest_undo))
 
     # --- door x ---
     door_undo = {'row': player.row, 'col': player.col, 'spent': budget.spent,
-                 'entities': _snap(room), 'fog_cells': set(room.fog_cells),
-                 'keys': player.keys}
+                 'entities': _snap(room), 'fog_cells': set(room.fog_cells)}
     room.kill_entity(door)
     budget.spend(1)
     entity_actions.append(('door', door_undo))
@@ -229,16 +234,13 @@ def test_all_entity_mutations_undoable():
     budget.spend(1)
     player.row, player.col = 2, 7
     dyn_undo = {'row': prev[0], 'col': prev[1], 'spent': prev[2],
-                'entities': _snap(room), 'fog_cells': set(room.fog_cells),
-                'keys': player.keys}
+                'entities': _snap(room), 'fog_cells': set(room.fog_cells)}
     room.kill_entity(dyn)
     entity_actions.append(('dynamite', dyn_undo))
 
     # --- locked_door p ---
     ldoor_undo = {'row': player.row, 'col': player.col, 'spent': budget.spent,
-                  'entities': _snap(room), 'fog_cells': set(room.fog_cells),
-                  'keys': player.keys}
-    player.keys -= 1
+                  'entities': _snap(room), 'fog_cells': set(room.fog_cells)}
     room.kill_entity(ldoor)
     budget.spend(1)
     entity_actions.append(('locked_door', ldoor_undo))
@@ -248,7 +250,9 @@ def test_all_entity_mutations_undoable():
             f"undo item for '{label}' is a {type(item).__name__}, not a dict — "
             "entity state cannot be restored; use _snapshot() in the handler"
         )
-        assert 'keys' in item, (
-            f"undo item for '{label}' is missing 'keys' — "
-            "use _snapshot() which always includes it"
+        required = {'row', 'col', 'spent', 'entities', 'fog_cells'}
+        missing = required - item.keys()
+        assert not missing, (
+            f"undo item for '{label}' is missing fields: {missing} — "
+            "use _snapshot() which always includes them"
         )

@@ -159,3 +159,27 @@ class TestSaveProgress:
         save_progress({}, 'Alice')
         raw = load_for('Alice')
         assert raw['player_name'] == 'Alice'
+
+    def test_heart_container_max_hp_persists(self, tmp_path, monkeypatch):
+        monkeypatch.setattr('save.save_manager.SAVES_DIR', tmp_path)
+        progress = {'max_hp': 8, 'collected_hearts': [[51, 2, 41]]}
+        save_progress(progress, 'Alice')
+        restored = load_progress(load_for('Alice'))
+        assert restored['max_hp'] == 8
+        assert restored['collected_hearts'] == [[51, 2, 41]]
+
+    def test_heart_container_round_trip_default_hp(self, tmp_path, monkeypatch):
+        monkeypatch.setattr('save.save_manager.SAVES_DIR', tmp_path)
+        save_progress({}, 'Alice')
+        restored = load_progress(load_for('Alice'))
+        # Default max_hp of 6 is not stored in progress dict (omitted when unchanged)
+        assert restored.get('max_hp', 6) == 6
+
+    def test_multiple_hearts_all_collected_positions_saved(self, tmp_path, monkeypatch):
+        monkeypatch.setattr('save.save_manager.SAVES_DIR', tmp_path)
+        hearts = [[51, 2, 41], [3, 4, 10]]
+        progress = {'max_hp': 10, 'collected_hearts': hearts}
+        save_progress(progress, 'Alice')
+        restored = load_progress(load_for('Alice'))
+        assert restored['max_hp'] == 10
+        assert restored['collected_hearts'] == hearts

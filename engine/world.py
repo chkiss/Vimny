@@ -1,7 +1,10 @@
 from __future__ import annotations
 from dataclasses import dataclass, field
 from enum import Enum, auto
+from itertools import count as _count
 from typing import Optional
+
+_uid_seq = _count(1)   # stable per-run counter; preserved through snapshots via explicit copy
 
 class CellType(Enum):
     WALL      = auto()
@@ -30,7 +33,13 @@ class Entity:
     ai:           str = ''  # 'chase' | '' (stationary/non-combatant)
     ai_speed:     int = 1   # move every N player turns
     ai_tick:      int = 0   # counts up; entity moves when ai_tick % ai_speed == 0
-    summon_timer: int = 0   # ticks down each turn; spawns goblin when it hits 0
+    summon_timer:       int = 0   # ticks down each turn; spawns goblin when it hits 0
+    goblin_free_turns:  int = 2   # turns elapsed with no live goblins (>=2 allows auto-spawn)
+    # --- identity & movement state (must be copied in _snapshot) ---
+    uid:          int = field(default_factory=lambda: next(_uid_seq))
+    summoner_uid: int = 0   # uid of the entity that spawned this (0 = not spawned)
+    origin_row:   int = -1  # starting row for bounded-oscillation entities (-1 = not set)
+    move_dir:     int = 1   # oscillation direction: +1 = down (row+1), -1 = up (row-1)
 
 @dataclass
 class RuneCluster:
@@ -122,7 +131,7 @@ class Room:
         if (r, c) in self.fog_cells:
             return False
         ent = self.entity_at(r, c)
-        return ent is None or ent.kind not in ('locked_door', 'shield')
+        return ent is None or ent.kind not in ('locked_door', 'shield', 'seal_door', 'boss_seal')
 
     def damage_wood_wall(self, r: int, c: int, half_steps: int = 1) -> bool:
         """Deal half_steps of damage to wood wall at (r, c).

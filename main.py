@@ -21,7 +21,7 @@ from engine.editor import (
     _ed_paste, _ed_row_items, _ed_clear_row, _ed_range_items, _ed_delete_range,
     _clip_desc, _serialize_room, _deserialize_room,
 )
-from generation.dungeon_gen import build_dungeon_0, build_dungeon_1, build_dungeon_1_1, build_dungeon_2, build_dungeon_3, build_dungeon_4, build_dungeon_5, build_dungeon_dummy
+from generation.dungeon_gen import build_dungeon_0, build_dungeon_1, build_dungeon_1_1, build_dungeon_2, build_dungeon_3, build_dungeon_4, build_dungeon_5, build_dungeon_51, build_dungeon_6, build_dungeon_dummy
 from content.levels import LEVELS, is_unlocked, is_reliquary, known_commands as _known_commands
 import save.save_manager as SM
 
@@ -35,6 +35,70 @@ _ALERT_RADIUS           = 5   # Manhattan dist at which goblins start chasing
 _ATTACK_RADIUS          = 1   # Manhattan dist at which goblins attack each turn
 _WARDEN_SUMMON_INTERVAL = 6   # turns between warden summons
 _MSG_ROTATE_TTL         = 10  # ticks per combat message (~1 s at 0.1 s inkey timeout)
+
+_SCROLL_TEXT_OPERATOR_CODEX = """\
+The Operator's Codex
+====================
+In the Loom, they carved the grammar of unmaking.
+
+  d{m}  ──  delete to motion
+  dd    ──  delete line
+  y{m}  ──  yank (copy without cutting)
+  yy    ──  yank line
+  c{m}  ──  change text (delete + insert)
+
+  "  holds what you cut and what you copy.
+
+  The operator takes a motion.
+  The motion sets the range.
+  The register is the vessel.
+"""
+
+_SCROLL_TEXT_ARCHIVISTS_METHOD = """\
+The Archivist's Method
+======================
+The Archivist copied before erasing. That was the discipline.
+
+  y{m}  ──  yank (copy without cutting)
+  yy    ──  yank line
+  p     ──  put after cursor
+  P     ──  Put before cursor
+  c{m}  ──  change text (delete + insert)
+
+  d and y share the same register.
+  Paste before deleting, or lose your copy.
+"""
+
+_SCROLL_TEXT_WHOLE_WORD = """\
+The Whole Word
+==============
+Position within the word ceased to matter.
+
+  iw  ──  inner word  (from anywhere inside)
+  aw  ──  around word (includes adjacent space)
+  i(  ──  inner parens
+  a(  ──  around parens
+  i"  ──  inside quotes
+  it  ──  inside tag
+
+  diw works at start, middle, or end.
+  The boundary is the rune, not where you stand.
+"""
+
+_SCROLL_TEXT_WARDENS_ACT = """\
+The Warden's Act
+================
+The Sight became the Hand.
+What the eye marks, the hand unmakes.
+
+  v{m}d  ──  select range, delete
+  v{m}y  ──  select range, yank
+  v{m}c  ──  select range, change
+  gv     ──  reselect last visual span
+
+  See. Select. Strike.
+  The eye and the hand are one.
+"""
 
 def _chest_loot(kind: str) -> str:
     """Return the item type yielded by looting a chest."""
@@ -52,7 +116,7 @@ def _chest_loot(kind: str) -> str:
 # ── Scroll overlays ───────────────────────────────────────────────────────────
 
 def _show_reliquary_scroll(term: Terminal, iw: int, game_h: int) -> None:
-    """Amber floating box showing the reliquary chest poem. Blocks until any key."""
+    """Amber floating box explaining the \" register. d and c rows are smudged."""
     BOX_IW = 54
     BOX_BW = BOX_IW + 4
 
@@ -60,43 +124,60 @@ def _show_reliquary_scroll(term: Terminal, iw: int, game_h: int) -> None:
     amber_b = term.color_rgb(220, 175, 35) + term.bold
     amber   = term.color_rgb(220, 175, 35)
     dim     = term.color_rgb(100, 80, 15)
+    smudge  = term.color_rgb(55, 40, 10)   # barely-visible ink
     hi      = term.color_rgb(255, 220, 60) + term.bold
     rst     = term.normal
 
     col_off = max(1, (iw + 2 - BOX_BW) // 2)
-    row_off = 3 + max(0, (game_h - 12) // 2)
+    row_off = 3 + max(0, (game_h - 17) // 2)
 
     bdr = box_bg + amber_b
     inn = box_bg
 
-    def center_row(vis: int, colored: str) -> str:
-        lpad = (BOX_IW - vis) // 2
-        rpad = BOX_IW - vis - lpad
+    def row(vis: int, colored: str) -> str:
         return (bdr + '║ ' + rst +
-                inn + ' ' * lpad + colored + inn + ' ' * rpad +
+                inn + colored +
+                inn + ' ' * max(0, BOX_IW - vis) +
                 bdr + ' ║' + rst)
 
-    blank = center_row(0, '')
+    blank = row(0, '')
 
-    T = '◈   A Scroll   ◈'
-    title = center_row(len(T), hi + T + rst)
+    T  = '◈   The Unnamed Register   ◈'
+    lT = (BOX_IW - len(T)) // 2
+    rT = BOX_IW - len(T) - lT
+    title = row(BOX_IW, ' ' * lT + hi + T + rst + ' ' * rT)
 
-    l1 = "You've already learned the lesson from this chest —"
-    line1 = center_row(len(l1), amber + l1 + rst)
+    def kv_clear(key: str, desc: str) -> str:
+        d25     = desc.ljust(25)[:25]
+        sep     = '  ────→  '
+        suf     = 'lands in  '
+        sym     = '"'
+        colored = ('    ' + hi + key + rst +
+                   inn + dim + sep + d25 + suf + rst +
+                   inn + amber + sym + rst + inn)
+        return row(50, colored)
 
-    l2 = "x doesn't just cut, it saves to your vest!"
-    line2 = center_row(len(l2),
-                       hi + 'x' + rst + inn + amber + l2[1:] + rst)
+    def kv_smudged(key: str, desc_smudge: str, desc_clear: str) -> str:
+        sd           = desc_smudge[:25]
+        cd           = desc_clear[:max(0, 25 - len(sd))].ljust(25 - len(sd))
+        sep          = '  ────→  '   # 9 chars
+        smudge_block = '▒' * (len(key) + len(sep) + len(sd))
+        suf          = 'lands in  '
+        sym          = '"'
+        colored = ('    ' + smudge + smudge_block + rst +
+                   inn + dim + cd + suf + rst +
+                   inn + amber + sym + rst + inn)
+        return row(50, colored)
 
-    l3 = "You have joined the halls of adventurers who possess"
-    line3 = center_row(len(l3), amber + l3 + rst)
+    p_plain = ' "  holds all you delete — there must be some use...'
+    p_col   = (dim + ' ' + rst +
+               inn + amber + '"' + rst +
+               inn + dim + '  holds all you delete — there must be some use...' + rst + inn)
+    p_row   = row(len(p_plain), p_col)
 
-    l4 = 'the " buffer.'
-    line4 = center_row(len(l4),
-                       amber + 'the ' + rst + inn + hi + '"' + rst + inn + amber + ' buffer.' + rst)
-
-    AK     = '[ any key ]'
-    footer = center_row(len(AK), dim + AK + rst)
+    AK  = '[ any key ]'
+    lAK = (BOX_IW - len(AK)) // 2
+    footer = row(BOX_IW, ' ' * lAK + dim + AK + rst + ' ' * (BOX_IW - len(AK) - lAK))
 
     sep_h = '═' * (BOX_IW + 2)
     lines = [
@@ -104,10 +185,17 @@ def _show_reliquary_scroll(term: Terminal, iw: int, game_h: int) -> None:
         blank,
         title,
         blank,
-        line1,
-        line2,
-        line3,
-        line4,
+        row(len('  Scrawled on the scroll: a revelation.'),
+            dim + '  Scrawled on the scroll: a revelation.' + rst),
+        blank,
+        kv_clear('x', 'deletes a character  '),
+        kv_smudged('▒', '▒', 'eletes a range'),
+        kv_smudged('▒', '▒▒▒', 'nges text'),
+        blank,
+        p_row,
+        blank,
+        row(len('  Your cuts are visible in the statusline.'),
+            dim + '  Your cuts are visible in the statusline.' + rst),
         blank,
         footer,
         blank,
@@ -204,6 +292,348 @@ def _show_register_tutorial(term: Terminal, iw: int, game_h: int) -> None:
     term.inkey()   # consume keypress; already inside term.cbreak()
 
 
+def _show_warden_sight_scroll(term: Terminal, iw: int, game_h: int) -> None:
+    """Amber floating box introducing v (Visual/Sight mode)."""
+    BOX_IW = 54
+    BOX_BW = BOX_IW + 4
+
+    box_bg  = term.on_color_rgb(10, 8, 2)
+    amber_b = term.color_rgb(220, 175, 35) + term.bold
+    amber   = term.color_rgb(220, 175, 35)
+    dim     = term.color_rgb(100, 80, 15)
+    hi      = term.color_rgb(255, 220, 60) + term.bold
+    rst     = term.normal
+
+    col_off = max(1, (iw + 2 - BOX_BW) // 2)
+    row_off = 3 + max(0, (game_h - 17) // 2)
+
+    bdr = box_bg + amber_b
+    inn = box_bg
+
+    def row(vis: int, colored: str) -> str:
+        return (bdr + '║ ' + rst +
+                inn + colored +
+                inn + ' ' * max(0, BOX_IW - vis) +
+                bdr + ' ║' + rst)
+
+    blank = row(0, '')
+
+    T  = "◈   The Warden's Sight   ◈"
+    lT = (BOX_IW - len(T)) // 2
+    rT = BOX_IW - len(T) - lT
+    title = row(BOX_IW, ' ' * lT + hi + T + rst + ' ' * rT)
+
+    v_plain   = '    v  ────→  enter Sight    (costs 1 key)'
+    v_colored = ('    ' + hi + 'v' + rst +
+                 inn + dim + '  ────→  ' + rst +
+                 inn + amber + 'enter Sight' + rst +
+                 inn + dim + '    (costs 1 key)' + rst + inn)
+    v_row = row(len(v_plain), v_colored)
+
+    def dim_row(s: str) -> str:
+        return row(len(s), dim + s + rst)
+
+    def amber_row(s: str) -> str:
+        return row(len(s), amber + s + rst)
+
+    AK  = '[ any key ]'
+    lAK = (BOX_IW - len(AK)) // 2
+    footer = row(BOX_IW, ' ' * lAK + dim + AK + rst + ' ' * (BOX_IW - len(AK) - lAK))
+
+    sep_h = '═' * (BOX_IW + 2)
+    lines = [
+        bdr + '╔' + sep_h + '╗' + rst,
+        blank,
+        title,
+        blank,
+        dim_row("  The Warden is gone. His sight is yours."),
+        blank,
+        v_row,
+        blank,
+        dim_row('  In Sight: all movement costs nothing.'),
+        dim_row('  Hover any creature to read its nature.'),
+        dim_row('  Esc returns you to the waking world.'),
+        blank,
+        amber_row('  See before you strike.'),
+        blank,
+        footer,
+        blank,
+        bdr + '╚' + sep_h + '╝' + rst,
+    ]
+
+    for i, line in enumerate(lines):
+        print(term.move_yx(row_off + i, col_off) + line, end='', flush=True)
+
+    term.inkey()
+
+
+def _show_operator_codex_scroll(term: Terminal, iw: int, game_h: int) -> None:
+    """12.1 vault scroll — d/dd clear, y/c smudged.
+    TODO: add `known: list` param; gate smudge_row→cmd_row on 'y_op'/'c_op' in known.
+    See new-level.md § Scroll revelation for the full pattern."""
+    BOX_IW = 54; BOX_BW = BOX_IW + 4
+    box_bg  = term.on_color_rgb(10, 8, 2)
+    amber_b = term.color_rgb(220, 175, 35) + term.bold
+    amber   = term.color_rgb(220, 175, 35)
+    dim     = term.color_rgb(100, 80, 15)
+    smudge  = term.color_rgb(55, 40, 10)
+    hi      = term.color_rgb(255, 220, 60) + term.bold
+    rst     = term.normal
+    col_off = max(1, (iw + 2 - BOX_BW) // 2)
+    row_off = 3 + max(0, (game_h - 17) // 2)
+    bdr = box_bg + amber_b; inn = box_bg
+
+    def row(vis, colored):
+        return (bdr + '║ ' + rst + inn + colored +
+                inn + ' ' * max(0, BOX_IW - vis) + bdr + ' ║' + rst)
+
+    blank = row(0, '')
+
+    T = "◈   The Operator's Codex   ◈"
+    lT = (BOX_IW - len(T)) // 2; rT = BOX_IW - len(T) - lT
+    title = row(BOX_IW, ' ' * lT + hi + T + rst + ' ' * rT)
+
+    def cmd_row(key, desc):
+        sep = '  ────→  '
+        plain = f'    {key}{sep}{desc}'
+        return row(len(plain),
+                   '    ' + hi + key + rst + inn + dim + sep + rst + inn + amber + desc + rst + inn)
+
+    def smudge_row(key, smudge_prefix, clear_tail):
+        sep = '  ────→  '
+        block = '▒' * (len(key) + len(sep) + len(smudge_prefix))
+        return row(4 + len(block) + len(clear_tail),
+                   '    ' + smudge + block + rst + inn + dim + clear_tail + rst + inn)
+
+    def dim_row(s): return row(len(s), dim + s + rst)
+    def amber_row(s): return row(len(s), amber + s + rst)
+
+    AK = '[ any key ]'; lAK = (BOX_IW - len(AK)) // 2
+    footer = row(BOX_IW, ' ' * lAK + dim + AK + rst + ' ' * (BOX_IW - len(AK) - lAK))
+    sep_h = '═' * (BOX_IW + 2)
+
+    lines = [
+        bdr + '╔' + sep_h + '╗' + rst,
+        blank, title, blank,
+        dim_row('  In the Loom, they carved the grammar of unmaking.'),
+        blank,
+        cmd_row('d{m}', 'delete to motion'),
+        cmd_row('dd  ', 'delete line'),
+        smudge_row('y{m}', 'y', 'ank (copy without cutting)'),
+        smudge_row('c{m}', 'ch', 'ange text (del + insert)'),
+        blank,
+        amber_row('  "  holds what you cut.  Something awaits.'),
+        blank,
+        footer, blank,
+        bdr + '╚' + sep_h + '╝' + rst,
+    ]
+
+    for i, line in enumerate(lines):
+        print(term.move_yx(row_off + i, col_off) + line, end='', flush=True)
+    term.inkey()
+
+
+def _show_archivists_method_scroll(term: Terminal, iw: int, game_h: int) -> None:
+    """17.1 vault scroll — y/yy/p clear, c smudged.
+    TODO: add `known: list` param; gate smudge_row→cmd_row on 'c_op' in known.
+    See new-level.md § Scroll revelation for the full pattern."""
+    BOX_IW = 54; BOX_BW = BOX_IW + 4
+    box_bg  = term.on_color_rgb(10, 8, 2)
+    amber_b = term.color_rgb(220, 175, 35) + term.bold
+    amber   = term.color_rgb(220, 175, 35)
+    dim     = term.color_rgb(100, 80, 15)
+    smudge  = term.color_rgb(55, 40, 10)
+    hi      = term.color_rgb(255, 220, 60) + term.bold
+    rst     = term.normal
+    col_off = max(1, (iw + 2 - BOX_BW) // 2)
+    row_off = 3 + max(0, (game_h - 17) // 2)
+    bdr = box_bg + amber_b; inn = box_bg
+
+    def row(vis, colored):
+        return (bdr + '║ ' + rst + inn + colored +
+                inn + ' ' * max(0, BOX_IW - vis) + bdr + ' ║' + rst)
+
+    blank = row(0, '')
+
+    T = "◈   The Archivist's Method   ◈"
+    lT = (BOX_IW - len(T)) // 2; rT = BOX_IW - len(T) - lT
+    title = row(BOX_IW, ' ' * lT + hi + T + rst + ' ' * rT)
+
+    def cmd_row(key, desc):
+        sep = '  ────→  '
+        plain = f'    {key}{sep}{desc}'
+        return row(len(plain),
+                   '    ' + hi + key + rst + inn + dim + sep + rst + inn + amber + desc + rst + inn)
+
+    def smudge_row(key, smudge_prefix, clear_tail):
+        sep = '  ────→  '
+        block = '▒' * (len(key) + len(sep) + len(smudge_prefix))
+        return row(4 + len(block) + len(clear_tail),
+                   '    ' + smudge + block + rst + inn + dim + clear_tail + rst + inn)
+
+    def dim_row(s): return row(len(s), dim + s + rst)
+    def amber_row(s): return row(len(s), amber + s + rst)
+
+    AK = '[ any key ]'; lAK = (BOX_IW - len(AK)) // 2
+    footer = row(BOX_IW, ' ' * lAK + dim + AK + rst + ' ' * (BOX_IW - len(AK) - lAK))
+    sep_h = '═' * (BOX_IW + 2)
+
+    lines = [
+        bdr + '╔' + sep_h + '╗' + rst,
+        blank, title, blank,
+        dim_row('  The Archivist copied before erasing. Wise.'),
+        blank,
+        cmd_row('y{m}', 'yank (copy without cutting)'),
+        cmd_row('yy  ', 'yank line'),
+        cmd_row('p   ', 'put after cursor'),
+        smudge_row('c{m}', 'ch', 'ange text (del + insert)'),
+        blank,
+        amber_row('  d and y share the same register.'),
+        dim_row('  Paste before deleting — or lose your copy.'),
+        blank,
+        footer, blank,
+        bdr + '╚' + sep_h + '╝' + rst,
+    ]
+
+    for i, line in enumerate(lines):
+        print(term.move_yx(row_off + i, col_off) + line, end='', flush=True)
+    term.inkey()
+
+
+def _show_whole_word_scroll(term: Terminal, iw: int, game_h: int) -> None:
+    """23.1 vault scroll — iw/aw clear, bracket/quote objects smudged.
+    TODO: add `known: list` param; gate smudge_row→cmd_row on 'bracket_obj'/'quote_obj' in known.
+    See new-level.md § Scroll revelation for the full pattern."""
+    BOX_IW = 54; BOX_BW = BOX_IW + 4
+    box_bg  = term.on_color_rgb(10, 8, 2)
+    amber_b = term.color_rgb(220, 175, 35) + term.bold
+    amber   = term.color_rgb(220, 175, 35)
+    dim     = term.color_rgb(100, 80, 15)
+    smudge  = term.color_rgb(55, 40, 10)
+    hi      = term.color_rgb(255, 220, 60) + term.bold
+    rst     = term.normal
+    col_off = max(1, (iw + 2 - BOX_BW) // 2)
+    row_off = 3 + max(0, (game_h - 17) // 2)
+    bdr = box_bg + amber_b; inn = box_bg
+
+    def row(vis, colored):
+        return (bdr + '║ ' + rst + inn + colored +
+                inn + ' ' * max(0, BOX_IW - vis) + bdr + ' ║' + rst)
+
+    blank = row(0, '')
+
+    T = '◈   The Whole Word   ◈'
+    lT = (BOX_IW - len(T)) // 2; rT = BOX_IW - len(T) - lT
+    title = row(BOX_IW, ' ' * lT + hi + T + rst + ' ' * rT)
+
+    def cmd_row(key, desc):
+        sep = '  ────→  '
+        plain = f'    {key}{sep}{desc}'
+        return row(len(plain),
+                   '    ' + hi + key + rst + inn + dim + sep + rst + inn + amber + desc + rst + inn)
+
+    def smudge_row(key, smudge_prefix, clear_tail):
+        sep = '  ────→  '
+        block = '▒' * (len(key) + len(sep) + len(smudge_prefix))
+        return row(4 + len(block) + len(clear_tail),
+                   '    ' + smudge + block + rst + inn + dim + clear_tail + rst + inn)
+
+    def dim_row(s): return row(len(s), dim + s + rst)
+    def amber_row(s): return row(len(s), amber + s + rst)
+
+    AK = '[ any key ]'; lAK = (BOX_IW - len(AK)) // 2
+    footer = row(BOX_IW, ' ' * lAK + dim + AK + rst + ' ' * (BOX_IW - len(AK) - lAK))
+    sep_h = '═' * (BOX_IW + 2)
+
+    lines = [
+        bdr + '╔' + sep_h + '╗' + rst,
+        blank, title, blank,
+        dim_row('  Position within the word ceased to matter.'),
+        blank,
+        cmd_row('iw', 'inner word  (anywhere in word)'),
+        cmd_row('aw', 'around word (includes space)'),
+        blank,
+        smudge_row('i(', 'i', 'nner parens'),
+        smudge_row('i"', 'in', 'side quotes'),
+        blank,
+        amber_row('  The boundary is the rune, not where you stand.'),
+        blank,
+        footer, blank,
+        bdr + '╚' + sep_h + '╝' + rst,
+    ]
+
+    for i, line in enumerate(lines):
+        print(term.move_yx(row_off + i, col_off) + line, end='', flush=True)
+    term.inkey()
+
+
+def _show_warden_act_scroll(term: Terminal, iw: int, game_h: int) -> None:
+    """33.1 vault scroll — visual operators clear, gv smudged.
+    TODO: add `known: list` param; gate smudge_row→cmd_row on 'gv' in known.
+    See new-level.md § Scroll revelation for the full pattern."""
+    BOX_IW = 54; BOX_BW = BOX_IW + 4
+    box_bg  = term.on_color_rgb(10, 8, 2)
+    amber_b = term.color_rgb(220, 175, 35) + term.bold
+    amber   = term.color_rgb(220, 175, 35)
+    dim     = term.color_rgb(100, 80, 15)
+    smudge  = term.color_rgb(55, 40, 10)
+    hi      = term.color_rgb(255, 220, 60) + term.bold
+    rst     = term.normal
+    col_off = max(1, (iw + 2 - BOX_BW) // 2)
+    row_off = 3 + max(0, (game_h - 17) // 2)
+    bdr = box_bg + amber_b; inn = box_bg
+
+    def row(vis, colored):
+        return (bdr + '║ ' + rst + inn + colored +
+                inn + ' ' * max(0, BOX_IW - vis) + bdr + ' ║' + rst)
+
+    blank = row(0, '')
+
+    T = "◈   The Warden's Act   ◈"
+    lT = (BOX_IW - len(T)) // 2; rT = BOX_IW - len(T) - lT
+    title = row(BOX_IW, ' ' * lT + hi + T + rst + ' ' * rT)
+
+    def cmd_row(key, desc):
+        sep = '  ────→  '
+        plain = f'    {key}{sep}{desc}'
+        return row(len(plain),
+                   '    ' + hi + key + rst + inn + dim + sep + rst + inn + amber + desc + rst + inn)
+
+    def smudge_row(key, smudge_prefix, clear_tail):
+        sep = '  ────→  '
+        block = '▒' * (len(key) + len(sep) + len(smudge_prefix))
+        return row(4 + len(block) + len(clear_tail),
+                   '    ' + smudge + block + rst + inn + dim + clear_tail + rst + inn)
+
+    def dim_row(s): return row(len(s), dim + s + rst)
+    def amber_row(s): return row(len(s), amber + s + rst)
+
+    AK = '[ any key ]'; lAK = (BOX_IW - len(AK)) // 2
+    footer = row(BOX_IW, ' ' * lAK + dim + AK + rst + ' ' * (BOX_IW - len(AK) - lAK))
+    sep_h = '═' * (BOX_IW + 2)
+
+    lines = [
+        bdr + '╔' + sep_h + '╗' + rst,
+        blank, title, blank,
+        dim_row('  The Sight became the Hand.'),
+        blank,
+        cmd_row('v{m}d', 'select range, delete'),
+        cmd_row('v{m}y', 'select range, yank'),
+        cmd_row('v{m}c', 'select range, change'),
+        smudge_row('gv', '', 'reselect last visual span'),
+        blank,
+        amber_row('  See. Select. Strike.'),
+        dim_row('  The eye and the hand are one.'),
+        blank,
+        footer, blank,
+        bdr + '╚' + sep_h + '╝' + rst,
+    ]
+
+    for i, line in enumerate(lines):
+        print(term.move_yx(row_off + i, col_off) + line, end='', flush=True)
+    term.inkey()
+
+
 def _unlock_animation(term: Terminal, room, player,
                       door_r: int, door_c: int, iw: int, game_h: int) -> None:
     """Flash key icon at door position, then blank it — door + key both vanish."""
@@ -295,6 +725,21 @@ def _drown_animation(term, screen_r, screen_c):
         print(term.move_yx(screen_r, screen_c) + color + sym + term.normal,
               end='', flush=True)
         time.sleep(0.12)
+
+
+def _heart_container_animation(term, dungeon, player, budget, old_max_hp, message):
+    """Fill the new hearts half-by-half, then flash all hearts gold, then back to red."""
+    new_max_hp = player.max_hp
+    player.hp  = old_max_hp
+    for hp in range(old_max_hp, new_max_hp + 1):
+        player.hp = hp
+        render_all(term, dungeon, player, budget, message)
+        time.sleep(0.09)
+    for _ in range(3):
+        render_all(term, dungeon, player, budget, message, heart_flash=True)
+        time.sleep(0.13)
+        render_all(term, dungeon, player, budget, message, heart_flash=False)
+        time.sleep(0.07)
 
 
 def _win_animation(term, iw):
@@ -416,6 +861,10 @@ def _build_dungeon(level: int, seed: int):
         return build_dungeon_4(seed)
     if level == 5:
         return build_dungeon_5(seed)
+    if level == 51:
+        return build_dungeon_51(seed)
+    if level == 6:
+        return build_dungeon_6(seed)
     return build_dungeon_0(seed)
 
 
@@ -433,10 +882,12 @@ def _snapshot(room, player, budget, *, row=None, col=None, spent=None) -> dict:
         'spent':    budget.spent if spent is None else spent,
         'entities': [Entity(kind=e.kind, row=e.row, col=e.col, hp=e.hp, alive=e.alive,
                             max_hp=e.max_hp, ai=e.ai, ai_speed=e.ai_speed,
-                            ai_tick=e.ai_tick, summon_timer=e.summon_timer)
+                            ai_tick=e.ai_tick, summon_timer=e.summon_timer,
+                            goblin_free_turns=e.goblin_free_turns,
+                            uid=e.uid, summoner_uid=e.summoner_uid,
+                            origin_row=e.origin_row, move_dir=e.move_dir)
                      for e in room.entities],
         'fog_cells': set(room.fog_cells),
-        'keys':      player.keys,
     }
 
 
@@ -451,7 +902,6 @@ def _pop_history_step(src: list, dst: list, room, player, budget) -> bool:
         budget.spent  = item['spent']
         room.entities = item['entities']
         room.fog_cells = item['fog_cells']
-        player.keys   = item.get('keys', player.keys)
         room.rebuild_indexes()
     else:
         dst.append((player.row, player.col, budget.spent))
@@ -499,22 +949,119 @@ def _kill_door_group(room, row: int, col: int, kind: str = 'door') -> None:
                     q.append(nb)
 
 
-def _spawn_goblin(room, row, col) -> None:
+def _spawn_goblin(room, row, col, summoner_uid: int = 0) -> Entity | None:
     for c in (col, col - 1, col + 1):
         if 0 <= c < room.cols and room.is_passable(row, c) and not room.entity_at(row, c):
-            room.add_entity(Entity('goblin', row, c, max_hp=1, ai='chase', ai_speed=1))
-            return
+            e = Entity('goblin', row, c, max_hp=1, ai='chase', ai_speed=1,
+                       summoner_uid=summoner_uid)
+            room.add_entity(e)
+            return e
+    return None
+
+
+def _drop_key(room, row: int, col: int) -> None:
+    """Place a floor_key entity at (row, col) if the cell is free."""
+    if not room.entity_at(row, col):
+        room.add_entity(Entity(kind='floor_key', row=row, col=col))
 
 
 def _on_kill(ent, player, room=None, level: int = 0) -> str:
     if ent.kind == 'warden':
-        player.keys += 1
-        return 'The Warden falls! He dropped a key. 🗝'
+        if level == 51:
+            return 'The Warden falls!'
+        if room is not None:
+            _drop_key(room, ent.row, ent.col)
+        return 'The Warden falls! A key drops to the floor. 🗝'
     if ent.kind == 'goblin' and level == 5 and room is not None:
         if not any(e.alive and e.kind == 'goblin' for e in room.entities):
-            player.keys += 1
+            _drop_key(room, ent.row, ent.col)
             return 'Last goblin down! A key clatters to the floor. 🗝'
     return ''
+
+
+def _remove_warden_shields(room) -> None:
+    """Kill all shield entities in the room (called when the Warden dies)."""
+    for sh in [e for e in room.entities if e.alive and e.kind == 'shield']:
+        room.kill_entity(sh)
+
+
+def _check_boss_cleared(room, level: int, player) -> str:
+    """Open the boss_seal when all wardens and goblins in a boss room are dead.
+
+    Returns a message to display, or '' if nothing happened.
+    """
+    if level != 51:
+        return ''
+    if any(e.alive and e.kind in ('warden', 'goblin') for e in room.entities):
+        return ''
+    boss_seal_ent = next(
+        (e for e in room.entities if e.alive and e.kind == 'boss_seal'), None
+    )
+    if boss_seal_ent is None:
+        return ''
+    room.kill_entity(boss_seal_ent)
+    _reveal_from(room, player.row, player.col)
+    return 'The seal crumbles — the way forward opens!'
+
+
+def _reposition_warden_shield(room, warden: Entity, player) -> None:
+    """Move the shield to the warden's new row, flipping it to the opposite horizontal side."""
+    candidates = [e for e in room.entities if e.alive and e.kind == 'shield']
+    if not candidates:
+        return
+    shield = min(candidates, key=lambda e: abs(e.row - warden.row) + abs(e.col - warden.col))
+    current_side = 1 if shield.col >= warden.col else -1
+    preferred = warden.col + (-current_side)   # flip to opposite side
+    fallback  = warden.col + current_side      # stay same side if blocked
+    for tc in (preferred, fallback):
+        if (0 <= tc < room.cols
+                and room.cells[warden.row][tc] in (CellType.FLOOR, CellType.CORRIDOR)
+                and not room.entity_at(warden.row, tc)):
+            room.move_entity(shield, warden.row, tc)
+            return
+
+
+def _do_warden_move(room, warden: Entity, player) -> str:
+    """Move warden ±1 row (oscillating, capped ±2 from origin_row), then reposition shield.
+
+    Lazy-initialises origin_row on first call. Tries current direction first; if blocked,
+    reverses and tries once more. Returns a non-empty message on success, '' if unmoveable.
+    """
+    if warden.origin_row < 0:
+        warden.origin_row = warden.row
+    origin = warden.origin_row
+    for _ in range(2):
+        nr = warden.row + warden.move_dir
+        if (0 <= nr < room.rows
+                and room.cells[nr][warden.col] in (CellType.FLOOR, CellType.CORRIDOR)
+                and not room.entity_at(nr, warden.col)):
+            room.move_entity(warden, nr, warden.col)
+            if abs(warden.row - origin) >= 2:
+                warden.move_dir *= -1
+            _reposition_warden_shield(room, warden, player)
+            return 'The Warden shifts position!'
+        warden.move_dir *= -1
+    return ''
+
+
+def _try_warden_move(room, killed_goblin: Entity, player) -> str:
+    """After a goblin is killed, check if it was the last spawn of a living Warden.
+    If so, trigger that Warden's movement and shield reposition.
+    Returns a message string or '' if no movement occurred.
+    """
+    if not killed_goblin.summoner_uid:
+        return ''
+    warden = next(
+        (e for e in room.entities
+         if e.alive and e.kind == 'warden' and e.uid == killed_goblin.summoner_uid),
+        None,
+    )
+    if warden is None:
+        return ''
+    if any(e.alive and e.kind == 'goblin' and e.summoner_uid == warden.uid
+           for e in room.entities):
+        return ''
+    return _do_warden_move(room, warden, player)
 
 
 def _enemy_tick(room, player) -> list:
@@ -524,18 +1071,21 @@ def _enemy_tick(room, player) -> list:
             continue
         dist = _manhattan(player.row, player.col, ent.row, ent.col)
         if ent.kind == 'warden' and dist <= _ALERT_RADIUS:
-            if ent.summon_timer == 0:
-                _spawn_goblin(room, ent.row, ent.col + random.choice((-1, 1)) * 3)
-                _spawn_goblin(room, ent.row, ent.col + random.choice((-1, 1)) * 4)
-                ent.summon_timer = _WARDEN_SUMMON_INTERVAL
-                msgs.append('The Warden summoned his goblin minions!')
+            has_goblins = any(
+                e.alive and e.kind == 'goblin' and e.summoner_uid == ent.uid
+                for e in room.entities
+            )
+            if has_goblins:
+                ent.goblin_free_turns = 0
             else:
+                ent.goblin_free_turns += 1
+            if ent.summon_timer > 0:
                 ent.summon_timer -= 1
-                if ent.summon_timer == 0:
-                    _spawn_goblin(room, ent.row, ent.col + random.choice((-1, 1)) * 3)
-                    _spawn_goblin(room, ent.row, ent.col + random.choice((-1, 1)) * 4)
-                    ent.summon_timer = _WARDEN_SUMMON_INTERVAL
-                    msgs.append('The Warden summoned his goblin minions!')
+            if ent.summon_timer == 0 and ent.goblin_free_turns >= 2:
+                _side = random.choice((-1, 1))
+                _spawn_goblin(room, ent.row, ent.col + _side * 3, summoner_uid=ent.uid)
+                ent.summon_timer = _WARDEN_SUMMON_INTERVAL
+                msgs.append('The Warden summoned a goblin minion!')
         if not ent.ai:
             continue
         if dist > _ALERT_RADIUS:
@@ -592,12 +1142,21 @@ def run_dungeon(term: Terminal, level: int, progress: dict,
         room.answer = ''
 
     player  = Player(row=room.entry[0], col=room.entry[1])
+    player.max_hp = progress.get('max_hp', 6)
+    player.hp     = player.max_hp
     player.known_commands = _known_commands(level)
     if player_name == 'admin':
         player.known_commands = player.known_commands + ['admin', 'register']
     for _cmd in progress.get('extras', []):
         if _cmd not in player.known_commands:
             player.known_commands = player.known_commands + [_cmd]
+
+    # Remove heart containers already collected by this player.
+    _collected = progress.get('collected_hearts', [])
+    for _e in list(room.entities):
+        if _e.kind == 'heart_container' and [level, _e.row, _e.col] in _collected:
+            room.kill_entity(_e)
+
     budget  = Budget(room.budget or 20)
 
     key_buf  = ''
@@ -617,6 +1176,8 @@ def run_dungeon(term: Terminal, level: int, progress: dict,
     engaged_entities: set = set()  # id(ent) of entities currently co-located with player
     door_hint_shown: set = set()   # id(ent) of locked doors that showed "requires a key"
     door_open_hint_shown: set = set()  # id(ent) of locked doors that showed "type p"
+    seal_door_col: int = -1   # set when seal_door is opened; seals the cell once player crosses
+    seal_door_row: int = -1
     msg_pool: list = []            # combat messages for this turn (rotation buffer)
     msg_idx:  int  = 0             # current rotation index into msg_pool
     attack_flash_sym: str   = ''      # directional arrow; '' = no flash active
@@ -659,6 +1220,9 @@ def run_dungeon(term: Terminal, level: int, progress: dict,
         msg_ttl = 60
     elif level == 4:
         message = 'The Character Cataracts — f{c}:jump to char  t{c}:just before  F/T:backward'
+        msg_ttl = 60
+    elif level == 51:
+        message = "The Warden's Keep — the shield follows you. Find the unguarded side."
         msg_ttl = 60
     elif level == 99:
         message = 'Sandbox — all mechanics active. Type :edit to enter editor mode.'
@@ -712,8 +1276,9 @@ def run_dungeon(term: Terminal, level: int, progress: dict,
                     message = ''
 
         if not key:
-            water_active  = any_water and (time.time() - last_activity < _WATER_SETTLE_SECS)
-            needs_render  = message != prev_message or water_active
+            water_active    = any_water and (time.time() - last_activity < _WATER_SETTLE_SECS)
+            overlap_active  = room.entity_at(player.row, player.col) is not None
+            needs_render    = message != prev_message or water_active or overlap_active
             if attack_flash_sym:
                 attack_flash_ttl -= 1
                 if attack_flash_ttl <= 0:
@@ -947,12 +1512,30 @@ def run_dungeon(term: Terminal, level: int, progress: dict,
         }
         count    = action.get('count', 1)
 
+        # . — repeat last change
+        if action['type'] == 'repeat':
+            if not _action_allowed(action, player.known_commands):
+                _push(_guard_message(action, player.known_commands))
+                message = _pool_msg(); msg_ttl = _MSG_ROTATE_TTL
+                render_all(term, dungeon, player, budget, message, attack_pos=_attack_pos(), attack_sym=_attack_sym())
+                continue
+            if not player.last_change:
+                _push('Nothing to repeat.')
+                message = _pool_msg(); msg_ttl = _MSG_ROTATE_TTL
+                render_all(term, dungeon, player, budget, message, attack_pos=_attack_pos(), attack_sym=_attack_sym())
+                continue
+            repeat_count = action.get('count', 1)
+            action = dict(player.last_change)
+            if repeat_count != 1:
+                action['count'] = repeat_count
+            count = action.get('count', 1)
+
         if action['type'] == 'motion':
             motion = action['motion']
             target = action.get('target')
 
             if not edit_mode and not _action_allowed(action, player.known_commands):
-                _push(_guard_message(action))
+                _push(_guard_message(action, player.known_commands))
                 message = _pool_msg(); msg_ttl = _MSG_ROTATE_TTL
                 render_all(term, dungeon, player, budget, message, attack_pos=_attack_pos(), attack_sym=_attack_sym())
                 continue
@@ -1051,6 +1634,14 @@ def run_dungeon(term: Terminal, level: int, progress: dict,
                         msg_ttl = 30
                     ent = None  # consumed; fall through to normal render
 
+                # Seal door: wall forms the moment the player steps off the threshold
+                if seal_door_col >= 0 and not edit_mode and player.col != seal_door_col:
+                    room.cells[seal_door_row][seal_door_col] = CellType.WALL
+                    seal_door_col = -1
+                    undo_stack.clear()
+                    redo_stack.clear()
+                    _push('The door seals shut behind you — there is no going back.')
+
                 # Win / exit check
                 if ent is None:
                     ent = room.entity_at(player.row, player.col)
@@ -1115,6 +1706,7 @@ def run_dungeon(term: Terminal, level: int, progress: dict,
                     player.register = cut_items
                     descs = ', '.join(_clip_desc(i) for i in cut_items)
                     _push(f'Cut {len(cut_items)}: {descs}')
+                    player.last_change = action
                 else:
                     ed_undo.pop()
                     _push('Nothing to cut here.')
@@ -1128,7 +1720,8 @@ def run_dungeon(term: Terminal, level: int, progress: dict,
                     room.kill_entity(cur)
                     budget.spend(1)
                     if item == 'key':
-                        player.keys += 1
+                        player.register = [{'type': 'entity',
+                                            'entity': Entity(kind='floor_key', row=cur.row, col=cur.col)}]
                         _push('You found a key!')
                     elif item == 'heart':
                         player.heal(2)
@@ -1144,6 +1737,50 @@ def run_dungeon(term: Terminal, level: int, progress: dict,
                                 progress['extras'] = extras + ['register']
                         render_all(term, dungeon, player, budget, _pool_msg(), attack_pos=_attack_pos(), attack_sym=_attack_sym())
                         _show_reliquary_scroll(term, _iw(term), term.height - 7)
+                    elif level == 51:
+                        if 'v' not in player.known_commands:
+                            player.known_commands = player.known_commands + ['v']
+                            extras = progress.get('extras', [])
+                            if 'v' not in extras:
+                                progress['extras'] = extras + ['v']
+                        render_all(term, dungeon, player, budget, _pool_msg(), attack_pos=_attack_pos(), attack_sym=_attack_sym())
+                        _show_warden_sight_scroll(term, _iw(term), term.height - 7)
+                    elif level == 121:
+                        if 'd_op' not in player.known_commands:
+                            player.known_commands = player.known_commands + ['d_op']
+                            extras = progress.get('extras', [])
+                            if 'd_op' not in extras:
+                                progress['extras'] = extras + ['d_op']
+                            SM.save_scroll_text("The Operator's Codex", _SCROLL_TEXT_OPERATOR_CODEX)
+                        render_all(term, dungeon, player, budget, _pool_msg(), attack_pos=_attack_pos(), attack_sym=_attack_sym())
+                        _show_operator_codex_scroll(term, _iw(term), term.height - 7)
+                    elif level == 171:
+                        if 'y_op' not in player.known_commands:
+                            player.known_commands = player.known_commands + ['y_op']
+                            extras = progress.get('extras', [])
+                            if 'y_op' not in extras:
+                                progress['extras'] = extras + ['y_op']
+                            SM.save_scroll_text("The Archivist's Method", _SCROLL_TEXT_ARCHIVISTS_METHOD)
+                        render_all(term, dungeon, player, budget, _pool_msg(), attack_pos=_attack_pos(), attack_sym=_attack_sym())
+                        _show_archivists_method_scroll(term, _iw(term), term.height - 7)
+                    elif level == 231:
+                        if 'text_obj' not in player.known_commands:
+                            player.known_commands = player.known_commands + ['text_obj']
+                            extras = progress.get('extras', [])
+                            if 'text_obj' not in extras:
+                                progress['extras'] = extras + ['text_obj']
+                            SM.save_scroll_text('The Whole Word', _SCROLL_TEXT_WHOLE_WORD)
+                        render_all(term, dungeon, player, budget, _pool_msg(), attack_pos=_attack_pos(), attack_sym=_attack_sym())
+                        _show_whole_word_scroll(term, _iw(term), term.height - 7)
+                    elif level == 331:
+                        if 'visual_op' not in player.known_commands:
+                            player.known_commands = player.known_commands + ['visual_op']
+                            extras = progress.get('extras', [])
+                            if 'visual_op' not in extras:
+                                progress['extras'] = extras + ['visual_op']
+                            SM.save_scroll_text("The Warden's Act", _SCROLL_TEXT_WARDENS_ACT)
+                        render_all(term, dungeon, player, budget, _pool_msg(), attack_pos=_attack_pos(), attack_sym=_attack_sym())
+                        _show_warden_act_scroll(term, _iw(term), term.height - 7)
                     elif 'register' not in player.known_commands:
                         player.known_commands = player.known_commands + ['register']
                         extras = progress.get('extras', [])
@@ -1159,13 +1796,44 @@ def run_dungeon(term: Terminal, level: int, progress: dict,
                     budget.spend(1)
                     _push('Door opened.')
                     interacted = True
+                elif cur and cur.kind == 'seal_door':
+                    undo_stack.append(_snapshot(room, player, budget))
+                    redo_stack.clear()
+                    seal_door_col = cur.col
+                    seal_door_row = cur.row
+                    room.remove_entity(cur)
+                    _reveal_from(room, player.row, player.col)
+                    budget.spend(1)
+                    _push('The door opens.')
+                    interacted = True
+                elif cur and cur.kind == 'floor_key':
+                    undo_stack.append(_snapshot(room, player, budget))
+                    redo_stack.clear()
+                    room.kill_entity(cur)
+                    player.register = [{'type': 'entity', 'entity': cur}]
+                    budget.spend(1)
+                    _push('Key picked up — use p to unlock a door.')
+                    interacted = True
                 elif cur and cur.kind in ('goblin', 'warden'):
                     cur.hp -= 1
                     budget.spend(1)
                     interacted = True
+                    if cur.kind == 'warden' and cur.hp > 0:
+                        move_msg = _do_warden_move(room, cur, player)
+                        if move_msg:
+                            _push(move_msg)
+                        _side = random.choice((-1, 1))
+                        _spawn_goblin(room, cur.row, cur.col + _side * 3, summoner_uid=cur.uid)
+                        cur.summon_timer = _WARDEN_SUMMON_INTERVAL
+                        _push('The Warden summoned a goblin minion!')
                     if cur.hp <= 0:
                         room.kill_entity(cur)
                         player.register = [{'type': 'entity', 'entity': cur}]
+                        if cur.kind == 'warden':
+                            _remove_warden_shields(room)
+                        clear_msg = _check_boss_cleared(room, level, player)
+                        if clear_msg:
+                            _push(clear_msg)
                         _push(_on_kill(cur, player, room, level) or 'Enemy defeated!')
                     else:
                         _push(f'Hit! ({cur.hp}/{cur.max_hp} HP)')
@@ -1176,13 +1844,22 @@ def run_dungeon(term: Terminal, level: int, progress: dict,
                     _push('Shield destroyed!')
                     interacted = True
                 elif cur and cur.kind == 'heart_container':
+                    old_max_hp = player.max_hp
+                    heart_pos  = [level, cur.row, cur.col]
                     player.max_hp += 2
-                    player.hp      = player.max_hp
                     room.kill_entity(cur)
                     player.register = [{'type': 'entity', 'entity': cur}]
                     budget.spend(1)
+                    _collected_hearts = progress.setdefault('collected_hearts', [])
+                    if heart_pos not in _collected_hearts:
+                        _collected_hearts.append(heart_pos)
+                    progress['max_hp'] = player.max_hp
+                    _heart_container_animation(term, dungeon, player, budget, old_max_hp, message)
+                    player.hp = player.max_hp
                     _push('Max HP increased!  ♥')
                     interacted = True
+                if interacted:
+                    player.last_change = action
                 if not interacted:
                     cut_items = []
                     for _ci in range(count):
@@ -1196,6 +1873,7 @@ def run_dungeon(term: Terminal, level: int, progress: dict,
                         budget.spend(1)
                         descs = ', '.join(_clip_desc(i) for i in cut_items)
                         _push(f'Cut {len(cut_items)}: {descs}')
+                        player.last_change = action
 
         elif edit_mode and action['type'] == 'substitute':
             ed_undo.append(_ed_snapshot(room, player))
@@ -1205,16 +1883,23 @@ def run_dungeon(term: Terminal, level: int, progress: dict,
                 all_items.extend(_ed_subst(room, player.row, player.col + _si))
             player.register = all_items
             _push('Substituted: ' + ', '.join(_clip_desc(i) for i in all_items))
+            player.last_change = action
 
         elif not edit_mode and action['type'] == 'paste' and _action_allowed(action, player.known_commands):
             before = action.get('before', False)
             dc = -1 if before else 1          # P → left, p → right
             target = room.entity_at(player.row, player.col + dc)
             if target and target.kind == 'locked_door':
-                if player.keys > 0:
+                reg_key_idx = next(
+                    (i for i, it in enumerate(player.register)
+                     if it.get('type') == 'entity' and
+                     it.get('entity') and it['entity'].kind == 'floor_key'),
+                    None,
+                )
+                if reg_key_idx is not None:
                     undo_stack.append(_snapshot(room, player, budget))
                     redo_stack.clear()
-                    player.keys -= 1
+                    player.register.pop(reg_key_idx)
                     render_all(term, dungeon, player, budget, _pool_msg(), attack_pos=_attack_pos(), attack_sym=_attack_sym())
                     _unlock_animation(term, room, player,
                                       target.row, target.col,
@@ -1319,6 +2004,8 @@ def run_dungeon(term: Terminal, level: int, progress: dict,
                 _push(f'{verb} {len(items)} item(s).')
             if op == 'y':
                 ed_undo.pop()
+            else:
+                player.last_change = action
 
         # ── Combat: enemy movement then adjacency attacks ────────────────────
         if not edit_mode:
@@ -1396,10 +2083,15 @@ def run_dungeon(term: Terminal, level: int, progress: dict,
             for ent in room.entities:
                 if (ent.alive and ent.kind == 'locked_door'
                         and abs(ent.row - player.row) + abs(ent.col - player.col) <= 1):
-                    if player.keys > 0 and id(ent) not in door_open_hint_shown:
+                    has_reg_key = any(
+                        it.get('type') == 'entity' and
+                        it.get('entity') and it['entity'].kind == 'floor_key'
+                        for it in player.register
+                    )
+                    if has_reg_key and id(ent) not in door_open_hint_shown:
                         door_open_hint_shown.add(id(ent))
                         _push('Type p to put the key in the lock.')
-                    elif player.keys == 0 and id(ent) not in door_hint_shown:
+                    elif not has_reg_key and id(ent) not in door_hint_shown:
                         door_hint_shown.add(id(ent))
                         _push('This door requires a key.')
 
@@ -1682,7 +2374,7 @@ def run_overworld(term: Terminal, player: Player, progress: dict) -> dict:
 
 def main():
     ap = argparse.ArgumentParser(description='Vimny — Vim dungeon crawler')
-    ap.add_argument('--level', type=int, default=None, choices=[0, 1, 11, 2, 3, 4, 5, 99],
+    ap.add_argument('--level', type=int, default=None, choices=[0, 1, 11, 2, 3, 4, 5, 51, 99],
                     help='skip overworld and start at this level (debug)')
     args = ap.parse_args()
 
@@ -1731,14 +2423,15 @@ def main():
             level = ow_result['level']
             dung_result = run_dungeon(term, level, progress, player.name)
 
-            # Persist progress only when the player explicitly saved (:wq).
+            # Always persist on :wq; only update level completion if won.
             # (:w mid-dungeon already updated progress and saved inline.)
-            if dung_result['won'] and dung_result['action'] == 'wq':
-                prev_stars = progress.get(level, {}).get('stars', 0)
-                progress[level] = {
-                    'complete': True,
-                    'stars': max(dung_result['stars'], prev_stars),
-                }
+            if dung_result['action'] == 'wq':
+                if dung_result['won']:
+                    prev_stars = progress.get(level, {}).get('stars', 0)
+                    progress[level] = {
+                        'complete': True,
+                        'stars': max(dung_result['stars'], prev_stars),
+                    }
                 SM.save_progress(progress, player.name)
 
 
