@@ -25,6 +25,18 @@ def test_insert_mode_entry_keys(key, variant):
     assert remaining == ''
 
 
+def test_s_parses_substitute_char():
+    action, remaining = parse('s', Mode.NORMAL)
+    assert action == {'type': 'substitute', 'count': 1}
+    assert remaining == ''
+
+
+def test_S_parses_substitute_line():
+    action, remaining = parse('S', Mode.NORMAL)
+    assert action == {'type': 'substitute', 'line': True, 'count': 1}
+    assert remaining == ''
+
+
 def test_v_enters_visual():
     action, remaining = parse('v', Mode.NORMAL)
     assert action == {'type': 'enter_mode', 'mode': 'visual'}
@@ -34,6 +46,12 @@ def test_v_enters_visual():
 def test_capital_V_enters_visual_line():
     action, remaining = parse('V', Mode.NORMAL)
     assert action == {'type': 'enter_mode', 'mode': 'visual_line'}
+    assert remaining == ''
+
+
+def test_gv_reselects_visual():
+    action, remaining = parse('gv', Mode.NORMAL)
+    assert action == {'type': 'enter_mode', 'mode': 'visual', 'reselect': True}
     assert remaining == ''
 
 

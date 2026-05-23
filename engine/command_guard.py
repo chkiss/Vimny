@@ -15,23 +15,61 @@ _MOTION_GUARD: dict[str, str] = {
     ';': ';',  ',': ',',
     'G': 'G',  'gg': 'G',
     'ge': 'ge', 'gE': 'gE',
-    '{': '{',  '}': '}',
+    'H': 'H',  'M': 'M',  'L': 'L',
+    '%': '%',
+    '{': '{',  '}': '}',  '(': '(',  ')': ')',
 }
 
 
 def action_allowed(action: dict, known: list | set, edit_mode: bool = False) -> bool:
     """Return True iff the player may execute action given their known_commands."""
     t = action['type']
-
-    # edit_mode is a hard requirement regardless of admin status
-    if t in ('operator', 'substitute') and not edit_mode:
-        return False
-
-    if 'admin' in known:
-        return True
-
     count     = action.get('count', 1)
     known_set = set(known)
+
+    # substitute: s (char) / S (line). Editor cell-cycle in edit mode; otherwise a
+    # player insert-entry once the key is learned.
+    if t == 'substitute':
+        if edit_mode or 'admin' in known_set:
+            return True
+        return ('S' if action.get('line') else 's') in known_set
+
+    if 'admin' in known_set:
+        return True
+
+    # Using an explicit (non-unnamed) register requires learning named registers.
+    reg = action.get('register')
+    if reg is not None and reg != '"' and 'reg_named' not in known_set:
+        return False
+
+    if t == 'operator':
+        if edit_mode:
+            return True
+        if action.get('op') not in known_set:        # 'd' / 'y' / 'c' learned?
+            return False
+        if count > 1 and 'count' not in known_set:
+            return False
+        if action.get('motion_count', 1) > 1 and 'count' not in known_set:
+            return False
+        to = action.get('textobj')
+        if to is not None:                            # text object must be learned
+            return to in known_set
+        motion = action.get('motion')
+        if motion and motion != 'line':
+            gk = _MOTION_GUARD.get(motion)
+            if gk is not None and gk not in known_set:
+                return False
+        return True
+
+    if t == 'case_char':                          # ~ toggle
+        if count > 1 and 'count' not in known_set:
+            return False
+        return '~' in known_set
+
+    if t == 'replace':                            # r{char}
+        if count > 1 and 'count' not in known_set:
+            return False
+        return 'r' in known_set
 
     if t == 'motion':
         if count > 1 and 'count' not in known_set:
@@ -46,19 +84,39 @@ def action_allowed(action: dict, known: list | set, edit_mode: bool = False) -> 
         m = action.get('mode', '')
         if m == 'insert':
             return 'insert' in known_set
+        if m == 'replace':
+            return 'R' in known_set
+        if m == 'search':
+            return '/' in known_set
         if m in ('visual', 'visual_line', 'visual_block'):
             return 'visual' in known_set
+
+    if t == 'search_repeat':                      # n / N
+        return '/' in known_set
+    if t == 'search_word':                        # * / #
+        return '*' in known_set
+    if t == 'macro_record':                       # q{reg}
+        return 'q' in known_set
+    if t == 'macro_play':                         # @{reg} / @@
+        return '@' in known_set
+    if t == 'jump':                               # Ctrl-o / Ctrl-i
+        return 'jump' in known_set
+    if t == 'mark':                               # m{a} / '{a} / `{a}
+        return 'mark' in known_set
 
     if t == 'repeat':
         return 'dot' in known_set
 
-    # interact (x), undo (u), redo (^R), command (:), mark — always allowed
+    # interact (x), undo (u), redo (^R), command (:) — always allowed
     return True
 
 
 def guard_message(action: dict, known: list | set = ()) -> str:
     """Human-readable reason why action_allowed returned False."""
     t = action['type']
+    reg = action.get('register')
+    if reg is not None and reg != '"' and 'reg_named' not in set(known):
+        return f"You haven't learned the \"{reg} register yet."
     if t == 'motion':
         known_set = set(known)
         m = action['motion']
@@ -71,8 +129,33 @@ def guard_message(action: dict, known: list | set = ()) -> str:
         return 'You haven\'t learned the " register yet.'
     if t == 'enter_mode':
         return f"You haven't learned {action.get('mode', '')} mode yet."
-    if t in ('operator', 'substitute'):
+    if t == 'operator':
+        op = action.get('op', '')
+        if op and op not in set(known):
+            return f"You haven't learned the '{op}' operator yet."
+        to = action.get('textobj')
+        if to and to not in set(known):
+            return f"You haven't learned the '{to}' text object yet."
+        return 'Editor commands require :edit mode.'
+    if t == 'substitute':
+        k = 'S' if action.get('line') else 's'
+        if k not in set(known):
+            return f"You haven't learned '{k}' yet."
         return 'Editor commands require :edit mode.'
     if t == 'repeat':
         return "You haven't learned . yet."
+    if t == 'case_char':
+        return "You haven't learned ~ yet."
+    if t == 'replace':
+        return "You haven't learned r yet."
+    if t in ('search_repeat', 'search_word'):
+        return "You haven't learned search yet."
+    if t == 'macro_record':
+        return "You haven't learned q (macros) yet."
+    if t == 'macro_play':
+        return "You haven't learned @ (macros) yet."
+    if t == 'jump':
+        return "You haven't learned the jump list yet."
+    if t == 'mark':
+        return "You haven't learned marks yet."
     return 'Command not available.'

@@ -11,12 +11,22 @@ class Player:
     name: str = 'Normand'
     mode: Mode = Mode.NORMAL
     known_commands: list = field(default_factory=lambda: ['h','j','k','l'])
-    register: list = field(default_factory=list)   # unnamed " register
+    register: list = field(default_factory=list)   # game inventory (keys); edit-mode clip
+    registers: dict = field(default_factory=dict)  # vim registers: '"' unnamed, 'a'-'z', '0', etc.
     inventory: list = field(default_factory=list)
     marks: dict = field(default_factory=dict)   # 'a'-'z' -> (row, col)
+    macros: dict = field(default_factory=dict)  # 'a'-'z' -> recorded keystroke string
+    jump_list: list = field(default_factory=list)  # (row, col) positions for Ctrl-o/Ctrl-i
+    jump_idx: int = 0                              # cursor index into jump_list
 
     last_f: tuple | None = None   # (motion, target) of most recent f/F/t/T; set by apply_motion
     last_change: dict | None = None  # last action that mutated the room; re-played by .
+    visual_anchor: tuple | None = None       # (row, col) where v/V/Ctrl-v was pressed
+    last_visual_anchor: tuple | None = None   # saved on operator-apply, for gv
+    last_visual_cursor: tuple | None = None
+    last_visual_mode: object = None           # Mode of the last visual selection, for gv
+    last_search: tuple | None = None  # (pattern, forward) of the most recent search; used by n/N
+    search_forward: bool = True   # direction of the in-progress / or ? entry (for rendering)
 
     # command input buffer for gg, f{c}, m{c}, `{c}, '{c}
     input_buf: str = ''

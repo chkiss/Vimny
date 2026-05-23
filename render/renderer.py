@@ -5,6 +5,7 @@ from blessed import Terminal
 from engine.world import Dungeon, CellType, Room
 from engine.player import Player
 from engine.modes import Mode, MODE_LABELS
+from engine.visual import in_selection as _in_visual_sel
 from engine.budget import Budget
 import render.colors as C
 import render.symbols as S
@@ -231,8 +232,13 @@ def render_all(term: Terminal, dungeon: Dungeon, player: Player,
     vr_start = max(0, vr_start)
     vc_start = max(0, vc_start)
 
-    floor_bg = C.floor_bg()
+    base_floor_bg = C.floor_bg()
+    floor_bg = base_floor_bg
     wall_bg  = C.wall_bg()
+    vis_bg   = C.visual_sel_bg()
+    _vis_active = (mode in (Mode.VISUAL, Mode.VISUAL_LINE, Mode.VISUAL_BLOCK)
+                   and getattr(player, 'visual_anchor', None) is not None)
+    _vis_cursor = (player.row, player.col)
 
     for screen_r in range(game_h):
         room_r = screen_r + vr_start
@@ -247,6 +253,9 @@ def render_all(term: Terminal, dungeon: Dungeon, player: Player,
                     line += ' '
                     continue
 
+                floor_bg = (vis_bg if (_vis_active and _in_visual_sel(
+                                player.visual_anchor, _vis_cursor, mode, room_r, room_c))
+                            else base_floor_bg)
                 ct = room.cells[room_r][room_c]
 
                 # Player?
@@ -328,6 +337,12 @@ def render_all(term: Terminal, dungeon: Dungeon, player: Player,
     elif mode == Mode.COMMAND:
         # Command line: show typed command flush-left, no ruler
         cmd_text = ':' + player.cmd_line
+        sl_pad   = max(0, sl_w - len(cmd_text))
+        output.append(sl_bg + C.mode_command() + cmd_text +
+                      sl_fg + ' ' * sl_pad + rst)
+    elif mode == Mode.SEARCH:
+        # Search line: show '/' or '?' prefix + typed pattern, flush-left
+        cmd_text = ('/' if player.search_forward else '?') + player.cmd_line
         sl_pad   = max(0, sl_w - len(cmd_text))
         output.append(sl_bg + C.mode_command() + cmd_text +
                       sl_fg + ' ' * sl_pad + rst)

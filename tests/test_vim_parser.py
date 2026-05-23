@@ -250,7 +250,7 @@ class TestUnknown:
 # ── Plain motions ─────────────────────────────────────────────────────────────
 
 class TestPlainMotions:
-    @pytest.mark.parametrize("key", list('hjklwbe0^${}G'))
+    @pytest.mark.parametrize("key", list('hjklwbe0^${}G()HML%'))
     def test_single_motion(self, key):
         action, remaining = parse(key, Mode.NORMAL)
         assert action == {'type': 'motion', 'motion': key, 'count': 1}
@@ -271,6 +271,187 @@ class TestPlainMotions:
     def test_zero_alone_is_motion(self):
         action, _ = parse('0', Mode.NORMAL)
         assert action == {'type': 'motion', 'motion': '0', 'count': 1}
+
+
+# ── Text objects (operator + i/a + obj) ──────────────────────────────────────
+
+class TestTextObjects:
+    def test_diw(self):
+        action, rem = parse('diw', Mode.NORMAL)
+        assert action == {'type': 'operator', 'op': 'd', 'textobj': 'iw',
+                          'count': 1, 'motion_count': 1}
+        assert rem == ''
+
+    def test_ci_paren(self):
+        action, _ = parse('ci(', Mode.NORMAL)
+        assert action['op'] == 'c' and action['textobj'] == 'i('
+
+    def test_da_quote(self):
+        action, _ = parse('da"', Mode.NORMAL)
+        assert action['op'] == 'd' and action['textobj'] == 'a"'
+
+    def test_yip(self):
+        action, _ = parse('yip', Mode.NORMAL)
+        assert action['op'] == 'y' and action['textobj'] == 'ip'
+
+    @pytest.mark.parametrize("keys,canon", [
+        ('dib', 'i('), ('dab', 'a('), ('di)', 'i('),
+        ('diB', 'i{'), ('di}', 'i{'), ('di]', 'i['), ('di>', 'i<'),
+    ])
+    def test_alias_normalisation(self, keys, canon):
+        action, _ = parse(keys, Mode.NORMAL)
+        assert action['textobj'] == canon
+
+    def test_incomplete_textobj_needs_obj_char(self):
+        action, buf = parse('di', Mode.NORMAL)
+        assert action is None          # waiting for the object char
+
+    def test_count_textobj(self):
+        action, _ = parse('2daw', Mode.NORMAL)
+        assert action['textobj'] == 'aw' and action['count'] == 2
+
+
+# ── Named registers ("a "0 "_ "A) ────────────────────────────────────────────
+
+class TestNamedRegisters:
+    def test_quote_needs_register(self):
+        assert parse('"', Mode.NORMAL)[0] is None
+
+    def test_register_yank_line(self):
+        assert parse('"ayy', Mode.NORMAL)[0] == {
+            'type': 'operator', 'op': 'y', 'motion': 'line', 'count': 1, 'register': 'a'}
+
+    def test_register_delete(self):
+        a = parse('"add', Mode.NORMAL)[0]
+        assert a['op'] == 'd' and a['register'] == 'a'
+
+    def test_register_paste(self):
+        assert parse('"ap', Mode.NORMAL)[0] == {
+            'type': 'paste', 'before': False, 'count': 1, 'register': 'a'}
+
+    def test_zero_register_paste(self):
+        assert parse('"0p', Mode.NORMAL)[0]['register'] == '0'
+
+    def test_blackhole_delete(self):
+        assert parse('"_dw', Mode.NORMAL)[0]['register'] == '_'
+
+    def test_incomplete_after_register(self):
+        assert parse('"a', Mode.NORMAL)[0] is None     # waiting for the command
+
+
+# ── Jump list (Ctrl-o / Ctrl-i) ──────────────────────────────────────────────
+
+class TestJumpList:
+    def test_ctrl_o_back(self):
+        assert parse('\x0f', Mode.NORMAL)[0] == {'type': 'jump', 'dir': 'back', 'count': 1}
+
+    def test_tab_forward(self):
+        assert parse('\t', Mode.NORMAL)[0] == {'type': 'jump', 'dir': 'forward', 'count': 1}
+
+
+# ── Macros (q @ @@) ────────────────────────────────────────────────────────────
+
+class TestMacros:
+    def test_q_needs_register(self):
+        assert parse('q', Mode.NORMAL)[0] is None
+
+    def test_record(self):
+        assert parse('qa', Mode.NORMAL)[0] == {'type': 'macro_record', 'reg': 'a'}
+
+    def test_play(self):
+        assert parse('@a', Mode.NORMAL)[0] == {'type': 'macro_play', 'reg': 'a', 'count': 1}
+
+    def test_play_last(self):
+        assert parse('@@', Mode.NORMAL)[0] == {'type': 'macro_play', 'reg': '@', 'count': 1}
+
+    def test_count_play(self):
+        assert parse('7@a', Mode.NORMAL)[0] == {'type': 'macro_play', 'reg': 'a', 'count': 7}
+
+
+# ── Search (/ ? n N * #) ──────────────────────────────────────────────────────
+
+class TestSearch:
+    def test_slash_enters_search_forward(self):
+        assert parse('/', Mode.NORMAL)[0] == {'type': 'enter_mode', 'mode': 'search', 'forward': True}
+
+    def test_question_enters_search_backward(self):
+        assert parse('?', Mode.NORMAL)[0] == {'type': 'enter_mode', 'mode': 'search', 'forward': False}
+
+    def test_n_repeat(self):
+        assert parse('n', Mode.NORMAL)[0] == {'type': 'search_repeat', 'reverse': False, 'count': 1}
+
+    def test_N_reverse(self):
+        assert parse('N', Mode.NORMAL)[0] == {'type': 'search_repeat', 'reverse': True, 'count': 1}
+
+    def test_star_word_forward(self):
+        assert parse('*', Mode.NORMAL)[0] == {'type': 'search_word', 'forward': True, 'count': 1}
+
+    def test_hash_word_backward(self):
+        assert parse('#', Mode.NORMAL)[0] == {'type': 'search_word', 'forward': False, 'count': 1}
+
+
+# ── Replace: r{char} and R (REPLACE mode) ────────────────────────────────────
+
+class TestReplace:
+    def test_r_needs_char(self):
+        assert parse('r', Mode.NORMAL)[0] is None
+
+    def test_r_char(self):
+        assert parse('rx', Mode.NORMAL)[0] == {'type': 'replace', 'char': 'x', 'count': 1}
+
+    def test_count_r(self):
+        assert parse('3rx', Mode.NORMAL)[0] == {'type': 'replace', 'char': 'x', 'count': 3}
+
+    def test_R_enters_replace_mode(self):
+        assert parse('R', Mode.NORMAL)[0] == {'type': 'enter_mode', 'mode': 'replace'}
+
+
+# ── Case operators (~ and g~/gu/gU) ──────────────────────────────────────────
+
+class TestCaseOperators:
+    def test_tilde(self):
+        assert parse('~', Mode.NORMAL)[0] == {'type': 'case_char', 'count': 1}
+
+    def test_count_tilde(self):
+        assert parse('3~', Mode.NORMAL)[0] == {'type': 'case_char', 'count': 3}
+
+    @pytest.mark.parametrize("keys,op", [('g~w', 'g~'), ('gUw', 'gU'), ('guw', 'gu')])
+    def test_case_op_with_motion(self, keys, op):
+        action, _ = parse(keys, Mode.NORMAL)
+        assert action['op'] == op and action['motion'] == 'w'
+
+    @pytest.mark.parametrize("keys,op", [('gUU', 'gU'), ('guu', 'gu'), ('g~~', 'g~')])
+    def test_case_op_line_form(self, keys, op):
+        action, _ = parse(keys, Mode.NORMAL)
+        assert action == {'type': 'operator', 'op': op, 'motion': 'line', 'count': 1}
+
+    def test_case_op_with_textobj(self):
+        action, _ = parse('gUiw', Mode.NORMAL)
+        assert action['op'] == 'gU' and action['textobj'] == 'iw'
+
+    def test_case_op_incomplete(self):
+        assert parse('gU', Mode.NORMAL)[0] is None    # needs a motion/object
+
+
+# ── Indent operators (>> << >{m}) ─────────────────────────────────────────────
+
+class TestIndentOperators:
+    def test_indent_line(self):
+        assert parse('>>', Mode.NORMAL)[0] == {'type': 'operator', 'op': '>', 'motion': 'line', 'count': 1}
+
+    def test_dedent_line(self):
+        assert parse('<<', Mode.NORMAL)[0] == {'type': 'operator', 'op': '<', 'motion': 'line', 'count': 1}
+
+    def test_count_indent_line(self):
+        assert parse('3>>', Mode.NORMAL)[0]['count'] == 3
+
+    def test_indent_with_motion(self):
+        action, _ = parse('>3j', Mode.NORMAL)
+        assert action['op'] == '>' and action['motion'] == 'j' and action['motion_count'] == 3
+
+    def test_indent_with_textobj(self):
+        action, _ = parse('>ip', Mode.NORMAL)
+        assert action['op'] == '>' and action['textobj'] == 'ip'
 
 
 # ── Mark commands ─────────────────────────────────────────────────────────────

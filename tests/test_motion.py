@@ -460,6 +460,166 @@ class TestApplyMotionBackwardWordEnd:
         assert p.col == 4   # coalesced end of WORD1 (∘∘ + ·)
 
 
+# ── apply_motion: H M L screen-relative rows (Batch 1) ───────────────────────
+
+class TestApplyMotionScreenRows:
+    # _bare_room: passable rows 1-5; M = middle = row 3.
+    def test_H_goes_to_top_passable_row(self):
+        room = _bare_room()
+        p = _player(5, 10)
+        apply_motion(p, 'H', 1, room)
+        assert (p.row, p.col) == (1, 1)
+
+    def test_L_goes_to_bottom_passable_row(self):
+        room = _bare_room()
+        p = _player(2, 10)
+        apply_motion(p, 'L', 1, room)
+        assert (p.row, p.col) == (5, 1)
+
+    def test_M_goes_to_middle_row(self):
+        room = _bare_room()
+        p = _player(1, 5)
+        apply_motion(p, 'M', 1, room)
+        assert p.row == 3
+
+    def test_M_lands_on_first_nonblank_rune_col(self):
+        room = _rune_room()   # runes on row 3 start at col 2
+        p = _player(1, 5)
+        apply_motion(p, 'M', 1, room)
+        assert (p.row, p.col) == (3, 2)
+
+    def test_H_no_move_when_already_there(self):
+        room = _bare_room()
+        p = _player(1, 1)
+        assert apply_motion(p, 'H', 1, room) is False
+
+
+# ── apply_motion: % bracket match (Batch 1) ──────────────────────────────────
+
+def _bracket_room():
+    """row 3: ( @2  [ @4  ] @6  ) @8  — nested ( [ ] )."""
+    room = _bare_room()
+    for col, sym in ((2, '('), (4, '['), (6, ']'), (8, ')')):
+        room.add_rune(RuneCluster(row=3, col=col, symbols=(sym,), kind='ancient'))
+    return room
+
+
+class TestApplyMotionBracketMatch:
+    def test_open_paren_to_close(self):
+        room = _bracket_room()
+        p = _player(3, 2)
+        apply_motion(p, '%', 1, room)
+        assert p.col == 8
+
+    def test_close_paren_to_open(self):
+        room = _bracket_room()
+        p = _player(3, 8)
+        apply_motion(p, '%', 1, room)
+        assert p.col == 2
+
+    def test_inner_bracket_pair(self):
+        room = _bracket_room()
+        p = _player(3, 4)   # '['
+        apply_motion(p, '%', 1, room)
+        assert p.col == 6   # ']'
+
+    def test_from_floor_scans_right_to_first_bracket(self):
+        room = _bracket_room()
+        p = _player(3, 1)
+        apply_motion(p, '%', 1, room)
+        assert p.col == 8   # finds '(' @2, matches ')' @8
+
+    def test_unmatched_no_move(self):
+        room = _bare_room()
+        room.add_rune(RuneCluster(row=3, col=5, symbols=('(',), kind='ancient'))
+        p = _player(3, 5)
+        assert apply_motion(p, '%', 1, room) is False
+        assert p.col == 5
+
+
+# ── apply_motion: { } paragraph (Batch 1) ────────────────────────────────────
+
+def _para_room():
+    """Content on rows 1,2,4; blank passable rows 3 and 5."""
+    room = _bare_room()
+    for r in (1, 2, 4):
+        room.add_rune(RuneCluster(row=r, col=2, symbols=('∘',), kind='ancient'))
+    return room
+
+
+class TestApplyMotionParagraph:
+    def test_next_paragraph_to_blank_row(self):
+        room = _para_room()
+        p = _player(1, 2)
+        apply_motion(p, '}', 1, room)
+        assert (p.row, p.col) == (3, 1)
+
+    def test_next_paragraph_chains(self):
+        room = _para_room()
+        p = _player(1, 2)
+        apply_motion(p, '}', 2, room)
+        assert (p.row, p.col) == (5, 1)
+
+    def test_prev_paragraph(self):
+        room = _para_room()
+        p = _player(4, 2)
+        apply_motion(p, '{', 1, room)
+        assert (p.row, p.col) == (3, 1)
+
+    def test_brace_no_blank_below_no_move(self):
+        room = _para_room()
+        p = _player(5, 1)
+        assert apply_motion(p, '}', 1, room) is False
+
+
+# ── apply_motion: ( ) sentence (Batch 1) ─────────────────────────────────────
+
+def _sentence_room():
+    """row 3: 'ab.' @2-4, 'cd!' @6-8, 'ef' @10-11 → sentence starts 2, 6, 10."""
+    room = _bare_room()
+    room.add_rune(RuneCluster(row=3, col=2,  symbols=('a', 'b', '.'), kind='ancient'))
+    room.add_rune(RuneCluster(row=3, col=6,  symbols=('c', 'd', '!'), kind='ancient'))
+    room.add_rune(RuneCluster(row=3, col=10, symbols=('e', 'f'),      kind='ancient'))
+    return room
+
+
+class TestApplyMotionSentence:
+    def test_next_sentence(self):
+        room = _sentence_room()
+        p = _player(3, 2)
+        apply_motion(p, ')', 1, room)
+        assert p.col == 6
+
+    def test_next_sentence_from_floor(self):
+        room = _sentence_room()
+        p = _player(3, 1)
+        apply_motion(p, ')', 1, room)
+        assert p.col == 2
+
+    def test_prev_sentence_mid_sentence(self):
+        room = _sentence_room()
+        p = _player(3, 7)
+        apply_motion(p, '(', 1, room)
+        assert p.col == 6
+
+    def test_prev_sentence_at_start_goes_previous(self):
+        room = _sentence_room()
+        p = _player(3, 6)
+        apply_motion(p, '(', 1, room)
+        assert p.col == 2
+
+    def test_next_sentence_count(self):
+        room = _sentence_room()
+        p = _player(3, 1)
+        apply_motion(p, ')', 2, room)
+        assert p.col == 6
+
+    def test_no_next_sentence_no_move(self):
+        room = _sentence_room()
+        p = _player(3, 10)
+        assert apply_motion(p, ')', 1, room) is False
+
+
 # ── apply_motion: f F t T find-char motions ──────────────────────────────────
 
 class TestApplyMotionFindChar:

@@ -3,6 +3,22 @@ import pytest
 from engine.budget import Budget
 
 
+class TestFrozen:
+    def test_spend_is_noop_when_frozen(self):
+        b = Budget(10)
+        b.frozen = True
+        b.spend(3)
+        assert b.spent == 0 and b.remaining == 10
+
+    def test_spend_resumes_when_unfrozen(self):
+        b = Budget(10)
+        b.frozen = True
+        b.spend(5)
+        b.frozen = False
+        b.spend(2)
+        assert b.spent == 2
+
+
 class TestRemaining:
     def test_full_at_start(self):
         b = Budget(10)

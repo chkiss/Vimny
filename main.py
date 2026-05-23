@@ -2,6 +2,7 @@
 """Vimny — entry point and main game loop."""
 from __future__ import annotations
 import sys, random, time, argparse
+from collections import deque
 from blessed import Terminal
 import render.colors as C
 from render.renderer import render_all
@@ -15,7 +16,20 @@ from engine.budget import Budget
 from engine.vim_parser import parse
 from engine.command_guard import action_allowed as _action_allowed, guard_message as _guard_message
 from engine.world import Entity, CellType, RuneCluster, Dungeon
-from engine.motion import apply_motion, move_player, _apply_esc, _reveal_from, _cell_char
+from engine.motion import apply_motion, move_player, _apply_esc, _reveal_from, _cell_char, _first_non_blank_col
+from engine.text_object import compute_text_object, resolve_text_object
+from engine.search import find_next as _search_next, word_under_cursor as _word_under_cursor
+from engine.macro import synth_key as _synth_key, record_char as _record_char
+from engine.jumplist import record_jump as _record_jump, jump_back as _jump_back, jump_forward as _jump_forward
+from engine.registers import write_register as _reg_write, read_register as _reg_read
+from engine.visual import apply_visual
+
+_JUMP_MOTIONS = frozenset({'G', 'gg', '%', '{', '}', '(', ')'})
+from engine.operator import op_delete, op_yank, op_paste, op_case, case_char, apply_indent, INDENT_WIDTH
+from engine.insert import (
+    begin_insert, insert_char, insert_backspace,
+    replace_chars, replace_overtype, replace_restore,
+)
 from engine.editor import (
     _merge_adjacent_runes, _ed_cut, _ed_snapshot, _ed_restore, _ed_subst,
     _ed_paste, _ed_row_items, _ed_clear_row, _ed_range_items, _ed_delete_range,
@@ -830,9 +844,24 @@ _SPEAR_DIRS = {
 def _keystroke_cost(count: int, motion: str = '') -> int:
     base = 1 if count == 1 else len(str(count)) + 1
     # multi-character motions: one extra keypress per extra character required
-    if motion in ('f', 'F', 't', 'T', 'gg'):
+    if motion in ('f', 'F', 't', 'T', 'gg', 'ge', 'gE'):
         base += 1
     return base
+
+
+def _operator_cost(action: dict) -> int:
+    """Keystroke cost of an operator command, e.g. dw=2, d3w=4, dd=2, gUiw=4, gUU=3."""
+    count = action.get('count', 1)
+    c = len(action['op'])                  # 'd'=1, 'gU'=2
+    if count > 1:
+        c += len(str(count))
+    if 'textobj' in action:                # diw, ci( … (i/a + obj char)
+        return c + 2
+    motion = action['motion']
+    if motion == 'line':                   # dd / yy / gUU
+        return c + 1
+    c += _keystroke_cost(action.get('motion_count', 1), motion)
+    return c
 
 
 def _calc_stars(won: bool, budget: Budget, room, player, level: int = 0) -> int:
@@ -887,6 +916,11 @@ def _snapshot(room, player, budget, *, row=None, col=None, spent=None) -> dict:
                             uid=e.uid, summoner_uid=e.summoner_uid,
                             origin_row=e.origin_row, move_dir=e.move_dir)
                      for e in room.entities],
+        'runes':    [RuneCluster(ru.row, ru.col, ru.symbols, ru.kind) for ru in room.runes],
+        'cells':    [r[:] for r in room.cells],
+        'rows':     room.rows,
+        'exit_pos': room.exit_pos,
+        'entry':    room.entry,
         'fog_cells': set(room.fog_cells),
     }
 
@@ -901,6 +935,13 @@ def _pop_history_step(src: list, dst: list, room, player, budget) -> bool:
         player.row, player.col = item['row'], item['col']
         budget.spent  = item['spent']
         room.entities = item['entities']
+        if 'runes' in item:
+            room.runes = item['runes']
+        if 'cells' in item:
+            room.cells = item['cells']
+            room.rows  = item['rows']
+            room.exit_pos = item['exit_pos']
+            room.entry    = item['entry']
         room.fog_cells = item['fog_cells']
         room.rebuild_indexes()
     else:
@@ -1167,6 +1208,13 @@ def run_dungeon(term: Terminal, level: int, progress: dict,
     edit_mode  = _start_edit
     ed_undo:   list = []
     ed_redo:   list = []
+    replace_stack: list = []   # REPLACE-mode per-char restore records (Block F)
+    recording_reg = None       # register currently being recorded into, or None
+    macro_buf     = ''         # keystrokes captured for the in-progress recording
+    macro_last    = None       # last register played (for @@)
+    macro_pending: deque = deque()   # queued macro keystrokes awaiting playback
+    macro_run_keys = 0         # keys replayed since last real keypress (recursion guard)
+    _MACRO_MAX     = 10000
     count_tutorial_shown = False
     at_exit  = False   # player has stepped on the exit at some point
     last_saved_stars = progress.get(level, {}).get('stars', 0)
@@ -1259,7 +1307,36 @@ def run_dungeon(term: Terminal, level: int, progress: dict,
     render_all(term, dungeon, player, budget, message, attack_pos=_attack_pos(), attack_sym=_attack_sym())
 
     while True:
-        key = term.inkey(timeout=0.1)
+        # Macro playback: drain queued keystrokes before reading the terminal.
+        if macro_pending:
+            macro_run_keys += 1
+            if macro_run_keys > _MACRO_MAX:
+                macro_pending.clear()
+                macro_run_keys = 0
+                budget.frozen = False
+                _push('Macro aborted (too long / recursion).')
+                render_all(term, dungeon, player, budget, _pool_msg(), attack_pos=_attack_pos(), attack_sym=_attack_sym())
+                continue
+            key = _synth_key(macro_pending.popleft())
+            from_macro = True
+        else:
+            key = term.inkey(timeout=0.1)
+            from_macro = False
+            macro_run_keys = 0
+        budget.frozen = from_macro            # replayed keys don't re-charge budget
+
+        # Macro recording: bare 'q' in NORMAL stops; otherwise capture real keys.
+        if recording_reg is not None and not from_macro:
+            if (player.mode == Mode.NORMAL and not key_buf
+                    and not key.is_sequence and str(key) == 'q'):
+                player.macros[recording_reg] = macro_buf
+                recording_reg = None
+                macro_buf = ''
+                render_all(term, dungeon, player, budget, message, attack_pos=_attack_pos(), attack_sym=_attack_sym())
+                continue
+            rc = _record_char(key)
+            if rc is not None:
+                macro_buf += rc
 
         prev_message = message
         if player.is_dead:
@@ -1445,6 +1522,36 @@ def run_dungeon(term: Terminal, level: int, progress: dict,
             render_all(term, dungeon, player, budget, message, attack_pos=_attack_pos(), attack_sym=_attack_sym())
             continue
 
+        # ── SEARCH mode (/ or ? pattern entry) ────────────────────────────────
+        if player.mode == Mode.SEARCH:
+            if key.name == 'KEY_ESCAPE':
+                player.mode = Mode.NORMAL
+                player.cmd_line = ''
+            elif key.name == 'KEY_ENTER' or str(key) in ('\n', '\r'):
+                pattern = player.cmd_line
+                fwd     = player.search_forward
+                player.mode     = Mode.NORMAL
+                player.cmd_line = ''
+                if pattern:
+                    player.last_search = (pattern, fwd)
+                    dest = _search_next(room, player, pattern, fwd)
+                    if dest is not None:
+                        pre = (player.row, player.col, budget.spent)
+                        _record_jump(player, (player.row, player.col))
+                        player.row, player.col = dest
+                        if not edit_mode:
+                            budget.spend(len(pattern) + 2)
+                            undo_stack.append(pre)
+                            redo_stack.clear()
+                    else:
+                        _push(f'Pattern not found: {pattern}')
+            elif key.name == 'KEY_BACKSPACE' or str(key) == '\x7f':
+                player.cmd_line = player.cmd_line[:-1]
+            elif not key.is_sequence:
+                player.cmd_line += str(key)
+            render_all(term, dungeon, player, budget, message, attack_pos=_attack_pos(), attack_sym=_attack_sym())
+            continue
+
         # ── INSERT mode (admin text placement) ───────────────────────────────
         if player.mode == Mode.INSERT:
             if key.name == 'KEY_ESCAPE':
@@ -1468,6 +1575,96 @@ def run_dungeon(term: Terminal, level: int, progress: dict,
                         _merge_adjacent_runes(room, r)
                         if c + 1 < room.cols:
                             player.col += 1
+            else:
+                # Player INSERT typing (one undo snapshot was pushed on entry).
+                if key.name == 'KEY_BACKSPACE' or str(key) == '\x7f':
+                    insert_backspace(room, player)
+                elif not key.is_sequence:
+                    ch = str(key)
+                    if ch.isprintable() and len(ch) == 1 and insert_char(room, player, ch):
+                        budget.spend(1)
+            render_all(term, dungeon, player, budget, message, attack_pos=_attack_pos(), attack_sym=_attack_sym())
+            continue
+
+        # ── REPLACE mode (overtype; Backspace restores originals) ─────────────
+        if player.mode == Mode.REPLACE:
+            if key.name == 'KEY_ESCAPE':
+                player.mode = Mode.NORMAL
+                if player.col > 0 and room.is_passable(player.row, player.col - 1):
+                    player.col -= 1                    # vim retreats one on Esc
+                replace_stack = []
+                key_buf = ''
+            elif key.name == 'KEY_BACKSPACE' or str(key) == '\x7f':
+                if replace_stack:
+                    replace_restore(room, player, replace_stack.pop())
+            elif not key.is_sequence:
+                ch = str(key)
+                if ch.isprintable() and len(ch) == 1:
+                    rec = replace_overtype(room, player, ch)
+                    if rec is not None:
+                        replace_stack.append(rec)
+                        if not edit_mode:
+                            budget.spend(1)
+            render_all(term, dungeon, player, budget, message, attack_pos=_attack_pos(), attack_sym=_attack_sym())
+            continue
+
+        # ── VISUAL modes (v / V / Ctrl-v): free-move, operate on selection ─────
+        if player.mode in (Mode.VISUAL, Mode.VISUAL_LINE, Mode.VISUAL_BLOCK):
+            vmode = player.mode
+            if key.name == 'KEY_ESCAPE':
+                player.mode = Mode.NORMAL
+                player.visual_anchor = None
+                key_buf = ''
+                render_all(term, dungeon, player, budget, message, attack_pos=_attack_pos(), attack_sym=_attack_sym())
+                continue
+            raw = str(key) if not key.is_sequence else ''
+            anchor = player.visual_anchor or (player.row, player.col)
+            cursor = (player.row, player.col)
+            # Single-key visual commands (only when not mid multi-key motion)
+            if not key_buf and raw == 'o':                 # swap ends
+                player.row, player.col = anchor
+                player.visual_anchor = cursor
+                render_all(term, dungeon, player, budget, message, attack_pos=_attack_pos(), attack_sym=_attack_sym())
+                continue
+            if not key_buf and (raw in 'vV' or str(key) == '\x16'):   # toggle / exit
+                want = {'v': Mode.VISUAL, 'V': Mode.VISUAL_LINE, '\x16': Mode.VISUAL_BLOCK}[raw or '\x16']
+                player.mode = Mode.NORMAL if want == vmode else want
+                if player.mode == Mode.NORMAL:
+                    player.visual_anchor = None
+                render_all(term, dungeon, player, budget, message, attack_pos=_attack_pos(), attack_sym=_attack_sym())
+                continue
+            if not key_buf and raw and raw in 'dycx~<>':
+                op = {'x': 'd', '~': 'g~'}.get(raw, raw)
+                if op in ('d', 'y', 'c', 'g~', '<', '>') and not (
+                        'visual_op' in player.known_commands or 'admin' in player.known_commands):
+                    _push("You haven't learned visual operators yet.")
+                    render_all(term, dungeon, player, budget, message, attack_pos=_attack_pos(), attack_sym=_attack_sym())
+                    continue
+                undo_stack.append(_snapshot(room, player, budget))
+                redo_stack.clear()
+                clip = apply_visual(op, anchor, cursor, vmode, room, player)
+                if op == 'y':
+                    _reg_write(player, '"', clip, is_delete=False)
+                elif op in ('d', 'c'):
+                    _reg_write(player, '"', clip, is_delete=True)
+                budget.spend(1)
+                player.last_visual_anchor = anchor
+                player.last_visual_cursor = cursor
+                player.last_visual_mode = vmode
+                player.visual_anchor = None
+                player.mode = Mode.INSERT if op == 'c' else Mode.NORMAL
+                player.last_change = {'type': 'visual_op', 'op': op}
+                key_buf = ''
+                render_all(term, dungeon, player, budget, message, attack_pos=_attack_pos(), attack_sym=_attack_sym())
+                continue
+            # Otherwise: a motion that extends the selection (free — no budget cost)
+            key_buf += raw
+            v_action, key_buf = parse(key_buf, Mode.NORMAL)
+            if v_action is not None and v_action.get('type') == 'motion':
+                apply_motion(player, v_action['motion'], v_action.get('count', 1),
+                             room, v_action.get('target'))
+            elif v_action is not None:
+                key_buf = ''                               # ignore non-motion keys in visual
             render_all(term, dungeon, player, budget, message, attack_pos=_attack_pos(), attack_sym=_attack_sym())
             continue
 
@@ -1540,8 +1737,11 @@ def run_dungeon(term: Terminal, level: int, progress: dict,
                 render_all(term, dungeon, player, budget, message, attack_pos=_attack_pos(), attack_sym=_attack_sym())
                 continue
 
+            jump_from = (player.row, player.col)
             moved = apply_motion(player, motion, count, room, target)
             if moved:
+                if motion in _JUMP_MOTIONS:
+                    _record_jump(player, jump_from)
                 if not edit_mode:
                     budget.spend(_keystroke_cost(count, motion))
                     undo_stack.append(prev_pos)
@@ -1665,17 +1865,170 @@ def run_dungeon(term: Terminal, level: int, progress: dict,
                 player.mode     = Mode.COMMAND
                 player.cmd_line = ''
             elif m == 'insert':
-                if 'insert' in player.known_commands or 'admin' in player.known_commands:
+                if edit_mode:
+                    player.mode = Mode.INSERT          # admin map-editing placement
+                elif 'insert' in player.known_commands or 'admin' in player.known_commands:
+                    undo_stack.append(_snapshot(room, player, budget))
+                    redo_stack.clear()
+                    begin_insert(room, player, action.get('variant', 'i'), count)
                     player.mode = Mode.INSERT
+                    budget.spend(1)
+                    player.last_change = action
                 else:
                     _push('INSERT mode not learned yet.')
+            elif m == 'replace':
+                if edit_mode or 'R' in player.known_commands or 'admin' in player.known_commands:
+                    if not edit_mode:
+                        undo_stack.append(_snapshot(room, player, budget))
+                        redo_stack.clear()
+                        budget.spend(1)
+                    else:
+                        ed_undo.append(_ed_snapshot(room, player))
+                        ed_redo.clear()
+                    replace_stack = []
+                    player.mode = Mode.REPLACE
+                    player.last_change = action
+                else:
+                    _push('REPLACE mode not learned yet.')
+            elif m == 'search':
+                if '/' in player.known_commands or 'admin' in player.known_commands:
+                    player.mode = Mode.SEARCH
+                    player.cmd_line = ''
+                    player.search_forward = action.get('forward', True)
+                else:
+                    _push('Search not learned yet.')
             elif m in ('visual', 'visual_line', 'visual_block'):
                 if 'visual' in player.known_commands or 'admin' in player.known_commands:
-                    player.mode = {'visual': Mode.VISUAL,
-                                   'visual_line': Mode.VISUAL_LINE,
-                                   'visual_block': Mode.VISUAL_BLOCK}[m]
+                    if action.get('reselect'):                # gv — restore last selection
+                        if player.last_visual_anchor is not None:
+                            player.mode = player.last_visual_mode or Mode.VISUAL
+                            player.visual_anchor = player.last_visual_anchor
+                            player.row, player.col = player.last_visual_cursor
+                        else:
+                            _push('No previous visual selection.')
+                    else:
+                        player.mode = {'visual': Mode.VISUAL,
+                                       'visual_line': Mode.VISUAL_LINE,
+                                       'visual_block': Mode.VISUAL_BLOCK}[m]
+                        player.visual_anchor = (player.row, player.col)
+                        if not edit_mode:
+                            budget.spend(1)
                 else:
                     _push('VISUAL mode not learned yet.')
+
+        elif action['type'] == 'jump':
+            if not edit_mode and not _action_allowed(action, player.known_commands):
+                _push(_guard_message(action, player.known_commands))
+                message = _pool_msg(); msg_ttl = _MSG_ROTATE_TTL
+                render_all(term, dungeon, player, budget, message, attack_pos=_attack_pos(), attack_sym=_attack_sym())
+                continue
+            dest = _jump_back(player) if action['dir'] == 'back' else _jump_forward(player)
+            if dest is not None:
+                player.row, player.col = dest
+                budget.spend(1)
+                undo_stack.append(prev_pos)
+                redo_stack.clear()
+            else:
+                _push('Jump list: nothing that way.')
+
+        elif action['type'] == 'mark':
+            if not edit_mode and not _action_allowed(action, player.known_commands):
+                _push(_guard_message(action, player.known_commands))
+                message = _pool_msg(); msg_ttl = _MSG_ROTATE_TTL
+                render_all(term, dungeon, player, budget, message, attack_pos=_attack_pos(), attack_sym=_attack_sym())
+                continue
+            cmd, reg = action['cmd'], action['reg']
+            if cmd == 'm':
+                player.marks[reg] = (player.row, player.col)
+                if not edit_mode:
+                    budget.spend(2)
+                _push(f"Mark '{reg}' set.")
+            elif reg not in player.marks:
+                _push(f"Mark '{reg}' not set.")
+            else:
+                mr, mc = player.marks[reg]
+                if cmd == "'":                         # ' → first non-blank of the row
+                    nb = _first_non_blank_col(room, mr) if 0 <= mr < room.rows else None
+                    dest = (mr, nb) if nb is not None else None
+                else:                                  # ` → exact position
+                    dest = (mr, mc)
+                if dest is None or not room.is_passable(dest[0], dest[1]):
+                    _push(f"Mark '{reg}': can't land there.")
+                else:
+                    _record_jump(player, (player.row, player.col))
+                    player.row, player.col = dest
+                    if not edit_mode:
+                        budget.spend(2)
+                        undo_stack.append(prev_pos)
+                        redo_stack.clear()
+
+        elif action['type'] == 'macro_record':
+            if not edit_mode and not _action_allowed(action, player.known_commands):
+                _push(_guard_message(action, player.known_commands))
+                message = _pool_msg(); msg_ttl = _MSG_ROTATE_TTL
+                render_all(term, dungeon, player, budget, message, attack_pos=_attack_pos(), attack_sym=_attack_sym())
+                continue
+            recording_reg = action['reg']
+            macro_buf = ''
+            _push(f'recording @{recording_reg}')
+
+        elif action['type'] == 'macro_play':
+            if not edit_mode and not _action_allowed(action, player.known_commands):
+                _push(_guard_message(action, player.known_commands))
+                message = _pool_msg(); msg_ttl = _MSG_ROTATE_TTL
+                render_all(term, dungeon, player, budget, message, attack_pos=_attack_pos(), attack_sym=_attack_sym())
+                continue
+            reg = macro_last if action['reg'] == '@' else action['reg']
+            keys = player.macros.get(reg) if reg else None
+            if not keys:
+                _push('No macro to play.')
+            else:
+                macro_last = reg
+                add = keys * count
+                if len(macro_pending) + len(add) > _MACRO_MAX:
+                    _push('Macro too long (recursion?).')
+                else:
+                    macro_pending.extendleft(reversed(add))   # play next, in order
+                    budget.spend(2 + (len(str(count)) if count > 1 else 0))
+
+        elif action['type'] in ('search_repeat', 'search_word'):
+            if not edit_mode and not _action_allowed(action, player.known_commands):
+                _push(_guard_message(action, player.known_commands))
+                message = _pool_msg(); msg_ttl = _MSG_ROTATE_TTL
+                render_all(term, dungeon, player, budget, message, attack_pos=_attack_pos(), attack_sym=_attack_sym())
+                continue
+            if action['type'] == 'search_word':
+                word = _word_under_cursor(room, player)
+                if word is None:
+                    _push('No rune under cursor.')
+                    pattern, fwd = None, True
+                else:
+                    fwd = action.get('forward', True)
+                    player.last_search = (word, fwd)
+                    pattern = word
+            else:                                  # n / N
+                if not player.last_search:
+                    _push('No previous search.')
+                    pattern, fwd = None, True
+                else:
+                    pattern, base_fwd = player.last_search
+                    fwd = (not base_fwd) if action.get('reverse') else base_fwd
+            if pattern:
+                moved = False
+                search_from = (player.row, player.col)
+                for _ in range(count):
+                    dest = _search_next(room, player, pattern, fwd)
+                    if dest is None:
+                        break
+                    player.row, player.col = dest
+                    moved = True
+                if moved:
+                    _record_jump(player, search_from)
+                    budget.spend(_keystroke_cost(count, ''))
+                    undo_stack.append(prev_pos)
+                    redo_stack.clear()
+                else:
+                    _push(f'Pattern not found: {pattern}')
 
         elif action['type'] == 'undo':
             if edit_mode:
@@ -1875,6 +2228,19 @@ def run_dungeon(term: Terminal, level: int, progress: dict,
                         _push(f'Cut {len(cut_items)}: {descs}')
                         player.last_change = action
 
+        elif not edit_mode and action['type'] == 'substitute':
+            if not _action_allowed(action, player.known_commands):
+                _push(_guard_message(action, player.known_commands))
+                message = _pool_msg(); msg_ttl = _MSG_ROTATE_TTL
+                render_all(term, dungeon, player, budget, message, attack_pos=_attack_pos(), attack_sym=_attack_sym())
+                continue
+            undo_stack.append(_snapshot(room, player, budget))
+            redo_stack.clear()
+            begin_insert(room, player, 'S' if action.get('line') else 's', count)
+            player.mode = Mode.INSERT
+            budget.spend(1)
+            player.last_change = action
+
         elif edit_mode and action['type'] == 'substitute':
             ed_undo.append(_ed_snapshot(room, player))
             ed_redo.clear()
@@ -1889,7 +2255,17 @@ def run_dungeon(term: Terminal, level: int, progress: dict,
             before = action.get('before', False)
             dc = -1 if before else 1          # P → left, p → right
             target = room.entity_at(player.row, player.col + dc)
-            if target and target.kind == 'locked_door':
+            clip = _reg_read(player, action.get('register', '"'))
+            if clip and any(rw['runes'] for rw in clip['rows']):
+                undo_stack.append(_snapshot(room, player, budget))
+                redo_stack.clear()
+                if op_paste(room, player, clip, before):
+                    budget.spend(1)
+                    _push('Pasted.')
+                else:
+                    undo_stack.pop()
+                    _push('Nothing pasted (no room).')
+            elif target and target.kind == 'locked_door':
                 reg_key_idx = next(
                     (i for i, it in enumerate(player.register)
                      if it.get('type') == 'entity' and
@@ -1972,36 +2348,162 @@ def run_dungeon(term: Terminal, level: int, progress: dict,
             else:
                 _push('Clipboard is empty.')
 
+        elif action['type'] == 'replace':
+            if not edit_mode and not _action_allowed(action, player.known_commands):
+                _push(_guard_message(action, player.known_commands))
+                message = _pool_msg(); msg_ttl = _MSG_ROTATE_TTL
+                render_all(term, dungeon, player, budget, message, attack_pos=_attack_pos(), attack_sym=_attack_sym())
+                continue
+            (ed_undo if edit_mode else undo_stack).append(
+                _ed_snapshot(room, player) if edit_mode else _snapshot(room, player, budget))
+            (ed_redo if edit_mode else redo_stack).clear()
+            if replace_chars(room, player, action['char'], count):
+                if not edit_mode:
+                    budget.spend(2 + (len(str(count)) if count > 1 else 0))
+                player.last_change = action
+            else:
+                (ed_undo if edit_mode else undo_stack).pop()
+                _push('Nothing to replace.')
+
+        elif action['type'] == 'case_char':
+            if not edit_mode and not _action_allowed(action, player.known_commands):
+                _push(_guard_message(action, player.known_commands))
+                message = _pool_msg(); msg_ttl = _MSG_ROTATE_TTL
+                render_all(term, dungeon, player, budget, message, attack_pos=_attack_pos(), attack_sym=_attack_sym())
+                continue
+            (ed_undo if edit_mode else undo_stack).append(
+                _ed_snapshot(room, player) if edit_mode else _snapshot(room, player, budget))
+            (ed_redo if edit_mode else redo_stack).clear()
+            if case_char(room, player, count):
+                if not edit_mode:
+                    budget.spend(_keystroke_cost(count, '~'))
+                player.last_change = action
+            else:
+                (ed_undo if edit_mode else undo_stack).pop()
+                _push('Nothing to toggle.')
+
+        elif action['type'] == 'operator' and action['op'] in ('>', '<'):
+            if not edit_mode and not _action_allowed(action, player.known_commands):
+                _push(_guard_message(action, player.known_commands))
+                message = _pool_msg(); msg_ttl = _MSG_ROTATE_TTL
+                render_all(term, dungeon, player, budget, message, attack_pos=_attack_pos(), attack_sym=_attack_sym())
+                continue
+            tobj = (resolve_text_object(action['textobj'], room, player)
+                    if 'textobj' in action else compute_text_object(player, action, room))
+            if tobj is None:
+                _push('Nothing to indent.')
+            else:
+                (ed_undo if edit_mode else undo_stack).append(
+                    _ed_snapshot(room, player) if edit_mode else _snapshot(room, player, budget))
+                (ed_redo if edit_mode else redo_stack).clear()
+                amount = INDENT_WIDTH if action['op'] == '>' else -INDENT_WIDTH
+                for _ir in range(tobj.start_row, tobj.end_row + 1):
+                    apply_indent(room, _ir, amount)
+                player.row = min(tobj.start_row, room.rows - 1)
+                nb = _first_non_blank_col(room, player.row)
+                if nb is not None:
+                    player.col = nb
+                if not edit_mode:
+                    budget.spend(_operator_cost(action))
+                player.last_change = action
+
+        elif action['type'] == 'operator' and action['op'] in ('g~', 'gu', 'gU'):
+            if not edit_mode and not _action_allowed(action, player.known_commands):
+                _push(_guard_message(action, player.known_commands))
+                message = _pool_msg(); msg_ttl = _MSG_ROTATE_TTL
+                render_all(term, dungeon, player, budget, message, attack_pos=_attack_pos(), attack_sym=_attack_sym())
+                continue
+            tobj = (resolve_text_object(action['textobj'], room, player)
+                    if 'textobj' in action else compute_text_object(player, action, room))
+            if tobj is None:
+                _push('Nothing to operate on.')
+            else:
+                (ed_undo if edit_mode else undo_stack).append(
+                    _ed_snapshot(room, player) if edit_mode else _snapshot(room, player, budget))
+                (ed_redo if edit_mode else redo_stack).clear()
+                op_case(room, player, tobj, action['op'])
+                if not edit_mode:
+                    budget.spend(_operator_cost(action))
+                player.last_change = action
+
+        elif not edit_mode and action['type'] == 'operator':
+            if not _action_allowed(action, player.known_commands):
+                _push(_guard_message(action, player.known_commands))
+                message = _pool_msg(); msg_ttl = _MSG_ROTATE_TTL
+                render_all(term, dungeon, player, budget, message, attack_pos=_attack_pos(), attack_sym=_attack_sym())
+                continue
+            op   = action['op']
+            if 'textobj' in action:
+                tobj = resolve_text_object(action['textobj'], room, player)
+            else:
+                tobj = compute_text_object(player, action, room)
+            if tobj is None:
+                _push('Nothing to operate on.')
+            else:
+                undo_stack.append(_snapshot(room, player, budget))
+                redo_stack.clear()
+                reg = action.get('register', '"')
+                if op == 'y':
+                    _reg_write(player, reg, op_yank(room, player, tobj), is_delete=False)
+                    undo_stack.pop()          # yank does not mutate; drop snapshot
+                    budget.spend(_operator_cost(action))
+                    _push('Yanked.')
+                elif op == 'c':
+                    # change = delete the span, then INSERT at the deletion start
+                    # (op_delete already repositions the cursor there).
+                    _reg_write(player, reg, op_delete(room, player, tobj), is_delete=True)
+                    budget.spend(_operator_cost(action))
+                    player.mode = Mode.INSERT
+                else:                          # 'd'
+                    _reg_write(player, reg, op_delete(room, player, tobj), is_delete=True)
+                    budget.spend(_operator_cost(action))
+                    _push('Deleted.')
+                player.last_change = action
+
         elif edit_mode and action['type'] == 'operator':
             op     = action['op']
-            motion = action['motion']
             ed_undo.append(_ed_snapshot(room, player))
             ed_redo.clear()
-            if motion == 'line':
-                all_items: list = []
-                for dr in range(count):
-                    r = player.row + dr
-                    if r >= room.rows:
-                        break
-                    all_items.extend(_ed_row_items(room, r))
-                    if op in ('d', 'c'):
-                        _ed_clear_row(room, r)
-                player.register = all_items
-                verb    = 'Cut' if op in ('d', 'c') else 'Yanked'
-                _push(f'{verb} {len(all_items)} item(s) from {count} row(s).')
-            else:
-                orig_r, orig_c = player.row, player.col
-                mc = action.get('motion_count', 1)
-                apply_motion(player, motion, mc, room, action.get('target'))
-                new_r, new_c = player.row, player.col
-                player.row, player.col = orig_r, orig_c
+            if 'textobj' in action:
+                tobj = resolve_text_object(action['textobj'], room, player)
+                if tobj is None:
+                    ed_undo.pop()
+                    _push('No text object here.')
+                    render_all(term, dungeon, player, budget, _pool_msg(), attack_pos=_attack_pos(), attack_sym=_attack_sym())
+                    continue
                 if op in ('d', 'c'):
-                    items = _ed_delete_range(room, orig_r, orig_c, new_r, new_c)
+                    items = _ed_delete_range(room, tobj.start_row, tobj.start_col, tobj.end_row, tobj.end_col)
                 else:
-                    items = _ed_range_items(room, orig_r, orig_c, new_r, new_c)
+                    items = _ed_range_items(room, tobj.start_row, tobj.start_col, tobj.end_row, tobj.end_col)
                 player.register = items
-                verb    = 'Cut' if op in ('d', 'c') else 'Yanked'
-                _push(f'{verb} {len(items)} item(s).')
+                _push(f"{'Cut' if op in ('d', 'c') else 'Yanked'} {len(items)} item(s).")
+            else:
+                motion = action['motion']
+                if motion == 'line':
+                    all_items: list = []
+                    for dr in range(count):
+                        r = player.row + dr
+                        if r >= room.rows:
+                            break
+                        all_items.extend(_ed_row_items(room, r))
+                        if op in ('d', 'c'):
+                            _ed_clear_row(room, r)
+                    player.register = all_items
+                    verb    = 'Cut' if op in ('d', 'c') else 'Yanked'
+                    _push(f'{verb} {len(all_items)} item(s) from {count} row(s).')
+                else:
+                    orig_r, orig_c = player.row, player.col
+                    mc = action.get('motion_count', 1)
+                    apply_motion(player, motion, mc, room, action.get('target'))
+                    new_r, new_c = player.row, player.col
+                    player.row, player.col = orig_r, orig_c
+                    if op in ('d', 'c'):
+                        items = _ed_delete_range(room, orig_r, orig_c, new_r, new_c)
+                    else:
+                        items = _ed_range_items(room, orig_r, orig_c, new_r, new_c)
+                    player.register = items
+                    verb    = 'Cut' if op in ('d', 'c') else 'Yanked'
+                    _push(f'{verb} {len(items)} item(s).')
             if op == 'y':
                 ed_undo.pop()
             else:

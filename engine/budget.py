@@ -3,12 +3,15 @@ class Budget:
         self.total   = total
         self.spent   = 0
         self._history: list[int] = []   # cost of each action, for undo
+        self.frozen  = False            # when True, spend() is a no-op (macro replay)
 
     @property
     def remaining(self) -> int:
         return self.total - self.spent
 
     def spend(self, cost: int = 1):
+        if self.frozen:                 # replayed macro keys don't re-charge budget
+            return
         self.spent += cost
         self._history.append(cost)
 

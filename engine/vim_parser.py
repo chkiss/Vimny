@@ -5,9 +5,60 @@ Returns action dicts consumed by the game loop.
 from __future__ import annotations
 from engine.modes import Mode
 
-MOTIONS  = set('hjklwbeWBEGg0^${}' + ';,')
-OPERATORS = set('dyc')
+MOTIONS  = set('hjklwbeWBEGg0^${}()HML%' + ';,')
+OPERATORS = set('dyc><')
 COUNTS   = set('123456789')
+# text-object alias normalisation: ib/i)->i(, iB/i}->i{, i]->i[, i>->i<
+_TEXTOBJ_NORMALIZE = {'b': '(', ')': '(', 'B': '{', '}': '{', ']': '[', '>': '<'}
+
+
+def _operator_target(op: str, double_ch: str, buf: str, j0: int, count_n: int):
+    """Parse the target (motion / text object / find / linewise) following an
+    operator. Shared by d/y/c and the g-case operators (g~/gu/gU).
+
+    `op` is the operator token ('d', 'gU', …); `double_ch` is the char whose
+    doubling means linewise (e.g. 'd'→dd, 'U'→gUU); `j0` is the buffer index of
+    the first char after the operator token. Returns (action|None, remaining).
+    """
+    if j0 >= len(buf):
+        return None, buf
+    if buf[j0] == double_ch:                       # doubled → linewise (dd / gUU)
+        return {'type': 'operator', 'op': op, 'motion': 'line', 'count': count_n}, buf[j0+1:]
+
+    motion_count = ''
+    j = j0
+    while j < len(buf) and buf[j] in COUNTS:
+        motion_count += buf[j]
+        j += 1
+    if j >= len(buf):
+        return None, buf
+    mc = int(motion_count) if motion_count else 1
+    m = buf[j]
+
+    if m in ('i', 'a'):                            # text object
+        if j + 1 >= len(buf):
+            return None, buf
+        obj = _TEXTOBJ_NORMALIZE.get(buf[j+1], buf[j+1])
+        return {'type': 'operator', 'op': op, 'textobj': m + obj,
+                'count': count_n, 'motion_count': mc}, buf[j+2:]
+    if m == 'g':                                   # g-prefixed motion: gg / ge / gE
+        if j + 1 >= len(buf):
+            return None, buf
+        g2 = buf[j+1]
+        if g2 == 'g':
+            return {'type': 'operator', 'op': op, 'motion': 'gg', 'count': count_n, 'motion_count': mc}, buf[j+2:]
+        if g2 in 'eE':
+            return {'type': 'operator', 'op': op, 'motion': 'g' + g2, 'count': count_n, 'motion_count': mc}, buf[j+2:]
+        return {'type': 'unknown'}, buf[j+2:]
+    if m in 'fFtT':                                # find/till with target char
+        if j + 1 >= len(buf):
+            return None, buf
+        return {'type': 'operator', 'op': op, 'motion': m, 'target': buf[j+1],
+                'count': count_n, 'motion_count': mc}, buf[j+2:]
+    if m in MOTIONS:
+        return {'type': 'operator', 'op': op, 'motion': m, 'count': count_n, 'motion_count': mc}, buf[j+1:]
+    return {'type': 'unknown'}, buf[j+1:]
+
 
 def parse(buf: str, mode: Mode) -> tuple[dict | None, str]:
     """
@@ -35,7 +86,19 @@ def parse(buf: str, mode: Mode) -> tuple[dict | None, str]:
     count_n = int(count) if count else 1
     ch = buf[i]
 
-    # gg / ge / gE
+    # "{reg} prefix — select a register for the following operator / paste
+    if ch == '"':
+        if i + 1 >= len(buf):
+            return None, buf                           # waiting for the register name
+        reg = buf[i+1]
+        sub, rest = parse(buf[i+2:], mode)
+        if sub is None:
+            return None, buf                           # waiting for the command
+        if sub.get('type') in ('operator', 'paste', 'substitute'):
+            sub['register'] = reg
+        return sub, rest
+
+    # g-prefix: gg / ge / gE motions, and g~ / gu / gU case operators
     if ch == 'g':
         if i + 1 >= len(buf):
             return None, buf
@@ -44,6 +107,10 @@ def parse(buf: str, mode: Mode) -> tuple[dict | None, str]:
             return {'type': 'motion', 'motion': 'gg', 'count': count_n}, buf[i+2:]
         if g2 in 'eE':
             return {'type': 'motion', 'motion': 'g' + g2, 'count': count_n}, buf[i+2:]
+        if g2 == 'v':                              # gv — reselect last visual span
+            return {'type': 'enter_mode', 'mode': 'visual', 'reselect': True}, buf[i+2:]
+        if g2 in ('~', 'u', 'U'):                  # case operator: g~{m} gu{m} gU{m}
+            return _operator_target('g' + g2, g2, buf, i + 2, count_n)
         return {'type': 'unknown'}, buf[i+2:]
 
     # f/F/t/T — need one more char
@@ -60,49 +127,9 @@ def parse(buf: str, mode: Mode) -> tuple[dict | None, str]:
         reg = buf[i+1]
         return {'type': 'mark', 'cmd': ch, 'reg': reg}, buf[i+2:]
 
-    # Operators
+    # Operators: d / y / c
     if ch in OPERATORS:
-        op = ch
-        if i + 1 >= len(buf):
-            return None, buf
-        nch = buf[i+1]
-
-        # Doubled operator: dd, yy, cc
-        if nch == op:
-            return {'type': 'operator', 'op': op, 'motion': 'line', 'count': count_n}, buf[i+2:]
-
-        # D / C / Y (capitalised shortcuts)
-        # handled below via capital branch
-
-        # count before motion
-        motion_count = ''
-        j = i + 1
-        while j < len(buf) and buf[j] in COUNTS:
-            motion_count += buf[j]
-            j += 1
-        if j >= len(buf):
-            return None, buf
-        motion_ch = buf[j]
-        if motion_ch == 'g':
-            if j + 1 >= len(buf):
-                return None, buf
-            g2 = buf[j+1]
-            mc = int(motion_count) if motion_count else 1
-            if g2 == 'g':
-                return {'type': 'operator', 'op': op, 'motion': 'gg', 'count': count_n, 'motion_count': mc}, buf[j+2:]
-            if g2 in 'eE':
-                return {'type': 'operator', 'op': op, 'motion': 'g' + g2, 'count': count_n, 'motion_count': mc}, buf[j+2:]
-            return {'type': 'unknown'}, buf[j+2:]
-        if motion_ch in 'fFtT':
-            if j + 1 >= len(buf):
-                return None, buf
-            tgt = buf[j+1]
-            mc = int(motion_count) if motion_count else 1
-            return {'type': 'operator', 'op': op, 'motion': motion_ch, 'target': tgt, 'count': count_n, 'motion_count': mc}, buf[j+2:]
-        if motion_ch in MOTIONS:
-            mc = int(motion_count) if motion_count else 1
-            return {'type': 'operator', 'op': op, 'motion': motion_ch, 'count': count_n, 'motion_count': mc}, buf[j+1:]
-        return {'type': 'unknown'}, buf[j+1:]
+        return _operator_target(ch, ch, buf, i + 1, count_n)
 
     # Capital D/C
     if ch in 'DC':
@@ -115,9 +142,19 @@ def parse(buf: str, mode: Mode) -> tuple[dict | None, str]:
     if ch == 'P':
         return {'type': 'paste', 'before': True, 'count': count_n}, buf[i+1:]
 
-    # s — substitute (cut in place, game-loop decides behaviour)
+    # s / S — substitute char / line (game-loop decides behaviour by mode)
     if ch == 's':
         return {'type': 'substitute', 'count': count_n}, buf[i+1:]
+    if ch == 'S':
+        return {'type': 'substitute', 'line': True, 'count': count_n}, buf[i+1:]
+
+    # r{char} — replace char(s); R — REPLACE (overtype) mode
+    if ch == 'r':
+        if i + 1 >= len(buf):
+            return None, buf                           # waiting for the replacement char
+        return {'type': 'replace', 'char': buf[i+1], 'count': count_n}, buf[i+2:]
+    if ch == 'R':
+        return {'type': 'enter_mode', 'mode': 'replace'}, buf[i+1:]
 
     # Plain motion
     if ch in MOTIONS:
@@ -132,6 +169,12 @@ def parse(buf: str, mode: Mode) -> tuple[dict | None, str]:
         return {'type': 'undo', 'count': count_n}, buf[i+1:]
     if ch == '\x12':  # Ctrl-R
         return {'type': 'redo', 'count': count_n}, buf[i+1:]
+
+    # Ctrl-o / Ctrl-i (Tab) — jump list back / forward
+    if ch == '\x0f':  # Ctrl-O
+        return {'type': 'jump', 'dir': 'back', 'count': count_n}, buf[i+1:]
+    if ch == '\t' or ch == '\x09':  # Ctrl-I / Tab
+        return {'type': 'jump', 'dir': 'forward', 'count': count_n}, buf[i+1:]
 
     # : — enter command mode
     if ch == ':':
@@ -152,5 +195,33 @@ def parse(buf: str, mode: Mode) -> tuple[dict | None, str]:
     # . — repeat last change
     if ch == '.':
         return {'type': 'repeat', 'count': count_n}, buf[i+1:]
+
+    # ~ — toggle case of char(s) under cursor, advancing
+    if ch == '~':
+        return {'type': 'case_char', 'count': count_n}, buf[i+1:]
+
+    # Macros: q{reg} start recording (stop handled by the game loop); @{reg}/@@ play
+    if ch == 'q':
+        if i + 1 >= len(buf):
+            return None, buf                           # waiting for the register
+        return {'type': 'macro_record', 'reg': buf[i+1]}, buf[i+2:]
+    if ch == '@':
+        if i + 1 >= len(buf):
+            return None, buf
+        return {'type': 'macro_play', 'reg': buf[i+1], 'count': count_n}, buf[i+2:]
+
+    # Search: / ? enter SEARCH mode; n/N repeat; * # search word under cursor
+    if ch == '/':
+        return {'type': 'enter_mode', 'mode': 'search', 'forward': True}, buf[i+1:]
+    if ch == '?':
+        return {'type': 'enter_mode', 'mode': 'search', 'forward': False}, buf[i+1:]
+    if ch == 'n':
+        return {'type': 'search_repeat', 'reverse': False, 'count': count_n}, buf[i+1:]
+    if ch == 'N':
+        return {'type': 'search_repeat', 'reverse': True, 'count': count_n}, buf[i+1:]
+    if ch == '*':
+        return {'type': 'search_word', 'forward': True, 'count': count_n}, buf[i+1:]
+    if ch == '#':
+        return {'type': 'search_word', 'forward': False, 'count': count_n}, buf[i+1:]
 
     return {'type': 'unknown'}, buf[i+1:]

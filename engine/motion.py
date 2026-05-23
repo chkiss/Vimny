@@ -101,6 +101,63 @@ def _cross_water(room, r: int, c: int) -> bool:
     return ent is None or ent.kind not in ('locked_door', 'shield', 'boss_seal')
 
 
+_PAIRS_OPEN  = {'(': ')', '[': ']', '{': '}'}
+_PAIRS_CLOSE = {')': '(', ']': '[', '}': '{'}
+
+
+def _leftmost_passable(room, row: int):
+    """First passable column on a row, or None if the row has none."""
+    for c in range(room.cols):
+        if room.is_passable(row, c):
+            return c
+    return None
+
+
+def _first_non_blank_col(room, row: int):
+    """First-non-blank column on a row: the first rune start if any, else the
+    leftmost passable column. None if the row has no passable cell."""
+    left = None
+    for c in range(room.cols):
+        if room.is_passable(row, c):
+            if left is None:
+                left = c
+            if room.rune_at(row, c) is not None:
+                return c
+    return left
+
+
+def _bracket_at(room, row: int, c: int):
+    """The bracket char ()[]{} at (row, c) if a rune symbol there is one, else None."""
+    ru = room.rune_at(row, c)
+    if ru is not None:
+        ch = ru.symbols[c - ru.col]
+        if ch in _PAIRS_OPEN or ch in _PAIRS_CLOSE:
+            return ch
+    return None
+
+
+def _row_has_rune(room, row: int) -> bool:
+    return any(room.rune_at(row, c) is not None for c in range(room.cols))
+
+
+def _sentence_starts(room, row: int) -> list:
+    """Columns on `row` where a sentence begins. The first non-void rune starts
+    a sentence; a rune symbol in '.!?' ends one, so the next non-void rune
+    after it starts the next. Row-scoped (cross-row flow can be added later)."""
+    starts = []
+    pending = True
+    for c in range(room.cols):
+        ru = room.rune_at(row, c)
+        if ru is None or ru.kind == 'void':
+            continue
+        if pending:
+            starts.append(c)
+            pending = False
+        if ru.symbols[c - ru.col] in '.!?':
+            pending = True
+    return starts
+
+
 def apply_motion(player, motion, count, room, target=None):
     moved = False
     for _ in range(count):
@@ -452,6 +509,101 @@ def apply_motion(player, motion, count, room, target=None):
                 moved = True
             else:
                 break
+        elif motion in ('H', 'M', 'L'):
+            # Screen-relative row jump. In a room that fits the viewport this is
+            # room-relative: H=top, L=bottom, M=middle passable row. Lands on the
+            # first non-blank column of the target row (vim-faithful).
+            prows = [r for r in range(room.rows)
+                     if _first_non_blank_col(room, r) is not None]
+            if not prows:
+                break
+            if motion == 'H':
+                tr = prows[0]
+            elif motion == 'L':
+                tr = prows[-1]
+            else:
+                tr = prows[len(prows) // 2]
+            tc = _first_non_blank_col(room, tr)
+            if (tr, tc) != (player.row, player.col):
+                player.row, player.col = tr, tc
+                moved = True
+            else:
+                break
+        elif motion == '%':
+            # Jump to the matching bracket. If not on a bracket, scan right on the
+            # row for the first one (vim behaviour). Row-scoped, nesting-aware.
+            row = player.row
+            bch = _bracket_at(room, row, player.col)
+            start = player.col if bch is not None else None
+            if start is None:
+                for c in range(player.col + 1, room.cols):
+                    if room.cells[row][c] in (CellType.WALL, CellType.WOOD_WALL):
+                        break
+                    b = _bracket_at(room, row, c)
+                    if b is not None:
+                        start, bch = c, b
+                        break
+            tgt = None
+            if start is not None:
+                forward = bch in _PAIRS_OPEN
+                want    = _PAIRS_OPEN[bch] if forward else _PAIRS_CLOSE[bch]
+                scan    = range(start, room.cols) if forward else range(start, -1, -1)
+                depth = 0
+                for c in scan:
+                    if room.cells[row][c] in (CellType.WALL, CellType.WOOD_WALL):
+                        break
+                    b = _bracket_at(room, row, c)
+                    if b == bch:
+                        depth += 1
+                    elif b == want:
+                        depth -= 1
+                        if depth == 0:
+                            tgt = c
+                            break
+            if tgt is not None and tgt != player.col:
+                player.col = tgt
+                moved = True
+            else:
+                break
+        elif motion in ('{', '}'):
+            # Paragraph jump: a blank row = a passable row with no runes.
+            row = player.row
+            rng = range(row + 1, room.rows) if motion == '}' else range(row - 1, -1, -1)
+            target_row = None
+            for r in rng:
+                if _leftmost_passable(room, r) is not None and not _row_has_rune(room, r):
+                    target_row = r
+                    break
+            if target_row is None:
+                # No blank row in that direction: fall to the extreme passable row.
+                prows = [r for r in range(room.rows) if _leftmost_passable(room, r) is not None]
+                if prows:
+                    target_row = prows[-1] if motion == '}' else prows[0]
+            if target_row is None:
+                break
+            tc = _leftmost_passable(room, target_row)
+            if (target_row, tc) != (player.row, player.col):
+                player.row, player.col = target_row, tc
+                moved = True
+            else:
+                break
+        elif motion in ('(', ')'):
+            # Sentence jump (row-scoped): start of next/previous sentence.
+            starts = _sentence_starts(room, player.row)
+            if motion == ')':
+                nxt = [s for s in starts if s > player.col]
+                if nxt:
+                    player.col = nxt[0]
+                    moved = True
+                else:
+                    break
+            else:
+                prev = [s for s in starts if s < player.col]
+                if prev:
+                    player.col = prev[-1]
+                    moved = True
+                else:
+                    break
         elif motion in ('f', 'F', 't', 'T'):
             if target is None:
                 break
