@@ -58,46 +58,261 @@ LEVELS = [
     },
     {
         'id': 6,
-        'key': 'dungeon_06_the_word_forge',
-        'name': 'The WORD Forge',
-        'commands': 'W B E',
+        'key': 'dungeon_06_the_wardens_precision',
+        'name': "The Warden's Precision",
+        'commands': 'v',
         'unlocks_after': 51,
     },
     {
-        'id': 121,
-        'key': 'dungeon_12.1_the_scrivenors_loom',
-        'name': "The Scrivener's Loom",
-        'commands': '(miniboss)',
-        'commands_level': 12,
+        'id': 7,
+        'key': 'dungeon_07_the_word_forge',
+        'name': 'The WORD Forge',
+        'commands': 'W B E',
+        'unlocks_after': 6,
+    },
+    {
+        'id': 8,
+        'key': 'dungeon_08_the_backward_vaults',
+        'name': 'The Backward Vaults',
+        'commands': 'ge gE',
+        'unlocks_after': 7,
+    },
+    {
+        'id': 9,
+        'key': 'dungeon_09_the_file_vaults',
+        'name': 'The File Vaults',
+        'commands': 'G gg',
+        'unlocks_after': 8,
+    },
+    {
+        'id': 10,
+        'key': 'dungeon_10_the_screen_vault',
+        'name': 'The Screen Vault',
+        'commands': 'H M L',
+        'unlocks_after': 9,
+    },
+    {
+        'id': 12,
+        'key': 'dungeon_12_the_bracket_vaults',
+        'name': 'The Bracket Vaults',
+        'commands': '%',
+        'unlocks_after': 10,
+    },
+    {
+        'id': 13,
+        'key': 'dungeon_13_the_runic_archives',
+        'name': 'The Runic Archives',
+        'commands': '} { ) (',
         'unlocks_after': 12,
+    },
+    {
+        'id': 14,
+        'key': 'dungeon_14_the_inscription_halls',
+        'name': 'The Inscription Halls',
+        'commands': 'i a I A',
+        'unlocks_after': 13,
+    },
+    {
+        'id': 142,
+        'key': 'dungeon_14.2_the_sculpting_chambers',
+        'name': 'The Sculpting Chambers',
+        'commands': 'o O s S',
+        'unlocks_after': 14,
+    },
+    {
+        'id': 141,
+        'key': 'dungeon_14.1_the_warden_unbound',
+        'name': 'The Warden Unbound',
+        'commands': '(boss)',
+        'commands_level': 142,
+        'unlocks_after': 142,
         'type': 'boss',
     },
     {
-        'id': 171,
-        'key': 'dungeon_17.1_the_erasure_engine',
-        'name': 'The Erasure Engine',
-        'commands': '(miniboss)',
-        'commands_level': 17,
+        'id': 15,
+        'key': 'dungeon_15_the_operators_vault',
+        'name': "The Operator's Vault",
+        'commands': 'd c',
+        'unlocks_after': 141,
+    },
+    {
+        'id': 155,
+        'key': 'dungeon_15.5_the_whole_line_annex',
+        'name': 'The Whole-Line Annex',
+        'commands': 'dd cc',
+        'unlocks_after': 15,
+    },
+    {
+        'id': 16,
+        'key': 'dungeon_16_the_undo_sanctum',
+        'name': 'The Undo Sanctum',
+        'commands': 'u Ctrl-R',
+        'unlocks_after': 155,
+    },
+    {
+        'id': 17,
+        'key': 'dungeon_17_the_word_chiseler',
+        'name': 'The Word Chiseler',
+        'commands': 'dw de db dW dE dB',
+        'unlocks_after': 16,
+    },
+    {
+        'id': 18,
+        'key': 'dungeon_18_the_delimiter_chamber',
+        'name': 'The Delimiter Chamber',
+        'commands': 'dt df dT dF',
         'unlocks_after': 17,
-        'type': 'boss',
     },
     {
-        'id': 231,
-        'key': 'dungeon_23.1_the_palimpsests_chamber',
-        'name': "The Palimpsest's Chamber",
-        'commands': '(miniboss)',
-        'commands_level': 23,
+        'id': 19,
+        'key': 'dungeon_19_the_line_edge_hall',
+        'name': 'The Line-Edge Hall',
+        'commands': 'd$ D d0 d^',
+        'unlocks_after': 18,
+    },
+    {
+        'id': 20,
+        'key': 'dungeon_20_the_file_sweep',
+        'name': 'The File Sweep',
+        'commands': 'dG dgg',
+        'unlocks_after': 19,
+    },
+    {
+        'id': 21,
+        'key': 'dungeon_21_the_yank_vault',
+        'name': 'The Yank Vault',
+        'commands': 'y yy',
+        'unlocks_after': 20,
+    },
+    {
+        'id': 22,
+        'key': 'dungeon_22_the_paste_halls',
+        'name': 'The Paste Halls',
+        'commands': 'p P',
+        'unlocks_after': 21,
+    },
+    {
+        'id': 23,
+        'key': 'dungeon_23_the_fine_liftmaster',
+        'name': 'The Fine Liftmaster',
+        'commands': 'yw ye y$',
+        'unlocks_after': 22,
+    },
+    {
+        'id': 24,
+        'key': 'dungeon_24_the_change_corridor',
+        'name': 'The Change Corridor',
+        'commands': 'cw ce cb',
         'unlocks_after': 23,
+    },
+    {
+        'id': 25,
+        'key': 'dungeon_25_the_delimiter_change',
+        'name': 'The Delimiter Change',
+        'commands': 'ct cf cT cF',
+        'unlocks_after': 24,
+    },
+    {
+        'id': 251,
+        'key': 'dungeon_25.1_the_warden_manifold',
+        'name': 'The Warden Manifold',
+        'commands': '(boss)',
+        'commands_level': 25,
+        'unlocks_after': 25,
         'type': 'boss',
     },
     {
-        'id': 331,
-        'key': 'dungeon_33.1_the_symmetrals_sanctum',
-        'name': "The Symmetral's Sanctum",
-        'commands': '(miniboss)',
-        'commands_level': 33,
-        'unlocks_after': 33,
+        'id': 26,
+        'key': 'dungeon_26_the_overwrite_halls',
+        'name': 'The Overwrite Halls',
+        'commands': 'r R',
+        'unlocks_after': 251,
+    },
+    {
+        'id': 27,
+        'key': 'dungeon_27_the_case_chambers',
+        'name': 'The Case Chambers',
+        'commands': '~',
+        'unlocks_after': 26,
+    },
+    {
+        'id': 28,
+        'key': 'dungeon_28_the_echo_vault',
+        'name': 'The Echo Vault',
+        'commands': '.',
+        'unlocks_after': 27,
+    },
+    {
+        'id': 29,
+        'key': 'dungeon_29_the_case_operator_halls',
+        'name': 'The Case Operator Halls',
+        'commands': 'g~ gU gu',
+        'unlocks_after': 28,
+    },
+    {
+        'id': 30,
+        'key': 'dungeon_30_the_join_corridor',
+        'name': 'The Join Corridor',
+        'commands': 'J gJ',
+        'unlocks_after': 29,
+    },
+    {
+        'id': 31,
+        'key': 'dungeon_31_the_indent_halls',
+        'name': 'The Indent Halls',
+        'commands': '>> <<',
+        'unlocks_after': 30,
+    },
+    {
+        'id': 32,
+        'key': 'dungeon_32_the_operator_indent',
+        'name': 'The Operator Indent',
+        'commands': '>{m} <{m} =',
+        'unlocks_after': 31,
+    },
+    {
+        'id': 321,
+        'key': 'dungeon_32.1_the_warden_scrivener',
+        'name': 'The Warden Scrivener',
+        'commands': '(boss)',
+        'commands_level': 32,
+        'unlocks_after': 32,
         'type': 'boss',
+    },
+    {
+        'id': 34,
+        'key': 'dungeon_34_the_word_enclosure',
+        'name': 'The Word Enclosure',
+        'commands': 'iw aw',
+        'unlocks_after': 321,
+    },
+    {
+        'id': 35,
+        'key': 'dungeon_35_the_bracket_enclosure',
+        'name': 'The Bracket Enclosure',
+        'commands': 'i( a( i[ a[ i{ a{',
+        'unlocks_after': 34,
+    },
+    {
+        'id': 36,
+        'key': 'dungeon_36_the_quote_enclosure',
+        'name': 'The Quote Enclosure',
+        'commands': 'i" a" i\' a\'',
+        'unlocks_after': 35,
+    },
+    {
+        'id': 37,
+        'key': 'dungeon_37_the_tag_enclosure',
+        'name': 'The Tag Enclosure',
+        'commands': 'it at',
+        'unlocks_after': 36,
+    },
+    {
+        'id': 38,
+        'key': 'dungeon_38_the_paragraph_enclosure',
+        'name': 'The Paragraph Enclosure',
+        'commands': 'is as ip ap',
+        'unlocks_after': 37,
     },
     {
         'id': 99,
@@ -110,7 +325,7 @@ LEVELS = [
 
 
 def level_type(level_id: int) -> str:
-    """Returns 'dungeon' or 'reliquary'. Defaults to 'dungeon' if not specified."""
+    """Returns 'dungeon', 'reliquary', or 'boss'. Defaults to 'dungeon'."""
     level = next((l for l in LEVELS if l['id'] == level_id), None)
     return (level or {}).get('type', 'dungeon')
 
@@ -135,7 +350,35 @@ def known_commands(level_id: int) -> list:
     if effective >= 5:
         cmds += [';', ',']
     if effective >= 6:
+        cmds += ['visual']
+    if effective >= 7:
         cmds += ['W', 'B', 'E']
+    if effective >= 8:
+        cmds += ['ge', 'gE']
+    if effective >= 9:
+        cmds += ['G', 'gg']
+    if effective >= 10:
+        cmds += ['H', 'M', 'L']
+    if effective >= 12:
+        cmds += ['%']
+    if effective >= 13:
+        cmds += ['{', '}', '(', ')']
+    if effective >= 14:
+        cmds += ['insert']
+    if effective >= 142:
+        cmds += ['s', 'S']
+    if effective >= 15:
+        cmds += ['d', 'c']
+    if effective >= 21:
+        cmds += ['y']
+    if effective >= 22:
+        cmds += ['register']
+    if effective >= 26:
+        cmds += ['r', 'R']
+    if effective >= 27:
+        cmds += ['~']
+    if effective >= 28:
+        cmds += ['dot']
     return cmds
 
 

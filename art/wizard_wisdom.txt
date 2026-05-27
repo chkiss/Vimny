@@ -26,7 +26,7 @@
       ]
     },
     {
-      "level": 2,
+      "level": 1,
       "name": "save and quit",
       "line_count": 4,
       "quote": [
@@ -67,153 +67,246 @@
     },
     {
       "level": 4,
-      "name": "gg / G",
+      "name": "w b e",
       "line_count": 4,
       "quote": [
-        "        gg two gulls, gulping morning air.      ",
-        "               G the cellar grate.              ",
-        "          g_ the gate to the outdoors.          ",
-        "  Go, adventurer! Grok the ends of your world.  "
+        "    w steps to the next word's first stone.     ",
+        "       b walks that same path home again.       ",
+        "       e reaches across to the far edge—        ",
+        "    three strides, and the river's crossed.     "
       ]
     },
     {
       "level": 5,
-      "name": "paragraphs",
-      "line_count": 3,
+      "name": "f F t T",
+      "line_count": 4,
       "quote": [
-        "          { drifts back. } drifts on.           ",
-        "   Paragraphs breathe like the moonlit tide.    ",
-        "   At eagle's height, climb to a wider sight.   "
+        "    fx lands square on the letter you name.     ",
+        "      tx halts a breath before it stands.       ",
+        "      F and T walk the same hunt backward.      ",
+        "   Name your mark; the rest is in your hands.   "
       ]
     },
     {
       "level": 6,
-      "name": "delete",
+      "name": "; ,",
       "line_count": 4,
       "quote": [
-        "  d swallows, its appetite unending. dw, dl,    ",
-        "      dx if you count what you're rending.      ",
-        "      d$ and D, brothers of convenience.        ",
-        "  will down a line complete! It's genius.       "
+        "           Name your letter the once.           ",
+        "      ; walks that find on down the line.       ",
+        "      , turns on its heel and comes back.       ",
+        "        The hunt remembers; you needn't.        "
       ]
     },
     {
       "level": 7,
-      "name": "echoes",
+      "name": "v",
       "line_count": 3,
       "quote": [
-        "    d to slash. y to keep. p to paste anew.     ",
-        "       All are moves that help to keep          ",
-        "             the memory with you.               "
+        "      v opens the eye and it follows you.       ",
+        "       Move, and the trail glows behind—        ",
+        "      all it crosses, held until you act.       "
       ]
     },
     {
       "level": 8,
-      "name": "transformation",
-      "line_count": 2,
+      "name": "v/V/Ctrl-V",
+      "line_count": 4,
       "quote": [
-        "         c can change one for a million,        ",
-        "                 s a single score.              ",
-        "           cc/C for a complete line,            ",
-        "             or ciw just one rune.              "
+        "     v for a span of letters, V for lines,      ",
+        "      Ctrl-V for a tower, column-straight.      ",
+        "     Choose the shape that fits your work;      ",
+        "      the verb that follows does not care.      "
       ]
     },
     {
       "level": 9,
-      "name": "dot",
-      "line_count": 2,
+      "name": "W B E",
+      "line_count": 4,
       "quote": [
-        "         . echoes your last whisper.            ",
-        "        Speak once, and spot the echo.          "
+        "       w minds each comma, dot, and dash;       ",
+        "     W strides past them in a single bound.     ",
+        "       B walks it backward, E to the end—       ",
+        "       the bolder path across the ground.       "
       ]
     },
     {
       "level": 10,
-      "name": "undo",
-      "line_count": 3,
+      "name": "ge gE",
+      "line_count": 4,
       "quote": [
-        "  u unwinds the thread. Ctrl-R weaves it back.  ",
-        "       Time bends softly within Vim,            ",
-        "     an amber thread, with endless slack.       "
+        "      e reaches the end of the next word.       ",
+        "  ge looks back to where the last word ended.   ",
+        "       Same landing, opposite direction.        ",
+        "  gE the wide step: whitespace to whitespace.   "
       ]
     },
     {
       "level": 11,
-      "name": "visual",
-      "line_count": 3,
+      "name": "G gg {n}G",
+      "line_count": 4,
       "quote": [
-        "        v, V, Ctrl-V: choose your frame.        ",
-        "        Hold the world in amber pause.          ",
-        "          Select, assess, then act.             "
+        "      gg: two soft steps to the top stone.      ",
+        "     G: one long fall to the cellar floor.      ",
+        "     Set a number first, and G lands there.     ",
+        "     Top, bottom, and every rung you name.      "
       ]
     },
     {
       "level": 12,
-      "name": "insert",
+      "name": "H M L",
       "line_count": 4,
       "quote": [
-        "    i inserts here. a appends to the rune.      ",
-        "   o below, O above—newlines for new runes.     ",
-        "I to insert where I begin, and A appends an end,",
-        "Esc return to normal, once all is done and said."
+        "        H: the high stone at the crest.         ",
+        "        M: the middle, without counting.        ",
+        "         L: the low stone at the base.          ",
+        "     No rows to tally; just point and land.     "
       ]
     },
     {
       "level": 13,
-      "name": "visual buffers",
+      "name": "%",
       "line_count": 3,
       "quote": [
-        "     :ls lists all scrolls unrolled, and :e     ",
-        "     unscrolls anew; :bn to skip, :bp returns   ",
-        "           :bd to close like half a q.          "
-      ]
-    },
-    {
-      "level": 13,
-      "name": "settings",
-      "line_count": 3,
-      "quote": [
-        ":set to set a setting, try number for each line ",
-        "     :set nonumber if you decide against it!    ",
-        "           Your scroll is unmaligned.           "
+        "       % finds the bracket's other half.        ",
+        "      Open calls to close; close to open.       ",
+        "    Stand on either; one step to the mirror.    "
       ]
     },
     {
       "level": 14,
-      "name": "search",
-      "line_count": 3,
+      "name": "} { ) (",
+      "line_count": 4,
       "quote": [
-        "      / casts light forward. ? casts back.     ",
-        "      n to go again, or N to retrace back.     ",
-        "        :set hlsearch to light each one:       ",
-        "           light them from the black.          "
+        "      } leaps the blank to the next block.      ",
+        "             { walks it back again.             ",
+        "      ) and ( move between sentence ends.       ",
+        "      Paragraphs and sentences, both jump.      "
       ]
     },
     {
       "level": 15,
-      "name": "marks",
-      "line_count": 3,
+      "name": "i a I A",
+      "line_count": 4,
       "quote": [
-        "ma leaves a waystone hither. 'a lets you return",
-        "       pixel-perfect, where you desire         ",
-        "  waystones a-z glow wherever you left them,   ",
-        "       but what of <>, [], ., ^, and '??       ",
-        "     select, amend/yank, change, leap, see!    "
-      ]
-    },
-
-    {
-      "level": 15,
-      "name": "fFtT",
-      "line_count": 3,
-      "quote": [
-        "fx lands on a future rune. tx stops just before.",
-        "  Fx looks to the past. Tx stops just short.    ",
-        "Every target within grasp of the precise caster."
+        "     i opens just before the cursor stands.     ",
+        "        a opens just after—one step in.         ",
+        "       I leaps to the line's first stone;       ",
+        "      A to the last. Four doors, one room.      "
       ]
     },
     {
       "level": 16,
+      "name": "o O s S",
+      "line_count": 4,
+      "quote": [
+        "     o opens a new line below and listens.      ",
+        "            O opens one just above.             ",
+        "  s swaps what's under for what you'll write.   ",
+        "         S clears the line—start fresh.         "
+      ]
+    },
+    {
+      "level": 18,
+      "name": "d c",
+      "line_count": 4,
+      "quote": [
+        "   d cuts the letters the motion would cross.   ",
+        "   c cuts, then opens for what you'll write.    ",
+        "          Two operators; one grammar.           ",
+        " Motion names the range—the verb does the rest. "
+      ]
+    },
+    {
+      "level": 19,
+      "name": "dd cc",
+      "line_count": 4,
+      "quote": [
+        "   Double the letter: the whole line answers.   ",
+        "    dd clears the row; cc clears and waits.     ",
+        "     One stroke for the span you stand on.      ",
+        "       The motion already knew which row.       "
+      ]
+    },
+    {
+      "level": 20,
+      "name": "u Ctrl-R",
+      "line_count": 4,
+      "quote": [
+        "         u walks the last change back.          ",
+        "        Ctrl-R brings it forward again.         ",
+        "     Not defeat—the tool that lets you try.     ",
+        "    Take the bold step; undo it if you must.    "
+      ]
+    },
+    {
+      "level": 25,
+      "name": "y yy",
+      "line_count": 4,
+      "quote": [
+        "  y lifts the letters the motion would cross.   ",
+        "   Nothing is cut; the stone stays in place.    ",
+        "     yy takes the whole line in one reach.      ",
+        "      What's lifted lives in the register.      "
+      ]
+    },
+    {
+      "level": 26,
+      "name": "p P",
+      "line_count": 4,
+      "quote": [
+        " p sets the lifted weight just past the cursor. ",
+        "           P lays it one step before.           ",
+        "           What y gathered, p places.           ",
+        "          Move first; then press once.          "
+      ]
+    },
+    {
+      "level": 31,
+      "name": "r R",
+      "line_count": 4,
+      "quote": [
+        "   r names the replacement; the cursor stays.   ",
+        "  R walks the line and overwrites as it goes.   ",
+        "       One letter wrong, or a whole run:        ",
+        "           pick the shape that fits.            "
+      ]
+    },
+    {
+      "level": 32,
+      "name": "~",
+      "line_count": 4,
+      "quote": [
+        "     ~ turns the lamp on the letter below:      ",
+        "    small to tall, tall to small, one step.     ",
+        "    Count it — 3~ flips three in one reach.     ",
+        "        Case bends; the cursor walks on.        "
+      ]
+    },
+    {
+      "level": 33,
+      "name": ".",
+      "line_count": 4,
+      "quote": [
+        "        . is memory; it forgets nothing.        ",
+        " Whatever you changed last—it holds the shape.  ",
+        "     Move to the next place and press once.     ",
+        "           The same hand falls again.           "
+      ]
+    },
+    {
+      "level": 39,
+      "name": "text objects",
+      "line_count": 4,
+      "quote": [
+        "         Stand anywhere inside a word—          ",
+        "       ciw still changes the whole thing.       ",
+        "        i for the flesh, a for the skin.        ",
+        "       Name the shape; the rest is done.        "
+      ]
+    },
+    {
+      "level": 0,
       "name": "%",
       "line_count": 2,
       "quote": [
@@ -222,7 +315,7 @@
       ]
     },
     {
-      "level": 17,
+      "level": 0,
       "name": "substitute",
       "line_count": 2,
       "quote": [
@@ -231,7 +324,7 @@
       ]
     },
     {
-      "level": 18,
+      "level": 0,
       "name": "macros",
       "line_count": 3,
       "quote": [
@@ -241,7 +334,7 @@
       ]
     },
     {
-      "level": 19,
+      "level": 0,
       "name": "files",
       "line_count": 3,
       "quote": [
@@ -276,7 +369,7 @@
       "line_count": 3,
       "quote": [
         "         Every mage began with hjkl.            ",
-        "     You’re not slow—you’re tuning the signal.  ",
+        "     You're not slow—you're tuning the signal.  ",
         "      The buffer awaits in warm, soft light.    "
       ]
     },
