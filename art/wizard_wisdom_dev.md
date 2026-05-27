@@ -46,27 +46,30 @@ Ord  Completed level             Commands              wisdom_idx → introduces
 12   id=10  The Screen Vault      H M L                → w[13] %
 13   id=12  The Bracket Vaults    %                    → w[14] } { ) (
 14   id=13  The Runic Archives    } { ) (              → w[15] i a I A
-15   id=14  The Inscription Halls i a I A              → w[16] o O s S
-16   id=142 The Sculpting Chambers o O s S             → w[17] (generic)
-17   id=141 The Warden Unbound    (boss)               → w[18] d c
-18   id=15  The Operator's Vault  d c                  → w[19] dd cc
-19   id=155 The Whole-Line Annex  dd cc                → w[20] u Ctrl-R
-20   id=16  The Undo Sanctum      u Ctrl-R             → w[21] (generic)
-21   id=17  The Word Chiseler     dw de db ...         → w[22] (generic)
-22   id=18  The Delimiter Chamber dt df dT dF          → w[23] (generic)
-23   id=19  The Line-Edge Hall    d$ D d0 d^           → w[24] (generic)
-24   id=20  The File Sweep        dG dgg               → w[25] y yy
-25   id=21  The Yank Vault        y yy                 → w[26] p P
-26   id=22  The Paste Halls       p P                  → w[27] (generic)
-27   id=23  The Fine Liftmaster   yw ye y$             → w[28] (generic)
-28   id=24  The Change Corridor   cw ce cb             → w[29] (generic)
-29   id=25  The Delimiter Change  ct cf cT cF          → w[30] (generic)
-30   id=251 The Warden Manifold   (boss)               → w[31] r R
-31   id=26  The Overwrite Halls   r R                  → w[32] ~
-32   id=27  The Case Chambers     ~                    → w[33] .
-33   id=28  The Echo Vault        .                    → w[34] (generic)
-...
-38   id=321 The Warden Scrivener  (boss)               → w[39] text objects
+15   id=14  The Inscription Halls  i a I A              → w[16] o O s S
+16   id=15  The Sculpting Chambers o O s S             → w[17] (generic)
+17   id=151 The Warden Unbound    (boss)               → w[18] d c
+18   id=16  The Operator's Vault  d c                  → w[19] dd cc
+19   id=17  The Whole-Line Annex  dd cc                → w[20] u Ctrl-R
+20   id=18  The Undo Sanctum      u Ctrl-R             → w[21] (generic)
+21   id=19  The Word Chiseler     dw de db ...         → w[22] (generic)
+22   id=20  The Delimiter Chamber dt df dT dF          → w[23] (generic)
+23   id=21  The Line-Edge Hall    d$ D d0 d^           → w[24] (generic)
+24   id=22  The File Sweep        dG dgg               → w[25] y yy
+25   id=23  The Yank Vault        y yy                 → w[26] p P
+26   id=24  The Paste Halls       p P                  → w[27] (generic)
+27   id=25  The Fine Liftmaster   yw ye y$             → w[28] (generic)
+28   id=26  The Change Corridor   cw ce cb             → w[29] (generic)
+29   id=27  The Delimiter Change  ct cf cT cF          → w[30] (generic)
+30   id=271 The Warden Manifold   (boss)               → w[31] r R
+31   id=28  The Overwrite Halls   r R                  → w[32] ~
+32   id=29  The Case Chambers     ~                    → w[33] .
+33   id=30  The Echo Vault        .                    → w[34] (generic)
+34   id=31  The Case Operator Halls g~ gU gu           → w[35] (generic)
+35   id=32  The Join Corridor     J gJ                 → w[36] (generic)
+36   id=33  The Indent Halls      >> <<                → w[37] (generic)
+37   id=34  The Operator Indent   >{m} <{m} =          → w[38] (generic)
+38   id=341 The Warden Scrivener  (boss)               → w[39] text objects
 ```
 
 ---
