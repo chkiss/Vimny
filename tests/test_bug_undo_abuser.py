@@ -125,7 +125,7 @@ def test_undo_tuple_pushes_to_redo_stack():
     assert len(redo_stack) == 1
     item = redo_stack[0]
     assert isinstance(item, tuple)
-    assert item == (3, 8, 3)
+    assert item[:3] == (3, 8, 3) and len(item) == 5
 
 
 # ── 6. Undo pushes inverse onto redo_stack (dict) ────────────────────────────

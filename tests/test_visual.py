@@ -44,7 +44,8 @@ class TestSpan:
         assert t.type is TextObjectType.LINEWISE
         assert (t.start_row, t.end_row) == (2, 4)
 
-    def test_multirow_charwise_is_linewise(self):
+    def test_multirow_charwise_still_linewise_for_indent(self):
+        # visual_span still returns LINEWISE for multi-row (used by >/<)
         room = _room()
         t = visual_span((2, 5), (4, 1), Mode.VISUAL, room)
         assert t.type is TextObjectType.LINEWISE
@@ -66,6 +67,22 @@ class TestInSelection:
 
     def test_no_anchor(self):
         assert in_selection(None, (3, 3), Mode.VISUAL, 3, 3) is False
+
+    def test_charwise_multirow_partial_rows(self):
+        # anchor=(2,3) cursor=(4,7): top row starts at col 3, bottom ends at col 7
+        assert in_selection((2, 3), (4, 7), Mode.VISUAL, 2, 2) is False  # before anchor col
+        assert in_selection((2, 3), (4, 7), Mode.VISUAL, 2, 3) is True   # at anchor col
+        assert in_selection((2, 3), (4, 7), Mode.VISUAL, 2, 9) is True   # past anchor col
+        assert in_selection((2, 3), (4, 7), Mode.VISUAL, 3, 0) is True   # middle row: any col
+        assert in_selection((2, 3), (4, 7), Mode.VISUAL, 4, 7) is True   # at cursor col
+        assert in_selection((2, 3), (4, 7), Mode.VISUAL, 4, 8) is False  # past cursor col
+
+    def test_charwise_multirow_reversed(self):
+        # cursor above anchor: same logic, just swapped
+        assert in_selection((4, 7), (2, 3), Mode.VISUAL, 2, 2) is False
+        assert in_selection((4, 7), (2, 3), Mode.VISUAL, 2, 3) is True
+        assert in_selection((4, 7), (2, 3), Mode.VISUAL, 4, 7) is True
+        assert in_selection((4, 7), (2, 3), Mode.VISUAL, 4, 8) is False
 
 
 class TestApplyVisual:
@@ -101,6 +118,34 @@ class TestApplyVisual:
         p = Player(row=3, col=4)
         apply_visual('g~', (3, 2), (3, 4), Mode.VISUAL, room, p)
         assert (_cell(room, 3, 2), _cell(room, 3, 3), _cell(room, 3, 4)) == ('A', 'b', 'C')
+
+    def test_charwise_multirow_delete_partial_rows(self):
+        # anchor=(2,3) cursor=(4,5): top row deletes cols 3+, bottom row deletes up to col 5
+        room = _room()
+        room.add_rune(RuneCluster(2, 1, ('a', 'b', 'c', 'd', 'e'), 'ancient'))  # cols 1-5
+        room.add_rune(RuneCluster(3, 1, ('f', 'g', 'h'), 'ancient'))             # cols 1-3
+        room.add_rune(RuneCluster(4, 1, ('i', 'j', 'k', 'l', 'm'), 'ancient'))  # cols 1-5
+        p = Player(row=2, col=3)
+        apply_visual('d', (2, 3), (4, 5), Mode.VISUAL, room, p)
+        # row 2: cols 1-2 kept (a,b), cols 3-5 deleted (c,d,e)
+        assert _cell(room, 2, 1) == 'a' and _cell(room, 2, 2) == 'b'
+        assert all(room.rune_at(2, c) is None for c in (3, 4, 5))
+        # row 3: whole passable extent deleted
+        assert all(room.rune_at(3, c) is None for c in (1, 2, 3))
+        # row 4: cols 1-5 deleted (up to cursor col 5)
+        assert all(room.rune_at(4, c) is None for c in (1, 2, 3, 4, 5))
+        assert p.row == 2 and p.col == 3
+
+    def test_charwise_multirow_top_row_not_col_zero(self):
+        # anchor col must be respected — col 0 on top row NOT deleted
+        room = _room()
+        room.add_rune(RuneCluster(2, 1, ('x', 'y', 'z'), 'ancient'))  # cols 1-3
+        room.add_rune(RuneCluster(3, 1, ('a', 'b', 'c'), 'ancient'))  # cols 1-3
+        p = Player(row=2, col=2)
+        apply_visual('d', (2, 2), (3, 3), Mode.VISUAL, room, p)
+        # row 2 col 1 ('x') is BEFORE anchor col 2 — must survive
+        assert _cell(room, 2, 1) == 'x'
+        assert room.rune_at(2, 2) is None and room.rune_at(2, 3) is None
 
     def test_block_delete_rectangle(self):
         room = _room()

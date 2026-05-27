@@ -1,11 +1,50 @@
 """Answer-path correctness: each token must be an atomic keystroke for the level."""
+import inspect
 import re
 import pytest
+import generation.dungeon_gen as _dg
 from generation.dungeon_gen import build_dungeon_0, build_dungeon_1
 
 SEEDS = [0, 1, 42, 999, 2**20 + 7]
 
 _COUNT_RE = re.compile(r'^\d+[hjkl]$')   # e.g. '44l', '3j', '2h'
+
+# ── General keystroke-cost model ──────────────────────────────────────────────
+# Matches engine/main.py _keystroke_cost and the Dijkstra cost model:
+#   count=1 → 1 ks; count=N → len(str(N))+1 ks.
+#   ge/gE add +1 base: 2 ks for n=1, len(str(n))+2 for n>1.
+
+_GE_RE  = re.compile(r'^(\d*)g[eEg]$')  # 'ge', 'gE', 'gg', '2gE', '10ge', …
+_FT_RE  = re.compile(r'^(\d*)[fFtT].$') # 'fr', 'Fw', 't!', 'T!', '2fr', …
+_CNT_RE = re.compile(r'^(\d+).')        # '4e', '18h', '2j', …
+
+
+def _token_ks_cost(token: str) -> int:
+    """Keystroke cost of a single answer token.
+
+    Matches _keystroke_cost in main.py:
+      - plain single key (j, ^, $, x, …): 1
+      - count-N + motion (4j, 63l, 9e): len(str(N)) + 1
+      - g-prefix 2-key (ge, gE, gg): base 2; with count N: len(str(N)) + 2
+      - f/F/t/T + target char (fr, Fw, t!, T!): base 2; with count: len+2
+    """
+    m = _GE_RE.match(token)
+    if m:
+        n_str = m.group(1)
+        return 2 if not n_str else len(n_str) + 2
+    m = _FT_RE.match(token)
+    if m:
+        n_str = m.group(1)
+        return 2 if not n_str else len(n_str) + 2
+    m = _CNT_RE.match(token)
+    if m:
+        return len(m.group(1)) + 1
+    return 1  # single key: 'j', '^', '$', 'v', ';', ',', etc.
+
+
+def _answer_total_ks_cost(answer: str) -> int:
+    """Total keystroke cost of a space-separated answer string."""
+    return sum(_token_ks_cost(t) for t in answer.split())
 
 
 def _answer_keystroke_cost(answer: str, has_count: bool) -> int:
@@ -18,6 +57,64 @@ def _answer_keystroke_cost(answer: str, has_count: bool) -> int:
         else:
             total += 1
     return total
+
+
+# ── Universal answer-cost == par test (auto-discovers all build_dungeon_*) ────
+#
+# Any new build_dungeon_N added to dungeon_gen is automatically tested.
+# Add to _XFAIL_LEVELS when a level's answer is intentionally not a
+# parseable Vim-command token sequence (document why).
+# Add to _SKIP_LEVELS when a level has no par yet (work in progress).
+
+_BUILDER_RE = re.compile(r'^build_dungeon_\w+$')
+
+_SKIP_LEVELS = {
+    # par=None: level is incomplete / not yet assigned a Dijkstra solver
+    'build_dungeon_1_1',
+    'build_dungeon_51',
+    'build_dungeon_dummy',
+}
+_XFAIL_LEVELS: dict = {}
+
+_UNIVERSAL_SEEDS = [1, 42, 999, 12345, 2**20 + 7]
+
+
+def _all_builder_params():
+    builders = sorted(
+        (name, fn)
+        for name, fn in inspect.getmembers(_dg, inspect.isfunction)
+        if _BUILDER_RE.match(name)
+    )
+    params = []
+    for name, fn in builders:
+        for seed in _UNIVERSAL_SEEDS:
+            marks = []
+            if name in _SKIP_LEVELS:
+                marks.append(pytest.mark.skip(reason=f"{name}: par not set"))
+            elif name in _XFAIL_LEVELS:
+                marks.append(pytest.mark.xfail(
+                    strict=False, reason=_XFAIL_LEVELS[name]
+                ))
+            params.append(pytest.param(fn, seed, id=f"{name}[{seed}]", marks=marks))
+    return params
+
+
+@pytest.mark.parametrize("builder,seed", _all_builder_params())
+def test_answer_cost_equals_par(builder, seed):
+    """answer keystroke cost == par for every level with a parseable answer.
+
+    Catches: stale hardcoded fallback strings, Dijkstra cost-model drift,
+    and any future level whose answer was written by hand and mis-counted.
+    New build_dungeon_* functions are discovered automatically.
+    """
+    room = builder(seed).rooms[0]
+    if room.par is None or not room.answer.strip():
+        pytest.skip("no par or answer set")
+    cost = _answer_total_ks_cost(room.answer)
+    assert cost == room.par, (
+        f"answer keystroke cost {cost} != par {room.par}\n"
+        f"  answer: {room.answer!r}"
+    )
 
 
 class TestLevel0AnswerPath:
@@ -59,3 +156,19 @@ class TestLevel1AnswerPath:
             assert len(tokens) == room.par, (
                 f"seed={seed}: answer has {len(tokens)} tokens but par={room.par}"
             )
+
+
+def test_L8_fallback_answer_cost_matches_fallback_par():
+    """Level 8 fallback string and fallback par must agree.
+
+    The universal test only exercises the live Dijkstra output; this test guards
+    the hardcoded fallback used when Dijkstra returns None, catching stale
+    hardcoding after a layout change.
+    """
+    fallback_answer = '4E 2j ^ 2j $ 2j ge 2j $ 2j gE j'
+    fallback_par    = 20
+    cost = _answer_total_ks_cost(fallback_answer)
+    assert cost == fallback_par, (
+        f"Fallback answer cost={cost} != fallback par={fallback_par} "
+        f"(answer={fallback_answer!r}) — update one to match the other"
+    )

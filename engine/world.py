@@ -64,11 +64,16 @@ class Room:
     fog_cells: set              = field(default_factory=set)  # (r,c) pairs not yet visible
     passable_walls: bool        = False  # if True, walls are walkable (editor mode)
     answer: str                 = ''     # keystroke solution shown to admin
+    answer_pos: int             = 0      # non-space chars of answer consumed by admin
+    answer_diverged: bool       = False  # admin pressed a wrong key
     wood_damage: dict           = field(default_factory=dict)  # (r,c) -> half-steps received (1=cracked)
 
     def __post_init__(self):
-        self._entity_map: dict = {}
-        self._rune_map:   dict = {}
+        self._entity_map:    dict = {}
+        self._rune_map:      dict = {}
+        self._entity_by_kind: dict = {}   # kind -> list[Entity] (includes dead)
+        self._rune_rows:      set  = set() # rows that contain at least one rune
+        self._rune_by_row:    dict = {}   # row -> list[RuneCluster]
 
     # ── Spatial index ──────────────────────────────────────────────────────────
 
@@ -80,19 +85,55 @@ class Room:
         in sync incrementally and do not require a full rebuild.
         """
         self._entity_map = {(e.row, e.col): e for e in self.entities if e.alive}
+        self._entity_by_kind = {}
+        for e in self.entities:
+            self._entity_by_kind.setdefault(e.kind, []).append(e)
         self._rune_map   = {}
+        self._rune_by_row = {}
         for ru in self.runes:
             for i in range(len(ru.symbols)):
                 self._rune_map[(ru.row, ru.col + i)] = ru
+            self._rune_by_row.setdefault(ru.row, []).append(ru)
+        self._rune_rows = {ru.row for ru in self.runes}
+        # Normalize WORD colors: adjacent non-void clusters on the same row all
+        # take the leftmost cluster's kind so a WORD renders in one color.
+        by_row: dict = {}
+        for ru in self.runes:
+            by_row.setdefault(ru.row, []).append(ru)
+        for row_runes in by_row.values():
+            row_runes.sort(key=lambda r: r.col)
+            i = 0
+            while i < len(row_runes):
+                ru = row_runes[i]
+                if ru.kind == 'void':
+                    i += 1
+                    continue
+                word_kind = ru.kind
+                j = i + 1
+                while j < len(row_runes):
+                    prev, curr = row_runes[j - 1], row_runes[j]
+                    if prev.col + len(prev.symbols) == curr.col and curr.kind != 'void':
+                        curr.kind = word_kind
+                        j += 1
+                    else:
+                        break
+                i = j
 
     def add_entity(self, e: Entity) -> None:
         self.entities.append(e)
         if e.alive:
             self._entity_map[(e.row, e.col)] = e
+        self._entity_by_kind.setdefault(e.kind, []).append(e)
 
     def remove_entity(self, e: Entity) -> None:
         self.entities.remove(e)
         self._entity_map.pop((e.row, e.col), None)
+        _kl = self._entity_by_kind.get(e.kind)
+        if _kl:
+            try:
+                _kl.remove(e)
+            except ValueError:
+                pass
 
     def kill_entity(self, e: Entity) -> None:
         """Set alive=False and remove from the spatial index."""
@@ -110,11 +151,22 @@ class Room:
         self.runes.append(ru)
         for i in range(len(ru.symbols)):
             self._rune_map[(ru.row, ru.col + i)] = ru
+        self._rune_by_row.setdefault(ru.row, []).append(ru)
+        self._rune_rows.add(ru.row)
 
     def remove_rune(self, ru: RuneCluster) -> None:
         self.runes.remove(ru)
         for i in range(len(ru.symbols)):
             self._rune_map.pop((ru.row, ru.col + i), None)
+        _rl = self._rune_by_row.get(ru.row)
+        if _rl:
+            try:
+                _rl.remove(ru)
+            except ValueError:
+                pass
+            if not _rl:
+                del self._rune_by_row[ru.row]
+                self._rune_rows.discard(ru.row)
 
     # ── Lookup methods (O(1) with indexes built) ───────────────────────────────
 

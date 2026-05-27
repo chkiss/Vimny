@@ -22,6 +22,7 @@ class Player:
     last_f: tuple | None = None   # (motion, target) of most recent f/F/t/T; set by apply_motion
     last_change: dict | None = None  # last action that mutated the room; re-played by .
     visual_anchor: tuple | None = None       # (row, col) where v/V/Ctrl-v was pressed
+    visual_start_spent: int = 0              # budget.spent before v/V/Ctrl-v was pressed
     last_visual_anchor: tuple | None = None   # saved on operator-apply, for gv
     last_visual_cursor: tuple | None = None
     last_visual_mode: object = None           # Mode of the last visual selection, for gv

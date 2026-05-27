@@ -41,10 +41,67 @@ def in_selection(anchor, cursor, vmode, r, c) -> bool:
         return True
     if vmode == Mode.VISUAL_BLOCK:
         return min(ac, cc) <= c <= max(ac, cc)
-    # charwise: single row → col span; multi-row → whole rows
+    # charwise single row
     if ar == cr:
         return min(ac, cc) <= c <= max(ac, cc)
+    # charwise multi-row: top row from anchor col, bottom row to cursor col
+    c_top = ac if ar <= cr else cc
+    c_bot = cc if ar <= cr else ac
+    if r == r1: return c_top <= c
+    if r == r2: return c <= c_bot
     return True
+
+
+_PROTECTED_KINDS = frozenset({'exit', 'door', 'boss_seal'})
+
+
+def _kill_entities_in_span(room, tobj) -> None:
+    for ent in list(room.entities):
+        if (ent.alive
+                and tobj.start_row <= ent.row <= tobj.end_row
+                and tobj.start_col <= ent.col <= tobj.end_col
+                and ent.kind not in _PROTECTED_KINDS):
+            room.kill_entity(ent)
+
+
+def _apply_charwise_multi(op: str, anchor, cursor, room, player):
+    """Delete/yank a charwise multi-row selection with per-row column bounds.
+
+    Top row:    from anchor_col to passable end.
+    Middle rows: full passable extent.
+    Bottom row: from passable start to cursor_col.
+    """
+    ar, ac = anchor
+    cr, cc = cursor
+    if ar <= cr:
+        r1, c_top, r2, c_bot = ar, ac, cr, cc
+    else:
+        r1, c_top, r2, c_bot = cr, cc, ar, ac
+
+    rows = []
+    for r in range(r1, r2 + 1):
+        ext = line_extent(room, r)
+        if ext is None:
+            rows.append({'width': 0, 'runes': []})
+            continue
+        lo = c_top if r == r1 else ext[0]
+        hi = c_bot if r == r2 else ext[1]
+        lo = max(lo, ext[0])
+        hi = min(hi, ext[1])
+        if lo <= hi:
+            rows.append(_capture_row(room, r, lo, hi))
+            if op in ('d', 'c'):
+                _delete_cols(room, r, lo, hi)
+        else:
+            rows.append({'width': 0, 'runes': []})
+
+    if op in ('d', 'c'):
+        player.row = r1
+        ext = line_extent(room, r1)
+        player.col = max(c_top, ext[0]) if ext else c_top
+    elif op == 'y':
+        player.row, player.col = r1, c_top
+    return {'linewise': False, 'rows': rows}
 
 
 def apply_visual(op: str, anchor, cursor, vmode, room, player):
@@ -53,13 +110,22 @@ def apply_visual(op: str, anchor, cursor, vmode, room, player):
     if vmode == Mode.VISUAL_BLOCK:
         return _apply_block(op, anchor, cursor, room, player)
 
+    ar, ac = anchor
+    cr, cc = cursor
+
+    # Charwise multi-row: use per-row column bounds, not linewise
+    if vmode == Mode.VISUAL and ar != cr and op in ('d', 'c', 'y'):
+        return _apply_charwise_multi(op, anchor, cursor, room, player)
+
     tobj = visual_span(anchor, cursor, vmode, room)
     if op == 'y':
         clip = op_yank(room, player, tobj)
         player.row, player.col = tobj.start_row, tobj.start_col
         return clip
     if op in ('d', 'c'):
-        return op_delete(room, player, tobj)       # repositions cursor to start
+        clip = op_delete(room, player, tobj)
+        _kill_entities_in_span(room, tobj)
+        return clip
     if op == 'g~':
         op_case(room, player, tobj, 'g~')
         return None

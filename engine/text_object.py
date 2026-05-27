@@ -279,7 +279,7 @@ def _resolve_sentence(room, r, c, around):
     if nxt is not None:
         e = nxt - 1
     else:
-        e = max((ru.col + len(ru.symbols) - 1 for ru in room.runes if ru.row == r), default=hi)
+        e = max((ru.col + len(ru.symbols) - 1 for ru in room._rune_by_row.get(r, [])), default=hi)
     if not around:                                  # trim trailing blanks for inner
         while e > s and room.rune_at(r, e) is None:
             e -= 1

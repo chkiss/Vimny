@@ -1,4 +1,4 @@
-"""Block B — operator application (d / y) over a TextObject.
+"""Block B — operator application (d / y / c / > / <) over a TextObject.
 
 The register clip preserves spacing: each captured rune records its column
 *offset* from the span's left edge, so gaps between runes survive a paste.
@@ -16,19 +16,20 @@ _PASTABLE = (CellType.FLOOR, CellType.CORRIDOR)
 def line_extent(room, row: int):
     """(lo, hi) inclusive passable column extent of a row — the run between the
     stone walls — or None if the row has no passable cell."""
-    passable = [c for c in range(room.cols) if room.is_passable(row, c)]
-    if not passable:
-        return None
-    return passable[0], passable[-1]
+    lo = hi = None
+    for c in range(room.cols):
+        if room.is_passable(row, c):
+            if lo is None:
+                lo = c
+            hi = c
+    return (lo, hi) if lo is not None else None
 
 
 def _capture_row(room, row: int, lo: int, hi: int) -> dict:
     """Capture runes overlapping [lo, hi] on `row`, split at the boundaries,
     each tagged with its column offset (dcol) from `lo`."""
     runes = []
-    for ru in room.runes:
-        if ru.row != row:
-            continue
+    for ru in room._rune_by_row.get(row, []):
         rlo, rhi = ru.col, ru.col + len(ru.symbols) - 1
         if rhi < lo or rlo > hi:
             continue
@@ -67,10 +68,13 @@ def capture(room, text_obj) -> dict:
     return {'linewise': linewise, 'rows': rows}
 
 
+_WALL_CELLS = (CellType.WALL, CellType.WATER, CellType.WOOD_WALL)
+
+
 def _delete_cols(room, row: int, lo: int, hi: int) -> None:
-    """Remove rune symbols in [lo, hi] on `row`, splitting clusters at the edges."""
-    affected = [ru for ru in room.runes
-                if ru.row == row and not (ru.col + len(ru.symbols) - 1 < lo or ru.col > hi)]
+    """Remove everything visible in [lo, hi] on `row`: runes, wall cells, and entities."""
+    affected = [ru for ru in room._rune_by_row.get(row, [])
+                if not (ru.col + len(ru.symbols) - 1 < lo or ru.col > hi)]
     for ru in affected:
         room.remove_rune(ru)
         if ru.col < lo:                                   # left remnant
@@ -78,6 +82,16 @@ def _delete_cols(room, row: int, lo: int, hi: int) -> None:
         rhi = ru.col + len(ru.symbols) - 1
         if rhi > hi:                                      # right remnant
             room.add_rune(RuneCluster(row, hi + 1, tuple(ru.symbols[hi + 1 - ru.col:]), ru.kind))
+    for c in range(lo, hi + 1):
+        if room.cells[row][c] in _WALL_CELLS:
+            room.cells[row][c] = CellType.FLOOR
+            room.wood_damage.pop((row, c), None)
+    for ent in [e for e in room.entities if e.row == row and lo <= e.col <= hi]:
+        room.remove_entity(ent)
+        if ent.kind == 'exit':
+            room.exit_pos = None
+        elif ent.kind == 'entry_marker':
+            room.entry = (1, 1)
 
 
 def op_yank(room, player, text_obj) -> dict:
@@ -89,9 +103,12 @@ def op_delete(room, player, text_obj) -> dict:
     """Capture the span, remove its runes, reposition the cursor; return the clip."""
     clip = capture(room, text_obj)
     linewise, spans = _clip(text_obj)
+    _ext_cache: dict = {}
     for row, lo, hi in spans:
         if linewise:
-            ext = line_extent(room, row)
+            if row not in _ext_cache:
+                _ext_cache[row] = line_extent(room, row)
+            ext = _ext_cache[row]
             if ext is None:
                 continue
             lo, hi = ext
@@ -100,7 +117,7 @@ def op_delete(room, player, text_obj) -> dict:
     # Cursor → start of the deleted region (vim-faithful).
     if linewise:
         player.row = min(text_obj.start_row, room.rows - 1)
-        ext = line_extent(room, player.row)
+        ext = line_extent(room, player.row)   # fresh call — cells may have changed
         player.col = ext[0] if ext else player.col
     else:
         player.col = text_obj.start_col
@@ -134,7 +151,7 @@ def apply_indent(room, row: int, amount: int) -> int:
     """Shift every rune cluster on `row` by `amount` columns (right > 0, left < 0),
     clamped within the row's passable extent (between the stone walls). Returns the
     net amount actually applied."""
-    clusters = [ru for ru in room.runes if ru.row == row]
+    clusters = list(room._rune_by_row.get(row, []))
     ext = line_extent(room, row)
     if not clusters or ext is None:
         return 0
@@ -165,7 +182,7 @@ def _case_transform(op: str, sym: str) -> str:
 def _case_cols(room, row: int, lo: int, hi: int, op: str) -> bool:
     """Transform the case of rune symbols in [lo, hi] on `row`. Returns changed."""
     changed = False
-    for ru in (r for r in room.runes if r.row == row):
+    for ru in room._rune_by_row.get(row, []):
         rlo, rhi = ru.col, ru.col + len(ru.symbols) - 1
         if rhi < lo or rlo > hi:
             continue

@@ -4,7 +4,7 @@ from blessed import Terminal
 from engine.player import Player
 import render.colors as C
 import render.symbols as S
-from content.levels import LEVELS, is_unlocked, is_reliquary
+from content.levels import LEVELS, is_unlocked, is_reliquary, level_type
 from render.utils import inner_w as _iw
 
 
@@ -38,38 +38,75 @@ def render_overworld(term: Terminal, player: Player, progress: dict,
     hearts_plain  = S.HEART_FULL * full_h + S.HEART_EMPTY * empty_h
     hearts_col    = ((C.heart_full()  + S.HEART_FULL  + rst) * full_h +
                      (C.heart_empty() + S.HEART_EMPTY + rst) * empty_h)
-    title_plain   = '  ' + hearts_plain + '  Vimny  -- OVERWORLD --'
-    pad           = max(0, iw - len(title_plain))
+    ow_label      = '-- OVERWORLD --'
+    name_tag      = '⌨  <' + player.name + '>'
+    left_cols     = len('Vimny  ') + len(name_tag) + 1 + len('  ') + len(hearts_plain) + len('  ')
+    #                                               ↑ extra col for wide ⌨
+    ow_start      = (iw - len(ow_label)) // 2
+    mid_gap       = max(1, ow_start - left_cols)
+    right_pad     = max(0, iw - left_cols - mid_gap - len(ow_label))
     out.append(bfg + S.BOX_V + rst +
+               C.normal_fg() + 'Vimny  ' + name_tag + rst +
                '  ' + hearts_col + '  ' +
-               C.normal_fg() + 'Vimny  ' +
-               C.mode_normal() + '-- OVERWORLD --' + rst +
-               ' ' * pad +
+               ' ' * mid_gap +
+               C.mode_normal() + ow_label + rst +
+               ' ' * right_pad +
                bfg + S.BOX_V + rst)
 
     # ── Row 2: separator ─────────────────────────────────────────────────────
     out.append(border_h(S.BOX_LT, S.BOX_RT))
 
     # ── Game area ────────────────────────────────────────────────────────────
-    game_h = term.height - 7
+    game_h = term.height - 5
 
-    # netrw-style header
-    header_lines = [
-        '',
-        '  === The Known World ===',
-        '  /world/',
-        '  Sorted by: discovery order',
+    sb   = C.sel_bg()
+    dfc  = C.dir_fg()
+    enfc = C.entry_fg()
+
+    def _row(is_cursor, vis, colored):
+        if is_cursor:
+            return (bfg + S.BOX_V + rst +
+                    sb + colored + rst + sb +
+                    ' ' * max(0, iw - vis) + rst +
+                    bfg + S.BOX_V + rst)
+        return (bfg + S.BOX_V + rst +
+                colored +
+                ' ' * max(0, iw - vis) +
+                bfg + S.BOX_V + rst)
+
+    def _hdr(plain, colored=None):
+        pad = max(0, iw - len(plain))
+        return (bfg + S.BOX_V + rst +
+                (dfc + plain if colored is None else colored) + rst +
+                ' ' * pad + bfg + S.BOX_V + rst)
+
+    def _div():
+        return _hdr('" ' + '=' * (iw - 2))
+
+    ver    = '(netrw v13ny)'
+    ndl    = '" Netrw Directory Listing'
+    ndl_sp = max(0, iw - len(ndl) - len(ver))
+    sb_lbl = '"   Sorted by      '
+    sb_val = 'discovery order'
+    kc     = C.mode_insert()
+    qh_pfx = '"   Quick Help: '
+    qh_prs = [('j/k', 'move'), ('Enter', 'open'), ('-', 'go up dir'), (':q', 'quit')]
+    qh_pl  = qh_pfx + '  '.join(f'{k}:{d}' for k, d in qh_prs)
+    qh_col = dfc + qh_pfx + ('  ' + dfc).join(kc + k + dfc + ':' + d for k, d in qh_prs)
+    hdr_rows = [
+        _div(),
+        _hdr(ndl + ' ' * ndl_sp + ver),
+        _hdr('"   ~/.vimny/world/'),
+        _hdr(sb_lbl + sb_val, dfc + sb_lbl + rst + sb_val),
+        _hdr(qh_pl, qh_col),
+        _div(),
     ]
-    for line in header_lines:
-        pad = max(0, iw - len(line))
-        out.append(bfg + S.BOX_V + rst +
-                   C.hint_fg() + line + rst +
-                   ' ' * pad +
-                   bfg + S.BOX_V + rst)
+    out.extend(hdr_rows)
 
-    # Divider line
-    div = '  ' + '=' * (iw - 2)
-    out.append(bfg + S.BOX_V + rst + C.hint_fg() + div + rst + bfg + S.BOX_V + rst)
+    # ../ and ./ directory entries
+    for di, dentry in enumerate(['../', './']):
+        is_cursor = di == cursor_row
+        out.append(_row(is_cursor, len(dentry), dfc + dentry))
 
     # Standard dungeon listing
     for idx, level in enumerate(visible_levels):
@@ -79,7 +116,7 @@ def render_overworld(term: Terminal, player: Player, progress: dict,
         unlocked = is_unlocked(level['id'], progress, player.name)
 
         if complete:
-            if is_reliquary(level['id']):
+            if level_type(level['id']) != 'dungeon':
                 badge = '[COMPLETE]'
             else:
                 star_str = '★' * stars + '☆' * (2 - stars)
@@ -92,95 +129,71 @@ def render_overworld(term: Terminal, player: Player, progress: dict,
             badge     = '[LOCKED]'
             badge_col = C.hint_fg()
 
-        cursor_sym = '► ' if idx == cursor_row else '  '
-        key_text   = level['key']
-        spaces     = max(2, iw - len(cursor_sym) - len(key_text) - len(badge))
+        is_cursor = (idx + 2) == cursor_row
+        key_text  = level['key']
+        nc        = enfc if is_cursor else (rst if unlocked else C.hint_fg())
+        spaces    = max(2, iw - len(key_text) - len(badge))
+        colored   = nc + key_text + ' ' * spaces + badge_col + badge
+        out.append(_row(is_cursor, iw, colored))
 
-        cursor_col = C.player_fg() if idx == cursor_row else rst
-        key_col    = C.normal_fg() if unlocked else C.hint_fg()
-        colored    = (cursor_col + cursor_sym + rst +
-                      key_col + key_text + rst +
-                      ' ' * spaces +
-                      badge_col + badge + rst)
-        out.append(bfg + S.BOX_V + rst + colored + bfg + S.BOX_V + rst)
-
-    # Custom levels subheading + tree listing (admin only)
+    # Custom levels dir entry + tree listing (admin only)
     custom_rows = 0
     if custom_layouts:
-        heading      = '  Custom levels:'
-        heading_pad  = max(0, iw - len(heading))
-        out.append(bfg + S.BOX_V + rst +
-                   C.hint_fg() + heading + rst +
-                   ' ' * heading_pad +
-                   bfg + S.BOX_V + rst)
+        out.append(_row(False, len('custom/'), dfc + 'custom/'))
         custom_rows += 1
 
         n_custom = len(custom_layouts)
         for ci, layout in enumerate(custom_layouts):
-            idx        = len(visible_levels) + ci
-            is_last    = ci == n_custom - 1
-            tree_char  = '└' if is_last else '├'
-            name       = layout.get('layout_name', '?')
-            badge      = '[CUSTOM]'
-            badge_col  = C.mode_insert()
-            cursor_sym = '► ' if idx == cursor_row else '  '
-            prefix     = cursor_sym + tree_char + ' '
-            spaces     = max(1, iw - len(prefix) - len(name) - len(badge))
-
-            cursor_col = C.player_fg() if idx == cursor_row else rst
-            colored    = (cursor_col + cursor_sym + rst +
-                          C.hint_fg() + tree_char + ' ' + rst +
-                          C.normal_fg() + name + rst +
-                          ' ' * spaces +
-                          badge_col + badge + rst)
-            out.append(bfg + S.BOX_V + rst + colored + bfg + S.BOX_V + rst)
+            idx       = len(visible_levels) + ci
+            is_last   = ci == n_custom - 1
+            tree_char = '└' if is_last else '├'
+            name      = layout.get('layout_name', '?')
+            badge     = '[CUSTOM]'
+            badge_col = C.mode_insert()
+            is_cursor = (idx + 2) == cursor_row
+            nc        = enfc if is_cursor else rst
+            spaces    = max(1, iw - 4 - len(name) - len(badge))
+            colored   = '  ' + C.hint_fg() + tree_char + ' ' + nc + name + ' ' * spaces + badge_col + badge
+            out.append(_row(is_cursor, iw, colored))
         custom_rows += n_custom
 
     # Fill remaining game-area rows
-    rows_used = len(header_lines) + 1 + len(visible_levels) + custom_rows
+    rows_used = len(hdr_rows) + 2 + len(visible_levels) + custom_rows
     for _ in range(max(0, game_h - rows_used)):
         out.append(bfg + S.BOX_V + rst + ' ' * iw + bfg + S.BOX_V + rst)
 
     # ── Vim statusline / command line ─────────────────────────────────────────
-    sl_w  = iw + 2
     sl_bg = C.statusline_bg()
     sl_fg = C.statusline_fg()
 
-    if player.error:
-        err_pad = max(0, sl_w - len(player.error) - 1)
-        out.append(C.error_bg() + C.error_fg() + ' ' + player.error +
-                   ' ' * err_pad + rst)
+    if deleting:
+        conf     = 'd again to confirm delete · any other key cancels'
+        conf_pad = max(0, iw - len(conf) - 1)
+        out.append(bfg + S.BOX_V + rst +
+                   C.error_bg() + C.error_fg() + ' ' + conf + ' ' * conf_pad + rst +
+                   bfg + S.BOX_V + rst)
+    elif player.error:
+        err_pad = max(0, iw - len(player.error) - 1)
+        out.append(bfg + S.BOX_V + rst +
+                   C.error_bg() + C.error_fg() + ' ' + player.error +
+                   ' ' * err_pad + rst +
+                   bfg + S.BOX_V + rst)
     elif cmd_line is not None:
         cmd_text = ':' + cmd_line
-        sl_pad   = max(0, sl_w - len(cmd_text))
-        out.append(sl_bg + C.mode_command() + cmd_text +
-                   sl_fg + ' ' * sl_pad + rst)
+        sl_pad   = max(0, iw - len(cmd_text))
+        out.append(bfg + S.BOX_V + rst +
+                   sl_bg + C.mode_command() + cmd_text +
+                   sl_fg + ' ' * sl_pad + rst +
+                   bfg + S.BOX_V + rst)
     else:
-        sl_label = '-- OVERWORLD --'
-        total_rows = len(visible_levels) + len(custom_layouts)
-        sl_right = f'{cursor_row + 1}/{total_rows} '
-        sl_mid   = max(0, sl_w - len(sl_label) - 2 - len(sl_right))
-        out.append(sl_bg + C.mode_normal() + ' ' + sl_label + ' ' +
-                   sl_bg + sl_fg + ' ' * sl_mid + sl_right + rst)
-
-    # ── Bottom separator ──────────────────────────────────────────────────────
-    out.append(border_h(S.BOX_LT, S.BOX_RT))
-
-    # ── Hint bar ──────────────────────────────────────────────────────────────
-    if deleting:
-        hint_raw  = 'd again to delete · any other key cancels'
-        hint_text = term.color_rgb(220, 80, 80) + hint_raw + rst
-        hint_len  = len(hint_raw)
-    else:
-        n_custom  = len(custom_layouts)
-        hint_raw  = ('j/k:move cursor  Enter:open dungeon  dd:delete  :q quit'
-                     if n_custom else 'j/k:move cursor  Enter:open dungeon  :q quit')
-        hint_text = C.hint_fg() + hint_raw + rst
-        hint_len  = len(hint_raw)
-    out.append(bfg + S.BOX_V + rst +
-               hint_text +
-               ' ' * max(0, iw - hint_len) +
-               bfg + S.BOX_V + rst)
+        sl_label   = '-- OVERWORLD --'
+        total_rows = len(visible_levels) + len(custom_layouts) + 2
+        sl_right   = f'{cursor_row + 1}/{total_rows} '
+        sl_mid     = max(0, iw - len(sl_label) - 2 - len(sl_right))
+        out.append(bfg + S.BOX_V + rst +
+                   sl_bg + C.mode_normal() + ' ' + sl_label + ' ' +
+                   sl_bg + sl_fg + ' ' * sl_mid + sl_right + rst +
+                   bfg + S.BOX_V + rst)
 
     # ── Bottom border ─────────────────────────────────────────────────────────
     out.append(border_h(S.BOX_BL, S.BOX_BR))

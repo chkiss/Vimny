@@ -369,12 +369,38 @@ def render_all(term: Terminal, dungeon: Dungeon, player: Player,
 
     # ── Bottom separator (answer sheet for admin) ─────────────────────────
     if room.answer:
-        ans_text = f' ▸ {room.answer}'
-        ans_pad  = max(0, iw - len(ans_text))
-        output.append(bfg + S.BOX_LT + rst +
-                      C.budget_ok() + ans_text[:iw] + rst +
-                      ' ' * ans_pad +
-                      bfg + S.BOX_RT + rst)
+        prefix   = ' ▸ '
+        ans      = room.answer
+        pos      = room.answer_pos
+        diverged = room.answer_diverged
+
+        # Find split: index of the pos-th non-space char in ans
+        count = 0
+        split = len(ans)
+        for i, ch in enumerate(ans):
+            if count >= pos:
+                split = i
+                break
+            if ch != ' ':
+                count += 1
+
+        # Karaoke tape: pin the playhead at ANCHOR chars from the left of the
+        # display window, so consumed text scrolls off left and upcoming always
+        # fills the remaining width.
+        ANCHOR   = 8                   # chars of consumed tail shown at left
+        up_w     = iw - len(prefix)    # display chars after the prefix arrow
+        win_start = max(0, split - ANCHOR)
+        win_text  = ans[win_start : win_start + up_w]
+        win_split = split - win_start  # split col within the window (≤ ANCHOR)
+
+        up_color  = C.answer_warn() if diverged else C.budget_ok()
+        pad       = ' ' * max(0, up_w - len(win_text))
+        output.append(
+            bfg + S.BOX_LT + rst +
+            C.budget_ok()       + prefix +
+            C.answer_consumed() + win_text[:win_split] +
+            up_color            + win_text[win_split:] + pad + rst +
+            bfg + S.BOX_RT + rst)
     else:
         output.append(border_h(S.BOX_LT, S.BOX_RT))
 

@@ -43,6 +43,9 @@ def mode_insert():   return _term.color_rgb(220, 200, 40)
 def mode_visual():   return _term.color_rgb(180, 60, 200)
 def mode_command():  return _term.white
 
+def answer_consumed(): return _term.color_rgb(75, 75, 75)
+def answer_warn():     return _term.color_rgb(220, 100, 0)
+
 def hint_fg():       return _term.color_rgb(90, 90, 90)
 def border_fg():     return _term.color_rgb(80, 80, 100)
 def normal_fg():     return _term.normal
@@ -58,3 +61,7 @@ def water_fg(r, g, b):       return _term.color_rgb(r, g, b)
 def wood_wall_bg():          return _term.on_color_rgb(90, 52, 18)
 def wood_wall_damaged_bg():  return _term.on_color_rgb(55, 28, 6)
 def wood_wall_damaged_fg():  return _term.color_rgb(160, 105, 45)
+
+def dir_fg():    return _term.color_rgb(100, 160, 230)   # netrw directory blue
+def entry_fg():  return _term.color_rgb(220, 215, 200)   # cursor-safe near-white
+def sel_bg():    return _term.on_color_rgb(40, 35, 15)   # cursor line background

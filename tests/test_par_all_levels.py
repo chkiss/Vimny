@@ -23,6 +23,7 @@ import pytest
 from generation.dungeon_gen import (
     build_dungeon_0, build_dungeon_1, build_dungeon_2,
     build_dungeon_3, build_dungeon_4, build_dungeon_5,
+    build_dungeon_6, build_dungeon_7, build_dungeon_8,
     build_dungeon_51, _par_l51,
     _bfs_par, _bfs_par_line,
     _dijkstra_par_level2,
@@ -34,12 +35,6 @@ SEEDS = [1, 42, 999, 12345, 2**20 + 7]
 
 
 # ── level-5 reference helpers ─────────────────────────────────────────────────
-
-def _move_cost(dist: int) -> int:
-    """Keystrokes for an optimal count-hjkl move of dist cells."""
-    if dist <= 0: return 0
-    if dist == 1: return 1
-    return len(str(dist)) + 1
 
 
 def _extract_l5_data(room):
@@ -70,9 +65,11 @@ def _par_l5_reference(corr_data: list, gobs_17: list) -> int:
       only; all later right-going corridors reuse last_f with ; (1 key).
     - Movement to connector after each kill chain: $ or 0 in 1 keystroke
       regardless of distance (both cross water, bounded only by walls).
+    - Connector transition: j (step onto door) + x (open door) + j (enter
+      corridor) = 3 keys.  2j cannot cross a fogged door.
     - Row-17 entry: ; (1 key) because last_f is already set.
-    - Row-17 connector approach: count-l via _move_cost ($ would overshoot the
-      locked door at col 53).
+    - Endgame: $ stops at col 52 (locked_door blocks _cross_water).  One p
+      kills both doors via BFS.  $ reaches col 56.  j exits.
     """
     total = 0
     first_right = True
@@ -86,14 +83,13 @@ def _par_l5_reference(corr_data: list, gobs_17: list) -> int:
         else:
             entry = 1                          # , reverses the stored last_f
         kill   = entry + 1 + max(0, n - 1) * 2   # reach-first  x  chain…
-        total += kill + 1 + 2                      # $ or 0 (1 key to connector) + 2j
+        total += kill + 1 + 3                      # $ or 0 (1) + j x j connector (3)
 
     n17 = len(gobs_17)
     if n17 > 0:
-        kill17    = 1 + 1 + max(0, n17 - 1) * 2 + 1   # ; x ;x… + x to pick up dropped key
-        dist_door = 52 - max(gobs_17)
-        total    += kill17 + _move_cost(dist_door)  # count-l; $ overshoots past door
-    total += 1 + 1 + 1 + 2   # p door17  j  p door18  fE exit
+        kill17 = 1 + 1 + max(0, n17 - 1) * 2 + 1   # ; x ;x… + x to pick up key
+        total += kill17
+    total += 4   # $ p $ j
 
     return max(total, 10)
 
@@ -104,13 +100,38 @@ def _par_l5_reference(corr_data: list, gobs_17: list) -> int:
 @pytest.mark.parametrize("builder,level_id", [
     (build_dungeon_0, 0), (build_dungeon_1, 1), (build_dungeon_2, 2),
     (build_dungeon_3, 3), (build_dungeon_4, 4), (build_dungeon_5, 5),
-    (build_dungeon_51, 51),
+    (build_dungeon_6, 6), (build_dungeon_7, 7), (build_dungeon_8, 8),
 ])
 def test_budget_is_ceil_par_times_1_4(builder, level_id, seed):
     room = builder(seed).room
     assert room.budget == math.ceil(room.par * 1.4), (
         f"level={level_id} seed={seed}: budget={room.budget}, "
         f"ceil(par*1.4)={math.ceil(room.par * 1.4)}"
+    )
+
+
+# ── universal: answer key length == par (catches Dijkstra cost-model bugs) ───
+
+@pytest.mark.parametrize("seed", SEEDS)
+@pytest.mark.parametrize("builder,level_id", [
+    (build_dungeon_0, 0), (build_dungeon_1, 1), (build_dungeon_2, 2),
+    (build_dungeon_3, 3), (build_dungeon_4, 4), (build_dungeon_5, 5),
+    (build_dungeon_6, 6), (build_dungeon_7, 7), (build_dungeon_8, 8),
+])
+def test_answer_key_length_matches_par(builder, level_id, seed):
+    """Non-space chars in room.answer must equal room.par.
+
+    Each character in the answer string is one keypress; the par is the total
+    keystroke budget cost for the optimal solution.  A mismatch means the
+    Dijkstra cost model diverges from _keystroke_cost in main.py.
+    """
+    room = builder(seed).room
+    if not room.answer:
+        return  # level has no answer key (e.g. L5.1 fallback)
+    ans_len = len(room.answer.replace(' ', ''))
+    assert ans_len == room.par, (
+        f"level={level_id} seed={seed}: answer has {ans_len} keypresses "
+        f"but par={room.par}"
     )
 
 
@@ -176,20 +197,16 @@ def test_level5_par_matches_reference(seed):
 
 # ── level 51: par == _par_l51() (seed-independent fixed layout) ──────────────
 
-def test_level51_par_matches_formula():
-    """_par_l51() is the simulated minimum keystroke cost for The Warden's Keep.
+def test_level51_completion_only():
+    """Level 5.1 is a boss fight — no par/stars, just completion.
 
-    Strategy: $ x $ k $ j 0 (7 keys) → combat (~78 keys, seed-dependent) → G (1 key).
-    Simulated across 20 seeds: min=86, max=95.
+    Budget is still derived from _par_l51() to allow a generous time limit,
+    but room.par is None so no fireworks or star rating are awarded.
     """
-    expected = _par_l51()
-    assert 55 <= expected <= 90, f"par={expected} outside sanity range [55, 90]"
-    # All seeds produce the same par (layout is fixed, no random elements)
+    expected_budget = math.ceil(_par_l51() * 1.4)
     for seed in SEEDS:
         room = build_dungeon_51(seed).room
-        assert room.par == expected, (
-            f"seed={seed}: room.par={room.par}, _par_l51()={expected}"
-        )
-        assert room.budget == math.ceil(expected * 1.4), (
-            f"seed={seed}: budget={room.budget}, ceil(par*1.4)={math.ceil(expected * 1.4)}"
+        assert room.par is None, f"seed={seed}: boss level must have par=None"
+        assert room.budget == expected_budget, (
+            f"seed={seed}: budget={room.budget}, expected {expected_budget}"
         )

@@ -61,7 +61,7 @@ def test_dollar_passes_through_void_rune_mid_row():
     """$ scan ignores void RuneClusters — only walls/entities stop it.
     A void rune in the middle of a row does not stop $; it lands at rightmost cell."""
     room = _bare_room()
-    mid_void = RuneCluster(row=3, col=10, symbols=('x',), kind='void')
+    mid_void = RuneCluster(row=3, col=10, symbols=('○',), kind='void')
     room.runes.append(mid_void)
     room.rebuild_indexes()
     player = Player(row=3, col=1)
@@ -76,7 +76,7 @@ def test_dollar_lands_on_void_at_rightmost_cell():
     """$ does not stop before a void RuneCluster mid-scan — it lands on the
     rightmost passable cell even when that cell has a void rune."""
     room = _bare_room()
-    end_void = RuneCluster(row=3, col=28, symbols=('x',), kind='void')
+    end_void = RuneCluster(row=3, col=28, symbols=('○',), kind='void')
     room.runes.append(end_void)
     room.rebuild_indexes()
     player = Player(row=3, col=1)

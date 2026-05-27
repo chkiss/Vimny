@@ -13,7 +13,7 @@ _SUBST_CYCLE = {
 
 def _merge_adjacent_runes(room, r: int) -> None:
     """Merge adjacent same-kind RuneClusters on row r into single clusters."""
-    row_runes = sorted([ru for ru in room.runes if ru.row == r], key=lambda ru: ru.col)
+    row_runes = sorted(room._rune_by_row.get(r, []), key=lambda ru: ru.col)
     if len(row_runes) < 2:
         return
     merged = []
@@ -137,9 +137,8 @@ def _ed_paste(room, r, start_c, items):
 
 def _ed_row_items(room, r):
     tagged = []
-    for ru in room.runes:
-        if ru.row == r:
-            tagged.append((ru.col, {'type': 'rune', 'rune': ru}))
+    for ru in room._rune_by_row.get(r, []):
+        tagged.append((ru.col, {'type': 'rune', 'rune': ru}))
     for e in room.entities:
         if e.row == r and e.alive:
             tagged.append((e.col, {'type': 'entity', 'entity': e}))
@@ -161,15 +160,16 @@ def _ed_clear_row(room, r):
 def _ed_range_items(room, r1, c1, r2, c2):
     if r1 == r2:
         lo, hi = min(c1, c2), max(c1, c2)
-        runes = [{'type': 'rune',   'rune': ru} for ru in room.runes
-                 if ru.row == r1 and lo <= ru.col <= hi]
+        runes = [{'type': 'rune',   'rune': ru}
+                 for ru in room._rune_by_row.get(r1, []) if lo <= ru.col <= hi]
         ents  = [{'type': 'entity', 'entity': e} for e in room.entities
                  if e.row == r1 and e.alive and lo <= e.col <= hi]
     else:
-        lo, hi = min(r1, r2), max(r1, r2)
-        runes = [{'type': 'rune',   'rune': ru} for ru in room.runes if lo <= ru.row <= hi]
+        rlo, rhi = min(r1, r2), max(r1, r2)
+        runes = [{'type': 'rune',   'rune': ru}
+                 for r in range(rlo, rhi + 1) for ru in room._rune_by_row.get(r, [])]
         ents  = [{'type': 'entity', 'entity': e} for e in room.entities
-                 if e.alive and lo <= e.row <= hi]
+                 if e.alive and rlo <= e.row <= rhi]
     return runes + ents
 
 

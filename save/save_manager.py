@@ -68,6 +68,7 @@ def save_progress(progress: dict, player_name: str) -> None:
     existing['player_name']       = player_name
     existing['progress']          = {str(k): v for k, v in progress.items() if isinstance(k, int)}
     existing['extras']            = progress.get('extras', [])
+    existing['scrolls_seen']      = progress.get('scrolls_seen', [])
     existing['flags']             = progress.get('flags', {})
     existing['max_hp']            = progress.get('max_hp', 6)
     existing['collected_hearts']  = progress.get('collected_hearts', [])
@@ -82,6 +83,9 @@ def load_progress(data: Optional[dict]) -> dict:
     extras = data.get('extras', [])
     if extras:
         result['extras'] = extras
+    scrolls_seen = data.get('scrolls_seen', [])
+    if scrolls_seen:
+        result['scrolls_seen'] = scrolls_seen
     flags = data.get('flags', {})
     if flags:
         result['flags'] = flags

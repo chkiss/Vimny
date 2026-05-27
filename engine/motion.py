@@ -1,5 +1,6 @@
 """Motion execution: apply_motion, move_player, and related helpers."""
 from __future__ import annotations
+import unicodedata
 from collections import deque
 from engine.player import Player
 from engine.modes import Mode
@@ -86,7 +87,10 @@ def _cell_char(room, r: int, c: int) -> str:
 
 
 def _is_word_char(ch: str) -> bool:
-    return ch.isalpha() or ch.isdigit() or ch == '_'
+    if ch.isalpha() or ch.isdigit() or ch == '_':
+        return True
+    # Vim's utf_class() treats So (Symbol,Other) as word chars; Po and Sm are punctuation.
+    return unicodedata.category(ch) == 'So'
 
 
 def _cross_water(room, r: int, c: int) -> bool:
@@ -137,7 +141,7 @@ def _bracket_at(room, row: int, c: int):
 
 
 def _row_has_rune(room, row: int) -> bool:
-    return any(room.rune_at(row, c) is not None for c in range(room.cols))
+    return row in room._rune_rows
 
 
 def _sentence_starts(room, row: int) -> list:
@@ -450,7 +454,15 @@ def apply_motion(player, motion, count, room, target=None):
             else:
                 break
         elif motion == 'G':
-            if room.exit_pos:
+            if count > 1:
+                # {n}G — jump to row (count-1), 0-indexed, Vim convention.
+                # This is a one-shot teleport, not a repeated motion; break out
+                # of the repeat loop immediately after the jump.
+                target_row = max(0, min(count - 1, room.rows - 1))
+                player.row = target_row
+                moved = True
+                break
+            elif room.exit_pos:
                 player.row, player.col = room.exit_pos
                 moved = True
         elif motion == 'gg':
@@ -513,17 +525,21 @@ def apply_motion(player, motion, count, room, target=None):
             # Screen-relative row jump. In a room that fits the viewport this is
             # room-relative: H=top, L=bottom, M=middle passable row. Lands on the
             # first non-blank column of the target row (vim-faithful).
-            prows = [r for r in range(room.rows)
-                     if _first_non_blank_col(room, r) is not None]
-            if not prows:
+            fnb: dict = {}
+            for _r in range(room.rows):
+                _c = _first_non_blank_col(room, _r)
+                if _c is not None:
+                    fnb[_r] = _c
+            if not fnb:
                 break
+            prows = sorted(fnb)
             if motion == 'H':
                 tr = prows[0]
             elif motion == 'L':
                 tr = prows[-1]
             else:
                 tr = prows[len(prows) // 2]
-            tc = _first_non_blank_col(room, tr)
+            tc = fnb[tr]
             if (tr, tc) != (player.row, player.col):
                 player.row, player.col = tr, tc
                 moved = True

@@ -50,15 +50,10 @@ def _load_wisdom() -> list[dict]:
 _QUOTES: list[dict] = _load_wisdom()
 
 
-def select_quote(max_level: int) -> tuple[str, str, str, str]:
-    """Return 4 box-inner strings (each exactly _BOX_INNER_W chars) for the quote box."""
-    pool = [q for q in _QUOTES if q['level'] <= max_level] or _QUOTES
-    if not pool:
-        blank = ' ' * _BOX_INNER_W
-        return (blank, blank, blank, blank)
-    chosen = _random.choice(pool)
-    pad    = ' ' * _BOX_INNER_W
-    lines  = [l.ljust(_BOX_INNER_W)[:_BOX_INNER_W] for l in chosen['quote']]
+def _fmt_quote(chosen: dict) -> tuple[str, str, str, str]:
+    """Format a wisdom entry into a 4-tuple of _BOX_INNER_W-padded strings."""
+    pad   = ' ' * _BOX_INNER_W
+    lines = [l.ljust(_BOX_INNER_W)[:_BOX_INNER_W] for l in chosen['quote']]
     if len(lines) >= 4:
         return (lines[0], lines[1], lines[2], lines[3])
     elif len(lines) == 3:
@@ -67,6 +62,46 @@ def select_quote(max_level: int) -> tuple[str, str, str, str]:
         return (pad, lines[0], lines[1], pad)
     else:
         return (pad, lines[0], pad, pad)
+
+
+def select_quote(max_level: int) -> tuple[str, str, str, str]:
+    """Return 4 box-inner strings (each exactly _BOX_INNER_W chars) for the quote box."""
+    pool = [q for q in _QUOTES if q['level'] <= max_level] or _QUOTES
+    if not pool:
+        blank = ' ' * _BOX_INNER_W
+        return (blank, blank, blank, blank)
+    return _fmt_quote(_random.choice(pool))
+
+
+def select_quote_by_name(name: str) -> tuple[str, str, str, str]:
+    """Return the formatted quote for the corpus entry with the given name field."""
+    for q in _QUOTES:
+        if q['name'] == name:
+            return _fmt_quote(q)
+    blank = ' ' * _BOX_INNER_W
+    return (blank, blank, blank, blank)
+
+
+def select_next_lesson_quote(completed_level_id: int) -> tuple[str, str, str, str]:
+    """Return a wisdom quote for the lesson that follows completed_level_id.
+
+    Maps the completed level to its ordinal position in LEVELS (skipping
+    admin-only entries) and picks a quote at that ordinal + 1, falling back
+    to general level-0 quotes when no exact match exists.
+    """
+    visible_ids = [l['id'] for l in LEVELS if not l.get('admin_only')]
+    try:
+        wisdom_idx = visible_ids.index(completed_level_id) + 1
+    except ValueError:
+        wisdom_idx = 0
+
+    pool = [q for q in _QUOTES if q['level'] == wisdom_idx]
+    if not pool:
+        pool = [q for q in _QUOTES if q['level'] == 0]
+    if not pool:
+        blank = ' ' * _BOX_INNER_W
+        return (blank, blank, blank, blank)
+    return _fmt_quote(_random.choice(pool))
 
 
 _WIZARD_ART: tuple[str, ...] = (
@@ -102,8 +137,8 @@ _EYE_OPEN  = '0  0'
 _EYE_BLINK = '^  ^'
 
 MENU_ITEMS: list[tuple[str, str]] = [
-    ('begin new journey', 'new'),
-    ('load saved game',   'load'),
+    (':e saves/',          'load'),
+    (':enew',             'new'),
     ('quit',              'quit'),
 ]
 
