@@ -92,7 +92,8 @@ def compute_text_object(player, action: dict, room) -> TextObject | None:
 
     # Run the real motion on a cloned cursor to find where it lands.
     save_row, save_col, save_f = player.row, player.col, player.last_f
-    apply_motion(player, motion, count * mc, room, action.get('target'))
+    apply_motion(player, motion, count * mc, room, action.get('target'),
+                 count_given=action.get('motion_count_given', True))
     dr, dc = player.row, player.col
     player.row, player.col, player.last_f = save_row, save_col, save_f
 

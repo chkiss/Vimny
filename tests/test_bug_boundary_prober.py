@@ -212,23 +212,25 @@ def test_gg_teleports_to_entry():
     assert (player.row, player.col) == room.entry
 
 
-def test_G_teleports_to_exit_pos():
+def test_G_jumps_to_last_passable_row():
+    # bare G → last passable row (row 5 in a 7-row room), first non-blank col
     room = _bare_room()
     player = Player(row=1, col=1)
 
-    apply_motion(player, 'G', 1, room)
+    apply_motion(player, 'G', 1, room, count_given=False)
 
-    assert (player.row, player.col) == room.exit_pos
+    assert player.row == 5   # last passable row (rows 0 and 6 are walls)
+    assert player.col == 1   # leftmost passable col (no runes in bare room)
 
 
-def test_G_with_no_exit_pos_does_not_crash():
-    """G when exit_pos is None must silently do nothing."""
+def test_G_exit_pos_irrelevant():
+    """bare G goes to last passable row regardless of exit_pos."""
     room = _bare_room()
     room.exit_pos = None
     player = Player(row=3, col=5)
 
-    moved = apply_motion(player, 'G', 1, room)
+    moved = apply_motion(player, 'G', 1, room, count_given=False)
 
-    assert not moved, "G with None exit_pos must return False"
-    assert player.row == 3
-    assert player.col == 5
+    assert moved
+    assert player.row == 5
+    assert player.col == 1

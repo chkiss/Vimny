@@ -196,7 +196,7 @@ def test_count_with_trailing_zero_not_split_at_zero():
     from engine.modes import Mode
 
     action, remaining = parse('30l', Mode.NORMAL)
-    assert action == {'type': 'motion', 'motion': 'l', 'count': 30}, (
+    assert action == {'type': 'motion', 'motion': 'l', 'count': 30, 'count_given': True}, (
         f"'30l' parsed as {action!r}; expected count=30 motion='l'"
     )
     assert remaining == '', f"unexpected remaining buffer after '30l': {remaining!r}"

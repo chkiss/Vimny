@@ -31,39 +31,39 @@ def _bare_room(rows=7, cols=30):
 def test_30l_parses_as_count_30():
     """30l must parse as count=30, motion='l' (regression: was split as '3','0','l')."""
     action, remaining = parse('30l', Mode.NORMAL)
-    assert action == {'type': 'motion', 'motion': 'l', 'count': 30}
+    assert action == {'type': 'motion', 'motion': 'l', 'count': 30, 'count_given': True}
     assert remaining == ''
 
 
 def test_100j_parses_as_count_100():
     action, remaining = parse('100j', Mode.NORMAL)
-    assert action == {'type': 'motion', 'motion': 'j', 'count': 100}
+    assert action == {'type': 'motion', 'motion': 'j', 'count': 100, 'count_given': True}
     assert remaining == ''
 
 
 def test_9999h_parses_as_count_9999():
     action, remaining = parse('9999h', Mode.NORMAL)
-    assert action == {'type': 'motion', 'motion': 'h', 'count': 9999}
+    assert action == {'type': 'motion', 'motion': 'h', 'count': 9999, 'count_given': True}
     assert remaining == ''
 
 
 def test_20l_trailing_zero_parses_correctly():
     """20l must parse as count=20, not count=2 + motion='0' then 'l'."""
     action, remaining = parse('20l', Mode.NORMAL)
-    assert action == {'type': 'motion', 'motion': 'l', 'count': 20}
+    assert action == {'type': 'motion', 'motion': 'l', 'count': 20, 'count_given': True}
     assert remaining == ''
 
 
 def test_300j_multiple_trailing_zeros():
     action, remaining = parse('300j', Mode.NORMAL)
-    assert action == {'type': 'motion', 'motion': 'j', 'count': 300}
+    assert action == {'type': 'motion', 'motion': 'j', 'count': 300, 'count_given': True}
     assert remaining == ''
 
 
 def test_0_alone_is_motion_not_count():
     """'0' alone must parse as the go-to-start-of-line motion, not a count digit."""
     action, remaining = parse('0', Mode.NORMAL)
-    assert action == {'type': 'motion', 'motion': '0', 'count': 1}
+    assert action == {'type': 'motion', 'motion': '0', 'count': 1, 'count_given': False}
     assert remaining == ''
 
 

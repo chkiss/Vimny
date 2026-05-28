@@ -41,7 +41,7 @@ from engine.editor import (
     _ed_paste, _ed_row_items, _ed_clear_row, _ed_range_items, _ed_delete_range,
     _clip_desc, _serialize_room, _deserialize_room,
 )
-from generation.dungeon_gen import build_dungeon_0, build_dungeon_1, build_dungeon_1_1, build_dungeon_2, build_dungeon_3, build_dungeon_4, build_dungeon_5, build_dungeon_51, build_dungeon_6, build_dungeon_7, build_dungeon_8, build_dungeon_9, build_dungeon_10, build_dungeon_12, build_dungeon_13, build_dungeon_dummy
+from generation.dungeon_gen import build_dungeon_0, build_dungeon_1, build_dungeon_1_1, build_dungeon_2, build_dungeon_3, build_dungeon_4, build_dungeon_5, build_dungeon_51, build_dungeon_6, build_dungeon_7, build_dungeon_8, build_dungeon_9, build_dungeon_10, build_dungeon_12, build_dungeon_13, build_dungeon_14, build_dungeon_dummy
 from content.levels import LEVELS, is_unlocked, is_reliquary, level_type, known_commands as _known_commands
 import save.save_manager as SM
 
@@ -686,6 +686,8 @@ def _build_dungeon(level: int, seed: int):
         return build_dungeon_12(seed)
     if level == 13:
         return build_dungeon_13(seed)
+    if level == 14:
+        return build_dungeon_14(seed)
     return build_dungeon_0(seed)
 
 
@@ -1554,7 +1556,8 @@ def run_dungeon(term: Terminal, level: int, progress: dict,
             if v_action is not None and v_action.get('type') == 'motion':
                 v_count = v_action.get('count', 1)
                 v_motion = v_action['motion']
-                moved = apply_motion(player, v_motion, v_count, room, v_action.get('target'))
+                moved = apply_motion(player, v_motion, v_count, room, v_action.get('target'),
+                                     count_given=v_action.get('count_given', True))
                 if moved and not edit_mode:
                     budget.spend(_keystroke_cost(v_count, v_motion))
             elif v_action is not None:
@@ -1633,7 +1636,8 @@ def run_dungeon(term: Terminal, level: int, progress: dict,
                 continue
 
             jump_from = (player.row, player.col)
-            moved = apply_motion(player, motion, count, room, target)
+            moved = apply_motion(player, motion, count, room, target,
+                                 count_given=action.get('count_given', True))
             if moved:
                 if motion in _JUMP_MOTIONS:
                     _record_jump(player, jump_from)
@@ -2412,7 +2416,8 @@ def run_dungeon(term: Terminal, level: int, progress: dict,
                 else:
                     orig_r, orig_c = player.row, player.col
                     mc = action.get('motion_count', 1)
-                    apply_motion(player, motion, mc, room, action.get('target'))
+                    apply_motion(player, motion, mc, room, action.get('target'),
+                                 count_given=action.get('motion_count_given', True))
                     new_r, new_c = player.row, player.col
                     player.row, player.col = orig_r, orig_c
                     if op in ('d', 'c'):
@@ -2922,7 +2927,8 @@ def run_title(term: Terminal, has_save: bool) -> tuple[str, str]:
 
 # ── Overworld loop ─────────────────────────────────────────────────────────────
 
-def run_overworld(term: Terminal, player: Player, progress: dict) -> dict:
+def run_overworld(term: Terminal, player: Player, progress: dict,
+                  initial_cursor: int = 2) -> dict:
     """Show the netrw overworld (~/.vimny/world/).
 
     Returns {'action': 'enter', 'level': N},
@@ -2937,7 +2943,7 @@ def run_overworld(term: Terminal, player: Player, progress: dict) -> dict:
     visible   = [l for l in LEVELS if not l.get('admin_only') or player.name == 'admin']
     customs   = SM.list_layouts() if player.name == 'admin' else []
     total     = len(visible) + len(customs)
-    cursor_row = 2  # 0=../ 1=./ 2+=levels
+    cursor_row = initial_cursor  # 0=../ 1=./ 2+=levels
     cmd_active = False
     cmd_line   = ''
     pending_d  = False
@@ -2983,14 +2989,14 @@ def run_overworld(term: Terminal, player: Player, progress: dict) -> dict:
                 if cmd in ('q', 'q!', 'wq'):
                     if cmd == 'wq':
                         SM.save_progress(progress, player.name)
-                    return {'action': 'quit'}
+                    return {'action': 'quit', 'cursor': cursor_row}
                 _e_path = cmd[2:].rstrip('/') if cmd.startswith('e ') else ''
                 if _e_path in ('saves',):
-                    return {'action': 'browse_saves'}
+                    return {'action': 'browse_saves', 'cursor': cursor_row}
                 if _e_path in ('scrolls',):
-                    return {'action': 'scrolls'}
+                    return {'action': 'scrolls', 'cursor': cursor_row}
                 if _e_path in ('..', '../'):
-                    return {'action': 'parent_view'}
+                    return {'action': 'parent_view', 'cursor': cursor_row}
                 # Unknown commands silently ignored
             elif key.name == 'KEY_BACKSPACE' or str(key) == '\x7f':
                 cmd_line    = cmd_line[:-1]
@@ -3024,7 +3030,7 @@ def run_overworld(term: Terminal, player: Player, progress: dict) -> dict:
             cmd_active = True
             cmd_line   = ''
         elif raw == '-':
-            return {'action': 'parent_view'}
+            return {'action': 'parent_view', 'cursor': cursor_row}
         elif raw == 'j':
             cursor_row = min(cursor_row + 1, total + 1)
         elif raw == 'k':
@@ -3033,16 +3039,16 @@ def run_overworld(term: Terminal, player: Player, progress: dict) -> dict:
             pending_d = True
         elif key.name == 'KEY_ENTER' or raw in ('\n', '\r'):
             if cursor_row == 0:
-                return {'action': 'parent_view'}
+                return {'action': 'parent_view', 'cursor': cursor_row}
             elif cursor_row == 1:
                 pass  # ./ — stay in world
             elif cursor_row < len(visible) + 2:
                 level_id = visible[cursor_row - 2]['id']
                 if is_unlocked(level_id, progress, player.name):
-                    return {'action': 'enter', 'level': level_id}
+                    return {'action': 'enter', 'level': level_id, 'cursor': cursor_row}
             else:
                 layout = customs[cursor_row - 2 - len(visible)]
-                return {'action': 'open_custom', 'layout': layout}
+                return {'action': 'open_custom', 'layout': layout, 'cursor': cursor_row}
 
         _render(deleting=pending_d)
 
@@ -3077,6 +3083,7 @@ def main():
                 progress  = SM.load_progress(save_data)
             # 'new': progress stays empty (fresh save already written in run_title)
 
+        ow_cursor = 2
         while True:
             if start_level is not None:
                 ow_result  = {'action': 'enter', 'level': start_level}
@@ -3084,7 +3091,9 @@ def main():
             else:
                 player.max_hp = progress.get('max_hp', 6)
                 player.hp     = player.max_hp
-                ow_result = run_overworld(term, player, progress)
+                ow_result = run_overworld(term, player, progress,
+                                          initial_cursor=ow_cursor)
+            ow_cursor = ow_result.get('cursor', 2)
 
             if ow_result['action'] == 'quit':
                 break

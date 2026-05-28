@@ -3547,38 +3547,44 @@ def build_dungeon_10(seed: int) -> Dungeon:
 #   j   — step down to sentence row 20
 #   3)  — sentence count-jump: col 1 → S1 col 2 → S2 col 23 → S3/exit col 49
 #
-# Without {/}: void barriers in rows 3–8 and 12–18 block all j/k paths.
+# Without {/}: void barriers in rows 3–8 block all j/k paths.
 #              Player trapped in rows 0–2.  Cost = infinity >> budget.
-# Without (/): wall gaps on row 20 block l/W/w; player trapped in S1.
-#              Cost = infinity >> budget.
 
-_L12_ROWS        = 22
-_L12_COLS        = 62
-_L12_ENTRY       = (0, 1)
-_L12_EXIT        = (20, 49)
+_L13_ROWS        = 13
+_L13_COLS        = 62
+_L13_ENTRY       = (0, 1)
+_L13_EXIT        = (11, 55)
 
-_L12_PARA1_ROWS  = (0, 1, 2)
-_L12_VOID_ROWS_A = tuple(range(3, 9))    # rows 3-8
-_L12_BLANK_ROW_1 = 9
-_L12_PARA2_ROWS  = (10, 11)
-_L12_VOID_ROWS_B = tuple(range(12, 19))  # rows 12-18
-_L12_BLANK_ROW_2 = 19
-_L12_SENT_ROW    = 20
+_L13_PARA1_ROWS  = (0, 1, 2)
+_L13_VOID_ROWS_A = tuple(range(3, 9))    # rows 3-8
+_L13_BLANK_ROW_1 = 9
+_L13_PARA2_ROWS  = (10, 11)
 
-_L12_S1_COLS = (1, 10)
-_L12_S2_COLS = (23, 36)
-_L12_S3_COLS = (49, 60)
 
-_L12_SENT_CLUSTERS = [
-    (20, 2,  ('T','h','e',' ','s','e','a','l','.')),
-    (20, 23, ('A','n','c','i','e','n','t',' ','p','o','w','e','r','!')),
-    (20, 49, ('T','h','e',' ','g','a','t','e',' ','o','!')),
+# ── Level 14 (Sentence Corridor) constants ────────────────────────────────
+# Without (/): wall gaps (cols 11-22 and 37-48) block all l/h/w paths.
+#              Player trapped in S1 (cols 1-10).  Cost = infinity >> budget.
+
+_L14_ROWS     = 3
+_L14_COLS     = 62
+_L14_ENTRY    = (1, 1)
+_L14_EXIT     = (1, 49)
+
+_L14_SENT_ROW = 1
+_L14_S1_COLS  = (1, 10)
+_L14_S2_COLS  = (23, 36)
+_L14_S3_COLS  = (49, 60)
+
+_L14_SENT_CLUSTERS = [
+    (1, 2,  ('T','h','e',' ','s','e','a','l','.')),
+    (1, 23, ('A','n','c','i','e','n','t',' ','p','o','w','e','r','!')),
+    (1, 49, ('T','h','e',' ','g','a','t','e',' ','o','!')),
 ]
 
 
-def _dijkstra_par_L12(composite, return_path=False,
+def _dijkstra_par_L13(composite, return_path=False,
                       disable_brace=False, disable_paren=False):
-    """Minimum-keystroke Dijkstra for Level 12 — Block and Sentence Jumps.
+    """Minimum-keystroke Dijkstra for Levels 13–14 — Paragraph and Sentence Jumps.
 
     Available motions: count hjkl, $, 0, ^, w b e, W B E, ge gE,
                        } { (paragraph), ) ( (sentence, with count).
@@ -4312,74 +4318,34 @@ def build_dungeon_9(seed: int) -> 'Dungeon':
 
 
 def build_dungeon_13(seed: int) -> 'Dungeon':
-    """Level 13 — Block and Sentence Jumps: The Runic Archives.
+    """Level 13 — Paragraph Jumps: The Void Rift.
 
-    Semi-fixed layout: 22 rows × 62 cols.
+    Semi-fixed layout: 13 rows × 62 cols.
 
-    Paragraph section (rows 0–19):
-      Para 1  rows 0–2  — seed-varying non-void rune clusters.
-      Void barrier rows 3–8  — full-width void clusters block j/k counting.
-      Blank row 9  — no runes; target of first } jump.
-      Para 2  rows 10–11 — seed-varying non-void rune clusters.
-      Void barrier rows 12–18 — full-width void clusters.
-      Blank row 19 — no runes; target of second } jump.
-
-    Sentence section (row 20):
-      S1 (cols 1–10)  — 'The seal.'      ends with '.'
-      Wall gap (cols 11–22)
-      S2 (cols 23–36) — 'Ancient power!' ends with '!'
-      Wall gap (cols 37–48)
-      S3 (cols 49–59) — 'The gate o!'    ends with '!'
-      Exit entity at (20, 49) = sentence-3 start.
-
-    Optimal path (par = 5):  } } j 3)
-      }  — row 0 → blank row 9  (1 ks)
-      }  — row 9 → blank row 19 (1 ks)
-      j  — row 19 → sentence row 20
-      3) — col 1 → S1 col 2 → S2 col 23 → S3/exit col 49  (2 ks)
+    Para 1  rows 0–2  — seed-varying non-void rune clusters.
+    Void barrier rows 3–8  — full-width void clusters block j/k counting.
+    Blank row 9  — no runes; target of } jump.
+    Para 2  rows 10–11 — seed-varying non-void rune clusters.
+    Exit at (11, 55) — end of Para 2.
 
     Without {/}: void barriers trap player in rows 0–2.  Cost = infinity.
-    Without (/): wall gaps on row 20 trap player in S1 (cols 1–10).  Cost = infinity.
     """
-    dungeon   = Dungeon(name='The Runic Archives', seed=seed)
-    ROWS, COLS = _L12_ROWS, _L12_COLS
+    dungeon   = Dungeon(name='The Void Rift', seed=seed)
+    ROWS, COLS = _L13_ROWS, _L13_COLS
 
     cells = [[CellType.WALL] * COLS for _ in range(ROWS)]
     composite = Room(rows=ROWS, cols=COLS, room_type=RoomType.ENTRY)
     composite.cells = cells
     composite.seed  = seed
 
-    # ── Carve interior corridor (rows 0–20, cols 1–60) ────────────────────────
-    for r in range(0, _L12_SENT_ROW + 1):
+    # ── Carve interior corridor (rows 0–11, cols 1–60) ───────────────────────
+    for r in range(0, ROWS - 1):
         for c in range(1, COLS - 1):
             cells[r][c] = CellType.CORRIDOR
 
-    # ── Re-wall sentence section gaps (row 20 only) ───────────────────────────
-    s1_end = _L12_S1_COLS[1]   # col 10
-    s2_beg = _L12_S2_COLS[0]   # col 23
-    s2_end = _L12_S2_COLS[1]   # col 36
-    s3_beg = _L12_S3_COLS[0]   # col 49
-
-    for c in range(s1_end + 1, s2_beg):     # cols 11-22: wall
-        cells[_L12_SENT_ROW][c] = CellType.WALL
-    for c in range(s2_end + 1, s3_beg):     # cols 37-48: wall
-        cells[_L12_SENT_ROW][c] = CellType.WALL
-
-    # ── Narrow blank row 19 to S1 width (cols 1–10) ──────────────────────────
-    # Without this, `} } $ j 0` bypasses the sentence wall gaps: $ on row 19
-    # reaches col 60, then j drops into S3 directly.  Walling cols 11-60 on
-    # the second blank row forces the player to land in col ≤ 10 (i.e. S1)
-    # when descending from above, so () are required to cross into S2/S3.
-    for c in range(s1_end + 1, COLS - 1):   # cols 11-60: wall on blank row 19
-        cells[_L12_BLANK_ROW_2][c] = CellType.WALL
-
-    # ── Sentence rune clusters (fixed) ────────────────────────────────────────
-    runes: list = []
-    for row, col, syms in _L12_SENT_CLUSTERS:
-        runes.append(RuneCluster(row=row, col=col, symbols=syms, kind='ember'))
-
     # ── Void barrier rows (full-width, deterministic) ─────────────────────────
-    for r in _L12_VOID_ROWS_A + _L12_VOID_ROWS_B:
+    runes: list = []
+    for r in _L13_VOID_ROWS_A:
         runes.append(RuneCluster(row=r, col=1,
                                  symbols=('○',) * (COLS - 2),
                                  kind='void'))
@@ -4405,23 +4371,88 @@ def build_dungeon_13(seed: int) -> 'Dungeon':
                     continue
             c += 1
 
-    for r in _L12_PARA1_ROWS:
+    for r in _L13_PARA1_ROWS:
         _fill_para_row(r)
-    for r in _L12_PARA2_ROWS:
+    for r in _L13_PARA2_ROWS:
         _fill_para_row(r)
 
     composite.runes = runes
 
     # ── Entry and exit ─────────────────────────────────────────────────────────
-    composite.entry    = _L12_ENTRY
-    composite.exit_pos = _L12_EXIT
-    composite.entities = [Entity(kind='exit', row=_L12_EXIT[0], col=_L12_EXIT[1])]
+    composite.entry    = _L13_ENTRY
+    composite.exit_pos = _L13_EXIT
+    composite.entities = [Entity(kind='exit', row=_L13_EXIT[0], col=_L13_EXIT[1])]
 
     composite.rebuild_indexes()
 
-    par, path = _dijkstra_par_L12(composite, return_path=True)
+    par, path = _dijkstra_par_L13(composite, return_path=True, disable_paren=True)
     if par is None:
-        par, path = 5, '} } j 3)'
+        par, path = 3, '} j $'
+    composite.par    = par
+    composite.budget = math.ceil(par * 1.4)
+    composite.answer = path
+
+    dungeon.rooms        = [composite]
+    dungeon.current_room = 0
+    return dungeon
+
+
+def build_dungeon_14(seed: int) -> 'Dungeon':
+    """Level 14 — Sentence Jumps: The Sentence Corridor.
+
+    Fixed layout: 3 rows × 62 cols.  Only row 1 is passable.
+
+    S1 (cols 1–10)  — 'The seal.'      ends with '.'
+    Wall gap (cols 11–22)
+    S2 (cols 23–36) — 'Ancient power!' ends with '!'
+    Wall gap (cols 37–48)
+    S3 (cols 49–59) — 'The gate o!'    ends with '!'
+    Exit entity at (1, 49) = sentence-3 start.
+
+    Optimal path (par = 2):  3)
+      3) — entry col 1 → S1 col 2 → S2 col 23 → S3/exit col 49  (2 ks)
+
+    Without (/): wall gaps trap player in S1 (cols 1–10).  Cost = infinity.
+    """
+    dungeon   = Dungeon(name='The Sentence Corridor', seed=seed)
+    ROWS, COLS = _L14_ROWS, _L14_COLS
+
+    cells = [[CellType.WALL] * COLS for _ in range(ROWS)]
+    composite = Room(rows=ROWS, cols=COLS, room_type=RoomType.ENTRY)
+    composite.cells = cells
+    composite.seed  = seed
+
+    # ── Carve sentence row (row 1, cols 1–60) ────────────────────────────────
+    for c in range(1, COLS - 1):
+        cells[_L14_SENT_ROW][c] = CellType.CORRIDOR
+
+    # ── Re-wall gaps between sentence segments ────────────────────────────────
+    s1_end = _L14_S1_COLS[1]   # col 10
+    s2_beg = _L14_S2_COLS[0]   # col 23
+    s2_end = _L14_S2_COLS[1]   # col 36
+    s3_beg = _L14_S3_COLS[0]   # col 49
+
+    for c in range(s1_end + 1, s2_beg):   # cols 11-22
+        cells[_L14_SENT_ROW][c] = CellType.WALL
+    for c in range(s2_end + 1, s3_beg):   # cols 37-48
+        cells[_L14_SENT_ROW][c] = CellType.WALL
+
+    # ── Fixed sentence rune clusters ──────────────────────────────────────────
+    runes: list = []
+    for row, col, syms in _L14_SENT_CLUSTERS:
+        runes.append(RuneCluster(row=row, col=col, symbols=syms, kind='ember'))
+    composite.runes = runes
+
+    # ── Entry and exit ─────────────────────────────────────────────────────────
+    composite.entry    = _L14_ENTRY
+    composite.exit_pos = _L14_EXIT
+    composite.entities = [Entity(kind='exit', row=_L14_EXIT[0], col=_L14_EXIT[1])]
+
+    composite.rebuild_indexes()
+
+    par, path = _dijkstra_par_L13(composite, return_path=True, disable_brace=True)
+    if par is None:
+        par, path = 2, '3)'
     composite.par    = par
     composite.budget = math.ceil(par * 1.4)
     composite.answer = path

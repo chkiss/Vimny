@@ -197,7 +197,8 @@ class TestYankSpacing:
 
 def _op(op, motion, **kw):
     d = {'op': op, 'motion': motion, 'count': kw.get('count', 1),
-         'motion_count': kw.get('motion_count', 1)}
+         'motion_count': kw.get('motion_count', 1),
+         'motion_count_given': kw.get('motion_count_given', 'motion_count' in kw)}
     if 'target' in kw:
         d['target'] = kw['target']
     return d
@@ -230,12 +231,13 @@ class TestComputeTextObjectMore:
         assert t.type is TextObjectType.INCLUSIVE
         assert (t.start_col, t.end_col) == (5, COLS - 2)   # rightmost passable
 
-    def test_dG_linewise_to_exit_row(self):
-        room = _room()                          # exit_pos row is 3
+    def test_dG_linewise_to_last_row(self):
+        # bare dG → linewise from cursor row to last passable row (row 5 in a 7-row room)
+        room = _room()
         p = _player(1, 5)
         t = compute_text_object(p, _op('d', 'G'), room)
         assert t.type is TextObjectType.LINEWISE
-        assert (t.start_row, t.end_row) == (1, 3)
+        assert (t.start_row, t.end_row) == (1, ROWS - 2)
 
     def test_dgg_linewise_to_entry_row(self):
         room = _room()                          # entry row is 1

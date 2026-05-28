@@ -379,18 +379,21 @@ class TestApplyMotionWordMotions:
 # ── apply_motion: G gg ────────────────────────────────────────────────────────
 
 class TestApplyMotionJumps:
-    def test_G_jumps_to_exit_pos(self):
+    def test_G_jumps_to_last_passable_row(self):
+        # bare G → last passable row (row 5 in a 7-row room with wall on row 6),
+        # first non-blank column (col 1, leftmost passable, no runes in bare room)
         room = _bare_room()
         p = _player(3, 1)
-        apply_motion(p, 'G', 1, room)
-        assert (p.row, p.col) == room.exit_pos
+        apply_motion(p, 'G', 1, room, count_given=False)
+        assert (p.row, p.col) == (ROWS - 2, 1)
 
-    def test_G_no_exit_does_nothing(self):
+    def test_G_exit_pos_ignored(self):
+        # bare G goes to last passable row regardless of exit_pos
         room = _bare_room()
         room.exit_pos = None
         p = _player(3, 5)
-        apply_motion(p, 'G', 1, room)
-        assert (p.row, p.col) == (3, 5)
+        apply_motion(p, 'G', 1, room, count_given=False)
+        assert (p.row, p.col) == (ROWS - 2, 1)
 
     def test_gg_jumps_to_entry(self):
         room = _bare_room()

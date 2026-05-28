@@ -162,7 +162,7 @@ def _sentence_starts(room, row: int) -> list:
     return starts
 
 
-def apply_motion(player, motion, count, room, target=None):
+def apply_motion(player, motion, count, room, target=None, count_given: bool = True):
     moved = False
     for _ in range(count):
         if motion == 'h':
@@ -454,17 +454,27 @@ def apply_motion(player, motion, count, room, target=None):
             else:
                 break
         elif motion == 'G':
-            if count > 1:
-                # {n}G — jump to row (count-1), 0-indexed, Vim convention.
-                # This is a one-shot teleport, not a repeated motion; break out
-                # of the repeat loop immediately after the jump.
+            # nG → line n; bare G → last line. Always land on first non-blank.
+            # Scan inward from the target row if it is a wall (no passable cells).
+            if count_given:
                 target_row = max(0, min(count - 1, room.rows - 1))
+                direction = 1
+            else:
+                target_row = room.rows - 1
+                direction = -1
+            col = None
+            r = target_row
+            while 0 <= r < room.rows:
+                col = _first_non_blank_col(room, r)
+                if col is not None:
+                    target_row = r
+                    break
+                r += direction
+            if col is not None:
                 player.row = target_row
+                player.col = col
                 moved = True
-                break
-            elif room.exit_pos:
-                player.row, player.col = room.exit_pos
-                moved = True
+            break
         elif motion == 'gg':
             player.row, player.col = room.entry
             moved = True

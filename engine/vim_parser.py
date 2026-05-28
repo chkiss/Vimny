@@ -56,7 +56,8 @@ def _operator_target(op: str, double_ch: str, buf: str, j0: int, count_n: int):
         return {'type': 'operator', 'op': op, 'motion': m, 'target': buf[j+1],
                 'count': count_n, 'motion_count': mc}, buf[j+2:]
     if m in MOTIONS:
-        return {'type': 'operator', 'op': op, 'motion': m, 'count': count_n, 'motion_count': mc}, buf[j+1:]
+        return {'type': 'operator', 'op': op, 'motion': m, 'count': count_n,
+                'motion_count': mc, 'motion_count_given': bool(motion_count)}, buf[j+1:]
     return {'type': 'unknown'}, buf[j+1:]
 
 
@@ -158,7 +159,7 @@ def parse(buf: str, mode: Mode) -> tuple[dict | None, str]:
 
     # Plain motion
     if ch in MOTIONS:
-        return {'type': 'motion', 'motion': ch, 'count': count_n}, buf[i+1:]
+        return {'type': 'motion', 'motion': ch, 'count': count_n, 'count_given': bool(count)}, buf[i+1:]
 
     # x — interact (open door / loot chest)
     if ch == 'x':

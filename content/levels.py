@@ -107,212 +107,212 @@ LEVELS = [
     },
     {
         'id': 14,
-        'key': 'dungeon_14_the_inscription_halls',
-        'name': 'The Inscription Halls',
-        'commands': 'i a I A',
-        'unlocks_after': 13,
+        'key': 'dungeon_14_the_sentence_corridor',
+        'name': 'The Sentence Corridor',
+        'commands': ') (',
+    },
+    {
+        'id': 141,
+        'key': 'dungeon_14.1_the_warden_surveyor',
+        'name': 'The Warden Surveyor',
+        'commands': '(boss)',
+        'commands_level': 14,
+        'unlocks_after': 14,
+        'type': 'boss',
     },
     {
         'id': 15,
-        'key': 'dungeon_15_the_sculpting_chambers',
-        'name': 'The Sculpting Chambers',
-        'commands': 'o O s S',
-        'unlocks_after': 14,
-    },
-    {
-        'id': 151,
-        'key': 'dungeon_15.1_the_warden_unbound',
-        'name': 'The Warden Unbound',
-        'commands': '(boss)',
-        'commands_level': 15,
-        'unlocks_after': 15,
-        'type': 'boss',
+        'key': 'dungeon_15_the_seekers_labyrinth',
+        'name': "The Seekers' Labyrinth",
+        'commands': '/ ? n N',
+        'unlocks_after': 141,
     },
     {
         'id': 16,
-        'key': 'dungeon_16_the_operators_vault',
-        'name': "The Operator's Vault",
-        'commands': 'd c',
-        'unlocks_after': 151,
+        'key': 'dungeon_16_the_waypoint_sanctum',
+        'name': 'The Waypoint Sanctum',
+        'commands': "m ' `",
     },
     {
         'id': 17,
-        'key': 'dungeon_17_the_whole_line_annex',
-        'name': 'The Whole-Line Annex',
-        'commands': 'dd cc',
-        'unlocks_after': 16,
+        'key': 'dungeon_17_the_archivists_library',
+        'name': "The Archivist's Library",
+        'commands': ':e :set',
+    },
+    {
+        'id': 171,
+        'key': 'dungeon_17.1_the_warden_pathfinder',
+        'name': 'The Warden Pathfinder',
+        'commands': '(boss)',
+        'commands_level': 17,
+        'unlocks_after': 17,
+        'type': 'boss',
     },
     {
         'id': 18,
-        'key': 'dungeon_18_the_undo_sanctum',
-        'name': 'The Undo Sanctum',
-        'commands': 'u Ctrl-R',
-        'unlocks_after': 17,
+        'key': 'dungeon_18_the_operators_vault',
+        'name': "The Operator's Vault",
+        'commands': 'd c',
+        'unlocks_after': 171,
     },
     {
         'id': 19,
-        'key': 'dungeon_19_the_word_chiseler',
-        'name': 'The Word Chiseler',
-        'commands': 'dw de db dW dE dB',
-        'unlocks_after': 18,
+        'key': 'dungeon_19_the_whole_line_annex',
+        'name': 'The Whole-Line Annex',
+        'commands': 'dd cc D S',
     },
     {
         'id': 20,
-        'key': 'dungeon_20_the_delimiter_chamber',
-        'name': 'The Delimiter Chamber',
-        'commands': 'dt df dT dF',
-        'unlocks_after': 19,
+        'key': 'dungeon_20_the_quartermaster',
+        'name': 'The Quartermaster',
+        'commands': 'y yy p P',
     },
     {
         'id': 21,
-        'key': 'dungeon_21_the_line_edge_hall',
-        'name': 'The Line-Edge Hall',
-        'commands': 'd$ D d0 d^',
-        'unlocks_after': 20,
+        'key': 'dungeon_21_the_undo_sanctum',
+        'name': 'The Undo Sanctum',
+        'commands': 'u',
     },
     {
         'id': 22,
-        'key': 'dungeon_22_the_file_sweep',
-        'name': 'The File Sweep',
-        'commands': 'dG dgg',
-        'unlocks_after': 21,
+        'key': 'dungeon_22_the_echo_vault',
+        'name': 'The Echo Vault',
+        'commands': '.',
+    },
+    {
+        'id': 221,
+        'key': 'dungeon_22.1_the_warden_manifold',
+        'name': 'The Warden Manifold',
+        'commands': '(boss)',
+        'commands_level': 22,
+        'unlocks_after': 22,
+        'type': 'boss',
     },
     {
         'id': 23,
-        'key': 'dungeon_23_the_yank_vault',
-        'name': 'The Yank Vault',
-        'commands': 'y yy',
-        'unlocks_after': 22,
+        'key': 'dungeon_23_the_inscription_halls',
+        'name': 'The Inscription Halls',
+        'commands': 'i a',
+        'unlocks_after': 221,
     },
     {
         'id': 24,
-        'key': 'dungeon_24_the_paste_halls',
-        'name': 'The Paste Halls',
-        'commands': 'p P',
-        'unlocks_after': 23,
+        'key': 'dungeon_24_the_sculpting_chambers',
+        'name': 'The Sculpting Chambers',
+        'commands': 'I A o O',
     },
     {
         'id': 25,
-        'key': 'dungeon_25_the_fine_liftmaster',
-        'name': 'The Fine Liftmaster',
-        'commands': 'yw ye y$',
-        'unlocks_after': 24,
+        'key': 'dungeon_25_the_overwrite_halls',
+        'name': 'The Overwrite Halls',
+        'commands': 'r R',
     },
     {
         'id': 26,
-        'key': 'dungeon_26_the_change_corridor',
-        'name': 'The Change Corridor',
-        'commands': 'cw ce cb',
-        'unlocks_after': 25,
+        'key': 'dungeon_26_the_case_chambers',
+        'name': 'The Case Chambers',
+        'commands': '~ g~ gU gu',
     },
     {
         'id': 27,
-        'key': 'dungeon_27_the_delimiter_change',
-        'name': 'The Delimiter Change',
-        'commands': 'ct cf cT cF',
-        'unlocks_after': 26,
-    },
-    {
-        'id': 271,
-        'key': 'dungeon_27.1_the_warden_manifold',
-        'name': 'The Warden Manifold',
-        'commands': '(boss)',
-        'commands_level': 27,
-        'unlocks_after': 27,
-        'type': 'boss',
+        'key': 'dungeon_27_the_joiners_gate',
+        'name': "The Joiner's Gate",
+        'commands': 'J gJ',
     },
     {
         'id': 28,
-        'key': 'dungeon_28_the_overwrite_halls',
-        'name': 'The Overwrite Halls',
-        'commands': 'r R',
-        'unlocks_after': 271,
+        'key': 'dungeon_28_the_alignment_halls',
+        'name': 'The Alignment Halls',
+        'commands': '>> <<',
     },
     {
         'id': 29,
-        'key': 'dungeon_29_the_case_chambers',
-        'name': 'The Case Chambers',
-        'commands': '~',
-        'unlocks_after': 28,
-    },
-    {
-        'id': 30,
-        'key': 'dungeon_30_the_echo_vault',
-        'name': 'The Echo Vault',
-        'commands': '.',
-        'unlocks_after': 29,
-    },
-    {
-        'id': 31,
-        'key': 'dungeon_31_the_case_operator_halls',
-        'name': 'The Case Operator Halls',
-        'commands': 'g~ gU gu',
-        'unlocks_after': 30,
-    },
-    {
-        'id': 32,
-        'key': 'dungeon_32_the_join_corridor',
-        'name': 'The Join Corridor',
-        'commands': 'J gJ',
-        'unlocks_after': 31,
-    },
-    {
-        'id': 33,
-        'key': 'dungeon_33_the_indent_halls',
-        'name': 'The Indent Halls',
-        'commands': '>> <<',
-        'unlocks_after': 32,
-    },
-    {
-        'id': 34,
-        'key': 'dungeon_34_the_operator_indent',
-        'name': 'The Operator Indent',
+        'key': 'dungeon_29_the_indentation_sanctum',
+        'name': 'The Indentation Sanctum',
         'commands': '>{m} <{m} =',
-        'unlocks_after': 33,
     },
     {
-        'id': 341,
-        'key': 'dungeon_34.1_the_warden_scrivener',
+        'id': 291,
+        'key': 'dungeon_29.1_the_warden_scrivener',
         'name': 'The Warden Scrivener',
         'commands': '(boss)',
-        'commands_level': 34,
-        'unlocks_after': 34,
+        'commands_level': 29,
+        'unlocks_after': 29,
         'type': 'boss',
     },
     {
-        'id': 35,
-        'key': 'dungeon_35_the_word_enclosure',
+        'id': 30,
+        'key': 'dungeon_30_the_word_enclosure',
         'name': 'The Word Enclosure',
         'commands': 'iw aw',
-        'unlocks_after': 341,
+        'unlocks_after': 291,
+    },
+    {
+        'id': 31,
+        'key': 'dungeon_31_the_bracket_enclosure',
+        'name': 'The Bracket Enclosure',
+        'commands': 'i( a(',
+    },
+    {
+        'id': 32,
+        'key': 'dungeon_32_the_brace_square_enclosure',
+        'name': 'The Brace & Square Enclosure',
+        'commands': 'i[ a[ i{ a{',
+    },
+    {
+        'id': 33,
+        'key': 'dungeon_33_the_quote_enclosure',
+        'name': 'The Quote Enclosure',
+        'commands': 'i" a" i\' a\'',
+    },
+    {
+        'id': 34,
+        'key': 'dungeon_34_the_tag_enclosure',
+        'name': 'The Tag Enclosure',
+        'commands': 'it at',
+    },
+    {
+        'id': 35,
+        'key': 'dungeon_35_the_sentence_enclosure',
+        'name': 'The Sentence Enclosure',
+        'commands': 'is as',
     },
     {
         'id': 36,
-        'key': 'dungeon_36_the_bracket_enclosure',
-        'name': 'The Bracket Enclosure',
-        'commands': 'i( a( i[ a[ i{ a{',
-        'unlocks_after': 35,
+        'key': 'dungeon_36_the_paragraph_enclosure',
+        'name': 'The Paragraph Enclosure',
+        'commands': 'ip ap',
+    },
+    {
+        'id': 361,
+        'key': 'dungeon_36.1_the_grandmasters_sanctum',
+        'name': "The Grandmaster's Sanctum",
+        'commands': '(boss)',
+        'commands_level': 36,
+        'unlocks_after': 36,
+        'type': 'boss',
     },
     {
         'id': 37,
-        'key': 'dungeon_37_the_quote_enclosure',
-        'name': 'The Quote Enclosure',
-        'commands': 'i" a" i\' a\'',
-        'unlocks_after': 36,
+        'key': 'dungeon_37_the_spellwrights_forge',
+        'name': "The Spellwright's Forge",
+        'commands': ':s///',
+        'unlocks_after': 361,
     },
     {
         'id': 38,
-        'key': 'dungeon_38_the_tag_enclosure',
-        'name': 'The Tag Enclosure',
-        'commands': 'it at',
-        'unlocks_after': 37,
+        'key': 'dungeon_38_the_hall_of_echoes',
+        'name': 'The Hall of Echoes',
+        'commands': 'q @ "',
     },
     {
-        'id': 39,
-        'key': 'dungeon_39_the_paragraph_enclosure',
-        'name': 'The Paragraph Enclosure',
-        'commands': 'is as ip ap',
+        'id': 381,
+        'key': 'dungeon_38.1_the_warden_eternal',
+        'name': 'The Warden Eternal',
+        'commands': '(boss)',
+        'commands_level': 38,
         'unlocks_after': 38,
+        'type': 'boss',
     },
     {
         'id': 99,
@@ -362,23 +362,45 @@ def known_commands(level_id: int) -> list:
     if effective >= 12:
         cmds += ['%']
     if effective >= 13:
-        cmds += ['{', '}', '(', ')']
+        cmds += ['{', '}']
     if effective >= 14:
-        cmds += ['insert']
+        cmds += ['(', ')']
     if effective >= 15:
-        cmds += ['s', 'S']
+        cmds += ['/', '*']
     if effective >= 16:
-        cmds += ['d', 'c']
-    if effective >= 23:
-        cmds += ['y']
-    if effective >= 24:
-        cmds += ['register']
-    if effective >= 28:
-        cmds += ['r', 'R']
-    if effective >= 29:
-        cmds += ['~']
-    if effective >= 30:
+        cmds += ['mark']
+    if effective >= 18:
+        cmds += ['d', 'c', 's']
+    if effective >= 19:
+        cmds += ['S']
+    if effective >= 20:
+        cmds += ['y', 'register']
+    if effective >= 22:
         cmds += ['dot']
+    if effective >= 23:
+        cmds += ['insert']
+    if effective >= 25:
+        cmds += ['r', 'R']
+    if effective >= 26:
+        cmds += ['~', 'gU', 'gu', 'g~']
+    if effective >= 28:
+        cmds += ['>', '<']
+    if effective >= 30:
+        cmds += ['iw', 'aw']
+    if effective >= 31:
+        cmds += ['i(', 'a(']
+    if effective >= 32:
+        cmds += ['i[', 'a[', 'i{', 'a{']
+    if effective >= 33:
+        cmds += ['i"', 'a"', "i'", "a'"]
+    if effective >= 34:
+        cmds += ['it', 'at']
+    if effective >= 35:
+        cmds += ['is', 'as']
+    if effective >= 36:
+        cmds += ['ip', 'ap']
+    if effective >= 38:
+        cmds += ['q', '@', 'reg_named']
     return cmds
 
 

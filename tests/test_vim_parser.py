@@ -253,24 +253,24 @@ class TestPlainMotions:
     @pytest.mark.parametrize("key", list('hjklwbe0^${}G()HML%'))
     def test_single_motion(self, key):
         action, remaining = parse(key, Mode.NORMAL)
-        assert action == {'type': 'motion', 'motion': key, 'count': 1}
+        assert action == {'type': 'motion', 'motion': key, 'count': 1, 'count_given': False}
         assert remaining == ''
 
     def test_count_motion(self):
         action, _ = parse('5j', Mode.NORMAL)
-        assert action == {'type': 'motion', 'motion': 'j', 'count': 5}
+        assert action == {'type': 'motion', 'motion': 'j', 'count': 5, 'count_given': True}
 
     def test_multi_digit_count(self):
         action, _ = parse('12h', Mode.NORMAL)
-        assert action == {'type': 'motion', 'motion': 'h', 'count': 12}
+        assert action == {'type': 'motion', 'motion': 'h', 'count': 12, 'count_given': True}
 
     def test_trailing_zero_in_count(self):
         action, _ = parse('30l', Mode.NORMAL)
-        assert action == {'type': 'motion', 'motion': 'l', 'count': 30}
+        assert action == {'type': 'motion', 'motion': 'l', 'count': 30, 'count_given': True}
 
     def test_zero_alone_is_motion(self):
         action, _ = parse('0', Mode.NORMAL)
-        assert action == {'type': 'motion', 'motion': '0', 'count': 1}
+        assert action == {'type': 'motion', 'motion': '0', 'count': 1, 'count_given': False}
 
 
 # ── Text objects (operator + i/a + obj) ──────────────────────────────────────

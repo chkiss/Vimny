@@ -119,12 +119,15 @@ def render_overworld(term: Terminal, player: Player, progress: dict,
     ]
     out.extend(hdr_rows)
 
-    # ../ and ./ directory entries
+    # ../ and ./ directory entries (always visible, not scrolled)
     for di, dentry in enumerate(['../', './']):
         is_cursor = di == cursor_row
         out.append(_row(is_cursor, len(dentry), dfc + dentry))
 
-    # Standard dungeon listing
+    # Build all scrollable entry rows; track which one the cursor is on
+    entry_rows      = []  # list of rendered row strings
+    cursor_entry    = 0   # entry_rows index of cursor (default to top when on ../ or ./)
+
     for idx, level in enumerate(visible_levels):
         prog     = progress.get(level['id'], {})
         complete = prog.get('complete', False)
@@ -146,10 +149,12 @@ def render_overworld(term: Terminal, player: Player, progress: dict,
             badge_col = C.hint_fg()
 
         is_cursor = (idx + 2) == cursor_row
+        if is_cursor:
+            cursor_entry = len(entry_rows)
         key_text  = level['key']
         cmds      = level.get('commands', '')
         nc        = enfc if is_cursor else (rst if unlocked else C.hint_fg())
-        cmd_col   = kc if unlocked else C.hint_fg()   # new keys taught (key color)
+        cmd_col   = kc if unlocked else C.hint_fg()
         cols      = _cols3(key_text, cmds, badge)
         if cols is not None:
             gap1, gap2 = cols
@@ -159,14 +164,10 @@ def render_overworld(term: Terminal, player: Player, progress: dict,
         else:
             spaces  = max(2, iw - len(key_text) - len(badge))
             colored = nc + key_text + ' ' * spaces + badge_col + badge
-        out.append(_row(is_cursor, iw, colored))
+        entry_rows.append(_row(is_cursor, iw, colored))
 
-    # Custom levels dir entry + tree listing (admin only)
-    custom_rows = 0
     if custom_layouts:
-        out.append(_row(False, len('custom/'), dfc + 'custom/'))
-        custom_rows += 1
-
+        entry_rows.append(_row(False, len('custom/'), dfc + 'custom/'))
         n_custom = len(custom_layouts)
         for ci, layout in enumerate(custom_layouts):
             idx       = len(visible_levels) + ci
@@ -176,14 +177,22 @@ def render_overworld(term: Terminal, player: Player, progress: dict,
             badge     = '[CUSTOM]'
             badge_col = C.mode_insert()
             is_cursor = (idx + 2) == cursor_row
+            if is_cursor:
+                cursor_entry = len(entry_rows)
             nc        = enfc if is_cursor else rst
             spaces    = max(1, iw - 4 - len(name) - len(badge))
             colored   = '  ' + C.hint_fg() + tree_char + ' ' + nc + name + ' ' * spaces + badge_col + badge
-            out.append(_row(is_cursor, iw, colored))
-        custom_rows += n_custom
+            entry_rows.append(_row(is_cursor, iw, colored))
+
+    # Scroll: keep cursor visible; header and footer are fixed
+    avail         = max(1, game_h - len(hdr_rows) - 2)
+    scroll_offset = max(0, cursor_entry - avail + 1)
+    scroll_offset = min(scroll_offset, max(0, len(entry_rows) - avail))
+    visible_slice = entry_rows[scroll_offset : scroll_offset + avail]
+    out.extend(visible_slice)
 
     # Fill remaining game-area rows
-    rows_used = len(hdr_rows) + 2 + len(visible_levels) + custom_rows
+    rows_used = len(hdr_rows) + 2 + len(visible_slice)
     for _ in range(max(0, game_h - rows_used)):
         out.append(bfg + S.BOX_V + rst + ' ' * iw + bfg + S.BOX_V + rst)
 
