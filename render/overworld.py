@@ -74,6 +74,22 @@ def render_overworld(term: Terminal, player: Player, progress: dict,
                 ' ' * max(0, iw - vis) +
                 bfg + S.BOX_V + rst)
 
+    def _cols3(left, mid, right):
+        """Gaps to lay out left | centered mid | right within iw.
+
+        Returns (gap1, gap2) with gap1+gap2 placing `mid` as centered as the
+        left/right anchors allow (>=1 space each side). None if there's no room
+        (caller falls back to the two-column layout).
+        """
+        if not mid or iw - len(left) - len(mid) - len(right) < 2:
+            return None
+        mid_start = (iw - len(mid)) // 2
+        mid_start = max(len(left) + 1, mid_start)
+        mid_start = min(mid_start, iw - len(right) - len(mid) - 1)
+        if mid_start < len(left) + 1:
+            return None
+        return mid_start - len(left), iw - len(right) - (mid_start + len(mid))
+
     def _hdr(plain, colored=None):
         pad = max(0, iw - len(plain))
         return (bfg + S.BOX_V + rst +
@@ -131,9 +147,18 @@ def render_overworld(term: Terminal, player: Player, progress: dict,
 
         is_cursor = (idx + 2) == cursor_row
         key_text  = level['key']
+        cmds      = level.get('commands', '')
         nc        = enfc if is_cursor else (rst if unlocked else C.hint_fg())
-        spaces    = max(2, iw - len(key_text) - len(badge))
-        colored   = nc + key_text + ' ' * spaces + badge_col + badge
+        cmd_col   = kc if unlocked else C.hint_fg()   # new keys taught (key color)
+        cols      = _cols3(key_text, cmds, badge)
+        if cols is not None:
+            gap1, gap2 = cols
+            colored = (nc + key_text + ' ' * gap1 +
+                       cmd_col + cmds + ' ' * gap2 +
+                       badge_col + badge)
+        else:
+            spaces  = max(2, iw - len(key_text) - len(badge))
+            colored = nc + key_text + ' ' * spaces + badge_col + badge
         out.append(_row(is_cursor, iw, colored))
 
     # Custom levels dir entry + tree listing (admin only)
