@@ -197,9 +197,6 @@ def render_overworld(term: Terminal, player: Player, progress: dict,
         out.append(bfg + S.BOX_V + rst + ' ' * iw + bfg + S.BOX_V + rst)
 
     # ── Vim statusline / command line ─────────────────────────────────────────
-    sl_bg = C.statusline_bg()
-    sl_fg = C.statusline_fg()
-
     if deleting:
         conf     = 'd again to confirm delete · any other key cancels'
         conf_pad = max(0, iw - len(conf) - 1)
@@ -216,8 +213,8 @@ def render_overworld(term: Terminal, player: Player, progress: dict,
         cmd_text = ':' + cmd_line
         sl_pad   = max(0, iw - len(cmd_text))
         out.append(bfg + S.BOX_V + rst +
-                   sl_bg + C.mode_command() + cmd_text +
-                   sl_fg + ' ' * sl_pad + rst +
+                   C.mode_command() + cmd_text +
+                   rst + ' ' * sl_pad +
                    bfg + S.BOX_V + rst)
     else:
         sl_label   = '-- OVERWORLD --'
@@ -225,8 +222,8 @@ def render_overworld(term: Terminal, player: Player, progress: dict,
         sl_right   = f'{cursor_row + 1}/{total_rows} '
         sl_mid     = max(0, iw - len(sl_label) - 2 - len(sl_right))
         out.append(bfg + S.BOX_V + rst +
-                   sl_bg + C.mode_normal() + ' ' + sl_label + ' ' +
-                   sl_bg + sl_fg + ' ' * sl_mid + sl_right + rst +
+                   C.mode_normal() + ' ' + sl_label + ' ' +
+                   rst + ' ' * sl_mid + sl_right +
                    bfg + S.BOX_V + rst)
 
     # ── Bottom border ─────────────────────────────────────────────────────────

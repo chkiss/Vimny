@@ -29,7 +29,7 @@ def _room():
          for c in range(COLS)]
         for r in range(ROWS)
     ]
-    room.entry    = (1, 1)
+    room.gg_pos    = (1, 1)
     room.exit_pos = (3, 20)
     room.rebuild_indexes()
     return room

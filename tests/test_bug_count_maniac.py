@@ -1,7 +1,6 @@
 """The Count Maniac — spams large counts everywhere.
 
-Uncovers: count parsing edge cases (30l, 0 ambiguity), motion clamping at
-room boundaries, and _keystroke_cost formula for extreme counts.
+Personality defined in agents/bug_testers.md.
 """
 import pytest
 from engine.vim_parser import parse
@@ -19,7 +18,7 @@ def _bare_room(rows=7, cols=30):
          for c in range(cols)]
         for r in range(rows)
     ]
-    room.entry    = (3, 1)
+    room.gg_pos    = (3, 1)
     room.exit_pos = (3, 28)
     room.fog_cells = set()
     room.rebuild_indexes()

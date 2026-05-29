@@ -162,7 +162,7 @@ def _sentence_starts(room, row: int) -> list:
     return starts
 
 
-def apply_motion(player, motion, count, room, target=None, count_given: bool = True):
+def apply_motion(player, motion, count, room, target=None, count_given: bool = True, game_h: int = 0):
     moved = False
     for _ in range(count):
         if motion == 'h':
@@ -476,7 +476,7 @@ def apply_motion(player, motion, count, room, target=None, count_given: bool = T
                 moved = True
             break
         elif motion == 'gg':
-            player.row, player.col = room.entry
+            player.row, player.col = room.gg_pos
             moved = True
         elif motion == 'ge':
             # Backward to the end of the previous word (a non-void RuneCluster).
@@ -532,24 +532,26 @@ def apply_motion(player, motion, count, room, target=None, count_given: bool = T
             else:
                 break
         elif motion in ('H', 'M', 'L'):
-            # Screen-relative row jump. In a room that fits the viewport this is
-            # room-relative: H=top, L=bottom, M=middle passable row. Lands on the
-            # first non-blank column of the target row (vim-faithful).
-            fnb: dict = {}
-            for _r in range(room.rows):
-                _c = _first_non_blank_col(room, _r)
-                if _c is not None:
-                    fnb[_r] = _c
-            if not fnb:
+            # Viewport-relative when game_h is provided and room exceeds it;
+            # otherwise room-relative (H=first, L=last, M=middle passable row).
+            if game_h > 0 and room.rows > game_h:
+                vr_s = max(0, min(player.row - game_h // 2, room.rows - game_h))
+                row_range = range(vr_s, min(vr_s + game_h, room.rows))
+            else:
+                row_range = range(room.rows)
+            prows = []
+            for _r in row_range:
+                if _first_non_blank_col(room, _r) is not None:
+                    prows.append(_r)
+            if not prows:
                 break
-            prows = sorted(fnb)
             if motion == 'H':
                 tr = prows[0]
             elif motion == 'L':
                 tr = prows[-1]
             else:
                 tr = prows[len(prows) // 2]
-            tc = fnb[tr]
+            tc = _first_non_blank_col(room, tr)
             if (tr, tc) != (player.row, player.col):
                 player.row, player.col = tr, tc
                 moved = True

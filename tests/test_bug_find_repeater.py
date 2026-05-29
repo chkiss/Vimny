@@ -1,7 +1,6 @@
 """The Find Repeater — lives on f/F/t/T and repeats with ;/,.
 
-Uncovers: ; with no prior f, , reversal, t adjacent-char noop, F through
-wall, count-f, last_f update semantics.
+Personality defined in agents/bug_testers.md.
 """
 import pytest
 from engine.world import Room, RoomType, CellType, Entity, RuneCluster
@@ -16,7 +15,7 @@ def _bare_room(rows=7, cols=40):
          for c in range(cols)]
         for r in range(rows)
     ]
-    room.entry    = (3, 1)
+    room.gg_pos    = (3, 1)
     room.exit_pos = (3, 38)
     room.fog_cells = set()
     room.rebuild_indexes()

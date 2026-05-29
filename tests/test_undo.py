@@ -28,7 +28,7 @@ from engine.budget import Budget
 def _corridor(rows=5, cols=12):
     cells = [[CellType.FLOOR] * cols for _ in range(rows)]
     room = Room(room_type=RoomType.SAFE, rows=rows, cols=cols, cells=cells,
-                entry=(2, 0), exit_pos=(2, cols - 1))
+                gg_pos=(2, 0), exit_pos=(2, cols - 1))
     room.rebuild_indexes()
     return room
 

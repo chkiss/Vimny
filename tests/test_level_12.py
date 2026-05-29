@@ -1,14 +1,16 @@
-"""Level 12 (id=12) — The Bracket Vaults: dungeon correctness tests.
+"""Level 10 (id=10) — The Bracket Vaults: dungeon correctness tests.
 
-Layout: three-corridor snake (7 rows × 60 cols).
-Rows 1 and 5 are open corridors; row 3 is void-filled except at
-( col 4 and ) col 54 — the only safe landing cells.
+Layout: three-corridor snake (7 rows × 60 cols).  Rows 1 and 5 are open
+corridors; rows 2, 3 and 4 are flooded with WATER except the turn cells and the
+row-3 bracket landing cells (( col 4, ) col 54).  WATER blocks manual h/l
+(is_passable is False), so % is the only way across.  Row 5's ) is at col 53
+with the exit one cell right at (5,54).
 
-Optimal path (par=9):  3l % j j % j j %
-  Entry (1,1) → (1,4) ( → % → (1,54) ) → j j → (3,54) ) → % → (3,4) (
-  → j j → (5,4) ( → % → (5,54) EXIT
+Optimal path (par=8):  % 2j % 2j % l
+  (1,1): % → (1,54) ).  2j → (3,54).  % → (3,4) (.  2j → (5,4) (.
+  % → (5,53) ).  l → (5,54) EXIT.
 
-Without %: par_no_% = None (row 3 is uncrossable without %).
+Without %: par_no_% = None (the water band is uncrossable by hand).
 """
 import math
 import pytest
@@ -17,7 +19,7 @@ from generation.dungeon_gen import (
     build_dungeon_12,
     _dijkstra_par_L11,
     _L11_ROWS, _L11_COLS, _L11_CORR_ROWS,
-    _L11_BRACKET_OPEN, _L11_BRACKET_CLOSE,
+    _L11_BRACKET_OPEN, _L11_BRACKET_CLOSE, _L11_CLOSE_R5,
     _L11_ENTRY, _L11_EXIT_POS, _L11_PAR, _L11_ANSWER,
 )
 
@@ -28,10 +30,10 @@ SEEDS = [1, 42, 999, 12345, 2**20 + 7]
 def test_entry_and_exit_passable(seed):
     d = build_dungeon_12(seed)
     room = d.rooms[0]
-    r0, c0 = room.entry
+    r0, c0 = room.gg_pos
     r1, c1 = room.exit_pos
     assert room.cells[r0][c0] == CellType.CORRIDOR, (
-        f"seed={seed}: entry {room.entry} is not CORRIDOR"
+        f"seed={seed}: entry {room.gg_pos} is not CORRIDOR"
     )
     assert room.cells[r1][c1] == CellType.CORRIDOR, (
         f"seed={seed}: exit {room.exit_pos} is not CORRIDOR"
@@ -82,12 +84,13 @@ def test_bracket_structure_corridor_rows(seed):
         assert open_ru.symbols == ('(',), (
             f"seed={seed}: rune at ({r},{_L11_BRACKET_OPEN}) symbols={open_ru.symbols}, expected ('(',)"
         )
-        close_ru = room.rune_at(r, _L11_BRACKET_CLOSE)
+        close_col = _L11_CLOSE_R5 if r == 5 else _L11_BRACKET_CLOSE
+        close_ru = room.rune_at(r, close_col)
         assert close_ru is not None, (
-            f"seed={seed}: no rune at ({r},{_L11_BRACKET_CLOSE}) — expected ')'"
+            f"seed={seed}: no rune at ({r},{close_col}) — expected ')'"
         )
         assert close_ru.symbols == (')',), (
-            f"seed={seed}: rune at ({r},{_L11_BRACKET_CLOSE}) symbols={close_ru.symbols}, expected (')',)"
+            f"seed={seed}: rune at ({r},{close_col}) symbols={close_ru.symbols}, expected (')',)"
         )
 
 
@@ -95,7 +98,7 @@ def test_bracket_structure_corridor_rows(seed):
 def test_percent_required(seed):
     """BFS with % disabled cannot reach the exit within budget.
 
-    The void field on row 3 makes it impossible to cross without %,
+    The water band on rows 2-4 makes it impossible to cross without %,
     so par_no_% is None (no path exists).
     """
     d = build_dungeon_12(seed)
@@ -162,32 +165,44 @@ def test_outer_paren_pair_matches_row1(seed):
 
 
 @pytest.mark.parametrize("seed", SEEDS)
-def test_void_field_on_row3(seed):
-    """Row 3 must have void runes at all corridor cols except BRACKET_OPEN and BRACKET_CLOSE."""
+def test_water_barrier_on_row3(seed):
+    """Row 3 must be WATER at all cols except the two bracket cells (which stay
+    CORRIDOR so % can land on them)."""
     d = build_dungeon_12(seed)
     room = d.rooms[0]
     row = 3
     for c in range(1, _L11_COLS - 1):
         if c == _L11_BRACKET_OPEN or c == _L11_BRACKET_CLOSE:
-            # Bracket cells must NOT be void
-            ru = room.rune_at(row, c)
-            assert ru is not None and ru.kind != 'void', (
-                f"seed={seed}: bracket cell ({row},{c}) should not be void"
+            assert room.cells[row][c] == CellType.CORRIDOR, (
+                f"seed={seed}: bracket cell ({row},{c}) should be CORRIDOR, got {room.cells[row][c]}"
             )
-        elif room.cells[row][c] == CellType.CORRIDOR:
-            # All other corridor cells on row 3 must be void
-            ru = room.rune_at(row, c)
-            assert ru is not None and ru.kind == 'void', (
-                f"seed={seed}: ({row},{c}) is CORRIDOR but not void (expected void barrier)"
+        else:
+            assert room.cells[row][c] == CellType.WATER, (
+                f"seed={seed}: ({row},{c}) should be WATER (water barrier), got {room.cells[row][c]}"
+            )
+
+
+@pytest.mark.parametrize("seed", SEEDS)
+def test_water_gap_rows_2_and_4(seed):
+    """Rows 2 and 4 must be WATER except their single CORRIDOR turn cell
+    (col 54 on row 2, col 4 on row 4)."""
+    d = build_dungeon_12(seed)
+    room = d.rooms[0]
+    for row, turn_col in {2: _L11_BRACKET_CLOSE, 4: _L11_BRACKET_OPEN}.items():
+        for c in range(1, _L11_COLS - 1):
+            want = CellType.CORRIDOR if c == turn_col else CellType.WATER
+            assert room.cells[row][c] == want, (
+                f"seed={seed}: ({row},{c}) should be {want}, got {room.cells[row][c]}"
             )
 
 
 @pytest.mark.parametrize("seed", SEEDS)
 def test_corridor_rows_carved(seed):
-    """Each corridor row must have CORRIDOR cells for cols 1..COLS-2."""
+    """Rows 1 and 5 must be CORRIDOR for cols 1..COLS-2 (row 3 is now water
+    except its two bracket cells — see test_water_barrier_on_row3)."""
     d = build_dungeon_12(seed)
     room = d.rooms[0]
-    for r in _L11_CORR_ROWS:
+    for r in (1, 5):
         for c in range(1, _L11_COLS - 1):
             assert room.cells[r][c] == CellType.CORRIDOR, (
                 f"seed={seed}: row {r} col {c} should be CORRIDOR"
@@ -195,11 +210,11 @@ def test_corridor_rows_carved(seed):
 
 
 def test_par_is_correct():
-    """Sanity check: par=_L11_PAR=7 and answer matches the constant for all seeds.
+    """Sanity check: par=_L11_PAR=8 and answer matches the constant for all seeds.
 
-    The optimal path is: % 2j % 2j % (7 ks)
-      (1,1): % scans right → ( col 4 → jumps to ) col 54.
-      2j → (3,54).  % → (3,4).  2j → (5,4).  % → (5,54) EXIT.
+    The optimal path is: % 2j % 2j % l (8 ks)
+      (1,1): % → ) col 54.  2j → (3,54).  % → (3,4).  2j → (5,4).
+      % → (5,53) ).  l → (5,54) EXIT.
     """
     for seed in SEEDS:
         d = build_dungeon_12(seed)

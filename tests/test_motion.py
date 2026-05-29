@@ -16,7 +16,7 @@ def _bare_room():
          for c in range(COLS)]
         for r in range(ROWS)
     ]
-    room.entry    = (3, 1)
+    room.gg_pos    = (3, 1)
     room.exit_pos = (3, 20)
     room.rebuild_indexes()
     return room
@@ -399,7 +399,7 @@ class TestApplyMotionJumps:
         room = _bare_room()
         p = _player(5, 15)
         apply_motion(p, 'gg', 1, room)
-        assert (p.row, p.col) == room.entry
+        assert (p.row, p.col) == room.gg_pos
 
 
 # ── apply_motion: ge gE backward word-end (Block E) ──────────────────────────

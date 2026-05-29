@@ -207,18 +207,20 @@ def _render_frame(term: Terminal, iw: int, content: list[str],
     out.extend(content[:game_h])
 
     # Vim statusline / command line
-    sl_w  = iw + 2
-    sl_bg = C.statusline_bg()
-    sl_fg = C.statusline_fg()
+    sl_w  = iw
     if cmd_line is not None:
         cmd_text = ':' + cmd_line
         sl_pad   = max(0, sl_w - len(cmd_text))
-        out.append(sl_bg + C.mode_command() + cmd_text +
-                   sl_fg + ' ' * sl_pad + rst)
+        out.append(bfg + S.BOX_V + rst +
+                   C.mode_command() + cmd_text +
+                   rst + ' ' * sl_pad +
+                   bfg + S.BOX_V + rst)
     else:
         sl_label = '-- VIMNY --'
         sl_mid   = max(0, sl_w - len(sl_label) - 2)
-        out.append(sl_bg + stamp + ' ' + sl_label + sl_fg + ' ' * sl_mid + rst)
+        out.append(bfg + S.BOX_V + rst +
+                   stamp + ' ' + sl_label + rst + ' ' * sl_mid +
+                   bfg + S.BOX_V + rst)
 
     # Bottom separator
     out.append(border_h(S.BOX_LT, S.BOX_RT))

@@ -1,7 +1,6 @@
 """The Dot Repeater — uses . (repeat last change) everywhere.
 
-Uncovers: . before any change, count-dot count-override, last_change
-copy semantics, which actions set/don't set last_change, dot gating.
+Personality defined in agents/bug_testers.md.
 """
 import pytest
 from engine.vim_parser import parse

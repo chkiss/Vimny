@@ -1,24 +1,43 @@
 """Level definitions and command curriculum."""
 from __future__ import annotations
 
+# Middle column (overworld display): each entry's 'commands' string is centred
+# between the level key and its status badge.
+#
+# Convention:
+#   Teaching levels — new Vim keys introduced here; should match what
+#                     known_commands() adds at this level (see below).
+#   Boss levels     — omit 'commands' entirely; column shows blank.
+#   Reliquary       — commands reviewed / introduced as a bonus.
+#
+# Intentional divergences from known_commands():
+#   Key vs token    : actual keystrokes shown, not internal token names
+#                     (e.g. 'v' not 'visual', '.' not 'dot', 'i a' not 'insert').
+#   Descriptive     : '[count] prefix' (L2), doubled forms 'dd'/'cc'/'yy' (L19–20),
+#                     '>{m}' motion notation (L29).
+#   Bonus hidden    : x (L2), s (L18), * (L15), register/reg_named (L20/L38)
+#                     are available but not the lesson.
+#   Always-on       : u, :w, :q, :q! are never gated — shown once at L0 only.
+#   Not yet gated   : J gJ (L27), = (L29), :e :set (L17), :s/// (L37) —
+#                     add known_commands() entries when engine support lands.
 LEVELS = [
     {
         'id': 0,
         'key': 'dungeon_00_the_first_cave',
         'name': 'The First Cave',
-        'commands': 'h j k l',
+        'commands': 'h j k l u :w :q :q!',
     },
     {
         'id': 1,
         'key': 'dungeon_01_the_line_halls',
         'name': 'The Line Halls',
-        'commands': '^ $ 0  :w :q :q!',
+        'commands': '^ $ 0',
     },
     {
         'id': 11,
         'key': 'dungeon_01.1_the_reliquary',
         'name': 'The Reliquary',
-        'commands': 'hjkl ^ $ 0',
+        'commands': '"',
         'commands_level': 1,
         'unlocks_after': 1,
         'type': 'reliquary',
@@ -45,87 +64,86 @@ LEVELS = [
         'id': 5,
         'key': 'dungeon_05_the_goblin_gauntlet',
         'name': 'The Goblin Gauntlet',
-        'commands': '; ,',
+        'commands': '; , p',
     },
     {
         'id': 51,
         'key': 'dungeon_05.1_the_wardens_keep',
         'name': "The Warden's Keep",
-        'commands': '(boss)',
         'commands_level': 5,
         'unlocks_after': 5,
         'type': 'boss',
     },
     {
         'id': 6,
-        'key': 'dungeon_06_the_wardens_precision',
-        'name': "The Warden's Precision",
-        'commands': 'v',
+        'key': 'dungeon_06_the_word_forge',
+        'name': 'The WORD Forge',
+        'commands': 'W B E',
         'unlocks_after': 51,
     },
     {
         'id': 7,
-        'key': 'dungeon_07_the_word_forge',
-        'name': 'The WORD Forge',
-        'commands': 'W B E',
+        'key': 'dungeon_07_the_backward_vaults',
+        'name': 'The Backward Vaults',
+        'commands': 'ge gE',
         'unlocks_after': 6,
     },
     {
         'id': 8,
-        'key': 'dungeon_08_the_backward_vaults',
-        'name': 'The Backward Vaults',
-        'commands': 'ge gE',
+        'key': 'dungeon_08_the_long_plumb',
+        'name': 'The Long Plumb',
+        'commands': 'G gg',
         'unlocks_after': 7,
     },
     {
         'id': 9,
-        'key': 'dungeon_09_the_file_vaults',
-        'name': 'The File Vaults',
-        'commands': 'G gg',
+        'key': 'dungeon_09_the_screen_vault',
+        'name': 'The Screen Vault',
+        'commands': 'H M L',
         'unlocks_after': 8,
     },
     {
         'id': 10,
-        'key': 'dungeon_10_the_screen_vault',
-        'name': 'The Screen Vault',
-        'commands': 'H M L',
+        'key': 'dungeon_10_the_bracket_vaults',
+        'name': 'The Bracket Vaults',
+        'commands': '%',
         'unlocks_after': 9,
     },
     {
         'id': 12,
-        'key': 'dungeon_12_the_bracket_vaults',
-        'name': 'The Bracket Vaults',
-        'commands': '%',
+        'key': 'dungeon_12_the_runic_archives',
+        'name': 'The Runic Archives',
+        'commands': '} {',
         'unlocks_after': 10,
     },
     {
         'id': 13,
-        'key': 'dungeon_13_the_runic_archives',
-        'name': 'The Runic Archives',
-        'commands': '} { ) (',
+        'key': 'dungeon_13_the_sentence_corridor',
+        'name': 'The Sentence Corridor',
+        'commands': ') (',
         'unlocks_after': 12,
     },
     {
-        'id': 14,
-        'key': 'dungeon_14_the_sentence_corridor',
-        'name': 'The Sentence Corridor',
-        'commands': ') (',
+        'id': 131,
+        'key': 'dungeon_13.1_the_wardens_sight',
+        'name': "The Warden's Sight",
+        'commands_level': 13,
+        'unlocks_after': 13,
+        'type': 'boss',
     },
     {
-        'id': 141,
-        'key': 'dungeon_14.1_the_warden_surveyor',
-        'name': 'The Warden Surveyor',
-        'commands': '(boss)',
-        'commands_level': 14,
-        'unlocks_after': 14,
-        'type': 'boss',
+        'id': 14,
+        'key': 'dungeon_14_the_sight_sanctum',
+        'name': 'The Sight Sanctum',
+        'commands': 'v',
+        'unlocks_after': 131,
     },
     {
         'id': 15,
         'key': 'dungeon_15_the_seekers_labyrinth',
         'name': "The Seekers' Labyrinth",
         'commands': '/ ? n N',
-        'unlocks_after': 141,
+        'unlocks_after': 14,
     },
     {
         'id': 16,
@@ -143,7 +161,6 @@ LEVELS = [
         'id': 171,
         'key': 'dungeon_17.1_the_warden_pathfinder',
         'name': 'The Warden Pathfinder',
-        'commands': '(boss)',
         'commands_level': 17,
         'unlocks_after': 17,
         'type': 'boss',
@@ -165,13 +182,12 @@ LEVELS = [
         'id': 20,
         'key': 'dungeon_20_the_quartermaster',
         'name': 'The Quartermaster',
-        'commands': 'y yy p P',
+        'commands': 'y yy P',
     },
     {
         'id': 21,
         'key': 'dungeon_21_the_undo_sanctum',
         'name': 'The Undo Sanctum',
-        'commands': 'u',
     },
     {
         'id': 22,
@@ -183,7 +199,6 @@ LEVELS = [
         'id': 221,
         'key': 'dungeon_22.1_the_warden_manifold',
         'name': 'The Warden Manifold',
-        'commands': '(boss)',
         'commands_level': 22,
         'unlocks_after': 22,
         'type': 'boss',
@@ -235,7 +250,6 @@ LEVELS = [
         'id': 291,
         'key': 'dungeon_29.1_the_warden_scrivener',
         'name': 'The Warden Scrivener',
-        'commands': '(boss)',
         'commands_level': 29,
         'unlocks_after': 29,
         'type': 'boss',
@@ -287,7 +301,6 @@ LEVELS = [
         'id': 361,
         'key': 'dungeon_36.1_the_grandmasters_sanctum',
         'name': "The Grandmaster's Sanctum",
-        'commands': '(boss)',
         'commands_level': 36,
         'unlocks_after': 36,
         'type': 'boss',
@@ -309,7 +322,6 @@ LEVELS = [
         'id': 381,
         'key': 'dungeon_38.1_the_warden_eternal',
         'name': 'The Warden Eternal',
-        'commands': '(boss)',
         'commands_level': 38,
         'unlocks_after': 38,
         'type': 'boss',
@@ -348,23 +360,23 @@ def known_commands(level_id: int) -> list:
     if effective >= 4:
         cmds += ['f', 'F', 't', 'T']
     if effective >= 5:
-        cmds += [';', ',']
+        cmds += [';', ',', 'p']
     if effective >= 6:
-        cmds += ['visual']
-    if effective >= 7:
         cmds += ['W', 'B', 'E']
-    if effective >= 8:
+    if effective >= 7:
         cmds += ['ge', 'gE']
-    if effective >= 9:
+    if effective >= 8:
         cmds += ['G', 'gg']
-    if effective >= 10:
+    if effective >= 9:
         cmds += ['H', 'M', 'L']
-    if effective >= 12:
+    if effective >= 10:
         cmds += ['%']
-    if effective >= 13:
+    if effective >= 12:
         cmds += ['{', '}']
-    if effective >= 14:
+    if effective >= 13:
         cmds += ['(', ')']
+    if effective >= 14:
+        cmds += ['visual']
     if effective >= 15:
         cmds += ['/', '*']
     if effective >= 16:
@@ -374,7 +386,7 @@ def known_commands(level_id: int) -> list:
     if effective >= 19:
         cmds += ['S']
     if effective >= 20:
-        cmds += ['y', 'register']
+        cmds += ['y', 'P', 'register']
     if effective >= 22:
         cmds += ['dot']
     if effective >= 23:

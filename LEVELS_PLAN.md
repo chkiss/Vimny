@@ -86,6 +86,13 @@ enemies (goblins chase; wardens+shields in bosses), visual mode.
 Acts are coherent skill phases; each ends with an `x.1` Warden boss immune to commands not
 yet taught, with phases that each demand a different command from the act.
 
+> **Numbering note (read before trusting the ids below).** Act I–II match the shipped
+> curriculum. **Act III onward keeps this proposal's tentative numbering and act-grouping**
+> (it lists the nav power-tools as Act III and puts visual mode in Act IV). The **authoritative
+> ids, keys, and grouping live in Part 7 + `content/levels.py`** — where the standalone Goblin
+> Gauntlet ships as **L5** and visual mode (`v`) ships as **L14**, leading the nav act. Do not
+> read the Act III–VII ids below as final.
+
 ### Act I — Navigation Foundations
 | # | Name | Teaches | Notes / changes |
 |---|---|---|---|
@@ -93,18 +100,21 @@ yet taught, with phases that each demand a different command from the act.
 | 1 | The Line Halls | `^ $ 0` | command-mode `:w :q :q!` introduced via the exit ritual, not as "motions" |
 | 2 | The Counting Crypts | `[count]` | `x` removed (now L0) |
 | 3 | The Rune Halls | `w b e` | — |
-| 4 | The Character Cataracts | `f F t T` `; ,` | **merge** `; ,` up from old L5 |
-| **4.1** | **The Warden's Keep** (BOSS) | caps Act I | phases: hjkl → count → wbe → fFtT;, |
+| 4 | The Character Cataracts | `f F t T` | — |
+| 5 | The Goblin Gauntlet | `; , p` | — |
+| **5.1** | **The Warden's Keep** (BOSS) | caps Act I | phases: hjkl → count → wbe → fFtT → ;,p |
 
 ### Act II — Extended & Structural Motion
 | # | Name | Teaches | Notes / changes |
 |---|---|---|---|
-| 5 | The WORD Forge | `W B E` | — |
-| 6 | The Backward Vaults | `ge gE` | — |
-| 7 | The File Vaults | `G gg` | — |
-| 8 | The Screen Vault | `H M L` | fix `L` forcing via room height |
-| 9 | The Runic Archives | `} {` `) (` | **define sentence metaphor** (e.g. `) (` = corridor segments) or split off `) (` |
-| **9.1** | **The Warden Surveyor** (BOSS) *(NEW)* | caps Act II | each phase a different structural motion |
+| 6 | The WORD Forge | `W B E` | — |
+| 7 | The Backward Vaults | `ge gE` | — |
+| 8 | The Long Plumb | `G gg` | — |
+| 9 | The Screen Vault | `H M L` | fix `L` forcing via room height |
+| 10 | The Bracket Vaults | `%` | bracket/pair matching |
+| 12 | The Runic Archives | `} {` | paragraph jumps; void barriers force `}` |
+| 13 | The Sentence Corridor | `) (` | **define sentence metaphor** (corridor segments); split from Runic Archives |
+| **13.1** | **The Warden's Sight** (BOSS) *(NEW)* | caps Act II | each phase a different structural motion |
 
 ### Act III — Navigation Power Tools  *(mostly NEW mechanics)*
 | # | Name | Teaches | Notes |
@@ -309,54 +319,59 @@ clean-renumber cascade when updating `content/levels.py`.
 
 # Part 7 — FINAL curriculum (to implement in `content/levels.py`)
 
-Teaching levels use sequential ids (0–37, skipping **11** = the Reliquary bonus, mirroring the
+Teaching levels use sequential ids (0–38, skipping **11** = the Reliquary bonus, mirroring the
 original convention). Bosses are `x.1` (id = `{N}1`, key `dungeon_{N:02d}.1`). Blueprints:
 `blueprints/act_*.md`.
 
+> This table mirrors the as-built `content/levels.py` (the canonical source). The standalone
+> **Goblin Gauntlet (L5)** is retained — `; ,` is **not** merged into L4 — which shifts every
+> later teaching level **+1** and re-bases the boss ids (`51 131 171 221 291 361 381`).
+
 | id | key suffix | Name | commands | type |
 |----|-----------|------|----------|------|
-| 0 | the_first_cave | The First Cave | `h j k l  :w :q :q!` | |
+| 0 | the_first_cave | The First Cave | `h j k l  u  :w :q :q!` | |
 | 1 | the_line_halls | The Line Halls | `^ $ 0` | |
 | 11 | the_reliquary | The Reliquary | — (review only) | reliquary |
-| 2 | the_counting_crypts | The Counting Crypts | `[count]  x` | |
+| 2 | the_counting_crypts | The Counting Crypts | `[count]`  (`x`) | |
 | 3 | the_rune_halls | The Rune Halls | `w b e` | |
-| 4 | the_character_cataracts | The Character Cataracts | `f F t T ; ,` | |
-| 41 | the_wardens_keep | The Warden's Keep | — | boss |
-| 5 | the_word_forge | The WORD Forge | `W B E` | |
-| 6 | the_backward_vaults | The Backward Vaults | `ge gE` | |
-| 7 | the_file_vaults | The File Vaults | `G gg` | |
-| 8 | the_screen_vault | The Screen Vault | `H M L` | |
-| 9 | the_void_rift | The Void Rift | `} {` | |
-| 10 | the_sentence_corridor | The Sentence Corridor | `) (` | |
-| 101 | the_warden_surveyor | The Warden Surveyor | — | boss |
-| 12 | the_mirror_temple | The Mirror Temple | `%` | |
-| 13 | the_seekers_labyrinth | The Seekers' Labyrinth | `/ ? n N` | |
-| 14 | the_waypoint_sanctum | The Waypoint Sanctum | `m ' \`` | |
-| 15 | the_archivists_library | The Archivist's Library | `:e :set` | |
-| 151 | the_warden_pathfinder | The Warden Pathfinder | — | boss |
-| 16 | the_sight_sanctum | The Sight Sanctum | `v` | |
-| 17 | the_operators_vault | The Operator's Vault | `d c` (`x`=`dl`,`s`=`cl`) | |
-| 18 | the_whole_line_annex | The Whole-Line Annex | `dd cc D S` | |
-| 19 | the_quartermaster | The Quartermaster | `y yy p P` | |
-| 20 | the_undo_sanctum | The Undo Sanctum | `u` (demo; `Ctrl-R`=scroll) | |
-| 21 | the_echo_vault | The Echo Vault | `.` | |
-| 211 | the_warden_manifold | The Warden Manifold | — | boss |
-| 22 | the_inscription_halls | The Inscription Halls | `i a` | |
-| 23 | the_sculpting_chambers | The Sculpting Chambers | `I A o O` | |
-| 24 | the_overwrite_halls | The Overwrite Halls | `r R` | |
-| 25 | the_case_chambers | The Case Chambers | `~ g~ gU gu` | |
-| 26 | the_joiners_gate | The Joiner's Gate | `J gJ` | |
-| 27 | the_alignment_halls | The Alignment Halls | `>> <<` | |
-| 28 | the_indentation_sanctum | The Indentation Sanctum | `>{m} <{m} =` | |
-| 281 | the_warden_scrivener | The Warden Scrivener | — | boss |
-| 29 | the_word_enclosure | The Word Enclosure | `iw aw` | |
-| 30 | the_bracket_enclosure | The Bracket Enclosure | `i( a(` | |
-| 31 | the_brace_square_enclosure | The Brace & Square Enclosure | `i[ a[ i{ a{` | |
-| 32 | the_quote_enclosure | The Quote Enclosure | `i" a" i' a'` | |
-| 33 | the_tag_enclosure | The Tag Enclosure | `it at` | |
-| 34 | the_sentence_enclosure | The Sentence Enclosure | `is as` | |
-| 35 | the_paragraph_enclosure | The Paragraph Enclosure | `ip ap` | |
-| 351 | the_grandmasters_sanctum | The Grandmaster's Sanctum | — | boss |
-| 36 | the_spellwrights_forge | The Spellwright's Forge | `:s///` | |
-| 37 | the_hall_of_echoes | The Hall of Echoes | `q @ "` | |
-| 371 | the_warden_eternal | The Warden Eternal | — | boss |
+| 4 | the_character_cataracts | The Character Cataracts | `f F t T` | |
+| 5 | the_goblin_gauntlet | The Goblin Gauntlet | `; , p` | |
+| 51 | the_wardens_keep | The Warden's Keep | — | boss |
+| 6 | the_word_forge | The WORD Forge | `W B E` | |
+| 7 | the_backward_vaults | The Backward Vaults | `ge gE` | |
+| 8 | the_long_plumb | The Long Plumb | `G gg` | |
+| 9 | the_screen_vault | The Screen Vault | `H M L` | |
+| 10 | the_bracket_vaults | The Bracket Vaults | `%` | |
+| 12 | the_runic_archives | The Runic Archives | `} {` | |
+| 13 | the_sentence_corridor | The Sentence Corridor | `) (` | |
+| 131 | the_wardens_sight | The Warden's Sight | — | boss |
+| 14 | the_sight_sanctum | The Sight Sanctum | `v` | |
+| 15 | the_seekers_labyrinth | The Seekers' Labyrinth | `/ ? n N` | |
+| 16 | the_waypoint_sanctum | The Waypoint Sanctum | `m ' \`` | |
+| 17 | the_archivists_library | The Archivist's Library | `:e :set` | |
+| 171 | the_warden_pathfinder | The Warden Pathfinder | — | boss |
+| 18 | the_operators_vault | The Operator's Vault | `d c` (`x`=`dl`,`s`=`cl`) | |
+| 19 | the_whole_line_annex | The Whole-Line Annex | `dd cc D S` | |
+| 20 | the_quartermaster | The Quartermaster | `y yy P` | |
+| 21 | the_undo_sanctum | The Undo Sanctum | `u` (demo; `Ctrl-R`=scroll) | |
+| 22 | the_echo_vault | The Echo Vault | `.` | |
+| 221 | the_warden_manifold | The Warden Manifold | — | boss |
+| 23 | the_inscription_halls | The Inscription Halls | `i a` | |
+| 24 | the_sculpting_chambers | The Sculpting Chambers | `I A o O` | |
+| 25 | the_overwrite_halls | The Overwrite Halls | `r R` | |
+| 26 | the_case_chambers | The Case Chambers | `~ g~ gU gu` | |
+| 27 | the_joiners_gate | The Joiner's Gate | `J gJ` | |
+| 28 | the_alignment_halls | The Alignment Halls | `>> <<` | |
+| 29 | the_indentation_sanctum | The Indentation Sanctum | `>{m} <{m} =` | |
+| 291 | the_warden_scrivener | The Warden Scrivener | — | boss |
+| 30 | the_word_enclosure | The Word Enclosure | `iw aw` | |
+| 31 | the_bracket_enclosure | The Bracket Enclosure | `i( a(` | |
+| 32 | the_brace_square_enclosure | The Brace & Square Enclosure | `i[ a[ i{ a{` | |
+| 33 | the_quote_enclosure | The Quote Enclosure | `i" a" i' a'` | |
+| 34 | the_tag_enclosure | The Tag Enclosure | `it at` | |
+| 35 | the_sentence_enclosure | The Sentence Enclosure | `is as` | |
+| 36 | the_paragraph_enclosure | The Paragraph Enclosure | `ip ap` | |
+| 361 | the_grandmasters_sanctum | The Grandmaster's Sanctum | — | boss |
+| 37 | the_spellwrights_forge | The Spellwright's Forge | `:s///` | |
+| 38 | the_hall_of_echoes | The Hall of Echoes | `q @ "` | |
+| 381 | the_warden_eternal | The Warden Eternal | — | boss |

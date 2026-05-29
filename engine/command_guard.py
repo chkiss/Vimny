@@ -78,7 +78,9 @@ def action_allowed(action: dict, known: list | set, edit_mode: bool = False) -> 
         return guard_key is None or guard_key in known_set
 
     if t == 'paste' and not edit_mode:
-        return 'register' in known_set
+        if action.get('before'):
+            return 'P' in known_set   # P — taught at L20
+        return 'p' in known_set       # p — taught at L5
 
     if t == 'enter_mode':
         m = action.get('mode', '')
@@ -126,7 +128,9 @@ def guard_message(action: dict, known: list | set = ()) -> str:
             return "You haven't learned G/gg yet."
         return f"You haven't learned '{m}' yet."
     if t == 'paste':
-        return 'You haven\'t learned the " register yet.'
+        if action.get('before'):
+            return "You haven't learned 'P' yet."
+        return "You haven't learned 'p' yet."
     if t == 'enter_mode':
         return f"You haven't learned {action.get('mode', '')} mode yet."
     if t == 'operator':

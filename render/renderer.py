@@ -10,6 +10,7 @@ from engine.budget import Budget
 import render.colors as C
 import render.symbols as S
 from render.utils import inner_w as _inner_w
+from render.hint_bar import hint_text as _hint_text
 
 
 def _is_vertical_door(room: Room, r: int, c: int, kind: str) -> bool:
@@ -79,8 +80,16 @@ def _reg_display(items: list) -> tuple[str, int]:
             for sym in item['rune'].symbols:
                 syms.append((sym, None))
         elif item['type'] == 'entity':
-            sym, col_fn = _REG_ENTITY.get(item['entity'].kind, ('?', None))
-            syms.append((sym, col_fn))
+            ent_e = item['entity']
+            if ent_e.kind == 'floor_key' and ent_e.tag == 'gold':
+                syms.append((S.KEY, lambda: C.key_gold_fg()))
+            elif ent_e.kind == 'floor_key' and ent_e.tag == 'red':
+                syms.append((S.KEY, lambda: C.key_red_fg()))
+            elif ent_e.kind == 'floor_key' and ent_e.tag == 'blue':
+                syms.append((S.KEY, lambda: C.key_blue_fg()))
+            else:
+                sym, col_fn = _REG_ENTITY.get(ent_e.kind, ('?', None))
+                syms.append((sym, col_fn))
         elif item['type'] == 'cell':
             sym = {CellType.WALL: '█', CellType.WATER: '~',
                    CellType.WOOD_WALL: '░'}.get(item['cell_type'], ' ')
@@ -126,6 +135,12 @@ def _ent_cell_str(ent, room, r: int, c: int, mode, floor_bg: str) -> str:
         return floor_bg + C.locked_door_fg() + S.DOOR_LOCKED + rst
     if ent.kind == 'locked_door':
         sym = S.DOOR_V if _is_vertical_door(room, r, c, 'locked_door') else S.DOOR_LOCKED
+        if ent.tag == 'gold':
+            return floor_bg + C.key_gold_fg() + sym + rst
+        if ent.tag == 'red':
+            return floor_bg + C.key_red_fg() + sym + rst
+        if ent.tag == 'blue':
+            return floor_bg + C.key_blue_fg() + sym + rst
         return floor_bg + C.locked_door_fg() + sym + rst
     if ent.kind == 'dynamite':
         return floor_bg + C.dynamite_fg() + S.DYNAMITE + rst
@@ -141,6 +156,12 @@ def _ent_cell_str(ent, room, r: int, c: int, mode, floor_bg: str) -> str:
     if ent.kind == 'heart_container':
         return floor_bg + C.heart_full() + '♥' + rst
     if ent.kind == 'floor_key':
+        if ent.tag == 'gold':
+            return floor_bg + C.key_gold_fg() + S.KEY + rst
+        if ent.tag == 'red':
+            return floor_bg + C.key_red_fg() + S.KEY + rst
+        if ent.tag == 'blue':
+            return floor_bg + C.key_blue_fg() + S.KEY + rst
         return floor_bg + C.key_fg() + S.KEY + rst
     if ent.kind == 'entry_marker':
         return floor_bg + C.hint_fg() + S.PLAYER + rst
@@ -221,8 +242,8 @@ def render_all(term: Terminal, dungeon: Dungeon, player: Player,
     output.append(border_h(S.BOX_LT, S.BOX_RT))
 
     # ── Game area ─────────────────────────────────────────────────────────
-    # 7 rows: top_border, status, top_sep, [game_h rows], statusline, bot_sep, hint, bot_border
-    game_h  = term.height - 7
+    # 8 rows: top_border, status, top_sep, [game_h rows], statusline, message, bot_sep, hint, bot_border
+    game_h  = term.height - 8
     room_display_rows = min(room.rows, game_h)
     room_display_cols = min(room.cols, iw)
 
@@ -245,12 +266,12 @@ def render_all(term: Terminal, dungeon: Dungeon, player: Player,
         line   = bfg + S.BOX_V + rst
 
         if room_r >= room.rows:
-            line += ' ' * iw
+            line += wall_bg + ' ' * iw + rst
         else:
             for screen_c in range(iw):
                 room_c = screen_c + vc_start
                 if room_c >= room.cols:
-                    line += ' '
+                    line += wall_bg + ' ' + rst
                     continue
 
                 floor_bg = (vis_bg if (_vis_active and _in_visual_sel(
@@ -327,25 +348,31 @@ def render_all(term: Terminal, dungeon: Dungeon, player: Player,
 
     sl_bg  = C.statusline_bg()
     sl_fg  = C.statusline_fg()
-    sl_w   = iw + 2
+    sl_w   = iw
 
     if player.error:
         # Vim-style error: red background, white text
         err_pad = max(0, sl_w - len(player.error) - 1)
-        output.append(C.error_bg() + C.error_fg() + ' ' + player.error +
-                      ' ' * err_pad + rst)
+        output.append(bfg + S.BOX_V + rst +
+                      C.error_bg() + C.error_fg() + ' ' + player.error +
+                      ' ' * err_pad + rst +
+                      bfg + S.BOX_V + rst)
     elif mode == Mode.COMMAND:
         # Command line: show typed command flush-left, no ruler
         cmd_text = ':' + player.cmd_line
         sl_pad   = max(0, sl_w - len(cmd_text))
-        output.append(sl_bg + C.mode_command() + cmd_text +
-                      sl_fg + ' ' * sl_pad + rst)
+        output.append(bfg + S.BOX_V + rst +
+                      sl_bg + C.mode_command() + cmd_text +
+                      sl_fg + ' ' * sl_pad + rst +
+                      bfg + S.BOX_V + rst)
     elif mode == Mode.SEARCH:
         # Search line: show '/' or '?' prefix + typed pattern, flush-left
         cmd_text = ('/' if player.search_forward else '?') + player.cmd_line
         sl_pad   = max(0, sl_w - len(cmd_text))
-        output.append(sl_bg + C.mode_command() + cmd_text +
-                      sl_fg + ' ' * sl_pad + rst)
+        output.append(bfg + S.BOX_V + rst +
+                      sl_bg + C.mode_command() + cmd_text +
+                      sl_fg + ' ' * sl_pad + rst +
+                      bfg + S.BOX_V + rst)
     else:
         # Statusline: mode label left, position+scroll right
         sl_label = MODE_LABELS[mode]
@@ -364,8 +391,10 @@ def render_all(term: Terminal, dungeon: Dungeon, player: Player,
             reg_s   = ''
             reg_vis = 0
         sl_mid   = max(0, sl_w - len(sl_label) - 2 - reg_vis - len(sl_right))
-        output.append(sl_bg + sl_mode_color + ' ' + sl_label + ' ' +
-                      sl_bg + sl_fg + reg_s + ' ' * sl_mid + sl_right + rst)
+        output.append(bfg + S.BOX_V + rst +
+                      sl_bg + sl_mode_color + ' ' + sl_label + ' ' +
+                      sl_bg + sl_fg + reg_s + ' ' * sl_mid + sl_right + rst +
+                      bfg + S.BOX_V + rst)
 
     # ── Bottom separator (answer sheet for admin) ─────────────────────────
     if room.answer:
@@ -404,18 +433,22 @@ def render_all(term: Terminal, dungeon: Dungeon, player: Player,
     else:
         output.append(border_h(S.BOX_LT, S.BOX_RT))
 
+    # ── Message bar ───────────────────────────────────────────────────────
+    if message:
+        msg_text = message[:iw]
+        msg_pad  = max(0, iw - len(msg_text))
+        output.append(bfg + S.BOX_V + rst +
+                      C.budget_low() + msg_text + rst + ' ' * msg_pad +
+                      bfg + S.BOX_V + rst)
+    else:
+        output.append(bfg + S.BOX_V + rst + ' ' * iw + bfg + S.BOX_V + rst)
+
     # ── Hint bar ──────────────────────────────────────────────────────────
     known = player.known_commands
     if 'editor' in known:
         hint_text = 's:toggle wall  :rune ancient|verdant|void|ember  :entity exit|door|locked_door|chest|dynamite|wanderer|goblin|warden  :save <name>  :wq write+quit'
-    elif ';' in known:
-        hint_text = 'fg:jump to goblin  ;:repeat  ,:reverse  x:attack  [N]hjkl  :w write  :q quit'
-    elif 'count' in known:
-        hint_text = '[N]hjkl:count move  0:jump to start of line  ^:first non-blank  $:jump to end of line  x:delete (cut) char  :w write  :q quit'
-    elif '$' in known:
-        hint_text = 'hjkl:move cursor  0:jump to start of line  ^:first non-blank  $:jump to end of line  :w write  :q quit'
     else:
-        hint_text = 'h/j/k/l:move cursor  :w write (save)  :q quit  :q! quit without saving'
+        hint_text = _hint_text(known)
     if 'admin' in known:
         hint_text += '  :e refresh'
     hint_text = hint_text[:iw]
@@ -427,9 +460,3 @@ def render_all(term: Terminal, dungeon: Dungeon, player: Player,
     output.append(border_h(S.BOX_BL, S.BOX_BR))
 
     print(term.home + '\n'.join(output), end='', flush=True)
-
-    # ── Message overlay (last row of game area, printed separately) ────────
-    if message:
-        msg_row = term.height - 5
-        print(term.move_yx(msg_row, 1) + C.budget_low() + _pad(message, iw) + rst,
-              end='', flush=True)

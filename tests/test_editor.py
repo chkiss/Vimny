@@ -21,7 +21,7 @@ def _make_room():
          for c in range(COLS)]
         for r in range(ROWS)
     ]
-    room.entry    = (3, 1)
+    room.gg_pos    = (3, 1)
     room.exit_pos = (3, 13)
     room.rebuild_indexes()
     return room
@@ -472,7 +472,7 @@ class TestSerializeRoom:
     def test_entry_and_exit_pos(self):
         room = _make_room()
         d = _serialize_room(room)
-        assert d['entry']    == [3, 1]
+        assert d['gg_pos']    == [3, 1]
         assert d['exit_pos'] == [3, 13]
 
     def test_no_exit_pos_is_none(self):

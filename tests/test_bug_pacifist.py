@@ -1,7 +1,6 @@
 """The Pacifist — navigates past enemies without ever engaging them.
 
-Uncovers: which entities block l/$ and which don't, fog blocking motion,
-wall stopping f-scan, boundary passability.
+Personality defined in agents/bug_testers.md.
 """
 import pytest
 from engine.world import Room, RoomType, CellType, Entity, RuneCluster
@@ -16,7 +15,7 @@ def _bare_room(rows=7, cols=40):
          for c in range(cols)]
         for r in range(rows)
     ]
-    room.entry    = (3, 1)
+    room.gg_pos    = (3, 1)
     room.exit_pos = (3, 38)
     room.fog_cells = set()
     room.rebuild_indexes()

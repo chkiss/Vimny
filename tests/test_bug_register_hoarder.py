@@ -1,7 +1,6 @@
 """The Register Hoarder — pastes clipboard content everywhere unusual.
 
-Uncovers: p vs P direction, empty register, wrong item type, key lookup order,
-action_allowed gating for paste.
+Personality defined in agents/bug_testers.md.
 """
 import pytest
 from engine.vim_parser import parse
@@ -18,7 +17,7 @@ def _bare_room(rows=7, cols=30):
          for c in range(cols)]
         for r in range(rows)
     ]
-    room.entry    = (3, 1)
+    room.gg_pos    = (3, 1)
     room.exit_pos = (3, 28)
     room.fog_cells = set()
     room.rebuild_indexes()
@@ -189,23 +188,23 @@ def test_p_wrong_direction_misses_locked_door():
 
 # ── action_allowed gating ─────────────────────────────────────────────────────
 
-def test_paste_blocked_without_register_in_known_commands():
-    """paste action must be blocked when 'register' is not in known_commands."""
+def test_paste_blocked_without_p_in_known_commands():
+    """p (paste after) must be blocked when 'p' is not in known_commands."""
     action = {'type': 'paste', 'before': False, 'count': 1}
     known = ['h', 'j', 'k', 'l']
 
     assert not action_allowed(action, known), (
-        "paste should be disallowed without 'register' in known_commands"
+        "paste should be disallowed without 'p' in known_commands"
     )
 
 
-def test_paste_allowed_with_register_in_known_commands():
-    """paste action must be allowed when 'register' is in known_commands."""
+def test_paste_allowed_with_p_in_known_commands():
+    """p (paste after) must be allowed when 'p' is in known_commands."""
     action = {'type': 'paste', 'before': False, 'count': 1}
-    known = ['h', 'j', 'k', 'l', 'register']
+    known = ['h', 'j', 'k', 'l', 'p']
 
     assert action_allowed(action, known), (
-        "paste should be allowed when 'register' is in known_commands"
+        "paste should be allowed when 'p' is in known_commands"
     )
 
 

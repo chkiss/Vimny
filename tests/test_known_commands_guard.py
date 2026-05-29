@@ -93,18 +93,26 @@ def test_admin_bypasses_all_motion_guards():
 
 # ── Paste guard ────────────────────────────────────────────────────────────────
 
-@pytest.mark.parametrize("keys", ['p', 'P'])
-def test_paste_blocked_for_all_standard_levels(keys):
-    action = _parse(keys)
+def test_p_blocked_before_level_5():
+    action = _parse('p')
+    for level in range(5):
+        assert not action_allowed(action, known_commands(level)), \
+            f"'p' should be blocked at level {level}"
+
+
+def test_p_allowed_at_level_5():
+    assert action_allowed(_parse('p'), known_commands(5))
+
+
+def test_P_blocked_before_level_20():
+    action = _parse('P')
     for level in range(6):
         assert not action_allowed(action, known_commands(level)), \
-            f"'{keys}' should be blocked at level {level}"
+            f"'P' should be blocked at level {level}"
 
 
-@pytest.mark.parametrize("keys", ['p', 'P'])
-def test_paste_allowed_with_register(keys):
-    action = _parse(keys)
-    assert action_allowed(action, known_commands(0) + ['register'])
+def test_P_allowed_at_level_20():
+    assert action_allowed(_parse('P'), known_commands(20))
 
 
 @pytest.mark.parametrize("keys", ['p', 'P'])
@@ -193,7 +201,7 @@ def test_indent_gated_on_token(keys, op):
 @pytest.mark.parametrize("keys", ['"ayy', '"ap', '"0p', '"_dw'])
 def test_named_register_gated_on_reg_named(keys):
     action = _parse(keys)
-    base = ['h', 'd', 'y', 'w', 'register']     # operator/motion/paste tokens, no reg_named
+    base = ['h', 'd', 'y', 'w', 'p', 'P', 'register']  # operator/motion/paste tokens, no reg_named
     assert not action_allowed(action, base, edit_mode=False)
     assert action_allowed(action, base + ['reg_named'], edit_mode=False)
 
