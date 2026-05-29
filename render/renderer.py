@@ -2,7 +2,7 @@
 from __future__ import annotations
 import time
 from blessed import Terminal
-from engine.world import Dungeon, CellType, Room
+from engine.world import Dungeon, CellType, Room, RuneCluster, Entity
 from engine.player import Player
 from engine.modes import Mode, MODE_LABELS
 from engine.visual import in_selection as _in_visual_sel
@@ -66,6 +66,21 @@ _REG_ENTITY: dict[str, tuple[str, object]] = {
     'floor_key':      (S.KEY, lambda: C.key_fg()),
     'exit':           ('◉',  None),
 }
+
+
+def _clip_to_items(clip) -> list:
+    """Adapt the unnamed-register clip to _reg_display items (read-only view)."""
+    if not clip:
+        return []
+    items: list = []
+    for rw in clip.get('rows', []):
+        for rd in rw.get('runes', []):
+            items.append({'type': 'rune', 'rune': RuneCluster(0, 0, rd['symbols'], rd['kind'])})
+        for ed in rw.get('entities', []):
+            t = ed['tmpl']
+            items.append({'type': 'entity',
+                          'entity': Entity(kind=t['kind'], row=0, col=0, tag=t.get('tag', ''))})
+    return items
 
 
 def _reg_display(items: list) -> tuple[str, int]:
@@ -384,7 +399,8 @@ def render_all(term: Terminal, dungeon: Dungeon, player: Player,
             sl_mode_color = C.mode_visual()
         sl_right = f'{pos_str}   {scroll} '
         if 'register' in player.known_commands:
-            reg_colored, reg_vis_len = _reg_display(player.register)
+            reg_colored, reg_vis_len = _reg_display(
+                _clip_to_items(player.registers.get('"')) + player.inventory)
             reg_s   = C.key_fg() + '  "' + reg_colored + sl_fg
             reg_vis = 3 + reg_vis_len  # len('  "') + visible content
         else:

@@ -6,7 +6,7 @@ This is how Vimny stays Vim-faithful — `yy` yanks the whole line including the
 spaces between runes (bounded by stone walls), not just the rune clusters.
 """
 from __future__ import annotations
-from engine.world import CellType, RuneCluster
+from engine.world import CellType, RuneCluster, Entity
 from engine.text_object import TextObjectType
 from engine.editor import _merge_adjacent_runes
 
@@ -66,6 +66,47 @@ def capture(room, text_obj) -> dict:
         else:
             rows.append(_capture_row(room, row, lo, hi))
     return {'linewise': linewise, 'rows': rows}
+
+
+def entity_clip(ent) -> dict:
+    """A charwise clip holding a single cut creature, so `p` can place it back.
+
+    Stores a template of the combat/identity fields; op_paste revives a fresh,
+    live copy (full HP, new uid). Used when an enemy is killed — the slain
+    creature lands in the unnamed register, exactly like cut text."""
+    return {'linewise': False, 'rows': [{
+        'width': 1,
+        'runes': [],
+        'entities': [{'dcol': 0, 'tmpl': {
+            'kind': ent.kind, 'max_hp': ent.max_hp, 'hp': ent.hp,
+            'ai': ent.ai, 'ai_speed': ent.ai_speed, 'tag': ent.tag,
+            'summon_timer': ent.summon_timer,
+        }}],
+    }]}
+
+
+def _revive_from_tmpl(t: dict, row: int, col: int) -> Entity:
+    """Build a fresh, live Entity from a clip template: full HP, hostile, new
+    identity (uid), independent of any summoner."""
+    e = Entity(kind=t['kind'], row=row, col=col,
+               max_hp=t.get('max_hp', 0), ai=t.get('ai', ''),
+               ai_speed=t.get('ai_speed', 1), tag=t.get('tag', ''),
+               summon_timer=t.get('summon_timer', 0))
+    e.hp = e.max_hp if e.max_hp > 0 else t.get('hp', 1)
+    e.origin_row = row
+    return e
+
+
+def _place_entities(room, row: int, start_col: int, rclip: dict) -> bool:
+    """Revive and place a captured row's entities at start_col + dcol, skipping
+    walls/occupied cells. Returns True if any entity was placed."""
+    placed = False
+    for ed in rclip.get('entities', ()):
+        c = start_col + ed['dcol']
+        if 0 <= c < room.cols and room.is_passable(row, c) and not room.entity_at(row, c):
+            room.add_entity(_revive_from_tmpl(ed['tmpl'], row, c))
+            placed = True
+    return placed
 
 
 _WALL_CELLS = (CellType.WALL, CellType.WATER, CellType.WOOD_WALL)
@@ -254,7 +295,9 @@ def op_paste(room, player, clip: dict, before: bool) -> bool:
             ext = line_extent(room, row)
             if ext is None:
                 continue
-            if _place_row(room, row, ext[0], rclip) >= 0:
+            rune_last = _place_row(room, row, ext[0], rclip)
+            ent_placed = _place_entities(room, row, ext[0], rclip)
+            if rune_last >= 0 or ent_placed:
                 placed_any = True
                 if first_row is None:
                     first_row = row
@@ -271,4 +314,8 @@ def op_paste(room, player, clip: dict, before: bool) -> bool:
         if last >= 0:
             placed_any = True
             player.col = last            # vim leaves cursor on last pasted cell
+        # Creatures respawn live & hostile; the cursor stays put — never landing
+        # the player on top of a pasted enemy.
+        if _place_entities(room, player.row, start, rclip):
+            placed_any = True
     return placed_any
