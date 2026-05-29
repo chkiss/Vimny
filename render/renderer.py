@@ -400,7 +400,7 @@ def render_all(term: Terminal, dungeon: Dungeon, player: Player,
         sl_right = f'{pos_str}   {scroll} '
         if 'register' in player.known_commands:
             reg_colored, reg_vis_len = _reg_display(
-                _clip_to_items(player.registers.get('"')) + player.inventory)
+                _clip_to_items(player.registers.get('"')))
             reg_s   = C.key_fg() + '  "' + reg_colored + sl_fg
             reg_vis = 3 + reg_vis_len  # len('  "') + visible content
         else:

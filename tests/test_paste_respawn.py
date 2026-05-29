@@ -113,5 +113,15 @@ def test_runes_only_clip_pastes_without_entities_key():
     assert room.char_run_at(3, 6) is not None
 
 
+def test_repeated_paste_lays_consecutive_copies():
+    """3p / p p p: looping op_paste lays consecutive copies (cursor advances)."""
+    room   = _bare_room()
+    player = Player(row=3, col=5)
+    clip   = _clip_from_cut_runes([_rune_item('z', 5)], base_col=5)
+    for _ in range(3):
+        op_paste(room, player, clip, before=False)
+    assert all(room.char_run_at(3, c) is not None for c in (6, 7, 8))
+
+
 def test_creature_spawn_messages_cover_the_combat_kinds():
     assert set(_PASTE_SPAWN_MSG) == {'goblin', 'warden', 'shield'}

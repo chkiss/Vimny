@@ -5,10 +5,10 @@ tuple.
 
 Covered actions
   chest x       — dict format (entity restored on undo)
-  chest_key x   — floor_key added to register; chest restored on undo
+  chest_key x   — floor_key added to the unnamed " register; chest restored on undo
   door x        — dict format (interact handler)
   dynamite step — dict format (motion handler, upgraded from tuple at explosion time)
-  locked_door p — dict format; floor_key consumed from register, door restored on undo
+  locked_door p — dict format; key read from " (NOT consumed), door restored on undo
 
 Why an action can be missed
   test_all_entity_mutations_undoable hardcodes every entity-killing action.
@@ -21,6 +21,8 @@ Required dict fields (all produced by _snapshot() in main.py)
 from engine.world import Room, Entity, CellType, RoomType
 from engine.player import Player
 from engine.budget import Budget
+from engine.operator import entity_clip
+from engine.registers import write_register, read_register
 
 
 # ── Fixtures ──────────────────────────────────────────────────────────────────
@@ -85,15 +87,15 @@ def test_chest_key_adds_floor_key_to_register():
     player = Player(row=2, col=5)
 
     # Simulate what main.py does on chest_key loot
-    player.inventory = [{'type': 'entity',
-                        'entity': Entity(kind='floor_key', row=chest.row, col=chest.col)}]
+    write_register(player, '"',
+                   entity_clip(Entity(kind='floor_key', row=chest.row, col=chest.col)),
+                   is_delete=True)
     room.kill_entity(chest)
 
-    assert any(
-        it.get('type') == 'entity' and
-        it.get('entity') and it['entity'].kind == 'floor_key'
-        for it in player.inventory
-    ), "register must hold a floor_key after looting chest_key"
+    ents = [ed['tmpl'] for rw in read_register(player, '"')['rows']
+            for ed in rw.get('entities', ())]
+    assert any(e['kind'] == 'floor_key' for e in ents), \
+        "the unnamed \" register must hold a floor_key after looting chest_key"
 
 
 def test_chest_key_undo_restores_chest():
@@ -106,8 +108,9 @@ def test_chest_key_undo_restores_chest():
 
     undo_item = {'row': player.row, 'col': player.col, 'spent': budget.spent,
                  'entities': _snap(room), 'fog_cells': set(room.fog_cells)}
-    player.inventory = [{'type': 'entity',
-                        'entity': Entity(kind='floor_key', row=chest.row, col=chest.col)}]
+    write_register(player, '"',
+                   entity_clip(Entity(kind='floor_key', row=chest.row, col=chest.col)),
+                   is_delete=True)
     room.kill_entity(chest)
     budget.spend(1)
 
@@ -174,13 +177,12 @@ def test_locked_door_p_undo_restores_door():
     room.add_entity(ldoor)
     player = Player(row=2, col=5)
     floor_key = Entity(kind='floor_key', row=2, col=5)
-    player.inventory = [{'type': 'entity', 'entity': floor_key}]
+    write_register(player, '"', entity_clip(floor_key), is_delete=True)
     budget = Budget(20)
 
     undo_item = {'row': player.row, 'col': player.col, 'spent': budget.spent,
                  'entities': _snap(room), 'fog_cells': set(room.fog_cells)}
-    # Consume key from register and unlock door
-    player.inventory.pop(0)
+    # Unlock the door — the key in " is NOT consumed (vim-faithful; reusable).
     room.kill_entity(ldoor)
     budget.spend(1)
 
@@ -192,6 +194,11 @@ def test_locked_door_p_undo_restores_door():
     assert restored is not None, "locked_door must be present after undo"
     assert restored.alive
     assert restored.kind == 'locked_door'
+
+    # The key still sits in the unnamed register, reusable for more doors.
+    ents = [ed['tmpl'] for rw in read_register(player, '"')['rows']
+            for ed in rw.get('entities', ())]
+    assert any(e['kind'] == 'floor_key' for e in ents)
 
 
 # ── Combined: all entity-mutating actions use dict undo entries ───────────────
