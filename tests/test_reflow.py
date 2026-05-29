@@ -44,10 +44,10 @@ def _text(room, row):
 
 # ── detection ───────────────────────────────────────────────────────────────────
 
-def test_is_ledge_only_for_marked_rows():
+def test_reflow_is_universal():
     room = _room()
     assert is_ledge(room, 1) is True
-    assert is_ledge(room, 0) is False          # an ordinary stone row
+    assert is_ledge(room, 0) is True           # every row reflows now (overlay retired)
 
 
 def test_void_col_is_the_leftmost_void_rune():
@@ -63,6 +63,18 @@ def test_open_gap_shifts_right_dropping_overflow():
     assert room.char_run_at(1, 5) is None               # …col 5 is now empty
     assert fell == [(1, 9, 'd')]                         # d went over the brink
     assert room._last_void_falls == [(1, 9, 'd')]        # recorded for animation
+
+
+def test_insert_pushes_whitespace_and_the_word_past_a_gap():
+    """Vim faithfulness: inserting in the whitespace BEFORE a word still pushes the
+    word — the shift travels THROUGH the blank cells, it doesn't stop at the gap."""
+    room = _wave_room(cols=20)                   # floor 1..18, wall 19, ledge
+    room.char_runs = [CharRun(1, 8, ('c', 'd'), 'ancient')]   # 'cd' at 8-9; blanks before it
+    room.rebuild_indexes()
+    p = Player(row=1, col=3)                      # cursor in the whitespace, left of the word
+    insert_char(room, p, 'Z')
+    assert _text(room, 1) == {3: 'Z', 9: 'c', 10: 'd'}   # word shifted right by one
+    assert p.col == 4
 
 
 def test_open_gap_no_fall_when_room_to_spare():
@@ -123,23 +135,14 @@ def test_charwise_delete_closes_the_gap_on_a_ledge():
     assert room._last_void_falls == []
 
 
-# ── regressions: non-ledge rows keep the overlay grid ────────────────────────────
+# ── reflow is universal — even an unmarked row flows (overlay retired) ────────────
 
-def test_overlay_insert_overwrites_in_place():
-    room = _room(ledge=False)                   # abcd at 5-8, NOT a ledge
+def test_insert_reflows_even_without_explicit_ledge_marking():
+    room = _room(ledge=False)                    # abcd at 5-8, void at 9; ledge_rows NOT set
     p    = Player(row=1, col=5)
-    insert_char(room, p, 'X')
-    assert _text(room, 1) == {5: 'X', 6: 'b', 7: 'c', 8: 'd'}   # overwrote, no shift
+    insert_char(room, p, 'X')                    # still reflows: X in, abc shift right, d into the void
+    assert _text(room, 1) == {5: 'X', 6: 'a', 7: 'b', 8: 'c'}
     assert p.col == 6
-
-
-def test_a_void_rune_alone_does_not_make_a_ledge():
-    room = _room(ledge=False)                   # has a void rune, but unmarked
-    assert is_ledge(room, 1) is False
-    p = Player(row=1, col=8)
-    insert_char(room, p, 'X')                    # overwrites 'd' in place; nothing moves
-    assert _text(room, 1) == {5: 'a', 6: 'b', 7: 'c', 8: 'X'}
-    assert room._last_void_falls == []
 
 
 # ── brink styles: painted void margin vs. bare wall edge ─────────────────────────

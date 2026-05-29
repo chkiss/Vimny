@@ -91,8 +91,8 @@ class TestApplyVisual:
         room.add_char_run(CharRun(3, 2, ('a', 'b', 'c', 'd', 'e'), 'ancient'))
         p = Player(row=3, col=5)
         apply_visual('d', (3, 3), (3, 5), Mode.VISUAL, room, p)   # delete b,c,d
-        assert _cell(room, 3, 2) == 'a' and _cell(room, 3, 6) == 'e'
-        assert all(room.char_run_at(3, c) is None for c in (3, 4, 5))
+        assert _cell(room, 3, 2) == 'a' and _cell(room, 3, 3) == 'e'   # gap closed: e pulled left
+        assert all(room.char_run_at(3, c) is None for c in (4, 5, 6))
         assert p.col == 3                                          # cursor to start
 
     def test_charwise_yank_no_mutation(self):
