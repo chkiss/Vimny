@@ -1,7 +1,7 @@
 """Generate a single room with walls, floor, rune clusters, and entities."""
 from __future__ import annotations
 import random
-from engine.world import Room, RoomType, CellType, RuneCluster, Entity
+from engine.world import Room, RoomType, CellType, CharRun, Entity
 
 RUNE_TYPES = {
     'ancient': ('∘', '∘', '∘'),
@@ -30,8 +30,8 @@ def _place_clusters(room: Room, rng: random.Random, density: float):
                 syms = RUNE_TYPES[kind]
                 width = len(syms)
                 if c + width < room.cols - 1:
-                    cluster = RuneCluster(row=r, col=c, symbols=syms, kind=kind)
-                    room.runes.append(cluster)
+                    cluster = CharRun(row=r, col=c, symbols=syms, kind=kind)
+                    room.char_runs.append(cluster)
                     placed.append((r, c, width))
                     c += width + rng.randint(1, 3)
                     continue

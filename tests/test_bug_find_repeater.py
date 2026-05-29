@@ -3,7 +3,7 @@
 Personality defined in agents/bug_testers.md.
 """
 import pytest
-from engine.world import Room, RoomType, CellType, Entity, RuneCluster
+from engine.world import Room, RoomType, CellType, Entity, CharRun
 from engine.player import Player
 from engine.motion import apply_motion, _apply_find
 
@@ -28,9 +28,9 @@ def _goblin_at(room, col, row=3):
     return g
 
 
-def _rune_at(room, col, symbol='∘', row=3):
-    ru = RuneCluster(row=row, col=col, symbols=(symbol,), kind='ancient')
-    room.runes.append(ru)
+def _char_run_at(room, col, symbol='∘', row=3):
+    ru = CharRun(row=row, col=col, symbols=(symbol,), kind='ancient')
+    room.char_runs.append(ru)
     room.rebuild_indexes()
     return ru
 
@@ -127,7 +127,7 @@ def test_comma_reverses_to_F():
 def test_t_lands_one_before_target():
     """t{∘} must land at target_col - 1, not on the rune itself."""
     room = _bare_room()
-    _rune_at(room, col=10, symbol='∘')
+    _char_run_at(room, col=10, symbol='∘')
     player = Player(row=3, col=1)
 
     moved = apply_motion(player, 't', 1, room, target='∘')
@@ -139,7 +139,7 @@ def test_t_lands_one_before_target():
 def test_T_lands_one_after_target():
     """T{∘} (backward) must land at target_col + 1."""
     room = _bare_room()
-    _rune_at(room, col=5, symbol='∘')
+    _char_run_at(room, col=5, symbol='∘')
     player = Player(row=3, col=15)
 
     moved = apply_motion(player, 'T', 1, room, target='∘')
@@ -151,7 +151,7 @@ def test_T_lands_one_after_target():
 def test_t_adjacent_target_does_not_move():
     """t{∘} where target is at player.col+1 would put dest at player.col — must not move."""
     room = _bare_room()
-    _rune_at(room, col=2, symbol='∘')
+    _char_run_at(room, col=2, symbol='∘')
     player = Player(row=3, col=1)
 
     # t wants dest = 2 - 1 = 1 = player.col → no move

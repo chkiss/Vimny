@@ -58,7 +58,7 @@ def test_all_entity_kinds_present():
 
 def test_all_rune_kinds_present():
     room = build_dungeon_dummy(SEED).room
-    present = {ru.kind for ru in room.runes}
+    present = {ru.kind for ru in room.char_runs}
     missing = sorted(EXPECTED_RUNE_KINDS - present)
     assert not missing, (
         f"Rune kind(s) {missing} absent from dummy dungeon — "
@@ -79,7 +79,7 @@ def test_no_unexpected_entity_kinds():
 
 def test_no_unexpected_rune_kinds():
     room = build_dungeon_dummy(SEED).room
-    present = {ru.kind for ru in room.runes}
+    present = {ru.kind for ru in room.char_runs}
     unexpected = sorted(present - EXPECTED_RUNE_KINDS)
     assert not unexpected, (
         f"Rune kind(s) {unexpected} found in dummy dungeon but not in "

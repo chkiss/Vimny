@@ -3,7 +3,7 @@
 Personality defined in agents/bug_testers.md.
 """
 import pytest
-from engine.world import Room, RoomType, CellType, Entity, RuneCluster
+from engine.world import Room, RoomType, CellType, Entity, CharRun
 from engine.player import Player
 from engine.motion import apply_motion, move_player, _apply_find
 

@@ -6,7 +6,7 @@ cursor advances; Backspace removes the cell to the left. The grid is fixed, so
 "insert" is overwrite-and-advance (matching the admin editor), not text-shift.
 """
 from __future__ import annotations
-from engine.world import CellType, RuneCluster
+from engine.world import CellType, CharRun
 from engine.motion import _first_non_blank_col, _leftmost_passable
 from engine.editor import _merge_adjacent_runes
 
@@ -17,26 +17,26 @@ _VARIANTS_MUTATING = frozenset('oOsS')   # entry commands that change the room
 
 def _last_content_col(room, row: int):
     """Rightmost column on `row` holding a rune symbol, or None."""
-    ends = [ru.col + len(ru.symbols) - 1 for ru in room.runes if ru.row == row]
+    ends = [ru.col + len(ru.symbols) - 1 for ru in room.char_runs if ru.row == row]
     return max(ends) if ends else None
 
 
 def _delete_at(room, row: int, col: int) -> None:
     """Remove the single rune symbol at (row, col), splitting its cluster."""
-    ru = room.rune_at(row, col)
+    ru = room.char_run_at(row, col)
     if ru is None:
         return
     idx = col - ru.col
-    room.remove_rune(ru)
+    room.remove_char_run(ru)
     if idx > 0:
-        room.add_rune(RuneCluster(row, ru.col, tuple(ru.symbols[:idx]), ru.kind))
+        room.add_char_run(CharRun(row, ru.col, tuple(ru.symbols[:idx]), ru.kind))
     if idx + 1 < len(ru.symbols):
-        room.add_rune(RuneCluster(row, col + 1, tuple(ru.symbols[idx + 1:]), ru.kind))
+        room.add_char_run(CharRun(row, col + 1, tuple(ru.symbols[idx + 1:]), ru.kind))
 
 
 def _clear_row(room, row: int) -> None:
     """Remove all rune clusters on a row (direct mutation; no operator system)."""
-    room.runes = [ru for ru in room.runes if ru.row != row]
+    room.char_runs = [ru for ru in room.char_runs if ru.row != row]
     room.rebuild_indexes()
 
 
@@ -49,7 +49,7 @@ def _insert_blank_row(room, at_row: int, template_row: int) -> None:
                for c in range(room.cols)]
     room.cells.insert(at_row, new_row)
     room.rows += 1
-    for ru in room.runes:
+    for ru in room.char_runs:
         if ru.row >= at_row:
             ru.row += 1
     for e in room.entities:
@@ -117,7 +117,7 @@ def insert_char(room, player, ch: str, kind: str = INSERT_KIND) -> bool:
     if not (0 <= c < room.cols) or room.cells[r][c] not in _PASTABLE:
         return False
     _delete_at(room, r, c)
-    room.add_rune(RuneCluster(r, c, (ch,), kind))
+    room.add_char_run(CharRun(r, c, (ch,), kind))
     _merge_adjacent_runes(room, r)
     if c + 1 < room.cols and room.cells[r][c + 1] in _PASTABLE:
         player.col += 1
@@ -126,7 +126,7 @@ def insert_char(room, player, ch: str, kind: str = INSERT_KIND) -> bool:
 
 def _cell_rune(room, row: int, col: int):
     """(symbol, kind) at (row, col) or None if the cell holds no rune."""
-    ru = room.rune_at(row, col)
+    ru = room.char_run_at(row, col)
     return (ru.symbols[col - ru.col], ru.kind) if ru is not None else None
 
 
@@ -140,7 +140,7 @@ def replace_chars(room, player, ch: str, count: int = 1) -> bool:
         if col >= room.cols or room.cells[r][col] not in _PASTABLE:
             break
         _delete_at(room, r, col)
-        room.add_rune(RuneCluster(r, col, (ch,), INSERT_KIND))
+        room.add_char_run(CharRun(r, col, (ch,), INSERT_KIND))
         last, changed = col, True
     _merge_adjacent_runes(room, r)
     if changed:
@@ -156,7 +156,7 @@ def replace_overtype(room, player, ch: str):
         return None
     rec = (c, _cell_rune(room, r, c))
     _delete_at(room, r, c)
-    room.add_rune(RuneCluster(r, c, (ch,), INSERT_KIND))
+    room.add_char_run(CharRun(r, c, (ch,), INSERT_KIND))
     _merge_adjacent_runes(room, r)
     if c + 1 < room.cols and room.cells[r][c + 1] in _PASTABLE:
         player.col += 1
@@ -170,7 +170,7 @@ def replace_restore(room, player, rec) -> None:
     _delete_at(room, player.row, col)
     if orig is not None:
         sym, kind = orig
-        room.add_rune(RuneCluster(player.row, col, (sym,), kind))
+        room.add_char_run(CharRun(player.row, col, (sym,), kind))
     _merge_adjacent_runes(room, player.row)
 
 

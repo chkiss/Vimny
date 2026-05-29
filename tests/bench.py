@@ -103,16 +103,16 @@ bench_ms("build_dungeon_3  (The Rune Halls)",      lambda: build_dungeon_3(SEED)
 
 _section("2. Spatial index lookups  [O(1) — P2]")
 
-void_ru   = next(ru for ru in r2.runes if ru.kind == 'void')
+void_ru   = next(ru for ru in r2.char_runs if ru.kind == 'void')
 exit_ent  = next(e  for e  in r2.entities if e.kind == 'exit')
-r3_ru     = next(ru for ru in r3.runes if ru.kind != 'void')
+r3_ru     = next(ru for ru in r3.char_runs if ru.kind != 'void')
 
-bench_us("rune_at   HIT  L2 (void wall cell)",
-         lambda: r2.rune_at(void_ru.row, void_ru.col))
-bench_us("rune_at   MISS L2 (wall cell (0,0))",
-         lambda: r2.rune_at(0, 0))
-bench_us("rune_at   HIT  L3 (rune corridor)",
-         lambda: r3.rune_at(r3_ru.row, r3_ru.col))
+bench_us("char_run_at   HIT  L2 (void wall cell)",
+         lambda: r2.char_run_at(void_ru.row, void_ru.col))
+bench_us("char_run_at   MISS L2 (wall cell (0,0))",
+         lambda: r2.char_run_at(0, 0))
+bench_us("char_run_at   HIT  L3 (rune corridor)",
+         lambda: r3.char_run_at(r3_ru.row, r3_ru.col))
 bench_us("entity_at HIT  L2 (exit entity)",
          lambda: r2.entity_at(exit_ent.row, exit_ent.col))
 bench_us("entity_at MISS L2 (empty floor)",
@@ -130,14 +130,14 @@ GAME_H, IW = 17, 78
 bench_us("all entity_at calls  L2  (1 326 lookups)",
          lambda: [r2.entity_at(r, c) for r in range(GAME_H) for c in range(IW)],
          n=500)
-bench_us("all rune_at calls    L2  (1 326 lookups)",
-         lambda: [r2.rune_at(r, c) for r in range(GAME_H) for c in range(IW)],
+bench_us("all char_run_at calls    L2  (1 326 lookups)",
+         lambda: [r2.char_run_at(r, c) for r in range(GAME_H) for c in range(IW)],
          n=500)
 bench_us("all entity_at calls  L3  (1 326 lookups)",
          lambda: [r3.entity_at(r, c) for r in range(GAME_H) for c in range(IW)],
          n=500)
-bench_us("all rune_at calls    L3  (1 326 lookups)",
-         lambda: [r3.rune_at(r, c) for r in range(GAME_H) for c in range(IW)],
+bench_us("all char_run_at calls    L3  (1 326 lookups)",
+         lambda: [r3.char_run_at(r, c) for r in range(GAME_H) for c in range(IW)],
          n=500)
 
 
@@ -152,9 +152,9 @@ snap2  = _ed_snapshot(r2, player)
 snap3  = _ed_snapshot(r3, player)
 
 _row("",
-     f"  L2: {len(r2.entities)} entities, {len(r2.runes)} rune clusters, {len(r2._rune_map)} indexed cells")
+     f"  L2: {len(r2.entities)} entities, {len(r2.char_runs)} rune clusters, {len(r2._char_run_map)} indexed cells")
 _row("",
-     f"  L3: {len(r3.entities)} entities, {len(r3.runes)} rune clusters, {len(r3._rune_map)} indexed cells")
+     f"  L3: {len(r3.entities)} entities, {len(r3.char_runs)} rune clusters, {len(r3._char_run_map)} indexed cells")
 
 bench_us("_ed_snapshot          L2",
          lambda: _ed_snapshot(r2, player))
@@ -168,15 +168,15 @@ bench_us("_ed_restore           L3",
 bench_us("copy.deepcopy entities  L2",
          lambda: copy.deepcopy(r2.entities))
 bench_us("copy.deepcopy runes     L2",
-         lambda: copy.deepcopy(r2.runes))
+         lambda: copy.deepcopy(r2.char_runs))
 bench_us("copy.deepcopy runes     L3",
-         lambda: copy.deepcopy(r3.runes))
+         lambda: copy.deepcopy(r3.char_runs))
 
 # Candidate P3 replacement: shallow tuple copy (symbols already immutable)
 bench_us("tuple-copy runes        L2  [P3 candidate]",
-         lambda: [type(ru)(ru.row, ru.col, ru.symbols, ru.kind) for ru in r2.runes])
+         lambda: [type(ru)(ru.row, ru.col, ru.symbols, ru.kind) for ru in r2.char_runs])
 bench_us("tuple-copy runes        L3  [P3 candidate]",
-         lambda: [type(ru)(ru.row, ru.col, ru.symbols, ru.kind) for ru in r3.runes])
+         lambda: [type(ru)(ru.row, ru.col, ru.symbols, ru.kind) for ru in r3.char_runs])
 
 
 # ─────────────────────────────────────────────────────────────────────────────

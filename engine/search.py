@@ -11,7 +11,7 @@ def _match_positions(room, pattern: str) -> list:
     """All (row, col) of the first occurrence of `pattern` within each cluster,
     sorted in reading order."""
     out = []
-    for ru in room.runes:
+    for ru in room.char_runs:
         idx = ''.join(ru.symbols).find(pattern)
         if idx >= 0:
             out.append((ru.row, ru.col + idx))
@@ -36,5 +36,5 @@ def find_next(room, player, pattern: str, forward: bool):
 
 def word_under_cursor(room, player):
     """Full symbol string of the cluster under the cursor (for * / #), or None."""
-    ru = room.rune_at(player.row, player.col)
+    ru = room.char_run_at(player.row, player.col)
     return ''.join(ru.symbols) if ru is not None else None

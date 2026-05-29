@@ -3,7 +3,7 @@
 Personality defined in agents/bug_testers.md.
 """
 import pytest
-from engine.world import Room, RoomType, CellType, RuneCluster
+from engine.world import Room, RoomType, CellType, CharRun
 from engine.player import Player
 from engine.motion import apply_motion, move_player
 
@@ -57,11 +57,11 @@ def test_dollar_entire_row_fogged_is_noop():
 
 
 def test_dollar_passes_through_void_rune_mid_row():
-    """$ scan ignores void RuneClusters — only walls/entities stop it.
+    """$ scan ignores void CharRuns — only walls/entities stop it.
     A void rune in the middle of a row does not stop $; it lands at rightmost cell."""
     room = _bare_room()
-    mid_void = RuneCluster(row=3, col=10, symbols=('○',), kind='void')
-    room.runes.append(mid_void)
+    mid_void = CharRun(row=3, col=10, symbols=('○',), kind='void')
+    room.char_runs.append(mid_void)
     room.rebuild_indexes()
     player = Player(row=3, col=1)
 
@@ -72,11 +72,11 @@ def test_dollar_passes_through_void_rune_mid_row():
 
 
 def test_dollar_lands_on_void_at_rightmost_cell():
-    """$ does not stop before a void RuneCluster mid-scan — it lands on the
+    """$ does not stop before a void CharRun mid-scan — it lands on the
     rightmost passable cell even when that cell has a void rune."""
     room = _bare_room()
-    end_void = RuneCluster(row=3, col=28, symbols=('○',), kind='void')
-    room.runes.append(end_void)
+    end_void = CharRun(row=3, col=28, symbols=('○',), kind='void')
+    room.char_runs.append(end_void)
     room.rebuild_indexes()
     player = Player(row=3, col=1)
 
@@ -175,8 +175,8 @@ def test_e_with_no_runes_does_not_move():
 def test_w_after_last_rune_does_not_move():
     """w from the only rune (nothing to the right) must not move."""
     room = _bare_room()
-    ru = RuneCluster(row=3, col=5, symbols=('∘',), kind='ancient')
-    room.runes.append(ru)
+    ru = CharRun(row=3, col=5, symbols=('∘',), kind='ancient')
+    room.char_runs.append(ru)
     room.rebuild_indexes()
     player = Player(row=3, col=5)
 
@@ -189,8 +189,8 @@ def test_w_after_last_rune_does_not_move():
 def test_b_before_first_rune_does_not_move():
     """b from a floor cell before any rune must not move."""
     room = _bare_room()
-    ru = RuneCluster(row=3, col=15, symbols=('∘',), kind='ancient')
-    room.runes.append(ru)
+    ru = CharRun(row=3, col=15, symbols=('∘',), kind='ancient')
+    room.char_runs.append(ru)
     room.rebuild_indexes()
     player = Player(row=3, col=1)   # col 1 has no rune and nothing to the left
 

@@ -146,14 +146,14 @@ def test_LT3_exit_at_col_19():
     assert room.cells[12][20] == CellType.WALL, "col 20 in row 12 must be wall"
     assert room.cells[12][21] == CellType.WALL, "col 21 in row 12 must be wall"
     # Col 20 in row 11 must be empty (gap between anchor and big WORD)
-    assert room.rune_at(11, 20) is None, "col 20 in row 11 must be empty (gap before big WORD)"
+    assert room.char_run_at(11, 20) is None, "col 20 in row 11 must be empty (gap before big WORD)"
 
 
 def test_C4_ge_anchor_at_correct_position():
     """4-char C4 anchor at (7,2): cols 2-5; ge from col 9+ lands at end=5 (in LT2 gap)."""
     d = build_dungeon_8(42)
     room = d.rooms[0]
-    anchor = room.rune_at(7, 2)
+    anchor = room.char_run_at(7, 2)
     assert anchor is not None, "Expected 4-char C4 anchor at (7,2)"
     assert len(anchor.symbols) == 4, (
         f"C4 anchor should be 4 chars wide, got {len(anchor.symbols)}"
@@ -174,20 +174,20 @@ def test_C6_baphomet_behemoth_word():
     room = d.rooms[0]
 
     # ── Cluster A: cols 21-28 ─────────────────────────────────────────────────
-    ca = room.rune_at(11, 21)
+    ca = room.char_run_at(11, 21)
     assert ca is not None, "Cluster A must start at (11,21)"
     assert ca.col == 21, f"Cluster A col={ca.col}, expected 21"
     assert len(ca.symbols) == 8, f"Cluster A must be 8 chars, got {len(ca.symbols)}"
     assert ca.col + len(ca.symbols) - 1 == 28, "Cluster A must end at col 28"
 
     # ── Separator cluster: cols 29-30 ────────────────────────────────────────
-    cs = room.rune_at(11, 29)
+    cs = room.char_run_at(11, 29)
     assert cs is not None, "Separator cluster must start at (11,29)"
     assert len(cs.symbols) == 2, f"Separator must be 2 chars, got {len(cs.symbols)}"
     assert cs.col + len(cs.symbols) - 1 == 30, "Separator must end at col 30"
 
     # ── Cluster B: cols 31-38 ─────────────────────────────────────────────────
-    cb = room.rune_at(11, 31)
+    cb = room.char_run_at(11, 31)
     assert cb is not None, "Cluster B must start at (11,31)"
     assert cb.col == 31, f"Cluster B col={cb.col}, expected 31"
     assert len(cb.symbols) == 8, f"Cluster B must be 8 chars, got {len(cb.symbols)}"
@@ -199,18 +199,18 @@ def test_C6_baphomet_behemoth_word():
     assert ca.kind == cs.kind == cb.kind, "All clusters must share color"
 
     # ── Col 20 is empty (gap between anchor and the big WORD) ────────────────
-    assert room.rune_at(11, 20) is None, "Col 20 must be empty (gap before big WORD)"
+    assert room.char_run_at(11, 20) is None, "Col 20 must be empty (gap before big WORD)"
 
     # ── Anchor rune ends at col 19 (gE landing) ──────────────────────────────
-    anchor = room.rune_at(11, 18)
+    anchor = room.char_run_at(11, 18)
     assert anchor is not None, "Anchor cluster must start at (11,18)"
     assert anchor.col + len(anchor.symbols) - 1 == 19, (
         f"Anchor must end at col 19, got {anchor.col + len(anchor.symbols) - 1}"
     )
-    assert room.rune_at(11, 17) is None or room.rune_at(11, 17) is anchor, (
+    assert room.char_run_at(11, 17) is None or room.char_run_at(11, 17) is anchor, (
         "Col 17 must not have a separate cluster before the anchor"
     )
 
     # ── Filler exists in cols 2-16 ───────────────────────────────────────────
-    filler_cols = [c for c in range(2, 17) if room.rune_at(11, c) is not None]
+    filler_cols = [c for c in range(2, 17) if room.char_run_at(11, c) is not None]
     assert len(filler_cols) > 0, "Expected some filler runes in cols 2-16"

@@ -1,7 +1,7 @@
 """Block A — TextObject: the range an operator (d/y/c) acts on.
 
 A motion run as an operator target produces a TextObject describing the grid
-span to operate on. This is the Vimny (2D grid + RuneCluster) analogue of the
+span to operate on. This is the Vimny (2D grid + CharRun) analogue of the
 prompt_toolkit pattern — re-implemented here, not copied: the span is computed
 by running the existing, tested `apply_motion` on a cloned cursor position.
 """
@@ -40,7 +40,7 @@ def _word_end(room, row: int, cur, WORD: bool) -> int:
     if WORD:
         cc = end + 1
         while cc < room.cols and room.is_passable(row, cc):
-            r2 = room.rune_at(row, cc)
+            r2 = room.char_run_at(row, cc)
             if r2 is not None and r2.kind != 'void':
                 end = r2.col + len(r2.symbols) - 1
                 cc = end + 1
@@ -77,7 +77,7 @@ def compute_text_object(player, action: dict, room) -> TextObject | None:
     # end of the word (like ce/cE) — NOT the trailing whitespace that dw eats.
     # (Only when the cursor sits on a non-void rune; on blanks cw behaves as dw.)
     if action.get('op') == 'c' and motion in ('w', 'W'):
-        cur = room.rune_at(sr, sc)
+        cur = room.char_run_at(sr, sc)
         if cur is not None and cur.kind != 'void':
             end_col = _word_end(room, sr, cur, WORD=(motion == 'W'))
             n = count * mc
@@ -122,7 +122,7 @@ _PAIRS = {'(': ('(', ')'), '[': ('[', ']'), '{': ('{', '}'), '<': ('<', '>')}
 
 
 def _sym_at(room, row, col):
-    ru = room.rune_at(row, col)
+    ru = room.char_run_at(row, col)
     return ru.symbols[col - ru.col] if ru is not None else None
 
 
@@ -136,7 +136,7 @@ def _row_blank(room, row) -> bool:
     """A text-blank row: passable but holding no runes. All-wall rows are not blank."""
     if _row_bounds(room, row) is None:
         return False
-    return not any(room.rune_at(row, c) is not None for c in range(room.cols))
+    return not any(room.char_run_at(row, c) is not None for c in range(room.cols))
 
 
 def _resolve_word(room, r, c, around):
@@ -144,31 +144,31 @@ def _resolve_word(room, r, c, around):
     if bounds is None:
         return None
     lo, hi = bounds
-    ru = room.rune_at(r, c)
+    ru = room.char_run_at(r, c)
     if ru is not None and ru.kind != 'void':
         ws, we = ru.col, ru.col + len(ru.symbols) - 1
         if not around:
             return TextObject(r, ws, r, we, TextObjectType.INCLUSIVE)
         t = we + 1                                  # trailing whitespace run
-        while t <= hi and room.is_passable(r, t) and room.rune_at(r, t) is None:
+        while t <= hi and room.is_passable(r, t) and room.char_run_at(r, t) is None:
             t += 1
         if t - 1 > we:
             return TextObject(r, ws, r, t - 1, TextObjectType.INCLUSIVE)
         s = ws - 1                                  # else leading whitespace
-        while s >= lo and room.is_passable(r, s) and room.rune_at(r, s) is None:
+        while s >= lo and room.is_passable(r, s) and room.char_run_at(r, s) is None:
             s -= 1
         return TextObject(r, s + 1, r, we, TextObjectType.INCLUSIVE)
     # cursor on a blank cell: the contiguous blank run
-    if not (lo <= c <= hi) or not room.is_passable(r, c) or room.rune_at(r, c) is not None:
+    if not (lo <= c <= hi) or not room.is_passable(r, c) or room.char_run_at(r, c) is not None:
         return None
     s = c
-    while s - 1 >= lo and room.is_passable(r, s - 1) and room.rune_at(r, s - 1) is None:
+    while s - 1 >= lo and room.is_passable(r, s - 1) and room.char_run_at(r, s - 1) is None:
         s -= 1
     e = c
-    while e + 1 <= hi and room.is_passable(r, e + 1) and room.rune_at(r, e + 1) is None:
+    while e + 1 <= hi and room.is_passable(r, e + 1) and room.char_run_at(r, e + 1) is None:
         e += 1
-    if around and e + 1 <= hi and room.rune_at(r, e + 1) is not None:
-        nru = room.rune_at(r, e + 1)
+    if around and e + 1 <= hi and room.char_run_at(r, e + 1) is not None:
+        nru = room.char_run_at(r, e + 1)
         e = nru.col + len(nru.symbols) - 1
     return TextObject(r, s, r, e, TextObjectType.INCLUSIVE)
 
@@ -280,9 +280,9 @@ def _resolve_sentence(room, r, c, around):
     if nxt is not None:
         e = nxt - 1
     else:
-        e = max((ru.col + len(ru.symbols) - 1 for ru in room._rune_by_row.get(r, [])), default=hi)
+        e = max((ru.col + len(ru.symbols) - 1 for ru in room._char_runs_by_row.get(r, [])), default=hi)
     if not around:                                  # trim trailing blanks for inner
-        while e > s and room.rune_at(r, e) is None:
+        while e > s and room.char_run_at(r, e) is None:
             e -= 1
     return TextObject(r, s, r, e, TextObjectType.INCLUSIVE)
 

@@ -1,6 +1,6 @@
 """Tests for engine/motion.py: apply_motion, move_player, _cell_char, _fog_unreachable, _reveal_from."""
 import pytest
-from engine.world import Room, RoomType, CellType, Entity, RuneCluster
+from engine.world import Room, RoomType, CellType, Entity, CharRun
 from engine.player import Player
 from engine.motion import apply_motion, move_player, _fog_unreachable, _reveal_from, _cell_char
 
@@ -33,10 +33,10 @@ def _rune_room():
       col 20:  exit entity (char 'E')
     """
     room = _bare_room()
-    room.add_rune(RuneCluster(row=3, col=2,  symbols=('∘', '∘'), kind='ancient'))
-    room.add_rune(RuneCluster(row=3, col=6,  symbols=('·',),     kind='verdant'))
-    room.add_rune(RuneCluster(row=3, col=9,  symbols=('∘',),     kind='ancient'))
-    room.add_rune(RuneCluster(row=3, col=13, symbols=('·',),     kind='verdant'))
+    room.add_char_run(CharRun(row=3, col=2,  symbols=('∘', '∘'), kind='ancient'))
+    room.add_char_run(CharRun(row=3, col=6,  symbols=('·',),     kind='verdant'))
+    room.add_char_run(CharRun(row=3, col=9,  symbols=('∘',),     kind='ancient'))
+    room.add_char_run(CharRun(row=3, col=13, symbols=('·',),     kind='verdant'))
     room.add_entity(Entity(kind='exit', row=3, col=20))
     room.exit_pos = (3, 20)
     return room
@@ -174,12 +174,12 @@ class TestCellChar:
 
     def test_rune_first_symbol(self):
         room = _bare_room()
-        room.add_rune(RuneCluster(row=3, col=5, symbols=('∘', '∘'), kind='ancient'))
+        room.add_char_run(CharRun(row=3, col=5, symbols=('∘', '∘'), kind='ancient'))
         assert _cell_char(room, 3, 5) == '∘'
 
     def test_rune_second_symbol(self):
         room = _bare_room()
-        room.add_rune(RuneCluster(row=3, col=5, symbols=('∘', '·'), kind='ancient'))
+        room.add_char_run(CharRun(row=3, col=5, symbols=('∘', '·'), kind='ancient'))
         assert _cell_char(room, 3, 6) == '·'
 
     def test_exit_entity(self):
@@ -315,15 +315,15 @@ class TestApplyMotionWordMotions:
 
     def test_w_skips_void_rune(self):
         room = _bare_room()
-        room.add_rune(RuneCluster(row=3, col=3, symbols=('○', '○'), kind='void'))
-        room.add_rune(RuneCluster(row=3, col=8, symbols=('∘',), kind='ancient'))
+        room.add_char_run(CharRun(row=3, col=3, symbols=('○', '○'), kind='void'))
+        room.add_char_run(CharRun(row=3, col=8, symbols=('∘',), kind='ancient'))
         p = _player(3, 1)
         apply_motion(p, 'w', 1, room)
         assert p.col == 8  # void skipped; lands on ancient
 
     def test_w_returns_false_when_no_next_word(self):
         room = _bare_room()
-        room.add_rune(RuneCluster(row=3, col=3, symbols=('∘',), kind='ancient'))
+        room.add_char_run(CharRun(row=3, col=3, symbols=('∘',), kind='ancient'))
         p = _player(3, 3)  # on the only rune; no next word
         assert apply_motion(p, 'w', 1, room) is False
 
@@ -347,7 +347,7 @@ class TestApplyMotionWordMotions:
 
     def test_b_returns_false_when_no_prev_word(self):
         room = _bare_room()
-        room.add_rune(RuneCluster(row=3, col=5, symbols=('∘',), kind='ancient'))
+        room.add_char_run(CharRun(row=3, col=5, symbols=('∘',), kind='ancient'))
         p = _player(3, 5)  # on the only rune
         assert apply_motion(p, 'b', 1, room) is False
 
@@ -371,7 +371,7 @@ class TestApplyMotionWordMotions:
 
     def test_e_returns_false_when_no_next_word(self):
         room = _bare_room()
-        room.add_rune(RuneCluster(row=3, col=5, symbols=('∘',), kind='ancient'))
+        room.add_char_run(CharRun(row=3, col=5, symbols=('∘',), kind='ancient'))
         p = _player(3, 5)  # on the only rune's end
         assert apply_motion(p, 'e', 1, room) is False
 
@@ -405,7 +405,7 @@ class TestApplyMotionJumps:
     def test_gg_lands_on_first_rune_of_first_line(self):
         # row 1: cols 1-3 blank, rune at col 4 → first-non-blank is the rune col
         room = _bare_room()
-        room.add_rune(RuneCluster(row=1, col=4, symbols=('x',), kind='ancient'))
+        room.add_char_run(CharRun(row=1, col=4, symbols=('x',), kind='ancient'))
         room.rebuild_indexes()
         p = _player(5, 10)
         apply_motion(p, 'gg', 1, room, count_given=False)
@@ -470,7 +470,7 @@ class TestApplyMotionBackwardWordEnd:
 
     def test_ge_does_not_land_on_void(self):
         room = _bare_room()
-        room.add_rune(RuneCluster(row=3, col=5, symbols=('○', '○'), kind='void'))
+        room.add_char_run(CharRun(row=3, col=5, symbols=('○', '○'), kind='void'))
         p = _player(3, 9)
         assert apply_motion(p, 'ge', 1, room) is False  # void is not a word
         assert p.col == 9
@@ -478,9 +478,9 @@ class TestApplyMotionBackwardWordEnd:
     def test_gE_coalesces_adjacent_clusters(self):
         # WORD1 = ∘∘@2-3 + ·@4 (adjacent, end 4); gap; WORD2 = ∘@7 (end 7)
         room = _bare_room()
-        room.add_rune(RuneCluster(row=3, col=2, symbols=('∘', '∘'), kind='ancient'))
-        room.add_rune(RuneCluster(row=3, col=4, symbols=('·',),     kind='verdant'))
-        room.add_rune(RuneCluster(row=3, col=7, symbols=('∘',),     kind='ancient'))
+        room.add_char_run(CharRun(row=3, col=2, symbols=('∘', '∘'), kind='ancient'))
+        room.add_char_run(CharRun(row=3, col=4, symbols=('·',),     kind='verdant'))
+        room.add_char_run(CharRun(row=3, col=7, symbols=('∘',),     kind='ancient'))
         p = _player(3, 10)
         apply_motion(p, 'gE', 1, room)
         assert p.col == 7   # end of WORD2
@@ -528,7 +528,7 @@ def _bracket_room():
     """row 3: ( @2  [ @4  ] @6  ) @8  — nested ( [ ] )."""
     room = _bare_room()
     for col, sym in ((2, '('), (4, '['), (6, ']'), (8, ')')):
-        room.add_rune(RuneCluster(row=3, col=col, symbols=(sym,), kind='ancient'))
+        room.add_char_run(CharRun(row=3, col=col, symbols=(sym,), kind='ancient'))
     return room
 
 
@@ -559,7 +559,7 @@ class TestApplyMotionBracketMatch:
 
     def test_unmatched_no_move(self):
         room = _bare_room()
-        room.add_rune(RuneCluster(row=3, col=5, symbols=('(',), kind='ancient'))
+        room.add_char_run(CharRun(row=3, col=5, symbols=('(',), kind='ancient'))
         p = _player(3, 5)
         assert apply_motion(p, '%', 1, room) is False
         assert p.col == 5
@@ -571,7 +571,7 @@ def _para_room():
     """Content on rows 1,2,4; blank passable rows 3 and 5."""
     room = _bare_room()
     for r in (1, 2, 4):
-        room.add_rune(RuneCluster(row=r, col=2, symbols=('∘',), kind='ancient'))
+        room.add_char_run(CharRun(row=r, col=2, symbols=('∘',), kind='ancient'))
     return room
 
 
@@ -605,9 +605,9 @@ class TestApplyMotionParagraph:
 def _sentence_room():
     """row 3: 'ab.' @2-4, 'cd!' @6-8, 'ef' @10-11 → sentence starts 2, 6, 10."""
     room = _bare_room()
-    room.add_rune(RuneCluster(row=3, col=2,  symbols=('a', 'b', '.'), kind='ancient'))
-    room.add_rune(RuneCluster(row=3, col=6,  symbols=('c', 'd', '!'), kind='ancient'))
-    room.add_rune(RuneCluster(row=3, col=10, symbols=('e', 'f'),      kind='ancient'))
+    room.add_char_run(CharRun(row=3, col=2,  symbols=('a', 'b', '.'), kind='ancient'))
+    room.add_char_run(CharRun(row=3, col=6,  symbols=('c', 'd', '!'), kind='ancient'))
+    room.add_char_run(CharRun(row=3, col=10, symbols=('e', 'f'),      kind='ancient'))
     return room
 
 
@@ -716,7 +716,7 @@ class TestApplyMotionFindChar:
     def test_f_stops_at_wall(self):
         room = _bare_room()
         # put a rune on row 4, player on row 3 — f only scans current row
-        room.add_rune(RuneCluster(row=4, col=5, symbols=('∘',), kind='ancient'))
+        room.add_char_run(CharRun(row=4, col=5, symbols=('∘',), kind='ancient'))
         p = _player(3, 1)
         result = apply_motion(p, 'f', 1, room, target='∘')
         assert result is False  # rune is on a different row

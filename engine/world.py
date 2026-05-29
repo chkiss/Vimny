@@ -43,7 +43,7 @@ class Entity:
     tag:          str = ''  # variant tag, e.g. 'gold' or 'red' for colored keys/doors
 
 @dataclass
-class RuneCluster:
+class CharRun:
     row: int
     col: int
     symbols: tuple      # e.g. ('∘','∘','∘')
@@ -55,7 +55,7 @@ class Room:
     rows: int
     cols: int
     cells: list[list[CellType]] = field(default_factory=list)
-    runes: list[RuneCluster]    = field(default_factory=list)
+    char_runs: list[CharRun]    = field(default_factory=list)
     entities: list[Entity]      = field(default_factory=list)
     spawn_pos: tuple[int,int]    = (0, 0)   # player spawn + par-solver/fog start (NOT a gg target — gg/G are buffer-relative)
     exit_pos: Optional[tuple[int,int]] = None
@@ -71,17 +71,17 @@ class Room:
 
     def __post_init__(self):
         self._entity_map:    dict = {}
-        self._rune_map:      dict = {}
+        self._char_run_map:      dict = {}
         self._entity_by_kind: dict = {}   # kind -> list[Entity] (includes dead)
-        self._rune_rows:      set  = set() # rows that contain at least one rune
-        self._rune_by_row:    dict = {}   # row -> list[RuneCluster]
+        self._char_run_rows:      set  = set() # rows that contain at least one rune
+        self._char_runs_by_row:    dict = {}   # row -> list[CharRun]
 
     # ── Spatial index ──────────────────────────────────────────────────────────
 
     def rebuild_indexes(self) -> None:
         """Rebuild O(1) lookup dicts from the current runes/entities lists.
 
-        Call after any wholesale assignment to room.runes or room.entities,
+        Call after any wholesale assignment to room.char_runs or room.entities,
         and after _ed_restore.  Individual add/remove helpers keep the indexes
         in sync incrementally and do not require a full rebuild.
         """
@@ -89,17 +89,17 @@ class Room:
         self._entity_by_kind = {}
         for e in self.entities:
             self._entity_by_kind.setdefault(e.kind, []).append(e)
-        self._rune_map   = {}
-        self._rune_by_row = {}
-        for ru in self.runes:
+        self._char_run_map   = {}
+        self._char_runs_by_row = {}
+        for ru in self.char_runs:
             for i in range(len(ru.symbols)):
-                self._rune_map[(ru.row, ru.col + i)] = ru
-            self._rune_by_row.setdefault(ru.row, []).append(ru)
-        self._rune_rows = {ru.row for ru in self.runes}
+                self._char_run_map[(ru.row, ru.col + i)] = ru
+            self._char_runs_by_row.setdefault(ru.row, []).append(ru)
+        self._char_run_rows = {ru.row for ru in self.char_runs}
         # Normalize WORD colors: adjacent non-void clusters on the same row all
         # take the leftmost cluster's kind so a WORD renders in one color.
         by_row: dict = {}
-        for ru in self.runes:
+        for ru in self.char_runs:
             by_row.setdefault(ru.row, []).append(ru)
         for row_runes in by_row.values():
             row_runes.sort(key=lambda r: r.col)
@@ -148,26 +148,26 @@ class Room:
         if e.alive:
             self._entity_map[(e.row, e.col)] = e
 
-    def add_rune(self, ru: RuneCluster) -> None:
-        self.runes.append(ru)
+    def add_char_run(self, ru: CharRun) -> None:
+        self.char_runs.append(ru)
         for i in range(len(ru.symbols)):
-            self._rune_map[(ru.row, ru.col + i)] = ru
-        self._rune_by_row.setdefault(ru.row, []).append(ru)
-        self._rune_rows.add(ru.row)
+            self._char_run_map[(ru.row, ru.col + i)] = ru
+        self._char_runs_by_row.setdefault(ru.row, []).append(ru)
+        self._char_run_rows.add(ru.row)
 
-    def remove_rune(self, ru: RuneCluster) -> None:
-        self.runes.remove(ru)
+    def remove_char_run(self, ru: CharRun) -> None:
+        self.char_runs.remove(ru)
         for i in range(len(ru.symbols)):
-            self._rune_map.pop((ru.row, ru.col + i), None)
-        _rl = self._rune_by_row.get(ru.row)
+            self._char_run_map.pop((ru.row, ru.col + i), None)
+        _rl = self._char_runs_by_row.get(ru.row)
         if _rl:
             try:
                 _rl.remove(ru)
             except ValueError:
                 pass
             if not _rl:
-                del self._rune_by_row[ru.row]
-                self._rune_rows.discard(ru.row)
+                del self._char_runs_by_row[ru.row]
+                self._char_run_rows.discard(ru.row)
 
     # ── Lookup methods (O(1) with indexes built) ───────────────────────────────
 
@@ -203,8 +203,8 @@ class Room:
     def entity_at(self, r: int, c: int) -> Optional[Entity]:
         return self._entity_map.get((r, c))
 
-    def rune_at(self, r: int, c: int) -> Optional[RuneCluster]:
-        return self._rune_map.get((r, c))
+    def char_run_at(self, r: int, c: int) -> Optional[CharRun]:
+        return self._char_run_map.get((r, c))
 
 @dataclass
 class Dungeon:

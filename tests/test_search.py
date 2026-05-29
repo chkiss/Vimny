@@ -1,7 +1,7 @@
 """Tests for Block F search — engine/search.py: substring matching over clusters,
 forward/backward with wraparound, match-column landing, word-under-cursor."""
 import pytest
-from engine.world import Room, RoomType, CellType, RuneCluster
+from engine.world import Room, RoomType, CellType, CharRun
 from engine.player import Player
 from engine.search import find_next, word_under_cursor, _match_positions
 
@@ -26,9 +26,9 @@ def _p(row, col):
 def _abab():
     """'ab'@(3,2), 'cd'@(3,8), 'ab'@(5,4)."""
     room = _room()
-    room.add_rune(RuneCluster(3, 2, ('a', 'b'), 'ancient'))
-    room.add_rune(RuneCluster(3, 8, ('c', 'd'), 'ancient'))
-    room.add_rune(RuneCluster(5, 4, ('a', 'b'), 'ancient'))
+    room.add_char_run(CharRun(3, 2, ('a', 'b'), 'ancient'))
+    room.add_char_run(CharRun(3, 8, ('c', 'd'), 'ancient'))
+    room.add_char_run(CharRun(5, 4, ('a', 'b'), 'ancient'))
     return room
 
 
@@ -47,7 +47,7 @@ class TestFindNext:
 
     def test_substring_matches_within_cluster(self):
         room = _room()
-        room.add_rune(RuneCluster(3, 5, ('x', 'a', 'b'), 'ancient'))    # 'xab'
+        room.add_char_run(CharRun(3, 5, ('x', 'a', 'b'), 'ancient'))    # 'xab'
         # match column is the first matched char: 5 + 'xab'.find('ab') == 6
         assert find_next(room, _p(3, 0), 'ab', True) == (3, 6)
 

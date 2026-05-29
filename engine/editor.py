@@ -1,6 +1,6 @@
 """Admin editor helpers: snapshot/restore, cut/paste, range operations."""
 from __future__ import annotations
-from engine.world import CellType, RuneCluster, Entity
+from engine.world import CellType, CharRun, Entity
 
 _SUBST_CYCLE = {
     CellType.FLOOR:     CellType.WALL,
@@ -12,8 +12,8 @@ _SUBST_CYCLE = {
 
 
 def _merge_adjacent_runes(room, r: int) -> None:
-    """Merge adjacent same-kind RuneClusters on row r into single clusters."""
-    row_runes = sorted(room._rune_by_row.get(r, []), key=lambda ru: ru.col)
+    """Merge adjacent same-kind CharRuns on row r into single clusters."""
+    row_runes = sorted(room._char_runs_by_row.get(r, []), key=lambda ru: ru.col)
     if len(row_runes) < 2:
         return
     merged = []
@@ -24,14 +24,14 @@ def _merge_adjacent_runes(room, r: int) -> None:
         if nxt.kind == cur_kind and nxt.col == cur_col + len(cur_syms):
             cur_syms.extend(list(nxt.symbols))
         else:
-            merged.append(RuneCluster(row=r, col=cur_col,
+            merged.append(CharRun(row=r, col=cur_col,
                                       symbols=tuple(cur_syms), kind=cur_kind))
             cur_col  = nxt.col
             cur_kind = nxt.kind
             cur_syms = list(nxt.symbols)
-    merged.append(RuneCluster(row=r, col=cur_col,
+    merged.append(CharRun(row=r, col=cur_col,
                               symbols=tuple(cur_syms), kind=cur_kind))
-    room.runes = [ru for ru in room.runes if ru.row != r] + merged
+    room.char_runs = [ru for ru in room.char_runs if ru.row != r] + merged
     room.rebuild_indexes()
 
 
@@ -41,18 +41,18 @@ def _ed_cut(room, r, c):
     For rune clusters: extracts only the single symbol at column c, leaving
     any remaining symbols as split remnants.
     """
-    ru = room.rune_at(r, c)
+    ru = room.char_run_at(r, c)
     if ru:
         idx = c - ru.col
-        room.remove_rune(ru)
+        room.remove_char_run(ru)
         if idx > 0:
-            room.add_rune(RuneCluster(row=r, col=ru.col,
+            room.add_char_run(CharRun(row=r, col=ru.col,
                                       symbols=tuple(ru.symbols[:idx]), kind=ru.kind))
         if idx + 1 < len(ru.symbols):
-            room.add_rune(RuneCluster(row=r, col=c + 1,
+            room.add_char_run(CharRun(row=r, col=c + 1,
                                       symbols=tuple(ru.symbols[idx + 1:]), kind=ru.kind))
         return {'type': 'rune',
-                'rune': RuneCluster(row=r, col=c,
+                'rune': CharRun(row=r, col=c,
                                     symbols=(ru.symbols[idx],), kind=ru.kind)}
     ent = room.entity_at(r, c)
     if ent:
@@ -73,7 +73,7 @@ def _ed_cut(room, r, c):
 def _ed_snapshot(room, player) -> dict:
     return {
         'cells':       [row[:] for row in room.cells],
-        'runes':       [RuneCluster(ru.row, ru.col, ru.symbols, ru.kind) for ru in room.runes],
+        'runes':       [CharRun(ru.row, ru.col, ru.symbols, ru.kind) for ru in room.char_runs],
         'entities':    [Entity(kind=e.kind, row=e.row, col=e.col, hp=e.hp, alive=e.alive)
                         for e in room.entities],
         'exit_pos':    room.exit_pos,
@@ -86,7 +86,7 @@ def _ed_snapshot(room, player) -> dict:
 
 def _ed_restore(room, player, snap: dict) -> None:
     room.cells       = snap['cells']
-    room.runes       = snap['runes']
+    room.char_runs       = snap['runes']
     room.entities    = snap['entities']
     room.exit_pos    = snap['exit_pos']
     room.spawn_pos    = snap.get('spawn_pos', snap.get('gg_pos', room.spawn_pos))
@@ -99,7 +99,7 @@ def _ed_restore(room, player, snap: dict) -> None:
 def _ed_subst(room, r, c):
     """Cycle cell type FLOOR→WALL→WATER→FLOOR; also cut any rune/entity."""
     items = []
-    if room.rune_at(r, c) or room.entity_at(r, c):
+    if room.char_run_at(r, c) or room.entity_at(r, c):
         item = _ed_cut(room, r, c)
         if item:
             items.append(item)
@@ -118,7 +118,7 @@ def _ed_paste(room, r, start_c, items):
             ru = item['rune']
             w  = len(ru.symbols)
             if c + w <= room.cols:
-                room.add_rune(RuneCluster(row=r, col=c, symbols=ru.symbols, kind=ru.kind))
+                room.add_char_run(CharRun(row=r, col=c, symbols=ru.symbols, kind=ru.kind))
                 c += w
         elif item['type'] == 'entity':
             ent   = item['entity']
@@ -137,7 +137,7 @@ def _ed_paste(room, r, start_c, items):
 
 def _ed_row_items(room, r):
     tagged = []
-    for ru in room._rune_by_row.get(r, []):
+    for ru in room._char_runs_by_row.get(r, []):
         tagged.append((ru.col, {'type': 'rune', 'rune': ru}))
     for e in room.entities:
         if e.row == r and e.alive:
@@ -147,7 +147,7 @@ def _ed_row_items(room, r):
 
 def _ed_clear_row(room, r):
     removed = [e for e in room.entities if e.row == r and e.alive]
-    room.runes    = [ru for ru in room.runes    if ru.row != r]
+    room.char_runs    = [ru for ru in room.char_runs    if ru.row != r]
     room.entities = [e  for e  in room.entities if not (e.row == r and e.alive)]
     room.rebuild_indexes()
     for e in removed:
@@ -161,13 +161,13 @@ def _ed_range_items(room, r1, c1, r2, c2):
     if r1 == r2:
         lo, hi = min(c1, c2), max(c1, c2)
         runes = [{'type': 'rune',   'rune': ru}
-                 for ru in room._rune_by_row.get(r1, []) if lo <= ru.col <= hi]
+                 for ru in room._char_runs_by_row.get(r1, []) if lo <= ru.col <= hi]
         ents  = [{'type': 'entity', 'entity': e} for e in room.entities
                  if e.row == r1 and e.alive and lo <= e.col <= hi]
     else:
         rlo, rhi = min(r1, r2), max(r1, r2)
         runes = [{'type': 'rune',   'rune': ru}
-                 for r in range(rlo, rhi + 1) for ru in room._rune_by_row.get(r, [])]
+                 for r in range(rlo, rhi + 1) for ru in room._char_runs_by_row.get(r, [])]
         ents  = [{'type': 'entity', 'entity': e} for e in room.entities
                  if e.alive and rlo <= e.row <= rhi]
     return runes + ents
@@ -178,7 +178,7 @@ def _ed_delete_range(room, r1, c1, r2, c2):
     rune_ids = {id(i['rune'])   for i in items if i['type'] == 'rune'}
     ent_ids  = {id(i['entity']) for i in items if i['type'] == 'entity'}
     removed  = [e for e in room.entities if id(e) in ent_ids]
-    room.runes    = [ru for ru in room.runes    if id(ru) not in rune_ids]
+    room.char_runs    = [ru for ru in room.char_runs    if id(ru) not in rune_ids]
     room.entities = [e  for e  in room.entities if id(e)  not in ent_ids]
     room.rebuild_indexes()
     for e in removed:
@@ -203,7 +203,7 @@ def _clip_desc(item) -> str:
 
 def _deserialize_room(data: dict):
     """Reconstruct a Room from a dict produced by _serialize_room / save_layout."""
-    from engine.world import Room, RoomType, CellType, RuneCluster, Entity
+    from engine.world import Room, RoomType, CellType, CharRun, Entity
     cell_map = {'W': CellType.WALL, 'F': CellType.FLOOR, 'C': CellType.CORRIDOR,
                 'A': CellType.WATER, 'X': CellType.WOOD_WALL}
     rows  = data['rows']
@@ -211,7 +211,7 @@ def _deserialize_room(data: dict):
     cells = [[cell_map.get(c, CellType.FLOOR) for c in row] for row in data['cells']]
     room  = Room(room_type=RoomType.ENTRY, rows=rows, cols=cols)
     room.cells    = cells
-    room.runes    = [RuneCluster(row=r['row'], col=r['col'],
+    room.char_runs    = [CharRun(row=r['row'], col=r['col'],
                                  symbols=tuple(r['symbols']), kind=r['kind'])
                      for r in data.get('runes', [])]
     room.entities = [Entity(kind=e['kind'], row=e['row'], col=e['col'])
@@ -234,7 +234,7 @@ def _serialize_room(room) -> dict:
         'cells':    [[cell_map.get(c, 'F') for c in row] for row in room.cells],
         'runes':    [{'row': ru.row, 'col': ru.col,
                       'symbols': list(ru.symbols), 'kind': ru.kind}
-                     for ru in room.runes],
+                     for ru in room.char_runs],
         'entities': [{'kind': e.kind, 'row': e.row, 'col': e.col}
                      for e in room.entities if e.alive],
         'spawn_pos': list(room.spawn_pos),

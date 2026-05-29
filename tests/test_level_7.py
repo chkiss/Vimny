@@ -76,7 +76,7 @@ def test_entry_and_exit_not_on_void(seed):
     room = d.rooms[0]
     void_cells = {
         (ru.row, ru.col + i)
-        for ru in room.runes if ru.kind == 'void'
+        for ru in room.char_runs if ru.kind == 'void'
         for i in range(len(ru.symbols))
     }
     assert room.spawn_pos    not in void_cells, f"seed={seed}: entry is on a void cell"
@@ -99,7 +99,7 @@ def test_anchor_W_at_fixed_position():
     """W anchor is always at row=1, col=53; char drawn from _L7_UNTYPABLE_PUNCT."""
     d = build_dungeon_7(42)
     room = d.rooms[0]
-    anchor = room.rune_at(1, 53)
+    anchor = room.char_run_at(1, 53)
     assert anchor is not None, "Expected W-anchor rune at (1, 53)"
     assert ''.join(anchor.symbols) in _L7_UNTYPABLE_PUNCT, (
         f"Expected untypable char at (1,53), got {''.join(anchor.symbols)!r}"
@@ -110,7 +110,7 @@ def test_anchor_B_at_fixed_position():
     """B anchor is always at row=4, col=3; char drawn from _L7_UNTYPABLE_PUNCT."""
     d = build_dungeon_7(42)
     room = d.rooms[0]
-    anchor = room.rune_at(4, 3)
+    anchor = room.char_run_at(4, 3)
     assert anchor is not None, "Expected B-anchor rune at (4, 3)"
     assert ''.join(anchor.symbols) in _L7_UNTYPABLE_PUNCT, (
         f"Expected untypable char at (4,3), got {''.join(anchor.symbols)!r}"
@@ -122,10 +122,10 @@ def test_anchors_use_distinct_chars(seed):
     """All 4 anchor chars (W4 pair + B1 pair) must be distinct across seeds."""
     d = build_dungeon_7(seed)
     room = d.rooms[0]
-    w4a = room.rune_at(1, 53)
-    w4b = room.rune_at(1, 54)
-    b1a = room.rune_at(4, 3)
-    b1b = room.rune_at(4, 4)
+    w4a = room.char_run_at(1, 53)
+    w4b = room.char_run_at(1, 54)
+    b1a = room.char_run_at(4, 3)
+    b1b = room.char_run_at(4, 4)
     chars = [
         ''.join(r.symbols) for r in (w4a, w4b, b1a, b1b) if r is not None
     ]
@@ -148,7 +148,7 @@ def test_void_guard_at_C2_left_end(seed):
     d = build_dungeon_7(seed)
     room = d.rooms[0]
     for r, c in ((4, 1), (5, 1)):
-        void_rune = room.rune_at(r, c)
+        void_rune = room.char_run_at(r, c)
         assert void_rune is not None, f"seed={seed}: no rune at ({r}, {c})"
         assert void_rune.kind == 'void', (
             f"seed={seed}: rune at ({r},{c}) is kind={void_rune.kind!r}, expected 'void'"
@@ -175,7 +175,7 @@ def test_C1_right_end_has_no_void(seed):
     d = build_dungeon_7(seed)
     room = d.rooms[0]
     for r, c in ((1, 55), (2, 55)):
-        ru = room.rune_at(r, c)
+        ru = room.char_run_at(r, c)
         assert ru is None or ru.kind != 'void', (
             f"seed={seed}: ({r},{c}) should no longer hold a void rune, got {ru}"
         )

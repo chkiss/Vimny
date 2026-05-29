@@ -13,7 +13,7 @@ def _count_optimal_reach(composite, max_count=50):
     """Dijkstra clone used for test verification (same logic as production)."""
     void_cells = {
         (ru.row, ru.col + i)
-        for ru in composite.runes if ru.kind == 'void'
+        for ru in composite.char_runs if ru.kind == 'void'
         for i in range(len(ru.symbols))
     }
     dist = {composite.spawn_pos: 0}
@@ -108,7 +108,7 @@ def test_count_is_necessary(seed):
     room.fog_cells = set()   # check structural reachability, not fog state
     void_cells = {
         (ru.row, ru.col + i)
-        for ru in room.runes if ru.kind == 'void'
+        for ru in room.char_runs if ru.kind == 'void'
         for i in range(len(ru.symbols))
     }
     # BFS counting one keystroke per single-step move
@@ -138,7 +138,7 @@ def test_void_wall_exists_in_puzzle_room(seed):
     # offsets[1] = 20 + 4 = 24, plan[1][2]//2 = 16 → mid_col = 40
     puzzle_offset = LEVEL_2_PLAN[0][2] + 4   # 24
     puzzle_mid_col = puzzle_offset + LEVEL_2_PLAN[1][2] // 2  # 40
-    void_at_mid = [ru for ru in room.runes
+    void_at_mid = [ru for ru in room.char_runs
                    if ru.kind == 'void' and ru.col == puzzle_mid_col]
     assert len(void_at_mid) >= 4, \
         f"seed={seed}: expected void wall at col {puzzle_mid_col}, found {len(void_at_mid)} runes"
@@ -150,7 +150,7 @@ def test_entry_and_exit_not_on_void(seed):
     room = d.room
     void_cells = {
         (ru.row, ru.col + i)
-        for ru in room.runes if ru.kind == 'void'
+        for ru in room.char_runs if ru.kind == 'void'
         for i in range(len(ru.symbols))
     }
     assert room.spawn_pos    not in void_cells, f"seed={seed}: entry is on a void cell"

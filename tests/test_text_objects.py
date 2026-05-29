@@ -1,7 +1,7 @@
 """Tests for Block K — resolve_text_object: word, brackets (nesting), quotes,
 angle, paragraph, and sentence objects over the 2D grid. Tags (it/at) deferred."""
 import pytest
-from engine.world import Room, RoomType, CellType, RuneCluster
+from engine.world import Room, RoomType, CellType, CharRun
 from engine.player import Player
 from engine.text_object import resolve_text_object, TextObjectType
 
@@ -31,7 +31,7 @@ def _span(t):
 def _chars(room, row, start, syms, kind='ancient'):
     """Place each char of `syms` as its own column starting at `start`."""
     for i, ch in enumerate(syms):
-        room.add_rune(RuneCluster(row, start + i, (ch,), kind))
+        room.add_char_run(CharRun(row, start + i, (ch,), kind))
 
 
 # ── word ──────────────────────────────────────────────────────────────────────
@@ -39,8 +39,8 @@ def _chars(room, row, start, syms, kind='ancient'):
 class TestWord:
     def _r(self):
         room = _room()
-        room.add_rune(RuneCluster(3, 2, ('a', 'b', 'c'), 'ancient'))   # cols 2-4
-        room.add_rune(RuneCluster(3, 7, ('d', 'e', 'f'), 'ancient'))   # cols 7-9
+        room.add_char_run(CharRun(3, 2, ('a', 'b', 'c'), 'ancient'))   # cols 2-4
+        room.add_char_run(CharRun(3, 7, ('d', 'e', 'f'), 'ancient'))   # cols 7-9
         return room
 
     def test_iw_from_mid_word(self):
@@ -64,7 +64,7 @@ class TestBrackets:
     def _r(self):
         room = _room()
         for col, ch in ((2, '('), (4, 'a'), (5, 'b'), (7, ')')):
-            room.add_rune(RuneCluster(3, col, (ch,), 'ancient'))
+            room.add_char_run(CharRun(3, col, (ch,), 'ancient'))
         return room
 
     def test_i_paren_inner(self):
@@ -82,7 +82,7 @@ class TestBrackets:
     def test_nesting_innermost(self):
         room = _room()
         for col, ch in ((2, '('), (4, '('), (6, ')'), (8, ')')):
-            room.add_rune(RuneCluster(3, col, (ch,), 'ancient'))
+            room.add_char_run(CharRun(3, col, (ch,), 'ancient'))
         # cursor inside inner pair (col 5) → innermost
         assert _span(resolve_text_object('a(', room, _p(3, 5))) == (3, 4, 3, 6)
         # cursor between outer open and inner open (col 3) → outer pair
@@ -90,14 +90,14 @@ class TestBrackets:
 
     def test_empty_pair_inner_is_none(self):
         room = _room()
-        room.add_rune(RuneCluster(3, 4, ('(',), 'ancient'))
-        room.add_rune(RuneCluster(3, 5, (')',), 'ancient'))
+        room.add_char_run(CharRun(3, 4, ('(',), 'ancient'))
+        room.add_char_run(CharRun(3, 5, (')',), 'ancient'))
         assert resolve_text_object('i(', room, _p(3, 4)) is None
 
     def test_brace_and_bracket(self):
         room = _room()
         for col, ch in ((2, '{'), (4, 'x'), (6, '}')):
-            room.add_rune(RuneCluster(3, col, (ch,), 'ancient'))
+            room.add_char_run(CharRun(3, col, (ch,), 'ancient'))
         assert _span(resolve_text_object('i{', room, _p(3, 4))) == (3, 3, 3, 5)
 
 
@@ -109,7 +109,7 @@ class TestQuotes:
         # "ab"   "cd"   → quotes at 2,5 and 8,11
         for col, ch in ((2, '"'), (3, 'a'), (4, 'b'), (5, '"'),
                         (8, '"'), (9, 'c'), (10, 'd'), (11, '"')):
-            room.add_rune(RuneCluster(3, col, (ch,), 'ancient'))
+            room.add_char_run(CharRun(3, col, (ch,), 'ancient'))
         return room
 
     def test_inner_quote(self):
@@ -125,7 +125,7 @@ class TestQuotes:
     def test_single_quote_object(self):
         room = _room()
         for col, ch in ((2, "'"), (3, 'x'), (4, "'")):
-            room.add_rune(RuneCluster(3, col, (ch,), 'ancient'))
+            room.add_char_run(CharRun(3, col, (ch,), 'ancient'))
         assert _span(resolve_text_object("i'", room, _p(3, 3))) == (3, 3, 3, 3)
 
 
@@ -134,7 +134,7 @@ class TestQuotes:
 def test_angle_object():
     room = _room()
     for col, ch in ((2, '<'), (3, 't'), (4, 'g'), (5, '>')):
-        room.add_rune(RuneCluster(3, col, (ch,), 'ancient'))
+        room.add_char_run(CharRun(3, col, (ch,), 'ancient'))
     assert _span(resolve_text_object('i<', room, _p(3, 3))) == (3, 3, 3, 4)
     assert _span(resolve_text_object('a<', room, _p(3, 3))) == (3, 2, 3, 5)
 
@@ -144,10 +144,10 @@ def test_angle_object():
 class TestParagraph:
     def _r(self):
         room = _room()
-        room.add_rune(RuneCluster(1, 2, ('a',), 'ancient'))
-        room.add_rune(RuneCluster(2, 2, ('b',), 'ancient'))
+        room.add_char_run(CharRun(1, 2, ('a',), 'ancient'))
+        room.add_char_run(CharRun(2, 2, ('b',), 'ancient'))
         # row 3 blank
-        room.add_rune(RuneCluster(4, 2, ('c',), 'ancient'))
+        room.add_char_run(CharRun(4, 2, ('c',), 'ancient'))
         return room
 
     def test_ip_inner_block(self):

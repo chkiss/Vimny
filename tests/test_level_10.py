@@ -88,7 +88,7 @@ def test_keys_match_doors(seed):
 def test_top_corridor_clear_between_doors_and_exit(seed):
     """No vocab runes on row 1 from the first door through the exit (cols 26-41)."""
     room = _room(seed)
-    cols = [ru.col for ru in room.runes if ru.row == 1 and 26 <= ru.col <= _L10_EXIT_COL]
+    cols = [ru.col for ru in room.char_runs if ru.row == 1 and 26 <= ru.col <= _L10_EXIT_COL]
     assert cols == [], f"seed={seed}: unexpected row-1 runes at cols {cols}"
 
 
@@ -99,7 +99,7 @@ def test_void_row_is_circles(seed):
     room = _room(seed)
     _, l_row = _l10_key_rows(_GH)
     void_row = l_row + 3
-    voids = [ru for ru in room.runes if ru.row == void_row]
+    voids = [ru for ru in room.char_runs if ru.row == void_row]
     assert voids, f"seed={seed}: no runes on void row {void_row}"
     assert all(ru.kind == 'void' for ru in voids), f"seed={seed}: non-void rune on void row"
     assert all(''.join(ru.symbols) == '○' for ru in voids), f"seed={seed}: void rune is not a ○"
@@ -113,7 +113,7 @@ def test_M_does_not_reach_key_alone(seed):
     col 25): the player must follow M with $.  The optimal answer uses both."""
     room = _room(seed)
     m_row, _ = _l10_key_rows(_GH)
-    fnb = min(ru.col for ru in room.runes if ru.row == m_row)   # where M lands
+    fnb = min(ru.col for ru in room.char_runs if ru.row == m_row)   # where M lands
     assert fnb != _L10_M_KEY_COL, f"seed={seed}: M lands directly on the key (col {fnb})"
     toks = room.answer.split()
     assert 'M' in toks and '$' in toks, f"seed={seed}: answer lacks M/$ {room.answer!r}"

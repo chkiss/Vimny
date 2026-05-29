@@ -1,6 +1,6 @@
 """Tests for engine/editor.py: snapshot/restore, cut/paste, merge, range ops."""
 import pytest
-from engine.world import Room, RoomType, CellType, Entity, RuneCluster
+from engine.world import Room, RoomType, CellType, Entity, CharRun
 from engine.player import Player
 from engine.editor import (
     _merge_adjacent_runes,
@@ -36,45 +36,45 @@ def _player(row=3, col=5):
 class TestMergeAdjacentRunes:
     def test_merges_same_kind_adjacent(self):
         room = _make_room()
-        room.add_rune(RuneCluster(row=3, col=2, symbols=('∘',),    kind='ancient'))
-        room.add_rune(RuneCluster(row=3, col=3, symbols=('∘', '∘'), kind='ancient'))
+        room.add_char_run(CharRun(row=3, col=2, symbols=('∘',),    kind='ancient'))
+        room.add_char_run(CharRun(row=3, col=3, symbols=('∘', '∘'), kind='ancient'))
         _merge_adjacent_runes(room, 3)
-        assert len([ru for ru in room.runes if ru.row == 3]) == 1
-        merged = room.rune_at(3, 2)
+        assert len([ru for ru in room.char_runs if ru.row == 3]) == 1
+        merged = room.char_run_at(3, 2)
         assert merged is not None
         assert merged.symbols == ('∘', '∘', '∘')
         assert merged.col == 2
 
     def test_does_not_merge_different_kinds(self):
         room = _make_room()
-        room.add_rune(RuneCluster(row=3, col=2, symbols=('∘',), kind='ancient'))
-        room.add_rune(RuneCluster(row=3, col=3, symbols=('·',), kind='verdant'))
+        room.add_char_run(CharRun(row=3, col=2, symbols=('∘',), kind='ancient'))
+        room.add_char_run(CharRun(row=3, col=3, symbols=('·',), kind='verdant'))
         _merge_adjacent_runes(room, 3)
-        assert len([ru for ru in room.runes if ru.row == 3]) == 2
+        assert len([ru for ru in room.char_runs if ru.row == 3]) == 2
 
     def test_does_not_merge_non_adjacent(self):
         room = _make_room()
-        room.add_rune(RuneCluster(row=3, col=2, symbols=('∘',), kind='ancient'))
-        room.add_rune(RuneCluster(row=3, col=4, symbols=('∘',), kind='ancient'))
+        room.add_char_run(CharRun(row=3, col=2, symbols=('∘',), kind='ancient'))
+        room.add_char_run(CharRun(row=3, col=4, symbols=('∘',), kind='ancient'))
         _merge_adjacent_runes(room, 3)
-        assert len([ru for ru in room.runes if ru.row == 3]) == 2
+        assert len([ru for ru in room.char_runs if ru.row == 3]) == 2
 
     def test_index_is_updated_after_merge(self):
         room = _make_room()
-        room.add_rune(RuneCluster(row=3, col=2, symbols=('∘',),    kind='ancient'))
-        room.add_rune(RuneCluster(row=3, col=3, symbols=('∘',), kind='ancient'))
+        room.add_char_run(CharRun(row=3, col=2, symbols=('∘',),    kind='ancient'))
+        room.add_char_run(CharRun(row=3, col=3, symbols=('∘',), kind='ancient'))
         _merge_adjacent_runes(room, 3)
-        merged = room.rune_at(3, 2)
-        assert room.rune_at(3, 3) is merged
+        merged = room.char_run_at(3, 2)
+        assert room.char_run_at(3, 3) is merged
 
     def test_only_touches_target_row(self):
         room = _make_room()
-        ru_row2 = RuneCluster(row=2, col=2, symbols=('·',), kind='verdant')
-        room.add_rune(ru_row2)
-        room.add_rune(RuneCluster(row=3, col=2, symbols=('∘',), kind='ancient'))
-        room.add_rune(RuneCluster(row=3, col=3, symbols=('∘',), kind='ancient'))
+        ru_row2 = CharRun(row=2, col=2, symbols=('·',), kind='verdant')
+        room.add_char_run(ru_row2)
+        room.add_char_run(CharRun(row=3, col=2, symbols=('∘',), kind='ancient'))
+        room.add_char_run(CharRun(row=3, col=3, symbols=('∘',), kind='ancient'))
         _merge_adjacent_runes(room, 3)
-        assert room.rune_at(2, 2) is ru_row2  # row 2 untouched
+        assert room.char_run_at(2, 2) is ru_row2  # row 2 untouched
 
 
 # ── _ed_cut ───────────────────────────────────────────────────────────────────
@@ -82,43 +82,43 @@ class TestMergeAdjacentRunes:
 class TestEdCut:
     def test_cut_single_symbol_cluster(self):
         room = _make_room()
-        ru = RuneCluster(row=3, col=5, symbols=('∘',), kind='ancient')
-        room.add_rune(ru)
+        ru = CharRun(row=3, col=5, symbols=('∘',), kind='ancient')
+        room.add_char_run(ru)
         item = _ed_cut(room, 3, 5)
         assert item is not None
         assert item['type'] == 'rune'
         assert item['rune'].symbols == ('∘',)
-        assert room.rune_at(3, 5) is None
+        assert room.char_run_at(3, 5) is None
 
     def test_cut_first_symbol_of_cluster_splits(self):
         room = _make_room()
-        room.add_rune(RuneCluster(row=3, col=5, symbols=('∘', '∘', '∘'), kind='ancient'))
+        room.add_char_run(CharRun(row=3, col=5, symbols=('∘', '∘', '∘'), kind='ancient'))
         item = _ed_cut(room, 3, 5)  # cut the leftmost ∘
         assert item['rune'].symbols == ('∘',)
         assert item['rune'].col == 5
         # Remaining: ∘∘ at col 6
-        remnant = room.rune_at(3, 6)
+        remnant = room.char_run_at(3, 6)
         assert remnant is not None
         assert remnant.symbols == ('∘', '∘')
-        assert room.rune_at(3, 5) is None
+        assert room.char_run_at(3, 5) is None
 
     def test_cut_middle_symbol_splits_into_two(self):
         room = _make_room()
-        room.add_rune(RuneCluster(row=3, col=5, symbols=('∘', '·', '∘'), kind='ancient'))
+        room.add_char_run(CharRun(row=3, col=5, symbols=('∘', '·', '∘'), kind='ancient'))
         item = _ed_cut(room, 3, 6)  # cut middle ·
         assert item['rune'].symbols == ('·',)
-        left = room.rune_at(3, 5)
-        right = room.rune_at(3, 7)
+        left = room.char_run_at(3, 5)
+        right = room.char_run_at(3, 7)
         assert left is not None and left.symbols == ('∘',)
         assert right is not None and right.symbols == ('∘',)
 
     def test_cut_last_symbol_leaves_prefix(self):
         room = _make_room()
-        room.add_rune(RuneCluster(row=3, col=5, symbols=('∘', '∘', '∘'), kind='ancient'))
+        room.add_char_run(CharRun(row=3, col=5, symbols=('∘', '∘', '∘'), kind='ancient'))
         _ed_cut(room, 3, 7)  # cut rightmost
-        prefix = room.rune_at(3, 5)
+        prefix = room.char_run_at(3, 5)
         assert prefix is not None and prefix.symbols == ('∘', '∘')
-        assert room.rune_at(3, 7) is None
+        assert room.char_run_at(3, 7) is None
 
     def test_cut_entity(self):
         room = _make_room()
@@ -165,10 +165,10 @@ class TestEdCut:
 class TestEdSnapshotRestore:
     def test_snapshot_creates_independent_rune_list(self):
         room = _make_room()
-        room.add_rune(RuneCluster(row=3, col=5, symbols=('∘',), kind='ancient'))
+        room.add_char_run(CharRun(row=3, col=5, symbols=('∘',), kind='ancient'))
         p = _player()
         snap = _ed_snapshot(room, p)
-        room.runes.clear()
+        room.char_runs.clear()
         assert len(snap['runes']) == 1  # snapshot unaffected
 
     def test_snapshot_creates_independent_entity_list(self):
@@ -194,14 +194,14 @@ class TestEdSnapshotRestore:
 
     def test_restore_reverts_rune_changes(self):
         room = _make_room()
-        ru = RuneCluster(row=3, col=5, symbols=('∘',), kind='ancient')
-        room.add_rune(ru)
+        ru = CharRun(row=3, col=5, symbols=('∘',), kind='ancient')
+        room.add_char_run(ru)
         p = _player()
         snap = _ed_snapshot(room, p)
-        room.remove_rune(ru)
-        assert room.rune_at(3, 5) is None
+        room.remove_char_run(ru)
+        assert room.char_run_at(3, 5) is None
         _ed_restore(room, p, snap)
-        assert room.rune_at(3, 5) is not None
+        assert room.char_run_at(3, 5) is not None
 
     def test_restore_reverts_cell_changes(self):
         room = _make_room()
@@ -221,14 +221,14 @@ class TestEdSnapshotRestore:
 
     def test_restore_rebuilds_indexes(self):
         room = _make_room()
-        ru = RuneCluster(row=3, col=5, symbols=('∘',), kind='ancient')
-        room.add_rune(ru)
+        ru = CharRun(row=3, col=5, symbols=('∘',), kind='ancient')
+        room.add_char_run(ru)
         p = _player()
         snap = _ed_snapshot(room, p)
-        room.runes.clear()
+        room.char_runs.clear()
         room.rebuild_indexes()
         _ed_restore(room, p, snap)
-        assert room.rune_at(3, 5) is not None  # index rebuilt
+        assert room.char_run_at(3, 5) is not None  # index rebuilt
 
 
 # ── _ed_subst ─────────────────────────────────────────────────────────────────
@@ -265,11 +265,11 @@ class TestEdSubst:
 
     def test_rune_cut_included_in_items(self):
         room = _make_room()
-        room.add_rune(RuneCluster(row=3, col=5, symbols=('∘',), kind='ancient'))
+        room.add_char_run(CharRun(row=3, col=5, symbols=('∘',), kind='ancient'))
         items = _ed_subst(room, 3, 5)
         rune_items = [i for i in items if i['type'] == 'rune']
         assert len(rune_items) == 1
-        assert room.rune_at(3, 5) is None
+        assert room.char_run_at(3, 5) is None
 
 
 # ── _ed_paste ─────────────────────────────────────────────────────────────────
@@ -278,9 +278,9 @@ class TestEdPaste:
     def test_paste_rune(self):
         room = _make_room()
         items = [{'type': 'rune',
-                  'rune': RuneCluster(row=0, col=0, symbols=('∘', '∘'), kind='ancient')}]
+                  'rune': CharRun(row=0, col=0, symbols=('∘', '∘'), kind='ancient')}]
         _ed_paste(room, 3, 5, items)
-        ru = room.rune_at(3, 5)
+        ru = room.char_run_at(3, 5)
         assert ru is not None
         assert ru.symbols == ('∘', '∘')
 
@@ -315,19 +315,19 @@ class TestEdPaste:
 
     def test_paste_merges_adjacent_runes(self):
         room = _make_room()
-        room.add_rune(RuneCluster(row=3, col=5, symbols=('∘',), kind='ancient'))
+        room.add_char_run(CharRun(row=3, col=5, symbols=('∘',), kind='ancient'))
         # Paste another ancient at col 4 — adjacent on left
         items = [{'type': 'rune',
-                  'rune': RuneCluster(row=0, col=0, symbols=('∘',), kind='ancient')}]
+                  'rune': CharRun(row=0, col=0, symbols=('∘',), kind='ancient')}]
         _ed_paste(room, 3, 4, items)
-        merged = room.rune_at(3, 4)
+        merged = room.char_run_at(3, 4)
         assert merged is not None
         assert merged.symbols == ('∘', '∘')  # merged into one cluster
 
     def test_paste_stops_at_room_boundary(self):
         room = _make_room()
         items = [{'type': 'rune',
-                  'rune': RuneCluster(row=0, col=0, symbols=('∘', '∘', '∘'), kind='ancient')}]
+                  'rune': CharRun(row=0, col=0, symbols=('∘', '∘', '∘'), kind='ancient')}]
         _ed_paste(room, 3, COLS - 2, items)  # barely fits 0 symbols
         # Should not raise, even if cols is exhausted
 
@@ -337,11 +337,11 @@ class TestEdPaste:
 class TestEdClearRow:
     def test_removes_all_runes_from_row(self):
         room = _make_room()
-        room.add_rune(RuneCluster(row=3, col=3, symbols=('∘', '∘'), kind='ancient'))
-        room.add_rune(RuneCluster(row=3, col=7, symbols=('·',),      kind='verdant'))
+        room.add_char_run(CharRun(row=3, col=3, symbols=('∘', '∘'), kind='ancient'))
+        room.add_char_run(CharRun(row=3, col=7, symbols=('·',),      kind='verdant'))
         _ed_clear_row(room, 3)
-        assert all(ru.row != 3 for ru in room.runes)
-        assert room.rune_at(3, 3) is None
+        assert all(ru.row != 3 for ru in room.char_runs)
+        assert room.char_run_at(3, 3) is None
 
     def test_removes_alive_entities_from_row(self):
         room = _make_room()
@@ -351,11 +351,11 @@ class TestEdClearRow:
 
     def test_does_not_touch_other_rows(self):
         room = _make_room()
-        ru2 = RuneCluster(row=2, col=3, symbols=('∘',), kind='ancient')
-        room.add_rune(ru2)
-        room.add_rune(RuneCluster(row=3, col=5, symbols=('·',), kind='verdant'))
+        ru2 = CharRun(row=2, col=3, symbols=('∘',), kind='ancient')
+        room.add_char_run(ru2)
+        room.add_char_run(CharRun(row=3, col=5, symbols=('·',), kind='verdant'))
         _ed_clear_row(room, 3)
-        assert room.rune_at(2, 3) is ru2
+        assert room.char_run_at(2, 3) is ru2
 
     def test_clears_exit_pos_when_exit_entity_on_row(self):
         room = _make_room()
@@ -370,42 +370,42 @@ class TestEdClearRow:
 class TestEdRangeOps:
     def test_range_items_single_row(self):
         room = _make_room()
-        room.add_rune(RuneCluster(row=3, col=4, symbols=('∘',), kind='ancient'))
-        room.add_rune(RuneCluster(row=3, col=8, symbols=('·',), kind='verdant'))
+        room.add_char_run(CharRun(row=3, col=4, symbols=('∘',), kind='ancient'))
+        room.add_char_run(CharRun(row=3, col=8, symbols=('·',), kind='verdant'))
         items = _ed_range_items(room, 3, 3, 3, 10)
         rune_cols = {i['rune'].col for i in items if i['type'] == 'rune'}
         assert 4 in rune_cols and 8 in rune_cols
 
     def test_range_items_excludes_outside_range(self):
         room = _make_room()
-        room.add_rune(RuneCluster(row=3, col=2,  symbols=('∘',), kind='ancient'))
-        room.add_rune(RuneCluster(row=3, col=12, symbols=('·',), kind='verdant'))
+        room.add_char_run(CharRun(row=3, col=2,  symbols=('∘',), kind='ancient'))
+        room.add_char_run(CharRun(row=3, col=12, symbols=('·',), kind='verdant'))
         items = _ed_range_items(room, 3, 4, 3, 10)
         assert all(i['rune'].col not in (2, 12) for i in items if i['type'] == 'rune')
 
     def test_delete_range_removes_runes_and_returns_them(self):
         room = _make_room()
-        room.add_rune(RuneCluster(row=3, col=5, symbols=('∘',), kind='ancient'))
+        room.add_char_run(CharRun(row=3, col=5, symbols=('∘',), kind='ancient'))
         items = _ed_delete_range(room, 3, 4, 3, 7)
         assert any(i['type'] == 'rune' for i in items)
-        assert room.rune_at(3, 5) is None
+        assert room.char_run_at(3, 5) is None
 
     def test_delete_range_multi_row(self):
         room = _make_room()
-        room.add_rune(RuneCluster(row=2, col=5, symbols=('∘',), kind='ancient'))
-        room.add_rune(RuneCluster(row=4, col=5, symbols=('·',), kind='verdant'))
+        room.add_char_run(CharRun(row=2, col=5, symbols=('∘',), kind='ancient'))
+        room.add_char_run(CharRun(row=4, col=5, symbols=('·',), kind='verdant'))
         items = _ed_delete_range(room, 2, 1, 4, 10)
         rune_rows = {i['rune'].row for i in items if i['type'] == 'rune'}
         assert 2 in rune_rows and 4 in rune_rows
-        assert room.rune_at(2, 5) is None
-        assert room.rune_at(4, 5) is None
+        assert room.char_run_at(2, 5) is None
+        assert room.char_run_at(4, 5) is None
 
 
 # ── _clip_desc ────────────────────────────────────────────────────────────────
 
 class TestClipDesc:
     def test_rune_item(self):
-        item = {'type': 'rune', 'rune': RuneCluster(row=0, col=0, symbols=('∘',), kind='ancient')}
+        item = {'type': 'rune', 'rune': CharRun(row=0, col=0, symbols=('∘',), kind='ancient')}
         assert _clip_desc(item) == 'ancient rune'
 
     def test_entity_item(self):
@@ -454,7 +454,7 @@ class TestSerializeRoom:
 
     def test_runes_included(self):
         room = _make_room()
-        room.add_rune(RuneCluster(row=3, col=5, symbols=('∘', '∘'), kind='ancient'))
+        room.add_char_run(CharRun(row=3, col=5, symbols=('∘', '∘'), kind='ancient'))
         d = _serialize_room(room)
         assert len(d['runes']) == 1
         assert d['runes'][0] == {'row': 3, 'col': 5, 'symbols': ['∘', '∘'], 'kind': 'ancient'}
