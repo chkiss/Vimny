@@ -11,9 +11,9 @@ class Player:
     name: str = 'Normand'
     mode: Mode = Mode.NORMAL
     known_commands: list = field(default_factory=lambda: ['h','j','k','l'])
-    register: list = field(default_factory=list)   # game inventory (keys); edit-mode clip
     registers: dict = field(default_factory=dict)  # vim registers: '"' unnamed, 'a'-'z', '0', etc.
-    inventory: list = field(default_factory=list)
+    inventory: list = field(default_factory=list)  # held keys (for locked-door unlock)
+    edit_clip: list = field(default_factory=list)  # admin map-editor clipboard (runes/entities/cells)
     marks: dict = field(default_factory=dict)   # 'a'-'z' -> (row, col)
     macros: dict = field(default_factory=dict)  # 'a'-'z' -> recorded keystroke string
     jump_list: list = field(default_factory=list)  # (row, col) positions for Ctrl-o/Ctrl-i

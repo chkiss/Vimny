@@ -31,7 +31,7 @@ from content.scrolls import (
 )
 
 _JUMP_MOTIONS = frozenset({'G', 'gg', '%', '{', '}', '(', ')'})
-from engine.operator import op_delete, op_yank, op_paste, op_case, case_char, apply_indent, INDENT_WIDTH
+from engine.operator import op_delete, op_yank, op_paste, op_case, case_char, apply_indent, INDENT_WIDTH, entity_clip
 from engine.insert import (
     begin_insert, insert_char, insert_backspace,
     replace_chars, replace_overtype, replace_restore,
@@ -869,6 +869,26 @@ def _spawn_goblin(room, row, col, summoner_uid: int = 0) -> Entity | None:
     return None
 
 
+# Flavour shown when a cut creature is pasted back (op_paste revives it live).
+_PASTE_SPAWN_MSG = {
+    'goblin': 'The goblin springs back to life and lunges!',
+    'warden': 'The Warden re-forms, wreathed in menace!',
+    'shield': 'A shield clatters back into place.',
+}
+
+
+def _clip_from_cut_runes(items: list, base_col: int) -> dict:
+    """Build a charwise register clip from x/cut rune items (each a single cell),
+    preserving column gaps via dcol from their original positions — so a cut
+    letter pastes back through the same op_paste path as d/dw. One Vim register
+    for every cut, yank, and paste."""
+    runes = [{'dcol': it['rune'].col - base_col,
+              'symbols': it['rune'].symbols, 'kind': it['rune'].kind}
+             for it in items if it.get('type') == 'rune']
+    width = max((rd['dcol'] + len(rd['symbols']) for rd in runes), default=0)
+    return {'linewise': False, 'rows': [{'width': width, 'runes': runes}]}
+
+
 def _drop_key(room, row: int, col: int) -> None:
     """Place a floor_key entity at (row, col) if the cell is free."""
     if not room.entity_at(row, col):
@@ -1370,7 +1390,7 @@ def run_dungeon(term: Terminal, level: int, progress: dict,
                     undo_stack.clear()
                     redo_stack.clear()
                     edit_mode = False
-                    player.register.clear()
+                    player.edit_clip.clear()
                     ed_undo.clear()
                     ed_redo.clear()
                     key_buf         = ''
@@ -2021,7 +2041,7 @@ def run_dungeon(term: Terminal, level: int, progress: dict,
                     if item:
                         cut_items.append(item)
                 if cut_items:
-                    player.register = cut_items
+                    player.edit_clip = cut_items
                     descs = ', '.join(_clip_desc(i) for i in cut_items)
                     _push(f'Cut {len(cut_items)}: {descs}')
                     player.last_change = action
@@ -2038,8 +2058,8 @@ def run_dungeon(term: Terminal, level: int, progress: dict,
                     room.kill_entity(cur)
                     budget.spend(1)
                     if item == 'key':
-                        player.register = [{'type': 'entity',
-                                            'entity': Entity(kind='floor_key', row=cur.row, col=cur.col)}]
+                        player.inventory = [{'type': 'entity',
+                                             'entity': Entity(kind='floor_key', row=cur.row, col=cur.col)}]
                         _push('You found a key!')
                     elif item == 'heart':
                         player.heal(2)
@@ -2117,7 +2137,7 @@ def run_dungeon(term: Terminal, level: int, progress: dict,
                     undo_stack.append(_snapshot(room, player, budget, ans=cmd_start_ans))
                     redo_stack.clear()
                     room.kill_entity(cur)
-                    player.register = [{'type': 'entity', 'entity': cur}]
+                    player.inventory = [{'type': 'entity', 'entity': cur}]
                     budget.spend(1)
                     _push('Key picked up — use p to unlock a door.')
                     interacted = True
@@ -2135,7 +2155,7 @@ def run_dungeon(term: Terminal, level: int, progress: dict,
                         _push('The Warden summoned a goblin minion!')
                     if cur.hp <= 0:
                         room.kill_entity(cur)
-                        player.register = [{'type': 'entity', 'entity': cur}]
+                        _reg_write(player, '"', entity_clip(cur), is_delete=True)
                         if cur.kind == 'warden':
                             _remove_warden_shields(room)
                         clear_msg = _check_boss_cleared(room, level, player)
@@ -2146,7 +2166,7 @@ def run_dungeon(term: Terminal, level: int, progress: dict,
                         _push(f'Hit! ({cur.hp}/{cur.max_hp} HP)')
                 elif cur and cur.kind == 'shield':
                     room.kill_entity(cur)
-                    player.register = [{'type': 'entity', 'entity': cur}]
+                    _reg_write(player, '"', entity_clip(cur), is_delete=True)
                     budget.spend(1)
                     _push('Shield destroyed!')
                     interacted = True
@@ -2155,7 +2175,6 @@ def run_dungeon(term: Terminal, level: int, progress: dict,
                     heart_pos  = [level, cur.row, cur.col]
                     player.max_hp += 2
                     room.kill_entity(cur)
-                    player.register = [{'type': 'entity', 'entity': cur}]
                     budget.spend(1)
                     _collected_hearts = progress.setdefault('collected_hearts', [])
                     if heart_pos not in _collected_hearts:
@@ -2176,7 +2195,8 @@ def run_dungeon(term: Terminal, level: int, progress: dict,
                     if cut_items:
                         undo_stack.append(_snapshot(room, player, budget, ans=cmd_start_ans))
                         redo_stack.clear()
-                        player.register = cut_items
+                        _reg_write(player, '"',
+                                   _clip_from_cut_runes(cut_items, player.col), is_delete=True)
                         budget.spend(1)
                         descs = ', '.join(_clip_desc(i) for i in cut_items)
                         _push(f'Cut {len(cut_items)}: {descs}')
@@ -2201,7 +2221,7 @@ def run_dungeon(term: Terminal, level: int, progress: dict,
             all_items: list = []
             for _si in range(count):
                 all_items.extend(_ed_subst(room, player.row, player.col + _si))
-            player.register = all_items
+            player.edit_clip = all_items
             _push('Substituted: ' + ', '.join(_clip_desc(i) for i in all_items))
             player.last_change = action
 
@@ -2210,31 +2230,39 @@ def run_dungeon(term: Terminal, level: int, progress: dict,
             dc = -1 if before else 1          # P → left, p → right
             target = room.entity_at(player.row, player.col + dc)
             clip = _reg_read(player, action.get('register', '"'))
-            if clip and any(rw['runes'] for rw in clip['rows']):
+            has_content = bool(clip) and any(
+                rw.get('runes') or rw.get('entities') for rw in clip['rows'])
+            if has_content:
+                # One register for everything cut/yanked: lay runes back down and
+                # respawn any cut creature live & hostile (op_paste handles both).
                 undo_stack.append(_snapshot(room, player, budget, ans=cmd_start_ans))
                 redo_stack.clear()
                 if op_paste(room, player, clip, before):
                     budget.spend(1)
-                    _push('Pasted.')
+                    spawned = next((ed['tmpl']['kind']
+                                    for rw in clip['rows'] for ed in rw.get('entities', ())),
+                                   None)
+                    _push(_PASTE_SPAWN_MSG.get(spawned, 'It springs back to life!')
+                          if spawned else 'Pasted.')
                 else:
                     undo_stack.pop()
                     _push('Nothing pasted (no room).')
             elif target and target.kind == 'locked_door':
                 reg_key_idx = next(
-                    (i for i, it in enumerate(player.register)
+                    (i for i, it in enumerate(player.inventory)
                      if it.get('type') == 'entity' and
                      it.get('entity') and it['entity'].kind == 'floor_key' and
                      (not target.tag or it['entity'].tag == target.tag)),
                     None,
                 )
                 if reg_key_idx is not None:
-                    _held_key = player.register[reg_key_idx]['entity']
+                    _held_key = player.inventory[reg_key_idx]['entity']
                     _kclr = (C.key_gold_fg() if _held_key.tag == 'gold' else
                              C.key_red_fg()  if _held_key.tag == 'red'  else
                              C.key_blue_fg() if _held_key.tag == 'blue' else None)
                     undo_stack.append(_snapshot(room, player, budget, ans=cmd_start_ans))
                     redo_stack.clear()
-                    player.register.pop(reg_key_idx)
+                    player.inventory.pop(reg_key_idx)
                     render_all(term, dungeon, player, budget, _pool_msg(), attack_pos=_attack_pos(), attack_sym=_attack_sym())
                     _unlock_animation(term, room, player,
                                       target.row, target.col,
@@ -2247,18 +2275,18 @@ def run_dungeon(term: Terminal, level: int, progress: dict,
                     _has_key = any(
                         it.get('type') == 'entity' and it.get('entity') and
                         it['entity'].kind == 'floor_key'
-                        for it in player.register
+                        for it in player.inventory
                     )
                     player.error = 'E: Wrong key for this door' if _has_key else 'E: No key in inventory'
             else:
                 _push('Nothing to paste here.')
 
         elif edit_mode and action['type'] == 'paste':
-            if player.register:
+            if player.edit_clip:
                 ed_undo.append(_ed_snapshot(room, player))
                 ed_redo.clear()
                 before = action.get('before', False)
-                reg    = player.register
+                reg    = player.edit_clip
                 items  = reg * count
                 r      = player.row
 
@@ -2439,7 +2467,7 @@ def run_dungeon(term: Terminal, level: int, progress: dict,
                     items = _ed_delete_range(room, tobj.start_row, tobj.start_col, tobj.end_row, tobj.end_col)
                 else:
                     items = _ed_range_items(room, tobj.start_row, tobj.start_col, tobj.end_row, tobj.end_col)
-                player.register = items
+                player.edit_clip = items
                 _push(f"{'Cut' if op in ('d', 'c') else 'Yanked'} {len(items)} item(s).")
             else:
                 motion = action['motion']
@@ -2452,7 +2480,7 @@ def run_dungeon(term: Terminal, level: int, progress: dict,
                         all_items.extend(_ed_row_items(room, r))
                         if op in ('d', 'c'):
                             _ed_clear_row(room, r)
-                    player.register = all_items
+                    player.edit_clip = all_items
                     verb    = 'Cut' if op in ('d', 'c') else 'Yanked'
                     _push(f'{verb} {len(all_items)} item(s) from {count} row(s).')
                 else:
@@ -2467,7 +2495,7 @@ def run_dungeon(term: Terminal, level: int, progress: dict,
                         items = _ed_delete_range(room, orig_r, orig_c, new_r, new_c)
                     else:
                         items = _ed_range_items(room, orig_r, orig_c, new_r, new_c)
-                    player.register = items
+                    player.edit_clip = items
                     verb    = 'Cut' if op in ('d', 'c') else 'Yanked'
                     _push(f'{verb} {len(items)} item(s).')
             if op == 'y':
@@ -2555,7 +2583,7 @@ def run_dungeon(term: Terminal, level: int, progress: dict,
                     has_reg_key = any(
                         it.get('type') == 'entity' and
                         it.get('entity') and it['entity'].kind == 'floor_key'
-                        for it in player.register
+                        for it in player.inventory
                     )
                     if has_reg_key and id(ent) not in door_open_hint_shown:
                         door_open_hint_shown.add(id(ent))

@@ -85,14 +85,14 @@ def test_chest_key_adds_floor_key_to_register():
     player = Player(row=2, col=5)
 
     # Simulate what main.py does on chest_key loot
-    player.register = [{'type': 'entity',
+    player.inventory = [{'type': 'entity',
                         'entity': Entity(kind='floor_key', row=chest.row, col=chest.col)}]
     room.kill_entity(chest)
 
     assert any(
         it.get('type') == 'entity' and
         it.get('entity') and it['entity'].kind == 'floor_key'
-        for it in player.register
+        for it in player.inventory
     ), "register must hold a floor_key after looting chest_key"
 
 
@@ -106,7 +106,7 @@ def test_chest_key_undo_restores_chest():
 
     undo_item = {'row': player.row, 'col': player.col, 'spent': budget.spent,
                  'entities': _snap(room), 'fog_cells': set(room.fog_cells)}
-    player.register = [{'type': 'entity',
+    player.inventory = [{'type': 'entity',
                         'entity': Entity(kind='floor_key', row=chest.row, col=chest.col)}]
     room.kill_entity(chest)
     budget.spend(1)
@@ -174,13 +174,13 @@ def test_locked_door_p_undo_restores_door():
     room.add_entity(ldoor)
     player = Player(row=2, col=5)
     floor_key = Entity(kind='floor_key', row=2, col=5)
-    player.register = [{'type': 'entity', 'entity': floor_key}]
+    player.inventory = [{'type': 'entity', 'entity': floor_key}]
     budget = Budget(20)
 
     undo_item = {'row': player.row, 'col': player.col, 'spent': budget.spent,
                  'entities': _snap(room), 'fog_cells': set(room.fog_cells)}
     # Consume key from register and unlock door
-    player.register.pop(0)
+    player.inventory.pop(0)
     room.kill_entity(ldoor)
     budget.spend(1)
 

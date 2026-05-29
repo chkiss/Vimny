@@ -81,10 +81,10 @@ def test_P_target_is_one_cell_to_left():
 def test_key_found_in_register_at_index_0():
     """Key lookup must succeed when the first register item is a floor_key."""
     player = Player()
-    player.register = [_floor_key_item()]
+    player.inventory = [_floor_key_item()]
 
     reg_key_idx = next(
-        (i for i, it in enumerate(player.register)
+        (i for i, it in enumerate(player.inventory)
          if it.get('type') == 'entity' and
          it.get('entity') and it['entity'].kind == 'floor_key'),
         None,
@@ -96,13 +96,13 @@ def test_key_found_in_register_at_index_0():
 def test_key_found_in_register_when_preceded_by_other_item():
     """Key lookup must find a floor_key even if another item precedes it."""
     player = Player()
-    player.register = [
+    player.inventory = [
         {'type': 'entity', 'entity': Entity(kind='goblin', row=1, col=1)},
         _floor_key_item(),
     ]
 
     reg_key_idx = next(
-        (i for i, it in enumerate(player.register)
+        (i for i, it in enumerate(player.inventory)
          if it.get('type') == 'entity' and
          it.get('entity') and it['entity'].kind == 'floor_key'),
         None,
@@ -114,10 +114,10 @@ def test_key_found_in_register_when_preceded_by_other_item():
 def test_key_not_found_in_empty_register():
     """Key lookup on an empty register must return None."""
     player = Player()
-    player.register = []
+    player.inventory = []
 
     reg_key_idx = next(
-        (i for i, it in enumerate(player.register)
+        (i for i, it in enumerate(player.inventory)
          if it.get('type') == 'entity' and
          it.get('entity') and it['entity'].kind == 'floor_key'),
         None,
@@ -129,12 +129,12 @@ def test_key_not_found_in_empty_register():
 def test_key_not_found_when_only_goblin_in_register():
     """Register with non-key item must not match the key lookup."""
     player = Player()
-    player.register = [
+    player.inventory = [
         {'type': 'entity', 'entity': Entity(kind='goblin', row=1, col=1)}
     ]
 
     reg_key_idx = next(
-        (i for i, it in enumerate(player.register)
+        (i for i, it in enumerate(player.inventory)
          if it.get('type') == 'entity' and
          it.get('entity') and it['entity'].kind == 'floor_key'),
         None,
@@ -148,25 +148,25 @@ def test_key_not_found_when_only_goblin_in_register():
 def test_consuming_key_removes_it_from_register():
     """After unlocking, the key must be removed from the register (not just ignored)."""
     player = Player()
-    player.register = [_floor_key_item()]
+    player.inventory = [_floor_key_item()]
 
     reg_key_idx = 0
-    player.register.pop(reg_key_idx)
+    player.inventory.pop(reg_key_idx)
 
-    assert player.register == [], "register must be empty after key is consumed"
+    assert player.inventory == [], "register must be empty after key is consumed"
 
 
 def test_consuming_key_removes_only_that_item():
     """Only the floor_key should be consumed; other register items must remain."""
     player = Player()
     other = {'type': 'entity', 'entity': Entity(kind='shield', row=1, col=1)}
-    player.register = [other, _floor_key_item()]
+    player.inventory = [other, _floor_key_item()]
 
     reg_key_idx = 1
-    player.register.pop(reg_key_idx)
+    player.inventory.pop(reg_key_idx)
 
-    assert len(player.register) == 1
-    assert player.register[0] is other
+    assert len(player.inventory) == 1
+    assert player.inventory[0] is other
 
 
 # ── Wrong direction: p with door to the left does nothing ────────────────────
