@@ -2,13 +2,64 @@
 
 ## How to use this file
 
-Run 4 writing agents in parallel (one per persona), then one critique agent with
-all outputs combined. Writing agents output poems only — no file edits. The
-critique agent compares new candidates against the current finalized poems and
-recommends upgrades only where a new candidate genuinely wins.
+The Wizard Wisdom corpus is the set of short poems the wizard recites after each
+level, teaching the commands of the **next** level. To improve them:
 
-See `wizard_wisdom_dev.md` for slot definitions, curriculum mapping, and finalized
-poems. See `wizard_wisdom.txt` for the live JSON corpus.
+1. Run the 4 writing-agent personas below **in parallel** (one per persona). Each
+   outputs candidate poems only — **no file edits**.
+2. Run the critique editor(s) with all candidates + the current baselines. They
+   score candidates against each slot's baseline and recommend an upgrade **only**
+   where a candidate genuinely wins.
+3. Apply the winners by editing the `POEMS` list in `art/_gen_wizard_wisdom.py`,
+   then re-run it to regenerate `art/wizard_wisdom.txt`.
+
+The full curriculum is ~50 poems. That is too many for one critique pass to score
+deeply, so **split the critique across 2+ editors by section** (e.g. motions/nav vs
+editing/text-objects/thematic) and consolidate their decisions.
+
+### Source of truth
+
+| File | Role |
+|---|---|
+| `art/_gen_wizard_wisdom.py` | **The poems.** Edit the `POEMS` list here, then run it. Holds the Voice & Theme notes too. |
+| `art/wizard_wisdom.txt` | Generated runtime corpus — **never hand-edit.** |
+| `content/levels.py` `LEVELS` | Curriculum order + the commands each level teaches. |
+
+There is no longer a `wizard_wisdom_dev.md` (it went stale and was removed). Do not
+recreate a hand-maintained slot table anywhere — assemble it fresh each run (below).
+
+## How poems are keyed to levels (`introduces_id`)
+
+Each poem carries `introduces_id`: the LEVELS **id** of the level it precedes. The
+blessing fires a poem when the player completes the level just before it —
+`select_next_lesson_quote(completed_id)` (render/title.py) finds the next visible
+level's id and matches the poem whose `introduces_id` equals it.
+
+Poems with `introduces_id = None` are the **generic pool**: title-screen flavour and
+the fallback when a level has no dedicated poem. `select_quote_by_name` also looks
+these up by `name` (`'home row'`, `'save and quit'` are both consumed by name).
+
+**Key by id, never by ordinal position.** Inserting or reordering levels must not
+silently misalign the corpus — that drift was the original bug this scheme fixed.
+
+## Assembling the slot sheet (do this before each run)
+
+Do **not** hardcode slot data in this file — it goes stale. Build the per-slot sheet
+fresh from the two source files above. For every poem the agents should consider,
+give them:
+
+- the `introduces_id` and the matching level's **name + taught commands** (from `LEVELS`);
+- the **exact behavior** of each command (Vim semantics) and 2–3 **mnemonic angles**;
+- the **current poem** as the BASELINE to beat;
+- the hard constraints + scoring rubric below.
+
+Notes when building the sheet:
+- **Boss levels** teach no new command — frame their poem as a warm, slightly
+  anticipatory pep-talk that consolidates prior skills (not threatening).
+- **The Reliquary** (`introduces_id` 11) reveals the unnamed register `"` — a
+  foreshadow that deletions are kept, *not* a how-to (the player has no yank/paste yet).
+- **Generic/mood poems** (rhythm, philosophy, encouragement, closing, etc.) have no
+  command — judge them on Voice & Freshness only.
 
 ---
 
@@ -18,12 +69,12 @@ Old scoring had V (Voice) and W (Warmth) as separate criteria, which double-coun
 the same quality and created a bias toward poems that used the theme paragraph's
 exact vocabulary ("amber", "lantern"). Revised:
 
-- **M — Mnemonic (0–3):** Does this help remember the command? Is the behavior fused into the image?
+- **M — Mnemonic (0–3):** Does this help remember the command? Is the behavior fused into the image? PENALIZE anything that MISSTATES what the key does. (For boss/mood poems with no command, score M as "does it serve its purpose" — set the mood / reassure / send off.)
 - **V — Voice (0–3):** Warm, unhurried, old-wizard? Tactile? NOTE: "amber" and "lantern" are examples of register, not required words. A poem can be fully in-voice using "stone," "stride," "cellar floor," a concrete number — anything physical and specific. Do not reward poems just for using those exact words.
-- **L — Length (0–2):** All lines ≤ 48 chars? (2 = all clean, 1 = one borderline 44–48, 0 = any over)
-- **F — Freshness (0–2):** Would you still want to read this on your 50th playthrough? Poems built on stock phrases ("amber trails", "warm lantern glow", "the world in amber") age badly. A specific, unexpected image tied to the exact command ages well.
+- **L — Length (0–2):** All lines ≤ 48 chars? (2 = all clean, 1 = one borderline 44–48, 0 = any over). Count carefully (an em dash — is one char). A candidate with any line >48 CANNOT win.
+- **F — Freshness (0–2):** Would you still want to read this on your 50th playthrough? Poems built on stock phrases ("amber trails", "warm lantern glow") age badly. A specific, unexpected image tied to the exact command ages well.
 
-**Max: 10 points.**
+**Max: 10 points.** Accuracy is paramount: a beautiful poem that misleads about the command LOSES to a plainer accurate one.
 
 ---
 
@@ -44,172 +95,31 @@ grandeur. Just warm precision.
 
 ### Hard constraints
 
-- Every line ≤ 48 characters (count every character — hard display limit)
-- 2–4 lines per poem
-- Do NOT use "rune" (internal game term). Use "letter", "character", "word", or implied context.
-- No "grimoire", no dramatic spell/magic language
-- Each poem must be mnemonic — reading it should help remember the command
-- Output only poem text, no commentary, no file edits
-
-### Current best poems (the bar to beat)
-
-These are the finalized winners from the previous pass. Write 2 new candidates
-per slot. The critique agent will compare yours against these. Only submit
-something if you genuinely believe it surpasses the current best — don't
-pad with weak alternatives.
-
-**w[4] w b e:**
-```
-w steps to the next word's first stone.
-b walks that same path home again.
-e reaches across to the far edge—
-three strides, and the river's crossed.
-```
-
-**w[5] f F t T:**
-```
-fx lands square on the letter you name.
-tx halts a breath before it stands.
-F and T walk the same hunt backward.
-Name your mark; the rest is in your hands.
-```
-
-**w[6] ; ,:**
-```
-Name your letter the once.
-; walks that find on down the line.
-, turns on its heel and comes back.
-The hunt remembers; you needn't.
-```
-
-**w[7] v (entering visual):**
-```
-v opens the eye and it follows you.
-Move, and the trail glows behind—
-all it crosses, held until you act.
-```
-
-**w[8] v/V/Ctrl-V:**
-```
-v for a span of letters, V for lines,
-Ctrl-V for a tower, column-straight.
-Choose the shape that fits your work;
-the verb that follows does not care.
-```
-
-**w[9] W B E:**
-```
-w minds each comma, dot, and dash;
-W strides past them in a single bound.
-B walks it backward, E to the end—
-the bolder path across the ground.
-```
-
-**w[10] ge gE:**
-```
-e reaches the end of the next word.
-ge looks back to where the last word ended.
-Same landing, opposite direction.
-gE the wide step: whitespace to whitespace.
-```
-
-**w[11] G gg {n}G:**
-```
-gg: two soft steps to the top stone.
-G: one long fall to the cellar floor.
-Set a number first, and G lands there.
-Top, bottom, and every rung you name.
-```
-
-**w[12] d y c:**
-```
-Three hands, one grip.
-d cuts, y lifts, c cuts and listens.
-Double the letter: the whole line bends.
-The motion is the same; you choose the deed.
-```
-
-**w[13] y p P yy:**
-```
-y lifts the word and leaves the stone in place.
-p sets it down just past where you stand.
-P lays it just before.
-yy takes the line — one stroke, the whole span.
-```
-
-**w[14] r R ~ .:**
-```
-One letter wrong: r, then the right one.
-R walks the line and overwrites.
-~ turns the lamp: small to tall, tall to small.
-. is memory; it forgets nothing.
-```
-
-**w[15] text objects:**
-```
-Stand anywhere inside a word—
-ciw still changes the whole thing.
-i for the flesh, a for the skin.
-Name the shape; the rest is done.
-```
-
-### Slot definitions
-
-**w[4]: w b e** — after The Counting Crypts, before The Rune Halls
-- w: jump to start of next word (forward)
-- b: jump to start of prev word (backward, exact inverse of w)
-- e: jump to end of current/next word (forward)
-Mnemonic angles: trio; b exactly reverses w; e finds the far edge; stepping-stone rhythm
-
-**w[5]: f F t T** — after The Rune Halls, before The Character Cataracts
-- fx: land ON char x (forward)
-- Fx: land ON char x (backward)
-- tx: stop BEFORE char x (forward)
-- Tx: stop AFTER char x (backward)
-Mnemonic angles: f=on, t=before; F/T are the backward twins; precision vs. one-short
-
-**w[6]: ; ,** — after The Character Cataracts, before The Goblin Gauntlet
-- ;: repeat last f/F/t/T (same direction)
-- ,: repeat last f/F/t/T (reversed direction)
-Mnemonic angles: name target once; ; carries you forward, , brings you back
-
-**w[7]: v** — after The Goblin Gauntlet, before The Warden's Precision
-- v: enter visual char mode; move to extend selection; operator acts on it
-Mnemonic angles: three-step (enter, move, act); the selection trail; v enables, motion selects, key acts
-
-**w[8]: v/V/Ctrl-V** — after The Warden's Keep (boss), before The Warden's Precision
-- v: character-wise
-- V: line-wise
-- Ctrl-V: block/column
-Mnemonic angles: three shapes; same operators apply to all three
-
-**w[9]: W B E** — after The Warden's Precision, before The WORD Forge
-- W: forward WORD (whitespace-delimited, leaps punctuation)
-- B: backward WORD
-- E: end of WORD
-Mnemonic angles: uppercase = bigger stride; w/b/e stop at punctuation, W/B/E leap it
-
-**w[10]: ge gE** — after The WORD Forge, before The Backward Vaults
-- ge: backward to end of previous word (stops at punctuation)
-- gE: backward to end of previous WORD (whitespace)
-Mnemonic angles: completes the motion matrix; e goes forward to word-end, ge goes backward to it; g = "turn around and do it"
-
-**w[11]: G gg {n}G** — after The Backward Vaults, before Level 9
-- gg: jump to first line of file
-- G: jump to last line of file
-- {n}G: jump to line n (no counting)
-Mnemonic angles: two small g's = top; one tall G = bottom; {n}G names and lands; scale shift from word-level to file-level
+- Every line ≤ 48 characters (count every character — hard display limit; aim ≤ 44).
+- 2–4 lines per poem.
+- Do NOT add leading/trailing spaces — the generator centres each line automatically.
+- "rune" is part of the game's theme (on-screen characters are runes) and is allowed,
+  but it is **overused** in the corpus — prefer variety: "letter", "word", "stone",
+  "character", "mark".
+- No "grimoire", no dramatic spell/magic language. (Archaic is fine; melodramatic is not.)
+- Each poem must be mnemonic — reading it should help remember the command.
+- Output only poem text, no commentary, no file edits.
 
 ### Output format
 
-## w[4]: w b e
-**A:**
-[lines]
+For each slot a writing agent chooses to improve:
 
-**B:**
+```
+### <slot name>
+A:
 [lines]
+B:
+[lines]
+```
 
-[...repeat for all 8 slots through w[11]]
+Write 1–2 candidates per slot. ONLY submit a slot where you genuinely believe your
+candidate surpasses the current baseline — skip the rest silently. Quality over
+coverage; don't pad with weak alternatives.
 
 ---
 
@@ -254,7 +164,8 @@ a lintel long enough to feel obvious. You see Vim commands the way a river guide
 sees currents: natural, reliable, worth learning with patience. You use imagery
 from the physical world — water, stone, birds, breath, light — and let the command
 meanings arise from those images rather than stating them head-on. You are
-unhurried. So is the wizard. You trust imagery over explanation.
+unhurried. So is the wizard. You trust imagery over explanation. (But never at the
+cost of the mnemonic: the player must still finish your poem knowing what the key DOES.)
 
 ---
 
@@ -275,28 +186,26 @@ pleased when they get it right. Short and sturdy, but never blank.
 ## Critique Agent Prompt
 
 You are the poetry editor for Vimny, a Vim-teaching dungeon crawler. Writing
-agents have submitted new candidates for 8 blessing slots. Your job: compare each
-new candidate against the current finalized poem for that slot, and recommend an
-upgrade only where a new candidate genuinely wins.
+agents have submitted new candidates for a set of blessing slots. Your job: compare
+each new candidate against the current finalized poem for that slot (BASELINE), and
+recommend an upgrade only where a new candidate genuinely wins.
 
 ### Voice & Theme
-[paste Voice & Theme section here]
+[paste the Voice & Theme section above]
 
 ### Scoring (M / V / L / F = total, max 10)
-- M — Mnemonic (0–3): Does this help remember the command? Is the behavior fused into the image?
-- V — Voice (0–3): Warm, unhurried, old-wizard? Tactile? "amber" and "lantern" are examples of register, not required words — do not reward poems just for using those exact words. Warmth comes from specificity and care, not vocabulary.
-- L — Length (0–2): All lines ≤ 48 chars? (2 = clean, 1 = one line 44–48, 0 = any over)
-- F — Freshness (0–2): Would you still want to read this on the 50th playthrough? Stock phrases age badly; specific unexpected images tied to the exact command age well.
+[paste the Revised scoring section above]
 
 ### For each slot:
-1. Score the current finalized poem (baseline)
-2. Score each new candidate
-3. UPGRADE if a new candidate scores higher — reproduce it in full
-4. KEEP if the current poem holds — say so briefly
-5. CLOSE CALL if within 1 point — present both with a one-line argument each
+1. Score the BASELINE (the current poem).
+2. Score each candidate.
+3. **UPGRADE** if a candidate scores strictly higher — reproduce it in full, exactly.
+4. **KEEP** if the baseline holds — say so briefly.
+5. **CLOSE CALL** if within 1 point — present the top two with a one-line argument each, then pick one.
+6. Verify EVERY winning line is ≤ 48 chars, and that the poem states the command accurately.
 
 ### End with:
-- A summary table: slot | decision | winner reproduced
-- A note on whether Craftsman or Wanderer produced any genuine upgrades (tracking persona performance)
+- A summary table: slot | decision | source (baseline or persona tag).
+- A note on which persona produced the most genuine upgrades (tracking persona performance).
 
 [CANDIDATES_GO_HERE]

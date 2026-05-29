@@ -709,7 +709,7 @@ def _build_dungeon(level: int, seed: int, game_h: int = 33, admin: bool = False)
     # Current level -> generator:
     #   L6  The WORD Forge        -> build_dungeon_7
     #   L7  The Backward Vaults   -> build_dungeon_8
-    #   L8  The Long Plumb        -> build_dungeon_9
+    #   L8  The Lineheads         -> build_dungeon_9
     #   L9  The Screen Vault      -> build_dungeon_10
     #   L10 The Bracket Vaults    -> build_dungeon_12
     #   L12 The Runic Archives    -> build_dungeon_13
@@ -2931,13 +2931,13 @@ def run_title(term: Terminal, has_save: bool) -> tuple[str, str]:
     if not has_save:
         _quote_lines = select_quote_by_name('save and quit')
     else:
-        _max_level = 0
+        _unlocked_ids: set[int] = set()
         for _sd in SM.list_saves():
             _prog = SM.load_progress(_sd)
             for _lv in LEVELS:
                 if is_unlocked(_lv['id'], _prog):
-                    _max_level = max(_max_level, _lv['id'])
-        _quote_lines = select_quote(_max_level)
+                    _unlocked_ids.add(_lv['id'])
+        _quote_lines = select_quote(_unlocked_ids)
 
     def _render():
         cl = cmd_buf[1:]  if cmd_buf.startswith(':') else None

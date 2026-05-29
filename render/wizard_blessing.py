@@ -6,9 +6,9 @@ from blessed import Terminal
 import render.colors as C
 import render.symbols as S
 from render.utils import inner_w as _iw
+from render.title import _BOX_INNER_W as _BOX_INNER
 
 _ART_PATH  = Path(__file__).parent.parent / 'art' / 'wizard.txt'
-_BOX_INNER = 48   # must match _BOX_INNER_W in title.py
 
 _AMBER_CHARS = frozenset('^${}')
 _EYE_LINE    = 7       # 0-based index of the "0  0" eye line within each frame
