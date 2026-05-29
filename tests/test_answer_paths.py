@@ -108,11 +108,16 @@ def test_answer_cost_equals_par(builder, seed):
 
     Catches: stale hardcoded fallback strings, Dijkstra cost-model drift,
     and any future level whose answer was written by hand and mis-counted.
-    New build_dungeon_* functions are discovered automatically.
+    New build_dungeon_* functions are discovered automatically; a discovered
+    level with no par/answer fails here (add it to _SKIP_LEVELS if intentional).
     """
     room = builder(seed).rooms[0]
     if room.par is None or not room.answer.strip():
-        pytest.skip("no par or answer set")
+        pytest.fail(
+            f"{builder.__name__}: par/answer not set. If this level has no "
+            f"keystroke par (combat boss / reward / placeholder), add it to "
+            f"_SKIP_LEVELS; otherwise give it a par and answer."
+        )
     cost = _answer_total_ks_cost(room.answer)
     assert cost == room.par, (
         f"answer keystroke cost {cost} != par {room.par}\n"
