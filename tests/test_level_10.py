@@ -17,7 +17,7 @@ from generation.dungeon_gen import (
     _L10_COLS, _L10_DEFAULT_GAME_H,
     _L10_H_KEY_COL, _L10_M_KEY_COL, _L10_L_KEY_COL,
     _L10_DOOR_COLS, _L10_EXIT_COL,
-    _L10_GG_POS, _L10_SPAWN, _L10_COLORS,
+    _L10_SPAWN, _L10_COLORS,
 )
 
 SEEDS = [1, 42, 999, 12345, 2**20 + 7]
@@ -44,12 +44,10 @@ def test_dimensions(seed):
 
 
 @pytest.mark.parametrize("seed", SEEDS)
-def test_spawn_and_gg(seed):
+def test_spawn(seed):
     room = _room(seed)
     assert room.spawn_pos == _L10_SPAWN
-    assert room.gg_pos == _L10_GG_POS
     assert room.is_passable(*room.spawn_pos), f"seed={seed}: spawn not passable"
-    assert room.is_passable(*room.gg_pos), f"seed={seed}: gg_pos not passable"
 
 
 @pytest.mark.parametrize("seed", SEEDS)

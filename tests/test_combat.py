@@ -14,7 +14,7 @@ def _bare_room():
          for c in range(COLS)]
         for r in range(ROWS)
     ]
-    room.gg_pos    = (3, 1)
+    room.spawn_pos    = (3, 1)
     room.exit_pos = (3, 28)
     room.rebuild_indexes()
     return room
@@ -113,7 +113,7 @@ def _combat_room():
          for c in range(cols)]
         for r in range(rows)
     ]
-    room.gg_pos    = (4, 1)
+    room.spawn_pos    = (4, 1)
     room.exit_pos = (4, 38)
     room.rebuild_indexes()
     return room
@@ -269,7 +269,7 @@ def _boss_room():
          for c in range(cols)]
         for r in range(rows)
     ]
-    room.gg_pos    = (3, 0)
+    room.spawn_pos    = (3, 0)
     room.exit_pos = (3, 39)
     room.fog_cells = set()
     room.rebuild_indexes()

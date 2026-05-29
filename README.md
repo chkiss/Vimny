@@ -87,7 +87,7 @@ Full curriculum (20 dungeons) in `SPEC.md`.
 | `f{c}` / `F{c}` | Jump to next/previous character `c` in row |
 | `t{c}` / `T{c}` | Jump to before/after character `c` |
 | `;` / `,` | Repeat last `f/F/t/T` forward/backward |
-| `gg` / `G` | Jump to dungeon entry / exit |
+| `gg` / `G` | Jump to first / last line (first non-blank column) |
 | `u` | Undo (returns budget) |
 | `:w` `:q` `:q!` `:wq` | Save / quit / force-quit / save-and-quit |
 

@@ -44,7 +44,7 @@ def test_dimensions(seed):
 @pytest.mark.parametrize("seed", SEEDS)
 def test_entry_and_exit_passable(seed):
     room = build_dungeon_13(seed).rooms[0]
-    r0, c0 = room.gg_pos
+    r0, c0 = room.spawn_pos
     r1, c1 = room.exit_pos
     assert room.cells[r0][c0] == CellType.CORRIDOR, f"entry not CORRIDOR"
     assert room.cells[r1][c1] == CellType.CORRIDOR, f"exit not CORRIDOR"

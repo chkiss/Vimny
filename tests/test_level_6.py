@@ -33,7 +33,7 @@ def test_layout_dimensions():
 
 def test_entry_position():
     room = _dungeon().rooms[0]
-    assert room.gg_pos == (1, 1)
+    assert room.spawn_pos == (1, 1)
 
 
 def test_exit_entity_position():
@@ -125,7 +125,7 @@ def _room_with_void():
     room.runes.append(RuneCluster(row=1, col=10, symbols=('○',), kind='void'))
     room.entities.append(Entity(kind='exit',     row=3, col=1))
     room.entities.append(Entity(kind='dynamite', row=3, col=2))
-    room.gg_pos = (1, 1)
+    room.spawn_pos = (1, 1)
     room.rebuild_indexes()
     return room
 

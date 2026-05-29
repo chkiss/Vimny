@@ -780,7 +780,7 @@ def _snapshot(room, player, budget, *, row=None, col=None, spent=None, ans=None)
         'cells':    [r[:] for r in room.cells],
         'rows':     room.rows,
         'exit_pos': room.exit_pos,
-        'gg_pos':   room.gg_pos,
+        'spawn_pos': room.spawn_pos,
         'fog_cells': set(room.fog_cells),
         'answer_pos':      ap,
         'answer_diverged': ad,
@@ -803,7 +803,7 @@ def _pop_history_step(src: list, dst: list, room, player, budget) -> bool:
             room.cells = item['cells']
             room.rows  = item['rows']
             room.exit_pos = item['exit_pos']
-            room.gg_pos    = item.get('gg_pos', item.get('entry', room.gg_pos))
+            room.spawn_pos = item.get('spawn_pos', item.get('gg_pos', item.get('entry', room.spawn_pos)))
         room.fog_cells = item['fog_cells']
         room.rebuild_indexes()
         if 'answer_pos' in item:
@@ -1096,7 +1096,7 @@ def run_dungeon(term: Terminal, level: int, progress: dict,
     if player_name != 'admin':
         room.answer = ''
 
-    _sp     = room.spawn_pos if room.spawn_pos is not None else room.gg_pos
+    _sp     = room.spawn_pos
     player  = Player(row=_sp[0], col=_sp[1])
     player.max_hp = progress.get('max_hp', 6)
     player.hp     = player.max_hp
@@ -1360,7 +1360,7 @@ def run_dungeon(term: Terminal, level: int, progress: dict,
                     room    = dungeon.room
                     if player_name != 'admin':
                         room.answer = ''
-                    _sp2    = room.spawn_pos if room.spawn_pos is not None else room.gg_pos
+                    _sp2    = room.spawn_pos
                     player  = Player(row=_sp2[0], col=_sp2[1])
                     player.known_commands = _known_commands(level)
                     if player_name == 'admin':

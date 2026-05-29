@@ -57,8 +57,8 @@ def _insert_blank_row(room, at_row: int, template_row: int) -> None:
             e.row += 1
     if room.exit_pos and room.exit_pos[0] >= at_row:
         room.exit_pos = (room.exit_pos[0] + 1, room.exit_pos[1])
-    if room.gg_pos and room.gg_pos[0] >= at_row:
-        room.gg_pos = (room.gg_pos[0] + 1, room.gg_pos[1])
+    if room.spawn_pos and room.spawn_pos[0] >= at_row:
+        room.spawn_pos = (room.spawn_pos[0] + 1, room.spawn_pos[1])
     room.fog_cells = {((r + 1) if r >= at_row else r, c) for (r, c) in room.fog_cells}
     room.rebuild_indexes()
 

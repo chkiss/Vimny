@@ -15,7 +15,7 @@ def _bare_room(rows=7, cols=30):
          for c in range(cols)]
         for r in range(rows)
     ]
-    room.gg_pos    = (3, 1)
+    room.spawn_pos = (3, 1)
     room.exit_pos = (3, 28)
     room.fog_cells = set()
     room.rebuild_indexes()
@@ -202,13 +202,14 @@ def test_b_before_first_rune_does_not_move():
 
 # ── gg / G teleportation ──────────────────────────────────────────────────────
 
-def test_gg_teleports_to_entry():
+def test_gg_jumps_to_first_line():
     room = _bare_room()
     player = Player(row=5, col=25)
 
-    apply_motion(player, 'gg', 1, room)
+    apply_motion(player, 'gg', 1, room, count_given=False)
 
-    assert (player.row, player.col) == room.gg_pos
+    # gg → first line, leftmost passable (no runes); independent of spawn_pos
+    assert (player.row, player.col) == (1, 1)
 
 
 def test_G_jumps_to_last_passable_row():

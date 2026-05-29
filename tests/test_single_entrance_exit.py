@@ -43,7 +43,7 @@ def test_exit_entity_matches_exit_pos(level, seed):
 @pytest.mark.parametrize("seed", SEEDS)
 def test_entry_is_passable(level, seed):
     room = _BUILDERS[level](seed).room
-    r, c = room.gg_pos
+    r, c = room.spawn_pos
     assert room.is_passable(r, c), (
-        f"level={level} seed={seed}: entry {room.gg_pos} is not passable"
+        f"level={level} seed={seed}: entry {room.spawn_pos} is not passable"
     )

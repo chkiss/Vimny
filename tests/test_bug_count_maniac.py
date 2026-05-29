@@ -18,7 +18,7 @@ def _bare_room(rows=7, cols=30):
          for c in range(cols)]
         for r in range(rows)
     ]
-    room.gg_pos    = (3, 1)
+    room.spawn_pos    = (3, 1)
     room.exit_pos = (3, 28)
     room.fog_cells = set()
     room.rebuild_indexes()
@@ -83,7 +83,7 @@ def test_f_with_count_parses_correctly():
 def test_gg_with_count_parses_correctly():
     """5gg must parse as count=5, motion='gg'."""
     action, remaining = parse('5gg', Mode.NORMAL)
-    assert action == {'type': 'motion', 'motion': 'gg', 'count': 5}
+    assert action == {'type': 'motion', 'motion': 'gg', 'count': 5, 'count_given': True}
     assert remaining == ''
 
 

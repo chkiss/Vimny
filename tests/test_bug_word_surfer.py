@@ -15,7 +15,7 @@ def _make_room(rows=5, cols=40):
          for c in range(cols)]
         for r in range(rows)
     ]
-    room.gg_pos = (2, 1)
+    room.spawn_pos = (2, 1)
     room.exit_pos = (2, cols - 2)
     room.fog_cells = set()
     room.rebuild_indexes()

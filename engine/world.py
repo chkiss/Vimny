@@ -57,8 +57,7 @@ class Room:
     cells: list[list[CellType]] = field(default_factory=list)
     runes: list[RuneCluster]    = field(default_factory=list)
     entities: list[Entity]      = field(default_factory=list)
-    gg_pos: tuple[int,int]       = (0, 0)   # gg jump target
-    spawn_pos: Optional[tuple[int,int]] = None  # initial player position; None → use gg_pos
+    spawn_pos: tuple[int,int]    = (0, 0)   # player spawn + par-solver/fog start (NOT a gg target — gg/G are buffer-relative)
     exit_pos: Optional[tuple[int,int]] = None
     budget: Optional[int]       = None
     par: Optional[int]          = None

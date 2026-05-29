@@ -64,15 +64,18 @@ def _answer_keystroke_cost(answer: str, has_count: bool) -> int:
 # Any new build_dungeon_N added to dungeon_gen is automatically tested.
 # Add to _XFAIL_LEVELS when a level's answer is intentionally not a
 # parseable Vim-command token sequence (document why).
-# Add to _SKIP_LEVELS when a level has no par yet (work in progress).
+# Add to _SKIP_LEVELS to EXCLUDE a level with no keystroke par (combat boss /
+# reward room / placeholder, or genuine WIP) — excluded levels are not collected,
+# so they are not reported as skips.
 
 _BUILDER_RE = re.compile(r'^build_dungeon_\w+$')
 
 _SKIP_LEVELS = {
-    # par=None: level is incomplete / not yet assigned a Dijkstra solver
-    'build_dungeon_1_1',
-    'build_dungeon_51',
-    'build_dungeon_dummy',
+    # par=None — not keystroke puzzles, so "answer cost == par" does not apply.
+    # Excluded from parametrization entirely (not emitted as skipped cases).
+    'build_dungeon_1_1',    # The Reliquary (reward / chest room)
+    'build_dungeon_51',     # The Warden's Keep (L5 boss)
+    'build_dungeon_dummy',  # Dummy Dungeon (test scaffold)
 }
 _XFAIL_LEVELS: dict = {}
 
@@ -87,11 +90,11 @@ def _all_builder_params():
     )
     params = []
     for name, fn in builders:
+        if name in _SKIP_LEVELS:
+            continue   # excluded entirely (no keystroke par) — not added as skipped params
         for seed in _UNIVERSAL_SEEDS:
             marks = []
-            if name in _SKIP_LEVELS:
-                marks.append(pytest.mark.skip(reason=f"{name}: par not set"))
-            elif name in _XFAIL_LEVELS:
+            if name in _XFAIL_LEVELS:
                 marks.append(pytest.mark.xfail(
                     strict=False, reason=_XFAIL_LEVELS[name]
                 ))

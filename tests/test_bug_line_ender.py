@@ -16,7 +16,7 @@ def _bare_room(rows=7, cols=30):
          for c in range(cols)]
         for r in range(rows)
     ]
-    room.gg_pos = (3, 1)
+    room.spawn_pos = (3, 1)
     room.exit_pos = (3, 28)
     room.fog_cells = set()
     room.rebuild_indexes()

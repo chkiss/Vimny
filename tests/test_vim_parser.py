@@ -85,12 +85,12 @@ class TestFindChar:
 class TestGG:
     def test_gg_motion(self):
         action, remaining = parse('gg', Mode.NORMAL)
-        assert action == {'type': 'motion', 'motion': 'gg', 'count': 1}
+        assert action == {'type': 'motion', 'motion': 'gg', 'count': 1, 'count_given': False}
         assert remaining == ''
 
     def test_count_gg(self):
         action, _ = parse('5gg', Mode.NORMAL)
-        assert action == {'type': 'motion', 'motion': 'gg', 'count': 5}
+        assert action == {'type': 'motion', 'motion': 'gg', 'count': 5, 'count_given': True}
 
     def test_gg_leaves_remaining(self):
         action, remaining = parse('ggl', Mode.NORMAL)

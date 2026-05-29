@@ -476,8 +476,26 @@ def apply_motion(player, motion, count, room, target=None, count_given: bool = T
                 moved = True
             break
         elif motion == 'gg':
-            player.row, player.col = room.gg_pos
-            moved = True
+            # {n}gg → line n (like {n}G); bare gg → first line. Always land on
+            # first non-blank, scanning downward to the first passable row.
+            # Mirror of the G branch; independent of spawn/exit (Vim-faithful).
+            if count_given:
+                target_row = max(0, min(count - 1, room.rows - 1))
+            else:
+                target_row = 0
+            col = None
+            r = target_row
+            while 0 <= r < room.rows:
+                col = _first_non_blank_col(room, r)
+                if col is not None:
+                    target_row = r
+                    break
+                r += 1
+            if col is not None:
+                player.row = target_row
+                player.col = col
+                moved = True
+            break
         elif motion == 'ge':
             # Backward to the end of the previous word (a non-void RuneCluster).
             row = player.row

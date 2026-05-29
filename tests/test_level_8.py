@@ -16,7 +16,7 @@ SEEDS = [1, 42, 999, 12345, 2**20 + 7]
 def test_entry_and_exit_passable(seed):
     d = build_dungeon_8(seed)
     room = d.rooms[0]
-    r0, c0 = room.gg_pos
+    r0, c0 = room.spawn_pos
     r1, c1 = room.exit_pos
     assert room.cells[r0][c0] == CellType.CORRIDOR, f"seed={seed}: entry is not passable"
     assert room.cells[r1][c1] == CellType.CORRIDOR, f"seed={seed}: exit is not passable"
