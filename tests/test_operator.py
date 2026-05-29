@@ -183,7 +183,7 @@ class TestYankSpacing:
         assert room.char_run_at(3, 11) is not None
         assert room.char_run_at(3, 15) is not None
         assert all(room.char_run_at(3, c) is None for c in (12, 13, 14))
-        assert p.col == 15                            # cursor on last pasted cell
+        assert p.col == 10                            # paste never moves the player
 
     def test_paste_stops_at_wall(self):
         room = _room()
@@ -313,13 +313,15 @@ class TestDeleteMore:
 
 
 class TestPasteMore:
-    def test_P_before_places_at_cursor(self):
+    def test_P_before_places_left_cursor_stays(self):
         room = _room()
         clip = {'linewise': False,
                 'rows': [{'width': 1, 'runes': [{'dcol': 0, 'symbols': ('a',), 'kind': 'ancient'}]}]}
         p = _player(3, 10)
-        op_paste(room, p, clip, before=True)      # P → start at cursor col
-        assert room.char_run_at(3, 10) is not None
+        op_paste(room, p, clip, before=True)      # P → left of cursor (col 9)
+        assert room.char_run_at(3, 9) is not None
+        assert room.char_run_at(3, 10) is None    # not under the cursor
+        assert p.col == 10                        # paste never moves the player
 
     def test_paste_empty_clip_is_noop(self):
         room = _room()
@@ -346,7 +348,7 @@ class TestPasteMore:
         clip = op_yank(room, p, compute_text_object(p, _op('y', 'line'), room))
         op_paste(room, p, clip, before=False)      # p → row below (4)
         assert room.char_run_at(4, 2) is not None and room.char_run_at(4, 6) is not None
-        assert p.row == 4
+        assert p.row == 3                          # paste never moves the player
 
 
 class TestRoundTrip:

@@ -279,19 +279,21 @@ def case_char(room, player, count: int = 1) -> bool:
 
 
 def op_paste(room, player, clip: dict, before: bool, count: int = 1) -> bool:
-    """Place a clip into the room `count` times — 3p lays 3 consecutive copies
-    (x on g, then 3p → ggg). Charwise: copies run left-to-right from the cursor
-    (P at cursor, p at cursor+1), each offset by the clip width. Linewise: copies
-    stack as row-blocks. Runes leave the cursor on the last pasted cell; creatures
-    respawn live & hostile and never move the cursor onto themselves. Returns True
-    if anything was placed."""
+    """Place a clip into the room `count` times (3p → 3 copies; x on g + 3p → ggg).
+
+    Vimny is a fixed overlay grid, NOT an insert buffer: pasting overlays chars
+    onto cells and never shifts neighbors (rows are wall-bounded). Charwise: `p`
+    places to the RIGHT of the cursor (col+1, extending right); `P` to the LEFT
+    (the copies end at col-1). Linewise: `p` overlays the row(s) below, `P` the
+    cursor row(s). Paste NEVER moves the player — the cursor relocates only via
+    motions, and never lands on pasted content (a letter, or a respawned creature).
+    Returns True if anything was placed."""
     if not clip or not clip.get('rows'):
         return False
     placed_any = False
     if clip['linewise']:
-        nrows     = len(clip['rows'])
-        base_row  = player.row if before else player.row + 1
-        first_row = None
+        nrows    = len(clip['rows'])
+        base_row = player.row if before else player.row + 1
         for copy in range(count):
             for i, rclip in enumerate(clip['rows']):
                 row = base_row + copy * nrows + i
@@ -302,30 +304,17 @@ def op_paste(room, player, clip: dict, before: bool, count: int = 1) -> bool:
                     continue
                 rune_last  = _place_row(room, row, ext[0], rclip)
                 ent_placed = _place_entities(room, row, ext[0], rclip)
-                if rune_last >= 0 or ent_placed:
-                    placed_any = True
-                    if first_row is None:
-                        first_row = row
+                placed_any = placed_any or rune_last >= 0 or ent_placed
                 _merge_adjacent_runes(room, row)
-        if first_row is not None:
-            player.row = first_row
-            ext = line_extent(room, first_row)
-            player.col = ext[0] if ext else player.col
     else:
         rclip = clip['rows'][0]
-        width = max(rclip.get('width', 0), 1)      # advance ≥1 cell per copy
-        base  = player.col if before else player.col + 1
-        last_rune = -1
+        width = max(rclip.get('width', 0), 1)               # advance ≥1 cell per copy
+        base  = (player.col - width * count) if before else (player.col + 1)
         for copy in range(count):
             col_k = base + copy * width
-            r = _place_row(room, player.row, col_k, rclip)
-            if r >= 0:
-                last_rune = r
+            if _place_row(room, player.row, col_k, rclip) >= 0:
                 placed_any = True
-            # Creatures respawn live & hostile; the cursor never lands on one.
             if _place_entities(room, player.row, col_k, rclip):
                 placed_any = True
         _merge_adjacent_runes(room, player.row)
-        if last_rune >= 0:
-            player.col = last_rune                 # vim leaves cursor on last cell
     return placed_any
