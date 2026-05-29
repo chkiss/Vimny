@@ -25,6 +25,7 @@ EXPECTED_ENTITY_KINDS = {
     'chest', 'chest_key', 'chest_scroll',
     'locked_door',
     'goblin', 'warden',
+    'floor_key',            # reflow water-wave demo (row 13): swept away by a wave
 }
 EXPECTED_RUNE_KINDS   = {'ancient', 'verdant', 'void', 'ember'}
 

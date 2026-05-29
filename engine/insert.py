@@ -9,6 +9,7 @@ from __future__ import annotations
 from engine.world import CellType, CharRun
 from engine.motion import _first_non_blank_col, _leftmost_passable
 from engine.editor import _merge_adjacent_runes
+from engine.reflow import is_ledge, open_gap
 
 INSERT_KIND = 'ember'           # kind tag for player-typed runes
 _PASTABLE = (CellType.FLOOR, CellType.CORRIDOR)
@@ -111,12 +112,23 @@ def begin_insert(room, player, variant: str, count: int = 1) -> None:
 
 
 def insert_char(room, player, ch: str, kind: str = INSERT_KIND) -> bool:
-    """Place a one-cell rune at the cursor (overwriting any rune there) and
-    advance. Returns False if the cursor is not on a pastable cell."""
+    """Place a one-cell rune at the cursor and advance.
+
+    Overlay rows (the default everywhere) overwrite the cell in place. On a
+    ledge row the line reflows: the cursor cell and everything right of it slide
+    right by one, and any rune shoved past the void brink falls in (see
+    engine/reflow.py). Returns False if the cursor is not on a pastable cell."""
     r, c = player.row, player.col
     if not (0 <= c < room.cols) or room.cells[r][c] not in _PASTABLE:
         return False
-    _delete_at(room, r, c)
+    if is_ledge(room, r):
+        ru = room.char_run_at(r, c)
+        if ru is not None and ru.kind == 'void':   # cursor sits on a void rune → glyph drops in
+            room._last_void_falls.append((r, c, ch))
+            return True
+        open_gap(room, r, c, 1)                # push the line right; overflow falls
+    else:
+        _delete_at(room, r, c)                 # overwrite the cell in place
     room.add_char_run(CharRun(r, c, (ch,), kind))
     _merge_adjacent_runes(room, r)
     if c + 1 < room.cols and room.cells[r][c + 1] in _PASTABLE:

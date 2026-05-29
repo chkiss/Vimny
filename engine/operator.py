@@ -9,6 +9,7 @@ from __future__ import annotations
 from engine.world import CellType, CharRun, Entity
 from engine.text_object import TextObjectType
 from engine.editor import _merge_adjacent_runes
+from engine.reflow import is_ledge, close_gap
 
 _PASTABLE = (CellType.FLOOR, CellType.CORRIDOR)
 
@@ -155,6 +156,8 @@ def op_delete(room, player, text_obj) -> dict:
             lo, hi = ext
         if hi >= lo:
             _delete_cols(room, row, lo, hi)
+            if not linewise and is_ledge(room, row):
+                close_gap(room, row, lo, hi - lo + 1)   # ledge: pull the tail left
     # Cursor → start of the deleted region (vim-faithful).
     if linewise:
         player.row = min(text_obj.start_row, room.rows - 1)

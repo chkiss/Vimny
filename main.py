@@ -32,6 +32,7 @@ from content.scrolls import (
 
 _JUMP_MOTIONS = frozenset({'G', 'gg', '%', '{', '}', '(', ')'})
 from engine.operator import op_delete, op_yank, op_paste, op_case, case_char, apply_indent, INDENT_WIDTH, entity_clip
+from engine.reflow import is_ledge, close_gap, void_col
 from engine.insert import (
     begin_insert, insert_char, insert_backspace,
     replace_chars, replace_overtype, replace_restore,
@@ -525,6 +526,30 @@ def _void_fall_animation(term, screen_r, screen_c):
         print(term.move_yx(screen_r, screen_c) + color + sym + term.normal,
               end='', flush=True)
         time.sleep(0.12)
+
+
+def _void_screen_xy(term, room, player, r, c):
+    """Buffer (r, c) → screen (row, col) within the player-centred viewport
+    (the same transform the renderer and the normal-mode void fall use)."""
+    iw       = _iw(term)
+    game_h   = term.height - 8
+    vr_start = max(0, min(player.row - game_h // 2, room.rows - game_h))
+    vc_start = max(0, min(player.col - iw  // 2,    room.cols - iw))
+    return r - vr_start + 3, c - vc_start + 1
+
+
+def _play_void_falls(term, dungeon, room, player):
+    """Animate any runes the last reflow shoved over a ledge into the void.
+
+    Reads room._last_void_falls (populated by engine/reflow.py), plays the drop at
+    each fallen cell, then clears the list. Returns True if anything fell."""
+    falls = getattr(room, '_last_void_falls', None)
+    if not falls:
+        return False
+    for (fr, fc, _sym) in falls:
+        _void_fall_animation(term, *_void_screen_xy(term, room, player, fr, fc))
+    room._last_void_falls = []
+    return True
 
 
 def _drown_animation(term, screen_r, screen_c):
@@ -1544,8 +1569,40 @@ def run_dungeon(term: Terminal, level: int, progress: dict,
                     insert_backspace(room, player)
                 elif not key.is_sequence:
                     ch = str(key)
-                    if ch.isprintable() and len(ch) == 1 and insert_char(room, player, ch):
-                        budget.spend(1)
+                    if ch.isprintable() and len(ch) == 1:
+                        prev_ins = (player.row, player.col)
+                        room._last_void_falls = []
+                        room._last_drowns     = []
+                        if insert_char(room, player, ch):
+                            budget.spend(1)
+                        if room._last_void_falls:          # ledge: a glyph went over the brink
+                            render_all(term, dungeon, player, budget, message,
+                                       attack_pos=_attack_pos(), attack_sym=_attack_sym())
+                            _play_void_falls(term, dungeon, room, player)
+                            message = 'Over the brink — into the void it tumbles!'
+                            msg_ttl = 25
+                        if room._last_drowns:              # ledge: a wave of water swept an entity away
+                            render_all(term, dungeon, player, budget, message,
+                                       attack_pos=_attack_pos(), attack_sym=_attack_sym())
+                            for (dr, dc) in room._last_drowns:
+                                _drown_animation(term, *_void_screen_xy(term, room, player, dr, dc))
+                            room._last_drowns = []
+                            message = 'A wave sweeps it away into the void!'
+                            msg_ttl = 25
+                        cur_ru = room.char_run_at(player.row, player.col)
+                        if cur_ru is not None and cur_ru.kind == 'void':   # typed yourself off the ledge
+                            render_all(term, dungeon, player, budget, message,
+                                       attack_pos=_attack_pos(), attack_sym=_attack_sym())
+                            _void_fall_animation(term, *_void_screen_xy(term, room, player, player.row, player.col))
+                            player.take_damage(2)                          # 1 full heart
+                            safe_c = min(prev_ins[1], void_col(room, prev_ins[0]) - 1)
+                            player.row, player.col = prev_ins[0], max(safe_c, 0)   # stumble back to safe ground
+                            player.mode = Mode.NORMAL
+                            if player.is_dead:
+                                message = '** GAME OVER ** Type  :e  to re-load the dungeon.'; msg_ttl = 2
+                            else:
+                                h, hh = player.hp // 2, '½' if player.hp % 2 else ''
+                                message = f'You typed yourself off the ledge!  ({h}{hh} ♥ remaining)'; msg_ttl = 25
             render_all(term, dungeon, player, budget, message, attack_pos=_attack_pos(), attack_sym=_attack_sym())
             continue
 
@@ -2198,6 +2255,8 @@ def run_dungeon(term: Terminal, level: int, progress: dict,
                         redo_stack.clear()
                         _reg_write(player, '"',
                                    _clip_from_cut_runes(cut_items, player.col), is_delete=True)
+                        if is_ledge(room, player.row):
+                            close_gap(room, player.row, player.col, count)   # ledge: pull the tail left
                         budget.spend(1)
                         descs = ', '.join(_clip_desc(i) for i in cut_items)
                         _push(f'Cut {len(cut_items)}: {descs}')

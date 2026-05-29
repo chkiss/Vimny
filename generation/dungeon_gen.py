@@ -1415,6 +1415,10 @@ def build_dungeon_dummy(seed: int) -> Dungeon:
     for c in range(25, 36):
         cells[9][c] = CellType.CORRIDOR
 
+    # Reflow water demo (row 13, clear of the wood-wall block): a 2-cell puddle
+    cells[13][9]  = CellType.WATER
+    cells[13][10] = CellType.WATER
+
     # Water pool in Room A
     for r in range(11, 17):
         for c in range(44, 57):
@@ -1438,6 +1442,8 @@ def build_dungeon_dummy(seed: int) -> Dungeon:
         # Combat entities
         Entity(kind='warden', row=4,  col=50, hp=5, max_hp=5, ai='',      summon_timer=0),
         Entity(kind='goblin', row=17, col=3,  hp=1, max_hp=1, ai='chase', ai_speed=1),
+        Entity(kind='goblin',    row=13, col=11, hp=1, max_hp=1, ai=''),  # reflow water-wave: drowns
+        Entity(kind='floor_key', row=13, col=12),                        # reflow water-wave: swept away (lost)
         # Room-divider door (fog boundary — opens into Room A)
         Entity(kind='door',         row=9,  col=42),
         Entity(kind='door',         row=10, col=42),
@@ -1453,7 +1459,22 @@ def build_dungeon_dummy(seed: int) -> Dungeon:
         CharRun(row=2, col=8,  symbols=('·',), kind='verdant'),
         CharRun(row=2, col=13, symbols=('○',), kind='void'),
         CharRun(row=2, col=17, symbols=('◦',), kind='ember'),
+        # ── Reflow pilot (engine/reflow.py): on a ledge row, editing flows and
+        # content falls against the FIXED brinks — walls and void runes alike.
+        # Three demos of the one law:
+        # Row 13 — WATER WAVE: shove the 'WAVE' glyphs into the puddle (cols 9-10);
+        # the wave rolls right and SWEEPS AWAY whatever it reaches — the goblin
+        # (col 11) drowns, the key (col 12) is lost.
+        CharRun(row=13, col=5,  symbols=tuple('WAVE'),   kind='verdant'),
+        # Row 14 — VOID MARGIN: the ○○○ brink (col 35) sits on floor, so the cursor
+        # can step onto it and FALL IN; glyphs past the brink tumble into the void.
+        CharRun(row=14, col=29, symbols=tuple('GLYPHS'), kind='ancient'),
+        CharRun(row=14, col=35, symbols=('○',) * 7,      kind='void'),
+        # Row 16 — WALL EDGE: the corridor just ends at the stone wall (col 42). The
+        # cursor CLAMPS at the last floor cell; glyphs tipped against the wall fall off.
+        CharRun(row=16, col=38, symbols=tuple('EDGE'),   kind='ember'),
     ]
+    composite.ledge_rows = {13, 14, 16}
 
     composite.par            = None
     composite.budget         = 99999
