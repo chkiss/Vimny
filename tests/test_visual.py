@@ -1,7 +1,7 @@
 """Tests for Block D2 — engine/visual.py: selection span, highlight membership,
 and operator application (charwise / linewise / block)."""
 import pytest
-from engine.world import Room, RoomType, CellType, RuneCluster
+from engine.world import Room, RoomType, CellType, CharRun
 from engine.player import Player
 from engine.modes import Mode
 from engine.text_object import TextObjectType
@@ -22,7 +22,7 @@ def _room():
 
 
 def _cell(room, r, c):
-    ru = room.rune_at(r, c)
+    ru = room.char_run_at(r, c)
     return ru.symbols[c - ru.col] if ru else None
 
 
@@ -88,16 +88,16 @@ class TestInSelection:
 class TestApplyVisual:
     def test_charwise_delete(self):
         room = _room()
-        room.add_rune(RuneCluster(3, 2, ('a', 'b', 'c', 'd', 'e'), 'ancient'))
+        room.add_char_run(CharRun(3, 2, ('a', 'b', 'c', 'd', 'e'), 'ancient'))
         p = Player(row=3, col=5)
         apply_visual('d', (3, 3), (3, 5), Mode.VISUAL, room, p)   # delete b,c,d
         assert _cell(room, 3, 2) == 'a' and _cell(room, 3, 6) == 'e'
-        assert all(room.rune_at(3, c) is None for c in (3, 4, 5))
+        assert all(room.char_run_at(3, c) is None for c in (3, 4, 5))
         assert p.col == 3                                          # cursor to start
 
     def test_charwise_yank_no_mutation(self):
         room = _room()
-        room.add_rune(RuneCluster(3, 2, ('a', 'b', 'c'), 'ancient'))
+        room.add_char_run(CharRun(3, 2, ('a', 'b', 'c'), 'ancient'))
         p = Player(row=3, col=4)
         clip = apply_visual('y', (3, 2), (3, 4), Mode.VISUAL, room, p)
         assert _cell(room, 3, 2) == 'a'                            # unchanged
@@ -106,15 +106,15 @@ class TestApplyVisual:
 
     def test_linewise_delete_clears_rows(self):
         room = _room()
-        room.add_rune(RuneCluster(2, 3, ('x',), 'ancient'))
-        room.add_rune(RuneCluster(3, 5, ('y',), 'ancient'))
+        room.add_char_run(CharRun(2, 3, ('x',), 'ancient'))
+        room.add_char_run(CharRun(3, 5, ('y',), 'ancient'))
         p = Player(row=2, col=0)
         apply_visual('d', (2, 0), (3, 0), Mode.VISUAL_LINE, room, p)
-        assert room.rune_at(2, 3) is None and room.rune_at(3, 5) is None
+        assert room.char_run_at(2, 3) is None and room.char_run_at(3, 5) is None
 
     def test_visual_case_toggle(self):
         room = _room()
-        room.add_rune(RuneCluster(3, 2, ('a', 'B', 'c'), 'ancient'))
+        room.add_char_run(CharRun(3, 2, ('a', 'B', 'c'), 'ancient'))
         p = Player(row=3, col=4)
         apply_visual('g~', (3, 2), (3, 4), Mode.VISUAL, room, p)
         assert (_cell(room, 3, 2), _cell(room, 3, 3), _cell(room, 3, 4)) == ('A', 'b', 'C')
@@ -122,37 +122,37 @@ class TestApplyVisual:
     def test_charwise_multirow_delete_partial_rows(self):
         # anchor=(2,3) cursor=(4,5): top row deletes cols 3+, bottom row deletes up to col 5
         room = _room()
-        room.add_rune(RuneCluster(2, 1, ('a', 'b', 'c', 'd', 'e'), 'ancient'))  # cols 1-5
-        room.add_rune(RuneCluster(3, 1, ('f', 'g', 'h'), 'ancient'))             # cols 1-3
-        room.add_rune(RuneCluster(4, 1, ('i', 'j', 'k', 'l', 'm'), 'ancient'))  # cols 1-5
+        room.add_char_run(CharRun(2, 1, ('a', 'b', 'c', 'd', 'e'), 'ancient'))  # cols 1-5
+        room.add_char_run(CharRun(3, 1, ('f', 'g', 'h'), 'ancient'))             # cols 1-3
+        room.add_char_run(CharRun(4, 1, ('i', 'j', 'k', 'l', 'm'), 'ancient'))  # cols 1-5
         p = Player(row=2, col=3)
         apply_visual('d', (2, 3), (4, 5), Mode.VISUAL, room, p)
         # row 2: cols 1-2 kept (a,b), cols 3-5 deleted (c,d,e)
         assert _cell(room, 2, 1) == 'a' and _cell(room, 2, 2) == 'b'
-        assert all(room.rune_at(2, c) is None for c in (3, 4, 5))
+        assert all(room.char_run_at(2, c) is None for c in (3, 4, 5))
         # row 3: whole passable extent deleted
-        assert all(room.rune_at(3, c) is None for c in (1, 2, 3))
+        assert all(room.char_run_at(3, c) is None for c in (1, 2, 3))
         # row 4: cols 1-5 deleted (up to cursor col 5)
-        assert all(room.rune_at(4, c) is None for c in (1, 2, 3, 4, 5))
+        assert all(room.char_run_at(4, c) is None for c in (1, 2, 3, 4, 5))
         assert p.row == 2 and p.col == 3
 
     def test_charwise_multirow_top_row_not_col_zero(self):
         # anchor col must be respected — col 0 on top row NOT deleted
         room = _room()
-        room.add_rune(RuneCluster(2, 1, ('x', 'y', 'z'), 'ancient'))  # cols 1-3
-        room.add_rune(RuneCluster(3, 1, ('a', 'b', 'c'), 'ancient'))  # cols 1-3
+        room.add_char_run(CharRun(2, 1, ('x', 'y', 'z'), 'ancient'))  # cols 1-3
+        room.add_char_run(CharRun(3, 1, ('a', 'b', 'c'), 'ancient'))  # cols 1-3
         p = Player(row=2, col=2)
         apply_visual('d', (2, 2), (3, 3), Mode.VISUAL, room, p)
         # row 2 col 1 ('x') is BEFORE anchor col 2 — must survive
         assert _cell(room, 2, 1) == 'x'
-        assert room.rune_at(2, 2) is None and room.rune_at(2, 3) is None
+        assert room.char_run_at(2, 2) is None and room.char_run_at(2, 3) is None
 
     def test_block_delete_rectangle(self):
         room = _room()
-        room.add_rune(RuneCluster(2, 2, ('a', 'b', 'c'), 'ancient'))
-        room.add_rune(RuneCluster(3, 2, ('d', 'e', 'f'), 'ancient'))
+        room.add_char_run(CharRun(2, 2, ('a', 'b', 'c'), 'ancient'))
+        room.add_char_run(CharRun(3, 2, ('d', 'e', 'f'), 'ancient'))
         p = Player(row=2, col=2)
         apply_visual('d', (2, 3), (3, 4), Mode.VISUAL_BLOCK, room, p)   # cols 3-4 on rows 2-3
         assert _cell(room, 2, 2) == 'a' and _cell(room, 3, 2) == 'd'    # col 2 kept
-        assert all(room.rune_at(r, c) is None for r in (2, 3) for c in (3, 4))
+        assert all(room.char_run_at(r, c) is None for r in (2, 3) for c in (3, 4))
         assert (p.row, p.col) == (2, 3)

@@ -2,7 +2,7 @@
 from __future__ import annotations
 import heapq, math, os, random, unicodedata
 from collections import deque
-from engine.world import Dungeon, Room, RoomType, CellType, RuneCluster, Entity
+from engine.world import Dungeon, Room, RoomType, CellType, CharRun, Entity
 from engine.motion import _fog_unreachable, _cell_char
 from generation.room_gen import make_room
 
@@ -95,7 +95,7 @@ _L4_WATER_SPANS = [
     ((1, 2, 3, 4, 5),   70, 70),   # Right-edge strip (narrows RT1 to col 69)
 ]
 
-# Visible text strings placed as RuneCluster symbols — f/F/t/T targets
+# Visible text strings placed as CharRun symbols — f/F/t/T targets
 _L4_TEXT_C1  = "Most files you encounter"             # 'r' at offset 23 → col 67
 _L4_TEXT_C2  = " will be scribed in letters"             # 'w' at offset 1 → col 4
 _L4_TEXT_C3A = "so you can jump"                         # Zone A (cols 2-16)
@@ -116,8 +116,8 @@ def _place_runes_in_room(composite, rng, col_offset, room_rows, room_cols,
                     syms = _make_rune_syms(rng, kind)
                     width = len(syms)
                     if c + width <= col_end:
-                        composite.runes.append(
-                            RuneCluster(row=r, col=c, symbols=syms, kind=kind))
+                        composite.char_runs.append(
+                            CharRun(row=r, col=c, symbols=syms, kind=kind))
                         c += width + rng.randint(1, 3)
                         placed = True
                         break
@@ -131,7 +131,7 @@ def _bfs_par(composite, return_path: bool = False):
     Returns cost, or (cost, path_str) when return_path=True."""
     void_cells = {
         (ru.row, ru.col + i)
-        for ru in composite.runes if ru.kind == 'void'
+        for ru in composite.char_runs if ru.kind == 'void'
         for i in range(len(ru.symbols))
     }
     entry = composite.spawn_pos
@@ -296,7 +296,7 @@ def _dijkstra_par_level2(composite, door_cols: list, return_path: bool = False):
             rb = nc
         tgt = lb
         for nc in range(lb, rb + 1):
-            if composite.rune_at(r, nc):
+            if composite.char_run_at(r, nc):
                 tgt = nc
                 break
         if tgt != c:
@@ -375,7 +375,7 @@ def build_dungeon_0(seed: int) -> Dungeon:
     # (up to 20 attempts).
     densities = {0: 0.20, 1: 0.28, 2: 0.20}
     for attempt in range(20):
-        composite.runes.clear()
+        composite.char_runs.clear()
         rune_rng = random.Random(rng.randint(0, 2**31))
         for i, (_, room_rows, room_cols) in enumerate(plan):
             _place_runes_in_room(composite, rune_rng, offsets[i],
@@ -386,19 +386,19 @@ def build_dungeon_0(seed: int) -> Dungeon:
         # right into Room 2, up to row 1, then press h to reach the exit.
         # Remove any random rune that would shadow these hard-coded voids.
         for void_row in (2, 3):
-            composite.runes = [
-                ru for ru in composite.runes
+            composite.char_runs = [
+                ru for ru in composite.char_runs
                 if not (ru.row == void_row
                         and ru.col <= ex_c < ru.col + len(ru.symbols))
             ]
-        composite.runes.append(RuneCluster(row=2, col=ex_c, symbols=('○',), kind='void'))
-        composite.runes.append(RuneCluster(row=3, col=ex_c, symbols=('○',), kind='void'))
+        composite.char_runs.append(CharRun(row=2, col=ex_c, symbols=('○',), kind='void'))
+        composite.char_runs.append(CharRun(row=3, col=ex_c, symbols=('○',), kind='void'))
 
         # Never leave a void rune sitting on the entry or exit itself.
         entry_r, entry_c = composite.spawn_pos
         exit_r,  exit_c  = composite.exit_pos
-        composite.runes = [
-            ru for ru in composite.runes
+        composite.char_runs = [
+            ru for ru in composite.char_runs
             if ru.kind != 'void' or not any(
                 (ru.row == r and ru.col <= c < ru.col + len(ru.symbols))
                 for r, c in ((entry_r, entry_c), (exit_r, exit_c))
@@ -440,7 +440,7 @@ def _bfs_par_line(composite, return_path: bool = False):
     goal  = composite.exit_pos
 
     rune_cols_by_row: dict[int, list[int]] = {}
-    for ru in composite.runes:
+    for ru in composite.char_runs:
         if ru.kind == 'void':
             continue
         for i in range(len(ru.symbols)):
@@ -565,18 +565,18 @@ def build_dungeon_1(seed: int) -> Dungeon:
     # Scatter decorative runes; strip void runes and row-1 runes so the only
     # rune on the exit row is the hardcoded anchor that ^ will land on.
     for _attempt in range(20):
-        composite.runes.clear()
+        composite.char_runs.clear()
         rune_rng = random.Random(rng.randint(0, 2**31))
         for i, (_, room_rows, room_cols) in enumerate(plan):
             _place_runes_in_room(composite, rune_rng, offsets[i],
                                  room_rows, room_cols, total_rows, 0.15)
-        composite.runes = [
-            ru for ru in composite.runes
+        composite.char_runs = [
+            ru for ru in composite.char_runs
             if ru.kind != 'void' and ru.row != ex_r
         ]
         # Anchor rune at exit position so ^ on row 1 lands exactly on the exit.
-        composite.runes.append(
-            RuneCluster(row=ex_r, col=ex_c, symbols=('∘',), kind='ancient'))
+        composite.char_runs.append(
+            CharRun(row=ex_r, col=ex_c, symbols=('∘',), kind='ancient'))
         par, path = _bfs_par_line(composite, return_path=True)
         if par is not None:
             break
@@ -654,13 +654,13 @@ def build_dungeon_2(seed: int) -> Dungeon:
     # Gaps at row 1 and row (total_rows-2) are the only safe crossings.
     puzzle_mid_col = offsets[1] + plan[1][2] // 2   # = 40
     void_wall = [
-        RuneCluster(row=row, col=puzzle_mid_col, symbols=('○',), kind='void')
+        CharRun(row=row, col=puzzle_mid_col, symbols=('○',), kind='void')
         for row in range(2, total_rows - 2)          # rows 2-9
     ]
 
     # Decorative runes in entry and exit rooms; retry if any void blocks path.
     for attempt in range(20):
-        composite.runes = list(void_wall)
+        composite.char_runs = list(void_wall)
         rune_rng = random.Random(rng.randint(0, 2**31))
         _place_runes_in_room(composite, rune_rng, offsets[0],
                               plan[0][1], plan[0][2], total_rows, 0.18)
@@ -670,8 +670,8 @@ def build_dungeon_2(seed: int) -> Dungeon:
         # Never place a void rune on the entry or exit cell itself
         entry_r, entry_c = composite.spawn_pos
         exit_r,  exit_c  = composite.exit_pos
-        composite.runes = [
-            ru for ru in composite.runes
+        composite.char_runs = [
+            ru for ru in composite.char_runs
             if ru.kind != 'void' or not any(
                 ru.row == r and ru.col <= c < ru.col + len(ru.symbols)
                 for r, c in ((entry_r, entry_c), (exit_r, exit_c))
@@ -740,8 +740,8 @@ def _make_rune_corridor(composite, rng, row_top,
                     if c + width - 1 <= col_end:
                         if not any((row, cc) in blocked
                                    for cc in range(c - 1, c + width + 1)):
-                            composite.runes.append(
-                                RuneCluster(row=row, col=c, symbols=syms, kind=kind))
+                            composite.char_runs.append(
+                                CharRun(row=row, col=c, symbols=syms, kind=kind))
                             c += width + rng.randint(1, 2)
                             placed = True
                             break
@@ -765,14 +765,14 @@ def _dijkstra_par_wbe(composite, return_path: bool = False):
     max_n = max(composite.rows, composite.cols)
 
     clusters_by_row: dict[int, list] = defaultdict(list)
-    for ru in composite.runes:
+    for ru in composite.char_runs:
         if ru.kind != 'void':
             clusters_by_row[ru.row].append(ru)
     for cls in clusters_by_row.values():
         cls.sort(key=lambda ru: ru.col)
 
     def _word_at(r, c):
-        ru = composite.rune_at(r, c)
+        ru = composite.char_run_at(r, c)
         return ru if (ru and ru.kind != 'void') else None
 
     def _w(r, c):
@@ -828,7 +828,7 @@ def _dijkstra_par_wbe(composite, return_path: bool = False):
             nr, nc = nb
             if not composite.is_passable(nr, nc):
                 return
-            ru = composite.rune_at(nr, nc)
+            ru = composite.char_run_at(nr, nc)
             if ru and ru.kind == 'void':
                 return
             g = cost + mc
@@ -844,7 +844,7 @@ def _dijkstra_par_wbe(composite, return_path: bool = False):
                 nr, nc = r + dr * n, c + dc * n
                 if not composite.is_passable(nr, nc):
                     break
-                ru = composite.rune_at(nr, nc)
+                ru = composite.char_run_at(nr, nc)
                 if ru and ru.kind == 'void':
                     continue  # can't land here; larger n can bypass
                 mc  = 1 if n == 1 else len(str(n)) + 1
@@ -897,8 +897,8 @@ def _l4_place_zone(composite, rng, rows, col_start, col_end,
                 if c + w - 1 <= col_end:
                     if not any((r, cc) in blocked
                                for cc in range(c - 1, c + w + 1)):
-                        composite.runes.append(
-                            RuneCluster(row=r, col=c, symbols=syms, kind=kind))
+                        composite.char_runs.append(
+                            CharRun(row=r, col=c, symbols=syms, kind=kind))
                         c += w + rng.randint(1, 2)
                         continue
             c += 1
@@ -943,14 +943,14 @@ def _dijkstra_par_ftFT(composite, return_path: bool = False):
     max_n = max(ROWS, COLS)
 
     clusters_by_row: dict[int, list] = defaultdict(list)
-    for ru in composite.runes:
+    for ru in composite.char_runs:
         if ru.kind != 'void':
             clusters_by_row[ru.row].append(ru)
     for cls in clusters_by_row.values():
         cls.sort(key=lambda ru: ru.col)
 
     def _word_at(r, c):
-        ru = composite.rune_at(r, c)
+        ru = composite.char_run_at(r, c)
         return ru if (ru and ru.kind != 'void') else None
 
     def _w(r, c):
@@ -959,7 +959,7 @@ def _dijkstra_par_ftFT(composite, return_path: bool = False):
         for nc in range(scan, COLS):
             if not _is_passable(r, nc):
                 return None  # water or wall stops w
-            ru = composite.rune_at(r, nc)
+            ru = composite.char_run_at(r, nc)
             if ru and ru.kind != 'void':
                 return (r, ru.col) if _is_passable(r, ru.col) else None
         return None
@@ -972,7 +972,7 @@ def _dijkstra_par_ftFT(composite, return_path: bool = False):
         for nc in range(limit - 1, -1, -1):
             if not _is_passable(r, nc):
                 return None  # water or wall stops b
-            ru = composite.rune_at(r, nc)
+            ru = composite.char_run_at(r, nc)
             if ru and ru.kind != 'void':
                 return (r, ru.col) if _is_passable(r, ru.col) else None
         return None
@@ -989,7 +989,7 @@ def _dijkstra_par_ftFT(composite, return_path: bool = False):
         for nc in range(scan, COLS):
             if not _is_passable(r, nc):
                 return None  # water or wall stops e
-            ru = composite.rune_at(r, nc)
+            ru = composite.char_run_at(r, nc)
             if ru and ru.kind != 'void':
                 end = ru.col + len(ru.symbols) - 1
                 return (r, end) if _is_passable(r, end) else None
@@ -1016,7 +1016,7 @@ def _dijkstra_par_ftFT(composite, return_path: bool = False):
                 return
             if (nr, nc) in _dynamite_cells:
                 return
-            ru = composite.rune_at(nr, nc)
+            ru = composite.char_run_at(nr, nc)
             if ru and ru.kind == 'void':
                 return
             g = cost + mc
@@ -1032,7 +1032,7 @@ def _dijkstra_par_ftFT(composite, return_path: bool = False):
                 nr, nc = r + dr * n, c + dc * n
                 if not _is_passable(nr, nc):
                     break
-                ru = composite.rune_at(nr, nc)
+                ru = composite.char_run_at(nr, nc)
                 if ru and ru.kind == 'void':
                     continue
                 if (nr, nc) in _dynamite_cells:
@@ -1136,24 +1136,24 @@ def build_dungeon_3(seed: int) -> Dungeon:
 
     # ── Hard-coded runes (deterministic; placed before random fill) ───────────
     # All positions are fixed regardless of seed.  Placing them first in the
-    # runes list guarantees rune_at() returns them before any random cluster.
+    # runes list guarantees char_run_at() returns them before any random cluster.
     _l3_hardcoded = [
         # Anchor rune at C5 exit — last symbol (col 44) is the exit cell
-        RuneCluster(row=13, col=42, symbols=('∘', '∘', '∘'), kind='ancient'),
+        CharRun(row=13, col=42, symbols=('∘', '∘', '∘'), kind='ancient'),
         # Ember at right end of C1 — marks the turn into RT1
-        RuneCluster(row=1,  col=44, symbols=('◦', '◦', '◦'), kind='ember'),
+        CharRun(row=1,  col=44, symbols=('◦', '◦', '◦'), kind='ember'),
         # Void guards at turn-room entries/exits
-        RuneCluster(row=1,  col=45, symbols=('○', '○'), kind='void'),
-        RuneCluster(row=2,  col=45, symbols=('○', '○'), kind='void'),
-        RuneCluster(row=4,  col=1,  symbols=('○', '○'), kind='void'),
-        RuneCluster(row=5,  col=1,  symbols=('○',),     kind='void'),
-        RuneCluster(row=7,  col=46, symbols=('○',),     kind='void'),
-        RuneCluster(row=8,  col=45, symbols=('○', '○'), kind='void'),
-        RuneCluster(row=10, col=1,  symbols=('○',),     kind='void'),
-        RuneCluster(row=10, col=2,  symbols=('·','·','·','·'),     kind='verdant'),
-        RuneCluster(row=11, col=1,  symbols=('○', '○'), kind='void'),
-        RuneCluster(row=13, col=46, symbols=('○',),     kind='void'),
-        RuneCluster(row=14, col=46, symbols=('○',),     kind='void'),
+        CharRun(row=1,  col=45, symbols=('○', '○'), kind='void'),
+        CharRun(row=2,  col=45, symbols=('○', '○'), kind='void'),
+        CharRun(row=4,  col=1,  symbols=('○', '○'), kind='void'),
+        CharRun(row=5,  col=1,  symbols=('○',),     kind='void'),
+        CharRun(row=7,  col=46, symbols=('○',),     kind='void'),
+        CharRun(row=8,  col=45, symbols=('○', '○'), kind='void'),
+        CharRun(row=10, col=1,  symbols=('○',),     kind='void'),
+        CharRun(row=10, col=2,  symbols=('·','·','·','·'),     kind='verdant'),
+        CharRun(row=11, col=1,  symbols=('○', '○'), kind='void'),
+        CharRun(row=13, col=46, symbols=('○',),     kind='void'),
+        CharRun(row=14, col=46, symbols=('○',),     kind='void'),
     ]
 
     # Reserved cells: Random runes must not land in or touch these cells.
@@ -1169,8 +1169,8 @@ def build_dungeon_3(seed: int) -> Dungeon:
 
     # ── Carve and populate rune corridors (up to 20 attempts for valid par) ──
     for _attempt in range(20):
-        # Hard-coded runes first so rune_at() always finds them before random ones
-        composite.runes = list(_l3_hardcoded)
+        # Hard-coded runes first so char_run_at() always finds them before random ones
+        composite.char_runs = list(_l3_hardcoded)
         rune_rng = random.Random(rng.randint(0, 2**31))
 
         for row_top in _L3_CORR_TOP_ROWS:
@@ -1246,15 +1246,15 @@ def build_dungeon_4(seed: int) -> Dungeon:
     # One row of text per corridor (the other row gets standard random runes).
     _text_runes = [
         # C1 row 1: fr jumps to 'r' at offset 23 → col 67
-        RuneCluster(row=1, col=44, symbols=tuple(_L4_TEXT_C1), kind='ember'),
+        CharRun(row=1, col=44, symbols=tuple(_L4_TEXT_C1), kind='ember'),
         # C2 row 5: Fw jumps backward to 'w' at offset 1 → col 4
-        RuneCluster(row=5, col=3,  symbols=tuple(_L4_TEXT_C2), kind='ember'),
+        CharRun(row=5, col=3,  symbols=tuple(_L4_TEXT_C2), kind='ember'),
         # C3 row 7 Zone A: walking terrain before the water (cols 2-16)
-        RuneCluster(row=7, col=2,  symbols=tuple(_L4_TEXT_C3A), kind='ember'),
+        CharRun(row=7, col=2,  symbols=tuple(_L4_TEXT_C3A), kind='ember'),
         # C3 row 7 Zone B: t! lands at col 69 (before dynamite at col 70)
-        RuneCluster(row=7, col=33, symbols=tuple(_L4_TEXT_C3B), kind='ember'),
+        CharRun(row=7, col=33, symbols=tuple(_L4_TEXT_C3B), kind='ember'),
         # C5 exit anchor: last symbol at col 65 so `e` lands on the exit
-        RuneCluster(row=13, col=64, symbols=('◦', '◦'), kind='ember'),
+        CharRun(row=13, col=64, symbols=('◦', '◦'), kind='ember'),
     ]
 
     # ── Fixed entities ────────────────────────────────────────────────────────
@@ -1282,7 +1282,7 @@ def build_dungeon_4(seed: int) -> Dungeon:
     blocked = frozenset(_bl)
 
     for _attempt in range(20):
-        composite.runes = list(_text_runes)
+        composite.char_runs = list(_text_runes)
         rng2 = random.Random(rng.randint(0, 2**31))
 
         # Fill all corridor zones with standard runes
@@ -1448,11 +1448,11 @@ def build_dungeon_dummy(seed: int) -> Dungeon:
         Entity(kind='exit',         row=9,  col=70),
     ]
 
-    composite.runes = [
-        RuneCluster(row=2, col=3,  symbols=('∘',), kind='ancient'),
-        RuneCluster(row=2, col=8,  symbols=('·',), kind='verdant'),
-        RuneCluster(row=2, col=13, symbols=('○',), kind='void'),
-        RuneCluster(row=2, col=17, symbols=('◦',), kind='ember'),
+    composite.char_runs = [
+        CharRun(row=2, col=3,  symbols=('∘',), kind='ancient'),
+        CharRun(row=2, col=8,  symbols=('·',), kind='verdant'),
+        CharRun(row=2, col=13, symbols=('○',), kind='void'),
+        CharRun(row=2, col=17, symbols=('◦',), kind='ember'),
     ]
 
     composite.par            = None
@@ -1506,7 +1506,7 @@ def _l5_place_near_runes(runes: list, rng, row: int,
                 continue
         word = rng.choice(word_tbl.get(length) or word_tbl[1])
         kind = rng.choice(kinds)
-        runes.append(RuneCluster(row=row, col=c,
+        runes.append(CharRun(row=row, col=c,
                                  symbols=tuple(word), kind=kind))
         for i in range(len(word)):
             occupied.add(c + i)
@@ -1727,7 +1727,7 @@ def build_dungeon_5(seed: int) -> Dungeon:
     entities.append(Entity(kind='exit', row=18, col=56))
 
     composite.entities = entities
-    composite.runes    = runes
+    composite.char_runs    = runes
 
     par = _par_l5(corr_data, gobs17)
     composite.par    = par
@@ -1897,9 +1897,9 @@ _L7_CODE_GROUPS = [
 ]
 
 def _l7_place_code_group(runes, row, col_start, text, kind='ember'):
-    """Place text as adjacent single-char RuneClusters (WORD group for W/B/E teaching)."""
+    """Place text as adjacent single-char CharRuns (WORD group for W/B/E teaching)."""
     for i, ch in enumerate(text):
-        runes.append(RuneCluster(row=row, col=col_start + i, symbols=(ch,), kind=kind))
+        runes.append(CharRun(row=row, col=col_start + i, symbols=(ch,), kind=kind))
 
 
 def _l7_fill_row(composite, rng, row, col_start, col_end,
@@ -1920,8 +1920,8 @@ def _l7_fill_row(composite, rng, row, col_start, col_end,
             if c + w - 1 <= col_end:
                 if not any((row, cc) in blocked
                            for cc in range(c - 1, c + w + 1)):
-                    composite.runes.append(
-                        RuneCluster(row=row, col=c, symbols=syms, kind=kind))
+                    composite.char_runs.append(
+                        CharRun(row=row, col=c, symbols=syms, kind=kind))
                     c += w + rng.randint(2, 3)   # 2-3 cell gap → w ≡ W
                     continue
         c += 1
@@ -1939,13 +1939,13 @@ def _dijkstra_par_WBE(composite, return_path=False):
     max_n = max(ROWS, COLS)
 
     def _rune(r, c):
-        ru = composite.rune_at(r, c)
+        ru = composite.char_run_at(r, c)
         return ru if (ru and ru.kind != 'void') else None
 
     def _ok(r, c):
         if not composite.is_passable(r, c):
             return False
-        ru = composite.rune_at(r, c)
+        ru = composite.char_run_at(r, c)
         return not (ru and ru.kind == 'void')
 
     # -- word/punct type helpers --
@@ -1954,7 +1954,7 @@ def _dijkstra_par_WBE(composite, return_path=False):
         return ch.isalpha() or ch.isdigit() or ch == '_' or unicodedata.category(ch) == 'So'
 
     def _char_at(r, c):
-        ru = composite.rune_at(r, c)
+        ru = composite.char_run_at(r, c)
         if ru is None or ru.kind == 'void':
             return None
         return ru.symbols[c - ru.col]
@@ -2193,7 +2193,7 @@ def _dijkstra_par_WBE(composite, return_path=False):
                 break
             right_b = cc
         for cc in range(left_b, right_b + 1):
-            ru2 = composite.rune_at(r, cc)
+            ru2 = composite.char_run_at(r, cc)
             if ru2:
                 if _ok(r, cc):
                     _push((r, cc), 1, '^')
@@ -2275,13 +2275,13 @@ def _dijkstra_par_L8(composite, return_path: bool = False):
     max_n = max(ROWS, COLS)
 
     def _rune(r, c):
-        ru = composite.rune_at(r, c)
+        ru = composite.char_run_at(r, c)
         return ru if (ru and ru.kind != 'void') else None
 
     def _ok(r, c):
         if not composite.is_passable(r, c):
             return False
-        ru = composite.rune_at(r, c)
+        ru = composite.char_run_at(r, c)
         return not (ru and ru.kind == 'void')
 
     # Matches engine/_is_word_char: alpha/digit/_ plus Unicode So (Symbol,Other).
@@ -2289,7 +2289,7 @@ def _dijkstra_par_L8(composite, return_path: bool = False):
         return ch.isalpha() or ch.isdigit() or ch == '_' or unicodedata.category(ch) == 'So'
 
     def _char_at(r, c):
-        ru = composite.rune_at(r, c)
+        ru = composite.char_run_at(r, c)
         if ru is None or ru.kind == 'void':
             return None
         return ru.symbols[c - ru.col]
@@ -2386,7 +2386,7 @@ def _dijkstra_par_L8(composite, return_path: bool = False):
         while nc >= 0:
             if not composite.is_passable(r, nc):
                 break
-            ru = composite.rune_at(r, nc)
+            ru = composite.char_run_at(r, nc)
             if ru and ru.kind != 'void':
                 end_col = ru.col + len(ru.symbols) - 1
                 if end_col < c:
@@ -2402,13 +2402,13 @@ def _dijkstra_par_L8(composite, return_path: bool = False):
         while nc >= 0:
             if not composite.is_passable(r, nc):
                 break
-            ru = composite.rune_at(r, nc)
+            ru = composite.char_run_at(r, nc)
             if ru and ru.kind != 'void':
                 end = ru.col + len(ru.symbols) - 1
                 # extend right to find WORD end
                 cc = end + 1
                 while cc < COLS and composite.is_passable(r, cc):
-                    r2 = composite.rune_at(r, cc)
+                    r2 = composite.char_run_at(r, cc)
                     if r2 and r2.kind != 'void':
                         end = r2.col + len(r2.symbols) - 1
                         cc  = end + 1
@@ -2575,7 +2575,7 @@ def _dijkstra_par_L8(composite, return_path: bool = False):
                 break
             rb = cc
         for cc in range(lb, rb + 1):
-            ru2 = composite.rune_at(r, cc)
+            ru2 = composite.char_run_at(r, cc)
             if ru2:
                 if _ok(r, cc):
                     _push((r, cc), 1, '^')
@@ -2702,12 +2702,12 @@ def build_dungeon_8(seed: int) -> Dungeon:
 
     # C1 (row 1) — e-teaching: four 3-char clusters, individual rune symbols
     for col, kind in ((5,'ancient'), (13,'verdant'), (22,'ember'), (34,'ancient')):
-        runes.append(RuneCluster(row=1, col=col,
+        runes.append(CharRun(row=1, col=col,
                                   symbols=(_sym(), _sym(), _sym()), kind=kind))
 
     # C2 (row 3) — b-teaching: four 3-char clusters, individual rune symbols
     for col, kind in ((2,'ember'), (13,'verdant'), (21,'ancient'), (29,'ember')):
-        runes.append(RuneCluster(row=3, col=col,
+        runes.append(CharRun(row=3, col=col,
                                   symbols=(_sym(), _sym(), _sym()), kind=kind))
 
     # C3 (row 5) — decorative plain words (cols 4-35, safe of LT1/RT2 turns)
@@ -2716,7 +2716,7 @@ def build_dungeon_8(seed: int) -> Dungeon:
         length = rng.randint(3, min(6, 35 - c3c + 1))
         if length < 3:
             break
-        runes.append(RuneCluster(row=5, col=c3c,
+        runes.append(CharRun(row=5, col=c3c,
                                   symbols=tuple(_plain_word(length)),
                                   kind=rng.choice(('ancient','verdant','ember'))))
         c3c += length + rng.randint(1, 3)
@@ -2727,7 +2727,7 @@ def build_dungeon_8(seed: int) -> Dungeon:
     # A mixed anchor (e.g. 'win⚑') would let b land at col 5 in 1 ks, beating gE.
     _c4_pool = [w for w in (plain.get(4) or plain[3])
                 if all(c.isalpha() or c.isdigit() or c == '_' for c in w)]
-    runes.append(RuneCluster(row=7, col=2,
+    runes.append(CharRun(row=7, col=2,
                               symbols=tuple(rng.choice(_c4_pool or ['proc'])),
                               kind='ancient'))
 
@@ -2737,7 +2737,7 @@ def build_dungeon_8(seed: int) -> Dungeon:
         length = rng.randint(3, min(6, 36 - c5c + 1))
         if length < 3:
             break
-        runes.append(RuneCluster(row=9, col=c5c,
+        runes.append(CharRun(row=9, col=c5c,
                                   symbols=tuple(_mixed_word(length)),
                                   kind=rng.choice(('ancient','verdant','ember'))))
         c5c += length + rng.randint(1, 3)
@@ -2760,27 +2760,27 @@ def build_dungeon_8(seed: int) -> Dungeon:
     # Cols 2-16: seed-randomized mixed filler.
     _kinds3 = ('ancient', 'verdant', 'ember')
     _bb_kind = rng.choice(_kinds3)
-    runes.append(RuneCluster(row=11, col=21,
+    runes.append(CharRun(row=11, col=21,
                              symbols=tuple('b4¶♯∘m3†'), kind=_bb_kind))  # A: cols 21-28
-    runes.append(RuneCluster(row=11, col=29,
+    runes.append(CharRun(row=11, col=29,
                              symbols=('!', '='), kind=_bb_kind))          # S: cols 29-30
-    runes.append(RuneCluster(row=11, col=31,
+    runes.append(CharRun(row=11, col=31,
                              symbols=tuple('b3♯3m∘†♯'), kind=_bb_kind))  # B: cols 31-38
 
     # Anchor: 2-char cluster ending at col 19; col 20 always empty
-    runes.append(RuneCluster(row=11, col=18,
+    runes.append(CharRun(row=11, col=18,
                              symbols=(_sym(), _sym()), kind=rng.choice(_kinds3)))
 
     # Seed-randomized mixed filler in cols 2-16
     _c6c = 2
     while _c6c <= 16:
         _flen = rng.randint(1, max(1, min(3, 17 - _c6c)))
-        runes.append(RuneCluster(row=11, col=_c6c,
+        runes.append(CharRun(row=11, col=_c6c,
                                  symbols=tuple(_sym() for _ in range(_flen)),
                                  kind=rng.choice(_kinds3)))
         _c6c += _flen + rng.randint(1, 2)
 
-    composite.runes = runes
+    composite.char_runs = runes
 
     composite.spawn_pos    = (1, 1)
     composite.exit_pos = (12, 19)
@@ -2806,7 +2806,7 @@ def build_dungeon_7(seed: int) -> Dungeon:
       C2 rows 4-5:  right→left   B teaching: packed adjacent code-char clusters
       C3 rows 7-8:  left→right   E teaching: exit at end of big packed group
 
-    Packed code groups use single-char RuneClusters placed adjacently:
+    Packed code groups use single-char CharRuns placed adjacently:
       w stops at every char (many keystrokes);  W jumps the whole group (one).
     Spaced rune clusters in filler zones: w ≡ W (both stop cluster-by-cluster).
     Budget is computed using the W/B/E-optimal path; w/b/e-only far exceeds it.
@@ -2852,7 +2852,7 @@ def build_dungeon_7(seed: int) -> Dungeon:
     composite.entities = [Entity(kind='exit', row=7, col=51)]
 
     # ── Hardcoded code-text clusters ──────────────────────────────────────────
-    _hardcoded: list[RuneCluster] = []
+    _hardcoded: list[CharRun] = []
     for row, col_start, text, kind in _L7_CODE_GROUPS:
         _l7_place_code_group(_hardcoded, row, col_start, text, kind)
     # Seed-varying untypable anchors (f/F cannot target these chars)
@@ -2862,8 +2862,8 @@ def build_dungeon_7(seed: int) -> Dungeon:
     # C2 left-end void guards (both rows): the first non-blank cell on each C2
     # row, so ^/0 land on them (death) while B skips back WORD-by-WORD to the
     # anchor at col 3. Forces B over the line-start shortcuts.
-    _hardcoded.append(RuneCluster(row=4, col=1, symbols=('○',), kind='void'))
-    _hardcoded.append(RuneCluster(row=5, col=1, symbols=('○',), kind='void'))
+    _hardcoded.append(CharRun(row=4, col=1, symbols=('○',), kind='void'))
+    _hardcoded.append(CharRun(row=5, col=1, symbols=('○',), kind='void'))
 
     # ── Blocked cell set (code text + exit — filler must not overlap) ──────────
     _bl: set = {(7, 51)}
@@ -2874,7 +2874,7 @@ def build_dungeon_7(seed: int) -> Dungeon:
 
     # ── Random filler rune clusters (secondary rows only; primary rows fixed) ──
     for _attempt in range(20):
-        composite.runes = list(_hardcoded)
+        composite.char_runs = list(_hardcoded)
         rng2 = random.Random(rng.randint(0, 2**31))
 
         _l7_fill_row(composite, rng2, 2,  3, 52, density=0.45, blocked=blocked, word_tbl=_VOCAB_MIXED_BY_LEN)  # C1r2 baseline
@@ -2884,8 +2884,8 @@ def build_dungeon_7(seed: int) -> Dungeon:
         # Protect entry and exit from void runes
         entry_r, entry_c = composite.spawn_pos
         exit_r,  exit_c  = composite.exit_pos
-        composite.runes = [
-            ru for ru in composite.runes
+        composite.char_runs = [
+            ru for ru in composite.char_runs
             if ru.kind != 'void' or not any(
                 ru.row == rr and ru.col <= cc < ru.col + len(ru.symbols)
                 for rr, cc in ((entry_r, entry_c), (exit_r, exit_c))
@@ -2946,10 +2946,10 @@ def build_dungeon_6(seed: int) -> Dungeon:
     rng = random.Random(seed)
     for c in range(2, 20):                   # row 1: cols 2-19
         if rng.random() < 0.6:
-            composite.runes.append(RuneCluster(row=1, col=c, symbols=('○',), kind='void'))
+            composite.char_runs.append(CharRun(row=1, col=c, symbols=('○',), kind='void'))
     for c in range(3, 19):                   # row 3: cols 3-18 (col 19 always clear)
         if rng.random() < 0.6:
-            composite.runes.append(RuneCluster(row=3, col=c, symbols=('○',), kind='void'))
+            composite.char_runs.append(CharRun(row=3, col=c, symbols=('○',), kind='void'))
 
     composite.entities.append(Entity(kind='exit',     row=3, col=1))
     composite.entities.append(Entity(kind='dynamite', row=3, col=2))
@@ -3012,11 +3012,11 @@ def _dijkstra_par_L11(composite, use_percent: bool = True, return_path: bool = F
     def _ok(r, c):
         if not composite.is_passable(r, c):
             return False
-        ru = composite.rune_at(r, c)
+        ru = composite.char_run_at(r, c)
         return not (ru and ru.kind == 'void')
 
     def _bracket_here(r, c):
-        ru = composite.rune_at(r, c)
+        ru = composite.char_run_at(r, c)
         if ru is not None:
             ch = ru.symbols[c - ru.col]
             if ch in _PAIRS_OPEN_L11 or ch in _PAIRS_CLOSE_L11:
@@ -3133,7 +3133,7 @@ def _dijkstra_par_L11(composite, use_percent: bool = True, return_path: bool = F
                 break
             rb = cc
         for cc in range(lb, rb + 1):
-            ru2 = composite.rune_at(r, cc)
+            ru2 = composite.char_run_at(r, cc)
             if ru2:
                 if _ok(r, cc):
                     _push((r, cc), 1, '^')
@@ -3208,23 +3208,23 @@ def build_dungeon_12(seed: int) -> Dungeon:
         if c != OPN and c != CLS:
             cells[3][c] = CellType.WATER
 
-    # ── Place bracket RuneClusters ────────────────────────────────────────────
-    # Single-char RuneCluster at each bracket position so _bracket_at() in
+    # ── Place bracket CharRuns ────────────────────────────────────────────
+    # Single-char CharRun at each bracket position so _bracket_at() in
     # motion.py can identify them via rune.symbols[c - rune.col].  Row 5's ) sits
     # at EXC (one left of CLS); the exit is at CLS, so the final % lands on ) at
     # EXC and one l steps onto the exit.
     rng = random.Random(seed)
     _kinds = ('ancient', 'verdant', 'ember')
 
-    runes: list[RuneCluster] = []
+    runes: list[CharRun] = []
     for row in _L11_CORR_ROWS:
         kind_open  = rng.choice(_kinds)
         kind_close = rng.choice(_kinds)
         close_col  = EXC if row == 5 else CLS
-        runes.append(RuneCluster(row=row, col=OPN, symbols=('(',), kind=kind_open))
-        runes.append(RuneCluster(row=row, col=close_col, symbols=(')',), kind=kind_close))
+        runes.append(CharRun(row=row, col=OPN, symbols=('(',), kind=kind_open))
+        runes.append(CharRun(row=row, col=close_col, symbols=(')',), kind=kind_close))
 
-    composite.runes = runes
+    composite.char_runs = runes
 
     # ── Entry and exit ────────────────────────────────────────────────────────
     composite.spawn_pos    = _L11_ENTRY
@@ -3335,7 +3335,7 @@ def _dijkstra_par_L10(composite, return_path: bool = False):
             if _ok(row, col, doors):
                 if left is None:
                     left = col
-                if composite.rune_at(row, col) is not None:
+                if composite.char_run_at(row, col) is not None:
                     left = col
                     break
         _fnb_cache[key] = left
@@ -3556,7 +3556,7 @@ def build_dungeon_10(seed: int, game_h: int = _L10_DEFAULT_GAME_H,
         (l_row, _L10_L_KEY_COL),
     ):
         sym = rng.choice([('∘',), ('·',), ('⊙',), ('∙',)])
-        composite.runes.append(RuneCluster(row=anchor_row, col=anchor_col,
+        composite.char_runs.append(CharRun(row=anchor_row, col=anchor_col,
                                            symbols=sym, kind=rng.choice(kinds)))
         blocked.add((anchor_row, anchor_col))
 
@@ -3577,7 +3577,7 @@ def build_dungeon_10(seed: int, game_h: int = _L10_DEFAULT_GAME_H,
                 c += 1
                 continue
             word = rng.choice(words)
-            composite.runes.append(RuneCluster(row=1, col=c,
+            composite.char_runs.append(CharRun(row=1, col=c,
                                                symbols=tuple(word),
                                                kind=rng.choice(kinds)))
             for i in range(len(word)):
@@ -3608,7 +3608,7 @@ def build_dungeon_10(seed: int, game_h: int = _L10_DEFAULT_GAME_H,
             if any((row, c + i) in blocked for i in range(len(word))):
                 c += 1
                 continue
-            composite.runes.append(RuneCluster(row=row, col=c,
+            composite.char_runs.append(CharRun(row=row, col=c,
                                                symbols=tuple(word),
                                                kind=rng.choice(kinds)))
             for i in range(len(word)):
@@ -3617,7 +3617,7 @@ def build_dungeon_10(seed: int, game_h: int = _L10_DEFAULT_GAME_H,
 
     # Void rune row: standard void runes (○) across cols 1-25 — where G lands.
     for c in range(1, 26):
-        composite.runes.append(RuneCluster(row=void_row, col=c,
+        composite.char_runs.append(CharRun(row=void_row, col=c,
                                            symbols=('○',), kind='void'))
 
     # ── Entry / spawn / exit ──────────────────────────────────────────────────
@@ -3719,12 +3719,12 @@ def _dijkstra_par_L13(composite, return_path=False,
             return False
         if (r, c) == (DR, DC) and not door_open:
             return False
-        ru = composite.rune_at(r, c)
+        ru = composite.char_run_at(r, c)
         return not (ru and ru.kind == 'void')
 
     def _row_blank(row, door_open):
         has_pass = any(_ok(row, cc, door_open) for cc in range(COLS))
-        has_rune = any(composite.rune_at(row, cc) is not None for cc in range(COLS))
+        has_rune = any(composite.char_run_at(row, cc) is not None for cc in range(COLS))
         return has_pass and not has_rune
 
     def _leftmost_pass(row, door_open):
@@ -3910,7 +3910,7 @@ def _dijkstra_par_LGG(composite, return_path: bool = False,
         di = door_index.get((r, c))
         if di is not None and not (dm >> di & 1):
             return False          # closed locked_door blocks
-        ru = composite.rune_at(r, c)
+        ru = composite.char_run_at(r, c)
         return not (ru and ru.kind == 'void')
 
     def _fnb(row, dm):
@@ -3921,7 +3921,7 @@ def _dijkstra_par_LGG(composite, return_path: bool = False,
             if _ok(row, c, dm):
                 if left is None:
                     left = c
-                if composite.rune_at(row, c) is not None:
+                if composite.char_run_at(row, c) is not None:
                     return c
         return left
 
@@ -4058,7 +4058,7 @@ def build_dungeon_9(seed: int) -> 'Dungeon':
     for dr, dc in _LGG_DOORS:
         entities.append(Entity(kind='locked_door', row=dr, col=dc))
     composite.entities = entities
-    composite.runes = []   # no seed-varying runes; the layout is fixed
+    composite.char_runs = []   # no seed-varying runes; the layout is fixed
 
     composite.rebuild_indexes()
     _fog_unreachable(composite, composite.spawn_pos[0], composite.spawn_pos[1])
@@ -4130,7 +4130,7 @@ def build_dungeon_13(seed: int) -> 'Dungeon':
                 w = len(syms)
                 if (c + w - 1 <= col_end
                         and not any(sk in range(c, c + w) for sk in skip_cols)):
-                    runes.append(RuneCluster(row=row, col=c, symbols=syms, kind=kind))
+                    runes.append(CharRun(row=row, col=c, symbols=syms, kind=kind))
                     c += w + rng.randint(2, 3)
                     first = False
                     continue
@@ -4147,9 +4147,9 @@ def build_dungeon_13(seed: int) -> 'Dungeon':
     for r in (16, 18):
         _fill_row(r)
 
-    runes.append(RuneCluster(row=_L13_VOID_POS[0], col=_L13_VOID_POS[1],
+    runes.append(CharRun(row=_L13_VOID_POS[0], col=_L13_VOID_POS[1],
                              symbols=('○',), kind='void'))
-    composite.runes = runes
+    composite.char_runs = runes
 
     composite.spawn_pos   = _L13_ENTRY
     composite.exit_pos = _L13_EXIT
@@ -4217,8 +4217,8 @@ def build_dungeon_14(seed: int) -> 'Dungeon':
     # ── Fixed sentence rune clusters ──────────────────────────────────────────
     runes: list = []
     for row, col, syms in _L14_SENT_CLUSTERS:
-        runes.append(RuneCluster(row=row, col=col, symbols=syms, kind='ember'))
-    composite.runes = runes
+        runes.append(CharRun(row=row, col=col, symbols=syms, kind='ember'))
+    composite.char_runs = runes
 
     # ── Entry and exit ─────────────────────────────────────────────────────────
     composite.spawn_pos    = _L14_ENTRY

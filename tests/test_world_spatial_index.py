@@ -1,6 +1,6 @@
-"""Phase 2: spatial index correctness — entity_at / rune_at and all mutation helpers."""
+"""Phase 2: spatial index correctness — entity_at / char_run_at and all mutation helpers."""
 import pytest
-from engine.world import Room, RoomType, CellType, Entity, RuneCluster
+from engine.world import Room, RoomType, CellType, Entity, CharRun
 
 
 def _make_room(rows=7, cols=16):
@@ -97,85 +97,85 @@ class TestEntityMutationHelpers:
         assert room.entity_at(3, 13) is e
 
 
-# ── rune_at ───────────────────────────────────────────────────────────────────
+# ── char_run_at ───────────────────────────────────────────────────────────────────
 
 class TestRuneAt:
     def test_hit_first_column(self):
         room = _make_room()
-        ru = RuneCluster(row=3, col=4, symbols=('∘', '∘', '∘'), kind='ancient')
-        room.add_rune(ru)
-        assert room.rune_at(3, 4) is ru
+        ru = CharRun(row=3, col=4, symbols=('∘', '∘', '∘'), kind='ancient')
+        room.add_char_run(ru)
+        assert room.char_run_at(3, 4) is ru
 
     def test_hit_middle_column(self):
         room = _make_room()
-        ru = RuneCluster(row=3, col=4, symbols=('∘', '∘', '∘'), kind='ancient')
-        room.add_rune(ru)
-        assert room.rune_at(3, 5) is ru
+        ru = CharRun(row=3, col=4, symbols=('∘', '∘', '∘'), kind='ancient')
+        room.add_char_run(ru)
+        assert room.char_run_at(3, 5) is ru
 
     def test_hit_last_column(self):
         room = _make_room()
-        ru = RuneCluster(row=3, col=4, symbols=('∘', '∘', '∘'), kind='ancient')
-        room.add_rune(ru)
-        assert room.rune_at(3, 6) is ru
+        ru = CharRun(row=3, col=4, symbols=('∘', '∘', '∘'), kind='ancient')
+        room.add_char_run(ru)
+        assert room.char_run_at(3, 6) is ru
 
     def test_miss_before_cluster(self):
         room = _make_room()
-        ru = RuneCluster(row=3, col=4, symbols=('∘', '∘'), kind='ancient')
-        room.add_rune(ru)
-        assert room.rune_at(3, 3) is None
+        ru = CharRun(row=3, col=4, symbols=('∘', '∘'), kind='ancient')
+        room.add_char_run(ru)
+        assert room.char_run_at(3, 3) is None
 
     def test_miss_after_cluster(self):
         room = _make_room()
-        ru = RuneCluster(row=3, col=4, symbols=('∘', '∘'), kind='ancient')
-        room.add_rune(ru)
-        assert room.rune_at(3, 6) is None
+        ru = CharRun(row=3, col=4, symbols=('∘', '∘'), kind='ancient')
+        room.add_char_run(ru)
+        assert room.char_run_at(3, 6) is None
 
     def test_miss_different_row(self):
         room = _make_room()
-        ru = RuneCluster(row=3, col=4, symbols=('∘',), kind='ancient')
-        room.add_rune(ru)
-        assert room.rune_at(2, 4) is None
+        ru = CharRun(row=3, col=4, symbols=('∘',), kind='ancient')
+        room.add_char_run(ru)
+        assert room.char_run_at(2, 4) is None
 
     def test_single_symbol_cluster(self):
         room = _make_room()
-        ru = RuneCluster(row=2, col=7, symbols=('·',), kind='verdant')
-        room.add_rune(ru)
-        assert room.rune_at(2, 7) is ru
-        assert room.rune_at(2, 8) is None
+        ru = CharRun(row=2, col=7, symbols=('·',), kind='verdant')
+        room.add_char_run(ru)
+        assert room.char_run_at(2, 7) is ru
+        assert room.char_run_at(2, 8) is None
 
 
 # ── rune mutation helpers ─────────────────────────────────────────────────────
 
 class TestRuneMutationHelpers:
-    def test_add_rune_indexes_all_columns(self):
+    def test_add_char_run_indexes_all_columns(self):
         room = _make_room()
-        ru = RuneCluster(row=2, col=3, symbols=('·', '·', '·', '·'), kind='verdant')
-        room.add_rune(ru)
+        ru = CharRun(row=2, col=3, symbols=('·', '·', '·', '·'), kind='verdant')
+        room.add_char_run(ru)
         for c in range(3, 7):
-            assert room.rune_at(2, c) is ru
+            assert room.char_run_at(2, c) is ru
 
-    def test_remove_rune_clears_all_columns(self):
+    def test_remove_char_run_clears_all_columns(self):
         room = _make_room()
-        ru = RuneCluster(row=2, col=3, symbols=('∘', '∘'), kind='ancient')
-        room.add_rune(ru)
-        room.remove_rune(ru)
-        assert room.rune_at(2, 3) is None
-        assert room.rune_at(2, 4) is None
-        assert ru not in room.runes
+        ru = CharRun(row=2, col=3, symbols=('∘', '∘'), kind='ancient')
+        room.add_char_run(ru)
+        room.remove_char_run(ru)
+        assert room.char_run_at(2, 3) is None
+        assert room.char_run_at(2, 4) is None
+        assert ru not in room.char_runs
 
     def test_rebuild_reindexes_multi_symbol(self):
         room = _make_room()
-        ru = RuneCluster(row=1, col=2, symbols=('∘', '∘', '∘'), kind='ancient')
-        room.runes.append(ru)            # bypass add_rune
-        assert room.rune_at(1, 3) is None  # not in index
+        ru = CharRun(row=1, col=2, symbols=('∘', '∘', '∘'), kind='ancient')
+        room.char_runs.append(ru)            # bypass add_char_run
+        assert room.char_run_at(1, 3) is None  # not in index
         room.rebuild_indexes()
-        assert room.rune_at(1, 3) is ru
+        assert room.char_run_at(1, 3) is ru
 
     def test_two_runes_adjacent_different_rows(self):
         room = _make_room()
-        ru1 = RuneCluster(row=2, col=5, symbols=('·',), kind='verdant')
-        ru2 = RuneCluster(row=3, col=5, symbols=('∘',), kind='ancient')
-        room.add_rune(ru1)
-        room.add_rune(ru2)
-        assert room.rune_at(2, 5) is ru1
-        assert room.rune_at(3, 5) is ru2
+        ru1 = CharRun(row=2, col=5, symbols=('·',), kind='verdant')
+        ru2 = CharRun(row=3, col=5, symbols=('∘',), kind='ancient')
+        room.add_char_run(ru1)
+        room.add_char_run(ru2)
+        assert room.char_run_at(2, 5) is ru1
+        assert room.char_run_at(3, 5) is ru2

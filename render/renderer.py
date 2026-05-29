@@ -2,7 +2,7 @@
 from __future__ import annotations
 import time
 from blessed import Terminal
-from engine.world import Dungeon, CellType, Room, RuneCluster, Entity
+from engine.world import Dungeon, CellType, Room, CharRun, Entity
 from engine.player import Player
 from engine.modes import Mode, MODE_LABELS
 from engine.visual import in_selection as _in_visual_sel
@@ -75,7 +75,7 @@ def _clip_to_items(clip) -> list:
     items: list = []
     for rw in clip.get('rows', []):
         for rd in rw.get('runes', []):
-            items.append({'type': 'rune', 'rune': RuneCluster(0, 0, rd['symbols'], rd['kind'])})
+            items.append({'type': 'rune', 'rune': CharRun(0, 0, rd['symbols'], rd['kind'])})
         for ed in rw.get('entities', []):
             t = ed['tmpl']
             items.append({'type': 'entity',
@@ -321,7 +321,7 @@ def render_all(term: Terminal, dungeon: Dungeon, player: Player,
                     continue
 
                 # Rune cluster?
-                ru = room.rune_at(room_r, room_c)
+                ru = room.char_run_at(room_r, room_c)
                 if ru:
                     idx = room_c - ru.col
                     sym = ru.symbols[idx]

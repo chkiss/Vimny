@@ -5,7 +5,7 @@ The cut/paste wiring lives in run_dungeon's keystroke loop, so these tests targe
 the engine-reachable contract it leans on: entity_clip + op_paste (the creature
 round-trip) and _clip_from_cut_runes (the letter round-trip)."""
 import pytest
-from engine.world import Room, RoomType, CellType, Entity, RuneCluster
+from engine.world import Room, RoomType, CellType, Entity, CharRun
 from engine.player import Player
 from engine.operator import entity_clip, op_paste
 from main import _clip_from_cut_runes, _enemy_tick, _PASTE_SPAWN_MSG
@@ -36,7 +36,7 @@ def _slain(kind, **kw):
 
 def _rune_item(sym, col, kind='ancient'):
     """A cut letter as `x` produces it (single-symbol rune at a column)."""
-    return {'type': 'rune', 'rune': RuneCluster(3, col, (sym,), kind)}
+    return {'type': 'rune', 'rune': CharRun(3, col, (sym,), kind)}
 
 
 # ── cut creature → clip → paste respawns it live & hostile ──────────────────────
@@ -92,7 +92,7 @@ def test_paste_cut_letter_after_cursor():
     player = Player(row=3, col=5)
     clip   = _clip_from_cut_runes([_rune_item('z', 5)], base_col=5)
     assert op_paste(room, player, clip, before=False)      # p → col 6
-    ru = room.rune_at(3, 6)
+    ru = room.char_run_at(3, 6)
     assert ru is not None and ru.symbols == ('z',)
 
 
@@ -110,7 +110,7 @@ def test_runes_only_clip_pastes_without_entities_key():
     clip   = {'linewise': False,
               'rows': [{'width': 1, 'runes': [{'dcol': 0, 'symbols': ('q',), 'kind': 'ancient'}]}]}
     assert op_paste(room, player, clip, before=False)
-    assert room.rune_at(3, 6) is not None
+    assert room.char_run_at(3, 6) is not None
 
 
 def test_creature_spawn_messages_cover_the_combat_kinds():

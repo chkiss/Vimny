@@ -3,7 +3,7 @@
 Personality defined in agents/bug_testers.md.
 """
 import pytest
-from engine.world import Room, RoomType, CellType, Entity, RuneCluster
+from engine.world import Room, RoomType, CellType, Entity, CharRun
 from engine.player import Player
 from engine.motion import apply_motion
 from main import _keystroke_cost
@@ -159,8 +159,8 @@ def test_zero_at_leftmost_passable_cell_is_noop():
 def test_caret_lands_on_first_rune():
     """^ must jump to the first rune cluster on the row."""
     room = _bare_room()
-    ru = RuneCluster(row=3, col=8, symbols=('∘', '∘'), kind='ancient')
-    room.runes.append(ru)
+    ru = CharRun(row=3, col=8, symbols=('∘', '∘'), kind='ancient')
+    room.char_runs.append(ru)
     room.rebuild_indexes()
     player = Player(row=3, col=20)
 
@@ -186,8 +186,8 @@ def test_caret_no_runes_falls_back_to_leftmost():
 def test_caret_noop_when_already_at_first_rune():
     """^ when already at the first rune should not move the player."""
     room = _bare_room()
-    ru = RuneCluster(row=3, col=5, symbols=('∘',), kind='ancient')
-    room.runes.append(ru)
+    ru = CharRun(row=3, col=5, symbols=('∘',), kind='ancient')
+    room.char_runs.append(ru)
     room.rebuild_indexes()
     player = Player(row=3, col=5)
 

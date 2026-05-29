@@ -73,11 +73,11 @@ def test_answer_uses_percent(seed):
 @pytest.mark.parametrize("seed", SEEDS)
 def test_bracket_structure_corridor_rows(seed):
     """( must be at col _L11_BRACKET_OPEN and ) at col _L11_BRACKET_CLOSE on each
-    corridor row.  Each bracket must be a single-char RuneCluster."""
+    corridor row.  Each bracket must be a single-char CharRun."""
     d = build_dungeon_12(seed)
     room = d.rooms[0]
     for r in _L11_CORR_ROWS:
-        open_ru = room.rune_at(r, _L11_BRACKET_OPEN)
+        open_ru = room.char_run_at(r, _L11_BRACKET_OPEN)
         assert open_ru is not None, (
             f"seed={seed}: no rune at ({r},{_L11_BRACKET_OPEN}) — expected '('"
         )
@@ -85,7 +85,7 @@ def test_bracket_structure_corridor_rows(seed):
             f"seed={seed}: rune at ({r},{_L11_BRACKET_OPEN}) symbols={open_ru.symbols}, expected ('(',)"
         )
         close_col = _L11_CLOSE_R5 if r == 5 else _L11_BRACKET_CLOSE
-        close_ru = room.rune_at(r, close_col)
+        close_ru = room.char_run_at(r, close_col)
         assert close_ru is not None, (
             f"seed={seed}: no rune at ({r},{close_col}) — expected ')'"
         )
@@ -132,7 +132,7 @@ def test_outer_paren_pair_matches_row1(seed):
     _PAIRS_CLOSE = {')': '(', ']': '[', '}': '{'}
 
     def _bracket_here(r, c):
-        ru = room.rune_at(r, c)
+        ru = room.char_run_at(r, c)
         if ru is not None:
             ch = ru.symbols[c - ru.col]
             if ch in _PAIRS_OPEN or ch in _PAIRS_CLOSE:

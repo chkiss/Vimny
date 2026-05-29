@@ -42,7 +42,7 @@ def test_word_motion_is_necessary(seed):
     room = d.room
     void_cells = {
         (ru.row, ru.col + i)
-        for ru in room.runes if ru.kind == 'void'
+        for ru in room.char_runs if ru.kind == 'void'
         for i in range(len(ru.symbols))
     }
     dist = {room.spawn_pos: 0}
@@ -69,7 +69,7 @@ def test_entry_and_exit_not_on_void(seed):
     room = d.room
     void_cells = {
         (ru.row, ru.col + i)
-        for ru in room.runes if ru.kind == 'void'
+        for ru in room.char_runs if ru.kind == 'void'
         for i in range(len(ru.symbols))
     }
     assert room.spawn_pos    not in void_cells, f"seed={seed}: entry is on a void cell"
@@ -93,18 +93,18 @@ def test_void_runes_present_in_turn_rooms(seed):
     """Turn-room void guards must exist to block direct j/k shortcutting."""
     d = build_dungeon_3(seed)
     room = d.room
-    void_runes = [ru for ru in room.runes if ru.kind == 'void']
+    void_runes = [ru for ru in room.char_runs if ru.kind == 'void']
     assert len(void_runes) >= 8, (
         f"seed={seed}: expected at least 8 void clusters (turn guards), "
         f"got {len(void_runes)}"
     )
 
 
-def test_anchor_rune_at_fixed_position():
+def test_anchor_char_run_at_fixed_position():
     """The exit-anchor rune at row=13, col=42 must always be present (hard-coded)."""
     d = build_dungeon_3(42)
     room = d.room
-    anchor = room.rune_at(13, 42)
+    anchor = room.char_run_at(13, 42)
     assert anchor is not None, "Expected anchor rune at (13, 42)"
     assert anchor.kind == 'ancient'
     assert anchor.col == 42 and anchor.row == 13

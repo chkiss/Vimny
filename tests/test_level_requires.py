@@ -12,7 +12,7 @@ def can_reach(room, entry, goal, allowed_keys):
     moves = [DELTA[k] for k in allowed_keys]
     void = {
         (ru.row, ru.col + i)
-        for ru in room.runes if ru.kind == 'void'
+        for ru in room.char_runs if ru.kind == 'void'
         for i in range(len(ru.symbols))
     }
     seen = {entry}

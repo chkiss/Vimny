@@ -97,7 +97,7 @@ def test_sentence_terminators_present(seed):
     d = build_dungeon_14(seed)
     room = d.rooms[0]
     terminators = [
-        ru for ru in room.runes
+        ru for ru in room.char_runs
         if ru.row == _L14_SENT_ROW and ru.symbols[-1] in '.!?'
     ]
     assert len(terminators) >= 2, (
@@ -111,7 +111,7 @@ def test_fixed_sentence_clusters_present(seed):
     d = build_dungeon_14(seed)
     room = d.rooms[0]
     for row, col, syms in _L14_SENT_CLUSTERS:
-        ru = room.rune_at(row, col)
+        ru = room.char_run_at(row, col)
         assert ru is not None, f"seed={seed}: no rune at ({row},{col})"
         assert ru.symbols == syms, (
             f"seed={seed}: rune at ({row},{col}) has symbols {ru.symbols!r}, "

@@ -16,7 +16,7 @@ from engine.modes import Mode
 from engine.budget import Budget
 from engine.vim_parser import parse
 from engine.command_guard import action_allowed as _action_allowed, guard_message as _guard_message
-from engine.world import Entity, CellType, RuneCluster, Dungeon
+from engine.world import Entity, CellType, CharRun, Dungeon
 from engine.motion import apply_motion, move_player, _apply_esc, _reveal_from, _cell_char, _first_non_blank_col
 from engine.text_object import compute_text_object, resolve_text_object
 from engine.search import find_next as _search_next, word_under_cursor as _word_under_cursor
@@ -776,7 +776,7 @@ def _snapshot(room, player, budget, *, row=None, col=None, spent=None, ans=None)
                             origin_row=e.origin_row, move_dir=e.move_dir,
                             tag=e.tag)
                      for e in room.entities],
-        'runes':    [RuneCluster(ru.row, ru.col, ru.symbols, ru.kind) for ru in room.runes],
+        'runes':    [CharRun(ru.row, ru.col, ru.symbols, ru.kind) for ru in room.char_runs],
         'cells':    [r[:] for r in room.cells],
         'rows':     room.rows,
         'exit_pos': room.exit_pos,
@@ -798,7 +798,7 @@ def _pop_history_step(src: list, dst: list, room, player, budget) -> bool:
         budget.spent  = item['spent']
         room.entities = item['entities']
         if 'runes' in item:
-            room.runes = item['runes']
+            room.char_runs = item['runes']
         if 'cells' in item:
             room.cells = item['cells']
             room.rows  = item['rows']
@@ -1433,10 +1433,10 @@ def run_dungeon(term: Terminal, level: int, progress: dict,
                         r, c = player.row, player.col
                         ed_undo.append(_ed_snapshot(room, player))
                         ed_redo.clear()
-                        existing = room.rune_at(r, c)
+                        existing = room.char_run_at(r, c)
                         if existing:
-                            room.remove_rune(existing)
-                        room.add_rune(RuneCluster(row=r, col=c,
+                            room.remove_char_run(existing)
+                        room.add_char_run(CharRun(row=r, col=c,
                                                   symbols=(_RUNE_SYMS[kind],), kind=kind))
                         _merge_adjacent_runes(room, r)
                         _push(f'Placed {kind} rune.')
@@ -1533,7 +1533,7 @@ def run_dungeon(term: Terminal, level: int, progress: dict,
                     if ch.isprintable() and len(ch) == 1:
                         ed_undo.append(_ed_snapshot(room, player))
                         _ed_cut(room, r, c)
-                        room.add_rune(RuneCluster(row=r, col=c,
+                        room.add_char_run(CharRun(row=r, col=c,
                                                   symbols=(ch,), kind='ember'))
                         _merge_adjacent_runes(room, r)
                         if c + 1 < room.cols:
@@ -1728,7 +1728,7 @@ def run_dungeon(term: Terminal, level: int, progress: dict,
                     _push(f'{count}{motion} moved {count} steps in 2 keystrokes — count is efficient!')
 
                 # Void rune: fall animation, lose heart, respawn (skip in edit mode)
-                ru = room.rune_at(player.row, player.col)
+                ru = room.char_run_at(player.row, player.col)
                 if not edit_mode and ru and ru.kind == 'void':
                     iw    = _iw(term)
                     game_h = term.height - 8

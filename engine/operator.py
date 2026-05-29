@@ -6,7 +6,7 @@ This is how Vimny stays Vim-faithful — `yy` yanks the whole line including the
 spaces between runes (bounded by stone walls), not just the rune clusters.
 """
 from __future__ import annotations
-from engine.world import CellType, RuneCluster, Entity
+from engine.world import CellType, CharRun, Entity
 from engine.text_object import TextObjectType
 from engine.editor import _merge_adjacent_runes
 
@@ -29,7 +29,7 @@ def _capture_row(room, row: int, lo: int, hi: int) -> dict:
     """Capture runes overlapping [lo, hi] on `row`, split at the boundaries,
     each tagged with its column offset (dcol) from `lo`."""
     runes = []
-    for ru in room._rune_by_row.get(row, []):
+    for ru in room._char_runs_by_row.get(row, []):
         rlo, rhi = ru.col, ru.col + len(ru.symbols) - 1
         if rhi < lo or rlo > hi:
             continue
@@ -114,15 +114,15 @@ _WALL_CELLS = (CellType.WALL, CellType.WATER, CellType.WOOD_WALL)
 
 def _delete_cols(room, row: int, lo: int, hi: int) -> None:
     """Remove everything visible in [lo, hi] on `row`: runes, wall cells, and entities."""
-    affected = [ru for ru in room._rune_by_row.get(row, [])
+    affected = [ru for ru in room._char_runs_by_row.get(row, [])
                 if not (ru.col + len(ru.symbols) - 1 < lo or ru.col > hi)]
     for ru in affected:
-        room.remove_rune(ru)
+        room.remove_char_run(ru)
         if ru.col < lo:                                   # left remnant
-            room.add_rune(RuneCluster(row, ru.col, tuple(ru.symbols[:lo - ru.col]), ru.kind))
+            room.add_char_run(CharRun(row, ru.col, tuple(ru.symbols[:lo - ru.col]), ru.kind))
         rhi = ru.col + len(ru.symbols) - 1
         if rhi > hi:                                      # right remnant
-            room.add_rune(RuneCluster(row, hi + 1, tuple(ru.symbols[hi + 1 - ru.col:]), ru.kind))
+            room.add_char_run(CharRun(row, hi + 1, tuple(ru.symbols[hi + 1 - ru.col:]), ru.kind))
     for c in range(lo, hi + 1):
         if room.cells[row][c] in _WALL_CELLS:
             room.cells[row][c] = CellType.FLOOR
@@ -180,7 +180,7 @@ def _place_row(room, row: int, start_col: int, rclip: dict) -> int:
             else:
                 break                       # stop this cluster at a wall/edge
         if syms:
-            room.add_rune(RuneCluster(row, base, tuple(syms), rd['kind']))
+            room.add_char_run(CharRun(row, base, tuple(syms), rd['kind']))
             last = base + len(syms) - 1
     return last
 
@@ -192,7 +192,7 @@ def apply_indent(room, row: int, amount: int) -> int:
     """Shift every rune cluster on `row` by `amount` columns (right > 0, left < 0),
     clamped within the row's passable extent (between the stone walls). Returns the
     net amount actually applied."""
-    clusters = list(room._rune_by_row.get(row, []))
+    clusters = list(room._char_runs_by_row.get(row, []))
     ext = line_extent(room, row)
     if not clusters or ext is None:
         return 0
@@ -206,9 +206,9 @@ def apply_indent(room, row: int, amount: int) -> int:
     if amount == 0:
         return 0
     for ru in clusters:
-        room.remove_rune(ru)
+        room.remove_char_run(ru)
     for ru in clusters:
-        room.add_rune(RuneCluster(row, ru.col + amount, ru.symbols, ru.kind))
+        room.add_char_run(CharRun(row, ru.col + amount, ru.symbols, ru.kind))
     return amount
 
 
@@ -223,7 +223,7 @@ def _case_transform(op: str, sym: str) -> str:
 def _case_cols(room, row: int, lo: int, hi: int, op: str) -> bool:
     """Transform the case of rune symbols in [lo, hi] on `row`. Returns changed."""
     changed = False
-    for ru in room._rune_by_row.get(row, []):
+    for ru in room._char_runs_by_row.get(row, []):
         rlo, rhi = ru.col, ru.col + len(ru.symbols) - 1
         if rhi < lo or rlo > hi:
             continue
@@ -264,7 +264,7 @@ def case_char(room, player, count: int = 1) -> bool:
     changed = False
     for _ in range(count):
         r, c = player.row, player.col
-        ru = room.rune_at(r, c)
+        ru = room.char_run_at(r, c)
         if ru is not None:
             k = c - ru.col
             new = list(ru.symbols)

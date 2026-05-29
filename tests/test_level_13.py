@@ -78,7 +78,7 @@ def test_door_entity_at_door_pos(seed):
 @pytest.mark.parametrize("seed", SEEDS)
 def test_void_at_correct_position(seed):
     room = build_dungeon_13(seed).rooms[0]
-    ru = room.rune_at(_L13_VOID_POS[0], _L13_VOID_POS[1])
+    ru = room.char_run_at(_L13_VOID_POS[0], _L13_VOID_POS[1])
     assert ru is not None and ru.kind == 'void', f"seed={seed}: no void at {_L13_VOID_POS}"
 
 
@@ -90,7 +90,7 @@ def test_blank_rows_have_no_runes(seed):
     room = build_dungeon_13(seed).rooms[0]
     for row in _BLANK_ROWS:
         for c in range(_L13_COLS):
-            assert room.rune_at(row, c) is None, (
+            assert room.char_run_at(row, c) is None, (
                 f"seed={seed}: unexpected rune at ({row},{c})"
             )
 
@@ -109,7 +109,7 @@ def test_content_rows_have_runes(seed):
     """Every content row must have at least one rune cluster (non-blank)."""
     room = build_dungeon_13(seed).rooms[0]
     for row in _CONTENT_ROWS:
-        has_rune = any(room.rune_at(row, c) is not None for c in range(_L13_COLS))
+        has_rune = any(room.char_run_at(row, c) is not None for c in range(_L13_COLS))
         assert has_rune, f"seed={seed}: content row {row} has no rune clusters"
 
 
