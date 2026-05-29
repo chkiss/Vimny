@@ -1,8 +1,9 @@
 # Vimny — Level Curriculum Plan
 
 > Canonical curriculum source: `content/levels.py` (`LEVELS` + `known_commands()`).
-> SPEC.md §9–§10 is a **stale 20-level draft** that contradicts the code and should be
-> rewritten or deleted once this plan lands. This document supersedes it for curriculum.
+> SPEC.md no longer holds a curriculum: its stale 20-level draft (former §9–§10) was removed
+> in the 2026-05 prune, leaving SPEC.md as design vision / UI only. This document and
+> `content/levels.py` are the curriculum source of truth.
 
 This plan was produced in two phases:
 1. **Audit** — the current curriculum stress-tested against four design principles.
@@ -214,7 +215,7 @@ game runs correctly again:
 - [ ] `unlocks_after` chains and any `commands_level` overrides.
 - [ ] Boss `x.1` keys/ids for the **new** bosses (9.1, 13.1, 30.1, 32.1).
 - [ ] Save/progress migration (old saves reference old IDs) — add a remap or reset note.
-- [ ] Rewrite or delete SPEC.md §9–§10.
+- [x] Rewrite or delete SPEC.md §9–§10. *(Done 2026-05: SPEC pruned to vision/UI; curriculum/command/boss sections removed.)*
 - [ ] Register the new commands in `known_commands()` (`J gJ`, `>> <<`, `g~ gU gu`, `r R`,
       text objects, search, marks, `:s`, macros).
 
