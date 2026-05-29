@@ -8,6 +8,8 @@ from engine.modes import Mode
 from engine.world import Room, RoomType, CellType, Entity
 from engine.player import Player
 from engine.command_guard import action_allowed
+from engine.operator import entity_clip
+from engine.registers import write_register, read_register
 
 
 def _bare_room(rows=7, cols=30):
@@ -76,97 +78,44 @@ def test_P_target_is_one_cell_to_left():
     assert target.kind == 'locked_door'
 
 
-# ── Key lookup in register ────────────────────────────────────────────────────
+# ── Key lives in the unnamed " register (one payload; reusable; overwritten by a cut) ──
 
-def test_key_found_in_register_at_index_0():
-    """Key lookup must succeed when the first register item is a floor_key."""
+def _key_clip(tag=''):
+    return entity_clip(Entity(kind='floor_key', row=2, col=2, tag=tag))
+
+
+def _reg_keys(player):
+    clip = read_register(player, '"') or {}
+    return [ed['tmpl'] for rw in clip.get('rows', [])
+            for ed in rw.get('entities', ()) if ed['tmpl'].get('kind') == 'floor_key']
+
+
+def test_key_held_in_unnamed_register():
+    """A picked-up key is just the unnamed register's payload."""
     player = Player()
-    player.inventory = [_floor_key_item()]
-
-    reg_key_idx = next(
-        (i for i, it in enumerate(player.inventory)
-         if it.get('type') == 'entity' and
-         it.get('entity') and it['entity'].kind == 'floor_key'),
-        None,
-    )
-
-    assert reg_key_idx == 0
+    write_register(player, '"', _key_clip(), is_delete=True)
+    assert _reg_keys(player), 'the " register must hold the floor_key'
 
 
-def test_key_found_in_register_when_preceded_by_other_item():
-    """Key lookup must find a floor_key even if another item precedes it."""
+def test_cutting_overwrites_held_key():
+    """Cutting anything after picking up a key overwrites it — one payload in "."""
     player = Player()
-    player.inventory = [
-        {'type': 'entity', 'entity': Entity(kind='goblin', row=1, col=1)},
-        _floor_key_item(),
-    ]
-
-    reg_key_idx = next(
-        (i for i, it in enumerate(player.inventory)
-         if it.get('type') == 'entity' and
-         it.get('entity') and it['entity'].kind == 'floor_key'),
-        None,
-    )
-
-    assert reg_key_idx == 1
+    write_register(player, '"', _key_clip(), is_delete=True)
+    write_register(player, '"',
+                   {'linewise': False,
+                    'rows': [{'width': 1,
+                              'runes': [{'dcol': 0, 'symbols': ('x',), 'kind': 'ancient'}]}]},
+                   is_delete=True)
+    assert not _reg_keys(player), 'a later cut must overwrite the held key'
 
 
-def test_key_not_found_in_empty_register():
-    """Key lookup on an empty register must return None."""
+def test_key_not_consumed_so_it_is_reusable():
+    """Unlock reads the key but never empties " — so p p / 3p reuse one key."""
     player = Player()
-    player.inventory = []
-
-    reg_key_idx = next(
-        (i for i, it in enumerate(player.inventory)
-         if it.get('type') == 'entity' and
-         it.get('entity') and it['entity'].kind == 'floor_key'),
-        None,
-    )
-
-    assert reg_key_idx is None
-
-
-def test_key_not_found_when_only_goblin_in_register():
-    """Register with non-key item must not match the key lookup."""
-    player = Player()
-    player.inventory = [
-        {'type': 'entity', 'entity': Entity(kind='goblin', row=1, col=1)}
-    ]
-
-    reg_key_idx = next(
-        (i for i, it in enumerate(player.inventory)
-         if it.get('type') == 'entity' and
-         it.get('entity') and it['entity'].kind == 'floor_key'),
-        None,
-    )
-
-    assert reg_key_idx is None
-
-
-# ── Key consumption ───────────────────────────────────────────────────────────
-
-def test_consuming_key_removes_it_from_register():
-    """After unlocking, the key must be removed from the register (not just ignored)."""
-    player = Player()
-    player.inventory = [_floor_key_item()]
-
-    reg_key_idx = 0
-    player.inventory.pop(reg_key_idx)
-
-    assert player.inventory == [], "register must be empty after key is consumed"
-
-
-def test_consuming_key_removes_only_that_item():
-    """Only the floor_key should be consumed; other register items must remain."""
-    player = Player()
-    other = {'type': 'entity', 'entity': Entity(kind='shield', row=1, col=1)}
-    player.inventory = [other, _floor_key_item()]
-
-    reg_key_idx = 1
-    player.inventory.pop(reg_key_idx)
-
-    assert len(player.inventory) == 1
-    assert player.inventory[0] is other
+    write_register(player, '"', _key_clip(), is_delete=True)
+    read_register(player, '"')
+    read_register(player, '"')
+    assert _reg_keys(player), 'the key must persist for repeated pastes'
 
 
 # ── Wrong direction: p with door to the left does nothing ────────────────────

@@ -2058,8 +2058,9 @@ def run_dungeon(term: Terminal, level: int, progress: dict,
                     room.kill_entity(cur)
                     budget.spend(1)
                     if item == 'key':
-                        player.inventory = [{'type': 'entity',
-                                             'entity': Entity(kind='floor_key', row=cur.row, col=cur.col)}]
+                        _reg_write(player, '"',
+                                   entity_clip(Entity(kind='floor_key', row=cur.row, col=cur.col)),
+                                   is_delete=True)
                         _push('You found a key!')
                     elif item == 'heart':
                         player.heal(2)
@@ -2137,7 +2138,7 @@ def run_dungeon(term: Terminal, level: int, progress: dict,
                     undo_stack.append(_snapshot(room, player, budget, ans=cmd_start_ans))
                     redo_stack.clear()
                     room.kill_entity(cur)
-                    player.inventory = [{'type': 'entity', 'entity': cur}]
+                    _reg_write(player, '"', entity_clip(cur), is_delete=True)
                     budget.spend(1)
                     _push('Key picked up — use p to unlock a door.')
                     interacted = True
@@ -2227,57 +2228,58 @@ def run_dungeon(term: Terminal, level: int, progress: dict,
 
         elif not edit_mode and action['type'] == 'paste' and _action_allowed(action, player.known_commands):
             before = action.get('before', False)
-            dc = -1 if before else 1          # P → left, p → right
+            count  = action.get('count', 1)
+            dc     = -1 if before else 1          # P → left, p → right
             target = room.entity_at(player.row, player.col + dc)
-            clip = _reg_read(player, action.get('register', '"'))
-            has_content = bool(clip) and any(
-                rw.get('runes') or rw.get('entities') for rw in clip['rows'])
-            if has_content:
-                # One register for everything cut/yanked: lay runes back down and
-                # respawn any cut creature live & hostile (op_paste handles both).
-                undo_stack.append(_snapshot(room, player, budget, ans=cmd_start_ans))
-                redo_stack.clear()
-                if op_paste(room, player, clip, before):
-                    budget.spend(1)
-                    spawned = next((ed['tmpl']['kind']
-                                    for rw in clip['rows'] for ed in rw.get('entities', ())),
-                                   None)
-                    _push(_PASTE_SPAWN_MSG.get(spawned, 'It springs back to life!')
-                          if spawned else 'Pasted.')
-                else:
-                    undo_stack.pop()
-                    _push('Nothing pasted (no room).')
-            elif target and target.kind == 'locked_door':
-                reg_key_idx = next(
-                    (i for i, it in enumerate(player.inventory)
-                     if it.get('type') == 'entity' and
-                     it.get('entity') and it['entity'].kind == 'floor_key' and
-                     (not target.tag or it['entity'].tag == target.tag)),
+            clip   = _reg_read(player, action.get('register', '"'))
+            clip_entities = [ed for rw in (clip['rows'] if clip else ())
+                             for ed in rw.get('entities', ())]
+            if target and target.kind == 'locked_door':
+                # Unlock with a key held in the unnamed register. The register is
+                # NOT consumed — p never empties " in Vim — so one key opens as
+                # many doors as you paste on, until a later cut overwrites it.
+                key_tmpl = next(
+                    (ed['tmpl'] for ed in clip_entities
+                     if ed['tmpl'].get('kind') == 'floor_key'
+                     and (not target.tag or ed['tmpl'].get('tag', '') == target.tag)),
                     None,
                 )
-                if reg_key_idx is not None:
-                    _held_key = player.inventory[reg_key_idx]['entity']
-                    _kclr = (C.key_gold_fg() if _held_key.tag == 'gold' else
-                             C.key_red_fg()  if _held_key.tag == 'red'  else
-                             C.key_blue_fg() if _held_key.tag == 'blue' else None)
+                if key_tmpl is not None:
+                    _ktag = key_tmpl.get('tag', '')
+                    _kclr = (C.key_gold_fg() if _ktag == 'gold' else
+                             C.key_red_fg()  if _ktag == 'red'  else
+                             C.key_blue_fg() if _ktag == 'blue' else None)
                     undo_stack.append(_snapshot(room, player, budget, ans=cmd_start_ans))
                     redo_stack.clear()
-                    player.inventory.pop(reg_key_idx)
                     render_all(term, dungeon, player, budget, _pool_msg(), attack_pos=_attack_pos(), attack_sym=_attack_sym())
                     _unlock_animation(term, room, player,
                                       target.row, target.col,
                                       _iw(term), term.height - 8, _kclr)
                     _kill_door_group(room, target.row, target.col, kind='locked_door')
                     _reveal_from(room, player.row, player.col)
-                    budget.spend(1)
+                    budget.spend(_keystroke_cost(count, 'p'))
                     _push('Door unlocked!')
                 else:
-                    _has_key = any(
-                        it.get('type') == 'entity' and it.get('entity') and
-                        it['entity'].kind == 'floor_key'
-                        for it in player.inventory
-                    )
-                    player.error = 'E: Wrong key for this door' if _has_key else 'E: No key in inventory'
+                    _has_key = any(ed['tmpl'].get('kind') == 'floor_key' for ed in clip_entities)
+                    player.error = 'E: Wrong key for this door' if _has_key else 'E: No key held'
+            elif clip and any(rw.get('runes') or rw.get('entities') for rw in clip['rows']):
+                # One register for everything cut/yanked: lay runes back down and
+                # respawn cut creatures. count repeats the paste (3p = 3 copies).
+                undo_stack.append(_snapshot(room, player, budget, ans=cmd_start_ans))
+                redo_stack.clear()
+                placed_any = False
+                for _ in range(count):
+                    if op_paste(room, player, clip, before):
+                        placed_any = True
+                    else:
+                        break
+                if placed_any:
+                    budget.spend(_keystroke_cost(count, 'p'))
+                    spawned = next((ed['tmpl']['kind'] for ed in clip_entities), None)
+                    _push(_PASTE_SPAWN_MSG[spawned] if spawned in _PASTE_SPAWN_MSG else 'Pasted.')
+                else:
+                    undo_stack.pop()
+                    _push('Nothing pasted (no room).')
             else:
                 _push('Nothing to paste here.')
 
@@ -2581,9 +2583,9 @@ def run_dungeon(term: Terminal, level: int, progress: dict,
                 if (ent.alive
                         and abs(ent.row - player.row) + abs(ent.col - player.col) <= 1):
                     has_reg_key = any(
-                        it.get('type') == 'entity' and
-                        it.get('entity') and it['entity'].kind == 'floor_key'
-                        for it in player.inventory
+                        ed['tmpl'].get('kind') == 'floor_key'
+                        for rw in (_reg_read(player, '"') or {}).get('rows', [])
+                        for ed in rw.get('entities', ())
                     )
                     if has_reg_key and id(ent) not in door_open_hint_shown:
                         door_open_hint_shown.add(id(ent))
