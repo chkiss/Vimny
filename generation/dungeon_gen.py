@@ -3652,27 +3652,27 @@ def build_dungeon_10(seed: int, game_h: int = _L10_DEFAULT_GAME_H,
 #   exit at (15,46) — inside side room.
 #   void at (20,1) — prevents } from exiting safely.
 #
-# Navigation: rows 6-8 are all non-blank (three-row code block), forcing the
-# second { to skip row 7 and land at blank row 5 (key).  Key is 10 rows above
-# door row 15, so count-j navigation costs 10j (3 ks) vs } } (2 ks) — making
-# brace jumps strictly cheaper.
+# Navigation: rows 6-8 are all non-blank (three-row code block), so a single {
+# from the spawn on blank row 9 skips them and lands at blank row 5 (key).  Key
+# is 10 rows above door row 15, so count-j navigation costs 10j (3 ks) vs } }
+# (2 ks) — making brace jumps strictly cheaper.
 #
-# Optimal path (par=8):  { { x } } $ p $
-#   Spawn (10,20): { → (9,1)  { → (5,1) [key; rows 6-8 non-blank, skip].
-#                  x picks up key.
-#                  } → (9,1)  } → (15,1) [door row].
-#                  $ → (15,42) [locked_door at 43 blocks $].
-#                  p unlocks door at (15,43).  $ → (15,46) EXIT.
+# Optimal path (par=7):  { x } } $ p $
+#   Spawn (9,20): { → (5,1) [key; rows 6-8 non-blank, skipped].
+#                 x picks up key.
+#                 } → (9,1)  } → (15,1) [door row].
+#                 $ → (15,42) [locked_door at 43 blocks $].
+#                 p unlocks door at (15,43).  $ → (15,46) EXIT.
 
 _L13_ROWS     = 22
 _L13_COLS     = 48        # main 44 (cols 0–43) + side room 4 (cols 44–47)
-_L13_ENTRY    = (10, 20)  # spawn position
+_L13_ENTRY    = (9, 20)   # spawn position
 _L13_EXIT     = (15, 46)  # exit entity (inside side room)
 _L13_KEY_POS  = (5, 1)    # floor_key entity (blank row above code block)
 _L13_DOOR_POS = (15, 43)  # locked_door entity
 _L13_VOID_POS = (20, 1)   # void rune
-_L13_PAR      = 8
-_L13_ANSWER   = '{ { x } } $ p $'
+_L13_PAR      = 7
+_L13_ANSWER   = '{ x } } $ p $'
 
 # ── Level 14 (Sentence Corridor) constants ────────────────────────────────
 # Without (/): wall gaps (cols 11-22 and 37-48) block all l/h/w paths.
@@ -4086,7 +4086,7 @@ def build_dungeon_13(seed: int) -> 'Dungeon':
     locked_door at (15,43) — right wall of main room at door row.
     exit at (15,46) — inside side room.
 
-    Optimal path (par=8):  { { x } } $ p $
+    Optimal path (par=7):  { x } } $ p $   (spawn (9,20), a blank row)
     """
     dungeon   = Dungeon(name='The Runic Archives', seed=seed)
     ROWS, COLS = _L13_ROWS, _L13_COLS

@@ -10,9 +10,9 @@ floor_key at (5,1) — blank row above code block (rows 6-8 all non-blank).
 locked_door at (15,43) — right-wall position at door row.
 exit at (15,46) — inside side room.
 
-Optimal path (par=8):  { { x } } $ p $
-  Spawn (10,20): { → (9,1)  { → (5,1) [key].  x picks up key.
-                 } → (9,1)  } → (15,1).  $ → (15,42).  p unlocks door.  $ → exit.
+Optimal path (par=7):  { x } } $ p $
+  Spawn (9,20): { → (5,1) [key].  x picks up key.
+                } → (9,1)  } → (15,1).  $ → (15,42).  p unlocks door.  $ → exit.
 """
 import math
 import pytest
@@ -129,7 +129,7 @@ def test_budget_is_ceil_par_times_1_4(seed):
 
 
 def test_par_is_correct():
-    """Par must equal _L13_PAR=8 for all seeds; answer must match _L13_ANSWER."""
+    """Par must equal _L13_PAR=7 for all seeds; answer must match _L13_ANSWER."""
     for seed in SEEDS:
         room = build_dungeon_13(seed).rooms[0]
         assert room.par == _L13_PAR, f"seed={seed}: par={room.par} != {_L13_PAR}"
@@ -153,7 +153,7 @@ def test_answer_uses_both_brace_directions(seed):
 def test_brace_required(seed):
     """Without {{ and }}, the cost exceeds par.
 
-    The optimal brace path (8 ks) beats the best hjkl/$-only path (10 ks):
+    The optimal brace path (7 ks) beats the best hjkl/$-only path (10 ks):
     10j from key row 5 to door row 15 costs 3 ks; } } costs only 2 ks.
     """
     room = build_dungeon_13(seed).rooms[0]
