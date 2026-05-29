@@ -10,7 +10,7 @@ def _make_room(rows=7, cols=16):
          for c in range(cols)]
         for r in range(rows)
     ]
-    room.gg_pos    = (3, 1)
+    room.spawn_pos    = (3, 1)
     room.exit_pos = (3, 13)
     room.rebuild_indexes()
     return room

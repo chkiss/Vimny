@@ -134,7 +134,7 @@ def _bfs_par(composite, return_path: bool = False):
         for ru in composite.runes if ru.kind == 'void'
         for i in range(len(ru.symbols))
     }
-    entry = composite.gg_pos
+    entry = composite.spawn_pos
     goal  = composite.exit_pos
     dist  = {entry: 0}
     prev  = {entry: None}
@@ -171,7 +171,7 @@ def _dijkstra_par_count(composite) -> int | None:
     through them and only the final landing cell triggers damage — matching
     engine behaviour in apply_motion.  Only true walls stop the search.
     """
-    entry = composite.gg_pos
+    entry = composite.spawn_pos
     goal  = composite.exit_pos
     max_n = max(composite.rows, composite.cols)
 
@@ -208,7 +208,7 @@ def _dijkstra_par_level2(composite, door_cols: list, return_path: bool = False):
     """
     n = len(door_cols)
     all_closed = (1 << n) - 1
-    entry = composite.gg_pos
+    entry = composite.spawn_pos
     goal  = composite.exit_pos
     max_n = max(composite.rows, composite.cols)
 
@@ -357,7 +357,7 @@ def build_dungeon_0(seed: int) -> Dungeon:
 
     # Entry: top-left interior of Room 0 → forces the player to use j (down)
     # to reach the corridor, and k (up) to reach the exit.
-    composite.gg_pos = (1, 2)
+    composite.spawn_pos = (1, 2)
 
     # Exit: top-left interior of Room 2 (col offsets[-1]+1).
     # Player arrives at corridor rows 4-5 at the left edge of Room 2 and must
@@ -395,7 +395,7 @@ def build_dungeon_0(seed: int) -> Dungeon:
         composite.runes.append(RuneCluster(row=3, col=ex_c, symbols=('○',), kind='void'))
 
         # Never leave a void rune sitting on the entry or exit itself.
-        entry_r, entry_c = composite.gg_pos
+        entry_r, entry_c = composite.spawn_pos
         exit_r,  exit_c  = composite.exit_pos
         composite.runes = [
             ru for ru in composite.runes
@@ -436,7 +436,7 @@ def _bfs_par_line(composite, return_path: bool = False):
     $ and ^ are wall-bounded: they stop at the nearest wall in each direction,
     matching apply_motion semantics.  Targets are precomputed per (row, col).
     """
-    entry = composite.gg_pos
+    entry = composite.spawn_pos
     goal  = composite.exit_pos
 
     rune_cols_by_row: dict[int, list[int]] = {}
@@ -551,7 +551,7 @@ def build_dungeon_1(seed: int) -> Dungeon:
     composite.seed  = seed
 
     # Entry above corridor rows — player must use j to reach the corridor.
-    composite.gg_pos = (2, 2)
+    composite.spawn_pos = (2, 2)
 
     # Exit at leftmost interior cell of EXIT room on row 1 (EXIT-only row).
     # offsets[-1]=82; interior starts at col 83.  Row 1 is above corridor
@@ -642,7 +642,7 @@ def build_dungeon_2(seed: int) -> Dungeon:
     composite.seed  = seed
 
     # Entry near top-left of Room 0 — player must navigate down+right to corridor
-    composite.gg_pos = (2, 2)
+    composite.spawn_pos = (2, 2)
 
     # Exit near top-left interior of Room 2 — arrives via corridor then goes up
     ex_c = offsets[-1] + 1   # = 61
@@ -668,7 +668,7 @@ def build_dungeon_2(seed: int) -> Dungeon:
                               plan[2][1], plan[2][2], total_rows, 0.18)
 
         # Never place a void rune on the entry or exit cell itself
-        entry_r, entry_c = composite.gg_pos
+        entry_r, entry_c = composite.spawn_pos
         exit_r,  exit_c  = composite.exit_pos
         composite.runes = [
             ru for ru in composite.runes
@@ -701,7 +701,7 @@ def build_dungeon_2(seed: int) -> Dungeon:
     composite.par, composite.answer = _dijkstra_par_level2(composite, door_cols, return_path=True)
     composite.budget = math.ceil(composite.par * 1.4)
 
-    _fog_unreachable(composite, composite.gg_pos[0], composite.gg_pos[1])
+    _fog_unreachable(composite, composite.spawn_pos[0], composite.spawn_pos[1])
 
     dungeon.rooms    = [composite]
     dungeon.current_room = 0
@@ -760,7 +760,7 @@ def _dijkstra_par_wbe(composite, return_path: bool = False):
     """
     from collections import defaultdict
 
-    entry = composite.gg_pos
+    entry = composite.spawn_pos
     goal  = composite.exit_pos
     max_n = max(composite.rows, composite.cols)
 
@@ -938,7 +938,7 @@ def _dijkstra_par_ftFT(composite, return_path: bool = False):
             if ch in _SCAN_CHARS:
                 row_chars[r].append((c, ch))
 
-    entry = composite.gg_pos
+    entry = composite.spawn_pos
     goal  = composite.exit_pos
     max_n = max(ROWS, COLS)
 
@@ -1163,7 +1163,7 @@ def build_dungeon_3(seed: int) -> Dungeon:
         for c in range(ru.col, ru.col + len(ru.symbols))
     )
 
-    composite.gg_pos    = (1, 1)
+    composite.spawn_pos    = (1, 1)
     composite.exit_pos = (13, 44)
     composite.entities = [Entity(kind='exit', row=13, col=44)]
 
@@ -1267,7 +1267,7 @@ def build_dungeon_4(seed: int) -> Dungeon:
         Entity(kind='exit',  row=13, col=65),
     ]
     composite.entities = list(_fixed)
-    composite.gg_pos    = (1, 1)
+    composite.spawn_pos    = (1, 1)
     composite.exit_pos = (13, 65)
 
     # ── Blocked cells: water + text/anchor runes + fixed entities ─────────────
@@ -1352,7 +1352,7 @@ def build_dungeon_1_1(seed: int) -> Dungeon:
     composite.cells = cells
     composite.seed  = seed
 
-    composite.gg_pos    = (1, 1)
+    composite.spawn_pos    = (1, 1)
     composite.exit_pos = (1, 15)
 
     composite.entities = [
@@ -1424,7 +1424,7 @@ def build_dungeon_dummy(seed: int) -> Dungeon:
     composite.cells = cells
     composite.seed  = seed
 
-    composite.gg_pos    = (1, 1)
+    composite.spawn_pos    = (1, 1)
     composite.exit_pos = (9, 70)
 
     composite.entities = [
@@ -1459,7 +1459,7 @@ def build_dungeon_dummy(seed: int) -> Dungeon:
     composite.budget         = 99999
     composite.passable_walls = False
     composite.rebuild_indexes()
-    _fog_unreachable(composite, composite.gg_pos[0], composite.gg_pos[1])
+    _fog_unreachable(composite, composite.spawn_pos[0], composite.spawn_pos[1])
     dungeon.rooms        = [composite]
     dungeon.current_room = 0
     return dungeon
@@ -1646,7 +1646,7 @@ def build_dungeon_5(seed: int) -> Dungeon:
     composite = Room(room_type=RoomType.ENTRY, rows=_L5_ROWS, cols=_L5_COLS)
     composite.cells    = cells
     composite.seed     = seed
-    composite.gg_pos    = (1, 1)
+    composite.spawn_pos    = (1, 1)
     composite.exit_pos = (18, 56)
 
     entities: list = [Entity(kind='entry_marker', row=1, col=1)]
@@ -1735,7 +1735,7 @@ def build_dungeon_5(seed: int) -> Dungeon:
     composite.answer = _answer_l5(corr_data, gobs17)
 
     composite.rebuild_indexes()
-    _fog_unreachable(composite, composite.gg_pos[0], composite.gg_pos[1])
+    _fog_unreachable(composite, composite.spawn_pos[0], composite.spawn_pos[1])
 
     dungeon.rooms        = [composite]
     dungeon.current_room = 0
@@ -1817,7 +1817,7 @@ def build_dungeon_51(seed: int) -> Dungeon:
     composite = Room(room_type=RoomType.COMBAT, rows=ROWS, cols=COLS)
     composite.cells    = cells
     composite.seed     = seed
-    composite.gg_pos    = (3, 0)
+    composite.spawn_pos    = (3, 0)
     composite.exit_pos = (3, 39)
     composite.entities = [
         Entity(kind='seal_door',       row=3, col=16),
@@ -1934,7 +1934,7 @@ def _dijkstra_par_WBE(composite, return_path=False):
     W: start of next WORD.  B: start of current (or prev) WORD.  E: end of WORD.
     """
     ROWS, COLS = composite.rows, composite.cols
-    entry = composite.gg_pos
+    entry = composite.spawn_pos
     goal  = composite.exit_pos
     max_n = max(ROWS, COLS)
 
@@ -2270,7 +2270,7 @@ def _dijkstra_par_L8(composite, return_path: bool = False):
     layout W≡w, B≡b, E≡e, so par is unchanged by their inclusion.
     """
     ROWS, COLS = composite.rows, composite.cols
-    entry = composite.gg_pos
+    entry = composite.spawn_pos
     goal  = composite.exit_pos
     max_n = max(ROWS, COLS)
 
@@ -2782,7 +2782,7 @@ def build_dungeon_8(seed: int) -> Dungeon:
 
     composite.runes = runes
 
-    composite.gg_pos    = (1, 1)
+    composite.spawn_pos    = (1, 1)
     composite.exit_pos = (12, 19)
     composite.entities = [Entity(kind='exit', row=12, col=19)]
 
@@ -2847,7 +2847,7 @@ def build_dungeon_7(seed: int) -> Dungeon:
     cells[6][1] = CellType.WALL
 
     # ── Entry and exit ────────────────────────────────────────────────────────
-    composite.gg_pos    = (1, 1)
+    composite.spawn_pos    = (1, 1)
     composite.exit_pos = (7, 51)   # last char of C3 code group "output=data[n]._key"
     composite.entities = [Entity(kind='exit', row=7, col=51)]
 
@@ -2882,7 +2882,7 @@ def build_dungeon_7(seed: int) -> Dungeon:
         _l7_fill_row(composite, rng2, 8,  3, 52, density=0.45, blocked=blocked, word_tbl=_VOCAB_MIXED_BY_LEN)  # C3r8 baseline
 
         # Protect entry and exit from void runes
-        entry_r, entry_c = composite.gg_pos
+        entry_r, entry_c = composite.spawn_pos
         exit_r,  exit_c  = composite.exit_pos
         composite.runes = [
             ru for ru in composite.runes
@@ -2954,7 +2954,7 @@ def build_dungeon_6(seed: int) -> Dungeon:
     composite.entities.append(Entity(kind='exit',     row=3, col=1))
     composite.entities.append(Entity(kind='dynamite', row=3, col=2))
 
-    composite.gg_pos  = (1, 1)
+    composite.spawn_pos  = (1, 1)
     composite.par    = 11
     composite.budget = math.ceil(11 * 1.4)
     composite.answer = 'v $ x $ j j v F ! x h'
@@ -3003,7 +3003,7 @@ def _dijkstra_par_L11(composite, use_percent: bool = True, return_path: bool = F
     use_percent=False simulates the command-necessity test (% disabled).
     """
     ROWS, COLS = composite.rows, composite.cols
-    entry = composite.gg_pos
+    entry = composite.spawn_pos
     goal  = composite.exit_pos
 
     _PAIRS_OPEN_L11  = {'(': ')', '[': ']', '{': '}'}
@@ -3227,7 +3227,7 @@ def build_dungeon_12(seed: int) -> Dungeon:
     composite.runes = runes
 
     # ── Entry and exit ────────────────────────────────────────────────────────
-    composite.gg_pos    = _L11_ENTRY
+    composite.spawn_pos    = _L11_ENTRY
     composite.exit_pos = _L11_EXIT_POS
     composite.entities = [Entity(kind='exit',
                                  row=_L11_EXIT_POS[0], col=_L11_EXIT_POS[1])]
@@ -3263,7 +3263,7 @@ _L10_M_KEY_COL = 25   # anchor col in M_ROW; rightmost of narrow corridor
 _L10_L_KEY_COL = 1    # anchor col in L_ROW; leftmost passable
 _L10_DOOR_COLS = (26, 33, 39)   # locked_door cols in row 1
 _L10_EXIT_COL  = 41             # exit entity col in row 1
-_L10_GG_POS    = (1, 1)
+_L10_TOP_LEFT    = (1, 1)
 _L10_SPAWN     = (8, 13)
 _L10_COLORS    = ('gold', 'red', 'blue')
 _L10_PAR       = 17   # deterministic: 17 for every color assignment (verified in
@@ -3301,8 +3301,8 @@ def _dijkstra_par_L10(composite, return_path: bool = False):
     M_COL  = _L10_M_KEY_COL
     L_COL  = _L10_L_KEY_COL
     D_COLS = _L10_DOOR_COLS
-    EX     = (_L10_GG_POS[0], _L10_EXIT_COL)
-    entry  = composite.gg_pos
+    EX     = (_L10_TOP_LEFT[0], _L10_EXIT_COL)
+    entry  = composite.spawn_pos
 
     door_key = composite._door_key  # door_key[d] = inv value (1/2/3) that opens door d
 
@@ -3621,7 +3621,6 @@ def build_dungeon_10(seed: int, game_h: int = _L10_DEFAULT_GAME_H,
                                            symbols=('○',), kind='void'))
 
     # ── Entry / spawn / exit ──────────────────────────────────────────────────
-    composite.gg_pos    = _L10_GG_POS
     composite.spawn_pos = _L10_SPAWN
     composite.exit_pos  = (1, _L10_EXIT_COL)
 
@@ -3710,7 +3709,7 @@ def _dijkstra_par_L13(composite, return_path=False,
     KR, KC = _L13_KEY_POS
     DR, DC = _L13_DOOR_POS
     EX     = _L13_EXIT
-    entry  = composite.gg_pos
+    entry  = composite.spawn_pos
     max_n  = max(ROWS, COLS)
 
     def _ok(r, c, door_open):
@@ -3863,7 +3862,7 @@ def _dijkstra_par_L13(composite, return_path=False,
 # _dijkstra_par_LGG (key/door + line-jump model).
 _LGG_ROWS  = 16
 _LGG_COLS  = 11
-_LGG_ENTRY = (1, 1)             # gg_pos / spawn (first line)
+_LGG_ENTRY = (1, 1)             # spawn / first line
 _LGG_EXIT  = (1, 9)             # exit entity == exit_pos (top-right)
 _LGG_KEYS  = ((4, 1), (14, 2))  # floor_key positions
 _LGG_DOORS = ((1, 3), (1, 6))   # locked_door positions
@@ -3882,7 +3881,7 @@ def _dijkstra_par_LGG(composite, return_path: bool = False,
     Models the vertical key/door shaft with the commands a Level-8 player has:
       hjkl + count-hjkl, 0 / $ / ^ (1 ks each),
       G  (1 ks)  → last line, first-non-blank col,
-      gg (2 ks)  → gg_pos (first line),
+      gg (2 ks)  → first line, first-non-blank col (mirror of G),
       {n}G (len(str(n))+1 ks) → line n, scanning down to a passable row, fnb col,
       x  (1 ks)  → pick up the floor_key here (overwrites the single register slot),
       p / P (1 ks) → open the locked_door to the right / left, consuming the key.
@@ -3895,7 +3894,7 @@ def _dijkstra_par_LGG(composite, return_path: bool = False,
     Goal: reach _LGG_EXIT (only reachable once both doors are open).
     """
     ROWS, COLS = composite.rows, composite.cols
-    entry = composite.gg_pos
+    entry = composite.spawn_pos
     keys  = _LGG_KEYS
     doors = _LGG_DOORS
     EX    = _LGG_EXIT
@@ -3973,9 +3972,13 @@ def _dijkstra_par_LGG(composite, return_path: bool = False,
                         _try((rr, gc, km, hold, dm), 1, 'G')
                     break
 
-            # gg: first line == gg_pos (2 ks)
-            if _ok(entry[0], entry[1], dm) and (entry[0], entry[1]) != (r, c):
-                _try((entry[0], entry[1], km, hold, dm), 2, 'gg')
+            # gg: first line (scan down to a passable row), land on first-non-blank (2 ks)
+            for rr in range(ROWS):
+                gc = _fnb(rr, dm)
+                if gc is not None:
+                    if (rr, gc) != (r, c):
+                        _try((rr, gc, km, hold, dm), 2, 'gg')
+                    break
 
             # {n}G: line n (1-based); scan down from row n-1 to a passable row, fnb
             for n in range(1, ROWS + 1):
@@ -4047,7 +4050,7 @@ def build_dungeon_9(seed: int) -> 'Dungeon':
             cells[row][c] = CellType.CORRIDOR
 
     # ── Entry / exit / keys / doors ───────────────────────────────────────────
-    composite.gg_pos   = _LGG_ENTRY
+    composite.spawn_pos   = _LGG_ENTRY
     composite.exit_pos = _LGG_EXIT
     entities = [Entity(kind='exit', row=_LGG_EXIT[0], col=_LGG_EXIT[1])]
     for kr, kc in _LGG_KEYS:
@@ -4058,7 +4061,7 @@ def build_dungeon_9(seed: int) -> 'Dungeon':
     composite.runes = []   # no seed-varying runes; the layout is fixed
 
     composite.rebuild_indexes()
-    _fog_unreachable(composite, composite.gg_pos[0], composite.gg_pos[1])
+    _fog_unreachable(composite, composite.spawn_pos[0], composite.spawn_pos[1])
 
     # ── Compute par via Dijkstra (key/door + line-jump model) ─────────────────
     par, path = _dijkstra_par_LGG(composite, return_path=True)
@@ -4148,7 +4151,7 @@ def build_dungeon_13(seed: int) -> 'Dungeon':
                              symbols=('○',), kind='void'))
     composite.runes = runes
 
-    composite.gg_pos   = _L13_ENTRY
+    composite.spawn_pos   = _L13_ENTRY
     composite.exit_pos = _L13_EXIT
     composite.entities = [
         Entity(kind='floor_key',   row=_L13_KEY_POS[0],  col=_L13_KEY_POS[1]),
@@ -4218,7 +4221,7 @@ def build_dungeon_14(seed: int) -> 'Dungeon':
     composite.runes = runes
 
     # ── Entry and exit ─────────────────────────────────────────────────────────
-    composite.gg_pos    = _L14_ENTRY
+    composite.spawn_pos    = _L14_ENTRY
     composite.exit_pos = _L14_EXIT
     composite.entities = [Entity(kind='exit', row=_L14_EXIT[0], col=_L14_EXIT[1])]
 

@@ -50,7 +50,7 @@ def make_room(room_type: RoomType, rows: int, cols: int, seed: int,
         _place_clusters(room, rng, density)
 
     # Entry point: top-left interior
-    room.gg_pos = (1, 1)
+    room.spawn_pos = (1, 1)
 
     # Exit: depends on room type
     if room_type == RoomType.EXIT:

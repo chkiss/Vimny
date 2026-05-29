@@ -238,8 +238,9 @@ The player's primary stance. Full navigation and combat available.
 | `w` | Jump to start of next rune cluster |
 | `b` | Jump to start of previous rune cluster |
 | `e` | Jump to end of current/next rune cluster |
-| `gg` | Jump to dungeon entry point |
-| `G` | Jump to dungeon exit |
+| `gg` | Jump to first line, first non-blank column |
+| `G` | Jump to last line, first non-blank column |
+| `{n}G` / `{n}gg` | Jump to line _n_, first non-blank column |
 | `{` | Jump to start of current room |
 | `}` | Jump to start of next room |
 | `f{c}` | Jump forward to next occurrence of character `c` in row |

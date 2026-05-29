@@ -46,7 +46,7 @@ def _operator_target(op: str, double_ch: str, buf: str, j0: int, count_n: int):
             return None, buf
         g2 = buf[j+1]
         if g2 == 'g':
-            return {'type': 'operator', 'op': op, 'motion': 'gg', 'count': count_n, 'motion_count': mc}, buf[j+2:]
+            return {'type': 'operator', 'op': op, 'motion': 'gg', 'count': count_n, 'motion_count': mc, 'motion_count_given': bool(motion_count)}, buf[j+2:]
         if g2 in 'eE':
             return {'type': 'operator', 'op': op, 'motion': 'g' + g2, 'count': count_n, 'motion_count': mc}, buf[j+2:]
         return {'type': 'unknown'}, buf[j+2:]
@@ -105,7 +105,7 @@ def parse(buf: str, mode: Mode) -> tuple[dict | None, str]:
             return None, buf
         g2 = buf[i+1]
         if g2 == 'g':
-            return {'type': 'motion', 'motion': 'gg', 'count': count_n}, buf[i+2:]
+            return {'type': 'motion', 'motion': 'gg', 'count': count_n, 'count_given': bool(count)}, buf[i+2:]
         if g2 in 'eE':
             return {'type': 'motion', 'motion': 'g' + g2, 'count': count_n}, buf[i+2:]
         if g2 == 'v':                              # gv — reselect last visual span

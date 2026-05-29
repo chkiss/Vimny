@@ -16,7 +16,7 @@ def _bare_room():
          for c in range(COLS)]
         for r in range(ROWS)
     ]
-    room.gg_pos    = (3, 1)
+    room.spawn_pos = (3, 1)
     room.exit_pos = (3, 20)
     room.rebuild_indexes()
     return room
@@ -395,11 +395,36 @@ class TestApplyMotionJumps:
         apply_motion(p, 'G', 1, room, count_given=False)
         assert (p.row, p.col) == (ROWS - 2, 1)
 
-    def test_gg_jumps_to_entry(self):
+    def test_gg_jumps_to_first_line(self):
+        # bare gg → first passable row (row 1), leftmost col (no runes); ignores spawn_pos
         room = _bare_room()
         p = _player(5, 15)
-        apply_motion(p, 'gg', 1, room)
-        assert (p.row, p.col) == room.gg_pos
+        apply_motion(p, 'gg', 1, room, count_given=False)
+        assert (p.row, p.col) == (1, 1)
+
+    def test_gg_lands_on_first_rune_of_first_line(self):
+        # row 1: cols 1-3 blank, rune at col 4 → first-non-blank is the rune col
+        room = _bare_room()
+        room.add_rune(RuneCluster(row=1, col=4, symbols=('x',), kind='ancient'))
+        room.rebuild_indexes()
+        p = _player(5, 10)
+        apply_motion(p, 'gg', 1, room, count_given=False)
+        assert (p.row, p.col) == (1, 4)
+
+    def test_gg_ignores_spawn_pos(self):
+        # gg is buffer-relative, not spawn-relative (regression guard for the bug-loop)
+        room = _bare_room()
+        room.spawn_pos = (5, 10)
+        p = _player(4, 8)
+        apply_motion(p, 'gg', 1, room, count_given=False)
+        assert (p.row, p.col) == (1, 1)
+
+    def test_ngg_jumps_to_line_n(self):
+        # {n}gg → line n (row index n-1), first non-blank — mirrors {n}G
+        room = _bare_room()
+        p = _player(5, 10)
+        apply_motion(p, 'gg', 3, room, count_given=True)
+        assert (p.row, p.col) == (2, 1)
 
 
 # ── apply_motion: ge gE backward word-end (Block E) ──────────────────────────

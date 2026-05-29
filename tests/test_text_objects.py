@@ -15,7 +15,7 @@ def _room():
          for c in range(COLS)]
         for r in range(ROWS)
     ]
-    room.gg_pos = (1, 1)
+    room.spawn_pos = (1, 1)
     room.rebuild_indexes()
     return room
 

@@ -16,8 +16,8 @@ def _count_optimal_reach(composite, max_count=50):
         for ru in composite.runes if ru.kind == 'void'
         for i in range(len(ru.symbols))
     }
-    dist = {composite.gg_pos: 0}
-    heap = [(0, composite.gg_pos)]
+    dist = {composite.spawn_pos: 0}
+    heap = [(0, composite.spawn_pos)]
     goal = composite.exit_pos
     while heap:
         cost, (r, c) = heapq.heappop(heap)
@@ -112,8 +112,8 @@ def test_count_is_necessary(seed):
         for i in range(len(ru.symbols))
     }
     # BFS counting one keystroke per single-step move
-    dist = {room.gg_pos: 0}
-    q = deque([room.gg_pos])
+    dist = {room.spawn_pos: 0}
+    q = deque([room.spawn_pos])
     while q:
         pos = q.popleft()
         r, c = pos
@@ -153,7 +153,7 @@ def test_entry_and_exit_not_on_void(seed):
         for ru in room.runes if ru.kind == 'void'
         for i in range(len(ru.symbols))
     }
-    assert room.gg_pos    not in void_cells, f"seed={seed}: entry is on a void cell"
+    assert room.spawn_pos    not in void_cells, f"seed={seed}: entry is on a void cell"
     assert room.exit_pos not in void_cells, f"seed={seed}: exit is on a void cell"
 
 
@@ -173,7 +173,7 @@ def test_3j_59l_3k_does_not_beat_par():
     d = build_dungeon_2(1)
     room = d.room
 
-    player = Player(row=room.gg_pos[0], col=room.gg_pos[1])
+    player = Player(row=room.spawn_pos[0], col=room.spawn_pos[1])
 
     for motion, count in [('j', 3), ('l', 59), ('k', 3)]:
         apply_motion(player, motion, count, room)

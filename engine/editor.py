@@ -60,7 +60,7 @@ def _ed_cut(room, r, c):
         if ent.kind == 'exit':
             room.exit_pos = None
         elif ent.kind == 'entry_marker':
-            room.gg_pos = (1, 1)
+            room.spawn_pos = (1, 1)
         return {'type': 'entity', 'entity': ent}
     ct = room.cells[r][c]
     if ct in (CellType.WALL, CellType.WATER, CellType.WOOD_WALL):
@@ -77,7 +77,7 @@ def _ed_snapshot(room, player) -> dict:
         'entities':    [Entity(kind=e.kind, row=e.row, col=e.col, hp=e.hp, alive=e.alive)
                         for e in room.entities],
         'exit_pos':    room.exit_pos,
-        'gg_pos':      room.gg_pos,
+        'spawn_pos':   room.spawn_pos,
         'wood_damage': dict(room.wood_damage),
         'pr':          player.row,
         'pc':          player.col,
@@ -89,7 +89,7 @@ def _ed_restore(room, player, snap: dict) -> None:
     room.runes       = snap['runes']
     room.entities    = snap['entities']
     room.exit_pos    = snap['exit_pos']
-    room.gg_pos       = snap.get('gg_pos', snap.get('entry', room.gg_pos))
+    room.spawn_pos    = snap.get('spawn_pos', snap.get('gg_pos', room.spawn_pos))
     room.wood_damage = snap.get('wood_damage', {})
     player.row       = snap['pr']
     player.col       = snap['pc']
@@ -127,7 +127,7 @@ def _ed_paste(room, r, start_c, items):
             if ent.kind == 'exit':
                 room.exit_pos = (r, c)
             elif ent.kind == 'entry_marker':
-                room.gg_pos = (r, c)
+                room.spawn_pos = (r, c)
             c += 1
         elif item['type'] == 'cell':
             room.cells[r][c] = item['cell_type']
@@ -154,7 +154,7 @@ def _ed_clear_row(room, r):
         if e.kind == 'exit':
             room.exit_pos = None
         elif e.kind == 'entry_marker':
-            room.gg_pos = (1, 1)
+            room.spawn_pos = (1, 1)
 
 
 def _ed_range_items(room, r1, c1, r2, c2):
@@ -185,7 +185,7 @@ def _ed_delete_range(room, r1, c1, r2, c2):
         if e.kind == 'exit':
             room.exit_pos = None
         elif e.kind == 'entry_marker':
-            room.gg_pos = (1, 1)
+            room.spawn_pos = (1, 1)
     return items
 
 
@@ -218,8 +218,8 @@ def _deserialize_room(data: dict):
                      for e in data.get('entities', [])]
     ep = data.get('exit_pos')
     room.exit_pos = tuple(ep) if ep else None
-    en = data.get('gg_pos', data.get('entry', [1, 1]))
-    room.gg_pos    = tuple(en)
+    en = data.get('spawn_pos', data.get('gg_pos', data.get('entry', [1, 1])))
+    room.spawn_pos = tuple(en)
     room.rebuild_indexes()
     return room
 
@@ -237,6 +237,6 @@ def _serialize_room(room) -> dict:
                      for ru in room.runes],
         'entities': [{'kind': e.kind, 'row': e.row, 'col': e.col}
                      for e in room.entities if e.alive],
-        'gg_pos':   list(room.gg_pos),
+        'spawn_pos': list(room.spawn_pos),
         'exit_pos': list(room.exit_pos) if room.exit_pos else None,
     }
