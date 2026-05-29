@@ -70,7 +70,7 @@ Each dungeon is a text buffer. The floor is made of **rune clusters** — groups
 | 6 | The Warden's Sight | `W B E` | Playable |
 | 7+ | — | — | Planned |
 
-Full curriculum (20 dungeons) in `SPEC.md`.
+Full curriculum: `content/levels.py` (canonical) and `LEVELS_PLAN.md` Part 7.
 
 ## Commands taught so far
 
@@ -109,9 +109,10 @@ render/
   renderer.py            Read-only view of state (no mutation)
 save/
   save_manager.py        Progress I/O, layout save
-tests/                   942 tests; pytest
-SPEC.md                  Full design specification
-developer/               Level plan documents
+tests/                   pytest test suite
+SPEC.md                  Design vision, UI spec, forward-looking notes
+LEVELS_PLAN.md           Curriculum plan (Part 7 = canonical level table)
+developer/               Legacy level plan documents
 ```
 
 ## Running tests
@@ -127,4 +128,4 @@ pytest
 - **Everything is a buffer.** Dungeons are files; the overworld is a directory; `:w`, `:q`, `:e` are real mechanics.
 - **Renderer never mutates state.** Required for a future web port (same logic, swap renderer for xterm.js).
 
-See `SPEC.md` for the complete design document.
+See `LEVELS_PLAN.md` for the curriculum and `SPEC.md` for design vision & UI.
