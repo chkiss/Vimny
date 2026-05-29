@@ -64,9 +64,22 @@ def _fmt_quote(chosen: dict) -> tuple[str, str, str, str]:
         return (pad, lines[0], pad, pad)
 
 
-def select_quote(max_level: int) -> tuple[str, str, str, str]:
-    """Return 4 box-inner strings (each exactly _BOX_INNER_W chars) for the quote box."""
-    pool = [q for q in _QUOTES if q['level'] <= max_level] or _QUOTES
+def _generic_pool() -> list[dict]:
+    """Poems with no specific level (title flavour + blessing fallback)."""
+    return [q for q in _QUOTES if q.get('introduces_id') is None]
+
+
+def select_quote(unlocked_ids: set[int]) -> tuple[str, str, str, str]:
+    """Return 4 box-inner strings for the title-screen quote box.
+
+    Picks from the generic pool plus any lesson poem whose introduced level
+    the player has already unlocked, so the wisdom never spoils a level the
+    player has not yet reached.
+    """
+    pool = _generic_pool() + [
+        q for q in _QUOTES if q.get('introduces_id') in unlocked_ids
+    ]
+    pool = pool or _QUOTES
     if not pool:
         blank = ' ' * _BOX_INNER_W
         return (blank, blank, blank, blank)
@@ -83,21 +96,23 @@ def select_quote_by_name(name: str) -> tuple[str, str, str, str]:
 
 
 def select_next_lesson_quote(completed_level_id: int) -> tuple[str, str, str, str]:
-    """Return a wisdom quote for the lesson that follows completed_level_id.
+    """Return the wisdom quote that introduces the level after completed_level_id.
 
-    Maps the completed level to its ordinal position in LEVELS (skipping
-    admin-only entries) and picks a quote at that ordinal + 1, falling back
-    to general level-0 quotes when no exact match exists.
+    Finds the next visible level in curriculum order and fires the poem tagged
+    with that level's id (introduces_id). Falls back to the generic pool when no
+    dedicated poem exists (e.g. after the final level). Keying by id — not by
+    ordinal position — keeps the corpus aligned when levels are reordered.
     """
     visible_ids = [l['id'] for l in LEVELS if not l.get('admin_only')]
     try:
-        wisdom_idx = visible_ids.index(completed_level_id) + 1
+        nxt = visible_ids.index(completed_level_id) + 1
+        next_id = visible_ids[nxt] if nxt < len(visible_ids) else None
     except ValueError:
-        wisdom_idx = 0
+        next_id = None
 
-    pool = [q for q in _QUOTES if q['level'] == wisdom_idx]
+    pool = [q for q in _QUOTES if q.get('introduces_id') == next_id] if next_id is not None else []
     if not pool:
-        pool = [q for q in _QUOTES if q['level'] == 0]
+        pool = _generic_pool()
     if not pool:
         blank = ' ' * _BOX_INNER_W
         return (blank, blank, blank, blank)
