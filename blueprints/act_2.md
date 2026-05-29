@@ -342,7 +342,7 @@ terrain, consistent with Vim's motion model where ge scans buffer positions.)*
 
 ---
 
-## Level 7 — The Long Plumb (`G gg`)
+## Level 7 — The Lineheads (`G gg`)
 
 ### New mechanics (≤3)
 
@@ -1156,7 +1156,7 @@ that:
 |---|---|---|---|---|---|---|
 | 5 | The WORD Forge | `W B E` | 11 | 15 (M=1.35) | Joint: all-three-skip=16>15 ✓ | S2 (code density + wall strip + tight M) |
 | 6 | The Backward Vaults | `ge gE` | 18 | 19 (M=1.055) | ge: ∞ (wall strip); gE: 20>19 ✓ | S1(ge) + S2(gE) |
-| 7 | The Long Plumb | `G gg` | 11 | 15 (M=1.36) | G: 16>15 ✓; gg: ∞ (full wall) ✓ | S1(gg) + S2(G) |
+| 7 | The Lineheads | `G gg` | 11 | 15 (M=1.36) | G: 16>15 ✓; gg: ∞ (full wall) ✓ | S1(gg) + S2(G) |
 | 8 | The Screen Vault | `H M L` | 17 | 19 (M=1.11) | STRICT individual: H-skip=20>19 ✓; M-skip=20>19 ✓; L-skip=20>19 ✓ | S2 per-command (3 sub-rooms, Δ=3 each) |
 | 9 | The Void Rift | `} {` | 3 | 5 (M=1.4) | ∞ (void barriers lethal) ✓ | S1 |
 | 9.5 | The Sentence Corridor | `) (` | 3 | 5 (M=1.4) | ∞ (wall gaps block h-count) ✓ | S1 |
