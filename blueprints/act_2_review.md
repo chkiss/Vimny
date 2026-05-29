@@ -121,7 +121,7 @@ Player at col 38, row 11. Must reach col 19 (exit anchor end).
 
 ---
 
-## Level 7 — The Long Plumb (`G gg {n}G`)
+## Level 7 — The Lineheads (`G gg {n}G`)
 
 ### 1. SCOPE
 
@@ -402,7 +402,7 @@ Each phase claims Act I-only paths cost infinity. Spot-check:
 
 ---
 
-### Level 7 — The Long Plumb
+### Level 7 — The Lineheads
 
 **Recomputed par = 11. Budget = 16.**
 

@@ -110,7 +110,7 @@ yet taught, with phases that each demand a different command from the act.
 |---|---|---|---|
 | 6 | The WORD Forge | `W B E` | — |
 | 7 | The Backward Vaults | `ge gE` | — |
-| 8 | The Long Plumb | `G gg` | — |
+| 8 | The Lineheads | `G gg` | — |
 | 9 | The Screen Vault | `H M L` | fix `L` forcing via room height |
 | 10 | The Bracket Vaults | `%` | bracket/pair matching |
 | 12 | The Runic Archives | `} {` | paragraph jumps; void barriers force `}` |
@@ -340,7 +340,7 @@ original convention). Bosses are `x.1` (id = `{N}1`, key `dungeon_{N:02d}.1`). B
 | 51 | the_wardens_keep | The Warden's Keep | — | boss |
 | 6 | the_word_forge | The WORD Forge | `W B E` | |
 | 7 | the_backward_vaults | The Backward Vaults | `ge gE` | |
-| 8 | the_long_plumb | The Long Plumb | `G gg` | |
+| 8 | the_lineheads | The Lineheads | `G gg` | |
 | 9 | the_screen_vault | The Screen Vault | `H M L` | |
 | 10 | the_bracket_vaults | The Bracket Vaults | `%` | |
 | 12 | the_runic_archives | The Runic Archives | `} {` | |

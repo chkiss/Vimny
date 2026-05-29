@@ -1,4 +1,4 @@
-"""Level 8 (id=8) — The Long Plumb: dungeon correctness tests.
+"""Level 8 (id=8) — The Lineheads: dungeon correctness tests.
 
 Teaching goal: G (last line), gg (first line), {n}G (nth line).
 

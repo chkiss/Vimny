@@ -90,8 +90,8 @@ LEVELS = [
     },
     {
         'id': 8,
-        'key': 'dungeon_08_the_long_plumb',
-        'name': 'The Long Plumb',
+        'key': 'dungeon_08_the_lineheads',
+        'name': 'The Lineheads',
         'commands': 'G gg',
         'unlocks_after': 7,
     },

@@ -3842,10 +3842,10 @@ def _dijkstra_par_L13(composite, return_path=False,
     return None
 
 
-# ── Level 8 — G/gg: The Long Plumb ─────────────────────────────────────────
+# ── Level 8 — G/gg: The Lineheads ─────────────────────────────────────────
 # 16-row × 11-col vertical shaft teaching G (last line), gg (first line), and
 # {n}G (nth line).  Restored from the admin design layout saved as
-# "dungeon_09_the_screen_vault_pre-reversion" (a mislabel — it is the Long Plumb).
+# "dungeon_09_the_screen_vault_pre-reversion" (a mislabel — it is the Lineheads).
 #
 # Layout:
 #   Row 1     : top corridor cols 1-9; start (1,1), exit (1,9);
@@ -3876,7 +3876,7 @@ _LGG_PASSABLE = {
 
 def _dijkstra_par_LGG(composite, return_path: bool = False,
                       disable_line_jumps: bool = False):
-    """Minimum-keystroke Dijkstra for Level 8 — The Long Plumb.
+    """Minimum-keystroke Dijkstra for Level 8 — The Lineheads.
 
     Models the vertical key/door shaft with the commands a Level-8 player has:
       hjkl + count-hjkl, 0 / $ / ^ (1 ks each),
@@ -4024,11 +4024,11 @@ def _dijkstra_par_LGG(composite, return_path: bool = False,
 
 
 def build_dungeon_9(seed: int) -> 'Dungeon':
-    """Level 8 — G gg {n}G: The Long Plumb.
+    """Level 8 — G gg {n}G: The Lineheads.
 
     A 16-row × 11-col vertical shaft (restored from the admin design layout
-    "dungeon_09_the_screen_vault_pre-reversion" — a mislabel; it is the Long
-    Plumb).  The exit sits on the top row behind two locked doors; the two keys
+    "dungeon_09_the_screen_vault_pre-reversion" — a mislabel; it is the
+    Lineheads).  The exit sits on the top row behind two locked doors; the two keys
     are buried near the top and bottom of a 2-wide left shaft, so the player
     rides G / gg / {n}G up and down to fetch a key, open a door, and repeat.
     Fixed layout (no seed variation); see the _LGG_* block above for geometry.
@@ -4036,7 +4036,7 @@ def build_dungeon_9(seed: int) -> 'Dungeon':
     Par/answer are computed by _dijkstra_par_LGG (key/door + line-jump model);
     e.g. par 15 = G l x 13k p 5G x gg $ p $.
     """
-    dungeon = Dungeon(name='The Long Plumb', seed=seed)
+    dungeon = Dungeon(name='The Lineheads', seed=seed)
     ROWS, COLS = _LGG_ROWS, _LGG_COLS
 
     cells = [[CellType.WALL] * COLS for _ in range(ROWS)]
@@ -4066,7 +4066,7 @@ def build_dungeon_9(seed: int) -> 'Dungeon':
     # ── Compute par via Dijkstra (key/door + line-jump model) ─────────────────
     par, path = _dijkstra_par_LGG(composite, return_path=True)
     if par is None:                      # fixed map — should always solve
-        raise RuntimeError('Level 8 (The Long Plumb) is unsolvable — check layout')
+        raise RuntimeError('Level 8 (The Lineheads) is unsolvable — check layout')
     composite.par    = par
     composite.budget = math.ceil(par * 1.4)
     composite.answer = path
