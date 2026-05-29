@@ -99,26 +99,26 @@ class TestComputeTextObject:
 # ── Block B: delete ──────────────────────────────────────────────────────────
 
 class TestDelete:
-    def test_dw_removes_word_and_trailing_gap(self):
+    def test_dw_closes_the_gap_pulling_next_word_left(self):
         room = _room()
         room.add_char_run(CharRun(3, 2, ('a',), 'ancient'))   # word A
         room.add_char_run(CharRun(3, 6, ('b',), 'ancient'))   # word B
         p = _player(3, 2)
         t = compute_text_object(p, {'op': 'd', 'motion': 'w', 'count': 1, 'motion_count': 1}, room)
         op_delete(room, p, t)
-        assert room.char_run_at(3, 2) is None        # A gone
-        assert room.char_run_at(3, 6) is not None     # B preserved
-        assert p.col == 2                         # cursor at start of deletion
+        assert room.char_run_at(3, 2).symbols == ('b',)   # gap closed: B pulled to the deletion start
+        assert room.char_run_at(3, 6) is None              # B no longer trails
+        assert p.col == 2                                  # cursor at start of deletion
 
-    def test_de_removes_word_only(self):
+    def test_de_closes_the_gap(self):
         room = _room()
         room.add_char_run(CharRun(3, 2, ('a', 'b', 'c'), 'ancient'))
         room.add_char_run(CharRun(3, 8, ('d',), 'ancient'))
         p = _player(3, 2)
         t = compute_text_object(p, {'op': 'd', 'motion': 'e', 'count': 1, 'motion_count': 1}, room)
         op_delete(room, p, t)
-        assert all(room.char_run_at(3, c) is None for c in (2, 3, 4))
-        assert room.char_run_at(3, 8) is not None     # next word untouched
+        assert room.char_run_at(3, 5).symbols == ('d',)   # 'abc' gone; 'd' pulled left by 3 (8→5)
+        assert room.char_run_at(3, 8) is None
 
     def test_dd_clears_row(self):
         room = _room()
@@ -130,16 +130,15 @@ class TestDelete:
         assert room.char_run_at(3, 2) is None and room.char_run_at(3, 6) is None
         assert p.row == 3
 
-    def test_delete_splits_partial_cluster(self):
+    def test_delete_closes_a_cluster_gap(self):
         room = _room()
         room.add_char_run(CharRun(3, 2, ('a', 'b', 'c', 'd'), 'ancient'))
         p = _player(3, 3)
         # delete cols [3,3] only (exclusive l from col3 → dest col4 → [3,3])
         t = TextObject(3, 3, 3, 4, TextObjectType.EXCLUSIVE)
         op_delete(room, p, t)
-        assert room.char_run_at(3, 2) is not None     # 'a' remnant
-        assert room.char_run_at(3, 3) is None         # 'b' deleted
-        assert room.char_run_at(3, 4) is not None     # 'cd' remnant
+        assert room.char_run_at(3, 2).symbols == ('a', 'c', 'd')   # 'b' gone, 'cd' pulled left into 'acd'
+        assert room.char_run_at(3, 5) is None
 
 
 # ── Block B: yank preserves spacing, paste reproduces it ─────────────────────
@@ -286,13 +285,14 @@ class TestYankNonMutation:
 
 
 class TestDeleteMore:
-    def test_db_cursor_to_start(self):
+    def test_db_closes_the_gap_cursor_to_start(self):
         room = _room()
         room.add_char_run(CharRun(3, 2, ('a',), 'ancient'))
         room.add_char_run(CharRun(3, 6, ('b',), 'ancient'))
         p = _player(3, 6)
         op_delete(room, p, compute_text_object(p, _op('d', 'b'), room))
-        assert room.char_run_at(3, 2) is None and room.char_run_at(3, 6) is not None
+        assert room.char_run_at(3, 2).symbols == ('b',)   # 'a' + gap gone; 'b' pulled to the start
+        assert room.char_run_at(3, 6) is None
         assert p.col == 2
 
     def test_dj_clears_both_rows_and_repositions(self):
@@ -581,12 +581,12 @@ class TestFindOperators:
         t = compute_text_object(p, _op('c', 'f', target=';'), room)
         assert (t.start_col, t.end_col) == (2, 4)         # includes ';'
 
-    def test_dt_then_delete_removes_prefix(self):
+    def test_dt_then_delete_closes_the_prefix_gap(self):
         room = self._cluster()
         p = _player(3, 2)
         op_delete(room, p, compute_text_object(p, _op('d', 't', target=';'), room))
-        assert room.char_run_at(3, 2) is None and room.char_run_at(3, 3) is None
-        assert room.char_run_at(3, 4) is not None             # ';' survives
+        assert room.char_run_at(3, 2).symbols == (';', 'c', 'd')   # 'ab' gone; ';cd' pulled to the start
+        assert room.char_run_at(3, 5) is None
 
 
 class TestChangeComposition:

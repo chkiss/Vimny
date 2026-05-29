@@ -29,8 +29,10 @@ _WALLS  = (CellType.WALL, CellType.WOOD_WALL)
 
 
 def is_ledge(room, row: int) -> bool:
-    """True if `row` reflows (opens onto the void) instead of overlaying."""
-    return row in getattr(room, 'ledge_rows', ())
+    """Reflow is universal: every row flows like a Vim line and content falls off
+    its fixed brinks (all walls + void runes). Kept as a single hook for future
+    per-row behaviour (e.g. the ledge-extending motions, task #15)."""
+    return True
 
 
 def _void_rune_at(room, row: int, c: int) -> bool:
@@ -63,13 +65,6 @@ def void_col(room, row: int) -> int:
     return min(min(vcols), c) if vcols else c
 
 
-def _glyph_at(room, row: int, c: int):
-    ru = room.char_run_at(row, c)
-    if ru is not None and ru.kind != 'void':
-        return ru.symbols[c - ru.col], ru.kind
-    return None
-
-
 def _row_glyphs(room, row: int) -> list:
     """``[[col, sym, kind], ...]`` for every non-void glyph symbol on the row."""
     out = []
@@ -91,65 +86,63 @@ def _rewrite_glyphs(room, row: int, cells: list) -> None:
     _merge_adjacent_runes(room, row)
 
 
-def _push_one(room, row: int, at_col: int) -> None:
-    """Open a one-cell gap at at_col and cascade the push right by one cell."""
-    # 1. Gather the movable run (glyphs + water) from at_col until a stop.
-    chain, c, stop = [], at_col, None
-    while stop is None:
-        if _fixed_sink(room, row, c):
-            stop = ('sink', c)
-        elif room.cells[row][c] == CellType.WATER:
-            chain.append(['water', c, None, None]); c += 1
-        else:
-            g = _glyph_at(room, row, c)
-            if g is not None:
-                chain.append(['glyph', c, g[0], g[1]]); c += 1
-            elif room.entity_at(row, c) is not None:
-                stop = ('entity', c)
-            else:
-                stop = ('empty', c)            # bare floor absorbs the push
-    kind, sp = stop
+def _dest_fate(room, row: int, c: int) -> str:
+    """Classify a rightward mover's DESTINATION cell:
+    'sink'   — a wall, void rune, or the edge: the mover is lost over the brink.
+    'entity' — an entity sits there: water drowns it, a glyph falls.
+    'free'   — floor / water / blank: the mover simply slides in."""
+    if _fixed_sink(room, row, c):
+        return 'sink'
+    if room.entity_at(row, c) is not None:
+        return 'entity'
+    return 'free'
 
-    # 2. Resolve the right end — which token (if any) is consumed.
-    survivors = chain
-    if kind == 'sink' and chain:
-        last, survivors = chain[-1], chain[:-1]
-        if last[0] == 'water':
-            room.cells[row][last[1]] = CellType.FLOOR
-            room._last_void_falls.append((row, sp, '~'))         # water spills off the brink
-        else:
-            room._last_void_falls.append((row, sp, last[2]))     # glyph falls over the brink
-    elif kind == 'entity' and chain:
-        last = chain[-1]; survivors = chain[:-1]
-        if last[0] == 'water':                                   # a wave sweeps the entity away
-            ent = room.entity_at(row, sp)
+
+def _push_one(room, row: int, at_col: int) -> None:
+    """One-cell rightward push at at_col (the Vim line model). Every movable cell
+    — a glyph or a water cell — at or right of at_col slides right by one. Blanks
+    are spaces: they shift implicitly as glyphs vacate and occupy cells, so a word
+    separated from the cursor by whitespace is STILL pushed (the shift travels
+    through the gap; it doesn't stop at it). Each mover's fate is set by its
+    destination: a brink loses it (room._last_void_falls); an entity is swept away
+    by water (room._last_drowns) but stops a glyph (which falls)."""
+    glyphs = _row_glyphs(room, row)
+    waters = [c for c in range(room.cols) if room.cells[row][c] == CellType.WATER]
+    final_glyphs = [[c, s, k] for (c, s, k) in glyphs if c < at_col]      # left side stays put
+    keep_water   = {c for c in waters if c < at_col}
+    movers = ([('glyph', c, s, k) for (c, s, k) in glyphs if c >= at_col]
+              + [('water', c, None, None) for c in waters if c >= at_col])
+    for kind, c, s, k in movers:
+        nc   = c + 1
+        fate = _dest_fate(room, row, nc)
+        if kind == 'glyph':
+            if fate == 'free':
+                final_glyphs.append([nc, s, k])
+            else:                                       # sink or entity — the glyph is lost
+                room._last_void_falls.append((row, nc, s))
+        elif fate == 'entity':                          # a wave sweeps the entity away
+            ent = room.entity_at(row, nc)
             room.kill_entity(ent)
             if ent.kind == 'exit':
                 room.exit_pos = None
             elif ent.kind == 'entry_marker':
                 room.spawn_pos = (1, 1)
-            room.cells[row][last[1]] = CellType.FLOOR
-            room.cells[row][sp]      = CellType.WATER            # water rolls onto the swept cell
-            room._last_drowns.append((row, sp))
-        else:                                                    # text can't shove an entity → it falls
-            room._last_void_falls.append((row, sp, last[2]))
-
-    # 3. Shift the survivors right by one (glyphs via rewrite, water via cells).
-    chain_cols = {t[1] for t in chain}
-    final = [[col, sym, k] for (col, sym, k) in _row_glyphs(room, row) if col not in chain_cols]
-    final += [[t[1] + 1, t[2], t[3]] for t in survivors if t[0] == 'glyph']
-    _rewrite_glyphs(room, row, final)
-    for t in chain:                                              # clear every chain water source first
-        if t[0] == 'water':
-            room.cells[row][t[1]] = CellType.FLOOR
-    for t in survivors:                                          # then lay surviving water one cell right
-        if t[0] == 'water':
-            room.cells[row][t[1] + 1] = CellType.WATER
+            keep_water.add(nc)                          # water rolls onto the swept cell
+            room._last_drowns.append((row, nc))
+        elif fate == 'sink':
+            room._last_void_falls.append((row, nc, '~'))   # water spills off the brink
+        else:
+            keep_water.add(nc)
+    for c in waters:                                    # clear old water, then lay survivors
+        room.cells[row][c] = CellType.FLOOR
+    for c in keep_water:
+        room.cells[row][c] = CellType.WATER
+    _rewrite_glyphs(room, row, final_glyphs)
 
 
 def open_gap(room, row: int, at_col: int, width: int = 1) -> list:
-    """Open a `width`-cell gap at at_col, cascading the push right each time.
-    Returns the list of cells lost over the brink (room._last_void_falls)."""
+    """Open a `width`-cell gap at at_col (a single-cell push, repeated). Returns
+    the cells lost over the brink (room._last_void_falls)."""
     for _ in range(max(1, width)):
         _push_one(room, row, at_col)
     return room._last_void_falls
