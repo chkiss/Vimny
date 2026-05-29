@@ -113,14 +113,25 @@ def test_runes_only_clip_pastes_without_entities_key():
     assert room.char_run_at(3, 6) is not None
 
 
-def test_repeated_paste_lays_consecutive_copies():
-    """3p / p p p: looping op_paste lays consecutive copies (cursor advances)."""
+def test_3p_lays_consecutive_letter_copies():
+    """3p lays 3 consecutive copies of a cut letter (ababab-style)."""
     room   = _bare_room()
     player = Player(row=3, col=5)
     clip   = _clip_from_cut_runes([_rune_item('z', 5)], base_col=5)
-    for _ in range(3):
-        op_paste(room, player, clip, before=False)
+    op_paste(room, player, clip, before=False, count=3)        # p → cols 6,7,8
     assert all(room.char_run_at(3, c) is not None for c in (6, 7, 8))
+
+
+def test_3p_fans_out_creatures():
+    """x on a goblin then 3p spawns three live goblins in adjacent cells (ggg)."""
+    room   = _bare_room()
+    player = Player(row=3, col=5)
+    clip   = entity_clip(_slain('goblin', max_hp=1, ai='chase'))
+    op_paste(room, player, clip, before=False, count=3)        # cols 6,7,8
+    gobs = [room.entity_at(3, c) for c in (6, 7, 8)]
+    assert all(g and g.kind == 'goblin' and g.alive for g in gobs)
+    assert len({g.uid for g in gobs}) == 3                     # three distinct creatures
+    assert player.col == 5                                     # cursor never lands on one
 
 
 def test_creature_spawn_messages_cover_the_combat_kinds():

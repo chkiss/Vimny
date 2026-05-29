@@ -2264,16 +2264,10 @@ def run_dungeon(term: Terminal, level: int, progress: dict,
                     player.error = 'E: Wrong key for this door' if _has_key else 'E: No key held'
             elif clip and any(rw.get('runes') or rw.get('entities') for rw in clip['rows']):
                 # One register for everything cut/yanked: lay runes back down and
-                # respawn cut creatures. count repeats the paste (3p = 3 copies).
+                # respawn cut creatures. count fans out copies (3p = 3 in a row).
                 undo_stack.append(_snapshot(room, player, budget, ans=cmd_start_ans))
                 redo_stack.clear()
-                placed_any = False
-                for _ in range(count):
-                    if op_paste(room, player, clip, before):
-                        placed_any = True
-                    else:
-                        break
-                if placed_any:
+                if op_paste(room, player, clip, before, count):
                     budget.spend(_keystroke_cost(count, 'p'))
                     spawned = next((ed['tmpl']['kind'] for ed in clip_entities), None)
                     _push(_PASTE_SPAWN_MSG[spawned] if spawned in _PASTE_SPAWN_MSG else 'Pasted.')
