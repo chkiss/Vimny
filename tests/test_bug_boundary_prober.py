@@ -1,7 +1,6 @@
 """The Boundary Prober — moves to corners, edges, and extreme cells.
 
-Uncovers: $-at-end, 0-at-start, w/b/e with no runes, G with None exit_pos,
-fog covering entire row, and gg/G teleport behavior.
+Personality defined in agents/bug_testers.md.
 """
 import pytest
 from engine.world import Room, RoomType, CellType, RuneCluster
@@ -16,7 +15,7 @@ def _bare_room(rows=7, cols=30):
          for c in range(cols)]
         for r in range(rows)
     ]
-    room.entry    = (3, 1)
+    room.gg_pos    = (3, 1)
     room.exit_pos = (3, 28)
     room.fog_cells = set()
     room.rebuild_indexes()
@@ -209,7 +208,7 @@ def test_gg_teleports_to_entry():
 
     apply_motion(player, 'gg', 1, room)
 
-    assert (player.row, player.col) == room.entry
+    assert (player.row, player.col) == room.gg_pos
 
 
 def test_G_jumps_to_last_passable_row():

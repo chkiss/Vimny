@@ -1,0 +1,80 @@
+"""Hint bar text, driven by developer/vim_commands.md.
+
+CMD is parsed once at import from the markdown table.
+HINT_TIERS is built by diffing known_commands() between consecutive curriculum
+levels — no token lists are hardcoded.  hint_text() walks the list newest-first
+and returns the first tier whose sentinel is in the player's known_commands.
+"""
+from __future__ import annotations
+import pathlib
+import re
+
+_MD = pathlib.Path(__file__).parent.parent / 'developer' / 'vim_commands.md'
+
+# ── Parse vim_commands.md ─────────────────────────────────────────────────────
+
+def _parse(path: pathlib.Path) -> dict[str, tuple[str, str]]:
+    cmd: dict[str, tuple[str, str]] = {}
+    sep = re.compile(r'^\|[-| ]+\|')
+    row = re.compile(r'^\|([^|]+)\|([^|]*)\|([^|]+)\|')
+    with open(path) as f:
+        for line in f:
+            line = line.rstrip()
+            if not line.startswith('|') or sep.match(line):
+                continue
+            m = row.match(line)
+            if not m:
+                continue
+            keys  = m.group(1).strip()
+            token = m.group(2).strip()
+            desc  = m.group(3).strip()
+            if not keys or keys == 'keys':
+                continue
+            tok = token or keys
+            cmd[tok] = (keys, desc)
+    return cmd
+
+CMD: dict[str, tuple[str, str]] = _parse(_MD)
+
+# ── Build hint tiers from curriculum diffs ────────────────────────────────────
+
+def _build_tiers() -> list[tuple[str, list[str]]]:
+    """Derive tiers by diffing known_commands() across curriculum levels.
+
+    Each tier = (sentinel, new_tokens) where sentinel is the first new token
+    and new_tokens is the ordered list of commands introduced at that level.
+    Levels that add no new commands (boss/reliquary with commands_level set to
+    a prior level) are skipped automatically.
+    """
+    from content.levels import known_commands, LEVELS
+    level_ids = sorted(set(l['id'] for l in LEVELS))
+    tiers: list[tuple[str, list[str]]] = []
+    prev_known: set[str] = set(known_commands(0))   # seed with L0 base
+    for lid in level_ids:
+        if lid == 0:
+            continue
+        curr = known_commands(lid)
+        new = [t for t in curr if t not in prev_known]
+        if new:
+            tiers.append((new[0], new))
+            prev_known = set(curr)
+    tiers.reverse()   # newest tier first
+    return tiers
+
+_HINT_TIERS: list[tuple[str, list[str]]] = _build_tiers()
+
+# ── Constants ─────────────────────────────────────────────────────────────────
+
+_SUFFIX  = '  :w write  :q quit'
+_DEFAULT = 'h/j/k/l:move cursor  :w write (save)  :q quit  :q! quit without saving'
+
+# ── Public API ────────────────────────────────────────────────────────────────
+
+def hint_text(known: list) -> str:
+    """Return hint bar text for the given known_commands list."""
+    for sentinel, tokens in _HINT_TIERS:
+        if sentinel in known:
+            parts = [f'{CMD[tok][0]}:{CMD[tok][1]}'
+                     for tok in tokens if tok in CMD]
+            return '  '.join(parts) + _SUFFIX
+    return _DEFAULT

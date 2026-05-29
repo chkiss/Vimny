@@ -91,7 +91,7 @@ def _delete_cols(room, row: int, lo: int, hi: int) -> None:
         if ent.kind == 'exit':
             room.exit_pos = None
         elif ent.kind == 'entry_marker':
-            room.entry = (1, 1)
+            room.gg_pos = (1, 1)
 
 
 def op_yank(room, player, text_obj) -> dict:

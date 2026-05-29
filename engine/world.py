@@ -40,6 +40,7 @@ class Entity:
     summoner_uid: int = 0   # uid of the entity that spawned this (0 = not spawned)
     origin_row:   int = -1  # starting row for bounded-oscillation entities (-1 = not set)
     move_dir:     int = 1   # oscillation direction: +1 = down (row+1), -1 = up (row-1)
+    tag:          str = ''  # variant tag, e.g. 'gold' or 'red' for colored keys/doors
 
 @dataclass
 class RuneCluster:
@@ -56,7 +57,8 @@ class Room:
     cells: list[list[CellType]] = field(default_factory=list)
     runes: list[RuneCluster]    = field(default_factory=list)
     entities: list[Entity]      = field(default_factory=list)
-    entry: tuple[int,int]       = (0, 0)
+    gg_pos: tuple[int,int]       = (0, 0)   # gg jump target
+    spawn_pos: Optional[tuple[int,int]] = None  # initial player position; None → use gg_pos
     exit_pos: Optional[tuple[int,int]] = None
     budget: Optional[int]       = None
     par: Optional[int]          = None

@@ -34,7 +34,7 @@ def can_reach(room, entry, goal, allowed_keys):
 def test_exit_is_reachable(seed):
     d = build_dungeon_0(seed)
     room = d.room
-    assert can_reach(room, room.entry, room.exit_pos, LEVEL_0_COMMANDS), \
+    assert can_reach(room, room.gg_pos, room.exit_pos, LEVEL_0_COMMANDS), \
         f"seed={seed}: exit unreachable with full hjkl"
 
 
@@ -43,5 +43,5 @@ def test_each_command_is_necessary(seed, omit):
     d = build_dungeon_0(seed)
     room = d.room
     restricted = LEVEL_0_COMMANDS - {omit}
-    assert not can_reach(room, room.entry, room.exit_pos, restricted), \
+    assert not can_reach(room, room.gg_pos, room.exit_pos, restricted), \
         f"seed={seed}: exit reachable without '{omit}' — command is not required"

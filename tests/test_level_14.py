@@ -1,4 +1,4 @@
-"""Level 14 (id 14) — The Sentence Corridor: dungeon correctness tests.
+"""Level 13 (id 13) — The Sentence Corridor: dungeon correctness tests.
 
 Tests cover structure, par/budget, and motion-necessity for
 ) ( (sentence jumps).
@@ -25,7 +25,7 @@ SEEDS = [1, 42, 999, 12345, 2**20 + 7]
 def test_entry_and_exit_passable(seed):
     d = build_dungeon_14(seed)
     room = d.rooms[0]
-    r0, c0 = room.entry
+    r0, c0 = room.gg_pos
     r1, c1 = room.exit_pos
     assert room.cells[r0][c0] == CellType.CORRIDOR, (
         f"seed={seed}: entry ({r0},{c0}) is not CORRIDOR"
@@ -126,13 +126,12 @@ def test_fixed_sentence_clusters_present(seed):
 # ── par and budget ────────────────────────────────────────────────────────────
 
 @pytest.mark.parametrize("seed", SEEDS)
-def test_par_matches_dijkstra(seed):
+def test_par_is_2(seed):
+    """The Sentence Corridor always has par=2 (fixed layout, hardcoded path '3)')."""
     d = build_dungeon_14(seed)
     room = d.rooms[0]
-    computed = _dijkstra_par_L13(room, disable_brace=True)
-    assert room.par == computed, (
-        f"seed={seed}: room.par={room.par} but Dijkstra computed {computed}"
-    )
+    assert room.par == 2, f"seed={seed}: expected par=2, got {room.par}"
+    assert room.answer == '3)', f"seed={seed}: expected '3)', got {room.answer!r}"
 
 
 @pytest.mark.parametrize("seed", SEEDS)

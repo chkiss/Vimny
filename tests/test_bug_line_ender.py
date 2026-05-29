@@ -1,7 +1,6 @@
-"""The Line Ender — bug tester personality obsessed with $, 0, and ^.
+"""The Line Ender — obsessed with $, 0, and ^; never uses h/l if a line-end command will do.
 
-Uncovers: fog/locked_door blocking $, water passability, count-$,
-keystroke cost formula, ^ fallback to leftmost when no rune.
+Personality defined in agents/bug_testers.md.
 """
 import pytest
 from engine.world import Room, RoomType, CellType, Entity, RuneCluster
@@ -17,7 +16,7 @@ def _bare_room(rows=7, cols=30):
          for c in range(cols)]
         for r in range(rows)
     ]
-    room.entry = (3, 1)
+    room.gg_pos = (3, 1)
     room.exit_pos = (3, 28)
     room.fog_cells = set()
     room.rebuild_indexes()

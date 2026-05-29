@@ -1,7 +1,6 @@
-"""The Word Surfer — bug tester personality that defaults to w/b/e for all navigation.
+"""The Word Surfer — defaults to w/b/e for all navigation; never uses h/l if a word motion reaches.
 
-Uncovers: w/b/e through rune clusters, void rune skipping, count-word,
-b-at-first-rune, w-blocked-by-wall.
+Personality defined in agents/bug_testers.md.
 """
 import pytest
 from engine.world import Room, RoomType, CellType, RuneCluster
@@ -16,7 +15,7 @@ def _make_room(rows=5, cols=40):
          for c in range(cols)]
         for r in range(rows)
     ]
-    room.entry = (2, 1)
+    room.gg_pos = (2, 1)
     room.exit_pos = (2, cols - 2)
     room.fog_cells = set()
     room.rebuild_indexes()

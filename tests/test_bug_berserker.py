@@ -1,7 +1,6 @@
 """The Berserker — kills everything before moving anywhere.
 
-Uncovers: combat ordering/HP edge cases, warden spawn uid, _on_kill key drops,
-enemy chase radius, shield cleanup.
+Personality defined in agents/bug_testers.md.
 """
 import pytest
 from engine.world import Room, RoomType, CellType, Entity
@@ -21,7 +20,7 @@ def _bare_room():
          for c in range(COLS)]
         for r in range(ROWS)
     ]
-    room.entry    = (3, 1)
+    room.gg_pos    = (3, 1)
     room.exit_pos = (3, 28)
     room.fog_cells = set()
     room.rebuild_indexes()
@@ -35,7 +34,7 @@ def _combat_room(rows=9, cols=40):
          for c in range(cols)]
         for r in range(rows)
     ]
-    room.entry    = (4, 1)
+    room.gg_pos    = (4, 1)
     room.exit_pos = (4, 38)
     room.fog_cells = set()
     room.rebuild_indexes()
@@ -114,8 +113,8 @@ def test_warden_moves_on_last_spawn_death():
     room.kill_entity(goblin)
     msg = _try_warden_move(room, goblin, player)
 
-    assert msg == 'The Warden shifts position!'
-    assert warden.row != 4
+    assert msg == 'The Warden leaps!'
+    assert abs(warden.row - 4) >= 2, "Warden must leap at least 2 rows"
 
 
 # ── _on_kill key drops ────────────────────────────────────────────────────────

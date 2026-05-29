@@ -147,7 +147,7 @@ bench_us("all rune_at calls    L3  (1 326 lookups)",
 
 _section("4. Undo snapshots  [deepcopy — target of P3]")
 
-player = Player(row=r2.entry[0], col=r2.entry[1])
+player = Player(row=r2.gg_pos[0], col=r2.gg_pos[1])
 snap2  = _ed_snapshot(r2, player)
 snap3  = _ed_snapshot(r3, player)
 
@@ -185,7 +185,7 @@ bench_us("tuple-copy runes        L3  [P3 candidate]",
 
 _section("5. apply_motion")
 
-er, ec = r2.entry
+er, ec = r2.gg_pos
 
 bench_us("'l' count=1  no-op (at wall)",
          lambda: apply_motion(Player(row=er, col=0), 'l', 1, r2))
@@ -196,9 +196,9 @@ bench_us("'l' count=10 move",
 bench_us("'$' line-end L2",
          lambda: apply_motion(Player(row=er, col=ec), '$', 1, r2))
 bench_us("'w' next-word L3",
-         lambda: apply_motion(Player(row=r3.entry[0], col=r3.entry[1]), 'w', 1, r3))
+         lambda: apply_motion(Player(row=r3.gg_pos[0], col=r3.gg_pos[1]), 'w', 1, r3))
 bench_us("'b' prev-word L3",
-         lambda: apply_motion(Player(row=r3.entry[0], col=r3.entry[1]+5), 'b', 1, r3))
+         lambda: apply_motion(Player(row=r3.gg_pos[0], col=r3.gg_pos[1]+5), 'b', 1, r3))
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -222,8 +222,8 @@ from render.renderer import render_all
 
 budget2 = Budget(r2.budget or 20)
 budget3 = Budget(r3.budget or 20)
-p2 = Player(row=r2.entry[0], col=r2.entry[1])
-p3 = Player(row=r3.entry[0], col=r3.entry[1])
+p2 = Player(row=r2.gg_pos[0], col=r2.gg_pos[1])
+p3 = Player(row=r3.gg_pos[0], col=r3.gg_pos[1])
 
 _null = open('/dev/null', 'w')
 

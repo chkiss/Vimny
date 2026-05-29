@@ -6,7 +6,14 @@ import render.colors as C
 import render.symbols as S
 from render.utils import inner_w as _iw
 
-ENTRIES = ['saves/', 'scrolls/', 'world/']
+_BASE_ENTRIES = ['saves/', 'scrolls/', 'world/']
+ENTRIES = _BASE_ENTRIES  # non-admin default; prefer entries_for()
+
+
+def entries_for(player: Player) -> list[str]:
+    if player.name == 'admin':
+        return _BASE_ENTRIES + ['colors/']
+    return _BASE_ENTRIES
 
 
 def render_parent_dir(
@@ -15,10 +22,11 @@ def render_parent_dir(
     cursor_row: int,
     cmd_line: str | None = None,
 ) -> None:
-    iw  = _iw(term)
-    bfg = C.border_fg()
-    rst = C.normal_fg()
-    out = []
+    iw      = _iw(term)
+    bfg     = C.border_fg()
+    rst     = C.normal_fg()
+    out     = []
+    entries = entries_for(player)
 
     def border_h(left, right, fill=S.BOX_H):
         return bfg + left + fill * iw + right + rst
@@ -101,31 +109,33 @@ def render_parent_dir(
         out.append(_row(is_cursor, len(dentry), dfc + dentry))
 
     # ── Directory entries ─────────────────────────────────────────────────────
-    for idx, entry in enumerate(ENTRIES):
+    for idx, entry in enumerate(entries):
         is_cursor = (idx + 2) == cursor_row
         nc        = enfc if is_cursor else dfc
         out.append(_row(is_cursor, len(entry), nc + entry))
 
     # ── Empty rows ────────────────────────────────────────────────────────────
-    rows_used = len(hdr_rows) + 2 + len(ENTRIES)
+    rows_used = len(hdr_rows) + 2 + len(entries)
     for _ in range(max(0, game_h - rows_used)):
         out.append(bfg + S.BOX_V + rst + ' ' * iw + bfg + S.BOX_V + rst)
 
     # ── Statusline / command line ─────────────────────────────────────────────
-    sl_w  = iw + 2
-    sl_bg = C.statusline_bg()
-    sl_fg = C.statusline_fg()
+    sl_w  = iw
 
     if cmd_line is not None:
         cmd_text = ':' + cmd_line
         sl_pad   = max(0, sl_w - len(cmd_text))
-        out.append(sl_bg + C.mode_command() + cmd_text +
-                   sl_fg + ' ' * sl_pad + rst)
+        out.append(bfg + S.BOX_V + rst +
+                   C.mode_command() + cmd_text +
+                   rst + ' ' * sl_pad +
+                   bfg + S.BOX_V + rst)
     else:
-        sl_right = f'{cursor_row + 1}/{len(ENTRIES) + 2} '
+        sl_right = f'{cursor_row + 1}/{len(entries) + 2} '
         sl_mid   = max(0, sl_w - len(sl_label) - 2 - len(sl_right))
-        out.append(sl_bg + C.mode_normal() + ' ' + sl_label + ' ' +
-                   sl_bg + sl_fg + ' ' * sl_mid + sl_right + rst)
+        out.append(bfg + S.BOX_V + rst +
+                   C.mode_normal() + ' ' + sl_label + ' ' +
+                   rst + ' ' * sl_mid + sl_right +
+                   bfg + S.BOX_V + rst)
 
     # ── Bottom border ─────────────────────────────────────────────────────────
     out.append(border_h(S.BOX_BL, S.BOX_BR))

@@ -1,4 +1,4 @@
-"""Level 6 — The Warden's Precision: dungeon correctness and visual-mode undo tests."""
+"""Level 14 — The Sight Sanctum: dungeon correctness and visual-mode undo tests."""
 import math
 import pytest
 from generation.dungeon_gen import build_dungeon_6
@@ -33,7 +33,7 @@ def test_layout_dimensions():
 
 def test_entry_position():
     room = _dungeon().rooms[0]
-    assert room.entry == (1, 1)
+    assert room.gg_pos == (1, 1)
 
 
 def test_exit_entity_position():
@@ -112,7 +112,7 @@ def test_budget_and_par():
 # independent of the randomised seed used by _dungeon().
 
 def _room_with_void():
-    """5×21 room matching Level 6 layout, with a single known void at (1,10)."""
+    """5×21 room matching Level 14 layout, with a single known void at (1,10)."""
     room = Room(rows=5, cols=21, room_type=RoomType.ENTRY)
     cells = [[CellType.WALL] * 21 for _ in range(5)]
     for c in range(1, 20):
@@ -125,7 +125,7 @@ def _room_with_void():
     room.runes.append(RuneCluster(row=1, col=10, symbols=('○',), kind='void'))
     room.entities.append(Entity(kind='exit',     row=3, col=1))
     room.entities.append(Entity(kind='dynamite', row=3, col=2))
-    room.entry = (1, 1)
+    room.gg_pos = (1, 1)
     room.rebuild_indexes()
     return room
 

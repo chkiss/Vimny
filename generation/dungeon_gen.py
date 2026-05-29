@@ -134,7 +134,7 @@ def _bfs_par(composite, return_path: bool = False):
         for ru in composite.runes if ru.kind == 'void'
         for i in range(len(ru.symbols))
     }
-    entry = composite.entry
+    entry = composite.gg_pos
     goal  = composite.exit_pos
     dist  = {entry: 0}
     prev  = {entry: None}
@@ -171,7 +171,7 @@ def _dijkstra_par_count(composite) -> int | None:
     through them and only the final landing cell triggers damage — matching
     engine behaviour in apply_motion.  Only true walls stop the search.
     """
-    entry = composite.entry
+    entry = composite.gg_pos
     goal  = composite.exit_pos
     max_n = max(composite.rows, composite.cols)
 
@@ -208,7 +208,7 @@ def _dijkstra_par_level2(composite, door_cols: list, return_path: bool = False):
     """
     n = len(door_cols)
     all_closed = (1 << n) - 1
-    entry = composite.entry
+    entry = composite.gg_pos
     goal  = composite.exit_pos
     max_n = max(composite.rows, composite.cols)
 
@@ -357,7 +357,7 @@ def build_dungeon_0(seed: int) -> Dungeon:
 
     # Entry: top-left interior of Room 0 → forces the player to use j (down)
     # to reach the corridor, and k (up) to reach the exit.
-    composite.entry = (1, 2)
+    composite.gg_pos = (1, 2)
 
     # Exit: top-left interior of Room 2 (col offsets[-1]+1).
     # Player arrives at corridor rows 4-5 at the left edge of Room 2 and must
@@ -395,7 +395,7 @@ def build_dungeon_0(seed: int) -> Dungeon:
         composite.runes.append(RuneCluster(row=3, col=ex_c, symbols=('○',), kind='void'))
 
         # Never leave a void rune sitting on the entry or exit itself.
-        entry_r, entry_c = composite.entry
+        entry_r, entry_c = composite.gg_pos
         exit_r,  exit_c  = composite.exit_pos
         composite.runes = [
             ru for ru in composite.runes
@@ -436,7 +436,7 @@ def _bfs_par_line(composite, return_path: bool = False):
     $ and ^ are wall-bounded: they stop at the nearest wall in each direction,
     matching apply_motion semantics.  Targets are precomputed per (row, col).
     """
-    entry = composite.entry
+    entry = composite.gg_pos
     goal  = composite.exit_pos
 
     rune_cols_by_row: dict[int, list[int]] = {}
@@ -551,7 +551,7 @@ def build_dungeon_1(seed: int) -> Dungeon:
     composite.seed  = seed
 
     # Entry above corridor rows — player must use j to reach the corridor.
-    composite.entry = (2, 2)
+    composite.gg_pos = (2, 2)
 
     # Exit at leftmost interior cell of EXIT room on row 1 (EXIT-only row).
     # offsets[-1]=82; interior starts at col 83.  Row 1 is above corridor
@@ -642,7 +642,7 @@ def build_dungeon_2(seed: int) -> Dungeon:
     composite.seed  = seed
 
     # Entry near top-left of Room 0 — player must navigate down+right to corridor
-    composite.entry = (2, 2)
+    composite.gg_pos = (2, 2)
 
     # Exit near top-left interior of Room 2 — arrives via corridor then goes up
     ex_c = offsets[-1] + 1   # = 61
@@ -668,7 +668,7 @@ def build_dungeon_2(seed: int) -> Dungeon:
                               plan[2][1], plan[2][2], total_rows, 0.18)
 
         # Never place a void rune on the entry or exit cell itself
-        entry_r, entry_c = composite.entry
+        entry_r, entry_c = composite.gg_pos
         exit_r,  exit_c  = composite.exit_pos
         composite.runes = [
             ru for ru in composite.runes
@@ -701,7 +701,7 @@ def build_dungeon_2(seed: int) -> Dungeon:
     composite.par, composite.answer = _dijkstra_par_level2(composite, door_cols, return_path=True)
     composite.budget = math.ceil(composite.par * 1.4)
 
-    _fog_unreachable(composite, composite.entry[0], composite.entry[1])
+    _fog_unreachable(composite, composite.gg_pos[0], composite.gg_pos[1])
 
     dungeon.rooms    = [composite]
     dungeon.current_room = 0
@@ -760,7 +760,7 @@ def _dijkstra_par_wbe(composite, return_path: bool = False):
     """
     from collections import defaultdict
 
-    entry = composite.entry
+    entry = composite.gg_pos
     goal  = composite.exit_pos
     max_n = max(composite.rows, composite.cols)
 
@@ -938,7 +938,7 @@ def _dijkstra_par_ftFT(composite, return_path: bool = False):
             if ch in _SCAN_CHARS:
                 row_chars[r].append((c, ch))
 
-    entry = composite.entry
+    entry = composite.gg_pos
     goal  = composite.exit_pos
     max_n = max(ROWS, COLS)
 
@@ -1163,7 +1163,7 @@ def build_dungeon_3(seed: int) -> Dungeon:
         for c in range(ru.col, ru.col + len(ru.symbols))
     )
 
-    composite.entry    = (1, 1)
+    composite.gg_pos    = (1, 1)
     composite.exit_pos = (13, 44)
     composite.entities = [Entity(kind='exit', row=13, col=44)]
 
@@ -1267,7 +1267,7 @@ def build_dungeon_4(seed: int) -> Dungeon:
         Entity(kind='exit',  row=13, col=65),
     ]
     composite.entities = list(_fixed)
-    composite.entry    = (1, 1)
+    composite.gg_pos    = (1, 1)
     composite.exit_pos = (13, 65)
 
     # ── Blocked cells: water + text/anchor runes + fixed entities ─────────────
@@ -1352,7 +1352,7 @@ def build_dungeon_1_1(seed: int) -> Dungeon:
     composite.cells = cells
     composite.seed  = seed
 
-    composite.entry    = (1, 1)
+    composite.gg_pos    = (1, 1)
     composite.exit_pos = (1, 15)
 
     composite.entities = [
@@ -1424,7 +1424,7 @@ def build_dungeon_dummy(seed: int) -> Dungeon:
     composite.cells = cells
     composite.seed  = seed
 
-    composite.entry    = (1, 1)
+    composite.gg_pos    = (1, 1)
     composite.exit_pos = (9, 70)
 
     composite.entities = [
@@ -1459,7 +1459,7 @@ def build_dungeon_dummy(seed: int) -> Dungeon:
     composite.budget         = 99999
     composite.passable_walls = False
     composite.rebuild_indexes()
-    _fog_unreachable(composite, composite.entry[0], composite.entry[1])
+    _fog_unreachable(composite, composite.gg_pos[0], composite.gg_pos[1])
     dungeon.rooms        = [composite]
     dungeon.current_room = 0
     return dungeon
@@ -1646,7 +1646,7 @@ def build_dungeon_5(seed: int) -> Dungeon:
     composite = Room(room_type=RoomType.ENTRY, rows=_L5_ROWS, cols=_L5_COLS)
     composite.cells    = cells
     composite.seed     = seed
-    composite.entry    = (1, 1)
+    composite.gg_pos    = (1, 1)
     composite.exit_pos = (18, 56)
 
     entities: list = [Entity(kind='entry_marker', row=1, col=1)]
@@ -1735,7 +1735,7 @@ def build_dungeon_5(seed: int) -> Dungeon:
     composite.answer = _answer_l5(corr_data, gobs17)
 
     composite.rebuild_indexes()
-    _fog_unreachable(composite, composite.entry[0], composite.entry[1])
+    _fog_unreachable(composite, composite.gg_pos[0], composite.gg_pos[1])
 
     dungeon.rooms        = [composite]
     dungeon.current_room = 0
@@ -1817,7 +1817,7 @@ def build_dungeon_51(seed: int) -> Dungeon:
     composite = Room(room_type=RoomType.COMBAT, rows=ROWS, cols=COLS)
     composite.cells    = cells
     composite.seed     = seed
-    composite.entry    = (3, 0)
+    composite.gg_pos    = (3, 0)
     composite.exit_pos = (3, 39)
     composite.entities = [
         Entity(kind='seal_door',       row=3, col=16),
@@ -1934,7 +1934,7 @@ def _dijkstra_par_WBE(composite, return_path=False):
     W: start of next WORD.  B: start of current (or prev) WORD.  E: end of WORD.
     """
     ROWS, COLS = composite.rows, composite.cols
-    entry = composite.entry
+    entry = composite.gg_pos
     goal  = composite.exit_pos
     max_n = max(ROWS, COLS)
 
@@ -2270,7 +2270,7 @@ def _dijkstra_par_L8(composite, return_path: bool = False):
     layout W≡w, B≡b, E≡e, so par is unchanged by their inclusion.
     """
     ROWS, COLS = composite.rows, composite.cols
-    entry = composite.entry
+    entry = composite.gg_pos
     goal  = composite.exit_pos
     max_n = max(ROWS, COLS)
 
@@ -2628,7 +2628,7 @@ def _dijkstra_par_L8(composite, return_path: bool = False):
 
 
 def build_dungeon_8(seed: int) -> Dungeon:
-    """Level 8 — ge/gE: The Backward Vaults.
+    """Level 7 — ge/gE: The Backward Vaults.
 
     Six 1-row corridors in a snake pattern (13 rows × 40 cols).  Each corridor
     is bridged to the next by a turn room at alternating ends.  Two turns have
@@ -2782,7 +2782,7 @@ def build_dungeon_8(seed: int) -> Dungeon:
 
     composite.runes = runes
 
-    composite.entry    = (1, 1)
+    composite.gg_pos    = (1, 1)
     composite.exit_pos = (12, 19)
     composite.entities = [Entity(kind='exit', row=12, col=19)]
 
@@ -2847,7 +2847,7 @@ def build_dungeon_7(seed: int) -> Dungeon:
     cells[6][1] = CellType.WALL
 
     # ── Entry and exit ────────────────────────────────────────────────────────
-    composite.entry    = (1, 1)
+    composite.gg_pos    = (1, 1)
     composite.exit_pos = (7, 51)   # last char of C3 code group "output=data[n]._key"
     composite.entities = [Entity(kind='exit', row=7, col=51)]
 
@@ -2882,7 +2882,7 @@ def build_dungeon_7(seed: int) -> Dungeon:
         _l7_fill_row(composite, rng2, 8,  3, 52, density=0.45, blocked=blocked, word_tbl=_VOCAB_MIXED_BY_LEN)  # C3r8 baseline
 
         # Protect entry and exit from void runes
-        entry_r, entry_c = composite.entry
+        entry_r, entry_c = composite.gg_pos
         exit_r,  exit_c  = composite.exit_pos
         composite.runes = [
             ru for ru in composite.runes
@@ -2909,7 +2909,7 @@ def build_dungeon_7(seed: int) -> Dungeon:
 
 
 def build_dungeon_6(seed: int) -> Dungeon:
-    """Level 6 — Visual Mode (The Warden's Precision).
+    """Level 14 — Visual Mode: The Sight Sanctum.
 
     Fixed U-shaped layout:
         #####################
@@ -2931,7 +2931,7 @@ def build_dungeon_6(seed: int) -> Dungeon:
       h    — step left onto exit at (3,1).
     """
     ROWS, COLS = 5, 21
-    dungeon   = Dungeon(name="The Warden's Precision", seed=seed)
+    dungeon   = Dungeon(name='The Sight Sanctum', seed=seed)
     composite = Room(rows=ROWS, cols=COLS, room_type=RoomType.ENTRY)
 
     cells = [[CellType.WALL] * COLS for _ in range(ROWS)]
@@ -2954,7 +2954,7 @@ def build_dungeon_6(seed: int) -> Dungeon:
     composite.entities.append(Entity(kind='exit',     row=3, col=1))
     composite.entities.append(Entity(kind='dynamite', row=3, col=2))
 
-    composite.entry  = (1, 1)
+    composite.gg_pos  = (1, 1)
     composite.par    = 11
     composite.budget = math.ceil(11 * 1.4)
     composite.answer = 'v $ x $ j j v F ! x h'
@@ -2984,12 +2984,13 @@ def build_dungeon_6(seed: int) -> Dungeon:
 _L11_ROWS          = 7
 _L11_COLS          = 60
 _L11_BRACKET_OPEN  = 4      # ( on each corridor row
-_L11_BRACKET_CLOSE = 54     # ) on each corridor row  (span = 50 cols)
+_L11_BRACKET_CLOSE = 54     # ) on rows 1 & 3; right-turn column; exit column
+_L11_CLOSE_R5      = 53     # ) on row 5 only (one left of CLS; exit sits at CLS)
 _L11_CORR_ROWS     = (1, 3, 5)
 _L11_ENTRY         = (1, 1)
 _L11_EXIT_POS      = (5, _L11_BRACKET_CLOSE)
-_L11_PAR           = 7       # % 2j % 2j %  = 1+2+1+2+1 = 7 ks
-_L11_ANSWER        = '% 2j % 2j %'
+_L11_PAR           = 8       # % 2j % 2j % l  = 1+2+1+2+1+1 = 8 ks
+_L11_ANSWER        = '% 2j % 2j % l'
 
 
 def _dijkstra_par_L11(composite, use_percent: bool = True, return_path: bool = False):
@@ -3002,7 +3003,7 @@ def _dijkstra_par_L11(composite, use_percent: bool = True, return_path: bool = F
     use_percent=False simulates the command-necessity test (% disabled).
     """
     ROWS, COLS = composite.rows, composite.cols
-    entry = composite.entry
+    entry = composite.gg_pos
     goal  = composite.exit_pos
 
     _PAIRS_OPEN_L11  = {'(': ')', '[': ']', '{': '}'}
@@ -3150,23 +3151,25 @@ def _dijkstra_par_L11(composite, use_percent: bool = True, return_path: bool = F
 
 
 def build_dungeon_12(seed: int) -> Dungeon:
-    """Level 11 — % (The Bracket Vaults).
+    """Level 10 — % (The Bracket Vaults).
 
-    Teaches `%` (bracket-matching jump) as the only way to cross a void-filled
-    middle corridor row.  Layout: three horizontal corridors in a snake pattern.
+    Teaches `%` (bracket-matching jump) as the only way to cross a band of WATER.
+    Layout: three horizontal corridors (rows 1/3/5) in a snake pattern, with rows
+    2, 3 and 4 flooded.
 
-    Rows 1 and 5 are open corridors (no voids): free navigation.
-    Row 3 is void-filled except at ( col 4 and ) col 54 — the only safe
-    landing cells.  Manual h/l cannot cross row 3; % jumps directly to the
-    matching bracket, skipping void cells.
+    Rows 1 and 5 are open corridors.  Rows 2 and 4 are water except the single
+    turn cell on each.  Row 3 is water except at ( col 4 and ) col 54 — the only
+    landing cells.  WATER blocks manual h/l (is_passable is False); % scans across
+    the water to the matching bracket.
 
-    Right turn: col 54, rows 1-3.  Left turn: col 4, rows 3-5.
+    Right turn: col 54, rows 1-3.  Left turn: col 4, rows 3-5.  Row 5's ) sits at
+    col 53 with the exit one cell right at (5,54).
 
-    Optimal path (par=7):  % 2j % 2j %
-      Entry (1,1): % scans right, finds ( col 4, jumps to ) col 54.
-      2j → (3,54) ).  % → (3,4) (.  2j → (5,4) (.  % → (5,54) EXIT.
+    Optimal path (par=8):  % 2j % 2j % l
+      Entry (1,1): % → ) col 54.  2j → (3,54).  % → (3,4) (.  2j → (5,4) (.
+      % → (5,53) ).  l → (5,54) EXIT.
 
-    Without %: par_no_% = None (row 3 void wall is uncrossable).
+    Without %: par_no_% = None (the water band is uncrossable by hand).
     Layout is deterministic; seed only colors bracket runes.
     """
     dungeon   = Dungeon(name='The Bracket Vaults', seed=seed)
@@ -3179,6 +3182,7 @@ def build_dungeon_12(seed: int) -> Dungeon:
 
     OPN = _L11_BRACKET_OPEN   # 4
     CLS = _L11_BRACKET_CLOSE  # 54
+    EXC = _L11_CLOSE_R5       # 53  (row-5 closing bracket col)
 
     # ── Carve corridors ───────────────────────────────────────────────────────
     for r in _L11_CORR_ROWS:
@@ -3191,9 +3195,24 @@ def build_dungeon_12(seed: int) -> Dungeon:
     # Left turn: col OPN rows 3-5 (the j-path down from C2 to C3)
     cells[4][OPN] = CellType.CORRIDOR
 
+    # ── Water in the gap and middle rows ──────────────────────────────────────
+    # Rows 2 and 4: water everywhere except the single CORRIDOR turn cells.
+    # Row 3: water everywhere except the two bracket cells (OPN and CLS).
+    # % scans through water (not a WALL/WOOD_WALL) to reach the matching bracket;
+    # manual h/l are blocked because is_passable returns False for WATER.
+    for c in range(1, COLS - 1):
+        if cells[2][c] != CellType.CORRIDOR:
+            cells[2][c] = CellType.WATER
+        if cells[4][c] != CellType.CORRIDOR:
+            cells[4][c] = CellType.WATER
+        if c != OPN and c != CLS:
+            cells[3][c] = CellType.WATER
+
     # ── Place bracket RuneClusters ────────────────────────────────────────────
     # Single-char RuneCluster at each bracket position so _bracket_at() in
-    # motion.py can identify them via rune.symbols[c - rune.col].
+    # motion.py can identify them via rune.symbols[c - rune.col].  Row 5's ) sits
+    # at EXC (one left of CLS); the exit is at CLS, so the final % lands on ) at
+    # EXC and one l steps onto the exit.
     rng = random.Random(seed)
     _kinds = ('ancient', 'verdant', 'ember')
 
@@ -3201,23 +3220,14 @@ def build_dungeon_12(seed: int) -> Dungeon:
     for row in _L11_CORR_ROWS:
         kind_open  = rng.choice(_kinds)
         kind_close = rng.choice(_kinds)
+        close_col  = EXC if row == 5 else CLS
         runes.append(RuneCluster(row=row, col=OPN, symbols=('(',), kind=kind_open))
-        runes.append(RuneCluster(row=row, col=CLS, symbols=(')',), kind=kind_close))
-
-    # ── Void field on row 3 ───────────────────────────────────────────────────
-    # Every corridor cell on row 3 except OPN and CLS is filled with a void rune.
-    # % scans through voids (they are CORRIDOR cells) to find the matching bracket;
-    # manual h/l are blocked (_ok returns False for void cells in the BFS and the
-    # game engine kills the player on landing).
-    for c in range(1, COLS - 1):
-        if c == OPN or c == CLS:
-            continue
-        runes.append(RuneCluster(row=3, col=c, symbols=('○',), kind='void'))
+        runes.append(RuneCluster(row=row, col=close_col, symbols=(')',), kind=kind_close))
 
     composite.runes = runes
 
     # ── Entry and exit ────────────────────────────────────────────────────────
-    composite.entry    = _L11_ENTRY
+    composite.gg_pos    = _L11_ENTRY
     composite.exit_pos = _L11_EXIT_POS
     composite.entities = [Entity(kind='exit',
                                  row=_L11_EXIT_POS[0], col=_L11_EXIT_POS[1])]
@@ -3236,285 +3246,394 @@ def build_dungeon_12(seed: int) -> Dungeon:
     return dungeon
 
 
-# ── Level 10 constants ────────────────────────────────────────────────────────
+# ── Level 9 — H/M/L: The Screen Vault (3 colored keys) ────────────────────────
+# Viewport-filling dungeon teaching H (viewport-top), M (viewport-middle), and
+# L (viewport-bottom) as distinct from G (which lands on a void row and is
+# punished).  Restored from the recovered "screen_vault_3keys" design.
+#   COLS=43, ROWS=game_h+4
+#   Row 1             : wide top section (cols 1-41) — H key, 3 colored doors, exit
+#   Rows 2..L_ROW     : narrow corridor (cols 1-25) — M key at M_ROW, L key at L_ROW
+#   void row (L_ROW+3): G lands here (void) — punishes using G
+# Three floor_keys (gold/red/blue) are randomly matched to three colored
+# locked_doors per seed; par is Dijkstra-computed (_dijkstra_par_L10).
+_L10_DEFAULT_GAME_H = 33   # main._build_dungeon's default game height
+_L10_COLS      = 43
+_L10_H_KEY_COL = 2    # anchor col in row 1 for H (NOT col 1)
+_L10_M_KEY_COL = 25   # anchor col in M_ROW; rightmost of narrow corridor
+_L10_L_KEY_COL = 1    # anchor col in L_ROW; leftmost passable
+_L10_DOOR_COLS = (26, 33, 39)   # locked_door cols in row 1
+_L10_EXIT_COL  = 41             # exit entity col in row 1
+_L10_GG_POS    = (1, 1)
+_L10_SPAWN     = (8, 13)
+_L10_COLORS    = ('gold', 'red', 'blue')
+_L10_PAR       = 17   # deterministic: 17 for every color assignment (verified in
+                      # test_level_10), so it is locked rather than re-solved on
+                      # every load — the par Dijkstra is expensive for this level.
 
-_L10_TOTAL_ROWS = 11   # rows 0-10; passable rows 1-9
-_L10_TOTAL_COLS = 52   # cols 0-51; passable cols 4-47
-_L10_PASS_LEFT  = 4    # first passable column
-_L10_PASS_RIGHT = 47   # last passable column
-_L10_KS_COL     = 4    # column of the three keystones (= first passable col)
-_L10_KS_ROWS    = (1, 5, 9)   # top / middle / bottom objective rows
-_L10_ENTRY      = (5, 25)     # dead centre of room
-_L10_EXIT_ROW   = 9
-_L10_EXIT_COL   = 47          # rightmost passable col = first-non-blank by $
+
+def _l10_key_rows(game_h: int) -> tuple:
+    """Return (M_ROW, L_ROW) for a given game_h.
+
+    H is always row 1.
+    M_ROW = 1 + (game_h-1)//2  (Vim-faithful middle of passable rows 1..game_h-1).
+    L_ROW = game_h - 1          (last row fully inside the viewport when vr_start=0).
+    """
+    m_row = 1 + (game_h - 1) // 2
+    l_row = game_h - 1
+    return m_row, l_row
 
 
 def _dijkstra_par_L10(composite, return_path: bool = False):
-    """Minimum-keystroke Dijkstra for Level 10 — The Screen Vault.
+    """Minimum-keystroke Dijkstra for the Screen Vault (3 colored keys).
 
-    State = (row, col, mask) where mask is a 3-bit bitmask of which keystones
-    have been collected (bit 0 = KS-top row 1, bit 1 = KS-mid row 5,
-    bit 2 = KS-bot row 9).  Win when at exit_pos with mask == 0b111.
+    State = (row, col, inv, key_alive, doors) where:
+      inv      : 0=none, 1=H key held, 2=M key held, 3=L key held
+      key_alive: 3-bit mask (bit0=H key on floor, bit1=M key on floor, bit2=L key)
+      doors    : 3-bit mask (bit0=door0 open, bit1=door1 open, bit2=door2 open)
+    Goal: position == EXIT_POS with all doors open (doors==7).
 
-    Available motions:
-      h j k l      — single step, 1 ks each
-      {n}h/j/k/l   — count step, len(str(n))+1 ks
-      H            — jump to prows[0] fnb col, 1 ks
-      M            — jump to prows[len//2] fnb col, 1 ks
-      L            — jump to prows[-1] fnb col, 1 ks
-      G            — jump to exit_pos, 1 ks
-      gg           — jump to entry, 2 ks (two characters)
-      $            — rightmost passable col in row, 1 ks
-      0            — leftmost passable col in row, 1 ks
-      ^            — first non-blank col in row, 1 ks
-      x            — collect keystone at current cell (mask |= bit), 1 ks
-                     (only valid if a live keystone entity is at current position)
+    H/M/L are modelled viewport-relative.
     """
+    game_h = composite._game_h
+    m_row, l_row = _l10_key_rows(game_h)
     ROWS, COLS = composite.rows, composite.cols
-    entry    = composite.entry
-    exit_pos = composite.exit_pos
+    H_COL  = _L10_H_KEY_COL
+    M_COL  = _L10_M_KEY_COL
+    L_COL  = _L10_L_KEY_COL
+    D_COLS = _L10_DOOR_COLS
+    EX     = (_L10_GG_POS[0], _L10_EXIT_COL)
+    entry  = composite.gg_pos
 
-    def _ok(r, c):
-        """Cell is passable and safe to land on (not a void rune)."""
-        if not composite.is_passable(r, c):
-            return False
-        ru = composite.rune_at(r, c)
-        return not (ru and ru.kind == 'void')
+    door_key = composite._door_key  # door_key[d] = inv value (1/2/3) that opens door d
 
-    # ── Screen-relative helpers ───────────────────────────────────────────────
-    # Compute first-non-blank col for all passable rows (matches motion.py).
-    _fnb: dict[int, int] = {}
-    for _r in range(ROWS):
-        _left = None
-        for _c in range(COLS):
-            if composite.is_passable(_r, _c):
-                if _left is None:
-                    _left = _c
-                if composite.rune_at(_r, _c) is not None:
-                    _fnb[_r] = _c
-                    break
+    _door_cells = {(1, dc): di for di, dc in enumerate(D_COLS)}
+    _ok_cache: dict = {}
+    def _ok(r, c, doors):
+        key = (r, c, doors)
+        cached = _ok_cache.get(key)
+        if cached is not None:
+            return cached
+        if not (0 <= r < ROWS and 0 <= c < COLS):
+            res = False
+        elif composite.cells[r][c] not in (CellType.CORRIDOR, CellType.FLOOR):
+            res = False
         else:
-            if _left is not None and _r not in _fnb:
-                _fnb[_r] = _left
+            di = _door_cells.get((r, c))
+            res = not (di is not None and not (doors >> di & 1))
+        _ok_cache[key] = res
+        return res
 
-    _prows = sorted(_fnb)
-    if not _prows:
-        if return_path:
-            return None, ''
-        return None
+    # _fnb_simple / _hml_targets depend only on (row, doors) with doors in 0..7,
+    # so memoize them — they are hit O(rows) times per Dijkstra state otherwise.
+    _fnb_cache: dict = {}
+    def _fnb_simple(row, doors):
+        key = (row, doors)
+        if key in _fnb_cache:
+            return _fnb_cache[key]
+        left = None
+        for col in range(COLS):
+            if _ok(row, col, doors):
+                if left is None:
+                    left = col
+                if composite.rune_at(row, col) is not None:
+                    left = col
+                    break
+        _fnb_cache[key] = left
+        return left
 
-    _h_dest  = (_prows[0],               _fnb[_prows[0]])
-    _m_dest  = (_prows[len(_prows) // 2], _fnb[_prows[len(_prows) // 2]])
-    _l_dest  = (_prows[-1],              _fnb[_prows[-1]])
+    _hml_cache: dict = {}
+    def _hml_targets(r, doors):
+        key = (r, doors)
+        if key in _hml_cache:
+            return _hml_cache[key]
+        vr_s = max(0, min(r - game_h // 2, ROWS - game_h))
+        prows = [_r for _r in range(vr_s, min(vr_s + game_h, ROWS))
+                 if _fnb_simple(_r, doors) is not None]
+        res = (None, None, None) if not prows else (prows[0], prows[len(prows) // 2], prows[-1])
+        _hml_cache[key] = res
+        return res
 
-    # ── Keystone positions → mask bits ────────────────────────────────────────
-    _ks_map: dict[tuple, int] = {}   # (row, col) → bit index
-    for _bit, _ent in enumerate(
-        e for e in composite.entities if e.kind == 'keystone'
-    ):
-        _ks_map[(_ent.row, _ent.col)] = _bit
-
-    FULL_MASK = (1 << len(_ks_map)) - 1  # all bits set = 0b111
-
-    # ── Dijkstra ──────────────────────────────────────────────────────────────
-    INF   = float('inf')
-    start = (*entry, 0)          # (row, col, mask)
+    start = (composite.spawn_pos[0], composite.spawn_pos[1], 0, 0b111, 0)
     dist  = {start: 0}
     prev  = {start: None}
     heap  = [(0, start)]
+    max_n = max(ROWS, COLS)
 
     while heap:
         cost, state = heapq.heappop(heap)
-        r, c, mask = state
-        if (r, c) == exit_pos and mask == FULL_MASK:
+        r, c, inv, ka, doors = state
+
+        if (r, c) == EX and doors == 0b111:
             if return_path:
                 return cost, _join_path(prev, state, merge_single=False)
             return cost
-        if cost > dist.get(state, INF):
+
+        if cost > dist.get(state, float('inf')):
             continue
 
-        def _push(nb_rc, mc=1, lbl='', nb_mask=None):
-            if nb_rc is None:
-                return
-            nr, nc = nb_rc
-            if not _ok(nr, nc):
-                return
-            nmask = nb_mask if nb_mask is not None else mask
-            nb    = (nr, nc, nmask)
-            g     = cost + mc
-            if g < dist.get(nb, INF):
+        def _try(nb, mc, lbl):
+            g = cost + mc
+            if g < dist.get(nb, float('inf')):
                 dist[nb] = g
                 prev[nb] = (state, lbl)
                 heapq.heappush(heap, (g, nb))
 
-        max_n = max(ROWS, COLS)
+        # x: collect key at current position (replaces register)
+        for key_inv, key_row, key_col, key_bit in (
+            (1, 1,     H_COL, 1),
+            (2, m_row, M_COL, 2),
+            (3, l_row, L_COL, 4),
+        ):
+            if (r, c) == (key_row, key_col) and (ka & key_bit):
+                _try((r, c, key_inv, ka & ~key_bit, doors), 1, 'x')
 
-        # ── hjkl (count) ──────────────────────────────────────────────────────
-        for dr, dc, key in ((1,0,'j'),(-1,0,'k'),(0,1,'l'),(0,-1,'h')):
+        # p: unlock door to right
+        for di, dc in enumerate(D_COLS):
+            if (r, c + 1) == (1, dc) and not (doors >> di & 1) and inv == door_key[di]:
+                _try((r, c, 0, ka, doors | (1 << di)), 1, 'p')
+        # P: unlock door to left
+        for di, dc in enumerate(D_COLS):
+            if (r, c - 1) == (1, dc) and not (doors >> di & 1) and inv == door_key[di]:
+                _try((r, c, 0, ka, doors | (1 << di)), 1, 'P')
+
+        # H, M, L (viewport-relative)
+        ht, mt, lt = _hml_targets(r, doors)
+        for trow, lbl in ((ht, 'H'), (mt, 'M'), (lt, 'L')):
+            if trow is None:
+                continue
+            tc = _fnb_simple(trow, doors)
+            if tc is not None and (trow, tc) != (r, c):
+                _try((trow, tc, inv, ka, doors), 1, lbl)
+
+        # gg
+        er, ec = entry
+        if _ok(er, ec, doors):
+            _try((er, ec, inv, ka, doors), 2, 'gg')
+
+        # G: jump to last passable row, first non-blank col
+        for tr in range(ROWS - 1, -1, -1):
+            fc = _fnb_simple(tr, doors)
+            if fc is not None:
+                if (tr, fc) != (r, c):
+                    _try((tr, fc, inv, ka, doors), 1, 'G')
+                break
+
+        # nG
+        for n in range(1, ROWS + 1):
+            tr2 = n - 1
+            fc2 = _fnb_simple(tr2, doors)
+            if fc2 is None or (tr2, fc2) == (r, c):
+                continue
+            _try((tr2, fc2, inv, ka, doors), len(str(n)) + 1, f'{n}G')
+
+        # $: last passable going right
+        end_c = None
+        for tc in range(c + 1, COLS):
+            if not _ok(r, tc, doors):
+                break
+            end_c = tc
+        if end_c is not None:
+            _try((r, end_c, inv, ka, doors), 1, '$')
+
+        # 0: first passable going left
+        start_c = None
+        for tc in range(c - 1, -1, -1):
+            if not _ok(r, tc, doors):
+                break
+            start_c = tc
+        if start_c is not None:
+            _try((r, start_c, inv, ka, doors), 1, '0')
+
+        # ^: first non-blank col
+        fnb = _fnb_simple(r, doors)
+        if fnb is not None and fnb != c:
+            _try((r, fnb, inv, ka, doors), 1, '^')
+
+        # hjkl and count-hjkl
+        for dr, dc_dir, key in ((0, -1, 'h'), (0, 1, 'l'), (1, 0, 'j'), (-1, 0, 'k')):
             for n in range(1, max_n + 1):
-                nr2, nc2 = r + dr * n, c + dc * n
-                if not _ok(nr2, nc2):
+                nr2 = r + dr * n
+                nc2 = c + dc_dir * n
+                if not _ok(nr2, nc2, doors):
                     break
                 mc2  = 1 if n == 1 else len(str(n)) + 1
                 lbl2 = key if n == 1 else f'{n}{key}'
-                _push((nr2, nc2), mc2, lbl2)
-
-        # ── $ 0 ^ ─────────────────────────────────────────────────────────────
-        bc = None
-        for cc in range(c + 1, COLS):
-            if not composite.is_passable(r, cc):
-                break
-            bc = cc
-        if bc is not None and _ok(r, bc):
-            _push((r, bc), 1, '$')
-
-        lc = c
-        for cc in range(c - 1, -1, -1):
-            if not composite.is_passable(r, cc):
-                break
-            lc = cc
-        if lc < c and _ok(r, lc):
-            _push((r, lc), 1, '0')
-
-        if _fnb.get(r) is not None and _ok(r, _fnb[r]):
-            _push((r, _fnb[r]), 1, '^')
-
-        # ── H M L ─────────────────────────────────────────────────────────────
-        if _ok(*_h_dest):
-            _push(_h_dest, 1, 'H')
-        if _ok(*_m_dest):
-            _push(_m_dest, 1, 'M')
-        if _ok(*_l_dest):
-            _push(_l_dest, 1, 'L')
-
-        # ── G (exit jump) ─────────────────────────────────────────────────────
-        if exit_pos and _ok(*exit_pos):
-            _push(exit_pos, 1, 'G')
-
-        # ── gg (entry jump, 2 ks) ─────────────────────────────────────────────
-        if _ok(*entry):
-            _push(entry, 2, 'gg')
-
-        # ── x (collect keystone) ─────────────────────────────────────────────
-        bit = _ks_map.get((r, c))
-        if bit is not None and not (mask >> bit & 1):
-            new_mask = mask | (1 << bit)
-            nb_state = (r, c, new_mask)
-            g = cost + 1
-            if g < dist.get(nb_state, INF):
-                dist[nb_state] = g
-                prev[nb_state] = (state, 'x')
-                heapq.heappush(heap, (g, nb_state))
+                _try((nr2, nc2, inv, ka, doors), mc2, lbl2)
 
     if return_path:
+        best_cost, best_state = float('inf'), None
+        for s2, d2 in dist.items():
+            if (s2[0], s2[1]) == EX and s2[4] == 0b111 and d2 < best_cost:
+                best_cost, best_state = d2, s2
+        if best_state:
+            return best_cost, _join_path(prev, best_state, merge_single=False)
         return None, ''
     return None
 
 
-def build_dungeon_10(seed: int) -> Dungeon:
-    """Level 10 — H/M/L: The Screen Vault.
+def build_dungeon_10(seed: int, game_h: int = _L10_DEFAULT_GAME_H,
+                     compute_answer: bool = True) -> Dungeon:
+    """Level 9 — H M L: The Screen Vault (3 colored keys).
 
-    A single open rectangular room (rows 1-9, cols 4-47, 11×52 total).
-    Three keystones mark the top, middle, and bottom rows:
+    Viewport-filling dungeon that teaches H (viewport-top), M (viewport-middle),
+    and L (viewport-bottom) as distinct from G (room-last-row = void, punished).
+    Restored from the recovered "screen_vault_3keys" design.
 
-      KS-top (row 1, col 4)  — H (1 ks) lands here; 4k + ^ costs 3 ks.
-      KS-mid (row 5, col 4)  — M (1 ks) is the only 1-ks row-5 jump.
-      KS-bot (row 9, col 4)  — L (1 ks); also reachable by 4j (2 ks).
+    Layout: COLS=43, ROWS=game_h+4
+      Row 0          : wall border
+      Row 1          : wide top section (cols 1-41) — H key, 3 locked doors, exit
+      Rows 2..L_ROW  : narrow corridor (cols 1-25) — M key at M_ROW, L key at L_ROW
+      L_ROW+1..+2    : extra narrow corridor (below the viewport)
+      L_ROW+3        : void rune row — G lands here; using G is punished
+      L_ROW+4        : wall border
 
-    Entry: (5, 25) — dead centre.
-    Exit:  (9, 47) — bottom-right corner.
+    Three floor_keys (gold/red/blue, randomly assigned) unlock three colored
+    locked_doors in the top section.  Par is 17 for every color assignment.
 
-    All three keystones must be collected (x) before the exit unlocks.
-    Decorative rune clusters fill each row between cols 6-45.
-
-    Optimal path (par = 7 keystrokes):
-      H x M x L x $
-      H(1) → KS-top(1,4) → x(1) → M(1) → KS-mid(5,4) → x(1) → L(1) →
-      KS-bot(9,4) → x(1) → $(1) → exit(9,47)
-
-    H is required for par: H(1) beats 4k^(3) to reach row-1 fnb.
-    M is required for par: M(1) beats 4j(2) for the row-1→row-5 jump.
-    L is demonstrated but not gated: 4j (2 ks) replaces L at cost+1,
-    still within budget = ceil(7 × 1.4) = 10.
+    Par is locked (`_L10_PAR`) instead of re-solved on every load; the full answer
+    path (admin-only) is solved lazily via ``compute_answer``.
     """
-    dungeon   = Dungeon(name='The Screen Vault', seed=seed)
-    ROWS, COLS = _L10_TOTAL_ROWS, _L10_TOTAL_COLS
+    dungeon = Dungeon(name='The Screen Vault', seed=seed)
+    ROWS   = game_h + 4
+    COLS   = _L10_COLS
+    m_row, l_row = _l10_key_rows(game_h)
+
+    rng = random.Random(seed)
 
     cells = [[CellType.WALL] * COLS for _ in range(ROWS)]
     composite = Room(rows=ROWS, cols=COLS, room_type=RoomType.ENTRY)
     composite.cells = cells
     composite.seed  = seed
+    composite._game_h = game_h
 
-    # ── Carve the single open room ────────────────────────────────────────────
-    for r in range(1, 10):           # rows 1-9
-        for c in range(_L10_PASS_LEFT, _L10_PASS_RIGHT + 1):   # cols 4-47
+    # ── Carve cells ───────────────────────────────────────────────────────────
+    # Row 1: wide top section (cols 1-41, all CORRIDOR)
+    for c in range(1, 42):
+        cells[1][c] = CellType.CORRIDOR
+    # Row 2: transition — cols 1-25 open, 26-42 wall
+    for c in range(1, 26):
+        cells[2][c] = CellType.CORRIDOR
+    # Rows 3 .. l_row+2: narrow corridor cols 1-25
+    for r in range(3, l_row + 3):
+        for c in range(1, 26):
             cells[r][c] = CellType.CORRIDOR
+    # Void rune row: CORRIDOR cells (void runes placed as rune clusters below)
+    void_row = l_row + 3
+    for c in range(1, 26):
+        cells[void_row][c] = CellType.CORRIDOR
 
-    # ── Keystone entities + anchor runes ─────────────────────────────────────
-    # One-char rune cluster at each keystone col so fnb(row) == _L10_KS_COL.
-    # The rune symbols are thematic glyphs: ancient / verdant / ember.
+    # ── Color assignment ──────────────────────────────────────────────────────
+    colors = list(_L10_COLORS)
+    key_colors  = colors[:]
+    rng.shuffle(key_colors)   # key_colors[0]=H key, [1]=M key, [2]=L key
+    door_colors = colors[:]
+    rng.shuffle(door_colors)  # door_colors[0]=door0, [1]=door1, [2]=door2
+
+    inv_for_color = {c: i + 1 for i, c in enumerate(key_colors)}
+    composite._door_key = [inv_for_color[dc] for dc in door_colors]
+
+    # ── Entities: keys, doors, exit ───────────────────────────────────────────
+    composite.entities = [
+        Entity(kind='floor_key',   row=1,     col=_L10_H_KEY_COL, tag=key_colors[0]),
+        Entity(kind='floor_key',   row=m_row, col=_L10_M_KEY_COL, tag=key_colors[1]),
+        Entity(kind='floor_key',   row=l_row, col=_L10_L_KEY_COL, tag=key_colors[2]),
+        Entity(kind='locked_door', row=1, col=_L10_DOOR_COLS[0],  tag=door_colors[0]),
+        Entity(kind='locked_door', row=1, col=_L10_DOOR_COLS[1],  tag=door_colors[1]),
+        Entity(kind='locked_door', row=1, col=_L10_DOOR_COLS[2],  tag=door_colors[2]),
+        Entity(kind='exit',        row=1, col=_L10_EXIT_COL),
+    ]
+
+    # ── Runes ─────────────────────────────────────────────────────────────────
     _load_vocab_tables()
-    rng     = random.Random(seed)
-    _kinds3 = ('ancient', 'verdant', 'ember')
+    plain = _VOCAB_PLAIN_BY_LEN
+    kinds  = ('ancient', 'verdant', 'ember')
+    blocked: set = set()
 
-    _KS_SYMBOLS = ('∘', '·', '⊙')   # one glyph per keystone row
-    for idx, ks_row in enumerate(_L10_KS_ROWS):
-        composite.entities.append(
-            Entity(kind='keystone', row=ks_row, col=_L10_KS_COL)
-        )
-        # Anchor rune at the keystone cell so H/M/L land exactly here.
-        composite.runes.append(
-            RuneCluster(row=ks_row, col=_L10_KS_COL,
-                        symbols=(_KS_SYMBOLS[idx],), kind=_kinds3[idx])
-        )
+    # Anchor runes at key positions (so H/M/L fnb returns the key col)
+    for anchor_row, anchor_col in (
+        (1,     _L10_H_KEY_COL),
+        (m_row, _L10_M_KEY_COL),
+        (l_row, _L10_L_KEY_COL),
+    ):
+        sym = rng.choice([('∘',), ('·',), ('⊙',), ('∙',)])
+        composite.runes.append(RuneCluster(row=anchor_row, col=anchor_col,
+                                           symbols=sym, kind=rng.choice(kinds)))
+        blocked.add((anchor_row, anchor_col))
 
-    # ── Decorative rune clusters ──────────────────────────────────────────────
-    # Scatter seed-varying mixed-vocab clusters on all 9 rows, cols 6-45.
-    # Skip col 4 (anchor) and col 5 (gap after anchor).
-    _blocked: set = set()
-    for ks_row in _L10_KS_ROWS:
-        _blocked.add((ks_row, _L10_KS_COL))   # anchor col
-
-    for row in range(1, 10):
-        c = _L10_PASS_LEFT + 2   # start at col 6
-        while c <= 45:
-            if (row, c) in _blocked:
+    # Row 1: vocab runes only in the left section (before the first door); the
+    # door-bounded corridor (cols 27-40, up to the exit) is left clear.
+    for zone_start, zone_end in ((3, 25),):
+        c = zone_start
+        while c <= zone_end:
+            if (1, c) in blocked:
                 c += 1
                 continue
-            # Pick word length fitting in remaining space
-            max_len = min(6, 46 - c)
-            if max_len < 2:
+            max_len = min(5, zone_end - c + 1)
+            if max_len < 1:
                 break
-            wlen = rng.randint(2, max_len)
-            words = (_VOCAB_MIXED_BY_LEN or {}).get(wlen, [])
+            wlen = rng.randint(1, max_len)
+            words = (plain or {}).get(wlen, [])
             if not words:
-                words = (_VOCAB_PLAIN_BY_LEN or {}).get(wlen, [])
-            if not words:
+                c += 1
+                continue
+            word = rng.choice(words)
+            composite.runes.append(RuneCluster(row=1, col=c,
+                                               symbols=tuple(word),
+                                               kind=rng.choice(kinds)))
+            for i in range(len(word)):
+                blocked.add((1, c + i))
+            c += len(word) + rng.randint(1, 2)
+
+    # Narrow corridor rows: vocab runes.  The M row IS filled (cols 1-24), so M
+    # lands on the leftmost rune and the player must then $ to reach the M key
+    # at col 25 — i.e. "M $", not just "M".
+    for row in range(2, l_row + 3):
+        c = 1
+        while c <= 25:
+            if (row, c) in blocked:
+                c += 1
+                continue
+            if row == _L10_SPAWN[0] and abs(c - _L10_SPAWN[1]) <= 1:
                 c += 2
                 continue
-            word  = rng.choice(words)
-            kind  = rng.choice(_kinds3)
-            composite.runes.append(
-                RuneCluster(row=row, col=c, symbols=tuple(word), kind=kind)
-            )
-            # Mark cells occupied
+            max_len = min(4, 26 - c)
+            if max_len < 1:
+                break
+            wlen = rng.randint(1, max_len)
+            words = (plain or {}).get(wlen, [])
+            if not words:
+                c += 1
+                continue
+            word = rng.choice(words)
+            if any((row, c + i) in blocked for i in range(len(word))):
+                c += 1
+                continue
+            composite.runes.append(RuneCluster(row=row, col=c,
+                                               symbols=tuple(word),
+                                               kind=rng.choice(kinds)))
             for i in range(len(word)):
-                _blocked.add((row, c + i))
-            c += len(word) + rng.randint(1, 3)   # gap between clusters
+                blocked.add((row, c + i))
+            c += len(word) + rng.randint(1, 3)
 
-    # ── Entry / exit ──────────────────────────────────────────────────────────
-    composite.entry    = _L10_ENTRY
-    composite.exit_pos = (_L10_EXIT_ROW, _L10_EXIT_COL)
-    composite.entities.append(Entity(kind='exit', row=_L10_EXIT_ROW, col=_L10_EXIT_COL))
+    # Void rune row: standard void runes (○) across cols 1-25 — where G lands.
+    for c in range(1, 26):
+        composite.runes.append(RuneCluster(row=void_row, col=c,
+                                           symbols=('○',), kind='void'))
+
+    # ── Entry / spawn / exit ──────────────────────────────────────────────────
+    composite.gg_pos    = _L10_GG_POS
+    composite.spawn_pos = _L10_SPAWN
+    composite.exit_pos  = (1, _L10_EXIT_COL)
 
     composite.rebuild_indexes()
 
-    par, path = _dijkstra_par_L10(composite, return_path=True)
-    if par is None:
-        par, path = 7, 'H x M x L x $'
-    composite.par    = par
-    composite.budget = math.ceil(par * 1.4)
-    composite.answer = path
+    # ── Par / answer ──────────────────────────────────────────────────────────
+    # Par is locked at _L10_PAR (deterministic; test_level_10 runs the solver to
+    # verify).  The answer path is only shown to admin, so solve for it only when
+    # compute_answer is set — the Dijkstra is too slow to run on every load.
+    composite.par    = _L10_PAR
+    composite.budget = math.ceil(_L10_PAR * 1.4)
+    composite.answer = _dijkstra_par_L10(composite, return_path=True)[1] if compute_answer else ''
 
     dungeon.rooms        = [composite]
     dungeon.current_room = 0
@@ -3522,44 +3641,38 @@ def build_dungeon_10(seed: int) -> Dungeon:
 
 
 # ── Level 12 layout constants ─────────────────────────────────────────────────
-# Room: 22 rows × 62 cols (rows 0–21, cols 0–61).
-# All interior cells (rows 0–20, cols 1–60) are CORRIDOR unless overridden.
+# Room: 22 rows × 48 cols.  Main area cols 1–42; side room row 15 cols 43–46.
 #
-# Paragraph section (rows 0–19):
-#   Para 1:  rows 0–2  — seed-varying non-void rune clusters
-#   Void:    rows 3–8  — full-width void rune barriers (block j/k counting)
-#   Blank:   row  9    — no rune clusters at all  (paragraph divider)
-#   Para 2:  rows 10–11 — seed-varying non-void rune clusters
-#   Void:    rows 12–18 — full-width void rune barriers
-#   Blank:   row  19   — no rune clusters at all  (paragraph divider)
+# Blank rows (passable, no rune clusters): 1, 3, 5, 9, 15, 17, 19.
+# Content rows (≥1 rune cluster): 2, 4, 6, 7, 8, 10, 11, 12, 13, 14, 16, 18, 20.
 #
-# Sentence section (row 20):
-#   S1 corridor: cols  1–10   CORRIDOR  (sentence-1 rune at cols 2–10)
-#   Wall gap:    cols 11–22   WALL
-#   S2 corridor: cols 23–36   CORRIDOR  (sentence-2 rune at cols 23–36)
-#   Wall gap:    cols 37–48   WALL
-#   S3 corridor: cols 49–60   CORRIDOR  (sentence-3 rune at cols 49–59, exit at 49)
+# Key mechanic:
+#   floor_key at (5,1)  — blank row above code block (rows 6–8 all non-blank).
+#   locked_door at (15,43) — right-wall position at door row.
+#   exit at (15,46) — inside side room.
+#   void at (20,1) — prevents } from exiting safely.
 #
-# Entry: (0, 1).  Exit entity: (20, 49).
+# Navigation: rows 6-8 are all non-blank (three-row code block), forcing the
+# second { to skip row 7 and land at blank row 5 (key).  Key is 10 rows above
+# door row 15, so count-j navigation costs 10j (3 ks) vs } } (2 ks) — making
+# brace jumps strictly cheaper.
 #
-# Optimal route: }} j 3)   = 1+1+1+2 = 5 ks
-#   }}  — paragraph jumps: row 0 → blank row 9 → blank row 19
-#   j   — step down to sentence row 20
-#   3)  — sentence count-jump: col 1 → S1 col 2 → S2 col 23 → S3/exit col 49
-#
-# Without {/}: void barriers in rows 3–8 block all j/k paths.
-#              Player trapped in rows 0–2.  Cost = infinity >> budget.
+# Optimal path (par=8):  { { x } } $ p $
+#   Spawn (10,20): { → (9,1)  { → (5,1) [key; rows 6-8 non-blank, skip].
+#                  x picks up key.
+#                  } → (9,1)  } → (15,1) [door row].
+#                  $ → (15,42) [locked_door at 43 blocks $].
+#                  p unlocks door at (15,43).  $ → (15,46) EXIT.
 
-_L13_ROWS        = 13
-_L13_COLS        = 62
-_L13_ENTRY       = (0, 1)
-_L13_EXIT        = (11, 55)
-
-_L13_PARA1_ROWS  = (0, 1, 2)
-_L13_VOID_ROWS_A = tuple(range(3, 9))    # rows 3-8
-_L13_BLANK_ROW_1 = 9
-_L13_PARA2_ROWS  = (10, 11)
-
+_L13_ROWS     = 22
+_L13_COLS     = 48        # main 44 (cols 0–43) + side room 4 (cols 44–47)
+_L13_ENTRY    = (10, 20)  # spawn position
+_L13_EXIT     = (15, 46)  # exit entity (inside side room)
+_L13_KEY_POS  = (5, 1)    # floor_key entity (blank row above code block)
+_L13_DOOR_POS = (15, 43)  # locked_door entity
+_L13_VOID_POS = (20, 1)   # void rune
+_L13_PAR      = 8
+_L13_ANSWER   = '{ { x } } $ p $'
 
 # ── Level 14 (Sentence Corridor) constants ────────────────────────────────
 # Without (/): wall gaps (cols 11-22 and 37-48) block all l/h/w paths.
@@ -3584,563 +3697,81 @@ _L14_SENT_CLUSTERS = [
 
 def _dijkstra_par_L13(composite, return_path=False,
                       disable_brace=False, disable_paren=False):
-    """Minimum-keystroke Dijkstra for Levels 13–14 — Paragraph and Sentence Jumps.
+    """Minimum-keystroke Dijkstra for Level 12 — Paragraph Jumps (The Runic Archives).
 
-    Available motions: count hjkl, $, 0, ^, w b e, W B E, ge gE,
-                       } { (paragraph), ) ( (sentence, with count).
+    State = (row, col, has_key, door_open) where:
+      has_key:   0 = key on floor, 1 = key held
+      door_open: 0 = locked_door blocking, 1 = door removed
 
-    disable_brace=True  excludes } and { from the search.
-    disable_paren=True  excludes ) and ( from the search.
+    Available motions: hjkl, count-hjkl, 0, $, { } (unless disable_brace), x, p.
+    disable_paren accepted but ignored (no sentence jumps in this level).
     """
     ROWS, COLS = composite.rows, composite.cols
-    entry = composite.entry
-    goal  = composite.exit_pos
-    max_n = max(ROWS, COLS)
+    KR, KC = _L13_KEY_POS
+    DR, DC = _L13_DOOR_POS
+    EX     = _L13_EXIT
+    entry  = composite.gg_pos
+    max_n  = max(ROWS, COLS)
 
-    def _rune(r, c):
-        ru = composite.rune_at(r, c)
-        return ru if (ru and ru.kind != 'void') else None
-
-    def _ok(r, c):
-        if not composite.is_passable(r, c):
+    def _ok(r, c, door_open):
+        if not (0 <= r < ROWS and 0 <= c < COLS):
+            return False
+        if composite.cells[r][c] not in (CellType.CORRIDOR, CellType.FLOOR):
+            return False
+        if (r, c) == (DR, DC) and not door_open:
             return False
         ru = composite.rune_at(r, c)
         return not (ru and ru.kind == 'void')
 
-    def _char_at(r, c):
-        ru = composite.rune_at(r, c)
-        if ru is None or ru.kind == 'void':
-            return None
-        return ru.symbols[c - ru.col]
-
-    def _is_wc(ch):
-        return (ch.isalpha() or ch.isdigit() or ch == '_'
-                or unicodedata.category(ch) == 'So')
-
-    # ── word motions ─────────────────────────────────────────────────────────
-
-    def _w(r, c):
-        ch = _char_at(r, c)
-        if ch is not None:
-            t    = _is_wc(ch)
-            scan = c + 1
-            while scan < COLS and composite.is_passable(r, scan):
-                ch2 = _char_at(r, scan)
-                if ch2 is None:
-                    break
-                if _is_wc(ch2) != t:
-                    break
-                scan += 1
-        else:
-            scan = c + 1
-        for nc in range(scan, COLS):
-            if not composite.is_passable(r, nc):
-                return None
-            if _rune(r, nc):
-                return (r, nc)
-        return None
-
-    def _b(r, c):
-        ch = _char_at(r, c)
-        if ch is not None:
-            t  = _is_wc(ch)
-            rs = c
-            for sc in range(c - 1, -1, -1):
-                if not composite.is_passable(r, sc):
-                    break
-                ch2 = _char_at(r, sc)
-                if ch2 is None or _is_wc(ch2) != t:
-                    break
-                rs = sc
-            if rs < c:
-                return (r, rs)
-            prev_c = c - 1
-        else:
-            prev_c = c - 1
-        while (prev_c >= 0 and composite.is_passable(r, prev_c)
-               and _char_at(r, prev_c) is None):
-            prev_c -= 1
-        if (prev_c >= 0 and composite.is_passable(r, prev_c)
-                and _char_at(r, prev_c) is not None):
-            ch2 = _char_at(r, prev_c)
-            t2  = _is_wc(ch2)
-            rs2 = prev_c
-            for sc2 in range(prev_c - 1, -1, -1):
-                if not composite.is_passable(r, sc2):
-                    break
-                ch3 = _char_at(r, sc2)
-                if ch3 is None or _is_wc(ch3) != t2:
-                    break
-                rs2 = sc2
-            return (r, rs2)
-        return None
-
-    def _e(r, c):
-        ch = _char_at(r, c)
-        if ch is not None:
-            t   = _is_wc(ch)
-            pos = c + 1
-            while pos < COLS and composite.is_passable(r, pos):
-                ch2 = _char_at(r, pos)
-                if ch2 is None or _is_wc(ch2) != t:
-                    break
-                pos += 1
-            end = pos - 1
-            if end > c:
-                return (r, end)
-            scan = pos
-        else:
-            scan = c + 1
-        while (scan < COLS and composite.is_passable(r, scan)
-               and _char_at(r, scan) is None):
-            scan += 1
-        if (scan < COLS and composite.is_passable(r, scan)
-                and _char_at(r, scan) is not None):
-            ch2  = _char_at(r, scan)
-            t2   = _is_wc(ch2)
-            epos = scan + 1
-            while epos < COLS and composite.is_passable(r, epos):
-                ch3 = _char_at(r, epos)
-                if ch3 is None or _is_wc(ch3) != t2:
-                    break
-                epos += 1
-            return (r, epos - 1)
-        return None
-
-    def _ge(r, c):
-        nc = c - 1
-        while nc >= 0:
-            if not composite.is_passable(r, nc):
-                break
-            ru = composite.rune_at(r, nc)
-            if ru and ru.kind != 'void':
-                end_col = ru.col + len(ru.symbols) - 1
-                if end_col < c:
-                    return (r, end_col)
-                nc = ru.col - 1
-                continue
-            nc -= 1
-        return None
-
-    def _gE(r, c):
-        nc = c - 1
-        while nc >= 0:
-            if not composite.is_passable(r, nc):
-                break
-            ru = composite.rune_at(r, nc)
-            if ru and ru.kind != 'void':
-                end  = ru.col + len(ru.symbols) - 1
-                cc   = end + 1
-                while cc < COLS and composite.is_passable(r, cc):
-                    r2 = composite.rune_at(r, cc)
-                    if r2 and r2.kind != 'void':
-                        end = r2.col + len(r2.symbols) - 1
-                        cc  = end + 1
-                    else:
-                        break
-                if end < c:
-                    return (r, end)
-                nc = ru.col - 1
-                continue
-            nc -= 1
-        return None
-
-    def _word_end(r, c):
-        cur = _rune(r, c)
-        if not cur:
-            return None
-        pos = cur.col + len(cur.symbols)
-        while pos < COLS and composite.is_passable(r, pos):
-            ru = _rune(r, pos)
-            if ru:
-                pos = ru.col + len(ru.symbols)
-            else:
-                break
-        return pos - 1
-
-    def _word_start(r, c):
-        cur = _rune(r, c)
-        if not cur:
-            return None
-        ws    = cur.col
-        check = cur.col - 1
-        while check >= 0 and composite.is_passable(r, check):
-            ru = _rune(r, check)
-            if ru:
-                ws = ru.col
-                check = ru.col - 1
-            else:
-                break
-        return ws
-
-    def _W(r, c):
-        cur  = _rune(r, c)
-        scan = (cur.col + len(cur.symbols)) if cur else c + 1
-        while scan < COLS and composite.is_passable(r, scan):
-            ru = _rune(r, scan)
-            if ru:
-                scan = ru.col + len(ru.symbols)
-            else:
-                break
-        while scan < COLS and composite.is_passable(r, scan) and not _rune(r, scan):
-            scan += 1
-        if scan < COLS and composite.is_passable(r, scan):
-            ru = _rune(r, scan)
-            if ru:
-                return (r, ru.col)
-        return None
-
-    def _B(r, c):
-        cur = _rune(r, c)
-        if cur:
-            ws = _word_start(r, c)
-            if ws < c:
-                return (r, ws)
-            pos = ws - 1
-        else:
-            pos = c - 1
-        while pos >= 0 and composite.is_passable(r, pos) and not _rune(r, pos):
-            pos -= 1
-        if pos >= 0 and composite.is_passable(r, pos):
-            ru = _rune(r, pos)
-            if ru:
-                return (r, _word_start(r, pos))
-        return None
-
-    def _E(r, c):
-        cur = _rune(r, c)
-        if cur:
-            end = _word_end(r, c)
-            if end > c:
-                return (r, end)
-            pos = end + 1
-        else:
-            pos = c + 1
-        while pos < COLS and composite.is_passable(r, pos) and not _rune(r, pos):
-            pos += 1
-        if pos < COLS and composite.is_passable(r, pos):
-            ru = _rune(r, pos)
-            if ru:
-                return (r, _word_end(r, pos))
-        return None
-
-    # ── paragraph jumps ───────────────────────────────────────────────────────
-
-    def _row_blank(row):
-        has_pass = any(composite.is_passable(row, cc) for cc in range(COLS))
-        has_rune = any(composite.rune_at(row, cc) is not None
-                       for cc in range(COLS))
+    def _row_blank(row, door_open):
+        has_pass = any(_ok(row, cc, door_open) for cc in range(COLS))
+        has_rune = any(composite.rune_at(row, cc) is not None for cc in range(COLS))
         return has_pass and not has_rune
 
-    def _leftmost_pass(row):
+    def _leftmost_pass(row, door_open):
         for cc in range(COLS):
-            if composite.is_passable(row, cc):
+            if _ok(row, cc, door_open):
                 return cc
         return None
 
-    def _para_fwd(r):
+    def _para_fwd(r, door_open):
         for nr in range(r + 1, ROWS):
-            if _row_blank(nr):
-                lp = _leftmost_pass(nr)
-                if lp is not None and _ok(nr, lp):
+            if _row_blank(nr, door_open):
+                lp = _leftmost_pass(nr, door_open)
+                if lp is not None:
                     return (nr, lp)
-        prows = [rr for rr in range(ROWS) if _leftmost_pass(rr) is not None]
+        prows = [rr for rr in range(ROWS) if _leftmost_pass(rr, door_open) is not None]
         if prows:
-            tr = prows[-1]
-            lp = _leftmost_pass(tr)
-            if lp is not None and _ok(tr, lp) and (tr, lp) != (r, _leftmost_pass(r)):
+            tr, cur_lp = prows[-1], _leftmost_pass(r, door_open)
+            lp = _leftmost_pass(tr, door_open)
+            if lp is not None and (tr, lp) != (r, cur_lp):
                 return (tr, lp)
         return None
 
-    def _para_bwd(r):
+    def _para_bwd(r, door_open):
         for nr in range(r - 1, -1, -1):
-            if _row_blank(nr):
-                lp = _leftmost_pass(nr)
-                if lp is not None and _ok(nr, lp):
+            if _row_blank(nr, door_open):
+                lp = _leftmost_pass(nr, door_open)
+                if lp is not None:
                     return (nr, lp)
-        prows = [rr for rr in range(ROWS) if _leftmost_pass(rr) is not None]
+        prows = [rr for rr in range(ROWS) if _leftmost_pass(rr, door_open) is not None]
         if prows:
-            tr = prows[0]
-            lp = _leftmost_pass(tr)
-            if lp is not None and _ok(tr, lp) and (tr, lp) != (r, _leftmost_pass(r)):
+            tr, cur_lp = prows[0], _leftmost_pass(r, door_open)
+            lp = _leftmost_pass(tr, door_open)
+            if lp is not None and (tr, lp) != (r, cur_lp):
                 return (tr, lp)
         return None
 
-    # ── sentence starts ───────────────────────────────────────────────────────
-
-    def _sent_starts(row):
-        starts = []
-        pending = True
-        for cc in range(COLS):
-            ru = composite.rune_at(row, cc)
-            if ru is None or ru.kind == 'void':
-                continue
-            if pending:
-                starts.append(cc)
-                pending = False
-            if ru.symbols[cc - ru.col] in '.!?':
-                pending = True
-        return starts
-
-    # ── main search ───────────────────────────────────────────────────────────
-
-    dist = {entry: 0}
-    prev = {entry: None}
-    heap = [(0, entry)]
-
-    while heap:
-        cost, (r, c) = heapq.heappop(heap)
-        if (r, c) == goal:
-            if return_path:
-                return cost, _join_path(prev, (r, c), merge_single=False)
-            return cost
-        if cost > dist.get((r, c), float('inf')):
-            continue
-
-        def _push(nb, mc=1, lbl=''):
-            if nb is None:
-                return
-            nr, nc = nb
-            if not _ok(nr, nc):
-                return
-            g = cost + mc
-            if g < dist.get((nr, nc), float('inf')):
-                dist[(nr, nc)] = g
-                prev[(nr, nc)] = ((r, c), lbl)
-                heapq.heappush(heap, (g, (nr, nc)))
-
-        # count j/k
-        for dr, key in ((1, 'j'), (-1, 'k')):
-            for n in range(1, max_n + 1):
-                nr2 = r + dr * n
-                if nr2 < 0 or nr2 >= ROWS or not _ok(nr2, c):
-                    break
-                mc2  = 1 if n == 1 else len(str(n)) + 1
-                lbl2 = key if n == 1 else f'{n}{key}'
-                _push((nr2, c), mc2, lbl2)
-
-        # count h/l
-        for dc, key in ((1, 'l'), (-1, 'h')):
-            for n in range(1, max_n + 1):
-                nc2 = c + dc * n
-                if nc2 < 0 or nc2 >= COLS or not _ok(r, nc2):
-                    break
-                mc2  = 1 if n == 1 else len(str(n)) + 1
-                lbl2 = key if n == 1 else f'{n}{key}'
-                _push((r, nc2), mc2, lbl2)
-
-        # $: rightmost contiguous passable non-void col
-        best_col = None
-        for cc in range(c + 1, COLS):
-            if not composite.is_passable(r, cc):
-                break
-            best_col = cc
-        if best_col is not None and _ok(r, best_col):
-            _push((r, best_col), 1, '$')
-
-        # 0: leftmost contiguous passable col
-        left_col = c
-        for cc in range(c - 1, -1, -1):
-            if not composite.is_passable(r, cc):
-                break
-            left_col = cc
-        if left_col < c and _ok(r, left_col):
-            _push((r, left_col), 1, '0')
-
-        # ^: first rune in passability-bounded range
-        lb = c
-        for cc in range(c - 1, -1, -1):
-            if not composite.is_passable(r, cc):
-                break
-            lb = cc
-        rb = c
-        for cc in range(c + 1, COLS):
-            if not composite.is_passable(r, cc):
-                break
-            rb = cc
-        for cc in range(lb, rb + 1):
-            ru2 = composite.rune_at(r, cc)
-            if ru2:
-                if _ok(r, cc):
-                    _push((r, cc), 1, '^')
-                break
-
-        # count W/B/E
-        for fn, key in ((_W, 'W'), (_B, 'B'), (_E, 'E')):
-            pos2 = (r, c)
-            for n in range(1, max_n):
-                nxt = fn(*pos2)
-                if nxt is None:
-                    break
-                mc2  = 1 if n == 1 else len(str(n)) + 1
-                lbl2 = key if n == 1 else f'{n}{key}'
-                _push(nxt, mc2, lbl2)
-                pos2 = nxt
-
-        # count w/b/e
-        for fn, key in ((_w, 'w'), (_b, 'b'), (_e, 'e')):
-            pos2 = (r, c)
-            for n in range(1, max_n):
-                nxt = fn(*pos2)
-                if nxt is None:
-                    break
-                mc2  = 1 if n == 1 else len(str(n)) + 1
-                lbl2 = key if n == 1 else f'{n}{key}'
-                _push(nxt, mc2, lbl2)
-                pos2 = nxt
-
-        # count ge/gE
-        for fn, key in ((_ge, 'ge'), (_gE, 'gE')):
-            pos2 = (r, c)
-            for n in range(1, max_n):
-                nxt = fn(*pos2)
-                if nxt is None:
-                    break
-                mc2  = 2 if n == 1 else len(str(n)) + 2
-                lbl2 = key if n == 1 else f'{n}{key}'
-                _push(nxt, mc2, lbl2)
-                pos2 = nxt
-
-        # } / { paragraph jumps (1 ks each)
-        if not disable_brace:
-            nb_fwd = _para_fwd(r)
-            if nb_fwd is not None and nb_fwd != (r, c):
-                _push(nb_fwd, 1, '}')
-            nb_bwd = _para_bwd(r)
-            if nb_bwd is not None and nb_bwd != (r, c):
-                _push(nb_bwd, 1, '{')
-
-        # ) / ( sentence jumps (row-scoped, chained count)
-        if not disable_paren:
-            pos2 = (r, c)
-            for n in range(1, max_n):
-                pr, pc = pos2
-                nxt_cols = [s for s in _sent_starts(pr) if s > pc]
-                if not nxt_cols:
-                    break
-                nc2  = nxt_cols[0]
-                mc2  = 1 if n == 1 else len(str(n)) + 1
-                lbl2 = ')' if n == 1 else f'{n})'
-                _push((pr, nc2), mc2, lbl2)
-                pos2 = (pr, nc2)
-
-            pos2 = (r, c)
-            for n in range(1, max_n):
-                pr, pc = pos2
-                prev_cols = [s for s in _sent_starts(pr) if s < pc]
-                if not prev_cols:
-                    break
-                nc2  = prev_cols[-1]
-                mc2  = 1 if n == 1 else len(str(n)) + 1
-                lbl2 = '(' if n == 1 else f'{n}('
-                _push((pr, nc2), mc2, lbl2)
-                pos2 = (pr, nc2)
-
-    if return_path:
-        return None, ''
-    return None
-
-
-# ── Level G/gg (id=85): The File Vaults ────────────────────────────────────
-# 15-row × 58-col dungeon teaching G, {n}G, and gg.
-#
-# Layout:
-#   Rows 0-3   : top section (cols 1-56), entry=(0,1)
-#   Row  4     : wall except (4,26-28); (4,27) = locked_door, (4,26) and (4,28)
-#                are corridor — the only crossing between top and bottom sections
-#   Rows 5-14  : bottom section (cols 1-56), exit_pos=(14,55) with keystone
-#
-# Keystones (must all be collected before exit completes):
-#   KS1 at (14, 55) — collected via G then x; {n}G unreachable without G first
-#   KS2 at (4, 28)  — collected by navigating from (4,55) via 27h then x
-#   Exit at (0, 2)  — step on to complete level after both keystones collected
-#
-# Optimal path (par = 11):
-#   G(1) x(1) 5G(2) 27h(3) x(1) gg(2) l(1)
-#   = 11 ks
-#
-# Key savings:
-#   G beats 14j 54l (1 vs 6 ks)  — strictly necessary
-#   5G beats 10k  (2 vs 3 ks)    — strictly cheaper from row 14
-#   gg beats 4k 26h (2+1=3 vs 5 ks) — strictly cheaper to reach exit near entry
-#
-# All-j/k path: 14j 54l x 10k 27h x k 3k 26h = ~20 ks >> budget
-#
-_LGG_TOTAL_ROWS  = 15
-_LGG_TOTAL_COLS  = 58
-_LGG_ENTRY       = (0, 1)
-_LGG_EXIT_POS    = (14, 55)   # where G teleports; has KS1
-_LGG_EXIT_ENTITY = (0, 2)     # where the level completes
-_LGG_KS1         = (14, 55)   # keystone 1 (same as exit_pos)
-_LGG_KS2         = (4, 28)    # keystone 2 (inside wall gap, right of door)
-_LGG_DOOR_COL    = 27         # locked_door entity at row 4 col 27
-_LGG_WALL_ROW    = 4          # the barrier row
-_LGG_GAP_COLS    = (26, 27, 28)  # corridor cells in the wall row
-
-
-def _dijkstra_par_LGG(composite, return_path: bool = False):
-    """Minimum-keystroke Dijkstra for Level G/gg — The File Vaults.
-
-    State = (row, col, ks_collected) where ks_collected is a frozenset of
-    collected keystone positions.  Actions:
-      hjkl (1 ks), count-hjkl (len(str(n))+1 ks)
-      G  (1 ks): teleport to exit_pos (_LGG_EXIT_POS)
-      gg (2 ks): teleport to entry (_LGG_ENTRY)
-      {n}G (len(str(n))+1 ks): teleport to row n-1 at current col; if that
-           cell is in the wall row, snap to nearest passable col in the row.
-      x  (1 ks): collect keystone at current cell (adds to ks_collected)
-      p/P (1 ks): open locked_door to right/left; costs 1 ks if door present
-    Goal: state = (_LGG_EXIT_ENTITY row/col, {KS1, KS2})
-    """
-    ROWS, COLS = composite.rows, composite.cols
-    entry    = composite.entry
-    exit_pos = composite.exit_pos
-    ks1_pos  = _LGG_KS1
-    ks2_pos  = _LGG_KS2
-    door_pos = (_LGG_WALL_ROW, _LGG_DOOR_COL)
-    goal_pos = _LGG_EXIT_ENTITY
-    all_ks   = frozenset([ks1_pos, ks2_pos])
-
-    def _ok(r, c, door_open: bool = False) -> bool:
-        if r < 0 or r >= ROWS or c < 0 or c >= COLS:
-            return False
-        ct = composite.cells[r][c]
-        if ct not in (CellType.CORRIDOR, CellType.FLOOR):
-            return False
-        if (r, c) == door_pos and not door_open:
-            return False  # locked_door blocks
-        return True
-
-    def _snap_col(r, c, prefer_right: bool = True) -> int:
-        """Find nearest passable col in row r around col c (door always open here)."""
-        if _ok(r, c, door_open=True):
-            return c
-        # scan left and right
-        for delta in range(1, COLS):
-            rc = c + delta
-            lc = c - delta
-            if prefer_right and 0 <= rc < COLS and composite.cells[r][rc] in (CellType.CORRIDOR, CellType.FLOOR):
-                return rc
-            if 0 <= lc < COLS and composite.cells[r][lc] in (CellType.CORRIDOR, CellType.FLOOR):
-                return lc
-            if not prefer_right and 0 <= rc < COLS and composite.cells[r][rc] in (CellType.CORRIDOR, CellType.FLOOR):
-                return rc
-        return c
-
-    # State = (row, col, ks_frozenset, door_open_bool)
-    start = (entry[0], entry[1], frozenset(), False)
-    goal_state_prefix = (goal_pos[0], goal_pos[1])
-
-    dist = {start: 0}
-    prev = {start: None}
-    heap = [(0, start)]
-    max_n = max(ROWS, COLS)
+    start = (entry[0], entry[1], 0, 0)
+    dist  = {start: 0}
+    prev  = {start: None}
+    heap  = [(0, start)]
 
     while heap:
         cost, state = heapq.heappop(heap)
-        r, c, ks, door_open = state
+        r, c, hk, do = state
 
-        if (r, c) == goal_state_prefix and ks == all_ks:
+        if (r, c) == EX:
             if return_path:
                 return cost, _join_path(prev, state, merge_single=False)
             return cost
@@ -4148,166 +3779,291 @@ def _dijkstra_par_LGG(composite, return_path: bool = False):
         if cost > dist.get(state, float('inf')):
             continue
 
-        def _push(nb_state, mc, lbl):
-            nr, nc, nks, ndoor = nb_state
-            if not _ok(nr, nc, ndoor):
-                return
+        def _try(nb, mc, lbl):
             g = cost + mc
-            if g < dist.get(nb_state, float('inf')):
-                dist[nb_state] = g
-                prev[nb_state] = (state, lbl)
-                heapq.heappush(heap, (g, nb_state))
+            if g < dist.get(nb, float('inf')):
+                dist[nb] = g
+                prev[nb] = (state, lbl)
+                heapq.heappush(heap, (g, nb))
 
-        # x: collect keystone at current cell
-        if (r, c) in (ks1_pos, ks2_pos) and (r, c) not in ks:
-            new_ks = ks | frozenset([(r, c)])
-            _push((r, c, new_ks, door_open), 1, 'x')
+        # x: pick up floor_key
+        if (r, c) == (KR, KC) and hk == 0:
+            _try((r, c, 1, do), 1, 'x')
 
-        # p: open locked_door to the right (requires floor_key = KS1 collected)
-        right_cell = (r, c + 1)
-        if right_cell == door_pos and not door_open and ks1_pos in ks:
-            _push((r, c, ks, True), 1, 'p')
+        # p: use key on locked_door to the right
+        if (r, c + 1) == (DR, DC) and hk == 1 and do == 0:
+            _try((r, c, 0, 1), 1, 'p')
 
-        # P: open locked_door to the left
-        left_cell = (r, c - 1)
-        if left_cell == door_pos and not door_open and ks1_pos in ks:
-            _push((r, c, ks, True), 1, 'P')
-
-        # G: teleport to exit_pos (1 ks)
-        er, ec = exit_pos
-        if _ok(er, ec, door_open):
-            _push((er, ec, ks, door_open), 1, 'G')
-
-        # gg: teleport to entry (2 ks)
-        tr, tc = entry
-        if _ok(tr, tc, door_open):
-            _push((tr, tc, ks, door_open), 2, 'gg')
-
-        # {n}G: teleport to row n-1 (count n ≥ 2); preserve col if passable, else snap
-        for n in range(2, ROWS + 1):
-            tr2 = n - 1
-            if tr2 < 0 or tr2 >= ROWS:
-                break
-            tc2 = c
-            if not _ok(tr2, tc2, door_open):
-                tc2 = _snap_col(tr2, c)
-            if _ok(tr2, tc2, door_open) and (tr2, tc2) != (r, c):
-                mc = len(str(n)) + 1
-                lbl = f'{n}G'
-                g = cost + mc
-                nb = (tr2, tc2, ks, door_open)
-                if g < dist.get(nb, float('inf')):
-                    dist[nb] = g
-                    prev[nb] = (state, lbl)
-                    heapq.heappush(heap, (g, nb))
+        # { } paragraph jumps
+        if not disable_brace:
+            fwd = _para_fwd(r, do)
+            if fwd and fwd != (r, c):
+                _try((fwd[0], fwd[1], hk, do), 1, '}')
+            bwd = _para_bwd(r, do)
+            if bwd and bwd != (r, c):
+                _try((bwd[0], bwd[1], hk, do), 1, '{')
 
         # hjkl and count-hjkl
-        for dr, dc, key in ((0,-1,'h'),(0,1,'l'),(1,0,'j'),(-1,0,'k')):
+        for _dr, _dc, _key in ((0, -1, 'h'), (0, 1, 'l'), (1, 0, 'j'), (-1, 0, 'k')):
             for n in range(1, max_n + 1):
-                nr2 = r + dr * n
-                nc2 = c + dc * n
-                if nr2 < 0 or nr2 >= ROWS or nc2 < 0 or nc2 >= COLS:
-                    break
-                if not _ok(nr2, nc2, door_open):
+                nr2 = r + _dr * n
+                nc2 = c + _dc * n
+                if not _ok(nr2, nc2, do):
                     break
                 mc2  = 1 if n == 1 else len(str(n)) + 1
-                lbl2 = key if n == 1 else f'{n}{key}'
-                g2   = cost + mc2
-                nb2  = (nr2, nc2, ks, door_open)
-                if g2 < dist.get(nb2, float('inf')):
-                    dist[nb2] = g2
-                    prev[nb2] = (state, lbl2)
-                    heapq.heappush(heap, (g2, nb2))
+                lbl2 = _key if n == 1 else f'{n}{_key}'
+                _try((nr2, nc2, hk, do), mc2, lbl2)
+
+        # $: scan right to last passable cell
+        end_c = None
+        for tc in range(c + 1, COLS):
+            if not _ok(r, tc, do):
+                break
+            end_c = tc
+        if end_c is not None:
+            _try((r, end_c, hk, do), 1, '$')
+
+        # 0: scan left to first passable cell
+        start_c = None
+        for tc in range(c - 1, -1, -1):
+            if not _ok(r, tc, do):
+                break
+            start_c = tc
+        if start_c is not None:
+            _try((r, start_c, hk, do), 1, '0')
 
     if return_path:
-        # Find best goal state (any ks collection)
-        best = None
-        for state2, d2 in dist.items():
-            r2, c2, ks2, _ = state2
-            if (r2, c2) == goal_state_prefix and ks2 == all_ks:
-                if best is None or d2 < best[0]:
-                    best = (d2, state2)
-        if best:
-            return best[0], _join_path(prev, best[1], merge_single=False)
+        best_cost, best_state = float('inf'), None
+        for s2, d2 in dist.items():
+            if (s2[0], s2[1]) == EX and d2 < best_cost:
+                best_cost, best_state = d2, s2
+        if best_state:
+            return best_cost, _join_path(prev, best_state, merge_single=False)
         return None, ''
     return None
 
 
-def build_dungeon_9(seed: int) -> 'Dungeon':
-    """Level id=85 — G gg {n}G: The File Vaults.
+# ── Level 8 — G/gg: The Long Plumb ─────────────────────────────────────────
+# 16-row × 11-col vertical shaft teaching G (last line), gg (first line), and
+# {n}G (nth line).  Restored from the admin design layout saved as
+# "dungeon_09_the_screen_vault_pre-reversion" (a mislabel — it is the Long Plumb).
+#
+# Layout:
+#   Row 1     : top corridor cols 1-9; start (1,1), exit (1,9);
+#               locked_doors at (1,3) and (1,6) gate the corridor
+#   Row 2     : cols 1-2, 4-5, 7-9 (walls at 3,6 — under the doors), so the two
+#               doors are the ONLY horizontal crossings of the top
+#   Rows 3-14 : a 2-wide left shaft (cols 1-2)
+#   floor_keys: (4,1) and (14,2) — buried near the top and bottom of the shaft
+#
+# Both doors are untagged (either key opens either door), but only ONE key can be
+# held at a time (x overwrites the register), so the solve is: fetch a key, open a
+# door, fetch the other, open the other, reach the exit — riding the shaft with
+# G (→ row 14), {n}G, and gg (→ row 1).  Par/answer are computed by
+# _dijkstra_par_LGG (key/door + line-jump model).
+_LGG_ROWS  = 16
+_LGG_COLS  = 11
+_LGG_ENTRY = (1, 1)             # gg_pos / spawn (first line)
+_LGG_EXIT  = (1, 9)             # exit entity == exit_pos (top-right)
+_LGG_KEYS  = ((4, 1), (14, 2))  # floor_key positions
+_LGG_DOORS = ((1, 3), (1, 6))   # locked_door positions
+# Passable columns per row (every other cell is WALL):
+_LGG_PASSABLE = {
+    1: tuple(range(1, 10)),               # top corridor cols 1-9
+    2: (1, 2, 4, 5, 7, 8, 9),             # walls at 3,6 under the doors
+    **{r: (1, 2) for r in range(3, 15)},  # 2-wide left shaft, rows 3-14
+}
 
-    15-row × 58-col dungeon.  A horizontal wall at row 4 separates the top
-    section (rows 0-3) from the bottom section (rows 5-14).  The only crossing
-    is through the gap at cols 26-28 of row 4, which holds a locked_door entity
-    at (4,27).
 
-    Two keystones must be collected before the exit completes:
-      KS1 at (14,55): collected by G then x  (G teleports to exit_pos=(14,55))
-      KS2 at (4,28):  collected by navigating to the wall gap
+def _dijkstra_par_LGG(composite, return_path: bool = False,
+                      disable_line_jumps: bool = False):
+    """Minimum-keystroke Dijkstra for Level 8 — The Long Plumb.
 
-    Optimal path (par = 11):
-      G x 5G 27h x gg l
-      G(1) teleports to (14,55) → x(1) collects KS1
-      5G(2) teleports to (4,55)  → 27h(3) navigates to (4,28)
-      x(1) collects KS2          → gg(2) teleports to (0,1)
-      l(1) steps to exit at (0,2)
+    Models the vertical key/door shaft with the commands a Level-8 player has:
+      hjkl + count-hjkl, 0 / $ / ^ (1 ks each),
+      G  (1 ks)  → last line, first-non-blank col,
+      gg (2 ks)  → gg_pos (first line),
+      {n}G (len(str(n))+1 ks) → line n, scanning down to a passable row, fnb col,
+      x  (1 ks)  → pick up the floor_key here (overwrites the single register slot),
+      p / P (1 ks) → open the locked_door to the right / left, consuming the key.
+    Word/find motions are degenerate here (the room has no runes) and are omitted.
 
-    Teaching checkpoints:
-      G beats  14j+54l (1 vs 6 ks)     — always strictly cheaper
-      5G beats 10k     (2 vs 3 ks)     — strictly cheaper from row 14
-      gg beats 4k+26h  (3 vs 5 ks)     — strictly cheaper to exit near entry
+    State = (row, col, keys_mask, holding, doors_mask):
+      keys_mask  — bit i set ⇒ key i still on the floor
+      holding    — 1 ⇒ a key is held in the register, else 0
+      doors_mask — bit i set ⇒ door i is open
+    Goal: reach _LGG_EXIT (only reachable once both doors are open).
     """
-    dungeon  = Dungeon(name='The File Vaults', seed=seed)
-    ROWS, COLS = _LGG_TOTAL_ROWS, _LGG_TOTAL_COLS
+    ROWS, COLS = composite.rows, composite.cols
+    entry = composite.gg_pos
+    keys  = _LGG_KEYS
+    doors = _LGG_DOORS
+    EX    = _LGG_EXIT
+    max_n = max(ROWS, COLS)
+    FULL_KEYS  = (1 << len(keys)) - 1
+    door_index = {d: i for i, d in enumerate(doors)}
+
+    def _ok(r, c, dm):
+        if not (0 <= r < ROWS and 0 <= c < COLS):
+            return False
+        if composite.cells[r][c] not in (CellType.CORRIDOR, CellType.FLOOR):
+            return False
+        di = door_index.get((r, c))
+        if di is not None and not (dm >> di & 1):
+            return False          # closed locked_door blocks
+        ru = composite.rune_at(r, c)
+        return not (ru and ru.kind == 'void')
+
+    def _fnb(row, dm):
+        """First-non-blank col (matches motion._first_non_blank_col): first rune
+        start, else leftmost passable; None if the row has no passable cell."""
+        left = None
+        for c in range(COLS):
+            if _ok(row, c, dm):
+                if left is None:
+                    left = c
+                if composite.rune_at(row, c) is not None:
+                    return c
+        return left
+
+    start = (entry[0], entry[1], FULL_KEYS, 0, 0)
+    dist  = {start: 0}
+    prev  = {start: None}
+    heap  = [(0, start)]
+
+    while heap:
+        cost, state = heapq.heappop(heap)
+        r, c, km, hold, dm = state
+
+        if (r, c) == EX:
+            if return_path:
+                return cost, _join_path(prev, state, merge_single=False)
+            return cost
+        if cost > dist.get(state, float('inf')):
+            continue
+
+        def _try(nb, mc, lbl):
+            g = cost + mc
+            if g < dist.get(nb, float('inf')):
+                dist[nb] = g
+                prev[nb] = (state, lbl)
+                heapq.heappush(heap, (g, nb))
+
+        # x: pick up a floor_key here (overwrites the single register slot)
+        for ki, kp in enumerate(keys):
+            if (r, c) == kp and (km >> ki & 1):
+                _try((r, c, km & ~(1 << ki), 1, dm), 1, 'x')
+
+        # p / P: open an adjacent locked_door, consuming the held key
+        if hold:
+            for di, dp in enumerate(doors):
+                if dm >> di & 1:
+                    continue
+                if (r, c + 1) == dp:
+                    _try((r, c, km, 0, dm | (1 << di)), 1, 'p')
+                if (r, c - 1) == dp:
+                    _try((r, c, km, 0, dm | (1 << di)), 1, 'P')
+
+        if not disable_line_jumps:
+            # G: last line (scan up to a passable row), land on first-non-blank
+            for rr in range(ROWS - 1, -1, -1):
+                gc = _fnb(rr, dm)
+                if gc is not None:
+                    if (rr, gc) != (r, c):
+                        _try((rr, gc, km, hold, dm), 1, 'G')
+                    break
+
+            # gg: first line == gg_pos (2 ks)
+            if _ok(entry[0], entry[1], dm) and (entry[0], entry[1]) != (r, c):
+                _try((entry[0], entry[1], km, hold, dm), 2, 'gg')
+
+            # {n}G: line n (1-based); scan down from row n-1 to a passable row, fnb
+            for n in range(1, ROWS + 1):
+                rr = n - 1
+                while rr < ROWS and _fnb(rr, dm) is None:
+                    rr += 1
+                if rr >= ROWS:
+                    continue
+                tc = _fnb(rr, dm)
+                if (rr, tc) != (r, c):
+                    _try((rr, tc, km, hold, dm), len(str(n)) + 1, f'{n}G')
+
+        # hjkl + count-hjkl
+        for dr, dc, key in ((0, -1, 'h'), (0, 1, 'l'), (1, 0, 'j'), (-1, 0, 'k')):
+            for n in range(1, max_n + 1):
+                nr2, nc2 = r + dr * n, c + dc * n
+                if not _ok(nr2, nc2, dm):
+                    break
+                mc2  = 1 if n == 1 else len(str(n)) + 1
+                lbl2 = key if n == 1 else f'{n}{key}'
+                _try((nr2, nc2, km, hold, dm), mc2, lbl2)
+
+        # $ / 0 / ^: horizontal jumps within the row
+        end_c = None
+        for tc in range(c + 1, COLS):
+            if not _ok(r, tc, dm):
+                break
+            end_c = tc
+        if end_c is not None:
+            _try((r, end_c, km, hold, dm), 1, '$')
+        st_c = None
+        for tc in range(c - 1, -1, -1):
+            if not _ok(r, tc, dm):
+                break
+            st_c = tc
+        if st_c is not None:
+            _try((r, st_c, km, hold, dm), 1, '0')
+        fb = _fnb(r, dm)
+        if fb is not None and fb != c:
+            _try((r, fb, km, hold, dm), 1, '^')
+
+    return (None, '') if return_path else None
+
+
+def build_dungeon_9(seed: int) -> 'Dungeon':
+    """Level 8 — G gg {n}G: The Long Plumb.
+
+    A 16-row × 11-col vertical shaft (restored from the admin design layout
+    "dungeon_09_the_screen_vault_pre-reversion" — a mislabel; it is the Long
+    Plumb).  The exit sits on the top row behind two locked doors; the two keys
+    are buried near the top and bottom of a 2-wide left shaft, so the player
+    rides G / gg / {n}G up and down to fetch a key, open a door, and repeat.
+    Fixed layout (no seed variation); see the _LGG_* block above for geometry.
+
+    Par/answer are computed by _dijkstra_par_LGG (key/door + line-jump model);
+    e.g. par 15 = G l x 13k p 5G x gg $ p $.
+    """
+    dungeon = Dungeon(name='The Long Plumb', seed=seed)
+    ROWS, COLS = _LGG_ROWS, _LGG_COLS
 
     cells = [[CellType.WALL] * COLS for _ in range(ROWS)]
     composite = Room(rows=ROWS, cols=COLS, room_type=RoomType.ENTRY)
     composite.cells = cells
     composite.seed  = seed
 
-    # ── Carve top section (rows 0-3) ─────────────────────────────────────────
-    for r in range(0, _LGG_WALL_ROW):
-        for c in range(1, COLS - 1):
-            cells[r][c] = CellType.CORRIDOR
+    # ── Carve the fixed layout (see _LGG_PASSABLE above) ──────────────────────
+    for row, passable_cols in _LGG_PASSABLE.items():
+        for c in passable_cols:
+            cells[row][c] = CellType.CORRIDOR
 
-    # ── Carve wall row 4 with gap ─────────────────────────────────────────────
-    for c in _LGG_GAP_COLS:
-        cells[_LGG_WALL_ROW][c] = CellType.CORRIDOR
-
-    # ── Carve bottom section (rows 5-14) ─────────────────────────────────────
-    for r in range(_LGG_WALL_ROW + 1, ROWS):
-        for c in range(1, COLS - 1):
-            cells[r][c] = CellType.CORRIDOR
-
-    # ── Entry, exit, keystones ────────────────────────────────────────────────
-    composite.entry    = _LGG_ENTRY
-    composite.exit_pos = _LGG_EXIT_POS
-
-    entities = [
-        # KS1 at exit_pos (bottom right): collected via G then x
-        Entity(kind='keystone',    row=_LGG_KS1[0],  col=_LGG_KS1[1]),
-        # KS2 at gap right (wall row): collected by navigating to door gap
-        Entity(kind='keystone',    row=_LGG_KS2[0],  col=_LGG_KS2[1]),
-        # locked_door at gap centre: blocks crossing until key collected
-        # (opened by p from (4,28) or P from (4,26); kills via _kill_door_group)
-        Entity(kind='locked_door', row=_LGG_WALL_ROW, col=_LGG_DOOR_COL),
-        # exit entity at top section
-        Entity(kind='exit',        row=_LGG_EXIT_ENTITY[0], col=_LGG_EXIT_ENTITY[1]),
-    ]
+    # ── Entry / exit / keys / doors ───────────────────────────────────────────
+    composite.gg_pos   = _LGG_ENTRY
+    composite.exit_pos = _LGG_EXIT
+    entities = [Entity(kind='exit', row=_LGG_EXIT[0], col=_LGG_EXIT[1])]
+    for kr, kc in _LGG_KEYS:
+        entities.append(Entity(kind='floor_key', row=kr, col=kc))
+    for dr, dc in _LGG_DOORS:
+        entities.append(Entity(kind='locked_door', row=dr, col=dc))
     composite.entities = entities
-
-    # No seed-varying runes needed for this level
-    composite.runes = []
+    composite.runes = []   # no seed-varying runes; the layout is fixed
 
     composite.rebuild_indexes()
+    _fog_unreachable(composite, composite.gg_pos[0], composite.gg_pos[1])
 
-    # ── Fog unreachable cells (top section initially hidden) ──────────────────
-    _fog_unreachable(composite, composite.entry[0], composite.entry[1])
-
-    # ── Compute par via Dijkstra ──────────────────────────────────────────────
+    # ── Compute par via Dijkstra (key/door + line-jump model) ─────────────────
     par, path = _dijkstra_par_LGG(composite, return_path=True)
-    if par is None:
-        par, path = 11, 'G x 5G 27h x gg l'
+    if par is None:                      # fixed map — should always solve
+        raise RuntimeError('Level 8 (The Long Plumb) is unsolvable — check layout')
     composite.par    = par
     composite.budget = math.ceil(par * 1.4)
     composite.answer = path
@@ -4318,19 +4074,21 @@ def build_dungeon_9(seed: int) -> 'Dungeon':
 
 
 def build_dungeon_13(seed: int) -> 'Dungeon':
-    """Level 13 — Paragraph Jumps: The Void Rift.
+    """Level 12 (id=12) — Paragraph Jumps: The Runic Archives.
 
-    Semi-fixed layout: 13 rows × 62 cols.
+    Layout: 22 rows × 48 cols.
+    Main area: rows 1–20, cols 1–42.  Side room: row 15, cols 43–46.
 
-    Para 1  rows 0–2  — seed-varying non-void rune clusters.
-    Void barrier rows 3–8  — full-width void clusters block j/k counting.
-    Blank row 9  — no runes; target of } jump.
-    Para 2  rows 10–11 — seed-varying non-void rune clusters.
-    Exit at (11, 55) — end of Para 2.
+    Blank rows (no rune clusters): 1, 3, 5, 9, 15, 17, 19.
+    Content rows (≥1 rune cluster): 2, 4, 6, 7, 8, 10–14, 16, 18, 20.
 
-    Without {/}: void barriers trap player in rows 0–2.  Cost = infinity.
+    floor_key at (5,1) — blank row above the three-row code block (6-8).
+    locked_door at (15,43) — right wall of main room at door row.
+    exit at (15,46) — inside side room.
+
+    Optimal path (par=8):  { { x } } $ p $
     """
-    dungeon   = Dungeon(name='The Void Rift', seed=seed)
+    dungeon   = Dungeon(name='The Runic Archives', seed=seed)
     ROWS, COLS = _L13_ROWS, _L13_COLS
 
     cells = [[CellType.WALL] * COLS for _ in range(ROWS)]
@@ -4338,56 +4096,71 @@ def build_dungeon_13(seed: int) -> 'Dungeon':
     composite.cells = cells
     composite.seed  = seed
 
-    # ── Carve interior corridor (rows 0–11, cols 1–60) ───────────────────────
-    for r in range(0, ROWS - 1):
-        for c in range(1, COLS - 1):
+    # Main area: rows 1–20, cols 1–42
+    for r in range(1, 21):
+        for c in range(1, 43):
             cells[r][c] = CellType.CORRIDOR
 
-    # ── Void barrier rows (full-width, deterministic) ─────────────────────────
-    runes: list = []
-    for r in _L13_VOID_ROWS_A:
-        runes.append(RuneCluster(row=r, col=1,
-                                 symbols=('○',) * (COLS - 2),
-                                 kind='void'))
+    # Side room: row 15 cols 43–46 (door cell + interior)
+    for c in range(43, 47):
+        cells[15][c] = CellType.CORRIDOR
 
-    # ── Seed-varying decorative rune clusters (Para 1 and Para 2) ─────────────
+    # Rune content
     _load_vocab_tables()
     plain = _VOCAB_PLAIN_BY_LEN
     rng   = random.Random(seed)
+    runes: list = []
 
-    def _fill_para_row(row):
-        c = 2
-        while c <= 58:
-            if rng.random() < 0.40:
+    def _fill_row(row, col_start=2, col_end=41, skip_cols=()):
+        c = col_start
+        first = True
+        while c <= col_end:
+            if c in skip_cols:
+                c += 1
+                continue
+            if first or rng.random() < 0.40:
                 kind    = rng.choice(_WORD_RUNE_KINDS)
-                max_len = min(6, 58 - c + 1)
+                max_len = min(4 if first else 6, col_end - c + 1)
                 length  = rng.randint(2, max(2, max_len))
                 word    = rng.choice(plain.get(length) or plain[3])
                 syms    = tuple(word)
                 w = len(syms)
-                if c + w - 1 <= 58:
+                if (c + w - 1 <= col_end
+                        and not any(sk in range(c, c + w) for sk in skip_cols)):
                     runes.append(RuneCluster(row=row, col=c, symbols=syms, kind=kind))
                     c += w + rng.randint(2, 3)
+                    first = False
                     continue
             c += 1
 
-    for r in _L13_PARA1_ROWS:
-        _fill_para_row(r)
-    for r in _L13_PARA2_ROWS:
-        _fill_para_row(r)
+    # Para 1 (rows 2, 4); code block rows 6-8 (all non-blank forces
+    # second { to skip row 7 and land at blank row 5 where key is).
+    for r in (2, 4, 6, 7, 8):
+        _fill_row(r)
+    _fill_row(10, skip_cols=(20,))
+    _fill_row(11)
+    for r in (12, 13, 14):
+        _fill_row(r)
+    for r in (16, 18):
+        _fill_row(r)
 
+    runes.append(RuneCluster(row=_L13_VOID_POS[0], col=_L13_VOID_POS[1],
+                             symbols=('○',), kind='void'))
     composite.runes = runes
 
-    # ── Entry and exit ─────────────────────────────────────────────────────────
-    composite.entry    = _L13_ENTRY
+    composite.gg_pos   = _L13_ENTRY
     composite.exit_pos = _L13_EXIT
-    composite.entities = [Entity(kind='exit', row=_L13_EXIT[0], col=_L13_EXIT[1])]
+    composite.entities = [
+        Entity(kind='floor_key',   row=_L13_KEY_POS[0],  col=_L13_KEY_POS[1]),
+        Entity(kind='locked_door', row=_L13_DOOR_POS[0], col=_L13_DOOR_POS[1]),
+        Entity(kind='exit',        row=_L13_EXIT[0],     col=_L13_EXIT[1]),
+    ]
 
     composite.rebuild_indexes()
 
-    par, path = _dijkstra_par_L13(composite, return_path=True, disable_paren=True)
+    par, path = _dijkstra_par_L13(composite, return_path=True)
     if par is None:
-        par, path = 3, '} j $'
+        par, path = _L13_PAR, _L13_ANSWER
     composite.par    = par
     composite.budget = math.ceil(par * 1.4)
     composite.answer = path
@@ -4397,8 +4170,9 @@ def build_dungeon_13(seed: int) -> 'Dungeon':
     return dungeon
 
 
+
 def build_dungeon_14(seed: int) -> 'Dungeon':
-    """Level 14 — Sentence Jumps: The Sentence Corridor.
+    """Level 13 — Sentence Jumps: The Sentence Corridor.
 
     Fixed layout: 3 rows × 62 cols.  Only row 1 is passable.
 
@@ -4444,18 +4218,16 @@ def build_dungeon_14(seed: int) -> 'Dungeon':
     composite.runes = runes
 
     # ── Entry and exit ─────────────────────────────────────────────────────────
-    composite.entry    = _L14_ENTRY
+    composite.gg_pos    = _L14_ENTRY
     composite.exit_pos = _L14_EXIT
     composite.entities = [Entity(kind='exit', row=_L14_EXIT[0], col=_L14_EXIT[1])]
 
     composite.rebuild_indexes()
 
-    par, path = _dijkstra_par_L13(composite, return_path=True, disable_brace=True)
-    if par is None:
-        par, path = 2, '3)'
-    composite.par    = par
-    composite.budget = math.ceil(par * 1.4)
-    composite.answer = path
+    # Fixed layout with fixed optimal path (par always 2).
+    composite.par    = 2
+    composite.budget = math.ceil(2 * 1.4)
+    composite.answer = '3)'
 
     dungeon.rooms        = [composite]
     dungeon.current_room = 0

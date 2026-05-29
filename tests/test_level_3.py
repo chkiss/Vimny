@@ -45,8 +45,8 @@ def test_word_motion_is_necessary(seed):
         for ru in room.runes if ru.kind == 'void'
         for i in range(len(ru.symbols))
     }
-    dist = {room.entry: 0}
-    q = deque([room.entry])
+    dist = {room.gg_pos: 0}
+    q = deque([room.gg_pos])
     while q:
         pos = q.popleft()
         r, c = pos
@@ -72,7 +72,7 @@ def test_entry_and_exit_not_on_void(seed):
         for ru in room.runes if ru.kind == 'void'
         for i in range(len(ru.symbols))
     }
-    assert room.entry    not in void_cells, f"seed={seed}: entry is on a void cell"
+    assert room.gg_pos    not in void_cells, f"seed={seed}: entry is on a void cell"
     assert room.exit_pos not in void_cells, f"seed={seed}: exit is on a void cell"
 
 

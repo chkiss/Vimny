@@ -25,7 +25,7 @@ from engine.jumplist import record_jump as _record_jump, jump_back as _jump_back
 from engine.registers import write_register as _reg_write, read_register as _reg_read
 from engine.visual import apply_visual
 from content.scrolls import (
-    RELIQUARY_SCROLL, REGISTER_TUTORIAL_SCROLL, WARDEN_SIGHT_SCROLL,
+    RELIQUARY_SCROLL, WARDEN_LEAP_SCROLL, WARDEN_SIGHT_SCROLL,
     OPERATOR_CODEX_SCROLL, ARCHIVISTS_METHOD_SCROLL,
     WHOLE_WORD_SCROLL, WARDEN_ACT_SCROLL,
 )
@@ -148,7 +148,63 @@ def _chest_loot(kind: str) -> str:
 
 # ── Scroll overlays ───────────────────────────────────────────────────────────
 
-def _show_reliquary_scroll(term: Terminal, iw: int, game_h: int) -> None:
+def _known_from_progress(progress: dict) -> set:
+    """Commands the player has learned across all completed levels.
+
+    A scroll's smudged lines clarify once the command they preview appears
+    here. A level counts as completed once it has been beaten with ≥1 star
+    (which is also what unlocks the levels that follow it), so this is the
+    cumulative set of commands the player has actually been taught.
+    """
+    known: set = {'h', 'j', 'k', 'l'}
+    for lid, rec in progress.items():
+        if not isinstance(lid, int):
+            continue
+        if isinstance(rec, dict) and (rec.get('complete') or rec.get('stars', 0) >= 1):
+            known.update(_known_commands(lid))
+    return known
+
+
+def _smudge_gate_met(gate, known) -> bool:
+    """True if every command token in `gate` is in the player's known set."""
+    if gate is None:
+        return False
+    tokens = (gate,) if isinstance(gate, str) else tuple(gate)
+    return all(t in known for t in tokens)
+
+
+def _water_stain(text: str, solid: int):
+    """Mask `text` as ink run from a water-damaged left edge.
+
+    The first `solid` characters (left margin + the hidden command) are fully
+    obscured; from there the smudge bleeds rightward, heavy at the wet edge and
+    fading to clean text on the right, with an organic random speckle. Darker
+    shades (▓▒) cluster near the wet edge, lighter (░) toward the dry side.
+    Spaces are never smudged (the stain runs through ink, not gaps). Returns
+    (chars, smudged) parallel lists; deterministic per `text`.
+    """
+    rnd  = random.Random(text)          # stable pattern for a given line
+    n    = len(text)
+    span = max(1, n - solid)
+    chars, smudged = [], []
+    for i, ch in enumerate(text):
+        if i < solid:                   # wet edge: margin + command, always hidden
+            chars.append(rnd.choice('▒▓'))
+            smudged.append(True)
+            continue
+        p = (1 - (i - solid) / span) ** 1.4      # fade probability, 1 → 0
+        if ch != ' ' and rnd.random() < p:
+            r = rnd.random()
+            chars.append('▓' if r < p * 0.5 else ('▒' if r < p * 0.85 else '░'))
+            smudged.append(True)
+        else:
+            chars.append(ch)
+            smudged.append(False)
+    return chars, smudged
+
+
+def _show_reliquary_scroll(term: Terminal, iw: int, game_h: int,
+                           known: set | None = None) -> None:
     """Amber floating box explaining the \" register. d and c rows are smudged."""
     C_ = RELIQUARY_SCROLL
     BOX_IW = 54
@@ -158,12 +214,11 @@ def _show_reliquary_scroll(term: Terminal, iw: int, game_h: int) -> None:
     amber_b = term.color_rgb(220, 175, 35) + term.bold
     amber   = term.color_rgb(220, 175, 35)
     body    = term.color_rgb(185, 150, 55)
-    smudge  = term.color_rgb(55, 40, 10)
+    smudge  = term.color_rgb(120, 92, 38)   # murky ink — visible as a stain, dimmer than body
     hi      = term.color_rgb(255, 220, 60) + term.bold
     rst     = term.normal
 
     col_off = max(1, (iw + 2 - BOX_BW) // 2)
-    row_off = 3 + max(0, (game_h - 17) // 2)
 
     bdr = box_bg + amber_b
     inn = box_bg
@@ -191,16 +246,22 @@ def _show_reliquary_scroll(term: Terminal, iw: int, game_h: int) -> None:
                    inn + amber + sym + rst + inn)
         return row(50, colored)
 
-    def kv_smudged(key: str, desc_smudge: str, desc_clear: str) -> str:
-        sd           = desc_smudge[:25]
-        cd           = desc_clear[:max(0, 25 - len(sd))].ljust(25 - len(sd))
-        sep          = '  ────>  '
-        smudge_block = '▒' * (len(key) + len(sep) + len(sd))
-        suf          = 'lands in  '
-        sym          = '"'
-        colored = ('    ' + smudge + smudge_block + rst +
-                   inn + body + cd + suf + rst +
-                   inn + amber + sym + rst + inn)
+    def kv_smudged(key: str, desc: str) -> str:
+        sep    = '  ────>  '
+        suf    = 'lands in  '
+        sym    = '"'
+        d25    = desc.ljust(25)[:25]
+        text   = '    ' + key + sep + d25            # command stays under the wet edge
+        solid  = 4 + len(key) + len(sep)
+        chars, smudged = _water_stain(text, solid)   # same ink-run fade as the lines-based scrolls
+        painted, prev = '', None
+        for ch, is_s in zip(chars, smudged):
+            col = smudge if is_s else body
+            if col != prev:
+                painted += col
+                prev = col
+            painted += ch
+        colored = painted + rst + inn + body + suf + rst + inn + amber + sym + rst + inn
         return row(50, colored)
 
     p_text  = C_['p_text']
@@ -214,12 +275,13 @@ def _show_reliquary_scroll(term: Terminal, iw: int, game_h: int) -> None:
     lAK = (BOX_IW - len(AK)) // 2
     footer = row(BOX_IW, ' ' * lAK + body + AK + inn + ' ' * (BOX_IW - len(AK) - lAK))
 
+    known = known or set()
     kv_lines = []
-    for spec in C_['kv_rows']:
-        if spec[0] == 'clear':
-            kv_lines.append(kv_clear(spec[1], spec[2]))
+    for key, desc, gate in C_['kv_rows']:
+        if gate is None or _smudge_gate_met(gate, known):
+            kv_lines.append(kv_clear(key, desc))
         else:
-            kv_lines.append(kv_smudged(spec[1], spec[2], spec[3]))
+            kv_lines.append(kv_smudged(key, desc))
 
     sep_h = '═' * (BOX_IW + 2)
     lines = [
@@ -240,6 +302,8 @@ def _show_reliquary_scroll(term: Terminal, iw: int, game_h: int) -> None:
         bdr + '╚' + sep_h + '╝' + rst,
     ]
 
+    # Center on the actual box height so the box tracks any added/removed lines.
+    row_off = 3 + max(0, (game_h - len(lines)) // 2)
     for i, line in enumerate(lines):
         print(term.move_yx(row_off + i, col_off) + line, end='', flush=True)
 
@@ -247,106 +311,43 @@ def _show_reliquary_scroll(term: Terminal, iw: int, game_h: int) -> None:
 
 
 def _show_register_tutorial(term: Terminal, iw: int, game_h: int, progress: dict | None = None) -> None:
-    """Amber floating box explaining the \" register. Blocks until any key."""
-    if 'd_op' not in set((progress or {}).get('extras', [])):
-        _show_reliquary_scroll(term, iw, game_h)
-        return
-    C_ = REGISTER_TUTORIAL_SCROLL
-    BOX_IW = 54
-    BOX_BW = BOX_IW + 4
+    """Amber floating box explaining the \" register. Blocks until any key.
 
-    box_bg  = term.on_color_rgb(10, 8, 2)
-    amber_b = term.color_rgb(220, 175, 35) + term.bold
-    amber   = term.color_rgb(220, 175, 35)
-    body    = term.color_rgb(185, 150, 55)
-    hi      = term.color_rgb(255, 220, 60) + term.bold
-    rst     = term.normal
-
-    col_off = max(1, (iw + 2 - BOX_BW) // 2)
-    row_off = 3 + max(0, (game_h - 17) // 2)
-
-    bdr = box_bg + amber_b
-    inn = box_bg
-
-    def row(vis: int, colored: str) -> str:
-        return (bdr + '║ ' + rst +
-                inn + colored +
-                inn + ' ' * max(0, BOX_IW - vis) +
-                bdr + ' ║' + rst)
-
-    blank = row(0, '')
-
-    T   = C_['title']
-    lT  = (BOX_IW - len(T)) // 2
-    rT  = BOX_IW - len(T) - lT
-    title = row(BOX_IW, ' ' * lT + hi + T + inn + ' ' * rT)
-
-    def kv(key: str, desc: str) -> str:
-        d25     = desc.ljust(25)[:25]
-        sep     = '  ────>  '
-        suf     = 'lands in  '
-        sym     = '"'
-        colored = ('    ' + hi + key + rst +
-                   inn + body + sep + d25 + suf + rst +
-                   inn + amber + sym + rst + inn)
-        return row(50, colored)
-
-    def body_row(s: str) -> str:
-        return row(len(s), body + s + rst)
-
-    p_text  = C_['p_text']
-    p_plain = ' "' + p_text
-    p_col   = (body + ' ' + rst +
-               inn + amber + '"' + rst +
-               inn + body + p_text + rst + inn)
-    p_row   = row(len(p_plain), p_col)
-
-    AK   = '[ any key ]'
-    lAK  = (BOX_IW - len(AK)) // 2
-    footer = row(BOX_IW, ' ' * lAK + body + AK + inn + ' ' * (BOX_IW - len(AK) - lAK))
-
-    sep_h = '═' * (BOX_IW + 2)
-    lines = [
-        bdr + '╔' + sep_h + '╗' + rst,
-        blank,
-        title,
-        blank,
-        body_row(C_['intro']),
-        blank,
-        *[kv(spec[1], spec[2]) for spec in C_['kv_rows']],
-        blank,
-        p_row,
-        blank,
-        body_row(C_['outro']),
-        blank,
-        footer,
-        blank,
-        bdr + '╚' + sep_h + '╝' + rst,
-    ]
-
-    for i, line in enumerate(lines):
-        print(term.move_yx(row_off + i, col_off) + line, end='', flush=True)
-
-    term.inkey()
+    The d / c rows clarify once those commands have been learned (i.e. the
+    levels teaching them have been completed)."""
+    known = _known_from_progress(progress or {})
+    _show_reliquary_scroll(term, iw, game_h, known)
 
 
-def _show_warden_sight_scroll(term: Terminal, iw: int, game_h: int) -> None:
+def _show_warden_leap_scroll(term: Terminal, iw: int, game_h: int,
+                             known: set | None = None) -> None:
+    """Amber floating box previewing Act II structural motions (smudged)."""
+    _render_standard_scroll(term, iw, game_h, WARDEN_LEAP_SCROLL, known)
+
+
+def _show_warden_sight_scroll(term: Terminal, iw: int, game_h: int,
+                              known: set | None = None) -> None:
     """Amber floating box introducing v (Visual mode)."""
-    _render_standard_scroll(term, iw, game_h, WARDEN_SIGHT_SCROLL)
+    _render_standard_scroll(term, iw, game_h, WARDEN_SIGHT_SCROLL, known)
 
 
-def _render_standard_scroll(term: Terminal, iw: int, game_h: int, content: dict) -> None:
-    """Render any scroll whose 'lines' list uses blank/dim/amber/cmd/smudge specs."""
+def _render_standard_scroll(term: Terminal, iw: int, game_h: int, content: dict,
+                            known: set | None = None) -> None:
+    """Render any scroll whose 'lines' list uses blank/dim/amber/cmd/smudge specs.
+
+    A ('smudge', key, prefix, tail, gate) line is drawn obscured until every
+    command token in `gate` is in `known`; once known it renders as a clear
+    ('cmd') row revealing the key and full description."""
+    known = known or set()
     BOX_IW = 54; BOX_BW = BOX_IW + 4
     box_bg  = term.on_color_rgb(10, 8, 2)
     amber_b = term.color_rgb(220, 175, 35) + term.bold
     amber   = term.color_rgb(220, 175, 35)
     body    = term.color_rgb(185, 150, 55)
-    smudge  = term.color_rgb(55, 40, 10)
+    smudge  = term.color_rgb(120, 92, 38)   # murky ink — visible as a stain, dimmer than body
     hi      = term.color_rgb(255, 220, 60) + term.bold
     rst     = term.normal
     col_off = max(1, (iw + 2 - BOX_BW) // 2)
-    row_off = 3 + max(0, (game_h - 17) // 2)
     bdr = box_bg + amber_b; inn = box_bg
 
     def row(vis, colored):
@@ -359,17 +360,33 @@ def _render_standard_scroll(term: Terminal, iw: int, game_h: int, content: dict)
     lT = (BOX_IW - len(T)) // 2; rT = BOX_IW - len(T) - lT
     title = row(BOX_IW, ' ' * lT + hi + T + inn + ' ' * rT)
 
+    # Pad every key to a common width so the ──> arrows and descriptions line
+    # up in clean columns (whether a row is smudged or revealed).
+    key_w  = max((len(s[1]) for s in content['lines'] if s[0] in ('cmd', 'smudge')),
+                 default=0)
+    indent = '  '
+
     def cmd_row(key, desc):
         sep = '  ────>  '
-        plain = f'    {key}{sep}{desc}'
+        k   = key.ljust(key_w)
+        plain = f'{indent}{k}{sep}{desc}'
         return row(len(plain),
-                   '    ' + hi + key + rst + inn + body + sep + rst + inn + amber + desc + rst + inn)
+                   indent + hi + k + rst + inn + body + sep + rst + inn + amber + desc + rst + inn)
 
     def smudge_row(key, smudge_prefix, clear_tail):
-        sep = '  ────>  '
-        block = '▒' * (len(key) + len(sep) + len(smudge_prefix))
-        return row(4 + len(block) + len(clear_tail),
-                   '    ' + smudge + block + rst + inn + body + clear_tail + rst + inn)
+        sep    = '  ────>  '
+        k      = key.ljust(key_w)
+        text   = f'{indent}{k}{sep}{smudge_prefix}{clear_tail}'
+        solid  = len(indent) + len(k) + len(sep) + len(smudge_prefix)
+        chars, smudged = _water_stain(text, solid)
+        painted, prev = '', None
+        for ch, is_s in zip(chars, smudged):
+            col = smudge if is_s else body
+            if col != prev:
+                painted += col
+                prev = col
+            painted += ch
+        return row(len(text), painted + rst + inn)
 
     def body_row(s):  return row(len(s), body + s + rst)
     def amber_row(s): return row(len(s), amber + s + rst)
@@ -380,7 +397,12 @@ def _render_standard_scroll(term: Terminal, iw: int, game_h: int, content: dict)
         if k == 'dim':    return body_row(spec[1])
         if k == 'amber':  return amber_row(spec[1])
         if k == 'cmd':    return cmd_row(spec[1], spec[2])
-        if k == 'smudge': return smudge_row(spec[1], spec[2], spec[3])
+        if k == 'smudge':
+            key, prefix, tail = spec[1], spec[2], spec[3]
+            gate = spec[4] if len(spec) > 4 else None
+            if _smudge_gate_met(gate, known):     # command learned → reveal
+                return cmd_row(key, prefix + tail)
+            return smudge_row(key, prefix, tail)
         raise ValueError(k)
 
     AK = '[ any key ]'; lAK = (BOX_IW - len(AK)) // 2
@@ -395,41 +417,40 @@ def _render_standard_scroll(term: Terminal, iw: int, game_h: int, content: dict)
         bdr + '╚' + sep_h + '╝' + rst,
     ]
 
+    # Center on the actual box height so the box tracks any added/removed lines.
+    row_off = 3 + max(0, (game_h - len(lines)) // 2)
     for i, line in enumerate(lines):
         print(term.move_yx(row_off + i, col_off) + line, end='', flush=True)
     term.inkey()
 
 
-def _show_operator_codex_scroll(term: Terminal, iw: int, game_h: int) -> None:
-    """12.1 vault scroll — d/dd clear, y/c smudged.
-    TODO: add `known: list` param; gate smudge_row→cmd_row on 'y_op'/'c_op' in known.
-    See new-level.md § Scroll revelation for the full pattern."""
-    _render_standard_scroll(term, iw, game_h, OPERATOR_CODEX_SCROLL)
+def _show_operator_codex_scroll(term: Terminal, iw: int, game_h: int,
+                                known: set | None = None) -> None:
+    """Operator's Codex (171) — d/dd clear; y/c clarify once learned."""
+    _render_standard_scroll(term, iw, game_h, OPERATOR_CODEX_SCROLL, known)
 
 
-def _show_archivists_method_scroll(term: Terminal, iw: int, game_h: int) -> None:
-    """17.1 vault scroll — y/yy/p clear, c smudged.
-    TODO: add `known: list` param; gate smudge_row→cmd_row on 'c_op' in known.
-    See new-level.md § Scroll revelation for the full pattern."""
-    _render_standard_scroll(term, iw, game_h, ARCHIVISTS_METHOD_SCROLL)
+def _show_archivists_method_scroll(term: Terminal, iw: int, game_h: int,
+                                   known: set | None = None) -> None:
+    """Archivist's Method (221) — y/yy/p clear; c clarifies once learned."""
+    _render_standard_scroll(term, iw, game_h, ARCHIVISTS_METHOD_SCROLL, known)
 
 
-def _show_whole_word_scroll(term: Terminal, iw: int, game_h: int) -> None:
-    """23.1 vault scroll — iw/aw clear, bracket/quote objects smudged.
-    TODO: add `known: list` param; gate smudge_row→cmd_row on 'bracket_obj'/'quote_obj' in known.
-    See new-level.md § Scroll revelation for the full pattern."""
-    _render_standard_scroll(term, iw, game_h, WHOLE_WORD_SCROLL)
+def _show_whole_word_scroll(term: Terminal, iw: int, game_h: int,
+                            known: set | None = None) -> None:
+    """The Whole Word (291) — iw/aw clear; bracket/quote objects clarify once learned."""
+    _render_standard_scroll(term, iw, game_h, WHOLE_WORD_SCROLL, known)
 
 
-def _show_warden_act_scroll(term: Terminal, iw: int, game_h: int) -> None:
-    """33.1 vault scroll — visual operators clear, gv smudged.
-    TODO: add `known: list` param; gate smudge_row→cmd_row on 'gv' in known.
-    See new-level.md § Scroll revelation for the full pattern."""
-    _render_standard_scroll(term, iw, game_h, WARDEN_ACT_SCROLL)
+def _show_warden_act_scroll(term: Terminal, iw: int, game_h: int,
+                            known: set | None = None) -> None:
+    """The Warden's Act (361) — visual operators clear; gv clarifies once learned."""
+    _render_standard_scroll(term, iw, game_h, WARDEN_ACT_SCROLL, known)
 
 
 def _unlock_animation(term: Terminal, room, player,
-                      door_r: int, door_c: int, iw: int, game_h: int) -> None:
+                      door_r: int, door_c: int, iw: int, game_h: int,
+                      key_color: str | None = None) -> None:
     """Flash key icon at door position, then blank it — door + key both vanish."""
     vr_start = max(0, min(player.row - game_h // 2, room.rows - game_h))
     vc_start = max(0, min(player.col - iw    // 2,  room.cols - iw))
@@ -437,10 +458,10 @@ def _unlock_animation(term: Terminal, room, player,
     scr_c = door_c - vc_start + 1
     if not (0 <= scr_r < term.height and 0 <= scr_c < iw):
         return
-    gold = C.key_fg()
+    key_clr = key_color if key_color is not None else C.key_fg()
     rst  = term.normal
     fbg  = C.floor_bg()
-    print(term.move_yx(scr_r, scr_c) + fbg + gold + S.KEY + rst, end='', flush=True)
+    print(term.move_yx(scr_r, scr_c) + fbg + key_clr + S.KEY + rst, end='', flush=True)
     time.sleep(0.35)
     print(term.move_yx(scr_r, scr_c) + fbg + '  ' + rst, end='', flush=True)
     time.sleep(0.08)
@@ -559,8 +580,34 @@ def _win_animation(term, iw):
         time.sleep(0.1)
 
 
-def _fireworks_animation(term, iw):
-    h       = term.height
+def _fireworks_animation(term, iw, dungeon, player):
+    h      = term.height
+    room   = dungeon.room
+    game_h = h - 8
+    vr_start = max(0, min(player.row - game_h // 2, room.rows - game_h))
+    vc_start = max(0, min(player.col - iw  // 2, room.cols - iw))
+    vr_start = max(0, vr_start)
+    vc_start = max(0, vc_start)
+
+    def _bg_at(term_r, term_c):
+        # Rows 3..3+game_h-1, cols 1..iw are dungeon cells.
+        if not (3 <= term_r < 3 + game_h and 1 <= term_c <= iw):
+            return C.floor_bg()
+        room_r = (term_r - 3) + vr_start
+        room_c = (term_c - 1) + vc_start
+        if room_r >= room.rows or room_c >= room.cols:
+            return C.wall_bg()
+        if (room_r, room_c) in room.fog_cells:
+            return C.wall_bg()
+        ct = room.cells[room_r][room_c]
+        if ct == CellType.WATER:
+            return C.water_bg()
+        if ct == CellType.WALL:
+            return C.wall_bg()
+        if ct == CellType.WOOD_WALL:
+            return C.wood_wall_bg()
+        return C.floor_bg()
+
     bursts  = [
         (h // 4,     iw // 6),
         (h // 3,     iw * 5 // 6),
@@ -597,7 +644,7 @@ def _fireworks_animation(term, iw):
                 rr = br + dr * (1 + frame // 5)
                 cc = bc_ + dc * (1 + frame // 4)
                 if 3 <= rr < h - 3 and 1 <= cc < iw:
-                    print(term.move_yx(rr, cc) + color + sc + term.normal,
+                    print(term.move_yx(rr, cc) + _bg_at(rr, cc) + color + sc + term.normal,
                           end='', flush=True)
         sp, tc, mc = banner_palettes[frame % 3]
         for i, line in enumerate(banner_rows):
@@ -655,7 +702,20 @@ def _calc_stars(won: bool, budget: Budget, room, player, level: int = 0) -> int:
     return 1
 
 
-def _build_dungeon(level: int, seed: int):
+def _build_dungeon(level: int, seed: int, game_h: int = 33, admin: bool = False):
+    # NOTE: generator function names track an OLDER numbering than the current
+    # curriculum (content/levels.py). Generator *content* matches the current
+    # level; only the names are legacy. This dispatch is the source of truth.
+    # Current level -> generator:
+    #   L6  The WORD Forge        -> build_dungeon_7
+    #   L7  The Backward Vaults   -> build_dungeon_8
+    #   L8  The Long Plumb        -> build_dungeon_9
+    #   L9  The Screen Vault      -> build_dungeon_10
+    #   L10 The Bracket Vaults    -> build_dungeon_12
+    #   L12 The Runic Archives    -> build_dungeon_13
+    #   L13 The Sentence Corridor -> build_dungeon_14
+    #   L14 The Sight Sanctum (v) -> build_dungeon_6
+    # (L0-5 and boss L51 use same-numbered generators; L15+ not yet built.)
     if level == 99:
         return build_dungeon_dummy(seed)
     if level == 1:
@@ -673,21 +733,23 @@ def _build_dungeon(level: int, seed: int):
     if level == 51:
         return build_dungeon_51(seed)
     if level == 6:
-        return build_dungeon_6(seed)
-    if level == 7:
         return build_dungeon_7(seed)
-    if level == 8:
+    if level == 7:
         return build_dungeon_8(seed)
-    if level == 9:
+    if level == 8:
         return build_dungeon_9(seed)
+    if level == 9:
+        # L9 Screen Vault: only solve the (admin-only) answer path when admin —
+        # its par-Dijkstra is too slow to run on every load (par is locked).
+        return build_dungeon_10(seed, game_h=game_h, compute_answer=admin)
     if level == 10:
-        return build_dungeon_10(seed)
-    if level == 12:
         return build_dungeon_12(seed)
-    if level == 13:
+    if level == 12:
         return build_dungeon_13(seed)
-    if level == 14:
+    if level == 13:
         return build_dungeon_14(seed)
+    if level == 14:
+        return build_dungeon_6(seed)
     return build_dungeon_0(seed)
 
 
@@ -711,13 +773,14 @@ def _snapshot(room, player, budget, *, row=None, col=None, spent=None, ans=None)
                             ai_tick=e.ai_tick, summon_timer=e.summon_timer,
                             goblin_free_turns=e.goblin_free_turns,
                             uid=e.uid, summoner_uid=e.summoner_uid,
-                            origin_row=e.origin_row, move_dir=e.move_dir)
+                            origin_row=e.origin_row, move_dir=e.move_dir,
+                            tag=e.tag)
                      for e in room.entities],
         'runes':    [RuneCluster(ru.row, ru.col, ru.symbols, ru.kind) for ru in room.runes],
         'cells':    [r[:] for r in room.cells],
         'rows':     room.rows,
         'exit_pos': room.exit_pos,
-        'entry':    room.entry,
+        'gg_pos':   room.gg_pos,
         'fog_cells': set(room.fog_cells),
         'answer_pos':      ap,
         'answer_diverged': ad,
@@ -740,7 +803,7 @@ def _pop_history_step(src: list, dst: list, room, player, budget) -> bool:
             room.cells = item['cells']
             room.rows  = item['rows']
             room.exit_pos = item['exit_pos']
-            room.entry    = item['entry']
+            room.gg_pos    = item.get('gg_pos', item.get('entry', room.gg_pos))
         room.fog_cells = item['fog_cells']
         room.rebuild_indexes()
         if 'answer_pos' in item:
@@ -869,27 +932,37 @@ def _reposition_warden_shield(room, warden: Entity, player) -> None:
             return
 
 
-def _do_warden_move(room, warden: Entity, player) -> str:
-    """Move warden ±1 row (oscillating, capped ±2 from origin_row), then reposition shield.
+_WARDEN_MIN_JUMP = 2   # the Warden never hops a single row — it leaps
+_WARDEN_MAX_JUMP = 6   # ...but won't teleport across an arbitrarily tall arena
 
-    Lazy-initialises origin_row on first call. Tries current direction first; if blocked,
-    reverses and tries once more. Returns a non-empty message on success, '' if unmoveable.
+
+def _do_warden_move(room, warden: Entity, player) -> str:
+    """Leap the warden to a random row a minimum of 2 rows away, then reposition shield.
+
+    The Warden bounds unpredictably off the arena's floor boundaries rather
+    than shuffling between nearby rows: each move it picks a random open row
+    that is at least _WARDEN_MIN_JUMP and at most _WARDEN_MAX_JUMP rows away,
+    in either direction. Lazy-initialises origin_row on first call. Returns a
+    non-empty message on success, '' if no landing ≥2 rows away exists.
     """
     if warden.origin_row < 0:
         warden.origin_row = warden.row
-    origin = warden.origin_row
-    for _ in range(2):
-        nr = warden.row + warden.move_dir
-        if (0 <= nr < room.rows
-                and room.cells[nr][warden.col] in (CellType.FLOOR, CellType.CORRIDOR)
-                and not room.entity_at(nr, warden.col)):
-            room.move_entity(warden, nr, warden.col)
-            if abs(warden.row - origin) >= 2:
-                warden.move_dir *= -1
-            _reposition_warden_shield(room, warden, player)
-            return 'The Warden shifts position!'
-        warden.move_dir *= -1
-    return ''
+    col = warden.col
+
+    candidates = [
+        nr for nr in range(room.rows)
+        if _WARDEN_MIN_JUMP <= abs(nr - warden.row) <= _WARDEN_MAX_JUMP
+        and room.cells[nr][col] in (CellType.FLOOR, CellType.CORRIDOR)
+        and not room.entity_at(nr, col)
+    ]
+    if not candidates:
+        return ''
+
+    nr = random.choice(candidates)
+    warden.move_dir = 1 if nr > warden.row else -1
+    room.move_entity(warden, nr, col)
+    _reposition_warden_shield(room, warden, player)
+    return 'The Warden leaps!'
 
 
 def _try_warden_move(room, killed_goblin: Entity, player) -> str:
@@ -998,26 +1071,6 @@ def _enemy_tick(room, player) -> list:
     return msgs
 
 
-def _hint_bar(known: list) -> str:
-    if '%' in known:
-        return '%:jump to match  } {:next/prev block  ) (:next/prev sentence  H M L:screen  :q quit'
-    if 'H' in known:
-        return 'H:screen-top  M:screen-mid  L:screen-bottom  } {:blocks  ) (:sentences  :q quit'
-    if '{' in known:
-        return '}:next block  {:prev block  ):next sentence  (:prev sentence  :q quit'
-    if 'G' in known:
-        return 'G:last line  gg:first line  {n}G:line n  j:down  k:up  :q quit'
-    if 'f' in known:
-        return 'f{c}:jump to char  t{c}:jump before char  F/T:backward  w b e  [N]hjkl  :w write  :q quit'
-    if 'w' in known:
-        return 'w:jump to word start  b:jump back to word  e:jump to word end  [N]hjkl  :w write  :q quit'
-    if 'count' in known:
-        return '[N]hjkl:count move  0:jump to start of line  ^:first non-blank  $:jump to end of line  x:delete (cut) char  :w write  :q quit'
-    if '$' in known:
-        return 'hjkl:move cursor  0:jump to start of line  ^:first non-blank  $:jump to end of line  :w write  :q quit'
-    return 'h/j/k/l:move cursor  :w write (save)  :q quit  :q! quit without saving'
-
-
 # ── Dungeon game loop ──────────────────────────────────────────────────────────
 
 def run_dungeon(term: Terminal, level: int, progress: dict,
@@ -1038,12 +1091,13 @@ def run_dungeon(term: Terminal, level: int, progress: dict,
         seed    = dungeon.seed or 0
     else:
         seed    = random.randint(0, 2**31)
-        dungeon = _build_dungeon(level, seed)
+        dungeon = _build_dungeon(level, seed, game_h=term.height - 8, admin=(player_name == 'admin'))
     room    = dungeon.room
     if player_name != 'admin':
         room.answer = ''
 
-    player  = Player(row=room.entry[0], col=room.entry[1])
+    _sp     = room.spawn_pos if room.spawn_pos is not None else room.gg_pos
+    player  = Player(row=_sp[0], col=_sp[1])
     player.max_hp = progress.get('max_hp', 6)
     player.hp     = player.max_hp
     player.known_commands = _known_commands(level)
@@ -1302,11 +1356,12 @@ def run_dungeon(term: Terminal, level: int, progress: dict,
 
                 elif cmd == 'e' and (player_name == 'admin' or player.is_dead):
                     seed    = random.randint(0, 2**31)
-                    dungeon = _build_dungeon(level, seed)
+                    dungeon = _build_dungeon(level, seed, admin=(player_name == 'admin'))
                     room    = dungeon.room
                     if player_name != 'admin':
                         room.answer = ''
-                    player  = Player(row=room.entry[0], col=room.entry[1])
+                    _sp2    = room.spawn_pos if room.spawn_pos is not None else room.gg_pos
+                    player  = Player(row=_sp2[0], col=_sp2[1])
                     player.known_commands = _known_commands(level)
                     if player_name == 'admin':
                         player.known_commands = player.known_commands + ['admin', 'register']
@@ -1557,7 +1612,8 @@ def run_dungeon(term: Terminal, level: int, progress: dict,
                 v_count = v_action.get('count', 1)
                 v_motion = v_action['motion']
                 moved = apply_motion(player, v_motion, v_count, room, v_action.get('target'),
-                                     count_given=v_action.get('count_given', True))
+                                     count_given=v_action.get('count_given', True),
+                                     game_h=term.height - 8)
                 if moved and not edit_mode:
                     budget.spend(_keystroke_cost(v_count, v_motion))
             elif v_action is not None:
@@ -1637,7 +1693,8 @@ def run_dungeon(term: Terminal, level: int, progress: dict,
 
             jump_from = (player.row, player.col)
             moved = apply_motion(player, motion, count, room, target,
-                                 count_given=action.get('count_given', True))
+                                 count_given=action.get('count_given', True),
+                                 game_h=term.height - 8)
             if moved:
                 if motion in _JUMP_MOTIONS:
                     _record_jump(player, jump_from)
@@ -1654,7 +1711,7 @@ def run_dungeon(term: Terminal, level: int, progress: dict,
                 ru = room.rune_at(player.row, player.col)
                 if not edit_mode and ru and ru.kind == 'void':
                     iw    = _iw(term)
-                    game_h = term.height - 7
+                    game_h = term.height - 8
                     vr_start = max(0, min(player.row - game_h // 2, room.rows - game_h))
                     vc_start = max(0, min(player.col - iw  // 2,    room.cols - iw))
                     scr_r    = player.row - vr_start + 3
@@ -1676,7 +1733,7 @@ def run_dungeon(term: Terminal, level: int, progress: dict,
                 # Water: drown if landed on water cell (e.g. via $, 0, ^)
                 if not edit_mode and room.cells[player.row][player.col] == CellType.WATER:
                     iw    = _iw(term)
-                    game_h = term.height - 7
+                    game_h = term.height - 8
                     vr_start = max(0, min(player.row - game_h // 2, room.rows - game_h))
                     vc_start = max(0, min(player.col - iw  // 2,    room.cols - iw))
                     scr_r    = player.row - vr_start + 3
@@ -1707,7 +1764,7 @@ def run_dungeon(term: Terminal, level: int, progress: dict,
                     expl_r, expl_c = ent.row, ent.col
                     room.kill_entity(ent)
                     iw_now     = _iw(term)
-                    game_h_now = term.height - 7
+                    game_h_now = term.height - 8
                     vr = max(0, min(player.row - game_h_now // 2, room.rows - game_h_now))
                     vc = max(0, min(player.col - iw_now     // 2, room.cols - iw_now))
                     vr, vc = max(0, vr), max(0, vc)
@@ -1759,7 +1816,7 @@ def run_dungeon(term: Terminal, level: int, progress: dict,
                     iw  = _iw(term)
                     par = room.par or 0
                     if par > 0 and budget.spent <= par:
-                        _fireworks_animation(term, iw)
+                        _fireworks_animation(term, iw, dungeon, player)
                         message = 'Par achieved! Flawless Vim mastery. Type :wq to return to the overworld.'
                     else:
                         _win_animation(term, iw)
@@ -1990,65 +2047,40 @@ def run_dungeon(term: Terminal, level: int, progress: dict,
                     else:
                         _push('You found a scroll!')
                     interacted = True
-                    if level == 11:
+                    # Each boss chest drops the scroll previewing the next act's
+                    # commands; smudged lines clarify as those commands are learned.
+                    # (level → scroll id, full-text title/body, overlay fn)
+                    _SCROLL_DROPS = {
+                        11:  ('register',  None, None,                         _show_reliquary_scroll),
+                        51:  ('leap',      None, None,                         _show_warden_leap_scroll),
+                        131: ('visual',    None, None,                         _show_warden_sight_scroll),
+                        171: ('d_op',      "The Operator's Codex",  _SCROLL_TEXT_OPERATOR_CODEX,   _show_operator_codex_scroll),
+                        221: ('y_op',      "The Archivist's Method", _SCROLL_TEXT_ARCHIVISTS_METHOD, _show_archivists_method_scroll),
+                        291: ('text_obj',  'The Whole Word',        _SCROLL_TEXT_WHOLE_WORD,        _show_whole_word_scroll),
+                        361: ('visual_op', "The Warden's Act",      _SCROLL_TEXT_WARDENS_ACT,       _show_warden_act_scroll),
+                    }
+                    _drop = _SCROLL_DROPS.get(level)
+                    if _drop is not None:
+                        _sid, _txt_title, _txt_body, _show_fn = _drop
+                        # Discovery is recorded by extras membership, NOT by
+                        # known_commands — admin has some ids (e.g. 'register')
+                        # pre-injected, so gating on known_commands would skip
+                        # the discovery record entirely.
+                        extras = progress.get('extras', [])
+                        if _sid not in extras:
+                            progress['extras'] = extras + [_sid]
+                            if _txt_body is not None:
+                                SM.save_scroll_text(_txt_title, _txt_body)
+                        if _sid not in player.known_commands:
+                            player.known_commands = player.known_commands + [_sid]
+                        render_all(term, dungeon, player, budget, _pool_msg(), attack_pos=_attack_pos(), attack_sym=_attack_sym())
+                        _show_fn(term, _iw(term), term.height - 8, set(player.known_commands))
+                    elif 'register' not in progress.get('extras', []):
+                        progress['extras'] = progress.get('extras', []) + ['register']
                         if 'register' not in player.known_commands:
                             player.known_commands = player.known_commands + ['register']
-                            extras = progress.get('extras', [])
-                            if 'register' not in extras:
-                                progress['extras'] = extras + ['register']
                         render_all(term, dungeon, player, budget, _pool_msg(), attack_pos=_attack_pos(), attack_sym=_attack_sym())
-                        _show_reliquary_scroll(term, _iw(term), term.height - 7)
-                    elif level == 51:
-                        if 'visual' not in player.known_commands:
-                            player.known_commands = player.known_commands + ['visual']
-                            extras = progress.get('extras', [])
-                            if 'visual' not in extras:
-                                progress['extras'] = extras + ['visual']
-                        render_all(term, dungeon, player, budget, _pool_msg(), attack_pos=_attack_pos(), attack_sym=_attack_sym())
-                        _show_warden_sight_scroll(term, _iw(term), term.height - 7)
-                    elif level == 121:
-                        if 'd_op' not in player.known_commands:
-                            player.known_commands = player.known_commands + ['d_op']
-                            extras = progress.get('extras', [])
-                            if 'd_op' not in extras:
-                                progress['extras'] = extras + ['d_op']
-                            SM.save_scroll_text("The Operator's Codex", _SCROLL_TEXT_OPERATOR_CODEX)
-                        render_all(term, dungeon, player, budget, _pool_msg(), attack_pos=_attack_pos(), attack_sym=_attack_sym())
-                        _show_operator_codex_scroll(term, _iw(term), term.height - 7)
-                    elif level == 171:
-                        if 'y_op' not in player.known_commands:
-                            player.known_commands = player.known_commands + ['y_op']
-                            extras = progress.get('extras', [])
-                            if 'y_op' not in extras:
-                                progress['extras'] = extras + ['y_op']
-                            SM.save_scroll_text("The Archivist's Method", _SCROLL_TEXT_ARCHIVISTS_METHOD)
-                        render_all(term, dungeon, player, budget, _pool_msg(), attack_pos=_attack_pos(), attack_sym=_attack_sym())
-                        _show_archivists_method_scroll(term, _iw(term), term.height - 7)
-                    elif level == 231:
-                        if 'text_obj' not in player.known_commands:
-                            player.known_commands = player.known_commands + ['text_obj']
-                            extras = progress.get('extras', [])
-                            if 'text_obj' not in extras:
-                                progress['extras'] = extras + ['text_obj']
-                            SM.save_scroll_text('The Whole Word', _SCROLL_TEXT_WHOLE_WORD)
-                        render_all(term, dungeon, player, budget, _pool_msg(), attack_pos=_attack_pos(), attack_sym=_attack_sym())
-                        _show_whole_word_scroll(term, _iw(term), term.height - 7)
-                    elif level == 331:
-                        if 'visual_op' not in player.known_commands:
-                            player.known_commands = player.known_commands + ['visual_op']
-                            extras = progress.get('extras', [])
-                            if 'visual_op' not in extras:
-                                progress['extras'] = extras + ['visual_op']
-                            SM.save_scroll_text("The Warden's Act", _SCROLL_TEXT_WARDENS_ACT)
-                        render_all(term, dungeon, player, budget, _pool_msg(), attack_pos=_attack_pos(), attack_sym=_attack_sym())
-                        _show_warden_act_scroll(term, _iw(term), term.height - 7)
-                    elif 'register' not in player.known_commands:
-                        player.known_commands = player.known_commands + ['register']
-                        extras = progress.get('extras', [])
-                        if 'register' not in extras:
-                            progress['extras'] = extras + ['register']
-                        render_all(term, dungeon, player, budget, _pool_msg(), attack_pos=_attack_pos(), attack_sym=_attack_sym())
-                        _show_register_tutorial(term, _iw(term), term.height - 7, progress)
+                        _show_register_tutorial(term, _iw(term), term.height - 8, progress)
                 elif cur and cur.kind == 'keystone':
                     undo_stack.append(_snapshot(room, player, budget, ans=cmd_start_ans))
                     redo_stack.clear()
@@ -2191,23 +2223,33 @@ def run_dungeon(term: Terminal, level: int, progress: dict,
                 reg_key_idx = next(
                     (i for i, it in enumerate(player.register)
                      if it.get('type') == 'entity' and
-                     it.get('entity') and it['entity'].kind == 'floor_key'),
+                     it.get('entity') and it['entity'].kind == 'floor_key' and
+                     (not target.tag or it['entity'].tag == target.tag)),
                     None,
                 )
                 if reg_key_idx is not None:
+                    _held_key = player.register[reg_key_idx]['entity']
+                    _kclr = (C.key_gold_fg() if _held_key.tag == 'gold' else
+                             C.key_red_fg()  if _held_key.tag == 'red'  else
+                             C.key_blue_fg() if _held_key.tag == 'blue' else None)
                     undo_stack.append(_snapshot(room, player, budget, ans=cmd_start_ans))
                     redo_stack.clear()
                     player.register.pop(reg_key_idx)
                     render_all(term, dungeon, player, budget, _pool_msg(), attack_pos=_attack_pos(), attack_sym=_attack_sym())
                     _unlock_animation(term, room, player,
                                       target.row, target.col,
-                                      _iw(term), term.height - 7)
+                                      _iw(term), term.height - 8, _kclr)
                     _kill_door_group(room, target.row, target.col, kind='locked_door')
                     _reveal_from(room, player.row, player.col)
                     budget.spend(1)
                     _push('Door unlocked!')
                 else:
-                    player.error = 'E: No key in inventory'
+                    _has_key = any(
+                        it.get('type') == 'entity' and it.get('entity') and
+                        it['entity'].kind == 'floor_key'
+                        for it in player.register
+                    )
+                    player.error = 'E: Wrong key for this door' if _has_key else 'E: No key in inventory'
             else:
                 _push('Nothing to paste here.')
 
@@ -2417,7 +2459,8 @@ def run_dungeon(term: Terminal, level: int, progress: dict,
                     orig_r, orig_c = player.row, player.col
                     mc = action.get('motion_count', 1)
                     apply_motion(player, motion, mc, room, action.get('target'),
-                                 count_given=action.get('motion_count_given', True))
+                                 count_given=action.get('motion_count_given', True),
+                                 game_h=term.height - 8)
                     new_r, new_c = player.row, player.col
                     player.row, player.col = orig_r, orig_c
                     if op in ('d', 'c'):
@@ -2595,13 +2638,15 @@ def run_scroll_library(term: Terminal, player: Player, progress: dict) -> str | 
 
     _SL_COMPLETIONS = ['../', 'saves/', 'world/']
 
+    _known = _known_from_progress(progress)
     _SCROLL_DISPATCH = {
         'register':  lambda t, iw, gh: _show_register_tutorial(t, iw, gh, progress),
-        'visual':    _show_warden_sight_scroll,
-        'd_op':      _show_operator_codex_scroll,
-        'y_op':      _show_archivists_method_scroll,
-        'text_obj':  _show_whole_word_scroll,
-        'visual_op': _show_warden_act_scroll,
+        'leap':      lambda t, iw, gh: _show_warden_leap_scroll(t, iw, gh, _known),
+        'visual':    lambda t, iw, gh: _show_warden_sight_scroll(t, iw, gh, _known),
+        'd_op':      lambda t, iw, gh: _show_operator_codex_scroll(t, iw, gh, _known),
+        'y_op':      lambda t, iw, gh: _show_archivists_method_scroll(t, iw, gh, _known),
+        'text_obj':  lambda t, iw, gh: _show_whole_word_scroll(t, iw, gh, _known),
+        'visual_op': lambda t, iw, gh: _show_warden_act_scroll(t, iw, gh, _known),
     }
 
     discovered  = set(progress.get('extras', []))
@@ -2698,6 +2743,66 @@ def run_scroll_library(term: Terminal, player: Player, progress: dict) -> str | 
         _render()
 
 
+# ── Color palette loop (~/.vimny/colors/) ────────────────────────────────────
+
+def run_colors(term: Terminal, player: Player) -> None:
+    """Show the color palette (admin only). Returns when the player exits."""
+    from render.color_palette import render_color_palette, content_row_count
+
+    scroll_top = 0
+    cmd_active = False
+    cmd_line   = ''
+
+    def _max_scroll() -> int:
+        from render.utils import inner_w as _iw
+        game_h    = term.height - 5
+        reserved  = 7  # 6 hdr rows + ../
+        visible_h = max(0, game_h - reserved)
+        return max(0, content_row_count() - visible_h)
+
+    def _render():
+        render_color_palette(term, player, scroll_top,
+                             cmd_line if cmd_active else None)
+
+    _render()
+
+    while True:
+        key = term.inkey(timeout=0.1)
+        if not key:
+            continue
+
+        if cmd_active:
+            if key.name == 'KEY_ESCAPE':
+                cmd_active = False
+                cmd_line   = ''
+            elif key.name == 'KEY_ENTER' or str(key) in ('\n', '\r'):
+                cmd        = cmd_line.strip()
+                cmd_active = False
+                cmd_line   = ''
+                if cmd in ('q', 'q!') or cmd.startswith('e '):
+                    return
+            elif key.name == 'KEY_BACKSPACE' or str(key) == '\x7f':
+                cmd_line = cmd_line[:-1]
+            else:
+                cmd_line = _cmd_append(cmd_line, key)
+            _render()
+            continue
+
+        raw = str(key) if not key.is_sequence else ''
+
+        if key.name == 'KEY_ESCAPE' or raw == '-':
+            return
+        elif raw == ':':
+            cmd_active = True
+            cmd_line   = ''
+        elif raw == 'j':
+            scroll_top = min(scroll_top + 1, _max_scroll())
+        elif raw == 'k':
+            scroll_top = max(scroll_top - 1, 0)
+
+        _render()
+
+
 # ── Parent directory loop (~/.vimny/) ─────────────────────────────────────────
 
 def run_parent_dir(term: Terminal, player: Player, progress: dict) -> str | None:
@@ -2706,10 +2811,14 @@ def run_parent_dir(term: Terminal, player: Player, progress: dict) -> str | None
     Returns None       → back to overworld (Esc or 'world/' selected)
             'scrolls'  → open scroll library
             'saves'    → open character select
+            'colors'   → open color palette (admin only)
     """
-    from render.parent_dir import render_parent_dir, ENTRIES
+    from render.parent_dir import render_parent_dir, entries_for
 
-    _PD_COMPLETIONS = ['saves/', 'scrolls/', 'world/']
+    entries = entries_for(player)
+    _PD_COMPLETIONS = ['saves/', 'scrolls/', 'world/'] + (
+        ['colors/'] if player.name == 'admin' else []
+    )
 
     cursor_row  = 2  # 0=../ 1=./ 2+=entries
     cmd_active  = False
@@ -2757,6 +2866,8 @@ def run_parent_dir(term: Terminal, player: Player, progress: dict) -> str | None
                     return 'scrolls'
                 if _e_path in ('saves',):
                     return 'saves'
+                if _e_path in ('colors',) and player.name == 'admin':
+                    return 'colors'
                 if _e_path in ('world',):
                     return None
             elif key.name == 'KEY_BACKSPACE' or str(key) == '\x7f':
@@ -2778,18 +2889,20 @@ def run_parent_dir(term: Terminal, player: Player, progress: dict) -> str | None
             cmd_active = True
             cmd_line   = ''
         elif raw == 'j':
-            cursor_row = min(cursor_row + 1, len(ENTRIES) + 1)
+            cursor_row = min(cursor_row + 1, len(entries) + 1)
         elif raw == 'k':
             cursor_row = max(cursor_row - 1, 0)
         elif key.name == 'KEY_ENTER' or raw in ('\n', '\r'):
             if cursor_row <= 1:
                 pass  # ../ or ./ — no-op in parent dir
             else:
-                entry = ENTRIES[cursor_row - 2].rstrip('/')
+                entry = entries[cursor_row - 2].rstrip('/')
                 if entry == 'scrolls':
                     return 'scrolls'
                 if entry == 'saves':
                     return 'saves'
+                if entry == 'colors':
+                    return 'colors'
                 return None  # 'world' → back to overworld
 
         _render()
@@ -3100,8 +3213,8 @@ def main():
 
             # ── Auxiliary screen dispatch (browse_saves / scrolls / parent_view) ──
             aux = ow_result['action']
-            if aux in ('browse_saves', 'scrolls', 'parent_view'):
-                while aux in ('browse_saves', 'scrolls', 'parent_view'):
+            if aux in ('browse_saves', 'scrolls', 'parent_view', 'colors'):
+                while aux in ('browse_saves', 'scrolls', 'parent_view', 'colors'):
                     if aux == 'browse_saves':
                         sel_action, sel_name = run_save_select(term)
                         if sel_action == 'load' and sel_name:
@@ -3114,9 +3227,12 @@ def main():
                         aux = ('parent_view' if result == 'parent'
                                else 'browse_saves' if result == 'saves'
                                else None)
+                    elif aux == 'colors':
+                        run_colors(term, player)
+                        aux = 'parent_view'
                     elif aux == 'parent_view':
                         result = run_parent_dir(term, player, progress)
-                        aux = (result if result in ('scrolls', 'saves') else None)
+                        aux = (result if result in ('scrolls', 'saves', 'colors') else None)
                         if aux == 'saves':
                             aux = 'browse_saves'
                 continue

@@ -42,7 +42,7 @@ Ord  Completed level             Commands              wisdom_idx → introduces
  8   id=6   The Warden's Prec.    v                    → w[9]  W B E
  9   id=7   The WORD Forge        W B E                → w[10] ge gE
 10   id=8   The Backward Vaults   ge gE                → w[11] G gg {n}G
-11   id=9   The File Vaults       G gg                 → w[12] H M L
+11   id=9   The Long Plumb       G gg                 → w[12] H M L
 12   id=10  The Screen Vault      H M L                → w[13] %
 13   id=12  The Bracket Vaults    %                    → w[14] } { ) (
 14   id=13  The Runic Archives    } { ) (              → w[15] i a I A
@@ -216,7 +216,7 @@ Top, bottom, and every rung you name.
 
 ---
 
-## w[12] — after The File Vaults (id=9) → introduces The Screen Vault (H M L)
+## w[12] — after The Long Plumb (id=9) → introduces The Screen Vault (H M L)
 **STATUS: ✓ FINALIZED**
 
 ```

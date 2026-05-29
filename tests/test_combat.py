@@ -14,7 +14,7 @@ def _bare_room():
          for c in range(COLS)]
         for r in range(ROWS)
     ]
-    room.entry    = (3, 1)
+    room.gg_pos    = (3, 1)
     room.exit_pos = (3, 28)
     room.rebuild_indexes()
     return room
@@ -113,7 +113,7 @@ def _combat_room():
          for c in range(cols)]
         for r in range(rows)
     ]
-    room.entry    = (4, 1)
+    room.gg_pos    = (4, 1)
     room.exit_pos = (4, 38)
     room.rebuild_indexes()
     return room
@@ -132,8 +132,8 @@ def test_warden_moves_on_last_spawn_kill():
     room.kill_entity(goblin)  # mirrors game loop: kill before calling _try_warden_move
     msg = _try_warden_move(room, goblin, player)
 
-    assert msg == 'The Warden shifts position!'
-    assert warden.row != 4
+    assert msg == 'The Warden leaps!'
+    assert abs(warden.row - 4) >= 2, "Warden must leap at least 2 rows"
 
 
 def test_warden_no_move_when_spawns_remain():
@@ -202,38 +202,60 @@ def test_shield_repositions_left_when_player_left():
     )
 
 
-def test_warden_oscillates_within_two_rows():
-    """Warden oscillates ±2 rows from origin and reverses at the limits."""
-    room   = _combat_room()
+def test_warden_leaps_at_least_two_rows_each_move():
+    """Every Warden move is a random leap of ≥2 rows, staying on floor within bounds."""
+    import random
+    random.seed(12345)            # deterministic trajectory for the roam assertion
+    room   = _combat_room()       # interior floor rows 1..7
     player = Player(row=4, col=1)
     warden = Entity(kind='warden', row=4, col=20, max_hp=5, ai='')
     room.add_entity(warden)
 
-    # Drive 8 moves and record the trajectory
     positions = [warden.row]
     for _ in range(8):
-        _do_warden_move(room, warden, player)
+        prev = warden.row
+        msg  = _do_warden_move(room, warden, player)
+        assert msg == 'The Warden leaps!'
+        assert abs(warden.row - prev) >= 2, (
+            f"Warden hopped <2 rows: {prev} → {warden.row}"
+        )
+        assert 1 <= warden.row <= 7, f"Warden left the floor: row {warden.row}"
         positions.append(warden.row)
 
-    origin = 4
-    for pos in positions:
-        assert abs(pos - origin) <= 2, f"Warden left ±2 bound: row {pos} (origin {origin})"
-
-    # Must actually have moved (not stuck)
+    # Must roam, not park on one row
     assert len(set(positions)) > 1, "Warden never moved from its origin row"
 
 
-def test_warden_direction_reverses_at_limit():
-    """move_dir flips to -1 once the Warden reaches origin+2."""
-    room   = _combat_room()
+def test_warden_leap_distance_varies_with_randomness():
+    """Across many leaps the Warden uses more than one jump distance."""
+    import random
+    random.seed(7)
+    room   = _combat_room()       # interior floor rows 1..7
     player = Player(row=4, col=1)
-    warden = Entity(kind='warden', row=4, col=20, max_hp=5, ai='', move_dir=1)
+    warden = Entity(kind='warden', row=4, col=20, max_hp=5, ai='')
     room.add_entity(warden)
 
-    _do_warden_move(room, warden, player)   # row 5, still +1
-    assert warden.move_dir == 1
-    _do_warden_move(room, warden, player)   # row 6 = origin+2 → flip
-    assert warden.move_dir == -1
+    dists = set()
+    for _ in range(20):
+        prev = warden.row
+        _do_warden_move(room, warden, player)
+        dists.add(abs(warden.row - prev))
+
+    assert all(d >= 2 for d in dists), f"every leap must be ≥2 rows; saw {dists}"
+    assert len(dists) > 1, f"leap distance should vary; only saw {dists}"
+
+
+def test_warden_direction_reverses_when_walled_in():
+    """A walled-in Warden can only leap toward open floor."""
+    room   = _combat_room()       # interior floor rows 1..7
+    player = Player(row=4, col=1)
+    warden = Entity(kind='warden', row=7, col=20, max_hp=5, ai='', move_dir=1)
+    room.add_entity(warden)
+
+    # From the bottom floor row, every valid landing (≥2 away) is upward.
+    _do_warden_move(room, warden, player)
+    assert warden.move_dir == -1, "Warden must reverse to leap up off the bottom row"
+    assert warden.row <= 5
 
 
 # ── Boss-cleared gate (level 51) ──────────────────────────────────────────────
@@ -247,7 +269,7 @@ def _boss_room():
          for c in range(cols)]
         for r in range(rows)
     ]
-    room.entry    = (3, 0)
+    room.gg_pos    = (3, 0)
     room.exit_pos = (3, 39)
     room.fog_cells = set()
     room.rebuild_indexes()

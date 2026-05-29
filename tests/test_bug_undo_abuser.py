@@ -1,7 +1,6 @@
 """The Undo Abuser — spams u and Ctrl-R constantly.
 
-Uncovers: undo/redo restoring entities and fog, undoing past stack limit,
-snapshot copy semantics, and redo invalidation.
+Personality defined in agents/bug_testers.md.
 """
 import pytest
 from engine.world import Room, RoomType, CellType, Entity
@@ -17,7 +16,7 @@ def _bare_room(rows=7, cols=30):
          for c in range(cols)]
         for r in range(rows)
     ]
-    room.entry    = (3, 1)
+    room.gg_pos    = (3, 1)
     room.exit_pos = (3, 28)
     room.fog_cells = set()
     room.rebuild_indexes()
