@@ -12,15 +12,15 @@ import pytest
 from engine.world import CellType
 from generation.dungeon_gen import (
     build_dungeon_8,
-    _dijkstra_par_LGG,
-    _LGG_ROWS, _LGG_COLS,
-    _LGG_ENTRY, _LGG_EXIT,
-    _LGG_KEYS, _LGG_DOORS, _LGG_PASSABLE,
+    _dijkstra_par_L8,
+    _L8_ROWS, _L8_COLS,
+    _L8_ENTRY, _L8_EXIT,
+    _L8_KEYS, _L8_DOORS, _L8_PASSABLE,
 )
 
 SEEDS = [1, 42, 999, 12345, 2**20 + 7]
 
-_PASSABLE_CELLS = {(r, c) for r, cols in _LGG_PASSABLE.items() for c in cols}
+_PASSABLE_CELLS = {(r, c) for r, cols in _L8_PASSABLE.items() for c in cols}
 
 
 # ── Structural tests ──────────────────────────────────────────────────────────
@@ -28,22 +28,22 @@ _PASSABLE_CELLS = {(r, c) for r, cols in _LGG_PASSABLE.items() for c in cols}
 @pytest.mark.parametrize("seed", SEEDS)
 def test_dimensions(seed):
     room = build_dungeon_8(seed).rooms[0]
-    assert room.rows == _LGG_ROWS
-    assert room.cols == _LGG_COLS
+    assert room.rows == _L8_ROWS
+    assert room.cols == _L8_COLS
 
 
 @pytest.mark.parametrize("seed", SEEDS)
 def test_entry_and_exit_passable(seed):
     room = build_dungeon_8(seed).rooms[0]
-    assert room.spawn_pos == _LGG_ENTRY
-    assert room.exit_pos == _LGG_EXIT
+    assert room.spawn_pos == _L8_ENTRY
+    assert room.exit_pos == _L8_EXIT
     for (r, c) in (room.spawn_pos, room.exit_pos):
         assert room.cells[r][c] == CellType.CORRIDOR, f"seed={seed}: ({r},{c}) not CORRIDOR"
 
 
 @pytest.mark.parametrize("seed", SEEDS)
 def test_passable_layout(seed):
-    """Exactly the _LGG_PASSABLE cells are CORRIDOR; every other cell is WALL."""
+    """Exactly the _L8_PASSABLE cells are CORRIDOR; every other cell is WALL."""
     room = build_dungeon_8(seed).rooms[0]
     for r in range(room.rows):
         for c in range(room.cols):
@@ -57,14 +57,14 @@ def test_passable_layout(seed):
 def test_keys_present(seed):
     room = build_dungeon_8(seed).rooms[0]
     keys = sorted((e.row, e.col) for e in room.entities if e.kind == 'floor_key')
-    assert keys == sorted(_LGG_KEYS), f"seed={seed}: floor_keys {keys} != {sorted(_LGG_KEYS)}"
+    assert keys == sorted(_L8_KEYS), f"seed={seed}: floor_keys {keys} != {sorted(_L8_KEYS)}"
 
 
 @pytest.mark.parametrize("seed", SEEDS)
 def test_doors_present(seed):
     room = build_dungeon_8(seed).rooms[0]
     doors = sorted((e.row, e.col) for e in room.entities if e.kind == 'locked_door')
-    assert doors == sorted(_LGG_DOORS), f"seed={seed}: doors {doors} != {sorted(_LGG_DOORS)}"
+    assert doors == sorted(_L8_DOORS), f"seed={seed}: doors {doors} != {sorted(_L8_DOORS)}"
 
 
 @pytest.mark.parametrize("seed", SEEDS)
@@ -72,7 +72,7 @@ def test_single_exit_at_exit_pos(seed):
     room = build_dungeon_8(seed).rooms[0]
     exits = [e for e in room.entities if e.kind == 'exit']
     assert len(exits) == 1
-    assert (exits[0].row, exits[0].col) == _LGG_EXIT == room.exit_pos
+    assert (exits[0].row, exits[0].col) == _L8_EXIT == room.exit_pos
 
 
 # ── Colored keys / doors (fixed door sequence, shuffled key colors) ───────────
@@ -105,7 +105,7 @@ def test_key_colors_vary_with_seed():
 @pytest.mark.parametrize("seed", SEEDS)
 def test_par_matches_dijkstra(seed):
     room = build_dungeon_8(seed).rooms[0]
-    assert room.par == _dijkstra_par_LGG(room)
+    assert room.par == _dijkstra_par_L8(room)
 
 
 @pytest.mark.parametrize("seed", SEEDS)
@@ -137,7 +137,7 @@ def test_line_jumps_reduce_keystrokes(seed):
     jumps) costs strictly more than par.  NB the no-jump route still fits the
     ×1.4 budget, so the forcing is soft (the shaft is short) — see build_dungeon_8."""
     room = build_dungeon_8(seed).rooms[0]
-    cost_no_jumps = _dijkstra_par_LGG(room, disable_line_jumps=True)
+    cost_no_jumps = _dijkstra_par_L8(room, disable_line_jumps=True)
     assert cost_no_jumps is not None and cost_no_jumps > room.par, (
         f"seed={seed}: no-line-jump cost {cost_no_jumps} not greater than par {room.par}"
     )
