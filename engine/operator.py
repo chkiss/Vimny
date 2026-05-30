@@ -9,7 +9,7 @@ from __future__ import annotations
 from engine.world import CellType, CharRun, Entity
 from engine.text_object import TextObjectType
 from engine.editor import _merge_adjacent_runes
-from engine.reflow import is_ledge, close_gap
+from engine.reflow import is_ledge, close_gap, open_gap
 
 _PASTABLE = (CellType.FLOOR, CellType.CORRIDOR)
 
@@ -282,15 +282,15 @@ def case_char(room, player, count: int = 1) -> bool:
 
 
 def op_paste(room, player, clip: dict, before: bool, count: int = 1) -> bool:
-    """Place a clip into the room `count` times (3p → 3 copies; x on g + 3p → ggg).
+    """Paste a clip `count` times (3p → 3 copies; x on g + 3p → ggg).
 
-    Vimny is a fixed overlay grid, NOT an insert buffer: pasting overlays chars
-    onto cells and never shifts neighbors (rows are wall-bounded). Charwise: `p`
-    places to the RIGHT of the cursor (col+1, extending right); `P` to the LEFT
-    (the copies end at col-1). Linewise: `p` overlays the row(s) below, `P` the
-    cursor row(s). Paste NEVER moves the player — the cursor relocates only via
-    motions, and never lands on pasted content (a letter, or a respawned creature).
-    Returns True if anything was placed."""
+    Charwise paste reflows like real Vim: `p` inserts AFTER the cursor (col+1),
+    `P` BEFORE it (col); existing content slides right to make room (overflow
+    falls off the brink) and the cursor lands on the LAST pasted cell. A cut
+    creature respawns live; a cut letter lays back down — both shift the line.
+    Linewise paste still overlays the row(s) below (`p`) / the cursor row(s)
+    (`P`) — vertical reflow waits on the ledge-extending motions. Returns True
+    if anything was placed."""
     if not clip or not clip.get('rows'):
         return False
     placed_any = False
@@ -311,8 +311,10 @@ def op_paste(room, player, clip: dict, before: bool, count: int = 1) -> bool:
                 _merge_adjacent_runes(room, row)
     else:
         rclip = clip['rows'][0]
-        width = max(rclip.get('width', 0), 1)               # advance ≥1 cell per copy
-        base  = (player.col - width * count) if before else (player.col + 1)
+        width = max(rclip.get('width', 0), 1)               # ≥1 cell per copy
+        base  = player.col if before else player.col + 1
+        total = width * count
+        open_gap(room, player.row, base, total)             # reflow: slide existing content right
         for copy in range(count):
             col_k = base + copy * width
             if _place_row(room, player.row, col_k, rclip) >= 0:
@@ -320,4 +322,11 @@ def op_paste(room, player, clip: dict, before: bool, count: int = 1) -> bool:
             if _place_entities(room, player.row, col_k, rclip):
                 placed_any = True
         _merge_adjacent_runes(room, player.row)
+        if placed_any:                                      # cursor on the last pasted cell (Vim)
+            last = base + total - 1
+            while last >= base and (not room.is_passable(player.row, last)
+                                    or room.entity_at(player.row, last) is not None):
+                last -= 1
+            if last >= base:                                # skip walls & creature cells →
+                player.col = last                           # a lone creature leaves the cursor put
     return placed_any

@@ -94,18 +94,18 @@ def test_paste_cut_letter_after_cursor():
     assert op_paste(room, player, clip, before=False)      # p → col 6 (right)
     ru = room.char_run_at(3, 6)
     assert ru is not None and ru.symbols == ('z',)
-    assert player.col == 5                                 # paste never moves the player
+    assert player.col == 6                                 # cursor on the pasted letter (Vim)
 
 
-def test_paste_cut_letter_before_places_left():
-    """P places the cut letter to the LEFT; the player stays put."""
+def test_paste_cut_letter_before_inserts_at_cursor():
+    """P inserts the cut letter AT the cursor (shifting the rest right); the
+    cursor lands on the pasted letter (full Vim paste)."""
     room   = _bare_room()
     player = Player(row=3, col=5)
     clip   = _clip_from_cut_runes([_rune_item('q', 5)], base_col=5)
-    op_paste(room, player, clip, before=True)              # P → col 4 (left)
-    assert room.char_run_at(3, 4) is not None
-    assert room.char_run_at(3, 5) is None                  # not under the cursor
-    assert player.col == 5
+    op_paste(room, player, clip, before=True)              # P → insert at col 5
+    assert room.char_run_at(3, 5).symbols == ('q',)
+    assert player.col == 5                                 # cursor on the pasted letter
 
 
 def test_cut_letter_clip_preserves_column_gaps():

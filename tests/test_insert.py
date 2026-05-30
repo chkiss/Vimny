@@ -75,22 +75,22 @@ class TestEntryPositioning:
 # ── Substitute entry (s / S) ─────────────────────────────────────────────────
 
 class TestSubstituteEntry:
-    def test_s_deletes_char_under_cursor(self):
+    def test_s_deletes_char_and_closes_the_gap(self):
         room = _room()
         room.add_char_run(CharRun(3, 5, ('a', 'b', 'c'), 'ancient'))
         p = _player(3, 5)
         begin_insert(room, p, 's')
-        assert room.char_run_at(3, 5) is None       # 'a' gone
-        assert room.char_run_at(3, 6) is not None    # 'bc' remnant
-        assert p.col == 5                         # cursor stays
+        assert room.char_run_at(3, 5).symbols == ('b', 'c')   # 'a' gone; 'bc' pulled left
+        assert room.char_run_at(3, 7) is None
+        assert p.col == 5                                     # cursor at the deletion point
 
-    def test_s_with_count_deletes_n(self):
+    def test_s_with_count_deletes_n_and_closes_the_gap(self):
         room = _room()
         room.add_char_run(CharRun(3, 2, ('a', 'b', 'c', 'd'), 'ancient'))
         p = _player(3, 2)
         begin_insert(room, p, 's', count=2)
-        assert room.char_run_at(3, 2) is None and room.char_run_at(3, 3) is None
-        assert room.char_run_at(3, 4) is not None     # 'cd' remnant
+        assert room.char_run_at(3, 2).symbols == ('c', 'd')   # 'ab' gone; 'cd' pulled left
+        assert room.char_run_at(3, 4) is None
 
     def test_S_clears_whole_row(self):
         room = _room()
