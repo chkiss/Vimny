@@ -3146,18 +3146,22 @@ def run_overworld(term: Terminal, player: Player, progress: dict,
     visible   = [l for l in LEVELS if not l.get('admin_only') or player.name == 'admin']
     customs   = SM.list_layouts() if player.name == 'admin' else []
     total     = len(visible) + len(customs)
-    cursor_row = initial_cursor  # 0=../ 1=./ 2+=levels
+    cursor_row = initial_cursor  # 0=../ 1=./ 2+=levels (the netrw line N = cursor_row+1)
     cmd_active = False
     cmd_line   = ''
-    pending_d  = False
+    pending_delete = False       # D pressed on a custom layout, awaiting y to confirm
+    pending_g  = False           # first g of gg
+    count_buf  = ''              # digits typed before a motion (e.g. 5j, 12G)
+    scroll_offset = 0            # stateful viewport top (so the cursor doesn't cling)
     tab_matches: list[str] = []
     tab_idx    = -1
 
     def _render(deleting=False):
-        render_overworld(term, player, progress, cursor_row,
+        nonlocal scroll_offset
+        scroll_offset = render_overworld(term, player, progress, cursor_row,
                          cmd_line if cmd_active else None,
                          levels=visible, custom_layouts=customs,
-                         deleting=deleting)
+                         deleting=deleting, scroll_offset=scroll_offset)
 
     _render()
 
@@ -3216,18 +3220,39 @@ def run_overworld(term: Terminal, player: Player, progress: dict,
         raw = str(key) if not key.is_sequence else ''
 
         on_custom = cursor_row >= len(visible) + 2
+        player.error = ''                              # clear any transient message
 
-        if pending_d:
-            pending_d = False
-            if raw == 'd' and on_custom:
+        # D — delete a custom layout (netrw deletes with D); confirm with y.
+        if pending_delete:
+            pending_delete = False
+            count_buf = ''
+            if raw == 'y' and on_custom:
                 layout = customs[cursor_row - 2 - len(visible)]
                 SM.delete_layout(layout.get('layout_name', ''))
                 customs    = SM.list_layouts()
                 total      = len(visible) + len(customs)
                 cursor_row = min(cursor_row, total + 1)
+            _render()
+            continue                                   # any non-y key cancels
+
+        # gg — jump to the first line
+        if pending_g:
+            pending_g = False
+            if raw == 'g':
+                cursor_row = 0
+                count_buf  = ''
                 _render()
                 continue
-            # fall through and handle the key normally
+            # not 'gg' → fall through and handle the key normally
+
+        # count prefix — digits accumulate before a motion ('0' alone is not a count)
+        if raw.isdigit() and (raw != '0' or count_buf):
+            count_buf += raw
+            _render()
+            continue
+        n_given = bool(count_buf)
+        n = int(count_buf) if count_buf else 1
+        count_buf = ''
 
         if raw == ':':
             cmd_active = True
@@ -3235,11 +3260,20 @@ def run_overworld(term: Terminal, player: Player, progress: dict,
         elif raw == '-':
             return {'action': 'parent_view', 'cursor': cursor_row}
         elif raw == 'j':
-            cursor_row = min(cursor_row + 1, total + 1)
+            cursor_row = min(cursor_row + n, total + 1)
         elif raw == 'k':
-            cursor_row = max(cursor_row - 1, 0)
-        elif raw == 'd' and on_custom:
-            pending_d = True
+            cursor_row = max(cursor_row - n, 0)
+        elif raw == 'g':
+            pending_g = True
+        elif raw == 'G':                               # {n}G → line n; bare G → last line
+            cursor_row = max(0, min(n - 1, total + 1)) if n_given else (total + 1)
+        elif raw == 'D':                               # netrw delete (custom only)
+            if on_custom:
+                pending_delete = True
+            else:
+                player.error = "Can't delete a built-in dungeon — only your own custom layouts."
+        elif raw == 'd':                               # read-only buffer (netrw is read-only)
+            player.error = 'The overworld is read-only — press D to delete a custom layout.'
         elif key.name == 'KEY_ENTER' or raw in ('\n', '\r'):
             if cursor_row == 0:
                 return {'action': 'parent_view', 'cursor': cursor_row}
@@ -3253,7 +3287,7 @@ def run_overworld(term: Terminal, player: Player, progress: dict,
                 layout = customs[cursor_row - 2 - len(visible)]
                 return {'action': 'open_custom', 'layout': layout, 'cursor': cursor_row}
 
-        _render(deleting=pending_d)
+        _render(deleting=pending_delete)
 
 
 # ── Main ───────────────────────────────────────────────────────────────────────

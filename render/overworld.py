@@ -8,11 +8,23 @@ from content.levels import LEVELS, is_unlocked, is_reliquary, level_type
 from render.utils import inner_w as _iw
 
 
+def _scroll_offset(cursor_entry: int, scroll_offset: int, avail: int, n_entries: int) -> int:
+    """Vim-like viewport top: keep the previous offset unless the cursor has left
+    the [offset, offset+avail) window, then scroll just enough to bring it back.
+    The cursor moves freely inside the window — it does not cling to an edge."""
+    max_off = max(0, n_entries - avail)
+    if cursor_entry < scroll_offset:
+        scroll_offset = cursor_entry
+    elif cursor_entry >= scroll_offset + avail:
+        scroll_offset = cursor_entry - avail + 1
+    return max(0, min(scroll_offset, max_off))
+
+
 def render_overworld(term: Terminal, player: Player, progress: dict,
                      cursor_row: int, cmd_line: str | None = None,
                      levels: list | None = None,
                      custom_layouts: list | None = None,
-                     deleting: bool = False) -> None:
+                     deleting: bool = False, scroll_offset: int = 0) -> int:
     """
     progress: {level_id (int): {'stars': int, 'complete': bool}}
     cursor_row: index into combined list (standard levels then custom layouts)
@@ -63,32 +75,41 @@ def render_overworld(term: Terminal, player: Player, progress: dict,
     dfc  = C.dir_fg()
     enfc = C.entry_fg()
 
-    def _row(is_cursor, vis, colored):
+    # netrw line-number gutter (`:set number`): every selectable row shows its
+    # 1-indexed line, so {n}G / gg / G jump by the number you see.
+    GW = 4                                   # gutter width ("123 ")
+    cw = max(1, iw - GW)                     # content width to the right of the gutter
+
+    def _gutter(lineno):
+        return ' ' * GW if lineno is None else C.hint_fg() + f'{lineno:>3} ' + rst
+
+    def _row(is_cursor, vis, colored, lineno=None):
+        g = _gutter(lineno)
         if is_cursor:
-            return (bfg + S.BOX_V + rst +
+            return (bfg + S.BOX_V + rst + g +
                     sb + colored + rst + sb +
-                    ' ' * max(0, iw - vis) + rst +
+                    ' ' * max(0, cw - vis) + rst +
                     bfg + S.BOX_V + rst)
-        return (bfg + S.BOX_V + rst +
+        return (bfg + S.BOX_V + rst + g +
                 colored +
-                ' ' * max(0, iw - vis) +
+                ' ' * max(0, cw - vis) +
                 bfg + S.BOX_V + rst)
 
     def _cols3(left, mid, right):
-        """Gaps to lay out left | centered mid | right within iw.
+        """Gaps to lay out left | centered mid | right within the content width.
 
         Returns (gap1, gap2) with gap1+gap2 placing `mid` as centered as the
         left/right anchors allow (>=1 space each side). None if there's no room
         (caller falls back to the two-column layout).
         """
-        if not mid or iw - len(left) - len(mid) - len(right) < 2:
+        if not mid or cw - len(left) - len(mid) - len(right) < 2:
             return None
-        mid_start = (iw - len(mid)) // 2
+        mid_start = (cw - len(mid)) // 2
         mid_start = max(len(left) + 1, mid_start)
-        mid_start = min(mid_start, iw - len(right) - len(mid) - 1)
+        mid_start = min(mid_start, cw - len(right) - len(mid) - 1)
         if mid_start < len(left) + 1:
             return None
-        return mid_start - len(left), iw - len(right) - (mid_start + len(mid))
+        return mid_start - len(left), cw - len(right) - (mid_start + len(mid))
 
     def _hdr(plain, colored=None):
         pad = max(0, iw - len(plain))
@@ -106,7 +127,7 @@ def render_overworld(term: Terminal, player: Player, progress: dict,
     sb_val = 'discovery order'
     kc     = C.mode_insert()
     qh_pfx = '"   Quick Help: '
-    qh_prs = [('j/k', 'move'), ('Enter', 'open'), ('-', 'go up dir'), (':q', 'quit')]
+    qh_prs = [('j/k', 'move'), ('gg/G', 'top/bot'), ('Enter', 'open'), ('D', 'del'), ('-', 'up'), (':q', 'quit')]
     qh_pl  = qh_pfx + '  '.join(f'{k}:{d}' for k, d in qh_prs)
     qh_col = dfc + qh_pfx + ('  ' + dfc).join(kc + k + dfc + ':' + d for k, d in qh_prs)
     hdr_rows = [
@@ -122,7 +143,7 @@ def render_overworld(term: Terminal, player: Player, progress: dict,
     # ../ and ./ directory entries (always visible, not scrolled)
     for di, dentry in enumerate(['../', './']):
         is_cursor = di == cursor_row
-        out.append(_row(is_cursor, len(dentry), dfc + dentry))
+        out.append(_row(is_cursor, len(dentry), dfc + dentry, lineno=di + 1))
 
     # Build all scrollable entry rows; track which one the cursor is on
     entry_rows      = []  # list of rendered row strings
@@ -162,12 +183,12 @@ def render_overworld(term: Terminal, player: Player, progress: dict,
                        cmd_col + cmds + ' ' * gap2 +
                        badge_col + badge)
         else:
-            spaces  = max(2, iw - len(key_text) - len(badge))
+            spaces  = max(2, cw - len(key_text) - len(badge))
             colored = nc + key_text + ' ' * spaces + badge_col + badge
-        entry_rows.append(_row(is_cursor, iw, colored))
+        entry_rows.append(_row(is_cursor, cw, colored, lineno=idx + 3))
 
     if custom_layouts:
-        entry_rows.append(_row(False, len('custom/'), dfc + 'custom/'))
+        entry_rows.append(_row(False, len('custom/'), dfc + 'custom/', lineno=None))
         n_custom = len(custom_layouts)
         for ci, layout in enumerate(custom_layouts):
             idx       = len(visible_levels) + ci
@@ -180,14 +201,14 @@ def render_overworld(term: Terminal, player: Player, progress: dict,
             if is_cursor:
                 cursor_entry = len(entry_rows)
             nc        = enfc if is_cursor else rst
-            spaces    = max(1, iw - 4 - len(name) - len(badge))
+            spaces    = max(1, cw - 4 - len(name) - len(badge))
             colored   = '  ' + C.hint_fg() + tree_char + ' ' + nc + name + ' ' * spaces + badge_col + badge
-            entry_rows.append(_row(is_cursor, iw, colored))
+            entry_rows.append(_row(is_cursor, cw, colored, lineno=idx + 3))
 
-    # Scroll: keep cursor visible; header and footer are fixed
+    # Scroll: the cursor moves freely within the window; the window scrolls only
+    # when the cursor would leave it (Vim-like — no clinging to the bottom edge).
     avail         = max(1, game_h - len(hdr_rows) - 2)
-    scroll_offset = max(0, cursor_entry - avail + 1)
-    scroll_offset = min(scroll_offset, max(0, len(entry_rows) - avail))
+    scroll_offset = _scroll_offset(cursor_entry, scroll_offset, avail, len(entry_rows))
     visible_slice = entry_rows[scroll_offset : scroll_offset + avail]
     out.extend(visible_slice)
 
@@ -198,7 +219,7 @@ def render_overworld(term: Terminal, player: Player, progress: dict,
 
     # ── Vim statusline / command line ─────────────────────────────────────────
     if deleting:
-        conf     = 'd again to confirm delete · any other key cancels'
+        conf     = 'Delete this custom layout?  y to confirm · any other key cancels'
         conf_pad = max(0, iw - len(conf) - 1)
         out.append(bfg + S.BOX_V + rst +
                    C.error_bg() + C.error_fg() + ' ' + conf + ' ' * conf_pad + rst +
@@ -230,3 +251,4 @@ def render_overworld(term: Terminal, player: Player, progress: dict,
     out.append(border_h(S.BOX_BL, S.BOX_BR))
 
     print(term.home + '\n'.join(out), end='', flush=True)
+    return scroll_offset
