@@ -4,7 +4,36 @@ The cling bug: the old formula recomputed the offset from the cursor every frame
 pinning the cursor to the bottom edge once scrolled. The fix keeps a stateful
 offset and scrolls only when the cursor leaves the window.
 """
-from render.overworld import _scroll_offset
+from render.overworld import _scroll_offset, build_lines, default_cursor
+
+
+def _levels(n=3):
+    return [{'id': i, 'key': f'dungeon_{i}', 'commands': ''} for i in range(n)]
+
+
+# ── flat-line buffer model (comments selectable; cursor defaults to ../) ─────────
+
+def test_build_lines_structure_and_default_cursor():
+    lines = build_lines(_levels(3), [])
+    assert [l['type'] for l in lines] == ['comment'] * 6 + ['parent', 'self', 'level', 'level', 'level']
+    assert default_cursor(lines) == 6                       # the ../ line, after the 6 comments
+    assert lines[default_cursor(lines)]['type'] == 'parent'
+
+
+def test_build_lines_with_customs_marks_last():
+    lines = build_lines(_levels(1), [{'layout_name': 'a'}, {'layout_name': 'b'}])
+    assert [l['type'] for l in lines][-3:] == ['subhdr', 'custom', 'custom']
+    assert lines[-1]['last'] is True and lines[-2]['last'] is False
+
+
+def test_ow_section_jumps_between_sections():
+    from main import _ow_section
+    lines = build_lines(_levels(3), [{'layout_name': 'a'}])
+    # sections start at 0 (comments), 6 (dirs ../), 8 (levels), 11 (custom subhdr)
+    assert _ow_section(lines, 9, -1) == 8                   # up to the levels section top
+    assert _ow_section(lines, 8, -1) == 6                   # then up to the dirs
+    assert _ow_section(lines, 9, +1) == 11                  # down to the customs
+    assert _ow_section(lines, 2, +1) == 6                   # from the comments, down to dirs
 
 
 def test_no_scroll_when_cursor_fits_in_window():

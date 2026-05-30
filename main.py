@@ -8,7 +8,7 @@ import render.colors as C
 from render.renderer import render_all
 import render.symbols as S
 from render.utils import inner_w as _iw
-from render.overworld import render_overworld
+from render.overworld import render_overworld, build_lines, default_cursor
 from render.title import render_title, render_save_select, select_quote, select_quote_by_name, select_next_lesson_quote, MENU_ITEMS as _TITLE_MENU, NAME_MAX as _NAME_MAX
 from render.wizard_blessing import run_wizard_blessing
 from engine.player import Player
@@ -3130,44 +3130,109 @@ def run_title(term: Terminal, has_save: bool) -> tuple[str, str]:
 
 # ── Overworld loop ─────────────────────────────────────────────────────────────
 
-def run_overworld(term: Terminal, player: Player, progress: dict,
-                  initial_cursor: int = 2) -> dict:
-    """Show the netrw overworld (~/.vimny/world/).
+def _ow_section(lines: list, cursor: int, direction: int) -> int:
+    """{ / } over the overworld buffer: the first line of the prev/next section
+    (comments → dirs → levels → customs)."""
+    grp = {'comment': 'c', 'parent': 'd', 'self': 'd', 'level': 'l',
+           'subhdr': 'x', 'custom': 'x'}
+    starts, prev = [], None
+    for i, ln in enumerate(lines):
+        g = grp.get(ln['type'])
+        if g != prev:
+            starts.append(i); prev = g
+    if direction < 0:
+        before = [s for s in starts if s < cursor]
+        return before[-1] if before else 0
+    after = [s for s in starts if s > cursor]
+    return after[0] if after else len(lines) - 1
 
-    Returns {'action': 'enter', 'level': N},
-            {'action': 'open_custom', 'layout': dict},
-            {'action': 'browse_saves'},
-            {'action': 'scrolls'},
-            {'action': 'parent_view'}, or
-            {'action': 'quit'}.
+
+def run_overworld(term: Terminal, player: Player, progress: dict,
+                  initial_cursor: int | None = None) -> dict:
+    """The netrw overworld (~/.vimny/world/) as a real netrw buffer.
+
+    Every line — the `"` comments, ../ ./, the levels, custom layouts — is a
+    selectable cursor position. Motions match what the player has learned: j/k
+    always; counts, gg/G, {n}G, H/M/L, {/} once learned; Ctrl-d/u/f/b page the
+    view. D deletes a custom layout (y to confirm), R renames it, d/dd hit the
+    read-only buffer; :set number/relativenumber/nonumber toggle the gutter.
+
+    Returns {'action': 'enter'|'open_custom'|'browse_saves'|'scrolls'|'parent_view'|'quit', ...}.
     """
     _OW_COMPLETIONS = ['../', 'saves/', 'scrolls/']
 
-    visible   = [l for l in LEVELS if not l.get('admin_only') or player.name == 'admin']
-    customs   = SM.list_layouts() if player.name == 'admin' else []
-    total     = len(visible) + len(customs)
-    cursor_row = initial_cursor  # 0=../ 1=./ 2+=levels (the netrw line N = cursor_row+1)
-    cmd_active = False
-    cmd_line   = ''
-    pending_delete = False       # D pressed on a custom layout, awaiting y to confirm
-    pending_g  = False           # first g of gg
-    count_buf  = ''              # digits typed before a motion (e.g. 5j, 12G)
-    scroll_offset = 0            # stateful viewport top (so the cursor doesn't cling)
-    tab_matches: list[str] = []
-    tab_idx    = -1
+    visible = [l for l in LEVELS if not l.get('admin_only') or player.name == 'admin']
 
-    def _render(deleting=False):
+    def _layouts():
+        return SM.list_layouts() if player.name == 'admin' else []
+
+    customs = _layouts()
+    lines   = build_lines(visible, customs)
+    cursor  = default_cursor(lines) if initial_cursor is None else initial_cursor
+    cursor  = max(0, min(cursor, len(lines) - 1))
+
+    learned  = _known_from_progress(progress)
+    is_admin = player.name == 'admin'
+    def _has(tok): return is_admin or tok in learned
+    def _gate(tok, label):
+        if _has(tok):
+            return True
+        player.error = f"You haven't learned {label} yet."
+        return False
+
+    number_mode    = 'number'
+    cmd_active     = False
+    cmd_line       = ''
+    renaming       = None        # None, or the in-progress new-name buffer
+    pending_delete = False
+    pending_g      = False
+    count_buf      = ''
+    scroll_offset  = 0
+    tab_matches: list[str] = []
+    tab_idx        = -1
+    avail          = max(1, term.height - 5)
+
+    def _rebuild():
+        nonlocal customs, lines, cursor
+        customs = _layouts()
+        lines   = build_lines(visible, customs)
+        cursor  = max(0, min(cursor, len(lines) - 1))
+
+    def _render():
         nonlocal scroll_offset
-        scroll_offset = render_overworld(term, player, progress, cursor_row,
-                         cmd_line if cmd_active else None,
-                         levels=visible, custom_layouts=customs,
-                         deleting=deleting, scroll_offset=scroll_offset)
+        scroll_offset, cy, cx = render_overworld(
+            term, player, progress, cursor, lines,
+            cmd_line=cmd_line if cmd_active else None,
+            number_mode=number_mode, deleting=pending_delete,
+            renaming=renaming, scroll_offset=scroll_offset)
+        print(term.move_yx(cy, cx) + (term.cvvis or term.cnorm), end='', flush=True)  # blinking cursor
+
+    def _done(result):
+        print(term.civis, end='', flush=True)   # re-hide the cursor for the dungeon
+        return result
 
     _render()
 
     while True:
         key = term.inkey(timeout=0.1)
         if not key:
+            continue
+
+        # ── Rename input (netrw R) ──────────────────────────────────────────────
+        if renaming is not None:
+            if key.name == 'KEY_ESCAPE':
+                renaming = None
+            elif key.name == 'KEY_ENTER' or str(key) in ('\n', '\r'):
+                ln = lines[cursor]
+                if ln['type'] == 'custom' and renaming.strip():
+                    SM.rename_layout(ln['layout'].get('layout_name', ''), renaming.strip())
+                    _rebuild()
+                renaming = None
+            elif key.name == 'KEY_BACKSPACE' or str(key) == '\x7f':
+                renaming = renaming[:-1]
+            elif not key.is_sequence and len(str(key)) == 1 and str(key).isprintable():
+                renaming += str(key)
+            _render()
             continue
 
         # ── Command mode ──────────────────────────────────────────────────────
@@ -3196,15 +3261,24 @@ def run_overworld(term: Terminal, player: Player, progress: dict,
                 if cmd in ('q', 'q!', 'wq'):
                     if cmd == 'wq':
                         SM.save_progress(progress, player.name)
-                    return {'action': 'quit', 'cursor': cursor_row}
-                _e_path = cmd[2:].rstrip('/') if cmd.startswith('e ') else ''
-                if _e_path in ('saves',):
-                    return {'action': 'browse_saves', 'cursor': cursor_row}
-                if _e_path in ('scrolls',):
-                    return {'action': 'scrolls', 'cursor': cursor_row}
-                if _e_path in ('..', '../'):
-                    return {'action': 'parent_view', 'cursor': cursor_row}
-                # Unknown commands silently ignored
+                    return _done({'action': 'quit', 'cursor': cursor})
+                if cmd in ('set number', 'set nu'):
+                    number_mode = 'number'
+                elif cmd in ('set relativenumber', 'set rnu'):
+                    number_mode = 'relativenumber'
+                elif cmd in ('set nonumber', 'set nonu'):
+                    number_mode = 'none'
+                elif cmd in ('set norelativenumber', 'set nornu'):
+                    number_mode = 'number'
+                else:
+                    _e_path = cmd[2:].rstrip('/') if cmd.startswith('e ') else ''
+                    if _e_path in ('saves',):
+                        return _done({'action': 'browse_saves', 'cursor': cursor})
+                    if _e_path in ('scrolls',):
+                        return _done({'action': 'scrolls', 'cursor': cursor})
+                    if _e_path in ('..', '../'):
+                        return _done({'action': 'parent_view', 'cursor': cursor})
+                    # Unknown commands silently ignored
             elif key.name == 'KEY_BACKSPACE' or str(key) == '\x7f':
                 cmd_line    = cmd_line[:-1]
                 tab_matches = []
@@ -3216,22 +3290,20 @@ def run_overworld(term: Terminal, player: Player, progress: dict,
             _render()
             continue
 
-        # ── Navigation ────────────────────────────────────────────────────────
+        # ── Navigation ──────────────────────────────────────────────────────────
         raw = str(key) if not key.is_sequence else ''
-
-        on_custom = cursor_row >= len(visible) + 2
         player.error = ''                              # clear any transient message
+        ln        = lines[cursor]
+        on_custom = ln['type'] == 'custom'
+        last      = len(lines) - 1
 
         # D — delete a custom layout (netrw deletes with D); confirm with y.
         if pending_delete:
             pending_delete = False
             count_buf = ''
             if raw == 'y' and on_custom:
-                layout = customs[cursor_row - 2 - len(visible)]
-                SM.delete_layout(layout.get('layout_name', ''))
-                customs    = SM.list_layouts()
-                total      = len(visible) + len(customs)
-                cursor_row = min(cursor_row, total + 1)
+                SM.delete_layout(ln['layout'].get('layout_name', ''))
+                _rebuild()
             _render()
             continue                                   # any non-y key cancels
 
@@ -3239,13 +3311,13 @@ def run_overworld(term: Terminal, player: Player, progress: dict,
         if pending_g:
             pending_g = False
             if raw == 'g':
-                cursor_row = 0
-                count_buf  = ''
+                cursor    = 0
+                count_buf = ''
                 _render()
                 continue
-            # not 'gg' → fall through and handle the key normally
+            # not 'gg' → fall through
 
-        # count prefix — digits accumulate before a motion ('0' alone is not a count)
+        # count prefix ('0' alone is not a count)
         if raw.isdigit() and (raw != '0' or count_buf):
             count_buf += raw
             _render()
@@ -3258,36 +3330,67 @@ def run_overworld(term: Terminal, player: Player, progress: dict,
             cmd_active = True
             cmd_line   = ''
         elif raw == '-':
-            return {'action': 'parent_view', 'cursor': cursor_row}
+            return _done({'action': 'parent_view', 'cursor': cursor})
         elif raw == 'j':
-            cursor_row = min(cursor_row + n, total + 1)
+            if n <= 1 or _gate('count', 'counts'):
+                cursor = min(cursor + n, last)
         elif raw == 'k':
-            cursor_row = max(cursor_row - n, 0)
+            if n <= 1 or _gate('count', 'counts'):
+                cursor = max(cursor - n, 0)
         elif raw == 'g':
             pending_g = True
         elif raw == 'G':                               # {n}G → line n; bare G → last line
-            cursor_row = max(0, min(n - 1, total + 1)) if n_given else (total + 1)
+            if (n <= 1 or _gate('count', 'counts')) and _gate('G', 'G'):
+                cursor = max(0, min(n - 1, last)) if n_given else last
+        elif raw == 'H':
+            if _gate('H', 'H'):
+                cursor = min(scroll_offset, last)
+        elif raw == 'M':
+            if _gate('M', 'M'):
+                vc = min(avail, last - scroll_offset + 1)
+                cursor = min(scroll_offset + (vc - 1) // 2, last)
+        elif raw == 'L':
+            if _gate('L', 'L'):
+                cursor = min(scroll_offset + avail - 1, last)
+        elif raw == '{':
+            if _gate('{', '{'):
+                cursor = _ow_section(lines, cursor, -1)
+        elif raw == '}':
+            if _gate('}', '}'):
+                cursor = _ow_section(lines, cursor, +1)
+        elif raw == '\x04':                            # Ctrl-d — half page down
+            cursor = min(cursor + avail // 2, last)
+        elif raw == '\x15':                            # Ctrl-u — half page up
+            cursor = max(cursor - avail // 2, 0)
+        elif raw == '\x06':                            # Ctrl-f — page down
+            cursor = min(cursor + avail, last)
+        elif raw == '\x02':                            # Ctrl-b — page up
+            cursor = max(cursor - avail, 0)
         elif raw == 'D':                               # netrw delete (custom only)
             if on_custom:
                 pending_delete = True
             else:
                 player.error = "Can't delete a built-in dungeon — only your own custom layouts."
+        elif raw == 'R':                               # netrw rename (custom only)
+            if on_custom:
+                renaming = ln['layout'].get('layout_name', '')
+            else:
+                player.error = "Can't rename a built-in dungeon — only your own custom layouts."
         elif raw == 'd':                               # read-only buffer (netrw is read-only)
             player.error = 'The overworld is read-only — press D to delete a custom layout.'
         elif key.name == 'KEY_ENTER' or raw in ('\n', '\r'):
-            if cursor_row == 0:
-                return {'action': 'parent_view', 'cursor': cursor_row}
-            elif cursor_row == 1:
-                pass  # ./ — stay in world
-            elif cursor_row < len(visible) + 2:
-                level_id = visible[cursor_row - 2]['id']
-                if is_unlocked(level_id, progress, player.name):
-                    return {'action': 'enter', 'level': level_id, 'cursor': cursor_row}
-            else:
-                layout = customs[cursor_row - 2 - len(visible)]
-                return {'action': 'open_custom', 'layout': layout, 'cursor': cursor_row}
+            t = ln['type']
+            if t == 'parent':
+                return _done({'action': 'parent_view', 'cursor': cursor})
+            elif t == 'level':
+                lid = ln['level']['id']
+                if is_unlocked(lid, progress, player.name):
+                    return _done({'action': 'enter', 'level': lid, 'cursor': cursor})
+            elif t == 'custom':
+                return _done({'action': 'open_custom', 'layout': ln['layout'], 'cursor': cursor})
+            # comment / self / subhdr → no-op
 
-        _render(deleting=pending_delete)
+        _render()
 
 
 # ── Main ───────────────────────────────────────────────────────────────────────
@@ -3320,7 +3423,7 @@ def main():
                 progress  = SM.load_progress(save_data)
             # 'new': progress stays empty (fresh save already written in run_title)
 
-        ow_cursor = 2
+        ow_cursor = None
         while True:
             if start_level is not None:
                 ow_result  = {'action': 'enter', 'level': start_level}
@@ -3330,7 +3433,7 @@ def main():
                 player.hp     = player.max_hp
                 ow_result = run_overworld(term, player, progress,
                                           initial_cursor=ow_cursor)
-            ow_cursor = ow_result.get('cursor', 2)
+            ow_cursor = ow_result.get('cursor')
 
             if ow_result['action'] == 'quit':
                 break

@@ -4,7 +4,7 @@ import pytest
 from pathlib import Path
 from save.save_manager import (
     _slug, save_for, load_for, list_saves, save_progress, load_progress,
-    load_player_name,
+    load_player_name, save_layout, list_layouts, delete_layout, rename_layout,
 )
 
 
@@ -183,3 +183,27 @@ class TestSaveProgress:
         restored = load_progress(load_for('Alice'))
         assert restored['max_hp'] == 10
         assert restored['collected_hearts'] == hearts
+
+
+# ── Layouts (netrw custom/) ────────────────────────────────────────────────────
+
+class TestLayouts:
+    _LAYOUT = {'rows': 1, 'cols': 1, 'cells': [['F']]}
+
+    def test_save_list_rename_delete(self, tmp_path, monkeypatch):
+        monkeypatch.setattr('save.save_manager.LAYOUTS_DIR', tmp_path)
+        save_layout('My Map', self._LAYOUT)
+        assert [l['layout_name'] for l in list_layouts()] == ['My Map']
+        assert rename_layout('My Map', 'Renamed') is True
+        assert [l['layout_name'] for l in list_layouts()] == ['Renamed']
+        assert not (tmp_path / 'my_map.json').exists()      # old slug removed
+        assert (tmp_path / 'renamed.json').exists()
+        assert delete_layout('Renamed') is True
+        assert list_layouts() == []
+
+    def test_rename_rejects_missing_source_or_empty_name(self, tmp_path, monkeypatch):
+        monkeypatch.setattr('save.save_manager.LAYOUTS_DIR', tmp_path)
+        assert rename_layout('nope', 'x') is False          # source doesn't exist
+        save_layout('Map', self._LAYOUT)
+        assert rename_layout('Map', '   ') is False         # empty new name
+        assert [l['layout_name'] for l in list_layouts()] == ['Map']
