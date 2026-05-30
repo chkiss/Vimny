@@ -71,6 +71,11 @@ def action_allowed(action: dict, known: list | set, edit_mode: bool = False) -> 
             return False
         return 'r' in known_set
 
+    if t == 'join':                               # J / gJ
+        if count > 1 and 'count' not in known_set:
+            return False
+        return ('J' if action.get('gap', True) else 'gJ') in known_set
+
     if t == 'motion':
         if count > 1 and 'count' not in known_set:
             return False
@@ -152,6 +157,8 @@ def guard_message(action: dict, known: list | set = ()) -> str:
         return "You haven't learned ~ yet."
     if t == 'replace':
         return "You haven't learned r yet."
+    if t == 'join':
+        return "You haven't learned J (join) yet."
     if t in ('search_repeat', 'search_word'):
         return "You haven't learned search yet."
     if t == 'macro_record':

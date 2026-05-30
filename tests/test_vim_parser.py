@@ -472,3 +472,25 @@ class TestMarkCommands:
     def test_mark_incomplete_without_register(self):
         action, _ = parse('m', Mode.NORMAL)
         assert action is None
+
+
+class TestJoin:
+    def test_J_join_with_space(self):
+        action, _ = parse('J', Mode.NORMAL)
+        assert action == {'type': 'join', 'gap': True, 'count': 1}
+
+    def test_gJ_join_without_space(self):
+        action, _ = parse('gJ', Mode.NORMAL)
+        assert action == {'type': 'join', 'gap': False, 'count': 1}
+
+    def test_count_J(self):
+        action, _ = parse('3J', Mode.NORMAL)
+        assert action == {'type': 'join', 'gap': True, 'count': 3}
+
+    def test_count_gJ(self):
+        action, _ = parse('2gJ', Mode.NORMAL)
+        assert action == {'type': 'join', 'gap': False, 'count': 2}
+
+    def test_g_incomplete_waits(self):
+        action, rest = parse('g', Mode.NORMAL)
+        assert action is None

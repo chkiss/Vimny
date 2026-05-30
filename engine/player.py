@@ -12,7 +12,7 @@ class Player:
     mode: Mode = Mode.NORMAL
     known_commands: list = field(default_factory=lambda: ['h','j','k','l'])
     registers: dict = field(default_factory=dict)  # vim registers: '"' unnamed, 'a'-'z', '0', etc.
-    edit_clip: list = field(default_factory=list)  # admin map-editor clipboard (runes/entities/cells)
+    edit_clip: list = field(default_factory=list)  # admin map-editor clipboard (characters/entities/cells)
     marks: dict = field(default_factory=dict)   # 'a'-'z' -> (row, col)
     macros: dict = field(default_factory=dict)  # 'a'-'z' -> recorded keystroke string
     jump_list: list = field(default_factory=list)  # (row, col) positions for Ctrl-o/Ctrl-i
@@ -20,6 +20,7 @@ class Player:
 
     last_f: tuple | None = None   # (motion, target) of most recent f/F/t/T; set by apply_motion
     last_change: dict | None = None  # last action that mutated the room; re-played by .
+    insert_extend: bool = False   # True during an A-initiated INSERT: typing builds new floor (ledge) into the void
     visual_anchor: tuple | None = None       # (row, col) where v/V/Ctrl-v was pressed
     visual_start_spent: int = 0              # budget.spent before v/V/Ctrl-v was pressed
     last_visual_anchor: tuple | None = None   # saved on operator-apply, for gv

@@ -74,7 +74,7 @@ def _clip_to_items(clip) -> list:
         return []
     items: list = []
     for rw in clip.get('rows', []):
-        for rd in rw.get('runes', []):
+        for rd in rw.get('char_runs', []):
             items.append({'type': 'rune', 'rune': CharRun(0, 0, rd['symbols'], rd['kind'])})
         for ed in rw.get('entities', []):
             t = ed['tmpl']
@@ -320,7 +320,7 @@ def render_all(term: Terminal, dungeon: Dungeon, player: Player,
                     line += _ent_cell_str(ent, room, room_r, room_c, mode, floor_bg)
                     continue
 
-                # Rune cluster?
+                # Character run?
                 ru = room.char_run_at(room_r, room_c)
                 if ru:
                     idx = room_c - ru.col

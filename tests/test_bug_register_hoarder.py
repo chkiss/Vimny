@@ -104,7 +104,7 @@ def test_cutting_overwrites_held_key():
     write_register(player, '"',
                    {'linewise': False,
                     'rows': [{'width': 1,
-                              'runes': [{'dcol': 0, 'symbols': ('x',), 'kind': 'ancient'}]}]},
+                              'char_runs': [{'dcol': 0, 'symbols': ('x',), 'kind': 'ancient'}]}]},
                    is_delete=True)
     assert not _reg_keys(player), 'a later cut must overwrite the held key'
 

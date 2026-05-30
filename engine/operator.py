@@ -1,15 +1,17 @@
 """Block B — operator application (d / y / c / > / <) over a TextObject.
 
-The register clip preserves spacing: each captured rune records its column
-*offset* from the span's left edge, so gaps between runes survive a paste.
+The register clip preserves spacing: each captured character records its column
+*offset* from the span's left edge, so gaps between characters survive a paste.
 This is how Vimny stays Vim-faithful — `yy` yanks the whole line including the
-spaces between runes (bounded by stone walls), not just the rune clusters.
+spaces between characters (bounded by stone walls), not just the character runs.
 """
 from __future__ import annotations
 from engine.world import CellType, CharRun, Entity
 from engine.text_object import TextObjectType
-from engine.editor import _merge_adjacent_runes
-from engine.reflow import is_ledge, close_gap, open_gap
+from engine.editor import _merge_adjacent_char_runs
+from engine.reflow import (
+    is_ledge, close_gap, open_gap, remove_row, _insert_blank_row, carve_floor, _row_glyphs, _MAX_COLS,
+)
 
 _PASTABLE = (CellType.FLOOR, CellType.CORRIDOR)
 
@@ -27,7 +29,7 @@ def line_extent(room, row: int):
 
 
 def _capture_row(room, row: int, lo: int, hi: int) -> dict:
-    """Capture runes overlapping [lo, hi] on `row`, split at the boundaries,
+    """Capture characters overlapping [lo, hi] on `row`, split at the boundaries,
     each tagged with its column offset (dcol) from `lo`."""
     runes = []
     for ru in room._char_runs_by_row.get(row, []):
@@ -39,7 +41,7 @@ def _capture_row(room, row: int, lo: int, hi: int) -> dict:
                       'symbols': tuple(ru.symbols[s - ru.col:e - ru.col + 1]),
                       'kind': ru.kind})
     runes.sort(key=lambda d: d['dcol'])
-    return {'width': hi - lo + 1, 'runes': runes}
+    return {'width': hi - lo + 1, 'char_runs': runes}
 
 
 def _clip(text_obj) -> tuple:
@@ -59,11 +61,11 @@ def capture(room, text_obj) -> dict:
         if linewise:
             ext = line_extent(room, row)
             if ext is None:
-                rows.append({'width': 0, 'runes': []})
+                rows.append({'width': 0, 'char_runs': []})
                 continue
             lo, hi = ext
         if hi < lo:
-            rows.append({'width': 0, 'runes': []})
+            rows.append({'width': 0, 'char_runs': []})
         else:
             rows.append(_capture_row(room, row, lo, hi))
     return {'linewise': linewise, 'rows': rows}
@@ -77,7 +79,7 @@ def entity_clip(ent) -> dict:
     creature lands in the unnamed register, exactly like cut text."""
     return {'linewise': False, 'rows': [{
         'width': 1,
-        'runes': [],
+        'char_runs': [],
         'entities': [{'dcol': 0, 'tmpl': {
             'kind': ent.kind, 'max_hp': ent.max_hp, 'hp': ent.hp,
             'ai': ent.ai, 'ai_speed': ent.ai_speed, 'tag': ent.tag,
@@ -114,7 +116,7 @@ _WALL_CELLS = (CellType.WALL, CellType.WATER, CellType.WOOD_WALL)
 
 
 def _delete_cols(room, row: int, lo: int, hi: int) -> None:
-    """Remove everything visible in [lo, hi] on `row`: runes, wall cells, and entities."""
+    """Remove everything visible in [lo, hi] on `row`: characters, wall cells, and entities."""
     affected = [ru for ru in room._char_runs_by_row.get(row, [])
                 if not (ru.col + len(ru.symbols) - 1 < lo or ru.col > hi)]
     for ru in affected:
@@ -141,10 +143,25 @@ def op_yank(room, player, text_obj) -> dict:
     return capture(room, text_obj)
 
 
-def op_delete(room, player, text_obj) -> dict:
-    """Capture the span, remove its runes, reposition the cursor; return the clip."""
+def op_delete(room, player, text_obj, collapse: bool = False) -> dict:
+    """Capture the span, remove it, reposition the cursor; return the clip.
+
+    Charwise: characters are deleted and the tail pulled left (``close_gap``).
+    Linewise with ``collapse=True`` (``dd`` / visual-line ``d``) structurally
+    removes the row(s) — the vertical inverse of ``o`` (rows below shift up);
+    ``collapse=False`` (``cc`` / ``S``) clears the line content in place and
+    keeps the row."""
     clip = capture(room, text_obj)
     linewise, spans = _clip(text_obj)
+    if linewise and collapse:
+        start = min(r for r, _, _ in spans)
+        for _ in range(len(spans)):
+            if not remove_row(room, start, player):
+                break                                  # hit a border guard — stop collapsing
+        player.row = min(start, room.rows - 1)
+        ext = line_extent(room, player.row)
+        player.col = ext[0] if ext else player.col
+        return clip
     _ext_cache: dict = {}
     for row, lo, hi in spans:
         if linewise:
@@ -169,10 +186,10 @@ def op_delete(room, player, text_obj) -> dict:
 
 
 def _place_row(room, row: int, start_col: int, rclip: dict) -> int:
-    """Lay a captured row's runes onto `row` starting at start_col + dcol,
+    """Lay a captured row's characters onto `row` starting at start_col + dcol,
     clipping at walls/bounds. Returns the rightmost column written (or -1)."""
     last = -1
-    for rd in rclip['runes']:
+    for rd in rclip['char_runs']:
         base = start_col + rd['dcol']
         syms = []
         c = base
@@ -192,20 +209,21 @@ INDENT_WIDTH = 2                                # one shiftwidth, in columns
 
 
 def apply_indent(room, row: int, amount: int) -> int:
-    """Shift every rune cluster on `row` by `amount` columns (right > 0, left < 0),
-    clamped within the row's passable extent (between the stone walls). Returns the
-    net amount actually applied."""
+    """Shift the row's content by `amount` columns. A RIGHT indent (`>`, amount>0)
+    REFLOWS: content slides right and whatever crosses the right brink falls into
+    the void (`open_gap`, recorded in room._last_void_falls). A LEFT dedent (`<`,
+    amount<0) pulls content toward the left wall, clamped there (nothing falls —
+    you cannot dedent past the wall). Returns the amount applied."""
     clusters = list(room._char_runs_by_row.get(row, []))
     ext = line_extent(room, row)
     if not clusters or ext is None:
         return 0
     lo, hi = ext
     leftmost = min(ru.col for ru in clusters)
-    rightmost = max(ru.col + len(ru.symbols) - 1 for ru in clusters)
-    if amount < 0:
-        amount = max(amount, lo - leftmost)        # don't cross the left wall
-    else:
-        amount = min(amount, hi - rightmost)        # don't cross the right wall
+    if amount > 0:
+        open_gap(room, row, leftmost, amount)       # reflow: overflow tumbles off the brink
+        return amount
+    amount = max(amount, lo - leftmost)             # don't cross the left wall
     if amount == 0:
         return 0
     for ru in clusters:
@@ -224,7 +242,7 @@ def _case_transform(op: str, sym: str) -> str:
 
 
 def _case_cols(room, row: int, lo: int, hi: int, op: str) -> bool:
-    """Transform the case of rune symbols in [lo, hi] on `row`. Returns changed."""
+    """Transform the case of characters in [lo, hi] on `row`. Returns changed."""
     changed = False
     for ru in room._char_runs_by_row.get(row, []):
         rlo, rhi = ru.col, ru.col + len(ru.symbols) - 1
@@ -288,27 +306,35 @@ def op_paste(room, player, clip: dict, before: bool, count: int = 1) -> bool:
     `P` BEFORE it (col); existing content slides right to make room (overflow
     falls off the brink) and the cursor lands on the LAST pasted cell. A cut
     creature respawns live; a cut letter lays back down — both shift the line.
-    Linewise paste still overlays the row(s) below (`p`) / the cursor row(s)
-    (`P`) — vertical reflow waits on the ledge-extending motions. Returns True
-    if anything was placed."""
+    Linewise paste inserts REAL new rows (Vim-faithful): `p` opens line(s) below,
+    `P` at the cursor row (the map below shifts down); the cursor lands on the
+    first non-blank of the first pasted line. Returns True if anything was
+    placed."""
     if not clip or not clip.get('rows'):
         return False
     placed_any = False
     if clip['linewise']:
         nrows    = len(clip['rows'])
+        total    = nrows * count
         base_row = player.row if before else player.row + 1
+        tmpl     = player.row                                 # copy the cursor row's wall pattern
+        for k in range(total):
+            _insert_blank_row(room, base_row + k, tmpl, player)   # grow real rows, shifting the map down
         for copy in range(count):
             for i, rclip in enumerate(clip['rows']):
                 row = base_row + copy * nrows + i
-                if row < 0 or row >= room.rows:
-                    break
                 ext = line_extent(room, row)
                 if ext is None:
                     continue
-                rune_last  = _place_row(room, row, ext[0], rclip)
-                ent_placed = _place_entities(room, row, ext[0], rclip)
-                placed_any = placed_any or rune_last >= 0 or ent_placed
-                _merge_adjacent_runes(room, row)
+                _place_row(room, row, ext[0], rclip)
+                _place_entities(room, row, ext[0], rclip)
+                _merge_adjacent_char_runs(room, row)
+        if total > 0:
+            placed_any = True                                 # inserting rows is itself a change
+            player.row = min(base_row, room.rows - 1)          # cursor → first pasted line (Vim)
+            ext   = line_extent(room, player.row)
+            runes = room._char_runs_by_row.get(player.row, [])
+            player.col = min((ru.col for ru in runes), default=(ext[0] if ext else player.col))
     else:
         rclip = clip['rows'][0]
         width = max(rclip.get('width', 0), 1)               # ≥1 cell per copy
@@ -321,12 +347,61 @@ def op_paste(room, player, clip: dict, before: bool, count: int = 1) -> bool:
                 placed_any = True
             if _place_entities(room, player.row, col_k, rclip):
                 placed_any = True
-        _merge_adjacent_runes(room, player.row)
+        _merge_adjacent_char_runs(room, player.row)
         if placed_any:                                      # cursor on the last pasted cell (Vim)
             last = base + total - 1
             while last >= base and not (room.char_run_at(player.row, last)
                                         or room.entity_at(player.row, last)):
                 last -= 1                                   # skip cells that got nothing (fell off the brink)
             if last >= base:
-                player.col = last                           # land on the last pasted cell — rune OR creature
+                player.col = last                           # land on the last pasted cell — character OR creature
     return placed_any
+
+
+def op_join(room, player, gap: bool = True, count: int = 1) -> bool:
+    """`J` / `gJ` — join the next line(s) onto the cursor line. Each next line is
+    cut (``remove_row`` — the dd half) and its glyphs appended to this line from
+    just past its rightmost content, building floor into the void (``carve_floor``
+    — the A half) while preserving the joined line's internal spacing (leading
+    blanks dropped). `J` leaves one space at the seam and lands the cursor there;
+    `gJ` leaves none. `nJ` joins n lines. Returns True if any join happened."""
+    joins  = max(1, count - 1)
+    seam   = None
+    joined = False
+    room._last_build_blocked = None
+    for _ in range(joins):
+        src = player.row + 1
+        if src >= room.rows or line_extent(room, src) is None:
+            break                                           # no next line (bottom wall / edge)
+        glyphs = sorted(_row_glyphs(room, src), key=lambda g: g[0])
+        ends = [ru.col + len(ru.symbols) - 1
+                for ru in room._char_runs_by_row.get(player.row, []) if ru.kind != 'void']
+        ext      = line_extent(room, player.row)
+        seam_col = (max(ends) + 1) if ends else (ext[0] if ext else 0)
+        base     = seam_col + (1 if gap else 0)             # where the joined glyphs begin
+        span     = (glyphs[-1][0] - glyphs[0][0]) if glyphs else 0
+        needed_end = (base + span) if glyphs else seam_col
+        if needed_end > _MAX_COLS - 2:                      # would build past the edge of the world
+            room._last_build_blocked = 'edge'
+            break
+        if gap and not carve_floor(room, player.row, seam_col):
+            break                                           # seam space blocked (void / edge)
+        if glyphs:
+            first = glyphs[0][0]
+            stop  = base + span
+            for col in range(base, base + span + 1):        # carve the run so inter-word gaps are real floor
+                if not carve_floor(room, player.row, col):
+                    stop = col - 1
+                    break
+            for (c, s, k) in glyphs:
+                dest = base + (c - first)
+                if dest <= stop:
+                    room.add_char_run(CharRun(player.row, dest, (s,), k))
+            _merge_adjacent_char_runs(room, player.row)
+        remove_row(room, src, player)
+        if seam is None:
+            seam = seam_col
+        joined = True
+    if joined and seam is not None:
+        player.col = min(seam, room.cols - 1)
+    return joined

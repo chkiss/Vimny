@@ -117,8 +117,17 @@ def _leftmost_passable(room, row: int):
     return None
 
 
+def _rightmost_passable(room, row: int):
+    """Last passable column on a row, or None if the row has none — the end of the
+    line (the corridor / ledge edge), used by `A` to append at the line's end."""
+    for c in range(room.cols - 1, -1, -1):
+        if room.is_passable(row, c):
+            return c
+    return None
+
+
 def _first_non_blank_col(room, row: int):
-    """First-non-blank column on a row: the first rune start if any, else the
+    """First-non-blank column on a row: the first character if any, else the
     leftmost passable column. None if the row has no passable cell."""
     left = None
     for c in range(room.cols):
@@ -131,7 +140,7 @@ def _first_non_blank_col(room, row: int):
 
 
 def _bracket_at(room, row: int, c: int):
-    """The bracket char ()[]{} at (row, c) if a rune symbol there is one, else None."""
+    """The bracket char ()[]{} at (row, c) if a character there is one, else None."""
     ru = room.char_run_at(row, c)
     if ru is not None:
         ch = ru.symbols[c - ru.col]
@@ -612,7 +621,7 @@ def apply_motion(player, motion, count, room, target=None, count_given: bool = T
             else:
                 break
         elif motion in ('{', '}'):
-            # Paragraph jump: a blank row = a passable row with no runes.
+            # Paragraph jump: a blank row = a passable row with no characters.
             row = player.row
             rng = range(row + 1, room.rows) if motion == '}' else range(row - 1, -1, -1)
             target_row = None

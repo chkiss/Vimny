@@ -9,7 +9,10 @@ it happens to carry a void rune; only membership in room.ledge_rows matters).
 import pytest
 from engine.world import Room, RoomType, CellType, CharRun, Entity
 from engine.player import Player
-from engine.reflow import is_ledge, void_col, open_gap, close_gap
+from engine.reflow import (
+    is_ledge, void_col, open_gap, close_gap, remove_row, extend_floor, _insert_blank_row,
+    carve_floor, _double_cols, _MAX_COLS,
+)
 from engine.insert import insert_char
 from engine.operator import op_delete
 from engine.text_object import TextObject, TextObjectType
@@ -268,3 +271,129 @@ def test_water_is_not_a_brink_so_cells_past_it_arent_void():
     assert room.char_run_at(1, 10).symbols == ('Z',)
     assert p.col == 11
     assert room._last_void_falls == []
+
+
+# ── remove_row (vertical collapse — the inverse of o; powers dd) ──────────────────
+
+def _col_room(rows=6, cols=10):
+    """A rows×cols room: all-FLOOR interior bounded by a wall border, no runes."""
+    room = Room(room_type=RoomType.PUZZLE, rows=rows, cols=cols)
+    room.cells = [[CellType.FLOOR if (0 < r < rows - 1 and 0 < c < cols - 1) else CellType.WALL
+                   for c in range(cols)] for r in range(rows)]
+    room.rebuild_indexes()
+    return room
+
+
+def test_remove_row_collapses_and_shifts_runes_up():
+    room = _col_room()
+    room.char_runs = [CharRun(2, 3, ('a',), 'ancient'), CharRun(3, 4, ('b',), 'ancient')]
+    room.rebuild_indexes()
+    before = room.rows
+    assert remove_row(room, 2) is True
+    assert room.rows == before - 1
+    assert room.char_run_at(2, 3) is None              # the removed row's rune is gone
+    assert room.char_run_at(2, 4).symbols == ('b',)    # row 3 pulled up into row 2
+
+
+def test_remove_row_drops_its_entities_and_shifts_those_below():
+    room = _col_room()
+    room.add_entity(Entity(kind='goblin', row=2, col=3, max_hp=2))
+    room.add_entity(Entity(kind='goblin', row=4, col=5, max_hp=2))
+    assert remove_row(room, 2) is True
+    assert room.entity_at(2, 3) is None                # entity on the removed row goes with it
+    shifted = room.entity_at(3, 5)                     # the row-4 goblin shifted up to row 3
+    assert shifted is not None and shifted.kind == 'goblin'
+
+
+def test_remove_row_shifts_exit_and_spawn_below_the_cut():
+    room = _col_room()
+    room.spawn_pos = (1, 1)
+    room.exit_pos  = (4, 6)
+    assert remove_row(room, 2) is True
+    assert room.exit_pos == (3, 6)                      # exit below the cut shifts up by one
+    assert room.spawn_pos == (1, 1)                     # spawn above the cut is unchanged
+
+
+def test_remove_row_refuses_solid_border_rows():
+    room = _col_room()
+    assert remove_row(room, 0) is False                # top border is all wall
+    assert remove_row(room, room.rows - 1) is False    # bottom border too
+    assert room.rows == 6                              # nothing collapsed
+
+
+def test_remove_row_refuses_the_last_row():
+    room = Room(room_type=RoomType.PUZZLE, rows=1, cols=5)
+    room.cells = [[CellType.FLOOR] * 5]
+    room.rebuild_indexes()
+    assert remove_row(room, 0) is False
+
+
+# ── extend_floor (horizontal ledge-build — powers A; J's append half) ────────────
+
+def test_extend_floor_carves_a_wall_into_floor():
+    room = _col_room(rows=3, cols=12)
+    room.cells[1][6] = CellType.WALL                  # a wall mid-row
+    assert extend_floor(room, 1, 6, 'X') is True
+    assert room.cells[1][6] == CellType.FLOOR         # carved into the ledge
+    assert room.char_run_at(1, 6).symbols == ('X',)
+
+
+def test_extend_floor_places_on_plain_floor_without_carving():
+    room = _col_room(rows=3, cols=12)                 # col 5 is already floor
+    assert extend_floor(room, 1, 5, 'Y') is True
+    assert room.cells[1][5] == CellType.FLOOR
+    assert room.char_run_at(1, 5).symbols == ('Y',)
+
+
+def test_extend_floor_stops_at_a_void_rune():
+    room = _col_room(rows=3, cols=12)
+    room.char_runs = [CharRun(1, 6, ('○',), 'void')]
+    room.rebuild_indexes()
+    assert extend_floor(room, 1, 6, 'Z') is False     # permanent void refuses the plank
+    assert room.char_run_at(1, 6).symbols == ('○',)   # unchanged
+
+
+def test_extend_floor_doubles_the_buffer_at_the_right_border():
+    room = _col_room(rows=3, cols=10)                 # border wall at col 9
+    assert extend_floor(room, 1, 9, 'E') is True      # building on the border grows the world
+    assert room.cols == 20
+    assert room.cells[1][9] == CellType.FLOOR         # old border carved to floor
+    assert room.char_run_at(1, 9).symbols == ('E',)
+    assert room.cells[1][19] == CellType.WALL         # fresh border at the new right edge
+
+
+def test_double_cols_caps_at_the_edge_of_the_world():
+    room = _col_room(rows=3, cols=_MAX_COLS - 10)
+    _double_cols(room)
+    assert room.cols == _MAX_COLS                     # 2× would overshoot → capped at the edge
+
+
+def test_carve_floor_refuses_past_the_edge_of_the_world():
+    room = _col_room(rows=3, cols=_MAX_COLS)          # already at max width
+    assert carve_floor(room, 1, _MAX_COLS - 1) is False   # the border of a maxed world
+    assert room._last_build_blocked == 'edge'
+    assert room.cols == _MAX_COLS                     # the world did not grow
+    assert carve_floor(room, 1, 5) is True            # interior still builds fine
+    assert room._last_build_blocked is None
+
+
+# ── mark / jumplist row fixups (player anchors move with the rows) ───────────────
+
+def test_insert_blank_row_shifts_player_marks_and_jumps_down():
+    room = _col_room()
+    p = Player(row=1, col=1)
+    p.marks     = {'a': (1, 2), 'b': (3, 4)}          # 'a' above the insert, 'b' below
+    p.jump_list = [(0, 0), (3, 5)]
+    _insert_blank_row(room, 2, 1, p)                  # insert a row at index 2
+    assert p.marks == {'a': (1, 2), 'b': (4, 4)}      # above stays; at/below shifts down
+    assert p.jump_list == [(0, 0), (4, 5)]
+
+
+def test_remove_row_shifts_player_marks_and_jumps_up():
+    room = _col_room()
+    p = Player(row=1, col=1)
+    p.marks     = {'a': (1, 2), 'b': (4, 4), 'c': (2, 3)}   # 'c' sits on the removed row
+    p.jump_list = [(1, 1), (2, 7), (4, 0)]
+    remove_row(room, 2, p)                            # remove row 2
+    assert p.marks == {'a': (1, 2), 'b': (3, 4), 'c': (2, 3)}   # below shifts up; on-cut clamps to row 2
+    assert p.jump_list == [(1, 1), (2, 7), (3, 0)]

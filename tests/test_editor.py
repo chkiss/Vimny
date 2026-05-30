@@ -3,11 +3,11 @@ import pytest
 from engine.world import Room, RoomType, CellType, Entity, CharRun
 from engine.player import Player
 from engine.editor import (
-    _merge_adjacent_runes,
+    _merge_adjacent_char_runs,
     _ed_cut, _ed_snapshot, _ed_restore, _ed_subst,
     _ed_paste, _ed_row_items, _ed_clear_row,
     _ed_range_items, _ed_delete_range,
-    _clip_desc, _serialize_room,
+    _clip_desc, _serialize_room, _deserialize_room,
 )
 
 # ── Fixtures ──────────────────────────────────────────────────────────────────
@@ -31,14 +31,14 @@ def _player(row=3, col=5):
     return Player(row=row, col=col)
 
 
-# ── _merge_adjacent_runes ─────────────────────────────────────────────────────
+# ── _merge_adjacent_char_runs ─────────────────────────────────────────────────────
 
 class TestMergeAdjacentRunes:
     def test_merges_same_kind_adjacent(self):
         room = _make_room()
         room.add_char_run(CharRun(row=3, col=2, symbols=('∘',),    kind='ancient'))
         room.add_char_run(CharRun(row=3, col=3, symbols=('∘', '∘'), kind='ancient'))
-        _merge_adjacent_runes(room, 3)
+        _merge_adjacent_char_runs(room, 3)
         assert len([ru for ru in room.char_runs if ru.row == 3]) == 1
         merged = room.char_run_at(3, 2)
         assert merged is not None
@@ -49,21 +49,21 @@ class TestMergeAdjacentRunes:
         room = _make_room()
         room.add_char_run(CharRun(row=3, col=2, symbols=('∘',), kind='ancient'))
         room.add_char_run(CharRun(row=3, col=3, symbols=('·',), kind='verdant'))
-        _merge_adjacent_runes(room, 3)
+        _merge_adjacent_char_runs(room, 3)
         assert len([ru for ru in room.char_runs if ru.row == 3]) == 2
 
     def test_does_not_merge_non_adjacent(self):
         room = _make_room()
         room.add_char_run(CharRun(row=3, col=2, symbols=('∘',), kind='ancient'))
         room.add_char_run(CharRun(row=3, col=4, symbols=('∘',), kind='ancient'))
-        _merge_adjacent_runes(room, 3)
+        _merge_adjacent_char_runs(room, 3)
         assert len([ru for ru in room.char_runs if ru.row == 3]) == 2
 
     def test_index_is_updated_after_merge(self):
         room = _make_room()
         room.add_char_run(CharRun(row=3, col=2, symbols=('∘',),    kind='ancient'))
         room.add_char_run(CharRun(row=3, col=3, symbols=('∘',), kind='ancient'))
-        _merge_adjacent_runes(room, 3)
+        _merge_adjacent_char_runs(room, 3)
         merged = room.char_run_at(3, 2)
         assert room.char_run_at(3, 3) is merged
 
@@ -73,7 +73,7 @@ class TestMergeAdjacentRunes:
         room.add_char_run(ru_row2)
         room.add_char_run(CharRun(row=3, col=2, symbols=('∘',), kind='ancient'))
         room.add_char_run(CharRun(row=3, col=3, symbols=('∘',), kind='ancient'))
-        _merge_adjacent_runes(room, 3)
+        _merge_adjacent_char_runs(room, 3)
         assert room.char_run_at(2, 2) is ru_row2  # row 2 untouched
 
 
@@ -169,7 +169,7 @@ class TestEdSnapshotRestore:
         p = _player()
         snap = _ed_snapshot(room, p)
         room.char_runs.clear()
-        assert len(snap['runes']) == 1  # snapshot unaffected
+        assert len(snap['char_runs']) == 1  # snapshot unaffected
 
     def test_snapshot_creates_independent_entity_list(self):
         room = _make_room()
@@ -456,8 +456,15 @@ class TestSerializeRoom:
         room = _make_room()
         room.add_char_run(CharRun(row=3, col=5, symbols=('∘', '∘'), kind='ancient'))
         d = _serialize_room(room)
-        assert len(d['runes']) == 1
-        assert d['runes'][0] == {'row': 3, 'col': 5, 'symbols': ['∘', '∘'], 'kind': 'ancient'}
+        assert len(d['char_runs']) == 1
+        assert d['char_runs'][0] == {'row': 3, 'col': 5, 'symbols': ['∘', '∘'], 'kind': 'ancient'}
+
+    def test_char_runs_round_trip_through_deserialize(self):
+        room = _make_room()
+        room.add_char_run(CharRun(row=3, col=5, symbols=('∘', '∘'), kind='ancient'))
+        back = _deserialize_room(_serialize_room(room))
+        ru = back.char_run_at(3, 5)
+        assert ru is not None and ru.symbols == ('∘', '∘') and ru.kind == 'ancient'
 
     def test_dead_entities_excluded(self):
         room = _make_room()

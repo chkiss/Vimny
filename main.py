@@ -31,14 +31,14 @@ from content.scrolls import (
 )
 
 _JUMP_MOTIONS = frozenset({'G', 'gg', '%', '{', '}', '(', ')'})
-from engine.operator import op_delete, op_yank, op_paste, op_case, case_char, apply_indent, INDENT_WIDTH, entity_clip
+from engine.operator import op_delete, op_yank, op_paste, op_case, op_join, case_char, apply_indent, INDENT_WIDTH, entity_clip
 from engine.reflow import is_ledge, close_gap, void_col
 from engine.insert import (
-    begin_insert, insert_char, insert_backspace,
+    begin_insert, insert_char, insert_char_extend, insert_backspace,
     replace_chars, replace_overtype, replace_restore,
 )
 from engine.editor import (
-    _merge_adjacent_runes, _ed_cut, _ed_snapshot, _ed_restore, _ed_subst,
+    _merge_adjacent_char_runs, _ed_cut, _ed_snapshot, _ed_restore, _ed_subst,
     _ed_paste, _ed_row_items, _ed_clear_row, _ed_range_items, _ed_delete_range,
     _clip_desc, _serialize_room, _deserialize_room,
 )
@@ -48,6 +48,8 @@ import save.save_manager as SM
 
 
 _WATER_SETTLE_SECS = 60   # stop animating water after this many idle seconds
+# Shown when A's ledge-build or a J join would run past the buffer's max width.
+_EDGE_OF_WORLD_MSG = 'The edge of the world — no stone lies beyond it.'
 
 
 def _cmd_append(cmd_line: str, key) -> str:
@@ -539,7 +541,7 @@ def _void_screen_xy(term, room, player, r, c):
 
 
 def _play_void_falls(term, dungeon, room, player):
-    """Animate any runes the last reflow shoved over a ledge into the void.
+    """Animate any characters the last reflow shoved over a ledge into the void.
 
     Reads room._last_void_falls (populated by engine/reflow.py), plays the drop at
     each fallen cell, then clears the list. Returns True if anything fell."""
@@ -696,7 +698,7 @@ _SPEAR_DIRS = {
 def _keystroke_cost(count: int, motion: str = '') -> int:
     base = 1 if count == 1 else len(str(count)) + 1
     # multi-character motions: one extra keypress per extra character required
-    if motion in ('f', 'F', 't', 'T', 'gg', 'ge', 'gE'):
+    if motion in ('f', 'F', 't', 'T', 'gg', 'ge', 'gE', 'gJ'):
         base += 1
     return base
 
@@ -769,9 +771,10 @@ def _snapshot(room, player, budget, *, row=None, col=None, spent=None, ans=None)
                             origin_row=e.origin_row, move_dir=e.move_dir,
                             tag=e.tag)
                      for e in room.entities],
-        'runes':    [CharRun(ru.row, ru.col, ru.symbols, ru.kind) for ru in room.char_runs],
+        'char_runs': [CharRun(ru.row, ru.col, ru.symbols, ru.kind) for ru in room.char_runs],
         'cells':    [r[:] for r in room.cells],
         'rows':     room.rows,
+        'cols':     room.cols,
         'exit_pos': room.exit_pos,
         'spawn_pos': room.spawn_pos,
         'fog_cells': set(room.fog_cells),
@@ -790,13 +793,14 @@ def _pop_history_step(src: list, dst: list, room, player, budget) -> bool:
         player.row, player.col = item['row'], item['col']
         budget.spent  = item['spent']
         room.entities = item['entities']
-        if 'runes' in item:
-            room.char_runs = item['runes']
+        if 'char_runs' in item:
+            room.char_runs = item['char_runs']
         if 'cells' in item:
             room.cells = item['cells']
             room.rows  = item['rows']
+            room.cols  = item.get('cols', room.cols)
             room.exit_pos = item['exit_pos']
-            room.spawn_pos = item.get('spawn_pos', item.get('gg_pos', item.get('entry', room.spawn_pos)))
+            room.spawn_pos = item['spawn_pos']
         room.fog_cells = item['fog_cells']
         room.rebuild_indexes()
         if 'answer_pos' in item:
@@ -870,8 +874,8 @@ _PASTE_SPAWN_MSG = {
 }
 
 
-def _clip_from_cut_runes(items: list, base_col: int) -> dict:
-    """Build a charwise register clip from x/cut rune items (each a single cell),
+def _clip_from_cut_chars(items: list, base_col: int) -> dict:
+    """Build a charwise register clip from x/cut character items (each a single cell),
     preserving column gaps via dcol from their original positions — so a cut
     letter pastes back through the same op_paste path as d/dw. One Vim register
     for every cut, yank, and paste."""
@@ -879,7 +883,7 @@ def _clip_from_cut_runes(items: list, base_col: int) -> dict:
               'symbols': it['rune'].symbols, 'kind': it['rune'].kind}
              for it in items if it.get('type') == 'rune']
     width = max((rd['dcol'] + len(rd['symbols']) for rd in runes), default=0)
-    return {'linewise': False, 'rows': [{'width': width, 'runes': runes}]}
+    return {'linewise': False, 'rows': [{'width': width, 'char_runs': runes}]}
 
 
 def _drop_key(room, row: int, col: int) -> None:
@@ -1194,7 +1198,7 @@ def run_dungeon(term: Terminal, level: int, progress: dict,
         message = 'The Counting Crypts — type [N] before hjkl: try 5j or 3l'
         msg_ttl = 50
     elif level == 3:
-        message = 'The Rune Halls — w:next cluster  b:prev cluster  e:end of cluster'
+        message = 'The Rune Halls — w:next word  b:prev word  e:end of word'
         msg_ttl = 60
     elif level == 4:
         message = 'The Character Cataracts — f{c}:jump to char  t{c}:just before  F/T:backward'
@@ -1431,7 +1435,7 @@ def run_dungeon(term: Terminal, level: int, progress: dict,
                             room.remove_char_run(existing)
                         room.add_char_run(CharRun(row=r, col=c,
                                                   symbols=(_RUNE_SYMS[kind],), kind=kind))
-                        _merge_adjacent_runes(room, r)
+                        _merge_adjacent_char_runs(room, r)
                         _push(f'Placed {kind} rune.')
 
                 elif cmd.startswith('entity ') and edit_mode and player_name == 'admin':
@@ -1520,7 +1524,7 @@ def run_dungeon(term: Terminal, level: int, progress: dict,
                         ed_undo.append(_ed_snapshot(room, player))
                         player.col -= 1
                         _ed_cut(room, r, player.col)
-                        _merge_adjacent_runes(room, r)
+                        _merge_adjacent_char_runs(room, r)
                 elif not key.is_sequence:
                     ch = str(key)
                     if ch.isprintable() and len(ch) == 1:
@@ -1528,7 +1532,7 @@ def run_dungeon(term: Terminal, level: int, progress: dict,
                         _ed_cut(room, r, c)
                         room.add_char_run(CharRun(row=r, col=c,
                                                   symbols=(ch,), kind='ember'))
-                        _merge_adjacent_runes(room, r)
+                        _merge_adjacent_char_runs(room, r)
                         if c + 1 < room.cols:
                             player.col += 1
             else:
@@ -1541,7 +1545,12 @@ def run_dungeon(term: Terminal, level: int, progress: dict,
                         prev_ins = (player.row, player.col)
                         room._last_void_falls = []
                         room._last_drowns     = []
-                        if insert_char(room, player, ch):
+                        if player.insert_extend:               # A: build new ledge into the void
+                            if insert_char_extend(room, player, ch):
+                                budget.spend(1)
+                            elif room._last_build_blocked == 'edge':
+                                message = _EDGE_OF_WORLD_MSG; msg_ttl = 25
+                        elif insert_char(room, player, ch):
                             budget.spend(1)
                         if room._last_void_falls:          # ledge: a glyph went over the brink
                             render_all(term, dungeon, player, budget, message,
@@ -2010,7 +2019,7 @@ def run_dungeon(term: Terminal, level: int, progress: dict,
             if action['type'] == 'search_word':
                 word = _word_under_cursor(room, player)
                 if word is None:
-                    _push('No rune under cursor.')
+                    _push('No character under cursor.')
                     pattern, fwd = None, True
                 else:
                     fwd = action.get('forward', True)
@@ -2222,7 +2231,7 @@ def run_dungeon(term: Terminal, level: int, progress: dict,
                         undo_stack.append(_snapshot(room, player, budget, ans=cmd_start_ans))
                         redo_stack.clear()
                         _reg_write(player, '"',
-                                   _clip_from_cut_runes(cut_items, player.col), is_delete=True)
+                                   _clip_from_cut_chars(cut_items, player.col), is_delete=True)
                         if is_ledge(room, player.row):
                             close_gap(room, player.row, player.col, count)   # ledge: pull the tail left
                         budget.spend(1)
@@ -2290,8 +2299,8 @@ def run_dungeon(term: Terminal, level: int, progress: dict,
                 else:
                     _has_key = any(ed['tmpl'].get('kind') == 'floor_key' for ed in clip_entities)
                     player.error = 'E: Wrong key for this door' if _has_key else 'E: No key held'
-            elif clip and any(rw.get('runes') or rw.get('entities') for rw in clip['rows']):
-                # One register for everything cut/yanked: lay runes back down and
+            elif clip and any(rw.get('char_runs') or rw.get('entities') for rw in clip['rows']):
+                # One register for everything cut/yanked: lay characters back down and
                 # respawn cut creatures. count fans out copies (3p = 3 in a row).
                 undo_stack.append(_snapshot(room, player, budget, ans=cmd_start_ans))
                 redo_stack.clear()
@@ -2398,6 +2407,23 @@ def run_dungeon(term: Terminal, level: int, progress: dict,
                 (ed_undo if edit_mode else undo_stack).pop()
                 _push('Nothing to toggle.')
 
+        elif action['type'] == 'join' and not edit_mode:
+            if not _action_allowed(action, player.known_commands):
+                _push(_guard_message(action, player.known_commands))
+                message = _pool_msg(); msg_ttl = _MSG_ROTATE_TTL
+                render_all(term, dungeon, player, budget, message, attack_pos=_attack_pos(), attack_sym=_attack_sym())
+                continue
+            undo_stack.append(_snapshot(room, player, budget))
+            redo_stack.clear()
+            gap = action.get('gap', True)
+            if op_join(room, player, gap=gap, count=count):
+                budget.spend(_keystroke_cost(count, 'J' if gap else 'gJ'))
+                player.last_change = action
+                _push(_EDGE_OF_WORLD_MSG if room._last_build_blocked == 'edge' else 'Joined.')
+            else:
+                undo_stack.pop()
+                _push(_EDGE_OF_WORLD_MSG if room._last_build_blocked == 'edge' else 'Nothing to join.')
+
         elif action['type'] == 'operator' and action['op'] in ('>', '<'):
             if not edit_mode and not _action_allowed(action, player.known_commands):
                 _push(_guard_message(action, player.known_commands))
@@ -2413,14 +2439,26 @@ def run_dungeon(term: Terminal, level: int, progress: dict,
                     _ed_snapshot(room, player) if edit_mode else _snapshot(room, player, budget))
                 (ed_redo if edit_mode else redo_stack).clear()
                 amount = INDENT_WIDTH if action['op'] == '>' else -INDENT_WIDTH
+                room._last_void_falls = []
+                room._last_drowns     = []
                 for _ir in range(tobj.start_row, tobj.end_row + 1):
-                    apply_indent(room, _ir, amount)
+                    apply_indent(room, _ir, amount)        # `>` reflows: overflow tumbles off the brink
                 player.row = min(tobj.start_row, room.rows - 1)
                 nb = _first_non_blank_col(room, player.row)
                 if nb is not None:
                     player.col = nb
                 if not edit_mode:
                     budget.spend(_operator_cost(action))
+                    if room._last_void_falls:
+                        render_all(term, dungeon, player, budget, message, attack_pos=_attack_pos(), attack_sym=_attack_sym())
+                        _play_void_falls(term, dungeon, room, player)
+                        message = 'Over the brink — into the void it tumbles!'; msg_ttl = 25
+                    if room._last_drowns:
+                        render_all(term, dungeon, player, budget, message, attack_pos=_attack_pos(), attack_sym=_attack_sym())
+                        for (dr, dc) in room._last_drowns:
+                            _drown_animation(term, *_void_screen_xy(term, room, player, dr, dc))
+                        room._last_drowns = []
+                        message = 'A wave sweeps it away into the void!'; msg_ttl = 25
                 player.last_change = action
 
         elif action['type'] == 'operator' and action['op'] in ('g~', 'gu', 'gU'):
@@ -2471,7 +2509,7 @@ def run_dungeon(term: Terminal, level: int, progress: dict,
                     budget.spend(_operator_cost(action))
                     player.mode = Mode.INSERT
                 else:                          # 'd'
-                    _reg_write(player, reg, op_delete(room, player, tobj), is_delete=True)
+                    _reg_write(player, reg, op_delete(room, player, tobj, collapse=True), is_delete=True)
                     budget.spend(_operator_cost(action))
                     _push('Deleted.')
                 player.last_change = action

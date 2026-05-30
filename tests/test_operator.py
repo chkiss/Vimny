@@ -8,9 +8,15 @@ from engine.text_object import (
     TextObject, TextObjectType, classify, compute_text_object,
 )
 from engine.operator import (
-    line_extent, capture, op_yank, op_delete, op_paste, op_case, case_char,
+    line_extent, capture, op_yank, op_delete, op_paste, op_case, op_join, case_char,
     apply_indent, INDENT_WIDTH,
 )
+
+
+def _sym(room, row, col):
+    """The single symbol at (row, col), independent of cluster merging."""
+    ru = room.char_run_at(row, col)
+    return ru.symbols[col - ru.col] if ru else None
 
 ROWS, COLS = 7, 24
 
@@ -120,15 +126,33 @@ class TestDelete:
         assert room.char_run_at(3, 5).symbols == ('d',)   # 'abc' gone; 'd' pulled left by 3 (8→5)
         assert room.char_run_at(3, 8) is None
 
-    def test_dd_clears_row(self):
+    def test_linewise_delete_without_collapse_clears_in_place(self):
+        # op_delete(collapse=False) is the cc / S path: runes go, the row stays.
         room = _room()
         room.add_char_run(CharRun(3, 2, ('a',), 'ancient'))
         room.add_char_run(CharRun(3, 6, ('b',), 'ancient'))
         p = _player(3, 5)
+        before = room.rows
         t = compute_text_object(p, {'op': 'd', 'motion': 'line', 'count': 1}, room)
         op_delete(room, p, t)
+        assert room.rows == before                                  # row kept
         assert room.char_run_at(3, 2) is None and room.char_run_at(3, 6) is None
         assert p.row == 3
+
+    def test_dd_collapses_row(self):
+        # op_delete(collapse=True) is real dd / visual-line d: the row is removed
+        # and the row below pulled up — the vertical inverse of o.
+        room = _room()
+        room.add_char_run(CharRun(2, 4, ('a',), 'ancient'))   # the row dd removes
+        room.add_char_run(CharRun(3, 7, ('Z',), 'ancient'))   # the row below it
+        p = _player(2, 5)
+        before = room.rows
+        t = compute_text_object(p, {'op': 'd', 'motion': 'line', 'count': 1}, room)
+        op_delete(room, p, t, collapse=True)
+        assert room.rows == before - 1                        # collapsed, not cleared
+        assert room.char_run_at(2, 4) is None                 # old row-2 content gone
+        assert room.char_run_at(2, 7).symbols == ('Z',)       # row 3 pulled up into row 2
+        assert p.row == 2
 
     def test_delete_closes_a_cluster_gap(self):
         room = _room()
@@ -156,7 +180,7 @@ class TestYankSpacing:
         t = compute_text_object(p, {'op': 'y', 'motion': 'line', 'count': 1}, room)
         clip = op_yank(room, p, t)
         assert clip['linewise'] is True
-        runes = clip['rows'][0]['runes']
+        runes = clip['rows'][0]['char_runs']
         # offsets relative to line start (col 1): A at 1, B at 5 → 3-cell gap kept
         assert [(r['dcol'], r['symbols']) for r in runes] == [(1, ('a',)), (5, ('b',))]
 
@@ -167,7 +191,7 @@ class TestYankSpacing:
         p = _player(3, 1)
         clip = op_yank(room, p, compute_text_object(p, {'op': 'y', 'motion': 'line', 'count': 1}, room))
         p.row, p.col = 4, 1
-        op_paste(room, p, clip, before=True)        # overlay onto row 4
+        op_paste(room, p, clip, before=True)        # P → insert a real line at row 4
         assert room.char_run_at(4, 2) is not None        # A back at col 2
         assert room.char_run_at(4, 6) is not None        # B back at col 6
         assert all(room.char_run_at(4, c) is None for c in (3, 4, 5))   # gap survived
@@ -175,7 +199,7 @@ class TestYankSpacing:
     def test_charwise_paste_preserves_relative_gap(self):
         room = _room()
         clip = {'linewise': False,
-                'rows': [{'width': 5, 'runes': [{'dcol': 0, 'symbols': ('a',), 'kind': 'ancient'},
+                'rows': [{'width': 5, 'char_runs': [{'dcol': 0, 'symbols': ('a',), 'kind': 'ancient'},
                                                 {'dcol': 4, 'symbols': ('b',), 'kind': 'ancient'}]}]}
         p = _player(3, 10)
         op_paste(room, p, clip, before=False)        # p → start at col 11
@@ -187,7 +211,7 @@ class TestYankSpacing:
     def test_paste_stops_at_wall(self):
         room = _room()
         clip = {'linewise': False,
-                'rows': [{'width': 5, 'runes': [{'dcol': 0, 'symbols': ('a', 'b', 'c'), 'kind': 'ancient'}]}]}
+                'rows': [{'width': 5, 'char_runs': [{'dcol': 0, 'symbols': ('a', 'b', 'c'), 'kind': 'ancient'}]}]}
         p = _player(3, 21)        # cols 22 is last floor; 23 is wall
         op_paste(room, p, clip, before=False)        # start col 22: only 1 cell fits
         assert room.char_run_at(3, 22) is not None
@@ -281,7 +305,7 @@ class TestYankNonMutation:
         clip = op_yank(room, p, t)
         assert room.char_run_at(3, 2) is not None and room.char_run_at(3, 4) is not None
         assert (p.row, p.col) == (3, 2)
-        assert clip['rows'][0]['runes'][0]['symbols'] == ('a', 'b', 'c')
+        assert clip['rows'][0]['char_runs'][0]['symbols'] == ('a', 'b', 'c')
 
 
 class TestDeleteMore:
@@ -309,7 +333,7 @@ class TestDeleteMore:
         room.add_char_run(CharRun(3, 2, ('a', 'b'), 'ancient'))
         p = _player(3, 2)
         clip = op_delete(room, p, _td_inclusive(3, 2, 3))
-        assert clip['rows'][0]['runes'][0]['symbols'] == ('a', 'b')
+        assert clip['rows'][0]['char_runs'][0]['symbols'] == ('a', 'b')
 
 
 class TestPasteMore:
@@ -317,7 +341,7 @@ class TestPasteMore:
         room = _room()
         room.add_char_run(CharRun(3, 10, ('X',), 'ancient'))   # something under the cursor
         clip = {'linewise': False,
-                'rows': [{'width': 1, 'runes': [{'dcol': 0, 'symbols': ('a',), 'kind': 'ancient'}]}]}
+                'rows': [{'width': 1, 'char_runs': [{'dcol': 0, 'symbols': ('a',), 'kind': 'ancient'}]}]}
         p = _player(3, 10)
         op_paste(room, p, clip, before=True)      # P → insert 'a' at the cursor; X shifts right
         assert room.char_run_at(3, 10).symbols == ('a', 'X')   # 'a' inserted at cursor, X shifted right (merged)
@@ -327,28 +351,43 @@ class TestPasteMore:
         room = _room()
         p = _player(3, 5)
         assert op_paste(room, p, None, before=False) is False
-        empty = {'linewise': False, 'rows': [{'width': 0, 'runes': []}]}
+        empty = {'linewise': False, 'rows': [{'width': 0, 'char_runs': []}]}
         assert op_paste(room, p, empty, before=False) is False
 
     def test_paste_merges_adjacent_same_kind(self):
         room = _room()
         room.add_char_run(CharRun(3, 5, ('a',), 'ancient'))
         clip = {'linewise': False,
-                'rows': [{'width': 1, 'runes': [{'dcol': 0, 'symbols': ('b',), 'kind': 'ancient'}]}]}
+                'rows': [{'width': 1, 'char_runs': [{'dcol': 0, 'symbols': ('b',), 'kind': 'ancient'}]}]}
         p = _player(3, 5)
         op_paste(room, p, clip, before=False)      # places 'b' at col 6, adjacent to 'a'
         merged = room.char_run_at(3, 5)
         assert merged.symbols == ('a', 'b') and merged.col == 5
 
-    def test_linewise_paste_below_with_p(self):
+    def test_linewise_paste_below_with_p_inserts_a_real_row(self):
         room = _room()
         room.add_char_run(CharRun(3, 2, ('a',), 'ancient'))
         room.add_char_run(CharRun(3, 6, ('b',), 'ancient'))
         p = _player(3, 1)
         clip = op_yank(room, p, compute_text_object(p, _op('y', 'line'), room))
-        op_paste(room, p, clip, before=False)      # p → row below (4)
+        before = room.rows
+        op_paste(room, p, clip, before=False)      # p → opens a real new line below (row 4)
+        assert room.rows == before + 1             # a row was inserted (Vim-faithful), not overlaid
         assert room.char_run_at(4, 2) is not None and room.char_run_at(4, 6) is not None
-        assert p.row == 3                          # paste never moves the player
+        assert (p.row, p.col) == (4, 2)            # cursor → first non-blank of the pasted line
+
+    def test_count_linewise_paste_inserts_rows_and_shifts_map_down(self):
+        room = _room()
+        room.add_char_run(CharRun(3, 2, ('a',), 'ancient'))     # the line to yank
+        room.add_char_run(CharRun(4, 7, ('Z',), 'ancient'))     # content below — must shift down
+        p = _player(3, 1)
+        clip = op_yank(room, p, compute_text_object(p, _op('y', 'line'), room))
+        before = room.rows
+        op_paste(room, p, clip, before=False, count=3)          # 3p → 3 new lines below
+        assert room.rows == before + 3                          # three real rows inserted
+        for r in (4, 5, 6):
+            assert room.char_run_at(r, 2) is not None           # 'a' on each pasted line
+        assert room.char_run_at(7, 7).symbols == ('Z',)         # old row-4 content pushed down 3
 
 
 class TestRoundTrip:
@@ -359,7 +398,7 @@ class TestRoundTrip:
         p = _player(3, 1)
         clip = op_yank(room, p, compute_text_object(p, _op('y', 'line'), room))
         p.row, p.col = 5, 1
-        op_paste(room, p, clip, before=True)        # overlay onto blank row 5
+        op_paste(room, p, clip, before=True)        # P → insert a real line at row 5
         assert room.char_run_at(5, 2) is not None        # x at same offset
         assert room.char_run_at(5, 5) is not None        # yz at same offset
         assert all(room.char_run_at(5, c) is None for c in (3, 4))   # gap preserved
@@ -451,11 +490,22 @@ class TestIndent:
         assert applied == -1                                    # clamped: 2 → 1
         assert room.char_run_at(3, 1) is not None
 
-    def test_indent_clamps_at_right_wall(self):
+    def test_indent_shoves_content_off_the_right_brink(self):
         room = _room()
-        room.add_char_run(CharRun(3, 22, ('a',), 'ancient'))   # rightmost = last passable
-        assert apply_indent(room, 3, INDENT_WIDTH) == 0         # no room to shift
-        assert room.char_run_at(3, 22) is not None
+        room.add_char_run(CharRun(3, 22, ('a',), 'ancient'))   # at the last passable col (wall at 23)
+        room._last_void_falls = []
+        apply_indent(room, 3, INDENT_WIDTH)                     # `>` pushes it past the brink
+        assert room.char_run_at(3, 22) is None                 # 'a' tumbled off the ledge
+        assert room._last_void_falls                           # it fell into the void
+
+    def test_indent_drops_only_the_overflow(self):
+        room = _room()
+        room.add_char_run(CharRun(3, 20, ('a', 'b', 'c'), 'ancient'))  # 20-22; wall at 23
+        room._last_void_falls = []
+        apply_indent(room, 3, INDENT_WIDTH)                     # >> by 2: a→22, b/c fall off
+        assert _sym(room, 3, 22) == 'a'                        # 'a' slid to the brink
+        assert room.char_run_at(3, 23) is None                 # nothing past the wall
+        assert len(room._last_void_falls) == 2                 # 'b' and 'c' went over
 
     def test_indent_moves_all_clusters_equally(self):
         room = _room()
@@ -610,3 +660,82 @@ class TestChangeComposition:
         op_delete(room, p, t)
         assert room.char_run_at(3, 2) is None and room.char_run_at(3, 8) is None
         assert (p.row, p.col) == (3, 1)
+
+
+# ── J / gJ (join: remove_row of the next line + extend_floor append) ──────────
+
+class TestJoin:
+    def test_J_joins_next_line_with_a_space_and_collapses_it(self):
+        room = _room()
+        room.add_char_run(CharRun(3, 2, ('a', 'b'), 'ancient'))
+        room.add_char_run(CharRun(4, 2, ('c', 'd'), 'ancient'))
+        p = _player(3, 2)
+        before = room.rows
+        assert op_join(room, p, gap=True, count=1) is True
+        assert room.rows == before - 1                       # the joined line is removed (collapse)
+        assert (_sym(room, 3, 2), _sym(room, 3, 3)) == ('a', 'b')
+        assert _sym(room, 3, 4) is None                      # one space at the seam
+        assert (_sym(room, 3, 5), _sym(room, 3, 6)) == ('c', 'd')
+        assert p.col == 4                                    # cursor on the seam space (Vim J)
+
+    def test_gJ_joins_without_a_space(self):
+        room = _room()
+        room.add_char_run(CharRun(3, 2, ('a', 'b'), 'ancient'))
+        room.add_char_run(CharRun(4, 2, ('c', 'd'), 'ancient'))
+        p = _player(3, 2)
+        assert op_join(room, p, gap=False, count=1) is True
+        assert (_sym(room, 3, 2), _sym(room, 3, 3), _sym(room, 3, 4), _sym(room, 3, 5)) == ('a', 'b', 'c', 'd')
+        assert p.col == 4                                    # cursor on the first joined glyph (gJ)
+
+    def test_count_J_joins_multiple_lines(self):
+        room = _room()
+        room.add_char_run(CharRun(3, 2, ('a',), 'ancient'))
+        room.add_char_run(CharRun(4, 2, ('b',), 'ancient'))
+        room.add_char_run(CharRun(5, 2, ('c',), 'ancient'))
+        p = _player(3, 2)
+        before = room.rows
+        assert op_join(room, p, gap=True, count=3) is True   # 3J → join the next two lines
+        assert room.rows == before - 2
+        assert (_sym(room, 3, 2), _sym(room, 3, 4), _sym(room, 3, 6)) == ('a', 'b', 'c')
+
+    def test_J_preserves_the_joined_lines_internal_spacing(self):
+        room = _room()
+        room.add_char_run(CharRun(3, 2, ('a',), 'ancient'))
+        room.add_char_run(CharRun(4, 2, ('p',), 'ancient'))   # 'p  q' — a 2-cell internal gap
+        room.add_char_run(CharRun(4, 5, ('q',), 'ancient'))
+        p = _player(3, 2)
+        op_join(room, p, gap=True, count=1)
+        # a(2) space(3) p(4) gap(5,6) q(7)
+        assert _sym(room, 3, 4) == 'p' and _sym(room, 3, 7) == 'q'
+        assert _sym(room, 3, 5) is None and _sym(room, 3, 6) is None
+
+    def test_J_builds_into_the_void_doubling_cols(self):
+        room = _room()                                        # floor 1..22, wall at 23
+        room.add_char_run(CharRun(3, 1, tuple('abcdefghijklmnopqrstuv'), 'ancient'))  # fills to col 22
+        room.add_char_run(CharRun(4, 2, ('Y', 'Z'), 'ancient'))
+        p = _player(3, 1)
+        assert op_join(room, p, gap=True, count=1) is True
+        assert room.cols == COLS * 2                          # ran off the brink → world doubled
+        assert _sym(room, 3, 24) == 'Y' and _sym(room, 3, 25) == 'Z'   # joined past the old wall
+
+    def test_J_at_last_row_does_nothing(self):
+        room = _room()
+        room.add_char_run(CharRun(5, 2, ('a',), 'ancient'))   # last passable row (row 5 in a 7-row room)
+        p = _player(5, 2)
+        before = room.rows
+        assert op_join(room, p, gap=True, count=1) is False   # no next line to join
+        assert room.rows == before
+
+    def test_J_refuses_past_the_edge_of_the_world(self):
+        from engine.reflow import _MAX_COLS
+        room = Room(room_type=RoomType.PUZZLE, rows=5, cols=_MAX_COLS)
+        room.cells = [[CellType.FLOOR if (0 < r < 4 and 0 < c < _MAX_COLS - 1) else CellType.WALL
+                       for c in range(_MAX_COLS)] for r in range(5)]
+        room.add_char_run(CharRun(1, _MAX_COLS - 2, ('a',), 'ancient'))   # fills to the last buildable col
+        room.add_char_run(CharRun(2, 1, ('b',), 'ancient'))               # a line below to join
+        room.rebuild_indexes()
+        p = _player(1, _MAX_COLS - 2)
+        before = room.rows
+        assert op_join(room, p, gap=True, count=1) is False               # would build past the world's edge
+        assert room._last_build_blocked == 'edge'
+        assert room.rows == before                                        # nothing collapsed

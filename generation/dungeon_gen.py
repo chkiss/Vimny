@@ -103,7 +103,7 @@ _L4_TEXT_C3B = "quite easily to anything you can type"  # t! lands at col 69 bef
 
 def _place_runes_in_room(composite, rng, col_offset, room_rows, room_cols,
                           total_rows, density):
-    """Scatter rune clusters inside one room of the composite grid."""
+    """Scatter character runs inside one room of the composite grid."""
     row_offset = (total_rows - room_rows) // 2
     col_end = col_offset + room_cols - 2
     for r in range(row_offset + 1, row_offset + room_rows - 1):
@@ -112,7 +112,7 @@ def _place_runes_in_room(composite, rng, col_offset, room_rows, room_cols,
             if rng.random() < density:
                 kind = rng.choice(_RUNE_KINDS)
                 placed = False
-                for _ in range(2):  # one retry for long runes at end
+                for _ in range(2):  # one retry for long characters at end
                     syms = _make_rune_syms(rng, kind)
                     width = len(syms)
                     if c + width <= col_end:
@@ -283,7 +283,7 @@ def _dijkstra_par_level2(composite, door_cols: list, return_path: bool = False):
         if left != c:
             push(r, left, closed, 1, '0')
 
-        # ^ — leftmost rune in wall/fog-bounded segment
+        # ^ — leftmost character in wall/fog-bounded segment
         lb = c
         for nc in range(c - 1, -1, -1):
             if not composite.is_passable(r, nc):
@@ -369,9 +369,9 @@ def build_dungeon_0(seed: int) -> Dungeon:
     composite.exit_pos = (1, ex_c)
     composite.entities.append(Entity(kind='exit', row=1, col=ex_c))
 
-    # Place rune clusters in all three rooms — no safe rows, runes can appear
+    # Place character runs in all three rooms — no safe rows, characters can appear
     # anywhere including rows 4-5 (the corridor band).  Par is computed by BFS
-    # after placement.  If the runes block every path, retry with a new sub-seed
+    # after placement.  If the characters block every path, retry with a new sub-seed
     # (up to 20 attempts).
     densities = {0: 0.20, 1: 0.28, 2: 0.20}
     for attempt in range(20):
@@ -384,7 +384,7 @@ def build_dungeon_0(seed: int) -> Dungeon:
         # Hard-coded void guards: block (2, ex_c) and (3, ex_c) so the player
         # cannot walk straight up from the corridor to the exit.  They must go
         # right into Room 2, up to row 1, then press h to reach the exit.
-        # Remove any random rune that would shadow these hard-coded voids.
+        # Remove any random character that would shadow these hard-coded voids.
         for void_row in (2, 3):
             composite.char_runs = [
                 ru for ru in composite.char_runs
@@ -509,7 +509,7 @@ def build_dungeon_1(seed: int) -> Dungeon:
 
     EXIT is full-height (10 rows); ENTRY/PUZZLE are 8 rows centred at rows 1-8.
     Global rows 0 and 9 exist only inside EXIT, so `^` on row 1 finds the exit
-    at (1, 83) with no competing runes from other rooms.
+    at (1, 83) with no competing characters from other rooms.
 
     Optimal path (≈7 keys): jj → $ → kkk → ^ .  hjkl-only cost ≫ budget.
     """
@@ -556,14 +556,14 @@ def build_dungeon_1(seed: int) -> Dungeon:
     # Exit at leftmost interior cell of EXIT room on row 1 (EXIT-only row).
     # offsets[-1]=82; interior starts at col 83.  Row 1 is above corridor
     # rows 4-5, so on row 1 only EXIT interior (cols 83-94) is passable.
-    # ^ on row 1 therefore lands at col 83 (first passable = first rune).
+    # ^ on row 1 therefore lands at col 83 (first passable = first character).
     ex_c = offsets[-1] + 1   # 83
     ex_r = 1
     composite.exit_pos = (ex_r, ex_c)
     composite.entities.append(Entity(kind='exit', row=ex_r, col=ex_c))
 
     # Scatter decorative runes; strip void runes and row-1 runes so the only
-    # rune on the exit row is the hardcoded anchor that ^ will land on.
+    # character on the exit row is the hardcoded anchor that ^ will land on.
     for _attempt in range(20):
         composite.char_runs.clear()
         rune_rng = random.Random(rng.randint(0, 2**31))
@@ -574,7 +574,7 @@ def build_dungeon_1(seed: int) -> Dungeon:
             ru for ru in composite.char_runs
             if ru.kind != 'void' and ru.row != ex_r
         ]
-        # Anchor rune at exit position so ^ on row 1 lands exactly on the exit.
+        # Anchor character at exit position so ^ on row 1 lands exactly on the exit.
         composite.char_runs.append(
             CharRun(row=ex_r, col=ex_c, symbols=('∘',), kind='ancient'))
         par, path = _bfs_par_line(composite, return_path=True)
@@ -658,7 +658,7 @@ def build_dungeon_2(seed: int) -> Dungeon:
         for row in range(2, total_rows - 2)          # rows 2-9
     ]
 
-    # Decorative runes in entry and exit rooms; retry if any void blocks path.
+    # Decorative characters in entry and exit rooms; retry if any void blocks path.
     for attempt in range(20):
         composite.char_runs = list(void_wall)
         rune_rng = random.Random(rng.randint(0, 2**31))
@@ -713,10 +713,10 @@ def build_dungeon_2(seed: int) -> Dungeon:
 def _make_rune_corridor(composite, rng, row_top,
                         col_start=None, col_end=None, density=0.65,
                         blocked: frozenset = frozenset()):
-    """Carve a 2-row CORRIDOR strip and fill it densely with non-void rune clusters.
+    """Carve a 2-row CORRIDOR strip and fill it densely with non-void character runs.
 
-    Leaves a 1-cell buffer at each end so runes reach the turn-room entrance.
-    blocked: set of (row, col) cells that random runes must not overlap or
+    Leaves a 1-cell buffer at each end so characters reach the turn-room entrance.
+    blocked: set of (row, col) cells that random characters must not overlap or
     touch (1-cell side buffer enforced by the caller via the set contents).
     """
     if col_start is None:
@@ -734,7 +734,7 @@ def _make_rune_corridor(composite, rng, row_top,
             if rng.random() < density:
                 kind  = rng.choice(_WORD_RUNE_KINDS)
                 placed = False
-                for _ in range(2):  # one retry for long runes at end
+                for _ in range(2):  # one retry for long characters at end
                     syms  = _make_rune_syms(rng, kind)
                     width = len(syms)
                     if c + width - 1 <= col_end:
@@ -886,7 +886,7 @@ def _dijkstra_par_wbe(composite, return_path: bool = False):
 
 def _l4_place_zone(composite, rng, rows, col_start, col_end,
                    density=0.55, blocked=frozenset()):
-    """Fill a rune zone across the given rows between col_start and col_end."""
+    """Fill a character zone across the given rows between col_start and col_end."""
     for r in rows:
         c = col_start
         while c <= col_end:
@@ -907,7 +907,7 @@ def _l4_place_zone(composite, rng, rows, col_start, col_end,
 def _dijkstra_par_ftFT(composite, return_path: bool = False):
     """Minimum-keystroke Dijkstra for Level 4: hjkl + count + w b e + f F t T.
 
-    f/F/t/T scan includes text-rune chars ('r','w','!') and entity chars
+    f/F/t/T scan includes text characters ('r','w','!') and entity chars
     ('E','?') as targets.  w/b/e stop at water (non-passable cells), matching
     apply_motion behaviour.  Scan stops at WALL/WOOD_WALL; water is transparent.
     """
@@ -927,7 +927,7 @@ def _dijkstra_par_ftFT(composite, return_path: bool = False):
     def _scan_stops(r, c):
         return composite.cells[r][c] in (CellType.WALL, CellType.WOOD_WALL)
 
-    # Include text chars that appear as rune symbols alongside entity chars.
+    # Include text chars that appear as characters alongside entity chars.
     _SCAN_CHARS = set('!rw')
     row_chars: dict[int, list] = defaultdict(list)
     for r in range(ROWS):
@@ -1092,14 +1092,14 @@ def _dijkstra_par_ftFT(composite, return_path: bool = False):
 
 
 def build_dungeon_3(seed: int) -> Dungeon:
-    """The Rune Halls — teaches w b e (word motions over rune clusters).
+    """The Rune Halls — teaches w b e (word motions over character runs).
 
-    Five 2-row rune corridors in a snake pattern:
+    Five 2-row character corridors in a snake pattern:
       C1 rows 1-2   left→right  (w efficient)
       C2 rows 4-5   right→left  (b efficient)
       C3 rows 7-8   left→right
       C4 rows 10-11 right→left
-      C5 rows 13-14 left→right  (exit = last symbol of anchor rune → use e)
+      C5 rows 13-14 left→right  (exit = last symbol of anchor character → use e)
 
     Turn rooms bridge adjacent corridors at alternating ends:
       RT1 rows 2-4   cols 45-46  (void at middle row 3)
@@ -1107,7 +1107,7 @@ def build_dungeon_3(seed: int) -> Dungeon:
       RT2 rows 8-10  cols 45-46  (void at middle row 9)
       LT2 rows 11-13 cols 1-2   (void at middle row 12)
 
-    Rune clusters fill each corridor from col 2 to col 45 (1-cell margin).
+    Character runs fill each corridor from col 2 to col 45 (1-cell margin).
     Void clusters at each turn-room middle row block straight j/k traversal,
     forcing count-j to skip them — reinforcing the level-2 count motion.
     """
@@ -1134,11 +1134,11 @@ def build_dungeon_3(seed: int) -> Dungeon:
             for col in range(c0, c1 + 1):
                 cells[row][col] = CellType.CORRIDOR
 
-    # ── Hard-coded runes (deterministic; placed before random fill) ───────────
+    # ── Hard-coded characters (deterministic; placed before random fill) ──────
     # All positions are fixed regardless of seed.  Placing them first in the
     # runes list guarantees char_run_at() returns them before any random cluster.
     _l3_hardcoded = [
-        # Anchor rune at C5 exit — last symbol (col 44) is the exit cell
+        # Anchor character at C5 exit — last symbol (col 44) is the exit cell
         CharRun(row=13, col=42, symbols=('∘', '∘', '∘'), kind='ancient'),
         # Ember at right end of C1 — marks the turn into RT1
         CharRun(row=1,  col=44, symbols=('◦', '◦', '◦'), kind='ember'),
@@ -1156,7 +1156,7 @@ def build_dungeon_3(seed: int) -> Dungeon:
         CharRun(row=14, col=46, symbols=('○',),     kind='void'),
     ]
 
-    # Reserved cells: Random runes must not land in or touch these cells.
+    # Reserved cells: Random characters must not land in or touch these cells.
     blocked: frozenset = frozenset(
         (ru.row, c)
         for ru in _l3_hardcoded
@@ -1167,7 +1167,7 @@ def build_dungeon_3(seed: int) -> Dungeon:
     composite.exit_pos = (13, 44)
     composite.entities = [Entity(kind='exit', row=13, col=44)]
 
-    # ── Carve and populate rune corridors (up to 20 attempts for valid par) ──
+    # ── Carve and populate character corridors (up to 20 attempts for valid par) ──
     for _attempt in range(20):
         # Hard-coded runes first so char_run_at() always finds them before random ones
         composite.char_runs = list(_l3_hardcoded)
@@ -1203,7 +1203,7 @@ def build_dungeon_4(seed: int) -> Dungeon:
       C2 rows 4-5   right→left  Fw  " will be scribed in letters"    → w at col 4
       C3 rows 7-8   left→right  t!  "so you can jump" + "quite easily…type" + dynamite at col 70
       C4 rows 10-11 right→left  T!  dynamite at col 1 (F! would explode)
-      C5 rows 13-14 left→right  w/b/e rune navigation + exit
+      C5 rows 13-14 left→right  w/b/e character navigation + exit
     """
     ROWS, COLS = _L4_TOTAL_ROWS, _L4_TOTAL_COLS
     rng     = random.Random(seed)
@@ -1240,10 +1240,10 @@ def build_dungeon_4(seed: int) -> Dungeon:
             for c in range(cs, ce + 1):
                 cells[r][c] = CellType.WATER
 
-    # ── Fixed text rune clusters (visible f/F/t/T targets) ───────────────────
-    # Text chars are individual rune symbols; _cell_char returns each char so
+    # ── Fixed text character runs (visible f/F/t/T targets) ───────────────────
+    # Text chars are individual characters; _cell_char returns each char so
     # f/F/t/T can find them.  kind='ember' gives a distinctive warm colour.
-    # One row of text per corridor (the other row gets standard random runes).
+    # One row of text per corridor (the other row gets standard random characters).
     _text_runes = [
         # C1 row 1: fr jumps to 'r' at offset 23 → col 67
         CharRun(row=1, col=44, symbols=tuple(_L4_TEXT_C1), kind='ember'),
@@ -1270,7 +1270,7 @@ def build_dungeon_4(seed: int) -> Dungeon:
     composite.spawn_pos    = (1, 1)
     composite.exit_pos = (13, 65)
 
-    # ── Blocked cells: water + text/anchor runes + fixed entities ─────────────
+    # ── Blocked cells: water + text/anchor characters + fixed entities ────────
     _bl: set = {(e.row, e.col) for e in _fixed}
     for rows, cs, ce in _L4_WATER_SPANS:
         for r in rows:
@@ -1285,7 +1285,7 @@ def build_dungeon_4(seed: int) -> Dungeon:
         composite.char_runs = list(_text_runes)
         rng2 = random.Random(rng.randint(0, 2**31))
 
-        # Fill all corridor zones with standard runes
+        # Fill all corridor zones with standard characters
         _l4_place_zone(composite, rng2, (1, 2),    2,  13, blocked=blocked)  # C1 Zone A
         _l4_place_zone(composite, rng2, (1, 2),   38,  68, blocked=blocked)  # C1 Zone B
         _l4_place_zone(composite, rng2, (4,),      2,  28, blocked=blocked)  # C2 row 4 Zone A
@@ -1294,7 +1294,7 @@ def build_dungeon_4(seed: int) -> Dungeon:
         _l4_place_zone(composite, rng2, (8,),     32,  70, blocked=blocked)  # C3 row 8 Zone B
         _l4_place_zone(composite, rng2, (10, 11),  2,  24, blocked=blocked)  # C4 Zone A
         _l4_place_zone(composite, rng2, (10, 11), 52,  68, blocked=blocked)  # C4 Zone B
-        # C5: dense rune corridor for w/b/e practice; chest at col 20, exit anchor at col 64-65
+        # C5: dense character corridor for w/b/e practice; chest at col 20, exit anchor at col 64-65
         _l4_place_zone(composite, rng2, (13, 14),  2,  63,
                         density=0.60, blocked=blocked)
 
@@ -1374,7 +1374,7 @@ def build_dungeon_dummy(seed: int) -> Dungeon:
     """Admin editing sandbox — all editable element types, plus two fog-walled rooms.
 
     Layout (rows 1-18):
-      Main room   cols 1-41  — open area with all entity/cell/rune types
+      Main room   cols 1-41  — open area with all entity/cell/character types
       Wall divider col 42    — doorway at rows 9-10 (regular door)
       Room A      cols 43-57 — water pool; accessed by opening the door
       Wall divider col 58    — doorway at rows 9-10 (locked door)
@@ -1506,7 +1506,7 @@ _L5_LC_COLS = (2, 3)
 def _l5_place_near_runes(runes: list, rng, row: int,
                           col_start: int, col_end: int, n: int,
                           word_tbl: dict) -> None:
-    """Scatter n decorative (non-void) rune clusters on the near side."""
+    """Scatter n decorative (non-void) character runs on the near side."""
     available = col_end - col_start + 1
     if available < 1 or n < 1:
         return
@@ -1703,7 +1703,7 @@ def build_dungeon_5(seed: int) -> Dungeon:
             entities.append(Entity(kind='goblin', row=row, col=gc,
                                    hp=1, max_hp=1, ai='chase', ai_speed=2))
 
-        # Decorative near-side runes (non-void)
+        # Decorative near-side characters (non-void)
         if right_going:
             near_s, near_e = 2, w_start - 2
         else:
@@ -1925,7 +1925,7 @@ def _l7_place_code_group(runes, row, col_start, text, kind='ember'):
 
 def _l7_fill_row(composite, rng, row, col_start, col_end,
                  density=0.40, blocked=frozenset(), word_tbl=None):
-    """Fill one corridor row with spaced non-void rune clusters (w ≡ W here)."""
+    """Fill one corridor row with spaced non-void character runs (w ≡ W here)."""
     c = col_start
     while c <= col_end:
         if rng.random() < density:
@@ -2202,7 +2202,7 @@ def _dijkstra_par_WBE(composite, return_path=False):
         if leftmost < c and _ok(r, leftmost):
             _push((r, leftmost), 1, '0')
 
-        # ^: leftmost rune in passability-bounded range; void as first rune = lethal, don't push
+        # ^: leftmost character in passability-bounded range; void as first character = lethal, don't push
         left_b = c
         for cc in range(c - 1, -1, -1):
             if not composite.is_passable(r, cc):
@@ -2218,7 +2218,7 @@ def _dijkstra_par_WBE(composite, return_path=False):
             if ru2:
                 if _ok(r, cc):
                     _push((r, cc), 1, '^')
-                break  # first rune (void or not) terminates search
+                break  # first character (void or not) terminates search
 
         # chain w/b/e/W/B/E
         for fn, key in ((_w, 'w'), (_b, 'b'), (_e, 'e'),
@@ -2238,7 +2238,7 @@ def _dijkstra_par_WBE(composite, return_path=False):
     return None
 
 
-# ── Rune-word tables (lazy-loaded from art/) ─────────────────────────────────
+# ── Vocab tables (lazy-loaded from art/) ─────────────────────────────────
 _VOCAB_PLAIN_BY_LEN: dict | None = None
 _VOCAB_MIXED_BY_LEN: dict | None = None
 _ART_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'art')
@@ -2584,7 +2584,7 @@ def _dijkstra_par_L7(composite, return_path: bool = False):
         if left_col < c and _ok(r, left_col):
             _push((r, left_col), 1, '0')
 
-        # ^: first rune in passability-bounded range (any direction from current col)
+        # ^: first character in passability-bounded range (any direction from current col)
         lb = c
         for cc in range(c - 1, -1, -1):
             if not composite.is_passable(r, cc):
@@ -2600,7 +2600,7 @@ def _dijkstra_par_L7(composite, return_path: bool = False):
             if ru2:
                 if _ok(r, cc):
                     _push((r, cc), 1, '^')
-                break  # first rune (void or not) terminates search
+                break  # first character (void or not) terminates search
 
         # count ge/gE (backward-end motions, chained); base cost +1 for the 'g' prefix.
         # Pushed BEFORE w/b/e so that gE wins tiebreaks when 9b and gE reach the same
@@ -2656,13 +2656,13 @@ def build_dungeon_7(seed: int) -> Dungeon:
     narrow gaps that physically enforce the lesson:
 
       LT2 (rows 7-9, cols 5-6)  — ge gap
-        C4 anchor: 4-char rune at cols 2-5.  ge lands at end=5 (in gap);
+        C4 anchor: 4-character run at cols 2-5.  ge lands at end=5 (in gap);
         b   lands at start=2 (wall in row 8 — cannot descend).
 
       LT3 (rows 11-12, col 19) — gE gap
         C6 (row 11) cols 21-38 hold the baphomet/behemoth WORD: two adjacent
         clusters forming one WORD (col 21-28 + col 29-38, no gap between them).
-        An anchor rune ends at col 19; col 20 is an empty gap.
+        An anchor character ends at col 19; col 20 is an empty gap.
         From col 38: gE hops the whole WORD in 1 step → lands at col 19 = 2 ks.
         ge needs 2 hops (one per cluster) → 2ge = 3 ks > gE = 2 ks.
         19h = 3 ks, also slower.  gE is the strict winner.
@@ -2704,7 +2704,7 @@ def build_dungeon_7(seed: int) -> Dungeon:
     # descend at the turn's near column — player must use ^ to land at col 2.
     cells[4][1]  = CellType.WALL
 
-    # ── Rune clusters (seed-varying) ──────────────────────────────────────────
+    # ── Character runs (seed-varying) ──────────────────────────────────────────
     _load_vocab_tables()
     plain = _VOCAB_PLAIN_BY_LEN
     mixed = _VOCAB_MIXED_BY_LEN
@@ -2721,12 +2721,12 @@ def build_dungeon_7(seed: int) -> Dungeon:
 
     runes: list = []
 
-    # C1 (row 1) — e-teaching: four 3-char clusters, individual rune symbols
+    # C1 (row 1) — e-teaching: four 3-char clusters, individual characters
     for col, kind in ((5,'ancient'), (13,'verdant'), (22,'ember'), (34,'ancient')):
         runes.append(CharRun(row=1, col=col,
                                   symbols=(_sym(), _sym(), _sym()), kind=kind))
 
-    # C2 (row 3) — b-teaching: four 3-char clusters, individual rune symbols
+    # C2 (row 3) — b-teaching: four 3-char clusters, individual characters
     for col, kind in ((2,'ember'), (13,'verdant'), (21,'ancient'), (29,'ember')):
         runes.append(CharRun(row=3, col=col,
                                   symbols=(_sym(), _sym(), _sym()), kind=kind))
@@ -2776,7 +2776,7 @@ def build_dungeon_7(seed: int) -> Dungeon:
     #   3ge = 3 cluster hops (S end → A end → anchor) = 4 ks
     #   19h = 3 ks
     #
-    # Anchor rune at cols 18-19 (ends at 19): gE landing cell.
+    # Anchor character at cols 18-19 (ends at 19): gE landing cell.
     # Col 20 is always an empty gap between anchor and the big WORD.
     # Cols 2-16: seed-randomized mixed filler.
     _kinds3 = ('ancient', 'verdant', 'ember')
@@ -2829,7 +2829,7 @@ def build_dungeon_6(seed: int) -> Dungeon:
 
     Packed code groups use single-char CharRuns placed adjacently:
       w stops at every char (many keystrokes);  W jumps the whole group (one).
-    Spaced rune clusters in filler zones: w ≡ W (both stop cluster-by-cluster).
+    Spaced character runs in filler zones: w ≡ W (both stop cluster-by-cluster).
     Budget is computed using the W/B/E-optimal path; w/b/e-only far exceeds it.
     """
     _load_vocab_tables()
@@ -2893,7 +2893,7 @@ def build_dungeon_6(seed: int) -> Dungeon:
             _bl.add((ru.row, ru.col + i))
     blocked = frozenset(_bl)
 
-    # ── Random filler rune clusters (secondary rows only; primary rows fixed) ──
+    # ── Random filler character runs (secondary rows only; primary rows fixed) ──
     for _attempt in range(20):
         composite.char_runs = list(_hardcoded)
         rng2 = random.Random(rng.randint(0, 2**31))
@@ -3140,8 +3140,8 @@ def _dijkstra_par_L10(composite, use_percent: bool = True, return_path: bool = F
         if left_col < c and _ok(r, left_col):
             _push((r, left_col), 1, '0')
 
-        # ^: first rune (any kind) scanning from leftmost passable boundary.
-        # Stops at the first rune found (void or not); only pushes if _ok
+        # ^: first character (any kind) scanning from leftmost passable boundary.
+        # Stops at the first character found (void or not); only pushes if _ok
         # (non-void).  Mirrors the game engine: void runes block ^ silently.
         lb = c
         for cc in range(c - 1, -1, -1):
@@ -3158,7 +3158,7 @@ def _dijkstra_par_L10(composite, use_percent: bool = True, return_path: bool = F
             if ru2:
                 if _ok(r, cc):
                     _push((r, cc), 1, '^')
-                break  # first rune (void or not) terminates search
+                break  # first character (void or not) terminates search
 
         # %: matching bracket jump (disabled in command-necessity test)
         if use_percent:
@@ -3191,7 +3191,7 @@ def build_dungeon_10(seed: int) -> Dungeon:
       % → (5,53) ).  l → (5,54) EXIT.
 
     Without %: par_no_% = None (the water band is uncrossable by hand).
-    Layout is deterministic; seed only colors bracket runes.
+    Layout is deterministic; seed only colors bracket characters.
     """
     dungeon   = Dungeon(name='The Bracket Vaults', seed=seed)
     ROWS, COLS = _L10_ROWS, _L10_COLS
@@ -3231,7 +3231,7 @@ def build_dungeon_10(seed: int) -> Dungeon:
 
     # ── Place bracket CharRuns ────────────────────────────────────────────
     # Single-char CharRun at each bracket position so _bracket_at() in
-    # motion.py can identify them via rune.symbols[c - rune.col].  Row 5's ) sits
+    # motion.py can identify them via the character at that cell.  Row 5's ) sits
     # at EXC (one left of CLS); the exit is at CLS, so the final % lands on ) at
     # EXC and one l steps onto the exit.
     rng = random.Random(seed)
@@ -3538,7 +3538,7 @@ def build_dungeon_9(seed: int, game_h: int = _L9_DEFAULT_GAME_H,
     for r in range(3, l_row + 3):
         for c in range(1, 26):
             cells[r][c] = CellType.CORRIDOR
-    # Void rune row: CORRIDOR cells (void runes placed as rune clusters below)
+    # Void rune row: CORRIDOR cells (void runes placed as character runs below)
     void_row = l_row + 3
     for c in range(1, 26):
         cells[void_row][c] = CellType.CORRIDOR
@@ -3564,13 +3564,13 @@ def build_dungeon_9(seed: int, game_h: int = _L9_DEFAULT_GAME_H,
         Entity(kind='exit',        row=1, col=_L9_EXIT_COL),
     ]
 
-    # ── Runes ─────────────────────────────────────────────────────────────────
+    # ── Characters ──────────────────────────────────────────────────────────
     _load_vocab_tables()
     plain = _VOCAB_PLAIN_BY_LEN
     kinds  = ('ancient', 'verdant', 'ember')
     blocked: set = set()
 
-    # Anchor runes at key positions (so H/M/L fnb returns the key col)
+    # Anchor characters at key positions (so H/M/L fnb returns the key col)
     for anchor_row, anchor_col in (
         (1,     _L9_H_KEY_COL),
         (m_row, _L9_M_KEY_COL),
@@ -3581,7 +3581,7 @@ def build_dungeon_9(seed: int, game_h: int = _L9_DEFAULT_GAME_H,
                                            symbols=sym, kind=rng.choice(kinds)))
         blocked.add((anchor_row, anchor_col))
 
-    # Row 1: vocab runes only in the left section (before the first door); the
+    # Row 1: vocab characters only in the left section (before the first door); the
     # door-bounded corridor (cols 27-40, up to the exit) is left clear.
     for zone_start, zone_end in ((3, 25),):
         c = zone_start
@@ -3605,8 +3605,8 @@ def build_dungeon_9(seed: int, game_h: int = _L9_DEFAULT_GAME_H,
                 blocked.add((1, c + i))
             c += len(word) + rng.randint(1, 2)
 
-    # Narrow corridor rows: vocab runes.  The M row IS filled (cols 1-24), so M
-    # lands on the leftmost rune and the player must then $ to reach the M key
+    # Narrow corridor rows: vocab characters.  The M row IS filled (cols 1-24), so M
+    # lands on the leftmost character and the player must then $ to reach the M key
     # at col 25 — i.e. "M $", not just "M".
     for row in range(2, l_row + 3):
         c = 1
@@ -3663,8 +3663,8 @@ def build_dungeon_9(seed: int, game_h: int = _L9_DEFAULT_GAME_H,
 # ── Level 12 layout constants ─────────────────────────────────────────────────
 # Room: 22 rows × 48 cols.  Main area cols 1–42; side room row 15 cols 43–46.
 #
-# Blank rows (passable, no rune clusters): 1, 3, 5, 9, 15, 17, 19.
-# Content rows (≥1 rune cluster): 2, 4, 6, 7, 8, 10, 11, 12, 13, 14, 16, 18, 20.
+# Blank rows (passable, no character runs): 1, 3, 5, 9, 15, 17, 19.
+# Content rows (≥1 character run): 2, 4, 6, 7, 8, 10, 11, 12, 13, 14, 16, 18, 20.
 #
 # Key mechanic:
 #   floor_key at (5,1)  — blank row above code block (rows 6–8 all non-blank).
@@ -3940,7 +3940,7 @@ def _dijkstra_par_L8(composite, return_path: bool = False,
         return not (ru and ru.kind == 'void')
 
     def _fnb(row, dm):
-        """First-non-blank col (matches motion._first_non_blank_col): first rune
+        """First-non-blank col (matches motion._first_non_blank_col): first character
         start, else leftmost passable; None if the row has no passable cell."""
         left = None
         for c in range(COLS):
@@ -4117,8 +4117,8 @@ def build_dungeon_12(seed: int) -> 'Dungeon':
     Layout: 22 rows × 48 cols.
     Main area: rows 1–20, cols 1–42.  Side room: row 15, cols 43–46.
 
-    Blank rows (no rune clusters): 1, 3, 5, 9, 15, 17, 19.
-    Content rows (≥1 rune cluster): 2, 4, 6, 7, 8, 10–14, 16, 18, 20.
+    Blank rows (no character runs): 1, 3, 5, 9, 15, 17, 19.
+    Content rows (≥1 character run): 2, 4, 6, 7, 8, 10–14, 16, 18, 20.
 
     floor_key at (5,1) — blank row above the three-row code block (6-8).
     locked_door at (15,43) — right wall of main room at door row.
@@ -4143,7 +4143,7 @@ def build_dungeon_12(seed: int) -> 'Dungeon':
     for c in range(43, 47):
         cells[15][c] = CellType.CORRIDOR
 
-    # Rune content
+    # Character content
     _load_vocab_tables()
     plain = _VOCAB_PLAIN_BY_LEN
     rng   = random.Random(seed)
@@ -4249,7 +4249,7 @@ def build_dungeon_13(seed: int) -> 'Dungeon':
     for c in range(s2_end + 1, s3_beg):   # cols 37-48
         cells[_L13_SENT_ROW][c] = CellType.WALL
 
-    # ── Fixed sentence rune clusters ──────────────────────────────────────────
+    # ── Fixed sentence character runs ──────────────────────────────────────────
     runes: list = []
     for row, col, syms in _L13_SENT_CLUSTERS:
         runes.append(CharRun(row=row, col=col, symbols=syms, kind='ember'))

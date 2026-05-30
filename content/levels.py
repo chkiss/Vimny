@@ -18,7 +18,7 @@ from __future__ import annotations
 #   Bonus hidden    : x (L2), s (L18), * (L15), register/reg_named (L20/L38)
 #                     are available but not the lesson.
 #   Always-on       : u, :w, :q, :q! are never gated — shown once at L0 only.
-#   Not yet gated   : J gJ (L27), = (L29), :e :set (L17), :s/// (L37) —
+#   Not yet gated   : = (L29), :e :set (L17), :s/// (L37) —
 #                     add known_commands() entries when engine support lands.
 LEVELS = [
     {
@@ -395,6 +395,8 @@ def known_commands(level_id: int) -> list:
         cmds += ['r', 'R']
     if effective >= 26:
         cmds += ['~', 'gU', 'gu', 'g~']
+    if effective >= 27:
+        cmds += ['J', 'gJ']
     if effective >= 28:
         cmds += ['>', '<']
     if effective >= 30:

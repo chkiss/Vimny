@@ -1,4 +1,4 @@
-"""Generate a single room with walls, floor, rune clusters, and entities."""
+"""Generate a single room with walls, floor, character runs, and entities."""
 from __future__ import annotations
 import random
 from engine.world import Room, RoomType, CellType, CharRun, Entity
