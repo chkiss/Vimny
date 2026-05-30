@@ -35,7 +35,7 @@ Vimny is a terminal-first, dungeon crawler that teaches Vim through play. The du
 
 The overworld renders as Vim's netrw directory browser, decorated with a game frame. The player navigates it with `hjkl` and presses `Enter` to enter a dungeon.
 
-*(Illustrative mockup — dungeon names/levels here are not the canonical curriculum; see `content/levels.py`.)*
+*(Illustrative mockup — dungeon names/levels here are not the canonical curriculum; see `content/levels.py`. The as-built overworld is a full netrw buffer (`render/overworld.py` / `run_overworld`): the mockup's `?:examine` / `I:inventory` keys are aspirational, while the shipped browser adds `D` (delete), `R` (rename), `:set number`, and learned-gated motions — see CLAUDE.md → Architecture rules.)*
 
 ```
 ┌──────────────────────────────────────────────────────────────────────────────┐
@@ -75,7 +75,7 @@ The overworld renders as Vim's netrw directory browser, decorated with a game fr
 Each dungeon is:
 - A series of **rooms** connected by corridors and doors
 - **Procedurally generated** each run (or replayed with the same seed by player choice)
-- A **text buffer** — the floor is made of rune clusters the player navigates with Vim
+- A **text buffer** — the floor is made of character runs the player navigates with Vim
 - Introduced by a **dungeon title card** styled as a Vim file header, showing dungeon name, command focus, and par scores
 
 **Room types**:
@@ -96,8 +96,8 @@ The dungeon floor is a navigable text buffer:
 | Vim concept | Dungeon equivalent |
 |---|---|
 | Characters | Individual floor cells |
-| Words | Rune clusters (groups of Unicode symbols) |
-| Whitespace | Empty floor cells between clusters — **traversable floor, not void** |
+| Words | Character runs (groups of Unicode symbols) |
+| Whitespace | Empty floor cells between runs — **traversable floor, not void** |
 | Lines | Rows of the dungeon |
 | End of line | Room wall — `$`, `l`, and count-`l` stop here |
 | Paragraphs | Rooms |
@@ -111,7 +111,7 @@ Every Vim navigation command has a direct, literal meaning in the dungeon. (Note
 
 **Fog of war**: Only applies to rooms separated by doors. A door-blocked room is hidden until its door is opened with `x`; once revealed it stays revealed. Open corridors (no door) connect rooms that are always visible. Level 0 has no doors and therefore no fog of war.
 
-**Empty floor rendering**: Empty floor cells (the "whitespace" between rune clusters) must always be rendered with a visible background color (`very dark grey`). They must never render as raw terminal background.
+**Empty floor rendering**: Empty floor cells (the "whitespace" between character runs) must always be rendered with a visible background color (`very dark grey`). They must never render as raw terminal background.
 
 **Corridor rendering**: Corridors connecting rooms are the same floor background color as room interiors. A corridor is just more floor.
 
@@ -188,7 +188,7 @@ The 6-row chrome layout is identical in both the dungeon view and the overworld,
 
 The `░░` gap in the right wall is a corridor opening — two floor-background cells where the `█` wall is absent, connecting this room to the next. There are no labels inside the map area; corridors are purely structural gaps.
 
-**Empty floor rendering**: Every cell inside the room boundary that does not contain a rune cluster, enemy, or item must be rendered as a space character with the floor background color applied (`very dark grey`). Never leave floor cells as raw terminal background. Without the fill, the room interior looks like floating symbol islands separated by void — the renderer must apply the background to every floor cell on every draw call.
+**Empty floor rendering**: Every cell inside the room boundary that does not contain a character run, enemy, or item must be rendered as a space character with the floor background color applied (`very dark grey`). Never leave floor cells as raw terminal background. Without the fill, the room interior looks like floating symbol islands separated by void — the renderer must apply the background to every floor cell on every draw call.
 
 **Corridor rendering**: Corridor cells share the same floor background as room interiors. A corridor is a contiguous strip of floor-background cells through a gap in the wall. Because both sides of the gap (room interior and corridor) carry the same background color, the connection is visually seamless. Any corridor that looks detached or dashed is a rendering bug: some floor cells are not receiving the background fill.
 

@@ -1,4 +1,4 @@
-"""Hint bar text, driven by developer/vim_commands.md.
+"""Hint bar text, driven by vim_commands.md.
 
 CMD is parsed once at import from the markdown table.
 HINT_TIERS is built by diffing known_commands() between consecutive curriculum
@@ -9,7 +9,7 @@ from __future__ import annotations
 import pathlib
 import re
 
-_MD = pathlib.Path(__file__).parent.parent / 'developer' / 'vim_commands.md'
+_MD = pathlib.Path(__file__).parent / 'vim_commands.md'
 
 # ── Parse vim_commands.md ─────────────────────────────────────────────────────
 
