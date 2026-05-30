@@ -23,7 +23,7 @@ This plan was produced in two phases:
 4. **Boss placement** — bosses sit at **meaningful act boundaries**, are well-spaced, and
    are numbered `x.1`.
 
-Existing forcing primitives: walls/corridors, doors, rune clusters (word/WORD targets),
+Existing forcing primitives: walls/corridors, doors, character runs (word/WORD targets),
 void runes (lethal), water, chests/keys, fog-of-war, **keystroke budget** (`par × 1.4`),
 enemies (goblins chase; wardens+shields in bosses), visual mode.
 
