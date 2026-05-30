@@ -324,9 +324,9 @@ def op_paste(room, player, clip: dict, before: bool, count: int = 1) -> bool:
         _merge_adjacent_runes(room, player.row)
         if placed_any:                                      # cursor on the last pasted cell (Vim)
             last = base + total - 1
-            while last >= base and (not room.is_passable(player.row, last)
-                                    or room.entity_at(player.row, last) is not None):
-                last -= 1
-            if last >= base:                                # skip walls & creature cells →
-                player.col = last                           # a lone creature leaves the cursor put
+            while last >= base and not (room.char_run_at(player.row, last)
+                                        or room.entity_at(player.row, last)):
+                last -= 1                                   # skip cells that got nothing (fell off the brink)
+            if last >= base:
+                player.col = last                           # land on the last pasted cell — rune OR creature
     return placed_any
