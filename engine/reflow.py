@@ -1,24 +1,24 @@
-"""Horizontal reflow for ledge rows (PILOT) — the sanctioned exception to the
-fixed overlay grid.
+"""Reflow — Vimny's editing model: every row flows like a real Vim line.
 
-On a ledge row (opt-in via ``room.ledge_rows``) editing flows like a real Vim
-line. Inserting opens a one-cell gap and pushes everything to its right along in
-a single cascade. What each thing does when shoved is decided by *what it is*,
-uniformly — no per-row options:
+Editing is universal reflow (not an opt-in, and not an overlay grid). Inserting
+and pasting slide content right; deleting pulls it left. Blanks are spaces, so
+the shift travels THROUGH them — a word separated from the cursor by whitespace
+is still pushed. What each thing does when shoved is decided by *what it is*:
 
-  • a glyph  — slides right.
-  • WATER    — slides right too (it's the one movable terrain); a wave of water
-               shoved over a goblin DROWNS it, the water rolling onto its cell.
-  • a stone wall / a void rune — FIXED. They never move; whatever is pushed into
-               them is lost over the brink (off the edge / into the hole).
-  • bare floor — absorbs the push (the cascade stops; nothing is lost).
+  • a glyph  — slides.
+  • WATER    — slides too (the one movable terrain); a wave shoved over ANY entity
+               sweeps it into the void (a goblin drowns, a key is lost), the water
+               rolling onto its cell.
+  • a stone wall / a void rune — FIXED brinks. They never move; whatever is pushed
+               into one is lost over the brink (off the wall / into the hole).
 
-Deleting (close_gap) pulls the tail left toward the anchored wall; nothing falls.
+The left wall anchors the line; the right brink is where content falls off.
+`r`/`R` overwrite in place (correct Vim) and don't come through here.
 
-Lost glyphs/water are recorded on ``room._last_void_falls`` and drowned goblins
-on ``room._last_drowns`` so the presentation layer can animate them; the engine
-never touches the terminal. Non-ledge rows never reach this module, so the whole
-shipped curriculum keeps the overlay grid untouched.
+Lost glyphs/water land in ``room._last_void_falls`` and swept entities in
+``room._last_drowns`` so the presentation layer can animate them; the engine
+never touches the terminal. ``is_ledge`` is universally True — ``room.ledge_rows``
+is kept only as a hook for future per-row behaviour (the ledge-extending motions).
 """
 from __future__ import annotations
 from engine.world import CharRun, CellType
