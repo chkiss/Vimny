@@ -149,6 +149,23 @@ def delete_layout(name: str) -> bool:
     return False
 
 
+def rename_layout(old_name: str, new_name: str) -> bool:
+    """Rename a saved layout (netrw R). Returns True on success."""
+    new_name = new_name.strip()
+    src = LAYOUTS_DIR / f'{_slug(old_name)}.json'
+    if not new_name or not src.exists():
+        return False
+    with open(src) as f:
+        data = json.load(f)
+    data['layout_name'] = new_name
+    dst = LAYOUTS_DIR / f'{_slug(new_name)}.json'
+    with open(dst, 'w') as f:
+        json.dump(data, f, indent=2)
+    if dst != src:
+        src.unlink()
+    return True
+
+
 # ── Scroll text I/O (unsmudged full text, discoverable later) ─────────────────
 
 def save_scroll_text(title: str, text: str) -> Path:
