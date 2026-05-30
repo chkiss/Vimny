@@ -22,7 +22,7 @@ Vimny is a terminal-first, dungeon crawler that teaches Vim through play. The du
 
 ## 2. Design Pillars
 
-1. **Vim fidelity above all else.** Commands behave exactly as they do in Vim. The game teaches the real tool.
+1. **Vim fidelity above all else.** Commands behave exactly as they do in Vim. The game teaches the real tool. Editing reflows like a real Vim line — insert/delete/paste shift content; the one bounded twist is that a dungeon row is wall-bounded, so content shoved past a wall or void rune falls into the void (water is movable and drowns whatever a wave reaches). See `engine/reflow.py`.
 2. **Efficiency is the skill.** The keystroke budget system makes Vim's core value proposition (fewer keystrokes = more power) mechanically central — not a side effect.
 3. **Everything is a buffer.** Dungeons are files. The overworld is a directory. `:e`, `:w`, `:q` are real game mechanics.
 4. **Learn, not suffer.** No permanent run loss. Undo returns budget. The game is a tutor, not a gauntlet.
