@@ -1,28 +1,34 @@
-"""Level 6 — The WORD Forge: dungeon correctness tests."""
+"""Level 7 — The Backward Vaults: dungeon correctness tests."""
 import math
-import heapq
 import pytest
-from generation.dungeon_gen import build_dungeon_7, _dijkstra_par_WBE, _L7_UNTYPABLE_PUNCT
+from engine.world import CellType
+from generation.dungeon_gen import (
+    build_dungeon_7,
+    _dijkstra_par_L8,
+    _L8_TOTAL_ROWS, _L8_TOTAL_COLS, _L8_CORR_ROWS,
+    _L8_TURN_SPANS,
+)
 
 SEEDS = [1, 42, 999, 12345, 2**20 + 7]
 
 
 @pytest.mark.parametrize("seed", SEEDS)
-def test_exit_is_reachable(seed):
+def test_entry_and_exit_passable(seed):
     d = build_dungeon_7(seed)
     room = d.rooms[0]
-    assert room.exit_pos is not None
-    par = _dijkstra_par_WBE(room)
-    assert par is not None, f"seed={seed}: exit unreachable"
+    r0, c0 = room.spawn_pos
+    r1, c1 = room.exit_pos
+    assert room.cells[r0][c0] == CellType.CORRIDOR, f"seed={seed}: entry is not passable"
+    assert room.cells[r1][c1] == CellType.CORRIDOR, f"seed={seed}: exit is not passable"
 
 
 @pytest.mark.parametrize("seed", SEEDS)
 def test_par_matches_dijkstra(seed):
     d = build_dungeon_7(seed)
     room = d.rooms[0]
-    expected = _dijkstra_par_WBE(room)
-    assert room.par == expected, (
-        f"seed={seed}: stored par {room.par} != Dijkstra {expected}"
+    computed = _dijkstra_par_L8(room)
+    assert room.par == computed, (
+        f"seed={seed}: room.par={room.par} but Dijkstra computed {computed}"
     )
 
 
@@ -31,56 +37,34 @@ def test_budget_is_ceil_par_times_1_4(seed):
     d = build_dungeon_7(seed)
     room = d.rooms[0]
     assert room.budget == math.ceil(room.par * 1.4), (
-        f"seed={seed}: budget={room.budget} but ceil(par*1.4)={math.ceil(room.par*1.4)}"
+        f"seed={seed}: budget={room.budget} but ceil(par*1.4)={math.ceil(room.par * 1.4)}"
     )
 
 
 @pytest.mark.parametrize("seed", SEEDS)
-def test_par_is_ten(seed):
-    """RT1 descent walls (3,54)/(3,55) force W on C1, C2-left void guards force B,
-    and game-faithful solver semantics guarantee par=10 (4W 3j 4B 3j 4E)."""
-    d = build_dungeon_7(seed)
-    room = d.rooms[0]
-    assert room.par == 10, f"seed={seed}: expected par=10, got {room.par}"
-
-
-@pytest.mark.parametrize("seed", SEEDS)
-def test_answer_uses_WBE(seed):
-    """Optimal answer must use W, B, and E (the WORD motions taught in level 7)."""
+def test_answer_uses_ge_or_gE_for_LT2(seed):
+    """The optimal path must use a backward-end motion to cross the LT2 gap (C4 anchor end=5)."""
     d = build_dungeon_7(seed)
     room = d.rooms[0]
     tokens = room.answer.split()
-    has_W = any(t.endswith('W') for t in tokens)
-    has_B = any(t.endswith('B') for t in tokens)
-    has_E = any(t.endswith('E') for t in tokens)
-    assert has_W, f"seed={seed}: W not in answer {room.answer!r}"
-    assert has_B, f"seed={seed}: B not in answer {room.answer!r}"
-    assert has_E, f"seed={seed}: E not in answer {room.answer!r}"
-
-
-@pytest.mark.parametrize("seed", SEEDS)
-def test_WBE_cheaper_than_count_hjkl(seed):
-    """W/B/E path (par=10) is cheaper than minimum count-hjkl path (13 keystrokes)."""
-    d = build_dungeon_7(seed)
-    room = d.rooms[0]
-    # Minimum count-hjkl: three horizontal segments (3 ks each) + two count-j (2 ks each) = 13
-    hjkl_min = 13
-    assert room.par < hjkl_min, (
-        f"seed={seed}: par={room.par} should be < hjkl_min={hjkl_min}"
+    assert 'ge' in tokens or 'gE' in tokens, (
+        f"seed={seed}: neither 'ge' nor 'gE' in answer {room.answer!r}"
     )
 
 
 @pytest.mark.parametrize("seed", SEEDS)
-def test_entry_and_exit_not_on_void(seed):
+def test_answer_uses_gE_for_LT3(seed):
+    """The optimal path must use gE (no count) to hop the baphomet/behemoth WORD to LT3 gap.
+
+    gE (2 ks) beats 2ge (3 ks) and 19h (3 ks) because the WORD spans two adjacent
+    clusters; gE jumps both in one shot while ge stops at each cluster boundary.
+    """
     d = build_dungeon_7(seed)
     room = d.rooms[0]
-    void_cells = {
-        (ru.row, ru.col + i)
-        for ru in room.char_runs if ru.kind == 'void'
-        for i in range(len(ru.symbols))
-    }
-    assert room.spawn_pos    not in void_cells, f"seed={seed}: entry is on a void cell"
-    assert room.exit_pos not in void_cells, f"seed={seed}: exit is on a void cell"
+    tokens = room.answer.split()
+    assert 'gE' in tokens and '8gE' not in tokens, (
+        f"seed={seed}: expected plain 'gE' for C6 crossing, got {room.answer!r}"
+    )
 
 
 @pytest.mark.parametrize("seed", SEEDS)
@@ -95,87 +79,138 @@ def test_exit_entity_at_exit_pos(seed):
     )
 
 
-def test_anchor_W_at_fixed_position():
-    """W anchor is always at row=1, col=53; char drawn from _L7_UNTYPABLE_PUNCT."""
+@pytest.mark.parametrize("seed", SEEDS)
+def test_corridors_carved(seed):
+    d = build_dungeon_7(seed)
+    room = d.rooms[0]
+    for r in _L8_CORR_ROWS:
+        for c in range(1, 39):
+            assert room.cells[r][c] == CellType.CORRIDOR, (
+                f"seed={seed}: corridor row {r} col {c} is not CORRIDOR"
+            )
+
+
+_L8_GUARD_WALLS = {(2, 38), (4, 1)}  # RT1 and LT1 narrow-turn walls
+
+
+@pytest.mark.parametrize("seed", SEEDS)
+def test_turn_spans_carved(seed):
+    d = build_dungeon_7(seed)
+    room = d.rooms[0]
+    for r0, r1, c0, c1 in _L8_TURN_SPANS:
+        for r in range(r0, r1 + 1):
+            for c in range(c0, c1 + 1):
+                if (r, c) in _L8_GUARD_WALLS:
+                    continue  # guard walls intentionally narrow these turns
+                assert room.cells[r][c] == CellType.CORRIDOR, (
+                    f"seed={seed}: turn span ({r0},{r1},{c0},{c1}) cell ({r},{c}) not CORRIDOR"
+                )
+
+
+def test_RT1_and_LT1_guard_walls():
+    """(2,38) and (4,1) must be WALL — they narrow RT1 and LT1 to force 4e and ^."""
     d = build_dungeon_7(42)
     room = d.rooms[0]
-    anchor = room.char_run_at(1, 53)
-    assert anchor is not None, "Expected W-anchor rune at (1, 53)"
-    assert ''.join(anchor.symbols) in _L7_UNTYPABLE_PUNCT, (
-        f"Expected untypable char at (1,53), got {''.join(anchor.symbols)!r}"
-    )
+    assert room.cells[2][38] == CellType.WALL, "(2,38) must be wall (RT1 guard)"
+    assert room.cells[4][1]  == CellType.WALL, "(4,1) must be wall (LT1 guard)"
+    # Adjacent cells in the turns must still be open
+    assert room.cells[2][37] == CellType.CORRIDOR, "(2,37) must remain open"
+    assert room.cells[2][36] == CellType.CORRIDOR, "(2,36) must remain open"
+    assert room.cells[4][2]  == CellType.CORRIDOR, "(4,2) must remain open"
+    assert room.cells[4][3]  == CellType.CORRIDOR, "(4,3) must remain open"
 
 
-def test_anchor_B_at_fixed_position():
-    """B anchor is always at row=4, col=3; char drawn from _L7_UNTYPABLE_PUNCT."""
+def test_LT2_gap_is_cols_5_6_only():
+    """LT2 turn (rows 7-9) is only passable at cols 5-6 — the ge lesson gap."""
     d = build_dungeon_7(42)
     room = d.rooms[0]
-    anchor = room.char_run_at(4, 3)
-    assert anchor is not None, "Expected B-anchor rune at (4, 3)"
-    assert ''.join(anchor.symbols) in _L7_UNTYPABLE_PUNCT, (
-        f"Expected untypable char at (4,3), got {''.join(anchor.symbols)!r}"
+    # cols 5-6 must be open in row 8
+    assert room.cells[8][5] == CellType.CORRIDOR, "LT2 gap col 5 must be open"
+    assert room.cells[8][6] == CellType.CORRIDOR, "LT2 gap col 6 must be open"
+    # col 2 (where b would land on C4 anchor) must be wall in row 8
+    assert room.cells[8][2] == CellType.WALL, (
+        "col 2 in row 8 must be wall (b-landing blocked, forcing ge)"
     )
+    # col 3 and 4 must also be wall in row 8
+    assert room.cells[8][3] == CellType.WALL, "col 3 in row 8 must be wall"
+    assert room.cells[8][4] == CellType.WALL, "col 4 in row 8 must be wall"
 
 
-@pytest.mark.parametrize("seed", SEEDS)
-def test_anchors_use_distinct_chars(seed):
-    """All 4 anchor chars (W4 pair + B1 pair) must be distinct across seeds."""
-    d = build_dungeon_7(seed)
-    room = d.rooms[0]
-    w4a = room.char_run_at(1, 53)
-    w4b = room.char_run_at(1, 54)
-    b1a = room.char_run_at(4, 3)
-    b1b = room.char_run_at(4, 4)
-    chars = [
-        ''.join(r.symbols) for r in (w4a, w4b, b1a, b1b) if r is not None
-    ]
-    assert len(chars) == len(set(chars)), (
-        f"seed={seed}: anchor chars not all distinct: {chars}"
-    )
-
-
-def test_exit_at_end_of_E4_group():
-    """exit_pos must be at col 51, row 7 (end of 'output=data[n]._key')."""
+def test_LT3_exit_at_col_19():
+    """LT3 turn (rows 11-12): only col 19 is passable in row 12 — the exit cell."""
     d = build_dungeon_7(42)
     room = d.rooms[0]
-    assert room.exit_pos == (7, 51), f"Expected exit at (7,51), got {room.exit_pos}"
+    # Only the exit cell is open in row 12
+    assert room.cells[12][19] == CellType.CORRIDOR, "exit cell (12,19) must be open"
+    assert room.cells[12][18] == CellType.WALL, "col 18 in row 12 must be wall"
+    assert room.cells[12][20] == CellType.WALL, "col 20 in row 12 must be wall"
+    assert room.cells[12][21] == CellType.WALL, "col 21 in row 12 must be wall"
+    # Col 20 in row 11 must be empty (gap between anchor and big WORD)
+    assert room.char_run_at(11, 20) is None, "col 20 in row 11 must be empty (gap before big WORD)"
 
 
-@pytest.mark.parametrize("seed", SEEDS)
-def test_void_guard_at_C2_left_end(seed):
-    """Void runes at (4,1) and (5,1) make 0/^ on either C2 row land on void
-    (death), blocking the line-start shortcut and forcing B."""
-    d = build_dungeon_7(seed)
+def test_C4_ge_anchor_at_correct_position():
+    """4-char C4 anchor at (7,2): cols 2-5; ge from col 9+ lands at end=5 (in LT2 gap)."""
+    d = build_dungeon_7(42)
     room = d.rooms[0]
-    for r, c in ((4, 1), (5, 1)):
-        void_rune = room.char_run_at(r, c)
-        assert void_rune is not None, f"seed={seed}: no rune at ({r}, {c})"
-        assert void_rune.kind == 'void', (
-            f"seed={seed}: rune at ({r},{c}) is kind={void_rune.kind!r}, expected 'void'"
-        )
+    anchor = room.char_run_at(7, 2)
+    assert anchor is not None, "Expected 4-char C4 anchor at (7,2)"
+    assert len(anchor.symbols) == 4, (
+        f"C4 anchor should be 4 chars wide, got {len(anchor.symbols)}"
+    )
+    end_col = anchor.col + len(anchor.symbols) - 1
+    assert end_col == 5, f"C4 anchor end should be col 5, got {end_col}"
 
 
-@pytest.mark.parametrize("seed", SEEDS)
-def test_descent_walls_force_W_on_C1(seed):
-    """RT1 descent walls at (3,54)/(3,55) leave col 53 as the only C1→C2 turn.
-    W lands at col 53 (start of the W4 WORD); E lands at col 54 (into a wall)."""
-    from engine.world import CellType
-    d = build_dungeon_7(seed)
+def test_C6_baphomet_behemoth_word():
+    """C6 row 11: the baphomet/behemoth WORD is three adjacent clusters spanning cols 21-38.
+
+    Cluster A 'b4¶♯∘m3†'  at cols 21-28 (8 chars).
+    Cluster S '!='          at cols 29-30 (2 chars, separator).
+    Cluster B 'b3♯3m∘†♯'  at cols 31-38 (8 chars).
+    All adjacent → one WORD: gE hops all in 1 shot; ge needs 3 hops.
+    """
+    d = build_dungeon_7(42)
     room = d.rooms[0]
-    assert room.cells[3][54] == CellType.WALL, f"seed={seed}: (3,54) should be wall"
-    assert room.cells[3][55] == CellType.WALL, f"seed={seed}: (3,55) should be wall"
-    assert room.cells[3][53] == CellType.CORRIDOR, (
-        f"seed={seed}: (3,53) must stay open — it is W's descent column"
+
+    # ── Cluster A: cols 21-28 ─────────────────────────────────────────────────
+    ca = room.char_run_at(11, 21)
+    assert ca is not None, "Cluster A must start at (11,21)"
+    assert ca.col == 21, f"Cluster A col={ca.col}, expected 21"
+    assert len(ca.symbols) == 8, f"Cluster A must be 8 chars, got {len(ca.symbols)}"
+    assert ca.col + len(ca.symbols) - 1 == 28, "Cluster A must end at col 28"
+
+    # ── Separator cluster: cols 29-30 ────────────────────────────────────────
+    cs = room.char_run_at(11, 29)
+    assert cs is not None, "Separator cluster must start at (11,29)"
+    assert len(cs.symbols) == 2, f"Separator must be 2 chars, got {len(cs.symbols)}"
+    assert cs.col + len(cs.symbols) - 1 == 30, "Separator must end at col 30"
+
+    # ── Cluster B: cols 31-38 ─────────────────────────────────────────────────
+    cb = room.char_run_at(11, 31)
+    assert cb is not None, "Cluster B must start at (11,31)"
+    assert cb.col == 31, f"Cluster B col={cb.col}, expected 31"
+    assert len(cb.symbols) == 8, f"Cluster B must be 8 chars, got {len(cb.symbols)}"
+    assert cb.col + len(cb.symbols) - 1 == 38, "Cluster B must end at col 38"
+
+    # ── All adjacent, all same color ─────────────────────────────────────────
+    assert ca.col + len(ca.symbols) == cs.col, "A and S must be adjacent"
+    assert cs.col + len(cs.symbols) == cb.col, "S and B must be adjacent"
+    assert ca.kind == cs.kind == cb.kind, "All clusters must share color"
+
+    # ── Col 20 is empty (gap between anchor and the big WORD) ────────────────
+    assert room.char_run_at(11, 20) is None, "Col 20 must be empty (gap before big WORD)"
+
+    # ── Anchor rune ends at col 19 (gE landing) ──────────────────────────────
+    anchor = room.char_run_at(11, 18)
+    assert anchor is not None, "Anchor cluster must start at (11,18)"
+    assert anchor.col + len(anchor.symbols) - 1 == 19, (
+        f"Anchor must end at col 19, got {anchor.col + len(anchor.symbols) - 1}"
+    )
+    assert room.char_run_at(11, 17) is None or room.char_run_at(11, 17) is anchor, (
+        "Col 17 must not have a separate cluster before the anchor"
     )
 
-
-@pytest.mark.parametrize("seed", SEEDS)
-def test_C1_right_end_has_no_void(seed):
-    """The old C1 right-end void guards are gone — the descent walls replace them."""
-    d = build_dungeon_7(seed)
-    room = d.rooms[0]
-    for r, c in ((1, 55), (2, 55)):
-        ru = room.char_run_at(r, c)
-        assert ru is None or ru.kind != 'void', (
-            f"seed={seed}: ({r},{c}) should no longer hold a void rune, got {ru}"
-        )
+    # ── Filler exists in cols 2-16 ───────────────────────────────────────────
+    filler_cols = [c for c in range(2, 17) if room.char_run_at(11, c) is not None]
+    assert len(filler_cols) > 0, "Expected some filler runes in cols 2-16"

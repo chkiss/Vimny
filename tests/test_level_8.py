@@ -1,216 +1,143 @@
-"""Level 7 — The Backward Vaults: dungeon correctness tests."""
+"""Level 8 (id=8) — The Lineheads: dungeon correctness tests.
+
+Teaching goal: G (last line), gg (first line), {n}G (nth line).
+
+A fixed 16×11 vertical shaft (restored from an admin design layout): the exit is
+on the top row behind two locked doors; the two keys are buried near the top and
+bottom of a 2-wide left shaft, so the solve rides G/gg/{n}G up and down to fetch
+a key, open a door, and repeat.  The layout is seed-independent.
+"""
 import math
 import pytest
 from engine.world import CellType
 from generation.dungeon_gen import (
     build_dungeon_8,
-    _dijkstra_par_L8,
-    _L8_TOTAL_ROWS, _L8_TOTAL_COLS, _L8_CORR_ROWS,
-    _L8_TURN_SPANS,
+    _dijkstra_par_LGG,
+    _LGG_ROWS, _LGG_COLS,
+    _LGG_ENTRY, _LGG_EXIT,
+    _LGG_KEYS, _LGG_DOORS, _LGG_PASSABLE,
 )
 
 SEEDS = [1, 42, 999, 12345, 2**20 + 7]
 
+_PASSABLE_CELLS = {(r, c) for r, cols in _LGG_PASSABLE.items() for c in cols}
+
+
+# ── Structural tests ──────────────────────────────────────────────────────────
+
+@pytest.mark.parametrize("seed", SEEDS)
+def test_dimensions(seed):
+    room = build_dungeon_8(seed).rooms[0]
+    assert room.rows == _LGG_ROWS
+    assert room.cols == _LGG_COLS
+
 
 @pytest.mark.parametrize("seed", SEEDS)
 def test_entry_and_exit_passable(seed):
-    d = build_dungeon_8(seed)
-    room = d.rooms[0]
-    r0, c0 = room.spawn_pos
-    r1, c1 = room.exit_pos
-    assert room.cells[r0][c0] == CellType.CORRIDOR, f"seed={seed}: entry is not passable"
-    assert room.cells[r1][c1] == CellType.CORRIDOR, f"seed={seed}: exit is not passable"
+    room = build_dungeon_8(seed).rooms[0]
+    assert room.spawn_pos == _LGG_ENTRY
+    assert room.exit_pos == _LGG_EXIT
+    for (r, c) in (room.spawn_pos, room.exit_pos):
+        assert room.cells[r][c] == CellType.CORRIDOR, f"seed={seed}: ({r},{c}) not CORRIDOR"
 
 
 @pytest.mark.parametrize("seed", SEEDS)
+def test_passable_layout(seed):
+    """Exactly the _LGG_PASSABLE cells are CORRIDOR; every other cell is WALL."""
+    room = build_dungeon_8(seed).rooms[0]
+    for r in range(room.rows):
+        for c in range(room.cols):
+            expect = CellType.CORRIDOR if (r, c) in _PASSABLE_CELLS else CellType.WALL
+            assert room.cells[r][c] == expect, (
+                f"seed={seed}: ({r},{c}) is {room.cells[r][c]}, expected {expect}"
+            )
+
+
+@pytest.mark.parametrize("seed", SEEDS)
+def test_keys_present(seed):
+    room = build_dungeon_8(seed).rooms[0]
+    keys = sorted((e.row, e.col) for e in room.entities if e.kind == 'floor_key')
+    assert keys == sorted(_LGG_KEYS), f"seed={seed}: floor_keys {keys} != {sorted(_LGG_KEYS)}"
+
+
+@pytest.mark.parametrize("seed", SEEDS)
+def test_doors_present(seed):
+    room = build_dungeon_8(seed).rooms[0]
+    doors = sorted((e.row, e.col) for e in room.entities if e.kind == 'locked_door')
+    assert doors == sorted(_LGG_DOORS), f"seed={seed}: doors {doors} != {sorted(_LGG_DOORS)}"
+
+
+@pytest.mark.parametrize("seed", SEEDS)
+def test_single_exit_at_exit_pos(seed):
+    room = build_dungeon_8(seed).rooms[0]
+    exits = [e for e in room.entities if e.kind == 'exit']
+    assert len(exits) == 1
+    assert (exits[0].row, exits[0].col) == _LGG_EXIT == room.exit_pos
+
+
+# ── Colored keys / doors (fixed door sequence, shuffled key colors) ───────────
+
+@pytest.mark.parametrize("seed", SEEDS)
+def test_doors_are_a_fixed_gold_red_sequence(seed):
+    """Doors are always gold (left, (1,3)) then red (right, (1,6))."""
+    room = build_dungeon_8(seed).rooms[0]
+    doors = {(e.row, e.col): e.tag for e in room.entities if e.kind == 'locked_door'}
+    assert doors == {(1, 3): 'gold', (1, 6): 'red'}, f"seed={seed}: {doors}"
+
+
+@pytest.mark.parametrize("seed", SEEDS)
+def test_keys_are_gold_and_red_one_each(seed):
+    """The two keys are gold + red — one each (position↔color shuffled per seed)."""
+    room = build_dungeon_8(seed).rooms[0]
+    assert sorted(e.tag for e in room.entities if e.kind == 'floor_key') == ['gold', 'red']
+
+
+def test_key_colors_vary_with_seed():
+    """The top key is gold on some seeds and red on others (the shuffle is live)."""
+    top = {next(e.tag for e in build_dungeon_8(s).rooms[0].entities
+                if e.kind == 'floor_key' and (e.row, e.col) == (4, 1))
+           for s in range(1, 40)}
+    assert top == {'gold', 'red'}, f"top-key color did not vary: {top}"
+
+
+# ── Par / budget ────────────────────────────────────────────────────────────
+
+@pytest.mark.parametrize("seed", SEEDS)
 def test_par_matches_dijkstra(seed):
-    d = build_dungeon_8(seed)
-    room = d.rooms[0]
-    computed = _dijkstra_par_L8(room)
-    assert room.par == computed, (
-        f"seed={seed}: room.par={room.par} but Dijkstra computed {computed}"
-    )
+    room = build_dungeon_8(seed).rooms[0]
+    assert room.par == _dijkstra_par_LGG(room)
 
 
 @pytest.mark.parametrize("seed", SEEDS)
 def test_budget_is_ceil_par_times_1_4(seed):
-    d = build_dungeon_8(seed)
-    room = d.rooms[0]
-    assert room.budget == math.ceil(room.par * 1.4), (
-        f"seed={seed}: budget={room.budget} but ceil(par*1.4)={math.ceil(room.par * 1.4)}"
-    )
+    room = build_dungeon_8(seed).rooms[0]
+    assert room.budget == math.ceil(room.par * 1.4)
+
+
+def test_par_is_deterministic():
+    """Key colors shuffle per seed, but both assignments are balanced — par stays
+    15 for every seed (regression guard)."""
+    pars = {build_dungeon_8(s).rooms[0].par for s in SEEDS}
+    assert pars == {15}, f"expected par 15 for all seeds, got {pars}"
+
+
+# ── Command necessity ─────────────────────────────────────────────────────────
+
+@pytest.mark.parametrize("seed", SEEDS)
+def test_answer_uses_G(seed):
+    """G (1 ks) is the strictly-cheapest way to the bottom of the shaft, so every
+    optimal path uses it."""
+    room = build_dungeon_8(seed).rooms[0]
+    assert 'G' in room.answer.split(), f"seed={seed}: 'G' not in answer {room.answer!r}"
 
 
 @pytest.mark.parametrize("seed", SEEDS)
-def test_answer_uses_ge_or_gE_for_LT2(seed):
-    """The optimal path must use a backward-end motion to cross the LT2 gap (C4 anchor end=5)."""
-    d = build_dungeon_8(seed)
-    room = d.rooms[0]
-    tokens = room.answer.split()
-    assert 'ge' in tokens or 'gE' in tokens, (
-        f"seed={seed}: neither 'ge' nor 'gE' in answer {room.answer!r}"
+def test_line_jumps_reduce_keystrokes(seed):
+    """G/gg/{n}G are the OPTIMAL tool here: solving with count-hjkl only (no line
+    jumps) costs strictly more than par.  NB the no-jump route still fits the
+    ×1.4 budget, so the forcing is soft (the shaft is short) — see build_dungeon_8."""
+    room = build_dungeon_8(seed).rooms[0]
+    cost_no_jumps = _dijkstra_par_LGG(room, disable_line_jumps=True)
+    assert cost_no_jumps is not None and cost_no_jumps > room.par, (
+        f"seed={seed}: no-line-jump cost {cost_no_jumps} not greater than par {room.par}"
     )
-
-
-@pytest.mark.parametrize("seed", SEEDS)
-def test_answer_uses_gE_for_LT3(seed):
-    """The optimal path must use gE (no count) to hop the baphomet/behemoth WORD to LT3 gap.
-
-    gE (2 ks) beats 2ge (3 ks) and 19h (3 ks) because the WORD spans two adjacent
-    clusters; gE jumps both in one shot while ge stops at each cluster boundary.
-    """
-    d = build_dungeon_8(seed)
-    room = d.rooms[0]
-    tokens = room.answer.split()
-    assert 'gE' in tokens and '8gE' not in tokens, (
-        f"seed={seed}: expected plain 'gE' for C6 crossing, got {room.answer!r}"
-    )
-
-
-@pytest.mark.parametrize("seed", SEEDS)
-def test_exit_entity_at_exit_pos(seed):
-    d = build_dungeon_8(seed)
-    room = d.rooms[0]
-    exit_ents = [e for e in room.entities if e.kind == 'exit']
-    assert len(exit_ents) == 1, f"seed={seed}: expected 1 exit entity, got {len(exit_ents)}"
-    e = exit_ents[0]
-    assert (e.row, e.col) == room.exit_pos, (
-        f"seed={seed}: exit entity at ({e.row},{e.col}) != exit_pos {room.exit_pos}"
-    )
-
-
-@pytest.mark.parametrize("seed", SEEDS)
-def test_corridors_carved(seed):
-    d = build_dungeon_8(seed)
-    room = d.rooms[0]
-    for r in _L8_CORR_ROWS:
-        for c in range(1, 39):
-            assert room.cells[r][c] == CellType.CORRIDOR, (
-                f"seed={seed}: corridor row {r} col {c} is not CORRIDOR"
-            )
-
-
-_L8_GUARD_WALLS = {(2, 38), (4, 1)}  # RT1 and LT1 narrow-turn walls
-
-
-@pytest.mark.parametrize("seed", SEEDS)
-def test_turn_spans_carved(seed):
-    d = build_dungeon_8(seed)
-    room = d.rooms[0]
-    for r0, r1, c0, c1 in _L8_TURN_SPANS:
-        for r in range(r0, r1 + 1):
-            for c in range(c0, c1 + 1):
-                if (r, c) in _L8_GUARD_WALLS:
-                    continue  # guard walls intentionally narrow these turns
-                assert room.cells[r][c] == CellType.CORRIDOR, (
-                    f"seed={seed}: turn span ({r0},{r1},{c0},{c1}) cell ({r},{c}) not CORRIDOR"
-                )
-
-
-def test_RT1_and_LT1_guard_walls():
-    """(2,38) and (4,1) must be WALL — they narrow RT1 and LT1 to force 4e and ^."""
-    d = build_dungeon_8(42)
-    room = d.rooms[0]
-    assert room.cells[2][38] == CellType.WALL, "(2,38) must be wall (RT1 guard)"
-    assert room.cells[4][1]  == CellType.WALL, "(4,1) must be wall (LT1 guard)"
-    # Adjacent cells in the turns must still be open
-    assert room.cells[2][37] == CellType.CORRIDOR, "(2,37) must remain open"
-    assert room.cells[2][36] == CellType.CORRIDOR, "(2,36) must remain open"
-    assert room.cells[4][2]  == CellType.CORRIDOR, "(4,2) must remain open"
-    assert room.cells[4][3]  == CellType.CORRIDOR, "(4,3) must remain open"
-
-
-def test_LT2_gap_is_cols_5_6_only():
-    """LT2 turn (rows 7-9) is only passable at cols 5-6 — the ge lesson gap."""
-    d = build_dungeon_8(42)
-    room = d.rooms[0]
-    # cols 5-6 must be open in row 8
-    assert room.cells[8][5] == CellType.CORRIDOR, "LT2 gap col 5 must be open"
-    assert room.cells[8][6] == CellType.CORRIDOR, "LT2 gap col 6 must be open"
-    # col 2 (where b would land on C4 anchor) must be wall in row 8
-    assert room.cells[8][2] == CellType.WALL, (
-        "col 2 in row 8 must be wall (b-landing blocked, forcing ge)"
-    )
-    # col 3 and 4 must also be wall in row 8
-    assert room.cells[8][3] == CellType.WALL, "col 3 in row 8 must be wall"
-    assert room.cells[8][4] == CellType.WALL, "col 4 in row 8 must be wall"
-
-
-def test_LT3_exit_at_col_19():
-    """LT3 turn (rows 11-12): only col 19 is passable in row 12 — the exit cell."""
-    d = build_dungeon_8(42)
-    room = d.rooms[0]
-    # Only the exit cell is open in row 12
-    assert room.cells[12][19] == CellType.CORRIDOR, "exit cell (12,19) must be open"
-    assert room.cells[12][18] == CellType.WALL, "col 18 in row 12 must be wall"
-    assert room.cells[12][20] == CellType.WALL, "col 20 in row 12 must be wall"
-    assert room.cells[12][21] == CellType.WALL, "col 21 in row 12 must be wall"
-    # Col 20 in row 11 must be empty (gap between anchor and big WORD)
-    assert room.char_run_at(11, 20) is None, "col 20 in row 11 must be empty (gap before big WORD)"
-
-
-def test_C4_ge_anchor_at_correct_position():
-    """4-char C4 anchor at (7,2): cols 2-5; ge from col 9+ lands at end=5 (in LT2 gap)."""
-    d = build_dungeon_8(42)
-    room = d.rooms[0]
-    anchor = room.char_run_at(7, 2)
-    assert anchor is not None, "Expected 4-char C4 anchor at (7,2)"
-    assert len(anchor.symbols) == 4, (
-        f"C4 anchor should be 4 chars wide, got {len(anchor.symbols)}"
-    )
-    end_col = anchor.col + len(anchor.symbols) - 1
-    assert end_col == 5, f"C4 anchor end should be col 5, got {end_col}"
-
-
-def test_C6_baphomet_behemoth_word():
-    """C6 row 11: the baphomet/behemoth WORD is three adjacent clusters spanning cols 21-38.
-
-    Cluster A 'b4¶♯∘m3†'  at cols 21-28 (8 chars).
-    Cluster S '!='          at cols 29-30 (2 chars, separator).
-    Cluster B 'b3♯3m∘†♯'  at cols 31-38 (8 chars).
-    All adjacent → one WORD: gE hops all in 1 shot; ge needs 3 hops.
-    """
-    d = build_dungeon_8(42)
-    room = d.rooms[0]
-
-    # ── Cluster A: cols 21-28 ─────────────────────────────────────────────────
-    ca = room.char_run_at(11, 21)
-    assert ca is not None, "Cluster A must start at (11,21)"
-    assert ca.col == 21, f"Cluster A col={ca.col}, expected 21"
-    assert len(ca.symbols) == 8, f"Cluster A must be 8 chars, got {len(ca.symbols)}"
-    assert ca.col + len(ca.symbols) - 1 == 28, "Cluster A must end at col 28"
-
-    # ── Separator cluster: cols 29-30 ────────────────────────────────────────
-    cs = room.char_run_at(11, 29)
-    assert cs is not None, "Separator cluster must start at (11,29)"
-    assert len(cs.symbols) == 2, f"Separator must be 2 chars, got {len(cs.symbols)}"
-    assert cs.col + len(cs.symbols) - 1 == 30, "Separator must end at col 30"
-
-    # ── Cluster B: cols 31-38 ─────────────────────────────────────────────────
-    cb = room.char_run_at(11, 31)
-    assert cb is not None, "Cluster B must start at (11,31)"
-    assert cb.col == 31, f"Cluster B col={cb.col}, expected 31"
-    assert len(cb.symbols) == 8, f"Cluster B must be 8 chars, got {len(cb.symbols)}"
-    assert cb.col + len(cb.symbols) - 1 == 38, "Cluster B must end at col 38"
-
-    # ── All adjacent, all same color ─────────────────────────────────────────
-    assert ca.col + len(ca.symbols) == cs.col, "A and S must be adjacent"
-    assert cs.col + len(cs.symbols) == cb.col, "S and B must be adjacent"
-    assert ca.kind == cs.kind == cb.kind, "All clusters must share color"
-
-    # ── Col 20 is empty (gap between anchor and the big WORD) ────────────────
-    assert room.char_run_at(11, 20) is None, "Col 20 must be empty (gap before big WORD)"
-
-    # ── Anchor rune ends at col 19 (gE landing) ──────────────────────────────
-    anchor = room.char_run_at(11, 18)
-    assert anchor is not None, "Anchor cluster must start at (11,18)"
-    assert anchor.col + len(anchor.symbols) - 1 == 19, (
-        f"Anchor must end at col 19, got {anchor.col + len(anchor.symbols) - 1}"
-    )
-    assert room.char_run_at(11, 17) is None or room.char_run_at(11, 17) is anchor, (
-        "Col 17 must not have a separate cluster before the anchor"
-    )
-
-    # ── Filler exists in cols 2-16 ───────────────────────────────────────────
-    filler_cols = [c for c in range(2, 17) if room.char_run_at(11, c) is not None]
-    assert len(filler_cols) > 0, "Expected some filler runes in cols 2-16"

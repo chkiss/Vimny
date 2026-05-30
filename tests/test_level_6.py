@@ -1,213 +1,181 @@
-"""Level 14 — The Sight Sanctum: dungeon correctness and visual-mode undo tests."""
+"""Level 6 — The WORD Forge: dungeon correctness tests."""
 import math
+import heapq
 import pytest
-from generation.dungeon_gen import build_dungeon_6
-from engine.world import Room, RoomType, CellType, CharRun, Entity
-from engine.player import Player
-from engine.budget import Budget
-from engine.modes import Mode
-from engine.motion import apply_motion
-from engine.visual import apply_visual
-from main import _pop_history_step, _snapshot
+from generation.dungeon_gen import build_dungeon_6, _dijkstra_par_WBE, _L7_UNTYPABLE_PUNCT
+
+SEEDS = [1, 42, 999, 12345, 2**20 + 7]
 
 
-# ── helpers ──────────────────────────────────────────────────────────────────
-
-def _dungeon():
-    return build_dungeon_6(0)
-
-
-def _budget(total=15, spent=0):
-    b = Budget(total)
-    b.spent = spent
-    return b
+@pytest.mark.parametrize("seed", SEEDS)
+def test_exit_is_reachable(seed):
+    d = build_dungeon_6(seed)
+    room = d.rooms[0]
+    assert room.exit_pos is not None
+    par = _dijkstra_par_WBE(room)
+    assert par is not None, f"seed={seed}: exit unreachable"
 
 
-# ── dungeon structure ─────────────────────────────────────────────────────────
-
-def test_layout_dimensions():
-    room = _dungeon().rooms[0]
-    assert room.rows == 5
-    assert room.cols == 21
-
-
-def test_entry_position():
-    room = _dungeon().rooms[0]
-    assert room.spawn_pos == (1, 1)
-
-
-def test_exit_entity_position():
-    room = _dungeon().rooms[0]
-    exit_ent = next((e for e in room.entities if e.kind == 'exit'), None)
-    assert exit_ent is not None
-    assert (exit_ent.row, exit_ent.col) == (3, 1)
-
-
-def test_dynamite_position():
-    room = _dungeon().rooms[0]
-    dyn = next((e for e in room.entities if e.kind == 'dynamite'), None)
-    assert dyn is not None
-    assert (dyn.row, dyn.col) == (3, 2)
-
-
-def test_top_corridor_void_runes_bounded():
-    # Voids only appear in row 1 cols 2-19; entry cell (1,1) always clear.
-    room = _dungeon().rooms[0]
-    assert room.char_run_at(1, 1) is None, "entry cell must not have a void rune"
-    for col in range(2, 20):
-        ru = room.char_run_at(1, col)
-        if ru is not None:
-            assert ru.kind == 'void', f"(1,{col}) non-void rune unexpected"
-
-
-def test_top_corridor_voids_spawn_at_roughly_60_pct():
-    # Over many seeds, void coverage in row 1 should be ~60%.
-    counts = []
-    for seed in range(50):
-        room = build_dungeon_6(seed).rooms[0]
-        counts.append(sum(1 for c in range(2, 20) if room.char_run_at(1, c) is not None))
-    avg = sum(counts) / len(counts)
-    assert 7 <= avg <= 13, f"expected ~10.8 voids on average, got {avg:.1f}"
-
-
-def test_bottom_corridor_void_runes_bounded():
-    # Voids only appear in row 3 cols 3-18; exit (3,1), dynamite (3,2), and (3,19) always clear.
-    room = _dungeon().rooms[0]
-    assert room.char_run_at(3, 1) is None, "exit cell must not have a void rune"
-    assert room.char_run_at(3, 2) is None, "dynamite cell must not have a void rune"
-    assert room.char_run_at(3, 19) is None, "col 19 of row 3 must always be clear"
-    for col in range(3, 19):
-        ru = room.char_run_at(3, col)
-        if ru is not None:
-            assert ru.kind == 'void', f"(3,{col}) non-void rune unexpected"
-
-
-def test_gap_is_passable():
-    room = _dungeon().rooms[0]
-    assert room.cells[2][18] != CellType.WALL
-    assert room.cells[2][19] != CellType.WALL
-
-
-def test_row2_otherwise_wall():
-    room = _dungeon().rooms[0]
-    for col in range(0, 18):
-        assert room.cells[2][col] == CellType.WALL, f"(2,{col}) should be wall"
-
-
-def test_budget_and_par():
-    room = _dungeon().rooms[0]
-    assert room.par == 11
-    assert room.budget == math.ceil(11 * 1.4)
-
-
-# ── visual-mode undo: the anchor bug ─────────────────────────────────────────
-#
-# Sequence: v $ d   (enter visual at (1,1), extend to (1,19), delete)
-# Bug: the undo snapshot captured the cursor position (1,19) and current budget
-#      spend (2), so `u` returned the player to col 19 with 2 keystrokes already
-#      charged — not to the anchor (1,1) with a clean slate.
-# Fix: snapshot uses (row, col) = anchor and spent = value before v was pressed.
-#
-# These tests build a minimal room with a known void at (1,10) so they are
-# independent of the randomised seed used by _dungeon().
-
-def _room_with_void():
-    """5×21 room matching Level 14 layout, with a single known void at (1,10)."""
-    room = Room(rows=5, cols=21, room_type=RoomType.ENTRY)
-    cells = [[CellType.WALL] * 21 for _ in range(5)]
-    for c in range(1, 20):
-        cells[1][c] = CellType.CORRIDOR
-    cells[2][18] = CellType.CORRIDOR
-    cells[2][19] = CellType.CORRIDOR
-    for c in range(1, 20):
-        cells[3][c] = CellType.CORRIDOR
-    room.cells = cells
-    room.char_runs.append(CharRun(row=1, col=10, symbols=('○',), kind='void'))
-    room.entities.append(Entity(kind='exit',     row=3, col=1))
-    room.entities.append(Entity(kind='dynamite', row=3, col=2))
-    room.spawn_pos = (1, 1)
-    room.rebuild_indexes()
-    return room
-
-
-def test_visual_delete_undo_restores_to_anchor_not_cursor_end():
-    """u after v$d must land the player at (1,1) (anchor), not (1,19) (cursor-end)."""
-    room = _room_with_void()
-    player = Player(row=1, col=1)
-    budget = _budget(spent=0)
-    undo_stack, redo_stack = [], []
-
-    pre_v_spent = budget.spent          # 0
-    player.mode = Mode.VISUAL
-    player.visual_anchor = (1, 1)
-    player.visual_start_spent = pre_v_spent
-    budget.spend(1)
-
-    apply_motion(player, '$', 1, room)
-    budget.spend(1)
-    assert player.col == 19
-
-    anchor = player.visual_anchor       # (1, 1)
-    cursor = (player.row, player.col)   # (1, 19)
-
-    undo_stack.append(_snapshot(room, player, budget,
-                                row=anchor[0], col=anchor[1],
-                                spent=player.visual_start_spent))
-    apply_visual('d', anchor, cursor, Mode.VISUAL, room, player)
-    budget.spend(1)
-    player.mode = Mode.NORMAL
-    player.visual_anchor = None
-
-    assert player.col == 1, "apply_visual repositions cursor to selection start"
-    assert room.char_run_at(1, 10) is None, "void rune must be cleared after delete"
-
-    _pop_history_step(undo_stack, redo_stack, room, player, budget)
-
-    assert player.row == 1
-    assert player.col == 1, (
-        f"undo must return to anchor (1,1), not cursor-end; got col={player.col}"
+@pytest.mark.parametrize("seed", SEEDS)
+def test_par_matches_dijkstra(seed):
+    d = build_dungeon_6(seed)
+    room = d.rooms[0]
+    expected = _dijkstra_par_WBE(room)
+    assert room.par == expected, (
+        f"seed={seed}: stored par {room.par} != Dijkstra {expected}"
     )
-    assert budget.spent == 0, (
-        f"undo must restore pre-v budget (0), got {budget.spent}"
+
+
+@pytest.mark.parametrize("seed", SEEDS)
+def test_budget_is_ceil_par_times_1_4(seed):
+    d = build_dungeon_6(seed)
+    room = d.rooms[0]
+    assert room.budget == math.ceil(room.par * 1.4), (
+        f"seed={seed}: budget={room.budget} but ceil(par*1.4)={math.ceil(room.par*1.4)}"
     )
-    assert room.char_run_at(1, 10) is not None, "void rune must be restored by undo"
 
 
-def test_visual_delete_undo_restores_dynamite():
-    """u after vF!x in bottom corridor must restore the dynamite entity."""
-    room = _room_with_void()
-    player = Player(row=3, col=19)
-    budget = _budget(spent=6)
-    undo_stack, redo_stack = [], []
+@pytest.mark.parametrize("seed", SEEDS)
+def test_par_is_ten(seed):
+    """RT1 descent walls (3,54)/(3,55) force W on C1, C2-left void guards force B,
+    and game-faithful solver semantics guarantee par=10 (4W 3j 4B 3j 4E)."""
+    d = build_dungeon_6(seed)
+    room = d.rooms[0]
+    assert room.par == 10, f"seed={seed}: expected par=10, got {room.par}"
 
-    pre_v_spent = budget.spent
-    player.mode = Mode.VISUAL
-    player.visual_anchor = (3, 19)
-    player.visual_start_spent = pre_v_spent
-    budget.spend(1)
 
-    # F! — move cursor left to dynamite at (3,2)
-    from engine.motion import _apply_find
-    _apply_find(player, 'F', '!', room)
-    budget.spend(1)
-    assert player.col == 2, f"F! must land on dynamite at col 2, got {player.col}"
+@pytest.mark.parametrize("seed", SEEDS)
+def test_answer_uses_WBE(seed):
+    """Optimal answer must use W, B, and E (the WORD motions taught in level 7)."""
+    d = build_dungeon_6(seed)
+    room = d.rooms[0]
+    tokens = room.answer.split()
+    has_W = any(t.endswith('W') for t in tokens)
+    has_B = any(t.endswith('B') for t in tokens)
+    has_E = any(t.endswith('E') for t in tokens)
+    assert has_W, f"seed={seed}: W not in answer {room.answer!r}"
+    assert has_B, f"seed={seed}: B not in answer {room.answer!r}"
+    assert has_E, f"seed={seed}: E not in answer {room.answer!r}"
 
-    anchor = player.visual_anchor
-    cursor = (player.row, player.col)
 
-    undo_stack.append(_snapshot(room, player, budget,
-                                row=anchor[0], col=anchor[1],
-                                spent=player.visual_start_spent))
-    apply_visual('d', anchor, cursor, Mode.VISUAL, room, player)
-    budget.spend(1)
-    player.mode = Mode.NORMAL
-    player.visual_anchor = None
+@pytest.mark.parametrize("seed", SEEDS)
+def test_WBE_cheaper_than_count_hjkl(seed):
+    """W/B/E path (par=10) is cheaper than minimum count-hjkl path (13 keystrokes)."""
+    d = build_dungeon_6(seed)
+    room = d.rooms[0]
+    # Minimum count-hjkl: three horizontal segments (3 ks each) + two count-j (2 ks each) = 13
+    hjkl_min = 13
+    assert room.par < hjkl_min, (
+        f"seed={seed}: par={room.par} should be < hjkl_min={hjkl_min}"
+    )
 
-    assert room.entity_at(3, 2) is None or not room.entity_at(3, 2).alive
 
-    _pop_history_step(undo_stack, redo_stack, room, player, budget)
+@pytest.mark.parametrize("seed", SEEDS)
+def test_entry_and_exit_not_on_void(seed):
+    d = build_dungeon_6(seed)
+    room = d.rooms[0]
+    void_cells = {
+        (ru.row, ru.col + i)
+        for ru in room.char_runs if ru.kind == 'void'
+        for i in range(len(ru.symbols))
+    }
+    assert room.spawn_pos    not in void_cells, f"seed={seed}: entry is on a void cell"
+    assert room.exit_pos not in void_cells, f"seed={seed}: exit is on a void cell"
 
-    dyn = room.entity_at(3, 2)
-    assert dyn is not None and dyn.alive, "undo must restore the dynamite entity"
-    assert player.col == 19, "undo must return to anchor col 19"
-    assert budget.spent == pre_v_spent, "undo must restore pre-v budget"
+
+@pytest.mark.parametrize("seed", SEEDS)
+def test_exit_entity_at_exit_pos(seed):
+    d = build_dungeon_6(seed)
+    room = d.rooms[0]
+    exit_ents = [e for e in room.entities if e.kind == 'exit']
+    assert len(exit_ents) == 1, f"seed={seed}: expected 1 exit entity, got {len(exit_ents)}"
+    e = exit_ents[0]
+    assert (e.row, e.col) == room.exit_pos, (
+        f"seed={seed}: exit entity at ({e.row},{e.col}) != exit_pos {room.exit_pos}"
+    )
+
+
+def test_anchor_W_at_fixed_position():
+    """W anchor is always at row=1, col=53; char drawn from _L7_UNTYPABLE_PUNCT."""
+    d = build_dungeon_6(42)
+    room = d.rooms[0]
+    anchor = room.char_run_at(1, 53)
+    assert anchor is not None, "Expected W-anchor rune at (1, 53)"
+    assert ''.join(anchor.symbols) in _L7_UNTYPABLE_PUNCT, (
+        f"Expected untypable char at (1,53), got {''.join(anchor.symbols)!r}"
+    )
+
+
+def test_anchor_B_at_fixed_position():
+    """B anchor is always at row=4, col=3; char drawn from _L7_UNTYPABLE_PUNCT."""
+    d = build_dungeon_6(42)
+    room = d.rooms[0]
+    anchor = room.char_run_at(4, 3)
+    assert anchor is not None, "Expected B-anchor rune at (4, 3)"
+    assert ''.join(anchor.symbols) in _L7_UNTYPABLE_PUNCT, (
+        f"Expected untypable char at (4,3), got {''.join(anchor.symbols)!r}"
+    )
+
+
+@pytest.mark.parametrize("seed", SEEDS)
+def test_anchors_use_distinct_chars(seed):
+    """All 4 anchor chars (W4 pair + B1 pair) must be distinct across seeds."""
+    d = build_dungeon_6(seed)
+    room = d.rooms[0]
+    w4a = room.char_run_at(1, 53)
+    w4b = room.char_run_at(1, 54)
+    b1a = room.char_run_at(4, 3)
+    b1b = room.char_run_at(4, 4)
+    chars = [
+        ''.join(r.symbols) for r in (w4a, w4b, b1a, b1b) if r is not None
+    ]
+    assert len(chars) == len(set(chars)), (
+        f"seed={seed}: anchor chars not all distinct: {chars}"
+    )
+
+
+def test_exit_at_end_of_E4_group():
+    """exit_pos must be at col 51, row 7 (end of 'output=data[n]._key')."""
+    d = build_dungeon_6(42)
+    room = d.rooms[0]
+    assert room.exit_pos == (7, 51), f"Expected exit at (7,51), got {room.exit_pos}"
+
+
+@pytest.mark.parametrize("seed", SEEDS)
+def test_void_guard_at_C2_left_end(seed):
+    """Void runes at (4,1) and (5,1) make 0/^ on either C2 row land on void
+    (death), blocking the line-start shortcut and forcing B."""
+    d = build_dungeon_6(seed)
+    room = d.rooms[0]
+    for r, c in ((4, 1), (5, 1)):
+        void_rune = room.char_run_at(r, c)
+        assert void_rune is not None, f"seed={seed}: no rune at ({r}, {c})"
+        assert void_rune.kind == 'void', (
+            f"seed={seed}: rune at ({r},{c}) is kind={void_rune.kind!r}, expected 'void'"
+        )
+
+
+@pytest.mark.parametrize("seed", SEEDS)
+def test_descent_walls_force_W_on_C1(seed):
+    """RT1 descent walls at (3,54)/(3,55) leave col 53 as the only C1→C2 turn.
+    W lands at col 53 (start of the W4 WORD); E lands at col 54 (into a wall)."""
+    from engine.world import CellType
+    d = build_dungeon_6(seed)
+    room = d.rooms[0]
+    assert room.cells[3][54] == CellType.WALL, f"seed={seed}: (3,54) should be wall"
+    assert room.cells[3][55] == CellType.WALL, f"seed={seed}: (3,55) should be wall"
+    assert room.cells[3][53] == CellType.CORRIDOR, (
+        f"seed={seed}: (3,53) must stay open — it is W's descent column"
+    )
+
+
+@pytest.mark.parametrize("seed", SEEDS)
+def test_C1_right_end_has_no_void(seed):
+    """The old C1 right-end void guards are gone — the descent walls replace them."""
+    d = build_dungeon_6(seed)
+    room = d.rooms[0]
+    for r, c in ((1, 55), (2, 55)):
+        ru = room.char_run_at(r, c)
+        assert ru is None or ru.kind != 'void', (
+            f"seed={seed}: ({r},{c}) should no longer hold a void rune, got {ru}"
+        )
