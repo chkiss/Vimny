@@ -78,11 +78,12 @@ class Room:
         self._char_runs_by_row:    dict = {}   # row -> list[CharRun]
         self._last_void_falls:     list = []   # (row,col,sym) shoved into the void by the last reflow op (engine/reflow.py)
         self._last_drowns:         list = []   # (row,col) goblins a reflow wave of water rolled over (engine/reflow.py)
+        self._last_build_blocked = None        # None | 'edge' | 'void' — why A/J's last ledge-build refused
 
     # ── Spatial index ──────────────────────────────────────────────────────────
 
     def rebuild_indexes(self) -> None:
-        """Rebuild O(1) lookup dicts from the current runes/entities lists.
+        """Rebuild O(1) lookup dicts from the current character and entity lists.
 
         Call after any wholesale assignment to room.char_runs or room.entities,
         and after _ed_restore.  Individual add/remove helpers keep the indexes

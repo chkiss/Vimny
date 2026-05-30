@@ -82,7 +82,7 @@ def _apply_charwise_multi(op: str, anchor, cursor, room, player):
     for r in range(r1, r2 + 1):
         ext = line_extent(room, r)
         if ext is None:
-            rows.append({'width': 0, 'runes': []})
+            rows.append({'width': 0, 'char_runs': []})
             continue
         lo = c_top if r == r1 else ext[0]
         hi = c_bot if r == r2 else ext[1]
@@ -93,7 +93,7 @@ def _apply_charwise_multi(op: str, anchor, cursor, room, player):
             if op in ('d', 'c'):
                 _delete_cols(room, r, lo, hi)
         else:
-            rows.append({'width': 0, 'runes': []})
+            rows.append({'width': 0, 'char_runs': []})
 
     if op in ('d', 'c'):
         player.row = r1
@@ -123,6 +123,8 @@ def apply_visual(op: str, anchor, cursor, vmode, room, player):
         player.row, player.col = tobj.start_row, tobj.start_col
         return clip
     if op in ('d', 'c'):
+        if op == 'd' and tobj.type is TextObjectType.LINEWISE:
+            return op_delete(room, player, tobj, collapse=True)   # remove_row drops the rows' entities
         clip = op_delete(room, player, tobj)
         _kill_entities_in_span(room, tobj)
         return clip

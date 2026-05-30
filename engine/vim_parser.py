@@ -112,6 +112,8 @@ def parse(buf: str, mode: Mode) -> tuple[dict | None, str]:
             return {'type': 'enter_mode', 'mode': 'visual', 'reselect': True}, buf[i+2:]
         if g2 in ('~', 'u', 'U'):                  # case operator: g~{m} gu{m} gU{m}
             return _operator_target('g' + g2, g2, buf, i + 2, count_n)
+        if g2 == 'J':                              # gJ — join with no space at the seam
+            return {'type': 'join', 'gap': False, 'count': count_n}, buf[i+2:]
         return {'type': 'unknown'}, buf[i+2:]
 
     # f/F/t/T — need one more char
@@ -136,6 +138,10 @@ def parse(buf: str, mode: Mode) -> tuple[dict | None, str]:
     if ch in 'DC':
         op = ch.lower()
         return {'type': 'operator', 'op': op, 'motion': '$', 'count': count_n}, buf[i+1:]
+
+    # J — join the next line onto this one (gJ, no space, handled in the g-branch)
+    if ch == 'J':
+        return {'type': 'join', 'gap': True, 'count': count_n}, buf[i+1:]
 
     # p / P — paste (standalone commands, not operator+motion)
     if ch == 'p':

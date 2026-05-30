@@ -1,6 +1,6 @@
 """Block F — search (/ ? n N * #).
 
-Searches rune clusters by **substring** (case-sensitive) over the grid in
+Searches character runs by **substring** (case-sensitive) over the grid in
 reading order (row-major), wrapping around. A match lands the cursor on the
 first matched character's column.
 """

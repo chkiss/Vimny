@@ -133,7 +133,7 @@ def _row_bounds(room, row):
 
 
 def _row_blank(room, row) -> bool:
-    """A text-blank row: passable but holding no runes. All-wall rows are not blank."""
+    """A text-blank row: passable but holding no characters. All-wall rows are not blank."""
     if _row_bounds(room, row) is None:
         return False
     return not any(room.char_run_at(row, c) is not None for c in range(room.cols))

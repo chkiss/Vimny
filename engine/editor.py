@@ -11,7 +11,7 @@ _SUBST_CYCLE = {
 }
 
 
-def _merge_adjacent_runes(room, r: int) -> None:
+def _merge_adjacent_char_runs(room, r: int) -> None:
     """Merge adjacent same-kind CharRuns on row r into single clusters."""
     row_runes = sorted(room._char_runs_by_row.get(r, []), key=lambda ru: ru.col)
     if len(row_runes) < 2:
@@ -36,9 +36,9 @@ def _merge_adjacent_runes(room, r: int) -> None:
 
 
 def _ed_cut(room, r, c):
-    """Remove the rune/entity/wall at (r, c); return a clip item or None.
+    """Remove the character/entity/wall at (r, c); return a clip item or None.
 
-    For rune clusters: extracts only the single symbol at column c, leaving
+    For character runs: extracts only the single symbol at column c, leaving
     any remaining symbols as split remnants.
     """
     ru = room.char_run_at(r, c)
@@ -73,7 +73,7 @@ def _ed_cut(room, r, c):
 def _ed_snapshot(room, player) -> dict:
     return {
         'cells':       [row[:] for row in room.cells],
-        'runes':       [CharRun(ru.row, ru.col, ru.symbols, ru.kind) for ru in room.char_runs],
+        'char_runs':       [CharRun(ru.row, ru.col, ru.symbols, ru.kind) for ru in room.char_runs],
         'entities':    [Entity(kind=e.kind, row=e.row, col=e.col, hp=e.hp, alive=e.alive)
                         for e in room.entities],
         'exit_pos':    room.exit_pos,
@@ -86,10 +86,10 @@ def _ed_snapshot(room, player) -> dict:
 
 def _ed_restore(room, player, snap: dict) -> None:
     room.cells       = snap['cells']
-    room.char_runs       = snap['runes']
+    room.char_runs       = snap['char_runs']
     room.entities    = snap['entities']
     room.exit_pos    = snap['exit_pos']
-    room.spawn_pos    = snap.get('spawn_pos', snap.get('gg_pos', room.spawn_pos))
+    room.spawn_pos    = snap['spawn_pos']
     room.wood_damage = snap.get('wood_damage', {})
     player.row       = snap['pr']
     player.col       = snap['pc']
@@ -97,7 +97,7 @@ def _ed_restore(room, player, snap: dict) -> None:
 
 
 def _ed_subst(room, r, c):
-    """Cycle cell type FLOOR→WALL→WATER→FLOOR; also cut any rune/entity."""
+    """Cycle cell type FLOOR→WALL→WATER→FLOOR; also cut any character/entity."""
     items = []
     if room.char_run_at(r, c) or room.entity_at(r, c):
         item = _ed_cut(room, r, c)
@@ -132,7 +132,7 @@ def _ed_paste(room, r, start_c, items):
         elif item['type'] == 'cell':
             room.cells[r][c] = item['cell_type']
             c += 1
-    _merge_adjacent_runes(room, r)
+    _merge_adjacent_char_runs(room, r)
 
 
 def _ed_row_items(room, r):
@@ -213,12 +213,12 @@ def _deserialize_room(data: dict):
     room.cells    = cells
     room.char_runs    = [CharRun(row=r['row'], col=r['col'],
                                  symbols=tuple(r['symbols']), kind=r['kind'])
-                     for r in data.get('runes', [])]
+                     for r in data.get('char_runs', [])]
     room.entities = [Entity(kind=e['kind'], row=e['row'], col=e['col'])
                      for e in data.get('entities', [])]
     ep = data.get('exit_pos')
     room.exit_pos = tuple(ep) if ep else None
-    en = data.get('spawn_pos', data.get('gg_pos', data.get('entry', [1, 1])))
+    en = data.get('spawn_pos', [1, 1])
     room.spawn_pos = tuple(en)
     room.rebuild_indexes()
     return room
@@ -232,7 +232,7 @@ def _serialize_room(room) -> dict:
         'rows':     room.rows,
         'cols':     room.cols,
         'cells':    [[cell_map.get(c, 'F') for c in row] for row in room.cells],
-        'runes':    [{'row': ru.row, 'col': ru.col,
+        'char_runs':    [{'row': ru.row, 'col': ru.col,
                       'symbols': list(ru.symbols), 'kind': ru.kind}
                      for ru in room.char_runs],
         'entities': [{'kind': e.kind, 'row': e.row, 'col': e.col}

@@ -4,7 +4,8 @@ import pytest
 from engine.world import Room, RoomType, CellType, CharRun, Entity
 from engine.player import Player
 from engine.insert import (
-    begin_insert, insert_char, insert_backspace, _insert_blank_row, _last_content_col,
+    begin_insert, insert_char, insert_char_extend, insert_backspace,
+    _insert_blank_row, _last_content_col,
     replace_chars, replace_overtype, replace_restore,
 )
 
@@ -59,17 +60,77 @@ class TestEntryPositioning:
         begin_insert(room, p, 'I')
         assert p.col == 8
 
-    def test_A_jumps_after_last_content(self):
-        room = _room()
-        room.add_char_run(CharRun(3, 2, ('a', 'b', 'c'), 'ancient'))   # ends col 4
+    def test_A_jumps_to_line_end_past_trailing_floor(self):
+        room = _room()                                                 # floor 1..22, wall at 23
+        room.add_char_run(CharRun(3, 2, ('a', 'b', 'c'), 'ancient'))   # content at cols 2-4
         p = _player(3, 0)
         begin_insert(room, p, 'A')
-        assert p.col == 5
+        assert p.col == 23                  # end of the LINE (past trailing floor), not col 5
 
-    def test_A_on_empty_row_goes_to_first_passable(self):
+    def test_A_on_empty_row_goes_to_line_end(self):
         room = _room(); p = _player(3, 10)
         begin_insert(room, p, 'A')
-        assert p.col == 1
+        assert p.col == 23                  # rightmost passable (22) + 1
+
+    def test_A_sets_extend_flag_other_variants_clear_it(self):
+        room = _room(); p = _player(3, 5)
+        begin_insert(room, p, 'A')
+        assert p.insert_extend is True          # A is the lone ledge-builder
+        begin_insert(room, p, 'i')
+        assert p.insert_extend is False
+        begin_insert(room, p, 'a')
+        assert p.insert_extend is False
+
+
+# ── A's ledge-building (insert_char_extend) ───────────────────────────────────
+
+class TestAppendExtend:
+    def test_A_typing_carves_new_floor_at_the_wall(self):
+        # content fills to the last floor; A then builds out through the wall,
+        # doubling the buffer when it reaches the right border.
+        room = _room()                                              # floor 1..22, wall at 23
+        room.add_char_run(CharRun(3, 20, ('x', 'y', 'z'), 'ancient'))   # ends at col 22
+        p = _player(3, 0)
+        begin_insert(room, p, 'A')
+        assert p.col == 23                                          # after content = the border wall
+        assert insert_char_extend(room, p, 'Q') is True
+        assert room.cols == COLS * 2                                # hit the border → world doubled
+        assert room.cells[3][23] == CellType.FLOOR                  # carved
+        assert _cell(room, 3, 23) == 'Q'
+        assert p.col == 24
+
+    def test_A_skips_trailing_floor_to_the_line_end(self):
+        # A jumps PAST trailing floor to the line end (Vim-faithful), then builds
+        # into the void — it does not fill the gap between content and the wall.
+        room = _room()
+        room.add_char_run(CharRun(3, 2, ('a',), 'ancient'))         # content at col 2; floor to 22
+        p = _player(3, 0)
+        begin_insert(room, p, 'A')
+        assert p.col == 23                                          # line end, past the trailing floor
+        insert_char_extend(room, p, 'Q')                            # builds at the end (doubles the world)
+        assert _cell(room, 3, 23) == 'Q'
+        assert all(_cell(room, 3, c) is None for c in range(3, 23)) # trailing floor left untouched
+
+    def test_A_extend_stops_at_a_void_rune(self):
+        room = _room()
+        room.add_char_run(CharRun(3, 5, ('○',), 'void'))            # a permanent void cell
+        p = _player(3, 5)                                          # cursor on the void
+        p.insert_extend = True
+        assert insert_char_extend(room, p, 'Q') is False           # plank refused
+        assert _cell(room, 3, 5) == '○'                            # void unchanged
+        assert p.col == 5                                          # cursor held
+
+    def test_A_extend_stops_at_the_edge_of_the_world(self):
+        from engine.reflow import _MAX_COLS
+        room = Room(room_type=RoomType.ENTRY, rows=3, cols=_MAX_COLS)
+        room.cells = [[CellType.FLOOR if (0 < r < 2 and 0 < c < _MAX_COLS - 1) else CellType.WALL
+                       for c in range(_MAX_COLS)] for r in range(3)]
+        room.rebuild_indexes()
+        p = _player(1, _MAX_COLS - 1)                              # at the world's last column
+        p.insert_extend = True
+        assert insert_char_extend(room, p, 'Z') is False           # cannot build past the edge
+        assert room._last_build_blocked == 'edge'
+        assert room.cols == _MAX_COLS                              # the world did not grow
 
 
 # ── Substitute entry (s / S) ─────────────────────────────────────────────────
@@ -262,3 +323,14 @@ def test_last_content_col():
     room.add_char_run(CharRun(3, 7, ('b', 'c'), 'ancient'))
     assert _last_content_col(room, 3) == 8         # 'bc' ends at col 8
     assert _last_content_col(room, 1) is None
+
+
+def test_A_in_goblin_gauntlet_row1_lands_at_line_end():
+    """Regression: A on a sparse corridor row goes to the line END (the corridor
+    edge), not just past the lone rune. The Goblin Gauntlet (58 cols) row-1
+    corridor ends at col 56, so A lands at col 57."""
+    from generation.dungeon_gen import build_dungeon_5
+    room = build_dungeon_5(42).rooms[0]
+    p = _player(1, 10)
+    begin_insert(room, p, 'A')
+    assert p.col == 57         # rightmost passable (56) + 1 — the corridor's end, not after the rune

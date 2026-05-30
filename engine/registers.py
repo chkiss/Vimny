@@ -18,8 +18,8 @@ def _append_clip(old, new):
         return {'linewise': True, 'rows': old['rows'] + new['rows']}
     a, b = old['rows'][0], new['rows'][0]
     w = a['width']
-    runes = list(a['runes']) + [dict(r, dcol=r['dcol'] + w) for r in b['runes']]
-    return {'linewise': False, 'rows': [{'width': w + b['width'], 'runes': runes}]}
+    runes = list(a['char_runs']) + [dict(r, dcol=r['dcol'] + w) for r in b['char_runs']]
+    return {'linewise': False, 'rows': [{'width': w + b['width'], 'char_runs': runes}]}
 
 
 def write_register(player, reg: str, clip, is_delete: bool = False) -> None:

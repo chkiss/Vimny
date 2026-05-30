@@ -3,12 +3,12 @@ respawn live and hostile — all through one Vim register (player.registers['"']
 
 The cut/paste wiring lives in run_dungeon's keystroke loop, so these tests target
 the engine-reachable contract it leans on: entity_clip + op_paste (the creature
-round-trip) and _clip_from_cut_runes (the letter round-trip)."""
+round-trip) and _clip_from_cut_chars (the letter round-trip)."""
 import pytest
 from engine.world import Room, RoomType, CellType, Entity, CharRun
 from engine.player import Player
 from engine.operator import entity_clip, op_paste
-from main import _clip_from_cut_runes, _enemy_tick, _PASTE_SPAWN_MSG
+from main import _clip_from_cut_chars, _enemy_tick, _PASTE_SPAWN_MSG
 
 ROWS, COLS = 7, 30
 
@@ -34,7 +34,7 @@ def _slain(kind, **kw):
     return e
 
 
-def _rune_item(sym, col, kind='ancient'):
+def _char_item(sym, col, kind='ancient'):
     """A cut letter as `x` produces it (single-symbol rune at a column)."""
     return {'type': 'rune', 'rune': CharRun(3, col, (sym,), kind)}
 
@@ -90,7 +90,7 @@ def test_pasted_goblin_is_killable_again():
 def test_paste_cut_letter_after_cursor():
     room   = _bare_room()
     player = Player(row=3, col=5)
-    clip   = _clip_from_cut_runes([_rune_item('z', 5)], base_col=5)
+    clip   = _clip_from_cut_chars([_char_item('z', 5)], base_col=5)
     assert op_paste(room, player, clip, before=False)      # p → col 6 (right)
     ru = room.char_run_at(3, 6)
     assert ru is not None and ru.symbols == ('z',)
@@ -102,7 +102,7 @@ def test_paste_cut_letter_before_inserts_at_cursor():
     cursor lands on the pasted letter (full Vim paste)."""
     room   = _bare_room()
     player = Player(row=3, col=5)
-    clip   = _clip_from_cut_runes([_rune_item('q', 5)], base_col=5)
+    clip   = _clip_from_cut_chars([_char_item('q', 5)], base_col=5)
     op_paste(room, player, clip, before=True)              # P → insert at col 5
     assert room.char_run_at(3, 5).symbols == ('q',)
     assert player.col == 5                                 # cursor on the pasted letter
@@ -110,8 +110,8 @@ def test_paste_cut_letter_before_inserts_at_cursor():
 
 def test_cut_letter_clip_preserves_column_gaps():
     # 'a' at col 5 and 'b' at col 7 (gap at 6) → dcol 0 and 2
-    clip   = _clip_from_cut_runes([_rune_item('a', 5), _rune_item('b', 7)], base_col=5)
-    dcols  = sorted(rd['dcol'] for rd in clip['rows'][0]['runes'])
+    clip   = _clip_from_cut_chars([_char_item('a', 5), _char_item('b', 7)], base_col=5)
+    dcols  = sorted(rd['dcol'] for rd in clip['rows'][0]['char_runs'])
     assert dcols == [0, 2]
 
 
@@ -120,7 +120,7 @@ def test_runes_only_clip_pastes_without_entities_key():
     room   = _bare_room()
     player = Player(row=3, col=5)
     clip   = {'linewise': False,
-              'rows': [{'width': 1, 'runes': [{'dcol': 0, 'symbols': ('q',), 'kind': 'ancient'}]}]}
+              'rows': [{'width': 1, 'char_runs': [{'dcol': 0, 'symbols': ('q',), 'kind': 'ancient'}]}]}
     assert op_paste(room, player, clip, before=False)
     assert room.char_run_at(3, 6) is not None
 
@@ -129,7 +129,7 @@ def test_3p_lays_consecutive_letter_copies():
     """3p lays 3 consecutive copies of a cut letter (ababab-style)."""
     room   = _bare_room()
     player = Player(row=3, col=5)
-    clip   = _clip_from_cut_runes([_rune_item('z', 5)], base_col=5)
+    clip   = _clip_from_cut_chars([_char_item('z', 5)], base_col=5)
     op_paste(room, player, clip, before=False, count=3)        # p → cols 6,7,8
     assert all(room.char_run_at(3, c) is not None for c in (6, 7, 8))
 

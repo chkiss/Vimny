@@ -47,6 +47,10 @@ def _apply_undo(item, room, player, budget):
         player.row, player.col = item['row'], item['col']
         budget.spent = item['spent']
         room.entities = item['entities']
+        if 'cells' in item:                      # cells/rows/cols round-trip (reflow vertical/ledge ops)
+            room.cells = item['cells']
+            room.rows  = item['rows']
+            room.cols  = item.get('cols', room.cols)
         room.fog_cells = item['fog_cells']
         room.rebuild_indexes()
     else:
@@ -263,3 +267,22 @@ def test_all_entity_mutations_undoable():
             f"undo item for '{label}' is missing fields: {missing} — "
             "use _snapshot() which always includes them"
         )
+
+
+def test_cols_round_trip_after_buffer_double():
+    """A's ledge-build can DOUBLE room.cols; undo must restore the old width.
+    Snapshot/restore now carry 'cols' alongside 'rows' so the cells grid and
+    room.cols stay in sync after an undo."""
+    from engine.reflow import extend_floor
+    room = _corridor(rows=4, cols=8)
+    player = Player(row=1, col=0)
+    budget = Budget(total=10)
+    snap = {'row': player.row, 'col': player.col, 'spent': budget.spent,
+            'entities': _snap(room),
+            'cells': [r[:] for r in room.cells], 'rows': room.rows, 'cols': room.cols,
+            'fog_cells': set(room.fog_cells)}
+    extend_floor(room, 1, 7, 'Q')                 # building on the border (col 7) doubles to 16
+    assert room.cols == 16
+    _apply_undo(snap, room, player, budget)
+    assert room.cols == 8                          # width restored
+    assert all(len(r) == 8 for r in room.cells)    # every row matches room.cols again

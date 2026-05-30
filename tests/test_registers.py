@@ -6,7 +6,7 @@ from engine.registers import write_register, read_register, _append_clip
 
 def _clip(*chars, kind='ancient'):
     runes = [{'dcol': i, 'symbols': (c,), 'kind': kind} for i, c in enumerate(chars)]
-    return {'linewise': False, 'rows': [{'width': len(chars), 'runes': runes}]}
+    return {'linewise': False, 'rows': [{'width': len(chars), 'char_runs': runes}]}
 
 
 def _p():
@@ -40,7 +40,7 @@ class TestWriteRead:
         write_register(p, '"', _clip('keep'), is_delete=False)
         write_register(p, '_', _clip('gone'), is_delete=True)
         # unnamed is untouched by the black-hole write
-        assert read_register(p, '"')['rows'][0]['runes'][0]['symbols'] == ('keep',)
+        assert read_register(p, '"')['rows'][0]['char_runs'][0]['symbols'] == ('keep',)
         assert read_register(p, '_') is None
 
     def test_uppercase_reads_lowercase(self):
@@ -52,8 +52,8 @@ class TestWriteRead:
         p = _p()
         write_register(p, '"', _clip('Y'), is_delete=False)     # yank → "0 = Y
         write_register(p, '"', _clip('D'), is_delete=True)      # delete → " = D, "0 stays Y
-        assert read_register(p, '0')['rows'][0]['runes'][0]['symbols'] == ('Y',)
-        assert read_register(p, '"')['rows'][0]['runes'][0]['symbols'] == ('D',)
+        assert read_register(p, '0')['rows'][0]['char_runs'][0]['symbols'] == ('Y',)
+        assert read_register(p, '"')['rows'][0]['char_runs'][0]['symbols'] == ('D',)
 
 
 class TestAppend:
@@ -61,8 +61,8 @@ class TestAppend:
         p = _p()
         write_register(p, 'a', _clip('a', 'b'), is_delete=False)
         write_register(p, 'A', _clip('c'), is_delete=False)
-        runes = read_register(p, 'a')['rows'][0]['runes']
+        runes = read_register(p, 'a')['rows'][0]['char_runs']
         assert [(r['dcol'], r['symbols']) for r in runes] == [(0, ('a',)), (1, ('b',)), (2, ('c',))]
 
     def test_append_to_empty(self):
-        assert _append_clip(None, _clip('x'))['rows'][0]['runes'][0]['symbols'] == ('x',)
+        assert _append_clip(None, _clip('x'))['rows'][0]['char_runs'][0]['symbols'] == ('x',)

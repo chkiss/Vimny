@@ -101,7 +101,7 @@ class TestApplyVisual:
         p = Player(row=3, col=4)
         clip = apply_visual('y', (3, 2), (3, 4), Mode.VISUAL, room, p)
         assert _cell(room, 3, 2) == 'a'                            # unchanged
-        assert clip['rows'][0]['runes'][0]['symbols'] == ('a', 'b', 'c')
+        assert clip['rows'][0]['char_runs'][0]['symbols'] == ('a', 'b', 'c')
         assert (p.row, p.col) == (3, 2)
 
     def test_linewise_delete_clears_rows(self):
