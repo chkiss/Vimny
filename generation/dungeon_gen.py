@@ -3408,14 +3408,14 @@ def _dijkstra_par_L10(composite, return_path: bool = False):
             if (r, c) == (key_row, key_col) and (ka & key_bit):
                 _try((r, c, key_inv, ka & ~key_bit, doors), 1, 'x')
 
-        # p: unlock door to right
+        # p: unlock door to right — and step ONTO it (paste moves the cursor over)
         for di, dc in enumerate(D_COLS):
             if (r, c + 1) == (1, dc) and not (doors >> di & 1) and inv == door_key[di]:
-                _try((r, c, 0, ka, doors | (1 << di)), 1, 'p')
-        # P: unlock door to left
+                _try((1, dc, 0, ka, doors | (1 << di)), 1, 'p')
+        # P: unlock door to left — and step onto it
         for di, dc in enumerate(D_COLS):
             if (r, c - 1) == (1, dc) and not (doors >> di & 1) and inv == door_key[di]:
-                _try((r, c, 0, ka, doors | (1 << di)), 1, 'P')
+                _try((1, dc, 0, ka, doors | (1 << di)), 1, 'P')
 
         # H, M, L (viewport-relative)
         ht, mt, lt = _hml_targets(r, doors)
@@ -3876,17 +3876,21 @@ def _dijkstra_par_L13(composite, return_path=False,
 #   Rows 3-14 : a 2-wide left shaft (cols 1-2)
 #   floor_keys: (4,1) and (14,2) — buried near the top and bottom of the shaft
 #
-# Both doors are untagged (either key opens either door), but only ONE key can be
-# held at a time (x overwrites the register), so the solve is: fetch a key, open a
-# door, fetch the other, open the other, reach the exit — riding the shaft with
-# G (→ row 14), {n}G, and gg (→ row 1).  Par/answer are computed by
-# _dijkstra_par_LGG (key/door + line-jump model).
-_LGG_ROWS  = 16
-_LGG_COLS  = 11
-_LGG_ENTRY = (1, 1)             # spawn / first line
-_LGG_EXIT  = (1, 9)             # exit entity == exit_pos (top-right)
-_LGG_KEYS  = ((4, 1), (14, 2))  # floor_key positions
-_LGG_DOORS = ((1, 3), (1, 6))   # locked_door positions
+# The two doors are COLORED in a fixed sequence (left=gold at (1,3), right=red at
+# (1,6)); the two key COLORS are shuffled per seed, so each key opens exactly one
+# door and which shaft-key matches which door varies.  Only ONE key is held at a
+# time (x overwrites the register), and the left door must open before the right is
+# reachable, so the solve is: fetch the gold key (wherever it landed), open the left
+# door (stepping onto it), fetch the red key, open the right, reach the exit —
+# riding the shaft with G (→ row 14), {n}G, and gg (→ row 1).  Par/answer are
+# computed by _dijkstra_par_LGG (colored key/door + line-jump model).
+_LGG_ROWS   = 16
+_LGG_COLS   = 11
+_LGG_ENTRY  = (1, 1)             # spawn / first line
+_LGG_EXIT   = (1, 9)             # exit entity == exit_pos (top-right)
+_LGG_KEYS   = ((4, 1), (14, 2))  # floor_key positions
+_LGG_DOORS  = ((1, 3), (1, 6))   # locked_door positions (left→right)
+_LGG_COLORS = ('gold', 'red')    # fixed door sequence: door0=(1,3)=gold, door1=(1,6)=red
 # Passable columns per row (every other cell is WALL):
 _LGG_PASSABLE = {
     1: tuple(range(1, 10)),               # top corridor cols 1-9
@@ -3922,6 +3926,7 @@ def _dijkstra_par_LGG(composite, return_path: bool = False,
     max_n = max(ROWS, COLS)
     FULL_KEYS  = (1 << len(keys)) - 1
     door_index = {d: i for i, d in enumerate(doors)}
+    door_key   = composite._lgg_door_key   # door_key[di] = hold value (1/2) that opens door di
 
     def _ok(r, c, dm):
         if not (0 <= r < ROWS and 0 <= c < COLS):
@@ -3969,20 +3974,20 @@ def _dijkstra_par_LGG(composite, return_path: bool = False,
                 prev[nb] = (state, lbl)
                 heapq.heappush(heap, (g, nb))
 
-        # x: pick up a floor_key here (overwrites the single register slot)
+        # x: pick up a floor_key here (sets the held key's index; overwrites)
         for ki, kp in enumerate(keys):
             if (r, c) == kp and (km >> ki & 1):
-                _try((r, c, km & ~(1 << ki), 1, dm), 1, 'x')
+                _try((r, c, km & ~(1 << ki), ki + 1, dm), 1, 'x')
 
-        # p / P: open an adjacent locked_door, consuming the held key
-        if hold:
-            for di, dp in enumerate(doors):
-                if dm >> di & 1:
-                    continue
-                if (r, c + 1) == dp:
-                    _try((r, c, km, 0, dm | (1 << di)), 1, 'p')
-                if (r, c - 1) == dp:
-                    _try((r, c, km, 0, dm | (1 << di)), 1, 'P')
+        # p / P: open an adjacent locked_door IF the held key matches its color;
+        # the key is consumed and the cursor steps ONTO the door (paste moves you over)
+        for di, dp in enumerate(doors):
+            if (dm >> di & 1) or hold != door_key[di]:
+                continue
+            if (r, c + 1) == dp:
+                _try((dp[0], dp[1], km, 0, dm | (1 << di)), 1, 'p')
+            if (r, c - 1) == dp:
+                _try((dp[0], dp[1], km, 0, dm | (1 << di)), 1, 'P')
 
         if not disable_line_jumps:
             # G: last line (scan up to a passable row), land on first-non-blank
@@ -4051,11 +4056,12 @@ def build_dungeon_9(seed: int) -> 'Dungeon':
     "dungeon_09_the_screen_vault_pre-reversion" — a mislabel; it is the
     Lineheads).  The exit sits on the top row behind two locked doors; the two keys
     are buried near the top and bottom of a 2-wide left shaft, so the player
-    rides G / gg / {n}G up and down to fetch a key, open a door, and repeat.
-    Fixed layout (no seed variation); see the _LGG_* block above for geometry.
+    rides G / gg / {n}G up and down to fetch a key, open its matching colored door
+    (stepping onto it), and repeat.  Geometry is fixed; the two key COLORS are
+    shuffled per seed (doors are a fixed gold→red sequence), so the fetch order —
+    and the par — varies with the seed.  See the _LGG_* block above for geometry.
 
-    Par/answer are computed by _dijkstra_par_LGG (key/door + line-jump model);
-    e.g. par 15 = G l x 13k p 5G x gg $ p $.
+    Par/answer are computed by _dijkstra_par_LGG (colored key/door + line-jump model).
     """
     dungeon = Dungeon(name='The Lineheads', seed=seed)
     ROWS, COLS = _LGG_ROWS, _LGG_COLS
@@ -4071,13 +4077,21 @@ def build_dungeon_9(seed: int) -> 'Dungeon':
             cells[row][c] = CellType.CORRIDOR
 
     # ── Entry / exit / keys / doors ───────────────────────────────────────────
+    # Doors are a fixed color sequence (left=gold, right=red); the key colors are
+    # shuffled per seed, so which shaft-key opens which door — and the order you
+    # ride the shaft to fetch them — varies.
     composite.spawn_pos   = _LGG_ENTRY
     composite.exit_pos = _LGG_EXIT
+    rng = random.Random(seed)
+    door_colors = list(_LGG_COLORS)                            # door0=(1,3)=gold, door1=(1,6)=red
+    key_colors  = list(_LGG_COLORS); rng.shuffle(key_colors)   # key0=(4,1), key1=(14,2)
+    inv_for_color = {col: ki + 1 for ki, col in enumerate(key_colors)}
+    composite._lgg_door_key = [inv_for_color[dc] for dc in door_colors]
     entities = [Entity(kind='exit', row=_LGG_EXIT[0], col=_LGG_EXIT[1])]
-    for kr, kc in _LGG_KEYS:
-        entities.append(Entity(kind='floor_key', row=kr, col=kc))
-    for dr, dc in _LGG_DOORS:
-        entities.append(Entity(kind='locked_door', row=dr, col=dc))
+    for ki, (kr, kc) in enumerate(_LGG_KEYS):
+        entities.append(Entity(kind='floor_key', row=kr, col=kc, tag=key_colors[ki]))
+    for di, (dr, dc) in enumerate(_LGG_DOORS):
+        entities.append(Entity(kind='locked_door', row=dr, col=dc, tag=door_colors[di]))
     composite.entities = entities
     composite.char_runs = []   # no seed-varying runes; the layout is fixed
 

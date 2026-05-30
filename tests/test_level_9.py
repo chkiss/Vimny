@@ -75,6 +75,31 @@ def test_single_exit_at_exit_pos(seed):
     assert (exits[0].row, exits[0].col) == _LGG_EXIT == room.exit_pos
 
 
+# ── Colored keys / doors (fixed door sequence, shuffled key colors) ───────────
+
+@pytest.mark.parametrize("seed", SEEDS)
+def test_doors_are_a_fixed_gold_red_sequence(seed):
+    """Doors are always gold (left, (1,3)) then red (right, (1,6))."""
+    room = build_dungeon_9(seed).rooms[0]
+    doors = {(e.row, e.col): e.tag for e in room.entities if e.kind == 'locked_door'}
+    assert doors == {(1, 3): 'gold', (1, 6): 'red'}, f"seed={seed}: {doors}"
+
+
+@pytest.mark.parametrize("seed", SEEDS)
+def test_keys_are_gold_and_red_one_each(seed):
+    """The two keys are gold + red — one each (position↔color shuffled per seed)."""
+    room = build_dungeon_9(seed).rooms[0]
+    assert sorted(e.tag for e in room.entities if e.kind == 'floor_key') == ['gold', 'red']
+
+
+def test_key_colors_vary_with_seed():
+    """The top key is gold on some seeds and red on others (the shuffle is live)."""
+    top = {next(e.tag for e in build_dungeon_9(s).rooms[0].entities
+                if e.kind == 'floor_key' and (e.row, e.col) == (4, 1))
+           for s in range(1, 40)}
+    assert top == {'gold', 'red'}, f"top-key color did not vary: {top}"
+
+
 # ── Par / budget ────────────────────────────────────────────────────────────
 
 @pytest.mark.parametrize("seed", SEEDS)
@@ -90,7 +115,8 @@ def test_budget_is_ceil_par_times_1_4(seed):
 
 
 def test_par_is_deterministic():
-    """Fixed, seed-independent layout → a stable par (regression guard)."""
+    """Key colors shuffle per seed, but both assignments are balanced — par stays
+    15 for every seed (regression guard)."""
     pars = {build_dungeon_9(s).rooms[0].par for s in SEEDS}
     assert pars == {15}, f"expected par 15 for all seeds, got {pars}"
 
