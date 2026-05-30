@@ -182,7 +182,7 @@ class TestYankSpacing:
         assert room.char_run_at(3, 11) is not None
         assert room.char_run_at(3, 15) is not None
         assert all(room.char_run_at(3, c) is None for c in (12, 13, 14))
-        assert p.col == 10                            # paste never moves the player
+        assert p.col == 15                            # cursor on the last pasted cell (Vim)
 
     def test_paste_stops_at_wall(self):
         room = _room()
@@ -313,15 +313,15 @@ class TestDeleteMore:
 
 
 class TestPasteMore:
-    def test_P_before_places_left_cursor_stays(self):
+    def test_P_before_inserts_at_cursor_shifting_right(self):
         room = _room()
+        room.add_char_run(CharRun(3, 10, ('X',), 'ancient'))   # something under the cursor
         clip = {'linewise': False,
                 'rows': [{'width': 1, 'runes': [{'dcol': 0, 'symbols': ('a',), 'kind': 'ancient'}]}]}
         p = _player(3, 10)
-        op_paste(room, p, clip, before=True)      # P → left of cursor (col 9)
-        assert room.char_run_at(3, 9) is not None
-        assert room.char_run_at(3, 10) is None    # not under the cursor
-        assert p.col == 10                        # paste never moves the player
+        op_paste(room, p, clip, before=True)      # P → insert 'a' at the cursor; X shifts right
+        assert room.char_run_at(3, 10).symbols == ('a', 'X')   # 'a' inserted at cursor, X shifted right (merged)
+        assert p.col == 10                        # cursor on the pasted char
 
     def test_paste_empty_clip_is_noop(self):
         room = _room()

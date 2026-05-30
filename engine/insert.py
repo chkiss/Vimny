@@ -9,7 +9,7 @@ from __future__ import annotations
 from engine.world import CellType, CharRun
 from engine.motion import _first_non_blank_col, _leftmost_passable
 from engine.editor import _merge_adjacent_runes
-from engine.reflow import is_ledge, open_gap
+from engine.reflow import is_ledge, open_gap, close_gap
 
 INSERT_KIND = 'ember'           # kind tag for player-typed runes
 _PASTABLE = (CellType.FLOOR, CellType.CORRIDOR)
@@ -102,6 +102,7 @@ def begin_insert(room, player, variant: str, count: int = 1) -> None:
     if variant == 's':
         for i in range(count):
             _delete_at(room, r, player.col + i)
+        close_gap(room, r, player.col, count)   # reflow: pull the tail left before INSERT
         return
     if variant == 'S':
         _clear_row(room, r)
