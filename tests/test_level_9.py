@@ -1,143 +1,159 @@
-"""Level 8 (id=8) — The Lineheads: dungeon correctness tests.
+"""Level 9 (id=9) — The Screen Vault: dungeon correctness tests.
 
-Teaching goal: G (last line), gg (first line), {n}G (nth line).
+Teaching goal: H/M/L (viewport-relative top/middle/bottom jumps), distinct from
+G (which lands on a void row and is punished).  Viewport-filling layout with
+three colored floor_keys matched to three colored locked_doors.
 
-A fixed 16×11 vertical shaft (restored from an admin design layout): the exit is
-on the top row behind two locked doors; the two keys are buried near the top and
-bottom of a 2-wide left shaft, so the solve rides G/gg/{n}G up and down to fetch
-a key, open a door, and repeat.  The layout is seed-independent.
+The M row is filled with vocab, so M lands on its leftmost rune and the player
+must then $ to reach the M key at the right edge — i.e. "M $", not just "M".
 """
 import math
 import pytest
 from engine.world import CellType
 from generation.dungeon_gen import (
     build_dungeon_9,
-    _dijkstra_par_LGG,
-    _LGG_ROWS, _LGG_COLS,
-    _LGG_ENTRY, _LGG_EXIT,
-    _LGG_KEYS, _LGG_DOORS, _LGG_PASSABLE,
+    _dijkstra_par_L10,
+    _l10_key_rows,
+    _L10_COLS, _L10_DEFAULT_GAME_H,
+    _L10_H_KEY_COL, _L10_M_KEY_COL, _L10_L_KEY_COL,
+    _L10_DOOR_COLS, _L10_EXIT_COL,
+    _L10_SPAWN, _L10_COLORS,
 )
 
 SEEDS = [1, 42, 999, 12345, 2**20 + 7]
+_GH = _L10_DEFAULT_GAME_H
 
-_PASSABLE_CELLS = {(r, c) for r, cols in _LGG_PASSABLE.items() for c in cols}
+# The par Dijkstra is moderately expensive, so build each seed's room once and
+# share it (these tests only read the room — never mutate it).
+_ROOM_CACHE: dict = {}
 
 
-# ── Structural tests ──────────────────────────────────────────────────────────
+def _room(seed):
+    if seed not in _ROOM_CACHE:
+        _ROOM_CACHE[seed] = build_dungeon_9(seed).rooms[0]
+    return _ROOM_CACHE[seed]
+
+
+# ── Structural ────────────────────────────────────────────────────────────────
 
 @pytest.mark.parametrize("seed", SEEDS)
 def test_dimensions(seed):
-    room = build_dungeon_9(seed).rooms[0]
-    assert room.rows == _LGG_ROWS
-    assert room.cols == _LGG_COLS
+    room = _room(seed)
+    assert room.rows == _GH + 4
+    assert room.cols == _L10_COLS
 
 
 @pytest.mark.parametrize("seed", SEEDS)
-def test_entry_and_exit_passable(seed):
-    room = build_dungeon_9(seed).rooms[0]
-    assert room.spawn_pos == _LGG_ENTRY
-    assert room.exit_pos == _LGG_EXIT
-    for (r, c) in (room.spawn_pos, room.exit_pos):
-        assert room.cells[r][c] == CellType.CORRIDOR, f"seed={seed}: ({r},{c}) not CORRIDOR"
+def test_spawn(seed):
+    room = _room(seed)
+    assert room.spawn_pos == _L10_SPAWN
+    assert room.is_passable(*room.spawn_pos), f"seed={seed}: spawn not passable"
 
 
 @pytest.mark.parametrize("seed", SEEDS)
-def test_passable_layout(seed):
-    """Exactly the _LGG_PASSABLE cells are CORRIDOR; every other cell is WALL."""
-    room = build_dungeon_9(seed).rooms[0]
-    for r in range(room.rows):
-        for c in range(room.cols):
-            expect = CellType.CORRIDOR if (r, c) in _PASSABLE_CELLS else CellType.WALL
-            assert room.cells[r][c] == expect, (
-                f"seed={seed}: ({r},{c}) is {room.cells[r][c]}, expected {expect}"
-            )
-
-
-@pytest.mark.parametrize("seed", SEEDS)
-def test_keys_present(seed):
-    room = build_dungeon_9(seed).rooms[0]
-    keys = sorted((e.row, e.col) for e in room.entities if e.kind == 'floor_key')
-    assert keys == sorted(_LGG_KEYS), f"seed={seed}: floor_keys {keys} != {sorted(_LGG_KEYS)}"
-
-
-@pytest.mark.parametrize("seed", SEEDS)
-def test_doors_present(seed):
-    room = build_dungeon_9(seed).rooms[0]
-    doors = sorted((e.row, e.col) for e in room.entities if e.kind == 'locked_door')
-    assert doors == sorted(_LGG_DOORS), f"seed={seed}: doors {doors} != {sorted(_LGG_DOORS)}"
-
-
-@pytest.mark.parametrize("seed", SEEDS)
-def test_single_exit_at_exit_pos(seed):
-    room = build_dungeon_9(seed).rooms[0]
+def test_exit(seed):
+    room = _room(seed)
     exits = [e for e in room.entities if e.kind == 'exit']
     assert len(exits) == 1
-    assert (exits[0].row, exits[0].col) == _LGG_EXIT == room.exit_pos
+    assert (exits[0].row, exits[0].col) == (1, _L10_EXIT_COL) == room.exit_pos
 
-
-# ── Colored keys / doors (fixed door sequence, shuffled key colors) ───────────
 
 @pytest.mark.parametrize("seed", SEEDS)
-def test_doors_are_a_fixed_gold_red_sequence(seed):
-    """Doors are always gold (left, (1,3)) then red (right, (1,6))."""
-    room = build_dungeon_9(seed).rooms[0]
+def test_three_keys_at_hml_positions(seed):
+    room = _room(seed)
+    m_row, l_row = _l10_key_rows(_GH)
+    keys = {(e.row, e.col): e.tag for e in room.entities if e.kind == 'floor_key'}
+    assert set(keys) == {(1, _L10_H_KEY_COL), (m_row, _L10_M_KEY_COL), (l_row, _L10_L_KEY_COL)}
+    assert sorted(keys.values()) == sorted(_L10_COLORS)   # each color used once
+
+
+@pytest.mark.parametrize("seed", SEEDS)
+def test_three_doors_colored(seed):
+    room = _room(seed)
     doors = {(e.row, e.col): e.tag for e in room.entities if e.kind == 'locked_door'}
-    assert doors == {(1, 3): 'gold', (1, 6): 'red'}, f"seed={seed}: {doors}"
+    assert set(doors) == {(1, dc) for dc in _L10_DOOR_COLS}
+    assert sorted(doors.values()) == sorted(_L10_COLORS)   # each color used once
 
 
 @pytest.mark.parametrize("seed", SEEDS)
-def test_keys_are_gold_and_red_one_each(seed):
-    """The two keys are gold + red — one each (position↔color shuffled per seed)."""
-    room = build_dungeon_9(seed).rooms[0]
-    assert sorted(e.tag for e in room.entities if e.kind == 'floor_key') == ['gold', 'red']
+def test_keys_match_doors(seed):
+    """Every door color has exactly one matching key color (so it is solvable)."""
+    room = _room(seed)
+    key_colors  = sorted(e.tag for e in room.entities if e.kind == 'floor_key')
+    door_colors = sorted(e.tag for e in room.entities if e.kind == 'locked_door')
+    assert key_colors == door_colors == sorted(_L10_COLORS)
 
 
-def test_key_colors_vary_with_seed():
-    """The top key is gold on some seeds and red on others (the shuffle is live)."""
-    top = {next(e.tag for e in build_dungeon_9(s).rooms[0].entities
-                if e.kind == 'floor_key' and (e.row, e.col) == (4, 1))
-           for s in range(1, 40)}
-    assert top == {'gold', 'red'}, f"top-key color did not vary: {top}"
+@pytest.mark.parametrize("seed", SEEDS)
+def test_top_corridor_clear_between_doors_and_exit(seed):
+    """No vocab runes on row 1 from the first door through the exit (cols 26-41)."""
+    room = _room(seed)
+    cols = [ru.col for ru in room.char_runs if ru.row == 1 and 26 <= ru.col <= _L10_EXIT_COL]
+    assert cols == [], f"seed={seed}: unexpected row-1 runes at cols {cols}"
 
 
-# ── Par / budget ────────────────────────────────────────────────────────────
+@pytest.mark.parametrize("seed", SEEDS)
+def test_void_row_is_circles(seed):
+    """The row G lands on (L_ROW+3) is filled with standard void runes (○) —
+    using G is punished."""
+    room = _room(seed)
+    _, l_row = _l10_key_rows(_GH)
+    void_row = l_row + 3
+    voids = [ru for ru in room.char_runs if ru.row == void_row]
+    assert voids, f"seed={seed}: no runes on void row {void_row}"
+    assert all(ru.kind == 'void' for ru in voids), f"seed={seed}: non-void rune on void row"
+    assert all(''.join(ru.symbols) == '○' for ru in voids), f"seed={seed}: void rune is not a ○"
+
+
+# ── M-key requires M then $ ───────────────────────────────────────────────────
+
+@pytest.mark.parametrize("seed", SEEDS)
+def test_M_does_not_reach_key_alone(seed):
+    """The M row is filled, so M lands on its leftmost rune (not the M key at
+    col 25): the player must follow M with $.  The optimal answer uses both."""
+    room = _room(seed)
+    m_row, _ = _l10_key_rows(_GH)
+    fnb = min(ru.col for ru in room.char_runs if ru.row == m_row)   # where M lands
+    assert fnb != _L10_M_KEY_COL, f"seed={seed}: M lands directly on the key (col {fnb})"
+    toks = room.answer.split()
+    assert 'M' in toks and '$' in toks, f"seed={seed}: answer lacks M/$ {room.answer!r}"
+
+
+# ── Par / budget ──────────────────────────────────────────────────────────────
 
 @pytest.mark.parametrize("seed", SEEDS)
 def test_par_matches_dijkstra(seed):
-    room = build_dungeon_9(seed).rooms[0]
-    assert room.par == _dijkstra_par_LGG(room)
+    room = _room(seed)
+    assert room.par == _dijkstra_par_L10(room)
 
 
 @pytest.mark.parametrize("seed", SEEDS)
 def test_budget_is_ceil_par_times_1_4(seed):
-    room = build_dungeon_9(seed).rooms[0]
+    room = _room(seed)
     assert room.budget == math.ceil(room.par * 1.4)
 
 
-def test_par_is_deterministic():
-    """Key colors shuffle per seed, but both assignments are balanced — par stays
-    15 for every seed (regression guard)."""
-    pars = {build_dungeon_9(s).rooms[0].par for s in SEEDS}
-    assert pars == {15}, f"expected par 15 for all seeds, got {pars}"
+def test_par_is_17_for_seeds():
+    """Regression guard: with the M row filled (M then $ to reach the M key) the
+    design solves in 17 for the test seeds."""
+    pars = {_room(s).par for s in SEEDS}
+    assert pars == {17}, f"expected par 17 for all test seeds, got {pars}"
 
 
-# ── Command necessity ─────────────────────────────────────────────────────────
-
-@pytest.mark.parametrize("seed", SEEDS)
-def test_answer_uses_G(seed):
-    """G (1 ks) is the strictly-cheapest way to the bottom of the shaft, so every
-    optimal path uses it."""
-    room = build_dungeon_9(seed).rooms[0]
-    assert 'G' in room.answer.split(), f"seed={seed}: 'G' not in answer {room.answer!r}"
-
+# ── Command usage ─────────────────────────────────────────────────────────────
 
 @pytest.mark.parametrize("seed", SEEDS)
-def test_line_jumps_reduce_keystrokes(seed):
-    """G/gg/{n}G are the OPTIMAL tool here: solving with count-hjkl only (no line
-    jumps) costs strictly more than par.  NB the no-jump route still fits the
-    ×1.4 budget, so the forcing is soft (the shaft is short) — see build_dungeon_9."""
-    room = build_dungeon_9(seed).rooms[0]
-    cost_no_jumps = _dijkstra_par_LGG(room, disable_line_jumps=True)
-    assert cost_no_jumps is not None and cost_no_jumps > room.par, (
-        f"seed={seed}: no-line-jump cost {cost_no_jumps} not greater than par {room.par}"
-    )
+def test_answer_uses_H_M_L(seed):
+    """The three keys sit on the viewport top/middle/bottom rows, so the optimal
+    solution collects them with H, M, and L."""
+    room = _room(seed)
+    toks = room.answer.split()
+    for cmd in ('H', 'M', 'L'):
+        assert cmd in toks, f"seed={seed}: '{cmd}' not in answer {room.answer!r}"
+
+
+@pytest.mark.parametrize("seed", SEEDS)
+def test_answer_avoids_G(seed):
+    """G lands on the void row (lethal), so the optimal path never uses bare G."""
+    room = _room(seed)
+    assert 'G' not in room.answer.split(), f"seed={seed}: G used in answer {room.answer!r}"

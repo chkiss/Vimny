@@ -42,7 +42,7 @@ from engine.editor import (
     _ed_paste, _ed_row_items, _ed_clear_row, _ed_range_items, _ed_delete_range,
     _clip_desc, _serialize_room, _deserialize_room,
 )
-from generation.dungeon_gen import build_dungeon_0, build_dungeon_1, build_dungeon_1_1, build_dungeon_2, build_dungeon_3, build_dungeon_4, build_dungeon_5, build_dungeon_51, build_dungeon_6, build_dungeon_7, build_dungeon_8, build_dungeon_9, build_dungeon_10, build_dungeon_12, build_dungeon_13, build_dungeon_14, build_dungeon_dummy
+from generation.dungeon_gen import build_dungeon_0, build_dungeon_1, build_dungeon_2, build_dungeon_3, build_dungeon_4, build_dungeon_5, build_dungeon_6, build_dungeon_7, build_dungeon_8, build_dungeon_9, build_dungeon_10, build_dungeon_11, build_dungeon_12, build_dungeon_13, build_dungeon_14, build_dungeon_51, build_dungeon_dummy
 from content.levels import LEVELS, is_unlocked, is_reliquary, level_type, known_commands as _known_commands
 import save.save_manager as SM
 
@@ -728,54 +728,22 @@ def _calc_stars(won: bool, budget: Budget, room, player, level: int = 0) -> int:
 
 
 def _build_dungeon(level: int, seed: int, game_h: int = 33, admin: bool = False):
-    # NOTE: generator function names track an OLDER numbering than the current
-    # curriculum (content/levels.py). Generator *content* matches the current
-    # level; only the names are legacy. This dispatch is the source of truth.
-    # Current level -> generator:
-    #   L6  The WORD Forge        -> build_dungeon_7
-    #   L7  The Backward Vaults   -> build_dungeon_8
-    #   L8  The Lineheads         -> build_dungeon_9
-    #   L9  The Screen Vault      -> build_dungeon_10
-    #   L10 The Bracket Vaults    -> build_dungeon_12
-    #   L12 The Runic Archives    -> build_dungeon_13
-    #   L13 The Sentence Corridor -> build_dungeon_14
-    #   L14 The Sight Sanctum (v) -> build_dungeon_6
-    # (L0-5 and boss L51 use same-numbered generators; L15+ not yet built.)
+    # Generators are named to match the curriculum (content/levels.py): level N is
+    # built by build_dungeon_N. (L15+ not yet built → fall through to L0.)
     if level == 99:
         return build_dungeon_dummy(seed)
-    if level == 1:
-        return build_dungeon_1(seed)
-    if level == 11:
-        return build_dungeon_1_1(seed)
-    if level == 2:
-        return build_dungeon_2(seed)
-    if level == 3:
-        return build_dungeon_3(seed)
-    if level == 4:
-        return build_dungeon_4(seed)
-    if level == 5:
-        return build_dungeon_5(seed)
-    if level == 51:
-        return build_dungeon_51(seed)
-    if level == 6:
-        return build_dungeon_7(seed)
-    if level == 7:
-        return build_dungeon_8(seed)
-    if level == 8:
-        return build_dungeon_9(seed)
     if level == 9:
         # L9 Screen Vault: only solve the (admin-only) answer path when admin —
         # its par-Dijkstra is too slow to run on every load (par is locked).
-        return build_dungeon_10(seed, game_h=game_h, compute_answer=admin)
-    if level == 10:
-        return build_dungeon_12(seed)
-    if level == 12:
-        return build_dungeon_13(seed)
-    if level == 13:
-        return build_dungeon_14(seed)
-    if level == 14:
-        return build_dungeon_6(seed)
-    return build_dungeon_0(seed)
+        return build_dungeon_9(seed, game_h=game_h, compute_answer=admin)
+    _gens = {
+        0: build_dungeon_0,   1: build_dungeon_1,   2: build_dungeon_2,
+        3: build_dungeon_3,   4: build_dungeon_4,   5: build_dungeon_5,
+        6: build_dungeon_6,   7: build_dungeon_7,   8: build_dungeon_8,
+        10: build_dungeon_10, 11: build_dungeon_11, 12: build_dungeon_12,
+        13: build_dungeon_13, 14: build_dungeon_14, 51: build_dungeon_51,
+    }
+    return _gens.get(level, build_dungeon_0)(seed)
 
 
 def _snapshot(room, player, budget, *, row=None, col=None, spent=None, ans=None) -> dict:

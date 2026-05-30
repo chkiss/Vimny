@@ -1314,7 +1314,7 @@ def build_dungeon_4(seed: int) -> Dungeon:
     return dungeon
 
 
-def build_dungeon_1_1(seed: int) -> Dungeon:
+def build_dungeon_11(seed: int) -> Dungeon:
     """The Reliquary — bonus chest room unlocked alongside level 2.
 
     Layout (5 rows × 17 cols):
@@ -1904,9 +1904,9 @@ _L7_CODE_GROUPS = [
     (1,  3, "result=func",         'ember'),   # W1 cols  3-13
     (1, 16, "(a,b)+val",           'ember'),   # W2 cols 16-24
     (1, 27, "x=y*2",               'ember'),   # W3 cols 27-31
-    # W4 anchor at (1, 53-54): seed-varying untypable pair (see build_dungeon_7)
+    # W4 anchor at (1, 53-54): seed-varying untypable pair (see build_dungeon_6)
     # C2 (rows 4-5, right→left): B teaching — `4B` from col 53 → col 3 in 2 keystrokes
-    # B1 anchor at (4, 3-4): seed-varying untypable pair (see build_dungeon_7)
+    # B1 anchor at (4, 3-4): seed-varying untypable pair (see build_dungeon_6)
     (4, 25, "x+=y*2",              'ember'),   # B2 cols 25-30
     (4, 35, "int[]",               'ember'),   # B3 cols 35-39
     (4, 43, "main()",              'ember'),   # B4 cols 43-48
@@ -2648,7 +2648,7 @@ def _dijkstra_par_L8(composite, return_path: bool = False):
     return None
 
 
-def build_dungeon_8(seed: int) -> Dungeon:
+def build_dungeon_7(seed: int) -> Dungeon:
     """Level 7 — ge/gE: The Backward Vaults.
 
     Six 1-row corridors in a snake pattern (13 rows × 40 cols).  Each corridor
@@ -2819,7 +2819,7 @@ def build_dungeon_8(seed: int) -> Dungeon:
     return dungeon
 
 
-def build_dungeon_7(seed: int) -> Dungeon:
+def build_dungeon_6(seed: int) -> Dungeon:
     """The WORD Forge — teaches W B E (WORD motions over code-text clusters).
 
     Three 2-row corridors, snake pattern (10 rows × 58 cols):
@@ -2929,7 +2929,7 @@ def build_dungeon_7(seed: int) -> Dungeon:
     return dungeon
 
 
-def build_dungeon_6(seed: int) -> Dungeon:
+def build_dungeon_14(seed: int) -> Dungeon:
     """Level 14 — Visual Mode: The Sight Sanctum.
 
     Fixed U-shaped layout:
@@ -3171,7 +3171,7 @@ def _dijkstra_par_L11(composite, use_percent: bool = True, return_path: bool = F
     return None
 
 
-def build_dungeon_12(seed: int) -> Dungeon:
+def build_dungeon_10(seed: int) -> Dungeon:
     """Level 10 — % (The Bracket Vaults).
 
     Teaches `%` (bracket-matching jump) as the only way to cross a band of WATER.
@@ -3492,7 +3492,7 @@ def _dijkstra_par_L10(composite, return_path: bool = False):
     return None
 
 
-def build_dungeon_10(seed: int, game_h: int = _L10_DEFAULT_GAME_H,
+def build_dungeon_9(seed: int, game_h: int = _L10_DEFAULT_GAME_H,
                      compute_answer: bool = True) -> Dungeon:
     """Level 9 — H M L: The Screen Vault (3 colored keys).
 
@@ -4049,7 +4049,7 @@ def _dijkstra_par_LGG(composite, return_path: bool = False,
     return (None, '') if return_path else None
 
 
-def build_dungeon_9(seed: int) -> 'Dungeon':
+def build_dungeon_8(seed: int) -> 'Dungeon':
     """Level 8 — G gg {n}G: The Lineheads.
 
     A 16-row × 11-col vertical shaft (restored from the admin design layout
@@ -4111,7 +4111,7 @@ def build_dungeon_9(seed: int) -> 'Dungeon':
     return dungeon
 
 
-def build_dungeon_13(seed: int) -> 'Dungeon':
+def build_dungeon_12(seed: int) -> 'Dungeon':
     """Level 12 (id=12) — Paragraph Jumps: The Runic Archives.
 
     Layout: 22 rows × 48 cols.
@@ -4209,7 +4209,7 @@ def build_dungeon_13(seed: int) -> 'Dungeon':
 
 
 
-def build_dungeon_14(seed: int) -> 'Dungeon':
+def build_dungeon_13(seed: int) -> 'Dungeon':
     """Level 13 — Sentence Jumps: The Sentence Corridor.
 
     Fixed layout: 3 rows × 62 cols.  Only row 1 is passable.

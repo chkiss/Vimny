@@ -73,7 +73,7 @@ _BUILDER_RE = re.compile(r'^build_dungeon_\w+$')
 _SKIP_LEVELS = {
     # par=None — not keystroke puzzles, so "answer cost == par" does not apply.
     # Excluded from parametrization entirely (not emitted as skipped cases).
-    'build_dungeon_1_1',    # The Reliquary (reward / chest room)
+    'build_dungeon_11',     # The Reliquary (reward / chest room)
     'build_dungeon_51',     # The Warden's Keep (L5 boss)
     'build_dungeon_dummy',  # Dummy Dungeon (test scaffold)
 }
