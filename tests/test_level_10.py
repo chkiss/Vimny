@@ -17,10 +17,10 @@ import pytest
 from engine.world import CellType
 from generation.dungeon_gen import (
     build_dungeon_10,
-    _dijkstra_par_L11,
-    _L11_ROWS, _L11_COLS, _L11_CORR_ROWS,
-    _L11_BRACKET_OPEN, _L11_BRACKET_CLOSE, _L11_CLOSE_R5,
-    _L11_ENTRY, _L11_EXIT_POS, _L11_PAR, _L11_ANSWER,
+    _dijkstra_par_L10,
+    _L10_ROWS, _L10_COLS, _L10_CORR_ROWS,
+    _L10_BRACKET_OPEN, _L10_BRACKET_CLOSE, _L10_CLOSE_R5,
+    _L10_ENTRY, _L10_EXIT_POS, _L10_PAR, _L10_ANSWER,
 )
 
 SEEDS = [1, 42, 999, 12345, 2**20 + 7]
@@ -44,7 +44,7 @@ def test_entry_and_exit_passable(seed):
 def test_par_matches_dijkstra(seed):
     d = build_dungeon_10(seed)
     room = d.rooms[0]
-    computed = _dijkstra_par_L11(room, use_percent=True)
+    computed = _dijkstra_par_L10(room, use_percent=True)
     assert room.par == computed, (
         f"seed={seed}: room.par={room.par} but Dijkstra computed {computed}"
     )
@@ -72,19 +72,19 @@ def test_answer_uses_percent(seed):
 
 @pytest.mark.parametrize("seed", SEEDS)
 def test_bracket_structure_corridor_rows(seed):
-    """( must be at col _L11_BRACKET_OPEN and ) at col _L11_BRACKET_CLOSE on each
+    """( must be at col _L10_BRACKET_OPEN and ) at col _L10_BRACKET_CLOSE on each
     corridor row.  Each bracket must be a single-char CharRun."""
     d = build_dungeon_10(seed)
     room = d.rooms[0]
-    for r in _L11_CORR_ROWS:
-        open_ru = room.char_run_at(r, _L11_BRACKET_OPEN)
+    for r in _L10_CORR_ROWS:
+        open_ru = room.char_run_at(r, _L10_BRACKET_OPEN)
         assert open_ru is not None, (
-            f"seed={seed}: no rune at ({r},{_L11_BRACKET_OPEN}) — expected '('"
+            f"seed={seed}: no rune at ({r},{_L10_BRACKET_OPEN}) — expected '('"
         )
         assert open_ru.symbols == ('(',), (
-            f"seed={seed}: rune at ({r},{_L11_BRACKET_OPEN}) symbols={open_ru.symbols}, expected ('(',)"
+            f"seed={seed}: rune at ({r},{_L10_BRACKET_OPEN}) symbols={open_ru.symbols}, expected ('(',)"
         )
-        close_col = _L11_CLOSE_R5 if r == 5 else _L11_BRACKET_CLOSE
+        close_col = _L10_CLOSE_R5 if r == 5 else _L10_BRACKET_CLOSE
         close_ru = room.char_run_at(r, close_col)
         assert close_ru is not None, (
             f"seed={seed}: no rune at ({r},{close_col}) — expected ')'"
@@ -103,7 +103,7 @@ def test_percent_required(seed):
     """
     d = build_dungeon_10(seed)
     room = d.rooms[0]
-    par_no_pct = _dijkstra_par_L11(room, use_percent=False)
+    par_no_pct = _dijkstra_par_L10(room, use_percent=False)
     assert par_no_pct is None or par_no_pct > room.budget, (
         f"seed={seed}: par without % = {par_no_pct}, budget = {room.budget}; "
         f"% should be required"
@@ -124,10 +124,10 @@ def test_exit_entity_at_exit_pos(seed):
 
 @pytest.mark.parametrize("seed", SEEDS)
 def test_outer_paren_pair_matches_row1(seed):
-    """% from ( col _L11_BRACKET_OPEN on row 1 must jump to ) col _L11_BRACKET_CLOSE."""
+    """% from ( col _L10_BRACKET_OPEN on row 1 must jump to ) col _L10_BRACKET_CLOSE."""
     d = build_dungeon_10(seed)
     room = d.rooms[0]
-    # Simulate what _dijkstra_par_L11's _pct() does for row 1 at BRACKET_OPEN.
+    # Simulate what _dijkstra_par_L10's _pct() does for row 1 at BRACKET_OPEN.
     _PAIRS_OPEN  = {'(': ')', '[': ']', '{': '}'}
     _PAIRS_CLOSE = {')': '(', ']': '[', '}': '{'}
 
@@ -140,7 +140,7 @@ def test_outer_paren_pair_matches_row1(seed):
         return None
 
     row = 1
-    c = _L11_BRACKET_OPEN
+    c = _L10_BRACKET_OPEN
     bch = _bracket_here(row, c)
     assert bch == '(', f"seed={seed}: expected '(' at ({row},{c}), got {bch!r}"
     # Scan forward for matching ')'
@@ -158,8 +158,8 @@ def test_outer_paren_pair_matches_row1(seed):
             if depth == 0:
                 target = cc
                 break
-    assert target == _L11_BRACKET_CLOSE, (
-        f"seed={seed}: % from ( col {c} row {row} should jump to col {_L11_BRACKET_CLOSE}, "
+    assert target == _L10_BRACKET_CLOSE, (
+        f"seed={seed}: % from ( col {c} row {row} should jump to col {_L10_BRACKET_CLOSE}, "
         f"got {target}"
     )
 
@@ -171,8 +171,8 @@ def test_water_barrier_on_row3(seed):
     d = build_dungeon_10(seed)
     room = d.rooms[0]
     row = 3
-    for c in range(1, _L11_COLS - 1):
-        if c == _L11_BRACKET_OPEN or c == _L11_BRACKET_CLOSE:
+    for c in range(1, _L10_COLS - 1):
+        if c == _L10_BRACKET_OPEN or c == _L10_BRACKET_CLOSE:
             assert room.cells[row][c] == CellType.CORRIDOR, (
                 f"seed={seed}: bracket cell ({row},{c}) should be CORRIDOR, got {room.cells[row][c]}"
             )
@@ -188,8 +188,8 @@ def test_water_gap_rows_2_and_4(seed):
     (col 54 on row 2, col 4 on row 4)."""
     d = build_dungeon_10(seed)
     room = d.rooms[0]
-    for row, turn_col in {2: _L11_BRACKET_CLOSE, 4: _L11_BRACKET_OPEN}.items():
-        for c in range(1, _L11_COLS - 1):
+    for row, turn_col in {2: _L10_BRACKET_CLOSE, 4: _L10_BRACKET_OPEN}.items():
+        for c in range(1, _L10_COLS - 1):
             want = CellType.CORRIDOR if c == turn_col else CellType.WATER
             assert room.cells[row][c] == want, (
                 f"seed={seed}: ({row},{c}) should be {want}, got {room.cells[row][c]}"
@@ -203,14 +203,14 @@ def test_corridor_rows_carved(seed):
     d = build_dungeon_10(seed)
     room = d.rooms[0]
     for r in (1, 5):
-        for c in range(1, _L11_COLS - 1):
+        for c in range(1, _L10_COLS - 1):
             assert room.cells[r][c] == CellType.CORRIDOR, (
                 f"seed={seed}: row {r} col {c} should be CORRIDOR"
             )
 
 
 def test_par_is_correct():
-    """Sanity check: par=_L11_PAR=8 and answer matches the constant for all seeds.
+    """Sanity check: par=_L10_PAR=8 and answer matches the constant for all seeds.
 
     The optimal path is: % 2j % 2j % l (8 ks)
       (1,1): % → ) col 54.  2j → (3,54).  % → (3,4).  2j → (5,4).
@@ -219,17 +219,17 @@ def test_par_is_correct():
     for seed in SEEDS:
         d = build_dungeon_10(seed)
         room = d.rooms[0]
-        assert room.par == _L11_PAR, (
-            f"seed={seed}: expected par={_L11_PAR}, got {room.par}"
+        assert room.par == _L10_PAR, (
+            f"seed={seed}: expected par={_L10_PAR}, got {room.par}"
         )
-        assert room.answer == _L11_ANSWER, (
-            f"seed={seed}: expected answer={_L11_ANSWER!r}, got {room.answer!r}"
+        assert room.answer == _L10_ANSWER, (
+            f"seed={seed}: expected answer={_L10_ANSWER!r}, got {room.answer!r}"
         )
 
 
 def test_room_dimensions():
-    """Room must be exactly _L11_ROWS × _L11_COLS."""
+    """Room must be exactly _L10_ROWS × _L10_COLS."""
     d = build_dungeon_10(42)
     room = d.rooms[0]
-    assert room.rows == _L11_ROWS, f"expected {_L11_ROWS} rows, got {room.rows}"
-    assert room.cols == _L11_COLS, f"expected {_L11_COLS} cols, got {room.cols}"
+    assert room.rows == _L10_ROWS, f"expected {_L10_ROWS} rows, got {room.rows}"
+    assert room.cols == _L10_COLS, f"expected {_L10_COLS} cols, got {room.cols}"

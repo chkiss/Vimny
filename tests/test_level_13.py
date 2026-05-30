@@ -8,12 +8,12 @@ import pytest
 from engine.world import CellType
 from generation.dungeon_gen import (
     build_dungeon_13,
-    _dijkstra_par_L13,
-    _L14_ROWS, _L14_COLS,
-    _L14_ENTRY, _L14_EXIT,
-    _L14_SENT_ROW,
-    _L14_S1_COLS, _L14_S2_COLS, _L14_S3_COLS,
-    _L14_SENT_CLUSTERS,
+    _dijkstra_par_L12,   # L12's brace/paren Dijkstra, reused here for the ')' necessity check
+    _L13_ROWS, _L13_COLS,
+    _L13_ENTRY, _L13_EXIT,
+    _L13_SENT_ROW,
+    _L13_S1_COLS, _L13_S2_COLS, _L13_S3_COLS,
+    _L13_SENT_CLUSTERS,
 )
 
 SEEDS = [1, 42, 999, 12345, 2**20 + 7]
@@ -39,8 +39,8 @@ def test_entry_and_exit_passable(seed):
 def test_dimensions(seed):
     d = build_dungeon_13(seed)
     room = d.rooms[0]
-    assert room.rows == _L14_ROWS, f"seed={seed}: expected {_L14_ROWS} rows, got {room.rows}"
-    assert room.cols == _L14_COLS, f"seed={seed}: expected {_L14_COLS} cols, got {room.cols}"
+    assert room.rows == _L13_ROWS, f"seed={seed}: expected {_L13_ROWS} rows, got {room.rows}"
+    assert room.cols == _L13_COLS, f"seed={seed}: expected {_L13_COLS} cols, got {room.cols}"
 
 
 @pytest.mark.parametrize("seed", SEEDS)
@@ -53,8 +53,8 @@ def test_exit_entity_at_exit_pos(seed):
     assert (e.row, e.col) == room.exit_pos, (
         f"seed={seed}: exit entity at ({e.row},{e.col}) != exit_pos {room.exit_pos}"
     )
-    assert room.exit_pos == _L14_EXIT, (
-        f"seed={seed}: exit_pos {room.exit_pos} != expected {_L14_EXIT}"
+    assert room.exit_pos == _L13_EXIT, (
+        f"seed={seed}: exit_pos {room.exit_pos} != expected {_L13_EXIT}"
     )
 
 
@@ -64,8 +64,8 @@ def test_exit_entity_at_exit_pos(seed):
 def test_sentence_section_corridors(seed):
     d = build_dungeon_13(seed)
     room = d.rooms[0]
-    row = _L14_SENT_ROW
-    for seg_cols in (_L14_S1_COLS, _L14_S2_COLS, _L14_S3_COLS):
+    row = _L13_SENT_ROW
+    for seg_cols in (_L13_S1_COLS, _L13_S2_COLS, _L13_S3_COLS):
         for c in range(seg_cols[0], seg_cols[1] + 1):
             assert room.cells[row][c] == CellType.CORRIDOR, (
                 f"seed={seed}: sentence section ({row},{c}) is not CORRIDOR"
@@ -76,11 +76,11 @@ def test_sentence_section_corridors(seed):
 def test_sentence_section_wall_gaps(seed):
     d = build_dungeon_13(seed)
     room = d.rooms[0]
-    row = _L14_SENT_ROW
-    s1_end = _L14_S1_COLS[1]   # col 10
-    s2_beg = _L14_S2_COLS[0]   # col 23
-    s2_end = _L14_S2_COLS[1]   # col 36
-    s3_beg = _L14_S3_COLS[0]   # col 49
+    row = _L13_SENT_ROW
+    s1_end = _L13_S1_COLS[1]   # col 10
+    s2_beg = _L13_S2_COLS[0]   # col 23
+    s2_end = _L13_S2_COLS[1]   # col 36
+    s3_beg = _L13_S3_COLS[0]   # col 49
     for c in range(s1_end + 1, s2_beg):   # cols 11-22
         assert room.cells[row][c] == CellType.WALL, (
             f"seed={seed}: gap col ({row},{c}) should be WALL, got {room.cells[row][c]}"
@@ -98,7 +98,7 @@ def test_sentence_terminators_present(seed):
     room = d.rooms[0]
     terminators = [
         ru for ru in room.char_runs
-        if ru.row == _L14_SENT_ROW and ru.symbols[-1] in '.!?'
+        if ru.row == _L13_SENT_ROW and ru.symbols[-1] in '.!?'
     ]
     assert len(terminators) >= 2, (
         f"seed={seed}: expected >= 2 sentence-terminator runes, got {len(terminators)}"
@@ -110,7 +110,7 @@ def test_fixed_sentence_clusters_present(seed):
     """All three fixed sentence clusters must be present at their specified positions."""
     d = build_dungeon_13(seed)
     room = d.rooms[0]
-    for row, col, syms in _L14_SENT_CLUSTERS:
+    for row, col, syms in _L13_SENT_CLUSTERS:
         ru = room.char_run_at(row, col)
         assert ru is not None, f"seed={seed}: no rune at ({row},{col})"
         assert ru.symbols == syms, (
@@ -169,7 +169,7 @@ def test_paren_required(seed):
     """
     d = build_dungeon_13(seed)
     room = d.rooms[0]
-    cost_no_paren = _dijkstra_par_L13(room, disable_brace=True, disable_paren=True)
+    cost_no_paren = _dijkstra_par_L12(room, disable_brace=True, disable_paren=True)
     assert cost_no_paren is None or cost_no_paren > room.budget, (
         f"seed={seed}: without (/), cost={cost_no_paren} fits in budget={room.budget}; "
         f"paren motions are not required"

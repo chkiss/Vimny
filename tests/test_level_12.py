@@ -19,11 +19,11 @@ import pytest
 from engine.world import CellType
 from generation.dungeon_gen import (
     build_dungeon_12,
-    _dijkstra_par_L13,
-    _L13_ROWS, _L13_COLS,
-    _L13_ENTRY, _L13_EXIT,
-    _L13_KEY_POS, _L13_DOOR_POS, _L13_VOID_POS,
-    _L13_PAR, _L13_ANSWER,
+    _dijkstra_par_L12,
+    _L12_ROWS, _L12_COLS,
+    _L12_ENTRY, _L12_EXIT,
+    _L12_KEY_POS, _L12_DOOR_POS, _L12_VOID_POS,
+    _L12_PAR, _L12_ANSWER,
 )
 
 SEEDS = [1, 42, 999, 12345, 2**20 + 7]
@@ -37,8 +37,8 @@ _CONTENT_ROWS = (2, 4, 6, 7, 8, 10, 11, 12, 13, 14, 16, 18, 20)
 @pytest.mark.parametrize("seed", SEEDS)
 def test_dimensions(seed):
     room = build_dungeon_12(seed).rooms[0]
-    assert room.rows == _L13_ROWS
-    assert room.cols == _L13_COLS
+    assert room.rows == _L12_ROWS
+    assert room.cols == _L12_COLS
 
 
 @pytest.mark.parametrize("seed", SEEDS)
@@ -55,8 +55,8 @@ def test_exit_entity_at_exit_pos(seed):
     room = build_dungeon_12(seed).rooms[0]
     exits = [e for e in room.entities if e.kind == 'exit']
     assert len(exits) == 1
-    assert (exits[0].row, exits[0].col) == _L13_EXIT
-    assert room.exit_pos == _L13_EXIT
+    assert (exits[0].row, exits[0].col) == _L12_EXIT
+    assert room.exit_pos == _L12_EXIT
 
 
 @pytest.mark.parametrize("seed", SEEDS)
@@ -64,7 +64,7 @@ def test_key_entity_at_key_pos(seed):
     room = build_dungeon_12(seed).rooms[0]
     keys = [e for e in room.entities if e.kind == 'floor_key']
     assert len(keys) == 1, f"seed={seed}: expected 1 floor_key, got {len(keys)}"
-    assert (keys[0].row, keys[0].col) == _L13_KEY_POS
+    assert (keys[0].row, keys[0].col) == _L12_KEY_POS
 
 
 @pytest.mark.parametrize("seed", SEEDS)
@@ -72,14 +72,14 @@ def test_door_entity_at_door_pos(seed):
     room = build_dungeon_12(seed).rooms[0]
     doors = [e for e in room.entities if e.kind == 'locked_door']
     assert len(doors) == 1, f"seed={seed}: expected 1 locked_door, got {len(doors)}"
-    assert (doors[0].row, doors[0].col) == _L13_DOOR_POS
+    assert (doors[0].row, doors[0].col) == _L12_DOOR_POS
 
 
 @pytest.mark.parametrize("seed", SEEDS)
 def test_void_at_correct_position(seed):
     room = build_dungeon_12(seed).rooms[0]
-    ru = room.char_run_at(_L13_VOID_POS[0], _L13_VOID_POS[1])
-    assert ru is not None and ru.kind == 'void', f"seed={seed}: no void at {_L13_VOID_POS}"
+    ru = room.char_run_at(_L12_VOID_POS[0], _L12_VOID_POS[1])
+    assert ru is not None and ru.kind == 'void', f"seed={seed}: no void at {_L12_VOID_POS}"
 
 
 # ── blank and content rows ────────────────────────────────────────────────────
@@ -89,7 +89,7 @@ def test_blank_rows_have_no_runes(seed):
     """All blank rows must have zero rune clusters."""
     room = build_dungeon_12(seed).rooms[0]
     for row in _BLANK_ROWS:
-        for c in range(_L13_COLS):
+        for c in range(_L12_COLS):
             assert room.char_run_at(row, c) is None, (
                 f"seed={seed}: unexpected rune at ({row},{c})"
             )
@@ -99,7 +99,7 @@ def test_blank_rows_have_no_runes(seed):
 def test_blank_rows_are_passable(seed):
     room = build_dungeon_12(seed).rooms[0]
     for row in _BLANK_ROWS:
-        assert any(room.is_passable(row, c) for c in range(_L13_COLS)), (
+        assert any(room.is_passable(row, c) for c in range(_L12_COLS)), (
             f"seed={seed}: blank row {row} has no passable cells"
         )
 
@@ -109,7 +109,7 @@ def test_content_rows_have_runes(seed):
     """Every content row must have at least one rune cluster (non-blank)."""
     room = build_dungeon_12(seed).rooms[0]
     for row in _CONTENT_ROWS:
-        has_rune = any(room.char_run_at(row, c) is not None for c in range(_L13_COLS))
+        has_rune = any(room.char_run_at(row, c) is not None for c in range(_L12_COLS))
         assert has_rune, f"seed={seed}: content row {row} has no rune clusters"
 
 
@@ -118,7 +118,7 @@ def test_content_rows_have_runes(seed):
 @pytest.mark.parametrize("seed", SEEDS)
 def test_par_matches_dijkstra(seed):
     room = build_dungeon_12(seed).rooms[0]
-    computed = _dijkstra_par_L13(room)
+    computed = _dijkstra_par_L12(room)
     assert room.par == computed, f"seed={seed}: room.par={room.par} Dijkstra={computed}"
 
 
@@ -129,11 +129,11 @@ def test_budget_is_ceil_par_times_1_4(seed):
 
 
 def test_par_is_correct():
-    """Par must equal _L13_PAR=7 for all seeds; answer must match _L13_ANSWER."""
+    """Par must equal _L12_PAR=7 for all seeds; answer must match _L12_ANSWER."""
     for seed in SEEDS:
         room = build_dungeon_12(seed).rooms[0]
-        assert room.par == _L13_PAR, f"seed={seed}: par={room.par} != {_L13_PAR}"
-        assert room.answer == _L13_ANSWER, f"seed={seed}: answer={room.answer!r}"
+        assert room.par == _L12_PAR, f"seed={seed}: par={room.par} != {_L12_PAR}"
+        assert room.answer == _L12_ANSWER, f"seed={seed}: answer={room.answer!r}"
 
 
 # ── answer uses brace motions ─────────────────────────────────────────────────
@@ -157,7 +157,7 @@ def test_brace_required(seed):
     10j from key row 5 to door row 15 costs 3 ks; } } costs only 2 ks.
     """
     room = build_dungeon_12(seed).rooms[0]
-    cost_no_brace = _dijkstra_par_L13(room, disable_brace=True)
+    cost_no_brace = _dijkstra_par_L12(room, disable_brace=True)
     assert cost_no_brace is None or cost_no_brace > room.par, (
         f"seed={seed}: without {{/}}, cost={cost_no_brace} <= par={room.par}"
     )

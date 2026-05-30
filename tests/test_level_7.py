@@ -4,9 +4,9 @@ import pytest
 from engine.world import CellType
 from generation.dungeon_gen import (
     build_dungeon_7,
-    _dijkstra_par_L8,
-    _L8_TOTAL_ROWS, _L8_TOTAL_COLS, _L8_CORR_ROWS,
-    _L8_TURN_SPANS,
+    _dijkstra_par_L7,
+    _L7_TOTAL_ROWS, _L7_TOTAL_COLS, _L7_CORR_ROWS,
+    _L7_TURN_SPANS,
 )
 
 SEEDS = [1, 42, 999, 12345, 2**20 + 7]
@@ -26,7 +26,7 @@ def test_entry_and_exit_passable(seed):
 def test_par_matches_dijkstra(seed):
     d = build_dungeon_7(seed)
     room = d.rooms[0]
-    computed = _dijkstra_par_L8(room)
+    computed = _dijkstra_par_L7(room)
     assert room.par == computed, (
         f"seed={seed}: room.par={room.par} but Dijkstra computed {computed}"
     )
@@ -83,24 +83,24 @@ def test_exit_entity_at_exit_pos(seed):
 def test_corridors_carved(seed):
     d = build_dungeon_7(seed)
     room = d.rooms[0]
-    for r in _L8_CORR_ROWS:
+    for r in _L7_CORR_ROWS:
         for c in range(1, 39):
             assert room.cells[r][c] == CellType.CORRIDOR, (
                 f"seed={seed}: corridor row {r} col {c} is not CORRIDOR"
             )
 
 
-_L8_GUARD_WALLS = {(2, 38), (4, 1)}  # RT1 and LT1 narrow-turn walls
+_L7_GUARD_WALLS = {(2, 38), (4, 1)}  # RT1 and LT1 narrow-turn walls
 
 
 @pytest.mark.parametrize("seed", SEEDS)
 def test_turn_spans_carved(seed):
     d = build_dungeon_7(seed)
     room = d.rooms[0]
-    for r0, r1, c0, c1 in _L8_TURN_SPANS:
+    for r0, r1, c0, c1 in _L7_TURN_SPANS:
         for r in range(r0, r1 + 1):
             for c in range(c0, c1 + 1):
-                if (r, c) in _L8_GUARD_WALLS:
+                if (r, c) in _L7_GUARD_WALLS:
                     continue  # guard walls intentionally narrow these turns
                 assert room.cells[r][c] == CellType.CORRIDOR, (
                     f"seed={seed}: turn span ({r0},{r1},{c0},{c1}) cell ({r},{c}) not CORRIDOR"

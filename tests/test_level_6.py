@@ -2,7 +2,7 @@
 import math
 import heapq
 import pytest
-from generation.dungeon_gen import build_dungeon_6, _dijkstra_par_WBE, _L7_UNTYPABLE_PUNCT
+from generation.dungeon_gen import build_dungeon_6, _dijkstra_par_WBE, _L6_UNTYPABLE_PUNCT
 
 SEEDS = [1, 42, 999, 12345, 2**20 + 7]
 
@@ -96,23 +96,23 @@ def test_exit_entity_at_exit_pos(seed):
 
 
 def test_anchor_W_at_fixed_position():
-    """W anchor is always at row=1, col=53; char drawn from _L7_UNTYPABLE_PUNCT."""
+    """W anchor is always at row=1, col=53; char drawn from _L6_UNTYPABLE_PUNCT."""
     d = build_dungeon_6(42)
     room = d.rooms[0]
     anchor = room.char_run_at(1, 53)
     assert anchor is not None, "Expected W-anchor rune at (1, 53)"
-    assert ''.join(anchor.symbols) in _L7_UNTYPABLE_PUNCT, (
+    assert ''.join(anchor.symbols) in _L6_UNTYPABLE_PUNCT, (
         f"Expected untypable char at (1,53), got {''.join(anchor.symbols)!r}"
     )
 
 
 def test_anchor_B_at_fixed_position():
-    """B anchor is always at row=4, col=3; char drawn from _L7_UNTYPABLE_PUNCT."""
+    """B anchor is always at row=4, col=3; char drawn from _L6_UNTYPABLE_PUNCT."""
     d = build_dungeon_6(42)
     room = d.rooms[0]
     anchor = room.char_run_at(4, 3)
     assert anchor is not None, "Expected B-anchor rune at (4, 3)"
-    assert ''.join(anchor.symbols) in _L7_UNTYPABLE_PUNCT, (
+    assert ''.join(anchor.symbols) in _L6_UNTYPABLE_PUNCT, (
         f"Expected untypable char at (4,3), got {''.join(anchor.symbols)!r}"
     )
 
