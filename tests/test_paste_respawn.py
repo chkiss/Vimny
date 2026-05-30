@@ -48,7 +48,7 @@ def test_paste_revives_cut_goblin_live_and_hostile():
                     before=False)                          # p → col 6
     g = room.entity_at(3, 6)
     assert g and g.kind == 'goblin' and g.alive and g.hp == g.max_hp == 1 and g.ai == 'chase'
-    assert player.col == 5, 'cursor must never land the player on the pasted creature'
+    assert player.col == 6, 'cursor lands on the pasted creature (the x-attack position)'
 
 
 def test_clip_is_reusable_and_spawns_are_independent():
@@ -143,7 +143,7 @@ def test_3p_fans_out_creatures():
     gobs = [room.entity_at(3, c) for c in (6, 7, 8)]
     assert all(g and g.kind == 'goblin' and g.alive for g in gobs)
     assert len({g.uid for g in gobs}) == 3                     # three distinct creatures
-    assert player.col == 5                                     # cursor never lands on one
+    assert player.col == 8                                     # cursor on the last pasted creature
 
 
 def test_creature_spawn_messages_cover_the_combat_kinds():

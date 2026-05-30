@@ -2315,6 +2315,7 @@ def run_dungeon(term: Terminal, level: int, progress: dict,
                                       target.row, target.col,
                                       _iw(term), term.height - 8, _kclr)
                     _kill_door_group(room, target.row, target.col, kind='locked_door')
+                    player.row, player.col = target.row, target.col   # paste moves you over: step onto the unlocked door
                     _reveal_from(room, player.row, player.col)
                     budget.spend(_keystroke_cost(count, 'p'))
                     _push('Door unlocked!')
