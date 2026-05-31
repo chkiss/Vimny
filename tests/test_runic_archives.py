@@ -1,4 +1,4 @@
-"""Level 12 (id=12) — The Runic Archives: dungeon correctness tests.
+"""Level 12 — The Runic Archives: dungeon correctness tests.
 
 Layout: 22 rows × 48 cols.
 Main area cols 1–42; side room row 15 cols 43–46.
@@ -26,7 +26,7 @@ from generation.dungeon_gen import (
     _RUNIC_ARCHIVES_PAR, _RUNIC_ARCHIVES_ANSWER,
 )
 
-SEEDS = [1, 42, 999, 12345, 2**20 + 7]
+from tests import SEEDS
 
 _BLANK_ROWS   = (1, 3, 5, 9, 15, 17, 19)
 _CONTENT_ROWS = (2, 4, 6, 7, 8, 10, 11, 12, 13, 14, 16, 18, 20)

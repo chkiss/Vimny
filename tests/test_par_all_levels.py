@@ -27,7 +27,7 @@ from generation.dungeon_gen import (
     _GOBLIN_GAUNTLET_CORR_ROWS, _GOBLIN_GAUNTLET_RIGHT_GOING,
 )
 
-SEEDS = [1, 42, 999, 12345, 2**20 + 7]
+from tests import SEEDS
 
 
 # ── level-5 reference helpers ─────────────────────────────────────────────────

@@ -5,7 +5,7 @@ import pytest
 import generation.dungeon_gen as _dg
 from generation.dungeon_gen import build_dungeon_first_cave, build_dungeon_line_halls
 
-SEEDS = [0, 1, 42, 999, 2**20 + 7]
+SEEDS = [0, 1, 42, 999, 2**20 + 7]   # answer-path set: includes seed 0 by design; differs from tests.SEEDS
 
 _COUNT_RE = re.compile(r'^\d+[hjkl]$')   # e.g. '44l', '3j', '2h'
 
@@ -79,7 +79,7 @@ _SKIP_LEVELS = {
 }
 _XFAIL_LEVELS: dict = {}
 
-_UNIVERSAL_SEEDS = [1, 42, 999, 12345, 2**20 + 7]
+from tests import SEEDS as _UNIVERSAL_SEEDS
 
 
 def _all_builder_params():

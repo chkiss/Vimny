@@ -1,4 +1,4 @@
-"""Level 10 (id=10) — The Bracket Vaults: dungeon correctness tests.
+"""Level 10 — The Bracket Vaults: dungeon correctness tests.
 
 Layout: three-corridor snake (7 rows × 60 cols).  Rows 1 and 5 are open
 corridors; rows 2, 3 and 4 are flooded with WATER except the turn cells and the
@@ -23,7 +23,7 @@ from generation.dungeon_gen import (
     _BRACKET_VAULTS_ENTRY, _BRACKET_VAULTS_EXIT_POS, _BRACKET_VAULTS_PAR, _BRACKET_VAULTS_ANSWER,
 )
 
-SEEDS = [1, 42, 999, 12345, 2**20 + 7]
+from tests import SEEDS
 
 
 @pytest.mark.parametrize("seed", SEEDS)

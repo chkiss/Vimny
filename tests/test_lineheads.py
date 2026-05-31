@@ -1,4 +1,4 @@
-"""Level 8 (id=8) — The Lineheads: dungeon correctness tests.
+"""Level 8 — The Lineheads: dungeon correctness tests.
 
 Teaching goal: G (last line), gg (first line), {n}G (nth line).
 
@@ -18,7 +18,7 @@ from generation.dungeon_gen import (
     _LINEHEADS_KEYS, _LINEHEADS_DOORS, _LINEHEADS_PASSABLE,
 )
 
-SEEDS = [1, 42, 999, 12345, 2**20 + 7]
+from tests import SEEDS
 
 _PASSABLE_CELLS = {(r, c) for r, cols in _LINEHEADS_PASSABLE.items() for c in cols}
 

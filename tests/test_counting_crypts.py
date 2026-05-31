@@ -6,7 +6,7 @@ from generation.dungeon_gen import (
 )
 from engine.world import RoomType
 
-SEEDS = [1, 42, 999, 12345, 2**20 + 7]
+from tests import SEEDS
 
 
 def _count_optimal_reach(composite, max_count=50):

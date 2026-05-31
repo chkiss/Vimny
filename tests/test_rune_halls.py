@@ -3,7 +3,7 @@ import math
 import pytest
 from generation.dungeon_gen import build_dungeon_rune_halls, _dijkstra_par_wbe
 
-SEEDS = [1, 42, 999, 12345, 2**20 + 7]
+from tests import SEEDS
 
 
 @pytest.mark.parametrize("seed", SEEDS)
