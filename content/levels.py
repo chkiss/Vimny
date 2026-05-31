@@ -29,8 +29,8 @@ from __future__ import annotations
 LEVELS = [
     {'display': '0',    'slug': 'first_cave',            'name': 'The First Cave',             'commands': 'h j k l u :w :q :q!', 'teaches': ['h', 'j', 'k', 'l']},
     {'display': '1',    'slug': 'line_halls',            'name': 'The Line Halls',             'commands': '^ $ 0', 'teaches': ['^', '$', '0']},
-    {'display': '1.1',  'slug': 'reliquary',             'name': 'The Reliquary',              'commands': '"', 'type': 'reliquary', 'after': 'line_halls', 'teaches': []},
-    {'display': '2',    'slug': 'counting_crypts',       'name': 'The Counting Crypts',        'commands': '[count] prefix', 'teaches': ['count', 'x']},
+    {'display': '1.1',  'slug': 'reliquary',             'name': 'The Reliquary',              'commands': 'x', 'type': 'reliquary', 'after': 'line_halls', 'teaches': ['x']},
+    {'display': '2',    'slug': 'counting_crypts',       'name': 'The Counting Crypts',        'commands': '[count] prefix', 'teaches': ['count']},
     {'display': '3',    'slug': 'rune_halls',            'name': 'The Rune Halls',             'commands': 'w b e', 'teaches': ['w', 'b', 'e']},
     {'display': '4',    'slug': 'character_cataracts',   'name': 'The Character Cataracts',    'commands': 'f F t T', 'teaches': ['f', 'F', 't', 'T']},
     {'display': '5',    'slug': 'goblin_gauntlet',       'name': 'The Goblin Gauntlet',        'commands': '; , p', 'teaches': [';', ',', 'p']},

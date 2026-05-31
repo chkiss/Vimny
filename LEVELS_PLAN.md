@@ -47,7 +47,7 @@ Curriculum order is the order of `LEVELS`. Blueprints: `blueprints/act_*.md`.
 |---|------|------|----------|------|
 | 0 | `first_cave` | The First Cave | `h j k l u :w :q :q!` |  |
 | 1 | `line_halls` | The Line Halls | `^ $ 0` |  |
-| 1.1 | `reliquary` | The Reliquary | `"` | reliquary |
+| 1.1 | `reliquary` | The Reliquary | `x` | reliquary |
 | 2 | `counting_crypts` | The Counting Crypts | `[count] prefix` |  |
 | 3 | `rune_halls` | The Rune Halls | `w b e` |  |
 | 4 | `character_cataracts` | The Character Cataracts | `f F t T` |  |

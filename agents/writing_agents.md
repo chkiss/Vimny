@@ -57,8 +57,9 @@ give them:
 Notes when building the sheet:
 - **Boss levels** teach no new command — frame their poem as a warm, slightly
   anticipatory pep-talk that consolidates prior skills (not threatening).
-- **The Reliquary** (`introduces_slug` `reliquary`) reveals the unnamed register `"` — a
-  foreshadow that deletions are kept, *not* a how-to (the player has no yank/paste yet).
+- **The Reliquary** (`introduces_slug` `reliquary`) now teaches `x` (delete the character
+  under the cursor); it may also foreshadow the unnamed register `"` (deletions are kept)
+  as a secondary grace note — the register's full reveal lives in the in-room scroll.
 - **Generic/mood poems** (rhythm, philosophy, encouragement, closing, etc.) have no
   command — judge them on Voice & Freshness only.
 

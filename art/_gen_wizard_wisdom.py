@@ -85,11 +85,11 @@ POEMS: list[tuple[str | None, str, list[str]]] = [
         "$ to the line's far wall.",
         'Far-left, first word, far-right.',
     ]),
-    ('reliquary', 'the unnamed register', [    # The Reliquary — " (deletions kept)
-        'What you brush away is not yet lost.',
-        'The unnamed register " keeps each cut.',
-        'Watch the statusline—it holds there.',
-        'Nothing gone until you choose again.',
+    ('reliquary', 'delete char', [             # The Reliquary — x (delete char); register " foreshadowed
+        'x. No aim, no stride—just the mark',
+        'beneath you, struck from the row.',
+        'The unnamed register " keeps it.',
+        'Nothing wanders far in here.',
     ]),
     ('counting_crypts', 'counts', [            # The Counting Crypts — [count]
         'Once I tapped j eleven times to fall.',
