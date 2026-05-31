@@ -406,15 +406,14 @@ solver, save record, scroll, and wizard poem is keyed by the immutable **slug**
 - Wizard poems: `introduces_slug` (`art/_gen_wizard_wisdom.py`).
 - Per-level special-casing in main.py compares `level == '<slug>'`.
 
-## The only places numbers still live
+## The only place numbers still live
 - `display` (one cosmetic string per level) — the single thing a renumber edits.
-- `LEGACY_ID_SLUG` (`content/levels.py`) — a **frozen** historical id→slug map,
-  used solely to migrate pre-refactor int-keyed save files. Never edit it: it is
-  a permanent record of the numbering in use when those saves were written.
+
+Saves are keyed by slug. The pre-refactor int-keyed save files were migrated to
+slug keys once (a throwaway script, with a backup); the historical id→slug map
+was then deleted, so there is **no** legacy numbering anywhere in the runtime.
 
 ## Adding a new level
 Add a `LEVELS` entry (unique slug, `display`, `name`, `key`, `teaches`); write
 `build_dungeon_<slug>` + `tests/test_<slug>.py`; if it precedes a lesson, add a
-slug-keyed poem in `art/_gen_wizard_wisdom.py` and regenerate. A brand-new slug
-needs **no** `LEGACY_ID_SLUG` entry (only levels that ever shipped with an int id
-appear there).
+slug-keyed poem in `art/_gen_wizard_wisdom.py` and regenerate.

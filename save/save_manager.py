@@ -2,8 +2,6 @@ import json, os, pwd, re
 from pathlib import Path
 from typing import Optional
 
-from content.levels import LEGACY_ID_SLUG
-
 def _home() -> Path:
     for var in ('SUDO_USER', 'DOAS_USER'):
         user = os.environ.get(var)
@@ -86,13 +84,9 @@ def load_progress(data: Optional[dict]) -> dict:
     if data is None:
         return {}
     raw    = data.get('progress', {})
-    # Level records are keyed by slug. Legacy saves used int level-ids — migrate
-    # them via LEGACY_ID_SLUG (digit-string key → slug); drop any id with no slug.
-    result: dict = {}
-    for k, v in raw.items():
-        slug = LEGACY_ID_SLUG.get(int(k)) if str(k).lstrip('-').isdigit() else k
-        if slug is not None:
-            result[slug] = v
+    # Level records are keyed by slug (a one-off migration converted the old
+    # int-keyed saves). Load them as-is.
+    result: dict = dict(raw)
     extras = data.get('extras', [])
     if extras:
         result['extras'] = extras
