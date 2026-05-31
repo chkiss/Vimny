@@ -1,22 +1,18 @@
 """Par correctness across all levels.
 
 For levels 0–4 each level's par equals its BFS/Dijkstra solver re-run on the
-final room (trivially passes today; catches future solver regressions).
-Level 2 par is already validated in test_level_2.py; the universal budget test
-here covers it alongside every other level.
+final room (trivially passes today; catches future solver regressions). The
+Counting Crypts par is also validated in test_counting_crypts.py; the universal
+budget test here covers it alongside every other level.
 
-Level 5 is the failing case: _par_l5 over-estimates par by not modelling two
-cheaper techniques available in the level-5 command set:
+The Goblin Gauntlet (level 5) par is checked against a hand-written reference
+(_par_l5_reference below) that models its cheapest command set:
 
   1. $ / 0 are water-crossing motions that reach any corridor connector in
-     exactly 1 keystroke.  _par_l5 charges _l5_move_cost(dist) ≥ 2 instead.
+     exactly 1 keystroke.
 
-  2. last_f persists across corridors.  The first right-going corridor (row 1)
-     needs fg (2 keys) to establish last_f, but every subsequent right-going
-     corridor can reuse it with ; (1 key).  _par_l5 charges fg every time.
-
-test_level5_par_matches_reference is currently FAILING; patching _par_l5 makes
-every test in this file pass.
+  2. last_f persists across corridors: the first right-going corridor needs fg
+     (2 keys) to establish last_f; every subsequent one reuses it with ; (1 key).
 """
 import math
 import pytest

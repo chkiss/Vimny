@@ -115,9 +115,9 @@ engine/
   reflow.py              Reflow editing primitives (insert/delete/join/ledge-build)
   budget.py              Budget tracking
 generation/
-  dungeon_gen.py         build_dungeon_0…14 (+ 51 boss), Dijkstra par solvers
+  dungeon_gen.py         build_dungeon_<slug> per level, Dijkstra par solvers
 content/
-  levels.py              Level definitions, known_commands()
+  levels.py              Level definitions (slug identity), known_commands(slug)
 render/
   renderer.py            Read-only dungeon view (no mutation)
   overworld.py           Read-only netrw overworld buffer
