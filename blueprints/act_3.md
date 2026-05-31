@@ -1,5 +1,7 @@
 # Act III — Navigation Power Tools: Blueprints
 
+> ⚠ **Pre-implementation design doc — obsolete conventions; delete-on-implement.** Uses pre-slug naming (e.g. `RuneCluster` → now `CharRun`; level numbers are now the cosmetic `display` field) — don't copy these symbols. **Delete a level's section when that level ships, and the whole file once its act is built.** See LEVELS_PLAN Part 8.
+
 Levels 10, 15, 16, 17, 17.1. Each level introduces at most 3 linked mechanics, budget-forces or
 contextually teaches them, and is buildable from existing engine primitives (with
 clearly flagged assumed extensions).

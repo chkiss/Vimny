@@ -1,5 +1,7 @@
 # Act II Boss Blueprint — The Warden Surveyor (13.1)
 
+> ⚠ **Pre-implementation design doc — obsolete conventions; delete-on-implement.** Uses pre-slug naming (e.g. `RuneCluster` → now `CharRun`; level numbers are now the cosmetic `display` field) — don't copy these symbols. **Delete a level's section when that level ships, and the whole file once its act is built.** See LEVELS_PLAN Part 8.
+
 Act II's teaching levels (L6–L13: WORD Forge → Sentence Corridor) are **built** —
 see `generation/dungeon_gen.py` (`build_dungeon_<slug>`) and the matching
 `tests/test_<slug>.py`. Their blueprints were retired (delete-on-implement).

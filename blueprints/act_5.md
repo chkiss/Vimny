@@ -1,5 +1,7 @@
 # Act V Blueprints — Insert-Mode Construction & Editing
 
+> ⚠ **Pre-implementation design doc — obsolete conventions; delete-on-implement.** Uses pre-slug naming (e.g. `RuneCluster` → now `CharRun`; level numbers are now the cosmetic `display` field) — don't copy these symbols. **Delete a level's section when that level ships, and the whole file once its act is built.** See LEVELS_PLAN Part 8.
+
 > Generator-grade ASCII blueprints for levels 23–29 + boss 29.1.
 > Each section is a complete spec for `build_dungeon_N()` in `generation/dungeon_gen.py`.
 > Dims = (rows × cols). @ = entry, X = exit, K = keystone, D = door, g = goblin, W = warden.
