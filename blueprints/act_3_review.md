@@ -5,7 +5,7 @@ layout, and an independent arithmetic check.
 
 ---
 
-## Level 10 — The Mirror Temple
+## Level 10 — The Bracket Vaults
 
 ### 1. Scope
 
@@ -82,7 +82,7 @@ PASS.
 
 ---
 
-## Level 11 — The Seekers' Labyrinth
+## Level 15 — The Seekers' Labyrinth
 
 ### 1. Scope
 
@@ -224,11 +224,11 @@ the par arithmetic is verifiable.
 
 ### 4. Boss
 
-Not applicable at L11.
+Not applicable at L15.
 
 ---
 
-## Level 12 — The Waypoint Sanctum
+## Level 16 — The Waypoint Sanctum
 
 ### 1. Scope
 
@@ -338,11 +338,11 @@ Design is sound IF mark commands are implemented.
 
 ### 4. Boss
 
-Not applicable at L12.
+Not applicable at L16.
 
 ---
 
-## Level 13 — The Archivist's Library
+## Level 17 — The Archivist's Library
 
 ### 1. Scope
 
@@ -416,16 +416,16 @@ precedent. Engine flags are honest and specific.
 
 ### 4. Boss
 
-Not applicable at L13.
+Not applicable at L17.
 
 ---
 
-## Level 13.1 — The Warden Pathfinder (Boss)
+## Level 17.1 — The Warden Pathfinder (Boss)
 
 ### 1. Boss placement and structure
 
 - Caps Act III (levels 10-13). ✓
-- Numbered 13.1. ✓
+- Numbered 17.1. ✓
 - Has 4 phases + 1 final, each mapping 1:1 to an Act III teaching level. ✓
 
 PASS.
@@ -585,7 +585,7 @@ All extensions from the blueprint table:
 | `:set {option}` command | ✓ | ✓ |
 | Warden immunity flag | ✓ | ✓ |
 
-**Missing flag:** For L11, the blueprint does NOT clarify whether `/SIGIL` warps the
+**Missing flag:** For L15, the blueprint does NOT clarify whether `/SIGIL` warps the
 player *avatar* (teleport) or just highlights the position (cursor-only). This is a
 critical missing engine specification that must be added.
 
@@ -597,12 +597,12 @@ argument.
 
 ## Summary of Defects
 
-### L10 — Mirror Temple
+### L10 — Bracket Vaults
 - **D1 (Minor):** Par is miscounted. Blueprint claims 14; independent computation gives 12.
   Budget should be 17, not 20. Forceability is unaffected (walls block alternatives).
 - **Fix:** Recount par step-by-step; tighten budget to ceil(12×1.4)=17. No redesign needed.
 
-### L11 — Seekers' Labyrinth
+### L15 — Seekers' Labyrinth
 - **D2 (Critical):** Par claim (33) is arithmetically impossible for a 20×70 grid. Even
   with optimal search, travel to SIGIL in worst-case alcove exceeds 33 total keystrokes.
 - **D3 (Critical):** Engine behavior of `/SIGIL` is unspecified: does it teleport the
@@ -615,10 +615,10 @@ argument.
     worst-case budget forces search.
   - Option B: Specify that `/SIGIL` teleports the player avatar (flag as engine extension),
     then recompute par correctly based on teleport-then-walk-to-exit cost.
-  - Option C: Split level — L11 teaches only `/` (forward search with fog-of-knowledge);
+  - Option C: Split level — L15 teaches only `/` (forward search with fog-of-knowledge);
     a small follow-up level teaches `n`/`N`.
 
-### L12 — Waypoint Sanctum
+### L16 — Waypoint Sanctum
 - **D6 (Minor):** No-marks par (65) is asserted without step-by-step arithmetic.
   The forcing margin (65-59=6) is too tight to trust without verification.
 - **D7 (Minor):** Grid dimension inconsistency: "18 rows" but rows 0-18 are listed (19 rows).
@@ -626,13 +626,13 @@ argument.
   dimensions. If no-marks path is actually closer to 62, increase the layout to widen
   the margin or adjust par downward.
 
-### L13 — Archivist's Library
+### L17 — Archivist's Library
 - **D8 (Minor):** `:e`-ing into a prior dungeon name (e.g., `cave_01` from the shelf)
   could leave the player stranded if those rooms don't have a return mechanism.
 - **Fix:** Either (a) restrict `:e` to only "index" in this level's context, or (b) ensure
   all named rooms have `:q` / `:e archivist_library` as a return path.
 
-### L13.1 — Boss
+### L17.1 — Boss
 - **D9 (Critical):** Phase 3 mark-forcing is broken. K-red→K-blue→K-green are left-to-right;
   a player can collect all three in linear order without marks. The Warden spawning at
   K-blue (col 60, already passed) does not block K-green (col 68, to the right).
@@ -657,12 +657,12 @@ argument.
 | Level | Scope | Linkage | Forceability | Boss | Overall |
 |-------|-------|---------|-------------|------|---------|
 | L10   | PASS  | PASS    | COND. PASS  | N/A  | COND. PASS |
-| L11   | BORDERLINE | PASS | FAIL | N/A | FAIL |
-| L12   | PASS  | PASS    | COND. PASS  | N/A  | COND. PASS |
-| L13   | PASS  | PASS    | PASS (contextual) | N/A | PASS |
-| 13.1  | PASS  | PASS    | FAIL        | FAIL (2 phase defects) | FAIL |
+| L15   | BORDERLINE | PASS | FAIL | N/A | FAIL |
+| L16   | PASS  | PASS    | COND. PASS  | N/A  | COND. PASS |
+| L17   | PASS  | PASS    | PASS (contextual) | N/A | PASS |
+| 17.1  | PASS  | PASS    | FAIL        | FAIL (2 phase defects) | FAIL |
 
-**Total FAILs: 2 levels** (L11, L13.1) **+ 2 CONDITIONAL PASSes** (L10, L12).
+**Total FAILs: 2 levels** (L15, L17.1) **+ 2 CONDITIONAL PASSes** (L10, L16).
 
 ---
 
@@ -670,19 +670,19 @@ argument.
 
 **P0 — Must fix before level runs:**
 
-1. **(L11) Specify `/ search` engine behavior** — teleport avatar or cursor-only? Add to
-   engine extensions table. Without this, the entire L11 forcing argument is undefined.
+1. **(L15) Specify `/ search` engine behavior** — teleport avatar or cursor-only? Add to
+   engine extensions table. Without this, the entire L15 forcing argument is undefined.
 
-2. **(L11) Recompute par with correct arithmetic** — the 33-keystroke claim is wrong for a
+2. **(L15) Recompute par with correct arithmetic** — the 33-keystroke claim is wrong for a
    20×70 grid. Either shrink the grid or recompute from first principles. Show worst-case
    seed arithmetic explicitly.
 
-3. **(L13.1 Phase 3) Redesign mark-forcing** — K-red/K-blue/K-green are co-linear (left to
+3. **(L17.1 Phase 3) Redesign mark-forcing** — K-red/K-blue/K-green are co-linear (left to
    right); player can reach all three without marks. Non-linear layout required (e.g., K-red
    at far left, K-green at far right, Warden spawning in the middle after K-blue is
    collected, forcing mark-jump back to one side).
 
-4. **(L13.1 Phase 4) Make `:set number` genuinely required** — add a mechanic that makes
+4. **(L17.1 Phase 4) Make `:set number` genuinely required** — add a mechanic that makes
    blind `x`-spamming fail (e.g., a counter puzzle, or a "wrong hit" penalty that is only
    avoidable by knowing exact HP via `:set number`).
 
@@ -690,23 +690,23 @@ argument.
 
 5. **(L10) Correct par to 12, tighten budget to 17** — minor but cleanest to fix now.
 
-6. **(L12) Provide step-by-step no-marks path arithmetic** — the 6-keystroke margin (65-59)
+6. **(L16) Provide step-by-step no-marks path arithmetic** — the 6-keystroke margin (65-59)
    must be verified; if the true no-marks cost is <60, the level needs a layout adjustment
    to widen the gap.
 
-7. **(L12) Fix grid dimension: "18 rows" should be 19 rows** (rows 0-18, 0-indexed).
+7. **(L16) Fix grid dimension: "18 rows" should be 19 rows** (rows 0-18, 0-indexed).
 
 **P2 — Cleanup:**
 
-8. **(L11) Provide explicit `n`/`N` and `?` forcing arithmetic** for a specific seed layout,
+8. **(L15) Provide explicit `n`/`N` and `?` forcing arithmetic** for a specific seed layout,
    not just narrative hand-waving.
 
-9. **(L13) Clarify `:e` scope** — restrict or handle all shelf dungeon names to prevent
+9. **(L17) Clarify `:e` scope** — restrict or handle all shelf dungeon names to prevent
    softlock when player `:e`s into a named room without a return path.
 
-10. **(L13.1) Clarify Phase 2 description** — remove the implication that `:set number` is
+10. **(L17.1) Clarify Phase 2 description** — remove the implication that `:set number` is
     useful in Phase 2 for decoy identification (it is not required; decoys die in 1 hit).
 
-11. **(L13.1) Recompute boss par** — Phase 4 alone costs ~18 keys (`:set number<Enter>` +
+11. **(L17.1) Recompute boss par** — Phase 4 alone costs ~18 keys (`:set number<Enter>` +
     `x x x` + exit navigation); total par is likely 70+, not 60. Recompute and adjust
     budget accordingly.

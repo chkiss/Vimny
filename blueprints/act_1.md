@@ -1,6 +1,6 @@
 # Act I Blueprint — Navigation Foundations (Revised)
 
-Levels: 0 · 1 · 2 · 3 · 4 · 4.1 (boss)
+Levels: 0 · 1 · 2 · 3 · 4 · 5 (The Goblin Gauntlet — shipped; no blueprint here) · 5.1 (boss)
 
 Engine conventions: grid fixed; hjkl stop at walls; `$`/`0`/`^` are room-scoped (stop at room
 wall / fog boundary); count cost = len(str(n))+1 keys; `w`/`b`/`e` are row-scoped over rune
@@ -1089,7 +1089,7 @@ suspenders for t/T vs f/F), ember anchor (exit via `e`), snake corridors (both d
 
 ---
 
-## Level 4.1 — The Warden's Keep (ACT I BOSS)
+## Level 5.1 — The Warden's Keep (ACT I BOSS)
 **Commands required:** all Act I commands — `h j k l`, `^ $ 0`, `[count]`, `w b e`, `f F t T ; ,`
 
 ### Phase 4 fix — `$` bypass of `w`/`e` (S4)
@@ -1321,7 +1321,7 @@ Phase 5 forcing: timer-based (engine dep). See CHALLENGE.
 2. **Linkage:** Each phase exercises one Act I command family. ✓
 3. **Forceability:** Phases 0-3 unambiguously forced. Phase 4 forced by S2 (warden at interior
    positions). Phase 5 forced by timer (engine dep — see CHALLENGE). ✓
-4. **Boss placement:** Level 4.1 — correct `x.1` numbering, caps Act I. ✓
+4. **Boss placement:** Level 5.1 — correct `x.1` numbering, caps Act I. ✓
 
 ---
 
@@ -1334,4 +1334,4 @@ Phase 5 forcing: timer-based (engine dep). See CHALLENGE.
 | 2 | The Counting Crypts | `[count]` (+ `0` formally forced) | 16 | 23 | 1.40 | Yes — count-free path = 26 > 23; void wall forces row-1 bypass (S1); `0` forced |
 | 3 | The Rune Halls | `w b e` | 24 | 34 | 1.40 | Conditional — S1 via activation triggers (CHALLENGE: engine dep) |
 | 4 | The Char. Cataracts | `f F t T`, `; ,` | 31 | 44 | 1.40 | Yes — water S1-forces f/F/t/T; void `!` runes: `t`-stop no-op → `;`/`,` terrain-∞ forced (S1) |
-| 4.1 | The Warden's Keep | all Act I (boss) | 74 | 104 | 1.40 | Phases 0-3 ✓; Phase 4 S2-forced by interior warden; Phase 5 CHALLENGE (engine dep) |
+| 5.1 | The Warden's Keep | all Act I (boss) | 74 | 104 | 1.40 | Phases 0-3 ✓; Phase 4 S2-forced by interior warden; Phase 5 CHALLENGE (engine dep) |

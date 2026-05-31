@@ -1,6 +1,6 @@
 # Act IV Blueprints — Visual Mode & The Operator Grammar
 
-> Generator-grade ASCII blueprints for levels 14–19 + boss 19.1.
+> Generator-grade ASCII blueprints for levels 14, 18–22 + boss 22.1.
 > Each section is a complete spec for `build_dungeon_N()` in `generation/dungeon_gen.py`.
 > Dims = (rows × cols). @ = entry, X = exit, K = keystone, D = door, g = goblin, W = warden.
 > Par-solver assumptions are stated explicitly in each section.
@@ -11,9 +11,9 @@
 > - S3 par recomputed as true full min-keystroke entry→exit including all navigation and Esc.
 > - S4 earlier commands blocked via terrain or command guards where they would trivialize.
 > - L14: `V` given its own `visual_line` token; `v` strictly cheapest.
-> - L16: par arithmetic corrected (2j 15l = 17, not 7; realistic par ~66); `D` taught as
+> - L19: par arithmetic corrected (2j 15l = 17, not 7; realistic par ~66); `D` taught as
 >   shorthand demo since `D` and `d$` cost identically in the engine (CHALLENGE recorded).
-> - L19: `dw` replaced by `de` (inclusive, chains correctly); `dd` and `d12e` bypasses
+> - L22: `dw` replaced by `de` (inclusive, chains correctly); `dd` and `d12e` bypasses
 >   blocked via terrain (each goblin in single-cell alcove; door sealed by goblin death).
 > - Boss Warden Manifold Phase 4: `yy`+`p` split — now Phase 4 = `yy`, Phase 5 = `p`,
 >   one operator per phase; note engine CHALLENGE for `immune_to`/`phase` fields.
@@ -29,11 +29,11 @@ New mechanics (count: 2):
 
 **Linkage:** `v` is the bridge level. Students already know all motions (hjkl, w, $, etc.).
 They now discover that any operator can act on a visual selection instead of a motion argument.
-The key insight — "select a span, then delete it" — will be re-expressed in L15 as `d{motion}`.
+The key insight — "select a span, then delete it" — will be re-expressed in L18 as `d{motion}`.
 
 **`V` (linewise visual) is explicitly NOT taught in L14.**
 `V` is gated on the `visual_line` token in `known_commands`. L14 grants only `visual` (charwise).
-`V` is deferred to L16 where it naturally pairs with the whole-line idiom (`dd` ~ `Vd`).
+`V` is deferred to L19 where it naturally pairs with the whole-line idiom (`dd` ~ `Vd`).
 This ensures `v` is strictly cheapest for void-field clearing in this level.
 
 ---
@@ -135,11 +135,11 @@ right void strip (bypass prevention).
   (3) operator on visual span. All three are one conceptual family: "select then operate."
 - Forced? YES: terrain-∞ forcing — void field is impassable without `v...d`. S1 satisfied.
 - `V` gated separately? YES: `visual_line` token separate from `visual` token.
-- Boss linkage? YES: `v` feeds directly into L15 operator grammar.
+- Boss linkage? YES: `v` feeds directly into L18 operator grammar.
 
 ---
 
-## L15 — The Operator's Vault
+## L18 — The Operator's Vault
 
 **Commands taught:** `d{motion}` and `c{motion}` with the full motion vocabulary.
   Sub-variants as practice (not separate lessons): `dw` `de` `db` `dt{c}` `df{c}` `d$` `d^`
@@ -244,12 +244,12 @@ Chamber corridor widths are set so the taught motion exactly spans the required 
 **Self-check:**
 - ≤3 new mechanics? YES: `d`/`c` operators instantiate one grammar pattern. Count = 2 operators.
 - Forced? YES: chambers block navigation; operator+motion uniquely cheapest per chamber.
-- L15 self-check text previously had "count: 2" vs "grammar is the single new idea" contradiction.
+- L18 self-check text previously had "count: 2" vs "grammar is the single new idea" contradiction.
   Resolved: count = 2 operators sharing 1 grammar pattern. Both are stated consistently above.
 
 ---
 
-## L16 — The Whole-Line Annex
+## L19 — The Whole-Line Annex
 
 **Commands taught:** `dd` `cc` `D` `S`.
   Idiom family: operator-doubling acts on the whole line; `D` = `d$`; `S` = `cc`.
@@ -260,7 +260,7 @@ New mechanics (count: 2):
 2. `D` (= `d$`) and `S` (= `cc`) as convenient single-key shorthands — taught as **idiomatic
    demos**, not budget-forced commands (see CHALLENGE below regarding `D` vs `d$` cost).
 
-**Linkage:** Students know `d{motion}` and `c{motion}` from L15. The new idea is that doubling
+**Linkage:** Students know `d{motion}` and `c{motion}` from L18. The new idea is that doubling
 the operator (`dd`, `cc`) operates on the full line — the "implicit whole-line motion." `D` and
 `S` are shorthands for already-known combinations (`d$` and `cc`), taught here as the natural
 same-lesson companions. `V` (linewise visual) is introduced as the bridge to what students
@@ -376,7 +376,7 @@ Total (skipping optional keystone):                             69
 
 ---
 
-## L17 — The Quartermaster
+## L20 — The Quartermaster
 
 **Commands taught:** `y` (yank), `yy` (yank line), `y{motion}` variants (yw, ye, y$, y^),
   and `p` / `P` (paste after / before cursor).
@@ -507,7 +507,7 @@ keystone, void strip (routing constraint).
 
 ---
 
-## L18 — The Undo Sanctum
+## L21 — The Undo Sanctum
 
 **Commands taught:** `u` (undo). `Ctrl-R` (redo) is a **discoverable scroll reward**, not a
 forced lesson.
@@ -576,7 +576,7 @@ Row 9: # . . . . . . . . . . . . . . . . . . . . . . X #
 
 ---
 
-## L19 — The Echo Vault
+## L22 — The Echo Vault
 
 **Commands taught:** `.` (dot-repeat — repeat the last change).
 New mechanics (count: 1, the minimum):
@@ -592,7 +592,7 @@ cover that cluster and the goblin on it. This is verified from the engine motion
 Budget arithmetic is identical whether `dw` or `de` is the teaching command.
 
 **Linkage:** `.` is only useful when there is a repeatable last change. This level immediately
-follows L15 (operator grammar). Students have `de`, `dd`, `ce`, etc. as known changes. The
+follows L18 (operator grammar). Students have `de`, `dd`, `ce`, etc. as known changes. The
 level is designed around 12 identical targets, each exactly 1 `e`-motion apart, so the optimal
 sequence is `de . . . . . . . . . . .` (1 + 11 dots) vs `de de de ...` (2 × 12 = 24 keys).
 
@@ -618,10 +618,10 @@ on the rune cluster at the alcove mouth. This layout has two bypass-blocking pro
    leaves all goblins alive in their alcoves. `dd` does not solve the level.
 
 2. **`d12e` count bypass blocked (S4):** Count-motions are available from L2. A command guard
-   at L19 disallows `count > 1` with the `e` motion (or with any operator-motion combination),
+   at L22 disallows `count > 1` with the `e` motion (or with any operator-motion combination),
    or equivalently the engine's operator guard for this level strips the count prefix. This
    means `d12e` is not accepted; the player must use `.` to chain. Document this guard in
-   `content/levels.py` as a `blocked_commands` entry for L19.
+   `content/levels.py` as a `blocked_commands` entry for L22.
 
 **Layout:**
 
@@ -673,7 +673,7 @@ Deleting a poison rune triggers "player takes damage = game over" (or level rest
 The player learns not to use `dd` here by experiencing the consequence.
 
 This is a new primitive (poison rune). If unimplemented, fall back to:
-**S4 command guard:** Block `dd` explicitly via `blocked_commands` at L19. Document this guard.
+**S4 command guard:** Block `dd` explicitly via `blocked_commands` at L22. Document this guard.
 
 ```
 ##############################################################
@@ -686,9 +686,9 @@ This is a new primitive (poison rune). If unimplemented, fall back to:
 Where goblins are at the same cols as cluster starts (row 1). `!` = poison rune at col 39.
 `dd` = game over (hits poison). `de . × 11` avoids col 39 (only spans within cluster fields).
 
-**Command guards for L19 (S4):**
+**Command guards for L22 (S4):**
 - `dd` blocked via terrain (poison rune) OR explicit `blocked_commands` entry.
-- `d12e` (count > 1) blocked via `blocked_commands = ['count_operator']` at L19.
+- `d12e` (count > 1) blocked via `blocked_commands = ['count_operator']` at L22.
 
 **Optimal path:**
 
@@ -719,7 +719,7 @@ Total:                                                         17
 - `de . × 11` = 2 + 11 = 13 keys + navigation (ll + 20l = 5) = **17 ≤ budget 24**. Passes.
 - **Forced.** (Multiplier used: ×1.4, standard. Documents: 29 > 24.)
 - `dd` blocked by terrain (poison rune at col 39) OR `blocked_commands`.
-- `d12e` blocked by `blocked_commands` (count > 1 with operators at L19).
+- `d12e` blocked by `blocked_commands` (count > 1 with operators at L22).
 
 **Primitives used:** rune clusters (12 identical, perfectly spaced), goblins (one per cluster),
 door (all-goblins-defeated trigger), poison rune (or command guard) blocking `dd` bypass,
@@ -733,7 +733,7 @@ command guard blocking count-operator bypass.
   is killed. This chains through all 12 goblins without any `j` or navigation.
 - Navigation keystrokes (`l`, `l` at start; `20l` at end) do NOT reset last change, since they
   are non-mutating. Only mutating operations set the last change register.
-- `blocked_commands` at L19: `['dd', 'count_operator']` (or equivalent guard names as implemented
+- `blocked_commands` at L22: `['dd', 'count_operator']` (or equivalent guard names as implemented
   in `main.py` / `content/levels.py`).
 
 **Self-check:**
@@ -745,7 +745,7 @@ command guard blocking count-operator bypass.
 
 ---
 
-## 19.1 — The Warden Manifold (Act IV Boss)
+## 22.1 — The Warden Manifold (Act IV Boss)
 
 **Commands taught:** None new. Caps Act IV — all operator+motion grammar.
 Format: Multi-phase boss where each phase of the Warden is immune to all operators EXCEPT
@@ -754,7 +754,7 @@ one specific operator∘motion pair. The player must recognize which pair is req
 **Phase 4 redesign:** The original Phase 4 (`yy + p`, two commands) violated the one-operator-
 per-phase invariant. It is now split into **two separate phases** — Phase 4 = `yy` (yank,
 captures the Warden), Phase 5 = `p` (paste, places the captured Warden into the trap). The
-boss is now 6 phases (previously 5). This preserves the yank+paste teaching from L17 while
+boss is now 6 phases (previously 5). This preserves the yank+paste teaching from L20 while
 respecting the single-operator-per-phase principle.
 
 **CHALLENGE — `immune_to` / `phase` fields (engine):**
@@ -922,7 +922,7 @@ decrease from any other attack. Implementation requires `immune_to` / `phase` on
   entity, deal phase damage. New trigger type; implement as post-action check.
 - Phase 5 paste-as-damage: post-paste check — if pasted row's capture rune overlaps pedestal
   zone, deal phase damage. New trigger type.
-- `Ctrl-R` scroll (from L18) may be found in a chest in the boss room's safe alcove.
+- `Ctrl-R` scroll (from L21) may be found in a chest in the boss room's safe alcove.
 
 **Self-check:**
 - Boss caps Act IV? YES — all Act IV commands used across 6 phases.
@@ -937,9 +937,9 @@ decrease from any other attack. Implementation requires `immune_to` / `phase` on
 | Level | Name | Commands | Par | Budget | Forcing | Key Risks / Challenges |
 |-------|------|----------|-----|--------|---------|----------------------|
 | 14 | The Sight Sanctum | `v {motion} d/y/c` | 36 | 51 | S1 terrain-∞ (void field impassable) | `V` gated on separate `visual_line` token; door trigger "all void clusters cleared" |
-| 15 | The Operator's Vault | `d{motion}` `c{motion}` | ~52 | 73 | S1 terrain-∞ (goblins block) + budget per chamber | Per-chamber alignment must be hand-tuned; count-motions handled by chamber geometry |
-| 16 | The Whole-Line Annex | `dd` `cc` `D` `S` | 69 | 97 | S1 terrain-∞ (void strips block bypass) | CHALLENGE: `D` ≡ `d$` cost (2=2); `D` taught as demo not forced. Par corrected from ~28 to 69. |
-| 17 | The Quartermaster | `y yy y{motion}` `p P` | ~75 | 105 | S1 structural (pedestal fill required) | Fill-check door trigger; par solver state (clip, fill_mask). Par corrected from ~31 to ~75. |
-| 18 | The Undo Sanctum | `u` (+ `Ctrl-R` scroll) | N/A | RELAXED (999) | DEMO — not forced (Decision D1) | Must not accidentally make `u` budget-required |
-| 19 | The Echo Vault | `.` (dot-repeat via `de`) | 17 | 24 | S2 tight budget (`de×12`=29>24) + S1/S4 bypass blocking | `de` not `dw` (chains correctly); `dd` blocked by terrain/guard; count blocked by guard. |
-| 19.1 | The Warden Manifold | ALL Act IV (`dw d$ dd yy p v..d`) | ~102 | 160 (relaxed) | Per-phase immunity | CHALLENGE: `immune_to`/`phase` fields on Entity; visual-source tagging; Phase 4/5 split (yy then p). |
+| 18 | The Operator's Vault | `d{motion}` `c{motion}` | ~52 | 73 | S1 terrain-∞ (goblins block) + budget per chamber | Per-chamber alignment must be hand-tuned; count-motions handled by chamber geometry |
+| 19 | The Whole-Line Annex | `dd` `cc` `D` `S` | 69 | 97 | S1 terrain-∞ (void strips block bypass) | CHALLENGE: `D` ≡ `d$` cost (2=2); `D` taught as demo not forced. Par corrected from ~28 to 69. |
+| 20 | The Quartermaster | `y yy y{motion}` `p P` | ~75 | 105 | S1 structural (pedestal fill required) | Fill-check door trigger; par solver state (clip, fill_mask). Par corrected from ~31 to ~75. |
+| 21 | The Undo Sanctum | `u` (+ `Ctrl-R` scroll) | N/A | RELAXED (999) | DEMO — not forced (Decision D1) | Must not accidentally make `u` budget-required |
+| 22 | The Echo Vault | `.` (dot-repeat via `de`) | 17 | 24 | S2 tight budget (`de×12`=29>24) + S1/S4 bypass blocking | `de` not `dw` (chains correctly); `dd` blocked by terrain/guard; count blocked by guard. |
+| 22.1 | The Warden Manifold | ALL Act IV (`dw d$ dd yy p v..d`) | ~102 | 160 (relaxed) | Per-phase immunity | CHALLENGE: `immune_to`/`phase` fields on Entity; visual-source tagging; Phase 4/5 split (yy then p). |

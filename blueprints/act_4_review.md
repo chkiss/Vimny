@@ -15,7 +15,7 @@ Both are one conceptual family. `y`/`c` variants on visual selections are practi
 new mechanics. Count is correctly 2.
 
 ### LINKAGE — PASS
-`v` bridges into operator grammar (L15). Prior motion vocabulary is unchanged.
+`v` bridges into operator grammar (L18). Prior motion vocabulary is unchanged.
 Coherent family: select → delete/yank/change.
 
 ### FORCEABILITY — FAIL
@@ -46,7 +46,7 @@ cheaper than `v $d` per row, so the par-solver would prefer `V` unless `V` is ex
 gated. The taught command `v` is **not strictly cheapest**.
 
 **Concrete fix:** Add a `V` gate separate from `v` in `known_commands`. Teach only `v`
-in L14; teach `V` in a later level (e.g., L16 as part of the whole-line family). Alternatively,
+in L14; teach `V` in a later level (e.g., L19 as part of the whole-line family). Alternatively,
 document that L14's budget is computed with V available and par = 25, budget = 35, and
 restate the solution sequence to use `v $d` only because the void field is not full-row-wide
 (so `V d` would clear walls too — but `V` with `op_delete` uses `line_extent()` which
@@ -57,7 +57,7 @@ is bounded by the inner walls, so `V d` is safe and clears only the void). Gate 
 
 ---
 
-## L15 — The Operator's Vault (`d c`)
+## L18 — The Operator's Vault (`d c`)
 
 ### SCOPE — BORDERLINE PASS (1 finding)
 
@@ -99,7 +99,7 @@ while `remove_entity` fully erases from the list. Door-open triggers that use
 
 ---
 
-## L16 — The Whole-Line Annex (`dd cc D S`)
+## L19 — The Whole-Line Annex (`dd cc D S`)
 
 ### SCOPE — PASS
 Count: 2. (1) Operator-doubling idiom (`dd`/`cc`); (2) Shorthands `D`/`S`.
@@ -107,7 +107,7 @@ All four are the whole-line/end-of-line family. `S = cc` is a shorthand of the i
 not a third mechanic.
 
 ### LINKAGE — PASS
-Students know `d{motion}`, `c{motion}` (L15). Doubling = implicit whole-line. `D = d$` is a
+Students know `d{motion}`, `c{motion}` (L18). Doubling = implicit whole-line. `D = d$` is a
 known combination in shorthand form. Coherent family.
 
 ### FORCEABILITY — FAIL (two defects)
@@ -165,14 +165,14 @@ deletion far too expensive). The forcing for `D`/`S` specifically is not sound.
 
 ---
 
-## L17 — The Quartermaster (`y yy p P`)
+## L20 — The Quartermaster (`y yy p P`)
 
 ### SCOPE — PASS
 Count: 2. (1) `y`/`yy` yank operator; (2) `p`/`P` paste. One family: copy-paste.
 "Linewise vs charwise clip distinction" is an implementation detail, not a third mechanic.
 
 ### LINKAGE — PASS
-`y{motion}` mirrors `d{motion}` grammar (L15). `yy` mirrors `dd` idiom (L16). `p`/`P`
+`y{motion}` mirrors `d{motion}` grammar (L18). `yy` mirrors `dd` idiom (L19). `p`/`P`
 complete the triad. Coherent family.
 
 ### FORCEABILITY — PASS (structurally)
@@ -196,13 +196,13 @@ strip forcing a detour, realistic par is approximately 55–65 keystrokes. Recom
 
 ---
 
-## L18 — The Undo Sanctum (`u`)
+## L21 — The Undo Sanctum (`u`)
 
 ### SCOPE — PASS
 Count: 1 (`u`). `Ctrl-R` is a scroll reward, not a lesson. Intentionally minimal.
 
 ### LINKAGE — PASS
-`u` logically follows operator grammar (corrects mistakes from L15–L17). Coherent.
+`u` logically follows operator grammar (corrects mistakes from L18–L20). Coherent.
 
 ### FORCEABILITY — PASS (correctly NOT forced)
 
@@ -215,13 +215,13 @@ the player can walk from `@` to `X` in ~8 keys without using `u`.
 
 ---
 
-## L19 — The Echo Vault (`.`)
+## L22 — The Echo Vault (`.`)
 
 ### SCOPE — PASS
 Count: 1 (`.` dot-repeat). The simplest scope of the act.
 
 ### LINKAGE — PASS
-`.` requires a repeatable last change. Design builds on L15's `dw` grammar. Coherent.
+`.` requires a repeatable last change. Design builds on L18's `dw` grammar. Coherent.
 
 ### FORCEABILITY — FAIL (three independent defects)
 
@@ -287,7 +287,7 @@ Plus navigation 6 = **10 keystrokes ≪ budget 27**. Not addressed in the bluepr
 
 ---
 
-## 19.1 — The Warden Manifold (Boss)
+## 22.1 — The Warden Manifold (Boss)
 
 ### SCOPE — N/A (no new mechanics; capstone)
 
@@ -318,7 +318,7 @@ damage; it just places rune clips. Implementing this requires a new post-paste c
 - `yy` alone: Warden is immune to everything except `yy`; yanking the Warden's row into the
   register "captures" it (yank is the attack, not paste). But `op_yank` does not mutate —
   using it as damage requires a new trigger on yank-of-warden-row.
-- Replace Phase 4 with a `cc` or `s`-based phase (already introduced in L16), keeping the
+- Replace Phase 4 with a `cc` or `s`-based phase (already introduced in L19), keeping the
   five-phase structure but using a simpler forcing mechanic.
 - Or: Collapse to four phases and remove Phase 4 entirely.
 
@@ -350,23 +350,23 @@ The immunity model must intercept both paths.
 | Level | Scope | Linkage | Forceability | Boss | Overall |
 |-------|-------|---------|--------------|------|---------|
 | L14 Sight Sanctum | PASS | PASS | **FAIL** (V beats v; same gate, cheaper) | N/A | **FAIL** |
-| L15 Operator's Vault | PASS\* | PASS | PASS | N/A | PASS |
-| L16 Whole-Line Annex | PASS | PASS | **FAIL** (par arithmetic wrong; D≡d$ cost) | N/A | **FAIL** |
-| L17 Quartermaster | PASS | PASS | PASS | N/A | PASS |
-| L18 Undo Sanctum | PASS | PASS | PASS (correctly demo) | N/A | PASS |
-| L19 Echo Vault | PASS | PASS | **FAIL** (dw chain broken; dd+count bypass) | N/A | **FAIL** |
-| 19.1 Warden Manifold | N/A | PASS | N/A | **PARTIAL FAIL** (Phase 4) | **FAIL** |
+| L18 Operator's Vault | PASS\* | PASS | PASS | N/A | PASS |
+| L19 Whole-Line Annex | PASS | PASS | **FAIL** (par arithmetic wrong; D≡d$ cost) | N/A | **FAIL** |
+| L20 Quartermaster | PASS | PASS | PASS | N/A | PASS |
+| L21 Undo Sanctum | PASS | PASS | PASS (correctly demo) | N/A | PASS |
+| L22 Echo Vault | PASS | PASS | **FAIL** (dw chain broken; dd+count bypass) | N/A | **FAIL** |
+| 22.1 Warden Manifold | N/A | PASS | N/A | **PARTIAL FAIL** (Phase 4) | **FAIL** |
 
-\* L15 scope: "count: 2" and "grammar is the single new idea" are contradictory. Accepted as 2
+\* L18 scope: "count: 2" and "grammar is the single new idea" are contradictory. Accepted as 2
 (both operators are new), but the text should be made consistent.
 
-**FAIL count: 4** (L14 forceability, L16 forceability, L19 forceability, 19.1 boss Phase 4).
+**FAIL count: 4** (L14 forceability, L19 forceability, L22 forceability, 22.1 boss Phase 4).
 
 ---
 
 ## Overall Verdict
 
-**FAIL.** Act IV has 4 distinct failures, two of which are critical (L19 dot-repeat chain is
+**FAIL.** Act IV has 4 distinct failures, two of which are critical (L22 dot-repeat chain is
 fundamentally broken; L14 V-shortcut bypass undermines the teaching).
 
 ---
@@ -375,15 +375,15 @@ fundamentally broken; L14 V-shortcut bypass undermines the teaching).
 
 ### P0 — Blocking (level is unworkable as designed)
 
-1. **L19: Replace `dw` with `de` as the teaching command.**
+1. **L22: Replace `dw` with `de` as the teaching command.**
    `dw` dot-repeat does not chain through column-separated targets; the cursor stays at the
    deleted-cluster's start_col and each `.` re-spans the same empty cells. `de` (INCLUSIVE)
    chains correctly because the end-of-word col is included, spanning to each successive
-   cluster. Restate all blueprint text referencing `dw` in L19 as `de`.
+   cluster. Restate all blueprint text referencing `dw` in L22 as `de`.
    Confirm: `de .×11` = 13 + nav 6 = 19 ≤ budget 27. `de×12` = each call hits one new cluster
    but also re-sweeps earlier floor; verify par-solver models this correctly.
 
-2. **L19: Fix the `dd` bypass.**
+2. **L22: Fix the `dd` bypass.**
    With 12 goblins on row 1, `dd` (2 keys) + nav (6 keys) = 8 ≪ budget 27.
    Fix option A: enclose each goblin in a 1-cell corridor so that `dd` on the goblin's row
    also deletes the exit entity on that row (per `_delete_cols` entity removal), making the
@@ -396,9 +396,9 @@ fundamentally broken; L14 V-shortcut bypass undermines the teaching).
    between-goblin movement is a `w` (not `j`) — so last_change is not reset. This requires
    a non-linear layout.
 
-3. **L19: Fix the count-motion bypass.**
+3. **L22: Fix the count-motion bypass.**
    `d12e` or `12de` = 4 keys + nav = 10 ≪ budget 27. Options: (a) apply a command guard that
-   disallows count > 1 with operators in L19 (teaching count is L2's job, not L19's); (b) design
+   disallows count > 1 with operators in L22 (teaching count is L2's job, not L22's); (b) design
    the level so the targets require individual targeting that count-motions cannot batch
    (e.g., goblins in cells where the count-motion span would include a protected entity that
    blocks the span).
@@ -409,17 +409,17 @@ fundamentally broken; L14 V-shortcut bypass undermines the teaching).
    `V` becomes available as soon as `'visual' in player.known_commands`. Since `V d` costs
    2 keys per row vs `v $d` = 3 keys per row, the taught command is not strictly optimal.
    Add `'visual_line'` as a separate known_commands token, gate `V` on it, and defer `V`
-   to a later level (e.g., the whole-line family in L16 where `V` is naturally equivalent to `dd`
+   to a later level (e.g., the whole-line family in L19 where `V` is naturally equivalent to `dd`
    for a row). Recompute par and budget for L14 with `V` unavailable (par = 29, budget = 41
    as stated).
 
-5. **L16: Retrace optimal path; correct par and budget.**
+5. **L19: Retrace optimal path; correct par and budget.**
    The stated optimal path has a known error: `2j 15l` stated as cost 7 (actual: 17).
    Retrace the full path for the stated 18 r × 52 c layout. Estimated correct par ≈ 60–70.
    Budget = ceil(par × 1.4). All subsequent self-checks and the summary table must use the
    corrected values.
 
-6. **L16: Acknowledge that `D` and `d$` have identical cost in Vimny.**
+6. **L19: Acknowledge that `D` and `d$` have identical cost in Vimny.**
    `_operator_cost` for `D` = `{'type':'operator','op':'d','motion':'$'}` = 1 + 1 = 2.
    For explicit `d$` = 1 + 1 = 2. Same cost. The blueprint's claim "D (1 key) must be used"
    is wrong in the Vimny engine. Either (a) accept that annex 3 teaches `D` as idiomatic
@@ -429,15 +429,15 @@ fundamentally broken; L14 V-shortcut bypass undermines the teaching).
 
 ### P2 — Architectural (boss design)
 
-7. **19.1 Phase 4: Replace `yy p` compound with a single-op phase.**
+7. **22.1 Phase 4: Replace `yy p` compound with a single-op phase.**
    Phase 4 breaks the per-phase "exactly one operator∘motion" invariant and requires new
    engine mechanics (paste-as-damage). Simplest replacement: make Phase 4 a `cc` phase
-   (the Warden is immune to all but a change-operator on its row). `cc` is taught in L16 and
+   (the Warden is immune to all but a change-operator on its row). `cc` is taught in L19 and
    not yet used in the boss. Alternatively, use a `yy`-only phase (yanking the Warden's row
    captures it into the register — implement as: if `op_yank` is called on a row containing
    a Warden entity, deal 1 phase damage). This is simpler than paste-as-damage.
 
-8. **19.1: Add `immune_to` and `phase` fields to `Entity` dataclass.**
+8. **22.1: Add `immune_to` and `phase` fields to `Entity` dataclass.**
    Both fields are required by the boss design and are absent from `engine/world.py`.
    `immune_to: frozenset = field(default_factory=frozenset)` and `phase: int = 0`.
    The `_check_boss_cleared` and warden-damage logic in `main.py` must consult `immune_to`
@@ -447,12 +447,12 @@ fundamentally broken; L14 V-shortcut bypass undermines the teaching).
 
 ### P3 — Documentation / consistency
 
-9. **L15: Resolve the "count: 2 vs grammar is the single new idea" contradiction.**
+9. **L18: Resolve the "count: 2 vs grammar is the single new idea" contradiction.**
    Pick one framing and state it consistently. Recommended: "The operator grammar `{op}{motion}`
    is the one new idea, instantiated by two operators: `d` (delete) and `c` (change). Count = 2
    operators, 1 grammar pattern."
 
-10. **L17: Retrace optimal path; correct arithmetic.**
+10. **L20: Retrace optimal path; correct arithmetic.**
     `5j 29l cost: 7` and `4j 14l 5j 8l cost: ~13` are both wrong (actual: 34 and 31 respectively).
     Retrace with the void-strip detour modelled. Estimated correct par ≈ 55–65. The structural
     forceability is unaffected, but the stated par/budget values will change the summary table.

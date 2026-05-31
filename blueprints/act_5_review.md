@@ -2,11 +2,11 @@
 
 > Reviewer role: adversarial blueprint auditor.
 > Source files: `blueprints/act_5.md`, `LEVELS_PLAN.md`.
-> Multiplier rule (from act_5.md header): ×1.2 for L22 (r/R); ×1.4 for all others. Esc = 1 keystroke.
+> Multiplier rule (from act_5.md header): ×1.2 for L25 (r/R); ×1.4 for all others. Esc = 1 keystroke.
 
 ---
 
-## L20 — The Inscription Halls (`i`, `a`)
+## L23 — The Inscription Halls (`i`, `a`)
 
 ### SCOPE
 Count of new mechanics:
@@ -53,7 +53,7 @@ Blueprint claims par = 30. The difference is ~3 keystrokes (blueprint includes s
 
 ---
 
-## L21 — The Sculpting Chambers (`I`, `A`, `o`, `O`)
+## L24 — The Sculpting Chambers (`I`, `A`, `o`, `O`)
 
 ### SCOPE
 Blueprint counts 3 mechanics:
@@ -104,7 +104,7 @@ Blueprint claims par=32. Plausible; par-solver authoritative.
 
 ---
 
-## L22 — The Overwrite Halls (`r`, `R`)
+## L25 — The Overwrite Halls (`r`, `R`)
 
 ### SCOPE
 New mechanics:
@@ -157,7 +157,7 @@ If `s` is used for r-corridor (4 corrections, +4 keys) AND repeated `r` is used 
 
 ---
 
-## L23 — The Case Chambers (`~`, `g~`, `gU`, `gu`)
+## L26 — The Case Chambers (`~`, `g~`, `gU`, `gu`)
 
 ### SCOPE
 New mechanics:
@@ -202,7 +202,7 @@ Blueprint claims par=28. **This is a massive discrepancy — 28 vs 46.**
 
 ---
 
-## L24 — The Joiner's Gate (`J`, `gJ`)
+## L27 — The Joiner's Gate (`J`, `gJ`)
 
 ### SCOPE
 New mechanics:
@@ -234,7 +234,7 @@ Blueprint optimal path:
 **J vs gJ distinction:**
 - D_inner trigger: rune at col 4. `gJ` (no space) places joined content at col immediately adjacent; `J` (with space) shifts content to col 5. Wrong command: door stays locked.
 - Repositioning cost: player must use the correct command. No repositioning is possible after the fact — the row has already been joined. **Player would need to undo and redo.** But `u` (undo) is available from L18.
-- **DEFECT:** If `u` is taught by L24, the player can undo a wrong `J`/`gJ` and retry. Cost of undo: `u J/gJ` = 2 extra keystrokes per wrong attempt. With budget=47 and par=33, margin=14 — the player could attempt both wrong and right for D_inner: `gJ u J` = 4 keys instead of 2. But this only adds 2 extra keys, well within budget. **The J vs gJ distinction is NOT forced by budget.**
+- **DEFECT:** If `u` is taught by L27, the player can undo a wrong `J`/`gJ` and retry. Cost of undo: `u J/gJ` = 2 extra keystrokes per wrong attempt. With budget=47 and par=33, margin=14 — the player could attempt both wrong and right for D_inner: `gJ u J` = 4 keys instead of 2. But this only adds 2 extra keys, well within budget. **The J vs gJ distinction is NOT forced by budget.**
 
 **DEFECT (SIGNIFICANT):** The J/gJ distinction relies on column-exact trigger, but undo allows a player to try `J` first, observe door stays locked, undo, try `gJ`. Cost: +2 keys per door. With 2 doors (D_inner and D2), maximum undo-retry cost: +4 keys. Par=33+4=37 ≤ budget=47. **Not forceable with undo available.**
 
@@ -246,7 +246,7 @@ Blueprint optimal path:
 
 ---
 
-## L24a — The Stonemason's Hall (`>>`, `<<`, `>{m}`, `<{m}`, `=`)
+## L28/L29 — The Alignment Halls + Indentation Sanctum (`>>`, `<<`, `>{m}`, `<{m}`, `=`)
 
 ### SCOPE — CRITICAL ANALYSIS
 
@@ -266,7 +266,7 @@ Grouping analysis:
 
 **However:** Is `>>`/`<<` genuinely the same mechanic as `>{m}`/`<{m}`? In Vim, `>>` is syntactic sugar for `>_` (indent current line). `>{motion}` is the general operator form. They are the same underlying mechanic at different scopes — analogous to `dd` vs `d{motion}`. By the LEVELS_PLAN.md rule ("trivial direction/flavor variants of one idea count as one"), grouping `>>`/`<<`/`>{m}`/`<{m}` as one family is defensible.
 
-**However: 5 commands is a lot even if grouped as 3 mechanics.** The blueprint itself flags "5 commands in one level; ensure coherent family framing." LEVELS_PLAN.md groups J/gJ AND `>>`/`<<`/`>{m}`/`<{m}`/`=` together in L24 (the original plan before the blueprint split them into L24 and L24a). **The LEVELS_PLAN.md table shows L24 as "The Stonemason's Hall" teaching `J gJ >> << >{m} <{m} =` — that is 7 commands.** The blueprint split J/gJ into the separate L24, so L24a has 5. This is better, but still at the edge.
+**However: 5 commands is a lot even if grouped as 3 mechanics.** The blueprint itself flags "5 commands in one level; ensure coherent family framing." LEVELS_PLAN.md groups J/gJ AND `>>`/`<<`/`>{m}`/`<{m}`/`=` together in L27 (the original plan before the blueprint split them into L27 and L28/L29). **The LEVELS_PLAN.md table shows L27 as "The Alignment Halls + Indentation Sanctum" teaching `J gJ >> << >{m} <{m} =` — that is 7 commands.** The blueprint split J/gJ into the separate L27, so L28/L29 has 5. This is better, but still at the edge.
 
 **SPLIT RECOMMENDATION — see Findings section below.**
 
@@ -331,14 +331,14 @@ Recomputing the full level:
 The 5-command level (technically 3 mechanics) is at the boundary. Given the forceability failures, a split is recommended:
 
 **Proposed Split:**
-- **L24a — The Alignment Halls:** `>>`, `<<` only. New mechanic: horizontal rune shifting (single-line). Rune-alignment trigger (gate opens when rune at column X). Par ≈ 25, budget ≈ 35 (×1.4). Tighter margin forces `>>` over delete+retype (need ≥4 alignment zones with 4-key savings each = 16 keys penalty for no-`>>` → 41 > 35). FORCEABLE.
-- **L24b — The Indentation Sanctum:** `>{m}`, `<{m}`, `=`. New mechanic: multi-row indent operator, auto-indent. 3-row zone forces `>{m}` over per-row `>>`; variable-delta zone forces `=`. Par ≈ 30, budget ≈ 42. FORCEABLE if budget is tighter.
+- **L28/L29 — The Alignment Halls:** `>>`, `<<` only. New mechanic: horizontal rune shifting (single-line). Rune-alignment trigger (gate opens when rune at column X). Par ≈ 25, budget ≈ 35 (×1.4). Tighter margin forces `>>` over delete+retype (need ≥4 alignment zones with 4-key savings each = 16 keys penalty for no-`>>` → 41 > 35). FORCEABLE.
+- **L27b — The Indentation Sanctum:** `>{m}`, `<{m}`, `=`. New mechanic: multi-row indent operator, auto-indent. 3-row zone forces `>{m}` over per-row `>>`; variable-delta zone forces `=`. Par ≈ 30, budget ≈ 42. FORCEABLE if budget is tighter.
 
 This split reduces each level to 2 commands and 1–2 mechanics each, and makes forceability achievable.
 
 ---
 
-## L24.1 — The Warden Scrivener (Boss)
+## L29.1 — The Warden Scrivener (Boss)
 
 ### SCOPE
 Boss level — all Act V commands. Not subject to the ≤3 mechanic limit; instead evaluated on per-phase immunity and one-command-per-phase structure. **N/A for scope.**
@@ -374,15 +374,15 @@ Phase budgets stated:
 - `3>>` = 4 keys. Then navigate to Warden for `x`: distance unclear. Budget says 18 keys.
 - `3>>` (`3`,`>`,`>`)=3 keystrokes, not 4. **`>>` is 2 keystrokes, `3>>` is `3`+`>`+`>`=3 keystrokes.** Blueprint claims "3>>` = 4 keys" — this is incorrect. **`3>>` = 3 keystrokes.**
 
-**DEFECT (ARITHMETIC):** `3>>` is 3 keystrokes (count=`3`, operator=`>`, second `>`), not 4. This error appears in both L24a and the boss.
+**DEFECT (ARITHMETIC):** `3>>` is 3 keystrokes (count=`3`, operator=`>`, second `>`), not 4. This error appears in both L28/L29 and the boss.
 
 **Budget check:** par=59, budget=ceil(59×1.4)=ceil(82.6)=83. Blueprint says 83. **Correct.**
 
 **Phase immunities coverage:**
-- Phase 1: `r` (overwrite family, from L22).
-- Phase 2: `gU` (case operator, from L23).
-- Phase 3: `J`/`gJ` (join, from L24). — Two commands used, violation.
-- Phase 4: `>>` (indent, from L24a).
+- Phase 1: `r` (overwrite family, from L25).
+- Phase 2: `gU` (case operator, from L26).
+- Phase 3: `J`/`gJ` (join, from L27). — Two commands used, violation.
+- Phase 4: `>>` (indent, from L28/L29).
 
 Commands NOT covered in boss phases: `i`, `a`, `I`, `A`, `o`, `O`, `R`, `~`, `g~`, `gu`, `<<`, `>{m}`, `<{m}`, `=`. The boss only tests 4 of the act's ~19 commands. This is a design choice (not every command needs a boss phase), but noteworthy.
 
@@ -390,18 +390,18 @@ Commands NOT covered in boss phases: `i`, `a`, `I`, `A`, `o`, `O`, `R`, `~`, `g~
 
 ---
 
-## Stonemason Split Proposal (Detailed)
+## Alignment/Indentation Split Proposal (Detailed)
 
-The LEVELS_PLAN.md groups J/gJ with `>>`/`<<`/`>{m}`/`<{m}`/`=` in one level. The blueprint already separated J/gJ into L24. The remaining 5 commands in L24a should be split further:
+The LEVELS_PLAN.md groups J/gJ with `>>`/`<<`/`>{m}`/`<{m}`/`=` in one level. The blueprint already separated J/gJ into L27. The remaining 5 commands in L28/L29 should be split further:
 
-### Proposed L24a — The Alignment Chambers (`>>`, `<<`)
+### Proposed L28/L29 — The Alignment Chambers (`>>`, `<<`)
 
 **Commands:** `>>` (indent right), `<<` (indent left).
 **Mechanic count:** 1 — horizontal rune shift, bidirectional.
 **Forcing:** Use 6 single-line alignment zones (3 for `>>`, 3 for `<<`). Each zone: rune offset by 2 cols (1 shiftwidth). `>>` or `<<` = 2 keys. Delete+retype = 7+ keys. Savings per zone = 5+ keys. 6 zones × 5 = 30 keys savings. Par ≈ 35, budget = ceil(35×1.4)=49. Without `>>`: 35+30=65 >> 49. FORCED.
 **Linkage:** `>>` and `<<` are one mechanic (indent/unindent), directional variants.
 
-### Proposed L24b — The Indentation Sanctum (`>{m}`, `<{m}`, `=`)
+### Proposed L27b — The Indentation Sanctum (`>{m}`, `<{m}`, `=`)
 
 **Commands:** `>{motion}` (multi-line indent), `<{motion}` (multi-line unindent), `=` (auto-indent).
 **Mechanic count:** 2 — operator-scope indent, auto-indent.
@@ -415,7 +415,7 @@ The LEVELS_PLAN.md groups J/gJ with `>>`/`<<`/`>{m}`/`<{m}`/`=` in one level. Th
 
 ## Summary: Defects by Level
 
-### L20 — The Inscription Halls
+### L23 — The Inscription Halls
 | Category | Finding |
 |---|---|
 | SCOPE | PASS (2 mechanics) |
@@ -423,7 +423,7 @@ The LEVELS_PLAN.md groups J/gJ with `>>`/`<<`/`>{m}`/`<{m}`/`=` in one level. Th
 | FORCEABILITY | CONDITIONAL FAIL — par likely ~27 not 30; forcing argument relies on par=30 being confirmed by par-solver; at par=27 budget=38 and wrong-command penalty (+2) does not exceed budget |
 | Concrete fix | Par-solver must confirm par≥30. If par<30, add 2 more trigger cells (one `i`-trigger, one `a`-trigger) to raise wrong-command penalty to +4 and ensure budget is exceeded without the correct commands. |
 
-### L21 — The Sculpting Chambers
+### L24 — The Sculpting Chambers
 | Category | Finding |
 |---|---|
 | SCOPE | PASS (2 mechanics by family rule, 4 commands) |
@@ -431,7 +431,7 @@ The LEVELS_PLAN.md groups J/gJ with `>>`/`<<`/`>{m}`/`<{m}`/`=` in one level. Th
 | FORCEABILITY | FAIL — `I` and `A` not budget-forced (13-key margin, 4-key penalty); `O` not topology-forced (only `o` from outside is usable) |
 | Concrete fix | (1) Reduce budget by tightening par (add mandatory long-distance navigation). (2) Add a second sealed sub-room inside the main sealed room, accessible only via `O` (open row above) from inside — requires first entering via `o`. (3) Add `I` and `A` triggers with tighter column constraints so wrong-command penalty exceeds 2 keys. |
 
-### L22 — The Overwrite Halls
+### L25 — The Overwrite Halls
 | Category | Finding |
 |---|---|
 | SCOPE | PASS (2 mechanics) |
@@ -439,7 +439,7 @@ The LEVELS_PLAN.md groups J/gJ with `>>`/`<<`/`>{m}`/`<{m}`/`=` in one level. Th
 | FORCEABILITY | FAIL — `r` not individually forced (4 corrections, 4-key savings, 8-key budget margin); `R` not individually forced (5-cell corridor saves 7 keys, within budget margin) |
 | Concrete fix | (1) Increase r-corridor to 9 corrections: `r`-savings = 9 keys > 8-key margin. (2) Increase R-corridor to 7 consecutive cells: `R`-savings = 11 keys > 8-key margin. Adjust grid dimensions accordingly. |
 
-### L23 — The Case Chambers
+### L26 — The Case Chambers
 | Category | Finding |
 |---|---|
 | SCOPE | PASS (2 mechanics) |
@@ -447,7 +447,7 @@ The LEVELS_PLAN.md groups J/gJ with `>>`/`<<`/`>{m}`/`<{m}`/`=` in one level. Th
 | FORCEABILITY | FAIL — par stated as 28 is arithmetically wrong (~46 is more accurate, since `gU6l` = 4 keystrokes not 3); budget of 40 is wrong (should be ~65); case operator forcing must be re-derived with correct par |
 | Concrete fix | (1) Recount all keystrokes: `g~`/`gU`/`gu` + motion = 4 keystrokes, not 3. (2) Restate par and budget. (3) Verify that `~`-only approach exceeds the corrected budget; add more zones if needed. |
 
-### L24 — The Joiner's Gate
+### L27 — The Joiner's Gate
 | Category | Finding |
 |---|---|
 | SCOPE | PASS (1 mechanic) |
@@ -455,15 +455,15 @@ The LEVELS_PLAN.md groups J/gJ with `>>`/`<<`/`>{m}`/`<{m}`/`=` in one level. Th
 | FORCEABILITY | CONDITIONAL PASS — topology forcing is strong; J vs gJ distinction is undermined by undo availability |
 | Concrete fix | Make the J/gJ distinction rely on rune *content* (e.g., joined rune forms a different word with/without space) rather than column position, so undo+retry is not sufficient — the player must choose correctly on the first attempt because both J and gJ each produce a different irreversible world state. Alternatively: lock the rune type so that after a wrong join, the resulting rune cluster is a different (non-trigger) sequence, and the only way to progress is the correct command from the start. |
 
-### L24a — The Stonemason's Hall
+### L28/L29 — The Alignment Halls + Indentation Sanctum
 | Category | Finding |
 |---|---|
 | SCOPE | BORDERLINE (5 commands, 3 mechanics — should be SPLIT) |
 | LINKAGE | PASS |
 | FORCEABILITY | FAIL — `>>` not forced (21-key budget margin absorbs 12-key penalty); `=` not forced; `3>>` keystroke count wrong (3 not 4) |
-| Concrete fix | SPLIT into L24a (>>/<< only) and L24b (>{m}/<{m}/=). In L24a: use 6 tight alignment zones, par≈35, budget≈49; without `>>`: 65>49. In L24b: use 4-row + variable-delta zones; combined savings 16 keys, par≈32, budget≈45; without operators: 48>45. |
+| Concrete fix | SPLIT into L28/L29 (>>/<< only) and L27b (>{m}/<{m}/=). In L28/L29: use 6 tight alignment zones, par≈35, budget≈49; without `>>`: 65>49. In L27b: use 4-row + variable-delta zones; combined savings 16 keys, par≈32, budget≈45; without operators: 48>45. |
 
-### L24.1 — The Warden Scrivener (Boss)
+### L29.1 — The Warden Scrivener (Boss)
 | Category | Finding |
 |---|---|
 | SCOPE | N/A |
@@ -476,22 +476,22 @@ The LEVELS_PLAN.md groups J/gJ with `>>`/`<<`/`>{m}`/`<{m}`/`=` in one level. Th
 
 ## Overall Verdict
 
-**5 out of 6 levels (+ boss) have at least one FAIL.** Only L24 (Joiner's Gate) passes all criteria conditionally.
+**5 out of 6 levels (+ boss) have at least one FAIL.** Only L27 (Joiner's Gate) passes all criteria conditionally.
 
 ### Prioritized Fix List
 
-1. **[CRITICAL] L24a — SPLIT into L24a (>>/<<) and L24b (>{m}/<{m}/=).** The 5-command scope and forceability failures together require this. The split also resolves the budget margin problem by tightening each sub-level's par.
+1. **[CRITICAL] L28/L29 — SPLIT into L28/L29 (>>/<<) and L27b (>{m}/<{m}/=).** The 5-command scope and forceability failures together require this. The split also resolves the budget margin problem by tightening each sub-level's par.
 
-2. **[CRITICAL] L22 — Increase r-corridor to 9 cells and R-corridor to 7 cells.** The current corridor sizes fail to force the commands within the ×1.2 budget margin.
+2. **[CRITICAL] L25 — Increase r-corridor to 9 cells and R-corridor to 7 cells.** The current corridor sizes fail to force the commands within the ×1.2 budget margin.
 
-3. **[CRITICAL] L23 — Recount par with correct keystroke arithmetic (`gU6l`=4, not 3).** Restate par (~46), budget (~65), and re-derive the forcing argument for case operators. Add more zones until `~`-only path exceeds budget.
+3. **[CRITICAL] L26 — Recount par with correct keystroke arithmetic (`gU6l`=4, not 3).** Restate par (~46), budget (~65), and re-derive the forcing argument for case operators. Add more zones until `~`-only path exceeds budget.
 
-4. **[CRITICAL] L24.1 (Boss) — Fix Phase 3 to use only one command.** Either `J` or `gJ` per phase, not both. Add a 5th phase for the second join command. Fix all keystroke arithmetic (`3>>`=3 keys).
+4. **[CRITICAL] L29.1 (Boss) — Fix Phase 3 to use only one command.** Either `J` or `gJ` per phase, not both. Add a 5th phase for the second join command. Fix all keystroke arithmetic (`3>>`=3 keys).
 
-5. **[SIGNIFICANT] L21 — Add topology forcing for `O` and budget forcing for `I`/`A`.** Add a sub-sealed-room inside the main sealed room requiring `O` from within. Tighten I/A trigger geometry so wrong-command penalty ≥ budget margin / 2.
+5. **[SIGNIFICANT] L24 — Add topology forcing for `O` and budget forcing for `I`/`A`.** Add a sub-sealed-room inside the main sealed room requiring `O` from within. Tighten I/A trigger geometry so wrong-command penalty ≥ budget margin / 2.
 
-6. **[SIGNIFICANT] L20 — Verify par≥30 with par-solver.** If par<30, add trigger cells to raise wrong-command penalty. The forcing argument is only sound if par=30 and budget=42 are confirmed.
+6. **[SIGNIFICANT] L23 — Verify par≥30 with par-solver.** If par<30, add trigger cells to raise wrong-command penalty. The forcing argument is only sound if par=30 and budget=42 are confirmed.
 
-7. **[MINOR] L24 — Harden J vs gJ distinction against undo+retry.** Change the trigger from column-exact to content-dependent so undo-and-retry does not allow brute-forcing the correct command.
+7. **[MINOR] L27 — Harden J vs gJ distinction against undo+retry.** Change the trigger from column-exact to content-dependent so undo-and-retry does not allow brute-forcing the correct command.
 
-8. **[MINOR] L24a — Fix `3>>` = 3 keystrokes (not 4) throughout the blueprint and boss section.**
+8. **[MINOR] L28/L29 — Fix `3>>` = 3 keystrokes (not 4) throughout the blueprint and boss section.**

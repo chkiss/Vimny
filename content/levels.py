@@ -125,8 +125,8 @@ LEVELS = [
     },
     {
         'id': 131,
-        'key': 'dungeon_13.1_the_wardens_sight',
-        'name': "The Warden's Sight",
+        'key': 'dungeon_13.1_the_warden_surveyor',
+        'name': 'The Warden Surveyor',
         'commands_level': 13,
         'unlocks_after': 13,
         'type': 'boss',

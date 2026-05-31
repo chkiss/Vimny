@@ -1,6 +1,6 @@
 # Act VII — Mastery Blueprints
 
-> Levels 31, 32, and 32.1. Commands: `:s/{}/{}/[g]`, `q @ "`. Capstone act.
+> Levels 37, 38, and 38.1. Commands: `:s/{}/{}/[g]`, `q @ "`. Capstone act.
 > All three share one coherent family: **power automation** — transform many
 > targets with a single compound command, then industrialise repetition.
 
@@ -14,7 +14,7 @@
 
 ---
 
-## Level 31 — The Spellwright's Forge
+## Level 37 — The Spellwright's Forge
 
 **Commands taught:** `:s/{from}/{to}/` and `:s/{from}/{to}/g`
 
@@ -209,7 +209,7 @@ a no-op per the terrain rule above. Belt-and-suspenders: budget also blocks it.)
   terrain tiles from rune-entities in `engine/operator.py`. Deletion operators must skip
   terrain. Needs explicit dispatch check.
 - **Par solver**: `:s/F/I/g` is modelled as a 9-keystroke action converting a fire row to
-  passable; BFS routes through after conversion. No macro state needed for L31.
+  passable; BFS routes through after conversion. No macro state needed for L37.
 
 ### Self-check
 
@@ -226,7 +226,7 @@ a no-op per the terrain rule above. Belt-and-suspenders: budget also blocks it.)
 
 ---
 
-## Level 32 — The Hall of Echoes
+## Level 38 — The Hall of Echoes
 
 **Commands taught:** `q{reg}…q` (record macro), `@{reg}` (replay macro),
 `N@{reg}` (replay N times), `"{reg}` (named register select)
@@ -426,9 +426,9 @@ repetition; tight budget additionally excludes the non-count replay form. Only
 
 ---
 
-## Level 32.1 — The Warden Eternal (FINAL BOSS)
+## Level 38.1 — The Warden Eternal (FINAL BOSS)
 
-**Commands demanded:** `:s/{}/{}/g` (from L31), `q @ "` (from L32), plus all
+**Commands demanded:** `:s/{}/{}/g` (from L37), `q @ "` (from L38), plus all
 prior mastery commands. This is the capstone encounter.
 
 **Boss concept:** The Warden Eternal occupies a three-phase arena. Each phase
@@ -693,7 +693,7 @@ Phase 3 par +15 (50 not 35) from correct counting of all steps.)*
 
 ### Self-check
 
-- [x] ≤ 3 new mechanics: `:s` (L31), macros (L32); boss reuses both. No new mechanic.
+- [x] ≤ 3 new mechanics: `:s` (L37), macros (L38); boss reuses both. No new mechanic.
 - [x] Coherent family: all phases demand Act VII power-automation techniques.
 - [x] Phase 1: S1 terrain-infinity forces `:s/F/I/g`. Mana blocks bare `:s/F/I/`.
 - [x] Phase 2: S1 sequence-force + S2 budget=17 (1.30×) forces `N@a` over single `@a`.
@@ -715,11 +715,11 @@ Phase 3 par +15 (50 not 35) from correct counting of all steps.)*
 
 | Level | Commands | Par | Budget | Multiplier | Forceable? | Key Risks / Challenges |
 |---|---|---|---|---|---|---|
-| 31 — Spellwright's Forge | `:s/F/I/` `:s/F/I/g` | 44 | 62 | 1.40 | Yes — S1 terrain-infinity (impassable fire) + mana hard-block on bare `:s` | C1 mana economy (SPEC §6.4 TBD); C2 terrain immutability under `d`/`c`/`r` |
-| 32 — Hall of Echoes | `qa…q` `@a` `N@a` | 14 | 18 | 1.28 | Yes — S1 goblin/door sequence + S2 tight budget excludes both manual and single-replay | C3 `w` word-boundary verification (layout locked); C4 `dw` kill semantics; C5 macro-aware par solver |
-| 32.1 P1 — Ashen Tide | `:s/F/I/g` | 34 | 48 | 1.40 | Yes — S1 terrain-infinity (fire impassable) | C6 wave timer (normal-mode only); C7 multi-phase state machine |
-| 32.1 P2 — Echo Storm | `qa…q` `N@a` | 13 | 17 | 1.30 | Yes — S1 sequence + S2 excludes single-replay | C6 wave timer; C7 state machine |
-| 32.1 P3 — Eternal Surge | `:s/F/I/g` + `qa…q` + `N@a` | 50 | 62 | 1.24 | Yes — S1 fire-infinity forces `:s`; S2 excludes `:s`-only and single-replay | C8 deferred (`:s` in macro not used); C9 macro-aware solver for boss |
+| 37 — Spellwright's Forge | `:s/F/I/` `:s/F/I/g` | 44 | 62 | 1.40 | Yes — S1 terrain-infinity (impassable fire) + mana hard-block on bare `:s` | C1 mana economy (SPEC §6.4 TBD); C2 terrain immutability under `d`/`c`/`r` |
+| 38 — Hall of Echoes | `qa…q` `@a` `N@a` | 14 | 18 | 1.28 | Yes — S1 goblin/door sequence + S2 tight budget excludes both manual and single-replay | C3 `w` word-boundary verification (layout locked); C4 `dw` kill semantics; C5 macro-aware par solver |
+| 38.1 P1 — Ashen Tide | `:s/F/I/g` | 34 | 48 | 1.40 | Yes — S1 terrain-infinity (fire impassable) | C6 wave timer (normal-mode only); C7 multi-phase state machine |
+| 38.1 P2 — Echo Storm | `qa…q` `N@a` | 13 | 17 | 1.30 | Yes — S1 sequence + S2 excludes single-replay | C6 wave timer; C7 state machine |
+| 38.1 P3 — Eternal Surge | `:s/F/I/g` + `qa…q` + `N@a` | 50 | 62 | 1.24 | Yes — S1 fire-infinity forces `:s`; S2 excludes `:s`-only and single-replay | C8 deferred (`:s` in macro not used); C9 macro-aware solver for boss |
 | **Boss total** | All Act VII | **97** | **127** | — | Yes | All challenges above |
 
 ---
@@ -730,12 +730,12 @@ See dedicated section at end of document for full list. Summary:
 
 | ID | Challenge | Affects | Decision needed |
 |---|---|---|---|
-| C1 | Mana economy (SPEC §6.4) — per-room pool, deduction, display | L31, L32.1 | Engine implementation spec |
-| C2 | Terrain immutability under `d`/`c`/`r` operators | L31, L32.1 | `engine/operator.py` dispatch rule |
-| C3 | `w` word-boundary on goblin/rune tile types | L32, L32.1 | `engine/motion.py` tile classification |
-| C4 | `dw` semantics: attack entity at cursor vs. delete through range | L32, L32.1 | `engine/operator.py` combat rule |
-| C5 | Macro-aware par solver (recording-state extended Dijkstra) | L32, L32.1 | Validator architecture decision |
-| C6 | Wave timer: normal-mode-only ticks; command-mode = 0 ticks during entry | L32.1 | Engine tick hook design |
-| C7 | Multi-phase boss state machine (phase doors, HP tracking, overlays) | L32.1 | `content/bosses.py` architecture |
+| C1 | Mana economy (SPEC §6.4) — per-room pool, deduction, display | L37, L38.1 | Engine implementation spec |
+| C2 | Terrain immutability under `d`/`c`/`r` operators | L37, L38.1 | `engine/operator.py` dispatch rule |
+| C3 | `w` word-boundary on goblin/rune tile types | L38, L38.1 | `engine/motion.py` tile classification |
+| C4 | `dw` semantics: attack entity at cursor vs. delete through range | L38, L38.1 | `engine/operator.py` combat rule |
+| C5 | Macro-aware par solver (recording-state extended Dijkstra) | L38, L38.1 | Validator architecture decision |
+| C6 | Wave timer: normal-mode-only ticks; command-mode = 0 ticks during entry | L38.1 | Engine tick hook design |
+| C7 | Multi-phase boss state machine (phase doors, HP tracking, overlays) | L38.1 | `content/bosses.py` architecture |
 | C8 | `:s` inside macro body via `synth_key` (deferred; not used in current design) | Deferred | Defer until needed |
-| C9 | Macro-aware par solver for boss Phase 3 (extension of C5) | L32.1 | Covered by C5 decision |
+| C9 | Macro-aware par solver for boss Phase 3 (extension of C5) | L38.1 | Covered by C5 decision |

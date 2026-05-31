@@ -787,7 +787,7 @@ To force `;`/`,`, the designer needs either:
 
 ---
 
-## Level 4.1 — The Warden's Keep (ACT I BOSS)
+## Level 5.1 — The Warden's Keep (ACT I BOSS)
 
 ### Scope (PASS)
 
@@ -842,7 +842,7 @@ is not budget-forced given the 26-key slack. Phase 0-3 are legitimately forced.
 
 ### Boss Placement (PASS)
 
-Level 4.1: `x.1` numbering ✓. Caps Act I ✓. One boss for the act ✓. Each phase maps to one
+Level 5.1: `x.1` numbering ✓. Caps Act I ✓. One boss for the act ✓. Each phase maps to one
 command family ✓. PASS.
 
 ---
@@ -859,7 +859,7 @@ command family ✓. PASS.
 | 2 | Forceability | Par = 14 incorrect (sequence omits door-approach steps and void-wall bypass) |
 | 3 | Forceability | `$`/`0` (taught L1) give ~14 key solution << budget 42; `w`/`b`/`e` not forced |
 | 4 | Forceability | `;`/`,` not forced (bypass costs 28 < budget 38); confirmed by designer |
-| 4.1 | Forceability | Phase 4: `$` (L1) beats `w`; Phase 5: `;` not budget-forced |
+| 5.1 | Forceability | Phase 4: `$` (L1) beats `w`; Phase 5: `;` not budget-forced |
 
 ---
 
@@ -957,7 +957,7 @@ command family ✓. PASS.
 
 **BOSS: N/A**
 
-### Level 4.1 — The Warden's Keep
+### Level 5.1 — The Warden's Keep
 
 **SCOPE: PASS** — no new mechanics.
 **LINKAGE: PASS** — each phase maps to one Act I family.
@@ -974,7 +974,7 @@ command family ✓. PASS.
   this. Fix: increase goblin chain to 6-8 goblins so that `;` saves 10+ keys, making non-`;`
   path exceed budget.
 
-**BOSS PLACEMENT: PASS** — 4.1 numbering, caps Act I, correct structure.
+**BOSS PLACEMENT: PASS** — 5.1 numbering, caps Act I, correct structure.
 
 ---
 
@@ -988,12 +988,12 @@ Total FAIL count across principles:
 - Level 2: 1 FAIL (Forceability)
 - Level 3: 1 FAIL (Forceability — CRITICAL)
 - Level 4: 1 FAIL (Forceability — partial, for `;`/`,`)
-- Level 4.1: 1 FAIL (Forceability — partial, Phases 4 and 5)
+- Level 5.1: 1 FAIL (Forceability — partial, Phases 4 and 5)
 
 **Total: 7 principle FAILs across 6 levels/boss.**
 
 The most severe systemic issue is that `$`/`0` (taught in Level 1) are never blocked from
-providing optimal or near-optimal paths in Levels 3 and 4.1's Phase 4. Once a powerful
+providing optimal or near-optimal paths in Levels 3 and 5.1's Phase 4. Once a powerful
 navigation shortcut is taught, all subsequent levels must actively prevent it from being the
 cheapest solution to their new mechanic.
 
@@ -1041,7 +1041,7 @@ cheapest solution to their new mechanic.
    targets so that `,` and `;` are each used 3+ times, accumulating a 6-key saving that
    pushes no-repeat-cost above budget.
 
-6. **Level 4.1 Phase 4 — `$` bypasses `w`.** Fix: Void rune at boss room far end (col 35)
+6. **Level 5.1 Phase 4 — `$` bypasses `w`.** Fix: Void rune at boss room far end (col 35)
    so `$` stops before warden at col 36; warden is at col 37 on a rune cluster so `e` or `w`
    is required to land precisely. Set the warden at the last cell of a rune cluster — then
    `w` to cluster start + `e` to cluster end = warden cell; `$` lands at void boundary (col 36).
@@ -1052,7 +1052,7 @@ cheapest solution to their new mechanic.
    demote to pure UI prompt text in the exit-tile overlay, not a learnable command. They
    appear naturally and are self-explanatory; they don't need to count as a mechanic family.
 
-8. **Level 4.1 Phase 5 — `;` not budget-forced.** Fix: Increase goblin summon chain to 6
+8. **Level 5.1 Phase 5 — `;` not budget-forced.** Fix: Increase goblin summon chain to 6
    goblins. Without `;`: 6 × `fg x`(3) = 18 keys; with `;`: `fg x` + 5×`;x`(2) = 13 keys.
    Savings = 5 keys. If combat base cost rises proportionally, the budget slack tightens to
    where `;` becomes required. OR: reduce Phase 5 budget component, e.g., impose a separate

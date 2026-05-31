@@ -1,6 +1,6 @@
 # Act III — Navigation Power Tools: Blueprints
 
-Levels 10–13.1. Each level introduces at most 3 linked mechanics, budget-forces or
+Levels 10, 15, 16, 17, 17.1. Each level introduces at most 3 linked mechanics, budget-forces or
 contextually teaches them, and is buildable from existing engine primitives (with
 clearly flagged assumed extensions).
 
@@ -10,7 +10,7 @@ D1–D12 addressed.
 
 ---
 
-## Level 10 — The Mirror Temple
+## Level 10 — The Bracket Vaults
 
 **Commands:** `%`
 
@@ -144,7 +144,7 @@ cannot run without it.
 
 ---
 
-## Level 11 — The Seekers' Labyrinth
+## Level 15 — The Seekers' Labyrinth
 
 **Commands:** `/ ? n N`
 
@@ -166,7 +166,7 @@ This decision is **required** for the forcing argument. If search only reveals p
 (cursor highlight) without moving the avatar, the level cannot force `/` over walking.
 The engine must implement search-as-avatar-teleport.
 
-**CHALLENGE C-L11-1:** `engine/search.py` `find_next()` returns `(row, col)`. The engine
+**CHALLENGE C-L15-1:** `engine/search.py` `find_next()` returns `(row, col)`. The engine
 dispatch for `/pattern<Enter>` must additionally move `player.row, player.col` to that
 position. This is a semantic extension beyond cursor highlighting — it is a core engine
 behavior change affecting all future search uses. A human must decide: should
@@ -354,18 +354,18 @@ full dungeon before reaching it. The budget forces the backward direction.
 - Rune clusters with specific text strings — existing RuneCluster.
 - Scroll hints — existing.
 
-**CHALLENGE C-L11-1 (critical):** `engine/search.py` `find_next()` must move the
+**CHALLENGE C-L15-1 (critical):** `engine/search.py` `find_next()` must move the
 player avatar to the matched cell, not only return `(row, col)`. This is a semantic
 extension — standard Vim `/` is cursor-only; Vimny `/` is avatar-teleport. A human
 must decide: is this global behavior or a room-flag opt-in? Decision required before
-L11 can be built.
+L15 can be built.
 
-**CHALLENGE C-L11-2:** `player.last_search` (pattern + direction) field and `n`/`N`
+**CHALLENGE C-L15-2:** `player.last_search` (pattern + direction) field and `n`/`N`
 dispatch in `engine/motion.py` are required. `n` calls
 `find_next(room, player, player.last_search.pattern, player.last_search.forward)`;
 `N` reverses direction. Neither is implemented (confirmed: LEVELS_PLAN.md Part 5).
 
-**CHALLENGE C-L11-3 (design decision):** What happens when the player teleports into
+**CHALLENGE C-L15-3 (design decision):** What happens when the player teleports into
 a fogged alcove via `/SIGIL`? The fog should clear for that alcove. Requires that the
 fog-reveal logic triggers on avatar position change (not only on manual walk-in). If
 fog reveal is tied to `player.row/col` change, this works automatically. Confirm.
@@ -381,14 +381,14 @@ fog reveal is tied to `player.row/col` change, this works automatically. Confirm
   gap. `?` forced by ECHO placement ordering in worst seed. Par=29 (worst case), budget=41.
   No-search path ≈ 80+. Pass.
 - (4) Boss: not applicable. Pass.
-- Engine flags: C-L11-1 (avatar teleport), C-L11-2 (last_search + n/N), C-L11-3 (fog on
+- Engine flags: C-L15-1 (avatar teleport), C-L15-2 (last_search + n/N), C-L15-3 (fog on
   teleport). All flagged as challenges requiring human decisions.
 
 ---
 
 ---
 
-## Level 12 — The Waypoint Sanctum
+## Level 16 — The Waypoint Sanctum
 
 **Commands:** `m{a-z}`, `'`/`` ` `` (jump to mark)
 
@@ -576,12 +576,12 @@ distinction in practice. Both are forced by the budget gap; `` ` `` is strictly 
 - Winding corridor topology uses standard walls arranged to force 5-6 direction changes
   per return path — no new engine primitive required.
 
-**CHALLENGE C-L12-A (engine prerequisite):** `player.marks` dict + `m{a-z}` dispatch +
+**CHALLENGE C-L16-A (engine prerequisite):** `player.marks` dict + `m{a-z}` dispatch +
 `` `a ``/`'a` dispatch are unimplemented (confirmed: LEVELS_PLAN.md Part 5). Required
-before L12 runs. This challenge is UNCHANGED from the prior design — it is an engine
+before L16 runs. This challenge is UNCHANGED from the prior design — it is an engine
 implementation task, not a design tension.
 
-**CHALLENGE C-L12-B:** The par-solver must model mark-teleports in its Dijkstra state.
+**CHALLENGE C-L16-B:** The par-solver must model mark-teleports in its Dijkstra state.
 `frozenset` of `(char, row, col)` mark states needed. Alternatively, hardcode par=77 for
 this fixed layout and skip the solver extension (recommended for the winding-maze layout,
 which has a fixed deterministic optimal path).
@@ -602,7 +602,7 @@ which has a fixed deterministic optimal path).
 
 ---
 
-## Level 13 — The Archivist's Library
+## Level 17 — The Archivist's Library
 
 **Commands:** `:e {filename}`, `:set {option}`
 
@@ -688,7 +688,7 @@ On return, `player.flags['index_read'] = True` is set automatically. The Archivi
 checks this flag on bump — no explicit passphrase input required; the flag IS the
 passphrase mechanism. This avoids any free-text input complexity.
 
-**`:e` scope guard (D8 fix):** `:e <name>` within L13 is restricted to the names
+**`:e` scope guard (D8 fix):** `:e <name>` within L17 is restricted to the names
 present on the shelves. Any other name returns the Archivist's message: "That dungeon
 is not in this library." This prevents softlocks from `:e`-ing into rooms without
 return paths. Shelf names other than `"index"` load abbreviated stub rooms (2×20, empty
@@ -746,14 +746,14 @@ earlier level — genuine Vim-fidelity moment with no softlock risk (all stubs h
 - Fog-of-war on exit portal — existing.
 - Keystones — existing.
 
-**CHALLENGE C-L13-1:** `:e {name}<Enter>` dispatch in command mode — maps name to
+**CHALLENGE C-L17-1:** `:e {name}<Enter>` dispatch in command mode — maps name to
 `build_dungeon_N()` or stub room builder. The engine has `:wq` / `:q` dispatch
 (`engine/modes.py` or `main.py`); `:e` must be added. Requires a dungeon-name registry.
 
-**CHALLENGE C-L13-2:** `:set number<Enter>` — toggles `player.options['number']`; renderer
+**CHALLENGE C-L17-2:** `:set number<Enter>` — toggles `player.options['number']`; renderer
 checks this flag to show HP. `player.options` dict + `:set` parser needed. Neither exists.
 
-**CHALLENGE C-L13-3:** Return-to-library mechanic — `:q` in a nested room (INDEX or stub)
+**CHALLENGE C-L17-3:** Return-to-library mechanic — `:q` in a nested room (INDEX or stub)
 must restore the player's exact position in the Archivist's Library room, including
 `player.flags['index_read']` being set. This requires a room-stack or save-state mechanism.
 
@@ -772,7 +772,7 @@ must restore the player's exact position in the Archivist's Library room, includ
 
 ---
 
-## Level 13.1 — The Warden Pathfinder (ACT III BOSS)
+## Level 17.1 — The Warden Pathfinder (ACT III BOSS)
 
 **Commands required (from Act III):** `%`, `/ ? n N`, `m ' \``, `:set`
 **Boss type:** Multi-phase Warden
@@ -1009,11 +1009,11 @@ No-marks par: 4+1+2+1+4+3+2+1+1+2 = **21 keystrokes** (approximately same as mar
 count-moves compress the long horizontal run. The mark-jump saves ~22 manual steps but
 those steps only cost 3-4 keystrokes with count-moves.
 
-**CHALLENGE C-L13-1-Boss (critical, same root cause as C-L12-1):** Count-move compression
+**CHALLENGE C-L17-1-Boss (critical, same root cause as C-L16-1):** Count-move compression
 eliminates the mark-forcing advantage in Phase 3. The arena detour (15 cells) costs `15l`
 = 3 keys. The mark-jump costs 2+1 = 3 keys. Essentially the same cost.
 
-**Resolution: forbid count-prefix in the NE Chamber during Phase 3** (extend C-L12-2 to
+**Resolution: forbid count-prefix in the NE Chamber during Phase 3** (extend C-L16-2 to
 boss rooms, or alternatively make the arena detour structurally longer by requiring door
 interaction sequences that each cost 1 key each, e.g. 20 door segments each requiring a
 single `l` = 20 keys vs. `` `b `` = 2 keys).
@@ -1072,7 +1072,7 @@ faces certain death (any over-press reflects). `:set number` is a hard lock via 
 rather than structure — but because the risk is deterministic (1 over-press = 1 death
 with reduced HP pool), it functionally forces the command.
 
-**CHALLENGE C-L13-2-Boss:** The mirror-trap reflected damage requires that `x` on a
+**CHALLENGE C-L17-2-Boss:** The mirror-trap reflected damage requires that `x` on a
 dead entity (HP=0) deals 1 damage to the player. This is a new engine behavior —
 currently `x` on a dead/absent entity is likely a no-op. The `REFLECTOR` entity or an
 HP-check on `x` dispatch must be implemented. A human must decide the implementation
@@ -1131,19 +1131,19 @@ Act II motions (`G gg H M L } {`) are blocked by the Warden immunity flag
 - Decoy entities (`kind='goblin'`, `name="WARDEN"`) — existing.
 - Phase gating via HP thresholds — existing.
 
-**CHALLENGE C-L13-1-Boss:** Count-move compression threatens mark-forcing in Phase 3.
+**CHALLENGE C-L17-1-Boss:** Count-move compression threatens mark-forcing in Phase 3.
 Resolved by 30-cell winding corridor (terrain forcing). No engine change required for
 THIS fix, but the winding corridor must be physically laid out in the room builder.
 
-**CHALLENGE C-L13-2-Boss:** Mirror trap (`x` on HP=0 entity → player -1 HP). Requires
+**CHALLENGE C-L17-2-Boss:** Mirror trap (`x` on HP=0 entity → player -1 HP). Requires
 new engine behavior: `x` dispatch checks if target entity HP ≤ 0; if so, applies damage
 to player and activates REFLECTOR effect. Must be implemented before Phase 4 runs.
 
-**CHALLENGE C-L13-3-Boss (existing):** Warden immunity flag `warden_phase_immune: set[str]`
+**CHALLENGE C-L17-3-Boss (existing):** Warden immunity flag `warden_phase_immune: set[str]`
 on Entity — motion dispatch checks before applying Act II motions. Already flagged in
 original blueprint; unchanged.
 
-**CHALLENGE C-L13-4-Boss:** All engine extensions from L10-L13 (`%`, last_search, n/N,
+**CHALLENGE C-L17-4-Boss:** All engine extensions from L10-L17 (`%`, last_search, n/N,
 marks, `:e`, `:set`) must be implemented before this boss level runs. The boss depends on
 all of them.
 
@@ -1156,10 +1156,10 @@ all of them.
 - (3) Forced:
   - Phase 1: void-gap forcing. Pass.
   - Phase 2: decoy-fog forcing. Pass (D11 clarified — `:set` not needed in P2).
-  - Phase 3: winding detour + mark-jump (D9 redesign). Pass pending C-L13-1-Boss
+  - Phase 3: winding detour + mark-jump (D9 redesign). Pass pending C-L17-1-Boss
     (winding corridor must be built).
-  - Phase 4: mirror-trap forcing (D10 redesign). Pass pending C-L13-2-Boss.
-- (4) Boss: caps Act III at 13.1. Well-spaced after 9.1. Pass.
+  - Phase 4: mirror-trap forcing (D10 redesign). Pass pending C-L17-2-Boss.
+- (4) Boss: caps Act III at 17.1. Well-spaced after 13.1. Pass.
 
 ---
 
@@ -1172,18 +1172,18 @@ All extensions below must be implemented before Act III runs, ordered by depende
 | Extension | Required by | Status | Notes |
 |-----------|------------|--------|-------|
 | `%` motion in `engine/motion.py` | L10, Boss P1, Boss Final | CHALLENGE C-L10-1 | Scan row for bracket glyph under cursor; jump to pair. Brackets: `[](){}` in RuneCluster. |
-| `player.last_search` (pattern + direction) | L11, Boss P2 | CHALLENGE C-L11-2 | Store after `/` or `?`. Used by `n`/`N`. |
-| `n`/`N` dispatch | L11, Boss P2 | CHALLENGE C-L11-2 | `find_next()` with stored pattern/direction. |
-| `/pattern` avatar teleport | L11, Boss P2 | CHALLENGE C-L11-1 | Critical: player avatar moves to match cell, not just cursor. Human decision required. |
-| Fog reveal on teleport | L11 | CHALLENGE C-L11-3 | Fog clears when avatar position changes. Likely free if fog tied to `player.row/col`. |
-| `player.marks` dict | L12, Boss P3 | CHALLENGE C-L12-2 | `{char: (row,col)}`. `m{a-z}` sets; `` `{a} `` and `'{a}` jump. |
-| `` `a ``/`'a` dispatch | L12, Boss P3 | CHALLENGE C-L12-2 | `` `a `` → exact (row,col); `'a` → first non-blank of marked row. |
-| Budget multiplier ×1.03 for L12 | L12 | CHALLENGE C-L12-3 | Near-zero slack; human must accept or redesign topology. |
-| Count-prefix forcing gap | L12 | CHALLENGE C-L12-1 | Count-move compression collapses mark budget advantage. Human decision required. |
-| `:e {name}` command dispatch | L13, Boss P4 | CHALLENGE C-L13-1 | Name→builder registry. Add to command-mode parser. |
-| `:set {option}` command | L13, Boss P4 | CHALLENGE C-L13-2 | `player.options` dict + renderer HP branch. |
-| Room-stack / return-to-library | L13 | CHALLENGE C-L13-3 | `:q` in nested room restores prior room state + sets flags. |
-| Mirror trap (x on dead entity → player damage) | Boss P4 | CHALLENGE C-L13-2-Boss | New engine behavior on `x` dispatch. |
-| Winding corridor (30-cell) in NE Chamber | Boss P3 | CHALLENGE C-L13-1-Boss | Must be laid out in room builder; no engine change, just map design. |
-| Warden immunity flag | Boss | CHALLENGE C-L13-3-Boss | `warden_phase_immune: set[str]` on Entity; checked in motion dispatch. |
-| Mark-aware par solver (or hardcoded par) | L12 | CHALLENGE C-L12-3 | Dijkstra state includes frozenset of mark positions, or hardcode par=49. |
+| `player.last_search` (pattern + direction) | L15, Boss P2 | CHALLENGE C-L15-2 | Store after `/` or `?`. Used by `n`/`N`. |
+| `n`/`N` dispatch | L15, Boss P2 | CHALLENGE C-L15-2 | `find_next()` with stored pattern/direction. |
+| `/pattern` avatar teleport | L15, Boss P2 | CHALLENGE C-L15-1 | Critical: player avatar moves to match cell, not just cursor. Human decision required. |
+| Fog reveal on teleport | L15 | CHALLENGE C-L15-3 | Fog clears when avatar position changes. Likely free if fog tied to `player.row/col`. |
+| `player.marks` dict | L16, Boss P3 | CHALLENGE C-L16-2 | `{char: (row,col)}`. `m{a-z}` sets; `` `{a} `` and `'{a}` jump. |
+| `` `a ``/`'a` dispatch | L16, Boss P3 | CHALLENGE C-L16-2 | `` `a `` → exact (row,col); `'a` → first non-blank of marked row. |
+| Budget multiplier ×1.03 for L16 | L16 | CHALLENGE C-L16-3 | Near-zero slack; human must accept or redesign topology. |
+| Count-prefix forcing gap | L16 | CHALLENGE C-L16-1 | Count-move compression collapses mark budget advantage. Human decision required. |
+| `:e {name}` command dispatch | L17, Boss P4 | CHALLENGE C-L17-1 | Name→builder registry. Add to command-mode parser. |
+| `:set {option}` command | L17, Boss P4 | CHALLENGE C-L17-2 | `player.options` dict + renderer HP branch. |
+| Room-stack / return-to-library | L17 | CHALLENGE C-L17-3 | `:q` in nested room restores prior room state + sets flags. |
+| Mirror trap (x on dead entity → player damage) | Boss P4 | CHALLENGE C-L17-2-Boss | New engine behavior on `x` dispatch. |
+| Winding corridor (30-cell) in NE Chamber | Boss P3 | CHALLENGE C-L17-1-Boss | Must be laid out in room builder; no engine change, just map design. |
+| Warden immunity flag | Boss | CHALLENGE C-L17-3-Boss | `warden_phase_immune: set[str]` on Entity; checked in motion dispatch. |
+| Mark-aware par solver (or hardcoded par) | L16 | CHALLENGE C-L16-3 | Dijkstra state includes frozenset of mark positions, or hardcode par=49. |
