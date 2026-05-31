@@ -66,10 +66,10 @@ def _fmt_quote(chosen: dict) -> tuple[str, str, str, str]:
 
 def _generic_pool() -> list[dict]:
     """Poems with no specific level (title flavour + blessing fallback)."""
-    return [q for q in _QUOTES if q.get('introduces_id') is None]
+    return [q for q in _QUOTES if q.get('introduces_slug') is None]
 
 
-def select_quote(unlocked_ids: set[int]) -> tuple[str, str, str, str]:
+def select_quote(unlocked_slugs: set[str]) -> tuple[str, str, str, str]:
     """Return 4 box-inner strings for the title-screen quote box.
 
     Picks from the generic pool plus any lesson poem whose introduced level
@@ -77,7 +77,7 @@ def select_quote(unlocked_ids: set[int]) -> tuple[str, str, str, str]:
     player has not yet reached.
     """
     pool = _generic_pool() + [
-        q for q in _QUOTES if q.get('introduces_id') in unlocked_ids
+        q for q in _QUOTES if q.get('introduces_slug') in unlocked_slugs
     ]
     pool = pool or _QUOTES
     if not pool:
@@ -95,22 +95,22 @@ def select_quote_by_name(name: str) -> tuple[str, str, str, str]:
     return (blank, blank, blank, blank)
 
 
-def select_next_lesson_quote(completed_level_id: int) -> tuple[str, str, str, str]:
-    """Return the wisdom quote that introduces the level after completed_level_id.
+def select_next_lesson_quote(completed_slug: str) -> tuple[str, str, str, str]:
+    """Return the wisdom quote that introduces the level after completed_slug.
 
     Finds the next visible level in curriculum order and fires the poem tagged
-    with that level's id (introduces_id). Falls back to the generic pool when no
-    dedicated poem exists (e.g. after the final level). Keying by id — not by
-    ordinal position — keeps the corpus aligned when levels are reordered.
+    with that level's slug (introduces_slug). Falls back to the generic pool when
+    no dedicated poem exists (e.g. after the final level). Keying by slug — not by
+    ordinal position — keeps the corpus aligned across reorders and renumbers.
     """
-    visible_ids = [l['id'] for l in LEVELS if not l.get('admin_only')]
+    visible_slugs = [l['slug'] for l in LEVELS if not l.get('admin_only')]
     try:
-        nxt = visible_ids.index(completed_level_id) + 1
-        next_id = visible_ids[nxt] if nxt < len(visible_ids) else None
+        nxt = visible_slugs.index(completed_slug) + 1
+        next_slug = visible_slugs[nxt] if nxt < len(visible_slugs) else None
     except ValueError:
-        next_id = None
+        next_slug = None
 
-    pool = [q for q in _QUOTES if q.get('introduces_id') == next_id] if next_id is not None else []
+    pool = [q for q in _QUOTES if q.get('introduces_slug') == next_slug] if next_slug is not None else []
     if not pool:
         pool = _generic_pool()
     if not pool:
