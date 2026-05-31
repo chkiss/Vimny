@@ -1,4 +1,4 @@
-"""Level 3 — The Rune Halls: dungeon correctness tests."""
+"""The Rune Halls: dungeon correctness tests."""
 import math
 import pytest
 from generation.dungeon_gen import build_dungeon_rune_halls, _dijkstra_par_wbe

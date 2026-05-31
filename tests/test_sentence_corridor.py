@@ -1,4 +1,4 @@
-"""Level 13 — The Sentence Corridor: dungeon correctness tests.
+"""The Sentence Corridor: dungeon correctness tests.
 
 Layout: two sentence rows (1 and 3) split by a stone wall row (2). Five
 sentences, scattered horizontally and divided by wall-gaps:

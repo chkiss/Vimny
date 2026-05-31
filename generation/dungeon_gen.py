@@ -42,7 +42,7 @@ def _join_path(prev: dict, goal, merge_single: bool = True) -> str:
 
 # ── Level plans ───────────────────────────────────────────────────────────────
 
-# Level 0: Entry → Puzzle → Exit  (hjkl only)
+# The First Cave: Entry → Puzzle → Exit  (hjkl only)
 LEVEL_0_PLAN = [
     (RoomType.ENTRY,  10, 18),
     (RoomType.PUZZLE, 10, 20),
@@ -64,14 +64,14 @@ def _make_rune_syms(rng, kind: str) -> tuple:
     ch = _RUNE_CHAR[kind]
     return tuple(ch for _ in range(rng.randint(min_len,max_len)))
 
-# ── Level 3 layout constants ──────────────────────────────────────────────────
+# ── The Rune Halls layout constants ──────────────────────────────────────────────────
 _RUNE_HALLS_CORR_TOP_ROWS = (1, 4, 7, 10, 13)  # top row of each of the 5 corridors
 _RUNE_HALLS_TOTAL_ROWS    = 16                  # rows 0-15
 _RUNE_HALLS_TOTAL_COLS    = 48                  # cols 0-47
 _RUNE_HALLS_CORR_LEFT     = 1
 _RUNE_HALLS_CORR_RIGHT    = 46
 
-# ── Level 4 layout constants ──────────────────────────────────────────────────
+# ── The Character Cataracts layout constants ──────────────────────────────────────────────────
 _CHARACTER_CATARACTS_CORR_TOP_ROWS = (1, 4, 7, 10, 13)
 _CHARACTER_CATARACTS_TOTAL_ROWS    = 16
 _CHARACTER_CATARACTS_TOTAL_COLS    = 72
@@ -155,7 +155,7 @@ def _bfs_par(composite, return_path: bool = False):
         return None, ''
     return None
 
-# Level 2: Entry → Puzzle → Exit  ([count] prefix with hjkl + ^$0)
+# The Counting Crypts: Entry → Puzzle → Exit  ([count] prefix with hjkl + ^$0)
 LEVEL_2_PLAN = [
     (RoomType.ENTRY,  12, 20),
     (RoomType.PUZZLE, 12, 32),
@@ -198,7 +198,7 @@ def _dijkstra_par_count(composite) -> int | None:
 
 
 def _par_counting_crypts(composite, door_cols: list, return_path: bool = False):
-    """Full state-space Dijkstra for Level 2.
+    """Full state-space Dijkstra for The Counting Crypts.
 
     State: (row, col, closed_mask) — bit i set means door_cols[i] is still closed.
     Commands modelled: count h/j/k/l, wall/fog-bounded $ ^ 0, and x (open door).
@@ -422,7 +422,7 @@ def build_dungeon_first_cave(seed: int) -> Dungeon:
     return dungeon
 
 
-# Level 1: Entry → Puzzle → Exit  (hjkl + ^ $ 0  + :w :q)
+# The Line Halls: Entry → Puzzle → Exit  (hjkl + ^ $ 0  + :w :q)
 LEVEL_1_PLAN = [
     (RoomType.ENTRY,  8, 14),
     (RoomType.PUZZLE, 8, 60),
@@ -431,7 +431,7 @@ LEVEL_1_PLAN = [
 
 
 def _bfs_par_line(composite, return_path: bool = False):
-    """BFS par for Level 1: hjkl + $ ^ 0 line-end motions (each costs 1).
+    """BFS par for The Line Halls: hjkl + $ ^ 0 line-end motions (each costs 1).
 
     $ and ^ are wall-bounded: they stop at the nearest wall in each direction,
     matching apply_motion semantics.  Targets are precomputed per (row, col).
@@ -695,7 +695,7 @@ def build_dungeon_counting_crypts(seed: int) -> Dungeon:
         for row in (mid - 1, mid):
             composite.entities.append(Entity(kind='door', row=row, col=dc))
 
-    # Full par: state-space Dijkstra with all Level 2 commands and door states.
+    # Full par: state-space Dijkstra with all Counting Crypts commands and door states.
     # Accounts for door-blocking (breaking $ into segments) and x keystrokes.
     composite.rebuild_indexes()
     composite.par, composite.answer = _par_counting_crypts(composite, door_cols, return_path=True)
@@ -708,7 +708,7 @@ def build_dungeon_counting_crypts(seed: int) -> Dungeon:
     return dungeon
 
 
-# ── Level 3 helpers ───────────────────────────────────────────────────────────
+# ── The Rune Halls helpers ───────────────────────────────────────────────────────────
 
 def _make_rune_corridor(composite, rng, row_top,
                         col_start=None, col_end=None, density=0.65,
@@ -751,7 +751,7 @@ def _make_rune_corridor(composite, rng, row_top,
 
 
 def _dijkstra_par_wbe(composite, return_path: bool = False):
-    """Minimum-keystroke Dijkstra for Level 3: hjkl + w b e + count-hjkl.
+    """Minimum-keystroke Dijkstra for The Rune Halls: hjkl + w b e + count-hjkl.
 
     w/b/e are row-scoped and each cost 1 keystroke.  Count-n h/j/k/l cost
     len(str(n))+1, matching the existing budget model.  Void cells are never
@@ -905,7 +905,7 @@ def _l4_place_zone(composite, rng, rows, col_start, col_end,
 
 
 def _dijkstra_par_ftFT(composite, return_path: bool = False):
-    """Minimum-keystroke Dijkstra for Level 4: hjkl + count + w b e + f F t T.
+    """Minimum-keystroke Dijkstra for The Character Cataracts: hjkl + count + w b e + f F t T.
 
     f/F/t/T scan includes text characters ('r','w','!') and entity chars
     ('E','?') as targets.  w/b/e stop at water (non-passable cells), matching
@@ -1486,7 +1486,7 @@ def build_dungeon_dummy(seed: int) -> Dungeon:
     return dungeon
 
 
-# ── Level 5 helpers ────────────────────────────────────────────────────────────
+# ── The Goblin Gauntlet helpers ────────────────────────────────────────────────────────────
 
 _GOBLIN_GAUNTLET_ROWS = 20
 _GOBLIN_GAUNTLET_COLS = 58
@@ -1562,7 +1562,7 @@ def _l5_goblin_positions(rng, far_start: int, far_end: int,
 
 
 def _par_goblin_gauntlet(corr_data: list, gobs_17: list) -> int:
-    """Analytical par for Level 5.
+    """Analytical par for The Goblin Gauntlet.
 
     Optimal strategy:
     - First right-going corridor: fg (2 keys) to establish last_f.
@@ -1600,7 +1600,7 @@ def _par_goblin_gauntlet(corr_data: list, gobs_17: list) -> int:
 
 
 def _answer_l5(corr_data: list, gobs_17: list) -> str:
-    """Exact command sequence for the current Level 5 layout."""
+    """Exact command sequence for the current Goblin Gauntlet layout."""
     cmds: list = []
     first_right = True
     for c in corr_data:
@@ -1763,7 +1763,7 @@ def build_dungeon_goblin_gauntlet(seed: int) -> Dungeon:
     return dungeon
 
 
-# ── Level 5.1 — The Warden's Keep ─────────────────────────────────────────────
+# ── The Warden's Keep ─────────────────────────────────────────────
 
 _WARDENS_KEEP_ROWS = 7
 _WARDENS_KEEP_COLS = 44
@@ -1776,7 +1776,7 @@ _WARDENS_KEEP_COLS = 44
 
 
 def _par_wardens_keep() -> int:
-    """Simulated par for Level 5.1 (The Warden's Keep).
+    """Simulated par for The Warden's Keep.
 
     Optimal strategy (layout fixed; combat cost is seed-dependent):
 
@@ -1862,7 +1862,7 @@ def build_dungeon_wardens_keep(seed: int) -> Dungeon:
     return dungeon
 
 
-# ── Level 8 layout constants ──────────────────────────────────────────────────
+# ── The WORD Forge layout constants ──────────────────────────────────────────────────
 
 _WORD_FORGE_TOTAL_ROWS    = 10
 _WORD_FORGE_TOTAL_COLS    = 58
@@ -1949,7 +1949,7 @@ def _l7_fill_row(composite, rng, row, col_start, col_end,
 
 
 def _dijkstra_par_WBE(composite, return_path=False):
-    """Minimum-keystroke Dijkstra for Level 8: count hjkl + w b e + W B E.
+    """Minimum-keystroke Dijkstra for The WORD Forge: count hjkl + w b e + W B E.
 
     WORD = maximal contiguous cluster sequence (no floor gap between clusters).
     W: start of next WORD.  B: start of current (or prev) WORD.  E: end of WORD.
@@ -2263,7 +2263,7 @@ def _load_vocab_tables() -> None:
     _VOCAB_MIXED_BY_LEN = _parse('vocab_mixed.txt')
 
 
-# ── Level 7 layout constants ──────────────────────────────────────────────────
+# ── The Backward Vaults layout constants ──────────────────────────────────────────────────
 _BACKWARD_VAULTS_TOTAL_ROWS = 14
 _BACKWARD_VAULTS_TOTAL_COLS = 40
 _BACKWARD_VAULTS_CORR_ROWS  = (1, 3, 5, 7, 9, 11)   # one row per corridor
@@ -2281,7 +2281,7 @@ _BACKWARD_VAULTS_TURN_SPANS = [
 
 
 def _par_backward_vaults(composite, return_path: bool = False):
-    """Minimum-keystroke Dijkstra for Level 8 — The Backward Vaults:
+    """Minimum-keystroke Dijkstra for The Backward Vaults:
     hjkl + $ ^ 0 + w b e + W B E (count) + ge gE (count).
 
     State = (row, col).  Cost model follows _keystroke_cost in main.py:
@@ -2649,7 +2649,7 @@ def _par_backward_vaults(composite, return_path: bool = False):
 
 
 def build_dungeon_backward_vaults(seed: int) -> Dungeon:
-    """Level 7 — ge/gE: The Backward Vaults.
+    """ge/gE: The Backward Vaults.
 
     Six 1-row corridors in a snake pattern (13 rows × 40 cols).  Each corridor
     is bridged to the next by a turn room at alternating ends.  Two turns have
@@ -2930,7 +2930,7 @@ def build_dungeon_word_forge(seed: int) -> Dungeon:
 
 
 def build_dungeon_sight_sanctum(seed: int) -> Dungeon:
-    """Level 14 — Visual Mode: The Sight Sanctum.
+    """Visual Mode: The Sight Sanctum.
 
     Fixed U-shaped layout:
         #####################
@@ -2986,7 +2986,7 @@ def build_dungeon_sight_sanctum(seed: int) -> Dungeon:
     return dungeon
 
 
-# ── Level 11 layout constants ─────────────────────────────────────────────────
+# ── The Bracket Vaults layout constants ─────────────────────────────────────────────────
 #
 # Three-corridor snake layout (7 rows × 60 cols).
 # Each corridor row has ( at col _BRACKET_VAULTS_BRACKET_OPEN and ) at col _BRACKET_VAULTS_BRACKET_CLOSE.
@@ -3015,7 +3015,7 @@ _BRACKET_VAULTS_ANSWER        = '% 2j % 2j % l'
 
 
 def _par_bracket_vaults(composite, use_percent: bool = True, return_path: bool = False):
-    """Minimum-keystroke Dijkstra for Level 11 — The Bracket Vaults.
+    """Minimum-keystroke Dijkstra for The Bracket Vaults.
 
     Supported motions (all available at level 11):
       h/l/j/k (count), $ 0 ^, % (if use_percent=True).
@@ -3172,7 +3172,7 @@ def _par_bracket_vaults(composite, use_percent: bool = True, return_path: bool =
 
 
 def build_dungeon_bracket_vaults(seed: int) -> Dungeon:
-    """Level 10 — % (The Bracket Vaults).
+    """% (The Bracket Vaults).
 
     Teaches `%` (bracket-matching jump) as the only way to cross a band of WATER.
     Layout: three horizontal corridors (rows 1/3/5) in a snake pattern, with rows
@@ -3267,7 +3267,7 @@ def build_dungeon_bracket_vaults(seed: int) -> Dungeon:
     return dungeon
 
 
-# ── Level 9 — H/M/L: The Screen Vault (3 colored keys) ────────────────────────
+# ── H/M/L: The Screen Vault (3 colored keys) ────────────────────────
 # Viewport-filling dungeon teaching H (viewport-top), M (viewport-middle), and
 # L (viewport-bottom) as distinct from G (which lands on a void row and is
 # punished).  Restored from the recovered "screen_vault_3keys" design.
@@ -3494,7 +3494,7 @@ def _par_screen_vault(composite, return_path: bool = False):
 
 def build_dungeon_screen_vault(seed: int, game_h: int = _SCREEN_VAULT_DEFAULT_GAME_H,
                      compute_answer: bool = True) -> Dungeon:
-    """Level 9 — H M L: The Screen Vault (3 colored keys).
+    """H M L: The Screen Vault (3 colored keys).
 
     Viewport-filling dungeon that teaches H (viewport-top), M (viewport-middle),
     and L (viewport-bottom) as distinct from G (room-last-row = void, punished).
@@ -3660,7 +3660,7 @@ def build_dungeon_screen_vault(seed: int, game_h: int = _SCREEN_VAULT_DEFAULT_GA
     return dungeon
 
 
-# ── Level 12 layout constants ─────────────────────────────────────────────────
+# ── The Runic Archives layout constants ─────────────────────────────────────────────────
 # Room: 22 rows × 48 cols.  Main area cols 1–42; side room row 15 cols 43–46.
 #
 # Blank rows (passable, no character runs): 1, 3, 5, 9, 15, 17, 19.
@@ -3694,7 +3694,7 @@ _RUNIC_ARCHIVES_VOID_POS = (20, 1)   # void rune
 _RUNIC_ARCHIVES_PAR      = 7
 _RUNIC_ARCHIVES_ANSWER   = '{ x } } $ p $'
 
-# ── Level 14 (Sentence Corridor) constants ────────────────────────────────
+# ── The Sentence Corridor constants ────────────────────────────────
 # Without (/): wall gaps (cols 11-22 and 37-48) block all l/h/w paths.
 #              Player trapped in S1 (cols 1-10).  Cost = infinity >> budget.
 
@@ -3723,7 +3723,7 @@ _SENTENCE_CORRIDOR_SENTENCES = [
 
 def _par_runic_archives(composite, return_path=False,
                       disable_brace=False, disable_paren=False):
-    """Minimum-keystroke Dijkstra for Level 12 — Paragraph Jumps (The Runic Archives).
+    """Minimum-keystroke Dijkstra for Paragraph Jumps (The Runic Archives).
 
     State = (row, col, has_key, door_open) where:
       has_key:   0 = key on floor, 1 = key held
@@ -3869,7 +3869,7 @@ def _par_runic_archives(composite, return_path=False,
     return None
 
 
-# ── Level 8 — G/gg: The Lineheads ─────────────────────────────────────────
+# ── G/gg: The Lineheads ─────────────────────────────────────────
 # 16-row × 11-col vertical shaft teaching G (last line), gg (first line), and
 # {n}G (nth line).  Restored from the admin design layout saved as
 # "dungeon_09_the_screen_vault_pre-reversion" (a mislabel — it is the Lineheads).
@@ -3907,7 +3907,7 @@ _LINEHEADS_PASSABLE = {
 
 def _par_lineheads(composite, return_path: bool = False,
                       disable_line_jumps: bool = False):
-    """Minimum-keystroke Dijkstra for Level 8 — The Lineheads.
+    """Minimum-keystroke Dijkstra for The Lineheads.
 
     Models the vertical key/door shaft with the commands a Level-8 player has:
       hjkl + count-hjkl, 0 / $ / ^ (1 ks each),
@@ -4056,7 +4056,7 @@ def _par_lineheads(composite, return_path: bool = False,
 
 
 def build_dungeon_lineheads(seed: int) -> 'Dungeon':
-    """Level 8 — G gg {n}G: The Lineheads.
+    """G gg {n}G: The Lineheads.
 
     A 16-row × 11-col vertical shaft (restored from the admin design layout
     "dungeon_09_the_screen_vault_pre-reversion" — a mislabel; it is the
@@ -4107,7 +4107,7 @@ def build_dungeon_lineheads(seed: int) -> 'Dungeon':
     # ── Compute par via Dijkstra (key/door + line-jump model) ─────────────────
     par, path = _par_lineheads(composite, return_path=True)
     if par is None:                      # fixed map — should always solve
-        raise RuntimeError('Level 8 (The Lineheads) is unsolvable — check layout')
+        raise RuntimeError('The Lineheads is unsolvable — check layout')
     composite.par    = par
     composite.budget = math.ceil(par * 1.4)
     composite.answer = path
@@ -4118,7 +4118,7 @@ def build_dungeon_lineheads(seed: int) -> 'Dungeon':
 
 
 def build_dungeon_runic_archives(seed: int) -> 'Dungeon':
-    """Level 12 (id=12) — Paragraph Jumps: The Runic Archives.
+    """Paragraph Jumps: The Runic Archives.
 
     Layout: 22 rows × 48 cols.
     Main area: rows 1–20, cols 1–42.  Side room: row 15, cols 43–46.
@@ -4216,7 +4216,7 @@ def build_dungeon_runic_archives(seed: int) -> 'Dungeon':
 
 
 def _par_sentence_corridor(composite, return_path=False, no_close=False, no_open=False):
-    """Minimum-keystroke Dijkstra for Level 13 — Sentence Jumps.
+    """Minimum-keystroke Dijkstra for The Sentence Corridor — Sentence Jumps.
 
     State = (row, col, has_key, door_open).  Models count-hjkl, 0, $, ) and (
     (buffer-wide sentence jumps, with count), x (pick up the floor_key), and p
@@ -4332,7 +4332,7 @@ def _par_sentence_corridor(composite, return_path=False, no_close=False, no_open
 
 
 def build_dungeon_sentence_corridor(seed: int) -> 'Dungeon':
-    """Level 13 — Sentence Jumps: The Sentence Corridor.
+    """Sentence Jumps: The Sentence Corridor.
 
     Two sentence rows (1 and 3) split by a stone wall row (2): the only way
     between them is a sentence jump — teaching that ) ( cross lines, not just

@@ -1,4 +1,4 @@
-"""Level 10 — The Bracket Vaults: dungeon correctness tests.
+"""The Bracket Vaults: dungeon correctness tests.
 
 Layout: three-corridor snake (7 rows × 60 cols).  Rows 1 and 5 are open
 corridors; rows 2, 3 and 4 are flooded with WATER except the turn cells and the

@@ -123,7 +123,7 @@ def test_answer_key_length_matches_par(builder, level_id, seed):
     """
     room = builder(seed).room
     if not room.answer:
-        return  # level has no answer key (e.g. L5.1 fallback)
+        return  # level has no answer key (e.g. the Warden's Keep boss)
     ans_len = len(room.answer.replace(' ', ''))
     assert ans_len == room.par, (
         f"level={level_id} seed={seed}: answer has {ans_len} keypresses "
@@ -194,7 +194,7 @@ def test_level5_par_matches_reference(seed):
 # ── level 51: par == _par_wardens_keep() (seed-independent fixed layout) ──────────────
 
 def test_level51_completion_only():
-    """Level 5.1 is a boss fight — no par/stars, just completion.
+    """The Warden's Keep is a boss fight — no par/stars, just completion.
 
     Budget is still derived from _par_wardens_keep() to allow a generous time limit,
     but room.par is None so no fireworks or star rating are awarded.

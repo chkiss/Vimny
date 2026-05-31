@@ -1,4 +1,4 @@
-"""Level 6 — The WORD Forge: dungeon correctness tests."""
+"""The WORD Forge: dungeon correctness tests."""
 import math
 import heapq
 import pytest

@@ -1,4 +1,4 @@
-"""Level 12 — The Runic Archives: dungeon correctness tests.
+"""The Runic Archives: dungeon correctness tests.
 
 Layout: 22 rows × 48 cols.
 Main area cols 1–42; side room row 15 cols 43–46.

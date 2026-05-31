@@ -1,4 +1,4 @@
-"""Level 14 — The Sight Sanctum: dungeon correctness and visual-mode undo tests."""
+"""The Sight Sanctum: dungeon correctness and visual-mode undo tests."""
 import math
 import pytest
 from generation.dungeon_gen import build_dungeon_sight_sanctum
@@ -112,7 +112,7 @@ def test_budget_and_par():
 # independent of the randomised seed used by _dungeon().
 
 def _room_with_void():
-    """5×21 room matching Level 14 layout, with a single known void at (1,10)."""
+    """5×21 room matching the Sight Sanctum layout, with a single known void at (1,10)."""
     room = Room(rows=5, cols=21, room_type=RoomType.ENTRY)
     cells = [[CellType.WALL] * 21 for _ in range(5)]
     for c in range(1, 20):
