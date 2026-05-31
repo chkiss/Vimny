@@ -43,17 +43,16 @@ def _build_tiers() -> list[tuple[str, list[str]]]:
 
     Each tier = (sentinel, new_tokens) where sentinel is the first new token
     and new_tokens is the ordered list of commands introduced at that level.
-    Levels that add no new commands (boss/reliquary with commands_level set to
-    a prior level) are skipped automatically.
+    Levels that add no new commands (bosses, the reliquary) are skipped
+    automatically. Walks LEVELS in curriculum order.
     """
     from content.levels import known_commands, LEVELS
-    level_ids = sorted(set(l['id'] for l in LEVELS))
     tiers: list[tuple[str, list[str]]] = []
-    prev_known: set[str] = set(known_commands(0))   # seed with L0 base
-    for lid in level_ids:
-        if lid == 0:
+    prev_known: set[str] = set(known_commands('first_cave'))   # seed with L0 base
+    for lv in LEVELS:
+        if lv['slug'] == 'first_cave' or lv.get('admin_only'):
             continue
-        curr = known_commands(lid)
+        curr = known_commands(lv['slug'])
         new = [t for t in curr if t not in prev_known]
         if new:
             tiers.append((new[0], new))

@@ -13,6 +13,17 @@ from engine.modes import Mode
 from engine.command_guard import action_allowed
 from content.levels import known_commands
 
+# These guard tests address levels by their (legacy) display number; resolve
+# each to a slug so the gating contract is checked by identity, not by number.
+_SLUG_BY_NUM = {0: 'first_cave', 1: 'line_halls', 2: 'counting_crypts',
+                3: 'rune_halls', 4: 'character_cataracts', 5: 'goblin_gauntlet',
+                20: 'quartermaster'}
+
+
+def _kc(num: int) -> list:
+    """known_commands for the level historically numbered `num`."""
+    return known_commands(_SLUG_BY_NUM[num])
+
 
 def _parse(keys: str) -> dict:
     action, _ = parse(keys, Mode.NORMAL)
@@ -43,14 +54,14 @@ _MOTION_LEVEL_CASES = [
 @pytest.mark.parametrize("keys,level_without,level_with", _MOTION_LEVEL_CASES)
 def test_motion_blocked_below_unlock_level(keys, level_without, level_with):
     action = _parse(keys)
-    assert not action_allowed(action, known_commands(level_without)), \
+    assert not action_allowed(action, _kc(level_without)), \
         f"'{keys}' should be blocked at level {level_without}"
 
 
 @pytest.mark.parametrize("keys,level_without,level_with", _MOTION_LEVEL_CASES)
 def test_motion_allowed_at_unlock_level(keys, level_without, level_with):
     action = _parse(keys)
-    assert action_allowed(action, known_commands(level_with)), \
+    assert action_allowed(action, _kc(level_with)), \
         f"'{keys}' should be allowed at level {level_with}"
 
 
@@ -58,31 +69,31 @@ def test_motion_allowed_at_unlock_level(keys, level_without, level_with):
 def test_hjkl_always_allowed(keys):
     action = _parse(keys)
     assert action_allowed(action, [])
-    assert action_allowed(action, known_commands(0))
+    assert action_allowed(action, _kc(0))
 
 
 @pytest.mark.parametrize("keys", ['G', 'gg', '{', '}'])
-def test_never_in_standard_known_commands(keys):
+def test_never_in_standard__kc(keys):
     """G, gg, paragraph motions never appear in levels 0-5."""
     action = _parse(keys)
     for level in range(6):
-        assert not action_allowed(action, known_commands(level)), \
+        assert not action_allowed(action, _kc(level)), \
             f"'{keys}' should be blocked at level {level}"
 
 
 def test_count_motion_blocked_below_level_2():
     action = _parse('3j')
-    assert not action_allowed(action, known_commands(1))
+    assert not action_allowed(action, _kc(1))
 
 
 def test_count_motion_allowed_at_level_2():
     action = _parse('3j')
-    assert action_allowed(action, known_commands(2))
+    assert action_allowed(action, _kc(2))
 
 
 def test_count_1_not_gated_by_count_token():
     action = _parse('j')
-    assert action_allowed(action, known_commands(0))
+    assert action_allowed(action, _kc(0))
 
 
 def test_admin_bypasses_all_motion_guards():
@@ -96,23 +107,23 @@ def test_admin_bypasses_all_motion_guards():
 def test_p_blocked_before_level_5():
     action = _parse('p')
     for level in range(5):
-        assert not action_allowed(action, known_commands(level)), \
+        assert not action_allowed(action, _kc(level)), \
             f"'p' should be blocked at level {level}"
 
 
 def test_p_allowed_at_level_5():
-    assert action_allowed(_parse('p'), known_commands(5))
+    assert action_allowed(_parse('p'), _kc(5))
 
 
 def test_P_blocked_before_level_20():
     action = _parse('P')
     for level in range(6):
-        assert not action_allowed(action, known_commands(level)), \
+        assert not action_allowed(action, _kc(level)), \
             f"'P' should be blocked at level {level}"
 
 
 def test_P_allowed_at_level_20():
-    assert action_allowed(_parse('P'), known_commands(20))
+    assert action_allowed(_parse('P'), _kc(20))
 
 
 @pytest.mark.parametrize("keys", ['p', 'P'])
@@ -131,7 +142,7 @@ def test_admin_bypasses_paste_guard():
 def test_insert_mode_blocked_for_all_standard_levels(keys):
     action = _parse(keys)
     for level in range(6):
-        assert not action_allowed(action, known_commands(level)), \
+        assert not action_allowed(action, _kc(level)), \
             f"'{keys}' should be blocked at level {level}"
 
 
@@ -139,14 +150,14 @@ def test_insert_mode_blocked_for_all_standard_levels(keys):
 def test_insert_mode_allowed_with_insert_token(keys):
     action = _parse(keys)
     assert action_allowed(action, ['insert'])
-    assert action_allowed(action, known_commands(0) + ['insert'])
+    assert action_allowed(action, _kc(0) + ['insert'])
 
 
 @pytest.mark.parametrize("keys", ['v', 'V', '\x16'])
 def test_visual_mode_blocked_for_all_standard_levels(keys):
     action = _parse(keys)
     for level in range(6):
-        assert not action_allowed(action, known_commands(level)), \
+        assert not action_allowed(action, _kc(level)), \
             f"'{keys!r}' should be blocked at level {level}"
 
 
@@ -159,7 +170,7 @@ def test_visual_mode_allowed_with_visual_token(keys):
 def test_command_mode_always_allowed():
     action = _parse(':')
     assert action_allowed(action, [])
-    assert action_allowed(action, known_commands(0))
+    assert action_allowed(action, _kc(0))
 
 
 # ── Operator / substitute guards ───────────────────────────────────────────────
@@ -168,7 +179,7 @@ def test_command_mode_always_allowed():
 def test_operators_blocked_until_learned(keys):
     # Player without the operator command learned cannot use it outside edit mode.
     action = _parse(keys)
-    assert not action_allowed(action, known_commands(0), edit_mode=False)
+    assert not action_allowed(action, _kc(0), edit_mode=False)
 
 
 @pytest.mark.parametrize("keys,op", [
@@ -208,18 +219,18 @@ def test_named_register_gated_on_reg_named(keys):
 
 @pytest.mark.parametrize("keys", ['\x0f', '\t'])
 def test_jump_gated_on_jump_token(keys):
-    assert not action_allowed(_parse(keys), known_commands(0), edit_mode=False)
+    assert not action_allowed(_parse(keys), _kc(0), edit_mode=False)
     assert action_allowed(_parse(keys), ['h', 'jump'], edit_mode=False)
 
 
 @pytest.mark.parametrize("keys", ['ma', "'a", '`a'])
 def test_marks_gated_on_mark_token(keys):
-    assert not action_allowed(_parse(keys), known_commands(0), edit_mode=False)
+    assert not action_allowed(_parse(keys), _kc(0), edit_mode=False)
     assert action_allowed(_parse(keys), ['h', 'mark'], edit_mode=False)
 
 
 def test_macro_record_gated_on_q():
-    assert not action_allowed(_parse('qa'), known_commands(0), edit_mode=False)
+    assert not action_allowed(_parse('qa'), _kc(0), edit_mode=False)
     assert action_allowed(_parse('qa'), ['h', 'q'], edit_mode=False)
 
 
@@ -230,7 +241,7 @@ def test_macro_play_gated_on_at():
 
 @pytest.mark.parametrize("keys", ['/', '?', 'n', 'N'])
 def test_search_gated_on_slash_token(keys):
-    assert not action_allowed(_parse(keys), known_commands(0), edit_mode=False)
+    assert not action_allowed(_parse(keys), _kc(0), edit_mode=False)
     assert action_allowed(_parse(keys), ['h', '/'], edit_mode=False)
 
 
@@ -241,17 +252,17 @@ def test_search_word_gated_on_star_token(keys):
 
 
 def test_replace_char_gated_on_token():
-    assert not action_allowed(_parse('rx'), known_commands(0), edit_mode=False)
+    assert not action_allowed(_parse('rx'), _kc(0), edit_mode=False)
     assert action_allowed(_parse('rx'), ['h', 'r'], edit_mode=False)
 
 
 def test_replace_mode_gated_on_token():
-    assert not action_allowed(_parse('R'), known_commands(0), edit_mode=False)
+    assert not action_allowed(_parse('R'), _kc(0), edit_mode=False)
     assert action_allowed(_parse('R'), ['h', 'R'], edit_mode=False)
 
 
 def test_tilde_gated_on_token():
-    assert not action_allowed(_parse('~'), known_commands(0), edit_mode=False)
+    assert not action_allowed(_parse('~'), _kc(0), edit_mode=False)
     assert action_allowed(_parse('~'), ['h', '~'], edit_mode=False)
 
 
@@ -265,7 +276,7 @@ def test_case_ops_gated_on_token(keys, op):
 @pytest.mark.parametrize("keys", ['dd', 'yy', 'cc', 'dw'])
 def test_operators_allowed_in_edit_mode(keys):
     action = _parse(keys)
-    assert action_allowed(action, known_commands(0), edit_mode=True)
+    assert action_allowed(action, _kc(0), edit_mode=True)
 
 
 @pytest.mark.parametrize("keys", ['dd', 'dw', 'yy'])
@@ -276,12 +287,12 @@ def test_operators_allowed_for_admin(keys):
 
 def test_substitute_allowed_for_admin_or_edit():
     assert action_allowed(_parse('s'), ['admin'], edit_mode=False)
-    assert action_allowed(_parse('S'), known_commands(0), edit_mode=True)
+    assert action_allowed(_parse('S'), _kc(0), edit_mode=True)
 
 
 def test_substitute_blocked_until_key_learned():
-    assert not action_allowed(_parse('s'), known_commands(0), edit_mode=False)
-    assert not action_allowed(_parse('S'), known_commands(0), edit_mode=False)
+    assert not action_allowed(_parse('s'), _kc(0), edit_mode=False)
+    assert not action_allowed(_parse('S'), _kc(0), edit_mode=False)
 
 
 def test_substitute_allowed_once_key_learned():
@@ -292,7 +303,7 @@ def test_substitute_allowed_once_key_learned():
 
 
 def test_substitute_allowed_in_edit_mode():
-    assert action_allowed(_parse('s'), known_commands(0), edit_mode=True)
+    assert action_allowed(_parse('s'), _kc(0), edit_mode=True)
 
 
 # ── Always-allowed actions ─────────────────────────────────────────────────────
@@ -301,13 +312,13 @@ def test_substitute_allowed_in_edit_mode():
 def test_interact_undo_redo_always_allowed(keys):
     action = _parse(keys)
     assert action_allowed(action, [])
-    assert action_allowed(action, known_commands(0))
+    assert action_allowed(action, _kc(0))
 
 
 @pytest.mark.parametrize("keys", ['ma', "'a", '`a'])
 def test_mark_commands_require_mark_token(keys):
     # Marks are gated (taught at the marks level), not always-allowed.
     action = _parse(keys)
-    assert not action_allowed(action, known_commands(0))
+    assert not action_allowed(action, _kc(0))
     assert action_allowed(action, ['h', 'mark'])
     assert action_allowed(action, ['admin'])
