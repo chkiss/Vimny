@@ -1,4 +1,4 @@
-"""Level 13 (id 13) — The Sentence Corridor: dungeon correctness tests.
+"""Level 13 — The Sentence Corridor: dungeon correctness tests.
 
 Layout: two sentence rows (1 and 3) split by a stone wall row (2). Five
 sentences, scattered horizontally and divided by wall-gaps:
@@ -24,7 +24,7 @@ from generation.dungeon_gen import (
     _SENTENCE_CORRIDOR_DOOR_POS, _SENTENCE_CORRIDOR_KEY_POS, _SENTENCE_CORRIDOR_SEP_ROW, _SENTENCE_CORRIDOR_SENTENCES,
 )
 
-SEEDS = [1, 42, 999, 12345, 2**20 + 7]
+from tests import SEEDS
 
 _PAR    = 9
 _ANSWER = '4) $ x 3( $ p l'

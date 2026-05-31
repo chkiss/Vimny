@@ -28,19 +28,20 @@ editing/text-objects/thematic) and consolidate their decisions.
 There is no longer a `wizard_wisdom_dev.md` (it went stale and was removed). Do not
 recreate a hand-maintained slot table anywhere — assemble it fresh each run (below).
 
-## How poems are keyed to levels (`introduces_id`)
+## How poems are keyed to levels (`introduces_slug`)
 
-Each poem carries `introduces_id`: the LEVELS **id** of the level it precedes. The
-blessing fires a poem when the player completes the level just before it —
-`select_next_lesson_quote(completed_id)` (render/title.py) finds the next visible
-level's id and matches the poem whose `introduces_id` equals it.
+Each poem carries `introduces_slug`: the immutable LEVELS **slug** of the level it
+precedes. The blessing fires a poem when the player completes the level just before
+it — `select_next_lesson_quote(completed_slug)` (render/title.py) finds the next
+visible level's slug and matches the poem whose `introduces_slug` equals it.
 
-Poems with `introduces_id = None` are the **generic pool**: title-screen flavour and
+Poems with `introduces_slug = None` are the **generic pool**: title-screen flavour and
 the fallback when a level has no dedicated poem. `select_quote_by_name` also looks
 these up by `name` (`'home row'`, `'save and quit'` are both consumed by name).
 
-**Key by id, never by ordinal position.** Inserting or reordering levels must not
-silently misalign the corpus — that drift was the original bug this scheme fixed.
+**Key by slug, never by ordinal position or number.** Inserting, reordering, or
+renumbering levels must not silently misalign the corpus — that drift was the
+original bug this scheme fixed, and the slug never changes.
 
 ## Assembling the slot sheet (do this before each run)
 
@@ -48,7 +49,7 @@ Do **not** hardcode slot data in this file — it goes stale. Build the per-slot
 fresh from the two source files above. For every poem the agents should consider,
 give them:
 
-- the `introduces_id` and the matching level's **name + taught commands** (from `LEVELS`);
+- the `introduces_slug` and the matching level's **name + taught commands** (from `LEVELS`);
 - the **exact behavior** of each command (Vim semantics) and 2–3 **mnemonic angles**;
 - the **current poem** as the BASELINE to beat;
 - the hard constraints + scoring rubric below.
@@ -56,7 +57,7 @@ give them:
 Notes when building the sheet:
 - **Boss levels** teach no new command — frame their poem as a warm, slightly
   anticipatory pep-talk that consolidates prior skills (not threatening).
-- **The Reliquary** (`introduces_id` 11) reveals the unnamed register `"` — a
+- **The Reliquary** (`introduces_slug` `reliquary`) reveals the unnamed register `"` — a
   foreshadow that deletions are kept, *not* a how-to (the player has no yank/paste yet).
 - **Generic/mood poems** (rhythm, philosophy, encouragement, closing, etc.) have no
   command — judge them on Voice & Freshness only.

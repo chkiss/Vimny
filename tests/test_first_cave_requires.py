@@ -3,7 +3,7 @@ from collections import deque
 import pytest
 from generation.dungeon_gen import build_dungeon_first_cave
 
-SEEDS = [1, 42, 999, 12345, 2**20 + 7]
+from tests import SEEDS
 DELTA = {'h': (0, -1), 'j': (1, 0), 'k': (-1, 0), 'l': (0, 1)}
 LEVEL_0_COMMANDS = set('hjkl')
 

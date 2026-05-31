@@ -1,4 +1,4 @@
-"""Level 9 (id=9) — The Screen Vault: dungeon correctness tests.
+"""Level 9 — The Screen Vault: dungeon correctness tests.
 
 Teaching goal: H/M/L (viewport-relative top/middle/bottom jumps), distinct from
 G (which lands on a void row and is punished).  Viewport-filling layout with
@@ -20,7 +20,7 @@ from generation.dungeon_gen import (
     _SCREEN_VAULT_SPAWN, _SCREEN_VAULT_COLORS,
 )
 
-SEEDS = [1, 42, 999, 12345, 2**20 + 7]
+from tests import SEEDS
 _GH = _SCREEN_VAULT_DEFAULT_GAME_H
 
 # The par Dijkstra is moderately expensive, so build each seed's room once and

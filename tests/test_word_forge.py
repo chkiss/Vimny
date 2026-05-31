@@ -4,7 +4,7 @@ import heapq
 import pytest
 from generation.dungeon_gen import build_dungeon_word_forge, _dijkstra_par_WBE, _WORD_FORGE_UNTYPABLE_PUNCT
 
-SEEDS = [1, 42, 999, 12345, 2**20 + 7]
+from tests import SEEDS
 
 
 @pytest.mark.parametrize("seed", SEEDS)

@@ -12,7 +12,7 @@ from generation.dungeon_gen import (
     build_dungeon_rune_halls, build_dungeon_character_cataracts,
 )
 
-SEEDS = [1, 42, 999, 12345, 2**20 + 7]
+from tests import SEEDS
 
 _BUILDERS = {
     0: build_dungeon_first_cave,

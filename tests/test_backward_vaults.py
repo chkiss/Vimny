@@ -9,7 +9,7 @@ from generation.dungeon_gen import (
     _BACKWARD_VAULTS_TURN_SPANS,
 )
 
-SEEDS = [1, 42, 999, 12345, 2**20 + 7]
+from tests import SEEDS
 
 
 @pytest.mark.parametrize("seed", SEEDS)
