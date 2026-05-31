@@ -119,8 +119,8 @@ def test_warden_moves_on_last_spawn_death():
 
 # ── _on_kill key drops ────────────────────────────────────────────────────────
 
-def test_on_kill_warden_drops_floor_key_at_level_5():
-    """_on_kill for a warden at level 5 (non-boss) must drop a floor_key.
+def test_on_kill_warden_drops_floor_key_at_goblin_gauntlet():
+    """_on_kill for a warden at the Goblin Gauntlet (non-boss) must drop a floor_key.
 
     The game loop kills the entity before calling _on_kill so the cell is free
     for _drop_key to place the floor_key.
@@ -139,8 +139,8 @@ def test_on_kill_warden_drops_floor_key_at_level_5():
     assert 'Warden' in msg or 'key' in msg.lower()
 
 
-def test_on_kill_warden_no_key_at_level_51():
-    """_on_kill for the boss Warden (level 51) must NOT drop a floor_key."""
+def test_on_kill_warden_no_key_at_wardens_keep():
+    """_on_kill for the boss Warden (The Warden's Keep) must NOT drop a floor_key."""
     room = _bare_room()
     warden = Entity(kind='warden', row=3, col=20, max_hp=5, ai='')
     room.add_entity(warden)
@@ -149,14 +149,14 @@ def test_on_kill_warden_no_key_at_level_51():
     room.kill_entity(warden)   # mirrors game loop
     msg = _on_kill(warden, player, room, level='wardens_keep')
 
-    # At level 51 _on_kill returns early — no _drop_key called
+    # At The Warden's Keep _on_kill returns early — no _drop_key called
     floor_keys = [e for e in room.entities if e.kind == 'floor_key']
-    assert floor_keys == [], "boss warden (level 51) must not drop a floor_key"
+    assert floor_keys == [], "boss warden (The Warden's Keep) must not drop a floor_key"
     assert msg == 'The Warden falls!'
 
 
-def test_last_goblin_at_level_5_drops_key():
-    """At level 5, killing the last goblin must drop a floor_key; earlier kills do not."""
+def test_last_goblin_at_goblin_gauntlet_drops_key():
+    """At the Goblin Gauntlet, killing the last goblin must drop a floor_key; earlier kills do not."""
     room = _bare_room()
     player = Player(row=3, col=1)
     g1 = Entity(kind='goblin', row=3, col=5, max_hp=1, ai='chase')
@@ -175,7 +175,7 @@ def test_last_goblin_at_level_5_drops_key():
     room.kill_entity(g2)
     msg2 = _on_kill(g2, player, room, level='goblin_gauntlet')
     assert any(e.alive and e.kind == 'floor_key' for e in room.entities), (
-        "floor_key must drop after the last goblin is killed at level 5"
+        "floor_key must drop after the last goblin is killed at the Goblin Gauntlet"
     )
 
 

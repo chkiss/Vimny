@@ -31,17 +31,17 @@ def line_extent(room, row: int):
 def _capture_row(room, row: int, lo: int, hi: int) -> dict:
     """Capture characters overlapping [lo, hi] on `row`, split at the boundaries,
     each tagged with its column offset (dcol) from `lo`."""
-    runes = []
+    char_runs = []
     for ru in room._char_runs_by_row.get(row, []):
         rlo, rhi = ru.col, ru.col + len(ru.symbols) - 1
         if rhi < lo or rlo > hi:
             continue
         s, e = max(rlo, lo), min(rhi, hi)
-        runes.append({'dcol': s - lo,
-                      'symbols': tuple(ru.symbols[s - ru.col:e - ru.col + 1]),
-                      'kind': ru.kind})
-    runes.sort(key=lambda d: d['dcol'])
-    return {'width': hi - lo + 1, 'char_runs': runes}
+        char_runs.append({'dcol': s - lo,
+                          'symbols': tuple(ru.symbols[s - ru.col:e - ru.col + 1]),
+                          'kind': ru.kind})
+    char_runs.sort(key=lambda d: d['dcol'])
+    return {'width': hi - lo + 1, 'char_runs': char_runs}
 
 
 def _clip(text_obj) -> tuple:
@@ -333,8 +333,8 @@ def op_paste(room, player, clip: dict, before: bool, count: int = 1) -> bool:
             placed_any = True                                 # inserting rows is itself a change
             player.row = min(base_row, room.rows - 1)          # cursor → first pasted line (Vim)
             ext   = line_extent(room, player.row)
-            runes = room._char_runs_by_row.get(player.row, [])
-            player.col = min((ru.col for ru in runes), default=(ext[0] if ext else player.col))
+            char_runs = room._char_runs_by_row.get(player.row, [])
+            player.col = min((ru.col for ru in char_runs), default=(ext[0] if ext else player.col))
     else:
         rclip = clip['rows'][0]
         width = max(rclip.get('width', 0), 1)               # ≥1 cell per copy
