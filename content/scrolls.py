@@ -13,7 +13,7 @@ Smudge clarification:
   the player's known-command set. `gate` is the command token (or tuple of
   tokens) that must all be known; once known the line renders as a clear ('cmd')
   row revealing `key` and the full description (smudge_prefix + clear_tail).
-  Gate tokens match the keys produced by content.levels.known_commands().
+  Gate tokens match the keys produced by content.levels.known_commands(slug).
 """
 
 # kv_rows tuples: (key, desc, gate)
