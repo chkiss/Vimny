@@ -64,7 +64,7 @@ The curriculum is defined in `content/levels.py` (canonical) and mirrored in `LE
 |---|---|---|---|
 | 0 | The First Cave | `h j k l u :w :q :q!` | Playable |
 | 1 | The Line Halls | `^ $ 0` | Playable |
-| 1.1 | The Reliquary | `"` | Playable |
+| 1.1 | The Reliquary | `x` | Playable |
 | 2 | The Counting Crypts | `[count] prefix` | Playable |
 | 3 | The Rune Halls | `w b e` | Playable |
 | 4 | The Character Cataracts | `f F t T` | Playable |
@@ -130,8 +130,8 @@ The full command reference (also the hint-bar source) is `render/vim_commands.md
 | `0` | line start |
 | `^` | first non-blank |
 | `$` | end of line |
-| `[N]hjkl` | count move |
 | `x` | delete char |
+| `[N]hjkl` | count move |
 | `w` | word start |
 | `b` | word back |
 | `e` | word end |

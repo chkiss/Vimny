@@ -34,12 +34,17 @@
 | ^    |       | first non-blank |
 | $    |       | end of line     |
 
-## L2 — count prefix + delete char
+## L1.1 — The Reliquary (delete char)
 
-| keys      | token | desc        |
-|-----------|-------|-------------|
-| [N]hjkl   | count | count move  |
-| x         |       | delete char |
+| keys | token | desc        |
+|------|-------|-------------|
+| x    |       | delete char |
+
+## L2 — count prefix
+
+| keys    | token | desc       |
+|---------|-------|------------|
+| [N]hjkl | count | count move |
 
 ## L3 — word motions
 
