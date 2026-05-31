@@ -22,7 +22,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 
 import render.colors as C
 from generation.dungeon_gen import (
-    build_dungeon_0, build_dungeon_1, build_dungeon_2, build_dungeon_3,
+    build_dungeon_first_cave, build_dungeon_line_halls, build_dungeon_counting_crypts, build_dungeon_rune_halls,
     build_dungeon_dummy,
 )
 from engine.player import Player
@@ -75,10 +75,10 @@ class _MockTerm:
 # ── Build fixtures once ───────────────────────────────────────────────────────
 
 print("Building dungeons...", end=' ', flush=True)
-d0 = build_dungeon_0(SEED);  r0 = d0.room
-d1 = build_dungeon_1(SEED);  r1 = d1.room
-d2 = build_dungeon_2(SEED);  r2 = d2.room
-d3 = build_dungeon_3(SEED);  r3 = d3.room
+d0 = build_dungeon_first_cave(SEED);  r0 = d0.room
+d1 = build_dungeon_line_halls(SEED);  r1 = d1.room
+d2 = build_dungeon_counting_crypts(SEED);  r2 = d2.room
+d3 = build_dungeon_rune_halls(SEED);  r3 = d3.room
 dd = build_dungeon_dummy(SEED); rd = dd.room
 print("done.\n")
 
@@ -91,10 +91,10 @@ C.init(mterm)
 # ─────────────────────────────────────────────────────────────────────────────
 
 _section("1. Dungeon generation")
-bench_ms("build_dungeon_0  (The First Cave)",     lambda: build_dungeon_0(SEED), n=50)
-bench_ms("build_dungeon_1  (The Line Halls)",      lambda: build_dungeon_1(SEED), n=50)
-bench_ms("build_dungeon_2  (The Counting Crypts)", lambda: build_dungeon_2(SEED), n=50)
-bench_ms("build_dungeon_3  (The Rune Halls)",      lambda: build_dungeon_3(SEED), n=20)
+bench_ms("build_dungeon_first_cave  (The First Cave)",     lambda: build_dungeon_first_cave(SEED), n=50)
+bench_ms("build_dungeon_line_halls  (The Line Halls)",      lambda: build_dungeon_line_halls(SEED), n=50)
+bench_ms("build_dungeon_counting_crypts  (The Counting Crypts)", lambda: build_dungeon_counting_crypts(SEED), n=50)
+bench_ms("build_dungeon_rune_halls  (The Rune Halls)",      lambda: build_dungeon_rune_halls(SEED), n=20)
 
 
 # ─────────────────────────────────────────────────────────────────────────────

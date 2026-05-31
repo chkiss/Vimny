@@ -65,20 +65,20 @@ def _make_rune_syms(rng, kind: str) -> tuple:
     return tuple(ch for _ in range(rng.randint(min_len,max_len)))
 
 # ── Level 3 layout constants ──────────────────────────────────────────────────
-_L3_CORR_TOP_ROWS = (1, 4, 7, 10, 13)  # top row of each of the 5 corridors
-_L3_TOTAL_ROWS    = 16                  # rows 0-15
-_L3_TOTAL_COLS    = 48                  # cols 0-47
-_L3_CORR_LEFT     = 1
-_L3_CORR_RIGHT    = 46
+_RUNE_HALLS_CORR_TOP_ROWS = (1, 4, 7, 10, 13)  # top row of each of the 5 corridors
+_RUNE_HALLS_TOTAL_ROWS    = 16                  # rows 0-15
+_RUNE_HALLS_TOTAL_COLS    = 48                  # cols 0-47
+_RUNE_HALLS_CORR_LEFT     = 1
+_RUNE_HALLS_CORR_RIGHT    = 46
 
 # ── Level 4 layout constants ──────────────────────────────────────────────────
-_L4_CORR_TOP_ROWS = (1, 4, 7, 10, 13)
-_L4_TOTAL_ROWS    = 16
-_L4_TOTAL_COLS    = 72
-_L4_CORR_LEFT     = 1
-_L4_CORR_RIGHT    = 70
+_CHARACTER_CATARACTS_CORR_TOP_ROWS = (1, 4, 7, 10, 13)
+_CHARACTER_CATARACTS_TOTAL_ROWS    = 16
+_CHARACTER_CATARACTS_TOTAL_COLS    = 72
+_CHARACTER_CATARACTS_CORR_LEFT     = 1
+_CHARACTER_CATARACTS_CORR_RIGHT    = 70
 
-_L4_TURN_SPANS = [
+_CHARACTER_CATARACTS_TURN_SPANS = [
     (2,  4,  69, 69),   # RT1: right side, single col, C1→C2
     (5,  7,   1,  2),   # LT1: left side,  C2→C3
     (8,  10, 69, 70),   # RT2: right side, C3→C4
@@ -86,7 +86,7 @@ _L4_TURN_SPANS = [
 ]
 
 # Water pools per corridor: (row_tuple, col_start, col_end)
-_L4_WATER_SPANS = [
+_CHARACTER_CATARACTS_WATER_SPANS = [
     ((1, 2),            14, 37),   # C1: Zone A cols 1-13, text cols 38-69
     ((4, 5),            30, 51),   # C2: text cols 3-29, Zone B cols 52-69
     ((4, 5, 6, 7),       1,  1),   # Left-edge strip: C2-C3 via LT1 col 2 only
@@ -96,10 +96,10 @@ _L4_WATER_SPANS = [
 ]
 
 # Visible text strings placed as CharRun symbols — f/F/t/T targets
-_L4_TEXT_C1  = "Most files you encounter"             # 'r' at offset 23 → col 67
-_L4_TEXT_C2  = " will be scribed in letters"             # 'w' at offset 1 → col 4
-_L4_TEXT_C3A = "so you can jump"                         # Zone A (cols 2-16)
-_L4_TEXT_C3B = "quite easily to anything you can type"  # t! lands at col 69 before dynamite at 70
+_CHARACTER_CATARACTS_TEXT_C1  = "Most files you encounter"             # 'r' at offset 23 → col 67
+_CHARACTER_CATARACTS_TEXT_C2  = " will be scribed in letters"             # 'w' at offset 1 → col 4
+_CHARACTER_CATARACTS_TEXT_C3A = "so you can jump"                         # Zone A (cols 2-16)
+_CHARACTER_CATARACTS_TEXT_C3B = "quite easily to anything you can type"  # t! lands at col 69 before dynamite at 70
 
 def _place_runes_in_room(composite, rng, col_offset, room_rows, room_cols,
                           total_rows, density):
@@ -197,7 +197,7 @@ def _dijkstra_par_count(composite) -> int | None:
     return None
 
 
-def _dijkstra_par_level2(composite, door_cols: list, return_path: bool = False):
+def _par_counting_crypts(composite, door_cols: list, return_path: bool = False):
     """Full state-space Dijkstra for Level 2.
 
     State: (row, col, closed_mask) — bit i set means door_cols[i] is still closed.
@@ -312,7 +312,7 @@ def _dijkstra_par_level2(composite, door_cols: list, return_path: bool = False):
     return None
 
 
-def build_dungeon_0(seed: int) -> Dungeon:
+def build_dungeon_first_cave(seed: int) -> Dungeon:
     rng = random.Random(seed)
     dungeon = Dungeon(name='The First Cave', seed=seed)
     CORRIDOR_LEN = 4
@@ -502,7 +502,7 @@ def _bfs_par_line(composite, return_path: bool = False):
     return None
 
 
-def build_dungeon_1(seed: int) -> Dungeon:
+def build_dungeon_line_halls(seed: int) -> Dungeon:
     """The Line Halls — teaches ^ $ 0 + :w :q.
 
     ENTRY(8×14) ─4─ PUZZLE(8×60) ─4─ EXIT(10×14)  →  96 × 10 composite.
@@ -592,7 +592,7 @@ def build_dungeon_1(seed: int) -> Dungeon:
     return dungeon
 
 
-def build_dungeon_2(seed: int) -> Dungeon:
+def build_dungeon_counting_crypts(seed: int) -> Dungeon:
     """The Counting Crypts — teaches [count] prefix with hjkl + ^$0.
 
     Layout: ENTRY(12×20) ──4── PUZZLE(12×32) ──4── EXIT(12×18)
@@ -698,7 +698,7 @@ def build_dungeon_2(seed: int) -> Dungeon:
     # Full par: state-space Dijkstra with all Level 2 commands and door states.
     # Accounts for door-blocking (breaking $ into segments) and x keystrokes.
     composite.rebuild_indexes()
-    composite.par, composite.answer = _dijkstra_par_level2(composite, door_cols, return_path=True)
+    composite.par, composite.answer = _par_counting_crypts(composite, door_cols, return_path=True)
     composite.budget = math.ceil(composite.par * 1.4)
 
     _fog_unreachable(composite, composite.spawn_pos[0], composite.spawn_pos[1])
@@ -720,9 +720,9 @@ def _make_rune_corridor(composite, rng, row_top,
     touch (1-cell side buffer enforced by the caller via the set contents).
     """
     if col_start is None:
-        col_start = _L3_CORR_LEFT
+        col_start = _RUNE_HALLS_CORR_LEFT
     if col_end is None:
-        col_end = _L3_CORR_RIGHT
+        col_end = _RUNE_HALLS_CORR_RIGHT
 
     for c in range(col_start, col_end + 1):
         composite.cells[row_top][c]     = CellType.CORRIDOR
@@ -1091,7 +1091,7 @@ def _dijkstra_par_ftFT(composite, return_path: bool = False):
     return None
 
 
-def build_dungeon_3(seed: int) -> Dungeon:
+def build_dungeon_rune_halls(seed: int) -> Dungeon:
     """The Rune Halls — teaches w b e (word motions over character runs).
 
     Five 2-row character corridors in a snake pattern:
@@ -1114,10 +1114,10 @@ def build_dungeon_3(seed: int) -> Dungeon:
     rng     = random.Random(seed)
     dungeon = Dungeon(name='The Rune Halls', seed=seed)
 
-    cells = [[CellType.WALL] * _L3_TOTAL_COLS for _ in range(_L3_TOTAL_ROWS)]
+    cells = [[CellType.WALL] * _RUNE_HALLS_TOTAL_COLS for _ in range(_RUNE_HALLS_TOTAL_ROWS)]
 
     composite = Room(room_type=RoomType.ENTRY,
-                     rows=_L3_TOTAL_ROWS, cols=_L3_TOTAL_COLS)
+                     rows=_RUNE_HALLS_TOTAL_ROWS, cols=_RUNE_HALLS_TOTAL_COLS)
     composite.cells = cells
     composite.seed  = seed
 
@@ -1173,7 +1173,7 @@ def build_dungeon_3(seed: int) -> Dungeon:
         composite.char_runs = list(_l3_hardcoded)
         rune_rng = random.Random(rng.randint(0, 2**31))
 
-        for row_top in _L3_CORR_TOP_ROWS:
+        for row_top in _RUNE_HALLS_CORR_TOP_ROWS:
             _make_rune_corridor(composite, rune_rng, row_top, blocked=blocked)
 
         composite.rebuild_indexes()
@@ -1192,7 +1192,7 @@ def build_dungeon_3(seed: int) -> Dungeon:
     return dungeon
 
 
-def build_dungeon_4(seed: int) -> Dungeon:
+def build_dungeon_character_cataracts(seed: int) -> Dungeon:
     """The Character Cataracts — teaches f F t T (character search over water pools).
 
     Five 2-row snake corridors (72 cols wide).  Each corridor has a water pool
@@ -1205,7 +1205,7 @@ def build_dungeon_4(seed: int) -> Dungeon:
       C4 rows 10-11 right→left  T!  dynamite at col 1 (F! would explode)
       C5 rows 13-14 left→right  w/b/e character navigation + exit
     """
-    ROWS, COLS = _L4_TOTAL_ROWS, _L4_TOTAL_COLS
+    ROWS, COLS = _CHARACTER_CATARACTS_TOTAL_ROWS, _CHARACTER_CATARACTS_TOTAL_COLS
     rng     = random.Random(seed)
     dungeon = Dungeon(name='The Character Cataracts', seed=seed)
 
@@ -1215,13 +1215,13 @@ def build_dungeon_4(seed: int) -> Dungeon:
     composite.seed  = seed
 
     # ── Carve corridors (2 rows each) ─────────────────────────────────────────
-    for row_top in _L4_CORR_TOP_ROWS:
-        for c in range(_L4_CORR_LEFT, _L4_CORR_RIGHT + 1):
+    for row_top in _CHARACTER_CATARACTS_CORR_TOP_ROWS:
+        for c in range(_CHARACTER_CATARACTS_CORR_LEFT, _CHARACTER_CATARACTS_CORR_RIGHT + 1):
             cells[row_top][c]     = CellType.CORRIDOR
             cells[row_top + 1][c] = CellType.CORRIDOR
 
     # ── Carve turn rooms ──────────────────────────────────────────────────────
-    for r0, r1, ca, cb in _L4_TURN_SPANS:
+    for r0, r1, ca, cb in _CHARACTER_CATARACTS_TURN_SPANS:
         c0, c1 = min(ca, cb), max(ca, cb)
         for row in range(r0, r1 + 1):
             for col in range(c0, c1 + 1):
@@ -1235,7 +1235,7 @@ def build_dungeon_4(seed: int) -> Dungeon:
         cells[r][c] = CellType.FLOOR
 
     # ── Water pools ───────────────────────────────────────────────────────────
-    for rows, cs, ce in _L4_WATER_SPANS:
+    for rows, cs, ce in _CHARACTER_CATARACTS_WATER_SPANS:
         for r in rows:
             for c in range(cs, ce + 1):
                 cells[r][c] = CellType.WATER
@@ -1246,13 +1246,13 @@ def build_dungeon_4(seed: int) -> Dungeon:
     # One row of text per corridor (the other row gets standard random characters).
     _text_runes = [
         # C1 row 1: fr jumps to 'r' at offset 23 → col 67
-        CharRun(row=1, col=44, symbols=tuple(_L4_TEXT_C1), kind='ember'),
+        CharRun(row=1, col=44, symbols=tuple(_CHARACTER_CATARACTS_TEXT_C1), kind='ember'),
         # C2 row 5: Fw jumps backward to 'w' at offset 1 → col 4
-        CharRun(row=5, col=3,  symbols=tuple(_L4_TEXT_C2), kind='ember'),
+        CharRun(row=5, col=3,  symbols=tuple(_CHARACTER_CATARACTS_TEXT_C2), kind='ember'),
         # C3 row 7 Zone A: walking terrain before the water (cols 2-16)
-        CharRun(row=7, col=2,  symbols=tuple(_L4_TEXT_C3A), kind='ember'),
+        CharRun(row=7, col=2,  symbols=tuple(_CHARACTER_CATARACTS_TEXT_C3A), kind='ember'),
         # C3 row 7 Zone B: t! lands at col 69 (before dynamite at col 70)
-        CharRun(row=7, col=33, symbols=tuple(_L4_TEXT_C3B), kind='ember'),
+        CharRun(row=7, col=33, symbols=tuple(_CHARACTER_CATARACTS_TEXT_C3B), kind='ember'),
         # C5 exit anchor: last symbol at col 65 so `e` lands on the exit
         CharRun(row=13, col=64, symbols=('◦', '◦'), kind='ember'),
     ]
@@ -1272,7 +1272,7 @@ def build_dungeon_4(seed: int) -> Dungeon:
 
     # ── Blocked cells: water + text/anchor characters + fixed entities ────────
     _bl: set = {(e.row, e.col) for e in _fixed}
-    for rows, cs, ce in _L4_WATER_SPANS:
+    for rows, cs, ce in _CHARACTER_CATARACTS_WATER_SPANS:
         for r in rows:
             for c in range(cs, ce + 1):
                 _bl.add((r, c))
@@ -1314,7 +1314,7 @@ def build_dungeon_4(seed: int) -> Dungeon:
     return dungeon
 
 
-def build_dungeon_11(seed: int) -> Dungeon:
+def build_dungeon_reliquary(seed: int) -> Dungeon:
     """The Reliquary — bonus chest room unlocked alongside level 2.
 
     Layout (5 rows × 17 cols):
@@ -1488,19 +1488,19 @@ def build_dungeon_dummy(seed: int) -> Dungeon:
 
 # ── Level 5 helpers ────────────────────────────────────────────────────────────
 
-_L5_ROWS = 20
-_L5_COLS = 58
+_GOBLIN_GAUNTLET_ROWS = 20
+_GOBLIN_GAUNTLET_COLS = 58
 
 # Snake corridor rows (single-row each)
-_L5_CORR_ROWS    = [1, 3, 5, 7, 9, 11, 13, 15]
-_L5_RIGHT_GOING  = {1, 5, 9, 13}   # player enters from left
-_L5_LEFT_GOING   = {3, 7, 11, 15}  # player enters from right
+_GOBLIN_GAUNTLET_CORR_ROWS    = [1, 3, 5, 7, 9, 11, 13, 15]
+_GOBLIN_GAUNTLET_RIGHT_GOING  = {1, 5, 9, 13}   # player enters from left
+_GOBLIN_GAUNTLET_LEFT_GOING   = {3, 7, 11, 15}  # player enters from right
 
 # Right connector rows (floor at cols 55-56); left connector rows (floor at cols 2-3)
-_L5_RIGHT_CONN_ROWS = [2, 6, 10, 14]
-_L5_LEFT_CONN_ROWS  = [4, 8, 12, 16]
-_L5_RC_COLS = (55, 56)
-_L5_LC_COLS = (2, 3)
+_GOBLIN_GAUNTLET_RIGHT_CONN_ROWS = [2, 6, 10, 14]
+_GOBLIN_GAUNTLET_LEFT_CONN_ROWS  = [4, 8, 12, 16]
+_GOBLIN_GAUNTLET_RC_COLS = (55, 56)
+_GOBLIN_GAUNTLET_LC_COLS = (2, 3)
 
 
 def _l5_place_near_runes(runes: list, rng, row: int,
@@ -1561,7 +1561,7 @@ def _l5_goblin_positions(rng, far_start: int, far_end: int,
 
 
 
-def _par_l5(corr_data: list, gobs_17: list) -> int:
+def _par_goblin_gauntlet(corr_data: list, gobs_17: list) -> int:
     """Analytical par for Level 5.
 
     Optimal strategy:
@@ -1627,7 +1627,7 @@ def _answer_l5(corr_data: list, gobs_17: list) -> str:
     return ' '.join(cmds)
 
 
-def build_dungeon_5(seed: int) -> Dungeon:
+def build_dungeon_goblin_gauntlet(seed: int) -> Dungeon:
     """The Goblin Gauntlet — teaches ; and , (repeat last f/t).
 
     Eight single-row snake corridors.  Each has a water pool (impassable to
@@ -1642,10 +1642,10 @@ def build_dungeon_5(seed: int) -> Dungeon:
     rng     = random.Random(seed)
     dungeon = Dungeon(name='The Goblin Gauntlet', seed=seed)
 
-    cells = [[CellType.WALL] * _L5_COLS for _ in range(_L5_ROWS)]
+    cells = [[CellType.WALL] * _GOBLIN_GAUNTLET_COLS for _ in range(_GOBLIN_GAUNTLET_ROWS)]
 
     # Carve corridor floors (single-row each)
-    for row in _L5_CORR_ROWS:
+    for row in _GOBLIN_GAUNTLET_CORR_ROWS:
         for c in range(1, 57):
             cells[row][c] = CellType.FLOOR
 
@@ -1655,16 +1655,16 @@ def build_dungeon_5(seed: int) -> Dungeon:
             cells[row][c] = CellType.FLOOR
 
     # Right connector passages (cols 55-56)
-    for row in _L5_RIGHT_CONN_ROWS:
-        for c in _L5_RC_COLS:
+    for row in _GOBLIN_GAUNTLET_RIGHT_CONN_ROWS:
+        for c in _GOBLIN_GAUNTLET_RC_COLS:
             cells[row][c] = CellType.FLOOR
 
     # Left connector passages (cols 2-3)
-    for row in _L5_LEFT_CONN_ROWS:
-        for c in _L5_LC_COLS:
+    for row in _GOBLIN_GAUNTLET_LEFT_CONN_ROWS:
+        for c in _GOBLIN_GAUNTLET_LC_COLS:
             cells[row][c] = CellType.FLOOR
 
-    composite = Room(room_type=RoomType.ENTRY, rows=_L5_ROWS, cols=_L5_COLS)
+    composite = Room(room_type=RoomType.ENTRY, rows=_GOBLIN_GAUNTLET_ROWS, cols=_GOBLIN_GAUNTLET_COLS)
     composite.cells    = cells
     composite.seed     = seed
     composite.spawn_pos    = (1, 1)
@@ -1675,8 +1675,8 @@ def build_dungeon_5(seed: int) -> Dungeon:
     corr_data      = []
 
     # Per-corridor randomisation
-    for row in _L5_CORR_ROWS:
-        right_going = row in _L5_RIGHT_GOING
+    for row in _GOBLIN_GAUNTLET_CORR_ROWS:
+        right_going = row in _GOBLIN_GAUNTLET_RIGHT_GOING
 
         w_width = rng.randint(3, 6)
         if right_going:
@@ -1690,11 +1690,11 @@ def build_dungeon_5(seed: int) -> Dungeon:
 
         if right_going:
             far_start = w_end + 2
-            far_end   = _L5_RC_COLS[0] - 2
+            far_end   = _GOBLIN_GAUNTLET_RC_COLS[0] - 2
             gobs = _l5_goblin_positions(rng, far_start, far_end,
                                         right_to_left=False)
         else:
-            far_start = _L5_LC_COLS[1] + 2
+            far_start = _GOBLIN_GAUNTLET_LC_COLS[1] + 2
             far_end   = w_start - 2
             gobs = _l5_goblin_positions(rng, far_start, far_end,
                                         right_to_left=True)
@@ -1721,11 +1721,11 @@ def build_dungeon_5(seed: int) -> Dungeon:
         })
 
     # Connector doors
-    for row in _L5_RIGHT_CONN_ROWS:
-        for c in _L5_RC_COLS:
+    for row in _GOBLIN_GAUNTLET_RIGHT_CONN_ROWS:
+        for c in _GOBLIN_GAUNTLET_RC_COLS:
             entities.append(Entity(kind='door', row=row, col=c))
-    for row in _L5_LEFT_CONN_ROWS:
-        for c in _L5_LC_COLS:
+    for row in _GOBLIN_GAUNTLET_LEFT_CONN_ROWS:
+        for c in _GOBLIN_GAUNTLET_LC_COLS:
             entities.append(Entity(kind='door', row=row, col=c))
 
     # Final section goblins (rows 17, no water)
@@ -1750,7 +1750,7 @@ def build_dungeon_5(seed: int) -> Dungeon:
     composite.entities = entities
     composite.char_runs    = runes
 
-    par = _par_l5(corr_data, gobs17)
+    par = _par_goblin_gauntlet(corr_data, gobs17)
     composite.par    = par
     composite.budget = math.ceil(par * 1.4)
     composite.answer = _answer_l5(corr_data, gobs17)
@@ -1765,8 +1765,8 @@ def build_dungeon_5(seed: int) -> Dungeon:
 
 # ── Level 5.1 — The Warden's Keep ─────────────────────────────────────────────
 
-_L51_ROWS = 7
-_L51_COLS = 44
+_WARDENS_KEEP_ROWS = 7
+_WARDENS_KEEP_COLS = 44
 
 # Layout (7 × 44):
 #   Row 0/6 : all wall
@@ -1775,7 +1775,7 @@ _L51_COLS = 44
 #   Rows 2,4: stone columns (wall at even cols 0-16), open floor 17-37, wall 38, floor 39-42
 
 
-def _par_l51() -> int:
+def _par_wardens_keep() -> int:
     """Simulated par for Level 5.1 (The Warden's Keep).
 
     Optimal strategy (layout fixed; combat cost is seed-dependent):
@@ -1804,8 +1804,8 @@ def _par_l51() -> int:
     return 63
 
 
-def build_dungeon_51(seed: int) -> Dungeon:
-    ROWS, COLS = _L51_ROWS, _L51_COLS
+def build_dungeon_wardens_keep(seed: int) -> Dungeon:
+    ROWS, COLS = _WARDENS_KEEP_ROWS, _WARDENS_KEEP_COLS
     cells = [[CellType.WALL] * COLS for _ in range(ROWS)]
 
     # Row 3: full open passage (col 43 stays wall = right border)
@@ -1854,7 +1854,7 @@ def build_dungeon_51(seed: int) -> Dungeon:
     _fog_unreachable(composite, 3, 0)
 
     composite.par    = None
-    composite.budget = math.ceil(_par_l51() * 1.4)
+    composite.budget = math.ceil(_par_wardens_keep() * 1.4)
 
     dungeon = Dungeon(name="The Warden's Keep", seed=seed)
     dungeon.rooms        = [composite]
@@ -1864,13 +1864,13 @@ def build_dungeon_51(seed: int) -> Dungeon:
 
 # ── Level 8 layout constants ──────────────────────────────────────────────────
 
-_L6_TOTAL_ROWS    = 10
-_L6_TOTAL_COLS    = 58
-_L6_CORR_TOP_ROWS = (1, 4, 7)   # top row of each of the 3 corridors
-_L6_CORR_LEFT     = 1
-_L6_CORR_RIGHT    = 55
+_WORD_FORGE_TOTAL_ROWS    = 10
+_WORD_FORGE_TOTAL_COLS    = 58
+_WORD_FORGE_CORR_TOP_ROWS = (1, 4, 7)   # top row of each of the 3 corridors
+_WORD_FORGE_CORR_LEFT     = 1
+_WORD_FORGE_CORR_RIGHT    = 55
 
-_L6_TURN_SPANS = [
+_WORD_FORGE_TURN_SPANS = [
     (2, 4, 53, 55),   # RT1: connects C1 to C2 (right side)
     (5, 7,  1,  3),   # LT1: connects C2 to C3 (left side)
 ]
@@ -1879,7 +1879,7 @@ _L6_TURN_SPANS = [
 # All have isalpha()=False so _is_word_char()=False — treated as punct by w/b/e.
 # Drawn from Latin-1 Supplement, General Punctuation, Mathematical Operators, and
 # Miscellaneous Technical blocks; chosen to be visually distinct from ASCII code chars.
-_L6_UNTYPABLE_PUNCT = (
+_WORD_FORGE_UNTYPABLE_PUNCT = (
     '§',   # U+00A7  Section Sign           Latin-1 Supplement
     '‽',   # U+203D  Interrobang            General Punctuation
     '°',   # U+00B0  Degree Sign            Latin-1 Supplement
@@ -1898,15 +1898,15 @@ _L6_UNTYPABLE_PUNCT = (
 # w stops at word/punct type boundaries within each group (many steps).
 # W treats the whole adjacent block as one WORD (one step per group).
 # Punctuation chars in code groups force 2-digit w counts (3 ks) vs 1-digit W counts (2 ks).
-# Anchors (W4 at 1,53 and B1 at 4,3) are placed separately per-seed from _L6_UNTYPABLE_PUNCT.
-_L6_CODE_GROUPS = [
+# Anchors (W4 at 1,53 and B1 at 4,3) are placed separately per-seed from _WORD_FORGE_UNTYPABLE_PUNCT.
+_WORD_FORGE_CODE_GROUPS = [
     # C1 (rows 1-2, left→right): W teaching — `4W` from col 1 → col 53 in 2 keystrokes
     (1,  3, "result=func",         'ember'),   # W1 cols  3-13
     (1, 16, "(a,b)+val",           'ember'),   # W2 cols 16-24
     (1, 27, "x=y*2",               'ember'),   # W3 cols 27-31
-    # W4 anchor at (1, 53-54): seed-varying untypable pair (see build_dungeon_6)
+    # W4 anchor at (1, 53-54): seed-varying untypable pair (see build_dungeon_word_forge)
     # C2 (rows 4-5, right→left): B teaching — `4B` from col 53 → col 3 in 2 keystrokes
-    # B1 anchor at (4, 3-4): seed-varying untypable pair (see build_dungeon_6)
+    # B1 anchor at (4, 3-4): seed-varying untypable pair (see build_dungeon_word_forge)
     (4, 25, "x+=y*2",              'ember'),   # B2 cols 25-30
     (4, 35, "int[]",               'ember'),   # B3 cols 35-39
     (4, 43, "main()",              'ember'),   # B4 cols 43-48
@@ -2264,13 +2264,13 @@ def _load_vocab_tables() -> None:
 
 
 # ── Level 7 layout constants ──────────────────────────────────────────────────
-_L7_TOTAL_ROWS = 14
-_L7_TOTAL_COLS = 40
-_L7_CORR_ROWS  = (1, 3, 5, 7, 9, 11)   # one row per corridor
-_L7_CORR_LEFT  = 1
-_L7_CORR_RIGHT = 38
+_BACKWARD_VAULTS_TOTAL_ROWS = 14
+_BACKWARD_VAULTS_TOTAL_COLS = 40
+_BACKWARD_VAULTS_CORR_ROWS  = (1, 3, 5, 7, 9, 11)   # one row per corridor
+_BACKWARD_VAULTS_CORR_LEFT  = 1
+_BACKWARD_VAULTS_CORR_RIGHT = 38
 
-_L7_TURN_SPANS = [
+_BACKWARD_VAULTS_TURN_SPANS = [
     (1,  3,  36, 38),  # RT1: C1→C2, right side
     (3,  5,   1,  3),  # LT1: C2→C3, left side
     (5,  7,  36, 38),  # RT2: C3→C4, right side
@@ -2280,7 +2280,7 @@ _L7_TURN_SPANS = [
 ]
 
 
-def _dijkstra_par_L7(composite, return_path: bool = False):
+def _par_backward_vaults(composite, return_path: bool = False):
     """Minimum-keystroke Dijkstra for Level 8 — The Backward Vaults:
     hjkl + $ ^ 0 + w b e + W B E (count) + ge gE (count).
 
@@ -2648,7 +2648,7 @@ def _dijkstra_par_L7(composite, return_path: bool = False):
     return None
 
 
-def build_dungeon_7(seed: int) -> Dungeon:
+def build_dungeon_backward_vaults(seed: int) -> Dungeon:
     """Level 7 — ge/gE: The Backward Vaults.
 
     Six 1-row corridors in a snake pattern (13 rows × 40 cols).  Each corridor
@@ -2671,13 +2671,13 @@ def build_dungeon_7(seed: int) -> Dungeon:
       (2,38) blocks $→col 38 descent in RT1; player uses 4e→col 36 instead.
       (4,1)  blocks 0→col 1 descent in LT1; player uses ^→col 2 instead.
 
-    Optimal route (par computed by _dijkstra_par_L7):
+    Optimal route (par computed by _par_backward_vaults):
       4E 2j ^ 2j $ 2j ge 2j $ 2j gE j
     ge is structurally forced at C4 (b lands at wall in row 8, ge costs same as gE).
     gE is structurally forced at C6 — gE j (2+1=3 ks) beats 2ge j (3+1=4 ks).
     """
     dungeon   = Dungeon(name='The Backward Vaults', seed=seed)
-    ROWS, COLS = _L7_TOTAL_ROWS, _L7_TOTAL_COLS
+    ROWS, COLS = _BACKWARD_VAULTS_TOTAL_ROWS, _BACKWARD_VAULTS_TOTAL_COLS
 
     cells = [[CellType.WALL] * COLS for _ in range(ROWS)]
     composite = Room(rows=ROWS, cols=COLS, room_type=RoomType.ENTRY)
@@ -2685,12 +2685,12 @@ def build_dungeon_7(seed: int) -> Dungeon:
     composite.seed  = seed
 
     # ── Carve corridors ───────────────────────────────────────────────────────
-    for r in _L7_CORR_ROWS:
-        for c in range(_L7_CORR_LEFT, _L7_CORR_RIGHT + 1):
+    for r in _BACKWARD_VAULTS_CORR_ROWS:
+        for c in range(_BACKWARD_VAULTS_CORR_LEFT, _BACKWARD_VAULTS_CORR_RIGHT + 1):
             cells[r][c] = CellType.CORRIDOR
 
     # ── Carve turn spans ──────────────────────────────────────────────────────
-    for r0, r1, c0, c1 in _L7_TURN_SPANS:
+    for r0, r1, c0, c1 in _BACKWARD_VAULTS_TURN_SPANS:
         for r in range(r0, r1 + 1):
             for c in range(c0, c1 + 1):
                 cells[r][c] = CellType.CORRIDOR
@@ -2808,7 +2808,7 @@ def build_dungeon_7(seed: int) -> Dungeon:
     composite.entities = [Entity(kind='exit', row=12, col=19)]
 
     composite.rebuild_indexes()
-    par, path = _dijkstra_par_L7(composite, return_path=True)
+    par, path = _par_backward_vaults(composite, return_path=True)
     if par is None:
         par, path = 20, '4E 2j ^ 2j $ 2j ge 2j $ 2j gE j'
     composite.par    = par
@@ -2819,7 +2819,7 @@ def build_dungeon_7(seed: int) -> Dungeon:
     return dungeon
 
 
-def build_dungeon_6(seed: int) -> Dungeon:
+def build_dungeon_word_forge(seed: int) -> Dungeon:
     """The WORD Forge — teaches W B E (WORD motions over code-text clusters).
 
     Three 2-row corridors, snake pattern (10 rows × 58 cols):
@@ -2835,11 +2835,11 @@ def build_dungeon_6(seed: int) -> Dungeon:
     _load_vocab_tables()
     rng     = random.Random(seed)
     # Pick 4 distinct untypable chars: first two → W4 anchor, last two → B1 anchor.
-    _four   = rng.sample(_L6_UNTYPABLE_PUNCT, 4)
+    _four   = rng.sample(_WORD_FORGE_UNTYPABLE_PUNCT, 4)
     _anchor_W = ''.join(_four[:2])   # W4 at (1, 53-54)
     _anchor_B = ''.join(_four[2:])   # B1 at (4,  3-4)
     dungeon = Dungeon(name='The WORD Forge', seed=seed)
-    ROWS, COLS = _L6_TOTAL_ROWS, _L6_TOTAL_COLS
+    ROWS, COLS = _WORD_FORGE_TOTAL_ROWS, _WORD_FORGE_TOTAL_COLS
 
     cells = [[CellType.WALL] * COLS for _ in range(ROWS)]
     composite = Room(room_type=RoomType.ENTRY, rows=ROWS, cols=COLS)
@@ -2847,13 +2847,13 @@ def build_dungeon_6(seed: int) -> Dungeon:
     composite.seed  = seed
 
     # ── Carve corridors (2 rows each) ─────────────────────────────────────────
-    for row_top in _L6_CORR_TOP_ROWS:
-        for c in range(_L6_CORR_LEFT, _L6_CORR_RIGHT + 1):
+    for row_top in _WORD_FORGE_CORR_TOP_ROWS:
+        for c in range(_WORD_FORGE_CORR_LEFT, _WORD_FORGE_CORR_RIGHT + 1):
             cells[row_top][c]     = CellType.CORRIDOR
             cells[row_top + 1][c] = CellType.CORRIDOR
 
     # ── Carve turn rooms ─────────────────────────────────────────────────────
-    for r0, r1, c0, c1 in _L6_TURN_SPANS:
+    for r0, r1, c0, c1 in _WORD_FORGE_TURN_SPANS:
         for row in range(r0, r1 + 1):
             for col in range(c0, c1 + 1):
                 cells[row][col] = CellType.CORRIDOR
@@ -2874,7 +2874,7 @@ def build_dungeon_6(seed: int) -> Dungeon:
 
     # ── Hardcoded code-text clusters ──────────────────────────────────────────
     _hardcoded: list[CharRun] = []
-    for row, col_start, text, kind in _L6_CODE_GROUPS:
+    for row, col_start, text, kind in _WORD_FORGE_CODE_GROUPS:
         _l7_place_code_group(_hardcoded, row, col_start, text, kind)
     # Seed-varying untypable anchors (f/F cannot target these chars)
     _l7_place_code_group(_hardcoded, 1, 53, _anchor_W, 'ember')  # W4 anchor
@@ -2929,7 +2929,7 @@ def build_dungeon_6(seed: int) -> Dungeon:
     return dungeon
 
 
-def build_dungeon_14(seed: int) -> Dungeon:
+def build_dungeon_sight_sanctum(seed: int) -> Dungeon:
     """Level 14 — Visual Mode: The Sight Sanctum.
 
     Fixed U-shaped layout:
@@ -2989,12 +2989,12 @@ def build_dungeon_14(seed: int) -> Dungeon:
 # ── Level 11 layout constants ─────────────────────────────────────────────────
 #
 # Three-corridor snake layout (7 rows × 60 cols).
-# Each corridor row has ( at col _L10_BRACKET_OPEN and ) at col _L10_BRACKET_CLOSE.
+# Each corridor row has ( at col _BRACKET_VAULTS_BRACKET_OPEN and ) at col _BRACKET_VAULTS_BRACKET_CLOSE.
 # Row 3 (middle) is filled with void runes everywhere EXCEPT the two bracket cells,
 # forcing the player to use % to cross it rather than manual h/l navigation.
 #
-# Right turn: col _L10_BRACKET_CLOSE, rows 1-3 (single-column gap cell at row 2).
-# Left turn:  col _L10_BRACKET_OPEN,  rows 3-5 (single-column gap cell at row 4).
+# Right turn: col _BRACKET_VAULTS_BRACKET_CLOSE, rows 1-3 (single-column gap cell at row 2).
+# Left turn:  col _BRACKET_VAULTS_BRACKET_OPEN,  rows 3-5 (single-column gap cell at row 4).
 #
 # Optimal path (par=7):  % 2j % 2j %
 #   Entry (1,1): % scans right, finds ( at col 4, jumps to ) at col 54.
@@ -3002,19 +3002,19 @@ def build_dungeon_14(seed: int) -> Dungeon:
 #   % at (1,1) is not on a bracket but Vim-style % scans right for the first
 #   bracket on the row — finds ( col 4 and jumps to its match ) col 54.
 #
-_L10_ROWS          = 7
-_L10_COLS          = 60
-_L10_BRACKET_OPEN  = 4      # ( on each corridor row
-_L10_BRACKET_CLOSE = 54     # ) on rows 1 & 3; right-turn column; exit column
-_L10_CLOSE_R5      = 53     # ) on row 5 only (one left of CLS; exit sits at CLS)
-_L10_CORR_ROWS     = (1, 3, 5)
-_L10_ENTRY         = (1, 1)
-_L10_EXIT_POS      = (5, _L10_BRACKET_CLOSE)
-_L10_PAR           = 8       # % 2j % 2j % l  = 1+2+1+2+1+1 = 8 ks
-_L10_ANSWER        = '% 2j % 2j % l'
+_BRACKET_VAULTS_ROWS          = 7
+_BRACKET_VAULTS_COLS          = 60
+_BRACKET_VAULTS_BRACKET_OPEN  = 4      # ( on each corridor row
+_BRACKET_VAULTS_BRACKET_CLOSE = 54     # ) on rows 1 & 3; right-turn column; exit column
+_BRACKET_VAULTS_CLOSE_R5      = 53     # ) on row 5 only (one left of CLS; exit sits at CLS)
+_BRACKET_VAULTS_CORR_ROWS     = (1, 3, 5)
+_BRACKET_VAULTS_ENTRY         = (1, 1)
+_BRACKET_VAULTS_EXIT_POS      = (5, _BRACKET_VAULTS_BRACKET_CLOSE)
+_BRACKET_VAULTS_PAR           = 8       # % 2j % 2j % l  = 1+2+1+2+1+1 = 8 ks
+_BRACKET_VAULTS_ANSWER        = '% 2j % 2j % l'
 
 
-def _dijkstra_par_L10(composite, use_percent: bool = True, return_path: bool = False):
+def _par_bracket_vaults(composite, use_percent: bool = True, return_path: bool = False):
     """Minimum-keystroke Dijkstra for Level 11 — The Bracket Vaults.
 
     Supported motions (all available at level 11):
@@ -3171,7 +3171,7 @@ def _dijkstra_par_L10(composite, use_percent: bool = True, return_path: bool = F
     return None
 
 
-def build_dungeon_10(seed: int) -> Dungeon:
+def build_dungeon_bracket_vaults(seed: int) -> Dungeon:
     """Level 10 — % (The Bracket Vaults).
 
     Teaches `%` (bracket-matching jump) as the only way to cross a band of WATER.
@@ -3194,19 +3194,19 @@ def build_dungeon_10(seed: int) -> Dungeon:
     Layout is deterministic; seed only colors bracket characters.
     """
     dungeon   = Dungeon(name='The Bracket Vaults', seed=seed)
-    ROWS, COLS = _L10_ROWS, _L10_COLS
+    ROWS, COLS = _BRACKET_VAULTS_ROWS, _BRACKET_VAULTS_COLS
 
     cells = [[CellType.WALL] * COLS for _ in range(ROWS)]
     composite = Room(rows=ROWS, cols=COLS, room_type=RoomType.ENTRY)
     composite.cells = cells
     composite.seed  = seed
 
-    OPN = _L10_BRACKET_OPEN   # 4
-    CLS = _L10_BRACKET_CLOSE  # 54
-    EXC = _L10_CLOSE_R5       # 53  (row-5 closing bracket col)
+    OPN = _BRACKET_VAULTS_BRACKET_OPEN   # 4
+    CLS = _BRACKET_VAULTS_BRACKET_CLOSE  # 54
+    EXC = _BRACKET_VAULTS_CLOSE_R5       # 53  (row-5 closing bracket col)
 
     # ── Carve corridors ───────────────────────────────────────────────────────
-    for r in _L10_CORR_ROWS:
+    for r in _BRACKET_VAULTS_CORR_ROWS:
         for c in range(1, COLS - 1):
             cells[r][c] = CellType.CORRIDOR
 
@@ -3238,7 +3238,7 @@ def build_dungeon_10(seed: int) -> Dungeon:
     _kinds = ('ancient', 'verdant', 'ember')
 
     runes: list[CharRun] = []
-    for row in _L10_CORR_ROWS:
+    for row in _BRACKET_VAULTS_CORR_ROWS:
         kind_open  = rng.choice(_kinds)
         kind_close = rng.choice(_kinds)
         close_col  = EXC if row == 5 else CLS
@@ -3248,16 +3248,16 @@ def build_dungeon_10(seed: int) -> Dungeon:
     composite.char_runs = runes
 
     # ── Entry and exit ────────────────────────────────────────────────────────
-    composite.spawn_pos    = _L10_ENTRY
-    composite.exit_pos = _L10_EXIT_POS
+    composite.spawn_pos    = _BRACKET_VAULTS_ENTRY
+    composite.exit_pos = _BRACKET_VAULTS_EXIT_POS
     composite.entities = [Entity(kind='exit',
-                                 row=_L10_EXIT_POS[0], col=_L10_EXIT_POS[1])]
+                                 row=_BRACKET_VAULTS_EXIT_POS[0], col=_BRACKET_VAULTS_EXIT_POS[1])]
 
     composite.rebuild_indexes()
 
-    par, path = _dijkstra_par_L10(composite, use_percent=True, return_path=True)
+    par, path = _par_bracket_vaults(composite, use_percent=True, return_path=True)
     if par is None:
-        par, path = _L10_PAR, _L10_ANSWER
+        par, path = _BRACKET_VAULTS_PAR, _BRACKET_VAULTS_ANSWER
     composite.par    = par
     composite.budget = math.ceil(par * 1.4)
     composite.answer = path
@@ -3276,18 +3276,18 @@ def build_dungeon_10(seed: int) -> Dungeon:
 #   Rows 2..L_ROW     : narrow corridor (cols 1-25) — M key at M_ROW, L key at L_ROW
 #   void row (L_ROW+3): G lands here (void) — punishes using G
 # Three floor_keys (gold/red/blue) are randomly matched to three colored
-# locked_doors per seed; par is Dijkstra-computed (_dijkstra_par_L9).
-_L9_DEFAULT_GAME_H = 33   # main._build_dungeon's default game height
-_L9_COLS      = 43
-_L9_H_KEY_COL = 2    # anchor col in row 1 for H (NOT col 1)
-_L9_M_KEY_COL = 25   # anchor col in M_ROW; rightmost of narrow corridor
-_L9_L_KEY_COL = 1    # anchor col in L_ROW; leftmost passable
-_L9_DOOR_COLS = (26, 33, 39)   # locked_door cols in row 1
-_L9_EXIT_COL  = 41             # exit entity col in row 1
-_L9_TOP_LEFT    = (1, 1)
-_L9_SPAWN     = (8, 13)
-_L9_COLORS    = ('gold', 'red', 'blue')
-_L9_PAR       = 17   # deterministic: 17 for every color assignment (verified in
+# locked_doors per seed; par is Dijkstra-computed (_par_screen_vault).
+_SCREEN_VAULT_DEFAULT_GAME_H = 33   # main._build_dungeon's default game height
+_SCREEN_VAULT_COLS      = 43
+_SCREEN_VAULT_H_KEY_COL = 2    # anchor col in row 1 for H (NOT col 1)
+_SCREEN_VAULT_M_KEY_COL = 25   # anchor col in M_ROW; rightmost of narrow corridor
+_SCREEN_VAULT_L_KEY_COL = 1    # anchor col in L_ROW; leftmost passable
+_SCREEN_VAULT_DOOR_COLS = (26, 33, 39)   # locked_door cols in row 1
+_SCREEN_VAULT_EXIT_COL  = 41             # exit entity col in row 1
+_SCREEN_VAULT_TOP_LEFT    = (1, 1)
+_SCREEN_VAULT_SPAWN     = (8, 13)
+_SCREEN_VAULT_COLORS    = ('gold', 'red', 'blue')
+_SCREEN_VAULT_PAR       = 17   # deterministic: 17 for every color assignment (verified in
                       # test_level_10), so it is locked rather than re-solved on
                       # every load — the par Dijkstra is expensive for this level.
 
@@ -3304,7 +3304,7 @@ def _l9_key_rows(game_h: int) -> tuple:
     return m_row, l_row
 
 
-def _dijkstra_par_L9(composite, return_path: bool = False):
+def _par_screen_vault(composite, return_path: bool = False):
     """Minimum-keystroke Dijkstra for the Screen Vault (3 colored keys).
 
     State = (row, col, inv, key_alive, doors) where:
@@ -3318,11 +3318,11 @@ def _dijkstra_par_L9(composite, return_path: bool = False):
     game_h = composite._game_h
     m_row, l_row = _l9_key_rows(game_h)
     ROWS, COLS = composite.rows, composite.cols
-    H_COL  = _L9_H_KEY_COL
-    M_COL  = _L9_M_KEY_COL
-    L_COL  = _L9_L_KEY_COL
-    D_COLS = _L9_DOOR_COLS
-    EX     = (_L9_TOP_LEFT[0], _L9_EXIT_COL)
+    H_COL  = _SCREEN_VAULT_H_KEY_COL
+    M_COL  = _SCREEN_VAULT_M_KEY_COL
+    L_COL  = _SCREEN_VAULT_L_KEY_COL
+    D_COLS = _SCREEN_VAULT_DOOR_COLS
+    EX     = (_SCREEN_VAULT_TOP_LEFT[0], _SCREEN_VAULT_EXIT_COL)
     entry  = composite.spawn_pos
 
     door_key = composite._door_key  # door_key[d] = inv value (1/2/3) that opens door d
@@ -3492,7 +3492,7 @@ def _dijkstra_par_L9(composite, return_path: bool = False):
     return None
 
 
-def build_dungeon_9(seed: int, game_h: int = _L9_DEFAULT_GAME_H,
+def build_dungeon_screen_vault(seed: int, game_h: int = _SCREEN_VAULT_DEFAULT_GAME_H,
                      compute_answer: bool = True) -> Dungeon:
     """Level 9 — H M L: The Screen Vault (3 colored keys).
 
@@ -3511,12 +3511,12 @@ def build_dungeon_9(seed: int, game_h: int = _L9_DEFAULT_GAME_H,
     Three floor_keys (gold/red/blue, randomly assigned) unlock three colored
     locked_doors in the top section.  Par is 17 for every color assignment.
 
-    Par is locked (`_L9_PAR`) instead of re-solved on every load; the full answer
+    Par is locked (`_SCREEN_VAULT_PAR`) instead of re-solved on every load; the full answer
     path (admin-only) is solved lazily via ``compute_answer``.
     """
     dungeon = Dungeon(name='The Screen Vault', seed=seed)
     ROWS   = game_h + 4
-    COLS   = _L9_COLS
+    COLS   = _SCREEN_VAULT_COLS
     m_row, l_row = _l9_key_rows(game_h)
 
     rng = random.Random(seed)
@@ -3544,7 +3544,7 @@ def build_dungeon_9(seed: int, game_h: int = _L9_DEFAULT_GAME_H,
         cells[void_row][c] = CellType.CORRIDOR
 
     # ── Color assignment ──────────────────────────────────────────────────────
-    colors = list(_L9_COLORS)
+    colors = list(_SCREEN_VAULT_COLORS)
     key_colors  = colors[:]
     rng.shuffle(key_colors)   # key_colors[0]=H key, [1]=M key, [2]=L key
     door_colors = colors[:]
@@ -3555,13 +3555,13 @@ def build_dungeon_9(seed: int, game_h: int = _L9_DEFAULT_GAME_H,
 
     # ── Entities: keys, doors, exit ───────────────────────────────────────────
     composite.entities = [
-        Entity(kind='floor_key',   row=1,     col=_L9_H_KEY_COL, tag=key_colors[0]),
-        Entity(kind='floor_key',   row=m_row, col=_L9_M_KEY_COL, tag=key_colors[1]),
-        Entity(kind='floor_key',   row=l_row, col=_L9_L_KEY_COL, tag=key_colors[2]),
-        Entity(kind='locked_door', row=1, col=_L9_DOOR_COLS[0],  tag=door_colors[0]),
-        Entity(kind='locked_door', row=1, col=_L9_DOOR_COLS[1],  tag=door_colors[1]),
-        Entity(kind='locked_door', row=1, col=_L9_DOOR_COLS[2],  tag=door_colors[2]),
-        Entity(kind='exit',        row=1, col=_L9_EXIT_COL),
+        Entity(kind='floor_key',   row=1,     col=_SCREEN_VAULT_H_KEY_COL, tag=key_colors[0]),
+        Entity(kind='floor_key',   row=m_row, col=_SCREEN_VAULT_M_KEY_COL, tag=key_colors[1]),
+        Entity(kind='floor_key',   row=l_row, col=_SCREEN_VAULT_L_KEY_COL, tag=key_colors[2]),
+        Entity(kind='locked_door', row=1, col=_SCREEN_VAULT_DOOR_COLS[0],  tag=door_colors[0]),
+        Entity(kind='locked_door', row=1, col=_SCREEN_VAULT_DOOR_COLS[1],  tag=door_colors[1]),
+        Entity(kind='locked_door', row=1, col=_SCREEN_VAULT_DOOR_COLS[2],  tag=door_colors[2]),
+        Entity(kind='exit',        row=1, col=_SCREEN_VAULT_EXIT_COL),
     ]
 
     # ── Characters ──────────────────────────────────────────────────────────
@@ -3572,9 +3572,9 @@ def build_dungeon_9(seed: int, game_h: int = _L9_DEFAULT_GAME_H,
 
     # Anchor characters at key positions (so H/M/L fnb returns the key col)
     for anchor_row, anchor_col in (
-        (1,     _L9_H_KEY_COL),
-        (m_row, _L9_M_KEY_COL),
-        (l_row, _L9_L_KEY_COL),
+        (1,     _SCREEN_VAULT_H_KEY_COL),
+        (m_row, _SCREEN_VAULT_M_KEY_COL),
+        (l_row, _SCREEN_VAULT_L_KEY_COL),
     ):
         sym = rng.choice([('∘',), ('·',), ('⊙',), ('∙',)])
         composite.char_runs.append(CharRun(row=anchor_row, col=anchor_col,
@@ -3614,7 +3614,7 @@ def build_dungeon_9(seed: int, game_h: int = _L9_DEFAULT_GAME_H,
             if (row, c) in blocked:
                 c += 1
                 continue
-            if row == _L9_SPAWN[0] and abs(c - _L9_SPAWN[1]) <= 1:
+            if row == _SCREEN_VAULT_SPAWN[0] and abs(c - _SCREEN_VAULT_SPAWN[1]) <= 1:
                 c += 2
                 continue
             max_len = min(4, 26 - c)
@@ -3642,18 +3642,18 @@ def build_dungeon_9(seed: int, game_h: int = _L9_DEFAULT_GAME_H,
                                            symbols=('○',), kind='void'))
 
     # ── Entry / spawn / exit ──────────────────────────────────────────────────
-    composite.spawn_pos = _L9_SPAWN
-    composite.exit_pos  = (1, _L9_EXIT_COL)
+    composite.spawn_pos = _SCREEN_VAULT_SPAWN
+    composite.exit_pos  = (1, _SCREEN_VAULT_EXIT_COL)
 
     composite.rebuild_indexes()
 
     # ── Par / answer ──────────────────────────────────────────────────────────
-    # Par is locked at _L9_PAR (deterministic; test_level_10 runs the solver to
+    # Par is locked at _SCREEN_VAULT_PAR (deterministic; test_level_10 runs the solver to
     # verify).  The answer path is only shown to admin, so solve for it only when
     # compute_answer is set — the Dijkstra is too slow to run on every load.
-    composite.par    = _L9_PAR
-    composite.budget = math.ceil(_L9_PAR * 1.4)
-    composite.answer = _dijkstra_par_L9(composite, return_path=True)[1] if compute_answer else ''
+    composite.par    = _SCREEN_VAULT_PAR
+    composite.budget = math.ceil(_SCREEN_VAULT_PAR * 1.4)
+    composite.answer = _par_screen_vault(composite, return_path=True)[1] if compute_answer else ''
 
     dungeon.rooms        = [composite]
     dungeon.current_room = 0
@@ -3684,27 +3684,27 @@ def build_dungeon_9(seed: int, game_h: int = _L9_DEFAULT_GAME_H,
 #                 $ → (15,42) [locked_door at 43 blocks $].
 #                 p unlocks door at (15,43).  $ → (15,46) EXIT.
 
-_L12_ROWS     = 22
-_L12_COLS     = 48        # main 44 (cols 0–43) + side room 4 (cols 44–47)
-_L12_ENTRY    = (9, 20)   # spawn position
-_L12_EXIT     = (15, 46)  # exit entity (inside side room)
-_L12_KEY_POS  = (5, 1)    # floor_key entity (blank row above code block)
-_L12_DOOR_POS = (15, 43)  # locked_door entity
-_L12_VOID_POS = (20, 1)   # void rune
-_L12_PAR      = 7
-_L12_ANSWER   = '{ x } } $ p $'
+_RUNIC_ARCHIVES_ROWS     = 22
+_RUNIC_ARCHIVES_COLS     = 48        # main 44 (cols 0–43) + side room 4 (cols 44–47)
+_RUNIC_ARCHIVES_ENTRY    = (9, 20)   # spawn position
+_RUNIC_ARCHIVES_EXIT     = (15, 46)  # exit entity (inside side room)
+_RUNIC_ARCHIVES_KEY_POS  = (5, 1)    # floor_key entity (blank row above code block)
+_RUNIC_ARCHIVES_DOOR_POS = (15, 43)  # locked_door entity
+_RUNIC_ARCHIVES_VOID_POS = (20, 1)   # void rune
+_RUNIC_ARCHIVES_PAR      = 7
+_RUNIC_ARCHIVES_ANSWER   = '{ x } } $ p $'
 
 # ── Level 14 (Sentence Corridor) constants ────────────────────────────────
 # Without (/): wall gaps (cols 11-22 and 37-48) block all l/h/w paths.
 #              Player trapped in S1 (cols 1-10).  Cost = infinity >> budget.
 
-_L13_ROWS     = 5
-_L13_COLS     = 73
-_L13_ENTRY    = (1, 1)          # spawn: start of sentence 1
-_L13_EXIT     = (1, 71)         # exit: just past the locked door
-_L13_DOOR_POS = (1, 70)         # locked_door at the END of sentence 3
-_L13_KEY_POS  = (3, 69)         # floor_key at the END of sentence 5
-_L13_SEP_ROW  = 2              # all-wall stone row between the two sentence rows
+_SENTENCE_CORRIDOR_ROWS     = 5
+_SENTENCE_CORRIDOR_COLS     = 73
+_SENTENCE_CORRIDOR_ENTRY    = (1, 1)          # spawn: start of sentence 1
+_SENTENCE_CORRIDOR_EXIT     = (1, 71)         # exit: just past the locked door
+_SENTENCE_CORRIDOR_DOOR_POS = (1, 70)         # locked_door at the END of sentence 3
+_SENTENCE_CORRIDOR_KEY_POS  = (3, 69)         # floor_key at the END of sentence 5
+_SENTENCE_CORRIDOR_SEP_ROW  = 2              # all-wall stone row between the two sentence rows
 
 # Five sentences (each one CharRun spanning its columns; terminator last):
 #   row 1:  S1 ·gap· S2 ·gap· S3 [door][exit]
@@ -3712,7 +3712,7 @@ _L13_SEP_ROW  = 2              # all-wall stone row between the two sentence row
 # S3 (3rd of row 1) and S5 (2nd of row 3) sit behind wall-gaps, so the line /
 # screen / paragraph jumps the player already knows (G gg {n}G H M L { }) reach
 # only a row's FIRST sentence — ) is the sole way onto them.
-_L13_SENTENCES = [
+_SENTENCE_CORRIDOR_SENTENCES = [
     (1, 1,  'A sentence is one stride.'),
     (1, 29, 'Where does it end?'),
     (1, 50, 'At a dot, or a bang!'),
@@ -3721,7 +3721,7 @@ _L13_SENTENCES = [
 ]
 
 
-def _dijkstra_par_L12(composite, return_path=False,
+def _par_runic_archives(composite, return_path=False,
                       disable_brace=False, disable_paren=False):
     """Minimum-keystroke Dijkstra for Level 12 — Paragraph Jumps (The Runic Archives).
 
@@ -3733,9 +3733,9 @@ def _dijkstra_par_L12(composite, return_path=False,
     disable_paren accepted but ignored (no sentence jumps in this level).
     """
     ROWS, COLS = composite.rows, composite.cols
-    KR, KC = _L12_KEY_POS
-    DR, DC = _L12_DOOR_POS
-    EX     = _L12_EXIT
+    KR, KC = _RUNIC_ARCHIVES_KEY_POS
+    DR, DC = _RUNIC_ARCHIVES_DOOR_POS
+    EX     = _RUNIC_ARCHIVES_EXIT
     entry  = composite.spawn_pos
     max_n  = max(ROWS, COLS)
 
@@ -3889,23 +3889,23 @@ def _dijkstra_par_L12(composite, return_path=False,
 # reachable, so the solve is: fetch the gold key (wherever it landed), open the left
 # door (stepping onto it), fetch the red key, open the right, reach the exit —
 # riding the shaft with G (→ row 14), {n}G, and gg (→ row 1).  Par/answer are
-# computed by _dijkstra_par_L8 (colored key/door + line-jump model).
-_L8_ROWS   = 16
-_L8_COLS   = 11
-_L8_ENTRY  = (1, 1)             # spawn / first line
-_L8_EXIT   = (1, 9)             # exit entity == exit_pos (top-right)
-_L8_KEYS   = ((4, 1), (14, 2))  # floor_key positions
-_L8_DOORS  = ((1, 3), (1, 6))   # locked_door positions (left→right)
-_L8_COLORS = ('gold', 'red')    # fixed door sequence: door0=(1,3)=gold, door1=(1,6)=red
+# computed by _par_lineheads (colored key/door + line-jump model).
+_LINEHEADS_ROWS   = 16
+_LINEHEADS_COLS   = 11
+_LINEHEADS_ENTRY  = (1, 1)             # spawn / first line
+_LINEHEADS_EXIT   = (1, 9)             # exit entity == exit_pos (top-right)
+_LINEHEADS_KEYS   = ((4, 1), (14, 2))  # floor_key positions
+_LINEHEADS_DOORS  = ((1, 3), (1, 6))   # locked_door positions (left→right)
+_LINEHEADS_COLORS = ('gold', 'red')    # fixed door sequence: door0=(1,3)=gold, door1=(1,6)=red
 # Passable columns per row (every other cell is WALL):
-_L8_PASSABLE = {
+_LINEHEADS_PASSABLE = {
     1: tuple(range(1, 10)),               # top corridor cols 1-9
     2: (1, 2, 4, 5, 7, 8, 9),             # walls at 3,6 under the doors
     **{r: (1, 2) for r in range(3, 15)},  # 2-wide left shaft, rows 3-14
 }
 
 
-def _dijkstra_par_L8(composite, return_path: bool = False,
+def _par_lineheads(composite, return_path: bool = False,
                       disable_line_jumps: bool = False):
     """Minimum-keystroke Dijkstra for Level 8 — The Lineheads.
 
@@ -3922,13 +3922,13 @@ def _dijkstra_par_L8(composite, return_path: bool = False,
       keys_mask  — bit i set ⇒ key i still on the floor
       holding    — 1 ⇒ a key is held in the register, else 0
       doors_mask — bit i set ⇒ door i is open
-    Goal: reach _L8_EXIT (only reachable once both doors are open).
+    Goal: reach _LINEHEADS_EXIT (only reachable once both doors are open).
     """
     ROWS, COLS = composite.rows, composite.cols
     entry = composite.spawn_pos
-    keys  = _L8_KEYS
-    doors = _L8_DOORS
-    EX    = _L8_EXIT
+    keys  = _LINEHEADS_KEYS
+    doors = _LINEHEADS_DOORS
+    EX    = _LINEHEADS_EXIT
     max_n = max(ROWS, COLS)
     FULL_KEYS  = (1 << len(keys)) - 1
     door_index = {d: i for i, d in enumerate(doors)}
@@ -4055,7 +4055,7 @@ def _dijkstra_par_L8(composite, return_path: bool = False,
     return (None, '') if return_path else None
 
 
-def build_dungeon_8(seed: int) -> 'Dungeon':
+def build_dungeon_lineheads(seed: int) -> 'Dungeon':
     """Level 8 — G gg {n}G: The Lineheads.
 
     A 16-row × 11-col vertical shaft (restored from the admin design layout
@@ -4065,20 +4065,20 @@ def build_dungeon_8(seed: int) -> 'Dungeon':
     rides G / gg / {n}G up and down to fetch a key, open its matching colored door
     (stepping onto it), and repeat.  Geometry is fixed; the two key COLORS are
     shuffled per seed (doors are a fixed gold→red sequence), so the fetch order —
-    and the par — varies with the seed.  See the _L8_* block above for geometry.
+    and the par — varies with the seed.  See the _LINEHEADS_* block above for geometry.
 
-    Par/answer are computed by _dijkstra_par_L8 (colored key/door + line-jump model).
+    Par/answer are computed by _par_lineheads (colored key/door + line-jump model).
     """
     dungeon = Dungeon(name='The Lineheads', seed=seed)
-    ROWS, COLS = _L8_ROWS, _L8_COLS
+    ROWS, COLS = _LINEHEADS_ROWS, _LINEHEADS_COLS
 
     cells = [[CellType.WALL] * COLS for _ in range(ROWS)]
     composite = Room(rows=ROWS, cols=COLS, room_type=RoomType.ENTRY)
     composite.cells = cells
     composite.seed  = seed
 
-    # ── Carve the fixed layout (see _L8_PASSABLE above) ──────────────────────
-    for row, passable_cols in _L8_PASSABLE.items():
+    # ── Carve the fixed layout (see _LINEHEADS_PASSABLE above) ──────────────────────
+    for row, passable_cols in _LINEHEADS_PASSABLE.items():
         for c in passable_cols:
             cells[row][c] = CellType.CORRIDOR
 
@@ -4086,17 +4086,17 @@ def build_dungeon_8(seed: int) -> 'Dungeon':
     # Doors are a fixed color sequence (left=gold, right=red); the key colors are
     # shuffled per seed, so which shaft-key opens which door — and the order you
     # ride the shaft to fetch them — varies.
-    composite.spawn_pos   = _L8_ENTRY
-    composite.exit_pos = _L8_EXIT
+    composite.spawn_pos   = _LINEHEADS_ENTRY
+    composite.exit_pos = _LINEHEADS_EXIT
     rng = random.Random(seed)
-    door_colors = list(_L8_COLORS)                            # door0=(1,3)=gold, door1=(1,6)=red
-    key_colors  = list(_L8_COLORS); rng.shuffle(key_colors)   # key0=(4,1), key1=(14,2)
+    door_colors = list(_LINEHEADS_COLORS)                            # door0=(1,3)=gold, door1=(1,6)=red
+    key_colors  = list(_LINEHEADS_COLORS); rng.shuffle(key_colors)   # key0=(4,1), key1=(14,2)
     inv_for_color = {col: ki + 1 for ki, col in enumerate(key_colors)}
     composite._lgg_door_key = [inv_for_color[dc] for dc in door_colors]
-    entities = [Entity(kind='exit', row=_L8_EXIT[0], col=_L8_EXIT[1])]
-    for ki, (kr, kc) in enumerate(_L8_KEYS):
+    entities = [Entity(kind='exit', row=_LINEHEADS_EXIT[0], col=_LINEHEADS_EXIT[1])]
+    for ki, (kr, kc) in enumerate(_LINEHEADS_KEYS):
         entities.append(Entity(kind='floor_key', row=kr, col=kc, tag=key_colors[ki]))
-    for di, (dr, dc) in enumerate(_L8_DOORS):
+    for di, (dr, dc) in enumerate(_LINEHEADS_DOORS):
         entities.append(Entity(kind='locked_door', row=dr, col=dc, tag=door_colors[di]))
     composite.entities = entities
     composite.char_runs = []   # no seed-varying runes; the layout is fixed
@@ -4105,7 +4105,7 @@ def build_dungeon_8(seed: int) -> 'Dungeon':
     _fog_unreachable(composite, composite.spawn_pos[0], composite.spawn_pos[1])
 
     # ── Compute par via Dijkstra (key/door + line-jump model) ─────────────────
-    par, path = _dijkstra_par_L8(composite, return_path=True)
+    par, path = _par_lineheads(composite, return_path=True)
     if par is None:                      # fixed map — should always solve
         raise RuntimeError('Level 8 (The Lineheads) is unsolvable — check layout')
     composite.par    = par
@@ -4117,7 +4117,7 @@ def build_dungeon_8(seed: int) -> 'Dungeon':
     return dungeon
 
 
-def build_dungeon_12(seed: int) -> 'Dungeon':
+def build_dungeon_runic_archives(seed: int) -> 'Dungeon':
     """Level 12 (id=12) — Paragraph Jumps: The Runic Archives.
 
     Layout: 22 rows × 48 cols.
@@ -4133,7 +4133,7 @@ def build_dungeon_12(seed: int) -> 'Dungeon':
     Optimal path (par=7):  { x } } $ p $   (spawn (9,20), a blank row)
     """
     dungeon   = Dungeon(name='The Runic Archives', seed=seed)
-    ROWS, COLS = _L12_ROWS, _L12_COLS
+    ROWS, COLS = _RUNIC_ARCHIVES_ROWS, _RUNIC_ARCHIVES_COLS
 
     cells = [[CellType.WALL] * COLS for _ in range(ROWS)]
     composite = Room(rows=ROWS, cols=COLS, room_type=RoomType.ENTRY)
@@ -4188,23 +4188,23 @@ def build_dungeon_12(seed: int) -> 'Dungeon':
     for r in (16, 18):
         _fill_row(r)
 
-    runes.append(CharRun(row=_L12_VOID_POS[0], col=_L12_VOID_POS[1],
+    runes.append(CharRun(row=_RUNIC_ARCHIVES_VOID_POS[0], col=_RUNIC_ARCHIVES_VOID_POS[1],
                              symbols=('○',), kind='void'))
     composite.char_runs = runes
 
-    composite.spawn_pos   = _L12_ENTRY
-    composite.exit_pos = _L12_EXIT
+    composite.spawn_pos   = _RUNIC_ARCHIVES_ENTRY
+    composite.exit_pos = _RUNIC_ARCHIVES_EXIT
     composite.entities = [
-        Entity(kind='floor_key',   row=_L12_KEY_POS[0],  col=_L12_KEY_POS[1]),
-        Entity(kind='locked_door', row=_L12_DOOR_POS[0], col=_L12_DOOR_POS[1]),
-        Entity(kind='exit',        row=_L12_EXIT[0],     col=_L12_EXIT[1]),
+        Entity(kind='floor_key',   row=_RUNIC_ARCHIVES_KEY_POS[0],  col=_RUNIC_ARCHIVES_KEY_POS[1]),
+        Entity(kind='locked_door', row=_RUNIC_ARCHIVES_DOOR_POS[0], col=_RUNIC_ARCHIVES_DOOR_POS[1]),
+        Entity(kind='exit',        row=_RUNIC_ARCHIVES_EXIT[0],     col=_RUNIC_ARCHIVES_EXIT[1]),
     ]
 
     composite.rebuild_indexes()
 
-    par, path = _dijkstra_par_L12(composite, return_path=True)
+    par, path = _par_runic_archives(composite, return_path=True)
     if par is None:
-        par, path = _L12_PAR, _L12_ANSWER
+        par, path = _RUNIC_ARCHIVES_PAR, _RUNIC_ARCHIVES_ANSWER
     composite.par    = par
     composite.budget = math.ceil(par * 1.4)
     composite.answer = path
@@ -4215,7 +4215,7 @@ def build_dungeon_12(seed: int) -> 'Dungeon':
 
 
 
-def _dijkstra_par_L13(composite, return_path=False, no_close=False, no_open=False):
+def _par_sentence_corridor(composite, return_path=False, no_close=False, no_open=False):
     """Minimum-keystroke Dijkstra for Level 13 — Sentence Jumps.
 
     State = (row, col, has_key, door_open).  Models count-hjkl, 0, $, ) and (
@@ -4231,9 +4231,9 @@ def _dijkstra_par_L13(composite, return_path=False, no_close=False, no_open=Fals
     """
     from engine.motion import _sentence_starts_all
     ROWS, COLS = composite.rows, composite.cols
-    DR, DC = _L13_DOOR_POS
-    KR, KC = _L13_KEY_POS
-    EX     = _L13_EXIT
+    DR, DC = _SENTENCE_CORRIDOR_DOOR_POS
+    KR, KC = _SENTENCE_CORRIDOR_KEY_POS
+    EX     = _SENTENCE_CORRIDOR_EXIT
     entry  = composite.spawn_pos
     max_n  = max(ROWS, COLS)
     starts = _sentence_starts_all(composite)
@@ -4331,7 +4331,7 @@ def _dijkstra_par_L13(composite, return_path=False, no_close=False, no_open=Fals
     return None
 
 
-def build_dungeon_13(seed: int) -> 'Dungeon':
+def build_dungeon_sentence_corridor(seed: int) -> 'Dungeon':
     """Level 13 — Sentence Jumps: The Sentence Corridor.
 
     Two sentence rows (1 and 3) split by a stone wall row (2): the only way
@@ -4361,7 +4361,7 @@ def build_dungeon_13(seed: int) -> 'Dungeon':
     the strongly-incentivized partner while ) carries the mandatory lesson.
     """
     dungeon = Dungeon(name='The Sentence Corridor', seed=seed)
-    ROWS, COLS = _L13_ROWS, _L13_COLS
+    ROWS, COLS = _SENTENCE_CORRIDOR_ROWS, _SENTENCE_CORRIDOR_COLS
 
     cells = [[CellType.WALL] * COLS for _ in range(ROWS)]
     composite = Room(rows=ROWS, cols=COLS, room_type=RoomType.ENTRY)
@@ -4370,22 +4370,22 @@ def build_dungeon_13(seed: int) -> 'Dungeon':
 
     # ── Sentence rows (row 2 stays all-wall: the stone separator) ─────────────
     runes: list = []
-    for (r, c, text) in _L13_SENTENCES:
+    for (r, c, text) in _SENTENCE_CORRIDOR_SENTENCES:
         for i in range(len(text)):
             cells[r][c + i] = CellType.CORRIDOR
         runes.append(CharRun(row=r, col=c, symbols=tuple(text), kind='ember'))
     composite.char_runs = runes
 
     # ── Door / exit / key cells (passable floor; the door blocks via entity) ──
-    dr, dc = _L13_DOOR_POS
-    er, ec = _L13_EXIT
-    kr, kc = _L13_KEY_POS
+    dr, dc = _SENTENCE_CORRIDOR_DOOR_POS
+    er, ec = _SENTENCE_CORRIDOR_EXIT
+    kr, kc = _SENTENCE_CORRIDOR_KEY_POS
     cells[dr][dc] = CellType.FLOOR
     cells[er][ec] = CellType.CORRIDOR
     cells[kr][kc] = CellType.CORRIDOR
 
-    composite.spawn_pos = _L13_ENTRY
-    composite.exit_pos  = _L13_EXIT
+    composite.spawn_pos = _SENTENCE_CORRIDOR_ENTRY
+    composite.exit_pos  = _SENTENCE_CORRIDOR_EXIT
     composite.entities = [
         Entity(kind='exit',        row=er, col=ec),
         Entity(kind='locked_door', row=dr, col=dc),
@@ -4393,7 +4393,7 @@ def build_dungeon_13(seed: int) -> 'Dungeon':
     ]
     composite.rebuild_indexes()
 
-    cost, answer = _dijkstra_par_L13(composite, return_path=True)
+    cost, answer = _par_sentence_corridor(composite, return_path=True)
     composite.par    = cost
     composite.budget = math.ceil(cost * 1.4)
     composite.answer = answer

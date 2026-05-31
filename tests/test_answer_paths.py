@@ -3,7 +3,7 @@ import inspect
 import re
 import pytest
 import generation.dungeon_gen as _dg
-from generation.dungeon_gen import build_dungeon_0, build_dungeon_1
+from generation.dungeon_gen import build_dungeon_first_cave, build_dungeon_line_halls
 
 SEEDS = [0, 1, 42, 999, 2**20 + 7]
 
@@ -73,8 +73,8 @@ _BUILDER_RE = re.compile(r'^build_dungeon_\w+$')
 _SKIP_LEVELS = {
     # par=None — not keystroke puzzles, so "answer cost == par" does not apply.
     # Excluded from parametrization entirely (not emitted as skipped cases).
-    'build_dungeon_11',     # The Reliquary (reward / chest room)
-    'build_dungeon_51',     # The Warden's Keep (L5 boss)
+    'build_dungeon_reliquary',     # The Reliquary (reward / chest room)
+    'build_dungeon_wardens_keep',     # The Warden's Keep (L5 boss)
     'build_dungeon_dummy',  # Dummy Dungeon (test scaffold)
 }
 _XFAIL_LEVELS: dict = {}
@@ -130,7 +130,7 @@ class TestLevel0AnswerPath:
 
     def test_no_count_notation(self):
         for seed in SEEDS:
-            room = build_dungeon_0(seed).room
+            room = build_dungeon_first_cave(seed).room
             for token in room.answer.split():
                 assert not _COUNT_RE.match(token), (
                     f"seed={seed}: count notation '{token}' in level-0 answer "
@@ -139,7 +139,7 @@ class TestLevel0AnswerPath:
 
     def test_token_count_equals_par(self):
         for seed in SEEDS:
-            room = build_dungeon_0(seed).room
+            room = build_dungeon_first_cave(seed).room
             tokens = room.answer.split()
             assert len(tokens) == room.par, (
                 f"seed={seed}: answer has {len(tokens)} tokens but par={room.par}"
@@ -151,7 +151,7 @@ class TestLevel1AnswerPath:
 
     def test_no_count_notation(self):
         for seed in SEEDS:
-            room = build_dungeon_1(seed).room
+            room = build_dungeon_line_halls(seed).room
             for token in room.answer.split():
                 assert not _COUNT_RE.match(token), (
                     f"seed={seed}: count notation '{token}' in level-1 answer"
@@ -159,7 +159,7 @@ class TestLevel1AnswerPath:
 
     def test_token_count_equals_par(self):
         for seed in SEEDS:
-            room = build_dungeon_1(seed).room
+            room = build_dungeon_line_halls(seed).room
             tokens = room.answer.split()
             assert len(tokens) == room.par, (
                 f"seed={seed}: answer has {len(tokens)} tokens but par={room.par}"

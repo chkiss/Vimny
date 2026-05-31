@@ -1,14 +1,14 @@
 """Level 3 — The Rune Halls: dungeon correctness tests."""
 import math
 import pytest
-from generation.dungeon_gen import build_dungeon_3, _dijkstra_par_wbe
+from generation.dungeon_gen import build_dungeon_rune_halls, _dijkstra_par_wbe
 
 SEEDS = [1, 42, 999, 12345, 2**20 + 7]
 
 
 @pytest.mark.parametrize("seed", SEEDS)
 def test_exit_is_reachable(seed):
-    d = build_dungeon_3(seed)
+    d = build_dungeon_rune_halls(seed)
     room = d.room
     assert room.exit_pos is not None
     par = _dijkstra_par_wbe(room)
@@ -17,7 +17,7 @@ def test_exit_is_reachable(seed):
 
 @pytest.mark.parametrize("seed", SEEDS)
 def test_par_matches_dijkstra(seed):
-    d = build_dungeon_3(seed)
+    d = build_dungeon_rune_halls(seed)
     room = d.room
     expected = _dijkstra_par_wbe(room)
     assert room.par == expected, (
@@ -27,7 +27,7 @@ def test_par_matches_dijkstra(seed):
 
 @pytest.mark.parametrize("seed", SEEDS)
 def test_budget_is_ceil_par_times_1_4(seed):
-    d = build_dungeon_3(seed)
+    d = build_dungeon_rune_halls(seed)
     room = d.room
     assert room.budget == math.ceil(room.par * 1.4), (
         f"seed={seed}: budget={room.budget} but ceil(par*1.4)={math.ceil(room.par*1.4)}"
@@ -38,7 +38,7 @@ def test_budget_is_ceil_par_times_1_4(seed):
 def test_word_motion_is_necessary(seed):
     """hjkl-only BFS must exceed the budget — w/b/e are required to win."""
     from collections import deque
-    d = build_dungeon_3(seed)
+    d = build_dungeon_rune_halls(seed)
     room = d.room
     void_cells = {
         (ru.row, ru.col + i)
@@ -65,7 +65,7 @@ def test_word_motion_is_necessary(seed):
 
 @pytest.mark.parametrize("seed", SEEDS)
 def test_entry_and_exit_not_on_void(seed):
-    d = build_dungeon_3(seed)
+    d = build_dungeon_rune_halls(seed)
     room = d.room
     void_cells = {
         (ru.row, ru.col + i)
@@ -78,7 +78,7 @@ def test_entry_and_exit_not_on_void(seed):
 
 @pytest.mark.parametrize("seed", SEEDS)
 def test_exit_entity_at_exit_pos(seed):
-    d = build_dungeon_3(seed)
+    d = build_dungeon_rune_halls(seed)
     room = d.room
     exit_ents = [e for e in room.entities if e.kind == 'exit']
     assert len(exit_ents) == 1, f"seed={seed}: expected 1 exit entity, got {len(exit_ents)}"
@@ -91,7 +91,7 @@ def test_exit_entity_at_exit_pos(seed):
 @pytest.mark.parametrize("seed", SEEDS)
 def test_void_runes_present_in_turn_rooms(seed):
     """Turn-room void guards must exist to block direct j/k shortcutting."""
-    d = build_dungeon_3(seed)
+    d = build_dungeon_rune_halls(seed)
     room = d.room
     void_runes = [ru for ru in room.char_runs if ru.kind == 'void']
     assert len(void_runes) >= 8, (
@@ -102,7 +102,7 @@ def test_void_runes_present_in_turn_rooms(seed):
 
 def test_anchor_char_run_at_fixed_position():
     """The exit-anchor rune at row=13, col=42 must always be present (hard-coded)."""
-    d = build_dungeon_3(42)
+    d = build_dungeon_rune_halls(42)
     room = d.room
     anchor = room.char_run_at(13, 42)
     assert anchor is not None, "Expected anchor rune at (13, 42)"
@@ -112,6 +112,6 @@ def test_anchor_char_run_at_fixed_position():
 
 def test_exit_at_last_symbol_of_anchor():
     """exit_pos must be col 44 (anchor col 42 + 2 symbols), row 13."""
-    d = build_dungeon_3(42)
+    d = build_dungeon_rune_halls(42)
     room = d.room
     assert room.exit_pos == (13, 44)

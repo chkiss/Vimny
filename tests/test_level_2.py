@@ -2,7 +2,7 @@
 import heapq
 import pytest
 from generation.dungeon_gen import (
-    build_dungeon_2, _dijkstra_par_count, _dijkstra_par_level2, LEVEL_2_PLAN,
+    build_dungeon_counting_crypts, _dijkstra_par_count, _par_counting_crypts, LEVEL_2_PLAN,
 )
 from engine.world import RoomType
 
@@ -40,7 +40,7 @@ def _count_optimal_reach(composite, max_count=50):
 
 @pytest.mark.parametrize("seed", SEEDS)
 def test_exit_is_reachable(seed):
-    d = build_dungeon_2(seed)
+    d = build_dungeon_counting_crypts(seed)
     room = d.room
     assert room.exit_pos is not None
     # Clear fog to test structural reachability with all doors open
@@ -52,12 +52,12 @@ def test_exit_is_reachable(seed):
 @pytest.mark.parametrize("seed", SEEDS)
 def test_par_matches_dijkstra(seed):
     """par equals full state-space Dijkstra: all Level 2 commands + door states."""
-    d = build_dungeon_2(seed)
+    d = build_dungeon_counting_crypts(seed)
     room = d.room
     door_cols = sorted(set(e.col for e in room.entities if e.kind == 'door' and e.alive))
     # Clear fog so the solver can navigate the full dungeon (it models fog internally)
     room.fog_cells = set()
-    expected = _dijkstra_par_level2(room, door_cols)
+    expected = _par_counting_crypts(room, door_cols)
     assert room.par == expected, (
         f"seed={seed}: stored par {room.par} != full Dijkstra {expected}"
     )
@@ -73,13 +73,13 @@ def test_par_includes_keystroke_for_every_action(seed):
     per-segment jumps) and x keypresses, must be strictly higher and must equal
     room.par.
     """
-    d = build_dungeon_2(seed)
+    d = build_dungeon_counting_crypts(seed)
     room = d.room
     door_cols = sorted(set(e.col for e in room.entities if e.kind == 'door' and e.alive))
     room.fog_cells = set()   # solvers navigate the full dungeon; fog is modelled internally
 
     nav_only = _dijkstra_par_count(room)           # ignores doors: physically impossible
-    full_par = _dijkstra_par_level2(room, door_cols)  # all commands + door state
+    full_par = _par_counting_crypts(room, door_cols)  # all commands + door state
 
     assert room.par == full_par, (
         f"seed={seed}: room.par={room.par} but full Dijkstra gives {full_par}"
@@ -92,7 +92,7 @@ def test_par_includes_keystroke_for_every_action(seed):
 
 @pytest.mark.parametrize("seed", SEEDS)
 def test_budget_is_ceil_par_times_1_4(seed):
-    d = build_dungeon_2(seed)
+    d = build_dungeon_counting_crypts(seed)
     room = d.room
     import math
     assert room.budget == math.ceil(room.par * 1.4), \
@@ -103,7 +103,7 @@ def test_budget_is_ceil_par_times_1_4(seed):
 def test_count_is_necessary(seed):
     """Single-step BFS should need MORE keystrokes than the budget allows."""
     from collections import deque
-    d = build_dungeon_2(seed)
+    d = build_dungeon_counting_crypts(seed)
     room = d.room
     room.fog_cells = set()   # check structural reachability, not fog state
     void_cells = {
@@ -133,7 +133,7 @@ def test_count_is_necessary(seed):
 @pytest.mark.parametrize("seed", SEEDS)
 def test_void_wall_exists_in_puzzle_room(seed):
     """Void wall at the puzzle room's horizontal midpoint must be present."""
-    d = build_dungeon_2(seed)
+    d = build_dungeon_counting_crypts(seed)
     room = d.room
     # offsets[1] = 20 + 4 = 24, plan[1][2]//2 = 16 → mid_col = 40
     puzzle_offset = LEVEL_2_PLAN[0][2] + 4   # 24
@@ -146,7 +146,7 @@ def test_void_wall_exists_in_puzzle_room(seed):
 
 @pytest.mark.parametrize("seed", SEEDS)
 def test_entry_and_exit_not_on_void(seed):
-    d = build_dungeon_2(seed)
+    d = build_dungeon_counting_crypts(seed)
     room = d.room
     void_cells = {
         (ru.row, ru.col + i)
@@ -170,7 +170,7 @@ def test_3j_59l_3k_does_not_beat_par():
     from engine.motion import apply_motion
     from engine.player import Player
 
-    d = build_dungeon_2(1)
+    d = build_dungeon_counting_crypts(1)
     room = d.room
 
     player = Player(row=room.spawn_pos[0], col=room.spawn_pos[1])

@@ -18,10 +18,10 @@ import pytest
 from engine.world import CellType
 from engine.motion import _sentence_starts_all
 from generation.dungeon_gen import (
-    build_dungeon_13,
-    _dijkstra_par_L13,
-    _L13_ROWS, _L13_COLS, _L13_ENTRY, _L13_EXIT,
-    _L13_DOOR_POS, _L13_KEY_POS, _L13_SEP_ROW, _L13_SENTENCES,
+    build_dungeon_sentence_corridor,
+    _par_sentence_corridor,
+    _SENTENCE_CORRIDOR_ROWS, _SENTENCE_CORRIDOR_COLS, _SENTENCE_CORRIDOR_ENTRY, _SENTENCE_CORRIDOR_EXIT,
+    _SENTENCE_CORRIDOR_DOOR_POS, _SENTENCE_CORRIDOR_KEY_POS, _SENTENCE_CORRIDOR_SEP_ROW, _SENTENCE_CORRIDOR_SENTENCES,
 )
 
 SEEDS = [1, 42, 999, 12345, 2**20 + 7]
@@ -34,40 +34,40 @@ _ANSWER = '4) $ x 3( $ p l'
 
 @pytest.mark.parametrize("seed", SEEDS)
 def test_dimensions(seed):
-    room = build_dungeon_13(seed).rooms[0]
-    assert (room.rows, room.cols) == (_L13_ROWS, _L13_COLS)
+    room = build_dungeon_sentence_corridor(seed).rooms[0]
+    assert (room.rows, room.cols) == (_SENTENCE_CORRIDOR_ROWS, _SENTENCE_CORRIDOR_COLS)
 
 
 @pytest.mark.parametrize("seed", SEEDS)
 def test_entry_and_exit_passable(seed):
-    room = build_dungeon_13(seed).rooms[0]
-    assert room.cells[_L13_ENTRY[0]][_L13_ENTRY[1]] == CellType.CORRIDOR
-    assert room.cells[_L13_EXIT[0]][_L13_EXIT[1]] == CellType.CORRIDOR
-    assert room.spawn_pos == _L13_ENTRY
-    assert room.exit_pos == _L13_EXIT
+    room = build_dungeon_sentence_corridor(seed).rooms[0]
+    assert room.cells[_SENTENCE_CORRIDOR_ENTRY[0]][_SENTENCE_CORRIDOR_ENTRY[1]] == CellType.CORRIDOR
+    assert room.cells[_SENTENCE_CORRIDOR_EXIT[0]][_SENTENCE_CORRIDOR_EXIT[1]] == CellType.CORRIDOR
+    assert room.spawn_pos == _SENTENCE_CORRIDOR_ENTRY
+    assert room.exit_pos == _SENTENCE_CORRIDOR_EXIT
 
 
 @pytest.mark.parametrize("seed", SEEDS)
 def test_separator_row_is_all_wall(seed):
     """The stone row between the two sentence rows blocks all j/k crossing,
     so the only way between rows is a sentence jump."""
-    room = build_dungeon_13(seed).rooms[0]
-    assert all(ct == CellType.WALL for ct in room.cells[_L13_SEP_ROW])
+    room = build_dungeon_sentence_corridor(seed).rooms[0]
+    assert all(ct == CellType.WALL for ct in room.cells[_SENTENCE_CORRIDOR_SEP_ROW])
 
 
 @pytest.mark.parametrize("seed", SEEDS)
 def test_entities_present(seed):
-    room = build_dungeon_13(seed).rooms[0]
+    room = build_dungeon_sentence_corridor(seed).rooms[0]
     placed = {(e.kind, e.row, e.col) for e in room.entities}
-    assert ('exit', *_L13_EXIT) in placed
-    assert ('locked_door', *_L13_DOOR_POS) in placed
-    assert ('floor_key', *_L13_KEY_POS) in placed
+    assert ('exit', *_SENTENCE_CORRIDOR_EXIT) in placed
+    assert ('locked_door', *_SENTENCE_CORRIDOR_DOOR_POS) in placed
+    assert ('floor_key', *_SENTENCE_CORRIDOR_KEY_POS) in placed
 
 
 @pytest.mark.parametrize("seed", SEEDS)
 def test_sentences_present_with_terminators(seed):
-    room = build_dungeon_13(seed).rooms[0]
-    for (r, c, text) in _L13_SENTENCES:
+    room = build_dungeon_sentence_corridor(seed).rooms[0]
+    for (r, c, text) in _SENTENCE_CORRIDOR_SENTENCES:
         ru = room.char_run_at(r, c)
         assert ru is not None and ru.symbols == tuple(text), (
             f"seed={seed}: sentence at ({r},{c}) is wrong"
@@ -80,8 +80,8 @@ def test_sentences_present_with_terminators(seed):
 @pytest.mark.parametrize("seed", SEEDS)
 def test_sentence_starts_in_reading_order(seed):
     """Five sentences, in reading order S1..S5 across the two rows."""
-    room = build_dungeon_13(seed).rooms[0]
-    assert _sentence_starts_all(room) == [(r, c) for (r, c, _t) in _L13_SENTENCES]
+    room = build_dungeon_sentence_corridor(seed).rooms[0]
+    assert _sentence_starts_all(room) == [(r, c) for (r, c, _t) in _SENTENCE_CORRIDOR_SENTENCES]
 
 
 # ── the $-for-ends lesson: key / door are at sentence ENDS, not starts ────────────
@@ -90,19 +90,19 @@ def test_sentence_starts_in_reading_order(seed):
 def test_key_and_door_are_at_sentence_ends_not_starts(seed):
     """) and ( land on sentence STARTS; the key and door sit just past the last
     char of S5 / S3, so neither is reachable by a jump alone — $ is needed."""
-    room = build_dungeon_13(seed).rooms[0]
+    room = build_dungeon_sentence_corridor(seed).rooms[0]
     starts = set(_sentence_starts_all(room))
-    assert _L13_KEY_POS not in starts
-    assert _L13_DOOR_POS not in starts
-    assert _L13_KEY_POS == (3, 40 + len('A good joint needs no mortar.'))
-    assert _L13_DOOR_POS == (1, 50 + len('At a dot, or a bang!'))
+    assert _SENTENCE_CORRIDOR_KEY_POS not in starts
+    assert _SENTENCE_CORRIDOR_DOOR_POS not in starts
+    assert _SENTENCE_CORRIDOR_KEY_POS == (3, 40 + len('A good joint needs no mortar.'))
+    assert _SENTENCE_CORRIDOR_DOOR_POS == (1, 50 + len('At a dot, or a bang!'))
 
 
 # ── par / budget / answer ────────────────────────────────────────────────────────
 
 @pytest.mark.parametrize("seed", SEEDS)
 def test_par_budget_answer(seed):
-    room = build_dungeon_13(seed).rooms[0]
+    room = build_dungeon_sentence_corridor(seed).rooms[0]
     assert room.par == _PAR
     assert room.budget == math.ceil(_PAR * 1.4)
     assert room.answer == _ANSWER
@@ -111,7 +111,7 @@ def test_par_budget_answer(seed):
 @pytest.mark.parametrize("seed", SEEDS)
 def test_answer_uses_both_parens(seed):
     """The optimal path teaches BOTH ) (forward) and ( (backward)."""
-    room = build_dungeon_13(seed).rooms[0]
+    room = build_dungeon_sentence_corridor(seed).rooms[0]
     toks = room.answer.split()
     assert any(t.endswith(')') for t in toks), room.answer
     assert any(t.endswith('(') for t in toks), room.answer
@@ -125,8 +125,8 @@ def test_close_paren_required(seed):
     unreachable, so the door can't be unlocked and the exit can't be reached.
     Line/screen jumps reach only a row's first sentence, so ) is genuinely
     required even though the solver doesn't model them."""
-    room = build_dungeon_13(seed).rooms[0]
-    cost = _dijkstra_par_L13(room, no_close=True)
+    room = build_dungeon_sentence_corridor(seed).rooms[0]
+    cost = _par_sentence_corridor(room, no_close=True)
     assert cost is None or cost > room.budget, (
         f"seed={seed}: without ), cost={cost} <= budget={room.budget}"
     )
@@ -136,6 +136,6 @@ def test_close_paren_required(seed):
 def test_open_paren_is_the_shortest_backtrack(seed):
     """The optimal solve spends ( on the backtrack from the key to the door —
     `3(` (( from S5's end returns to S5 start, then S4, then S3)."""
-    room = build_dungeon_13(seed).rooms[0]
-    assert _dijkstra_par_L13(room) == _PAR
+    room = build_dungeon_sentence_corridor(seed).rooms[0]
+    assert _par_sentence_corridor(room) == _PAR
     assert '3(' in room.answer.split()
