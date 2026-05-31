@@ -11,7 +11,7 @@ from blessed import Terminal
 from engine.player import Player
 import render.colors as C
 import render.symbols as S
-from content.levels import LEVELS, is_unlocked, level_type
+from content.levels import LEVELS, is_unlocked, level_type, key_for_slug
 from render.utils import inner_w as _iw
 
 
@@ -165,7 +165,7 @@ def render_overworld(term: Terminal, player: Player, progress: dict,
             badge, badge_col = '[LOCKED]', C.hint_fg()
         nc       = enfc if is_cursor else (rst if unlocked else C.hint_fg())
         cmd_col  = kc if unlocked else C.hint_fg()
-        key_text = lv['key']
+        key_text = key_for_slug(lv['slug'])
         cmds     = lv.get('commands', '')
         cols     = _cols3(key_text, cmds, badge)
         if cols is not None:
