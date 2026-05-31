@@ -126,14 +126,14 @@ WARDEN_ACT_SCROLL = {
 
 # ── Scroll catalog ────────────────────────────────────────────────────────────
 # id matches the key stored in progress['extras'] when the scroll is discovered.
-# dropped_by / level_id / level_name are display metadata only.
+# dropped_by / level_slug / level_name are display metadata only.
 
 SCROLL_CATALOG = [
     {
         'id':         'register',
         'title':      'The Unnamed Register',
         'dropped_by': 'The Reliquary',
-        'level_id':   11,
+        'level_slug': 'reliquary',
         'level_name': "The Reliquary",
         'content':    RELIQUARY_SCROLL,
     },
@@ -141,23 +141,23 @@ SCROLL_CATALOG = [
         'id':         'leap',
         'title':      "The Warden's Leap",
         'dropped_by': "The Warden's Keep",
-        'level_id':   51,
+        'level_slug': 'wardens_keep',
         'level_name': "The Warden's Keep",
         'content':    WARDEN_LEAP_SCROLL,
     },
     {
         'id':         'visual',
         'title':      "The Warden's Sight",
-        'dropped_by': "The Warden's Sight",
-        'level_id':   131,
-        'level_name': "The Warden's Sight",
+        'dropped_by': 'The Warden Surveyor',
+        'level_slug': 'warden_surveyor',
+        'level_name': 'The Warden Surveyor',
         'content':    WARDEN_SIGHT_SCROLL,
     },
     {
         'id':         'd_op',
         'title':      "The Operator's Codex",
         'dropped_by': 'The Warden Pathfinder',
-        'level_id':   171,
+        'level_slug': 'warden_pathfinder',
         'level_name': 'The Warden Pathfinder',
         'content':    OPERATOR_CODEX_SCROLL,
     },
@@ -165,7 +165,7 @@ SCROLL_CATALOG = [
         'id':         'y_op',
         'title':      "The Archivist's Method",
         'dropped_by': 'The Warden Manifold',
-        'level_id':   221,
+        'level_slug': 'warden_manifold',
         'level_name': 'The Warden Manifold',
         'content':    ARCHIVISTS_METHOD_SCROLL,
     },
@@ -173,7 +173,7 @@ SCROLL_CATALOG = [
         'id':         'text_obj',
         'title':      'The Whole Word',
         'dropped_by': 'The Warden Scrivener',
-        'level_id':   291,
+        'level_slug': 'warden_scrivener',
         'level_name': 'The Warden Scrivener',
         'content':    WHOLE_WORD_SCROLL,
     },
@@ -181,7 +181,7 @@ SCROLL_CATALOG = [
         'id':         'visual_op',
         'title':      "The Warden's Act",
         'dropped_by': "The Grandmaster's Sanctum",
-        'level_id':   361,
+        'level_slug': 'grandmasters_sanctum',
         'level_name': "The Grandmaster's Sanctum",
         'content':    WARDEN_ACT_SCROLL,
     },

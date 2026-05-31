@@ -43,7 +43,7 @@ from engine.editor import (
     _clip_desc, _serialize_room, _deserialize_room,
 )
 import generation.dungeon_gen as _dg
-from content.levels import LEVELS, is_unlocked, level_type_for_slug, known_commands_for_slug as _known_commands, id_for_slug
+from content.levels import LEVELS, is_unlocked, level_type_for_slug, known_commands_for_slug as _known_commands
 import save.save_manager as SM
 
 
@@ -3012,13 +3012,13 @@ def run_title(term: Terminal, has_save: bool) -> tuple[str, str]:
     if not has_save:
         _quote_lines = select_quote_by_name('save and quit')
     else:
-        _unlocked_ids: set[int] = set()
+        _unlocked_slugs: set[str] = set()
         for _sd in SM.list_saves():
             _prog = SM.load_progress(_sd)
             for _lv in LEVELS:
                 if is_unlocked(_lv['slug'], _prog):
-                    _unlocked_ids.add(_lv['id'])
-        _quote_lines = select_quote(_unlocked_ids)
+                    _unlocked_slugs.add(_lv['slug'])
+        _quote_lines = select_quote(_unlocked_slugs)
 
     def _render():
         cl = cmd_buf[1:]  if cmd_buf.startswith(':') else None
@@ -3491,7 +3491,7 @@ def main():
             if dung_result.get('first_written_completion'):
                 run_wizard_blessing(
                     term,
-                    select_next_lesson_quote(id_for_slug(level)),
+                    select_next_lesson_quote(level),
                 )
 
 
