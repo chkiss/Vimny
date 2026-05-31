@@ -2,8 +2,8 @@
 
 > Canonical reference: `LEVELS_PLAN.md` (authoritative curriculum).
 > Generator reference: `generation/dungeon_gen.py` (`build_dungeon_6`=W/B/E,
-> `build_dungeon_8`=ge/gE, `build_dungeon_9`=G/gg, `build_dungeon_10`=H/M/L,
-> `build_dungeon_13a`=`}`/`{`, `build_dungeon_13b`=`)`/`(`).
+> `build_dungeon_7`=ge/gE, `build_dungeon_8`=G/gg, `build_dungeon_9`=H/M/L,
+> `build_dungeon_12`=`}`/`{`, `build_dungeon_13`=`)`/`(`).
 >
 > **Par** = minimum keystrokes via Dijkstra over taught motions only, entry→exit inclusive.
 > **Budget** = smallest ceil(par × M) such that the next-best alternative STRICTLY exceeds it;
@@ -18,7 +18,7 @@
 
 ---
 
-## Level 5 — The WORD Forge (`W B E`)
+## Level 6 — The WORD Forge (`W B E`)
 
 ### New mechanics (≤3)
 
@@ -185,7 +185,7 @@ next-best ≈15 > 14. Still works. Document actual M after implementation.)*
 
 ---
 
-## Level 6 — The Backward Vaults (`ge gE`)
+## Level 7 — The Backward Vaults (`ge gE`)
 
 ### New mechanics (≤3)
 
@@ -323,7 +323,7 @@ jumps backward to col 19 (end of anchor) in 1 ks. `ge`-chain: `ge`→30, `ge`→
 - LT2 gap structure (col 2 walled in row 8; only col 5–6 passable)
 - Three adjacent clusters forming one WORD on C6 (baphomet run)
 - Col 20 always empty between anchor and WORD (ensures gE lands at col 19)
-- `_dijkstra_par_L8` Dijkstra (already implemented; must model ge/gE jumping over walls)
+- `_dijkstra_par_L7` Dijkstra (already implemented; must model ge/gE jumping over walls)
 
 **CHALLENGE (engine):** `ge`/`gE` must be able to jump over wall-strip terrain to reach the
 semantic cluster target. If the engine only allows motions to traverse passable cells, the wall
@@ -342,7 +342,7 @@ terrain, consistent with Vim's motion model where ge scans buffer positions.)*
 
 ---
 
-## Level 7 — The Lineheads (`G gg`)
+## Level 8 — The Lineheads (`G gg`)
 
 ### New mechanics (≤3)
 
@@ -410,7 +410,7 @@ G  (1 ks):  (0,1) → (14,55)  [G = last row, first non-blank = (14,1)? No: G la
             (14,55) only if we define exit_pos=(14,55). Clarification needed.]
 ```
 
-**Engine note on G:** In `build_dungeon_9`, `G` teleports to `_LGG_EXIT_POS`. For this layout
+**Engine note on G:** In `build_dungeon_8`, `G` teleports to `_LGG_EXIT_POS`. For this layout
 to work, `G` must teleport to the KS1 location (14,55) — i.e., the "exit_pos" in the engine is
 set to (14,55) for the purpose of G's target, and the actual exit door is (0,2). This is a
 design-level choice: G's target is "the far end" which happens to be (14,55), not the door.
@@ -525,7 +525,7 @@ section that makes the G/gg savings visible by contrast.
 - Two keystones requiring top→bottom→top traversal (forces G then gg)
 - Exit one step right of entry (forces `gg l` not just `gg`)
 - G and gg teleport across the wall (engine teleports regardless of intermediate walls)
-- `_dijkstra_par_LGG` Dijkstra (already implemented; budget M=1.36)
+- `_dijkstra_par_L8` Dijkstra (already implemented; budget M=1.36)
 
 **CHALLENGE (engine):** `gg` and `G` must teleport to their fixed targets regardless of
 intervening wall terrain. Confirm `motion.py` implements G/gg as direct position-set (not
@@ -541,7 +541,7 @@ pathfinding). If G/gg are blocked by walls, the level is unsolvable.
 
 ---
 
-## Level 8 — The Screen Vault (`H M L`)
+## Level 9 — The Screen Vault (`H M L`)
 
 ### New mechanics (≤3)
 
@@ -785,7 +785,7 @@ instead of 1 ks. Δ=3 for each. Budget margin = 2. 3 > 2. ✓
 - Portal cells at (1,44) and (12,44) (pass-through connections between sub-rooms)
 - KS lock on exit X (all three keystones required)
 - Decorative seed-varying rune clusters (don't affect fnb)
-- `_dijkstra_par_L10` Dijkstra (must model: per-sub-room H/M/L targets; portal transitions;
+- `_dijkstra_par_L9` Dijkstra (must model: per-sub-room H/M/L targets; portal transitions;
   col-25 arrival at each sub-room entry)
 
 **ENGINE NOTE:** H/M/L must reference the CURRENT sub-room's passable rows (not the global
@@ -806,7 +806,7 @@ the "passable rows" visible to H/M/L are scoped to the current sub-room's rows.
 
 ---
 
-## Level 9 — The Void Rift (`} {`)
+## Level 12 — The Runic Archives (`} {`)
 
 *(Split from original "Runic Archives" per S5 — paragraph and sentence families are distinct.)*
 
@@ -898,7 +898,7 @@ each) or `$`/`^` repositioning on paragraph rows — none cheaper. ✓
 - Full-width void-rune barrier rows (3 rows deep each: lethal on landing)
 - Blank rows (no runes; `}` target)
 - Exit directly below blank row 2 (one `j` from the `}` landing)
-- `_dijkstra_par_L13a` Dijkstra (new; supports `disable_brace` flag)
+- `_dijkstra_par_L12` Dijkstra (new; supports `disable_brace` flag)
 
 ### Self-check
 
@@ -909,7 +909,7 @@ each) or `$`/`^` repositioning on paragraph rows — none cheaper. ✓
 
 ---
 
-## Level 9.5 — The Sentence Corridor (`) (`)
+## Level 13 — The Sentence Corridor (`) (`)
 
 *(Split from original "Runic Archives" per S5.)*
 
@@ -998,7 +998,7 @@ Similarly from col 27 → S3 at col 39. **Next-best: ∞ (wall). S1 forced.** �
 - Wall gaps between sentence segments on row 3 (S1–S2 gap, S2–S3 gap)
 - Ember-kind rune clusters ending with `.`/`!` (sentence terminators)
 - Wall row 2 with single gap at col 1 (descent path; prevents `$`-then-j bypass)
-- `_dijkstra_par_L13b` Dijkstra (new; supports `disable_paren` flag)
+- `_dijkstra_par_L13` Dijkstra (new; supports `disable_paren` flag)
 
 **CHALLENGE (engine):** `)` must be implemented as a semantic scan that crosses wall-gap terrain
 (i.e., `)` finds the next sentence-start by scanning the row's rune content, not by pathfinding
@@ -1015,14 +1015,17 @@ unsolvable. Confirm `motion.py` implements `)` as a position-jump (not terrain t
 
 ---
 
-## Level 10.1 — The Warden Surveyor (ACT II BOSS)
+## Level 13.1 — The Warden Surveyor (ACT II BOSS — caps L6–L13)
 
-*(Renumbered from 9.1 to 10.1 due to the S5 split adding Level 9.5.)*
+*(Ships as boss **13.1** — id 131, key `dungeon_13.1_the_warden_surveyor` — after L13 The
+Sentence Corridor. Other Act II level numbers in this file are proposal-era, pending a full
+blueprint renumber. The grid below still shows the original 5-phase layout; phases 5 (`%`) and
+7 (`)`/`(`) need adding — see the Phase Table.)*
 
 ### Overview
 
-The Warden Surveyor caps Act II. Each of its five combat phases demands a different Act II
-structural motion family.
+The Warden Surveyor caps the structural-motion act (L6–L13). Each of its **seven** combat phases
+demands a different structural family taught in that act.
 
 **Immunity clarification:** The Warden Surveyor's phase seals and shields CANNOT be cleared by
 Act I motion-based approaches. Only Act II structural motions trigger phase transitions. `hjkl`
@@ -1035,11 +1038,13 @@ freely usable for navigation; they simply cost too much (or ∞ due to terrain) 
 
 | Phase | Motion family | How forced (S1 terrain) | One motion per phase |
 |---|---|---|---|
-| 1 — WORD Approach | `W` or `B` or `E` | Code-WORD corridor; `w`/`b`/`e` alternatives cost ≥3× as many ks; with tight phase budget W/B/E required | ✓ |
-| 2 — Backward Retreat | `ge` or `gE` | Wall strip between anchor and right side (S1); h-count ∞ | ✓ |
-| 3 — File Teleport | `G` then `gg` | Full WALL between sections; G and gg are the only cross-wall teleports | ✓ |
-| 4 — Screen Thirds | `H`, `M`, `L` | Keystones at H/M/L rows; entry at M-row col 25; H/M/L-skip alternatives need `^` after count-k/j; jointly forced within phase (all-three-skip > phase budget) | ✓ |
-| 5 — Para Finale | `}` | Full-width void barrier; `}` is the only finite-cost cross-barrier motion | ✓ |
+| 1 — WORD Approach | `W` `B` `E` | Code-WORD corridor; `w`/`b`/`e` cost ≥3× as many ks; tight phase budget → W/B/E required | ✓ |
+| 2 — Backward Retreat | `ge` `gE` | Wall strip between anchor and right side (S1); h-count ∞ | ✓ |
+| 3 — File Teleport | `G` `gg` | Full WALL between sections; G/gg the only cross-wall teleports | ✓ |
+| 4 — Screen Thirds | `H` `M` `L` | Keystones at H/M/L rows; jointly forced (all-three-skip > phase budget) | ✓ |
+| 5 — Bracket Lock *(NEW)* | `%` | Phase seal sits behind a nested bracket pair; `%` is the only finite-cost jump to its match (walls/void ∞ otherwise) | ✓ |
+| 6 — Paragraph Gulf | `}` `{` | Full-width void barrier; `}`/`{` the only finite-cost cross-barrier motion | ✓ |
+| 7 — Sentence Span *(NEW)* | `)` `(` | Wall-gapped multi-sentence row (per L13); `)`/`(` the only way onto the trigger sentence, then `$` to its end | ✓ |
 
 ### Grid
 
@@ -1080,7 +1085,7 @@ Row 25: ############################################################
 
 ### Phase Details
 
-**Phase 1 (WORD Approach):** Row 1 has four code-WORD groups (same spec as Level 5:
+**Phase 1 (WORD Approach):** Row 1 has four code-WORD groups (same spec as Level 6:
 alternating word/punct chars, ≥6 w-boundaries per group). Seal door D1 at (1,50). Player
 uses `4W` (2 ks) to navigate the code corridor. `w`-only alternative: ≥24 w-presses = 3 ks
 for C1 alone — per-phase budget makes this too slow. Phase par ≈5 ks; phase budget tight.
@@ -1096,7 +1101,7 @@ Without G: `7j 54l` = 2+3 = 5 ks (phase budget makes this too slow). Without gg:
 
 **Phase 4 (Screen Thirds):** Phase 4 section is rows 11–15 (5 rows total; 3 passable rows 11,
 13, 15 with KS at H/M/L targets). Entry at (13,25) (M row). KS-H at (11,4), KS-M at (13,4),
-KS-L at (15,4). Same H/M/L mechanics as Level 8 but within a single 5-row phase section (not
+KS-L at (15,4). Same H/M/L mechanics as Level 9 but within a single 5-row phase section (not
 3 sub-rooms). Wall separators at rows 10,12,14,16 with single-col gap at col 4 only force the
 player to be at col 4 to descend/ascend between rows — `^` step required for any count-k/j
 alternative from col 25. All-three-skip > phase budget (jointly forced within this phase section).
@@ -1109,13 +1114,15 @@ void row landing. S1 forced. ✓
 
 | Phase | Par (approx) | Key motions | S1/S2 |
 |---|---|---|---|
-| 1 | 5 ks | 4W (2 ks) + x + navigate | S2 (w-count too slow) |
-| 2 | 3 ks | ge (1 ks) + combat | S1 (wall strip) |
-| 3 | 5 ks | G(1)+x(1)+gg(2)+l(1) | S1 (full wall) + S2 (G) |
-| 4 | 7 ks | H x M x L x | joint S2 |
-| 5 | 3 ks | }(1)+j(1)+combat | S1 (void barrier) |
+| 1 WORD | 5 ks | 4W (2 ks) + x + navigate | S2 (w-count too slow) |
+| 2 ge/gE | 3 ks | ge (1 ks) + combat | S1 (wall strip) |
+| 3 G/gg | 5 ks | G(1)+x(1)+gg(2)+l(1) | S1 (full wall) + S2 (G) |
+| 4 H/M/L | 7 ks | H x M x L x | joint S2 |
+| 5 % | 3 ks | %(1) to the match + x + combat | S1 (bracket lock) |
+| 6 }/{ | 3 ks | }(1)+j(1)+combat | S1 (void barrier) |
+| 7 )/( | 4 ks | )/( to trigger sentence + $ + combat | S1 (wall-gap row) |
 
-**Total simulated par ≈ 23 ks. Budget = ceil(23 × 1.4) = 33.**
+**Total simulated par ≈ 30 ks (recompute at build). Budget = ceil(30 × 1.4) = 42.**
 
 ### Immunity mechanism
 
@@ -1140,13 +1147,12 @@ that:
 
 ### Self-check
 
-- **Scope:** Boss — exercises taught Act II commands. ✓
-- **Linkage:** One phase per Act II family (W/B/E; ge/gE; G/gg; H/M/L; `}`). ✓
-- **Immunity clarification:** hjkl usable for nav; Act II motions required for phase triggers. ✓
-- **S1 phases:** Phase 2 (wall strip), Phase 3 (full wall/void), Phase 5 (void barrier). ✓
-- **S2 phases:** Phase 1 (code-WORD density + tight phase budget), Phase 4 (joint HML forcing). ✓
-- **One motion family per phase:** ✓ (Phase 5 uses only `}`, not `)` — sentence motions not
-  needed at the boss level; they are Phase 3 of Act II teaching). ✓
+- **Scope:** Boss — exercises every structural family taught in the act it caps (L6–L13). ✓
+- **Linkage:** One phase per family — all seven: W/B/E; ge/gE; G/gg; H/M/L; `%`; `}`/`{`; `)`/`(`. ✓
+- **Immunity clarification:** hjkl usable for nav; the act's structural motions required for phase triggers. ✓
+- **S1 phases:** 2 (wall strip), 3 (full wall), 5 (bracket lock), 6 (void barrier), 7 (wall-gap row). ✓
+- **S2 phases:** 1 (code-WORD density + tight phase budget), 4 (joint HML forcing). ✓
+- **One motion family per phase:** ✓ — and `)`/`(` now have their own phase (7), matching the L13 lesson. ✓
 
 ---
 
@@ -1154,19 +1160,19 @@ that:
 
 | Level | Name | Commands | par | budget | Forceability | S1/S2 |
 |---|---|---|---|---|---|---|
-| 5 | The WORD Forge | `W B E` | 11 | 15 (M=1.35) | Joint: all-three-skip=16>15 ✓ | S2 (code density + wall strip + tight M) |
-| 6 | The Backward Vaults | `ge gE` | 18 | 19 (M=1.055) | ge: ∞ (wall strip); gE: 20>19 ✓ | S1(ge) + S2(gE) |
-| 7 | The Lineheads | `G gg` | 11 | 15 (M=1.36) | G: 16>15 ✓; gg: ∞ (full wall) ✓ | S1(gg) + S2(G) |
-| 8 | The Screen Vault | `H M L` | 17 | 19 (M=1.11) | STRICT individual: H-skip=20>19 ✓; M-skip=20>19 ✓; L-skip=20>19 ✓ | S2 per-command (3 sub-rooms, Δ=3 each) |
-| 9 | The Void Rift | `} {` | 3 | 5 (M=1.4) | ∞ (void barriers lethal) ✓ | S1 |
-| 9.5 | The Sentence Corridor | `) (` | 3 | 5 (M=1.4) | ∞ (wall gaps block h-count) ✓ | S1 |
-| 10.1 | The Warden Surveyor | all Act II | ≈23 | 33 (M=1.4) | Per-phase: S1 (Phases 2,3,5) + S2 (Phases 1,4) | S1+S2 |
+| 6 | The WORD Forge | `W B E` | 11 | 15 (M=1.35) | Joint: all-three-skip=16>15 ✓ | S2 (code density + wall strip + tight M) |
+| 7 | The Backward Vaults | `ge gE` | 18 | 19 (M=1.055) | ge: ∞ (wall strip); gE: 20>19 ✓ | S1(ge) + S2(gE) |
+| 8 | The Lineheads | `G gg` | 11 | 15 (M=1.36) | G: 16>15 ✓; gg: ∞ (full wall) ✓ | S1(gg) + S2(G) |
+| 9 | The Screen Vault | `H M L` | 17 | 19 (M=1.11) | STRICT individual: H-skip=20>19 ✓; M-skip=20>19 ✓; L-skip=20>19 ✓ | S2 per-command (3 sub-rooms, Δ=3 each) |
+| 12 | The Runic Archives | `} {` | 3 | 5 (M=1.4) | ∞ (void barriers lethal) ✓ | S1 |
+| 13 | The Sentence Corridor | `) (` | 3 | 5 (M=1.4) | ∞ (wall gaps block h-count) ✓ | S1 |
+| 13.1 | The Warden Surveyor | all 7 families | ≈30 | 42 (M=1.4) | Per-phase: S1 (2,3,5,6,7) + S2 (1,4) | S1+S2 |
 
 ---
 
 ## Challenges Requiring Human Decision
 
-### CHALLENGE-A — Level 6 ge/gE: engine must support wall-crossing motions
+### CHALLENGE-A — Level 7 ge/gE: engine must support wall-crossing motions
 
 `ge`/`gE` must jump to semantic cluster targets through intermediate wall cells. If the engine
 resolves ge/gE by pathfinding through passable terrain, the S1 wall strip at C4 also blocks the
@@ -1175,14 +1181,14 @@ implements ge/gE as a rune-type scan (buffer-position model) that is not blocked
 If not implemented this way, an alternative S1 forcing mechanism is needed (e.g., make `33h`
 wrap around via a corridor, costing ∞ without ge/gE).
 
-### CHALLENGE-B — Level 7 G/gg: engine must teleport through walls
+### CHALLENGE-B — Level 8 G/gg: engine must teleport through walls
 
 `G` and `gg` must teleport to their fixed targets regardless of intermediate wall terrain (full
 WALL at row 4). **Decision needed:** Confirm `motion.py` implements G/gg as direct
 position-sets that bypass wall checks. If G/gg are blocked by walls, the full-WALL separator
 topology is unworkable and an alternative (e.g., water barrier + G/gg ignore water) is needed.
 
-### CHALLENGE-C — Level 8 H/M/L: RESOLVED via three-sub-room design
+### CHALLENGE-C — Level 9 H/M/L: RESOLVED via three-sub-room design
 
 Redesigned as three sequential sub-rooms (each 25 rows × 50 cols). Each sub-room teaches one
 command with Δ=3 ks (count-j alternative requires 2-digit count + `^` step = 4 ks vs 1 ks).
@@ -1192,7 +1198,7 @@ that the engine scopes H/M/L to the active sub-room's grid slice when sub-rooms 
 as separate regions in the global map. If sub-rooms share a single grid object, the H/M/L
 target rows must be re-derived based on the player's current sub-section boundaries.
 
-### CHALLENGE-D — Level 9.5 `)` (`: engine must support wall-crossing sentence scan
+### CHALLENGE-D — Level 13 `)` (`: engine must support wall-crossing sentence scan
 
 `)` must find the next sentence-start by scanning rune content across wall-gap terrain. If `)`
 is blocked by the wall between S1 and S2, the level is unsolvable. **Decision needed:** Confirm
@@ -1200,9 +1206,9 @@ is blocked by the wall between S1 and S2, the level is unsolvable. **Decision ne
 pathfinding). If not, an alternative forcing mechanism is needed (e.g., water gap that `)` can
 cross but `l`-count cannot).
 
-### CHALLENGE-E — Boss level 10.1: renumbering from 9.1
+### CHALLENGE-E — Boss numbering (RESOLVED)
 
-The S5 split (Void Rift + Sentence Corridor = two levels) shifts the boss from 9.1 to 10.1.
+Shipped: the act caps at boss 13.1 (The Warden Surveyor, id 131). The `} {` / `) (` split shipped as L12 (The Runic Archives) and L13 (The Sentence Corridor).
 This propagates to `levels.py`, `main.py` dispatch, test files, save/progress data, and the
 Act III numbering (which would start at level 11 instead of 10). **Decision needed:** Confirm
 renumbering is acceptable and update all references in Part 4 of LEVELS_PLAN.md.
@@ -1215,20 +1221,20 @@ renumbering is acceptable and update all references in Part 4 of LEVELS_PLAN.md.
 
 | Level | Builder function | Status |
 |---|---|---|
-| 5 | `build_dungeon_6` | Modify: denser code groups (≥6 boundaries), LT1 wall strip, tighten M=1.35 |
-| 6 | `build_dungeon_8` | Modify: add wall strip row 7 cols 6–37; tighten M=1.055 |
-| 7 | `build_dungeon_9` | Modify: full WALL row 4, KS2 at (5,1), G-target=(14,55), M=1.36 |
-| 8 | `build_dungeon_10` | REDESIGN: 3 sub-rooms (25r×50c each); M=1.11; per-sub-room H/M/L scoping |
-| 9 | `build_dungeon_13a` | New: void barriers + blank rows; par solver with `disable_brace` |
-| 9.5 | `build_dungeon_13b` | New: wall-gap sentence row; par solver with `disable_paren` |
-| 10.1 | `build_dungeon_101` | New: 5-phase boss; follow `build_dungeon_51` pattern |
+| 6 | `build_dungeon_6` | Modify: denser code groups (≥6 boundaries), LT1 wall strip, tighten M=1.35 |
+| 7 | `build_dungeon_7` | Modify: add wall strip row 7 cols 6–37; tighten M=1.055 |
+| 8 | `build_dungeon_8` | Modify: full WALL row 4, KS2 at (5,1), G-target=(14,55), M=1.36 |
+| 9 | `build_dungeon_9` | REDESIGN: 3 sub-rooms (25r×50c each); M=1.11; per-sub-room H/M/L scoping |
+| 12 | `build_dungeon_12` | New: void barriers + blank rows; par solver with `disable_brace` |
+| 13 | `build_dungeon_13` | New: wall-gap sentence row; par solver with `disable_paren` |
+| 13.1 | `build_dungeon_131` | New: 7-phase boss; follow `build_dungeon_51` pattern |
 
 ### Dijkstra changes
 
 - `_dijkstra_par_WBE`: recompute with M=1.35 and denser groups.
-- `_dijkstra_par_L8`: recompute with M=1.055 and wall-strip terrain.
-- `_dijkstra_par_LGG`: recompute with M=1.36 and full-WALL row 4; drop {n}G from motion set.
-- `_dijkstra_par_L10`: no structural change; document joint-forcing.
-- `_dijkstra_par_L13a`: new; models `}`/`{` with void-row lethal terrain.
-- `_dijkstra_par_L13b`: new; models `)`/`(` with wall-gap segment terrain.
-- `_dijkstra_par_L101`: new; multi-phase stateful; follows `_par_l51` pattern.
+- `_dijkstra_par_L7`: recompute with M=1.055 and wall-strip terrain.
+- `_dijkstra_par_L8`: recompute with M=1.36 and full-WALL row 4; drop {n}G from motion set.
+- `_dijkstra_par_L9`: no structural change; document joint-forcing.
+- `_dijkstra_par_L12`: new; models `}`/`{` with void-row lethal terrain.
+- `_dijkstra_par_L13`: new; models `)`/`(` with wall-gap segment terrain.
+- `_dijkstra_par_L131`: new; 7-phase stateful; follows the `build_dungeon_51` boss pattern.

@@ -6,7 +6,7 @@ until verified.
 
 ---
 
-## Level 31 — The Spellwright's Forge
+## Level 37 — The Spellwright's Forge
 
 ### SCOPE
 
@@ -184,7 +184,7 @@ sound in principle but the arithmetic errors undermine confidence.
 
 ---
 
-### BOSS: N/A (Level 31 has no boss)
+### BOSS: N/A (Level 37 has no boss)
 
 ---
 
@@ -204,7 +204,7 @@ sound in principle but the arithmetic errors undermine confidence.
 
 ---
 
-## Level 32 — The Hall of Echoes
+## Level 38 — The Hall of Echoes
 
 ### SCOPE
 
@@ -364,7 +364,7 @@ but the sub-goal of forcing `N@a` specifically is not achieved.
 
 ---
 
-### BOSS: N/A (Level 32 has no boss)
+### BOSS: N/A (Level 38 has no boss)
 
 ---
 
@@ -385,11 +385,11 @@ D-32-3 (`49l`→`50l`), D-32-4 (CRITICAL: `@a` = 2 keys, not 3 — add chamber 6
 
 ---
 
-## Level 32.1 — The Warden Eternal (FINAL BOSS)
+## Level 38.1 — The Warden Eternal (FINAL BOSS)
 
 ### SCOPE
 
-No new mechanics introduced. The boss reuses `:s/F/I/g` (Level 31) and `q/@ "` (Level
+No new mechanics introduced. The boss reuses `:s/F/I/g` (Level 37) and `q/@ "` (Level
 32). The wave-timer mechanic (fire respawn every N keystrokes), the multi-phase boss state
 machine, and the mana refill orbs are engine features, not new commands taught to the
 player. Scope is satisfied.
@@ -665,16 +665,16 @@ can be correctly implemented or validated:
 
 | # | Feature | Required by | Status per blueprint |
 |---|---------|------------|---------------------|
-| E1 | Arcane Mana pool (per-room integer, deducted by `:s`, displayed in status bar) | L31, L32.1 | TBD (SPEC §6.4) |
-| E2 | Fire terrain `F` (impassable) / Ice terrain `I` (passable, produced by `:s`) | L31, L32.1 | New terrain types |
-| E3 | `:s/{}/{}/` and `:s/{}/{}/g` command dispatch — terrain-aware substitution | L31, L32.1 | New command |
-| E4 | Macro recording (`q{a-z}`) and replay (`@{reg}`, `N@{reg}`) | L32, L32.1 | Partially in `engine/macro.py` |
-| E5 | Macro-aware par solver (extended Dijkstra modeling macro recording state) | L32, L32.1 | Significant validator extension |
-| E6 | Wave timer mechanic (fire respawn every N player keystrokes) | L32.1 Phase 1 | New engine tick hook |
-| E7 | Multi-phase boss state machine (phase door triggers, HP tracking) | L32.1 | New `content/bosses.py` feature |
-| E8 | `:s` replay inside macro body via `synth_key` in command-mode dispatch | L32.1 Phase 3 | Confirm before build |
-| E9 | `dw` kills enemy on landing cell (verify semantic) | L32, L32.1 | Needs verification in `engine/operator.py` |
-| E10 | Word-boundary `w` reliably lands on entity positions (verify for given layout) | L32, L32.1 | Layout-dependent; must verify |
+| E1 | Arcane Mana pool (per-room integer, deducted by `:s`, displayed in status bar) | L37, L38.1 | TBD (SPEC §6.4) |
+| E2 | Fire terrain `F` (impassable) / Ice terrain `I` (passable, produced by `:s`) | L37, L38.1 | New terrain types |
+| E3 | `:s/{}/{}/` and `:s/{}/{}/g` command dispatch — terrain-aware substitution | L37, L38.1 | New command |
+| E4 | Macro recording (`q{a-z}`) and replay (`@{reg}`, `N@{reg}`) | L38, L38.1 | Partially in `engine/macro.py` |
+| E5 | Macro-aware par solver (extended Dijkstra modeling macro recording state) | L38, L38.1 | Significant validator extension |
+| E6 | Wave timer mechanic (fire respawn every N player keystrokes) | L38.1 Phase 1 | New engine tick hook |
+| E7 | Multi-phase boss state machine (phase door triggers, HP tracking) | L38.1 | New `content/bosses.py` feature |
+| E8 | `:s` replay inside macro body via `synth_key` in command-mode dispatch | L38.1 Phase 3 | Confirm before build |
+| E9 | `dw` kills enemy on landing cell (verify semantic) | L38, L38.1 | Needs verification in `engine/operator.py` |
+| E10 | Word-boundary `w` reliably lands on entity positions (verify for given layout) | L38, L38.1 | Layout-dependent; must verify |
 
 ---
 
@@ -685,9 +685,9 @@ capstone — but contains multiple critical arithmetic errors in the forceabilit
 that cause the mandatory commands to not be strictly forced under independent verification.
 
 Specific failures:
-- Level 31: Par overcounted by 3 keys (navigation off-by-ones); tile count contradicted
+- Level 37: Par overcounted by 3 keys (navigation off-by-ones); tile count contradicted
   (20 vs. 46); `dd`-on-fire-terrain escape hatch unaddressed.
-- Level 32: `N@a` count form not forced because `@a` = 2 keys not 3 (four separate
+- Level 38: `N@a` count form not forced because `@a` = 2 keys not 3 (four separate
   `@a` calls fit under budget). `dw` kill semantics unverified.
 - Boss Phase 2: Recording overhead off by 1 key (6→7); manual approach ties budget at
   corrected numbers; macro not strictly forced.
@@ -700,8 +700,8 @@ Specific failures:
 ## Prioritized Fix List
 
 1. **[CRITICAL] Fix `@a` key count** (D-32-4, D-B-4): `@a` = 2 keystrokes, not 3.
-   Consequences: Level 32 and Boss Phase 2 do not force `N@a` over individual `@a`
-   repeats. Fix: add chamber 6 to Level 32 (making manual cost 33 > 20) and add a warden
+   Consequences: Level 38 and Boss Phase 2 do not force `N@a` over individual `@a`
+   repeats. Fix: add chamber 6 to Level 38 (making manual cost 33 > 20) and add a warden
    copy to Boss Phase 2 to maintain forcing.
 
 2. **[CRITICAL] Recompute Boss Phase 3 par** (D-B-6, D-B-7): Correct par is ~47, not
@@ -714,10 +714,10 @@ Specific failures:
    mid-`:s` command. Either make the timer fire only on normal-mode keystrokes, or extend
    the wave window to ≥ 40 keystrokes.
 
-4. **[HIGH] Fix Level 31 navigation off-by-ones** (D-31-2, D-31-3): `4j` → `3j` for
+4. **[HIGH] Fix Level 37 navigation off-by-ones** (D-31-2, D-31-3): `4j` → `3j` for
    first fire row; `3j` → `2j` for keystone navigation. Corrected par = 44, budget = 62.
 
-5. **[HIGH] Reconcile L31 fire tile count** (D-31-1): ASCII grid shows 46 F tiles;
+5. **[HIGH] Reconcile L37 fire tile count** (D-31-1): ASCII grid shows 46 F tiles;
    placements say 20. Choose one and update the forcing argument accordingly.
 
 6. **[HIGH] Fix Boss Phase 2 recording overhead** (D-B-2, D-B-3): Overhead = 7 keys
@@ -727,7 +727,7 @@ Specific failures:
 7. **[HIGH] Address `dd` escape hatch on fire terrain** (D-31-5): Explicitly specify
    that `d`/`c` operators do not affect terrain tiles. Document in level and engine spec.
 
-8. **[HIGH] Fix Level 31 scope claim** (D-31 scope): Blueprint claims 1 new mechanic;
+8. **[HIGH] Fix Level 37 scope claim** (D-31 scope): Blueprint claims 1 new mechanic;
    correct count is 3 (mana, F/I terrain conversion, `:s` command). Update documentation.
 
 9. **[MEDIUM] Verify `dw` kill semantics** (D-32-2): Confirm in `engine/operator.py`
@@ -742,10 +742,10 @@ Specific failures:
     not 15. Overhead = 7 keys (not 6). Restate phase 3 par and budget after correcting
     all sub-counts.
 
-12. **[MEDIUM] Reconcile per-room vs. level-wide budget** in Level 31 (D-31-4): The
+12. **[MEDIUM] Reconcile per-room vs. level-wide budget** in Level 37 (D-31-4): The
     mana allocation table cites per-room budget=14 which contradicts the level-wide
     budget=62. Clarify which enforcement model is used.
 
-13. **[LOW] Fix L32 navigation command** (D-32-3): `49l` → `50l` (player at col 27,
+13. **[LOW] Fix L38 navigation command** (D-32-3): `49l` → `50l` (player at col 27,
     exit at col 77 = 50 steps). Keystroke count is unaffected (both = 3 keys) but
     command is wrong.

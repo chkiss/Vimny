@@ -20,7 +20,7 @@ Four principles checked per level:
 
 ---
 
-## Level 25 — The Word Enclosure (`iw` `aw`)
+## Level 30 — The Word Enclosure (`iw` `aw`)
 
 ### Scope
 
@@ -98,7 +98,7 @@ required. The level's "iw is the cheapest" claim is falsified by the known `dw` 
 
 ---
 
-## Level 26 — The Bracket Enclosure (`i(` `a(`)
+## Level 31 — The Bracket Enclosure (`i(` `a(`)
 
 ### Scope
 
@@ -182,7 +182,7 @@ but the stated arithmetic is wrong)**
 
 ---
 
-## Level 27 — The Brace & Square Enclosure (`i[` `a[` `i{` `a{`)
+## Level 32 — The Brace & Square Enclosure (`i[` `a[` `i{` `a{`)
 
 ### Scope
 
@@ -261,7 +261,7 @@ L27; deferred to boss is insufficient)**
 
 ---
 
-## Level 28 — The Quote Enclosure (`i"` `a"` `i'` `a'`)
+## Level 33 — The Quote Enclosure (`i"` `a"` `i'` `a'`)
 
 ### Scope
 
@@ -330,7 +330,7 @@ enclosure is not cheaper than manual)**
 
 ---
 
-## Level 29 — The Tag Enclosure (`it` `at`)
+## Level 34 — The Tag Enclosure (`it` `at`)
 
 ### Scope
 
@@ -390,7 +390,7 @@ engine; exit placement inconsistency)**
 
 ---
 
-## Level 30 — The Sentence & Paragraph Enclosure (`is` `as` `ip` `ap`)
+## Levels 35 & 36 — The Sentence Enclosure (`is` `as`) + The Paragraph Enclosure (`ip` `ap`)
 
 ### Scope
 
@@ -403,7 +403,7 @@ Count: **3**. PASS by the blueprint's counting.
 
 **But this is adversarially BORDERLINE.** LEVELS_PLAN.md's audit table (row 39) explicitly
 flags `is as ip ap` as "Sentence + paragraph = two families" and marks it as a **Linkage**
-defect with severity Low. The plan's proposed curriculum lists L30 as "The Sentence &
+defect with severity Low. The plan's proposed curriculum lists L35 as "The Sentence &
 Paragraph Enclosure (is as ip ap) (or split into two)." Introducing both sentence objects AND
 paragraph objects in one level is introducing two distinct scanner algorithms: `_resolve_sentence`
 (punctuation-based) and `_resolve_paragraph` (blank-row-based). These are genuinely different
@@ -477,7 +477,7 @@ position error; P2 navigation undercount)**
 
 ---
 
-## Level 30.1 — The Grandmaster's Sanctum (FINAL BOSS)
+## Level 36.1 — The Grandmaster's Sanctum (FINAL BOSS)
 
 ### Scope
 
@@ -651,7 +651,7 @@ No other text objects used in Act VI are unimplemented. `iw`, `aw`, `i(`, `a(`, 
   - **Fix:** Implement `it`/`at` in engine before generating this level. Move X to end of row 7
     or restructure grid so path is linear. Recompute par.
 
-### L30 — The Sentence & Paragraph Enclosure
+### L35 & L36 — The Sentence + Paragraph Enclosure
 - **SCOPE:** PASS (3 mechanics by count) / FAIL (2 families by linkage)
 - **LINKAGE:** FAIL (sentence = charwise punctuation-scanner; paragraph = linewise blank-scanner;
   two distinct families flagged by LEVELS_PLAN §1.1 audit)
@@ -660,10 +660,10 @@ No other text objects used in Act VI are unimplemented. `iw`, `aw`, `i(`, `a(`, 
   - After `dap` on P1 (linewise), cursor at row 11, not row 14; `2j` to P2 should be `4j`.
   - `as` (around sentence) forcing is valid (period is wall_rune choke).
   - `ap` (around paragraph) forcing via void-hazard on blank row is valid in principle.
-  - **Fix:** Split into two levels: L30 = sentence only (`is as`), L30.5 = paragraph only
+  - **Fix:** Split into two levels: L35 = sentence only (`is as`), L36 = paragraph only
     (`ip ap`). Recompute par for each. Fix cursor-after-linewise-delete position in par calc.
 
-### Boss 30.1 — The Grandmaster's Sanctum
+### Boss 36.1 — The Grandmaster's Sanctum
 - **SCOPE:** PASS (3 new boss mechanics)
 - **LINKAGE:** PASS (synthesises all act families)
 - **FORCEABILITY:** PASS (overall; each phase requires the specific family's command)
@@ -695,13 +695,13 @@ The act is structurally sound in intent but has two pervasive problems:
 | P2 | L27 | `a[` and `a{` never forced anywhere in the act | Add wall_rune `[` gate (forces `da[`) and wall_rune `{` gate (forces `da{`) in L27 |
 | P2 | L28 | `a'` never forced | Add wall_rune single-quote gate on row 7 or a new row |
 | P3 | L25 | Known `dw` bypasses `iw` teaching | Place cursor mid-cluster so `dw` only deletes part; or verify `dw` is excluded from known commands at L25 |
-| P3 | L30 | Sentence + paragraph = two families (LEVELS_PLAN flagged) | Split L30 into L30 (`is as`) and L30.5 (`ip ap`) |
+| P3 | L35 | Sentence + paragraph = two families (LEVELS_PLAN flagged) | Split L35 into L35 (`is as`) and L36 (`ip ap`) |
 | P4 | L25 | Par=28 undercounted | Recompute with correct exit navigation |
 | P4 | L26 | Par=25 undercounted | Recompute; consider placing X on row 7 (gate row) to minimize exit nav |
 | P4 | L27 | Par=35 undercounted; exit at (13,36) too far | Recompute; move X to right-end of row 7 or 11 |
 | P4 | L28 | Par=27 undercounted; di" on single-goblin enclosure not forced | Recompute; relabel enclosure C as pedagogical, not forced |
 | P4 | L29 | Par=45 undercounted; exit placement creates navigation loop | Restructure grid; X on row 7 (gate row) after the gate |
-| P4 | L30 | Par=29 undercounted; cursor-after-dap position error | Fix `dap` cursor landing point in par calc; recompute |
+| P4 | L35 | Par=29 undercounted; cursor-after-dap position error | Fix `dap` cursor landing point in par calc; recompute |
 | P5 | Boss | Phase 4 table says 6 keys, detail says 8 | Correct table to 8 keys; update boss par to 107 |
 | P5 | Boss | `a[` and `a{` absent from all phases and final chamber | Add one `da[` or `da{` encounter in final chamber |
 

@@ -5,7 +5,7 @@
 
 ---
 
-## Level 5 — The WORD Forge (`W B E`)
+## Level 6 — The WORD Forge (`W B E`)
 
 ### 1. SCOPE
 
@@ -52,7 +52,7 @@ W/B/E are the WORD-level analogs of already-taught w/b/e (Act I, Level 3). The t
 
 ---
 
-## Level 6 — The Backward Vaults (`ge gE`)
+## Level 7 — The Backward Vaults (`ge gE`)
 
 ### 1. SCOPE
 
@@ -121,7 +121,7 @@ Player at col 38, row 11. Must reach col 19 (exit anchor end).
 
 ---
 
-## Level 7 — The Lineheads (`G gg {n}G`)
+## Level 8 — The Lineheads (`G gg {n}G`)
 
 ### 1. SCOPE
 
@@ -180,7 +180,7 @@ From (4,28) to entry (0,1):
 
 ---
 
-## Level 8 — The Screen Vault (`H M L`)
+## Level 9 — The Screen Vault (`H M L`)
 
 ### 1. SCOPE
 
@@ -264,7 +264,7 @@ To make M individually forced: need `4j`-equivalent to cost ≥5 ks. If KS-mid i
 
 ---
 
-## Level 9 — The Runic Archives (`} { ) (`)
+## Levels 12 & 13 — The Runic Archives (`} {`) + The Sentence Corridor (`) (`)
 
 ### 1. SCOPE
 
@@ -312,14 +312,14 @@ Wait: `3)` from col 1. First `)` lands at the start of the first sentence in S1 
 
 **Adversarial search for cheaper path:**
 - Row 19 is narrowed (cols 11-60 walled). After descending to row 20, player is at col 1 (leftmost passable). `$` on row 20 would go to col 60 (rightmost passable after S3), passing the exit. But `$` still can't cross the wall gaps — `$` on row 20 would go only to col 10 (end of S1, since cols 11-22 are walled). So `$` reaches col 10, not col 49. Cannot bypass walls with `$`.
-- `G` or `gg`: not taught yet in Act II's own internal ordering... but taught in Level 7. Could `G` skip to the exit? `G` jumps to last passable row's first non-blank. Last passable row is row 20; first non-blank = col 1 (the entry of row 20). That's S1, not the exit. Not useful.
+- `G` or `gg`: not taught yet in Act II's own internal ordering... but taught in Level 8. Could `G` skip to the exit? `G` jumps to last passable row's first non-blank. Last passable row is row 20; first non-blank = col 1 (the entry of row 20). That's S1, not the exit. Not useful.
 - Any taught motion short of `)` cannot cross the wall gaps on row 20. **Strictly forced.** ✓
 
 **Forceability verdict: PASS** (despite linkage failure).
 
 ---
 
-## Level 9.1 — The Warden Surveyor (Boss)
+## Level 13.1 — The Warden Surveyor (Boss)
 
 ### 1. SCOPE
 
@@ -327,8 +327,8 @@ Boss — scope principle applies differently: the boss exercises previously taug
 
 ### 2. BOSS PLACEMENT
 
-- Numbered 9.1: caps Act II. ✓
-- Positioned after Level 9 (the last Act II teaching level). ✓
+- Numbered 13.1: caps Act II. ✓
+- Positioned after Level 13 (the last Act II teaching level). ✓
 - New boss (the Warden Surveyor) — not recycling a prior boss. ✓
 
 ### 3. IMMUNITY TO UNTAUGHT COMMANDS
@@ -343,11 +343,11 @@ But: Phase 3 (File Teleport) says "G/gg" is forced, yet G/gg require basic navig
 
 | Phase | Motion | Status |
 |---|---|---|
-| 1 | W/B/E | Act II Level 5 family ✓ |
-| 2 | ge/gE | Act II Level 6 family ✓ |
-| 3 | G/gg | Act II Level 7 family ✓ |
-| 4 | H/M/L | Act II Level 8 family ✓ |
-| 5 | `}` / `{` / `)` / `(` | Act II Level 9 family ✓ |
+| 1 | W/B/E | Act II Level 6 family ✓ |
+| 2 | ge/gE | Act II Level 7 family ✓ |
+| 3 | G/gg | Act II Level 8 family ✓ |
+| 4 | H/M/L | Act II Level 9 family ✓ |
+| 5 | `}` / `{` / `)` / `(` | Act II Levels 12 & 13 family ✓ |
 
 5 phases, 5 Act II families. ✓
 
@@ -368,7 +368,7 @@ Each phase claims Act I-only paths cost infinity. Spot-check:
 
 ## Per-Level Summary
 
-### Level 5 — The WORD Forge
+### Level 6 — The WORD Forge
 
 **Recomputed par = 10. Budget = 14.**
 
@@ -385,7 +385,7 @@ Each phase claims Act I-only paths cost infinity. Spot-check:
 
 ---
 
-### Level 6 — The Backward Vaults
+### Level 7 — The Backward Vaults
 
 **Recomputed par = 18. Budget = 26.**
 
@@ -402,7 +402,7 @@ Each phase claims Act I-only paths cost infinity. Spot-check:
 
 ---
 
-### Level 7 — The Lineheads
+### Level 8 — The Lineheads
 
 **Recomputed par = 11. Budget = 16.**
 
@@ -421,7 +421,7 @@ Each phase claims Act I-only paths cost infinity. Spot-check:
 
 ---
 
-### Level 8 — The Screen Vault
+### Level 9 — The Screen Vault
 
 **Recomputed par = 7. Budget = 10.**
 
@@ -438,7 +438,7 @@ Each phase claims Act I-only paths cost infinity. Spot-check:
 
 ---
 
-### Level 9 — The Runic Archives
+### Levels 12 & 13 — The Runic Archives + The Sentence Corridor
 
 **Recomputed par = 5. Budget = 7.**
 
@@ -452,13 +452,13 @@ Each phase claims Act I-only paths cost infinity. Spot-check:
 **Defect:** Mixed linkage — paragraph and sentence jumps use different terrain types and different axes. LEVELS_PLAN.md explicitly flags this as a medium-severity issue.
 
 **Concrete fix:** Split into two levels:
-- Level 9: `} {` — "The Void Rift" — paragraph jumps, void barriers, vertical axis.
-- Level 9.5 (or renumber): `) (` — "The Sentence Corridor" — sentence jumps, wall-segmented rows, horizontal axis.
+- Level 12: `} {` — "The Runic Archives" — paragraph jumps, void barriers, vertical axis.
+- Level 13: `) (` — "The Sentence Corridor" — sentence jumps, wall-segmented rows, horizontal axis.
 Both levels individually have 2 mechanics, coherent families, and terrain-forced commands.
 
 ---
 
-### Level 9.1 — The Warden Surveyor (Boss)
+### Level 13.1 — The Warden Surveyor (Boss)
 
 **Par ≈ 29. Budget = 41.**
 
@@ -478,21 +478,21 @@ Both levels individually have 2 mechanics, coherent families, and terrain-forced
 
 ## Overall Verdict
 
-**Total FAIL count: 5** (Level 5 Forceability, Level 6 Forceability, Level 7 Forceability, Level 8 Forceability, Level 9 Linkage). Boss is CONDITIONAL PASS.
+**Total FAIL count: 5** (Level 6 Forceability, Level 7 Forceability, Level 8 Forceability, Level 9 Forceability, Levels 12 & 13 Linkage). Boss is CONDITIONAL PASS.
 
 ### Prioritized Fix List
 
-1. **(CRITICAL) Level 9 — Split `} {` and `) (` into two levels.** Linkage failure is a structural blueprint defect that affects act numbering and boss design. Splitting requires renumbering 9.1 to 10.1 (or inserting 9.5).
+1. **(CRITICAL) `} {` and `) (` ship as two levels (L12 + L13).** Linkage failure is a structural blueprint defect that affects act numbering and boss design. Shipped: L12 (The Runic Archives) + L13 (The Sentence Corridor), boss at 13.1.
 
-2. **(HIGH) Level 6 — Add intermediate walls in C4 row 7 to make ge/gE-alternatives physically impossible.** Budget slack alone does not force the commanded motions. Terrain-based forcing is the correct mechanism.
+2. **(HIGH) Level 7 — Add intermediate walls in C4 row 7 to make ge/gE-alternatives physically impossible.** Budget slack alone does not force the commanded motions. Terrain-based forcing is the correct mechanism.
 
-3. **(HIGH) Level 5 — Guarantee ≥5 word-boundary transitions per code group** (redesign groups like `a.b+c*d`) AND tighten budget to ceil(10 × 1.2) = 12 to ensure w-only paths exceed budget.
+3. **(HIGH) Level 6 — Guarantee ≥5 word-boundary transitions per code group** (redesign groups like `a.b+c*d`) AND tighten budget to ceil(10 × 1.2) = 12 to ensure w-only paths exceed budget.
 
-4. **(HIGH) Level 7 — Resolve {n}G engine behavior definitively** (standard Vim: set row, clamp col to first-non-blank). Restructure layout so gg-alternative ≥5 ks (move KS2 location or add a return-trip requirement).
+4. **(HIGH) Level 8 — Resolve {n}G engine behavior definitively** (standard Vim: set row, clamp col to first-non-blank). Restructure layout so gg-alternative ≥5 ks (move KS2 location or add a return-trip requirement).
 
-5. **(MEDIUM) Level 8 — Accept joint-only forcing as documented; add explicit "demonstrated but not individually forced" label in blueprint.** If strict individual forcing is desired, implement two-pass layout with H required on return trip, and document that this is the best achievable under ×1.4 budget formula.
+5. **(MEDIUM) Level 9 — Accept joint-only forcing as documented; add explicit "demonstrated but not individually forced" label in blueprint.** If strict individual forcing is desired, implement two-pass layout with H required on return trip, and document that this is the best achievable under ×1.4 budget formula.
 
-6. **(LOW) Level 9.1 — Clarify immunity mechanism** in blueprint text: specify that hjkl remain functional for micro-navigation; only phase triggers require Act II motions.
+6. **(LOW) Level 13.1 — Clarify immunity mechanism** in blueprint text: specify that hjkl remain functional for micro-navigation; only phase triggers require Act II motions.
 
 ---
 

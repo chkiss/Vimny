@@ -115,7 +115,7 @@ yet taught, with phases that each demand a different command from the act.
 | 10 | The Bracket Vaults | `%` | bracket/pair matching |
 | 12 | The Runic Archives | `} {` | paragraph jumps; void barriers force `}` |
 | 13 | The Sentence Corridor | `) (` | **define sentence metaphor** (corridor segments); split from Runic Archives |
-| **13.1** | **The Warden's Sight** (BOSS) *(NEW)* | caps Act II | each phase a different structural motion |
+| **13.1** | **The Warden Surveyor** (BOSS) | caps Act II | one phase per structural family — all 7: W/B/E, ge/gE, G/gg, H/M/L, %, }/{, )/( |
 
 ### Act III — Navigation Power Tools  *(mostly NEW mechanics)*
 | # | Name | Teaches | Notes |
@@ -345,7 +345,7 @@ original convention). Bosses are `x.1` (id = `{N}1`, key `dungeon_{N:02d}.1`). B
 | 10 | the_bracket_vaults | The Bracket Vaults | `%` | |
 | 12 | the_runic_archives | The Runic Archives | `} {` | |
 | 13 | the_sentence_corridor | The Sentence Corridor | `) (` | |
-| 131 | the_wardens_sight | The Warden's Sight | — | boss |
+| 131 | the_warden_surveyor | The Warden Surveyor | — | boss |
 | 14 | the_sight_sanctum | The Sight Sanctum | `v` | |
 | 15 | the_seekers_labyrinth | The Seekers' Labyrinth | `/ ? n N` | |
 | 16 | the_waypoint_sanctum | The Waypoint Sanctum | `m ' \`` | |

@@ -14,7 +14,7 @@
 >   so each text object is strictly required (cursor position forced mid-cluster, or
 >   content-size makes manual path impossible, or S1 wall forces exactly the right object).
 > - S5 split: Sentence (`is as`) and Paragraph (`ip ap`) are distinct scanner families
->   and are taught in separate levels (L30 and L30.5).
+>   and are taught in separate levels (L30 and L36).
 >
 > Operator keystrokes counted: `d`=1, `i`/`a`=1, object-char=1 → `diw`=3.
 > `$`=1, `0`=1, each h/j/k/l-step=1.  `c`-operator escape=1 extra.
@@ -22,7 +22,7 @@
 
 ---
 
-## Level 25 — The Word Enclosure
+## Level 30 — The Word Enclosure
 
 **Commands introduced:** `iw` `aw`
 **New mechanics (≤3):**
@@ -178,7 +178,7 @@ without it).  The 1.35× multiplier is conservative; the real forcing is terrain
 
 ---
 
-## Level 26 — The Bracket Enclosure
+## Level 31 — The Bracket Enclosure
 
 **Commands introduced:** `i(` `a(`
 **Engine aliases:** `ib`→`i(`, `ab`→`a(`.
@@ -363,7 +363,7 @@ engine primitives. The keystone entity and the delimiter rune glyph coexist at t
 
 ---
 
-## Level 27 — The Brace & Square Enclosure
+## Level 32 — The Brace & Square Enclosure
 
 **Commands introduced:** `i[` `a[` `i{` `a{`
 **Engine aliases:** `iB`→`i{`, `aB`→`a{`.
@@ -513,7 +513,7 @@ delimiter glyphs (passable), wall_rune `[` and `{` entities (S1 blocking gates).
 
 ---
 
-## Level 28 — The Quote Enclosure
+## Level 33 — The Quote Enclosure
 
 **Commands introduced:** `i"` `a"` `i'` `a'`
 **New mechanics (≤3):**
@@ -565,7 +565,7 @@ types taught together as they share the identical algorithm.
 
 ### Row 2 — tutorial enclosures (di" and di' terrain-∞ forced via keystone-on-delimiter)
 
-**Terrain-∞ strategy for `di"`/`di'`:** Same mechanism as Level 26 `di(`. A **keystone
+**Terrain-∞ strategy for `di"`/`di'`:** Same mechanism as Level 31 `di(`. A **keystone
 entity is placed ON the closing quote delimiter** of each enclosure. `di"` preserves the
 closing `"` (and its keystone); `da"` deletes the closing `"` (and destroys the keystone,
 permanently locking the exit). `da"` is terrain-∞ forbidden on row-2 enclosures.
@@ -687,7 +687,7 @@ only existing engine primitives: keystone entity + rune glyph at the same cell.
 
 ---
 
-## Level 29 — The Tag Enclosure
+## Level 34 — The Tag Enclosure
 
 **Commands introduced:** `it` `at`
 
@@ -823,7 +823,7 @@ passable; kind='wall_rune' for gate), choke corridors.
 
 ---
 
-## Level 30 — The Sentence Enclosure
+## Level 35 — The Sentence Enclosure
 
 **Commands introduced:** `is` `as`
 
@@ -1004,7 +1004,7 @@ wall_rune period entities (S1 choke), corridor.
 
 ---
 
-## Level 30.5 — The Paragraph Enclosure
+## Level 36 — The Paragraph Enclosure
 
 **Commands introduced:** `ip` `ap`
 
@@ -1185,7 +1185,7 @@ corridor between P-sections.
 
 ---
 
-## Level 30.1 — The Grandmaster's Sanctum (FINAL BOSS)
+## Level 36.1 — The Grandmaster's Sanctum (FINAL BOSS)
 
 **Commands exercised:** `diw` `daw` `di(` `da(` `da[` `da{` `di"` `da"` `da'` `dit` `dat`
 `dis` `das` `dip` `dap` `ci"` — full text-object grammar.
@@ -1203,7 +1203,7 @@ sentence, paragraph).
 - Phase 4 key count corrected to 8 (was inconsistently listed as 6 in the phase table).
 - Phase 4 uses a dedicated `da[` sub-puzzle AND a `da{` sub-puzzle to ensure both `a[`/`a{`
   are exercised.
-- Phase 6 split into Phase 6a (`is`/`as`) and Phase 6b (`ip`/`ap`) matching the L30/L30.5 split.
+- Phase 6 split into Phase 6a (`is`/`as`) and Phase 6b (`ip`/`ap`) matching the L30/L36 split.
 
 ---
 
@@ -1344,14 +1344,14 @@ defuse-check (rune kind ≠ 'void' after ci"), defuse scroll hints.
 
 | Level | Name                          | Commands              | par | budget | Multiplier | Both i AND a forced? | Residual Challenge                              |
 |-------|-------------------------------|-----------------------|-----|--------|------------|----------------------|-------------------------------------------------|
-| 25    | The Word Enclosure            | `iw` `aw`             |  30 |     41 | ×1.35      | Yes (S1 void+S1 wall-blank) | None — S1 terrain fully forces both      |
-| 26    | The Bracket Enclosure         | `i(` `a(`             |  33 |     34 | ×1.03      | Yes (S1 gate + S2 enclosures) | CHALLENGE: budget ×1.03 is very tight; designer may add a 4th enclosure |
-| 27    | The Brace & Square Enclosure  | `i[` `a[` `i{` `a{`  |  35 |     49 | ×1.4       | Yes (S1 gates for all four) | None — S1 gates force all four variants   |
-| 28    | The Quote Enclosure           | `i"` `a"` `i'` `a'`  |  36 |     37 | ×1.03      | Yes (S1 gates for " and ') | CHALLENGE: budget ×1.03 very tight; designer may add enclosures |
-| 29    | The Tag Enclosure             | `it` `at`             |  30 |     36 | ×1.2       | Yes (S1 gate for at; S2 for it) | CHALLENGE (blocking): `it`/`at` unimplemented in engine |
-| 30    | The Sentence Enclosure        | `is` `as`             |  43 |     52 | ×1.2       | Yes (S1 period wall_rune; S2 5-goblin sentences) | None — S1 fully forces `as`; S2 forces `is` |
-| 30.5  | The Paragraph Enclosure       | `ip` `ap`             |  37 |     52 | ×1.4       | Yes (S1 void-hazard blank; S2 18-goblin paras) | None — S1+S2 fully force both             |
-| 30.1  | The Grandmaster's Sanctum     | all text objects      | 145 |    203 | ×1.4       | Yes (all phases) | CHALLENGE: Phase 5 blocked by `it`/`at` engine prereq |
+| 30    | The Word Enclosure            | `iw` `aw`             |  30 |     41 | ×1.35      | Yes (S1 void+S1 wall-blank) | None — S1 terrain fully forces both      |
+| 31    | The Bracket Enclosure         | `i(` `a(`             |  33 |     34 | ×1.03      | Yes (S1 gate + S2 enclosures) | CHALLENGE: budget ×1.03 is very tight; designer may add a 4th enclosure |
+| 32    | The Brace & Square Enclosure  | `i[` `a[` `i{` `a{`  |  35 |     49 | ×1.4       | Yes (S1 gates for all four) | None — S1 gates force all four variants   |
+| 33    | The Quote Enclosure           | `i"` `a"` `i'` `a'`  |  36 |     37 | ×1.03      | Yes (S1 gates for " and ') | CHALLENGE: budget ×1.03 very tight; designer may add enclosures |
+| 34    | The Tag Enclosure             | `it` `at`             |  30 |     36 | ×1.2       | Yes (S1 gate for at; S2 for it) | CHALLENGE (blocking): `it`/`at` unimplemented in engine |
+| 35    | The Sentence Enclosure        | `is` `as`             |  43 |     52 | ×1.2       | Yes (S1 period wall_rune; S2 5-goblin sentences) | None — S1 fully forces `as`; S2 forces `is` |
+| 36  | The Paragraph Enclosure       | `ip` `ap`             |  37 |     52 | ×1.4       | Yes (S1 void-hazard blank; S2 18-goblin paras) | None — S1+S2 fully force both             |
+| 36.1  | The Grandmaster's Sanctum     | all text objects      | 145 |    203 | ×1.4       | Yes (all phases) | CHALLENGE: Phase 5 blocked by `it`/`at` engine prereq |
 
 ---
 

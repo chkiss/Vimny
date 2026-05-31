@@ -1,6 +1,6 @@
 # Act V Blueprints — Insert-Mode Construction & Editing
 
-> Generator-grade ASCII blueprints for levels 20–24b + boss 24.1.
+> Generator-grade ASCII blueprints for levels 23–29 + boss 29.1.
 > Each section is a complete spec for `build_dungeon_N()` in `generation/dungeon_gen.py`.
 > Dims = (rows × cols). @ = entry, X = exit, K = keystone, D = door, g = goblin, W = warden.
 > Par-solver assumptions are stated explicitly in each section.
@@ -11,7 +11,7 @@
 
 ---
 
-## L20 — The Inscription Halls
+## L23 — The Inscription Halls
 
 **Commands taught:** `i` (insert before cursor), `a` (insert after cursor).
 New mechanics (count: 2):
@@ -83,13 +83,13 @@ Row 11: ########################################
 - **S1 terrain fix (adopted):** The inner room has void runes at cols 9 and 11 flanking the `i`-trigger cell col 10, and void runes at cols 20 and 22 flanking the `a`-trigger cell col 20 (but col 19 the cursor position is safe). The void placement means: if `a` is used from col 10, the rune lands at col 11 which is a void — player takes void damage = level fails immediately. If `i` is used from col 19, rune lands at col 19 ≠ trigger col 20, and player cannot step to col 20 through the void at col 20... Actually: simpler approach: wall cells at col 9 and col 13 force the cursor to stand exactly at col 10 for the first trigger (walls left and right bound the 3-cell slot); wall cells at col 18 and col 22 bound the second trigger slot forcing cursor at col 19.
 - **Terrain-forced rule for `i`:** The `i`-trigger slot cols 10–12 is preceded by a wall at col 9 (forcing entry from left only, cursor arrives at col 10 from the wall gap), and followed by a wall at col 13. Player enters the slot at col 10. `i` writes at col 10 — correct. `a` writes at col 11 — off by one, trigger fails, rune at wrong cell, door locked. No repositioning possible without backing out through the wall gap (costly). This is terrain-guided; undo is available but costs +2 (undo + redo correctly), which is within ×1.4. **So terrain doesn't give infinite forcing for `i`/`a` — the commands differ by only 1 cell.**
 - **Final approach:** Use the ×1.4 budget with par=31, budget=44, and TWO triggers with a total wrong-command penalty of +2 (not enough alone), PLUS add 2 more `i`/`a` trigger pairs (total 4 triggers) making wrong-command total penalty +4 → par+4=35 ≤ 44. This still doesn't force. **Switch to: 8 triggers (4 `i`, 4 `a`) in a longer inner corridor, wrong penalty = +8 → par_extended+8 must exceed budget.** Revised par with 8 triggers: navigation grows, par≈42, budget=ceil(42×1.4)=59. Wrong-all: 42+8=50 ≤ 59. Still not enough.
-- **Root issue:** At ×1.4 the wrong-by-1 penalty per trigger is too small. **Decision: tighten multiplier to ×1.15 for L20.** Par=31, budget=ceil(31×1.15)=ceil(35.65)=36. Wrong on both triggers: 31+2=33 ≤ 36. Still not enough. Wrong on four triggers: 31+4=35 ≤ 36. Still not. Five triggers: 31+5=36 = budget. Need 6 triggers: 31+6=37 > 36. **Six triggers (3 `i`, 3 `a`) with ×1.15 budget forces.** But ×1.15 requires documentation and is non-standard.
+- **Root issue:** At ×1.4 the wrong-by-1 penalty per trigger is too small. **Decision: tighten multiplier to ×1.15 for L23.** Par=31, budget=ceil(31×1.15)=ceil(35.65)=36. Wrong on both triggers: 31+2=33 ≤ 36. Still not enough. Wrong on four triggers: 31+4=35 ≤ 36. Still not. Five triggers: 31+5=36 = budget. Need 6 triggers: 31+6=37 > 36. **Six triggers (3 `i`, 3 `a`) with ×1.15 budget forces.** But ×1.15 requires documentation and is non-standard.
 - **Cleaner design (adopted):** Use the 3-glyph `i`-trigger (costs 5 keys total: `i ∆∆∆ Esc`) and 1-glyph `a`-trigger (costs 3 keys: `a Ω Esc`). Wrong on `i`-trigger (use `a ∆∆∆ Esc` at cursor col 10): runes land at 11,12,13; correct need 10,11,12. Player must undo, move left 1, redo: `u h i ∆∆∆ Esc` = 5+3=8 keys vs 5 correct = +3 per trigger. Two `i`-triggers: +6. One `a`-trigger with +1 penalty. Three total triggers: wrong-all penalty = +7. Par with 3 triggers ≈ 31+5+3=39 (extra trigger traversal). Budget=ceil(39×1.4)=55. Wrong-all: 39+7=46 ≤ 55. **×1.4 still too loose.**
-- **Final decision (adopted):** Budget multiplier ×1.2 for L20 (same as L22, justified by the "wrong-by-1" penalty being inherently small for `i`/`a`). Par=31, budget=ceil(31×1.2)=38. Two triggers (+2 wrong penalty): 31+2=33 ≤ 38. Still not forced at 2 triggers. Four triggers (+4): 35 ≤ 38. Five triggers (+5): 36 ≤ 38. Six triggers (+6): 37 ≤ 38. Seven triggers (+7): 38 = budget, not >. Eight triggers (+8): 39 > 38. **Eight triggers (4 `i`, 4 `a`) at ×1.2 forces.**
+- **Final decision (adopted):** Budget multiplier ×1.2 for L23 (same as L25, justified by the "wrong-by-1" penalty being inherently small for `i`/`a`). Par=31, budget=ceil(31×1.2)=38. Two triggers (+2 wrong penalty): 31+2=33 ≤ 38. Still not forced at 2 triggers. Four triggers (+4): 35 ≤ 38. Five triggers (+5): 36 ≤ 38. Six triggers (+6): 37 ≤ 38. Seven triggers (+7): 38 = budget, not >. Eight triggers (+8): 39 > 38. **Eight triggers (4 `i`, 4 `a`) at ×1.2 forces.**
 - **Par with 8 triggers:** 4 `i`-triggers × 5 keys + 4 `a`-triggers × 3 keys + navigation between all = 20+12+nav. Navigation (traversing trigger cells in order along a corridor): roughly 8 × 2 nav keys (move between triggers) = 16. Plus K1, K2, exit nav: ~15. Total par ≈ 20+12+16+15 = 63. Budget = ceil(63×1.2) = 76. Wrong-all (8 triggers): 63+8=71 ≤ 76. Still not forced!
 - **Root problem identified:** The per-trigger wrong-command penalty for `i`/`a` is inherently +1 key (reposition 1 cell). No budget multiplier makes 8×1=8 keys exceed a budget that has all of par's navigation baked in. The only solution is terrain-forcing (S1) or a rethink.
 
-**S1 Terrain-forcing adopted for L20 (final):**
+**S1 Terrain-forcing adopted for L23 (final):**
 
 The inner room is a narrow 1-wide corridor with walls on both sides. Trigger cells are at the far ends of single-cell dead-ends. For the `i`-trigger:
 - A dead-end alcove at (3, 10): wall at (3,9) and (3,11) and (2,10) so cursor arrives from (3,10) via the only gap (from left). Player is at col 10; the only passable cells are col 10 (current) and the way back.
@@ -131,7 +131,7 @@ Similarly for the `a`-trigger:
 
 ---
 
-## L21 — The Sculpting Chambers
+## L24 — The Sculpting Chambers
 
 **Commands taught:** `I` (insert at first non-blank of line), `A` (insert after last rune on line), `o` (open line below), `O` (open line above).
 New mechanics (count: 2):
@@ -309,7 +309,7 @@ Row  7: #..I_trig....................................#  (was row 6, shifted to r
 
 ---
 
-## L22 — The Overwrite Halls
+## L25 — The Overwrite Halls
 
 **Commands taught:** `r{ch}` (replace char without entering INSERT), `R` (Replace mode: overwrite-and-advance stream, Esc to exit).
 New mechanics (count: 2):
@@ -530,7 +530,7 @@ Combined with budget forcing: `r` is both S1-guarded and budget-forced. ✓
 
 ---
 
-## L23 — The Case Chambers
+## L26 — The Case Chambers
 
 **Commands taught:** `~` (toggle case of char at cursor, advance), `g~{motion}` (toggle case over motion), `gU{motion}` (uppercase over motion), `gu{motion}` (lowercase over motion).
 New mechanics (count: 2):
@@ -656,7 +656,7 @@ Operator path (3 zones, 3 single-chars):
 
 ---
 
-## L24 — The Joiner's Gate
+## L27 — The Joiner's Gate
 
 **Commands taught:** `J` (join: append next row onto current, adding a space), `gJ` (join without space).
 New mechanics (count: 1 — the row-join/carve mechanic is one idea, two variants):
@@ -765,7 +765,7 @@ Row 5 contains rune cluster `αβγ` (3 glyphs) at cols 3–5. Row 6 contains `�
 
 ---
 
-## L24a — The Alignment Halls
+## L28 — The Alignment Halls
 
 **Commands taught:** `>>` (indent line right by shiftwidth), `<<` (indent line left by shiftwidth).
 New mechanics (count: 1):
@@ -868,7 +868,7 @@ Row 13: ####################################################
 
 ---
 
-## L24b — The Indentation Sanctum
+## L29 — The Indentation Sanctum
 
 **Commands taught:** `>{motion}` / `<{motion}` (indent over motion span), `=` (auto-indent / re-align).
 New mechanics (count: 2):
@@ -997,7 +997,7 @@ Row 15: #...∆∆ (col 3, target col 7)...D_C.....X.......#  ← = zone row C (
 
 ---
 
-## L24.1 — The Warden Scrivener (ACT V BOSS)
+## L29.1 — The Warden Scrivener (ACT V BOSS)
 
 **Commands:** All Act V commands (i a I A o O r R ~ g~ gU gu J gJ >> << >{m} <{m} =).
 **Phases:** 5 phases (one command per phase). Each phase: Warden is immune to all Act V commands except one; the correct command dissolves the rune shield; then `x` deals damage.
@@ -1116,7 +1116,7 @@ Row 19: #....⊕ (lock rune at col 8, target col 14)..........#
 
 **Self-check:**
 - [x] 5 phases, each demands exactly one Act V command.
-- [x] Boss numbered 24.1 (x.1 convention).
+- [x] Boss numbered 29.1 (x.1 convention).
 - [x] Phases escalate: stationary → slow chase → medium chase → fast chase → fast+goblins.
 - [x] Each phase has a clear rune condition before `x` damage (immune mechanic).
 - [x] Phase commands span the act: r (overwrite), gU (case), J (join), gJ (join-no-space), >> (indent).
@@ -1132,27 +1132,27 @@ Row 19: #....⊕ (lock rune at col 8, target col 14)..........#
 
 | Level | Commands | Par | Budget | Forceable? | Key risks |
 |-------|----------|-----|--------|------------|-----------|
-| L20 — Inscription Halls | `i a` | 31 | 44 (×1.4) | Yes — `i` S1-terrain-forced (wall blocks `a`); `a` S1-guided (contamination) | `a`-trigger: +1 undo penalty only; soft forcing. CHALLENGE filed. |
-| L21 — Sculpting Chambers | `I A o O` | ~35 | 49 (×1.4) | Yes — `o`/`O` S1-topology; `A`/`I` budget-forced (4A-triggers saves 12 > margin; 3I-triggers saves 9 > margin) | Par-solver must confirm with wider 60-col map and 4 A-triggers + 3 I-triggers |
-| L22 — Overwrite Halls | `r R` | 39 | 45 (×1.15) | Yes — `r` individually forced (39+9=48>45); `R` individually forced (39+11=50>45); STRICT ✓ | w-hop navigation between r-cells; void isolation blocks R on r-corridor |
-| L23 — Case Chambers | `~ g~ gU gu` | 52 | 73 (×1.4) | Yes — `gUW`/`guW`/`g~W` budget-forced (~-only path=74>73); `~` S1-forced by runtime-random case | Par corrected (52, not 28); `gUW` = 3 keys (WORD motion, no count digit) |
-| L24 — Joiner's Gate | `J gJ` | 28 | 40 (×1.4) | Yes — S1 topology + S1 rune-content; both J and gJ forced | CHALLENGE: J/gJ must be non-undoable in engine |
-| L24a — Alignment Halls | `>> <<` | 47 | 66 (×1.4) | Yes — 4 zones each direction; savings (24) > margin (19) | `3>>` = 3 keystrokes corrected |
-| L24b — Indentation Sanctum | `>{m} <{m} =` | 45 | 63 (×1.4) | Yes — S1 water tiles block per-row approach; operator forced | CHALLENGE: engine must apply indent to rows cursor does not occupy |
-| L24.1 — Warden Scrivener | All Act V | 60 | 84 (×1.4) | Yes — per-phase immunity + 5 distinct phases | Phase 1 par corrected (21, not 12); Phase 3/4 J/gJ split into separate phases |
+| L23 — Inscription Halls | `i a` | 31 | 44 (×1.4) | Yes — `i` S1-terrain-forced (wall blocks `a`); `a` S1-guided (contamination) | `a`-trigger: +1 undo penalty only; soft forcing. CHALLENGE filed. |
+| L24 — Sculpting Chambers | `I A o O` | ~35 | 49 (×1.4) | Yes — `o`/`O` S1-topology; `A`/`I` budget-forced (4A-triggers saves 12 > margin; 3I-triggers saves 9 > margin) | Par-solver must confirm with wider 60-col map and 4 A-triggers + 3 I-triggers |
+| L25 — Overwrite Halls | `r R` | 39 | 45 (×1.15) | Yes — `r` individually forced (39+9=48>45); `R` individually forced (39+11=50>45); STRICT ✓ | w-hop navigation between r-cells; void isolation blocks R on r-corridor |
+| L26 — Case Chambers | `~ g~ gU gu` | 52 | 73 (×1.4) | Yes — `gUW`/`guW`/`g~W` budget-forced (~-only path=74>73); `~` S1-forced by runtime-random case | Par corrected (52, not 28); `gUW` = 3 keys (WORD motion, no count digit) |
+| L27 — Joiner's Gate | `J gJ` | 28 | 40 (×1.4) | Yes — S1 topology + S1 rune-content; both J and gJ forced | CHALLENGE: J/gJ must be non-undoable in engine |
+| L28 — Alignment Halls | `>> <<` | 47 | 66 (×1.4) | Yes — 4 zones each direction; savings (24) > margin (19) | `3>>` = 3 keystrokes corrected |
+| L29 — Indentation Sanctum | `>{m} <{m} =` | 45 | 63 (×1.4) | Yes — S1 water tiles block per-row approach; operator forced | CHALLENGE: engine must apply indent to rows cursor does not occupy |
+| L29.1 — Warden Scrivener | All Act V | 60 | 84 (×1.4) | Yes — per-phase immunity + 5 distinct phases | Phase 1 par corrected (21, not 12); Phase 3/4 J/gJ split into separate phases |
 
 ---
 
 ## CHALLENGES (requiring human/engine decision)
 
-1. **`a`-trigger in L20 (soft forcing):** The `a`-trigger uses a contamination mechanic (+1 key penalty for wrong command). This does not exceed the ×1.4 budget margin. The level teaches `a` but does not hard-force it. Options: (a) accept soft forcing as sufficient for the first Insert-mode level; (b) redesign with a column-placement puzzle where the `a`-trigger cell is at the rightmost wall of a sealed slot (so `a` must write AT the rightmost passable cell — `i` would write one cell left, leaving the trigger unsatisfied AND the player cannot reposition because the slot's right wall blocks further movement). Decision needed.
+1. **`a`-trigger in L23 (soft forcing):** The `a`-trigger uses a contamination mechanic (+1 key penalty for wrong command). This does not exceed the ×1.4 budget margin. The level teaches `a` but does not hard-force it. Options: (a) accept soft forcing as sufficient for the first Insert-mode level; (b) redesign with a column-placement puzzle where the `a`-trigger cell is at the rightmost wall of a sealed slot (so `a` must write AT the rightmost passable cell — `i` would write one cell left, leaving the trigger unsatisfied AND the player cannot reposition because the slot's right wall blocks further movement). Decision needed.
 
-2. **L22 individual r and R — RESOLVED:** Compact single-row layout (par=39, ×1.15, budget=45, margin=6) makes r (savings=9>6) and R (savings=11>6) individually forced. Challenge closed.
+2. **L25 individual r and R — RESOLVED:** Compact single-row layout (par=39, ×1.15, budget=45, margin=6) makes r (savings=9>6) and R (savings=11>6) individually forced. Challenge closed.
 
-3. **J/gJ non-undoable (engine decision):** Levels L24 and L24.1 (phases 3/4) require `J`/`gJ` to be non-undoable or to produce visibly different/irreversible world states that make undo+retry unhelpful. The engine must either: (a) mark J/gJ as non-undoable ops; (b) have the join produce a locked rune state that undo would not restore correctly (content-sensitive undo). Decision needed from engine maintainer.
+3. **J/gJ non-undoable (engine decision):** Levels L27 and L29.1 (phases 3/4) require `J`/`gJ` to be non-undoable or to produce visibly different/irreversible world states that make undo+retry unhelpful. The engine must either: (a) mark J/gJ as non-undoable ops; (b) have the join produce a locked rune state that undo would not restore correctly (content-sensitive undo). Decision needed from engine maintainer.
 
-4. **`>{m}` operator on non-cursor rows (engine prerequisite):** L24b requires `apply_indent` (and `apply_autoindent` for `=`) to act on all rows in the motion span without requiring the cursor to visit each row. This must be verified as an engine capability. If `>{m}` currently only applies indent to the cursor's row (ignoring the motion), L24b's forcing model breaks. Decision: verify or implement multi-row indent operator in engine before finalizing L24b design.
+4. **`>{m}` operator on non-cursor rows (engine prerequisite):** L29 requires `apply_indent` (and `apply_autoindent` for `=`) to act on all rows in the motion span without requiring the cursor to visit each row. This must be verified as an engine capability. If `>{m}` currently only applies indent to the cursor's row (ignoring the motion), L29's forcing model breaks. Decision: verify or implement multi-row indent operator in engine before finalizing L29 design.
 
 5. **J/gJ op implementation (engine prerequisite):** `J`/`gJ` are listed in LEVELS_PLAN.md as unimplemented. The boss phases 3 and 4 depend on J/gJ producing distinguishable content outputs (with/without space) that the trigger system can check. The engine must implement J/gJ as specified in LEVELS_PLAN.md D3 before these levels can be generated and tested.
 
-6. **L21 map size and par-solver:** L21 adopts a 60-col map with 4 `A`-triggers and 3 `I`-triggers. The par-solver must confirm that: (a) the optimal path uses `A` for all `A`-triggers (not manual walk); (b) the optimal path uses `I` for all `I`-triggers; (c) the resulting par and budget satisfy the forcing inequalities stated in the blueprint. Par-solver run required before finalizing L21's generator code.
+6. **L24 map size and par-solver:** L24 adopts a 60-col map with 4 `A`-triggers and 3 `I`-triggers. The par-solver must confirm that: (a) the optimal path uses `A` for all `A`-triggers (not manual walk); (b) the optimal path uses `I` for all `I`-triggers; (c) the resulting par and budget satisfy the forcing inequalities stated in the blueprint. Par-solver run required before finalizing L24's generator code.
