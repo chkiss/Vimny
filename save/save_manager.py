@@ -2,6 +2,8 @@ import json, os, pwd, re
 from pathlib import Path
 from typing import Optional
 
+from content.levels import LEGACY_ID_SLUG
+
 def _home() -> Path:
     for var in ('SUDO_USER', 'DOAS_USER'):
         user = os.environ.get(var)
@@ -63,10 +65,15 @@ def list_saves() -> list[dict]:
 
 # ── Progress helpers ───────────────────────────────────────────────────────────
 
+# Non-level top-level progress fields — excluded from the slug-keyed 'progress'
+# sub-dict (each gets its own JSON field below).
+_SPECIAL_KEYS = {'extras', 'scrolls_seen', 'flags', 'max_hp', 'collected_hearts'}
+
+
 def save_progress(progress: dict, player_name: str) -> None:
     existing = load_for(player_name) or {}
     existing['player_name']       = player_name
-    existing['progress']          = {str(k): v for k, v in progress.items() if isinstance(k, int)}
+    existing['progress']          = {k: v for k, v in progress.items() if k not in _SPECIAL_KEYS}
     existing['extras']            = progress.get('extras', [])
     existing['scrolls_seen']      = progress.get('scrolls_seen', [])
     existing['flags']             = progress.get('flags', {})
@@ -79,7 +86,13 @@ def load_progress(data: Optional[dict]) -> dict:
     if data is None:
         return {}
     raw    = data.get('progress', {})
-    result = {int(k): v for k, v in raw.items()}
+    # Level records are keyed by slug. Legacy saves used int level-ids — migrate
+    # them via LEGACY_ID_SLUG (digit-string key → slug); drop any id with no slug.
+    result: dict = {}
+    for k, v in raw.items():
+        slug = LEGACY_ID_SLUG.get(int(k)) if str(k).lstrip('-').isdigit() else k
+        if slug is not None:
+            result[slug] = v
     extras = data.get('extras', [])
     if extras:
         result['extras'] = extras

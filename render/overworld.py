@@ -11,7 +11,7 @@ from blessed import Terminal
 from engine.player import Player
 import render.colors as C
 import render.symbols as S
-from content.levels import LEVELS, is_unlocked, level_type
+from content.levels import LEVELS, is_unlocked, level_type_for_slug
 from render.utils import inner_w as _iw
 
 
@@ -149,12 +149,12 @@ def render_overworld(term: Terminal, player: Player, progress: dict,
                     badge_col + badge), cw
         # level
         lv       = line['level']
-        prog     = progress.get(lv['id'], {})
+        prog     = progress.get(lv['slug'], {})
         complete = prog.get('complete', False)
         stars    = prog.get('stars', 0)
-        unlocked = is_unlocked(lv['id'], progress, player.name)
+        unlocked = is_unlocked(lv['slug'], progress, player.name)
         if complete:
-            if level_type(lv['id']) != 'dungeon':
+            if level_type_for_slug(lv['slug']) != 'dungeon':
                 badge = '[COMPLETE]'
             else:
                 badge = f"[{'★' * stars}{'☆' * (2 - stars)} COMPLETE]"
