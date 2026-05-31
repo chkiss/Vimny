@@ -1,4 +1,4 @@
-"""Level 9 — The Screen Vault: dungeon correctness tests.
+"""The Screen Vault: dungeon correctness tests.
 
 Teaching goal: H/M/L (viewport-relative top/middle/bottom jumps), distinct from
 G (which lands on a void row and is punished).  Viewport-filling layout with

@@ -1,4 +1,4 @@
-"""Level 8 — The Lineheads: dungeon correctness tests.
+"""The Lineheads: dungeon correctness tests.
 
 Teaching goal: G (last line), gg (first line), {n}G (nth line).
 

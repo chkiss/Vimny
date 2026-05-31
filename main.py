@@ -1849,7 +1849,7 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
                 if ent is None:
                     ent = room.entity_at(player.row, player.col)
                 if ent and ent.kind == 'exit' and not won:
-                    # Level 10: exit is gated until all keystones are collected.
+                    # Keystone-gated exit: blocked until all keystone entities are collected.
                     _ks_alive = [e for e in room._entity_by_kind.get('keystone', []) if e.alive]
                     if _ks_alive:
                         _push(f'{len(_ks_alive)} keystone(s) still uncollected.')

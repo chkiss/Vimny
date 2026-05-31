@@ -1,4 +1,4 @@
-"""Level 7 — The Backward Vaults: dungeon correctness tests."""
+"""The Backward Vaults: dungeon correctness tests."""
 import math
 import pytest
 from engine.world import CellType

@@ -74,7 +74,7 @@ _SKIP_LEVELS = {
     # par=None — not keystroke puzzles, so "answer cost == par" does not apply.
     # Excluded from parametrization entirely (not emitted as skipped cases).
     'build_dungeon_reliquary',     # The Reliquary (reward / chest room)
-    'build_dungeon_wardens_keep',     # The Warden's Keep (L5 boss)
+    'build_dungeon_wardens_keep',     # The Warden's Keep (boss)
     'build_dungeon_dummy',  # Dummy Dungeon (test scaffold)
 }
 _XFAIL_LEVELS: dict = {}
@@ -126,7 +126,7 @@ def test_answer_cost_equals_par(builder, seed):
 
 
 class TestLevel0AnswerPath:
-    """Level 0 has only h/j/k/l.  Answer must not use count notation."""
+    """The First Cave has only h/j/k/l.  Answer must not use count notation."""
 
     def test_no_count_notation(self):
         for seed in SEEDS:
@@ -147,7 +147,7 @@ class TestLevel0AnswerPath:
 
 
 class TestLevel1AnswerPath:
-    """Level 1 has h/j/k/l + ^$0.  Answer must not use count notation."""
+    """The Line Halls has h/j/k/l + ^$0.  Answer must not use count notation."""
 
     def test_no_count_notation(self):
         for seed in SEEDS:
@@ -166,8 +166,8 @@ class TestLevel1AnswerPath:
             )
 
 
-def test_L8_fallback_answer_cost_matches_fallback_par():
-    """Level 8 fallback string and fallback par must agree.
+def test_backward_vaults_fallback_answer_cost_matches_fallback_par():
+    """The Backward Vaults fallback string and fallback par must agree.
 
     The universal test only exercises the live Dijkstra output; this test guards
     the hardcoded fallback used when Dijkstra returns None, catching stale

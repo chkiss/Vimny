@@ -1,4 +1,4 @@
-"""Prove every hjkl direction is required to complete Level 0."""
+"""Prove every hjkl direction is required to complete the First Cave."""
 from collections import deque
 import pytest
 from generation.dungeon_gen import build_dungeon_first_cave

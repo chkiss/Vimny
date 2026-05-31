@@ -1,4 +1,4 @@
-"""Level 2 — The Counting Crypts: dungeon correctness tests."""
+"""The Counting Crypts: dungeon correctness tests."""
 import heapq
 import pytest
 from generation.dungeon_gen import (
@@ -51,7 +51,7 @@ def test_exit_is_reachable(seed):
 
 @pytest.mark.parametrize("seed", SEEDS)
 def test_par_matches_dijkstra(seed):
-    """par equals full state-space Dijkstra: all Level 2 commands + door states."""
+    """par equals full state-space Dijkstra: all Counting Crypts commands + door states."""
     d = build_dungeon_counting_crypts(seed)
     room = d.room
     door_cols = sorted(set(e.col for e in room.entities if e.kind == 'door' and e.alive))
