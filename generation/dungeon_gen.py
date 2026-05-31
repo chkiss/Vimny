@@ -3270,7 +3270,7 @@ def build_dungeon_bracket_vaults(seed: int) -> Dungeon:
 # ── H/M/L: The Screen Vault (3 colored keys) ────────────────────────
 # Viewport-filling dungeon teaching H (viewport-top), M (viewport-middle), and
 # L (viewport-bottom) as distinct from G (which lands on a void row and is
-# punished).  Restored from the recovered "screen_vault_3keys" design.
+# punished).
 #   COLS=43, ROWS=game_h+4
 #   Row 1             : wide top section (cols 1-41) — H key, 3 colored doors, exit
 #   Rows 2..L_ROW     : narrow corridor (cols 1-25) — M key at M_ROW, L key at L_ROW
@@ -3498,7 +3498,6 @@ def build_dungeon_screen_vault(seed: int, game_h: int = _SCREEN_VAULT_DEFAULT_GA
 
     Viewport-filling dungeon that teaches H (viewport-top), M (viewport-middle),
     and L (viewport-bottom) as distinct from G (room-last-row = void, punished).
-    Restored from the recovered "screen_vault_3keys" design.
 
     Layout: COLS=43, ROWS=game_h+4
       Row 0          : wall border
@@ -3871,7 +3870,7 @@ def _par_runic_archives(composite, return_path=False,
 
 # ── G/gg: The Lineheads ─────────────────────────────────────────
 # 16-row × 11-col vertical shaft teaching G (last line), gg (first line), and
-# {n}G (nth line).  Restored from the admin design layout "The Lineheads".
+# {n}G (nth line).
 #
 # Layout:
 #   Row 1     : top corridor cols 1-9; start (1,1), exit (1,9);
@@ -4057,8 +4056,7 @@ def _par_lineheads(composite, return_path: bool = False,
 def build_dungeon_lineheads(seed: int) -> 'Dungeon':
     """G gg {n}G: The Lineheads.
 
-    A 16-row × 11-col vertical shaft (restored from the admin design layout
-    "The Lineheads").  The exit sits on the top row behind two locked doors; the two keys
+    A 16-row × 11-col vertical shaft.  The exit sits on the top row behind two locked doors; the two keys
     are buried near the top and bottom of a 2-wide left shaft, so the player
     rides G / gg / {n}G up and down to fetch a key, open its matching colored door
     (stepping onto it), and repeat.  Geometry is fixed; the two key COLORS are

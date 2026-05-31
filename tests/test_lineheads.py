@@ -2,7 +2,7 @@
 
 Teaching goal: G (last line), gg (first line), {n}G (nth line).
 
-A fixed 16×11 vertical shaft (restored from an admin design layout): the exit is
+A fixed 16×11 vertical shaft: the exit is
 on the top row behind two locked doors; the two keys are buried near the top and
 bottom of a 2-wide left shaft, so the solve rides G/gg/{n}G up and down to fetch
 a key, open a door, and repeat.  The layout is seed-independent.
