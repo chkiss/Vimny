@@ -79,28 +79,6 @@ LEVELS = [
 # ── Lookup map ──────────────────────────────────────────────────────────────
 _BY_SLUG = {l['slug']: l for l in LEVELS}
 
-# Frozen historical id→slug map: migrates legacy int-keyed save files (written
-# before the slug refactor) to slug keys. This is a permanent record of the
-# numbering at the time those saves were written; it must never change.
-LEGACY_ID_SLUG = {
-    0: 'first_cave',   1: 'line_halls',          11: 'reliquary',
-    2: 'counting_crypts', 3: 'rune_halls',        4: 'character_cataracts',
-    5: 'goblin_gauntlet', 51: 'wardens_keep',     6: 'word_forge',
-    7: 'backward_vaults', 8: 'lineheads',         9: 'screen_vault',
-    10: 'bracket_vaults', 12: 'runic_archives',   13: 'sentence_corridor',
-    131: 'warden_surveyor', 14: 'sight_sanctum',  15: 'seekers_labyrinth',
-    16: 'waypoint_sanctum', 17: 'archivists_library', 171: 'warden_pathfinder',
-    18: 'operators_vault', 19: 'whole_line_annex', 20: 'quartermaster',
-    21: 'undo_sanctum',   22: 'echo_vault',       221: 'warden_manifold',
-    23: 'inscription_halls', 24: 'sculpting_chambers', 25: 'overwrite_halls',
-    26: 'case_chambers',  27: 'joiners_gate',     28: 'alignment_halls',
-    29: 'indentation_sanctum', 291: 'warden_scrivener', 30: 'word_enclosure',
-    31: 'bracket_enclosure', 32: 'brace_square_enclosure', 33: 'quote_enclosure',
-    34: 'tag_enclosure',  35: 'sentence_enclosure', 36: 'paragraph_enclosure',
-    361: 'grandmasters_sanctum', 37: 'spellwrights_forge', 38: 'hall_of_echoes',
-    381: 'warden_eternal', 99: 'dummy',
-}
-
 
 def display_number(slug: str) -> str:
     """Human-facing level number (e.g. '5', '5.1'). Cosmetic only."""

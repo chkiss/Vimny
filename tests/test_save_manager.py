@@ -102,18 +102,17 @@ class TestLoadProgress:
     def test_missing_progress_key_returns_empty(self):
         assert load_progress({'player_name': 'Alice'}) == {}
 
-    def test_legacy_int_keys_migrated_to_slug(self):
-        # Legacy saves keyed level records by int id; load migrates them to slug.
-        data = {'progress': {'0': {'complete': True}, '2': {'complete': False}}}
+    def test_slug_keys_loaded_as_is(self):
+        data = {'progress': {'first_cave': {'complete': True},
+                             'counting_crypts': {'complete': False}}}
         result = load_progress(data)
-        assert 'first_cave' in result        # id 0 → slug
-        assert 'counting_crypts' in result   # id 2 → slug
-        assert all(isinstance(k, str) for k in result)
+        assert result['first_cave'] == {'complete': True}
+        assert result['counting_crypts'] == {'complete': False}
 
     def test_values_preserved(self):
-        data = {'progress': {'1': {'complete': True, 'stars': 3}}}
+        data = {'progress': {'line_halls': {'complete': True, 'stars': 3}}}
         result = load_progress(data)
-        assert result['line_halls'] == {'complete': True, 'stars': 3}   # id 1 → slug
+        assert result['line_halls'] == {'complete': True, 'stars': 3}
 
     def test_round_trip_via_save_progress(self, tmp_path, monkeypatch):
         monkeypatch.setattr('save.save_manager.SAVES_DIR', tmp_path)
