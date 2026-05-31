@@ -318,61 +318,103 @@ clean-renumber cascade when updating `content/levels.py`.
 
 ---
 
-# Part 7 — FINAL curriculum (to implement in `content/levels.py`)
+# Part 7 — FINAL curriculum (mirrors `content/levels.py`)
 
-Teaching levels use sequential ids (0–38, skipping **11** = the Reliquary bonus, mirroring the
-original convention). Bosses are `x.1` (id = `{N}1`, key `dungeon_{N:02d}.1`). Blueprints:
-`blueprints/act_*.md`.
+Identity is the **slug** (immutable). The leftmost column is the human-facing
+**display** number — cosmetic only; the historical gap (no level 11; the Runic
+Archives is 12) is preserved. Bosses and the Reliquary render as `x.1`.
+Curriculum order is the order of `LEVELS`. Blueprints: `blueprints/act_*.md`.
 
-> This table mirrors the as-built `content/levels.py` (the canonical source). The standalone
-> **Goblin Gauntlet (L5)** is retained — `; ,` is **not** merged into L4 — which shifts every
-> later teaching level **+1** and re-bases the boss ids (`51 131 171 221 291 361 381`).
+> **This table is generated** from `content/levels.py` by
+> `python3 content/_gen_curriculum_table.py` — do not hand-edit between the
+> markers. After renumbering (edit `display` / reorder `LEVELS`), rerun it. The
+> renumbering procedure is Part 8.
 
-| id | key suffix | Name | commands | type |
-|----|-----------|------|----------|------|
-| 0 | the_first_cave | The First Cave | `h j k l  u  :w :q :q!` | |
-| 1 | the_line_halls | The Line Halls | `^ $ 0` | |
-| 11 | the_reliquary | The Reliquary | — (review only) | reliquary |
-| 2 | the_counting_crypts | The Counting Crypts | `[count]`  (`x`) | |
-| 3 | the_rune_halls | The Rune Halls | `w b e` | |
-| 4 | the_character_cataracts | The Character Cataracts | `f F t T` | |
-| 5 | the_goblin_gauntlet | The Goblin Gauntlet | `; , p` | |
-| 51 | the_wardens_keep | The Warden's Keep | — | boss |
-| 6 | the_word_forge | The WORD Forge | `W B E` | |
-| 7 | the_backward_vaults | The Backward Vaults | `ge gE` | |
-| 8 | the_lineheads | The Lineheads | `G gg` | |
-| 9 | the_screen_vault | The Screen Vault | `H M L` | |
-| 10 | the_bracket_vaults | The Bracket Vaults | `%` | |
-| 12 | the_runic_archives | The Runic Archives | `} {` | |
-| 13 | the_sentence_corridor | The Sentence Corridor | `) (` | |
-| 131 | the_warden_surveyor | The Warden Surveyor | — | boss |
-| 14 | the_sight_sanctum | The Sight Sanctum | `v` | |
-| 15 | the_seekers_labyrinth | The Seekers' Labyrinth | `/ ? n N` | |
-| 16 | the_waypoint_sanctum | The Waypoint Sanctum | `m ' \`` | |
-| 17 | the_archivists_library | The Archivist's Library | `:e :set` | |
-| 171 | the_warden_pathfinder | The Warden Pathfinder | — | boss |
-| 18 | the_operators_vault | The Operator's Vault | `d c` (`x`=`dl`,`s`=`cl`) | |
-| 19 | the_whole_line_annex | The Whole-Line Annex | `dd cc D S` | |
-| 20 | the_quartermaster | The Quartermaster | `y yy P` | |
-| 21 | the_undo_sanctum | The Undo Sanctum | `u` (demo; `Ctrl-R`=scroll) | |
-| 22 | the_echo_vault | The Echo Vault | `.` | |
-| 221 | the_warden_manifold | The Warden Manifold | — | boss |
-| 23 | the_inscription_halls | The Inscription Halls | `i a` | |
-| 24 | the_sculpting_chambers | The Sculpting Chambers | `I A o O` | |
-| 25 | the_overwrite_halls | The Overwrite Halls | `r R` | |
-| 26 | the_case_chambers | The Case Chambers | `~ g~ gU gu` | |
-| 27 | the_joiners_gate | The Joiner's Gate | `J gJ` | |
-| 28 | the_alignment_halls | The Alignment Halls | `>> <<` | |
-| 29 | the_indentation_sanctum | The Indentation Sanctum | `>{m} <{m} =` | |
-| 291 | the_warden_scrivener | The Warden Scrivener | — | boss |
-| 30 | the_word_enclosure | The Word Enclosure | `iw aw` | |
-| 31 | the_bracket_enclosure | The Bracket Enclosure | `i( a(` | |
-| 32 | the_brace_square_enclosure | The Brace & Square Enclosure | `i[ a[ i{ a{` | |
-| 33 | the_quote_enclosure | The Quote Enclosure | `i" a" i' a'` | |
-| 34 | the_tag_enclosure | The Tag Enclosure | `it at` | |
-| 35 | the_sentence_enclosure | The Sentence Enclosure | `is as` | |
-| 36 | the_paragraph_enclosure | The Paragraph Enclosure | `ip ap` | |
-| 361 | the_grandmasters_sanctum | The Grandmaster's Sanctum | — | boss |
-| 37 | the_spellwrights_forge | The Spellwright's Forge | `:s///` | |
-| 38 | the_hall_of_echoes | The Hall of Echoes | `q @ "` | |
-| 381 | the_warden_eternal | The Warden Eternal | — | boss |
+<!-- BEGIN GENERATED CURRICULUM TABLE -->
+| # | slug | Name | commands | type |
+|---|------|------|----------|------|
+| 0 | `first_cave` | The First Cave | `h j k l u :w :q :q!` |  |
+| 1 | `line_halls` | The Line Halls | `^ $ 0` |  |
+| 1.1 | `reliquary` | The Reliquary | `"` | reliquary |
+| 2 | `counting_crypts` | The Counting Crypts | `[count] prefix` |  |
+| 3 | `rune_halls` | The Rune Halls | `w b e` |  |
+| 4 | `character_cataracts` | The Character Cataracts | `f F t T` |  |
+| 5 | `goblin_gauntlet` | The Goblin Gauntlet | `; , p` |  |
+| 5.1 | `wardens_keep` | The Warden's Keep | — | boss |
+| 6 | `word_forge` | The WORD Forge | `W B E` |  |
+| 7 | `backward_vaults` | The Backward Vaults | `ge gE` |  |
+| 8 | `lineheads` | The Lineheads | `G gg` |  |
+| 9 | `screen_vault` | The Screen Vault | `H M L` |  |
+| 10 | `bracket_vaults` | The Bracket Vaults | `%` |  |
+| 12 | `runic_archives` | The Runic Archives | `} {` |  |
+| 13 | `sentence_corridor` | The Sentence Corridor | `) (` |  |
+| 13.1 | `warden_surveyor` | The Warden Surveyor | — | boss |
+| 14 | `sight_sanctum` | The Sight Sanctum | `v` |  |
+| 15 | `seekers_labyrinth` | The Seekers' Labyrinth | `/ ? n N` |  |
+| 16 | `waypoint_sanctum` | The Waypoint Sanctum | `m ' `` |  |
+| 17 | `archivists_library` | The Archivist's Library | `:e :set` |  |
+| 17.1 | `warden_pathfinder` | The Warden Pathfinder | — | boss |
+| 18 | `operators_vault` | The Operator's Vault | `d c` |  |
+| 19 | `whole_line_annex` | The Whole-Line Annex | `dd cc D S` |  |
+| 20 | `quartermaster` | The Quartermaster | `y yy P` |  |
+| 21 | `undo_sanctum` | The Undo Sanctum | — |  |
+| 22 | `echo_vault` | The Echo Vault | `.` |  |
+| 22.1 | `warden_manifold` | The Warden Manifold | — | boss |
+| 23 | `inscription_halls` | The Inscription Halls | `i a` |  |
+| 24 | `sculpting_chambers` | The Sculpting Chambers | `I A o O` |  |
+| 25 | `overwrite_halls` | The Overwrite Halls | `r R` |  |
+| 26 | `case_chambers` | The Case Chambers | `~ g~ gU gu` |  |
+| 27 | `joiners_gate` | The Joiner's Gate | `J gJ` |  |
+| 28 | `alignment_halls` | The Alignment Halls | `>> <<` |  |
+| 29 | `indentation_sanctum` | The Indentation Sanctum | `>{m} <{m} =` |  |
+| 29.1 | `warden_scrivener` | The Warden Scrivener | — | boss |
+| 30 | `word_enclosure` | The Word Enclosure | `iw aw` |  |
+| 31 | `bracket_enclosure` | The Bracket Enclosure | `i( a(` |  |
+| 32 | `brace_square_enclosure` | The Brace & Square Enclosure | `i[ a[ i{ a{` |  |
+| 33 | `quote_enclosure` | The Quote Enclosure | `i" a" i' a'` |  |
+| 34 | `tag_enclosure` | The Tag Enclosure | `it at` |  |
+| 35 | `sentence_enclosure` | The Sentence Enclosure | `is as` |  |
+| 36 | `paragraph_enclosure` | The Paragraph Enclosure | `ip ap` |  |
+| 36.1 | `grandmasters_sanctum` | The Grandmaster's Sanctum | — | boss |
+| 37 | `spellwrights_forge` | The Spellwright's Forge | `:s///` |  |
+| 38 | `hall_of_echoes` | The Hall of Echoes | `q @ "` |  |
+| 38.1 | `warden_eternal` | The Warden Eternal | — | boss |
+| 99 | `dummy` | Dummy Dungeon | `d x s y p yy P` |  |
+<!-- END GENERATED CURRICULUM TABLE -->
+
+---
+
+# Part 8 — Renumbering & the slug model (for future edits)
+
+`content/levels.py` is the single source of truth. Every builder, test, par
+solver, save record, scroll, and wizard poem is keyed by the immutable **slug**
+— never by a level number. Renumbering is therefore cheap and safe.
+
+## To renumber or reorder the curriculum
+1. Edit `LEVELS` in `content/levels.py`: reorder entries and/or change `display`
+   strings. **Never change a `slug`** — that is the identity.
+2. `known_commands`, unlock gating (`unlocks_after_slug`), and the hint-bar tiers
+   all derive from `LEVELS` order automatically — nothing else to touch.
+3. Run `python3 content/_gen_curriculum_table.py` to refresh the Part 7 table.
+4. `python3 -m pytest -q` — green confirms the curriculum is consistent.
+
+## Keyed by slug (renumber-immune)
+- Builders: `build_dungeon_<slug>` (`generation/dungeon_gen.py`).
+- Tests: `tests/test_<slug>.py`; par solvers `_par_<slug>`; constants `_<SLUG>_*`.
+- Saves: `progress` is keyed by slug (`save/save_manager.py`).
+- Scrolls: `_SCROLL_DROPS` (main.py) + `SCROLL_CATALOG.level_slug` (content/scrolls.py).
+- Wizard poems: `introduces_slug` (`art/_gen_wizard_wisdom.py`).
+- Per-level special-casing in main.py compares `level == '<slug>'`.
+
+## The only places numbers still live
+- `display` (one cosmetic string per level) — the single thing a renumber edits.
+- `LEGACY_ID_SLUG` (`content/levels.py`) — a **frozen** historical id→slug map,
+  used solely to migrate pre-refactor int-keyed save files. Never edit it: it is
+  a permanent record of the numbering in use when those saves were written.
+
+## Adding a new level
+Add a `LEVELS` entry (unique slug, `display`, `name`, `key`, `teaches`); write
+`build_dungeon_<slug>` + `tests/test_<slug>.py`; if it precedes a lesson, add a
+slug-keyed poem in `art/_gen_wizard_wisdom.py` and regenerate. A brand-new slug
+needs **no** `LEGACY_ID_SLUG` entry (only levels that ever shipped with an int id
+appear there).
