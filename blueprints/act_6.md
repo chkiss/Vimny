@@ -1,5 +1,7 @@
 # Act VI — Text Objects (Capstone) — Generator-Grade Blueprints (Revised)
 
+> ⚠ **Pre-implementation design doc — obsolete conventions; delete-on-implement.** Uses pre-slug naming (e.g. `RuneCluster` → now `CharRun`; level numbers are now the cosmetic `display` field) — don't copy these symbols. **Delete a level's section when that level ships, and the whole file once its act is built.** See LEVELS_PLAN Part 8.
+
 > Authority: LEVELS_PLAN.md §Act VI + §Part 3 + §Part 5; engine/text_object.py;
 > engine/operator.py; generation/dungeon_gen.py.
 >

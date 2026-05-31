@@ -1,5 +1,7 @@
 # Act VII — Mastery Blueprints
 
+> ⚠ **Pre-implementation design doc — obsolete conventions; delete-on-implement.** Uses pre-slug naming (e.g. `RuneCluster` → now `CharRun`; level numbers are now the cosmetic `display` field) — don't copy these symbols. **Delete a level's section when that level ships, and the whole file once its act is built.** See LEVELS_PLAN Part 8.
+
 > Levels 37, 38, and 38.1. Commands: `:s/{}/{}/[g]`, `q @ "`. Capstone act.
 > All three share one coherent family: **power automation** — transform many
 > targets with a single compound command, then industrialise repetition.

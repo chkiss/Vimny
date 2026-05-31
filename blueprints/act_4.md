@@ -1,6 +1,8 @@
 # Act IV Blueprints — Visual Mode & The Operator Grammar
 
-> Generator-grade ASCII blueprints for levels 14, 18–22 + boss 22.1.
+> ⚠ **Pre-implementation design doc — obsolete conventions; delete-on-implement.** Uses pre-slug naming (e.g. `RuneCluster` → now `CharRun`; level numbers are now the cosmetic `display` field) — don't copy these symbols. **Delete a level's section when that level ships, and the whole file once its act is built.** See LEVELS_PLAN Part 8.
+
+> Generator-grade ASCII blueprints for levels 18–22 + boss 22.1.
 > Each section is a complete spec for `build_dungeon_N()` in `generation/dungeon_gen.py`.
 > Dims = (rows × cols). @ = entry, X = exit, K = keystone, D = door, g = goblin, W = warden.
 > Par-solver assumptions are stated explicitly in each section.
@@ -10,132 +12,12 @@
 > - S2 tight budget fallback: multiplier documented per level when margin-forcing is used.
 > - S3 par recomputed as true full min-keystroke entry→exit including all navigation and Esc.
 > - S4 earlier commands blocked via terrain or command guards where they would trivialize.
-> - L14: `V` given its own `visual_line` token; `v` strictly cheapest.
 > - L19: par arithmetic corrected (2j 15l = 17, not 7; realistic par ~66); `D` taught as
 >   shorthand demo since `D` and `d$` cost identically in the engine (CHALLENGE recorded).
 > - L22: `dw` replaced by `de` (inclusive, chains correctly); `dd` and `d12e` bypasses
 >   blocked via terrain (each goblin in single-cell alcove; door sealed by goblin death).
 > - Boss Warden Manifold Phase 4: `yy`+`p` split — now Phase 4 = `yy`, Phase 5 = `p`,
 >   one operator per phase; note engine CHALLENGE for `immune_to`/`phase` fields.
-
----
-
-## L14 — The Sight Sanctum
-
-**Commands taught:** `v` (charwise visual select), then `d`/`y`/`c` applied to the selection.
-New mechanics (count: 2):
-1. Visual mode `v` — enters charwise-select; cursor movement extends the highlight.
-2. `v{motion}d` / `v{motion}y` — the "select then operate" pattern; bridges immediately into operator grammar.
-
-**Linkage:** `v` is the bridge level. Students already know all motions (hjkl, w, $, etc.).
-They now discover that any operator can act on a visual selection instead of a motion argument.
-The key insight — "select a span, then delete it" — will be re-expressed in L18 as `d{motion}`.
-
-**`V` (linewise visual) is explicitly NOT taught in L14.**
-`V` is gated on the `visual_line` token in `known_commands`. L14 grants only `visual` (charwise).
-`V` is deferred to L19 where it naturally pairs with the whole-line idiom (`dd` ~ `Vd`).
-This ensures `v` is strictly cheapest for void-field clearing in this level.
-
----
-
-### Grid
-
-**Dims:** 10 rows × 50 cols.
-
-```
-##################################################
-#@.......................................#....o..#
-#.###############################........#....o..#
-#.#.oooooooooooooooooooooooooooo#........#....o..#
-#.#.oooooooooooooooooooooooooooo#........#....o..#
-#.#.oooooooooooooooooooooooooooo#........#....o..#
-#.#.oooooooooooooooooooooooooooo#........D....X..#
-#.###############################................#
-#..........K.............................        #
-##################################################
-```
-
-- `@` at (1, 1).
-- `X` (exit) at (6, 47).
-- `K` (keystone) at (8, 11).
-- Void field: rows 3–6, cols 3–30 (4 r × 28 c). Cells are void RuneClusters (kind='void'),
-  one per cell, packed in a 4×28 grid. The player cannot walk through them.
-- Inner wall: rows 2–7, cols 2–31 (rectangular border around the void field). Interior is void.
-- `D` (door) at col 43, rows 5–6 (2-cell-high door in the corridor to the exit).
-  Door unlocks when all void RuneClusters in rows 3–6, cols 3–30 are cleared.
-- Corridor from exit room: rows 5–7, cols 31–46.
-- Right void strip at cols 45–46, rows 1–5: lethal strip to the north, preventing hjkl bypass
-  around the door by going north-east.
-
-**Void-field clearing mechanic (S1 terrain-∞ forcing):**
-The void field is a 4 r × 28 c rectangle of void RuneClusters. They are impassable.
-There is no route from `@` to `X` without clearing them — the inner wall and void strip
-make every non-clearing path physically impossible (infinite cost), not merely expensive.
-To clear: `v` enters charwise visual, `$` extends to end of inner room row, `d` removes voids.
-Four passes of `v $d` (with `j` between rows) clears the field and opens the door.
-
-`V` (linewise visual) is NOT available in L14 (gated on `visual_line` token, not granted here).
-Therefore `v $d` (3 keys/row) is the only visual-clear option, and `v` is strictly required.
-
-**Optimal path (par solver model):**
-
-```
-Step 1: Navigate to void field top-left (3,3)
-  @ is (1,1). 2j 2l                           cost: 4
-
-Step 2: Clear void row 3 (cols 3–30, width 28)
-  v $d                                         cost: 3
-
-Step 3: Move to row 4, clear
-  j v $d                                       cost: 4
-
-Step 4: Move to row 5, clear
-  j v $d                                       cost: 4
-
-Step 5: Move to row 6, clear
-  j v $d                                       cost: 4
-
-Step 6: Exit inner room right wall gap at (6,31)
-  l (through gap)                              cost: 1
-
-Step 7: Navigate corridor to exit (6,47)
-  Door now open. 16l to reach X               cost: 16
-```
-
-**Par:** 4 + 3 + 4 + 4 + 4 + 1 + 16 = **36 keystrokes** (true full entry→exit).
-**Budget:** ceil(36 × 1.4) = **51 keystrokes**.
-
-**Forcing argument (S1 terrain-∞):**
-The void field is physically impassable. No path to X exists without clearing it.
-`v` is the only command that initiates visual-select-delete on void RuneClusters.
-(`x` = `dl` removes a single floor-level rune but void clusters span cells that block
-movement; `x` can delete them one-at-a-time, but this costs 28 × 4 = 112 keys >> budget 51.)
-`V` is not available (gated separately). The forcing is therefore terrain-∞ (infinite cost
-to bypass), not budget-margin.
-
-**Next-best (without v, using x):** 4 (nav) + 112 (x on each void cell) + 17 (exit) = 133 >> 51.
-
-**Primitives used:** void RuneClusters (kind='void'), door with clearing-trigger, corridor,
-right void strip (bypass prevention).
-
-**Assumptions:**
-- Void RuneClusters (kind='void') are cleared by `v...d`; `op_delete` removes them and cells
-  become passable. Uses existing rune-cluster void mechanic.
-- The door trigger condition: `door.open = (count of void RuneClusters in rows 3–6, cols 3–30 == 0)`.
-  Implement as a post-action check in the dungeon tick, same pattern as other conditional doors.
-- Par solver must include `v` as a mode-toggle (cost 1), motion extension (cost per motion),
-  and `d` (cost 1), and must model the state: (player_pos, void_clusters_cleared, door_open).
-- `$` within the inner room reaches col 30 (the right inner wall), so `v $d` clears exactly
-  one row of voids (cols 3–30) if cursor is at col 3.
-- `V` (`visual_line`) token is NOT in `known_commands` for L14. This must be enforced in
-  `content/levels.py` `known_commands()` for level 14.
-
-**Self-check:**
-- ≤3 new mechanics? YES: (1) visual-mode entry `v`, (2) selection extension with motions,
-  (3) operator on visual span. All three are one conceptual family: "select then operate."
-- Forced? YES: terrain-∞ forcing — void field is impassable without `v...d`. S1 satisfied.
-- `V` gated separately? YES: `visual_line` token separate from `visual` token.
-- Boss linkage? YES: `v` feeds directly into L18 operator grammar.
 
 ---
 
@@ -264,7 +146,7 @@ New mechanics (count: 2):
 the operator (`dd`, `cc`) operates on the full line — the "implicit whole-line motion." `D` and
 `S` are shorthands for already-known combinations (`d$` and `cc`), taught here as the natural
 same-lesson companions. `V` (linewise visual) is introduced as the bridge to what students
-learned in L14: "select then delete" now applies to whole lines.
+learned in The Sight Sanctum: "select then delete" now applies to whole lines.
 
 **CHALLENGE — `D` vs `d$` cost equality (engine):**
 In the Vimny engine, `D` is parsed as `{'type':'operator','op':'d','motion':'$'}`, costing
@@ -936,7 +818,6 @@ decrease from any other attack. Implementation requires `immune_to` / `phase` on
 
 | Level | Name | Commands | Par | Budget | Forcing | Key Risks / Challenges |
 |-------|------|----------|-----|--------|---------|----------------------|
-| 14 | The Sight Sanctum | `v {motion} d/y/c` | 36 | 51 | S1 terrain-∞ (void field impassable) | `V` gated on separate `visual_line` token; door trigger "all void clusters cleared" |
 | 18 | The Operator's Vault | `d{motion}` `c{motion}` | ~52 | 73 | S1 terrain-∞ (goblins block) + budget per chamber | Per-chamber alignment must be hand-tuned; count-motions handled by chamber geometry |
 | 19 | The Whole-Line Annex | `dd` `cc` `D` `S` | 69 | 97 | S1 terrain-∞ (void strips block bypass) | CHALLENGE: `D` ≡ `d$` cost (2=2); `D` taught as demo not forced. Par corrected from ~28 to 69. |
 | 20 | The Quartermaster | `y yy y{motion}` `p P` | ~75 | 105 | S1 structural (pedestal fill required) | Fill-check door trigger; par solver state (clip, fill_mask). Par corrected from ~31 to ~75. |

@@ -3871,8 +3871,7 @@ def _par_runic_archives(composite, return_path=False,
 
 # ── G/gg: The Lineheads ─────────────────────────────────────────
 # 16-row × 11-col vertical shaft teaching G (last line), gg (first line), and
-# {n}G (nth line).  Restored from the admin design layout saved as
-# "dungeon_09_the_screen_vault_pre-reversion" (a mislabel — it is the Lineheads).
+# {n}G (nth line).  Restored from the admin design layout "The Lineheads".
 #
 # Layout:
 #   Row 1     : top corridor cols 1-9; start (1,1), exit (1,9);
@@ -4059,8 +4058,7 @@ def build_dungeon_lineheads(seed: int) -> 'Dungeon':
     """G gg {n}G: The Lineheads.
 
     A 16-row × 11-col vertical shaft (restored from the admin design layout
-    "dungeon_09_the_screen_vault_pre-reversion" — a mislabel; it is the
-    Lineheads).  The exit sits on the top row behind two locked doors; the two keys
+    "The Lineheads").  The exit sits on the top row behind two locked doors; the two keys
     are buried near the top and bottom of a 2-wide left shaft, so the player
     rides G / gg / {n}G up and down to fetch a key, open its matching colored door
     (stepping onto it), and repeat.  Geometry is fixed; the two key COLORS are
