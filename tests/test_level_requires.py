@@ -1,7 +1,7 @@
 """Prove every hjkl direction is required to complete Level 0."""
 from collections import deque
 import pytest
-from generation.dungeon_gen import build_dungeon_0
+from generation.dungeon_gen import build_dungeon_first_cave
 
 SEEDS = [1, 42, 999, 12345, 2**20 + 7]
 DELTA = {'h': (0, -1), 'j': (1, 0), 'k': (-1, 0), 'l': (0, 1)}
@@ -32,7 +32,7 @@ def can_reach(room, entry, goal, allowed_keys):
 
 @pytest.mark.parametrize("seed", SEEDS)
 def test_exit_is_reachable(seed):
-    d = build_dungeon_0(seed)
+    d = build_dungeon_first_cave(seed)
     room = d.room
     assert can_reach(room, room.spawn_pos, room.exit_pos, LEVEL_0_COMMANDS), \
         f"seed={seed}: exit unreachable with full hjkl"
@@ -40,7 +40,7 @@ def test_exit_is_reachable(seed):
 
 @pytest.mark.parametrize("seed,omit", [(s, c) for s in SEEDS for c in sorted(LEVEL_0_COMMANDS)])
 def test_each_command_is_necessary(seed, omit):
-    d = build_dungeon_0(seed)
+    d = build_dungeon_first_cave(seed)
     room = d.room
     restricted = LEVEL_0_COMMANDS - {omit}
     assert not can_reach(room, room.spawn_pos, room.exit_pos, restricted), \

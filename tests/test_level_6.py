@@ -2,14 +2,14 @@
 import math
 import heapq
 import pytest
-from generation.dungeon_gen import build_dungeon_6, _dijkstra_par_WBE, _L6_UNTYPABLE_PUNCT
+from generation.dungeon_gen import build_dungeon_word_forge, _dijkstra_par_WBE, _WORD_FORGE_UNTYPABLE_PUNCT
 
 SEEDS = [1, 42, 999, 12345, 2**20 + 7]
 
 
 @pytest.mark.parametrize("seed", SEEDS)
 def test_exit_is_reachable(seed):
-    d = build_dungeon_6(seed)
+    d = build_dungeon_word_forge(seed)
     room = d.rooms[0]
     assert room.exit_pos is not None
     par = _dijkstra_par_WBE(room)
@@ -18,7 +18,7 @@ def test_exit_is_reachable(seed):
 
 @pytest.mark.parametrize("seed", SEEDS)
 def test_par_matches_dijkstra(seed):
-    d = build_dungeon_6(seed)
+    d = build_dungeon_word_forge(seed)
     room = d.rooms[0]
     expected = _dijkstra_par_WBE(room)
     assert room.par == expected, (
@@ -28,7 +28,7 @@ def test_par_matches_dijkstra(seed):
 
 @pytest.mark.parametrize("seed", SEEDS)
 def test_budget_is_ceil_par_times_1_4(seed):
-    d = build_dungeon_6(seed)
+    d = build_dungeon_word_forge(seed)
     room = d.rooms[0]
     assert room.budget == math.ceil(room.par * 1.4), (
         f"seed={seed}: budget={room.budget} but ceil(par*1.4)={math.ceil(room.par*1.4)}"
@@ -39,7 +39,7 @@ def test_budget_is_ceil_par_times_1_4(seed):
 def test_par_is_ten(seed):
     """RT1 descent walls (3,54)/(3,55) force W on C1, C2-left void guards force B,
     and game-faithful solver semantics guarantee par=10 (4W 3j 4B 3j 4E)."""
-    d = build_dungeon_6(seed)
+    d = build_dungeon_word_forge(seed)
     room = d.rooms[0]
     assert room.par == 10, f"seed={seed}: expected par=10, got {room.par}"
 
@@ -47,7 +47,7 @@ def test_par_is_ten(seed):
 @pytest.mark.parametrize("seed", SEEDS)
 def test_answer_uses_WBE(seed):
     """Optimal answer must use W, B, and E (the WORD motions taught in level 7)."""
-    d = build_dungeon_6(seed)
+    d = build_dungeon_word_forge(seed)
     room = d.rooms[0]
     tokens = room.answer.split()
     has_W = any(t.endswith('W') for t in tokens)
@@ -61,7 +61,7 @@ def test_answer_uses_WBE(seed):
 @pytest.mark.parametrize("seed", SEEDS)
 def test_WBE_cheaper_than_count_hjkl(seed):
     """W/B/E path (par=10) is cheaper than minimum count-hjkl path (13 keystrokes)."""
-    d = build_dungeon_6(seed)
+    d = build_dungeon_word_forge(seed)
     room = d.rooms[0]
     # Minimum count-hjkl: three horizontal segments (3 ks each) + two count-j (2 ks each) = 13
     hjkl_min = 13
@@ -72,7 +72,7 @@ def test_WBE_cheaper_than_count_hjkl(seed):
 
 @pytest.mark.parametrize("seed", SEEDS)
 def test_entry_and_exit_not_on_void(seed):
-    d = build_dungeon_6(seed)
+    d = build_dungeon_word_forge(seed)
     room = d.rooms[0]
     void_cells = {
         (ru.row, ru.col + i)
@@ -85,7 +85,7 @@ def test_entry_and_exit_not_on_void(seed):
 
 @pytest.mark.parametrize("seed", SEEDS)
 def test_exit_entity_at_exit_pos(seed):
-    d = build_dungeon_6(seed)
+    d = build_dungeon_word_forge(seed)
     room = d.rooms[0]
     exit_ents = [e for e in room.entities if e.kind == 'exit']
     assert len(exit_ents) == 1, f"seed={seed}: expected 1 exit entity, got {len(exit_ents)}"
@@ -96,23 +96,23 @@ def test_exit_entity_at_exit_pos(seed):
 
 
 def test_anchor_W_at_fixed_position():
-    """W anchor is always at row=1, col=53; char drawn from _L6_UNTYPABLE_PUNCT."""
-    d = build_dungeon_6(42)
+    """W anchor is always at row=1, col=53; char drawn from _WORD_FORGE_UNTYPABLE_PUNCT."""
+    d = build_dungeon_word_forge(42)
     room = d.rooms[0]
     anchor = room.char_run_at(1, 53)
     assert anchor is not None, "Expected W-anchor rune at (1, 53)"
-    assert ''.join(anchor.symbols) in _L6_UNTYPABLE_PUNCT, (
+    assert ''.join(anchor.symbols) in _WORD_FORGE_UNTYPABLE_PUNCT, (
         f"Expected untypable char at (1,53), got {''.join(anchor.symbols)!r}"
     )
 
 
 def test_anchor_B_at_fixed_position():
-    """B anchor is always at row=4, col=3; char drawn from _L6_UNTYPABLE_PUNCT."""
-    d = build_dungeon_6(42)
+    """B anchor is always at row=4, col=3; char drawn from _WORD_FORGE_UNTYPABLE_PUNCT."""
+    d = build_dungeon_word_forge(42)
     room = d.rooms[0]
     anchor = room.char_run_at(4, 3)
     assert anchor is not None, "Expected B-anchor rune at (4, 3)"
-    assert ''.join(anchor.symbols) in _L6_UNTYPABLE_PUNCT, (
+    assert ''.join(anchor.symbols) in _WORD_FORGE_UNTYPABLE_PUNCT, (
         f"Expected untypable char at (4,3), got {''.join(anchor.symbols)!r}"
     )
 
@@ -120,7 +120,7 @@ def test_anchor_B_at_fixed_position():
 @pytest.mark.parametrize("seed", SEEDS)
 def test_anchors_use_distinct_chars(seed):
     """All 4 anchor chars (W4 pair + B1 pair) must be distinct across seeds."""
-    d = build_dungeon_6(seed)
+    d = build_dungeon_word_forge(seed)
     room = d.rooms[0]
     w4a = room.char_run_at(1, 53)
     w4b = room.char_run_at(1, 54)
@@ -136,7 +136,7 @@ def test_anchors_use_distinct_chars(seed):
 
 def test_exit_at_end_of_E4_group():
     """exit_pos must be at col 51, row 7 (end of 'output=data[n]._key')."""
-    d = build_dungeon_6(42)
+    d = build_dungeon_word_forge(42)
     room = d.rooms[0]
     assert room.exit_pos == (7, 51), f"Expected exit at (7,51), got {room.exit_pos}"
 
@@ -145,7 +145,7 @@ def test_exit_at_end_of_E4_group():
 def test_void_guard_at_C2_left_end(seed):
     """Void runes at (4,1) and (5,1) make 0/^ on either C2 row land on void
     (death), blocking the line-start shortcut and forcing B."""
-    d = build_dungeon_6(seed)
+    d = build_dungeon_word_forge(seed)
     room = d.rooms[0]
     for r, c in ((4, 1), (5, 1)):
         void_rune = room.char_run_at(r, c)
@@ -160,7 +160,7 @@ def test_descent_walls_force_W_on_C1(seed):
     """RT1 descent walls at (3,54)/(3,55) leave col 53 as the only C1→C2 turn.
     W lands at col 53 (start of the W4 WORD); E lands at col 54 (into a wall)."""
     from engine.world import CellType
-    d = build_dungeon_6(seed)
+    d = build_dungeon_word_forge(seed)
     room = d.rooms[0]
     assert room.cells[3][54] == CellType.WALL, f"seed={seed}: (3,54) should be wall"
     assert room.cells[3][55] == CellType.WALL, f"seed={seed}: (3,55) should be wall"
@@ -172,7 +172,7 @@ def test_descent_walls_force_W_on_C1(seed):
 @pytest.mark.parametrize("seed", SEEDS)
 def test_C1_right_end_has_no_void(seed):
     """The old C1 right-end void guards are gone — the descent walls replace them."""
-    d = build_dungeon_6(seed)
+    d = build_dungeon_word_forge(seed)
     room = d.rooms[0]
     for r, c in ((1, 55), (2, 55)):
         ru = room.char_run_at(r, c)

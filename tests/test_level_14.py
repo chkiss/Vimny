@@ -1,7 +1,7 @@
 """Level 14 — The Sight Sanctum: dungeon correctness and visual-mode undo tests."""
 import math
 import pytest
-from generation.dungeon_gen import build_dungeon_14
+from generation.dungeon_gen import build_dungeon_sight_sanctum
 from engine.world import Room, RoomType, CellType, CharRun, Entity
 from engine.player import Player
 from engine.budget import Budget
@@ -14,7 +14,7 @@ from main import _pop_history_step, _snapshot
 # ── helpers ──────────────────────────────────────────────────────────────────
 
 def _dungeon():
-    return build_dungeon_14(0)
+    return build_dungeon_sight_sanctum(0)
 
 
 def _budget(total=15, spent=0):
@@ -64,7 +64,7 @@ def test_top_corridor_voids_spawn_at_roughly_60_pct():
     # Over many seeds, void coverage in row 1 should be ~60%.
     counts = []
     for seed in range(50):
-        room = build_dungeon_14(seed).rooms[0]
+        room = build_dungeon_sight_sanctum(seed).rooms[0]
         counts.append(sum(1 for c in range(2, 20) if room.char_run_at(1, c) is not None))
     avg = sum(counts) / len(counts)
     assert 7 <= avg <= 13, f"expected ~10.8 voids on average, got {avg:.1f}"

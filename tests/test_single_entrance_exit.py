@@ -1,18 +1,18 @@
 """All levels must have exactly one entrance and one exit entity."""
 import pytest
 from generation.dungeon_gen import (
-    build_dungeon_0, build_dungeon_1, build_dungeon_2,
-    build_dungeon_3, build_dungeon_4,
+    build_dungeon_first_cave, build_dungeon_line_halls, build_dungeon_counting_crypts,
+    build_dungeon_rune_halls, build_dungeon_character_cataracts,
 )
 
 SEEDS = [1, 42, 999, 12345, 2**20 + 7]
 
 _BUILDERS = {
-    0: build_dungeon_0,
-    1: build_dungeon_1,
-    2: build_dungeon_2,
-    3: build_dungeon_3,
-    4: build_dungeon_4,
+    0: build_dungeon_first_cave,
+    1: build_dungeon_line_halls,
+    2: build_dungeon_counting_crypts,
+    3: build_dungeon_rune_halls,
+    4: build_dungeon_character_cataracts,
 }
 
 

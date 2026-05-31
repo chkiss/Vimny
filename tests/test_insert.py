@@ -329,8 +329,8 @@ def test_A_in_goblin_gauntlet_row1_lands_at_line_end():
     """Regression: A on a sparse corridor row goes to the line END (the corridor
     edge), not just past the lone rune. The Goblin Gauntlet (58 cols) row-1
     corridor ends at col 56, so A lands at col 57."""
-    from generation.dungeon_gen import build_dungeon_5
-    room = build_dungeon_5(42).rooms[0]
+    from generation.dungeon_gen import build_dungeon_goblin_gauntlet
+    room = build_dungeon_goblin_gauntlet(42).rooms[0]
     p = _player(1, 10)
     begin_insert(room, p, 'A')
     assert p.col == 57         # rightmost passable (56) + 1 — the corridor's end, not after the rune

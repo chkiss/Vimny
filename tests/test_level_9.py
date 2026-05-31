@@ -11,17 +11,17 @@ import math
 import pytest
 from engine.world import CellType
 from generation.dungeon_gen import (
-    build_dungeon_9,
-    _dijkstra_par_L9,
+    build_dungeon_screen_vault,
+    _par_screen_vault,
     _l9_key_rows,
-    _L9_COLS, _L9_DEFAULT_GAME_H,
-    _L9_H_KEY_COL, _L9_M_KEY_COL, _L9_L_KEY_COL,
-    _L9_DOOR_COLS, _L9_EXIT_COL,
-    _L9_SPAWN, _L9_COLORS,
+    _SCREEN_VAULT_COLS, _SCREEN_VAULT_DEFAULT_GAME_H,
+    _SCREEN_VAULT_H_KEY_COL, _SCREEN_VAULT_M_KEY_COL, _SCREEN_VAULT_L_KEY_COL,
+    _SCREEN_VAULT_DOOR_COLS, _SCREEN_VAULT_EXIT_COL,
+    _SCREEN_VAULT_SPAWN, _SCREEN_VAULT_COLORS,
 )
 
 SEEDS = [1, 42, 999, 12345, 2**20 + 7]
-_GH = _L9_DEFAULT_GAME_H
+_GH = _SCREEN_VAULT_DEFAULT_GAME_H
 
 # The par Dijkstra is moderately expensive, so build each seed's room once and
 # share it (these tests only read the room — never mutate it).
@@ -30,7 +30,7 @@ _ROOM_CACHE: dict = {}
 
 def _room(seed):
     if seed not in _ROOM_CACHE:
-        _ROOM_CACHE[seed] = build_dungeon_9(seed).rooms[0]
+        _ROOM_CACHE[seed] = build_dungeon_screen_vault(seed).rooms[0]
     return _ROOM_CACHE[seed]
 
 
@@ -40,13 +40,13 @@ def _room(seed):
 def test_dimensions(seed):
     room = _room(seed)
     assert room.rows == _GH + 4
-    assert room.cols == _L9_COLS
+    assert room.cols == _SCREEN_VAULT_COLS
 
 
 @pytest.mark.parametrize("seed", SEEDS)
 def test_spawn(seed):
     room = _room(seed)
-    assert room.spawn_pos == _L9_SPAWN
+    assert room.spawn_pos == _SCREEN_VAULT_SPAWN
     assert room.is_passable(*room.spawn_pos), f"seed={seed}: spawn not passable"
 
 
@@ -55,7 +55,7 @@ def test_exit(seed):
     room = _room(seed)
     exits = [e for e in room.entities if e.kind == 'exit']
     assert len(exits) == 1
-    assert (exits[0].row, exits[0].col) == (1, _L9_EXIT_COL) == room.exit_pos
+    assert (exits[0].row, exits[0].col) == (1, _SCREEN_VAULT_EXIT_COL) == room.exit_pos
 
 
 @pytest.mark.parametrize("seed", SEEDS)
@@ -63,16 +63,16 @@ def test_three_keys_at_hml_positions(seed):
     room = _room(seed)
     m_row, l_row = _l9_key_rows(_GH)
     keys = {(e.row, e.col): e.tag for e in room.entities if e.kind == 'floor_key'}
-    assert set(keys) == {(1, _L9_H_KEY_COL), (m_row, _L9_M_KEY_COL), (l_row, _L9_L_KEY_COL)}
-    assert sorted(keys.values()) == sorted(_L9_COLORS)   # each color used once
+    assert set(keys) == {(1, _SCREEN_VAULT_H_KEY_COL), (m_row, _SCREEN_VAULT_M_KEY_COL), (l_row, _SCREEN_VAULT_L_KEY_COL)}
+    assert sorted(keys.values()) == sorted(_SCREEN_VAULT_COLORS)   # each color used once
 
 
 @pytest.mark.parametrize("seed", SEEDS)
 def test_three_doors_colored(seed):
     room = _room(seed)
     doors = {(e.row, e.col): e.tag for e in room.entities if e.kind == 'locked_door'}
-    assert set(doors) == {(1, dc) for dc in _L9_DOOR_COLS}
-    assert sorted(doors.values()) == sorted(_L9_COLORS)   # each color used once
+    assert set(doors) == {(1, dc) for dc in _SCREEN_VAULT_DOOR_COLS}
+    assert sorted(doors.values()) == sorted(_SCREEN_VAULT_COLORS)   # each color used once
 
 
 @pytest.mark.parametrize("seed", SEEDS)
@@ -81,14 +81,14 @@ def test_keys_match_doors(seed):
     room = _room(seed)
     key_colors  = sorted(e.tag for e in room.entities if e.kind == 'floor_key')
     door_colors = sorted(e.tag for e in room.entities if e.kind == 'locked_door')
-    assert key_colors == door_colors == sorted(_L9_COLORS)
+    assert key_colors == door_colors == sorted(_SCREEN_VAULT_COLORS)
 
 
 @pytest.mark.parametrize("seed", SEEDS)
 def test_top_corridor_clear_between_doors_and_exit(seed):
     """No vocab runes on row 1 from the first door through the exit (cols 26-41)."""
     room = _room(seed)
-    cols = [ru.col for ru in room.char_runs if ru.row == 1 and 26 <= ru.col <= _L9_EXIT_COL]
+    cols = [ru.col for ru in room.char_runs if ru.row == 1 and 26 <= ru.col <= _SCREEN_VAULT_EXIT_COL]
     assert cols == [], f"seed={seed}: unexpected row-1 runes at cols {cols}"
 
 
@@ -114,7 +114,7 @@ def test_M_does_not_reach_key_alone(seed):
     room = _room(seed)
     m_row, _ = _l9_key_rows(_GH)
     fnb = min(ru.col for ru in room.char_runs if ru.row == m_row)   # where M lands
-    assert fnb != _L9_M_KEY_COL, f"seed={seed}: M lands directly on the key (col {fnb})"
+    assert fnb != _SCREEN_VAULT_M_KEY_COL, f"seed={seed}: M lands directly on the key (col {fnb})"
     toks = room.answer.split()
     assert 'M' in toks and '$' in toks, f"seed={seed}: answer lacks M/$ {room.answer!r}"
 
@@ -124,7 +124,7 @@ def test_M_does_not_reach_key_alone(seed):
 @pytest.mark.parametrize("seed", SEEDS)
 def test_par_matches_dijkstra(seed):
     room = _room(seed)
-    assert room.par == _dijkstra_par_L9(room)
+    assert room.par == _par_screen_vault(room)
 
 
 @pytest.mark.parametrize("seed", SEEDS)

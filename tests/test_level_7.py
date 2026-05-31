@@ -3,10 +3,10 @@ import math
 import pytest
 from engine.world import CellType
 from generation.dungeon_gen import (
-    build_dungeon_7,
-    _dijkstra_par_L7,
-    _L7_TOTAL_ROWS, _L7_TOTAL_COLS, _L7_CORR_ROWS,
-    _L7_TURN_SPANS,
+    build_dungeon_backward_vaults,
+    _par_backward_vaults,
+    _BACKWARD_VAULTS_TOTAL_ROWS, _BACKWARD_VAULTS_TOTAL_COLS, _BACKWARD_VAULTS_CORR_ROWS,
+    _BACKWARD_VAULTS_TURN_SPANS,
 )
 
 SEEDS = [1, 42, 999, 12345, 2**20 + 7]
@@ -14,7 +14,7 @@ SEEDS = [1, 42, 999, 12345, 2**20 + 7]
 
 @pytest.mark.parametrize("seed", SEEDS)
 def test_entry_and_exit_passable(seed):
-    d = build_dungeon_7(seed)
+    d = build_dungeon_backward_vaults(seed)
     room = d.rooms[0]
     r0, c0 = room.spawn_pos
     r1, c1 = room.exit_pos
@@ -24,9 +24,9 @@ def test_entry_and_exit_passable(seed):
 
 @pytest.mark.parametrize("seed", SEEDS)
 def test_par_matches_dijkstra(seed):
-    d = build_dungeon_7(seed)
+    d = build_dungeon_backward_vaults(seed)
     room = d.rooms[0]
-    computed = _dijkstra_par_L7(room)
+    computed = _par_backward_vaults(room)
     assert room.par == computed, (
         f"seed={seed}: room.par={room.par} but Dijkstra computed {computed}"
     )
@@ -34,7 +34,7 @@ def test_par_matches_dijkstra(seed):
 
 @pytest.mark.parametrize("seed", SEEDS)
 def test_budget_is_ceil_par_times_1_4(seed):
-    d = build_dungeon_7(seed)
+    d = build_dungeon_backward_vaults(seed)
     room = d.rooms[0]
     assert room.budget == math.ceil(room.par * 1.4), (
         f"seed={seed}: budget={room.budget} but ceil(par*1.4)={math.ceil(room.par * 1.4)}"
@@ -44,7 +44,7 @@ def test_budget_is_ceil_par_times_1_4(seed):
 @pytest.mark.parametrize("seed", SEEDS)
 def test_answer_uses_ge_or_gE_for_LT2(seed):
     """The optimal path must use a backward-end motion to cross the LT2 gap (C4 anchor end=5)."""
-    d = build_dungeon_7(seed)
+    d = build_dungeon_backward_vaults(seed)
     room = d.rooms[0]
     tokens = room.answer.split()
     assert 'ge' in tokens or 'gE' in tokens, (
@@ -59,7 +59,7 @@ def test_answer_uses_gE_for_LT3(seed):
     gE (2 ks) beats 2ge (3 ks) and 19h (3 ks) because the WORD spans two adjacent
     clusters; gE jumps both in one shot while ge stops at each cluster boundary.
     """
-    d = build_dungeon_7(seed)
+    d = build_dungeon_backward_vaults(seed)
     room = d.rooms[0]
     tokens = room.answer.split()
     assert 'gE' in tokens and '8gE' not in tokens, (
@@ -69,7 +69,7 @@ def test_answer_uses_gE_for_LT3(seed):
 
 @pytest.mark.parametrize("seed", SEEDS)
 def test_exit_entity_at_exit_pos(seed):
-    d = build_dungeon_7(seed)
+    d = build_dungeon_backward_vaults(seed)
     room = d.rooms[0]
     exit_ents = [e for e in room.entities if e.kind == 'exit']
     assert len(exit_ents) == 1, f"seed={seed}: expected 1 exit entity, got {len(exit_ents)}"
@@ -81,26 +81,26 @@ def test_exit_entity_at_exit_pos(seed):
 
 @pytest.mark.parametrize("seed", SEEDS)
 def test_corridors_carved(seed):
-    d = build_dungeon_7(seed)
+    d = build_dungeon_backward_vaults(seed)
     room = d.rooms[0]
-    for r in _L7_CORR_ROWS:
+    for r in _BACKWARD_VAULTS_CORR_ROWS:
         for c in range(1, 39):
             assert room.cells[r][c] == CellType.CORRIDOR, (
                 f"seed={seed}: corridor row {r} col {c} is not CORRIDOR"
             )
 
 
-_L7_GUARD_WALLS = {(2, 38), (4, 1)}  # RT1 and LT1 narrow-turn walls
+_BACKWARD_VAULTS_GUARD_WALLS = {(2, 38), (4, 1)}  # RT1 and LT1 narrow-turn walls
 
 
 @pytest.mark.parametrize("seed", SEEDS)
 def test_turn_spans_carved(seed):
-    d = build_dungeon_7(seed)
+    d = build_dungeon_backward_vaults(seed)
     room = d.rooms[0]
-    for r0, r1, c0, c1 in _L7_TURN_SPANS:
+    for r0, r1, c0, c1 in _BACKWARD_VAULTS_TURN_SPANS:
         for r in range(r0, r1 + 1):
             for c in range(c0, c1 + 1):
-                if (r, c) in _L7_GUARD_WALLS:
+                if (r, c) in _BACKWARD_VAULTS_GUARD_WALLS:
                     continue  # guard walls intentionally narrow these turns
                 assert room.cells[r][c] == CellType.CORRIDOR, (
                     f"seed={seed}: turn span ({r0},{r1},{c0},{c1}) cell ({r},{c}) not CORRIDOR"
@@ -109,7 +109,7 @@ def test_turn_spans_carved(seed):
 
 def test_RT1_and_LT1_guard_walls():
     """(2,38) and (4,1) must be WALL — they narrow RT1 and LT1 to force 4e and ^."""
-    d = build_dungeon_7(42)
+    d = build_dungeon_backward_vaults(42)
     room = d.rooms[0]
     assert room.cells[2][38] == CellType.WALL, "(2,38) must be wall (RT1 guard)"
     assert room.cells[4][1]  == CellType.WALL, "(4,1) must be wall (LT1 guard)"
@@ -122,7 +122,7 @@ def test_RT1_and_LT1_guard_walls():
 
 def test_LT2_gap_is_cols_5_6_only():
     """LT2 turn (rows 7-9) is only passable at cols 5-6 — the ge lesson gap."""
-    d = build_dungeon_7(42)
+    d = build_dungeon_backward_vaults(42)
     room = d.rooms[0]
     # cols 5-6 must be open in row 8
     assert room.cells[8][5] == CellType.CORRIDOR, "LT2 gap col 5 must be open"
@@ -138,7 +138,7 @@ def test_LT2_gap_is_cols_5_6_only():
 
 def test_LT3_exit_at_col_19():
     """LT3 turn (rows 11-12): only col 19 is passable in row 12 — the exit cell."""
-    d = build_dungeon_7(42)
+    d = build_dungeon_backward_vaults(42)
     room = d.rooms[0]
     # Only the exit cell is open in row 12
     assert room.cells[12][19] == CellType.CORRIDOR, "exit cell (12,19) must be open"
@@ -151,7 +151,7 @@ def test_LT3_exit_at_col_19():
 
 def test_C4_ge_anchor_at_correct_position():
     """4-char C4 anchor at (7,2): cols 2-5; ge from col 9+ lands at end=5 (in LT2 gap)."""
-    d = build_dungeon_7(42)
+    d = build_dungeon_backward_vaults(42)
     room = d.rooms[0]
     anchor = room.char_run_at(7, 2)
     assert anchor is not None, "Expected 4-char C4 anchor at (7,2)"
@@ -170,7 +170,7 @@ def test_C6_baphomet_behemoth_word():
     Cluster B 'b3♯3m∘†♯'  at cols 31-38 (8 chars).
     All adjacent → one WORD: gE hops all in 1 shot; ge needs 3 hops.
     """
-    d = build_dungeon_7(42)
+    d = build_dungeon_backward_vaults(42)
     room = d.rooms[0]
 
     # ── Cluster A: cols 21-28 ─────────────────────────────────────────────────

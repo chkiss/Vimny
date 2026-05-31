@@ -1,11 +1,11 @@
 """
-Simulate level 51 (Warden's Keep) to find the actual optimal keystroke cost.
-Run with:  python _sim_l51.py [-v]
+Simulate the Warden's Keep boss to find the actual optimal keystroke cost.
+Run with:  python _sim_wardens_keep.py [-v]
 """
 import random, sys
 sys.path.insert(0, '/home/ch/Vimny')
 
-from generation.dungeon_gen import build_dungeon_51
+from generation.dungeon_gen import build_dungeon_wardens_keep
 from engine.player import Player
 from engine.motion import apply_motion, _reveal_from
 from main import (
@@ -19,7 +19,7 @@ MAX_STEPS = 500  # safety limit to prevent infinite loops
 
 def simulate(seed=42, verbose=False):
     random.seed(seed)
-    dungeon = build_dungeon_51(seed)
+    dungeon = build_dungeon_wardens_keep(seed)
     room = dungeon.rooms[0]
     player = Player(row=3, col=0)
     cost = [0]

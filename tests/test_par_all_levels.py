@@ -21,14 +21,14 @@ every test in this file pass.
 import math
 import pytest
 from generation.dungeon_gen import (
-    build_dungeon_0, build_dungeon_1, build_dungeon_2,
-    build_dungeon_3, build_dungeon_4, build_dungeon_5,
-    build_dungeon_6, build_dungeon_7, build_dungeon_8,
-    build_dungeon_51, _par_l51,
+    build_dungeon_first_cave, build_dungeon_line_halls, build_dungeon_counting_crypts,
+    build_dungeon_rune_halls, build_dungeon_character_cataracts, build_dungeon_goblin_gauntlet,
+    build_dungeon_word_forge, build_dungeon_backward_vaults, build_dungeon_lineheads,
+    build_dungeon_wardens_keep, _par_wardens_keep,
     _bfs_par, _bfs_par_line,
-    _dijkstra_par_level2,
+    _par_counting_crypts,
     _dijkstra_par_wbe, _dijkstra_par_ftFT,
-    _L5_CORR_ROWS, _L5_RIGHT_GOING,
+    _GOBLIN_GAUNTLET_CORR_ROWS, _GOBLIN_GAUNTLET_RIGHT_GOING,
 )
 
 SEEDS = [1, 42, 999, 12345, 2**20 + 7]
@@ -42,13 +42,13 @@ def _extract_l5_data(room):
     corr_data = [
         {
             'row': row,
-            'right_going': row in _L5_RIGHT_GOING,
+            'right_going': row in _GOBLIN_GAUNTLET_RIGHT_GOING,
             'goblins': sorted(
                 e.col for e in room.entities
                 if e.alive and e.kind == 'goblin' and e.row == row
             ),
         }
-        for row in _L5_CORR_ROWS
+        for row in _GOBLIN_GAUNTLET_CORR_ROWS
     ]
     gobs_17 = sorted(
         e.col for e in room.entities
@@ -98,9 +98,9 @@ def _par_l5_reference(corr_data: list, gobs_17: list) -> int:
 
 @pytest.mark.parametrize("seed", SEEDS)
 @pytest.mark.parametrize("builder,level_id", [
-    (build_dungeon_0, 0), (build_dungeon_1, 1), (build_dungeon_2, 2),
-    (build_dungeon_3, 3), (build_dungeon_4, 4), (build_dungeon_5, 5),
-    (build_dungeon_6, 6), (build_dungeon_7, 7), (build_dungeon_8, 8),
+    (build_dungeon_first_cave, 0), (build_dungeon_line_halls, 1), (build_dungeon_counting_crypts, 2),
+    (build_dungeon_rune_halls, 3), (build_dungeon_character_cataracts, 4), (build_dungeon_goblin_gauntlet, 5),
+    (build_dungeon_word_forge, 6), (build_dungeon_backward_vaults, 7), (build_dungeon_lineheads, 8),
 ])
 def test_budget_is_ceil_par_times_1_4(builder, level_id, seed):
     room = builder(seed).room
@@ -114,9 +114,9 @@ def test_budget_is_ceil_par_times_1_4(builder, level_id, seed):
 
 @pytest.mark.parametrize("seed", SEEDS)
 @pytest.mark.parametrize("builder,level_id", [
-    (build_dungeon_0, 0), (build_dungeon_1, 1), (build_dungeon_2, 2),
-    (build_dungeon_3, 3), (build_dungeon_4, 4), (build_dungeon_5, 5),
-    (build_dungeon_6, 6), (build_dungeon_7, 7), (build_dungeon_8, 8),
+    (build_dungeon_first_cave, 0), (build_dungeon_line_halls, 1), (build_dungeon_counting_crypts, 2),
+    (build_dungeon_rune_halls, 3), (build_dungeon_character_cataracts, 4), (build_dungeon_goblin_gauntlet, 5),
+    (build_dungeon_word_forge, 6), (build_dungeon_backward_vaults, 7), (build_dungeon_lineheads, 8),
 ])
 def test_answer_key_length_matches_par(builder, level_id, seed):
     """Non-space chars in room.answer must equal room.par.
@@ -139,7 +139,7 @@ def test_answer_key_length_matches_par(builder, level_id, seed):
 
 @pytest.mark.parametrize("seed", SEEDS)
 def test_level0_par_matches_bfs(seed):
-    room = build_dungeon_0(seed).room   # _fog_unreachable never called for level 0
+    room = build_dungeon_first_cave(seed).room   # _fog_unreachable never called for level 0
     expected = _bfs_par(room)
     assert expected is not None, f"seed={seed}: BFS found no path"
     assert room.par == expected, f"seed={seed}: par={room.par}, BFS={expected}"
@@ -149,7 +149,7 @@ def test_level0_par_matches_bfs(seed):
 
 @pytest.mark.parametrize("seed", SEEDS)
 def test_level1_par_matches_bfs(seed):
-    room = build_dungeon_1(seed).room   # _fog_unreachable never called for level 1
+    room = build_dungeon_line_halls(seed).room   # _fog_unreachable never called for level 1
     expected = _bfs_par_line(room)
     assert expected is not None, f"seed={seed}: BFS found no path"
     assert room.par == expected, f"seed={seed}: par={room.par}, BFS={expected}"
@@ -159,7 +159,7 @@ def test_level1_par_matches_bfs(seed):
 
 @pytest.mark.parametrize("seed", SEEDS)
 def test_level3_par_matches_dijkstra(seed):
-    room = build_dungeon_3(seed).room   # _fog_unreachable never called for level 3
+    room = build_dungeon_rune_halls(seed).room   # _fog_unreachable never called for level 3
     expected = _dijkstra_par_wbe(room)
     assert expected is not None, f"seed={seed}: Dijkstra found no path"
     assert room.par == expected, f"seed={seed}: par={room.par}, Dijkstra={expected}"
@@ -169,7 +169,7 @@ def test_level3_par_matches_dijkstra(seed):
 
 @pytest.mark.parametrize("seed", SEEDS)
 def test_level4_par_matches_dijkstra(seed):
-    room = build_dungeon_4(seed).room   # _fog_unreachable never called for level 4
+    room = build_dungeon_character_cataracts(seed).room   # _fog_unreachable never called for level 4
     expected = _dijkstra_par_ftFT(room)
     assert expected is not None, f"seed={seed}: Dijkstra found no path"
     assert room.par == expected, f"seed={seed}: par={room.par}, Dijkstra={expected}"
@@ -187,7 +187,7 @@ def test_level5_par_matches_reference(seed):
     - uses count-hjkl (_l5_move_cost) to reach connectors instead of
       $ / 0 (always 1 key regardless of distance)
     """
-    room = build_dungeon_5(seed).room
+    room = build_dungeon_goblin_gauntlet(seed).room
     corr_data, gobs_17 = _extract_l5_data(room)
     expected = _par_l5_reference(corr_data, gobs_17)
     assert room.par == expected, (
@@ -195,17 +195,17 @@ def test_level5_par_matches_reference(seed):
     )
 
 
-# ── level 51: par == _par_l51() (seed-independent fixed layout) ──────────────
+# ── level 51: par == _par_wardens_keep() (seed-independent fixed layout) ──────────────
 
 def test_level51_completion_only():
     """Level 5.1 is a boss fight — no par/stars, just completion.
 
-    Budget is still derived from _par_l51() to allow a generous time limit,
+    Budget is still derived from _par_wardens_keep() to allow a generous time limit,
     but room.par is None so no fireworks or star rating are awarded.
     """
-    expected_budget = math.ceil(_par_l51() * 1.4)
+    expected_budget = math.ceil(_par_wardens_keep() * 1.4)
     for seed in SEEDS:
-        room = build_dungeon_51(seed).room
+        room = build_dungeon_wardens_keep(seed).room
         assert room.par is None, f"seed={seed}: boss level must have par=None"
         assert room.budget == expected_budget, (
             f"seed={seed}: budget={room.budget}, expected {expected_budget}"
