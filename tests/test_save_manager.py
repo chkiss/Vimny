@@ -102,26 +102,28 @@ class TestLoadProgress:
     def test_missing_progress_key_returns_empty(self):
         assert load_progress({'player_name': 'Alice'}) == {}
 
-    def test_string_keys_converted_to_int(self):
+    def test_legacy_int_keys_migrated_to_slug(self):
+        # Legacy saves keyed level records by int id; load migrates them to slug.
         data = {'progress': {'0': {'complete': True}, '2': {'complete': False}}}
         result = load_progress(data)
-        assert 0 in result
-        assert 2 in result
-        assert isinstance(list(result.keys())[0], int)
+        assert 'first_cave' in result        # id 0 → slug
+        assert 'counting_crypts' in result   # id 2 → slug
+        assert all(isinstance(k, str) for k in result)
 
     def test_values_preserved(self):
         data = {'progress': {'1': {'complete': True, 'stars': 3}}}
         result = load_progress(data)
-        assert result[1] == {'complete': True, 'stars': 3}
+        assert result['line_halls'] == {'complete': True, 'stars': 3}   # id 1 → slug
 
     def test_round_trip_via_save_progress(self, tmp_path, monkeypatch):
         monkeypatch.setattr('save.save_manager.SAVES_DIR', tmp_path)
-        original = {0: {'complete': True, 'stars': 2}, 1: {'complete': False}}
+        original = {'first_cave': {'complete': True, 'stars': 2},
+                    'line_halls': {'complete': False}}
         save_progress(original, 'Alice')
         raw = load_for('Alice')
         restored = load_progress(raw)
         assert restored == original
-        assert all(isinstance(k, int) for k in restored)
+        assert all(isinstance(k, str) for k in restored)
 
 
 # ── load_player_name ──────────────────────────────────────────────────────────
@@ -140,19 +142,19 @@ class TestLoadPlayerName:
 # ── save_progress ─────────────────────────────────────────────────────────────
 
 class TestSaveProgress:
-    def test_writes_progress_with_string_keys(self, tmp_path, monkeypatch):
+    def test_writes_progress_keyed_by_slug(self, tmp_path, monkeypatch):
         monkeypatch.setattr('save.save_manager.SAVES_DIR', tmp_path)
-        save_progress({0: {'complete': True}}, 'Alice')
+        save_progress({'first_cave': {'complete': True}}, 'Alice')
         raw = load_for('Alice')
-        assert '0' in raw['progress']
+        assert 'first_cave' in raw['progress']
 
     def test_merges_with_existing_data(self, tmp_path, monkeypatch):
         monkeypatch.setattr('save.save_manager.SAVES_DIR', tmp_path)
         save_for('Alice', {'extra_field': 'preserved'})
-        save_progress({0: {'complete': True}}, 'Alice')
+        save_progress({'first_cave': {'complete': True}}, 'Alice')
         raw = load_for('Alice')
         assert raw.get('extra_field') == 'preserved'
-        assert '0' in raw['progress']
+        assert 'first_cave' in raw['progress']
 
     def test_player_name_stored(self, tmp_path, monkeypatch):
         monkeypatch.setattr('save.save_manager.SAVES_DIR', tmp_path)

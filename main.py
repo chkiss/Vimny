@@ -43,7 +43,7 @@ from engine.editor import (
     _clip_desc, _serialize_room, _deserialize_room,
 )
 import generation.dungeon_gen as _dg
-from content.levels import LEVELS, is_unlocked, is_reliquary, level_type, known_commands as _known_commands
+from content.levels import LEVELS, is_unlocked, level_type_for_slug, known_commands_for_slug as _known_commands, id_for_slug
 import save.save_manager as SM
 
 
@@ -721,7 +721,7 @@ def _operator_cost(action: dict) -> int:
 def _calc_stars(won: bool, budget: Budget, room, player, level: int = 0) -> int:
     if not won:
         return 0
-    if level_type(level) != 'dungeon':
+    if level_type_for_slug(level) != 'dungeon':
         return 0
     par = room.par or 0
     if par > 0 and budget.spent <= par and player.hp >= 6:
@@ -729,14 +729,11 @@ def _calc_stars(won: bool, budget: Budget, room, player, level: int = 0) -> int:
     return 1
 
 
-def _build_dungeon(level: int, seed: int, game_h: int = 33, admin: bool = False):
+def _build_dungeon(slug: str, seed: int, game_h: int = 33, admin: bool = False):
     # Builders are named by slug (content/levels.py): build_dungeon_<slug>.
-    # Resolve via the level's slug so this never needs touching on a renumber.
-    from content.levels import slug_for_id
-    slug = slug_for_id(level) or 'first_cave'
     builder = getattr(_dg, f'build_dungeon_{slug}', _dg.build_dungeon_first_cave)
     if slug == 'screen_vault':
-        # L9 Screen Vault: only solve the (admin-only) answer path when admin —
+        # The Screen Vault: only solve the (admin-only) answer path when admin —
         # its par-Dijkstra is too slow to run on every load (par is locked).
         return builder(seed, game_h=game_h, compute_answer=admin)
     return builder(seed)
@@ -886,14 +883,14 @@ def _drop_key(room, row: int, col: int) -> None:
         room.add_entity(Entity(kind='floor_key', row=row, col=col))
 
 
-def _on_kill(ent, player, room=None, level: int = 0) -> str:
+def _on_kill(ent, player, room=None, level: str = '') -> str:
     if ent.kind == 'warden':
-        if level == 51:
+        if level == 'wardens_keep':
             return 'The Warden falls!'
         if room is not None:
             _drop_key(room, ent.row, ent.col)
         return 'The Warden falls! A key drops to the floor. 🗝'
-    if ent.kind == 'goblin' and level == 5 and room is not None:
+    if ent.kind == 'goblin' and level == 'goblin_gauntlet' and room is not None:
         if not any(e.alive for e in room._entity_by_kind.get('goblin', [])):
             _drop_key(room, ent.row, ent.col)
             return 'Last goblin down! A key clatters to the floor. 🗝'
@@ -1084,7 +1081,7 @@ def _enemy_tick(room, player) -> list:
 
 # ── Dungeon game loop ──────────────────────────────────────────────────────────
 
-def run_dungeon(term: Terminal, level: int, progress: dict,
+def run_dungeon(term: Terminal, level: str, progress: dict,
                 player_name: str = 'Normand',
                 _dungeon: Dungeon | None = None,
                 _start_edit: bool = False) -> dict:
@@ -1182,25 +1179,25 @@ def run_dungeon(term: Terminal, level: int, progress: dict,
         if 'editor' not in player.known_commands:
             player.known_commands = player.known_commands + ['editor']
 
-    if level == 1:
+    if level == 'line_halls':
         message = 'The Line Halls — navigate to the corridor, then use $ and ^'
         msg_ttl = 50
-    elif level == 11:
+    elif level == 'reliquary':
         message = 'The Reliquary — Reap the rewards of your adventures!'
         msg_ttl = 50
-    elif level == 2:
+    elif level == 'counting_crypts':
         message = 'The Counting Crypts — type [N] before hjkl: try 5j or 3l'
         msg_ttl = 50
-    elif level == 3:
+    elif level == 'rune_halls':
         message = 'The Rune Halls — w:next word  b:prev word  e:end of word'
         msg_ttl = 60
-    elif level == 4:
+    elif level == 'character_cataracts':
         message = 'The Character Cataracts — f{c}:jump to char  t{c}:just before  F/T:backward'
         msg_ttl = 60
-    elif level == 51:
+    elif level == 'wardens_keep':
         message = "The Warden's Keep — the shield follows you. Find the unguarded side."
         msg_ttl = 60
-    elif level == 99:
+    elif level == 'dummy':
         message = 'Sandbox — all mechanics active. Type :edit to enter editor mode.'
         msg_ttl = 60
 
@@ -1751,7 +1748,7 @@ def run_dungeon(term: Terminal, level: int, progress: dict,
                     undo_stack.append(prev_pos)
                     redo_stack.clear()
 
-                if count > 1 and not count_tutorial_shown and not edit_mode and level == 2:
+                if count > 1 and not count_tutorial_shown and not edit_mode and level == 'counting_crypts':
                     count_tutorial_shown = True
                     _push(f'{count}{motion} moved {count} steps in 2 keystrokes — count is efficient!')
 
@@ -2100,13 +2097,13 @@ def run_dungeon(term: Terminal, level: int, progress: dict,
                     # commands; smudged lines clarify as those commands are learned.
                     # (level → scroll id, full-text title/body, overlay fn)
                     _SCROLL_DROPS = {
-                        11:  ('register',  None, None,                         _show_reliquary_scroll),
-                        51:  ('leap',      None, None,                         _show_warden_leap_scroll),
-                        131: ('visual',    None, None,                         _show_warden_sight_scroll),
-                        171: ('d_op',      "The Operator's Codex",  _SCROLL_TEXT_OPERATOR_CODEX,   _show_operator_codex_scroll),
-                        221: ('y_op',      "The Archivist's Method", _SCROLL_TEXT_ARCHIVISTS_METHOD, _show_archivists_method_scroll),
-                        291: ('text_obj',  'The Whole Word',        _SCROLL_TEXT_WHOLE_WORD,        _show_whole_word_scroll),
-                        361: ('visual_op', "The Warden's Act",      _SCROLL_TEXT_WARDENS_ACT,       _show_warden_act_scroll),
+                        'reliquary':            ('register',  None, None,                           _show_reliquary_scroll),
+                        'wardens_keep':         ('leap',      None, None,                           _show_warden_leap_scroll),
+                        'warden_surveyor':      ('visual',    None, None,                           _show_warden_sight_scroll),
+                        'warden_pathfinder':    ('d_op',      "The Operator's Codex",   _SCROLL_TEXT_OPERATOR_CODEX,    _show_operator_codex_scroll),
+                        'warden_manifold':      ('y_op',      "The Archivist's Method", _SCROLL_TEXT_ARCHIVISTS_METHOD, _show_archivists_method_scroll),
+                        'warden_scrivener':     ('text_obj',  'The Whole Word',         _SCROLL_TEXT_WHOLE_WORD,        _show_whole_word_scroll),
+                        'grandmasters_sanctum': ('visual_op', "The Warden's Act",       _SCROLL_TEXT_WARDENS_ACT,       _show_warden_act_scroll),
                     }
                     _drop = _SCROLL_DROPS.get(level)
                     if _drop is not None:
@@ -3019,7 +3016,7 @@ def run_title(term: Terminal, has_save: bool) -> tuple[str, str]:
         for _sd in SM.list_saves():
             _prog = SM.load_progress(_sd)
             for _lv in LEVELS:
-                if is_unlocked(_lv['id'], _prog):
+                if is_unlocked(_lv['slug'], _prog):
                     _unlocked_ids.add(_lv['id'])
         _quote_lines = select_quote(_unlocked_ids)
 
@@ -3377,7 +3374,7 @@ def run_overworld(term: Terminal, player: Player, progress: dict,
             if t == 'parent':
                 return _done({'action': 'parent_view', 'cursor': cursor})
             elif t == 'level':
-                lid = ln['level']['id']
+                lid = ln['level']['slug']
                 if is_unlocked(lid, progress, player.name):
                     return _done({'action': 'enter', 'level': lid, 'cursor': cursor})
             elif t == 'custom':
@@ -3391,8 +3388,11 @@ def run_overworld(term: Terminal, player: Player, progress: dict,
 
 def main():
     ap = argparse.ArgumentParser(description='Vimny — Vim dungeon crawler')
-    ap.add_argument('--level', type=int, default=None, choices=[0, 1, 11, 2, 3, 4, 5, 51, 6, 7, 8, 99],
-                    help='skip overworld and start at this level (debug)')
+    ap.add_argument('--level', type=str, default=None,
+                    choices=['first_cave', 'line_halls', 'reliquary', 'counting_crypts',
+                             'rune_halls', 'character_cataracts', 'goblin_gauntlet',
+                             'wardens_keep', 'word_forge', 'backward_vaults', 'lineheads', 'dummy'],
+                    help='skip overworld and start at this level slug (debug)')
     args = ap.parse_args()
 
     term = Terminal()
@@ -3464,7 +3464,7 @@ def main():
                 dungeon = Dungeon(name=layout.get('layout_name', 'Custom'), seed=0)
                 dungeon.rooms        = [room]
                 dungeon.current_room = 0
-                run_dungeon(term, 0, progress, player.name,
+                run_dungeon(term, 'first_cave', progress, player.name,
                             _dungeon=dungeon, _start_edit=True)
                 continue
 
@@ -3472,7 +3472,7 @@ def main():
 
             # Pre-game blessing: wizard bestows hjkl poem before every attempt
             # at level 0 until the player has earned at least 1 star there.
-            if level == 0 and progress.get(0, {}).get('stars', 0) == 0:
+            if level == 'first_cave' and progress.get('first_cave', {}).get('stars', 0) == 0:
                 run_wizard_blessing(term, select_quote_by_name('home row'))
 
             dung_result = run_dungeon(term, level, progress, player.name)
@@ -3491,7 +3491,7 @@ def main():
             if dung_result.get('first_written_completion'):
                 run_wizard_blessing(
                     term,
-                    select_next_lesson_quote(level),
+                    select_next_lesson_quote(id_for_slug(level)),
                 )
 
 

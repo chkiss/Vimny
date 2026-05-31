@@ -78,6 +78,10 @@ LEVELS = [
 _BY_ID   = {l['id']: l for l in LEVELS}
 _BY_SLUG = {l['slug']: l for l in LEVELS}
 
+# Frozen historical id→slug map: migrates legacy int-keyed save files to slug
+# keys. Derived now while `id` exists; becomes a literal dict once `id` is dropped.
+LEGACY_ID_SLUG = {l['id']: l['slug'] for l in LEVELS}
+
 
 def slug_for_id(level_id: int) -> str | None:
     lv = _BY_ID.get(level_id)
@@ -166,15 +170,18 @@ def unlocks_after_slug(slug: str) -> str | None:
     return None
 
 
-def is_unlocked(level_id: int, progress: dict, player_name: str = '') -> bool:
+def is_unlocked(slug: str, progress: dict, player_name: str = '') -> bool:
+    """True if `slug` is playable: admin sees all; admin-only sandboxes are
+    always open; every other level unlocks when its unlocks_after_slug prereq is
+    complete. `progress` is keyed by slug."""
     if player_name == 'admin':
         return True
-    level = _BY_ID.get(level_id)
+    level = _BY_SLUG.get(slug)
     if level is None:
         return False
     if level.get('admin_only', False):
         return True
-    target = unlocks_after_slug(level['slug'])
+    target = unlocks_after_slug(slug)
     if target is None:                       # first_cave / no prerequisite
         return True
-    return progress.get(id_for_slug(target), {}).get('complete', False)
+    return progress.get(target, {}).get('complete', False)

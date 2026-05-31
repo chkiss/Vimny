@@ -131,7 +131,7 @@ def test_on_kill_warden_drops_floor_key_at_level_5():
     player = Player(row=3, col=5)
 
     room.kill_entity(warden)   # mirrors game loop: kill before _on_kill
-    msg = _on_kill(warden, player, room, level=5)
+    msg = _on_kill(warden, player, room, level='goblin_gauntlet')
 
     key = room.entity_at(warden.row, warden.col)
     assert key is not None, "floor_key should be placed at warden position"
@@ -147,7 +147,7 @@ def test_on_kill_warden_no_key_at_level_51():
     player = Player(row=3, col=5)
 
     room.kill_entity(warden)   # mirrors game loop
-    msg = _on_kill(warden, player, room, level=51)
+    msg = _on_kill(warden, player, room, level='wardens_keep')
 
     # At level 51 _on_kill returns early — no _drop_key called
     floor_keys = [e for e in room.entities if e.kind == 'floor_key']
@@ -166,14 +166,14 @@ def test_last_goblin_at_level_5_drops_key():
 
     # Kill first goblin — key must NOT drop yet
     room.kill_entity(g1)
-    msg1 = _on_kill(g1, player, room, level=5)
+    msg1 = _on_kill(g1, player, room, level='goblin_gauntlet')
     assert not any(e.alive and e.kind == 'floor_key' for e in room.entities), (
         "key must not drop while second goblin still lives"
     )
 
     # Kill second goblin — key must drop now
     room.kill_entity(g2)
-    msg2 = _on_kill(g2, player, room, level=5)
+    msg2 = _on_kill(g2, player, room, level='goblin_gauntlet')
     assert any(e.alive and e.kind == 'floor_key' for e in room.entities), (
         "floor_key must drop after the last goblin is killed at level 5"
     )
