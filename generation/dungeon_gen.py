@@ -156,7 +156,7 @@ def _bfs_par(composite, return_path: bool = False):
     return None
 
 # The Counting Crypts: Entry → Puzzle → Exit  ([count] prefix with hjkl + ^$0)
-LEVEL_2_PLAN = [
+_COUNTING_CRYPTS_PLAN = [
     (RoomType.ENTRY,  12, 20),
     (RoomType.PUZZLE, 12, 32),
     (RoomType.EXIT,   12, 18),
@@ -608,7 +608,7 @@ def build_dungeon_counting_crypts(seed: int) -> Dungeon:
     dungeon = Dungeon(name='The Counting Crypts', seed=seed)
     CORRIDOR_LEN = 4
 
-    plan = LEVEL_2_PLAN
+    plan = _COUNTING_CRYPTS_PLAN
     total_cols = sum(c for _, _, c in plan) + CORRIDOR_LEN * (len(plan) - 1)
     total_rows = max(r for _, r, _ in plan)  # 12
 
@@ -884,7 +884,7 @@ def _dijkstra_par_wbe(composite, return_path: bool = False):
     return None
 
 
-def _l4_place_zone(composite, rng, rows, col_start, col_end,
+def _cataracts_place_zone(composite, rng, rows, col_start, col_end,
                    density=0.55, blocked=frozenset()):
     """Fill a character zone across the given rows between col_start and col_end."""
     for r in rows:
@@ -1137,7 +1137,7 @@ def build_dungeon_rune_halls(seed: int) -> Dungeon:
     # ── Hard-coded characters (deterministic; placed before random fill) ──────
     # All positions are fixed regardless of seed.  Placing them first in the
     # runes list guarantees char_run_at() returns them before any random cluster.
-    _l3_hardcoded = [
+    _rune_halls_hardcoded = [
         # Anchor character at C5 exit — last symbol (col 44) is the exit cell
         CharRun(row=13, col=42, symbols=('∘', '∘', '∘'), kind='ancient'),
         # Ember at right end of C1 — marks the turn into RT1
@@ -1159,7 +1159,7 @@ def build_dungeon_rune_halls(seed: int) -> Dungeon:
     # Reserved cells: Random characters must not land in or touch these cells.
     blocked: frozenset = frozenset(
         (ru.row, c)
-        for ru in _l3_hardcoded
+        for ru in _rune_halls_hardcoded
         for c in range(ru.col, ru.col + len(ru.symbols))
     )
 
@@ -1170,7 +1170,7 @@ def build_dungeon_rune_halls(seed: int) -> Dungeon:
     # ── Carve and populate character corridors (up to 20 attempts for valid par) ──
     for _attempt in range(20):
         # Hard-coded runes first so char_run_at() always finds them before random ones
-        composite.char_runs = list(_l3_hardcoded)
+        composite.char_runs = list(_rune_halls_hardcoded)
         rune_rng = random.Random(rng.randint(0, 2**31))
 
         for row_top in _RUNE_HALLS_CORR_TOP_ROWS:
@@ -1286,16 +1286,16 @@ def build_dungeon_character_cataracts(seed: int) -> Dungeon:
         rng2 = random.Random(rng.randint(0, 2**31))
 
         # Fill all corridor zones with standard characters
-        _l4_place_zone(composite, rng2, (1, 2),    2,  13, blocked=blocked)  # C1 Zone A
-        _l4_place_zone(composite, rng2, (1, 2),   38,  68, blocked=blocked)  # C1 Zone B
-        _l4_place_zone(composite, rng2, (4,),      2,  28, blocked=blocked)  # C2 row 4 Zone A
-        _l4_place_zone(composite, rng2, (4, 5),   52,  68, blocked=blocked)  # C2 Zone B
-        _l4_place_zone(composite, rng2, (8,),      2,  16, blocked=blocked)  # C3 row 8 Zone A
-        _l4_place_zone(composite, rng2, (8,),     32,  70, blocked=blocked)  # C3 row 8 Zone B
-        _l4_place_zone(composite, rng2, (10, 11),  2,  24, blocked=blocked)  # C4 Zone A
-        _l4_place_zone(composite, rng2, (10, 11), 52,  68, blocked=blocked)  # C4 Zone B
+        _cataracts_place_zone(composite, rng2, (1, 2),    2,  13, blocked=blocked)  # C1 Zone A
+        _cataracts_place_zone(composite, rng2, (1, 2),   38,  68, blocked=blocked)  # C1 Zone B
+        _cataracts_place_zone(composite, rng2, (4,),      2,  28, blocked=blocked)  # C2 row 4 Zone A
+        _cataracts_place_zone(composite, rng2, (4, 5),   52,  68, blocked=blocked)  # C2 Zone B
+        _cataracts_place_zone(composite, rng2, (8,),      2,  16, blocked=blocked)  # C3 row 8 Zone A
+        _cataracts_place_zone(composite, rng2, (8,),     32,  70, blocked=blocked)  # C3 row 8 Zone B
+        _cataracts_place_zone(composite, rng2, (10, 11),  2,  24, blocked=blocked)  # C4 Zone A
+        _cataracts_place_zone(composite, rng2, (10, 11), 52,  68, blocked=blocked)  # C4 Zone B
         # C5: dense character corridor for w/b/e practice; chest at col 20, exit anchor at col 64-65
-        _l4_place_zone(composite, rng2, (13, 14),  2,  63,
+        _cataracts_place_zone(composite, rng2, (13, 14),  2,  63,
                         density=0.60, blocked=blocked)
 
         composite.rebuild_indexes()
@@ -1315,7 +1315,7 @@ def build_dungeon_character_cataracts(seed: int) -> Dungeon:
 
 
 def build_dungeon_reliquary(seed: int) -> Dungeon:
-    """The Reliquary — bonus chest room unlocked alongside level 2.
+    """The Reliquary — bonus chest room unlocked after The Line Halls.
 
     Layout (5 rows × 17 cols):
       Entry room (interior 3r × 2c): rows 0-4, cols 0-3;  floor at rows 1-3, cols 1-2.
@@ -3017,7 +3017,7 @@ _BRACKET_VAULTS_ANSWER        = '% 2j % 2j % l'
 def _par_bracket_vaults(composite, use_percent: bool = True, return_path: bool = False):
     """Minimum-keystroke Dijkstra for The Bracket Vaults.
 
-    Supported motions (all available at level 11):
+    Supported motions (all available at The Bracket Vaults):
       h/l/j/k (count), $ 0 ^, % (if use_percent=True).
 
     State = (row, col).
@@ -3292,7 +3292,7 @@ _SCREEN_VAULT_PAR       = 17   # deterministic: 17 for every color assignment (v
                       # every load — the par Dijkstra is expensive for this level.
 
 
-def _l9_key_rows(game_h: int) -> tuple:
+def _screen_vault_key_rows(game_h: int) -> tuple:
     """Return (M_ROW, L_ROW) for a given game_h.
 
     H is always row 1.
@@ -3316,7 +3316,7 @@ def _par_screen_vault(composite, return_path: bool = False):
     H/M/L are modelled viewport-relative.
     """
     game_h = composite._game_h
-    m_row, l_row = _l9_key_rows(game_h)
+    m_row, l_row = _screen_vault_key_rows(game_h)
     ROWS, COLS = composite.rows, composite.cols
     H_COL  = _SCREEN_VAULT_H_KEY_COL
     M_COL  = _SCREEN_VAULT_M_KEY_COL
@@ -3517,7 +3517,7 @@ def build_dungeon_screen_vault(seed: int, game_h: int = _SCREEN_VAULT_DEFAULT_GA
     dungeon = Dungeon(name='The Screen Vault', seed=seed)
     ROWS   = game_h + 4
     COLS   = _SCREEN_VAULT_COLS
-    m_row, l_row = _l9_key_rows(game_h)
+    m_row, l_row = _screen_vault_key_rows(game_h)
 
     rng = random.Random(seed)
 

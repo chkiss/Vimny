@@ -46,7 +46,7 @@ def test_par_is_ten(seed):
 
 @pytest.mark.parametrize("seed", SEEDS)
 def test_answer_uses_WBE(seed):
-    """Optimal answer must use W, B, and E (the WORD motions taught in level 7)."""
+    """Optimal answer must use W, B, and E (the WORD motions taught in The WORD Forge)."""
     d = build_dungeon_word_forge(seed)
     room = d.rooms[0]
     tokens = room.answer.split()

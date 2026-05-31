@@ -2,7 +2,7 @@
 import heapq
 import pytest
 from generation.dungeon_gen import (
-    build_dungeon_counting_crypts, _dijkstra_par_count, _par_counting_crypts, LEVEL_2_PLAN,
+    build_dungeon_counting_crypts, _dijkstra_par_count, _par_counting_crypts, _COUNTING_CRYPTS_PLAN,
 )
 from engine.world import RoomType
 
@@ -136,8 +136,8 @@ def test_void_wall_exists_in_puzzle_room(seed):
     d = build_dungeon_counting_crypts(seed)
     room = d.room
     # offsets[1] = 20 + 4 = 24, plan[1][2]//2 = 16 → mid_col = 40
-    puzzle_offset = LEVEL_2_PLAN[0][2] + 4   # 24
-    puzzle_mid_col = puzzle_offset + LEVEL_2_PLAN[1][2] // 2  # 40
+    puzzle_offset = _COUNTING_CRYPTS_PLAN[0][2] + 4   # 24
+    puzzle_mid_col = puzzle_offset + _COUNTING_CRYPTS_PLAN[1][2] // 2  # 40
     void_at_mid = [ru for ru in room.char_runs
                    if ru.kind == 'void' and ru.col == puzzle_mid_col]
     assert len(void_at_mid) >= 4, \

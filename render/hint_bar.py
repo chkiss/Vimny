@@ -48,7 +48,7 @@ def _build_tiers() -> list[tuple[str, list[str]]]:
     """
     from content.levels import known_commands, LEVELS
     tiers: list[tuple[str, list[str]]] = []
-    prev_known: set[str] = set(known_commands('first_cave'))   # seed with L0 base
+    prev_known: set[str] = set(known_commands('first_cave'))   # seed with the First Cave base
     for lv in LEVELS:
         if lv['slug'] == 'first_cave' or lv.get('admin_only'):
             continue

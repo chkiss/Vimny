@@ -258,10 +258,10 @@ def test_warden_direction_reverses_when_walled_in():
     assert warden.row <= 5
 
 
-# ── Boss-cleared gate (level 51) ──────────────────────────────────────────────
+# ── Boss-cleared gate (The Warden's Keep) ────────────────────────────────────
 
 def _boss_room():
-    """Minimal level-51-style room: open corridor with a boss_seal."""
+    """Minimal Warden's-Keep-style room: open corridor with a boss_seal."""
     rows, cols = 7, 44
     room = Room(room_type=RoomType.COMBAT, rows=rows, cols=cols)
     room.cells = [

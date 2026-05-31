@@ -5,7 +5,7 @@ from generation.dungeon_gen import build_dungeon_first_cave
 
 from tests import SEEDS
 DELTA = {'h': (0, -1), 'j': (1, 0), 'k': (-1, 0), 'l': (0, 1)}
-LEVEL_0_COMMANDS = set('hjkl')
+FIRST_CAVE_COMMANDS = set('hjkl')
 
 
 def can_reach(room, entry, goal, allowed_keys):
@@ -34,14 +34,14 @@ def can_reach(room, entry, goal, allowed_keys):
 def test_exit_is_reachable(seed):
     d = build_dungeon_first_cave(seed)
     room = d.room
-    assert can_reach(room, room.spawn_pos, room.exit_pos, LEVEL_0_COMMANDS), \
+    assert can_reach(room, room.spawn_pos, room.exit_pos, FIRST_CAVE_COMMANDS), \
         f"seed={seed}: exit unreachable with full hjkl"
 
 
-@pytest.mark.parametrize("seed,omit", [(s, c) for s in SEEDS for c in sorted(LEVEL_0_COMMANDS)])
+@pytest.mark.parametrize("seed,omit", [(s, c) for s in SEEDS for c in sorted(FIRST_CAVE_COMMANDS)])
 def test_each_command_is_necessary(seed, omit):
     d = build_dungeon_first_cave(seed)
     room = d.room
-    restricted = LEVEL_0_COMMANDS - {omit}
+    restricted = FIRST_CAVE_COMMANDS - {omit}
     assert not can_reach(room, room.spawn_pos, room.exit_pos, restricted), \
         f"seed={seed}: exit reachable without '{omit}' — command is not required"

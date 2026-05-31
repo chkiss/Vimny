@@ -13,7 +13,7 @@ from engine.world import CellType
 from generation.dungeon_gen import (
     build_dungeon_screen_vault,
     _par_screen_vault,
-    _l9_key_rows,
+    _screen_vault_key_rows,
     _SCREEN_VAULT_COLS, _SCREEN_VAULT_DEFAULT_GAME_H,
     _SCREEN_VAULT_H_KEY_COL, _SCREEN_VAULT_M_KEY_COL, _SCREEN_VAULT_L_KEY_COL,
     _SCREEN_VAULT_DOOR_COLS, _SCREEN_VAULT_EXIT_COL,
@@ -61,7 +61,7 @@ def test_exit(seed):
 @pytest.mark.parametrize("seed", SEEDS)
 def test_three_keys_at_hml_positions(seed):
     room = _room(seed)
-    m_row, l_row = _l9_key_rows(_GH)
+    m_row, l_row = _screen_vault_key_rows(_GH)
     keys = {(e.row, e.col): e.tag for e in room.entities if e.kind == 'floor_key'}
     assert set(keys) == {(1, _SCREEN_VAULT_H_KEY_COL), (m_row, _SCREEN_VAULT_M_KEY_COL), (l_row, _SCREEN_VAULT_L_KEY_COL)}
     assert sorted(keys.values()) == sorted(_SCREEN_VAULT_COLORS)   # each color used once
@@ -97,7 +97,7 @@ def test_void_row_is_circles(seed):
     """The row G lands on (L_ROW+3) is filled with standard void runes (○) —
     using G is punished."""
     room = _room(seed)
-    _, l_row = _l9_key_rows(_GH)
+    _, l_row = _screen_vault_key_rows(_GH)
     void_row = l_row + 3
     voids = [ru for ru in room.char_runs if ru.row == void_row]
     assert voids, f"seed={seed}: no runes on void row {void_row}"
@@ -112,7 +112,7 @@ def test_M_does_not_reach_key_alone(seed):
     """The M row is filled, so M lands on its leftmost rune (not the M key at
     col 25): the player must follow M with $.  The optimal answer uses both."""
     room = _room(seed)
-    m_row, _ = _l9_key_rows(_GH)
+    m_row, _ = _screen_vault_key_rows(_GH)
     fnb = min(ru.col for ru in room.char_runs if ru.row == m_row)   # where M lands
     assert fnb != _SCREEN_VAULT_M_KEY_COL, f"seed={seed}: M lands directly on the key (col {fnb})"
     toks = room.answer.split()

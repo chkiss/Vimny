@@ -3471,7 +3471,7 @@ def main():
             level = ow_result['level']
 
             # Pre-game blessing: wizard bestows hjkl poem before every attempt
-            # at level 0 until the player has earned at least 1 star there.
+            # at the First Cave until the player has earned at least 1 star there.
             if level == 'first_cave' and progress.get('first_cave', {}).get('stars', 0) == 0:
                 run_wizard_blessing(term, select_quote_by_name('home row'))
 

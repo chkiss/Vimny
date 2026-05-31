@@ -84,8 +84,8 @@ def action_allowed(action: dict, known: list | set, edit_mode: bool = False) -> 
 
     if t == 'paste' and not edit_mode:
         if action.get('before'):
-            return 'P' in known_set   # P — taught at L20
-        return 'p' in known_set       # p — taught at L5
+            return 'P' in known_set   # P — taught at The Quartermaster
+        return 'p' in known_set       # p — taught at The Goblin Gauntlet
 
     if t == 'enter_mode':
         m = action.get('mode', '')

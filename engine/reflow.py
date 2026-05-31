@@ -60,8 +60,8 @@ def void_col(room, row: int) -> int:
     through it; treating water as a brink wrongly marks everything past a puddle
     as 'the void'."""
     vcols = [ru.col for ru in room._char_runs_by_row.get(row, []) if ru.kind == 'void']
-    runes = [ru.col for ru in room._char_runs_by_row.get(row, []) if ru.kind != 'void']
-    c = min(runes) if runes else 0
+    char_cols = [ru.col for ru in room._char_runs_by_row.get(row, []) if ru.kind != 'void']
+    c = min(char_cols) if char_cols else 0
     while c < room.cols and room.cells[row][c] in _WALLS:
         c += 1                         # skip any leading wall into the corridor
     while c < room.cols and room.cells[row][c] not in _WALLS and not _void_rune_at(room, row, c):
