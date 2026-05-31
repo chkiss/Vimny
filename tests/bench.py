@@ -12,6 +12,10 @@ Sections:
   5. apply_motion
   6. rebuild_indexes        (P2 maintenance cost)
   7. Full render_all frame
+
+Fixtures: the Counting Crypts (voids/doors) and the Rune Halls (dense word
+corridors) are the two representative dungeons benchmarked; the dummy sandbox is
+used for the rebuild_indexes cost.
 """
 
 import copy, sys, timeit
@@ -75,9 +79,9 @@ class _MockTerm:
 # ── Build fixtures once ───────────────────────────────────────────────────────
 
 print("Building dungeons...", end=' ', flush=True)
-d2 = build_dungeon_counting_crypts(SEED);  r2 = d2.room
-d3 = build_dungeon_rune_halls(SEED);  r3 = d3.room
-dd = build_dungeon_dummy(SEED); rd = dd.room
+d_crypts = build_dungeon_counting_crypts(SEED);  r_crypts = d_crypts.room
+d_halls  = build_dungeon_rune_halls(SEED);  r_halls = d_halls.room
+d_dummy  = build_dungeon_dummy(SEED); r_dummy = d_dummy.room
 print("done.\n")
 
 mterm = _MockTerm()
@@ -101,20 +105,20 @@ bench_ms("build_dungeon_rune_halls  (The Rune Halls)",      lambda: build_dungeo
 
 _section("2. Spatial index lookups  [O(1) — P2]")
 
-void_ru   = next(ru for ru in r2.char_runs if ru.kind == 'void')
-exit_ent  = next(e  for e  in r2.entities if e.kind == 'exit')
-r3_ru     = next(ru for ru in r3.char_runs if ru.kind != 'void')
+void_ru   = next(ru for ru in r_crypts.char_runs if ru.kind == 'void')
+exit_ent  = next(e  for e  in r_crypts.entities if e.kind == 'exit')
+halls_ru  = next(ru for ru in r_halls.char_runs if ru.kind != 'void')
 
 bench_us("char_run_at   HIT  crypts (void wall cell)",
-         lambda: r2.char_run_at(void_ru.row, void_ru.col))
+         lambda: r_crypts.char_run_at(void_ru.row, void_ru.col))
 bench_us("char_run_at   MISS crypts (wall cell (0,0))",
-         lambda: r2.char_run_at(0, 0))
+         lambda: r_crypts.char_run_at(0, 0))
 bench_us("char_run_at   HIT  halls (rune corridor)",
-         lambda: r3.char_run_at(r3_ru.row, r3_ru.col))
+         lambda: r_halls.char_run_at(halls_ru.row, halls_ru.col))
 bench_us("entity_at HIT  crypts (exit entity)",
-         lambda: r2.entity_at(exit_ent.row, exit_ent.col))
+         lambda: r_crypts.entity_at(exit_ent.row, exit_ent.col))
 bench_us("entity_at MISS crypts (empty floor)",
-         lambda: r2.entity_at(5, 5))
+         lambda: r_crypts.entity_at(5, 5))
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -126,16 +130,16 @@ _section("3. Simulated render frame  (17 rows × 78 cols = 1 326 cells)")
 GAME_H, IW = 17, 78
 
 bench_us("all entity_at calls  crypts  (1 326 lookups)",
-         lambda: [r2.entity_at(r, c) for r in range(GAME_H) for c in range(IW)],
+         lambda: [r_crypts.entity_at(r, c) for r in range(GAME_H) for c in range(IW)],
          n=500)
 bench_us("all char_run_at calls    crypts  (1 326 lookups)",
-         lambda: [r2.char_run_at(r, c) for r in range(GAME_H) for c in range(IW)],
+         lambda: [r_crypts.char_run_at(r, c) for r in range(GAME_H) for c in range(IW)],
          n=500)
 bench_us("all entity_at calls  halls  (1 326 lookups)",
-         lambda: [r3.entity_at(r, c) for r in range(GAME_H) for c in range(IW)],
+         lambda: [r_halls.entity_at(r, c) for r in range(GAME_H) for c in range(IW)],
          n=500)
 bench_us("all char_run_at calls    halls  (1 326 lookups)",
-         lambda: [r3.char_run_at(r, c) for r in range(GAME_H) for c in range(IW)],
+         lambda: [r_halls.char_run_at(r, c) for r in range(GAME_H) for c in range(IW)],
          n=500)
 
 
@@ -145,36 +149,36 @@ bench_us("all char_run_at calls    halls  (1 326 lookups)",
 
 _section("4. Undo snapshots  [deepcopy — target of P3]")
 
-player = Player(row=r2.spawn_pos[0], col=r2.spawn_pos[1])
-snap2  = _ed_snapshot(r2, player)
-snap3  = _ed_snapshot(r3, player)
+player      = Player(row=r_crypts.spawn_pos[0], col=r_crypts.spawn_pos[1])
+snap_crypts = _ed_snapshot(r_crypts, player)
+snap_halls  = _ed_snapshot(r_halls, player)
 
 _row("",
-     f"  crypts: {len(r2.entities)} entities, {len(r2.char_runs)} character runs, {len(r2._char_run_map)} indexed cells")
+     f"  crypts: {len(r_crypts.entities)} entities, {len(r_crypts.char_runs)} character runs, {len(r_crypts._char_run_map)} indexed cells")
 _row("",
-     f"  halls: {len(r3.entities)} entities, {len(r3.char_runs)} character runs, {len(r3._char_run_map)} indexed cells")
+     f"  halls: {len(r_halls.entities)} entities, {len(r_halls.char_runs)} character runs, {len(r_halls._char_run_map)} indexed cells")
 
 bench_us("_ed_snapshot          crypts",
-         lambda: _ed_snapshot(r2, player))
+         lambda: _ed_snapshot(r_crypts, player))
 bench_us("_ed_snapshot          halls",
-         lambda: _ed_snapshot(r3, player))
+         lambda: _ed_snapshot(r_halls, player))
 bench_us("_ed_restore           crypts",
-         lambda: _ed_restore(r2, player, snap2))
+         lambda: _ed_restore(r_crypts, player, snap_crypts))
 bench_us("_ed_restore           halls",
-         lambda: _ed_restore(r3, player, snap3))
+         lambda: _ed_restore(r_halls, player, snap_halls))
 
 bench_us("copy.deepcopy entities  crypts",
-         lambda: copy.deepcopy(r2.entities))
+         lambda: copy.deepcopy(r_crypts.entities))
 bench_us("copy.deepcopy char runs     crypts",
-         lambda: copy.deepcopy(r2.char_runs))
+         lambda: copy.deepcopy(r_crypts.char_runs))
 bench_us("copy.deepcopy char runs     halls",
-         lambda: copy.deepcopy(r3.char_runs))
+         lambda: copy.deepcopy(r_halls.char_runs))
 
 # Candidate P3 replacement: shallow tuple copy (symbols already immutable)
 bench_us("tuple-copy char runs        crypts  [P3 candidate]",
-         lambda: [type(ru)(ru.row, ru.col, ru.symbols, ru.kind) for ru in r2.char_runs])
+         lambda: [type(ru)(ru.row, ru.col, ru.symbols, ru.kind) for ru in r_crypts.char_runs])
 bench_us("tuple-copy char runs        halls  [P3 candidate]",
-         lambda: [type(ru)(ru.row, ru.col, ru.symbols, ru.kind) for ru in r3.char_runs])
+         lambda: [type(ru)(ru.row, ru.col, ru.symbols, ru.kind) for ru in r_halls.char_runs])
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -183,20 +187,20 @@ bench_us("tuple-copy char runs        halls  [P3 candidate]",
 
 _section("5. apply_motion")
 
-er, ec = r2.spawn_pos
+er, ec = r_crypts.spawn_pos
 
 bench_us("'l' count=1  no-op (at wall)",
-         lambda: apply_motion(Player(row=er, col=0), 'l', 1, r2))
+         lambda: apply_motion(Player(row=er, col=0), 'l', 1, r_crypts))
 bench_us("'l' count=1  move  (open floor)",
-         lambda: apply_motion(Player(row=er, col=ec), 'l', 1, r2))
+         lambda: apply_motion(Player(row=er, col=ec), 'l', 1, r_crypts))
 bench_us("'l' count=10 move",
-         lambda: apply_motion(Player(row=er, col=ec), 'l', 10, r2))
+         lambda: apply_motion(Player(row=er, col=ec), 'l', 10, r_crypts))
 bench_us("'$' line-end crypts",
-         lambda: apply_motion(Player(row=er, col=ec), '$', 1, r2))
+         lambda: apply_motion(Player(row=er, col=ec), '$', 1, r_crypts))
 bench_us("'w' next-word halls",
-         lambda: apply_motion(Player(row=r3.spawn_pos[0], col=r3.spawn_pos[1]), 'w', 1, r3))
+         lambda: apply_motion(Player(row=r_halls.spawn_pos[0], col=r_halls.spawn_pos[1]), 'w', 1, r_halls))
 bench_us("'b' prev-word halls",
-         lambda: apply_motion(Player(row=r3.spawn_pos[0], col=r3.spawn_pos[1]+5), 'b', 1, r3))
+         lambda: apply_motion(Player(row=r_halls.spawn_pos[0], col=r_halls.spawn_pos[1]+5), 'b', 1, r_halls))
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -205,9 +209,9 @@ bench_us("'b' prev-word halls",
 
 _section("6. rebuild_indexes  [P2 maintenance cost]")
 
-bench_us("rebuild_indexes  crypts",  lambda: r2.rebuild_indexes())
-bench_us("rebuild_indexes  halls",  lambda: r3.rebuild_indexes())
-bench_us("rebuild_indexes  dummy", lambda: rd.rebuild_indexes())
+bench_us("rebuild_indexes  crypts",  lambda: r_crypts.rebuild_indexes())
+bench_us("rebuild_indexes  halls",  lambda: r_halls.rebuild_indexes())
+bench_us("rebuild_indexes  dummy", lambda: r_dummy.rebuild_indexes())
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -218,20 +222,20 @@ _section("7. Full render_all frame  (stdout → /dev/null)")
 
 from render.renderer import render_all
 
-budget2 = Budget(r2.budget or 20)
-budget3 = Budget(r3.budget or 20)
-p2 = Player(row=r2.spawn_pos[0], col=r2.spawn_pos[1])
-p3 = Player(row=r3.spawn_pos[0], col=r3.spawn_pos[1])
+budget_crypts = Budget(r_crypts.budget or 20)
+budget_halls  = Budget(r_halls.budget or 20)
+p_crypts = Player(row=r_crypts.spawn_pos[0], col=r_crypts.spawn_pos[1])
+p_halls  = Player(row=r_halls.spawn_pos[0], col=r_halls.spawn_pos[1])
 
 _null = open('/dev/null', 'w')
 
 def _render_crypts():
     with redirect_stdout(_null):
-        render_all(mterm, d2, p2, budget2)
+        render_all(mterm, d_crypts, p_crypts, budget_crypts)
 
 def _render_halls():
     with redirect_stdout(_null):
-        render_all(mterm, d3, p3, budget3)
+        render_all(mterm, d_halls, p_halls, budget_halls)
 
 bench_ms("render_all  crypts  (100-col mock terminal)", _render_crypts, n=300)
 bench_ms("render_all  halls  (100-col mock terminal)", _render_halls, n=300)
