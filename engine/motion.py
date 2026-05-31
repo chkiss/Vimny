@@ -171,6 +171,17 @@ def _sentence_starts(room, row: int) -> list:
     return starts
 
 
+def _sentence_starts_all(room) -> list:
+    """Every sentence start in the buffer, in reading order — (row, col) tuples,
+    top row to bottom and left to right within a row. Buffer-wide companion to
+    _sentence_starts (which stays row-scoped for the is/as text objects)."""
+    out = []
+    for r in range(room.rows):
+        for c in _sentence_starts(room, r):
+            out.append((r, c))
+    return out
+
+
 def apply_motion(player, motion, count, room, target=None, count_given: bool = True, game_h: int = 0):
     moved = False
     for _ in range(count):
@@ -643,19 +654,21 @@ def apply_motion(player, motion, count, room, target=None, count_given: bool = T
             else:
                 break
         elif motion in ('(', ')'):
-            # Sentence jump (row-scoped): start of next/previous sentence.
-            starts = _sentence_starts(room, player.row)
+            # Sentence jump (buffer-wide): the next/previous sentence start
+            # anywhere in the buffer — Vim-faithful, since sentences span lines.
+            starts = _sentence_starts_all(room)
+            cur = (player.row, player.col)
             if motion == ')':
-                nxt = [s for s in starts if s > player.col]
+                nxt = [s for s in starts if s > cur]
                 if nxt:
-                    player.col = nxt[0]
+                    player.row, player.col = nxt[0]
                     moved = True
                 else:
                     break
             else:
-                prev = [s for s in starts if s < player.col]
-                if prev:
-                    player.col = prev[-1]
+                prev_s = [s for s in starts if s < cur]
+                if prev_s:
+                    player.row, player.col = prev_s[-1]
                     moved = True
                 else:
                     break

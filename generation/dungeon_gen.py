@@ -3698,20 +3698,26 @@ _L12_ANSWER   = '{ x } } $ p $'
 # Without (/): wall gaps (cols 11-22 and 37-48) block all l/h/w paths.
 #              Player trapped in S1 (cols 1-10).  Cost = infinity >> budget.
 
-_L13_ROWS     = 3
-_L13_COLS     = 62
-_L13_ENTRY    = (1, 1)
-_L13_EXIT     = (1, 49)
+_L13_ROWS     = 5
+_L13_COLS     = 73
+_L13_ENTRY    = (1, 1)          # spawn: start of sentence 1
+_L13_EXIT     = (1, 71)         # exit: just past the locked door
+_L13_DOOR_POS = (1, 70)         # locked_door at the END of sentence 3
+_L13_KEY_POS  = (3, 69)         # floor_key at the END of sentence 5
+_L13_SEP_ROW  = 2              # all-wall stone row between the two sentence rows
 
-_L13_SENT_ROW = 1
-_L13_S1_COLS  = (1, 10)
-_L13_S2_COLS  = (23, 36)
-_L13_S3_COLS  = (49, 60)
-
-_L13_SENT_CLUSTERS = [
-    (1, 2,  ('T','h','e',' ','s','e','a','l','.')),
-    (1, 23, ('A','n','c','i','e','n','t',' ','p','o','w','e','r','!')),
-    (1, 49, ('T','h','e',' ','g','a','t','e',' ','o','!')),
+# Five sentences (each one CharRun spanning its columns; terminator last):
+#   row 1:  S1 ·gap· S2 ·gap· S3 [door][exit]
+#   row 3:  S4 ·gap· S5 [key]
+# S3 (3rd of row 1) and S5 (2nd of row 3) sit behind wall-gaps, so the line /
+# screen / paragraph jumps the player already knows (G gg {n}G H M L { }) reach
+# only a row's FIRST sentence — ) is the sole way onto them.
+_L13_SENTENCES = [
+    (1, 1,  'A sentence is one stride.'),
+    (1, 29, 'Where does it end?'),
+    (1, 50, 'At a dot, or a bang!'),
+    (3, 8,  'I cut each stone to fit.'),
+    (3, 40, 'A good joint needs no mortar.'),
 ]
 
 
@@ -4209,24 +4215,152 @@ def build_dungeon_12(seed: int) -> 'Dungeon':
 
 
 
+def _dijkstra_par_L13(composite, return_path=False, no_close=False, no_open=False):
+    """Minimum-keystroke Dijkstra for Level 13 — Sentence Jumps.
+
+    State = (row, col, has_key, door_open).  Models count-hjkl, 0, $, ) and (
+    (buffer-wide sentence jumps, with count), x (pick up the floor_key), and p
+    (unlock the locked_door to the right, stepping onto it).  no_close / no_open
+    drop ) / ( for the command-necessity checks.
+
+    Line/screen jumps (G gg {n}G H M L { }) are intentionally NOT modelled: they
+    only reach the FIRST sentence of a row, so they never beat ) onto the key's or
+    door's sentence (both sit behind wall-gaps) — par is unaffected and ) stays
+    genuinely required.  ( CAN be replaced by gg/{n}G + ), so it is the
+    strongly-incentivized partner, not asserted as required.
+    """
+    from engine.motion import _sentence_starts_all
+    ROWS, COLS = composite.rows, composite.cols
+    DR, DC = _L13_DOOR_POS
+    KR, KC = _L13_KEY_POS
+    EX     = _L13_EXIT
+    entry  = composite.spawn_pos
+    max_n  = max(ROWS, COLS)
+    starts = _sentence_starts_all(composite)
+
+    def _ok(r, c, door_open):
+        if not (0 <= r < ROWS and 0 <= c < COLS):
+            return False
+        if composite.cells[r][c] not in (CellType.CORRIDOR, CellType.FLOOR):
+            return False
+        if (r, c) == (DR, DC) and not door_open:
+            return False
+        ru = composite.char_run_at(r, c)
+        return not (ru and ru.kind == 'void')
+
+    start = (entry[0], entry[1], 0, 0)
+    dist  = {start: 0}
+    prev  = {start: None}
+    heap  = [(0, start)]
+
+    while heap:
+        cost, state = heapq.heappop(heap)
+        r, c, hk, do = state
+
+        if (r, c) == EX:
+            if return_path:
+                return cost, _join_path(prev, state, merge_single=False)
+            return cost
+
+        if cost > dist.get(state, float('inf')):
+            continue
+
+        def _try(nb, mc, lbl):
+            g = cost + mc
+            if g < dist.get(nb, float('inf')):
+                dist[nb] = g
+                prev[nb] = (state, lbl)
+                heapq.heappush(heap, (g, nb))
+
+        # x: pick up the floor_key
+        if (r, c) == (KR, KC) and hk == 0:
+            _try((r, c, 1, do), 1, 'x')
+
+        # p: unlock the locked_door to the right and step onto it (key retained)
+        if (r, c + 1) == (DR, DC) and hk == 1 and do == 0:
+            _try((DR, DC, hk, 1), 1, 'p')
+
+        # ) forward / ( backward — buffer-wide sentence jumps, with count
+        cur = (r, c)
+        if not no_close:
+            fwd = [s for s in starts if s > cur]
+            for n in range(1, len(fwd) + 1):
+                tr, tc = fwd[n - 1]
+                mc  = 1 if n == 1 else len(str(n)) + 1
+                lbl = ')' if n == 1 else f'{n})'
+                _try((tr, tc, hk, do), mc, lbl)
+        if not no_open:
+            bwd = [s for s in starts if s < cur]
+            for n in range(1, len(bwd) + 1):
+                tr, tc = bwd[-n]
+                mc  = 1 if n == 1 else len(str(n)) + 1
+                lbl = '(' if n == 1 else f'{n}('
+                _try((tr, tc, hk, do), mc, lbl)
+
+        # hjkl and count-hjkl
+        for _dr, _dc, _key in ((0, -1, 'h'), (0, 1, 'l'), (1, 0, 'j'), (-1, 0, 'k')):
+            for n in range(1, max_n + 1):
+                nr2 = r + _dr * n
+                nc2 = c + _dc * n
+                if not _ok(nr2, nc2, do):
+                    break
+                mc2  = 1 if n == 1 else len(str(n)) + 1
+                lbl2 = _key if n == 1 else f'{n}{_key}'
+                _try((nr2, nc2, hk, do), mc2, lbl2)
+
+        # $: scan right to the last passable cell
+        end_c = None
+        for tc in range(c + 1, COLS):
+            if not _ok(r, tc, do):
+                break
+            end_c = tc
+        if end_c is not None:
+            _try((r, end_c, hk, do), 1, '$')
+
+        # 0: scan left to the first passable cell
+        start_c = None
+        for tc in range(c - 1, -1, -1):
+            if not _ok(r, tc, do):
+                break
+            start_c = tc
+        if start_c is not None:
+            _try((r, start_c, hk, do), 1, '0')
+
+    if return_path:
+        return None, ''
+    return None
+
+
 def build_dungeon_13(seed: int) -> 'Dungeon':
     """Level 13 — Sentence Jumps: The Sentence Corridor.
 
-    Fixed layout: 3 rows × 62 cols.  Only row 1 is passable.
+    Two sentence rows (1 and 3) split by a stone wall row (2): the only way
+    between them is a sentence jump — teaching that ) ( cross lines, not just
+    move within one.  Five sentences, scattered horizontally, divided by stone
+    gaps:
 
-    S1 (cols 1–10)  — 'The seal.'      ends with '.'
-    Wall gap (cols 11–22)
-    S2 (cols 23–36) — 'Ancient power!' ends with '!'
-    Wall gap (cols 37–48)
-    S3 (cols 49–59) — 'The gate o!'    ends with '!'
-    Exit entity at (1, 49) = sentence-3 start.
+        row 1:  A sentence is one stride. | Where does it end? | At a dot, or a bang![door][exit]
+        row 3:  I cut each stone to fit. | A good joint needs no mortar.[key]
 
-    Optimal path (par = 2):  3)
-      3) — entry col 1 → S1 col 2 → S2 col 23 → S3/exit col 49  (2 ks)
+    The floor_key sits at the END of sentence 5 and the locked_door at the END of
+    sentence 3.  Both host-sentences are the 2nd/3rd on their row, so the line /
+    screen / paragraph jumps the player already has (G gg {n}G H M L { }) reach
+    only a row's FIRST sentence — the ONLY way onto the key's and door's
+    sentences is ).  Reaching the key is mandatory, so ) is forced.
 
-    Without (/): wall gaps trap player in S1 (cols 1–10).  Cost = infinity.
+    ) and ( land on sentence STARTS; the key and door are at sentence ENDS, so
+    the player must add $ after each jump — the core lesson of the level.
+
+    Optimal path (par 9):  4) $ x 3( $ p l
+      4) → S5 start · $ → key · x grab · 3( → S3 start · $ → door · p unlock · l exit
+    (3( because ( from a sentence's END first returns to that sentence's START:
+    S5end → S5start → S4start → S3start — the very nuance this level teaches.)
+
+    ( is the shortest backtrack (3( beats gg+2)) but — like H/M/L and r/R — it
+    cannot be infinitely forced (gg/{n}G + ) substitutes within budget); it is
+    the strongly-incentivized partner while ) carries the mandatory lesson.
     """
-    dungeon   = Dungeon(name='The Sentence Corridor', seed=seed)
+    dungeon = Dungeon(name='The Sentence Corridor', seed=seed)
     ROWS, COLS = _L13_ROWS, _L13_COLS
 
     cells = [[CellType.WALL] * COLS for _ in range(ROWS)]
@@ -4234,38 +4368,35 @@ def build_dungeon_13(seed: int) -> 'Dungeon':
     composite.cells = cells
     composite.seed  = seed
 
-    # ── Carve sentence row (row 1, cols 1–60) ────────────────────────────────
-    for c in range(1, COLS - 1):
-        cells[_L13_SENT_ROW][c] = CellType.CORRIDOR
-
-    # ── Re-wall gaps between sentence segments ────────────────────────────────
-    s1_end = _L13_S1_COLS[1]   # col 10
-    s2_beg = _L13_S2_COLS[0]   # col 23
-    s2_end = _L13_S2_COLS[1]   # col 36
-    s3_beg = _L13_S3_COLS[0]   # col 49
-
-    for c in range(s1_end + 1, s2_beg):   # cols 11-22
-        cells[_L13_SENT_ROW][c] = CellType.WALL
-    for c in range(s2_end + 1, s3_beg):   # cols 37-48
-        cells[_L13_SENT_ROW][c] = CellType.WALL
-
-    # ── Fixed sentence character runs ──────────────────────────────────────────
+    # ── Sentence rows (row 2 stays all-wall: the stone separator) ─────────────
     runes: list = []
-    for row, col, syms in _L13_SENT_CLUSTERS:
-        runes.append(CharRun(row=row, col=col, symbols=syms, kind='ember'))
+    for (r, c, text) in _L13_SENTENCES:
+        for i in range(len(text)):
+            cells[r][c + i] = CellType.CORRIDOR
+        runes.append(CharRun(row=r, col=c, symbols=tuple(text), kind='ember'))
     composite.char_runs = runes
 
-    # ── Entry and exit ─────────────────────────────────────────────────────────
-    composite.spawn_pos    = _L13_ENTRY
-    composite.exit_pos = _L13_EXIT
-    composite.entities = [Entity(kind='exit', row=_L13_EXIT[0], col=_L13_EXIT[1])]
+    # ── Door / exit / key cells (passable floor; the door blocks via entity) ──
+    dr, dc = _L13_DOOR_POS
+    er, ec = _L13_EXIT
+    kr, kc = _L13_KEY_POS
+    cells[dr][dc] = CellType.FLOOR
+    cells[er][ec] = CellType.CORRIDOR
+    cells[kr][kc] = CellType.CORRIDOR
 
+    composite.spawn_pos = _L13_ENTRY
+    composite.exit_pos  = _L13_EXIT
+    composite.entities = [
+        Entity(kind='exit',        row=er, col=ec),
+        Entity(kind='locked_door', row=dr, col=dc),
+        Entity(kind='floor_key',   row=kr, col=kc),
+    ]
     composite.rebuild_indexes()
 
-    # Fixed layout with fixed optimal path (par always 2).
-    composite.par    = 2
-    composite.budget = math.ceil(2 * 1.4)
-    composite.answer = '3)'
+    cost, answer = _dijkstra_par_L13(composite, return_path=True)
+    composite.par    = cost
+    composite.budget = math.ceil(cost * 1.4)
+    composite.answer = answer
 
     dungeon.rooms        = [composite]
     dungeon.current_room = 0
