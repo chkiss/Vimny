@@ -43,7 +43,7 @@ from engine.editor import (
     _clip_desc, _serialize_room, _deserialize_room,
 )
 import generation.dungeon_gen as _dg
-from content.levels import LEVELS, is_unlocked, level_type_for_slug, known_commands_for_slug as _known_commands
+from content.levels import LEVELS, is_unlocked, level_type, known_commands as _known_commands
 import save.save_manager as SM
 
 
@@ -721,7 +721,7 @@ def _operator_cost(action: dict) -> int:
 def _calc_stars(won: bool, budget: Budget, room, player, level: int = 0) -> int:
     if not won:
         return 0
-    if level_type_for_slug(level) != 'dungeon':
+    if level_type(level) != 'dungeon':
         return 0
     par = room.par or 0
     if par > 0 and budget.spent <= par and player.hp >= 6:
