@@ -1321,55 +1321,100 @@ def build_dungeon_character_cataracts(seed: int) -> Dungeon:
     return dungeon
 
 
+# ── The Reliquary layout constants (the Sealed Ward) ──────────────────────────
+_RELIQUARY_ROWS        = 7
+_RELIQUARY_COLS        = 19
+_RELIQUARY_ACTION_ROW  = 3
+_RELIQUARY_WALL_COL    = 12          # full-height dividing wall; doorway at action row
+_RELIQUARY_FRIEZE_ROWS = (1, 5)
+_RELIQUARY_SPAWN       = (3, 1)
+_RELIQUARY_CHEST       = (3, 15)
+_RELIQUARY_EXIT        = (3, 16)     # immediately right of the chest
+# Themed ward-words (classical Latin, V for U), right-aligned against the wall.
+_RELIQUARY_SEAL_WORDS  = ('SIGILLVM', 'VINCVLVM', 'CLAVSTRA', 'ARCANVM',
+                          'CVSTOS', 'SERVATA', 'SIGNVM', 'OBEX')
+
+
+def _place_frieze(composite, rng, row: int, c0: int, c1: int) -> None:
+    """Scatter ornamental ancient/verdant runes across [c0, c1] on `row`."""
+    c = c0
+    while c <= c1:
+        if rng.random() < 0.55:
+            kind = rng.choice(('ancient', 'verdant'))
+            n    = min(rng.randint(1, 3), c1 - c + 1)
+            composite.char_runs.append(
+                CharRun(row=row, col=c,
+                        symbols=tuple(_RUNE_CHAR[kind] for _ in range(n)), kind=kind))
+            c += n + rng.randint(1, 2)
+        else:
+            c += rng.randint(1, 2)
+
+
+def _reliquary_answer(word: str) -> str:
+    """Representative solve path (informational — reliquary has no par)."""
+    seal_col = _RELIQUARY_WALL_COL - len(word)
+    approach = ['l'] * (seal_col - _RELIQUARY_SPAWN[1])    # reach the leftmost glyph
+    erase    = ['x'] * len(word)                           # break the seal in place
+    cross    = ['l'] * (_RELIQUARY_CHEST[1] - seal_col)    # pass through to the chest
+    return ' '.join(approach + erase + cross + ['x', 'l'])  # loot, then step to exit
+
+
 def build_dungeon_reliquary(seed: int) -> Dungeon:
-    """The Reliquary — bonus chest room unlocked after The Line Halls.
+    """The Reliquary — the Sealed Ward (bonus room after The Line Halls).
 
-    Layout (5 rows × 17 cols):
-      Entry room (interior 3r × 2c): rows 0-4, cols 0-3;  floor at rows 1-3, cols 1-2.
-      Corridor   (1r × 8c):          row 2,   cols 3-12   (carves through both room walls).
-      Dest room  (interior 3r × 3c): rows 0-4, cols 12-16; floor at rows 1-3, cols 13-15.
+    A two-chamber vault split by a full-height wall. On the approach side a
+    ward-word is inscribed across the threshold; erase it glyph-by-glyph with
+    x and the warded doorway opens onto the sanctum, where the relic-scroll
+    (The Unnamed Register) and the exit wait — entry, seal, chest, and exit
+    all on one row.
 
-    Chest (scroll) at center of destination interior: (2, 14).
-    Exit at top-right interior corner: (1, 15).
-    Entry at top-left of entry interior: (1, 1).
-
-    No par challenge (par=None).  Budget = 15.
-    Intended path: j  $  h  x  k  l  (6 keystrokes).
+    No par challenge (par=None, reward room).  x is *forced*: the dividing
+    wall blocks the sanctum until the seal CharRun on the action row is fully
+    cut, which main.py's _check_seal_broken detects, opening composite.seal_door.
     """
+    rng = random.Random(seed)
     dungeon = Dungeon(name='The Reliquary', seed=seed)
-    ROWS, COLS = 5, 17
+    ROWS, COLS = _RELIQUARY_ROWS, _RELIQUARY_COLS
+    W, ar = _RELIQUARY_WALL_COL, _RELIQUARY_ACTION_ROW
 
     cells = [[CellType.WALL] * COLS for _ in range(ROWS)]
-
-    # Entry room interior: rows 1-3, cols 1-2
-    for r in range(1, 4):
-        for c in range(1, 3):
-            cells[r][c] = CellType.FLOOR
-
-    # Single-row corridor: row 2, cols 3-12 (carves entry right wall and dest left wall)
-    for c in range(3, 13):
-        cells[2][c] = CellType.CORRIDOR
-
-    # Destination room interior: rows 1-3, cols 13-15
-    for r in range(1, 4):
-        for c in range(13, 16):
-            cells[r][c] = CellType.FLOOR
+    # Two floor chambers (rows 1..ROWS-2) split by the dividing wall at col W.
+    for r in range(1, ROWS - 1):
+        for c in range(1, W):
+            cells[r][c] = CellType.FLOOR          # left approach chamber
+        for c in range(W + 1, COLS - 1):
+            cells[r][c] = CellType.FLOOR          # right sanctum
+    # col W stays WALL top-to-bottom; the doorway at (ar, W) opens on seal-break.
 
     composite = Room(room_type=RoomType.ENTRY, rows=ROWS, cols=COLS)
-    composite.cells = cells
-    composite.seed  = seed
-
-    composite.spawn_pos    = (1, 1)
-    composite.exit_pos = (1, 15)
+    composite.cells     = cells
+    composite.seed      = seed
+    composite.spawn_pos = _RELIQUARY_SPAWN
+    composite.exit_pos  = _RELIQUARY_EXIT
+    composite.seal_door = (ar, W)                 # opened by _check_seal_broken
 
     composite.entities = [
-        Entity(kind='chest_scroll', row=2, col=14),
-        Entity(kind='exit',         row=1, col=15),
+        Entity(kind='chest_scroll', row=_RELIQUARY_CHEST[0], col=_RELIQUARY_CHEST[1]),
+        Entity(kind='exit',         row=_RELIQUARY_EXIT[0],  col=_RELIQUARY_EXIT[1]),
     ]
 
+    # The seal: a Latin ward-word in ember, right-aligned against the dividing
+    # wall on the action row — the ONLY CharRun on that row (so its absence
+    # signals a broken seal).
+    word     = rng.choice(_RELIQUARY_SEAL_WORDS)
+    seal_col = W - len(word)
+    composite.char_runs = [
+        CharRun(row=ar, col=seal_col, symbols=tuple(word), kind='ember'),
+    ]
+    # Ornamental friezes (randomized per seed) line both chambers — never the
+    # action row, so they can't be mistaken for the seal.
+    for fr in _RELIQUARY_FRIEZE_ROWS:
+        _place_frieze(composite, rng, fr, 1, W - 1)            # left chamber
+        _place_frieze(composite, rng, fr, W + 1, COLS - 2)     # right sanctum
+
     composite.par    = None
-    composite.budget = 15
-    composite.answer = 'j $ h x k l'
+    composite.budget = 35
+    composite.answer = _reliquary_answer(word)
 
     composite.rebuild_indexes()
     dungeon.rooms        = [composite]
@@ -1777,7 +1822,7 @@ _WARDENS_KEEP_COLS = 44
 
 # Layout (7 × 44):
 #   Row 0/6 : all wall
-#   Row 3   : open floor 0-42  (entry 0, seal_door 16, Warden 27, boss_seal 38, exit 39)
+#   Row 3   : open floor 0-42  (entry 0, seal_door 16, Warden 27, locked_door 38, exit 39)
 #   Rows 1,5: floor 0-15, wall 16, floor 17-37, wall 38, floor 39-42
 #   Rows 2,4: stone columns (wall at even cols 0-16), open floor 17-37, wall 38, floor 39-42
 
@@ -1852,7 +1897,7 @@ def build_dungeon_wardens_keep(seed: int) -> Dungeon:
         Entity(kind='shield',          row=3, col=26),
         Entity(kind='warden',          row=3, col=27, hp=5, max_hp=5, ai='',
                summon_timer=0),
-        Entity(kind='boss_seal',       row=3, col=38),
+        Entity(kind='locked_door',     row=3, col=38),   # opened with the key the Warden drops
         Entity(kind='exit',            row=3, col=39),
         Entity(kind='heart_container', row=2, col=41),
         Entity(kind='chest_scroll',    row=4, col=41),
@@ -1864,6 +1909,280 @@ def build_dungeon_wardens_keep(seed: int) -> Dungeon:
     composite.budget = math.ceil(_par_wardens_keep() * 1.4)
 
     dungeon = Dungeon(name="The Warden's Keep", seed=seed)
+    dungeon.rooms        = [composite]
+    dungeon.current_room = 0
+    return dungeon
+
+
+# ── The Warden Surveyor (ACT II BOSS, caps L6-L13) ────────────────────────────
+# A massive, vertically-scrolling hall papered with the warden's own verse
+# (English + readable Latin). Poems are laid as sentence char-runs so the act's
+# structural motions stay useful: '.!?' make )/( boundaries, '()' give % its
+# jumps, and spacing drives w/b/e/W/B/E/ge. Words are bounded and punctuated by
+# void runes (○) and dynamite — stepping h/l through a gap can be lethal, but
+# w/b/e leap word-to-word and only ever LAND on a word, so the survey motions
+# are the safe way across the minefield. A clear vertical aisle (col 1) and the
+# clear warden row guarantee a hazard-free route to the warden and the exit.
+#
+# NOTE (phase a — static arena): the two-phase visual/teleport warden AI is
+# wired in main.py next. Here the warden is a plain 5-HP boss tagged 'surveyor'
+# so it neither chases nor summons goblins.
+
+_SURVEYOR_CORPUS: list[list[str]] = [
+    ["I walked the world to its last wall",
+     "and drove my stake where the floor gives way.",
+     "All within my line is mine to keep.",
+     "And you (who wandered in)? You stay."],
+    ["Sight is a kind of reaching.",
+     "The eye lays its level across the room,",
+     "and what it touches (mark this) it can take.",
+     "So watch what the warden watches!"],
+    ["Do not trust the dark beyond the runes!",
+     "It is not floor; it is the end of floor.",
+     "One step too far surveys nothing",
+     "but the long fall (and the silence after)."],
+    ["Every wall I raise has a seam.",
+     "Every shield (you've seen it) bares a back.",
+     "Round the sentence, past the bracket -",
+     "can you find the side I cannot guard?"],
+    ["Count nothing twice! Move by the word,",
+     "not the trembling letter. The wise foot",
+     "leaps the phrase entire (the whole WORD)",
+     "and lands a sentence nearer the gate."],
+    ["He frames you. See the bright cells bloom -",
+     "that is his gaze (deciding what to cut).",
+     "One breath to leave the box. One!",
+     "Step wide; he does not aim again."],
+    ["Strike me, and I am elsewhere",
+     "(a mark recalled, a name made place).",
+     "Where will I be? Where I will.",
+     "So learn to be where I am not."],
+    ["The old god of edges asked no blood,",
+     "only that none should move the stone.",
+     "Here the stones are hungry (and patient).",
+     "The line you cross will cross you back!"],
+    ["To map a thing is to confess",
+     "you mean to cross it. So read the room!",
+     "The periods are stepping-stones;",
+     "the brackets (these) swing both ways."],
+    ["Lamps gutter, and the long hour turns.",
+     "Still he keeps his count (and waits)."],
+    ["Noli lineam transgredi meam!",
+     "Quod tetigit oculus, custodis est.",
+     "Ultra? Nihil."],
+    ["Mensus sum noctem passibus.",
+     "Oculus meus regula est (et iudex).",
+     "Quod video, teneo."],
+    ["Hic finis est mundi.",
+     "Umbra non est solum.",
+     "Cave gradum ultimum!"],
+    ["Omnis murus rimam habet.",
+     "Omnis clipeus tergum nudat (semper).",
+     "Quaere latus quod non tegit!"],
+    ["Non dormit qui portam servat.",
+     "Numerat gradus tuos (omnes),",
+     "patiens ut lapis."],
+    ["Feri me: non ero illic!",
+     "Nomen meum locus fit.",
+     "Ubi ero? Ubi volam.",
+     "Disce stare ubi non sum."],
+    ["Etiam caelum mensus sum.",
+     "Stellas numeravi mediumque iter.",
+     "Quod supra est (et infra), meum est."],
+]
+
+_WS_ROWS, _WS_COLS = 30, 74
+# Horizontal flow like the Warden's Keep, scaled up: a pillared entry corridor
+# on the main row (you reach the seal-door with $, open it with x), a BIG hall,
+# then the treasure room. The seal-door MUST sit on the player's row — only line
+# motions ($/0/^) can land on a closed door; j/l cannot step onto one.
+_WS_MAIN_ROW     = 14                 # entry passage / warden / exit row
+_WS_ENTRY_C0, _WS_ENTRY_C1 = 1, 15    # pillared entry corridor
+_WS_DIVIDE_COL   = 16                 # wall between entry and hall (seal-door gap at main row)
+_WS_HALL_TOP, _WS_HALL_BOT = 1, 28    # hall incl. its water ring (perimeter)
+_WS_HALL_LEFT    = 17
+_WS_HALL_RIGHT   = 66
+_WS_INNER_TOP, _WS_INNER_BOT = 2, 27  # dry interior (inside the moat): poem rows
+_WS_INNER_RIGHT  = 65
+_WS_TEXT_COL     = 18                 # poems / inscription start (interior left)
+_WS_WARDEN_ROW   = 14
+_WS_SEAL_DOOR    = (14, 16)
+_WS_DOOR         = (14, 67)           # locked exit door (gap in the dividing wall)
+_WS_EXIT         = (14, 72)
+_WS_HEART        = (13, 70)
+_WS_SCROLL       = (15, 70)
+_WS_SPAWN        = (14, 1)
+_WS_KINDS        = ('ancient', 'verdant', 'ember')
+_WS_HAZARD_P     = 0.16
+# The warden's inscription: '(' left of him and ')' right of him (so % hops
+# across to his unshielded far side), and a '.' past him (so ) lands there too).
+# No '!' — every '!' becomes a live charge, and the warden row stays clear.
+_WS_WARDEN_LINE  = "He guards it (the far seam). Cross now."
+
+
+def _ws_place_hazard(composite, rng, row: int, col: int) -> None:
+    """Drop a dynamite charge on an empty gap cell. (Void runes were replaced by
+    the room's water moat — see the ring in build_dungeon_warden_surveyor.)"""
+    if col < 1 or col > composite.cols - 2:
+        return
+    composite.entities.append(Entity(kind='dynamite', row=row, col=col, hp=1))
+
+
+def _ws_lay_line(composite, rng, row: int, col0: int, text: str, kind: str,
+                 hazard_p: float, skip=()) -> None:
+    """Lay one verse line as CharRuns with spaces INCLUDED, so f/t skip blanks
+    and land on real punctuation (an empty floor cell reads as '.'). Runs break
+    only at: every '!' (a live charge), some inter-word gaps (random
+    void/dynamite), and any `skip` columns — left empty so an entity beneath
+    (the warden/shield) shows through to f/F/t/T."""
+    skip = set(skip)
+    seg: list[str] = []
+    seg_col = None
+
+    def _flush():
+        nonlocal seg, seg_col
+        if seg:
+            composite.char_runs.append(
+                CharRun(row=row, col=seg_col, symbols=tuple(seg), kind=kind))
+        seg, seg_col = [], None
+
+    for i, ch in enumerate(text):
+        col = col0 + i
+        if col in skip:
+            _flush()
+            continue
+        if ch == '!':                       # every '!' renders/behaves as dynamite
+            _flush()
+            composite.entities.append(Entity(kind='dynamite', row=row, col=col, hp=1))
+            continue
+        if ch == ' ' and hazard_p and rng.random() < hazard_p:
+            _flush()
+            _ws_place_hazard(composite, rng, row, col)
+            continue
+        if seg_col is None:
+            seg_col = col
+        seg.append(ch)
+    _flush()
+    if hazard_p and rng.random() < hazard_p:
+        _ws_place_hazard(composite, rng, row, col0 + len(text))
+
+
+def _ws_lay_corpus(composite, rng, row_top: int, row_bot: int, col0: int,
+                   reserved: set) -> None:
+    """Paper the hall with the corpus: each poem a paragraph (blank-row gap for
+    }/{), kinds cycling for colour, repeating the shuffled corpus until full."""
+    poems = list(_SURVEYOR_CORPUS)
+    rng.shuffle(poems)
+    r, pi, ki = row_top, 0, 0
+    while r <= row_bot:
+        if pi >= len(poems):
+            rng.shuffle(poems)
+            pi = 0
+        poem = poems[pi]; pi += 1
+        kind = _WS_KINDS[ki % len(_WS_KINDS)]; ki += 1
+        for line in poem:
+            while r <= row_bot and r in reserved:
+                r += 1
+            if r > row_bot:
+                break
+            _ws_lay_line(composite, rng, r, col0, line, kind, _WS_HAZARD_P)
+            r += 1
+        r += 1   # blank separator = a }/{ paragraph break
+
+
+def regen_surveyor_hall(room, rng) -> None:
+    """Re-ink the dry interior with a fresh corpus (poems + '!'-charges), wiping
+    the old verse and its dynamite. Used when the Warden Surveyor enters Phase 2
+    — the sentences he ate during Phase 1 regrow, reshuffled."""
+    room.char_runs = [ru for ru in room.char_runs
+                      if not (_WS_INNER_TOP <= ru.row <= _WS_INNER_BOT
+                              and _WS_TEXT_COL <= ru.col <= _WS_INNER_RIGHT)]
+    room.entities = [e for e in room.entities
+                     if not (e.kind == 'dynamite'
+                             and _WS_INNER_TOP <= e.row <= _WS_INNER_BOT)]
+    _ws_lay_corpus(room, rng, _WS_INNER_TOP, _WS_INNER_BOT, _WS_TEXT_COL, reserved=set())
+    room.rebuild_indexes()
+
+
+def build_dungeon_warden_surveyor(seed: int) -> Dungeon:
+    rng = random.Random(seed)
+    ROWS, COLS = _WS_ROWS, _WS_COLS
+    cells = [[CellType.WALL] * COLS for _ in range(ROWS)]
+    MR = _WS_MAIN_ROW
+
+    def _floor(r0, r1, c0, c1):
+        for r in range(r0, r1 + 1):
+            for c in range(c0, c1 + 1):
+                cells[r][c] = CellType.FLOOR
+
+    # Pillared entry corridor (reused from the Keep): a floored 5-row block,
+    # passage on the main row, with stone columns (wall at even cols) carved
+    # into the rows just above/below — framed by the solid floor edges so the
+    # columns actually read as columns.
+    _floor(MR - 2, MR + 2, _WS_ENTRY_C0, _WS_ENTRY_C1)
+    for pr in (MR - 1, MR + 1):
+        for c in range(_WS_ENTRY_C0, _WS_ENTRY_C1 + 1):
+            if c % 2 == 0:
+                cells[pr][c] = CellType.WALL
+    cells[MR][_WS_DIVIDE_COL] = CellType.FLOOR         # seal-door gap (rest of col wall)
+
+    # The big hall: floor the interior, then ring it with a WATER moat. hjkl
+    # can't step onto water, so you must LEAP in (w/e/f land on a word/letter
+    # beyond it); 0/$ land IN it and drown. The right edge opens a floor gate on
+    # the main row so the exit stays walkable once the boss falls.
+    _floor(_WS_HALL_TOP, _WS_HALL_BOT, _WS_HALL_LEFT, _WS_HALL_RIGHT)
+    for c in range(_WS_HALL_LEFT, _WS_HALL_RIGHT + 1):
+        cells[_WS_HALL_TOP][c] = CellType.WATER
+        cells[_WS_HALL_BOT][c] = CellType.WATER
+    for r in range(_WS_HALL_TOP, _WS_HALL_BOT + 1):
+        cells[r][_WS_HALL_LEFT]  = CellType.WATER
+        cells[r][_WS_HALL_RIGHT] = CellType.WATER
+    cells[MR][_WS_HALL_RIGHT] = CellType.FLOOR         # exit gate (main row only)
+
+    cells[MR][_WS_DOOR[1]] = CellType.FLOOR            # locked-door gap (rest of col wall)
+    _floor(MR - 2, MR + 2, _WS_DOOR[1] + 1, COLS - 2)                  # treasure room
+
+    composite = Room(room_type=RoomType.COMBAT, rows=ROWS, cols=COLS)
+    composite.cells     = cells
+    composite.seed      = seed
+    composite.spawn_pos = _WS_SPAWN
+    composite.exit_pos  = _WS_EXIT
+    composite.char_runs = []
+    composite.entities  = []
+
+    # Warden embedded mid-hall on a punctuation-rich inscription so % (or a )/(
+    # hop) carries the player across to his unshielded far side.
+    line       = _WS_WARDEN_LINE
+    lcol       = _WS_TEXT_COL + line.index('(')
+    rcol       = _WS_TEXT_COL + line.index(')')
+    warden_col = (lcol + rcol) // 2
+    shield_col = warden_col - 1
+    # leave the warden/shield cells un-lettered so f/F/t/T see 'W' beneath, not the verse
+    _ws_lay_line(composite, rng, _WS_WARDEN_ROW, _WS_TEXT_COL, line, 'ember', 0.0,
+                 skip=(shield_col, warden_col))
+
+    # Paper the dry interior (skip the warden row, which must stay clear).
+    _ws_lay_corpus(composite, rng, _WS_INNER_TOP, _WS_INNER_BOT,
+                   _WS_TEXT_COL, reserved={_WS_WARDEN_ROW})
+
+    composite.entities += [
+        Entity(kind='seal_door',       row=_WS_SEAL_DOOR[0], col=_WS_SEAL_DOOR[1]),
+        Entity(kind='shield',          row=_WS_WARDEN_ROW,   col=shield_col),
+        Entity(kind='warden',          row=_WS_WARDEN_ROW,   col=warden_col,
+               hp=5, max_hp=5, ai='', tag='surveyor', summon_timer=10**6),
+        Entity(kind='locked_door',     row=_WS_DOOR[0], col=_WS_DOOR[1]),   # Warden's key opens it
+        Entity(kind='exit',            row=_WS_EXIT[0],      col=_WS_EXIT[1]),
+        Entity(kind='heart_container', row=_WS_HEART[0],     col=_WS_HEART[1]),
+        Entity(kind='chest_scroll',    row=_WS_SCROLL[0],    col=_WS_SCROLL[1]),
+    ]
+
+    composite.rebuild_indexes()
+    _fog_unreachable(composite, _WS_SPAWN[0], _WS_SPAWN[1])
+
+    composite.par    = None
+    composite.budget = 200    # provisional; refine once the AI / par sim exists
+
+    dungeon = Dungeon(name='The Warden Surveyor', seed=seed)
     dungeon.rooms        = [composite]
     dungeon.current_room = 0
     return dungeon

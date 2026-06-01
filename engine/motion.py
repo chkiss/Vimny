@@ -117,6 +117,23 @@ def _leftmost_passable(room, row: int):
     return None
 
 
+def _segment_left(room, row: int, col: int):
+    """Leftmost floor cell contiguous with `col` on `row` — the left edge of the
+    player's own segment. Bounded by terrain only (walls/water), so a paragraph
+    jump stays out of separate rooms but still reaches the leftmost blank past a
+    blocking ENTITY like the Warden's shield. None if `col` isn't on floor (the
+    caller falls back to the row's global leftmost)."""
+    def _floor(c: int) -> bool:
+        return (room.cells[row][c] in (CellType.FLOOR, CellType.CORRIDOR)
+                and (row, c) not in room.fog_cells)
+    if not _floor(col):
+        return None
+    c = col
+    while c - 1 >= 0 and _floor(c - 1):
+        c -= 1
+    return c
+
+
 def _rightmost_passable(room, row: int):
     """Last passable column on a row, or None if the row has none — the end of the
     line (the corridor / ledge edge), used by `A` to append at the line's end."""
@@ -153,20 +170,43 @@ def _row_has_rune(room, row: int) -> bool:
     return row in room._char_run_rows
 
 
+def _sentence_terminates(room, row: int, c: int) -> bool:
+    """A '.!?' at (row, c) ends a sentence only if followed by whitespace, the
+    end of the line, or a single closing bracket/quote then whitespace/EOL —
+    Vim-faithful. So a decimal point (the '.' in '17.3', followed by a digit)
+    does NOT split the sentence."""
+    nc = c + 1
+    if nc < room.cols:
+        ru = room.char_run_at(row, nc)
+        if ru is not None and ru.symbols[nc - ru.col] in ')]}"\'':
+            nc += 1                       # skip one closing bracket/quote
+    if nc >= room.cols:
+        return True                       # end of line
+    ru = room.char_run_at(row, nc)
+    return ru is None or ru.symbols[nc - ru.col] == ' '   # gap/floor or a space
+
+
 def _sentence_starts(room, row: int) -> list:
     """Columns on `row` where a sentence begins. The first non-void rune starts
-    a sentence; a rune symbol in '.!?' ends one, so the next non-void rune
-    after it starts the next. Row-scoped (cross-row flow can be added later)."""
+    a sentence; a '.!?' followed by whitespace/EOL ends one, so the next
+    non-void rune after it starts the next. Row-scoped (cross-row flow can be
+    added later)."""
     starts = []
     pending = True
     for c in range(room.cols):
+        ent = room.entity_at(row, c)
+        if ent is not None and ent.kind == 'dynamite':
+            # a !-charge renders as '!' and ends a sentence when followed by space/EOL
+            if _sentence_terminates(room, row, c):
+                pending = True
+            continue
         ru = room.char_run_at(row, c)
         if ru is None or ru.kind == 'void':
             continue
         if pending:
             starts.append(c)
             pending = False
-        if ru.symbols[c - ru.col] in '.!?':
+        if ru.symbols[c - ru.col] in '.!?' and _sentence_terminates(room, row, c):
             pending = True
     return starts
 
@@ -647,7 +687,11 @@ def apply_motion(player, motion, count, room, target=None, count_given: bool = T
                     target_row = prows[-1] if motion == '}' else prows[0]
             if target_row is None:
                 break
-            tc = _leftmost_passable(room, target_row)
+            # Land at the left edge of the player's OWN segment on that row, so
+            # `}`/`{` can't vault a wall/moat into the entry or treasure room.
+            tc = _segment_left(room, target_row, player.col)
+            if tc is None:
+                tc = _leftmost_passable(room, target_row)
             if (target_row, tc) != (player.row, player.col):
                 player.row, player.col = target_row, tc
                 moved = True

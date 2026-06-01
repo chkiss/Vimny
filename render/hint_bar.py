@@ -69,11 +69,23 @@ _DEFAULT = 'h/j/k/l:move cursor  :w write (save)  :q quit  :q! quit without savi
 
 # ── Public API ────────────────────────────────────────────────────────────────
 
-def hint_text(known: list) -> str:
-    """Return hint bar text for the given known_commands list."""
+def _format(tokens) -> str:
+    parts = [f'{CMD[tok][0]}:{CMD[tok][1]}' for tok in tokens if tok in CMD]
+    return ('  '.join(parts) + _SUFFIX) if parts else _DEFAULT
+
+
+def hint_text(known: list, slug: str | None = None) -> str:
+    """Return hint bar text for the given known_commands list.
+
+    On a boss level the bar lists the WHOLE act the boss caps (so the player is
+    nudged to wield every command they've learned), never the next-act command
+    the boss merely previews. Elsewhere it shows the newest tier the player owns.
+    """
+    if slug is not None:
+        from content.levels import level_type, act_commands  # noqa: PLC0415
+        if level_type(slug) == 'boss':
+            return _format(act_commands(slug))
     for sentinel, tokens in _HINT_TIERS:
         if sentinel in known:
-            parts = [f'{CMD[tok][0]}:{CMD[tok][1]}'
-                     for tok in tokens if tok in CMD]
-            return '  '.join(parts) + _SUFFIX
+            return _format(tokens)
     return _DEFAULT

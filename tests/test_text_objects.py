@@ -183,6 +183,21 @@ class TestSentence:
     def test_second_sentence(self):
         assert _span(resolve_text_object('is', self._r(), _p(3, 7))) == (3, 6, 3, 8)
 
+    def test_decimal_point_does_not_end_a_sentence(self):
+        """A '.' followed by a digit (e.g. '17.3') is not a sentence end — `)`
+        must skip it and land on the space after the real terminator."""
+        from engine.motion import _sentence_starts, apply_motion
+        room = _room()
+        _chars(room, 3, 1, 'a 17.3 b. X')   # cols 1..11; '.' at col 5 (decimal), col 9 (real)
+        starts = _sentence_starts(room, 3)
+        # the decimal '.' (col 5) and the digit '3' (col 6) are NOT sentence starts
+        assert 6 not in starts
+        # the space after 'b.' (col 10) is the next start
+        assert starts == [1, 10]
+        p = _p(3, 1)
+        apply_motion(p, ')', 1, room, game_h=0)
+        assert (p.row, p.col) == (3, 10)
+
 
 # ── deferred: tags return None ─────────────────────────────────────────────────
 

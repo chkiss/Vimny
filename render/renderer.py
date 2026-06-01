@@ -272,6 +272,8 @@ def render_all(term: Terminal, dungeon: Dungeon, player: Player,
     floor_bg = base_floor_bg
     wall_bg  = C.wall_bg()
     vis_bg   = C.visual_sel_bg()
+    threat_bg = C.threat_sel_bg()
+    _threat   = getattr(room, 'surveyor_threat', None)   # warden's telegraphed v-selection
     _vis_active = (mode in (Mode.VISUAL, Mode.VISUAL_LINE, Mode.VISUAL_BLOCK)
                    and getattr(player, 'visual_anchor', None) is not None)
     _vis_cursor = (player.row, player.col)
@@ -289,9 +291,15 @@ def render_all(term: Terminal, dungeon: Dungeon, player: Player,
                     line += wall_bg + ' ' + rst
                     continue
 
-                floor_bg = (vis_bg if (_vis_active and _in_visual_sel(
-                                player.visual_anchor, _vis_cursor, mode, room_r, room_c))
-                            else base_floor_bg)
+                if (_threat is not None and 'r0' in _threat
+                        and _threat['r0'] <= room_r <= _threat['r1']
+                        and _threat['c0'] <= room_c <= _threat['c1']):
+                    floor_bg = threat_bg
+                elif _vis_active and _in_visual_sel(
+                        player.visual_anchor, _vis_cursor, mode, room_r, room_c):
+                    floor_bg = vis_bg
+                else:
+                    floor_bg = base_floor_bg
                 ct = room.cells[room_r][room_c]
 
                 # Player?
@@ -464,7 +472,7 @@ def render_all(term: Terminal, dungeon: Dungeon, player: Player,
     if 'editor' in known:
         hint_text = 's:toggle wall  :rune ancient|verdant|void|ember  :entity exit|door|locked_door|chest|dynamite|wanderer|goblin|warden  :save <name>  :wq write+quit'
     else:
-        hint_text = _hint_text(known)
+        hint_text = _hint_text(known, getattr(dungeon, 'level_slug', None))
     if 'admin' in known:
         hint_text += '  :e refresh'
     hint_text = hint_text[:iw]

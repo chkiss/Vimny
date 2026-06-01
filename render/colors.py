@@ -16,6 +16,7 @@ def t():
 def wall_bg():       return _term.on_color_rgb(12, 12, 20)       # void-black, screen off
 def floor_bg():      return _term.on_color_rgb(24, 24, 32)       # dark slate, terminal idle
 def visual_sel_bg(): return _term.on_color_rgb(30, 50, 90)       # cold selection, vim-blue
+def threat_sel_bg(): return _term.on_color_rgb(95, 20, 28)       # warden's gaze, blood-crimson
 def player_fg():     return _term.bright_white                    # cursor: sharp, no warmth
 def enemy_fg():      return _term.color_rgb(100, 155, 80)        # muted olive, enemy life
 def enemy_frozen():  return _term.color_rgb(80, 200, 240)        # ice-blue, frozen state
