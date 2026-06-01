@@ -69,11 +69,13 @@ WAYPOINT_SCROLL = {
     'lines': [
         ('dim',   "  A surveyor's ledger, folded in the chest."),
         ('blank',),
-        ('abbr',  ':set nu', 'mber', 'show line numbers'),
-        ('cmd',   ':set rnu',    'count from the cursor'),
-        ('cmd',   ':set nonu',   'hide the gutter'),
+        # full option names, with the typable abbreviation letters bold:
+        ('segs',  [(':set nu', True), ('mber', False)], 'show line numbers'),
+        ('segs',  [(':set r', True), ('elative', False), ('nu', True), ('mber', False)],
+                  'count from the cursor'),
+        ('segs',  [(':set nonu', True), ('mber', False)], 'hide the gutter'),
         ('blank',),
-        ('dim',   '  Type the bright runes; the rest is flourish.'),
+        ('dim',   '  A name half-spoken is a name still heard.'),
         ('blank',),
         ('amber', '  Know the line; the leap follows.'),
     ],
