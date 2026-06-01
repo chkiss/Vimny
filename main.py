@@ -584,7 +584,10 @@ def _heart_container_animation(term, dungeon, player, budget, old_max_hp, messag
         time.sleep(0.07)
 
 
-def _win_animation(term, iw):
+def _win_animation(term, iw, dungeon, player):
+    """Non-par finish: a brief 'DUNGEON CLEARED' banner, blended into the room via
+    the same per-cell-background draw as the fireworks/starfield (helpers below)."""
+    bg_at     = _victory_cell_bg(term, dungeon.room, player, iw, term.height - 8)
     rows_text = [
         '✦  ★  ✦  ★  ✦  ★  ✦  ★  ✦',
         ' D U N G E O N   C L E A R E D ',
@@ -598,26 +601,23 @@ def _win_animation(term, iw):
     center = term.height // 2 - 1
     for frame in range(16):
         star_col, text_col = palettes[frame % 3]
-        for i, line in enumerate(rows_text):
-            pad     = max(0, (iw - len(line)) // 2)
-            content = ' ' * pad + line + ' ' * max(0, iw - pad - len(line))
-            color   = text_col if i == 1 else star_col
-            print(term.move_yx(center + i, 1) + color + content + term.normal,
-                  end='', flush=True)
+        _draw_victory_banner(term, iw, center, rows_text,
+                             [star_col, text_col, star_col], bg_at)
         time.sleep(0.1)
 
 
-def _fireworks_animation(term, iw, dungeon, player):
-    h      = term.height
-    room   = dungeon.room
-    game_h = h - 8
-    vr_start = max(0, min(player.row - game_h // 2, room.rows - game_h))
-    vc_start = max(0, min(player.col - iw  // 2, room.cols - iw))
-    vr_start = max(0, vr_start)
-    vc_start = max(0, vc_start)
+def _spaced_title(text: str) -> str:
+    """Letter-space an all-caps banner title: 'VIM AD ASTRA' -> 'V I M   A D   A S T R A'."""
+    return '   '.join(' '.join(word) for word in text.split())
 
-    def _bg_at(term_r, term_c):
-        # Rows 3..3+game_h-1, cols 1..iw are dungeon cells.
+
+def _victory_cell_bg(term, room, player, iw, game_h):
+    """Return bg_at(term_r, term_c) -> the dungeon cell's background under that
+    terminal cell, so overlaid victory glyphs blend into the room (not a flat band)."""
+    vr_start = max(0, min(player.row - game_h // 2, room.rows - game_h))
+    vc_start = max(0, min(player.col - iw // 2, room.cols - iw))
+
+    def bg_at(term_r, term_c):
         if not (3 <= term_r < 3 + game_h and 1 <= term_c <= iw):
             return C.floor_bg()
         room_r = (term_r - 3) + vr_start
@@ -634,6 +634,30 @@ def _fireworks_animation(term, iw, dungeon, player):
         if ct == CellType.WOOD_WALL:
             return C.wood_wall_bg()
         return C.floor_bg()
+
+    return bg_at
+
+
+def _draw_victory_banner(term, iw, center, banner_rows, row_colors, bg_at):
+    """Draw centered banner rows; each cell sits on its dungeon background."""
+    for i, line in enumerate(banner_rows):
+        pad     = max(0, (iw - len(line)) // 2)
+        content = ' ' * pad + line + ' ' * max(0, iw - pad - len(line))
+        col     = row_colors[i]
+        term_r  = center + i
+        out = term.move_yx(term_r, 1)
+        for j, ch in enumerate(content):
+            out += bg_at(term_r, 1 + j) + col + ch
+        print(out + term.normal, end='', flush=True)
+
+
+def _fireworks_animation(term, iw, dungeon, player):
+    """Par-perfect (non-boss) finish: multicolour fireworks + the Horace banner
+    'VIM PROMOVET INSITAM' ("training draws out the inborn force"; see CREDITS.md)."""
+    h      = term.height
+    room   = dungeon.room
+    game_h = h - 8
+    bg_at  = _victory_cell_bg(term, room, player, iw, game_h)
 
     bursts  = [
         (h // 4,     iw // 6),
@@ -653,8 +677,8 @@ def _fireworks_animation(term, iw, dungeon, player):
     ]
     banner_rows = [
         '✦ ★ ✦ ★ ✦ ★ ✦ ★ ✦ ★ ✦ ★ ✦ ★ ✦',
-        '  V I M   M A S T E R Y   A C H I E V E D  ',
-        '  Par excellence! Your keystrokes are art.  ',
+        '  ' + _spaced_title('VIM PROMOVET INSITAM') + '  ',
+        '  Not a stroke wasted. You meant every key.  ',
         '★ ✦ ★ ✦ ★ ✦ ★ ✦ ★ ✦ ★ ✦ ★ ✦ ★',
     ]
     banner_palettes = [
@@ -663,6 +687,11 @@ def _fireworks_animation(term, iw, dungeon, player):
         (term.bright_green  + term.bold, term.bright_yellow + term.bold, term.bright_white  + term.bold),
     ]
     center = h // 2 - 2
+
+    def _banner(frame):
+        sp, tc, mc = banner_palettes[frame % 3]
+        _draw_victory_banner(term, iw, center, banner_rows, [sp, tc, mc, sp], bg_at)
+
     for frame in range(20):
         sc = star_chars[min(frame // 4, len(star_chars) - 1)]
         for bi, (br, bc_) in enumerate(bursts):
@@ -671,16 +700,74 @@ def _fireworks_animation(term, iw, dungeon, player):
                 rr = br + dr * (1 + frame // 5)
                 cc = bc_ + dc * (1 + frame // 4)
                 if 3 <= rr < h - 3 and 1 <= cc < iw:
-                    print(term.move_yx(rr, cc) + _bg_at(rr, cc) + color + sc + term.normal,
+                    print(term.move_yx(rr, cc) + bg_at(rr, cc) + color + sc + term.normal,
                           end='', flush=True)
-        sp, tc, mc = banner_palettes[frame % 3]
-        for i, line in enumerate(banner_rows):
-            pad     = max(0, (iw - len(line)) // 2)
-            content = ' ' * pad + line + ' ' * max(0, iw - pad - len(line))
-            col     = tc if i == 1 else (mc if i == 2 else sp)
-            print(term.move_yx(center + i, 1) + col + content + term.normal,
-                  end='', flush=True)
+        _banner(frame)
         time.sleep(0.1)
+    _banner(19)             # settle on a final frame and hold ~1s so the motto can
+    time.sleep(1.1)         # be read (this fires after every par-perfect finish)
+
+
+def _starfield_victory(term, iw, dungeon, player):
+    """Boss-completion finish: a lasting, sky-accurate twinkling starfield behind
+    the 'VIM AD ASTRA' banner. Held until the player presses a key — a permanent
+    celebration rather than a passing burst (see CREDITS.md)."""
+    h      = term.height
+    room   = dungeon.room
+    game_h = h - 8
+    bg_at  = _victory_cell_bg(term, room, player, iw, game_h)
+    center = h // 2 - 1
+
+    banner_rows = [
+        '  ' + _spaced_title('VIM AD ASTRA') + '  ',
+        '  Onward and upward — the stars draw nearer.  ',
+    ]
+    banner_band = set(range(center, center + len(banner_rows)))
+    title_col   = term.bright_white + term.bold
+    sub_col     = term.color_rgb(190, 205, 255)
+
+    # A fixed field: mostly white stars, a touch of blue and red, twinkling in
+    # brightness — sky-accurate (stars shimmer in brightness, not in hue).
+    rng = random.Random(0x5A17)
+    WHITE, BLUE, RED = 0, 1, 2
+    palette = {
+        WHITE: (term.bright_white + term.bold, term.color_rgb(205, 205, 220), term.color_rgb(120, 120, 145)),
+        BLUE:  (term.color_rgb(175, 200, 255) + term.bold, term.color_rgb(120, 150, 215), term.color_rgb(75, 95, 150)),
+        RED:   (term.color_rgb(255, 170, 150) + term.bold, term.color_rgb(215, 130, 115), term.color_rgb(150, 90, 80)),
+    }
+    glyphs  = ('★', '✦', '·')       # bright, mid, dim
+    n_stars = max(24, (iw * game_h) // 26)
+    stars = []
+    for _ in range(n_stars):
+        sr = rng.randint(3, 3 + game_h - 1)
+        sc = rng.randint(1, iw)
+        if sr in banner_band:
+            continue
+        roll = rng.random()
+        hue  = BLUE if roll < 0.12 else (RED if roll < 0.22 else WHITE)
+        stars.append((sr, sc, hue, rng.randint(0, 13)))
+
+    hint     = '· · ·   press any key   · · ·'
+    hint_row = min(h - 2, center + len(banner_rows) + 2)
+    hint_col = term.color_rgb(95, 100, 130)
+
+    frame = 0
+    while True:
+        for (sr, sc, hue, phase) in stars:
+            v = (frame * 2 + sr * 7 + sc * 5 + phase) % 14
+            if   v < 1: lvl = 0          # bright twinkle
+            elif v < 5: lvl = 1          # mid
+            elif v < 9: lvl = 2          # dim
+            else:       lvl = None       # dark this frame (the shimmer)
+            ch = ' ' if lvl is None else glyphs[lvl]
+            fg = ''  if lvl is None else palette[hue][lvl]
+            print(term.move_yx(sr, sc) + bg_at(sr, sc) + fg + ch + term.normal,
+                  end='', flush=True)
+        _draw_victory_banner(term, iw, center, banner_rows, [title_col, sub_col], bg_at)
+        _draw_victory_banner(term, iw, hint_row, [hint], [hint_col], bg_at)
+        frame += 1
+        if term.inkey(timeout=0.13):
+            break
 
 
 # ── Small helpers ──────────────────────────────────────────────────────────────
@@ -903,12 +990,12 @@ def _remove_warden_shields(room) -> None:
         room.kill_entity(sh)
 
 
-def _check_boss_cleared(room, level: int, player) -> str:
+def _check_boss_cleared(room, level: str, player) -> str:
     """Open the boss_seal when all wardens and goblins in a boss room are dead.
 
     Returns a message to display, or '' if nothing happened.
     """
-    if level != 51:
+    if level_type(level) != 'boss':
         return ''
     if (any(e.alive for e in room._entity_by_kind.get('warden', []))
             or any(e.alive for e in room._entity_by_kind.get('goblin', []))):
@@ -1859,12 +1946,14 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
                     at_exit = True
                     render_all(term, dungeon, player, budget, '', attack_pos=_attack_pos(), attack_sym=_attack_sym())
                     iw  = _iw(term)
-                    par = room.par or 0
-                    if par > 0 and budget.spent <= par:
+                    if level_type(level) == 'boss':
+                        _starfield_victory(term, iw, dungeon, player)
+                        message = 'VIM AD ASTRA — the way upward opens. Type :wq to return to the overworld.'
+                    elif (room.par or 0) > 0 and budget.spent <= room.par:
                         _fireworks_animation(term, iw, dungeon, player)
-                        message = 'Par achieved! Flawless Vim mastery. Type :wq to return to the overworld.'
+                        message = 'Par-perfect — not a stroke wasted!  Type :wq to return to the overworld.'
                     else:
-                        _win_animation(term, iw)
+                        _win_animation(term, iw, dungeon, player)
                         message = 'Dungeon cleared!  Type :wq to return to the overworld.'
                     msg_ttl = 200
 
@@ -2120,7 +2209,11 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
                         if _sid not in player.known_commands:
                             player.known_commands = player.known_commands + [_sid]
                         render_all(term, dungeon, player, budget, _pool_msg(), attack_pos=_attack_pos(), attack_sym=_attack_sym())
-                        _show_fn(term, _iw(term), term.height - 8, set(player.known_commands))
+                        # Gate the scroll's smudged lines on what the player has
+                        # actually learned (their whole progress), not this level's
+                        # frozen command set — otherwise replaying an early boss
+                        # re-smudges commands learned in later levels.
+                        _show_fn(term, _iw(term), term.height - 8, _known_from_progress(progress))
                     elif 'register' not in progress.get('extras', []):
                         progress['extras'] = progress.get('extras', []) + ['register']
                         if 'register' not in player.known_commands:
