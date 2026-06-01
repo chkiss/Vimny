@@ -64,6 +64,21 @@ WARDEN_SIGHT_SCROLL = {
     ],
 }
 
+WAYPOINT_SCROLL = {
+    'title': "◈   The Numbered Ledger   ◈",
+    'lines': [
+        ('dim',   "  A surveyor's ledger, folded in the chest."),
+        ('blank',),
+        ('cmd',   ':set number', 'show line numbers'),
+        ('cmd',   ':set rnu',    'count from the cursor'),
+        ('cmd',   ':set nonu',   'hide the gutter'),
+        ('blank',),
+        ('dim',   '  Numbered lines make G and marks plain.'),
+        ('blank',),
+        ('amber', '  Know the line; the leap follows.'),
+    ],
+}
+
 OPERATOR_CODEX_SCROLL = {
     'title': "◈   The Operator's Codex   ◈",
     'lines': [
