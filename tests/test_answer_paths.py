@@ -28,6 +28,9 @@ def _token_ks_cost(token: str) -> int:
       - g-prefix 2-key (ge, gE, gg): base 2; with count N: len(str(N)) + 2
       - f/F/t/T + target char (fr, Fw, t!, T!): base 2; with count: len+2
     """
+    if token and token[0] in '/?' and token.endswith('⏎'):
+        # search: /pat⏎ or ?pat⏎ — '/' + len(pat) chars + ⏎ = len(pat)+2 (main.py)
+        return len(token[1:-1]) + 2
     m = _GE_RE.match(token)
     if m:
         n_str = m.group(1)

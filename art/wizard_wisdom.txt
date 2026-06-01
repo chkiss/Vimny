@@ -246,13 +246,13 @@
     },
     {
       "introduces_slug": "seekers_labyrinth",
-      "name": "/ ? n N",
+      "name": "/ ? n N *",
       "line_count": 4,
       "quote": [
-        "      / casts a name down the hall ahead.       ",
-        "        ? sends the same call backward.         ",
-        "    n follows the echo on; N turns it round.    ",
-        "    Name what you seek; the buffer answers.     "
+        "      / casts a name down the hall ahead;       ",
+        "    ? sends the same call back. n, N follow.    ",
+        "       * takes the word beneath your feet       ",
+        "     and hunts its echo through the stone.      "
       ]
     },
     {

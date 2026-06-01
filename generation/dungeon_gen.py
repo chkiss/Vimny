@@ -3312,6 +3312,307 @@ def build_dungeon_sight_sanctum(seed: int) -> Dungeon:
     return dungeon
 
 
+# ── The Seekers' Labyrinth (search: / ? n N *) ──────────────────────────────────
+#
+# A frozen perfect maze (recursive-backtracker, 17×39).  Search ignores walls —
+# it teleports the cursor to the matched text wherever it lies — so the labyrinth
+# is something you *query*, not something you walk.  Walking to a key is so far
+# (foot-only par ≫ budget) that the ONLY affordable route is to call out a name
+# and be pulled to it.  Path-critical words are real typable vocab tokens:
+#   • 'maze'  appears 3× (the player SPAWNS on the first one): * jumps to the next,
+#     n walks the echoes forward, N walks them back.
+#   • 'vault' sits beside the red door at the very end: /vault⏎ lands the search.
+# Decor words (also vocab) flesh out the halls; none contains 'maze' or 'vault',
+# so they never perturb the two taught searches.
+#
+# Two keys gate two colour-matched doors, and the GOLD key sits to the LEFT of the
+# 3rd 'maze' — so reaching the RED key demands a backward jump:
+#   • 3rd 'maze' (11,15): the GOLD key is just left of it at (11,11).
+#   • 2nd 'maze' (5,1): a GOLD door (5,6) seals the RED key in a one-cell stub (5,7).
+#   • the RED door (1,18) caps the exit (1,19); 'vault' (1,7) shares its corridor.
+#
+# Optimal route (par 19):  * n 0 x N $ p l x /vault⏎ $ p l
+#   * n    — 'maze'(1,1) → 2nd 'maze'(5,1) [a decoy] → 3rd 'maze'(11,15).
+#   0 x    — 0 halts on the gold key at (11,11) (left of the maze); x cuts it.
+#   N      — reverse the search: back to the 2nd 'maze'(5,1), the passed decoy.
+#   $ p l  — $ halts at (5,5) before the gold door; p opens it (gold), l → red key.
+#   x      — cut the red key (the register now holds red).
+#   /vault⏎— teleport to 'vault'(1,7), the exit corridor.
+#   $ p l  — $ halts at (1,17) before the RED door; p opens it (red), l → exit.
+_SEEKERS_MAZE = [
+    "#######################################",
+    "#.....#.............#.................#",
+    "#####.#####.#########.###########.###.#",
+    "#...#.....#...#.....#...#.#.....#.#...#",
+    "#.#######.#.#.#.###.###.#.#.###.#.#.###",
+    "#.......#.#.#.#...#.#.....#.#...#.#...#",
+    "#.###.###.###.###.#.#.#####.#.###.###.#",
+    "#.#.#...#.#...#.#.#...#.....#.#...#...#",
+    "#.#.###.#.#.#.#.#.#####.#####.#.###.###",
+    "#.....#.#.#.#...#...#...#.#...#.#.#...#",
+    "#####.#.#.#.#######.#.###.#.###.#.###.#",
+    "#.....#...#.........#.#.#...#.......#.#",
+    "#.###########.#######.#.#.###.#####.#.#",
+    "#.....#.....#.#.....#.#.#...#.#...#.#.#",
+    "#####.#.###.###.###.#.#.###.###.#.###.#",
+    "#.......#.......#.....#.........#.....#",
+    "#######################################",
+]
+_SEEKERS_SPAWN        = (1, 1)
+_SEEKERS_GOLD_KEY     = (11, 11)               # left of the 3rd 'maze' (0 halts on it)
+_SEEKERS_GOLD_DOOR    = (5, 6)                 # seals the red key beside the 2nd 'maze'
+_SEEKERS_RED_KEY      = (5, 7)                 # one-cell stub behind the gold door
+_SEEKERS_RED_DOOR     = (1, 18)               # caps the exit
+_SEEKERS_EXIT         = (1, 19)
+_SEEKERS_WORD         = 'maze'                 # repeated search word (3 occurrences)
+_SEEKERS_WORD_POS     = [(1, 1), (5, 1), (11, 15)]
+_SEEKERS_DOORWORD     = 'vault'                # word beside the red door
+_SEEKERS_DOORWORD_POS = (1, 7)
+_SEEKERS_PAR          = 19
+_SEEKERS_ANSWER       = '* n 0 x N $ p l x /vault⏎ $ p l'
+
+
+def _seekers_runs(cells) -> list:
+    """All horizontal floor runs (row, start_col, end_col) of length >= 3."""
+    runs = []
+    for r in range(len(cells)):
+        c = 0
+        row = cells[r]
+        ncols = len(row)
+        while c < ncols:
+            if row[c] == CellType.CORRIDOR:
+                s = c
+                while c < ncols and row[c] == CellType.CORRIDOR:
+                    c += 1
+                if c - s >= 3:
+                    runs.append((r, s, c - 1))
+            else:
+                c += 1
+    return runs
+
+
+def _seekers_decor_pool(rng) -> dict:
+    """Length-keyed pool of typable + a few mixed vocab tokens for labyrinth
+    decor — excluding any token containing the two taught search words."""
+    _load_vocab_tables()
+    bad = (_SEEKERS_WORD, _SEEKERS_DOORWORD)
+    pool: dict = {}
+    for length, words in _VOCAB_PLAIN_BY_LEN.items():
+        if 3 <= length <= 8:
+            keep = [w for w in words if not any(b in w for b in bad)]
+            if keep:
+                pool[length] = list(keep)
+    # a sprinkle of mixed (glyph) tokens for atmosphere — scenery only
+    for length, words in _VOCAB_MIXED_BY_LEN.items():
+        if 4 <= length <= 7:
+            keep = [w for w in words if not any(b in w for b in bad)]
+            pool.setdefault(length, []).extend(keep[: max(1, len(keep) // 4)])
+    for length in pool:
+        rng.shuffle(pool[length])
+    return pool
+
+
+def build_dungeon_seekers_labyrinth(seed: int) -> 'Dungeon':
+    """Search: The Seekers' Labyrinth. See module comment above for the design."""
+    rng = random.Random(seed)
+    ROWS, COLS = len(_SEEKERS_MAZE), len(_SEEKERS_MAZE[0])
+    dungeon   = Dungeon(name="The Seekers' Labyrinth", seed=seed)
+    composite = Room(rows=ROWS, cols=COLS, room_type=RoomType.ENTRY)
+    composite.cells = [
+        [CellType.CORRIDOR if _SEEKERS_MAZE[r][c] == '.' else CellType.WALL
+         for c in range(COLS)]
+        for r in range(ROWS)
+    ]
+    composite.seed = seed
+
+    # ── Reserved cells: the path-critical words + the five entities ───────────
+    reserved: set = {_SEEKERS_GOLD_KEY, _SEEKERS_GOLD_DOOR, _SEEKERS_RED_KEY,
+                     _SEEKERS_RED_DOOR, _SEEKERS_EXIT}
+    char_runs: list = []
+    for (r, c) in _SEEKERS_WORD_POS:
+        char_runs.append(CharRun(row=r, col=c, symbols=tuple(_SEEKERS_WORD), kind='ember'))
+        reserved |= {(r, c + i) for i in range(len(_SEEKERS_WORD))}
+    dr, dc = _SEEKERS_DOORWORD_POS
+    char_runs.append(CharRun(row=dr, col=dc, symbols=tuple(_SEEKERS_DOORWORD), kind='ember'))
+    reserved |= {(dr, dc + i) for i in range(len(_SEEKERS_DOORWORD))}
+
+    # ── Decor: fill the OTHER runs with vocab tokens (scenery + search fodder) ─
+    pool = _seekers_decor_pool(rng)
+    for (r, s, e) in _seekers_runs(composite.cells):
+        if any((r, c) in reserved for c in range(s, e + 1)):
+            continue                      # leave path-word / entity runs untouched
+        c = s
+        while c <= e:
+            remaining = e - c + 1
+            lengths = [L for L in pool if L <= remaining and pool[L]]
+            if not lengths:
+                break
+            L = rng.choice(lengths)
+            word = pool[L][rng.randrange(len(pool[L]))]
+            char_runs.append(CharRun(row=r, col=c, symbols=tuple(word),
+                                     kind=rng.choice(('ancient', 'verdant', 'ember'))))
+            c += L + 1                     # one-cell gap between words
+
+    composite.char_runs = char_runs
+    composite.spawn_pos = _SEEKERS_SPAWN
+    composite.exit_pos  = _SEEKERS_EXIT
+    composite.entities  = [
+        Entity(kind='floor_key',   row=_SEEKERS_GOLD_KEY[0],  col=_SEEKERS_GOLD_KEY[1],  tag='gold'),
+        Entity(kind='locked_door', row=_SEEKERS_GOLD_DOOR[0], col=_SEEKERS_GOLD_DOOR[1], tag='gold'),
+        Entity(kind='floor_key',   row=_SEEKERS_RED_KEY[0],   col=_SEEKERS_RED_KEY[1],   tag='red'),
+        Entity(kind='locked_door', row=_SEEKERS_RED_DOOR[0],  col=_SEEKERS_RED_DOOR[1],  tag='red'),
+        Entity(kind='exit',        row=_SEEKERS_EXIT[0],      col=_SEEKERS_EXIT[1]),
+    ]
+    composite.par    = _SEEKERS_PAR
+    composite.budget = math.ceil(_SEEKERS_PAR * 1.4)
+    composite.answer = _SEEKERS_ANSWER
+
+    composite.rebuild_indexes()
+    dungeon.rooms        = [composite]
+    dungeon.current_room = 0
+    return dungeon
+
+
+# Motions available to the player on this level, for the par solver's foot phase.
+# % and ( ) are bracket/sentence jumps with no targets in a bracket-free, full-stop-
+# free maze (they never move), so they are omitted; ge/gE only reverse e/b within a
+# run and never beat them — the set below is the player's full *useful* toolkit.
+_SEEKERS_FOOT = ('h', 'j', 'k', 'l', '0', '$', '^', 'w', 'b', 'e',
+                 'W', 'B', 'E', 'G', 'gg', 'H', 'M', 'L', '{', '}')
+_SEEKERS_COUNTABLE = {'h', 'j', 'k', 'l', 'w', 'b', 'e', 'W', 'B', 'E', 'G', 'gg'}
+
+
+def _par_seekers_labyrinth(composite, no_search: bool = False, return_path: bool = False):
+    """Min-keystroke Dijkstra for The Seekers' Labyrinth (two keys, two doors).
+
+    State = (row, col, reg, gold_open, red_open) where reg ∈ {'', 'gold', 'red'}
+    is the colour of the key held in the register.  Foot moves are evaluated
+    through the REAL engine (apply_motion) so maze walls and the (currently
+    locked) doors behave exactly as in play — open doors are temporarily removed
+    so motions cross them.  x at a key cell loads the register; p beside a door
+    opens it iff the held key's colour matches.  Search is modelled as composite
+    edges: '/W⏎'/'?W⏎' + k·n reaches the k-th match forward/backward of any word W
+    (cost len(W)+2+k); '*' + k·n does the same for the word under the cursor
+    (cost 1+k).  no_search drops all search edges — the foot-only bound that
+    proves search is required (it dwarfs the budget).
+    """
+    from engine.player import Player
+    from engine.motion import apply_motion
+    ROWS, COLS = composite.rows, composite.cols
+    keys  = {e.tag: (e.row, e.col) for e in composite.entities if e.kind == 'floor_key'}
+    doors = {e.tag: (e.row, e.col) for e in composite.entities if e.kind == 'locked_door'}
+    EXIT  = next((e.row, e.col) for e in composite.entities if e.kind == 'exit')
+    entry = composite.spawn_pos
+
+    def _kcost(n):
+        return 1 if n == 1 else len(str(n)) + 1
+
+    _foot_cache: dict = {}
+
+    def _foot_edges(r, c, g_open, ro_open):
+        ck = (r, c, g_open, ro_open)
+        if ck in _foot_cache:
+            return _foot_cache[ck]
+        saved = composite.entities
+        open_tags = ({'gold'} if g_open else set()) | ({'red'} if ro_open else set())
+        if open_tags:
+            composite.entities = [e for e in saved
+                                  if not (e.kind == 'locked_door' and e.tag in open_tags)]
+            composite.rebuild_indexes()
+        out = []
+        for m in _SEEKERS_FOOT:
+            maxn = max(ROWS, COLS) if m in _SEEKERS_COUNTABLE else 1
+            prev = None
+            for n in range(1, maxn + 1):
+                p = Player(row=r, col=c)
+                cg = True if m not in ('G', 'gg') else (n != 1)
+                apply_motion(p, m, n, composite, count_given=cg)
+                np = (p.row, p.col)
+                if m in _SEEKERS_COUNTABLE and np == prev:
+                    break
+                prev = np
+                if np != (r, c):
+                    out.append((_kcost(n), np, m if n == 1 else f'{n}{m}'))
+                if m not in _SEEKERS_COUNTABLE:
+                    break
+        if open_tags:
+            composite.entities = saved
+            composite.rebuild_indexes()
+        _foot_cache[ck] = out
+        return out
+
+    distinct = sorted({''.join(ru.symbols) for ru in composite.char_runs})
+
+    def _matches(pat):
+        out = []
+        for ru in composite.char_runs:
+            i = ''.join(ru.symbols).find(pat)
+            if i >= 0:
+                out.append((ru.row, ru.col + i))
+        return sorted(out)
+
+    def _search_edges(r, c):
+        out = []
+        cur = (r, c)
+        for W in distinct:
+            ms = _matches(W)
+            if not ms:
+                continue
+            fwd = [m for m in ms if m > cur] + [m for m in ms if m <= cur]   # wrap
+            for k, tgt in enumerate(fwd):
+                out.append((len(W) + 2 + k, tgt, f'/{W}⏎' + 'n' * k))
+            bwd = [m for m in reversed(ms) if m < cur] + [m for m in reversed(ms) if m >= cur]
+            for k, tgt in enumerate(bwd):
+                out.append((len(W) + 2 + k, tgt, f'?{W}⏎' + 'n' * k))
+        ru = composite.char_run_at(r, c)
+        if ru is not None:
+            ms = _matches(''.join(ru.symbols))
+            fwd = [m for m in ms if m > cur] + [m for m in ms if m <= cur]
+            for k, tgt in enumerate(fwd):
+                if tgt != cur:
+                    out.append((1 + k, tgt, '*' + 'n' * k))
+        return out
+
+    start = (entry[0], entry[1], '', 0, 0)
+    dist = {start: 0}
+    prev = {start: None}
+    heap = [(0, start)]
+    while heap:
+        cost, st = heapq.heappop(heap)
+        r, c, reg, go, ro = st
+        if (r, c) == EXIT:
+            if return_path:
+                return cost, _join_path(prev, st, merge_single=False)
+            return cost
+        if cost > dist.get(st, float('inf')):
+            continue
+
+        def _try(nb, mc, lbl):
+            g = cost + mc
+            if g < dist.get(nb, float('inf')):
+                dist[nb] = g
+                prev[nb] = (st, lbl)
+                heapq.heappush(heap, (g, nb))
+
+        edges = _foot_edges(r, c, go, ro)
+        if not no_search:
+            edges = edges + _search_edges(r, c)
+        for mc, (nr, nc), lbl in edges:
+            _try((nr, nc, reg, go, ro), mc, lbl)
+        # x: cut the key under the cursor into the register (overwrites)
+        for tag, pos in keys.items():
+            if (r, c) == pos and reg != tag:
+                _try((r, c, tag, go, ro), 1, 'x')
+        # p: open an adjacent door iff the held key's colour matches
+        for tag, pos in doors.items():
+            opened = go if tag == 'gold' else ro
+            if reg == tag and not opened and abs(r - pos[0]) + abs(c - pos[1]) == 1:
+                ngo, nro = (1, ro) if tag == 'gold' else (go, 1)
+                _try((pos[0], pos[1], reg, ngo, nro), 1, 'p')
+
+    return (None, '') if return_path else None
+
+
 # ── The Bracket Vaults layout constants ─────────────────────────────────────────────────
 #
 # Three-corridor snake layout (7 rows × 60 cols).

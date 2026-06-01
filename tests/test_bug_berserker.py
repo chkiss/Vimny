@@ -7,7 +7,7 @@ from engine.world import Room, RoomType, CellType, Entity
 from engine.player import Player
 from main import (
     _enemy_tick, _try_warden_move, _do_warden_move,
-    _check_boss_cleared, _remove_warden_shields, _on_kill, _spawn_goblin,
+    _remove_warden_shields, _on_kill, _spawn_goblin,
 )
 
 ROWS, COLS = 7, 30
@@ -139,8 +139,9 @@ def test_on_kill_warden_drops_floor_key_at_goblin_gauntlet():
     assert 'Warden' in msg or 'key' in msg.lower()
 
 
-def test_on_kill_warden_no_key_at_wardens_keep():
-    """_on_kill for the boss Warden (The Warden's Keep) must NOT drop a floor_key."""
+def test_on_kill_warden_drops_key_at_wardens_keep():
+    """Every Warden — including The Warden's Keep boss — drops a floor_key to its
+    keep's locked exit door (the seal no longer auto-crumbles; the key is the way)."""
     room = _bare_room()
     warden = Entity(kind='warden', row=3, col=20, max_hp=5, ai='')
     room.add_entity(warden)
@@ -149,10 +150,9 @@ def test_on_kill_warden_no_key_at_wardens_keep():
     room.kill_entity(warden)   # mirrors game loop
     msg = _on_kill(warden, player, room, level='wardens_keep')
 
-    # At The Warden's Keep _on_kill returns early — no _drop_key called
-    floor_keys = [e for e in room.entities if e.kind == 'floor_key']
-    assert floor_keys == [], "boss warden (The Warden's Keep) must not drop a floor_key"
-    assert msg == 'The Warden falls!'
+    key = room.entity_at(warden.row, warden.col)
+    assert key is not None and key.kind == 'floor_key', "boss warden must drop a key"
+    assert 'key' in msg.lower()
 
 
 def test_last_goblin_at_goblin_gauntlet_drops_key():
