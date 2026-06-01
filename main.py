@@ -366,7 +366,7 @@ def _render_standard_scroll(term: Terminal, iw: int, game_h: int, content: dict,
     # Pad every key to a common width so the ──> arrows and descriptions line
     # up in clean columns (whether a row is smudged or revealed).
     key_w  = max(([len(s[1]) for s in content['lines'] if s[0] in ('cmd', 'smudge')]
-                  + [len(s[1]) + len(s[2]) for s in content['lines'] if s[0] == 'abbr']),
+                  + [sum(len(t) for t, _ in s[1]) for s in content['lines'] if s[0] == 'segs']),
                  default=0)
     indent = '  '
 
@@ -377,14 +377,18 @@ def _render_standard_scroll(term: Terminal, iw: int, game_h: int, content: dict,
         return row(len(plain),
                    indent + hi + k + rst + inn + body + sep + rst + inn + amber + desc + rst + inn)
 
-    def abbr_row(short, tail, desc):
-        # bold the typable abbreviation (short), dim the optional remainder (tail)
+    def seg_row(segments, desc):
+        # render a key as (text, bold) segments — bold the typable abbreviation
+        # letters, dim the optional remainder of the full option name.
         sep = '  ────>  '
-        pad = ' ' * max(0, key_w - len(short) - len(tail))
-        plain = f'{indent}{short}{tail}{pad}{sep}{desc}'
-        return row(len(plain),
-                   indent + hi + short + rst + inn + body + tail + pad + sep
-                   + rst + inn + amber + desc + rst + inn)
+        key = ''.join(t for t, _ in segments)
+        pad = ' ' * max(0, key_w - len(key))
+        plain = f'{indent}{key}{pad}{sep}{desc}'
+        colored = indent
+        for txt, bold in segments:
+            colored += (hi if bold else body) + txt + rst + inn
+        colored += body + pad + sep + rst + inn + amber + desc + rst + inn
+        return row(len(plain), colored)
 
     def smudge_row(key, smudge_prefix, clear_tail):
         sep    = '  ────>  '
@@ -410,7 +414,7 @@ def _render_standard_scroll(term: Terminal, iw: int, game_h: int, content: dict,
         if k == 'dim':    return body_row(spec[1])
         if k == 'amber':  return amber_row(spec[1])
         if k == 'cmd':    return cmd_row(spec[1], spec[2])
-        if k == 'abbr':   return abbr_row(spec[1], spec[2], spec[3])
+        if k == 'segs':   return seg_row(spec[1], spec[2])
         if k == 'smudge':
             key, prefix, tail = spec[1], spec[2], spec[3]
             gate = spec[4] if len(spec) > 4 else None
