@@ -288,7 +288,7 @@ def test_boss_seal_stays_while_warden_alive():
     room.add_entity(seal)
 
     room.kill_entity(goblin)
-    msg = _check_boss_cleared(room, 51, player)
+    msg = _check_boss_cleared(room, 'wardens_keep', player)
 
     assert msg == '', "boss_seal must stay closed while Warden is still alive"
     assert any(e.alive and e.kind == 'boss_seal' for e in room.entities)
@@ -306,7 +306,7 @@ def test_boss_seal_stays_while_goblins_alive():
     room.add_entity(seal)
 
     room.kill_entity(warden)
-    msg = _check_boss_cleared(room, 51, player)
+    msg = _check_boss_cleared(room, 'wardens_keep', player)
 
     assert msg == '', "boss_seal must stay closed while goblins are still alive"
     assert any(e.alive and e.kind == 'boss_seal' for e in room.entities)
@@ -324,23 +324,23 @@ def test_boss_seal_opens_when_room_cleared():
     room.add_entity(seal)
 
     room.kill_entity(goblin)
-    assert _check_boss_cleared(room, 51, player) == ''   # goblin dead, warden alive
+    assert _check_boss_cleared(room, 'wardens_keep', player) == ''   # goblin dead, warden alive
 
     room.kill_entity(warden)
-    msg = _check_boss_cleared(room, 51, player)
+    msg = _check_boss_cleared(room, 'wardens_keep', player)
 
     assert msg != '', "boss_seal should open once all enemies are dead"
     assert not any(e.alive and e.kind == 'boss_seal' for e in room.entities)
 
 
 def test_boss_seal_not_triggered_on_other_levels():
-    """_check_boss_cleared must be a no-op for levels other than 51."""
+    """_check_boss_cleared must be a no-op for non-boss levels."""
     room   = _boss_room()
     player = Player(row=3, col=10)
     seal   = Entity(kind='boss_seal', row=3, col=38)
     room.add_entity(seal)
 
-    msg = _check_boss_cleared(room, 5, player)
+    msg = _check_boss_cleared(room, 'goblin_gauntlet', player)
 
     assert msg == ''
     assert any(e.alive and e.kind == 'boss_seal' for e in room.entities)
