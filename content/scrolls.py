@@ -69,11 +69,11 @@ WAYPOINT_SCROLL = {
     'lines': [
         ('dim',   "  A surveyor's ledger, folded in the chest."),
         ('blank',),
-        ('cmd',   ':set number', 'show line numbers'),
+        ('abbr',  ':set nu', 'mber', 'show line numbers'),
         ('cmd',   ':set rnu',    'count from the cursor'),
         ('cmd',   ':set nonu',   'hide the gutter'),
         ('blank',),
-        ('dim',   '  Numbered lines make G and marks plain.'),
+        ('dim',   '  Type the bright runes; the rest is flourish.'),
         ('blank',),
         ('amber', '  Know the line; the leap follows.'),
     ],
