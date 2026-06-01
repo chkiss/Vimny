@@ -260,14 +260,31 @@ def render_all(term: Terminal, dungeon: Dungeon, player: Player,
     # ── Game area ─────────────────────────────────────────────────────────
     # 8 rows: top_border, status, top_sep, [game_h rows], statusline, message, bot_sep, hint, bot_border
     game_h  = term.height - 8
+    # :set number gutter (dungeon line numbers) — opt-in via player.number_mode;
+    # default 'none' leaves the layout exactly as before (no gutter).
+    number_mode = getattr(player, 'number_mode', 'none')
+    gutter_w  = 0 if number_mode == 'none' else 4      # "123 "
+    content_w = max(1, iw - gutter_w)
     room_display_rows = min(room.rows, game_h)
-    room_display_cols = min(room.cols, iw)
+    room_display_cols = min(room.cols, content_w)
 
-    # Viewport: centre on player
-    vr_start = max(0, min(player.row - game_h // 2,  room.rows - game_h))
-    vc_start = max(0, min(player.col - iw // 2,       room.cols - iw))
+    # Viewport: centre on player (over the content width, right of the gutter)
+    vr_start = max(0, min(player.row - game_h // 2,    room.rows - game_h))
+    vc_start = max(0, min(player.col - content_w // 2, room.cols - content_w))
     vr_start = max(0, vr_start)
     vc_start = max(0, vc_start)
+
+    gnum_fg = C.hint_fg()                              # dim gutter ink
+    def _gutter(room_r):
+        if gutter_w == 0:
+            return ''
+        if room_r >= room.rows:
+            return wall_bg + ' ' * gutter_w + rst
+        if number_mode == 'relativenumber':
+            n = 0 if room_r == player.row else abs(room_r - player.row)
+        else:
+            n = room_r + 1
+        return gnum_fg + f'{n:>{gutter_w - 1}} ' + rst
 
     base_floor_bg = C.floor_bg()
     floor_bg = base_floor_bg
@@ -296,12 +313,12 @@ def render_all(term: Terminal, dungeon: Dungeon, player: Player,
 
     for screen_r in range(game_h):
         room_r = screen_r + vr_start
-        line   = bfg + S.BOX_V + rst
+        line   = bfg + S.BOX_V + rst + _gutter(room_r)
 
         if room_r >= room.rows:
-            line += wall_bg + ' ' * iw + rst
+            line += wall_bg + ' ' * content_w + rst
         else:
-            for screen_c in range(iw):
+            for screen_c in range(content_w):
                 room_c = screen_c + vc_start
                 if room_c >= room.cols:
                     line += wall_bg + ' ' + rst

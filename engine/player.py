@@ -28,6 +28,7 @@ class Player:
     last_visual_mode: object = None           # Mode of the last visual selection, for gv
     last_search: tuple | None = None  # (pattern, forward) of the most recent search; used by n/N
     search_forward: bool = True   # direction of the in-progress / or ? entry (for rendering)
+    number_mode: str = 'none'     # ':set number' gutter in dungeons: 'none'|'number'|'relativenumber'
 
     # command input buffer for gg, f{c}, m{c}, `{c}, '{c}
     input_buf: str = ''

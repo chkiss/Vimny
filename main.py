@@ -25,7 +25,7 @@ from engine.jumplist import record_jump as _record_jump, jump_back as _jump_back
 from engine.registers import write_register as _reg_write, read_register as _reg_read
 from engine.visual import apply_visual, block_bounds
 from content.scrolls import (
-    RELIQUARY_SCROLL, WARDEN_LEAP_SCROLL, WARDEN_SIGHT_SCROLL,
+    RELIQUARY_SCROLL, WARDEN_LEAP_SCROLL, WARDEN_SIGHT_SCROLL, WAYPOINT_SCROLL,
     OPERATOR_CODEX_SCROLL, ARCHIVISTS_METHOD_SCROLL,
     WHOLE_WORD_SCROLL, WARDEN_ACT_SCROLL,
 )
@@ -427,6 +427,12 @@ def _render_standard_scroll(term: Terminal, iw: int, game_h: int, content: dict,
     term.inkey()
 
 
+def _show_waypoint_scroll(term: Terminal, iw: int, game_h: int,
+                          known: set | None = None) -> None:
+    """Amber scroll teaching :set number (the Waypoint Sanctum's left-room reward)."""
+    _render_standard_scroll(term, iw, game_h, WAYPOINT_SCROLL, known)
+
+
 def _show_operator_codex_scroll(term: Terminal, iw: int, game_h: int,
                                 known: set | None = None) -> None:
     """Operator's Codex (171) — d/dd clear; y/c clarify once learned."""
@@ -460,6 +466,7 @@ _SCROLL_DROPS = {
     'reliquary':            ('register',  None,                     None,                          _show_reliquary_scroll),
     'wardens_keep':         ('leap',      None,                     None,                          _show_warden_leap_scroll),
     'warden_surveyor':      ('visual',    None,                     None,                          _show_warden_sight_scroll),
+    'waypoint_sanctum':     ('setnum',    None,                     None,                          _show_waypoint_scroll),
     'warden_pathfinder':    ('d_op',      "The Operator's Codex",   _SCROLL_TEXT_OPERATOR_CODEX,    _show_operator_codex_scroll),
     'warden_manifold':      ('y_op',      "The Archivist's Method", _SCROLL_TEXT_ARCHIVISTS_METHOD, _show_archivists_method_scroll),
     'warden_scrivener':     ('text_obj',  'The Whole Word',         _SCROLL_TEXT_WHOLE_WORD,        _show_whole_word_scroll),
@@ -1793,6 +1800,22 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
                         room.add_entity(Entity(kind=kind, row=r, col=c,
                                                **_ENTITY_PRESETS[kind]))
                         _push(f'Placed {kind}.')
+
+                elif cmd.split()[0:1] == ['set']:
+                    # :set number/relativenumber/nonumber — line-number gutter,
+                    # unlocked by the Waypoint Sanctum scroll ('setnum').
+                    if 'setnum' not in player.known_commands and player_name != 'admin':
+                        _push("You haven't learned :set yet.")
+                    elif cmd in ('set number', 'set nu'):
+                        player.number_mode = 'number'; _push(':set number')
+                    elif cmd in ('set relativenumber', 'set rnu'):
+                        player.number_mode = 'relativenumber'; _push(':set relativenumber')
+                    elif cmd in ('set nonumber', 'set nonu'):
+                        player.number_mode = 'none'; _push(':set nonumber')
+                    elif cmd in ('set norelativenumber', 'set nornu'):
+                        player.number_mode = 'number'; _push(':set norelativenumber')
+                    else:
+                        _push(f'Unknown option: :{cmd}')
 
                 else:
                     _push(f'Unknown command: :{cmd}')

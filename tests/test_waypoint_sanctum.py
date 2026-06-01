@@ -183,3 +183,38 @@ def test_skipping_the_scroll_beats_par():
     assert reached and not got_scroll
     assert spent == _WP_PAR - 3 == 16                 # 'a(2) + x(1) saved
     assert spent < _WP_PAR
+
+
+# ── :set number gutter (the scroll's payoff) + scroll-drop wiring ────────────
+def test_left_room_scroll_grants_setnum():
+    import main
+    assert main._SCROLL_DROPS['waypoint_sanctum'][0] == 'setnum'
+
+
+def test_set_number_renders_a_line_gutter(capsys):
+    """player.number_mode toggles a dungeon line-number gutter; default 'none'
+    leaves the frame ungutted (no regression)."""
+    from blessed import Terminal
+    import render.colors as C
+    import render.symbols as S
+    from render.renderer import render_all
+    from engine.budget import Budget
+    t = Terminal(); C.init(t); S.init(t)
+    d = _build(42)
+    p = Player(row=7, col=5)                           # player on the sanctum row (line 8)
+
+    p.number_mode = 'none'
+    render_all(t, d, p, Budget(total=27), '')
+    plain = capsys.readouterr().out
+
+    p.number_mode = 'number'
+    render_all(t, d, p, Budget(total=27), '')
+    numbered = capsys.readouterr().out
+
+    p.number_mode = 'relativenumber'
+    render_all(t, d, p, Budget(total=27), '')
+    relative = capsys.readouterr().out
+
+    assert '  1 ' in numbered and '  8 ' in numbered    # absolute line numbers
+    assert '  1 ' not in plain                          # default: no gutter
+    assert '  0 ' in relative                           # cursor line = 0 in relativenumber
