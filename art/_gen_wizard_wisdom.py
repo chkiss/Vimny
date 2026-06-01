@@ -47,8 +47,8 @@ POEMS: list[tuple[str | None, str, list[str]]] = [
     (None, 'home row', [
         'h left, l right, j down, k up—',
         'a road built one step at a time.',
-        'The reaching keys lie far from the hearth;',
-        'keep your hands where they began.',
+        'The arrow keys lie far from the hearth;',
+        'keep your hands warm.',
     ]),
     (None, 'save and quit', [
         ': opens the spellbook beneath the glass.',

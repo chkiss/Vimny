@@ -116,6 +116,29 @@ def known_commands(slug: str) -> list:
     return cmds
 
 
+def act_commands(slug: str) -> list:
+    """The commands taught in the act `slug` belongs to: every `teaches` from the
+    previous boss (exclusive) up to — but NOT including — `slug`, in curriculum
+    order. Used for a boss's hint bar: the player can drill every command of the
+    act it caps, but not the next act's command (which the boss only previews).
+    A reliquary is not an act boundary, so its commands are included."""
+    lv = _BY_SLUG.get(slug)
+    if lv is None:
+        return []
+    idx = LEVELS.index(lv)
+    start = 0                                # first level of this act
+    for i in range(idx - 1, -1, -1):
+        if LEVELS[i].get('type') == 'boss':  # the previous boss caps the prior act
+            start = i + 1
+            break
+    cmds: list = []
+    for prev in LEVELS[start:idx]:           # curriculum order, up to (not incl.) slug
+        for tok in prev.get('teaches', ()):
+            if tok not in cmds:
+                cmds.append(tok)
+    return cmds
+
+
 def level_type(slug: str) -> str:
     """Returns 'dungeon' (default), 'boss', or 'reliquary'."""
     return (_BY_SLUG.get(slug) or {}).get('type', 'dungeon')

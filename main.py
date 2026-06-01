@@ -23,7 +23,7 @@ from engine.search import find_next as _search_next, word_under_cursor as _word_
 from engine.macro import synth_key as _synth_key, record_char as _record_char
 from engine.jumplist import record_jump as _record_jump, jump_back as _jump_back, jump_forward as _jump_forward
 from engine.registers import write_register as _reg_write, read_register as _reg_read
-from engine.visual import apply_visual
+from engine.visual import apply_visual, block_bounds
 from content.scrolls import (
     RELIQUARY_SCROLL, WARDEN_LEAP_SCROLL, WARDEN_SIGHT_SCROLL,
     OPERATOR_CODEX_SCROLL, ARCHIVISTS_METHOD_SCROLL,
@@ -160,11 +160,11 @@ def _known_from_progress(progress: dict) -> set:
     cumulative set of commands the player has actually been taught.
     """
     known: set = {'h', 'j', 'k', 'l'}
-    for lid, rec in progress.items():
-        if not isinstance(lid, int):
-            continue
+    for slug, rec in progress.items():
+        # Level records are slug-keyed dicts with complete/stars; the non-level
+        # fields (extras, flags, max_hp, …) fail this check and are skipped.
         if isinstance(rec, dict) and (rec.get('complete') or rec.get('stars', 0) >= 1):
-            known.update(_known_commands(lid))
+            known.update(_known_commands(slug))
     return known
 
 
@@ -449,6 +449,22 @@ def _show_warden_act_scroll(term: Terminal, iw: int, game_h: int,
                             known: set | None = None) -> None:
     """The Warden's Act (361) — visual operators clear; gv clarifies once learned."""
     _render_standard_scroll(term, iw, game_h, WARDEN_ACT_SCROLL, known)
+
+
+# Each boss chest drops the scroll previewing the next act's commands; smudged
+# lines clarify as those commands are learned.  level → (scroll/extras id,
+# full-text title|None, full-text body|None, overlay fn).  The id is also the
+# command the boss GATES: it stays locked on the boss level until its scroll is
+# read (see run_dungeon's level-start extras injection).
+_SCROLL_DROPS = {
+    'reliquary':            ('register',  None,                     None,                          _show_reliquary_scroll),
+    'wardens_keep':         ('leap',      None,                     None,                          _show_warden_leap_scroll),
+    'warden_surveyor':      ('visual',    None,                     None,                          _show_warden_sight_scroll),
+    'warden_pathfinder':    ('d_op',      "The Operator's Codex",   _SCROLL_TEXT_OPERATOR_CODEX,    _show_operator_codex_scroll),
+    'warden_manifold':      ('y_op',      "The Archivist's Method", _SCROLL_TEXT_ARCHIVISTS_METHOD, _show_archivists_method_scroll),
+    'warden_scrivener':     ('text_obj',  'The Whole Word',         _SCROLL_TEXT_WHOLE_WORD,        _show_whole_word_scroll),
+    'grandmasters_sanctum': ('visual_op', "The Warden's Act",       _SCROLL_TEXT_WARDENS_ACT,       _show_warden_act_scroll),
+}
 
 
 def _unlock_animation(term: Terminal, room, player,
@@ -972,8 +988,7 @@ def _drop_key(room, row: int, col: int) -> None:
 
 def _on_kill(ent, player, room=None, level: str = '') -> str:
     if ent.kind == 'warden':
-        if level == 'wardens_keep':
-            return 'The Warden falls!'
+        # Every Warden drops the key to its keep's locked exit door (no auto-open).
         if room is not None:
             _drop_key(room, ent.row, ent.col)
         return 'The Warden falls! A key drops to the floor. 🗝'
@@ -990,24 +1005,84 @@ def _remove_warden_shields(room) -> None:
         room.kill_entity(sh)
 
 
-def _check_boss_cleared(room, level: str, player) -> str:
-    """Open the boss_seal when all wardens and goblins in a boss room are dead.
+def _check_seal_broken(room) -> str:
+    """Open the Reliquary's warded doorway once its seal-word is fully erased.
 
-    Returns a message to display, or '' if nothing happened.
+    The dividing wall blocks the sanctum until the seal CharRun on the action
+    row is cut away with x; then the doorway cell (room.seal_door) opens.
+    Returns a message to display, or '' if nothing changed.
     """
-    if level_type(level) != 'boss':
+    sd = getattr(room, 'seal_door', None)
+    if sd is None:
         return ''
-    if (any(e.alive for e in room._entity_by_kind.get('warden', []))
-            or any(e.alive for e in room._entity_by_kind.get('goblin', []))):
-        return ''
-    boss_seal_ent = next(
-        (e for e in room.entities if e.alive and e.kind == 'boss_seal'), None
-    )
-    if boss_seal_ent is None:
-        return ''
-    room.kill_entity(boss_seal_ent)
-    _reveal_from(room, player.row, player.col)
-    return 'The seal crumbles — the way forward opens!'
+    sr, sc = sd
+    if room.cells[sr][sc] != CellType.WALL:
+        return ''                                      # already open
+    if any(ru.row == sr for ru in room.char_runs):
+        return ''                                      # seal not fully erased
+    room.cells[sr][sc] = CellType.FLOOR
+    return 'The seal is broken — the ward dissolves and the way opens!'
+
+
+# ── The Warden Surveyor — Phase-1 attack (pure helpers; orchestrated below) ───
+def _ws_bounds():
+    """Dry-interior bounds (top, bot, left, right) of the Surveyor's hall."""
+    return _dg._WS_INNER_TOP, _dg._WS_INNER_BOT, _dg._WS_TEXT_COL, _dg._WS_INNER_RIGHT
+
+
+def _ws_paren_cells(room) -> list:
+    """Dry interior cells sitting between a '(' and its matching ')'."""
+    top, bot, l, r = _ws_bounds()
+    out = []
+    for rr in range(top, bot + 1):
+        stack = []
+        for c in range(l, r + 1):
+            ru = room.char_run_at(rr, c)
+            ch = ru.symbols[c - ru.col] if ru else None
+            if ch == '(':
+                stack.append(c)
+            elif ch == ')' and stack:
+                o = stack.pop()
+                out += [(rr, cc) for cc in range(o + 1, c)]
+    return out
+
+
+def _ws_threat_span(warden_col: int, player_col: int) -> tuple:
+    """The warden's v-sweep: (c0, c1) from himself to the dry edge on the side
+    the adventurer stands — v$ (right) or v0 (left)."""
+    _, _, l, r = _ws_bounds()
+    return (warden_col, r) if player_col >= warden_col else (l, warden_col)
+
+
+def _ws_landable(room, player, r: int, c: int) -> bool:
+    """A dry interior floor cell the warden may leap to (clear, ≥3 from player)."""
+    top, bot, l, rr = _ws_bounds()
+    return (top <= r <= bot and l <= c <= rr
+            and room.cells[r][c] == CellType.FLOOR
+            and room.entity_at(r, c) is None
+            and abs(r - player.row) + abs(c - player.col) >= 3)
+
+
+def _ws_erase_row(room, row: int, c0: int, c1: int) -> None:
+    """Erase char-runs in [c0, c1] on `row` (the warden eats the verse there)."""
+    kept = []
+    for ru in room.char_runs:
+        if ru.row != row:
+            kept.append(ru); continue
+        seg, seg_col = [], None
+        for i, sym in enumerate(ru.symbols):
+            cc = ru.col + i
+            if c0 <= cc <= c1:
+                if seg:
+                    kept.append(CharRun(row, seg_col, tuple(seg), ru.kind)); seg, seg_col = [], None
+            else:
+                if seg_col is None:
+                    seg_col = cc
+                seg.append(sym)
+        if seg:
+            kept.append(CharRun(row, seg_col, tuple(seg), ru.kind))
+    room.char_runs = kept
+    room.rebuild_indexes()
 
 
 def _reposition_warden_shield(room, warden: Entity, player) -> None:
@@ -1124,7 +1199,7 @@ def _enemy_tick(room, player) -> list:
         if not ent.alive:
             continue
         dist = _manhattan(player.row, player.col, ent.row, ent.col)
-        if ent.kind == 'warden' and dist <= _ALERT_RADIUS:
+        if ent.kind == 'warden' and ent.tag != 'surveyor' and dist <= _ALERT_RADIUS:
             has_goblins = any(
                 e.alive and e.summoner_uid == ent.uid
                 for e in room._entity_by_kind.get('goblin', [])
@@ -1198,9 +1273,14 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
     player.known_commands = _known_commands(level)
     if player_name == 'admin':
         player.known_commands = player.known_commands + ['admin', 'register']
+    # On a boss level, the command its scroll gates stays LOCKED on entry — even
+    # if a past playthrough already banked it in extras — until the player reads
+    # this boss's scroll again (which re-adds it below, on chest loot).
+    _gated = _SCROLL_DROPS.get(level, (None,))[0] if level_type(level) == 'boss' else None
     for _cmd in progress.get('extras', []):
-        if _cmd not in player.known_commands:
+        if _cmd != _gated and _cmd not in player.known_commands:
             player.known_commands = player.known_commands + [_cmd]
+    dungeon.level_slug = level   # lets the renderer show the act's hint on bosses
 
     # Remove heart containers already collected by this player.
     _collected = progress.get('collected_hearts', [])
@@ -1251,6 +1331,153 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
     def _attack_pos() -> tuple | None:
         return attack_flash_pos if attack_flash_sym else None
 
+    def _detonate(ent, message):
+        """Set off a dynamite charge at ent's cell: animate, damage nearby wood
+        walls, and hurt the player by blast proximity (centre 1.5♥ → falls off).
+        Returns (message, msg_ttl). Shared by step-on and cut-to-detonate."""
+        expl_r, expl_c = ent.row, ent.col
+        room.kill_entity(ent)
+        iw_now     = _iw(term)
+        game_h_now = term.height - 8
+        vr = max(0, min(player.row - game_h_now // 2, room.rows - game_h_now))
+        vc = max(0, min(player.col - iw_now     // 2, room.cols - iw_now))
+        vr, vc = max(0, vr), max(0, vc)
+        scr_r = 3 + (expl_r - vr)
+        scr_c = 1 + (expl_c - vc)
+        render_all(term, dungeon, player, budget, message,
+                   attack_pos=_attack_pos(), attack_sym=_attack_sym())
+        _explosion_animation(term, room, expl_r, expl_c, scr_r, scr_c, iw_now, game_h_now)
+        for _dr in range(-3, 4):
+            for _dc in range(-3, 4):
+                _dist = abs(_dr) + abs(_dc)
+                if _dist not in _EXPL_DAMAGE:
+                    continue
+                _wr, _wc = expl_r + _dr, expl_c + _dc
+                if (0 <= _wr < room.rows and 0 <= _wc < room.cols
+                        and room.cells[_wr][_wc] == CellType.WOOD_WALL):
+                    room.damage_wood_wall(_wr, _wc, _EXPL_DAMAGE[_dist])
+        # The blast scorches any Warden in range — the minefield cuts both ways.
+        for _w in list(room._entity_by_kind.get('warden', [])):
+            if not _w.alive:
+                continue
+            _wdmg = _EXPL_DAMAGE.get(abs(_w.row - expl_r) + abs(_w.col - expl_c), 0)
+            if not _wdmg:
+                continue
+            _w.hp -= _wdmg
+            if _w.hp <= 0:
+                room.kill_entity(_w)
+                _remove_warden_shields(room)
+                room.surveyor_threat = None
+                _drop_key(room, _w.row, _w.col)          # keep the exit openable
+                _push('The Warden is blown apart by his own minefield! A key drops. 🗝')
+            else:
+                _push(f'The blast scorches the Warden! ({_w.hp}/{_w.max_hp} HP)')
+        pdist = abs(player.row - expl_r) + abs(player.col - expl_c)
+        dmg   = _EXPL_DAMAGE.get(pdist, 0)
+        if dmg:
+            player.take_damage(dmg)
+        if player.is_dead:
+            return 'You set off a dynamite charge!  GAME OVER  (:e to reload)', 2
+        h, hh = player.hp // 2, '½' if player.hp % 2 else ''
+        return f'BOOM! Dynamite!  ({h}{hh} ♥ remaining)', 30
+
+    # ── The Warden Surveyor's two-phase visual attack (Phase 1) ───────────────
+    def _surveyor_warden():
+        for e in room.entities:
+            if e.alive and e.kind == 'warden' and e.tag == 'surveyor':
+                return e
+        return None
+
+    def _surveyor_teleport(warden):
+        """Leap the warden to a fresh cell — 60% inside a parenthetical — then
+        plant the shield between him and the adventurer."""
+        top, bot, l, r = _ws_bounds()
+        paren = [p for p in _ws_paren_cells(room) if _ws_landable(room, player, *p)]
+        anyc  = [(rr, c) for rr in range(top, bot + 1) for c in range(l, r + 1)
+                 if _ws_landable(room, player, rr, c)]
+        pool = paren if (paren and random.random() < 0.6) else (anyc or paren)
+        if not pool:
+            return
+        room.move_entity(warden, *random.choice(pool))
+        shield = next((e for e in room.entities if e.alive and e.kind == 'shield'), None)
+        if shield:
+            side = 1 if player.col >= warden.col else -1     # face the adventurer
+            for sc in (warden.col + side, warden.col - side):
+                if (l <= sc <= r and room.cells[warden.row][sc] == CellType.FLOOR
+                        and not room.entity_at(warden.row, sc)):
+                    room.move_entity(shield, warden.row, sc)
+                    break
+
+    def _surveyor_regen():
+        """Phase-2 onset: the eaten verse regrows (reshuffled), then clear any
+        fresh charge that landed on the player/warden/shield."""
+        _dg.regen_surveyor_hall(room, random.Random(room.seed * 131 + 7))
+        protect = {(player.row, player.col)}
+        for e in room.entities:
+            if e.alive and e.kind in ('warden', 'shield'):
+                protect.add((e.row, e.col))
+        room.entities = [e for e in room.entities
+                         if not (e.kind == 'dynamite' and (e.row, e.col) in protect)]
+        room.rebuild_indexes()
+
+    def _surveyor_resolve(threat):
+        """Detonate charges the selection crosses, erase the verse within it, and
+        dock a heart if the adventurer didn't step out of the box."""
+        nonlocal message, msg_ttl
+        r0, r1, c0, c1 = threat['r0'], threat['r1'], threat['c0'], threat['c1']
+        caught = (r0 <= player.row <= r1 and c0 <= player.col <= c1)
+        for r in range(r0, r1 + 1):
+            for c in range(c0, c1 + 1):
+                ent = room.entity_at(r, c)
+                if ent and ent.kind == 'dynamite':
+                    message, msg_ttl = _detonate(ent, message)
+            _ws_erase_row(room, r, c0, c1)
+        if caught and not player.is_dead:
+            player.take_damage(2)                            # 1 heart
+            if player.is_dead:
+                message, msg_ttl = 'The Warden erases you!  GAME OVER  (:e to reload)', 2
+            else:
+                h, hh = player.hp // 2, '½' if player.hp % 2 else ''
+                message, msg_ttl = f"The Warden's selection erases you!  ({h}{hh} ♥)", 30
+
+    def _surveyor_tick():
+        warden = _surveyor_warden()
+        last = getattr(room, 'surveyor_last_player', (player.row, player.col))
+        room.surveyor_last_player = (player.row, player.col)   # remember for next tick
+        if warden is None or (warden.row, warden.col) in room.fog_cells \
+                or player.col < _dg._WS_TEXT_COL:
+            return                                      # dormant until you've entered
+        threat = getattr(room, 'surveyor_threat', None)
+        step = threat.get('step') if threat else None
+        anchor = {'r0': warden.row, 'r1': warden.row, 'c0': warden.col, 'c1': warden.col}
+        if step == 'recover':
+            # one tick to regain focus after being struck; no telegraph this beat
+            room.surveyor_threat = None
+        elif step is None:
+            # v — enter visual mode: the anchor lands on his own cell
+            room.surveyor_threat = {**anchor, 'step': 'aim'}
+            _push("The Warden's eye opens — he enters visual mode.")
+        elif step == 'aim':
+            if warden.hp > 3:
+                # Phase 1 ($/0): he commits to the side you were on LAST turn
+                c0, c1 = _ws_threat_span(warden.col, last[1])
+                room.surveyor_threat = {'step': 'scoped', 'r0': warden.row,
+                                        'r1': warden.row, 'c0': c0, 'c1': c1}
+                _push('His sight sweeps your row — step clear!')
+            else:
+                # Phase 2 (/): one more wind-up beat — he searches for you
+                room.surveyor_threat = {**anchor, 'step': 'search'}
+                _push('The Warden searches for you...')
+        elif step == 'search':
+            # Phase 2 lock (@): the block aims true to where you are NOW
+            r0, r1, c0, c1 = block_bounds((warden.row, warden.col),
+                                          (player.row, player.col))
+            room.surveyor_threat = {'step': 'scoped', 'r0': r0, 'r1': r1, 'c0': c0, 'c1': c1}
+            _push('He frames you in a block — break out of it!')
+        else:                                           # 'scoped' → cut (x)
+            _surveyor_resolve(threat)
+            room.surveyor_threat = None
+
     def _pool_msg() -> str:
         if not msg_pool:
             return ''
@@ -1270,8 +1497,8 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
         message = 'The Line Halls — navigate to the corridor, then use $ and ^'
         msg_ttl = 50
     elif level == 'reliquary':
-        message = 'The Reliquary — Reap the rewards of your adventures!'
-        msg_ttl = 50
+        message = 'The Reliquary — break the ward: x away the seal to reach the relic.'
+        msg_ttl = 60
     elif level == 'counting_crypts':
         message = 'The Counting Crypts — type [N] before hjkl: try 5j or 3l'
         msg_ttl = 50
@@ -1283,6 +1510,9 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
         msg_ttl = 60
     elif level == 'wardens_keep':
         message = "The Warden's Keep — the shield follows you. Find the unguarded side."
+        msg_ttl = 60
+    elif level == 'warden_surveyor':
+        message = "The Warden Surveyor — survey his hall; w/b/e leap word to word, over the void."
         msg_ttl = 60
     elif level == 'dummy':
         message = 'Sandbox — all mechanics active. Type :edit to enter editor mode.'
@@ -1457,9 +1687,12 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
                         room.answer = ''
                     _sp2    = room.spawn_pos
                     player  = Player(row=_sp2[0], col=_sp2[1])
+                    player.max_hp = progress.get('max_hp', 6)   # keep heart-container upgrades
+                    player.hp     = player.max_hp
                     player.known_commands = _known_commands(level)
                     if player_name == 'admin':
                         player.known_commands = player.known_commands + ['admin', 'register']
+                    dungeon.level_slug = level
                     budget        = Budget(room.budget or 20)
                     cmd_start_ans = (0, False)
                     undo_stack.clear()
@@ -1893,35 +2126,7 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
                         undo_stack.append(_snapshot(room, player, budget,
                                                     row=pr, col=pc, spent=ps,
                                                     ans=cmd_start_ans))
-                    expl_r, expl_c = ent.row, ent.col
-                    room.kill_entity(ent)
-                    iw_now     = _iw(term)
-                    game_h_now = term.height - 8
-                    vr = max(0, min(player.row - game_h_now // 2, room.rows - game_h_now))
-                    vc = max(0, min(player.col - iw_now     // 2, room.cols - iw_now))
-                    vr, vc = max(0, vr), max(0, vc)
-                    scr_r = 3 + (expl_r - vr)
-                    scr_c = 1 + (expl_c - vc)
-                    render_all(term, dungeon, player, budget, message, attack_pos=_attack_pos(), attack_sym=_attack_sym())
-                    _explosion_animation(term, room, expl_r, expl_c, scr_r, scr_c, iw_now, game_h_now)
-                    for _dr in range(-3, 4):
-                        for _dc in range(-3, 4):
-                            _dist = abs(_dr) + abs(_dc)
-                            if _dist not in _EXPL_DAMAGE:
-                                continue
-                            _wr, _wc = expl_r + _dr, expl_c + _dc
-                            if (0 <= _wr < room.rows and 0 <= _wc < room.cols
-                                    and room.cells[_wr][_wc] == CellType.WOOD_WALL):
-                                room.damage_wood_wall(_wr, _wc, _EXPL_DAMAGE[_dist])
-                    dmg = _EXPL_DAMAGE.get(0, 0)  # player is at the centre
-                    player.take_damage(dmg)
-                    if player.is_dead:
-                        message = 'You set off a dynamite charge!  GAME OVER  (:e to reload)'
-                        msg_ttl = 2
-                    else:
-                        h, hh = player.hp // 2, '½' if player.hp % 2 else ''
-                        message = f'BOOM! Dynamite!  ({h}{hh} ♥ remaining)'
-                        msg_ttl = 30
+                    message, msg_ttl = _detonate(ent, message)
                     ent = None  # consumed; fall through to normal render
 
                 # Seal door: wall forms the moment the player steps off the threshold
@@ -2182,18 +2387,6 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
                     else:
                         _push('You found a scroll!')
                     interacted = True
-                    # Each boss chest drops the scroll previewing the next act's
-                    # commands; smudged lines clarify as those commands are learned.
-                    # (level → scroll id, full-text title/body, overlay fn)
-                    _SCROLL_DROPS = {
-                        'reliquary':            ('register',  None, None,                           _show_reliquary_scroll),
-                        'wardens_keep':         ('leap',      None, None,                           _show_warden_leap_scroll),
-                        'warden_surveyor':      ('visual',    None, None,                           _show_warden_sight_scroll),
-                        'warden_pathfinder':    ('d_op',      "The Operator's Codex",   _SCROLL_TEXT_OPERATOR_CODEX,    _show_operator_codex_scroll),
-                        'warden_manifold':      ('y_op',      "The Archivist's Method", _SCROLL_TEXT_ARCHIVISTS_METHOD, _show_archivists_method_scroll),
-                        'warden_scrivener':     ('text_obj',  'The Whole Word',         _SCROLL_TEXT_WHOLE_WORD,        _show_whole_word_scroll),
-                        'grandmasters_sanctum': ('visual_op', "The Warden's Act",       _SCROLL_TEXT_WARDENS_ACT,       _show_warden_act_scroll),
-                    }
                     _drop = _SCROLL_DROPS.get(level)
                     if _drop is not None:
                         _sid, _txt_title, _txt_body, _show_fn = _drop
@@ -2264,7 +2457,9 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
                     cur.hp -= 1
                     budget.spend(1)
                     interacted = True
-                    if cur.kind == 'warden' and cur.hp > 0:
+                    # The Surveyor uses its own two-phase visual/teleport AI
+                    # (wired separately); it never leaps-and-summons like the Keep.
+                    if cur.kind == 'warden' and cur.hp > 0 and cur.tag != 'surveyor':
                         move_msg = _do_warden_move(room, cur, player)
                         if move_msg:
                             _push(move_msg)
@@ -2272,14 +2467,19 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
                         _spawn_goblin(room, cur.row, cur.col + _side * 3, summoner_uid=cur.uid)
                         cur.summon_timer = _WARDEN_SUMMON_INTERVAL
                         _push('The Warden summoned a goblin minion!')
+                    elif cur.kind == 'warden' and cur.hp > 0 and cur.tag == 'surveyor':
+                        if cur.hp == 3:                      # just entered Phase 2 (2 HP spent)
+                            _surveyor_regen()                # the eaten verse regrows
+                            _push('The sentences regrow — his sight will frame you in blocks!')
+                        _surveyor_teleport(cur)              # leap away (60% into a parenthetical)
+                        room.surveyor_threat = {'step': 'recover'}   # a tick to regain focus before re-entering visual mode
+                        _push('The Warden leaps — you broke his focus!')
                     if cur.hp <= 0:
                         room.kill_entity(cur)
                         _reg_write(player, '"', entity_clip(cur), is_delete=True)
                         if cur.kind == 'warden':
                             _remove_warden_shields(room)
-                        clear_msg = _check_boss_cleared(room, level, player)
-                        if clear_msg:
-                            _push(clear_msg)
+                            room.surveyor_threat = None      # clear any lingering telegraph
                         _push(_on_kill(cur, player, room, level) or 'Enemy defeated!')
                     else:
                         _push(f'Hit! ({cur.hp}/{cur.max_hp} HP)')
@@ -2306,6 +2506,22 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
                 if interacted:
                     player.last_change = action
                 if not interacted:
+                    # Cutting a dynamite charge sets it off — a deliberate break
+                    # from vim-faithfulness: it detonates instead of cutting to
+                    # the register. (A count-cut can reach one a cell or more away.)
+                    _dyn = None
+                    for _ci in range(count):
+                        _e2 = room.entity_at(player.row, player.col + _ci)
+                        if _e2 and _e2.kind == 'dynamite':
+                            _dyn = _e2
+                            break
+                    if _dyn is not None:
+                        budget.spend(1)
+                        message, msg_ttl = _detonate(_dyn, message)
+                        player.last_change = action
+                        interacted = True
+
+                if not interacted:
                     cut_items = []
                     for _ci in range(count):
                         item = _ed_cut(room, player.row, player.col + _ci)
@@ -2322,6 +2538,9 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
                         descs = ', '.join(_clip_desc(i) for i in cut_items)
                         _push(f'Cut {len(cut_items)}: {descs}')
                         player.last_change = action
+                        seal_msg = _check_seal_broken(room)
+                        if seal_msg:
+                            _push(seal_msg)
 
         elif not edit_mode and action['type'] == 'substitute':
             if not _action_allowed(action, player.known_commands):
@@ -2655,6 +2874,7 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
                          if action['type'] == 'interact' and cur_combat_target
                          else None)
             tick_msgs = _enemy_tick(room, player)
+            _surveyor_tick()                  # the Surveyor's telegraph → resolve cadence
 
             # Any enemy now adjacent attacks (except the one the player just hit,
             # and except enemies that only became adjacent this turn — player gets
@@ -3484,7 +3704,8 @@ def main():
     ap.add_argument('--level', type=str, default=None,
                     choices=['first_cave', 'line_halls', 'reliquary', 'counting_crypts',
                              'rune_halls', 'character_cataracts', 'goblin_gauntlet',
-                             'wardens_keep', 'word_forge', 'backward_vaults', 'lineheads', 'dummy'],
+                             'wardens_keep', 'word_forge', 'backward_vaults', 'lineheads',
+                             'warden_surveyor', 'dummy'],
                     help='skip overworld and start at this level slug (debug)')
     args = ap.parse_args()
 

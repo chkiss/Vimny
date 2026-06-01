@@ -14,8 +14,8 @@
       "quote": [
         "         h left, l right, j down, k up—         ",
         "        a road built one step at a time.        ",
-        "   The reaching keys lie far from the hearth;   ",
-        "       keep your hands where they began.        "
+        "    The arrow keys lie far from the hearth;     ",
+        "             keep your hands warm.              "
       ]
     },
     {

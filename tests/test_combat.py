@@ -2,7 +2,7 @@
 import pytest
 from engine.world import Room, RoomType, CellType, Entity
 from engine.player import Player
-from main import _enemy_tick, _try_warden_move, _do_warden_move, _reposition_warden_shield, _check_boss_cleared, _remove_warden_shields
+from main import _enemy_tick, _try_warden_move, _do_warden_move, _reposition_warden_shield, _on_kill, _remove_warden_shields
 
 ROWS, COLS = 7, 30
 
@@ -258,10 +258,10 @@ def test_warden_direction_reverses_when_walled_in():
     assert warden.row <= 5
 
 
-# ── Boss-cleared gate (The Warden's Keep) ────────────────────────────────────
+# ── Warden death drops the key to its locked exit (no auto-opening seal) ──────
 
 def _boss_room():
-    """Minimal Warden's-Keep-style room: open corridor with a boss_seal."""
+    """Minimal Warden's-Keep-style room."""
     rows, cols = 7, 44
     room = Room(room_type=RoomType.COMBAT, rows=rows, cols=cols)
     room.cells = [
@@ -269,81 +269,30 @@ def _boss_room():
          for c in range(cols)]
         for r in range(rows)
     ]
-    room.spawn_pos    = (3, 0)
-    room.exit_pos = (3, 39)
+    room.spawn_pos = (3, 0)
+    room.exit_pos  = (3, 39)
     room.fog_cells = set()
     room.rebuild_indexes()
     return room
 
 
-def test_boss_seal_stays_while_warden_alive():
-    """Killing a goblin alone must not open the boss_seal if the Warden still lives."""
+def test_warden_death_drops_a_key_and_leaves_the_door():
+    """The Warden drops a key on its cell; the locked exit door is NOT auto-opened."""
     room   = _boss_room()
     player = Player(row=3, col=10)
     warden = Entity(kind='warden', row=3, col=27, max_hp=5, ai='')
-    goblin = Entity(kind='goblin',  row=3, col=20, max_hp=1, ai='chase', ai_speed=1)
-    seal   = Entity(kind='boss_seal', row=3, col=38)
+    door   = Entity(kind='locked_door', row=3, col=38)
     room.add_entity(warden)
-    room.add_entity(goblin)
-    room.add_entity(seal)
-
-    room.kill_entity(goblin)
-    msg = _check_boss_cleared(room, 'wardens_keep', player)
-
-    assert msg == '', "boss_seal must stay closed while Warden is still alive"
-    assert any(e.alive and e.kind == 'boss_seal' for e in room.entities)
-
-
-def test_boss_seal_stays_while_goblins_alive():
-    """Killing the Warden alone must not open the boss_seal if goblins still live."""
-    room   = _boss_room()
-    player = Player(row=3, col=10)
-    warden = Entity(kind='warden', row=3, col=27, max_hp=5, ai='')
-    goblin = Entity(kind='goblin',  row=3, col=20, max_hp=1, ai='chase', ai_speed=1)
-    seal   = Entity(kind='boss_seal', row=3, col=38)
-    room.add_entity(warden)
-    room.add_entity(goblin)
-    room.add_entity(seal)
+    room.add_entity(door)
 
     room.kill_entity(warden)
-    msg = _check_boss_cleared(room, 'wardens_keep', player)
+    msg = _on_kill(warden, player, room, 'wardens_keep')
 
-    assert msg == '', "boss_seal must stay closed while goblins are still alive"
-    assert any(e.alive and e.kind == 'boss_seal' for e in room.entities)
-
-
-def test_boss_seal_opens_when_room_cleared():
-    """boss_seal is removed only after every enemy (warden + all goblins) is dead."""
-    room   = _boss_room()
-    player = Player(row=3, col=10)
-    warden = Entity(kind='warden', row=3, col=27, max_hp=5, ai='')
-    goblin = Entity(kind='goblin',  row=3, col=20, max_hp=1, ai='chase', ai_speed=1)
-    seal   = Entity(kind='boss_seal', row=3, col=38)
-    room.add_entity(warden)
-    room.add_entity(goblin)
-    room.add_entity(seal)
-
-    room.kill_entity(goblin)
-    assert _check_boss_cleared(room, 'wardens_keep', player) == ''   # goblin dead, warden alive
-
-    room.kill_entity(warden)
-    msg = _check_boss_cleared(room, 'wardens_keep', player)
-
-    assert msg != '', "boss_seal should open once all enemies are dead"
-    assert not any(e.alive and e.kind == 'boss_seal' for e in room.entities)
-
-
-def test_boss_seal_not_triggered_on_other_levels():
-    """_check_boss_cleared must be a no-op for non-boss levels."""
-    room   = _boss_room()
-    player = Player(row=3, col=10)
-    seal   = Entity(kind='boss_seal', row=3, col=38)
-    room.add_entity(seal)
-
-    msg = _check_boss_cleared(room, 'goblin_gauntlet', player)
-
-    assert msg == ''
-    assert any(e.alive and e.kind == 'boss_seal' for e in room.entities)
+    assert 'key' in msg.lower()
+    assert any(e.alive and e.kind == 'floor_key' and (e.row, e.col) == (3, 27)
+               for e in room.entities), "a key should drop on the Warden's cell"
+    assert any(e.alive and e.kind == 'locked_door' for e in room.entities), \
+        "the exit door stays locked until the key is used"
 
 
 # ── Shield removal on Warden death ───────────────────────────────────────────

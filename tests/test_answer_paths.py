@@ -75,6 +75,7 @@ _SKIP_LEVELS = {
     # Excluded from parametrization entirely (not emitted as skipped cases).
     'build_dungeon_reliquary',     # The Reliquary (reward / chest room)
     'build_dungeon_wardens_keep',     # The Warden's Keep (boss)
+    'build_dungeon_warden_surveyor',  # The Warden Surveyor (boss)
     'build_dungeon_dummy',  # Dummy Dungeon (test scaffold)
 }
 _XFAIL_LEVELS: dict = {}
