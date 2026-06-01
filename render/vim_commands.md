@@ -133,6 +133,7 @@
 | keys    | token | desc        |
 |---------|-------|-------------|
 | /{pat}  | /     | search      |
+| ?{pat}  |       | search back |
 | n       |       | next match  |
 | N       |       | prev match  |
 | *       |       | search word |

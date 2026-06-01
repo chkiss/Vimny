@@ -6,6 +6,7 @@ from engine.world import Dungeon, CellType, Room, CharRun, Entity
 from engine.player import Player
 from engine.modes import Mode, MODE_LABELS
 from engine.visual import in_selection as _in_visual_sel
+from engine.search import match_cells as _match_cells, find_next as _find_next
 from engine.budget import Budget
 import render.colors as C
 import render.symbols as S
@@ -273,10 +274,25 @@ def render_all(term: Terminal, dungeon: Dungeon, player: Player,
     wall_bg  = C.wall_bg()
     vis_bg   = C.visual_sel_bg()
     threat_bg = C.threat_sel_bg()
+    hl_bg     = C.search_hl_bg()
+    cur_bg    = C.search_cur_bg()
     _threat   = getattr(room, 'surveyor_threat', None)   # warden's telegraphed v-selection
     _vis_active = (mode in (Mode.VISUAL, Mode.VISUAL_LINE, Mode.VISUAL_BLOCK)
                    and getattr(player, 'visual_anchor', None) is not None)
     _vis_cursor = (player.row, player.col)
+
+    # Search highlighting: incsearch (live, while typing /…?…) takes precedence
+    # over hlsearch (all matches of the last confirmed pattern). _cur_cells is the
+    # match the cursor would jump to (the incsearch preview target).
+    _hl_cells: set = set()
+    _cur_cells: set = set()
+    if mode == Mode.SEARCH and player.cmd_line:
+        _hl_cells = _match_cells(room, player.cmd_line)
+        dest = _find_next(room, player, player.cmd_line, player.search_forward)
+        if dest is not None:
+            _cur_cells = {(dest[0], dest[1] + k) for k in range(len(player.cmd_line))}
+    elif getattr(player, 'last_search', None):
+        _hl_cells = _match_cells(room, player.last_search[0])
 
     for screen_r in range(game_h):
         room_r = screen_r + vr_start
@@ -298,6 +314,10 @@ def render_all(term: Terminal, dungeon: Dungeon, player: Player,
                 elif _vis_active and _in_visual_sel(
                         player.visual_anchor, _vis_cursor, mode, room_r, room_c):
                     floor_bg = vis_bg
+                elif (room_r, room_c) in _cur_cells:
+                    floor_bg = cur_bg
+                elif (room_r, room_c) in _hl_cells:
+                    floor_bg = hl_bg
                 else:
                     floor_bg = base_floor_bg
                 ct = room.cells[room_r][room_c]

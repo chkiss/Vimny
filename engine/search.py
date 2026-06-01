@@ -34,6 +34,25 @@ def find_next(room, player, pattern: str, forward: bool):
     return behind[-1] if behind else positions[-1]          # wrap to last
 
 
+def match_cells(room, pattern: str) -> set:
+    """Every (row, col) covered by a NON-overlapping occurrence of `pattern` in
+    any character run — the cell set for hlsearch / incsearch highlighting."""
+    cells: set = set()
+    if not pattern:
+        return cells
+    for ru in room.char_runs:
+        s = ''.join(ru.symbols)
+        start = 0
+        while True:
+            i = s.find(pattern, start)
+            if i < 0:
+                break
+            for k in range(len(pattern)):
+                cells.add((ru.row, ru.col + i + k))
+            start = i + len(pattern)
+    return cells
+
+
 def word_under_cursor(room, player):
     """Full symbol string of the cluster under the cursor (for * / #), or None."""
     ru = room.char_run_at(player.row, player.col)

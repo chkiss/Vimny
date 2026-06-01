@@ -69,8 +69,18 @@ _DEFAULT = 'h/j/k/l:move cursor  :w write (save)  :q quit  :q! quit without savi
 
 # ── Public API ────────────────────────────────────────────────────────────────
 
+# Some single curriculum tokens unlock a whole keystroke family that shares one
+# gate.  '/' (search) gates ? n N too — show them all on the hint bar.
+_FAMILY = {'/': ['/', '?{pat}', 'n', 'N']}
+
+
 def _format(tokens) -> str:
-    parts = [f'{CMD[tok][0]}:{CMD[tok][1]}' for tok in tokens if tok in CMD]
+    expanded: list = []
+    for tok in tokens:
+        for t in _FAMILY.get(tok, [tok]):
+            if t not in expanded:
+                expanded.append(t)
+    parts = [f'{CMD[t][0]}:{CMD[t][1]}' for t in expanded if t in CMD]
     return ('  '.join(parts) + _SUFFIX) if parts else _DEFAULT
 
 

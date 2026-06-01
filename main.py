@@ -980,10 +980,26 @@ def _clip_from_cut_chars(items: list, base_col: int) -> dict:
     return {'linewise': False, 'rows': [{'width': width, 'char_runs': runes}]}
 
 
-def _drop_key(room, row: int, col: int) -> None:
-    """Place a floor_key entity at (row, col) if the cell is free."""
+def _drop_key(room, row: int, col: int, tag: str = '') -> bool:
+    """Place a floor_key (optionally colour-tagged) at (row, col) if free.
+    Returns True if a key was placed."""
     if not room.entity_at(row, col):
-        room.add_entity(Entity(kind='floor_key', row=row, col=col))
+        room.add_entity(Entity(kind='floor_key', row=row, col=col, tag=tag))
+        return True
+    return False
+
+
+def _held_key(player):
+    """If the unnamed register is carrying a floor_key, return its template
+    (so its colour tag survives a drop); otherwise None."""
+    clip = _reg_read(player, '"')
+    if not clip:
+        return None
+    for rw in clip.get('rows', []):
+        for ed in rw.get('entities', ()):
+            if ed.get('tmpl', {}).get('kind') == 'floor_key':
+                return ed['tmpl']
+    return None
 
 
 def _on_kill(ent, player, room=None, level: str = '') -> str:
@@ -2337,10 +2353,22 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
         elif action['type'] == 'undo':
             if edit_mode:
                 done = _ed_step_n(ed_undo, ed_redo, count, room, player)
+                _push(f'{done} change(s) undone.' if done else 'Nothing to undo.')
             else:
+                held = _held_key(player)
+                spot = (player.row, player.col)     # where the key slips, pre-undo
                 done = sum(_pop_history_step(undo_stack, redo_stack, room, player, budget)
                            for _ in range(count))
-            _push(f'{done} change(s) undone.' if done else 'Nothing to undo.')
+                # Keys are slippery: undoing while carrying one drops it where you
+                # stood — the undo STILL happens (you snap back to your previous
+                # position), but you must walk back for the key. A precision tax.
+                # Drop AFTER the undo so the entity-restore can't wipe the key.
+                if held is not None and done and _drop_key(room, spot[0], spot[1],
+                                                           held.get('tag', '')):
+                    player.registers['"'] = None
+                    _push('The key clatters to the floor! 🗝')
+                else:
+                    _push(f'{done} change(s) undone.' if done else 'Nothing to undo.')
 
         elif action['type'] == 'redo':
             if edit_mode:
@@ -3705,7 +3733,7 @@ def main():
                     choices=['first_cave', 'line_halls', 'reliquary', 'counting_crypts',
                              'rune_halls', 'character_cataracts', 'goblin_gauntlet',
                              'wardens_keep', 'word_forge', 'backward_vaults', 'lineheads',
-                             'warden_surveyor', 'dummy'],
+                             'warden_surveyor', 'sight_sanctum', 'seekers_labyrinth', 'dummy'],
                     help='skip overworld and start at this level slug (debug)')
     args = ap.parse_args()
 

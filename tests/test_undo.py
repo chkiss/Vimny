@@ -269,6 +269,64 @@ def test_all_entity_mutations_undoable():
         )
 
 
+# ── Fumble: undo while carrying a key drops it (penalty, NOT a normal undo) ───
+
+def _undo_or_fumble(room, player, budget, undo_stack):
+    """Mirror main.py's undo branch: the undo HAPPENS, and if a key is carried it
+    drops at the pre-undo spot (dropped after the undo so a restore can't wipe it)."""
+    from main import _held_key, _drop_key
+    held = _held_key(player)
+    spot = (player.row, player.col)
+    done = False
+    if undo_stack:
+        _apply_undo(undo_stack.pop(), room, player, budget)
+        done = True
+    if held is not None and done and _drop_key(room, spot[0], spot[1], held.get('tag', '')):
+        player.registers['"'] = None
+        return 'fumble'
+    return 'undo' if done else 'noop'
+
+
+def test_undo_while_holding_key_drops_it_and_still_undoes():
+    """u while carrying a key drops it where you stood (colour preserved) AND the
+    undo still happens (you snap back to the previous position); register clears."""
+    room = _corridor()
+    player = Player(row=2, col=5)
+    budget = Budget(20)
+    budget.spent = 4
+    write_register(player, '"',
+                   entity_clip(Entity(kind='floor_key', row=2, col=2, tag='red')),
+                   is_delete=True)
+    # Last change was a move from (2,0); undo returns the adventurer there.
+    undo_stack = [(2, 0, 0)]
+
+    result = _undo_or_fumble(room, player, budget, undo_stack)
+
+    assert result == 'fumble'
+    dropped = room.entity_at(2, 5)                      # key left at the pre-undo spot
+    assert dropped is not None and dropped.kind == 'floor_key' and dropped.tag == 'red'
+    from main import _held_key
+    assert _held_key(player) is None, "register must no longer carry the key"
+    assert (player.row, player.col) == (2, 0), "the undo must have run (snapped back)"
+    assert budget.spent == 0, "the undo must have reverted the budget"
+
+
+def test_undo_without_a_key_is_normal():
+    """With no key in hand, u behaves as a plain undo."""
+    room = _corridor()
+    player = Player(row=2, col=8)
+    budget = Budget(20)
+    budget.spent = 3
+    undo_stack = [{'row': 2, 'col': 1, 'spent': 0,
+                   'entities': _snap(room), 'fog_cells': set(room.fog_cells)}]
+
+    result = _undo_or_fumble(room, player, budget, undo_stack)
+
+    assert result == 'undo'
+    assert (player.row, player.col) == (2, 1) and budget.spent == 0
+    assert undo_stack == []
+
+
 def test_cols_round_trip_after_buffer_double():
     """A's ledge-build can DOUBLE room.cols; undo must restore the old width.
     Snapshot/restore now carry 'cols' alongside 'rows' so the cells grid and

@@ -173,11 +173,11 @@ POEMS: list[tuple[str | None, str, list[str]]] = [
         'Move, and the trail glows behind—',
         'all it crosses, held until you act.',
     ]),
-    ('seekers_labyrinth', '/ ? n N', [         # The Seekers' Labyrinth — / ? n N
-        '/ casts a name down the hall ahead.',
-        '? sends the same call backward.',
-        'n follows the echo on; N turns it round.',
-        'Name what you seek; the buffer answers.',
+    ('seekers_labyrinth', '/ ? n N *', [       # The Seekers' Labyrinth — / ? n N *
+        '/ casts a name down the hall ahead;',
+        '? sends the same call back. n, N follow.',
+        '* takes the word beneath your feet',
+        'and hunts its echo through the stone.',
     ]),
     ('waypoint_sanctum', "m ' `", [            # The Waypoint Sanctum — m ' `
         'ma sets a stone you can name.',
