@@ -3733,7 +3733,8 @@ def main():
                     choices=['first_cave', 'line_halls', 'reliquary', 'counting_crypts',
                              'rune_halls', 'character_cataracts', 'goblin_gauntlet',
                              'wardens_keep', 'word_forge', 'backward_vaults', 'lineheads',
-                             'warden_surveyor', 'sight_sanctum', 'seekers_labyrinth', 'dummy'],
+                             'warden_surveyor', 'sight_sanctum', 'seekers_labyrinth',
+                             'waypoint_sanctum', 'dummy'],
                     help='skip overworld and start at this level slug (debug)')
     args = ap.parse_args()
 

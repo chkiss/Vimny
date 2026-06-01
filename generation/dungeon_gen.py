@@ -3613,6 +3613,130 @@ def _par_seekers_labyrinth(composite, no_search: bool = False, return_path: bool
     return (None, '') if return_path else None
 
 
+# ── The Waypoint Sanctum (marks: m ' `) ──────────────────────────────────────────
+#
+# A sealed, WORDLESS sanctum embedded in a goblin-haunted prose "danger room".
+# Search teleports you OUT to the text to fetch the exit key; the wordless
+# sanctum can't be searched back to, so a MARK is the way home.  The sanctum
+# row's first-left-passable cell is a treasure room with a `:set number` scroll,
+# reached by 'a (optional — par includes the detour; skippers beat par).  The
+# EXACT mark (`a) lands at the exit-lock approach.  The exit key sits BACKWARD in
+# reading order with forward decoys, so ? is the cheapest fetch.  The other
+# treasure rooms (locked, wordless, not col-1) are visible but unreachable teases.
+#
+# Optimal route (par 19, taking the scroll):
+#   ma · 'a x (scroll) · ?cipher⏎ h x (key) · `a p (exit lock) · l → exit
+# A skipper drops 'a x and finishes in 16 — under par, exactly as intended.
+_WP_ROWS, _WP_COLS = 15, 46
+_WP_SROW   = 7                     # sanctum corridor row (wordless, sealed)
+_WP_SCROLL = (7, 1)                # chest_scroll — row's first-left-passable -> 'a
+_WP_SPAWN  = (7, 5)                # spawn + mark -> `a (exit-lock approach)
+_WP_LOCK   = (7, 6)                # exit lock (locked_door)
+_WP_EXIT   = (7, 7)
+_WP_KEYWORD      = 'cipher'
+_WP_KEY_WORD_POS = (5, 30)         # the real key word — BACKWARD of the sanctum
+_WP_KEY          = (5, 29)         # floor_key just left of the word
+_WP_DECOY_POS    = [(9, 12), (11, 20), (13, 8)]   # forward decoys of the key word
+_WP_GOBLINS      = [(3, 15), (4, 33), (10, 25), (12, 18)]
+_WP_PROSE_ROWS   = (1, 2, 3, 4, 5, 9, 10, 11, 12, 13)
+_WP_PAR    = 19
+_WP_ANSWER = "ma 'a x ?cipher⏎ h x `a p l"
+
+
+def build_dungeon_waypoint_sanctum(seed: int) -> 'Dungeon':
+    """Marks: The Waypoint Sanctum.  See the module comment above for the design."""
+    rng = random.Random(seed)
+    R, C = _WP_ROWS, _WP_COLS
+    dungeon = Dungeon(name='The Waypoint Sanctum', seed=seed)
+    composite = Room(rows=R, cols=C, room_type=RoomType.ENTRY)
+    cells = [[CellType.WALL] * C for _ in range(R)]
+    for r in _WP_PROSE_ROWS:                         # prose rows = open floor
+        for c in range(1, C - 1):
+            cells[r][c] = CellType.CORRIDOR
+    for c in (1, 2, 4, 5, 6, 7):                      # sanctum row: left room | wall | sanctum
+        cells[_WP_SROW][c] = CellType.CORRIDOR
+    composite.cells = cells
+    composite.seed = seed
+
+    reserved: set = {_WP_KEY, _WP_SCROLL, _WP_LOCK, _WP_EXIT, _WP_SPAWN}
+    reserved |= {(_WP_KEY_WORD_POS[0], _WP_KEY_WORD_POS[1] + i) for i in range(len(_WP_KEYWORD))}
+    for (dr, dc) in _WP_DECOY_POS:
+        reserved |= {(dr, dc + i) for i in range(len(_WP_KEYWORD))}
+    reserved |= set(_WP_GOBLINS)
+
+    # Treasure-room teases: a heart / chest sealed behind a keyless lock — visible,
+    # wordless, never at col 1, so no search / ' / foot ever reaches them.
+    entities: list = []
+    for (cell, kind, lock, walls) in (
+        ((2, 41), 'heart_container', (2, 40), [(1, 41), (3, 41), (2, 42)]),
+        ((11, 41), 'chest',          (11, 40), [(10, 41), (12, 41), (11, 42)]),
+    ):
+        cells[cell[0]][cell[1]] = CellType.CORRIDOR
+        cells[lock[0]][lock[1]] = CellType.CORRIDOR
+        for (wr, wc) in walls:
+            cells[wr][wc] = CellType.WALL
+        entities += [Entity(kind=kind, row=cell[0], col=cell[1]),
+                     Entity(kind='locked_door', row=lock[0], col=lock[1])]
+        reserved |= {cell, lock} | set(walls)
+
+    # Key word (real vocab token) + forward decoys.
+    char_runs = [CharRun(row=_WP_KEY_WORD_POS[0], col=_WP_KEY_WORD_POS[1],
+                         symbols=tuple(_WP_KEYWORD), kind='ember')]
+    for (dr, dc) in _WP_DECOY_POS:
+        char_runs.append(CharRun(row=dr, col=dc, symbols=tuple(_WP_KEYWORD), kind='ember'))
+
+    # Prose fill: vocab words across the danger-room rows (seed-varied, never
+    # containing the key word, never on a reserved cell — so the only 'cipher'
+    # matches are the real one + the three decoys).
+    _load_vocab_tables()
+    pool: dict = {}
+    for length, words in _VOCAB_PLAIN_BY_LEN.items():
+        if 3 <= length <= 8:
+            keep = [w for w in words if _WP_KEYWORD not in w]
+            if keep:
+                pool[length] = list(keep)
+    for r in _WP_PROSE_ROWS:
+        c = 1
+        while c < C - 1:
+            if (r, c) in reserved or cells[r][c] != CellType.CORRIDOR:
+                c += 1
+                continue
+            span = 0                                  # free run length from c
+            while (c + span < C - 1 and cells[r][c + span] == CellType.CORRIDOR
+                   and (r, c + span) not in reserved):
+                span += 1
+            lengths = [L for L in pool if L <= span and pool[L]]
+            if lengths and span >= 3:
+                L = rng.choice(lengths)
+                word = pool[L][rng.randrange(len(pool[L]))]
+                char_runs.append(CharRun(row=r, col=c, symbols=tuple(word),
+                                         kind=rng.choice(('ancient', 'verdant', 'ember'))))
+                c += L + 1
+            else:
+                c += span + 1
+
+    composite.char_runs = char_runs
+    composite.spawn_pos = _WP_SPAWN
+    composite.exit_pos  = _WP_EXIT
+    entities += [
+        Entity(kind='chest_scroll', row=_WP_SCROLL[0], col=_WP_SCROLL[1]),
+        Entity(kind='locked_door',  row=_WP_LOCK[0],   col=_WP_LOCK[1]),
+        Entity(kind='exit',         row=_WP_EXIT[0],   col=_WP_EXIT[1]),
+        Entity(kind='floor_key',    row=_WP_KEY[0],    col=_WP_KEY[1]),
+    ]
+    for (gr, gc) in _WP_GOBLINS:
+        entities.append(Entity(kind='goblin', row=gr, col=gc, max_hp=1, ai='chase'))
+    composite.entities = entities
+    composite.par    = _WP_PAR
+    composite.budget = math.ceil(_WP_PAR * 1.4)
+    composite.answer = _WP_ANSWER
+
+    composite.rebuild_indexes()
+    dungeon.rooms        = [composite]
+    dungeon.current_room = 0
+    return dungeon
+
+
 # ── The Bracket Vaults layout constants ─────────────────────────────────────────────────
 #
 # Three-corridor snake layout (7 rows × 60 cols).
