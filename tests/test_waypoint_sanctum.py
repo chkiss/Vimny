@@ -1,10 +1,12 @@
 """The Waypoint Sanctum (marks: m ' `; applies / ?).
 
-A sealed, wordless sanctum in a goblin-haunted prose danger room.  Search ferries
-you out for the exit key; the wordless sanctum can't be searched back to, so a
-mark is the way home.  'a reaches the optional scroll room (row's first-left cell),
-`a reaches the exact exit-lock approach, ? fetches the backward key past forward
-decoys.  Structure fixed; only the prose decor varies by seed.
+A sealed, wordless sanctum corridor ringed by evenly-spaced treasure rooms
+(visible chests/hearts behind keyless locks) and prose danger rooms crawling with
+goblins.  Search ferries you out for the gold exit key; the wordless corridor
+can't be searched back to, so a mark is the way home — and teleporting (search /
+mark) is the only survivable way past the goblin horde.  'a reaches the optional
+scroll room (corridor's first-left cell), `a the exact exit-lock approach, ? the
+backward key past forward decoys.  Structure fixed; only prose decor varies by seed.
 """
 import os
 import pytest
@@ -12,7 +14,7 @@ import pytest
 from generation.dungeon_gen import (
     build_dungeon_waypoint_sanctum as _build,
     _WP_PAR, _WP_ANSWER, _WP_KEYWORD, _WP_SCROLL, _WP_SPAWN,
-    _WP_LOCK, _WP_EXIT, _WP_KEY, _WP_KEY_WORD_POS, _WP_DECOY_POS,
+    _WP_LOCK, _WP_EXIT, _WP_KEY, _WP_KEY_WORD_POS, _WP_DECOY_POS, _WP_CROW,
 )
 from engine.world import CellType
 from engine.player import Player
@@ -97,33 +99,46 @@ def _simulate(answer, room):
 @pytest.mark.parametrize('seed', SEEDS)
 def test_dimensions_and_budget(seed):
     room = _room(seed)
-    assert (room.rows, room.cols) == (15, 46)
+    assert (room.rows, room.cols) == (19, 46)
     assert room.par == _WP_PAR == 19
     assert room.budget == 27                       # ceil(19 * 1.4)
 
 
 @pytest.mark.parametrize('seed', SEEDS)
-def test_sanctum_is_sealed_and_wordless(seed):
+def test_corridor_is_wordless_and_walled_off(seed):
     room = _room(seed)
-    # the sanctum row carries no characters, so it can't be searched back to
-    assert not any(ru.row == 7 for ru in room.char_runs)
-    # the sanctum is walled off top and bottom (rows 6 and 8 all wall)
-    assert all(room.cells[6][c] == CellType.WALL for c in range(room.cols))
-    assert all(room.cells[8][c] == CellType.WALL for c in range(room.cols))
+    # the sanctum corridor (rows 8-10) carries no characters -> can't be searched to
+    assert not any(8 <= ru.row <= 10 for ru in room.char_runs)
+    # solid wall bands seal the corridor from the prose danger rooms
+    assert all(room.cells[4][c] == CellType.WALL for c in range(room.cols))
+    assert all(room.cells[14][c] == CellType.WALL for c in range(room.cols))
+    # the prose danger rooms DO carry text (search fodder + the key word)
+    assert any(ru.row in (1, 2, 3) for ru in room.char_runs)
+    assert any(ru.row in (15, 16, 17) for ru in room.char_runs)
+
+
+@pytest.mark.parametrize('seed', SEEDS)
+def test_danger_room_crawls_with_goblins(seed):
+    room = _room(seed)
+    goblins = [e for e in room.entities if e.kind == 'goblin']
+    assert len(goblins) >= 20                       # crawling
+    assert all(g.row in (1, 2, 3, 15, 16, 17) for g in goblins)   # all in the danger rooms
 
 
 @pytest.mark.parametrize('seed', SEEDS)
 def test_entities_and_search_words(seed):
     room = _room(seed)
-    ent = {(e.kind): [] for e in room.entities}
+    ent = {}
     for e in room.entities:
-        ent[e.kind].append((e.row, e.col))
-    assert _WP_SCROLL in ent['chest_scroll']
-    assert _WP_EXIT in ent['exit']
-    assert _WP_LOCK in ent['locked_door']
-    assert _WP_KEY in ent['floor_key']
-    assert len(ent['goblin']) == 4
-    # one real key word (backward) + three forward decoys; nothing else matches
+        ent.setdefault(e.kind, []).append((e.row, e.col, e.tag))
+    assert (_WP_SCROLL[0], _WP_SCROLL[1], '') in ent['chest_scroll']
+    assert (_WP_EXIT[0], _WP_EXIT[1], '') in ent['exit']
+    assert (_WP_LOCK[0], _WP_LOCK[1], 'gold') in ent['locked_door']     # gold exit lock
+    assert (_WP_KEY[0], _WP_KEY[1], 'gold') in ent['floor_key']         # gold key
+    # treasure teases: chests + hearts behind 'blue' locks (no blue key exists)
+    assert len(ent.get('chest', [])) + len(ent.get('heart_container', [])) >= 8
+    assert any(tag == 'blue' for (_, _, tag) in ent['locked_door'])
+    # one real key word (backward) + the forward decoys; nothing else matches
     assert _positions(room, _WP_KEYWORD) == sorted([_WP_KEY_WORD_POS] + _WP_DECOY_POS)
     for ru in room.char_runs:
         w = ''.join(ru.symbols)
@@ -133,14 +148,14 @@ def test_entities_and_search_words(seed):
 
 @pytest.mark.parametrize('seed', SEEDS)
 def test_apostrophe_reaches_scroll_backtick_reaches_lock(seed):
-    """'a → the scroll room (row's first-left cell); `a → the exit-lock approach."""
+    """'a → the scroll room (corridor's first-left cell); `a → the exit-lock approach."""
     room = _room(seed)
-    assert _first_non_blank_col(room, 7) == _WP_SCROLL[1]      # 'a target = scroll cell
-    assert _WP_SPAWN != _WP_SCROLL and _WP_SPAWN[1] > _WP_SCROLL[1]  # `a target is distinct, deeper
+    assert _first_non_blank_col(room, _WP_CROW) == _WP_SCROLL[1]          # 'a target
+    assert _WP_SPAWN != _WP_SCROLL and _WP_SPAWN[1] > _WP_SCROLL[1]       # `a target distinct, deeper
 
 
 @pytest.mark.parametrize('seed', SEEDS)
-def test_backward_search_is_the_cheapest_key_fetch(seed):
+def test_backward_search_is_the_direct_key_fetch(seed):
     """From the scroll cell, ?cipher lands on the real key; /cipher hits a forward
     decoy first — so ? is the direct fetch (/ would need n-wrapping)."""
     room = _room(seed)
@@ -151,18 +166,15 @@ def test_backward_search_is_the_cheapest_key_fetch(seed):
 
 @pytest.mark.parametrize('seed', SEEDS)
 def test_exit_is_teleport_safe(seed):
-    """No mark-jump / line-jump target is the exit: it's not the sanctum row's
-    first-non-blank, and it's reachable only through the (blocking) exit lock."""
     room = _room(seed)
-    assert _first_non_blank_col(room, 7) != _WP_EXIT[1]
-    assert not room.is_passable(*_WP_LOCK)            # lock blocks
+    assert _first_non_blank_col(room, _WP_CROW) != _WP_EXIT[1]
+    assert not room.is_passable(*_WP_LOCK)            # exit lock blocks
     assert room.is_passable(*_WP_EXIT)
-    # exit's only orthogonal floor neighbour is the lock cell
     er, ec = _WP_EXIT
     nbrs = [(er + dr, ec + dc) for dr, dc in ((1, 0), (-1, 0), (0, 1), (0, -1))
             if 0 <= er + dr < room.rows and 0 <= ec + dc < room.cols
             and room.cells[er + dr][ec + dc] == CellType.CORRIDOR]
-    assert nbrs == [_WP_LOCK]
+    assert nbrs == [_WP_LOCK]                          # only way to the exit is the lock
 
 
 # ── par path (structure is seed-independent: run once) ───────────────────────
@@ -176,12 +188,11 @@ def test_answer_solves_within_budget_and_takes_the_scroll():
 
 
 def test_skipping_the_scroll_beats_par():
-    """Dropping the 'a x detour finishes under par — the scroll is optional."""
     room = _room(42)
     skip = _WP_ANSWER.replace("'a x ", "")            # drop the scroll detour
     pos, spent, reached, got_scroll = _simulate(skip, room)
     assert reached and not got_scroll
-    assert spent == _WP_PAR - 3 == 16                 # 'a(2) + x(1) saved
+    assert spent == _WP_PAR - 3 == 16
     assert spent < _WP_PAR
 
 
@@ -193,7 +204,7 @@ def test_left_room_scroll_grants_setnum():
 
 def test_set_number_renders_a_line_gutter(capsys):
     """player.number_mode toggles a dungeon line-number gutter; default 'none'
-    leaves the frame ungutted (no regression)."""
+    leaves the frame ungutted.  In relativenumber the cursor's own line reads 0."""
     from blessed import Terminal
     import render.colors as C
     import render.symbols as S
@@ -201,7 +212,7 @@ def test_set_number_renders_a_line_gutter(capsys):
     from engine.budget import Budget
     t = Terminal(); C.init(t); S.init(t)
     d = _build(42)
-    p = Player(row=7, col=5)                           # player on the sanctum row (line 8)
+    p = Player(row=_WP_CROW, col=_WP_SPAWN[1])
 
     p.number_mode = 'none'
     render_all(t, d, p, Budget(total=27), '')
@@ -215,6 +226,8 @@ def test_set_number_renders_a_line_gutter(capsys):
     render_all(t, d, p, Budget(total=27), '')
     relative = capsys.readouterr().out
 
-    assert '  1 ' in numbered and '  8 ' in numbered    # absolute line numbers
-    assert '  1 ' not in plain                          # default: no gutter
-    assert '  0 ' in relative                           # cursor line = 0 in relativenumber
+    assert numbered != plain                           # the gutter changes the frame
+    assert relative != plain
+    assert '  0 ' in relative                          # cursor line = 0 (relativenumber)
+    assert '  0 ' not in plain                         # default: no gutter
+    assert '  0 ' not in numbered                      # absolute mode never shows 0
