@@ -422,16 +422,46 @@ def build_dungeon_first_cave(seed: int) -> Dungeon:
     return dungeon
 
 
-# The Line Halls: Entry → Puzzle → Exit  (hjkl + ^ $ 0  + :w :q)
-LEVEL_1_PLAN = [
-    (RoomType.ENTRY,  8, 14),
-    (RoomType.PUZZLE, 8, 60),
-    (RoomType.EXIT,   10, 14),
-]
+# ── The Line Halls layout (teaches $ ^ 0; + always-on :w :q) ──────────────────
+# A fixed vertical serpentine of three single-row halls joined by one-cell
+# doorways at alternating ends.  No counts exist yet, so walking costs one key
+# per cell and each hall forces one line motion: $ (Hall A, doorway far right),
+# 0 (Hall B, doorway at the bare left margin past a field of runes), ^ (Hall C,
+# exit one l right of the first carved rune, behind an unmarked indent).
+_LINE_HALLS_ROWS  = 7      # 0 wall · 1 Hall A · 2 sep · 3 Hall B · 4 sep · 5 Hall C · 6 wall
+_LINE_HALLS_COLS  = 50     # 0 wall · 1..48 halls · 49 wall
+_LINE_HALLS_LEFT  = 1
+_LINE_HALLS_RIGHT = 48
+_LINE_HALLS_A_ROW, _LINE_HALLS_B_ROW, _LINE_HALLS_C_ROW = 1, 3, 5
+_LINE_HALLS_SPAWN = (_LINE_HALLS_A_ROW, _LINE_HALLS_LEFT)            # left end of Hall A
+_LINE_HALLS_DOORS = ((2, _LINE_HALLS_RIGHT), (4, _LINE_HALLS_LEFT))  # A→B right, B→C left
+_LINE_HALLS_B_FIRST_RUNE_COL = 9                  # Hall B indent (cols 1..8 blank) → 0 ≠ ^
+_LINE_HALLS_C_FIRST_RUNE = (_LINE_HALLS_C_ROW, 10)        # ^ lands here…
+_LINE_HALLS_EXIT = (_LINE_HALLS_C_ROW, 11)                # …then one l onto the exit
+
+def _tile_line_hall(rng, row: int, c0: int, c1: int, first_non_void: bool = True) -> list:
+    """Pack runes left→right across [c0, c1] with random kinds, lengths and 1–3
+    cell gaps (seeded by the dungeon seed, the way the other levels scatter
+    theirs).  The first rune placed is forced non-void: apply_motion ^ halts on
+    the first char_run of ANY kind while the par solver skips void, so a leading
+    void rune would desync them — and the ^ landing must be survivable.  Void
+    runes therefore only sit mid-hall (passed over by the line jumps) or right of
+    the exit, never on a cell a motion lands on."""
+    runs, c, first = [], c0, first_non_void
+    while c <= c1:
+        kind = rng.choice(_WORD_RUNE_KINDS) if first else rng.choice(_RUNE_KINDS)
+        first = False
+        syms = list(_make_rune_syms(rng, kind))[:c1 - c + 1]   # trim a long rune to fit
+        runs.append(CharRun(row=row, col=c, symbols=tuple(syms), kind=kind))
+        c += len(syms) + rng.randint(1, 3)
+    return runs
 
 
-def _bfs_par_line(composite, return_path: bool = False):
-    """BFS par for The Line Halls: hjkl + $ ^ 0 line-end motions (each costs 1).
+def _bfs_par_line(composite, return_path: bool = False,
+                  allow=('$', '0', '^')):
+    """BFS par for The Line Halls: hjkl (each cost 1) plus the line motions in
+    `allow` ($ ^ 0, each cost 1).  `allow` lets the command-necessity tests drop
+    one motion and confirm the cheapest remaining solve exceeds the budget.
 
     $ and ^ are wall-bounded: they stop at the nearest wall in each direction,
     matching apply_motion semantics.  Targets are precomputed per (row, col).
@@ -493,7 +523,7 @@ def _bfs_par_line(composite, return_path: bool = False):
         for nb, lbl in ((dollar_of.get((r, c)), '$'),
                         (zero_of.get((r, c)),   '0'),
                         (hat_of.get((r, c)),    '^')):
-            if nb is not None and nb != (r, c) and nb not in dist:
+            if lbl in allow and nb is not None and nb != (r, c) and nb not in dist:
                 dist[nb] = d + 1
                 prev[nb] = ((r, c), lbl)
                 q.append(nb)
@@ -503,91 +533,68 @@ def _bfs_par_line(composite, return_path: bool = False):
 
 
 def build_dungeon_line_halls(seed: int) -> Dungeon:
-    """The Line Halls — teaches ^ $ 0 + :w :q.
+    """The Line Halls — teaches $ ^ 0 (+ always-on :w :q).
 
-    ENTRY(8×14) ─4─ PUZZLE(8×60) ─4─ EXIT(10×14)  →  96 × 10 composite.
+    A fixed vertical serpentine of three single-row halls joined by one-cell
+    doorways at alternating ends.  No counts exist yet, so walking costs one key
+    per cell and each hall forces exactly one line motion:
 
-    EXIT is full-height (10 rows); ENTRY/PUZZLE are 8 rows centred at rows 1-8.
-    Global rows 0 and 9 exist only inside EXIT, so `^` on row 1 finds the exit
-    at (1, 83) with no competing characters from other rooms.
+      Hall A (row 1): spawn at the far left; the only way down is a doorway at
+        the far RIGHT                                                   → $
+      Hall B (row 3): you arrive at the right; the doorway down is at the bare
+        LEFT margin, but the hall is packed with carved runes, so ^ halts on
+        the first rune mid-hall — only 0 reaches the margin             → 0
+      Hall C (row 5): you arrive at the left; the exit sits one cell right of
+        the first carved rune (cols 1..9 are an unmarked indent), so ^ jumps to
+        that rune and one l steps onto the exit                         → ^
 
-    Optimal path (≈7 keys): jj → $ → kkk → ^ .  hjkl-only cost ≫ budget.
+    Seed-independent (par 8 every seed).  Void runes appear only mid-hall —
+    passed over by the line jumps — or right of the exit; every cell a motion
+    lands on is safe.
     """
-    rng = random.Random(seed)
     dungeon = Dungeon(name='The Line Halls', seed=seed)
-    CORRIDOR_LEN = 4
+    ROWS, COLS = _LINE_HALLS_ROWS, _LINE_HALLS_COLS
+    L, R = _LINE_HALLS_LEFT, _LINE_HALLS_RIGHT
 
-    plan      = LEVEL_1_PLAN
-    total_cols = sum(c for _, _, c in plan) + CORRIDOR_LEN * (len(plan) - 1)
-    total_rows = max(r for _, r, _ in plan)  # 10
+    cells = [[CellType.WALL] * COLS for _ in range(ROWS)]
+    for hall_row in (_LINE_HALLS_A_ROW, _LINE_HALLS_B_ROW, _LINE_HALLS_C_ROW):
+        for c in range(L, R + 1):
+            cells[hall_row][c] = CellType.FLOOR
+    for (dr, dc) in _LINE_HALLS_DOORS:          # one-cell doorways through the wall rows
+        cells[dr][dc] = CellType.CORRIDOR
 
-    cells = [[CellType.WALL] * total_cols for _ in range(total_rows)]
+    composite = Room(room_type=RoomType.ENTRY, rows=ROWS, cols=COLS)
+    composite.cells     = cells
+    composite.seed      = seed
+    composite.spawn_pos = _LINE_HALLS_SPAWN
+    composite.exit_pos  = _LINE_HALLS_EXIT
+    composite.entities.append(
+        Entity(kind='exit', row=_LINE_HALLS_EXIT[0], col=_LINE_HALLS_EXIT[1]))
 
-    col_offset = 0
-    offsets    = []
-    for room_type, rows, cols in plan:
-        offsets.append(col_offset)
-        r_seed = rng.randint(0, 2**31)
-        room   = make_room(room_type, rows, cols, r_seed)
-        for r in range(rows):
-            for c in range(cols):
-                gr = r + (total_rows - rows) // 2
-                gc = c + col_offset
-                cells[gr][gc] = room.cells[r][c]
-        col_offset += cols + CORRIDOR_LEN
+    # ── Carved runes (random per seed, like the other levels) ───────────────────
+    # The structural anchors (indents, the col-10 ^ target, the unmarked exit, the
+    # blank approaches) are fixed so the forcing holds for every seed; only the
+    # filler runes' kinds, lengths and gaps vary.
+    rng = random.Random(seed)
+    runs: list = []
+    # Hall A: packed; col 1 is the spawn and cols R-1..R the doorway approach (left blank).
+    runs += _tile_line_hall(rng, _LINE_HALLS_A_ROW, L + 1, R - 2)
+    # Hall B: cols 1..8 blank, so 0 reaches the bare margin while ^ stops at col 9.
+    runs += _tile_line_hall(rng, _LINE_HALLS_B_ROW, _LINE_HALLS_B_FIRST_RUNE_COL, R - 2)
+    # Hall C: one single-cell non-void rune just left of the exit (the ^ target),
+    # then a field of runes to its right so $ overshoots.  The exit cell stays unmarked.
+    fr_r, fr_c = _LINE_HALLS_C_FIRST_RUNE
+    fr_kind = rng.choice(_WORD_RUNE_KINDS)
+    runs.append(CharRun(row=fr_r, col=fr_c, symbols=(_RUNE_CHAR[fr_kind],), kind=fr_kind))
+    runs += _tile_line_hall(rng, _LINE_HALLS_C_ROW, _LINE_HALLS_EXIT[1] + 2, R - 2)
+    composite.char_runs = runs
 
-    # Carve corridors at rows 4-5 (mid = total_rows // 2 = 5)
-    for i in range(len(plan) - 1):
-        _, rows_l, cols_l = plan[i]
-        left_right_edge  = offsets[i] + cols_l - 1
-        right_left_edge  = offsets[i + 1]
-        mid = total_rows // 2
-        for c in range(left_right_edge, right_left_edge + 1):
-            cells[mid][c]     = CellType.CORRIDOR
-            cells[mid - 1][c] = CellType.CORRIDOR
-
-    composite = Room(room_type=RoomType.ENTRY, rows=total_rows, cols=total_cols)
-    composite.cells = cells
-    composite.seed  = seed
-
-    # Entry above corridor rows — player must use j to reach the corridor.
-    composite.spawn_pos = (2, 2)
-
-    # Exit at leftmost interior cell of EXIT room on row 1 (EXIT-only row).
-    # offsets[-1]=82; interior starts at col 83.  Row 1 is above corridor
-    # rows 4-5, so on row 1 only EXIT interior (cols 83-94) is passable.
-    # ^ on row 1 therefore lands at col 83 (first passable = first character).
-    ex_c = offsets[-1] + 1   # 83
-    ex_r = 1
-    composite.exit_pos = (ex_r, ex_c)
-    composite.entities.append(Entity(kind='exit', row=ex_r, col=ex_c))
-
-    # Scatter decorative runes; strip void runes and row-1 runes so the only
-    # character on the exit row is the hardcoded anchor that ^ will land on.
-    for _attempt in range(20):
-        composite.char_runs.clear()
-        rune_rng = random.Random(rng.randint(0, 2**31))
-        for i, (_, room_rows, room_cols) in enumerate(plan):
-            _place_runes_in_room(composite, rune_rng, offsets[i],
-                                 room_rows, room_cols, total_rows, 0.15)
-        composite.char_runs = [
-            ru for ru in composite.char_runs
-            if ru.kind != 'void' and ru.row != ex_r
-        ]
-        # Anchor character at exit position so ^ on row 1 lands exactly on the exit.
-        composite.char_runs.append(
-            CharRun(row=ex_r, col=ex_c, symbols=('∘',), kind='ancient'))
-        par, path = _bfs_par_line(composite, return_path=True)
-        if par is not None:
-            break
-    else:
-        par, path = 7, ''
-
+    composite.rebuild_indexes()
+    par, path = _bfs_par_line(composite, return_path=True)
     composite.par    = par
     composite.budget = math.ceil(par * 1.4)
     composite.answer = path
-    composite.rebuild_indexes()
-    dungeon.rooms    = [composite]
+    dungeon.rooms        = [composite]
     dungeon.current_room = 0
     return dungeon
 
