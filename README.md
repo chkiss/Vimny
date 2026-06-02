@@ -53,6 +53,8 @@ Each dungeon is a text buffer. The floor is made of **character runs** — group
 
 **Keystroke budget**: Every puzzle room displays a budget. Reaching the exit within it completes the room. The par is the minimum possible keystrokes using the level's taught commands — hitting par earns a second star. `u` (undo) returns budget; you can backtrack freely.
 
+> **Note — par is not the absolute minimum on search levels.** On levels that use search (`/`, `?`), par is computed assuming you type the **full search term** the level highlights (e.g. `/cipher⏎`). Because a search pattern only needs enough characters to land uniquely on the target, an expert can type a shorter prefix (e.g. `/cip⏎`) and finish *under* par. This is intentional and consistent across all search levels: par rewards "type the word you see," and the budget leaves headroom for prefix-search optimization.
+
 **Void runes**: Landing on a void cell costs 1 HP. Count motions pass through void cells silently; only the final landing cell triggers damage. This mirrors Vim's motion semantics exactly.
 
 ## Levels
@@ -80,7 +82,7 @@ The curriculum is defined in `content/levels.py` (canonical) and mirrored in `LE
 | 13.1 | The Warden Surveyor | (boss) | Playable |
 | 14 | The Sight Sanctum | `v` | Playable |
 | 15 | The Seekers' Labyrinth | `/ ? n N *` | Playable |
-| 16 | The Waypoint Sanctum | `` m ' ` `` | Planned |
+| 16 | The Waypoint Sanctum | `` m ' ` `` | Playable |
 | 17 | The Archivist's Library | `:e :set` | Planned |
 | 17.1 | The Warden Pathfinder | (boss) | Planned |
 | 18 | The Operator's Vault | `d c` | Planned |
