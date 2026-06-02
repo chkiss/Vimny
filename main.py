@@ -14,7 +14,7 @@ from render.wizard_blessing import run_wizard_blessing
 from engine.player import Player
 from engine.modes import Mode
 from engine.budget import Budget
-from engine.vim_parser import parse
+from engine.vim_parser import parse, parse_visual_textobj
 from engine.command_guard import action_allowed as _action_allowed, guard_message as _guard_message
 from engine.world import Entity, CellType, CharRun, Dungeon
 from engine.motion import apply_motion, move_player, _apply_esc, _reveal_from, _cell_char, _first_non_blank_col
@@ -365,7 +365,7 @@ def _render_standard_scroll(term: Terminal, iw: int, game_h: int, content: dict,
 
     # Pad every key to a common width so the ──> arrows and descriptions line
     # up in clean columns (whether a row is smudged or revealed).
-    key_w  = max(([len(s[1]) for s in content['lines'] if s[0] in ('cmd', 'smudge')]
+    key_w  = max(([len(s[1]) for s in content['lines'] if s[0] in ('cmd', 'smudge', 'smudge_seg')]
                   + [sum(len(t) for t, _ in s[1]) for s in content['lines'] if s[0] == 'segs']),
                  default=0)
     indent = '  '
@@ -405,6 +405,26 @@ def _render_standard_scroll(term: Terminal, iw: int, game_h: int, content: dict,
             painted += ch
         return row(len(text), painted + rst + inn)
 
+    def smudge_seg_row(key_text, hide_prefix, desc):
+        # a 'segs'-style key/desc line whose key HEAD is blotted out: the indent +
+        # hide_prefix become an ink stain, the key tail + arrow + desc stay clean.
+        sep   = '  ────>  '
+        k     = key_text.ljust(key_w)
+        text  = f'{indent}{k}{sep}{desc}'
+        solid = len(indent) + len(hide_prefix)
+        rnd   = random.Random(text)        # stable speckle for a given line
+        painted, prev = '', None
+        for i, ch in enumerate(text):
+            if i < solid:
+                col, out = smudge, rnd.choice('▒▓')   # wet edge: blotted, spaces too
+            else:
+                col, out = body, ch                   # tail reads clean
+            if col != prev:
+                painted += col
+                prev = col
+            painted += out
+        return row(len(text), painted + rst + inn)
+
     def body_row(s):  return row(len(s), body + s + rst)
     def amber_row(s): return row(len(s), amber + s + rst)
 
@@ -415,6 +435,7 @@ def _render_standard_scroll(term: Terminal, iw: int, game_h: int, content: dict,
         if k == 'amber':  return amber_row(spec[1])
         if k == 'cmd':    return cmd_row(spec[1], spec[2])
         if k == 'segs':   return seg_row(spec[1], spec[2])
+        if k == 'smudge_seg': return smudge_seg_row(spec[1], spec[2], spec[3])
         if k == 'smudge':
             key, prefix, tail = spec[1], spec[2], spec[3]
             gate = spec[4] if len(spec) > 4 else None
@@ -1279,6 +1300,33 @@ def _enemy_tick(room, player) -> list:
     return msgs
 
 
+def _budget_exhausted_blocks(action: dict) -> bool:
+    """Once the budget is spent, the path is over: every budget-costing action is
+    blocked so the player can't move (or edit / search / etc.) any further.  Only
+    undo/redo (to recover the spent budget) and entering command mode (:q to quit,
+    :edit) may still proceed.  Callers gate with `budget.remaining <= 0 and not
+    edit_mode`; this answers "is THIS action one of the blocked ones?\""""
+    if action['type'] in ('undo', 'redo'):
+        return False
+    if action['type'] == 'enter_mode' and action.get('mode') == 'command':
+        return False
+    return True
+
+
+def _visual_mode_toggle(raw: str, key_str: str):
+    """While in a visual mode, the target mode for a v / V / Ctrl-v keypress (which
+    toggles or switches), or None if the key isn't one of those switches.
+
+    `raw` is '' for every *sequence* key (Enter, arrows, Home, …).  Those must return
+    None — a regression once used `raw in 'vV'`, and since '' is a substring of any
+    string that flipped <enter> (and friends) into VISUAL_BLOCK."""
+    if raw in ('v', 'V'):
+        return {'v': Mode.VISUAL, 'V': Mode.VISUAL_LINE}[raw]
+    if key_str == '\x16':                       # Ctrl-v
+        return Mode.VISUAL_BLOCK
+    return None
+
+
 # ── Dungeon game loop ──────────────────────────────────────────────────────────
 
 def run_dungeon(term: Terminal, level: str, progress: dict,
@@ -1345,10 +1393,24 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
     macro_run_keys = 0         # keys replayed since last real keypress (recursion guard)
     _MACRO_MAX     = 10000
     count_tutorial_shown = False
+    search_return_mode = None  # visual mode to resume after a / ? search launched from it
     at_exit  = False   # player has stepped on the exit at some point
     last_saved_stars = progress.get(level, {}).get('stars', 0)
     won             = False  # win animation has been triggered
     _first_written_completion = False  # set on first :w/:wq that earns ≥1 star from 0
+    pending_hearts: list = []  # heart containers grabbed this run, not yet written (:w/:wq commit)
+
+    def _commit_hearts() -> None:
+        """Persist heart containers grabbed this run into progress (max_hp + the
+        collected list). Called by :w / :wq only — :q discards them."""
+        if not pending_hearts:
+            return
+        ch = progress.setdefault('collected_hearts', [])
+        for hp in pending_hearts:
+            if hp not in ch:
+                ch.append(hp)
+        progress['max_hp'] = player.max_hp
+        pending_hearts.clear()
     spotted_goblins: set = set()   # id(ent) of goblins the player has seen
     spotted_wardens: set = set()   # id(ent) of wardens the player has seen
     engaged_entities: set = set()  # id(ent) of entities currently co-located with player
@@ -1566,15 +1628,21 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
             return base + ' Cut them down!'
         return base
 
+    def _goblin_sighting(n: int) -> str:
+        """Base sighting line for n newly-spotted goblins — a horde once it's > 9."""
+        if n == 1:
+            return 'You spotted a goblin!'
+        if n > 9:
+            return 'You see a goblin horde!'
+        return f'You see {n} goblins!'
+
     # Spot any enemies already visible at level entry
     _entry_goblins = [e for e in room._entity_by_kind.get('goblin', [])
                       if e.alive and (e.row, e.col) not in room.fog_cells]
     for e in _entry_goblins:
         spotted_goblins.add(id(e))
-    if len(_entry_goblins) == 1:
-        msg_pool.append(_goblin_msg('You spotted a goblin!'))
-    elif len(_entry_goblins) > 1:
-        msg_pool.append(_goblin_msg(f'You see {len(_entry_goblins)} goblins!'))
+    if _entry_goblins:
+        msg_pool.append(_goblin_msg(_goblin_sighting(len(_entry_goblins))))
     for e in room._entity_by_kind.get('warden', []):
         if e.alive and (e.row, e.col) not in room.fog_cells:
             spotted_wardens.add(id(e))
@@ -1689,6 +1757,7 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
                             progress[level] = {'complete': True,
                                                'stars': max(stars, prev)}
                             last_saved_stars = max(stars, last_saved_stars)
+                        _commit_hearts()
                         SM.save_progress(progress, player_name)
                         _push('Saved.')
 
@@ -1701,13 +1770,14 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
                         prev = progress.get(level, {}).get('stars', 0)
                         if prev == 0 and stars >= 1:
                             _first_written_completion = True
+                    _commit_hearts()                         # caller saves on 'wq'
                     return {'won': won, 'stars': stars, 'action': 'wq',
                             'first_written_completion': _first_written_completion}
 
                 elif cmd == 'q':
                     stars = _calc_stars(won, budget, room, player, level)
                     if (player_name != 'admin'
-                            and won and stars > last_saved_stars):
+                            and ((won and stars > last_saved_stars) or pending_hearts)):
                         player.error = 'E37: No write since last change (add ! to override)'
                     else:
                         return {'won': won, 'stars': stars, 'action': 'quit',
@@ -1849,12 +1919,18 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
         # ── SEARCH mode (/ or ? pattern entry) ────────────────────────────────
         if player.mode == Mode.SEARCH:
             if key.name == 'KEY_ESCAPE':
-                player.mode = Mode.NORMAL
+                player.mode = search_return_mode or Mode.NORMAL   # back to visual if launched there
+                search_return_mode = None
                 player.cmd_line = ''
             elif key.name == 'KEY_ENTER' or str(key) in ('\n', '\r'):
                 pattern = player.cmd_line
                 fwd     = player.search_forward
-                player.mode     = Mode.NORMAL
+                # A search launched from visual mode is a MOTION that extends the
+                # selection: resume that visual mode (anchor intact) and just move the
+                # cursor — no jumplist/undo entry, exactly like any visual-mode motion.
+                from_visual     = search_return_mode is not None
+                player.mode     = search_return_mode or Mode.NORMAL
+                search_return_mode = None
                 player.cmd_line = ''
                 if pattern:
                     player.last_search = (pattern, fwd)
@@ -1862,12 +1938,14 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
                     if dest is not None:
                         pre = (player.row, player.col, budget.spent,
                                cmd_start_ans[0], cmd_start_ans[1])
-                        _record_jump(player, (player.row, player.col))
+                        if not from_visual:
+                            _record_jump(player, (player.row, player.col))
                         player.row, player.col = dest
                         if not edit_mode:
                             budget.spend(len(pattern) + 2)
-                            undo_stack.append(pre)
-                            redo_stack.clear()
+                            if not from_visual:
+                                undo_stack.append(pre)
+                                redo_stack.clear()
                     else:
                         _push(f'Pattern not found: {pattern}')
             elif key.name == 'KEY_BACKSPACE' or str(key) == '\x7f':
@@ -1990,11 +2068,24 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
                 player.visual_anchor = cursor
                 render_all(term, dungeon, player, budget, message, attack_pos=_attack_pos(), attack_sym=_attack_sym())
                 continue
-            if not key_buf and (raw in 'vV' or str(key) == '\x16'):   # toggle / exit
-                want = {'v': Mode.VISUAL, 'V': Mode.VISUAL_LINE, '\x16': Mode.VISUAL_BLOCK}[raw or '\x16']
+            want = _visual_mode_toggle(raw, str(key)) if not key_buf else None
+            if want is not None:                           # v / V / Ctrl-v toggle / exit
                 player.mode = Mode.NORMAL if want == vmode else want
                 if player.mode == Mode.NORMAL:
                     player.visual_anchor = None
+                render_all(term, dungeon, player, budget, message, attack_pos=_attack_pos(), attack_sym=_attack_sym())
+                continue
+            if not key_buf and raw in ('/', '?'):          # search extends the selection
+                if not ('/' in player.known_commands or 'admin' in player.known_commands):
+                    _push('Search not learned yet.')
+                elif not edit_mode and budget.remaining <= 0:
+                    _push('Out of budget!  (Esc, then u to undo)')
+                    message = _pool_msg(); msg_ttl = _MSG_ROTATE_TTL
+                else:
+                    search_return_mode = vmode             # resume this visual mode on <enter>
+                    player.mode = Mode.SEARCH
+                    player.cmd_line = ''
+                    player.search_forward = (raw == '/')
                 render_all(term, dungeon, player, budget, message, attack_pos=_attack_pos(), attack_sym=_attack_sym())
                 continue
             if not key_buf and raw and raw in 'dycx~<>':
@@ -2002,6 +2093,11 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
                 if raw in 'dyc~<>' and not (
                         'visual_op' in player.known_commands or 'admin' in player.known_commands):
                     _push("You haven't learned visual operators yet.")
+                    render_all(term, dungeon, player, budget, message, attack_pos=_attack_pos(), attack_sym=_attack_sym())
+                    continue
+                if not edit_mode and budget.remaining <= 0:
+                    _push('Out of budget!  (Esc, then u to undo)')
+                    message = _pool_msg(); msg_ttl = _MSG_ROTATE_TTL
                     render_all(term, dungeon, player, budget, message, attack_pos=_attack_pos(), attack_sym=_attack_sym())
                     continue
                 undo_stack.append(_snapshot(room, player, budget,
@@ -2024,17 +2120,48 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
                 key_buf = ''
                 render_all(term, dungeon, player, budget, message, attack_pos=_attack_pos(), attack_sym=_attack_sym())
                 continue
-            # Otherwise: a motion that extends the selection (costs same as normal mode)
             key_buf += raw
+            # Text object: i/a (+ optional count) + object char selects the span
+            # (viw, vaw, vi(, va", …).  In visual mode i/a are object prefixes.
+            vt = parse_visual_textobj(key_buf)
+            if vt == 'pending':
+                render_all(term, dungeon, player, budget, message, attack_pos=_attack_pos(), attack_sym=_attack_sym())
+                continue
+            if vt is not None:
+                _, textobj, tcount = vt
+                key_buf = ''
+                if not (textobj in player.known_commands or 'admin' in player.known_commands):
+                    _push("You haven't learned that text object yet.")
+                    message = _pool_msg(); msg_ttl = _MSG_ROTATE_TTL
+                elif not edit_mode and budget.remaining <= 0:
+                    _push('Out of budget!  (Esc, then u to undo)')
+                    message = _pool_msg(); msg_ttl = _MSG_ROTATE_TTL
+                else:
+                    tobj = resolve_text_object(textobj, room, player)
+                    if tobj is None:
+                        _push('No text object here.')
+                        message = _pool_msg(); msg_ttl = _MSG_ROTATE_TTL
+                    else:
+                        player.visual_anchor = (tobj.start_row, tobj.start_col)
+                        player.row, player.col = tobj.end_row, tobj.end_col
+                        if not edit_mode:
+                            budget.spend(2 + (len(str(tcount)) if tcount > 1 else 0))
+                render_all(term, dungeon, player, budget, message, attack_pos=_attack_pos(), attack_sym=_attack_sym())
+                continue
+            # Otherwise: a motion that extends the selection (costs same as normal mode)
             v_action, key_buf = parse(key_buf, Mode.NORMAL)
             if v_action is not None and v_action.get('type') == 'motion':
-                v_count = v_action.get('count', 1)
-                v_motion = v_action['motion']
-                moved = apply_motion(player, v_motion, v_count, room, v_action.get('target'),
-                                     count_given=v_action.get('count_given', True),
-                                     game_h=term.height - 8)
-                if moved and not edit_mode:
-                    budget.spend(_keystroke_cost(v_count, v_motion))
+                if not edit_mode and budget.remaining <= 0:
+                    _push('Out of budget!  (Esc, then u to undo)')
+                    message = _pool_msg(); msg_ttl = _MSG_ROTATE_TTL
+                else:
+                    v_count = v_action.get('count', 1)
+                    v_motion = v_action['motion']
+                    moved = apply_motion(player, v_motion, v_count, room, v_action.get('target'),
+                                         count_given=v_action.get('count_given', True),
+                                         game_h=term.height - 8)
+                    if moved and not edit_mode:
+                        budget.spend(_keystroke_cost(v_count, v_motion))
             elif v_action is not None:
                 key_buf = ''                               # ignore non-motion keys in visual
             render_all(term, dungeon, player, budget, message, attack_pos=_attack_pos(), attack_sym=_attack_sym())
@@ -2058,6 +2185,14 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
         # Dead players may only enter command mode to type :e
         if player.is_dead and not (action['type'] == 'enter_mode'
                                    and action.get('mode') == 'command'):
+            render_all(term, dungeon, player, budget, message, attack_pos=_attack_pos(), attack_sym=_attack_sym())
+            continue
+
+        # Out of budget: the path is spent.  No budget-costing action may proceed —
+        # only undo/redo (to recover) or :command (to quit / :edit).
+        if not edit_mode and budget.remaining <= 0 and _budget_exhausted_blocks(action):
+            _push('Out of budget!  (u to undo)')
+            message = _pool_msg(); msg_ttl = _MSG_ROTATE_TTL
             render_all(term, dungeon, player, budget, message, attack_pos=_attack_pos(), attack_sym=_attack_sym())
             continue
 
@@ -2561,13 +2696,14 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
                     player.max_hp += 2
                     room.kill_entity(cur)
                     budget.spend(1)
-                    _collected_hearts = progress.setdefault('collected_hearts', [])
-                    if heart_pos not in _collected_hearts:
-                        _collected_hearts.append(heart_pos)
-                    progress['max_hp'] = player.max_hp
+                    # The +HP is yours for this run, but the upgrade only PERSISTS when
+                    # the player writes (:w / :wq) — quitting with :q discards it, like
+                    # any unsaved change.  Stage it here; commit at write time.
+                    if heart_pos not in pending_hearts:
+                        pending_hearts.append(heart_pos)
                     _heart_container_animation(term, dungeon, player, budget, old_max_hp, message)
                     player.hp = player.max_hp
-                    _push('Max HP increased!  ♥')
+                    _push('Max HP increased!  ♥  (:w to keep it)')
                     interacted = True
                 if interacted:
                     player.last_change = action
@@ -2992,10 +3128,8 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
                          and (e.row, e.col) not in room.fog_cells]
                 for e in new_g:
                     spotted_goblins.add(id(e))
-                if len(new_g) == 1:
-                    _push(_goblin_msg('You spotted a goblin!'))
-                elif len(new_g) > 1:
-                    _push(_goblin_msg(f'You see {len(new_g)} goblins!'))
+                if new_g:
+                    _push(_goblin_msg(_goblin_sighting(len(new_g))))
 
                 for e in room._entity_by_kind.get('warden', []):
                     if (e.alive
@@ -3103,6 +3237,7 @@ def run_scroll_library(term: Terminal, player: Player, progress: dict) -> str | 
         'register':  lambda t, iw, gh: _show_register_tutorial(t, iw, gh, progress),
         'leap':      lambda t, iw, gh: _show_warden_leap_scroll(t, iw, gh, _known),
         'visual':    lambda t, iw, gh: _show_warden_sight_scroll(t, iw, gh, _known),
+        'setnum':    lambda t, iw, gh: _show_waypoint_scroll(t, iw, gh, _known),
         'd_op':      lambda t, iw, gh: _show_operator_codex_scroll(t, iw, gh, _known),
         'y_op':      lambda t, iw, gh: _show_archivists_method_scroll(t, iw, gh, _known),
         'text_obj':  lambda t, iw, gh: _show_whole_word_scroll(t, iw, gh, _known),
