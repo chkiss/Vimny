@@ -194,3 +194,37 @@ def insert_backspace(room, player) -> bool:
     _delete_at(room, player.row, player.col)
     _merge_adjacent_char_runs(room, player.row)
     return True
+
+
+def insert_delete_word_back(room, player) -> bool:
+    """<C-w>: delete the word before the cursor (and any spaces just before it),
+    stopping at an empty cell, wall or line start. Returns True if anything went."""
+    def _sym_left():
+        c = player.col - 1
+        if c < 0:
+            return None
+        ru = room.char_run_at(player.row, c)
+        return ru.symbols[c - ru.col] if ru is not None else None
+
+    moved = False
+    while player.col > 0 and _sym_left() == ' ':       # eat trailing spaces
+        if not insert_backspace(room, player):
+            break
+        moved = True
+    while player.col > 0:                              # eat the word's characters
+        s = _sym_left()
+        if s is None or s == ' ':
+            break
+        if not insert_backspace(room, player):
+            break
+        moved = True
+    return moved
+
+
+def insert_delete_to_start(room, player) -> bool:
+    """<C-u>: delete from the cursor back to the start of the line. Returns True
+    if anything went."""
+    moved = False
+    while insert_backspace(room, player):
+        moved = True
+    return moved

@@ -273,6 +273,22 @@ def apply_motion(player, motion, count, room, target=None, count_given: bool = T
             if target != player.col:
                 player.col = target
                 moved = True
+        elif motion == '|':
+            # {n}| → column n (1-indexed); bare | → column 1. Count is the target,
+            # not a repeat, so walk toward it and stop at a wall/water brink, then
+            # break out of the count loop (mirrors G / gg).
+            row = player.row
+            target_col = max(0, min(count - 1, room.cols - 1))
+            best = player.col
+            step = 1 if target_col > player.col else -1
+            for c in range(player.col + step, target_col + step, step):
+                if not _cross_water(room, row, c):
+                    break
+                best = c
+            if best != player.col:
+                player.col = best
+                moved = True
+            break
         elif motion == 'w':
             row = player.row
             cur = room.char_run_at(row, player.col)

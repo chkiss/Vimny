@@ -6,7 +6,7 @@ Plain:  typable characters only; themed vocabulary.
 Mixed:  every word contains ≥1 untypable char, appearing at start/middle/end.
         Words are CRAFTED with semantic meaning, not mechanical prefix+symbol.
 """
-import re, pathlib
+import pathlib
 from collections import defaultdict
 
 BASE = pathlib.Path(__file__).parent

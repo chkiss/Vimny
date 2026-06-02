@@ -29,6 +29,10 @@ class Player:
     last_search: tuple | None = None  # (pattern, forward) of the most recent search; used by n/N
     search_forward: bool = True   # direction of the in-progress / or ? entry (for rendering)
     number_mode: str = 'none'     # ':set number' gutter in dungeons: 'none'|'number'|'relativenumber'
+    hlsearch: bool = True         # ':set hlsearch' — paint all matches of the last search
+    incsearch: bool = True        # ':set incsearch' — preview matches while typing / or ?
+    wrap: bool = False            # ':set wrap' — soft-wrap a single-line buffer across screen rows (The Archivist's Library). Off by default: only renders on Room.wrap_buffer rooms, which open nowrap.
+    hl_suppressed: bool = False   # ':noh' cleared the current highlight (until the next search)
 
     # command input buffer for gg, f{c}, m{c}, `{c}, '{c}
     input_buf: str = ''

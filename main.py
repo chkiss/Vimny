@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Vimny — entry point and main game loop."""
 from __future__ import annotations
-import sys, random, time, argparse
+import random, time, argparse
 from collections import deque
 from blessed import Terminal
 import render.colors as C
@@ -17,9 +17,10 @@ from engine.budget import Budget
 from engine.vim_parser import parse, parse_visual_textobj
 from engine.command_guard import action_allowed as _action_allowed, guard_message as _guard_message
 from engine.world import Entity, CellType, CharRun, Dungeon
-from engine.motion import apply_motion, move_player, _apply_esc, _reveal_from, _cell_char, _first_non_blank_col
+from engine.motion import apply_motion, _apply_esc, _reveal_from, _first_non_blank_col
 from engine.text_object import compute_text_object, resolve_text_object
 from engine.search import find_next as _search_next, word_under_cursor as _word_under_cursor
+from engine.options import apply_set as _apply_set, parse_modifier as _parse_set_mod
 from engine.macro import synth_key as _synth_key, record_char as _record_char
 from engine.jumplist import record_jump as _record_jump, jump_back as _jump_back, jump_forward as _jump_forward
 from engine.registers import write_register as _reg_write, read_register as _reg_read
@@ -28,6 +29,11 @@ from content.scrolls import (
     RELIQUARY_SCROLL, WARDEN_LEAP_SCROLL, WARDEN_SIGHT_SCROLL, WAYPOINT_SCROLL,
     OPERATOR_CODEX_SCROLL, ARCHIVISTS_METHOD_SCROLL,
     WHOLE_WORD_SCROLL, WARDEN_ACT_SCROLL,
+    SETTERS_HAND_SCROLL, SEARCH_CRAFT_SCROLL, WANDERERS_THREAD_SCROLL,
+    PLUMB_LINE_SCROLL, RECALLING_HAND_SCROLL, QUICK_ERASE_SCROLL,
+    REGEX_CLASSES_SCROLL, REGEX_ANCHORS_SCROLL, REGEX_QUANTIFIERS_SCROLL,
+    REGEX_COLLECTIONS_SCROLL, REGEX_MAGIC_SCROLL,
+    pick_relic_scroll as _pick_relic_scroll,
 )
 
 _JUMP_MOTIONS = frozenset({'G', 'gg', '%', '{', '}', '(', ')'})
@@ -35,6 +41,7 @@ from engine.operator import op_delete, op_yank, op_paste, op_case, op_join, case
 from engine.reflow import is_ledge, close_gap, void_col
 from engine.insert import (
     begin_insert, insert_char, insert_char_extend, insert_backspace,
+    insert_delete_word_back, insert_delete_to_start,
     replace_chars, replace_overtype, replace_restore,
 )
 from engine.editor import (
@@ -63,6 +70,28 @@ def _cmd_append(cmd_line: str, key) -> str:
     if key.is_sequence:
         return cmd_line
     return cmd_line + str(key)
+
+def _clip_to_text(clip) -> str:
+    """Flatten a register clip into plain text for INSERT-mode <C-r> paste.
+
+    Charwise/linewise clips store per-row char_runs at relative `dcol` offsets;
+    gaps become spaces. Rows join with newline (the insert handler inserts the
+    first row only, the common single-line case)."""
+    if not clip or not clip.get('rows'):
+        return ''
+    lines = []
+    for row in clip['rows']:
+        cells = [' '] * row.get('width', 0)
+        for rd in row.get('char_runs', ()):
+            for i, sym in enumerate(rd['symbols']):
+                pos = rd['dcol'] + i
+                if pos >= len(cells):
+                    cells.extend([' '] * (pos - len(cells) + 1))
+                if pos >= 0:
+                    cells[pos] = sym
+        lines.append(''.join(cells))
+    return '\n'.join(lines)
+
 
 # Explosion damage in half-hearts by Manhattan distance from centre
 _EXPL_DAMAGE = {0: 3, 1: 3, 2: 2, 3: 1}   # 0-1: 1.5♥  2: 1♥  3: 0.5♥
@@ -493,6 +522,18 @@ def _show_warden_act_scroll(term: Terminal, iw: int, game_h: int,
     _render_standard_scroll(term, iw, game_h, WARDEN_ACT_SCROLL, known)
 
 
+def _show_catalog_scroll(term: Terminal, iw: int, game_h: int,
+                         scroll_id: str, known: set | None = None) -> None:
+    """Render any SCROLL_CATALOG scroll by id via the standard renderer — used
+    for the relic (randomly dropped) scrolls, which all use the 'lines'
+    format."""
+    from content.scrolls import SCROLL_CATALOG
+    for s in SCROLL_CATALOG:
+        if s['id'] == scroll_id:
+            _render_standard_scroll(term, iw, game_h, s['content'], known)
+            return
+
+
 # Each boss chest drops the scroll previewing the next act's commands; smudged
 # lines clarify as those commands are learned.  level → (scroll/extras id,
 # full-text title|None, full-text body|None, overlay fn).  The id is also the
@@ -502,7 +543,6 @@ _SCROLL_DROPS = {
     'reliquary':            ('register',  None,                     None,                          _show_reliquary_scroll),
     'wardens_keep':         ('leap',      None,                     None,                          _show_warden_leap_scroll),
     'warden_surveyor':      ('visual',    None,                     None,                          _show_warden_sight_scroll),
-    'waypoint_sanctum':     ('setnum',    None,                     None,                          _show_waypoint_scroll),
     'warden_pathfinder':    ('d_op',      "The Operator's Codex",   _SCROLL_TEXT_OPERATOR_CODEX,    _show_operator_codex_scroll),
     'warden_manifold':      ('y_op',      "The Archivist's Method", _SCROLL_TEXT_ARCHIVISTS_METHOD, _show_archivists_method_scroll),
     'warden_scrivener':     ('text_obj',  'The Whole Word',         _SCROLL_TEXT_WHOLE_WORD,        _show_whole_word_scroll),
@@ -906,7 +946,7 @@ def _snapshot(room, player, budget, *, row=None, col=None, spent=None, ans=None)
                             goblin_free_turns=e.goblin_free_turns,
                             uid=e.uid, summoner_uid=e.summoner_uid,
                             origin_row=e.origin_row, move_dir=e.move_dir,
-                            tag=e.tag)
+                            tag=e.tag, scroll_id=e.scroll_id)
                      for e in room.entities],
         'char_runs': [CharRun(ru.row, ru.col, ru.symbols, ru.kind) for ru in room.char_runs],
         'cells':    [r[:] for r in room.cells],
@@ -1394,6 +1434,9 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
     _MACRO_MAX     = 10000
     count_tutorial_shown = False
     search_return_mode = None  # visual mode to resume after a / ? search launched from it
+    insert_creg_pending = False  # INSERT <C-r> typed; next key names the register to paste
+    insert_co_buf = None         # INSERT <C-o> active; accumulates one Normal command, then resumes INSERT
+    search_creg_pending = False  # SEARCH <C-r> typed; next key names the register / <C-w> to insert
     at_exit  = False   # player has stepped on the exit at some point
     last_saved_stars = progress.get(level, {}).get('stars', 0)
     won             = False  # win animation has been triggered
@@ -1886,27 +1929,58 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
                                                **_ENTITY_PRESETS[kind]))
                         _push(f'Placed {kind}.')
 
+                elif cmd in ('noh', 'nohl', 'nohls', 'nohlsearch'):
+                    # :noh — clear the search highlight until the next search.
+                    if '/' in player.known_commands or player_name == 'admin':
+                        player.hl_suppressed = True
+                        _push(':nohlsearch')
+                    else:
+                        _push("You haven't learned search yet.")
+
                 elif cmd.split()[0:1] == ['set']:
-                    # :set number/relativenumber/nonumber — line-number gutter,
-                    # unlocked by the Waypoint Sanctum scroll ('setnum').
+                    # :set number/relativenumber + the boolean hlsearch/incsearch,
+                    # each with toggle (!/inv), reset (&) and query (?) forms.
+                    # Unlocked by the Waypoint Sanctum scroll ('setnum').
                     if 'setnum' not in player.known_commands and player_name != 'admin':
                         _push("You haven't learned :set yet.")
-                    elif cmd in ('set number', 'set nu'):
-                        player.number_mode = 'number'; _push(':set number')
-                    elif cmd in ('set relativenumber', 'set rnu'):
-                        player.number_mode = 'relativenumber'; _push(':set relativenumber')
-                    elif cmd in ('set nonumber', 'set nonu'):
-                        player.number_mode = 'none'; _push(':set nonumber')
-                    elif cmd in ('set norelativenumber', 'set nornu'):
-                        player.number_mode = 'number'; _push(':set norelativenumber')
                     else:
-                        _push(f'Unknown option: :{cmd}')
+                        _core, _act = _parse_set_mod(cmd[len('set'):])
+                        _flag = ('hlsearch'  if _core in ('hlsearch', 'hls') else
+                                 'incsearch' if _core in ('incsearch', 'is') else
+                                 'wrap'      if _core in ('wrap',)            else None)
+                        if _flag is not None:
+                            _cur = getattr(player, _flag)
+                            _new = {'on': True, 'off': False, 'reset': True,
+                                    'toggle': not _cur, 'query': _cur}[_act]
+                            setattr(player, _flag, _new)
+                            if _flag == 'hlsearch':
+                                player.hl_suppressed = False
+                            if _act == 'query':
+                                _push(_flag if _cur else 'no' + _flag)
+                            else:
+                                _push((':set ' if _act in ('on', 'reset') else '')
+                                      + (_flag if _new else 'no' + _flag))
+                        else:
+                            player.number_mode, _set_msg = _apply_set(
+                                player.number_mode, cmd[len('set'):])
+                            _push(_set_msg)
 
                 else:
                     _push(f'Unknown command: :{cmd}')
 
             elif key.name == 'KEY_BACKSPACE' or str(key) == '\x7f':
                 player.cmd_line = player.cmd_line[:-1]
+            elif search_creg_pending:
+                # second key after <C-r>: <C-w> pulls the word under the cursor,
+                # otherwise the named register's text, into the search line.
+                search_creg_pending = False
+                if not key.is_sequence:
+                    if str(key) == '\x17':
+                        player.cmd_line += _word_under_cursor(room, player) or ''
+                    else:
+                        player.cmd_line += _clip_to_text(_reg_read(player, str(key)))
+            elif str(key) == '\x12':                       # <C-r> — insert into the search line
+                search_creg_pending = True
             else:
                 player.cmd_line = _cmd_append(player.cmd_line, key)
             if msg_pool:
@@ -1934,6 +2008,7 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
                 player.cmd_line = ''
                 if pattern:
                     player.last_search = (pattern, fwd)
+                    player.hl_suppressed = False        # a fresh search re-lights matches
                     dest = _search_next(room, player, pattern, fwd)
                     if dest is not None:
                         pre = (player.row, player.col, budget.spent,
@@ -1960,6 +2035,8 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
             if key.name == 'KEY_ESCAPE':
                 player.mode = Mode.NORMAL
                 key_buf = ''
+                insert_creg_pending = False
+                insert_co_buf = None
             elif edit_mode:
                 r, c = player.row, player.col
                 if key.name == 'KEY_BACKSPACE' or str(key) == '\x7f':
@@ -1980,6 +2057,59 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
                             player.col += 1
             else:
                 # Player INSERT typing (one undo snapshot was pushed on entry).
+                _ins_ok = lambda tok: tok in player.known_commands or 'admin' in player.known_commands
+                _kstr = '' if key.is_sequence else str(key)
+
+                if insert_co_buf is not None:
+                    # <C-o>: accumulate ONE Normal-mode motion, apply it, resume INSERT.
+                    if key.name == 'KEY_ESCAPE':
+                        insert_co_buf = None
+                    elif not key.is_sequence:
+                        insert_co_buf += str(key)
+                        _co_act, _ = parse(insert_co_buf, Mode.NORMAL)
+                        if _co_act is not None:
+                            if _co_act.get('type') == 'motion' and (
+                                    edit_mode or _action_allowed(_co_act, player.known_commands)):
+                                apply_motion(player, _co_act['motion'], _co_act.get('count', 1),
+                                             room, _co_act.get('target'),
+                                             count_given=_co_act.get('count_given', True))
+                            insert_co_buf = None
+                    render_all(term, dungeon, player, budget, message, attack_pos=_attack_pos(), attack_sym=_attack_sym())
+                    continue
+
+                if insert_creg_pending:
+                    # second key after <C-r>: the register name (or <C-w> for the word).
+                    insert_creg_pending = False
+                    if not key.is_sequence:
+                        if str(key) == '\x17':                  # <C-r><C-w> → word under cursor
+                            _ins_text = _word_under_cursor(room, player) or ''
+                        else:
+                            _ins_text = _clip_to_text(_reg_read(player, str(key)))
+                        for _tch in _ins_text:
+                            if _tch == '\n':
+                                break
+                            if insert_char(room, player, _tch):
+                                budget.spend(1)
+                    render_all(term, dungeon, player, budget, message, attack_pos=_attack_pos(), attack_sym=_attack_sym())
+                    continue
+
+                if _kstr == '\x12' and _ins_ok('ins_paste'):     # <C-r> — paste a register
+                    insert_creg_pending = True
+                    render_all(term, dungeon, player, budget, message, attack_pos=_attack_pos(), attack_sym=_attack_sym())
+                    continue
+                if _kstr == '\x0f' and _ins_ok('ins_edit'):      # <C-o> — one Normal command
+                    insert_co_buf = ''
+                    render_all(term, dungeon, player, budget, message, attack_pos=_attack_pos(), attack_sym=_attack_sym())
+                    continue
+                if _kstr == '\x17' and _ins_ok('ins_edit'):      # <C-w> — delete word back
+                    insert_delete_word_back(room, player)
+                    render_all(term, dungeon, player, budget, message, attack_pos=_attack_pos(), attack_sym=_attack_sym())
+                    continue
+                if _kstr == '\x15' and _ins_ok('ins_edit'):      # <C-u> — delete to line start
+                    insert_delete_to_start(room, player)
+                    render_all(term, dungeon, player, budget, message, attack_pos=_attack_pos(), attack_sym=_attack_sym())
+                    continue
+
                 if key.name == 'KEY_BACKSPACE' or str(key) == '\x7f':
                     insert_backspace(room, player)
                 elif not key.is_sequence:
@@ -2497,8 +2627,10 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
                     pattern, fwd = None, True
                 else:
                     fwd = action.get('forward', True)
-                    player.last_search = (word, fwd)
-                    pattern = word
+                    # * / # search the word literally (not as a regex) — \V makes
+                    # every char of the word a literal in the matcher.
+                    pattern = '\\V' + word
+                    player.last_search = (pattern, fwd)
             else:                                  # n / N
                 if not player.last_search:
                     _push('No previous search.')
@@ -2508,6 +2640,7 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
                     fwd = (not base_fwd) if action.get('reverse') else base_fwd
             if pattern:
                 moved = False
+                player.hl_suppressed = False            # n/N/*/# re-light matches
                 search_from = (player.row, player.col)
                 for _ in range(count):
                     dest = _search_next(room, player, pattern, fwd)
@@ -2575,6 +2708,7 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
                     undo_stack.append(_snapshot(room, player, budget, ans=cmd_start_ans))
                     redo_stack.clear()
                     item = _chest_loot(cur.kind)
+                    _chest_sid = cur.scroll_id            # a chest may name its own scroll
                     room.kill_entity(cur)
                     budget.spend(1)
                     if item == 'key':
@@ -2589,7 +2723,19 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
                         _push('You found a scroll!')
                     interacted = True
                     _drop = _SCROLL_DROPS.get(level)
-                    if _drop is not None:
+                    if _chest_sid:
+                        # This chest names a specific scroll (e.g. the Waypoint
+                        # nook → the Numbered Ledger). Grant it and show it via
+                        # the standard catalog renderer.
+                        extras = progress.get('extras', [])
+                        if _chest_sid not in extras:
+                            progress['extras'] = extras + [_chest_sid]
+                        if _chest_sid not in player.known_commands:
+                            player.known_commands = player.known_commands + [_chest_sid]
+                        render_all(term, dungeon, player, budget, _pool_msg(), attack_pos=_attack_pos(), attack_sym=_attack_sym())
+                        _show_catalog_scroll(term, _iw(term), term.height - 8, _chest_sid,
+                                             _known_from_progress(progress))
+                    elif _drop is not None:
                         _sid, _txt_title, _txt_body, _show_fn = _drop
                         # Discovery is recorded by extras membership, NOT by
                         # known_commands — admin has some ids (e.g. 'register')
@@ -2608,12 +2754,19 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
                         # frozen command set — otherwise replaying an early boss
                         # re-smudges commands learned in later levels.
                         _show_fn(term, _iw(term), term.height - 8, _known_from_progress(progress))
-                    elif 'register' not in progress.get('extras', []):
-                        progress['extras'] = progress.get('extras', []) + ['register']
-                        if 'register' not in player.known_commands:
-                            player.known_commands = player.known_commands + ['register']
-                        render_all(term, dungeon, player, budget, _pool_msg(), attack_pos=_attack_pos(), attack_sym=_attack_sym())
-                        _show_register_tutorial(term, _iw(term), term.height - 8, progress)
+                    else:
+                        # No scroll assigned to this level: pull a random, not-yet-
+                        # discovered "safe" relic scroll from the library.
+                        _wid = _pick_relic_scroll(progress.get('extras', []))
+                        if _wid is not None:
+                            progress['extras'] = progress.get('extras', []) + [_wid]
+                            if _wid not in player.known_commands:
+                                player.known_commands = player.known_commands + [_wid]
+                            render_all(term, dungeon, player, budget, _pool_msg(), attack_pos=_attack_pos(), attack_sym=_attack_sym())
+                            _show_catalog_scroll(term, _iw(term), term.height - 8, _wid,
+                                                 _known_from_progress(progress))
+                        else:
+                            _push('The scroll case is empty — you hold every relic scroll.')
                 elif cur and cur.kind == 'keystone':
                     undo_stack.append(_snapshot(room, player, budget, ans=cmd_start_ans))
                     redo_stack.clear()
@@ -3227,8 +3380,9 @@ def run_scroll_library(term: Terminal, player: Player, progress: dict) -> str | 
             'parent' → go up to ~/.vimny/ parent view
             'saves'  → open character select
     """
-    from render.scroll_library import render_scroll_library
-    from content.scrolls import SCROLL_CATALOG
+    from render.scroll_library import render_scroll_library, library_rows
+
+    _rows = library_rows()
 
     _SL_COMPLETIONS = ['../', 'saves/', 'world/']
 
@@ -3242,10 +3396,23 @@ def run_scroll_library(term: Terminal, player: Player, progress: dict) -> str | 
         'y_op':      lambda t, iw, gh: _show_archivists_method_scroll(t, iw, gh, _known),
         'text_obj':  lambda t, iw, gh: _show_whole_word_scroll(t, iw, gh, _known),
         'visual_op': lambda t, iw, gh: _show_warden_act_scroll(t, iw, gh, _known),
+        # Relic scrolls — all use the standard lines/segs/cmd renderer.
+        'set_more':          lambda t, iw, gh: _render_standard_scroll(t, iw, gh, SETTERS_HAND_SCROLL, _known),
+        'regex_classes':     lambda t, iw, gh: _render_standard_scroll(t, iw, gh, REGEX_CLASSES_SCROLL, _known),
+        'regex_anchors':     lambda t, iw, gh: _render_standard_scroll(t, iw, gh, REGEX_ANCHORS_SCROLL, _known),
+        'regex_quant':       lambda t, iw, gh: _render_standard_scroll(t, iw, gh, REGEX_QUANTIFIERS_SCROLL, _known),
+        'regex_collections': lambda t, iw, gh: _render_standard_scroll(t, iw, gh, REGEX_COLLECTIONS_SCROLL, _known),
+        'regex_magic':       lambda t, iw, gh: _render_standard_scroll(t, iw, gh, REGEX_MAGIC_SCROLL, _known),
+        'searchcraft':       lambda t, iw, gh: _render_standard_scroll(t, iw, gh, SEARCH_CRAFT_SCROLL, _known),
+        'jump':              lambda t, iw, gh: _render_standard_scroll(t, iw, gh, WANDERERS_THREAD_SCROLL, _known),
+        'col_motion':        lambda t, iw, gh: _render_standard_scroll(t, iw, gh, PLUMB_LINE_SCROLL, _known),
+        'ins_paste':         lambda t, iw, gh: _render_standard_scroll(t, iw, gh, RECALLING_HAND_SCROLL, _known),
+        'ins_edit':          lambda t, iw, gh: _render_standard_scroll(t, iw, gh, QUICK_ERASE_SCROLL, _known),
     }
 
     discovered  = set(progress.get('extras', []))
-    cursor_row  = 2  # 0=../ 1=./ 2+=scrolls
+    # start on the first actual scroll (skip ../ ./ and the first subtree header)
+    cursor_row  = next((i for i, r in enumerate(_rows) if r['type'] == 'scroll'), 0)
     cmd_active  = False
     cmd_line    = ''
     tab_matches: list[str] = []
@@ -3314,16 +3481,17 @@ def run_scroll_library(term: Terminal, player: Player, progress: dict) -> str | 
         elif raw == '-':
             return 'parent'
         elif raw == 'j':
-            cursor_row = min(cursor_row + 1, len(SCROLL_CATALOG) + 1)
+            cursor_row = min(cursor_row + 1, len(_rows) - 1)
         elif raw == 'k':
             cursor_row = max(cursor_row - 1, 0)
         elif key.name == 'KEY_ENTER' or raw in ('\n', '\r'):
-            if cursor_row == 0:
+            _r = _rows[cursor_row]
+            if _r['type'] == 'parent':
                 return 'parent'
-            elif cursor_row == 1:
-                pass  # ./ — stay
+            elif _r['type'] in ('self', 'subhdr'):
+                pass  # ./ or a subtree header — stay
             else:
-                scroll = SCROLL_CATALOG[cursor_row - 2]
+                scroll = _r['scroll']
                 if scroll['id'] in discovered:
                     iw     = _iw(term)
                     game_h = term.height - 5

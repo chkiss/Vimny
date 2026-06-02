@@ -15,173 +15,192 @@ D1–D12 addressed.
 
 ---
 
-## Level 17 — The Archivist's Library
+## Level 17 — The Archivist's Library  (REDESIGN 2026-06-02)
 
-**Commands:** `:e {filename}`, `:set {option}`
+> Supersedes the prior INDEX/passphrase design (which re-taught `:set number` —
+> now owned by L16 Waypoint Sanctum — and required a nested-room subsystem that
+> collides with `:q`=exit-to-overworld). New design below, decided with the user.
 
-**Teaching mode: CONTEXTUAL — not budget-forced.**
-Budget multiplier: ×2.0 (explicitly documented per S2, justified per LEVELS_PLAN.md D1
-precedent). The level is a guided discovery moment: "the overworld is a filesystem."
+**Commands taught:** `:set wrap` · `:e` / `:e!` (reload) · `:w {name}` (save-as)
+**Rewards (scrolls, from finale chests):** `gj` / `gk` · `:e {name}`
 
-**New mechanics (2):**
-- `:e {dungeon-name}` — travel to a dungeon by filename.
-- `:set number` — toggle line-numbers (reveals enemy HP).
-**Linkage:** Both are command-mode (`:`) meta-operations. `:e` = navigation; `:set` =
-configuration. Same control-plane family as `:wq`/`:q!` from Act I.
-
----
-
-### Grid
-
-```
-Dims: 22 rows × 80 cols   (the Library's Reading Hall)
-```
-
-Exact layout (22 rows × 80 cols, 0-indexed):
-
-```
-Row  0: wall (full)
-Row  1: #   THE ARCHIVIST'S LIBRARY                                          #
-Row  2: #   (subtitle rune cluster)                                          #
-Row  3: wall (partial — north stacks wall)
-Row  4: #  [shelf-A]  [shelf-B]  [shelf-C]  [shelf-D]  ...                  #
-Row  5: #  (dungeon-name rune clusters: "cave_01" "crypt_02" "goblin_gauntlet" "cataracts" "mirror_temple" "index")
-Row  6: #  [shelf-E]  [shelf-F]                                              #
-Row  7: wall (partial — dividing stacks from center)
-Row  8: #                                                                    #
-Row  9: #   [ARCHIVIST: Entity kind='npc', shows scroll on bump]            #
-Row 10: #   [READING TABLE: decoration rune]                                 #
-Row 11: #                                                                    #
-Row 12: wall (partial — dividing center from south)
-Row 13: #  [shelf-G]  [shelf-H]  — :set option names as rune clusters       #
-Row 14: #  "number"   "wrap"     "ignorecase"                                #
-Row 15: wall (partial)
-Row 16: #  @ ENTRY                                                           #
-Row 17: #  [SCROLL-1: "Every dungeon is a file. `:e <dungeon-name>` opens it.
-         The filenames are on the shelves. Try `:e index`."]                 #
-Row 18: #                                                                    #
-Row 19: #  [SCROLL-2: "`:set number` reveals an entity's true strength."]   #
-Row 20: #  [X — portal, initially fogged/locked]                             #
-Row 21: wall (full)
-```
+**Teaching mode: CONTEXTUAL — ×2.0 budget.**
+Theme: the command-line `:` family AS file operations. The whole level is a single
+buffer you read with `wrap`, reload with `:e!`, and snapshot with `:w {name}`.
 
 ---
 
-### Placements
+### The buffer model — ONE logical line (drives everything)
 
-- **Entry** `@`: (16, 3).
-- **Exit** `X`: (20, 70) — initially fogged. Revealed + unlocked after `:e index` +
-  return sequence.
+The entire level is a **1-row × ~1000-col room with no walls.** Consequences:
 
-**Scrolls:**
-1. (17, 3): "Every dungeon is a file. `:e <dungeon-name>` opens it. Try `:e index`."
-2. (19, 3): "`:set number` reveals an entity's true strength. Try it now."
-3. (9, 38) [Archivist NPC]: "The INDEX holds the way forward. Return here once you
-   have read it."
-
-**Dungeon-name rune clusters (STACKS NORTH, rows 4-6):**
-- `"cave_01"`, `"crypt_02"`, `"goblin_gauntlet"`, `"cataracts"`, `"mirror_temple"`,
-  `"index"`
-The player can read them. The special one is `"index"`.
-
-**:set option rune clusters (STACKS EAST, rows 13-14):**
-- `"number"`, `"wrap"`, `"ignorecase"`
-
-**The INDEX "file":** When the player types `:e index<Enter>`, the game loads a
-handcrafted 4×30 read-only room:
-```
-  ┌──────────────────────────┐
-  │  INDEX OF DUNGEONS       │
-  │  ─────────────────────── │
-  │  PASSPHRASE: "OPEN"      │
-  └──────────────────────────┘
-```
-The player reads it, then types `:q<Enter>` (or `:e archivist_library<Enter>`) to return.
-On return, `player.flags['index_read'] = True` is set automatically. The Archivist NPC
-checks this flag on bump — no explicit passphrase input required; the flag IS the
-passphrase mechanism. This avoids any free-text input complexity.
-
-**`:e` scope guard (D8 fix):** `:e <name>` within L17 is restricted to the names
-present on the shelves. Any other name returns the Archivist's message: "That dungeon
-is not in this library." This prevents softlocks from `:e`-ing into rooms without
-return paths. Shelf names other than `"index"` load abbreviated stub rooms (2×20, empty
-except for a `:q` hint) — they all have a `":q` to return" scroll and cannot trap the
-player.
-
-**`:set number` demonstration:**
-Two stationary guard Entities (HP=2 each) on rows 8-10. Before `:set number`, HP is
-hidden (shown as `g`). After `:set number`, HP shows as `g(2)`. A bonus keystone (K)
-in STACKS EAST unlocks a scroll reward — but is NOT required for the exit. Guards can
-be bypassed by walking around them; `:set number` is contextually rewarding, not forced.
-
-**`:e` is a hard lock (D8 / review Forceability concern):**
-The exit portal at (20, 70) is fogged and locked. The ONLY trigger to reveal and unlock
-it is the Archivist NPC bump with `player.flags['index_read'] == True`. The ONLY way to
-set that flag is to `:e index` and return. There is no alternative path. `:e index` is
-a genuine hard prerequisite for progression.
+- **`nowrap` is free.** The renderer already centres a horizontal viewport on the
+  player (`render/renderer.py` `vc_start`), so the opening "ribbon" needs no new
+  rendering — `l`/`w`/`$`/`fA` scroll the Archivist into view.
+- **`j`/`k` are honest no-ops** — moving *by line* on a one-line buffer goes nowhere,
+  exactly as real Vim behaves. No special-casing; a one-time hint on first press:
+  *"This library is one long line — j/k move between lines, and there's only one."*
+- **Horizontal motions carry you down the page.** Past a wrap column, `l` lands on the
+  next *display* row (it's one continuous line). The player traverses the wrapped
+  manuscript with `l`/`w`/`$`/`f`/marks/search — the hard way — until the finale hands
+  over `gj`/`gk`.
+- **Motion/collision engine is untouched** — it stays a wide 1×N room; only the *view*
+  wraps.
 
 ---
 
-### Optimal keystrokes
+### `:set wrap` — the centrepiece
 
-1. Read entry scroll: bump (1 key).
-2. Open INDEX: `:e index<Enter>` = 9 keystrokes (`:`, `e`, ` `, `i`, `n`, `d`, `e`, `x`, `Enter`).
-3. Read passphrase. Return: `:q<Enter>` = 3 keystrokes.
-4. Navigate to Archivist NPC + bump: ~7 moves = 3-4 keystrokes (count-move to row 9).
-5. Exit revealed — navigate to portal: ~12 keystrokes.
+`:set wrap<CR>` flips render mode: the long line flows into a viewport-width block, the
+`├ └ │ ─` tree snaps into aligned columns, and the **Archivist (`A`)** appears on
+screen. `:set nowrap` reverts to the ribbon.
 
-**Par: ~28 keystrokes** (no optional content)
-**Budget: ceil(28 × 2.0) = 56** (contextual ×2.0 multiplier, documented)
-
----
-
-### Forcing / Teaching argument
-
-**`:e` is contextually taught (hard lock):** The exit portal is physically locked until
-`:e index` + return. No budget math needed — it is structurally impossible to reach the
-exit without `:e`. The experiential insight ("the dungeon I just visited was a file")
-is the teaching moment.
-
-**`:set` is contextually taught (reward, not required):** The bonus keystone provides a
-scroll reward but doesn't gate the exit. The `:set number` → HP-visibility → guard-HP
-puzzle is engaging but optional. This matches the contextual design pattern.
-
-**Overworld-as-filesystem reveal:** Shelf rune clusters listing real dungeon names makes
-the metaphor concrete. The player can `:e cave_01` and see an abbreviated version of an
-earlier level — genuine Vim-fidelity moment with no softlock risk (all stubs have `:q`).
+- **Parsing** is nearly free — `engine/options.py` already has `parse_modifier` for
+  boolean options (handles `wrap`/`nowrap`/`invwrap`/`wrap?`). Add a `Player.wrap`
+  field; this level sets it `False` at entry (the only level that opens `nowrap`).
+- **Rendering** is the real work: lay row 0's columns across screen rows of width `W`;
+  map cursor at logical col *c* → display `(c // W, c % W)`; same for the Archivist.
+  When the block is taller than the viewport, **scroll vertically BY DISPLAY LINE,
+  centred on the cursor** (standard Vim wrap behaviour).
+- *Detail:* with `:set number` on, Vim numbers only the first display row of a wrapped
+  line and blanks the continuations — mirror that. (Number stays off here.)
 
 ---
 
-### Primitives
+### The reload loop — `:e` → `E37` → `:e!`, and `:w {suit}`
 
-- Rune clusters — existing RuneCluster.
-- NPC Entity (scroll-on-bump) — existing.
-- Fog-of-war on exit portal — existing.
-- Keystones — existing.
+The Archivist edits the buffer **live, in front of the player**, so the buffer is
+*perpetually modified*. The loop:
 
-**CHALLENGE C-L17-1:** `:e {name}<Enter>` dispatch in command mode — maps name to
-`build_dungeon_N()` or stub room builder. The engine has `:wq` / `:q` dispatch
-(`engine/modes.py` or `main.py`); `:e` must be added. Requires a dungeon-name registry.
+1. The file keeps changing under the player → **`W11: Warning: File "library" has
+   changed since editing started`** flickers in the status bar (the nudge to reload).
+2. Player reaches for **`:e`** → blocked: **`E37: No write since last change (add ! to
+   override)`** — *already emitted by this codebase* (`main.py:1767`). The teaching beat.
+3. **`:e!`** force-reloads to the **next manuscript** in the sequence; echoes the read
+   message `"library" 1L, 412B`.
+4. Player **reads which suit** the current manuscript is (drenched in that suit's glyph,
+   named in the wrapped tree) and files a *named copy*: **`:w hearts`** /
+   `:w diamonds` / `:w spades` / `:w clubs`. Echo `"hearts" [New] 1L, 412B written`.
+   **No correctness check** — `:w {name}` writes whatever is in the buffer, exactly as
+   real Vim does. The reckoning is deferred to assembly.
+5. `:w {name}` does **not** clear the modified flag (it's a copy), so plain `:e` still
+   hits E37 → the player keeps using `:e!` to advance.
 
-**CHALLENGE C-L17-2:** `:set number<Enter>` — toggles `player.options['number']`; renderer
-checks this flag to show HP. `player.options` dict + `:set` parser needed. Neither exists.
+---
 
-**CHALLENGE C-L17-3:** Return-to-library mechanic — `:q` in a nested room (INDEX or stub)
-must restore the player's exact position in the Archivist's Library room, including
-`player.flags['index_read']` being set. This requires a room-stack or save-state mechanism.
+### The sequence (deterministic cadence, seed-shuffled suits)
+
+`:e!` walks a fixed-length **cycle** with cadence `suit, non, non, suit, non, non,
+non, suit, …` that **loops**, so a missed suit comes back around (forgiving on
+navigation). The four suits are assigned to the suit-slots in **seed-randomised order**;
+the *positions* of suit vs. decoy are fixed. Decoys = corrupted noise pages or **`~`
+empty-buffer pages** (Vim's own end-of-file glyph). On the post-death fresh `:e`
+restart the seed reshuffles, so the order can't be memorised — you must read.
 
 ---
 
-### Self-check
+### The reckoning — forge a folio, the Archivist kills you
 
-- (1) Scope: 2 mechanics (`:e`, `:set`). Pass.
-- (2) Linkage: command-mode meta-operations. Pass.
-- (3) Contextual: `:e` is a hard lock (structurally required). `:set` is contextual
-  (rewarding but optional). ×2.0 multiplier documented. Pass.
-- (4) Boss: not applicable. Pass.
-- D8 (`:e` softlock) fixed by name restriction + stub rooms with `:q` return. Pass.
+There is **no save-time feedback** (faithful: `:w hearts` confirms the *write*, never
+the *content*). The four-quadrant library is assembled from **whatever you actually
+saved** under each name:
+
+- Correct → that suit's clean folio fills its quadrant.
+- Wrong (misnamed, or a decoy/`~` filed under a suit) → the bogus characters sit
+  visibly in that quadrant. You *see* your forgery assembled.
+
+**Commit point:** filing is free (re-`:w hearts` overwrites; last write wins). Assembly
+triggers only when the player **presents the set to the Archivist** (bump him) after all
+four suit-files exist — the deliberate moment of truth, so a careful player can
+self-correct before committing.
+
+**Verdict:**
+- **Any forgery → the Archivist turns hostile** — *"So YOU'RE the pest who's been
+  mangling my folios!"* — and lands a **lethal hit** (`take_damage` ≥ `player.max_hp`,
+  guaranteed kill even with heart-container upgrades). This routes straight into the
+  **existing** death convention: `** GAME OVER ** Type :e to re-load the dungeon.`
+  (`main.py:1733`) → `:e` rebuilds the level **fresh with a new seed** (`main.py:1833`).
+  **Full restart, no redo.** No new combat system: it's a scripted lethal `take_damage`
+  at the assembly bump, not a ranged-projectile mechanic.
+- **Clean assembly (all four correct) → the combined library reveal** + two
+  `chest_scroll` entities.
 
 ---
+
+### Finale — combined library + two reward chests
+
+The buffer transforms into a serene wrapped four-quadrant library (`♥ ♦` / `♠ ♣`):
+
+- **Chest 1 → `gj` / `gk`** — display-line motion. On this 1-row buffer, `gj` = `col +
+  W`, `gk` = `col − W` (clamped). Thematic payoff: having tamed the wrapped library,
+  you learn to *walk its display lines*.
+- **Chest 2 → `:e {name}`** — open a buffer *by name* (the escalation from the bare `:e`
+  you used all level; unlocks the token for future use).
+
+`:wq` completes the level. Rewards are scroll tokens (like `setnum`), granted only after
+a clean assembly — so the combat verdict gates them.
+
+---
+
+### Par / budget
+
+This is a **command-loop level, not a path level** — the standard Dijkstra `_par_<slug>`
+solver does not apply. Par is bespoke: `:set wrap` (1) + `:e!` × (cycle steps to surface
+all 4 suits, ~7–10) + `:w {suit}` × 4 + the present-to-Archivist bump + minimal reading
+navigation. Rough par ≈ 90–120 keystrokes; **budget = ceil(par × 2.0)**. The test
+asserts the loop is *completable* within budget and that all four `:w`s are *necessary*
+(can't assemble cleanly without them) — not a path cost.
+
+---
+
+### Engine change-list (system PR — slice riskiest-first)
+
+**CHALLENGE C-L17-1 — `:set wrap` rendering (the risk; prove it alone first):**
+`Player.wrap` field; `apply_set` adds `wrap`/`nowrap`/`invwrap`; renderer wraps a 1-row
+room across screen rows + vertical display-line scroll + cursor/entity coord mapping.
+
+**CHALLENGE C-L17-2 — reload loop:** per-level sequence + cadence + seed-shuffle +
+pointer + filed-suit set; `:e`→E37 (reuse existing message), `:e!`→advance+reload+read
+message, W11 nudge; `:w {name}` save-as (pure buffer→file write, no validation).
+
+**CHALLENGE C-L17-3 — Archivist NPC:** new `npc` entity kind (non-combat) with a
+dialogue state machine (pre-wrap panic → post-wrap quest brief → live tidying animation
+on each `:e!` → assembly verdict) and a **hostile state** that fires the scripted lethal
+hit on a forged commit. Tidying animation rides the existing real-time tick; functionally
+stubbable as an instant swap for MVP.
+
+**CHALLENGE C-L17-4 — finale + rewards:** combined-library layout assembled *from the
+saved files*; two `chest_scroll`s; reward scrolls in `content/scrolls.py` granting
+`gj`/`gk` + `:e {name}` tokens; `gj`/`gk` motion impl (col ± W).
+
+**Bookkeeping:** `content/levels.py` L17 `commands`/`teaches`; `content/scrolls.py`
+(two reward scrolls); `render/vim_commands.md` (hint tokens); regen
+`content/_gen_curriculum_table.py`; new `tests/test_archivists_library.py`.
+
+---
+
+### Faithfulness self-check
+
+| Element | Real Vim | ✓ |
+|---|---|---|
+| ribbon → block on `:set wrap` | `nowrap`/`wrap` | ✓ |
+| `j`/`k` go nowhere | line-motion on a 1-line buffer | ✓ |
+| `gj`/`gk` move by display row | exactly their purpose | ✓ |
+| `:e` blocked → `:e!` | `E37`, force-reload | ✓ (msg already in code) |
+| "edited under you" nudge | `W11` | ✓ |
+| `:w hearts` files a copy, no validation, stays modified | `:w {file}` save-as | ✓ |
+| reload echo `"library" 1L, NNNB` | read message | ✓ |
+
+---
+
+### Deferred / minor
+
+- **Terminal resize mid-level** re-wraps cosmetically (tree alignment assumes entry-time
+  width) — acceptable; punt.
+- Exact decoy glyphs and folio text — author during build.
+- Optional faithful micro-beat: `:w` onto an existing name → `E13: File exists (add ! to
+  override)` teaching `:w!` — probably too fiddly; skip unless wanted.
+- Chest-open uses the existing `chest_scroll` flow.
 
 ---
 
@@ -593,9 +612,11 @@ All extensions below must be implemented before Act III runs, ordered by depende
 | `` `a ``/`'a` dispatch | L16, Boss P3 | CHALLENGE C-L16-2 | `` `a `` → exact (row,col); `'a` → first non-blank of marked row. |
 | Budget multiplier ×1.03 for L16 | L16 | CHALLENGE C-L16-3 | Near-zero slack; human must accept or redesign topology. |
 | Count-prefix forcing gap | L16 | CHALLENGE C-L16-1 | Count-move compression collapses mark budget advantage. Human decision required. |
-| `:e {name}` command dispatch | L17, Boss P4 | CHALLENGE C-L17-1 | Name→builder registry. Add to command-mode parser. |
-| `:set {option}` command | L17, Boss P4 | CHALLENGE C-L17-2 | `player.options` dict + renderer HP branch. |
-| Room-stack / return-to-library | L17 | CHALLENGE C-L17-3 | `:q` in nested room restores prior room state + sets flags. |
+| `:set wrap` rendering (1-row buffer wrapped across screen rows + vertical display-line scroll) | L17 | CHALLENGE C-L17-1 | The risk — prove alone first. `Player.wrap` + `apply_set` wrap option (parsing free via `engine/options.py`); motion engine untouched (stays 1×N), view-only wrap. |
+| Reload loop: `:e`→E37, `:e!`→advance+reload, `:w {name}` save-as | L17 | CHALLENGE C-L17-2 | Per-level seed-shuffled suit sequence + filed-suit set; E37 message already in code; `:w {name}` = pure buffer→file write, no validation. |
+| Archivist `npc` entity + hostile state + scripted lethal hit | L17 | CHALLENGE C-L17-3 | New non-combat `npc` kind; dialogue state machine; forged-commit fires `take_damage ≥ max_hp` → reuses existing GAME OVER → `:e` fresh-restart convention (no new combat system). |
+| `gj`/`gk` (col ± W) + `:e {name}` reward tokens | L17 | CHALLENGE C-L17-4 | Granted by finale `chest_scroll`s after a clean assembly. |
+| `:set number` HP reveal | Boss P4 | (covered by L16) | Boss P4 reuses `:set number` (now shipped at L16 Waypoint Sanctum) to reveal the Warden's hidden HP — NOT an L17 dependency anymore. |
 | Mirror trap (x on dead entity → player damage) | Boss P4 | CHALLENGE C-L17-2-Boss | New engine behavior on `x` dispatch. |
 | Winding corridor (30-cell) in NE Chamber | Boss P3 | CHALLENGE C-L17-1-Boss | Must be laid out in room builder; no engine change, just map design. |
 | Warden immunity flag | Boss | CHALLENGE C-L17-3-Boss | `warden_phase_immune: set[str]` on Entity; checked in motion dispatch. |

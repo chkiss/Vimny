@@ -1,11 +1,34 @@
-"""Scroll library renderer — netrw-style listing of discovered scrolls."""
+"""Scroll library renderer — netrw-style listing of discovered scrolls.
+
+The catalog is split into two subtrees, mirroring the overworld's ``custom/``
+section: the act-gated codex scrolls on top, then the found relic scrolls.
+``library_rows`` is the single source of truth for the on-screen row order;
+both this renderer and run_scroll_library's navigation index into it."""
 from __future__ import annotations
 from blessed import Terminal
 from engine.player import Player
 import render.colors as C
 import render.symbols as S
-from content.scrolls import SCROLL_CATALOG
-from render.utils import inner_w as _iw
+from content.scrolls import SCROLL_CATALOG, RELIC_SCROLL_IDS
+from render.utils import inner_w as _iw, subtree_lines, tree_glyph
+
+# Subtree labels (netrw directory style). Change these two strings to rename
+# the categories everywhere.
+CODEX_LABEL  = 'codex/'
+RELICS_LABEL = 'relics/'
+
+
+def library_rows() -> list[dict]:
+    """Ordered, flat list of navigable rows in the scroll library. Each row is
+    a dict with a 'type': 'parent' | 'self' | 'subhdr' | 'scroll'. A subhdr
+    carries 'label'; a scroll carries 'scroll' (catalog entry) and 'last' (True
+    for the final entry under its subtree, for the └ tree glyph)."""
+    rows: list[dict] = [{'type': 'parent'}, {'type': 'self'}]
+    codex  = [s for s in SCROLL_CATALOG if s['id'] not in RELIC_SCROLL_IDS]
+    relics = [s for s in SCROLL_CATALOG if s['id'] in RELIC_SCROLL_IDS]
+    rows += subtree_lines(CODEX_LABEL,  codex,  'scroll', 'scroll')
+    rows += subtree_lines(RELICS_LABEL, relics, 'scroll', 'scroll')
+    return rows
 
 
 def render_scroll_library(
@@ -99,16 +122,26 @@ def render_scroll_library(
     ]
     out.extend(hdr_rows)
 
-    # ── ../ and ./ directory entries ─────────────────────────────────────────
-    for di, dentry in enumerate(['../', './']):
-        is_cursor = di == cursor_row
-        out.append(_row(is_cursor, len(dentry), dfc + dentry))
+    # ── Navigable rows: ../ ./ then the codex/ and relics/ subtrees ───────────
+    rows = library_rows()
+    for idx, r in enumerate(rows):
+        is_cursor = idx == cursor_row
+        t = r['type']
+        if t == 'parent':
+            out.append(_row(is_cursor, len('../'), dfc + '../'))
+            continue
+        if t == 'self':
+            out.append(_row(is_cursor, len('./'), dfc + './'))
+            continue
+        if t == 'subhdr':
+            out.append(_row(is_cursor, len(r['label']), dfc + r['label']))
+            continue
 
-    # ── Scroll rows ───────────────────────────────────────────────────────────
-    for idx, scroll in enumerate(SCROLL_CATALOG):
+        # scroll row, indented under its subtree with a ├/└ tree glyph
+        scroll    = r['scroll']
         is_disc   = scroll['id'] in discovered
         is_new    = is_disc and scroll['id'] not in seen
-        is_cursor = (idx + 2) == cursor_row
+        prefix    = '  ' + tree_glyph(r['last']) + ' '   # 4 visible columns
 
         if is_disc:
             glyph      = '◈  '
@@ -130,16 +163,16 @@ def render_scroll_library(
         nc  = enfc if is_cursor else (C.normal_fg() if is_disc else C.hint_fg())
         bc  = badge_col if badge else ''
         mc  = C.hint_fg() if meta else ''
-        plain_len = len(glyph) + len(title_text) + len(badge) + len(meta)
+        plain_len = len(prefix) + len(glyph) + len(title_text) + len(badge) + len(meta)
         spaces    = max(2, iw - plain_len)
-        colored   = (nc + glyph + title_text +
+        colored   = (C.hint_fg() + prefix + nc + glyph + title_text +
                      ' ' * spaces +
                      bc + badge +
                      mc + meta)
         out.append(_row(is_cursor, iw, colored))
 
     # ── Empty rows ────────────────────────────────────────────────────────────
-    rows_used = len(hdr_rows) + 2 + len(SCROLL_CATALOG)
+    rows_used = len(hdr_rows) + len(rows)
     for _ in range(max(0, game_h - rows_used)):
         out.append(bfg + S.BOX_V + rst + ' ' * iw + bfg + S.BOX_V + rst)
 
@@ -154,7 +187,7 @@ def render_scroll_library(
                    rst + ' ' * sl_pad +
                    bfg + S.BOX_V + rst)
     else:
-        sl_right = f'{cursor_row + 1}/{n_total + 2} '
+        sl_right = f'{cursor_row + 1}/{len(rows)} '
         sl_mid   = max(0, sl_w - len(sl_label) - 2 - len(sl_right))
         out.append(bfg + S.BOX_V + rst +
                    C.mode_normal() + ' ' + sl_label + ' ' +
