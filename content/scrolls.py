@@ -5,7 +5,9 @@ Line-kind tuples used in 'lines' lists:
   ('dim',    text)
   ('amber',  text)
   ('cmd',    key, desc)                              ← hi key, dim arrow, amber desc
+  ('segs',   [(text, bold), …], desc)                ← key as bold/dim segments
   ('smudge', key, smudge_prefix, clear_tail, gate)  ← smudge block + dim tail
+  ('smudge_seg', key_text, hide_prefix, desc)       ← key with its head smudged
   ('v_sight',)                                       ← warden-sight special v row
 
 Smudge clarification:
@@ -71,9 +73,10 @@ WAYPOINT_SCROLL = {
         ('blank',),
         # full option names, with the typable abbreviation letters bold:
         ('segs',  [(':set nu', True), ('mber', False)], 'show line numbers'),
-        ('segs',  [(':set r', True), ('elative', False), ('nu', True), ('mber', False)],
-                  'count from the cursor'),
         ('segs',  [(':set nonu', True), ('mber', False)], 'hide the gutter'),
+        # relativenumber: a name half-spoken — its head is smudged on the old
+        # ledger, only the tail still legible (the flourish below names this).
+        ('smudge_seg', ':set relativenumber', ':set relativen', 'count from the cursor'),
         ('blank',),
         ('dim',   '  A name half-spoken is a name still heard.'),
         ('blank',),
@@ -169,6 +172,14 @@ SCROLL_CATALOG = [
         'level_slug': 'warden_surveyor',
         'level_name': 'The Warden Surveyor',
         'content':    WARDEN_SIGHT_SCROLL,
+    },
+    {
+        'id':         'setnum',
+        'title':      'The Numbered Ledger',
+        'dropped_by': 'The Waypoint Sanctum',
+        'level_slug': 'waypoint_sanctum',
+        'level_name': 'The Waypoint Sanctum',
+        'content':    WAYPOINT_SCROLL,
     },
     {
         'id':         'd_op',

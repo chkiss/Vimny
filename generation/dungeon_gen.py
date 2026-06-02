@@ -3615,47 +3615,40 @@ def _par_seekers_labyrinth(composite, no_search: bool = False, return_path: bool
 
 # ── The Waypoint Sanctum (marks: m ' `) ──────────────────────────────────────────
 #
-# A sealed, WORDLESS sanctum CORRIDOR, ringed above and below by evenly-spaced
-# treasure rooms (visible chests/hearts behind keyless 'blue' locks — pure teases)
-# and, beyond them, prose "danger rooms" CRAWLING with goblins.  Search teleports
-# you OUT to the prose for the gold exit key; the wordless corridor can't be
-# searched back to, so a MARK is the way home — and a mark/search teleport is the
-# only SURVIVABLE way past the goblin horde (a foot-crawl is lethal).
-#   • 'a (the corridor's first-left cell) -> the left chamber's :set number scroll
+# A sealed, WORDLESS sanctum CORRIDOR set HIGH in the map: a thin prose danger band
+# above it (holding the gold exit key) and a HUGE prose danger room filling the
+# bottom two-thirds — both CRAWLING with goblins, both sealed (reachable only by a
+# teleport: search / mark / line-jump).  Treasure teases (chests & hearts behind
+# keyless 'blue' locks) line the bottom wall.  Search teleports you OUT to the prose
+# for the gold key; the wordless corridor can't be searched back to, so a MARK is the
+# way home — and a mark/search teleport is the only SURVIVABLE way past the horde.
+#   • 'a (the sanctum row's first-left cell) -> the scroll nook's :set number scroll
 #     (optional — par includes the detour; skippers beat par).
-#   • `a (exact mark) -> the exit-lock approach.
-#   • the exit key sits BACKWARD (top danger room) with forward decoys (bottom),
+#   • `a (exact mark) -> back to the spawn at the sanctum's centre.
+#   • the exit key sits BACKWARD (thin top band) with forward decoys (bottom room),
 #     so ? lands on it directly while / hits a decoy.
+#   • the sanctum sits HIGH so M (middle-of-screen) always lands DOWN in the goblin
+#     room, never on the scroll nook — using M to cheat the scroll backfires lethally.
 # The exit is teleport-safe (not any jump target; behind the blocking exit lock).
 #
-# Optimal route (par 19, taking the scroll):
-#   ma · 'a x (scroll) · ?cipher⏎ h x (key) · `a p (exit lock) · l → exit
-# A skipper drops 'a x and finishes in 16 — under par.
+# Optimal route (par 20, taking the scroll):
+#   ma · 'a x (scroll) · ?cipher⏎ h x (key) · `a $ (home, then line-end) · p l → exit
+# A skipper drops 'a x and finishes in 17 — under par.
 _WP_ROWS, _WP_COLS = 19, 46
-_WP_CROW   = 9                     # sanctum corridor row (mark row; wordless)
-_WP_SCROLL = (9, 1)                # chest_scroll — corridor's first-left cell -> 'a
-_WP_SCROLL_DOOR = (9, 4)           # 'blue' lock sealing the scroll chamber ('a hops it)
-_WP_SPAWN  = (9, 42)               # spawn + mark -> `a (exit-lock approach)
-_WP_LOCK   = (9, 43)               # exit lock (gold)
-_WP_EXIT   = (9, 44)
+_WP_CROW   = 5                     # sanctum corridor row (mark row; wordless)
+_WP_SCROLL = (5, 1)                # chest_scroll — sanctum row's first-left cell -> 'a
+_WP_SCROLL_DOOR = (5, 4)           # 'blue' lock sealing the scroll nook ('a hops it)
+_WP_SPAWN  = (5, 23)               # spawn + mark -> centre of the sanctum corridor
+_WP_LOCK   = (5, 43)               # exit lock (gold)
+_WP_EXIT   = (5, 44)
 _WP_KEYWORD      = 'cipher'
-_WP_KEY_WORD_POS = (3, 30)         # exit key's word — TOP danger room (backward)
-_WP_KEY          = (3, 29)         # gold floor_key, just left of the word
-_WP_DECOY_POS    = [(15, 12), (16, 24), (17, 34)]   # forward decoys (bottom danger room)
-_WP_DANGER_ROWS  = (1, 2, 3, 15, 16, 17)
-_WP_ROOM_COLS    = (8, 14, 20, 26, 32, 38)          # evenly-spaced treasure rooms
-_WP_PAR    = 19
-_WP_ANSWER = "ma 'a x ?cipher⏎ h x `a p l"
-
-
-_WP_GOBLINS = [
-    (1, 6), (1, 14), (1, 22), (1, 28), (1, 33), (1, 38),
-    (2, 10), (2, 18), (2, 26), (2, 31), (2, 36), (2, 42),
-    (3, 8), (3, 16), (3, 24), (3, 33), (3, 40),
-    (15, 8), (15, 16), (15, 24), (15, 30), (15, 38),
-    (16, 10), (16, 20), (16, 28), (16, 36), (16, 42),
-    (17, 6), (17, 14), (17, 26), (17, 32), (17, 40),
-]
+_WP_KEY_WORD_POS = (2, 30)         # exit key's word — thin TOP danger band (backward)
+_WP_KEY          = (2, 29)         # gold floor_key, just left of the word
+_WP_DECOY_POS    = [(11, 12), (13, 24), (15, 34)]  # forward decoys (open danger floor)
+_WP_DANGER_ROWS  = (1, 2, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17)
+_WP_VAULT_COLS   = (6, 10, 14, 18, 22, 26, 30, 34, 38, 42)  # vaults lining the sanctum underside
+_WP_PAR    = 20
+_WP_ANSWER = "ma 'a x ?cipher⏎ h x `a $ p l"
 
 
 def build_dungeon_waypoint_sanctum(seed: int) -> 'Dungeon':
@@ -3669,42 +3662,52 @@ def build_dungeon_waypoint_sanctum(seed: int) -> 'Dungeon':
     def carve(r, c):
         cells[r][c] = CellType.CORRIDOR
 
-    # Danger rooms (open prose) — top rows 1-3, bottom rows 15-17.
-    for r in _WP_DANGER_ROWS:
+    # Thin TOP danger band (rows 1-2) — holds the gold key + its 'cipher' word.
+    for r in (1, 2):
         for c in range(1, C - 1):
             carve(r, c)
-    # Sanctum corridor (rows 8-10): left chamber (1-3) | scroll-door (4) | corridor
-    # (5-42) | exit alcove (43-44).
-    for r in (8, 9, 10):
-        for c in range(1, 4):
+    # SANCTUM (rows 4-6), sealed above by the row-3 wall and below by the row-7 wall.
+    # Row 5 is the mark row: a one-cell scroll nook at col 1 behind a 'blue' lock at
+    # col 2, then the wordless corridor, the gold exit lock (43) + exit (44).  Rows 4
+    # & 6 are corridor only from col 5 — so their first-non-blank is the corridor,
+    # never the nook (this keeps M off the scroll; see the module comment).
+    for c in range(5, 43):
+        carve(4, c); carve(6, c)
+    for c in range(1, 43):
+        carve(5, c)
+    carve(5, 43); carve(5, 44)           # exit-lock + exit cells
+    # HUGE bottom danger room (rows 8-17).
+    for r in range(8, 18):
+        for c in range(1, C - 1):
             carve(r, c)
-        for c in range(5, 43):
-            carve(r, c)
-    carve(9, 4)                          # scroll-door cell
-    carve(9, 43); carve(9, 44)           # exit-lock + exit cells
-    # Evenly-spaced treasure rooms above (rows 5-6) and below (rows 12-13), each a
-    # chest/heart sealed in a box with one locked door down to the corridor.
+    # Treasure teases LINE the sanctum's underside: each is a 2-deep box hanging off
+    # the row-7 seal — a keyless 'blue' door in the seal, a sealed shaft (row 8) and
+    # the chest/heart at its foot (row 9), walled off from the danger room so only the
+    # locked door (facing UP into the sanctum) ever sees it.
     entities: list = []
-    top_items = ('chest', 'chest', 'heart_container', 'chest', 'chest', 'heart_container')
-    bot_items = ('heart_container', 'chest', 'chest', 'heart_container', 'chest', 'chest')
-    for X, kind in zip(_WP_ROOM_COLS, top_items):
-        carve(5, X); carve(6, X); carve(7, X)
-        entities += [Entity(kind=kind, row=5, col=X),
-                     Entity(kind='locked_door', row=7, col=X, tag='blue')]
-    for X, kind in zip(_WP_ROOM_COLS, bot_items):
-        carve(12, X); carve(13, X); carve(11, X)
-        entities += [Entity(kind=kind, row=13, col=X),
-                     Entity(kind='locked_door', row=11, col=X, tag='blue')]
+    vault_cells: set = set()
+    for i, X in enumerate(_WP_VAULT_COLS):
+        kind = 'heart_container' if i % 3 == 1 else 'chest'
+        carve(7, X)                                      # 'blue' door cell (in the seal)
+        for r in (8, 9):                                 # box the shaft off the danger room
+            cells[r][X - 1] = CellType.WALL
+            cells[r][X + 1] = CellType.WALL
+        cells[10][X] = CellType.WALL
+        entities += [Entity(kind='locked_door', row=7, col=X, tag='blue'),
+                     Entity(kind=kind, row=9, col=X)]
+        vault_cells |= {(7, X), (8, X), (9, X)}
     composite.cells = cells
     composite.seed = seed
 
-    # Reserved cells (no prose decor): key, key word, decoys, goblins.
-    reserved: set = {_WP_KEY}
+    # Reserved cells (no prose decor / no goblins): key, key word, decoys, vaults.
+    reserved: set = {_WP_KEY} | vault_cells
     reserved |= {(_WP_KEY_WORD_POS[0], _WP_KEY_WORD_POS[1] + i) for i in range(len(_WP_KEYWORD))}
     for (dr, dc) in _WP_DECOY_POS:
         reserved |= {(dr, dc + i) for i in range(len(_WP_KEYWORD))}
-    goblins = [(r, c) for (r, c) in _WP_GOBLINS
-               if cells[r][c] == CellType.CORRIDOR and (r, c) not in reserved]
+    # Goblins crawl every danger room (deterministic stride, ~1 in 7 floor cells).
+    goblins = [(r, c) for r in _WP_DANGER_ROWS for c in range(1, C - 1)
+               if cells[r][c] == CellType.CORRIDOR and (r, c) not in reserved
+               and (c + 2 * r) % 7 == 0]
     reserved |= set(goblins)
 
     # Key word (real vocab token) + forward decoys.
