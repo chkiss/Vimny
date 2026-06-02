@@ -12,6 +12,30 @@ COUNTS   = set('123456789')
 _TEXTOBJ_NORMALIZE = {'b': '(', ')': '(', 'B': '{', '}': '{', ']': '[', '>': '<'}
 
 
+def parse_visual_textobj(buf: str):
+    """Parse a visual-mode text object: ``[count](i|a)(obj)`` — e.g. 'iw', 'a(', '2iw'.
+
+    In visual mode `i`/`a` are text-object prefixes (never insert/append), so this is
+    parsed directly rather than via the operator grammar.  Returns:
+      ('object', textobj, count) — complete, textobj canonicalised ('iw', 'a(', …);
+      'pending'                  — a valid `i`/`a` prefix awaiting its object char;
+      None                       — not a text object (let the motion parser handle it,
+                                    incl. a bare count like '2' that may become '2j').
+    """
+    i = 0
+    while i < len(buf) and buf[i] in COUNTS:
+        i += 1
+    if i >= len(buf):
+        return None                                # digits only / empty → motion parser
+    if buf[i] not in ('i', 'a'):
+        return None
+    count = int(buf[:i]) if i else 1
+    if i + 1 >= len(buf):
+        return 'pending'                           # have i/a, await the object char
+    obj = _TEXTOBJ_NORMALIZE.get(buf[i+1], buf[i+1])
+    return ('object', buf[i] + obj, count)
+
+
 def _operator_target(op: str, double_ch: str, buf: str, j0: int, count_n: int):
     """Parse the target (motion / text object / find / linewise) following an
     operator. Shared by d/y/c and the g-case operators (g~/gu/gU).
