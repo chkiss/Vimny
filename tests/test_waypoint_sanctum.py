@@ -1,12 +1,15 @@
 """The Waypoint Sanctum (marks: m ' `; applies / ?).
 
-A sealed, wordless sanctum corridor ringed by evenly-spaced treasure rooms
-(visible chests/hearts behind keyless locks) and prose danger rooms crawling with
-goblins.  Search ferries you out for the gold exit key; the wordless corridor
-can't be searched back to, so a mark is the way home — and teleporting (search /
-mark) is the only survivable way past the goblin horde.  'a reaches the optional
-scroll room (corridor's first-left cell), `a the exact exit-lock approach, ? the
-backward key past forward decoys.  Structure fixed; only prose decor varies by seed.
+A sealed, wordless sanctum corridor set HIGH in the map — a thin prose danger band
+above it (holding the gold key) and a huge prose danger room filling the bottom,
+both crawling with goblins, both reachable only by teleport.  Treasure teases
+(chests/hearts behind keyless locks) line the bottom wall.  Search ferries you out
+for the gold exit key; the wordless corridor can't be searched back to, so a mark is
+the way home — and teleporting (search / mark) is the only survivable way past the
+goblin horde.  'a reaches the optional scroll nook (sanctum row's first-left cell),
+`a the exact spawn at the sanctum centre, ? the backward key past forward decoys.
+The sanctum sits high so M never lands on the scroll.  Structure fixed; only prose
+decor varies by seed.
 """
 import os
 import pytest
@@ -15,6 +18,7 @@ from generation.dungeon_gen import (
     build_dungeon_waypoint_sanctum as _build,
     _WP_PAR, _WP_ANSWER, _WP_KEYWORD, _WP_SCROLL, _WP_SPAWN,
     _WP_LOCK, _WP_EXIT, _WP_KEY, _WP_KEY_WORD_POS, _WP_DECOY_POS, _WP_CROW,
+    _WP_DANGER_ROWS,
 )
 from engine.world import CellType
 from engine.player import Player
@@ -100,29 +104,31 @@ def _simulate(answer, room):
 def test_dimensions_and_budget(seed):
     room = _room(seed)
     assert (room.rows, room.cols) == (19, 46)
-    assert room.par == _WP_PAR == 19
-    assert room.budget == 27                       # ceil(19 * 1.4)
+    assert room.par == _WP_PAR == 20
+    assert room.budget == 28                       # ceil(20 * 1.4)
 
 
 @pytest.mark.parametrize('seed', SEEDS)
 def test_corridor_is_wordless_and_walled_off(seed):
     room = _room(seed)
-    # the sanctum corridor (rows 8-10) carries no characters -> can't be searched to
-    assert not any(8 <= ru.row <= 10 for ru in room.char_runs)
-    # solid wall bands seal the corridor from the prose danger rooms
-    assert all(room.cells[4][c] == CellType.WALL for c in range(room.cols))
-    assert all(room.cells[14][c] == CellType.WALL for c in range(room.cols))
+    # the sanctum (rows 4-6) carries no characters -> can't be searched to
+    assert not any(4 <= ru.row <= 6 for ru in room.char_runs)
+    # the sanctum is sealed from the danger rooms above and below: the top seal is a
+    # solid wall, the bottom seal a wall pierced only by keyless ('blue') vault doors
+    # — every cell of both rows is impassable, so no foot route crosses.
+    assert all(room.cells[3][c] == CellType.WALL for c in range(room.cols))
+    assert all(not room.is_passable(7, c) for c in range(room.cols))
     # the prose danger rooms DO carry text (search fodder + the key word)
-    assert any(ru.row in (1, 2, 3) for ru in room.char_runs)
-    assert any(ru.row in (15, 16, 17) for ru in room.char_runs)
+    assert any(ru.row in (1, 2) for ru in room.char_runs)
+    assert any(8 <= ru.row <= 17 for ru in room.char_runs)
 
 
 @pytest.mark.parametrize('seed', SEEDS)
 def test_danger_room_crawls_with_goblins(seed):
     room = _room(seed)
     goblins = [e for e in room.entities if e.kind == 'goblin']
-    assert len(goblins) >= 20                       # crawling
-    assert all(g.row in (1, 2, 3, 15, 16, 17) for g in goblins)   # all in the danger rooms
+    assert len(goblins) >= 40                       # crawling
+    assert all(g.row in _WP_DANGER_ROWS for g in goblins)   # all in the danger rooms
 
 
 @pytest.mark.parametrize('seed', SEEDS)
@@ -177,13 +183,28 @@ def test_exit_is_teleport_safe(seed):
     assert nbrs == [_WP_LOCK]                          # only way to the exit is the lock
 
 
+def test_M_never_lands_on_the_scroll():
+    """The sanctum sits HIGH, so M (jump to the middle visible row's first cell) is
+    pulled DOWN into the goblin room — never onto the scroll nook — at every realistic
+    terminal height.  Using M to cheat the scroll backfires instead of rewarding."""
+    room = _room(42)
+    for game_h in [0] + list(range(11, 51)):           # 0 = whole-room view; 11+ = playable
+        p = Player(row=_WP_SPAWN[0], col=_WP_SPAWN[1])
+        apply_motion(p, 'M', 1, room, game_h=game_h)
+        assert (p.row, p.col) != _WP_SCROLL, f'M freebies the scroll at game_h={game_h}'
+    # at a near-full-room view M drops you INTO the danger room below the sanctum
+    p = Player(row=_WP_SPAWN[0], col=_WP_SPAWN[1])
+    apply_motion(p, 'M', 1, room, game_h=room.rows - 1)
+    assert p.row in _WP_DANGER_ROWS and p.row > _WP_CROW
+
+
 # ── par path (structure is seed-independent: run once) ───────────────────────
 def test_answer_solves_within_budget_and_takes_the_scroll():
     room = _room(42)
     pos, spent, reached, got_scroll = _simulate(_WP_ANSWER, room)
     assert reached, f'answer ended at {pos}, not the exit {_WP_EXIT}'
     assert got_scroll, 'the par route loots the :set number scroll via \'a'
-    assert spent == _WP_PAR == 19
+    assert spent == _WP_PAR == 20
     assert spent <= room.budget
 
 
@@ -192,7 +213,7 @@ def test_skipping_the_scroll_beats_par():
     skip = _WP_ANSWER.replace("'a x ", "")            # drop the scroll detour
     pos, spent, reached, got_scroll = _simulate(skip, room)
     assert reached and not got_scroll
-    assert spent == _WP_PAR - 3 == 16
+    assert spent == _WP_PAR - 3 == 17
     assert spent < _WP_PAR
 
 
