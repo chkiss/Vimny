@@ -41,6 +41,8 @@ class Entity:
     origin_row:   int = -1  # starting row for bounded-oscillation entities (-1 = not set)
     move_dir:     int = 1   # oscillation direction: +1 = down (row+1), -1 = up (row-1)
     tag:          str = ''  # variant tag, e.g. 'gold' or 'red' for colored keys/doors
+    scroll_id:    str = ''  # chest_scroll only: the specific scroll this chest drops
+                            # ('' = pull a random relic scroll from the pool)
 
 @dataclass
 class CharRun:
@@ -69,6 +71,7 @@ class Room:
     answer_diverged: bool       = False  # admin pressed a wrong key
     wood_damage: dict           = field(default_factory=dict)  # (r,c) -> half-steps received (1=cracked)
     ledge_rows: set             = field(default_factory=set)   # rows that REFLOW (open to the void); empty = overlay (see engine/reflow.py)
+    wrap_buffer: bool           = False  # single-line text buffer (rows==1); ':set wrap' soft-wraps it across screen rows (The Archivist's Library)
 
     def __post_init__(self):
         self._entity_map:    dict = {}

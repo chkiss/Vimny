@@ -11,8 +11,8 @@ from blessed import Terminal
 from engine.player import Player
 import render.colors as C
 import render.symbols as S
-from content.levels import LEVELS, is_unlocked, level_type, key_for_slug
-from render.utils import inner_w as _iw
+from content.levels import is_unlocked, level_type, key_for_slug
+from render.utils import inner_w as _iw, subtree_lines, tree_glyph
 
 
 def build_lines(levels: list, custom_layouts: list) -> list:
@@ -24,11 +24,7 @@ def build_lines(levels: list, custom_layouts: list) -> list:
     lines.append({'type': 'self'})
     for lv in levels:
         lines.append({'type': 'level', 'level': lv})
-    if custom_layouts:
-        lines.append({'type': 'subhdr'})
-        last = len(custom_layouts) - 1
-        for ci, cl in enumerate(custom_layouts):
-            lines.append({'type': 'custom', 'layout': cl, 'last': ci == last})
+    lines += subtree_lines('custom/', custom_layouts, 'custom', 'layout')
     return lines
 
 
@@ -138,10 +134,11 @@ def render_overworld(term: Terminal, player: Player, progress: dict,
             txt = '../' if t == 'parent' else './'
             return dfc + txt, len(txt)
         if t == 'subhdr':
-            return dfc + 'custom/', len('custom/')
+            label = line.get('label', 'custom/')
+            return dfc + label, len(label)
         if t == 'custom':
             name = line['layout'].get('layout_name', '?')
-            tree = '└' if line.get('last') else '├'
+            tree = tree_glyph(line.get('last'))
             badge, badge_col = '[CUSTOM]', C.mode_insert()
             nc = enfc if is_cursor else rst
             spaces = max(1, cw - 4 - len(name) - len(badge))

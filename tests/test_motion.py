@@ -724,6 +724,43 @@ class TestApplyMotionFindChar:
 
 # ── apply_motion: door entity not targetable by f+ ───────────────────────────
 
+class TestApplyMotionColumnBar:
+    """| — go to column n (1-indexed); bare | → column 1."""
+
+    def test_bar_count_goes_to_column(self):
+        room = _bare_room()
+        p = _player(3, 1)
+        apply_motion(p, '|', 10, room)          # 10| → col 9
+        assert p.col == 9
+
+    def test_bare_bar_goes_to_first_column(self):
+        room = _bare_room()
+        p = _player(3, 15)
+        apply_motion(p, '|', 1, room)           # | → column 1 = col 0… but col 0 is wall
+        assert p.col == 1                        # stops at first passable cell
+
+    def test_bar_moves_left(self):
+        room = _bare_room()
+        p = _player(3, 18)
+        apply_motion(p, '|', 6, room)           # 6| → col 5, moving left
+        assert p.col == 5
+
+    def test_bar_clamps_to_room_width(self):
+        room = _bare_room()
+        p = _player(3, 1)
+        apply_motion(p, '|', 999, room)         # far past the right wall
+        assert p.col == COLS - 2                 # last passable column
+
+    def test_bar_stops_at_wall(self):
+        room = _bare_room()
+        # wall the interior at col 8: | past it cannot cross
+        room.cells[3][8] = CellType.WALL
+        room.rebuild_indexes()
+        p = _player(3, 1)
+        apply_motion(p, '|', 15, room)
+        assert p.col == 7                        # stops one before the wall
+
+
 class TestApplyMotionDoor:
     def test_f_plus_cannot_target_door(self):
         room = _bare_room()

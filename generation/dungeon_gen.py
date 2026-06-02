@@ -3652,7 +3652,22 @@ _WP_ANSWER = "ma 'a x ?cipher⏎ h x `a $ p l"
 
 
 def build_dungeon_waypoint_sanctum(seed: int) -> 'Dungeon':
-    """Marks: The Waypoint Sanctum.  See the module comment above for the design."""
+    """Marks: The Waypoint Sanctum.  See the module comment above for the design.
+
+    DESIGN NOTE — row-9 vault loot (relic scrolls + hearts): reaching it is meant
+    to be an emergent Vim feat (e.g. / to a row-10 word, then G$x to carve the
+    danger room open and clear the goblins), NOT a handed-out key puzzle. We
+    deliberately do NOT gate it with blue keys or void-rune brinks.
+    Budget does NOT meaningfully gate this: once the next level is unlocked the
+    player can replay and loot one chest per visit. The heart_containers are
+    safe (one-time per player via progress['collected_hearts']), but the relic
+    chests respawn each visit, so replaying farms a fresh relic each run until
+    the pool empties.
+    REBALANCING LEVERS, post-playtesting (only if farming proves undesirable):
+    (a) persist looted vault chests per-player, mirroring the collected_hearts
+    mechanism, so each chest yields at most one relic ever; and/or (b) a
+    warden/summoner guarding the vault band. Both need real tuning/judgement, so
+    deferred until there are more players than Joseph testing."""
     rng = random.Random(seed)
     R, C = _WP_ROWS, _WP_COLS
     dungeon = Dungeon(name='The Waypoint Sanctum', seed=seed)
@@ -3687,7 +3702,9 @@ def build_dungeon_waypoint_sanctum(seed: int) -> 'Dungeon':
     entities: list = []
     vault_cells: set = set()
     for i, X in enumerate(_WP_VAULT_COLS):
-        kind = 'heart_container' if i % 3 == 1 else 'chest'
+        # The row-9 vaults hold hearts and relic scrolls (the random pool); only
+        # the left-chamber nook holds the Numbered Ledger (see below).
+        kind = 'heart_container' if i % 3 == 1 else 'chest_scroll'
         carve(7, X)                                      # 'blue' door cell (in the seal)
         for r in (8, 9):                                 # box the shaft off the danger room
             cells[r][X - 1] = CellType.WALL
@@ -3750,7 +3767,7 @@ def build_dungeon_waypoint_sanctum(seed: int) -> 'Dungeon':
     composite.spawn_pos = _WP_SPAWN
     composite.exit_pos  = _WP_EXIT
     entities += [
-        Entity(kind='chest_scroll', row=_WP_SCROLL[0],      col=_WP_SCROLL[1]),
+        Entity(kind='chest_scroll', row=_WP_SCROLL[0],      col=_WP_SCROLL[1], scroll_id='setnum'),
         Entity(kind='locked_door',  row=_WP_SCROLL_DOOR[0], col=_WP_SCROLL_DOOR[1], tag='blue'),
         Entity(kind='locked_door',  row=_WP_LOCK[0],        col=_WP_LOCK[1],        tag='gold'),
         Entity(kind='exit',         row=_WP_EXIT[0],        col=_WP_EXIT[1]),
