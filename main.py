@@ -1632,12 +1632,44 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
             msg_pool.append(text)
 
     # ── The Archivist's Library (L17) — reload loop + reckoning ─────────────
-    def _lib_show(idx):
-        item = room.lib_catalog if idx < 0 else room.lib_seq[idx]
-        room.char_runs = [CharRun(0, 0, item['syms'], item['kind'])]
-        room.rebuild_indexes()
+    def _lib_w():
+        gut = 0 if getattr(player, 'number_mode', 'none') == 'none' else 4
+        return max(12, _iw(term) - gut)
+
+    def _lib_relayout():
+        _dg._lib_layout(room, _lib_w())
         if player.col >= room.cols:
             player.col = room.cols - 1
+
+    def _lib_sync():
+        # Re-tighten the page frame to the viewport whenever its width changes.
+        if level == 'archivists_library' and getattr(room, '_lib_w', None) != _lib_w():
+            _lib_relayout()
+
+    def _lib_animate():
+        # The Archivist scurries the hall, scrambling the leaf in front of the
+        # reader, before it settles into the next manuscript. Skipped when there is
+        # no live terminal (tests / headless).
+        if not getattr(term, 'is_a_tty', False) or not room.char_runs:
+            return
+        import time as _t
+        arch = next((e for e in room.entities if e.kind == 'archivist'), None)
+        base = list(room.char_runs[0].symbols)
+        kind = room.char_runs[0].kind
+        frame_glyphs = '▌▐▎█░▒▓·∘◦~≋'
+        n = len(base)
+        for _f in range(14):
+            syms = base[:]
+            for _ in range(20):
+                c = random.randrange(n)
+                if syms[c] not in '┌┐└┘─│':
+                    syms[c] = random.choice(frame_glyphs)
+            room.char_runs = [CharRun(0, 0, tuple(syms), kind)]
+            if arch is not None:
+                arch.col = random.randrange(1, max(2, room.cols - 1))
+            room.rebuild_indexes()
+            render_all(term, dungeon, player, budget, 'The Archivist is tidying the shelves…')
+            _t.sleep(0.05)
 
     def _lib_reload(force):
         if getattr(room, 'lib_done', None):
@@ -1648,54 +1680,57 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
             _push('E37: No write since last change (add ! to override)')
             return
         room.lib_idx = (room.lib_idx + 1) % len(room.lib_seq)
-        _lib_show(room.lib_idx)
-        _push('"library" 1 line  --reloaded-- (the Archivist keeps editing it)')
+        _lib_animate()
+        _lib_relayout()
+        _push('"library" 1 line  --reloaded--')
 
     def _lib_file(name):
         if getattr(room, 'lib_done', None):
             return
         if room.lib_idx < 0:
-            _push('Nothing leafed yet — press  :e!  to open a manuscript first.')
+            _push('Nothing leafed yet — press  :e!  first.')
             return
         room.lib_filed[name] = room.lib_seq[room.lib_idx]['suit']
         _push(f'"{name}" [New] 1 line written')
         if all(s in room.lib_filed for s in _dg._LIB_SUITS):
-            _push('All four folios filed. Return to the Archivist (A) to present them.')
+            _push('All four folios filed.')
+            _push('Press  $  to bring them to the Archivist.')
 
     def _lib_finale():
-        g = _dg._LIB_SUIT_GLYPH
-        text = (f"   {g['hearts']} {g['diamonds']}   THE LIBRARY RESTORED   "
-                f"{g['spades']} {g['clubs']}      Every suit shelved in its place; the "
-                "Archivist bows low.   Open his two chests, then  :wq  to leave.   ")
-        room.char_runs = [CharRun(0, 0, _dg._lib_pad(text), 'ember')]
-        room.entities  = [e for e in room.entities if e.kind != 'archivist']
-        room.add_entity(Entity(kind='chest_scroll', row=0, col=6,  scroll_id='display_move'))
-        room.add_entity(Entity(kind='chest_scroll', row=0, col=12, scroll_id='edit_name'))
-        room.add_entity(Entity(kind='exit',         row=0, col=20))
-        room.rebuild_indexes()
         room.lib_done = 'win'
+        room.entities = [e for e in room.entities if e.kind != 'archivist']
+        _lib_relayout()                          # draw the restored-library page
+        # Place the rewards a few steps LEFT of where $ left the player (the far
+        # corner): two chests first, then the exit — open, then step on to win.
+        last = room.cols - 1
+        room.add_entity(Entity(kind='chest_scroll', row=0, col=last - 2, scroll_id='display_move'))
+        room.add_entity(Entity(kind='chest_scroll', row=0, col=last - 4, scroll_id='edit_name'))
+        room.add_entity(Entity(kind='exit',         row=0, col=last - 8))
+        room.rebuild_indexes()
 
     def _lib_on_archivist():
         if getattr(room, 'lib_done', None):
             return
         if not all(s in room.lib_filed for s in _dg._LIB_SUITS):
             if not player.wrap:
-                _push("MY LIBRARY! It's all on ONE LINE — some fiend ran :set nowrap! "
-                      "Put it right with  :set wrap!")
+                _push('MY LIBRARY! All on ONE LINE!')
+                _push('Some fiend ran  :set nowrap  — put it right!')
             elif not room.lib_briefed:
                 room.lib_briefed = True
-                _push("A reader, at last! A vandal corrupted my shelves. Leaf the "
-                      "manuscripts with  :e!  and file the four suits — :w hearts, "
-                      ":w diamonds, :w spades, :w clubs — then bring them to me.")
+                _push('A reader, at last!')
+                _push('A vandal corrupted my shelves.')
+                _push(':e!  leafs onward;  :w <suit>  files a folio.')
+                _push('Bring me hearts, diamonds, spades and clubs.')
             else:
-                _push('"File all four suits with  :w , then return to me."')
+                _push('File all four suits, then return to me.')
             return
         if all(room.lib_filed.get(s) == s for s in _dg._LIB_SUITS):
             _lib_finale()
-            _push('The Archivist beams: "Flawless! My library is whole again."')
+            _push('"Flawless! My library is whole again."')
+            _push('Open my two chests, then  :wq  to leave.')
         else:
-            _push('"So YOU\'RE the pest who has been MANGLING my folios!"  '
-                  'The Archivist hurls a curse and strikes you down.')
+            _push('"So YOU\'RE the pest mangling my folios!"')
+            _push('The Archivist strikes you down.')
             player.take_damage(player.max_hp + 20)
 
     if _start_edit:
@@ -1765,9 +1800,14 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
         message = _pool_msg()
         msg_ttl = _MSG_ROTATE_TTL
 
+    if level == 'archivists_library':
+        _lib_relayout()                          # fit the page frame to the real viewport
+
     render_all(term, dungeon, player, budget, message, attack_pos=_attack_pos(), attack_sym=_attack_sym())
 
     while True:
+        if level == 'archivists_library':
+            _lib_sync()                          # re-tighten the frame on terminal resize
         # Macro playback: drain queued keystrokes before reading the terminal.
         if macro_pending:
             macro_run_keys += 1

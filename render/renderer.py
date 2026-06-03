@@ -566,7 +566,9 @@ def render_all(term: Terminal, dungeon: Dungeon, player: Player,
 
     # ── Message bar ───────────────────────────────────────────────────────
     if message:
-        msg_text = message[:iw]
+        # Truncate to the viewport with an ellipsis; long dialogue is split into
+        # short pushes that rotate via the (n/m) pool, so each part fits on the bar.
+        msg_text = message if len(message) <= iw else message[:max(1, iw - 1)] + '…'
         msg_pad  = max(0, iw - len(msg_text))
         output.append(bfg + S.BOX_V + rst +
                       C.budget_low() + msg_text + rst + ' ' * msg_pad +

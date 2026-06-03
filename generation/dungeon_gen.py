@@ -5207,51 +5207,122 @@ def build_dungeon_sentence_corridor(seed: int) -> 'Dungeon':
 # (lib_*) and is driven by the hooks in main.run_dungeon.
 _LIB_SUITS      = ('hearts', 'diamonds', 'spades', 'clubs')
 _LIB_SUIT_GLYPH = {'hearts': '♥', 'diamonds': '♦', 'spades': '♠', 'clubs': '♣'}
-_LIB_WIDTH      = 360            # logical columns; wraps to the viewport at render time
-_LIB_ARCH_COL   = 2             # the Archivist sits two columns in from the start
+_LIB_BODY_ROWS  = 9             # text rows inside the page frame
+_LIB_FALLBACK_W = 78           # build-time width; main relayouts to the real viewport
 
 
-def _lib_pad(s: str) -> tuple:
-    """Trim/pad a manuscript to exactly _LIB_WIDTH columns of character cells."""
-    s = s[:_LIB_WIDTH]
-    return tuple(s.ljust(_LIB_WIDTH))
+def _lib_center(s: str, w: int) -> str:
+    s = s[:w]
+    pad  = w - len(s)
+    left = pad // 2
+    return ' ' * left + s + ' ' * (pad - left)
 
 
-def _lib_catalog() -> dict:
+def _lib_frame(W: int, body: list) -> str:
+    """Compose a framed 'page' as ONE wrap line: rows of EXACTLY W columns, so that
+    wrapping at the viewport width W redraws a perfect rectangle. The first W chars
+    are the top border, so even unwrapped the player sees ┌────┐ filling the view."""
+    inner = max(1, W - 2)
+    rows  = ['┌' + '─' * inner + '┐']
+    for i in range(_LIB_BODY_ROWS):
+        rows.append('│' + _lib_center(body[i] if i < len(body) else '', inner) + '│')
+    rows.append('└' + '─' * inner + '┘')
+    return ''.join(rows)        # each row is exactly W chars → (rows)*W total
+
+
+def _lib_catalog_spec() -> dict:
     g = _LIB_SUIT_GLYPH
-    text = ("THE ARCHIVIST'S LIBRARY    Some fiend ran  :set nowrap  and my whole "
-            "catalogue spilled onto a single endless line.  Shelve it with  "
-            ":set wrap  — then leaf through the manuscripts with  :e!  and file each "
-            "suit under its name:   :w hearts   :w diamonds   :w spades   :w clubs.   "
-            f"The four folios I need:   {g['hearts']} hearts    {g['diamonds']} diamonds"
-            f"    {g['spades']} spades    {g['clubs']} clubs.   (Plain  :e  will not "
-            "reload — I am forever editing, so the buffer is never clean: use  :e!)")
-    return {'suit': None, 'syms': _lib_pad(text), 'kind': 'ancient'}
+    body = [
+        "T H E   A R C H I V I S T ' S   L I B R A R Y",
+        "▌▎█▐▌  │  ▐█▎▌▐  │  ▌▐█▎▌  │  ▐▌█▎▐  │  ▌█▐▎▌",
+        "",
+        "Some fiend ran  :set nowrap  —",
+        "and my shelves spilled into one endless line.",
+        "",
+        ":set wrap   reshelve the hall",
+        ":e!  leaf onward       :w <suit>  file a folio",
+        f"{g['hearts']} hearts    {g['diamonds']} diamonds    "
+        f"{g['spades']} spades    {g['clubs']} clubs",
+    ]
+    return {'suit': None, 'kind': 'ancient', 'body': body}
 
 
-def _lib_suit_folio(suit: str) -> dict:
-    g  = _LIB_SUIT_GLYPH[suit]
-    gg = (g + ' ') * 14
-    text = (f"{g} {g} {g}   THE {suit.upper()} FOLIO   {g} {g} {g}     A clean leaf, "
-            f"every margin inked with {suit}.    {gg}   If this is a suit you seek, "
-            f"file it now:   :w {suit}    {gg}")
-    return {'suit': suit, 'syms': _lib_pad(text), 'kind': 'ember'}
+def _lib_suit_spec(suit: str) -> dict:
+    g    = _LIB_SUIT_GLYPH[suit]
+    band = (' '.join([g] * 14))
+    shelf = (' '.join(['▌▐ ' + g] * 7))
+    body = [
+        f"{g}   T H E   {'   '.join(suit.upper())}   F O L I O   {g}",
+        band,
+        shelf,
+        "",
+        f"a clean leaf, every margin inked with {suit}",
+        "",
+        "if this is a suit you seek —",
+        f"file it:   :w {suit}",
+        band,
+    ]
+    return {'suit': suit, 'kind': 'ember', 'body': body}
 
 
-def _lib_decoy(n: int) -> dict:
-    waves = '~ ' * 18
-    text = (f"≋ ≋ ≋   a water-stained leaf — the ink has run and no suit survives   "
-            f"≋ ≋ ≋     {waves}   do not file this one; press  :e!  for the next "
-            f"manuscript   ≋ ≋ ≋  (leaf {n})")
-    return {'suit': None, 'syms': _lib_pad(text), 'kind': 'verdant'}
+def _lib_decoy_spec(n: int) -> dict:
+    body = [
+        "≋ ≋ ≋    R U I N E D   L E A F    ≋ ≋ ≋",
+        "~ " * 18,
+        "▒▓░▒  ▓░▒▓  ░▒▓░  ▒▓░▒  ▓░▒▓  ░▒▓",
+        "",
+        "the ink has run — no suit survives here",
+        "",
+        "do not file this leaf",
+        ":e!   on to the next manuscript",
+        "≋ " * 18,
+    ]
+    return {'suit': None, 'kind': 'verdant', 'body': body}
+
+
+def _lib_finale_spec() -> dict:
+    g = _LIB_SUIT_GLYPH
+    body = [
+        f"{g['hearts']} {g['diamonds']}    T H E   L I B R A R Y   "
+        f"R E S T O R E D    {g['spades']} {g['clubs']}",
+        "▌▎█▐▌  ▐█▎▌▐  ▌▐█▎▌  ▐▌█▎▐  ▌█▐▎▌  ▐█▌▎▐",
+        "",
+        "Every suit shelved in its place; the Archivist bows low.",
+        "",
+        "Open his two chests for their gifts —",
+        "then  :wq  to leave the hall.",
+        "",
+        f"{g['hearts']}  {g['diamonds']}  {g['spades']}  {g['clubs']}",
+    ]
+    return {'suit': None, 'kind': 'ember', 'body': body}
+
+
+def _lib_layout(room, W: int) -> None:
+    """(Re)compose the current page at viewport width W: rebuild the one-line buffer,
+    resize the room, and rest the Archivist at the bottom-right corner so $ presents.
+    Called by the builder and by main.run_dungeon whenever the width changes."""
+    if getattr(room, 'lib_done', None) == 'win' and getattr(room, 'lib_finale', None):
+        spec = room.lib_finale
+    elif room.lib_idx < 0:
+        spec = room.lib_catalog
+    else:
+        spec = room.lib_seq[room.lib_idx]
+    line = _lib_frame(W, spec['body'])
+    room.cols      = len(line)
+    room.cells     = [[CellType.FLOOR] * room.cols]
+    room.char_runs = [CharRun(0, 0, tuple(line), spec['kind'])]
+    for e in room.entities:
+        if e.kind == 'archivist':
+            e.col = room.cols - 1          # bottom-right corner → reachable with $
+    room._lib_w = W
+    room.rebuild_indexes()
 
 
 def build_dungeon_archivists_library(seed: int) -> Dungeon:
     rng = random.Random(seed)
     dungeon = Dungeon(name="The Archivist's Library", seed=seed)
 
-    room = Room(room_type=RoomType.ENTRY, rows=1, cols=_LIB_WIDTH)
-    room.cells       = [[CellType.FLOOR] * _LIB_WIDTH]
+    room = Room(room_type=RoomType.ENTRY, rows=1, cols=_LIB_FALLBACK_W)
     room.seed        = seed
     room.spawn_pos   = (0, 0)
     room.wrap_buffer = True
@@ -5266,26 +5337,27 @@ def build_dungeon_archivists_library(seed: int) -> Dungeon:
     seq, decoy_n = [], 0
     for i in range(11):
         if i in suit_slots:
-            seq.append(_lib_suit_folio(suits[suit_slots.index(i)]))
+            seq.append(_lib_suit_spec(suits[suit_slots.index(i)]))
         else:
             decoy_n += 1
-            seq.append(_lib_decoy(decoy_n))
+            seq.append(_lib_decoy_spec(decoy_n))
 
     room.lib_seq     = seq
-    room.lib_catalog = _lib_catalog()
+    room.lib_catalog = _lib_catalog_spec()
+    room.lib_finale  = _lib_finale_spec()
     room.lib_idx     = -1         # -1 = the catalogue/index is showing
     room.lib_filed   = {}         # suit-name -> the true suit of what was filed (None = decoy)
     room.lib_done    = None       # None | 'win' | 'dead'
     room.lib_briefed = False      # has the player seen the post-wrap brief?
     room._lib_arch_flag = False   # debounces the on-Archivist trigger
 
-    # The current manuscript renders as one CharRun across row 0 (catalogue first).
-    room.char_runs = [CharRun(0, 0, room.lib_catalog['syms'], room.lib_catalog['kind'])]
-    room.entities  = [
+    # The Archivist starts off the first screen (resting at the far corner); ':set wrap'
+    # folds the line into the viewport and brings him into view.
+    room.entities = [
         Entity(kind='entry_marker', row=0, col=0),
-        Entity(kind='archivist',    row=0, col=_LIB_ARCH_COL),
+        Entity(kind='archivist',    row=0, col=1),
     ]
-    room.rebuild_indexes()
+    _lib_layout(room, _LIB_FALLBACK_W)
 
     dungeon.rooms        = [room]
     dungeon.current_room = 0
