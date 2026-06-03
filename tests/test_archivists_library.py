@@ -73,7 +73,7 @@ def test_brief_dialogue_advances_by_steps_then_editing(monkeypatch):
     blob = ' || '.join(seen)
     assert "you've fixed my library" in blob
     assert 'a vandal is about' in blob
-    assert 'try to find them' in blob
+    assert 'seek them out' in blob
     assert 'W11' in blob                 # the live editing warned the buffer changed
     assert d.room.lib_dlg >= 4
 

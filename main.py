@@ -1298,15 +1298,21 @@ def _enemy_tick(room, player) -> list:
         if not ent.alive:
             continue
         if ent.kind == 'archivist':
-            # Paces the hall at random: short horizontal strides plus the odd gj/gk
-            # hop (± one display line = the wrap width), so he roams the wrapped floor
-            # in two dimensions. Never onto the player; fA finds him wherever he is.
+            # Discrete gait: single-cell steps taken two at a time (a quick step-step
+            # in one direction), with the occasional gj/gk hop of a whole display line
+            # (± the wrap width), so he roams the wrapped floor. Never onto the player;
+            # fA finds him wherever he is. (summon_timer = steps left in this gait.)
             if ent.ai:
                 ent.ai_tick += 1
                 if ent.ai_tick % ent.ai_speed == 0:
-                    w    = getattr(room, '_wrap_w', 0) or 1
-                    step = random.choice([-2, -1, 1, 2, -w, w])
-                    nc   = min(max(1, ent.col + step), room.cols - 2)
+                    w = getattr(room, '_wrap_w', 0) or 1
+                    if ent.summon_timer <= 0:
+                        if random.random() < 0.2:
+                            ent.move_dir, ent.summon_timer = random.choice([-w, w]), 1
+                        else:
+                            ent.move_dir, ent.summon_timer = random.choice([-1, 1]), 2
+                    ent.summon_timer -= 1
+                    nc = min(max(1, ent.col + ent.move_dir), room.cols - 2)
                     if (0, nc) != (player.row, player.col) and nc != ent.col:
                         room.move_entity(ent, 0, nc)
             continue
@@ -1660,8 +1666,9 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
             _lib_relayout()
 
     def _lib_vandalize_step():
-        # One pass of the vandalism: pull books off a few full shelves (▤→□), throw
-        # open some closed books (≡→◫), and spill more open books onto the tables.
+        # One pass of the ransacking: pull books off a few full shelves (▤→□) — but
+        # leave plenty standing — and pile the tables with a MIX of stacks (≡) and
+        # open books (◫).
         if not room.char_runs:
             return
         syms  = list(room.char_runs[0].symbols)
@@ -1669,23 +1676,23 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
         books = [i for i, ch in enumerate(syms) if ch in ('≡', '◫')]
         spill = [nb for b in books for nb in (b - 1, b + 1)
                  if 0 <= nb < len(syms) and syms[nb] == ' ']
-        for i in random.sample(shelf, min(len(shelf), random.randint(3, 6))):
-            syms[i] = '□'
-        for i in random.sample(books, min(len(books), random.randint(2, 4))):
-            syms[i] = '◫'
-        for i in random.sample(spill, min(len(spill), random.randint(2, 4))):
-            syms[i] = '◫'
+        if len(shelf) > 30:                       # stop once half the shelves are bare
+            for i in random.sample(shelf, min(len(shelf), random.randint(1, 3))):
+                syms[i] = '□'
+        for i in random.sample(spill, min(len(spill), random.randint(1, 3))):
+            syms[i] = random.choice(['≡', '◫', '◫'])   # a mix, leaning open
         room.char_runs = [CharRun(0, 0, tuple(syms), room.char_runs[0].kind)]
         room.rebuild_indexes()
 
     def _lib_scramble():
-        # The vandal at work: the Archivist darts all over the hall, ransacking the
-        # shelves and piling open books on the tables, in front of the reader.
+        # The vandal at work: a fresh page, then the Archivist darts all over it,
+        # ransacking some shelves and cluttering the tables, in front of the reader.
         if not getattr(term, 'is_a_tty', False) or not room.char_runs:
             return
         import time as _t
+        _lib_relayout()
         arch = next((e for e in room.entities if e.kind == 'archivist'), None)
-        for _f in range(18):
+        for _f in range(12):
             _lib_vandalize_step()
             if arch is not None:
                 spots = [i for i, ch in enumerate(room.char_runs[0].symbols)
@@ -1732,7 +1739,7 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
 
     _LIB_BRIEF = ["Great Vim — you've fixed my library!",
                   'Some of my folios are still missing... a vandal is about...',
-                  "If you don't mind helping me, try to find them."]
+                  'Might I trouble a young reader to seek them out? My old eyes fail me so.']
 
     def _lib_brief_step(near):
         # Post-wrap brief: line 1 on approach, each later line on the next step, then
@@ -1748,11 +1755,22 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
                 _push(_LIB_BRIEF[d])
         elif d == 3:
             if player.col != room.lib_dlg_col:
-                room.lib_dlg = 4               # the editing begins
+                room.lib_dlg      = 4          # the editing begins
+                room.lib_step_col = player.col
+                room.lib_steps    = 0
+                room.lib_scramble_at = random.randint(6, 12)
                 _lib_scramble()               # he ransacks the shelves, in front of you
         if room.lib_dlg >= 4:
             # Vim's real "file changed underfoot" warning — red statusline, not dialogue.
             player.error = 'W11: Warning: File "library" has changed since editing started'
+            # Linger in the hall without reloading and he ransacks it again.
+            if player.col != getattr(room, 'lib_step_col', player.col):
+                room.lib_step_col = player.col
+                room.lib_steps += 1
+                if room.lib_steps >= room.lib_scramble_at:
+                    room.lib_steps = 0
+                    room.lib_scramble_at = random.randint(6, 12)
+                    _lib_scramble()
 
     def _lib_present():
         if all(room.lib_filed.get(s) == s for s in _dg._LIB_SUITS):
