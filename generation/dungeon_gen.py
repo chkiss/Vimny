@@ -5246,22 +5246,6 @@ _LIB_TBL_SURF2  = 5                  # body index of the reading table's 2nd sur
 _LIB_BORDER     = set('┌─┐│└┘◠◡')    # box-drawing glyphs — always drawn in ancient indigo
 
 
-def _lib_folio_tables(fill, rng) -> list:
-    """Pre-generate the two reading tables' contents (2 tables × 2 rows × 10 cells) for
-    a :e! folio — every cell packed, spelling the answer:
-      ('suit', g)  → all one suit (the correct folio for that suit)
-      ('mixsuit',) → a jumble of suits (wrong)
-      ('glyph', c) → label glyphs: one repeated if c else mixed (wrong either way)."""
-    w     = 10
-    suits = list(_LIB_SUIT_GLYPH.values())
-    one   = rng.choice(_LIB_FILLERS)
-    def cell():
-        if fill[0] == 'suit':    return fill[1]
-        if fill[0] == 'mixsuit': return rng.choice(suits)
-        return one if fill[1] else rng.choice(_LIB_FILLERS)
-    return [[[cell() for _ in range(w)] for _ in range(2)] for _ in range(2)]
-
-
 def _lib_table_band(inner: int, rng, tables=None) -> list:
     """A centred row of two reading tables (chairs ◠/◡ along the edges). With tables=None
     the surfaces are set sparsely with a few books (≡/◫) — the library at rest. Given
@@ -5299,35 +5283,67 @@ def _lib_title_row(inner: int, text: str) -> str:
     return ''.join(row)
 
 
-def _lib_floor_spec(inner: int, rng, filled=(), tables=None,
-                    title='L I B R A R Y', shelf_empty=0.0) -> dict:
+def _lib_table_fill(fill, suit_glyphs, nonsuit_labels, frng):
+    """Choose the glyphs for a folio's tables, sampled from THIS page's shelves so the
+    empties always correspond. fill is one of:
+      ('suit', g)       — unmixed one suit  (the correct folio)
+      ('mixsuit',)      — a jumble of suits
+      ('nonsuit', True) — unmixed one non-suit label (chess piece or ornament)
+      ('nonsuit', False)— a jumble of non-suit labels
+    Returns (glyphs, unmixed?)."""
+    if fill[0] == 'suit':
+        return [fill[1]], True
+    if fill[0] == 'mixsuit':
+        return suit_glyphs, False
+    if fill[1]:                                   # unmixed non-suit
+        return [frng.choice(nonsuit_labels)], True
+    return frng.sample(nonsuit_labels, min(len(nonsuit_labels), 5)), False   # mixed non-suit
+
+
+def _lib_floor_spec(inner: int, rng, filled=(), fill=None, fill_rng=None,
+                    title='L I B R A R Y') -> dict:
     """A library-floor page: a title, two shelf bands (the chess group and the suit
     group, packed out with UNIQUE filler labels — no duplicates), and the reading
-    tables. The four suit stacks stand empty (□□) until `filled`. Bookshelves render
-    ancient indigo, tables/desk ember. Pass pre-generated `tables` for a :e! folio;
-    None gives the sparse library. `shelf_empty` empties that fraction of the full
-    shelves — the books the Archivist pulled to fill a folio's tables."""
-    g, F   = _LIB_SUIT_GLYPH, set(filled)
-    ncells = min(24, max(9, inner // 4))          # stacks per band (capped: labels stay unique)
-    pool   = list(_LIB_FILLERS)
+    tables. Bookshelves render ancient indigo, tables/desk ember. Without `fill` it is
+    the sparse library and the four suit stacks stand empty (□□) until `filled`. With
+    a `fill` descriptor (a :e! folio) the tables are PACKED with glyphs sampled from
+    this page's own shelves, and exactly those bookcases are emptied — the books the
+    Archivist pulled to pack it — so the empties always correspond to the table."""
+    g       = _LIB_SUIT_GLYPH
+    F       = set(filled) if fill is None else set(_LIB_SUITS)
+    ncells  = min(24, max(9, inner // 4))         # stacks per band (capped: labels stay unique)
+    pool    = list(_LIB_FILLERS)
     rng.shuffle(pool)
-    take   = lambda: (pool.pop() if pool else '·')
+    take    = lambda: (pool.pop() if pool else '·')
 
-    def band(center):                             # center: list of (glyph, full)
+    nonsuit = list(_LIB_CHESS)                    # every non-suit label on this page
+
+    def make_band(center):
         side  = (ncells - len(center)) // 2
-        left  = [(take(), True) for _ in range(side)]
-        right = [(take(), True) for _ in range(ncells - side - len(center))]
-        cells = left + center + right
-        if shelf_empty:                           # pull books off a fraction of full shelves
-            full = [k for k, (_, f) in enumerate(cells) if f]
-            for k in rng.sample(full, int(len(full) * shelf_empty)):
-                cells[k] = (cells[k][0], False)
+        left  = [take() for _ in range(side)]
+        right = [take() for _ in range(ncells - side - len(center))]
+        nonsuit.extend(left + right)              # fillers are non-suit labels
+        return [(gl, True) for gl in left] + center + [(gl, True) for gl in right]
+
+    chess_cells = make_band([(c, True) for c in _LIB_CHESS])
+    suit_cells  = make_band([(g[s], s in F) for s in _LIB_SUITS])
+
+    tables, empty = None, set()
+    if fill is not None:
+        glyphs, unmixed = _lib_table_fill(fill, list(g.values()), nonsuit, fill_rng or rng)
+        w = 10
+        tables = [[[(glyphs[0] if unmixed else (fill_rng or rng).choice(glyphs))
+                    for _ in range(w)] for _ in range(2)] for _ in range(2)]
+        empty  = {ch for t in tables for row in t for ch in row}
+
+    def render(cells):
+        cells = [(gl, f and gl not in empty) for gl, f in cells]
         lab   = '  '.join(f'{gl} ' for gl, _ in cells)
         shelf = '  '.join('▤▤' if f else '□□' for _, f in cells)
         return lab, shelf
 
-    cl, cs = band([(c, True) for c in _LIB_CHESS])
-    sl, ss = band([(g[s], s in F) for s in _LIB_SUITS])
+    cl, cs = render(chess_cells)
+    sl, ss = render(suit_cells)
     table  = _lib_table_band(inner, rng, tables)
     body   = [_lib_title_row(inner, title), cl, cs, *table, sl, ss]
     # title + shelves + frame in ancient indigo; only the reading tables glow ember.
@@ -5380,9 +5396,9 @@ def _lib_layout(room, W: int) -> None:
     elif getattr(room, 'lib_view', 'catalog') == 'catalog' or room.lib_idx < 0:
         filled = [s for s in _LIB_SUITS if s in room.lib_filed]
         spec = _lib_floor_spec(inner, rng, filled=filled)
-    else:                                         # a :e! folio — packed tables show the answer,
-        spec = _lib_floor_spec(inner, rng, tables=room.lib_seq[room.lib_idx]['tables'],
-                               shelf_empty=0.2)   # ...a fifth of the shelves pulled to fill them
+    else:                                         # a :e! folio — packed tables show the answer
+        frng = random.Random((room.seed or 0) ^ ((room.lib_idx + 1) * 0x9E37))
+        spec = _lib_floor_spec(inner, rng, fill=room.lib_seq[room.lib_idx]['fill'], fill_rng=frng)
     rows = _lib_frame(W, spec['body'], spec['kinds'], spec['border'])
     room.cols      = sum(len(r) for r, _ in rows)
     room.cells     = [[CellType.FLOOR] * room.cols]
@@ -5428,20 +5444,22 @@ def build_dungeon_archivists_library(seed: int) -> Dungeon:
     room.budget      = 2000       # generous; the loop is exploratory, never budget-gated
     room.answer      = ''
 
-    # Cadence: a one-suit folio (the answer) at indices 0,3,7,10; decoys elsewhere; loops.
-    # Each folio's tables are pre-generated (width-independent) so they stay stable.
+    # Cadence: a one-suit folio (the only correct answer) at indices 0,3,7,10; decoys
+    # elsewhere, cycling through mixed suits, unmixed non-suits and mixed non-suits.
+    # Each folio carries only its FILL TYPE; the glyphs are sampled at render time from
+    # the page's own shelves (so the emptied bookcases always correspond).
     suit_slots = [0, 3, 7, 10]
     suits      = list(_LIB_SUITS)
     rng.shuffle(suits)
+    _decoys    = [('mixsuit',), ('nonsuit', True), ('nonsuit', False)]
     seq, decoy_n = [], 0
     for i in range(11):
         if i in suit_slots:
             S = suits[suit_slots.index(i)]
-            seq.append({'suit': S, 'tables': _lib_folio_tables(('suit', _LIB_SUIT_GLYPH[S]), rng)})
+            seq.append({'suit': S, 'fill': ('suit', _LIB_SUIT_GLYPH[S])})
         else:
-            fill = ('mixsuit',) if decoy_n % 2 == 0 else ('glyph', rng.random() < 0.5)
+            seq.append({'suit': None, 'fill': _decoys[decoy_n % len(_decoys)]})
             decoy_n += 1
-            seq.append({'suit': None, 'tables': _lib_folio_tables(fill, rng)})
 
     room.lib_seq     = seq
     room.lib_idx     = -1         # index into the cycle of the manuscript last leafed to

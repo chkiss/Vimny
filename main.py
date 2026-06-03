@@ -1311,6 +1311,21 @@ def _enemy_tick(room, player) -> list:
                     nc = min(max(0, ent.col + step), room.cols - 1)
                     if step and (0, nc) != (player.row, player.col):
                         room.move_entity(ent, 0, nc)
+            elif getattr(room, 'lib_done', None) == 'win':
+                # Won: settle back beside his desk and stay within 0-4 cells of it (to
+                # the right, clear of the reward chests on its left).
+                home = getattr(room, '_lib_desk_col', ent.col)
+                if ent.col < home:
+                    nc = min(ent.col + 2, home)
+                elif ent.col > home + 4:
+                    nc = ent.col - 2
+                elif random.random() < 0.3:
+                    nc = min(max(home, ent.col + random.choice([-1, 1])), home + 4)
+                else:
+                    nc = ent.col
+                nc = min(max(1, nc), room.cols - 2)
+                if (0, nc) != (player.row, player.col) and nc != ent.col:
+                    room.move_entity(ent, 0, nc)
             elif ent.ai:
                 # Discrete gait: single-cell steps two at a time (a quick step-step),
                 # with the occasional gj/gk hop. (summon_timer = steps left in this gait.)
@@ -1772,17 +1787,27 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
         room.lib_view = 'catalog'                 # back to the floor — the stack fills in
         _lib_relayout()
         _push(f'"{name}" [New] 1 line written')
+        if len(room.lib_filed) >= 4:              # four files named → the reckoning
+            if all(room.lib_filed.get(s) == s for s in _dg._LIB_SUITS):
+                _lib_win()                        # the four folios are cleanly archived
+            else:
+                _lib_strike('"So YOU\'RE the vandal! I\'ll deal with you MYSELF!"')
 
     def _lib_finale():
         room.lib_done = 'win'
-        room.entities = [e for e in room.entities if e.kind != 'archivist']
-        _lib_relayout()                          # draw the restored-library page
-        # Lay the rewards near the end of the hall: two chests, then the exit.
-        last = room.cols - 1
-        room.add_entity(Entity(kind='chest_scroll', row=0, col=last - 2, scroll_id='display_move'))
-        room.add_entity(Entity(kind='chest_scroll', row=0, col=last - 4, scroll_id='edit_name'))
-        room.add_entity(Entity(kind='exit',         row=0, col=last - 8))
+        _lib_relayout()                          # draw the restored-library page + the desk
+        # Lay the rewards just behind the Archivist's desk (to its left); he settles
+        # back beside it (see _enemy_tick), to the right, clear of the chests.
+        dc = room._lib_desk_col
+        room.add_entity(Entity(kind='chest_scroll', row=0, col=dc - 2, scroll_id='display_move'))
+        room.add_entity(Entity(kind='chest_scroll', row=0, col=dc - 4, scroll_id='edit_name'))
+        room.add_entity(Entity(kind='exit',         row=0, col=dc - 6))
         room.rebuild_indexes()
+
+    def _lib_win():
+        _lib_finale()
+        _push("Great Vim! You've gone and cleanly archived the right folios!")
+        _push('Help yourself to anything in those chests over there.')
 
     _LIB_BRIEF = ["Great Vim — you've fixed my library!",
                   'Some of my folios are still missing... a vandal is about...',
@@ -1829,13 +1854,6 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
         room.lib_view    = 'catalog'      # back to the hall for the chase
         _lib_relayout()
         _push(line)
-
-    def _lib_present():
-        if all(room.lib_filed.get(s) == s for s in _dg._LIB_SUITS):
-            _lib_finale()
-            _push('"Flawless! My library is whole again — my gifts are yours."')
-        else:
-            _lib_strike('"So YOU\'RE the vandal! I\'ll deal with you MYSELF!"')
 
     if _start_edit:
         room.passable_walls = True
@@ -2693,14 +2711,8 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
                     _arch = next((e for e in room.entities
                                   if e.kind == 'archivist' and e.alive), None)
                     _near = _arch is not None and abs(player.col - _arch.col) <= 2
-                    _all  = all(s in room.lib_filed for s in _dg._LIB_SUITS)
-                    if _all:                                  # present the filed folios
-                        if _near and not room._lib_arch_flag:
-                            room._lib_arch_flag = True
-                            _lib_present()
-                        elif not _near:
-                            room._lib_arch_flag = False
-                    elif not player.wrap:                     # pre-wrap panic
+                    # (Win/lose is decided in _lib_file after the fourth :w.)
+                    if not player.wrap:                       # pre-wrap panic
                         if _near and not room._lib_arch_flag:
                             room._lib_arch_flag = True
                             _push('MY LIBRARY! All on ONE LINE!')
@@ -3073,7 +3085,8 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
                     budget.spend(1)
                     _push('Key picked up — use p to unlock a door.')
                     interacted = True
-                elif cur and cur.kind in ('goblin', 'warden', 'archivist'):
+                elif cur and (cur.kind in ('goblin', 'warden')
+                              or (cur.kind == 'archivist' and getattr(room, 'lib_hostile', False))):
                     cur.hp -= 1
                     budget.spend(1)
                     interacted = True
