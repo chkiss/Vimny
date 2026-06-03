@@ -103,6 +103,8 @@ class Room:
                 self._char_run_map[(ru.row, ru.col + i)] = ru
             self._char_runs_by_row.setdefault(ru.row, []).append(ru)
         self._char_run_rows = {ru.row for ru in self.char_runs}
+        if getattr(self, 'wrap_buffer', False):
+            return                       # single-line library: each region keeps its own colour
         # Normalize WORD colors: adjacent non-void clusters on the same row all
         # take the leftmost cluster's kind so a WORD renders in one color.
         by_row: dict = {}
