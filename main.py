@@ -33,6 +33,7 @@ from content.scrolls import (
     PLUMB_LINE_SCROLL, RECALLING_HAND_SCROLL, QUICK_ERASE_SCROLL,
     REGEX_CLASSES_SCROLL, REGEX_ANCHORS_SCROLL, REGEX_QUANTIFIERS_SCROLL,
     REGEX_COLLECTIONS_SCROLL, REGEX_MAGIC_SCROLL,
+    DISPLAY_LINE_SCROLL, EDIT_BY_NAME_SCROLL,
     pick_relic_scroll as _pick_relic_scroll,
 )
 
@@ -3697,6 +3698,8 @@ def run_scroll_library(term: Terminal, player: Player, progress: dict) -> str | 
         'col_motion':        lambda t, iw, gh: _render_standard_scroll(t, iw, gh, PLUMB_LINE_SCROLL, _known),
         'ins_paste':         lambda t, iw, gh: _render_standard_scroll(t, iw, gh, RECALLING_HAND_SCROLL, _known),
         'ins_edit':          lambda t, iw, gh: _render_standard_scroll(t, iw, gh, QUICK_ERASE_SCROLL, _known),
+        'display_move':      lambda t, iw, gh: _render_standard_scroll(t, iw, gh, DISPLAY_LINE_SCROLL, _known),
+        'edit_name':         lambda t, iw, gh: _render_standard_scroll(t, iw, gh, EDIT_BY_NAME_SCROLL, _known),
     }
 
     discovered  = set(progress.get('extras', []))
@@ -3785,7 +3788,11 @@ def run_scroll_library(term: Terminal, player: Player, progress: dict) -> str | 
                     iw     = _iw(term)
                     game_h = term.height - 5
                     _render()
-                    _SCROLL_DISPATCH[scroll['id']](term, iw, game_h)
+                    _fn = _SCROLL_DISPATCH.get(scroll['id'])
+                    if _fn is not None:
+                        _fn(term, iw, game_h)
+                    else:                              # any other catalog scroll → standard renderer
+                        _show_catalog_scroll(term, iw, game_h, scroll['id'], _known)
                     seen = list(progress.get('scrolls_seen', []))
                     if scroll['id'] not in seen:
                         seen.append(scroll['id'])
