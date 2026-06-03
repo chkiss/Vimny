@@ -26,14 +26,11 @@ from engine.jumplist import record_jump as _record_jump, jump_back as _jump_back
 from engine.registers import write_register as _reg_write, read_register as _reg_read
 from engine.visual import apply_visual, block_bounds
 from content.scrolls import (
+    # The eight scrolls below have bespoke codex renderers (_show_*); every other
+    # catalogue scroll renders from its 'lines' content via _show_catalog_scroll.
     RELIQUARY_SCROLL, WARDEN_LEAP_SCROLL, WARDEN_SIGHT_SCROLL, WAYPOINT_SCROLL,
     OPERATOR_CODEX_SCROLL, ARCHIVISTS_METHOD_SCROLL,
     WHOLE_WORD_SCROLL, WARDEN_ACT_SCROLL,
-    SETTERS_HAND_SCROLL, SEARCH_CRAFT_SCROLL, WANDERERS_THREAD_SCROLL,
-    PLUMB_LINE_SCROLL, RECALLING_HAND_SCROLL, QUICK_ERASE_SCROLL,
-    REGEX_CLASSES_SCROLL, REGEX_ANCHORS_SCROLL, REGEX_QUANTIFIERS_SCROLL,
-    REGEX_COLLECTIONS_SCROLL, REGEX_MAGIC_SCROLL,
-    DISPLAY_LINE_SCROLL, EDIT_BY_NAME_SCROLL,
     pick_relic_scroll as _pick_relic_scroll,
 )
 
@@ -3677,6 +3674,10 @@ def run_scroll_library(term: Terminal, player: Player, progress: dict) -> str | 
     _SL_COMPLETIONS = ['../', 'saves/', 'world/']
 
     _known = _known_from_progress(progress)
+    # Only scrolls with a BESPOKE renderer need an entry here; every other catalogue
+    # scroll (the relic scrolls, the Archivist's rewards, …) renders through
+    # _show_catalog_scroll below, which reads its 'lines' content straight from the
+    # catalogue — so there is no per-scroll boilerplate to keep in sync.
     _SCROLL_DISPATCH = {
         'register':  lambda t, iw, gh: _show_register_tutorial(t, iw, gh, progress),
         'leap':      lambda t, iw, gh: _show_warden_leap_scroll(t, iw, gh, _known),
@@ -3686,20 +3687,6 @@ def run_scroll_library(term: Terminal, player: Player, progress: dict) -> str | 
         'y_op':      lambda t, iw, gh: _show_archivists_method_scroll(t, iw, gh, _known),
         'text_obj':  lambda t, iw, gh: _show_whole_word_scroll(t, iw, gh, _known),
         'visual_op': lambda t, iw, gh: _show_warden_act_scroll(t, iw, gh, _known),
-        # Relic scrolls — all use the standard lines/segs/cmd renderer.
-        'set_more':          lambda t, iw, gh: _render_standard_scroll(t, iw, gh, SETTERS_HAND_SCROLL, _known),
-        'regex_classes':     lambda t, iw, gh: _render_standard_scroll(t, iw, gh, REGEX_CLASSES_SCROLL, _known),
-        'regex_anchors':     lambda t, iw, gh: _render_standard_scroll(t, iw, gh, REGEX_ANCHORS_SCROLL, _known),
-        'regex_quant':       lambda t, iw, gh: _render_standard_scroll(t, iw, gh, REGEX_QUANTIFIERS_SCROLL, _known),
-        'regex_collections': lambda t, iw, gh: _render_standard_scroll(t, iw, gh, REGEX_COLLECTIONS_SCROLL, _known),
-        'regex_magic':       lambda t, iw, gh: _render_standard_scroll(t, iw, gh, REGEX_MAGIC_SCROLL, _known),
-        'searchcraft':       lambda t, iw, gh: _render_standard_scroll(t, iw, gh, SEARCH_CRAFT_SCROLL, _known),
-        'jump':              lambda t, iw, gh: _render_standard_scroll(t, iw, gh, WANDERERS_THREAD_SCROLL, _known),
-        'col_motion':        lambda t, iw, gh: _render_standard_scroll(t, iw, gh, PLUMB_LINE_SCROLL, _known),
-        'ins_paste':         lambda t, iw, gh: _render_standard_scroll(t, iw, gh, RECALLING_HAND_SCROLL, _known),
-        'ins_edit':          lambda t, iw, gh: _render_standard_scroll(t, iw, gh, QUICK_ERASE_SCROLL, _known),
-        'display_move':      lambda t, iw, gh: _render_standard_scroll(t, iw, gh, DISPLAY_LINE_SCROLL, _known),
-        'edit_name':         lambda t, iw, gh: _render_standard_scroll(t, iw, gh, EDIT_BY_NAME_SCROLL, _known),
     }
 
     discovered  = set(progress.get('extras', []))
