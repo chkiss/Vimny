@@ -5207,7 +5207,7 @@ def build_dungeon_sentence_corridor(seed: int) -> 'Dungeon':
 # (lib_*) and is driven by the hooks in main.run_dungeon.
 _LIB_SUITS      = ('hearts', 'diamonds', 'spades', 'clubs')
 _LIB_SUIT_GLYPH = {'hearts': '♥', 'diamonds': '♦', 'spades': '♠', 'clubs': '♣'}
-_LIB_BODY_ROWS  = 9             # text rows inside the page frame
+_LIB_BODY_ROWS  = 13            # text rows inside the page frame
 _LIB_FALLBACK_W = 78           # build-time width; main relayouts to the real viewport
 
 
@@ -5231,51 +5231,74 @@ def _lib_frame(W: int, body: list) -> str:
 
 
 # A library floor drawn top-down: rows of book-stacks (each labelled), reading
-# tables with chairs. Full stacks are ▐█▌; the four SUIT stacks stand empty (▐ ▌)
-# until their folios are refiled.
-_LIB_GAP    = '   '
-_LIB_TABLES = 'o▭▭▭o      o▭▭▭o      o▭▭▭o'
+# tables, and the Archivist's desk. Full shelves are ▤▤▤, empty shelves □□□;
+# the four SUIT stacks stand empty until their folios are refiled (live). Non-suit
+# stacks are labelled with chess pieces; books resting on a table are ≡.
+_LIB_GAP     = '   '
+_LIB_DESK    = '╞═══════════╡'      # the Archivist's desk (books ▤ sit on the row above)
+_LIB_TBL_N   = 2                    # reading tables across the hall
+_LIB_TBL_W   = 9                    # interior width of each table
 
 
-def _lib_band(labels: list, fill: list) -> tuple:
-    """One shelf-band: a label row (a glyph centred over each stack) and a stack row."""
-    lab   = _LIB_GAP.join(f' {g} ' for g in labels)
-    shelf = _LIB_GAP.join('▐█▌' if f else '▐ ▌' for f in fill)
+def _lib_table_band() -> list:
+    """A row of reading tables drawn in the library's own line-art (┌─┐│└┘), books
+    (≡) on each surface, two chairs (o) above and two below. Returns 5 body rows."""
+    w     = _LIB_TBL_W
+    gap   = '     '
+    chair = _lib_center('o     o', w + 2)            # 2 chairs over the table width
+    top   = '┌' + '─' * w + '┐'
+    books = '│' + _lib_center('≡ ≡ ≡ ≡', w) + '│'
+    surf  = '│' + _lib_center('≡ ≡ ≡ ≡', w) + '│'
+    bot   = '└' + '─' * w + '┘'
+    row   = lambda cell: gap.join([cell] * _LIB_TBL_N)
+    return [row(chair), row(top), row(books), row(surf), row(bot), row(chair)]
+
+
+def _lib_band(stacks: list) -> tuple:
+    """One shelf-band from a list of (label, full?) → (label row, shelf row).
+    A full shelf is ▤▤▤; an empty shelf is □□□; labels are centred over each."""
+    lab   = _LIB_GAP.join(f' {lbl} ' for lbl, _ in stacks)
+    shelf = _LIB_GAP.join('▤▤▤' if full else '□□□' for _, full in stacks)
     return lab, shelf
 
 
-def _lib_catalog_spec() -> dict:
-    g = _LIB_SUIT_GLYPH
-    l1, s1 = _lib_band(['▦', '▦', g['hearts'], '▦', g['diamonds'], '▦'],
-                       [1, 1, 0, 1, 0, 1])
-    l2, s2 = _lib_band(['▦', g['spades'], '▦', '▦', g['clubs'], '▦'],
-                       [1, 0, 1, 1, 0, 1])
-    body = ['L I B R A R Y', '', l1, s1, s1, _LIB_TABLES, l2, s2, s2]
+def _lib_catalog_spec(filled=()) -> dict:
+    g, F = _LIB_SUIT_GLYPH, set(filled)
+    top = [('♞', 1), (g['hearts'], 'hearts' in F), ('♜', 1),
+           (g['diamonds'], 'diamonds' in F), ('♝', 1)]
+    bot = [('♟', 1), (g['spades'], 'spades' in F), ('♘', 1),
+           (g['clubs'], 'clubs' in F), ('♖', 1)]
+    l1, s1 = _lib_band(top)
+    l2, s2 = _lib_band(bot)
+    body = ['L I B R A R Y', l1, s1, *_lib_table_band(), l2, s2,
+            '▤   ▤   ▤   ▤   ▤', _LIB_DESK]
     return {'suit': None, 'kind': 'ancient', 'body': body}
 
 
 def _lib_suit_spec(suit: str) -> dict:
     g    = _LIB_SUIT_GLYPH[suit]
-    row  = ' '.join([g] * 7)
-    full = '▐' + '█' * 15 + '▌'
-    mid  = '▐█' + _lib_center(' '.join([g] * 3), 13) + '█▌'
-    body = ['  '.join(suit.upper()), '', row, full, mid, full, row, '', '']
+    band = ' '.join([g] * 7)
+    body = ['  '.join(suit.upper()), '',
+            '▤ ▤ ▤ ▤ ▤ ▤ ▤', band, '▤ ▤ ▤ ▤ ▤ ▤ ▤', band, '▤ ▤ ▤ ▤ ▤ ▤ ▤',
+            '', '', '']
     return {'suit': suit, 'kind': 'ember', 'body': body}
 
 
 def _lib_decoy_spec(n: int) -> dict:
-    full = '▐' + '░▒▓' * 5 + '▌'
-    mid  = '▐░' + _lib_center('~ ~ ~ ~', 13) + '▒▌'
     body = ['R U I N E D   L E A F', '',
-            '░ ▒ ▓ ░ ▒ ▓ ░', full, mid, full, '▓ ░ ▒ ▓ ░ ▒ ▓', '', '']
+            '□ □ □ □ □ □ □', '▒ ░ ▓ ▒ ░ ▓ ▒', '□ □ □ □ □ □ □',
+            '░ ▓ ▒ ░ ▓ ▒ ░', '□ □ □ □ □ □ □', '', '', '']
     return {'suit': None, 'kind': 'verdant', 'body': body}
 
 
 def _lib_finale_spec() -> dict:
     g = _LIB_SUIT_GLYPH
-    l1, s1 = _lib_band([g['hearts'], '▦', g['diamonds'], '▦', g['spades'], g['clubs']],
-                       [1, 1, 1, 1, 1, 1])
-    body = ['L I B R A R Y   R E S T O R E D', '', l1, s1, s1, _LIB_TABLES, s1, s1, '']
+    top = [(g['hearts'], 1), ('♜', 1), (g['diamonds'], 1), ('♝', 1), (g['spades'], 1)]
+    bot = [('♞', 1), (g['clubs'], 1), ('♘', 1), ('♖', 1), ('♛', 1)]
+    l1, s1 = _lib_band(top)
+    l2, s2 = _lib_band(bot)
+    body = ['L I B R A R Y   R E S T O R E D', l1, s1, *_lib_table_band(), l2, s2,
+            '▤   ▤   ▤   ▤   ▤', _LIB_DESK]
     return {'suit': None, 'kind': 'ember', 'body': body}
 
 
@@ -5283,10 +5306,11 @@ def _lib_layout(room, W: int) -> None:
     """(Re)compose the current page at viewport width W: rebuild the one-line buffer,
     resize the room, and rest the Archivist at the bottom-right corner so $ presents.
     Called by the builder and by main.run_dungeon whenever the width changes."""
-    if getattr(room, 'lib_done', None) == 'win' and getattr(room, 'lib_finale', None):
-        spec = room.lib_finale
-    elif room.lib_idx < 0:
-        spec = room.lib_catalog
+    if getattr(room, 'lib_done', None) == 'win':
+        spec = _lib_finale_spec()
+    elif getattr(room, 'lib_view', 'catalog') == 'catalog' or room.lib_idx < 0:
+        filled = [s for s in _LIB_SUITS if room.lib_filed.get(s) == s]
+        spec = _lib_catalog_spec(filled)      # stacks fill in live as suits are filed
     else:
         spec = room.lib_seq[room.lib_idx]
     line = _lib_frame(W, spec['body'])
@@ -5325,9 +5349,8 @@ def build_dungeon_archivists_library(seed: int) -> Dungeon:
             seq.append(_lib_decoy_spec(decoy_n))
 
     room.lib_seq     = seq
-    room.lib_catalog = _lib_catalog_spec()
-    room.lib_finale  = _lib_finale_spec()
-    room.lib_idx     = -1         # -1 = the catalogue/index is showing
+    room.lib_idx     = -1         # index into the cycle of the manuscript last leafed to
+    room.lib_view    = 'catalog'  # 'catalog' (the library floor) | 'leaf' (a manuscript)
     room.lib_filed   = {}         # suit-name -> the true suit of what was filed (None = decoy)
     room.lib_done    = None       # None | 'win' | 'dead'
     room.lib_briefed = False      # has the player seen the post-wrap brief?
