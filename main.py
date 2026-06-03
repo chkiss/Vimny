@@ -1297,6 +1297,19 @@ def _enemy_tick(room, player) -> list:
     for ent in list(room.entities):
         if not ent.alive:
             continue
+        if ent.kind == 'archivist':
+            # The Archivist paces the hall: oscillate along the single row, turning
+            # at the ends, never stepping onto the player. fA finds him anywhere.
+            if ent.ai:
+                ent.ai_tick += 1
+                if ent.ai_tick % ent.ai_speed == 0:
+                    nc = ent.col + ent.move_dir
+                    if nc <= 1 or nc >= room.cols - 2:
+                        ent.move_dir *= -1
+                        nc = ent.col + ent.move_dir
+                    if (0, nc) != (player.row, player.col):
+                        room.move_entity(ent, 0, nc)
+            continue
         dist = _manhattan(player.row, player.col, ent.row, ent.col)
         if ent.kind == 'warden' and ent.tag != 'surveyor' and dist <= _ALERT_RADIUS:
             has_goblins = any(
@@ -1697,7 +1710,7 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
         _push(f'"{name}" [New] 1 line written')
         if all(s in room.lib_filed for s in _dg._LIB_SUITS):
             _push('All four stacks filled.')
-            _push('Press  $  to bring them to the Archivist.')
+            _push('Approach the Archivist (fA) to present them.')
         else:
             _push('The stack fills. Press  :e!  to leaf on.')
 
@@ -1722,12 +1735,11 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
                 _push('Some fiend ran  :set nowrap  — put it right!')
             elif not room.lib_briefed:
                 room.lib_briefed = True
-                _push('A reader, at last!')
-                _push('A vandal corrupted my shelves.')
-                _push(':e!  leafs onward;  :w <suit>  files a folio.')
-                _push('Bring me hearts, diamonds, spades and clubs.')
+                _push("Great Vim — you've fixed my library!")
+                _push('But some folios are missing... a vandal must be about...')
+                _push(':e!  leafs the shelves;  :w <suit>  refiles one.')
             else:
-                _push('File all four suits, then return to me.')
+                _push('Folios still missing — :e!  to leaf,  :w <suit>  to refile.')
             return
         if all(room.lib_filed.get(s) == s for s in _dg._LIB_SUITS):
             _lib_finale()
@@ -2080,15 +2092,15 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
                             setattr(player, _flag, _new)
                             if _flag == 'hlsearch':
                                 player.hl_suppressed = False
+                            _lib_wrap = (level == 'archivists_library' and _flag == 'wrap')
                             if _act == 'query':
                                 _push(_flag if _cur else 'no' + _flag)
-                            else:
+                            elif not _lib_wrap:
                                 _push((':set ' if _act in ('on', 'reset') else '')
                                       + (_flag if _new else 'no' + _flag))
-                            if (level == 'archivists_library' and _flag == 'wrap'
-                                    and _new and not getattr(room, 'lib_done', None)):
-                                _push('The hall unfolds — the Archivist (the gold A) sits at his desk, top-right.')
-                                _push('Reach him with  fA  (press it again to pass the title), or just  $.')
+                            if _lib_wrap and _new and not getattr(room, 'lib_done', None):
+                                _push('You see someone pacing among the shelves!')
+                                _push('(fA to approach them.)')
                         else:
                             player.number_mode, _set_msg = _apply_set(
                                 player.number_mode, cmd[len('set'):])
@@ -2585,17 +2597,17 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
                     redo_stack.clear()
                     _push('The door seals shut behind you — there is no going back.')
 
-                # The Archivist's Library: stepping onto the Archivist (his seat, the
-                # 'A' — reachable with fA) OR reaching the hall's end ($) calls him over.
-                if level == 'archivists_library':
+                # The Archivist's Library: approaching the pacing Archivist (within a
+                # couple of columns — fA lands right on him) starts his dialogue. Only
+                # in the hall (the catalogue/finale), not while reading a manuscript.
+                if level == 'archivists_library' and getattr(room, 'lib_view', 'catalog') != 'leaf':
                     _arch = next((e for e in room.entities
                                   if e.kind == 'archivist' and e.alive), None)
-                    _here = ((_arch is not None and player.col == _arch.col)
-                             or player.col == room.cols - 1)
-                    if _here and not room._lib_arch_flag:
+                    _near = _arch is not None and abs(player.col - _arch.col) <= 2
+                    if _near and not room._lib_arch_flag:
                         room._lib_arch_flag = True
                         _lib_on_archivist()
-                    elif not _here:
+                    elif not _near:
                         room._lib_arch_flag = False
 
                 # Win / exit check

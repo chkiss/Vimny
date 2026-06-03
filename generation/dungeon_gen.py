@@ -5236,9 +5236,7 @@ def _lib_frame(W: int, body: list) -> str:
 # stacks are labelled with chess pieces; books resting on a table are ≡.
 # Decorative shelf labels that fill the hall wall-to-wall (always full shelves).
 _LIB_FILLERS = ['✦', '❋', '◈', '❖', '⬡', '✤', '⟡', '❉', '✣', '❀', '✿', '⚘', '✻', '❈']
-_LIB_DESK    = '╓A╖'                # the Archivist's small desk (top-right); the literal
-                                    # A is his seat, so fA can find him (the gold entity
-                                    # renders over it)
+_LIB_DESK    = '╓─╖'                # the Archivist's small desk (top-right corner)
 
 
 def _lib_table_band(inner: int, rng) -> list:
@@ -5352,12 +5350,10 @@ def _lib_layout(room, W: int) -> None:
     room.cols      = len(line)
     room.cells     = [[CellType.FLOOR] * room.cols]
     room.char_runs = [CharRun(0, 0, tuple(line), spec['kind'])]
-    # Seat the Archivist on his desk (top-right); present by reaching the hall's end ($).
-    didx = line.find(_LIB_DESK[0])
-    arch_col = didx + 1 if didx >= 0 else room.cols - 1
+    # The Archivist paces the hall (see _enemy_tick); just keep him in bounds here.
     for e in room.entities:
         if e.kind == 'archivist':
-            e.col = arch_col
+            e.col = min(max(1, e.col), room.cols - 2)
     room._lib_w = W
     room.rebuild_indexes()
 
@@ -5394,13 +5390,15 @@ def build_dungeon_archivists_library(seed: int) -> Dungeon:
     room.lib_briefed = False      # has the player seen the post-wrap brief?
     room._lib_arch_flag = False   # debounces the on-Archivist trigger
 
-    # The Archivist starts off the first screen (resting at the far corner); ':set wrap'
-    # folds the line into the viewport and brings him into view.
+    # The Archivist paces the hall (ai='wander' → oscillates in _enemy_tick); he starts
+    # off the first screen, and ':set wrap' folds the line in so the player sees him move.
     room.entities = [
         Entity(kind='entry_marker', row=0, col=0),
-        Entity(kind='archivist',    row=0, col=1),
+        Entity(kind='archivist',    row=0, col=1, ai='wander', ai_speed=2, move_dir=1),
     ]
     _lib_layout(room, _LIB_FALLBACK_W)
+    arch = next(e for e in room.entities if e.kind == 'archivist')
+    arch.col = room.cols // 2                  # start him pacing mid-hall
 
     dungeon.rooms        = [room]
     dungeon.current_room = 0

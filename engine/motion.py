@@ -73,10 +73,12 @@ def _reveal_from(room, player_r: int, player_c: int) -> None:
 
 def _cell_char(room, r: int, c: int) -> str:
     """Return the printable character at (r, c) for f/F/t/T target matching."""
+    ent = room.entity_at(r, c)
+    if ent and ent.kind == 'archivist':
+        return 'A'                      # he paces over the library art; his glyph wins (fA finds him)
     ru = room.char_run_at(r, c)
     if ru:
         return ru.symbols[c - ru.col]
-    ent = room.entity_at(r, c)
     if ent:
         if ent.kind == 'dynamite':  return '!'
         if ent.kind == 'goblin':    return 'g'

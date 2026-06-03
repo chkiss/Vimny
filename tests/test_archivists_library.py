@@ -39,16 +39,15 @@ def _suit_slots(d):
 
 
 # ── builder structure ───────────────────────────────────────────────────────
-def test_archivist_seat_is_findable_by_f():
-    # The Archivist is an entity drawn over the buffer, so fA could only ever find a
-    # literal 'A'. Keep one at his seat so `fA` reaches him (regression: it used to
-    # stop at the 'A' in the title with nothing beyond it).
+def test_archivist_is_findable_by_f():
+    # The Archivist paces the hall (ai='wander') and fA must find him just like fg/fW
+    # finds a goblin/Warden — his glyph wins over the library art under him.
+    from engine.motion import _cell_char
     d = _dungeon()
     dg._lib_layout(d.room, 72)
-    line = ''.join(d.room.char_runs[0].symbols)
     arch = next(e for e in d.room.entities if e.kind == 'archivist')
-    assert line[arch.col] == 'A'
-    assert line.count('A') >= 2          # the title's A, then the Archivist's
+    assert arch.ai == 'wander'
+    assert _cell_char(d.room, arch.row, arch.col) == 'A'
 
 
 def test_builder_structure():
@@ -75,8 +74,8 @@ def _winning_script(d):
             keys += _cmd('e!')
             cur = (cur + 1) % len(d.room.lib_seq)
         keys += _cmd(f'w {suit}')
-    # the Archivist rests at the far corner; $ jumps the player onto him to present
-    keys += [_ks('$')]
+    # the Archivist paces the hall; fA·fA lands on him (past the title's A) to present
+    keys += [_ks('f'), _ks('A'), _ks('f'), _ks('A')]
     return keys
 
 
@@ -115,7 +114,7 @@ def test_forgery_is_lethal(monkeypatch):
             keys += _cmd('e!')
             cur = (cur + 1) % len(d.room.lib_seq)
         keys += _cmd(f'w {wrong[suit]}')   # file this folio under a different suit's name
-    keys += [_ks('$')]                     # present forged folios
+    keys += [_ks('f'), _ks('A'), _ks('f'), _ks('A')]   # present forged folios
 
     monkeypatch.setattr(main, 'render_all', lambda *a, **k: None)
     term = Terminal()
