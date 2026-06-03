@@ -25,6 +25,9 @@ A terminal dungeon crawler that teaches Vim through play. The dungeons are text 
 
 - Python 3.9+
 - `blessed` library
+- A terminal **at least 80 columns** wide (the supported minimum). The playfield
+  grows with the window up to **189 columns** (the overworld and The Archivist's
+  Library use the extra width); beyond that it stops widening.
 
 ```bash
 pip install blessed

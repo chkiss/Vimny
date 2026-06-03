@@ -1,8 +1,10 @@
 from blessed import Terminal
 
 def inner_w(term: Terminal) -> int:
-    """Inner playfield width: terminal width clamped to [80, 120], minus 2 borders."""
-    return min(max(term.width, 80), 120) - 2
+    """Inner playfield width: terminal width clamped to [80, 189], minus 2 borders.
+    80 is the minimum supported terminal width; 189 the maximum we lay out to (wide
+    enough for the overworld and The Archivist's Library)."""
+    return min(max(term.width, 80), 189) - 2
 
 
 def subtree_lines(label: str, items: list, entry_type: str, key: str = 'item') -> list[dict]:

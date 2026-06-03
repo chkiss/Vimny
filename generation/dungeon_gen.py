@@ -5329,7 +5329,8 @@ def _lib_floor_spec(inner: int, rng, filled=(), tables=None,
     sl, ss = band([(g[s], s in F) for s in _LIB_SUITS])
     table  = _lib_table_band(inner, rng, tables)
     body   = [_lib_title_row(inner, title), cl, cs, *table, sl, ss]
-    kinds  = ['ember', 'ancient', 'ancient', *(['ember'] * len(table)), 'ancient', 'ancient']
+    # title + shelves + frame in ancient indigo; only the reading tables glow ember.
+    kinds  = ['ancient', 'ancient', 'ancient', *(['ember'] * len(table)), 'ancient', 'ancient']
     return {'kind': 'ancient', 'border': 'ancient', 'body': body, 'kinds': kinds}
 
 
@@ -5358,7 +5359,7 @@ def _lib_place_desk(room, c0: int) -> None:
     parts = []
     if off > 0:
         parts.append(CharRun(0, ru.col, tuple(s[:off]), ru.kind))
-    parts.append(CharRun(0, c0, tuple(_LIB_DESK), 'ember'))
+    parts.append(CharRun(0, c0, tuple(_LIB_DESK), 'ancient'))
     tail = s[off + len(_LIB_DESK):]
     if tail:
         parts.append(CharRun(0, c0 + len(_LIB_DESK), tuple(tail), ru.kind))
