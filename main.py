@@ -1787,6 +1787,7 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
     _LIB_BRIEF = ["Great Vim — you've fixed my library!",
                   'Some of my folios are still missing... a vandal is about...',
                   'Might I trouble a young reader to seek them out? My old eyes fail me so.']
+    _LIB_W11   = 'W11: Warning: File "library" has changed since editing started'
 
     def _lib_brief_step(near):
         # Post-wrap brief: line 1 on approach, each later line on the next step, then
@@ -1807,17 +1808,17 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
                 room.lib_steps    = 0
                 room.lib_scramble_at = random.randint(6, 12)
                 _lib_scramble()               # he ransacks the shelves, in front of you
-        if room.lib_dlg >= 4:
-            # Vim's real "file changed underfoot" warning — red statusline, not dialogue.
-            player.error = 'W11: Warning: File "library" has changed since editing started'
-            # Linger in the hall without reloading and he ransacks it again.
-            if player.col != getattr(room, 'lib_step_col', player.col):
-                room.lib_step_col = player.col
-                room.lib_steps += 1
-                if room.lib_steps >= room.lib_scramble_at:
-                    room.lib_steps = 0
-                    room.lib_scramble_at = random.randint(6, 12)
-                    _lib_scramble()
+                player.error = _LIB_W11       # ...and Vim warns the file changed
+        # Linger in the hall without reloading and he ransacks it again — only THEN
+        # (right after a scramble) does the red W11 warning appear.
+        if room.lib_dlg >= 4 and player.col != getattr(room, 'lib_step_col', player.col):
+            room.lib_step_col = player.col
+            room.lib_steps += 1
+            if room.lib_steps >= room.lib_scramble_at:
+                room.lib_steps = 0
+                room.lib_scramble_at = random.randint(6, 12)
+                _lib_scramble()
+                player.error = _LIB_W11
 
     def _lib_strike(line):
         # The Archivist turns on the player and GIVES CHASE (he hunts you down the hall
@@ -2006,8 +2007,8 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
                     _lib_reload(force=(cmd == 'e!'))
 
                 elif (level == 'archivists_library' and cmd.startswith('w ')
-                        and cmd[2:].strip() in _dg._LIB_SUITS):
-                    _lib_file(cmd[2:].strip())
+                        and cmd[2:].strip()):
+                    _lib_file(cmd[2:].strip())   # :w {any filename} — only the suit names win
 
                 elif cmd == 'w':
                     if edit_mode and player_name == 'admin':
@@ -2948,8 +2949,10 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
                         cut_items.append(item)
                 if cut_items:
                     player.edit_clip = cut_items
-                    descs = ', '.join(_clip_desc(i) for i in cut_items)
-                    _push(f'Cut {len(cut_items)}: {descs}')
+                    if len(cut_items) > 1:
+                        _push(f'Cut {len(cut_items)} characters')
+                    else:
+                        _push(f'Cut 1: {_clip_desc(cut_items[0])}')
                     player.last_change = action
                 else:
                     ed_undo.pop()
@@ -3070,7 +3073,7 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
                     budget.spend(1)
                     _push('Key picked up — use p to unlock a door.')
                     interacted = True
-                elif cur and cur.kind in ('goblin', 'warden'):
+                elif cur and cur.kind in ('goblin', 'warden', 'archivist'):
                     cur.hp -= 1
                     budget.spend(1)
                     interacted = True
@@ -3153,8 +3156,10 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
                         if is_ledge(room, player.row):
                             close_gap(room, player.row, player.col, count)   # ledge: pull the tail left
                         budget.spend(1)
-                        descs = ', '.join(_clip_desc(i) for i in cut_items)
-                        _push(f'Cut {len(cut_items)}: {descs}')
+                        if len(cut_items) > 1:
+                            _push(f'Cut {len(cut_items)} characters')
+                        else:
+                            _push(f'Cut 1: {_clip_desc(cut_items[0])}')
                         player.last_change = action
                         seal_msg = _check_seal_broken(room)
                         if seal_msg:
@@ -3510,7 +3515,7 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
                     continue
                 if _manhattan(player.row, player.col, ent.row, ent.col) <= _ATTACK_RADIUS:
                     attackers.append(ent)
-                    player.take_damage(1)
+                    player.take_damage(10 if ent.kind == 'archivist' else 1)
                     if player.is_dead:
                         message = '** GAME OVER ** Type  :e  to re-load the dungeon.'
                         msg_ttl = 2
