@@ -5230,70 +5230,52 @@ def _lib_frame(W: int, body: list) -> str:
     return ''.join(rows)        # each row is exactly W chars → (rows)*W total
 
 
+# A library floor drawn top-down: rows of book-stacks (each labelled), reading
+# tables with chairs. Full stacks are ▐█▌; the four SUIT stacks stand empty (▐ ▌)
+# until their folios are refiled.
+_LIB_GAP    = '   '
+_LIB_TABLES = 'o▭▭▭o      o▭▭▭o      o▭▭▭o'
+
+
+def _lib_band(labels: list, fill: list) -> tuple:
+    """One shelf-band: a label row (a glyph centred over each stack) and a stack row."""
+    lab   = _LIB_GAP.join(f' {g} ' for g in labels)
+    shelf = _LIB_GAP.join('▐█▌' if f else '▐ ▌' for f in fill)
+    return lab, shelf
+
+
 def _lib_catalog_spec() -> dict:
     g = _LIB_SUIT_GLYPH
-    body = [
-        "T H E   A R C H I V I S T ' S   L I B R A R Y",
-        "▌▎█▐▌  │  ▐█▎▌▐  │  ▌▐█▎▌  │  ▐▌█▎▐  │  ▌█▐▎▌",
-        "",
-        "Some fiend ran  :set nowrap  —",
-        "and my shelves spilled into one endless line.",
-        "",
-        ":set wrap   reshelve the hall",
-        ":e!  leaf onward       :w <suit>  file a folio",
-        f"{g['hearts']} hearts    {g['diamonds']} diamonds    "
-        f"{g['spades']} spades    {g['clubs']} clubs",
-    ]
+    l1, s1 = _lib_band(['▦', '▦', g['hearts'], '▦', g['diamonds'], '▦'],
+                       [1, 1, 0, 1, 0, 1])
+    l2, s2 = _lib_band(['▦', g['spades'], '▦', '▦', g['clubs'], '▦'],
+                       [1, 0, 1, 1, 0, 1])
+    body = ['L I B R A R Y', '', l1, s1, s1, _LIB_TABLES, l2, s2, s2]
     return {'suit': None, 'kind': 'ancient', 'body': body}
 
 
 def _lib_suit_spec(suit: str) -> dict:
     g    = _LIB_SUIT_GLYPH[suit]
-    band = (' '.join([g] * 14))
-    shelf = (' '.join(['▌▐ ' + g] * 7))
-    body = [
-        f"{g}   T H E   {'   '.join(suit.upper())}   F O L I O   {g}",
-        band,
-        shelf,
-        "",
-        f"a clean leaf, every margin inked with {suit}",
-        "",
-        "if this is a suit you seek —",
-        f"file it:   :w {suit}",
-        band,
-    ]
+    row  = ' '.join([g] * 7)
+    full = '▐' + '█' * 15 + '▌'
+    mid  = '▐█' + _lib_center(' '.join([g] * 3), 13) + '█▌'
+    body = ['  '.join(suit.upper()), '', row, full, mid, full, row, '', '']
     return {'suit': suit, 'kind': 'ember', 'body': body}
 
 
 def _lib_decoy_spec(n: int) -> dict:
-    body = [
-        "≋ ≋ ≋    R U I N E D   L E A F    ≋ ≋ ≋",
-        "~ " * 18,
-        "▒▓░▒  ▓░▒▓  ░▒▓░  ▒▓░▒  ▓░▒▓  ░▒▓",
-        "",
-        "the ink has run — no suit survives here",
-        "",
-        "do not file this leaf",
-        ":e!   on to the next manuscript",
-        "≋ " * 18,
-    ]
+    full = '▐' + '░▒▓' * 5 + '▌'
+    mid  = '▐░' + _lib_center('~ ~ ~ ~', 13) + '▒▌'
+    body = ['R U I N E D   L E A F', '',
+            '░ ▒ ▓ ░ ▒ ▓ ░', full, mid, full, '▓ ░ ▒ ▓ ░ ▒ ▓', '', '']
     return {'suit': None, 'kind': 'verdant', 'body': body}
 
 
 def _lib_finale_spec() -> dict:
     g = _LIB_SUIT_GLYPH
-    body = [
-        f"{g['hearts']} {g['diamonds']}    T H E   L I B R A R Y   "
-        f"R E S T O R E D    {g['spades']} {g['clubs']}",
-        "▌▎█▐▌  ▐█▎▌▐  ▌▐█▎▌  ▐▌█▎▐  ▌█▐▎▌  ▐█▌▎▐",
-        "",
-        "Every suit shelved in its place; the Archivist bows low.",
-        "",
-        "Open his two chests for their gifts —",
-        "then  :wq  to leave the hall.",
-        "",
-        f"{g['hearts']}  {g['diamonds']}  {g['spades']}  {g['clubs']}",
-    ]
+    l1, s1 = _lib_band([g['hearts'], '▦', g['diamonds'], '▦', g['spades'], g['clubs']],
+                       [1, 1, 1, 1, 1, 1])
+    body = ['L I B R A R Y   R E S T O R E D', '', l1, s1, s1, _LIB_TABLES, s1, s1, '']
     return {'suit': None, 'kind': 'ember', 'body': body}
 
 

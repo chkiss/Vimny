@@ -2080,6 +2080,11 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
                             else:
                                 _push((':set ' if _act in ('on', 'reset') else '')
                                       + (_flag if _new else 'no' + _flag))
+                            if (level == 'archivists_library' and _flag == 'wrap'
+                                    and _new and not getattr(room, 'lib_done', None)):
+                                _push('The hall folds into view.')
+                                _push('The Archivist waits at his desk —')
+                                _push('press  $  to cross to him.')
                         else:
                             player.number_mode, _set_msg = _apply_set(
                                 player.number_mode, cmd[len('set'):])
