@@ -2087,9 +2087,8 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
                                       + (_flag if _new else 'no' + _flag))
                             if (level == 'archivists_library' and _flag == 'wrap'
                                     and _new and not getattr(room, 'lib_done', None)):
-                                _push('The hall folds into view.')
-                                _push('The Archivist waits at his desk —')
-                                _push('press  $  to cross to him.')
+                                _push('The hall unfolds — the Archivist (the gold A) sits at his desk, top-right.')
+                                _push('Reach him with  fA  (press it again to pass the title), or just  $.')
                         else:
                             player.number_mode, _set_msg = _apply_set(
                                 player.number_mode, cmd[len('set'):])
@@ -2586,14 +2585,17 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
                     redo_stack.clear()
                     _push('The door seals shut behind you — there is no going back.')
 
-                # The Archivist's Library: reaching the hall's end ($) calls the
-                # Archivist over — to brief you, or to receive the filed folios.
+                # The Archivist's Library: stepping onto the Archivist (his seat, the
+                # 'A' — reachable with fA) OR reaching the hall's end ($) calls him over.
                 if level == 'archivists_library':
-                    _at_end = player.col == room.cols - 1
-                    if _at_end and not room._lib_arch_flag:
+                    _arch = next((e for e in room.entities
+                                  if e.kind == 'archivist' and e.alive), None)
+                    _here = ((_arch is not None and player.col == _arch.col)
+                             or player.col == room.cols - 1)
+                    if _here and not room._lib_arch_flag:
                         room._lib_arch_flag = True
                         _lib_on_archivist()
-                    elif not _at_end:
+                    elif not _here:
                         room._lib_arch_flag = False
 
                 # Win / exit check

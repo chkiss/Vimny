@@ -5236,7 +5236,9 @@ def _lib_frame(W: int, body: list) -> str:
 # stacks are labelled with chess pieces; books resting on a table are ≡.
 # Decorative shelf labels that fill the hall wall-to-wall (always full shelves).
 _LIB_FILLERS = ['✦', '❋', '◈', '❖', '⬡', '✤', '⟡', '❉', '✣', '❀', '✿', '⚘', '✻', '❈']
-_LIB_DESK    = '╓─╖'                # the Archivist's small desk (top-right corner)
+_LIB_DESK    = '╓A╖'                # the Archivist's small desk (top-right); the literal
+                                    # A is his seat, so fA can find him (the gold entity
+                                    # renders over it)
 
 
 def _lib_table_band(inner: int, rng) -> list:

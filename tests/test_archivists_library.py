@@ -39,6 +39,18 @@ def _suit_slots(d):
 
 
 # ── builder structure ───────────────────────────────────────────────────────
+def test_archivist_seat_is_findable_by_f():
+    # The Archivist is an entity drawn over the buffer, so fA could only ever find a
+    # literal 'A'. Keep one at his seat so `fA` reaches him (regression: it used to
+    # stop at the 'A' in the title with nothing beyond it).
+    d = _dungeon()
+    dg._lib_layout(d.room, 72)
+    line = ''.join(d.room.char_runs[0].symbols)
+    arch = next(e for e in d.room.entities if e.kind == 'archivist')
+    assert line[arch.col] == 'A'
+    assert line.count('A') >= 2          # the title's A, then the Archivist's
+
+
 def test_builder_structure():
     d = _dungeon()
     r = d.room
