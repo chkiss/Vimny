@@ -15,6 +15,7 @@ _MOTION_GUARD: dict[str, str] = {
     ';': ';',  ',': ',',
     'G': 'G',  'gg': 'G',
     'ge': 'ge', 'gE': 'gE',
+    'gj': 'display_move', 'gk': 'display_move',
     'H': 'H',  'M': 'M',  'L': 'L',
     '%': '%',
     '{': '{',  '}': '}',  '(': '(',  ')': ')',

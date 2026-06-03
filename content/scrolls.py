@@ -308,6 +308,32 @@ WARDEN_ACT_SCROLL = {
 }
 
 
+DISPLAY_LINE_SCROLL = {
+    'title': "◈   The Wrapped Line   ◈",
+    'lines': [
+        ('dim',   '  A long line folds to fill the page.'),
+        ('dim',   '  j and k leap whole lines — here is a finer step.'),
+        ('blank',),
+        ('cmd',   'gj', 'down one DISPLAY line'),
+        ('cmd',   'gk', 'up one DISPLAY line'),
+        ('blank',),
+        ('amber', '  Walk the wrap, not the line.'),
+    ],
+}
+
+EDIT_BY_NAME_SCROLL = {
+    'title': "◈   The Named Folio   ◈",
+    'lines': [
+        ('dim',   '  Every dungeon is a file; every file has a name.'),
+        ('blank',),
+        ('cmd',   ':e {name}', 'open a buffer by its name'),
+        ('blank',),
+        ('dim',   '  :e alone reloads — :e {name} opens another.'),
+        ('amber', '  Call a folio by its name.'),
+    ],
+}
+
+
 # ── Scroll catalog ────────────────────────────────────────────────────────────
 # id matches the key stored in progress['extras'] when the scroll is discovered.
 # dropped_by / level_slug / level_name are display metadata only.
@@ -344,6 +370,22 @@ SCROLL_CATALOG = [
         'level_slug': 'waypoint_sanctum',
         'level_name': 'The Waypoint Sanctum',
         'content':    WAYPOINT_SCROLL,
+    },
+    {
+        'id':         'display_move',
+        'title':      'The Wrapped Line',
+        'dropped_by': "The Archivist's Library",
+        'level_slug': 'archivists_library',
+        'level_name': "The Archivist's Library",
+        'content':    DISPLAY_LINE_SCROLL,
+    },
+    {
+        'id':         'edit_name',
+        'title':      'The Named Folio',
+        'dropped_by': "The Archivist's Library",
+        'level_slug': 'archivists_library',
+        'level_name': "The Archivist's Library",
+        'content':    EDIT_BY_NAME_SCROLL,
     },
     {
         'id':         'd_op',

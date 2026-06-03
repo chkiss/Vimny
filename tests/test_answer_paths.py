@@ -82,6 +82,7 @@ _SKIP_LEVELS = {
     'build_dungeon_wardens_keep',     # The Warden's Keep (boss)
     'build_dungeon_warden_surveyor',  # The Warden Surveyor (boss)
     'build_dungeon_dummy',  # Dummy Dungeon (test scaffold)
+    'build_dungeon_archivists_library',  # The Archivist's Library (contextual :e!/:w loop; no keystroke par)
 }
 _XFAIL_LEVELS: dict = {}
 
