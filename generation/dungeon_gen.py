@@ -5241,8 +5241,9 @@ _LIB_CHESS    = ['♚', '♛', '♜', '♝', '♞']
 _LIB_FILLERS  = ['✦', '❋', '◈', '❖', '⬡', '✤', '⟡', '❉', '✣', '❀', '✿', '⚘', '✻', '❈',
                  '✠', '✢', '✥', '✧', '✩', '✪', '✫', '✬', '✭', '✮', '✯',
                  '❂', '❄', '❅', '❆', '❇', '❊', '❍', '♔', '♕', '♖', '♗', '♘', '♙', '♪']
-_LIB_DESK       = '╓─╖'              # the Archivist's small desk
+_LIB_DESK       = '╓─╖'              # the Archivist's small desk (ember)
 _LIB_TBL_SURF2  = 5                  # body index of the reading table's 2nd surface row
+_LIB_BORDER     = set('┌─┐│└┘◠◡')    # box-drawing glyphs — always drawn in ancient indigo
 
 
 def _lib_folio_tables(fill, rng) -> list:
@@ -5359,7 +5360,7 @@ def _lib_place_desk(room, c0: int) -> None:
     parts = []
     if off > 0:
         parts.append(CharRun(0, ru.col, tuple(s[:off]), ru.kind))
-    parts.append(CharRun(0, c0, tuple(_LIB_DESK), 'ancient'))
+    parts.append(CharRun(0, c0, tuple(_LIB_DESK), 'ember'))   # the desk glows amber
     tail = s[off + len(_LIB_DESK):]
     if tail:
         parts.append(CharRun(0, c0 + len(_LIB_DESK), tuple(tail), ru.kind))
@@ -5388,8 +5389,19 @@ def _lib_layout(room, W: int) -> None:
     room.char_runs = []
     col = 0
     for rowstr, kind in rows:
-        room.char_runs.append(CharRun(0, col, tuple(rowstr), kind))
-        col += len(rowstr)
+        # Split each row so box-drawing borders stay ancient indigo while the row's
+        # own content (table books, etc.) keeps its colour — e.g. blue table frames
+        # around amber books.
+        j, n = 0, len(rowstr)
+        while j < n:
+            border = rowstr[j] in _LIB_BORDER
+            k = j
+            while k < n and (rowstr[k] in _LIB_BORDER) == border:
+                k += 1
+            room.char_runs.append(CharRun(0, col + j, tuple(rowstr[j:k]),
+                                          'ancient' if border else kind))
+            j = k
+        col += n
     room.rebuild_indexes()
     room._lib_desk_col = _lib_desk_col(W, spec['body'])
     _lib_place_desk(room, room._lib_desk_col)
@@ -5447,7 +5459,7 @@ def build_dungeon_archivists_library(seed: int) -> Dungeon:
     room.entities = [
         Entity(kind='entry_marker', row=0, col=0),
         Entity(kind='archivist',    row=0, col=1, ai='wander', ai_speed=1, move_dir=1,
-               hp=5, max_hp=5),       # max_hp so the combat tick tracks his attacks
+               hp=100, max_hp=100),   # tanky, but his 10-damage strike is what stops you
     ]
     _lib_layout(room, _LIB_FALLBACK_W)   # seats the Archivist at his desk (he paces off later)
 

@@ -67,6 +67,20 @@ def test_unique_labels_folios_and_desk():
     assert sorted(it['suit'] for it in r.lib_seq if it['suit']) == sorted(dg._LIB_SUITS)
 
 
+def test_w_accepts_arbitrary_filename(monkeypatch):
+    # :w {file} writes to ANY name (Vim-faithful); only the suit names win the level.
+    d = _dungeon()
+    msgs = []
+    monkeypatch.setattr(main, 'render_all',
+                        lambda term, dungeon, player, budget, message='', *a, **k: msgs.append(message))
+    term = Terminal()
+    it = iter(_cmd('set wrap') + _cmd('e!') + _cmd('w suits') + _cmd('q!'))
+    monkeypatch.setattr(term, 'inkey', lambda *a, **k: next(it, _ks('')))
+    main.run_dungeon(term, 'archivists_library', {}, player_name='admin', _dungeon=d)
+    assert 'suits' in d.room.lib_filed                       # filed under the arbitrary name
+    assert not any('Unknown command' in (m or '') for m in msgs)
+
+
 def test_brief_dialogue_advances_by_steps_then_editing(monkeypatch):
     # Approaching starts the brief; each further step advances it; after the last
     # line the Archivist edits the buffer (books toggle) and Vim warns W11.
