@@ -243,6 +243,8 @@ engine/
   vim_parser.py          Keystroke → action dict
   motion.py              apply_motion, move_player
   reflow.py              Reflow editing primitives (insert/delete/join/ledge-build)
+  search.py              / ? n N * # — Vim-regex search, matched per line
+  substitute.py          :s :g :v & — ex substitute & global
   budget.py              Budget tracking
 generation/
   dungeon_gen.py         build_dungeon_<slug> per level, Dijkstra par solvers
