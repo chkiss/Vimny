@@ -70,7 +70,7 @@ LEVELS = [
     {'display': '35',   'slug': 'sentence_enclosure',    'name': 'The Sentence Enclosure',     'commands': 'is as', 'teaches': ['is', 'as']},
     {'display': '36',   'slug': 'paragraph_enclosure',   'name': 'The Paragraph Enclosure',    'commands': 'ip ap', 'teaches': ['ip', 'ap']},
     {'display': '36.1', 'slug': 'grandmasters_sanctum',  'name': "The Grandmaster's Sanctum",  'type': 'boss', 'after': 'paragraph_enclosure', 'teaches': []},
-    {'display': '37',   'slug': 'spellwrights_forge',    'name': "The Spellwright's Forge",    'commands': ':s///', 'teaches': []},
+    {'display': '37',   'slug': 'spellwrights_forge',    'name': "The Spellwright's Forge",    'commands': ':s///  :g  &', 'teaches': ['subst']},
     {'display': '38',   'slug': 'hall_of_echoes',        'name': 'The Hall of Echoes',         'commands': 'q @ "', 'teaches': ['q', '@', 'reg_named']},
     {'display': '38.1', 'slug': 'warden_eternal',        'name': 'The Warden Eternal',         'type': 'boss', 'after': 'hall_of_echoes', 'teaches': []},
     {'display': '99',   'slug': 'dummy',                 'name': 'Dummy Dungeon',              'commands': 'd x s y p yy P', 'admin_only': True, 'teaches': []},

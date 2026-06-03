@@ -36,7 +36,8 @@ from content.scrolls import (
 
 _JUMP_MOTIONS = frozenset({'G', 'gg', '%', '{', '}', '(', ')'})
 from engine.operator import op_delete, op_yank, op_paste, op_case, op_join, case_char, apply_indent, INDENT_WIDTH, entity_clip
-from engine.reflow import is_ledge, close_gap, void_col
+from engine.reflow import is_ledge, close_gap, void_col, _insert_blank_row, remove_row
+from engine import substitute as _subst
 from engine.insert import (
     begin_insert, insert_char, insert_char_extend, insert_backspace,
     insert_delete_word_back, insert_delete_to_start,
@@ -713,9 +714,15 @@ def _victory_cell_bg(term, room, player, iw, game_h):
     terminal cell, so overlaid victory glyphs blend into the room (not a flat band)."""
     vr_start = max(0, min(player.row - game_h // 2, room.rows - game_h))
     vc_start = max(0, min(player.col - iw // 2, room.cols - iw))
+    # A soft-wrapped buffer (e.g. The Archivist's Library) is ONE logical row whose view
+    # fills the whole screen with floor; walking room.cells by row would paint every line
+    # past the first as wall_bg, so the banner backdrop wouldn't match the room. Flat floor.
+    wrap = getattr(room, 'wrap_buffer', False)
 
     def bg_at(term_r, term_c):
         if not (3 <= term_r < 3 + game_h and 1 <= term_c <= iw):
+            return C.floor_bg()
+        if wrap:
             return C.floor_bg()
         room_r = (term_r - 3) + vr_start
         room_c = (term_c - 1) + vc_start
@@ -958,13 +965,26 @@ def _snapshot(room, player, budget, *, row=None, col=None, spent=None, ans=None)
     }
 
 
-def _pop_history_step(src: list, dst: list, room, player, budget) -> bool:
-    """Pop one normal-mode undo/redo entry from src, restore state, push inverse to dst."""
+def _pop_history_step(src: list, dst: list, room, player, budget, is_redo: bool = False) -> bool:
+    """Pop one normal-mode undo/redo entry from src, restore state, push inverse to dst.
+
+    A movement entry may carry a 6th element ('f'|'s', recost) tagging the find/search
+    that established the ;/, or n/N repeat register. Undoing it arms pending_recost so the
+    next repeat re-pays the full cost (it can't inherit a refunded find/search for 1 key);
+    redoing it clears the arm again. The tag rides along to the inverse so undo/redo stay
+    symmetric."""
     if not src:
         return False
     item = src.pop()
     if isinstance(item, dict):
-        dst.append(_snapshot(room, player, budget))
+        marker = item.get('recost')           # ('c', recost): a tagged change (see the dot accounting)
+        inv = _snapshot(room, player, budget)
+        if marker is not None:
+            inv['recost'] = marker
+        dst.append(inv)
+        if marker is not None:
+            reg, recost = marker
+            setattr(player, f'pending_recost_{reg}', 0 if is_redo else recost)
         player.row, player.col = item['row'], item['col']
         budget.spent  = item['spent']
         room.entities = item['entities']
@@ -982,12 +1002,16 @@ def _pop_history_step(src: list, dst: list, room, player, budget) -> bool:
             room.answer_pos      = item['answer_pos']
             room.answer_diverged = item['answer_diverged']
     else:
-        dst.append((player.row, player.col, budget.spent,
-                    room.answer_pos, room.answer_diverged))
+        marker = item[5] if len(item) >= 6 else None
+        inv = (player.row, player.col, budget.spent, room.answer_pos, room.answer_diverged)
+        dst.append(inv + (marker,) if marker is not None else inv)
         r, c, s = item[0], item[1], item[2]
         player.row, player.col, budget.spent = r, c, s
-        if len(item) == 5:
+        if len(item) >= 5:
             room.answer_pos, room.answer_diverged = item[3], item[4]
+        if marker is not None:
+            reg, recost = marker
+            setattr(player, f'pending_recost_{reg}', 0 if is_redo else recost)
     return True
 
 
@@ -1330,15 +1354,15 @@ def _enemy_tick(room, player) -> list:
                 if (0, nc) != (player.row, player.col) and nc != ent.col:
                     room.move_entity(ent, 0, nc)
             elif ent.ai:
-                # Discrete gait: single-cell steps two at a time (a quick step-step),
-                # with the occasional gj/gk hop. (summon_timer = steps left in this gait.)
+                # Discrete gait: two cells per tick (a brisk, even pace), with the
+                # occasional gj/gk display-row hop. (summon_timer = ticks left in this run.)
                 ent.ai_tick += 1
                 if ent.ai_tick % ent.ai_speed == 0:
                     if ent.summon_timer <= 0:
                         if random.random() < 0.2:
                             ent.move_dir, ent.summon_timer = random.choice([-w, w]), 1
                         else:
-                            ent.move_dir, ent.summon_timer = random.choice([-1, 1]), 2
+                            ent.move_dir, ent.summon_timer = random.choice([-2, 2]), 2
                     ent.summon_timer -= 1
                     nc = min(max(1, ent.col + ent.move_dir), room.cols - 2)
                     if (0, nc) != (player.row, player.col) and nc != ent.col:
@@ -1679,6 +1703,43 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
         if text not in msg_pool:
             msg_pool.append(text)
 
+    # ── :s / :g — buffer-shifting + confirm (c flag) callbacks ──────────────
+    def _sub_insert_row(at):
+        _insert_blank_row(room, at + 1, at, player)
+
+    def _sub_delete_row(at):
+        return remove_row(room, at, player)
+
+    def _sub_confirm(row, c0, c1):
+        """The :s/c flag: show the match under the cursor, ask y/n/a/q/l."""
+        player.row, player.col = row, c0
+        render_all(term, dungeon, player, budget,
+                   'replace with (y)es (n)o (a)ll (q)uit (l)ast?')
+        while True:
+            k = term.inkey(timeout=0.2)
+            if not k:
+                continue
+            if k.name == 'KEY_ESCAPE':
+                return 'q'
+            ch = str(k).lower()
+            if ch in 'ynaql':
+                return ch
+
+    def _forge_check():
+        """The Spellwright's Forge: dissolve the sanctum seal once every line is mended
+        (no 'old' corruption and no 'curse' verse remain)."""
+        seal = getattr(room, '_forge_seal', None)
+        if seal is None:
+            return
+        texts = [_subst.line_text(room, r)[0] for r in range(room.rows)]
+        if any('old' in t for t in texts) or any('curse' in t for t in texts):
+            return
+        sr, sc = seal
+        if room.cells[sr][sc] == CellType.WALL:
+            room.cells[sr][sc] = CellType.FLOOR
+        room._forge_seal = None
+        _push('The wards dissolve — the spellwork rings true. The way opens!')
+
     # ── The Archivist's Library (L17) — reload loop + reckoning ─────────────
     def _lib_w():
         gut = 0 if getattr(player, 'number_mode', 'none') == 'none' else 4
@@ -1933,6 +1994,8 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
     while True:
         if level == 'archivists_library':
             _lib_sync()                          # re-tighten the frame on terminal resize
+        elif level == 'spellwrights_forge':
+            _forge_check()                       # open the sanctum seal once the rites are true
         # Macro playback: drain queued keystrokes before reading the terminal.
         if macro_pending:
             macro_run_keys += 1
@@ -2213,6 +2276,27 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
                                 player.number_mode, cmd[len('set'):])
                             _push(_set_msg)
 
+                elif _subst.looks_like_sg(cmd, room, player):
+                    if 'subst' not in player.known_commands and player_name != 'admin':
+                        player.error = 'E492: Not an editor command: ' + cmd
+                    else:
+                        _pre = _snapshot(room, player, budget, ans=cmd_start_ans)
+                        _sg_h, _sg_msg, _ns, _nl = _subst.run_ex(
+                            cmd, room, player, confirm=_sub_confirm,
+                            insert_row=_sub_insert_row, delete_row=_sub_delete_row)
+                        if _sg_h and (_ns or _nl):
+                            undo_stack.append(_pre)
+                            redo_stack.clear()
+                            if not edit_mode:
+                                budget.spend(len(cmd) + 1)
+                            room.rebuild_indexes()
+                            if _sg_msg:
+                                _push(_sg_msg)
+                        elif _sg_msg and _sg_msg.startswith('E'):
+                            player.error = _sg_msg
+                        elif _sg_msg:
+                            _push(_sg_msg)
+
                 else:
                     _push(f'Unknown command: :{cmd}')
 
@@ -2265,9 +2349,11 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
                             _record_jump(player, (player.row, player.col))
                         player.row, player.col = dest
                         if not edit_mode:
-                            budget.spend(len(pattern) + 2)
+                            _scost = len(pattern) + 2
+                            budget.spend(_scost)
+                            player.pending_recost_s = 0      # a fresh search is paid
                             if not from_visual:
-                                undo_stack.append(pre)
+                                undo_stack.append(pre + (('s', _scost),))
                                 redo_stack.clear()
                     else:
                         _push(f'Pattern not found: {pattern}')
@@ -2588,6 +2674,12 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
 
         prev_pos = (player.row, player.col, budget.spent,
                     cmd_start_ans[0], cmd_start_ans[1])
+        # Baselines for the centralised '.'-cost + change re-cost accounting below.
+        _spent_before = budget.spent
+        _lc_before    = player.last_change
+        _undo_len0    = len(undo_stack)
+        _dot_active   = False
+        _dot_cost     = 0
         prev_adjacent_ids = {
             id(e) for e in room.entities
             if e.alive and e.max_hp
@@ -2612,6 +2704,13 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
             if repeat_count != 1:
                 action['count'] = repeat_count
             count = action.get('count', 1)
+            # '.' is ONE keystroke: it should cost its own keypress(es), not the change's
+            # full price — unless its change was undone, in which case it re-pays in full
+            # (pending_recost_c). The re-dispatched handler charges full below; the
+            # centralised settle (before the combat block) refunds down to the dot's cost.
+            _dot_active = True
+            _dot_cost   = player.pending_recost_c or _keystroke_cost(repeat_count)
+            player.pending_recost_c = 0
 
         if action['type'] == 'motion':
             motion = action['motion']
@@ -2631,8 +2730,19 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
                 if motion in _JUMP_MOTIONS:
                     _record_jump(player, jump_from)
                 if not edit_mode:
-                    budget.spend(_keystroke_cost(count, motion))
-                    undo_stack.append(prev_pos)
+                    # Find-register accounting (anti-exploit): an f/F/t/T pays the full
+                    # find cost and tags its undo entry; undoing that find arms
+                    # pending_recost_f so the next ;/, re-pays the full cost instead of
+                    # inheriting the refunded find for 1 key. A ;/, that settles that
+                    # re-cost is tagged in turn, so undoing IT re-arms.
+                    if motion in ('f', 'F', 't', 'T'):
+                        cost, player.pending_recost_f, mark = _keystroke_cost(count, motion), 0, 'f'
+                    elif motion in (';', ',') and player.pending_recost_f:
+                        cost, player.pending_recost_f, mark = player.pending_recost_f, 0, 'f'
+                    else:
+                        cost, mark = _keystroke_cost(count, motion), None
+                    budget.spend(cost)
+                    undo_stack.append(prev_pos + ((mark, cost),) if mark else prev_pos)
                     redo_stack.clear()
 
                 if count > 1 and not count_tutorial_shown and not edit_mode and level == 'counting_crypts':
@@ -2919,8 +3029,17 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
                     moved = True
                 if moved:
                     _record_jump(player, search_from)
-                    budget.spend(_keystroke_cost(count, ''))
-                    undo_stack.append(prev_pos)
+                    # Same anti-exploit accounting as f/;/, (see the motion branch): * / #
+                    # establish the n/N register and tag their entry; an n/N that settles a
+                    # re-cost (after the search was undone) re-pays the full search cost.
+                    if action['type'] == 'search_word':
+                        cost, player.pending_recost_s, smark = _keystroke_cost(count, ''), 0, True
+                    elif player.pending_recost_s:
+                        cost, player.pending_recost_s, smark = player.pending_recost_s, 0, True
+                    else:
+                        cost, smark = _keystroke_cost(count, ''), False
+                    budget.spend(cost)
+                    undo_stack.append(prev_pos + (('s', cost),) if smark else prev_pos)
                     redo_stack.clear()
                 else:
                     _push(f'Pattern not found: {pattern}')
@@ -2949,7 +3068,7 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
             if edit_mode:
                 done = _ed_step_n(ed_redo, ed_undo, count, room, player)
             else:
-                done = sum(_pop_history_step(redo_stack, undo_stack, room, player, budget)
+                done = sum(_pop_history_step(redo_stack, undo_stack, room, player, budget, is_redo=True)
                            for _ in range(count))
             _push(f'{done} change(s) redone.' if done else 'Nothing to redo.')
 
@@ -3159,13 +3278,18 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
                         interacted = True
 
                 if not interacted:
+                    # Snapshot BEFORE _ed_cut mutates — it removes the character on the
+                    # spot, so a snapshot taken afterwards captures the already-cut state
+                    # and 'u' would refund the keystroke without restoring the character
+                    # (a free delete). Push it only if something was actually cut.
+                    pre_cut   = _snapshot(room, player, budget, ans=cmd_start_ans)
                     cut_items = []
                     for _ci in range(count):
                         item = _ed_cut(room, player.row, player.col + _ci)
                         if item:
                             cut_items.append(item)
                     if cut_items:
-                        undo_stack.append(_snapshot(room, player, budget, ans=cmd_start_ans))
+                        undo_stack.append(pre_cut)
                         redo_stack.clear()
                         _reg_write(player, '"',
                                    _clip_from_cut_chars(cut_items, player.col), is_delete=True)
@@ -3366,6 +3490,29 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
                 undo_stack.pop()
                 _push(_EDGE_OF_WORLD_MSG if room._last_build_blocked == 'edge' else 'Nothing to join.')
 
+        elif action['type'] == 'sub_repeat' and not edit_mode:
+            if not _action_allowed(action, player.known_commands):
+                _push(_guard_message(action, player.known_commands))
+                message = _pool_msg(); msg_ttl = _MSG_ROTATE_TTL
+                render_all(term, dungeon, player, budget, message, attack_pos=_attack_pos(), attack_sym=_attack_sym())
+                continue
+            _pre = _snapshot(room, player, budget, ans=cmd_start_ans)
+            _sr_msg, _ns, _nl = _subst.repeat_normal(
+                room, player, action['whole_file'], action['keep_flags'],
+                confirm=_sub_confirm, insert_row=_sub_insert_row, delete_row=_sub_delete_row)
+            if _ns or _nl:
+                undo_stack.append(_pre)
+                redo_stack.clear()
+                budget.spend(2 if action['whole_file'] else 1)
+                room.rebuild_indexes()
+                player.last_change = action
+                if _sr_msg:
+                    _push(_sr_msg)
+            elif _sr_msg and _sr_msg.startswith('E'):
+                player.error = _sr_msg
+            elif _sr_msg:
+                _push(_sr_msg)
+
         elif action['type'] == 'operator' and action['op'] in ('>', '<'):
             if not edit_mode and not _action_allowed(action, player.known_commands):
                 _push(_guard_message(action, player.known_commands))
@@ -3506,6 +3653,20 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
                 ed_undo.pop()
             else:
                 player.last_change = action
+
+        # ── '.' repeat cost + change re-cost accounting (centralised) ────────
+        # If a change ran this iteration (last_change changed and an undo entry was
+        # pushed): for '.', refund the change's full price down to the dot's own keypress
+        # cost; and tag the change's undo entry with its EFFECTIVE cost so undoing it arms
+        # pending_recost_c — the next '.' then re-pays in full, closing the undo-refund
+        # cheat (the same principle as f/;/ and search n/N).
+        if (not edit_mode and not budget.frozen
+                and player.last_change is not _lc_before and len(undo_stack) > _undo_len0):
+            if _dot_active:
+                budget.spent = _spent_before + _dot_cost
+            _top = undo_stack[-1]
+            if isinstance(_top, dict):
+                _top['recost'] = ('c', budget.spent - _spent_before)
 
         # ── Combat: enemy movement then adjacency attacks ────────────────────
         if not edit_mode:

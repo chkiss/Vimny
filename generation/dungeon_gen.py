@@ -5235,12 +5235,21 @@ def _lib_frame(W: int, body: list, kinds: list, border: str = 'ancient') -> list
 
 
 # A library floor drawn top-down: rows of labelled book-stacks (full ▤▤, empty □□),
-# reading tables, and the Archivist's desk. 48 DISTINCT stack labels — the 4 card
-# suits, 5 chess pieces, and 39 ornaments — never duplicated within a page.
-_LIB_CHESS    = ['♚', '♛', '♜', '♝', '♞']
-_LIB_FILLERS  = ['✦', '❋', '◈', '❖', '⬡', '✤', '⟡', '❉', '✣', '❀', '✿', '⚘', '✻', '❈',
-                 '✠', '✢', '✥', '✧', '✩', '✪', '✫', '✬', '✭', '✮', '✯',
-                 '❂', '❄', '❅', '❆', '❇', '❊', '❍', '♔', '♕', '♖', '♗', '♘', '♙', '♪']
+# reading tables, and the Archivist's desk. Stack labels are UNIQUE within a page —
+# the 4 card suits, 6 chess pieces, and a RANKED pool of 89 ornaments (crosses first,
+# then stars, snowflakes, florals, geometric & misc). The shelves fill the viewport
+# left-to-right and the ornament pool is drawn front-to-back, so a wider window simply
+# pulls in more glyphs in rank order. All glyphs are terminal width-1 (the wrapped page
+# must stay a perfect rectangle).
+_LIB_CHESS    = ['♚', '♛', '♜', '♝', '♞', '♟']
+_LIB_FILLERS  = ['✝', '✞', '✟', '✠', '✚', '✛', '✜', '✢', '✣', '†', '‡', '☩', '☦', '☨', '✙', '⁜',
+                 '✦', '✧', '✩', '✪', '✫', '✬', '✭', '✮', '✯', '✰', '★', '☆', '✱', '✲', '✴', '✵',
+                 '✶', '✷', '✸', '✹', '✺', '✳',
+                 '❀', '❁', '❂', '❃', '❄', '❅', '❆', '❇', '❈', '❉', '❊', '❋', '❍',
+                 '✿', '❦', '❧', '⁂', '⁕', '✾', '✽', '✼', '✻', '⚘', '☘',
+                 '◈', '◇', '◆', '❖', '⬡', '⬢', '⬣', '⟡', '⬠', '⬟', '⬨', '⬩',
+                 '♪', '♫', '♬', '♩', '⚜', '⚝', '☼',
+                 '❡', '❢', '☸', '☫', '⚹', '⚶', '⚸', '⸙']
 _LIB_DESK       = '╓─╖'              # the Archivist's small desk (ember)
 _LIB_TBL_SURF2  = 5                  # body index of the reading table's 2nd surface row
 _LIB_BORDER     = set('┌─┐│└┘◠◡')    # box-drawing glyphs — always drawn in ancient indigo
@@ -5311,17 +5320,19 @@ def _lib_floor_spec(inner: int, rng, filled=(), fill=None, fill_rng=None,
     Archivist pulled to pack it — so the empties always correspond to the table."""
     g       = _LIB_SUIT_GLYPH
     F       = set(filled)                          # suit stacks fill ONLY as the player saves them
-    ncells  = min(24, max(9, inner // 4))         # stacks per band (capped: labels stay unique)
-    pool    = list(_LIB_FILLERS)
-    rng.shuffle(pool)
-    take    = lambda: (pool.pop() if pool else '·')
+    pool    = list(_LIB_FILLERS)                   # ranked: pulled front-to-back as the page widens
+    # Shelves per band scale to fill the viewport left-to-right, bounded by the label pool
+    # so every stack stays uniquely labelled (no duplicates, no '·' fallback).
+    ncells  = max(9, (inner + 2) // 4)
+    ncells  = min(ncells, (len(pool) + len(_LIB_CHESS) + len(_LIB_SUITS)) // 2)
+    take    = lambda: (pool.pop(0) if pool else '·')
 
     nonsuit = list(_LIB_CHESS)                    # every non-suit label on this page
 
-    def make_band(center):
-        side  = (ncells - len(center)) // 2
-        left  = [take() for _ in range(side)]
-        right = [take() for _ in range(ncells - side - len(center))]
+    def make_band(center):                        # functional group centred; fillers flank both sides
+        n_fill = max(0, ncells - len(center))
+        left   = [take() for _ in range(n_fill // 2)]
+        right  = [take() for _ in range(n_fill - n_fill // 2)]
         nonsuit.extend(left + right)              # fillers are non-suit labels
         return [(gl, True) for gl in left] + center + [(gl, True) for gl in right]
 
@@ -5485,6 +5496,72 @@ def build_dungeon_archivists_library(seed: int) -> Dungeon:
     ]
     _lib_layout(room, _LIB_FALLBACK_W)   # seats the Archivist at his desk (he paces off later)
 
+    dungeon.rooms        = [room]
+    dungeon.current_room = 0
+    return dungeon
+
+
+# ── The Spellwright's Forge (L37) — :s, :g, & ─────────────────────────────────
+# A warded workroom: corrupted incantations the apprentice must make TRUE before
+# the sanctum door opens. Two flaws to mend with ex-commands:
+#   • every line says "old" where the rite now reads "new"  →  :%s/old/new/g
+#   • two cursed verses must be struck out entirely         →  :g/cursed/d
+# When no line bears 'old' or 'curse', the seal at (action row, divider) dissolves
+# and the player walks through to the exit. x-erasing each glyph by hand blows the
+# budget — :s / :g are the efficient way (the lesson).
+_FORGE_ROWS, _FORGE_COLS = 13, 54
+_FORGE_DIV   = 42                       # full-height divider wall; sanctum to its right
+_FORGE_DOOR  = 6                        # the corridor row whose divider cell is the seal door
+_FORGE_WARDS = [(3, 'the old gods stir'),
+                (5, 'the old ways fade'),
+                (7, 'the old fire dies')]
+_FORGE_DECOYS = [(9,  'a cursed name'),
+                 (10, 'a cursed verse')]
+
+
+def _forge_text(room, row, col, text, kind):
+    for i, ch in enumerate(text):
+        if ch != ' ':
+            room.char_runs.append(CharRun(row, col + i, (ch,), kind))
+
+
+def build_dungeon_spellwrights_forge(seed: int) -> Dungeon:
+    rng = random.Random(seed)
+    dungeon = Dungeon(name="The Spellwright's Forge", seed=seed)
+    ROWS, COLS, W = _FORGE_ROWS, _FORGE_COLS, _FORGE_DIV
+
+    cells = [[CellType.WALL] * COLS for _ in range(ROWS)]
+    for r in range(1, ROWS - 1):
+        for c in range(1, W):                      # left workroom
+            cells[r][c] = CellType.FLOOR
+        for c in range(W + 1, COLS - 1):           # right sanctum
+            cells[r][c] = CellType.FLOOR
+    # col W is wall top-to-bottom except the seal door, which opens once the rites are true.
+
+    room = Room(room_type=RoomType.ENTRY, rows=ROWS, cols=COLS)
+    room.cells     = cells
+    room.seed      = seed
+    room.spawn_pos = (_FORGE_DOOR, 1)
+    room.exit_pos  = (_FORGE_DOOR, COLS - 2)
+    room.char_runs = []
+    for r, txt in _FORGE_WARDS:
+        _forge_text(room, r, 2, txt, 'ember')
+    for r, txt in _FORGE_DECOYS:
+        _forge_text(room, r, 2, txt, 'verdant')
+
+    room.entities = [
+        Entity(kind='entry_marker', row=_FORGE_DOOR, col=1),
+        Entity(kind='exit',         row=_FORGE_DOOR, col=COLS - 2),
+    ]
+    # The seal: the divider cell on the corridor row. main.run_dungeon opens it once
+    # the incantations are mended (no 'old' / no 'curse' remains).
+    room._forge_seal = (_FORGE_DOOR, W)
+
+    room.par    = 34          # :%s/old/new/g (13) + :g/cursed/d (10) + the walk to the exit
+    room.budget = 90          # generous; the rites are exploratory, never budget-gated
+    room.answer = ''
+
+    room.rebuild_indexes()
     dungeon.rooms        = [room]
     dungeon.current_room = 0
     return dungeon

@@ -66,6 +66,23 @@ class VimPattern:
             return span
         return None
 
+    def match_iter(self, s: str):
+        """Yield re.Match objects for non-overlapping matches (zero-width safe),
+        so substitution can read capture groups. Same advance rule as finditer."""
+        pos = 0
+        while pos <= len(s):
+            m = self._re.search(s, pos)
+            if not m:
+                return
+            yield m
+            pos = m.end() + 1 if m.end() == m.start() else m.end()
+
+    def eff_span(self, m) -> tuple:
+        """The effective (start, end) of a match, honouring \\zs / \\ze."""
+        start = m.start('_zs') if self.has_zs else m.start()
+        end   = m.start('_ze') if self.has_ze else m.end()
+        return start, end
+
 
 def _read_class(s: str, i: int):
     """Parse a ``[...]`` collection starting just after '['. Returns (py, idx)."""
@@ -204,3 +221,23 @@ def compile_vim(pattern: str):
         return VimPattern(re.compile(py, flags), has_zs, has_ze)
     except (re.error, ValueError):
         return None
+
+
+@lru_cache(maxsize=256)
+def compile_sub(pattern: str, ignorecase=None):
+    """Compile a pattern for :s / :g — like :func:`compile_vim` but ALWAYS returns a
+    VimPattern (an untranslatable pattern falls back to a literal match) so the caller
+    has capture groups via ``match_iter``. ``ignorecase`` forces the case of the match:
+    True (the ``i`` flag), False (``I``), or None (honour the pattern's own \\c/\\C)."""
+    if not pattern:
+        return None
+    vp = compile_vim(pattern)
+    if vp is None:
+        try:
+            vp = VimPattern(re.compile(re.escape(pattern)), False, False)
+        except re.error:
+            return None
+    if ignorecase is not None:
+        flags = (vp._re.flags | re.IGNORECASE) if ignorecase else (vp._re.flags & ~re.IGNORECASE)
+        vp = VimPattern(re.compile(vp._re.pattern, flags), vp.has_zs, vp.has_ze)
+    return vp
