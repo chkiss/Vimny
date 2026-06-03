@@ -5299,12 +5299,13 @@ def _lib_title_row(inner: int, text: str) -> str:
 
 
 def _lib_floor_spec(inner: int, rng, filled=(), tables=None,
-                    title='L I B R A R Y') -> dict:
+                    title='L I B R A R Y', shelf_empty=0.0) -> dict:
     """A library-floor page: a title, two shelf bands (the chess group and the suit
     group, packed out with UNIQUE filler labels — no duplicates), and the reading
     tables. The four suit stacks stand empty (□□) until `filled`. Bookshelves render
     ancient indigo, tables/desk ember. Pass pre-generated `tables` for a :e! folio;
-    None gives the sparse library."""
+    None gives the sparse library. `shelf_empty` empties that fraction of the full
+    shelves — the books the Archivist pulled to fill a folio's tables."""
     g, F   = _LIB_SUIT_GLYPH, set(filled)
     ncells = min(24, max(9, inner // 4))          # stacks per band (capped: labels stay unique)
     pool   = list(_LIB_FILLERS)
@@ -5316,6 +5317,10 @@ def _lib_floor_spec(inner: int, rng, filled=(), tables=None,
         left  = [(take(), True) for _ in range(side)]
         right = [(take(), True) for _ in range(ncells - side - len(center))]
         cells = left + center + right
+        if shelf_empty:                           # pull books off a fraction of full shelves
+            full = [k for k, (_, f) in enumerate(cells) if f]
+            for k in rng.sample(full, int(len(full) * shelf_empty)):
+                cells[k] = (cells[k][0], False)
         lab   = '  '.join(f'{gl} ' for gl, _ in cells)
         shelf = '  '.join('▤▤' if f else '□□' for _, f in cells)
         return lab, shelf
@@ -5373,8 +5378,9 @@ def _lib_layout(room, W: int) -> None:
     elif getattr(room, 'lib_view', 'catalog') == 'catalog' or room.lib_idx < 0:
         filled = [s for s in _LIB_SUITS if s in room.lib_filed]
         spec = _lib_floor_spec(inner, rng, filled=filled)
-    else:                                         # a :e! folio — packed tables show the answer
-        spec = _lib_floor_spec(inner, rng, tables=room.lib_seq[room.lib_idx]['tables'])
+    else:                                         # a :e! folio — packed tables show the answer,
+        spec = _lib_floor_spec(inner, rng, tables=room.lib_seq[room.lib_idx]['tables'],
+                               shelf_empty=0.2)   # ...a fifth of the shelves pulled to fill them
     rows = _lib_frame(W, spec['body'], spec['kinds'], spec['border'])
     room.cols      = sum(len(r) for r, _ in rows)
     room.cells     = [[CellType.FLOOR] * room.cols]
@@ -5431,6 +5437,7 @@ def build_dungeon_archivists_library(seed: int) -> Dungeon:
     room.lib_done    = None       # None | 'win' | 'dead'
     room.lib_dlg     = 0          # brief dialogue index (0 idle, 1-3 lines, 4 = editing)
     room.lib_dlg_col = 0          # player col when the last brief line was shown
+    room.lib_hostile = False      # True once he catches the player forging — he gives chase
     room._lib_arch_flag  = False  # debounces the on-Archivist (present/panic) trigger
     room._lib_arch_paced = False  # False until the Archivist first steps off his desk
 
@@ -5438,7 +5445,8 @@ def build_dungeon_archivists_library(seed: int) -> Dungeon:
     # off the first screen, and ':set wrap' folds the line in so the player sees him move.
     room.entities = [
         Entity(kind='entry_marker', row=0, col=0),
-        Entity(kind='archivist',    row=0, col=1, ai='wander', ai_speed=1, move_dir=1),
+        Entity(kind='archivist',    row=0, col=1, ai='wander', ai_speed=1, move_dir=1,
+               hp=5, max_hp=5),       # max_hp so the combat tick tracks his attacks
     ]
     _lib_layout(room, _LIB_FALLBACK_W)   # seats the Archivist at his desk (he paces off later)
 

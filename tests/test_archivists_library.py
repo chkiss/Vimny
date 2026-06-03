@@ -143,8 +143,8 @@ def test_correct_play_restores_library(monkeypatch):
         'display_move', 'edit_name'}
 
 
-# ── forgery → the Archivist kills the player ────────────────────────────────
-def test_forgery_is_lethal(monkeypatch):
+# ── forgery → the Archivist gives chase ─────────────────────────────────────
+def test_forgery_turns_archivist_hostile(monkeypatch):
     d = _dungeon()
     slots = _suit_slots(d)
     # File every suit under the WRONG name: rotate the labels by one.
@@ -163,12 +163,38 @@ def test_forgery_is_lethal(monkeypatch):
 
     monkeypatch.setattr(main, 'render_all', lambda *a, **k: None)
     term = Terminal()
-    it = iter(keys + _cmd('e') + _cmd('q!'))   # :e to reload after death, then leave
+    it = iter(keys + _cmd('q!'))
     monkeypatch.setattr(term, 'inkey', lambda *a, **k: next(it, _ks('')))
 
     main.run_dungeon(term, 'archivists_library', {}, player_name='admin', _dungeon=d)
-    # the library was never restored; the player was struck down (then :e reloaded fresh).
+    # the library was never restored; the Archivist turned on the forger and gave chase.
     assert d.room.lib_done != 'win'
+    assert d.room.lib_hostile is True
+
+
+def test_hostile_archivist_chases_and_strikes(monkeypatch):
+    d = _dungeon()
+    slots = _suit_slots(d)
+    names = sorted(slots, key=lambda s: slots[s])
+    wrong = {names[i]: names[(i + 1) % len(names)] for i in range(len(names))}
+    keys, cur = _cmd('set wrap'), -1
+    for suit in names:
+        while cur != slots[suit]:
+            keys += _cmd('e!')
+            cur = (cur + 1) % len(d.room.lib_seq)
+        keys += _cmd(f'w {wrong[suit]}')
+    keys += [_ks('f'), _ks('A'), _ks('f'), _ks('A')]      # present forgery → hostile
+    keys += [_ks('l')] * 12                                # flee; he gives chase and strikes
+
+    hps = []
+    monkeypatch.setattr(main, 'render_all',
+                        lambda term, dungeon, player, budget, *a, **k: hps.append(player.hp))
+    term = Terminal()
+    it = iter(keys + _cmd('q!'))
+    monkeypatch.setattr(term, 'inkey', lambda *a, **k: next(it, _ks('')))
+    main.run_dungeon(term, 'archivists_library', {}, player_name='admin', _dungeon=d)
+    assert d.room.lib_hostile is True
+    assert min(hps) < max(hps)                             # he landed at least one blow
 
 
 # ── :e is blocked (E37); :e! is required ────────────────────────────────────

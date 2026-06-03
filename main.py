@@ -1298,14 +1298,21 @@ def _enemy_tick(room, player) -> list:
         if not ent.alive:
             continue
         if ent.kind == 'archivist':
-            # Discrete gait: single-cell steps taken two at a time (a quick step-step
-            # in one direction), with the occasional gj/gk hop of a whole display line
-            # (± the wrap width), so he roams the wrapped floor. Never onto the player;
-            # fA finds him wherever he is. (summon_timer = steps left in this gait.)
-            if ent.ai:
+            w = getattr(room, '_wrap_w', 0) or 1
+            if getattr(room, 'lib_hostile', False):
+                # Furious: take the quickest path to the player — gj/gk (± a display
+                # line) to close the distance, then single steps — and stop adjacent.
+                d = player.col - ent.col
+                if d:
+                    step = (w if d > 0 else -w) if abs(d) >= w else (1 if d > 0 else -1)
+                    nc   = min(max(0, ent.col + step), room.cols - 1)
+                    if (0, nc) != (player.row, player.col):
+                        room.move_entity(ent, 0, nc)
+            elif ent.ai:
+                # Discrete gait: single-cell steps two at a time (a quick step-step),
+                # with the occasional gj/gk hop. (summon_timer = steps left in this gait.)
                 ent.ai_tick += 1
                 if ent.ai_tick % ent.ai_speed == 0:
-                    w = getattr(room, '_wrap_w', 0) or 1
                     if ent.summon_timer <= 0:
                         if random.random() < 0.2:
                             ent.move_dir, ent.summon_timer = random.choice([-w, w]), 1
@@ -1705,7 +1712,42 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
             render_all(term, dungeon, player, budget, '')
             _t.sleep(0.05)
 
+    def _lib_form_folio():
+        # Morph the current page into the new folio in front of the reader: the
+        # Archivist darts about, pulling books off the shelves to pile the tables with
+        # the folio's glyphs. (Skipped headless — just settle on the folio.)
+        if not getattr(term, 'is_a_tty', False) or not room.char_runs:
+            _lib_relayout()
+            return
+        import time as _t
+        cur = [list(ru.symbols) for ru in room.char_runs]
+        _lib_relayout()                               # build the target folio
+        tgt = [list(ru.symbols) for ru in room.char_runs]
+        if len(cur) != len(tgt) or any(len(a) != len(b) for a, b in zip(cur, tgt)):
+            return                                    # structure mismatch → already there
+        work = [c[:] for c in cur]                    # start from the old page
+        for i, ru in enumerate(room.char_runs):
+            room.char_runs[i] = CharRun(ru.row, ru.col, tuple(work[i]), ru.kind)
+        diff = [(i, j) for i in range(len(cur)) for j in range(len(cur[i]))
+                if cur[i][j] != tgt[i][j]]
+        random.shuffle(diff)
+        arch = next((e for e in room.entities if e.kind == 'archivist'), None)
+        frames, per = 12, max(1, -(-len(diff) // 12))
+        for f in range(frames):
+            for i, j in diff[f * per:(f + 1) * per]:
+                work[i][j] = tgt[i][j]
+            for i, ru in enumerate(room.char_runs):
+                room.char_runs[i] = CharRun(ru.row, ru.col, tuple(work[i]), ru.kind)
+            if arch is not None:
+                arch.col = random.randrange(1, max(2, room.cols - 1))
+            room.rebuild_indexes()
+            render_all(term, dungeon, player, budget, '')
+            _t.sleep(0.05)
+        _lib_relayout()                               # settle exactly on the folio
+
     def _lib_reload(force):
+        if getattr(room, 'lib_hostile', False):
+            return                                    # no leafing while he hunts you
         if getattr(room, 'lib_done', None):
             _push('The library is whole again — nothing left to reload.')
             return
@@ -1714,11 +1756,11 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
             return
         room.lib_idx  = (room.lib_idx + 1) % len(room.lib_seq)
         room.lib_view = 'leaf'
-        _lib_relayout()
+        _lib_form_folio()
         _push('"library" 1 line  --reloaded--')
 
     def _lib_file(name):
-        if getattr(room, 'lib_done', None):
+        if getattr(room, 'lib_done', None) or getattr(room, 'lib_hostile', False):
             return
         if room.lib_idx < 0 or getattr(room, 'lib_view', 'catalog') != 'leaf':
             _push('No manuscript open — press  :e!  to leaf to one.')
@@ -1775,20 +1817,21 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
                     _lib_scramble()
 
     def _lib_strike(line):
-        # The Archivist turns on the player — lethal, as for presenting forged folios.
-        if getattr(room, 'lib_done', None):
+        # The Archivist turns on the player and GIVES CHASE (he hunts you down the hall
+        # with gj/gk and strikes when adjacent — see _enemy_tick + the combat block).
+        if getattr(room, 'lib_done', None) or getattr(room, 'lib_hostile', False):
             return
-        room.lib_done = 'dead'
+        room.lib_hostile = True
+        room.lib_view    = 'catalog'      # back to the hall for the chase
+        _lib_relayout()
         _push(line)
-        _push('The Archivist strikes you down.')
-        player.take_damage(player.max_hp + 20)
 
     def _lib_present():
         if all(room.lib_filed.get(s) == s for s in _dg._LIB_SUITS):
             _lib_finale()
             _push('"Flawless! My library is whole again — my gifts are yours."')
         else:
-            _lib_strike('"So YOU\'RE the pest mangling my folios!"')
+            _lib_strike('"So YOU\'RE the vandal! I\'ll deal with you MYSELF!"')
 
     if _start_edit:
         room.passable_walls = True
@@ -2641,7 +2684,8 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
                 # reading a manuscript, and not once the level is decided.
                 if (level == 'archivists_library'
                         and getattr(room, 'lib_view', 'catalog') != 'leaf'
-                        and not getattr(room, 'lib_done', None)):
+                        and not getattr(room, 'lib_done', None)
+                        and not getattr(room, 'lib_hostile', False)):
                     _arch = next((e for e in room.entities
                                   if e.kind == 'archivist' and e.alive), None)
                     _near = _arch is not None and abs(player.col - _arch.col) <= 2
@@ -2908,6 +2952,7 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
                     ed_undo.pop()
                     _push('Nothing to cut here.')
             elif (level == 'archivists_library' and not getattr(room, 'lib_done', None)
+                  and not getattr(room, 'lib_hostile', False)
                   and any((lambda ru: ru and ru.symbols[player.col + _i - ru.col] != ' ')(
                               room.char_run_at(player.row, player.col + _i))
                           for _i in range(count))):
@@ -3449,9 +3494,11 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
             # Any enemy now adjacent attacks (except the one the player just hit,
             # and except enemies that only became adjacent this turn — player gets
             # one free turn when landing next to a new enemy via fg/motion).
+            _arch_atk = (room._entity_by_kind.get('archivist', [])
+                         if getattr(room, 'lib_hostile', False) else [])
             attackers = []
             for ent in (*room._entity_by_kind.get('goblin', []),
-                        *room._entity_by_kind.get('warden', [])):
+                        *room._entity_by_kind.get('warden', []), *_arch_atk):
                 if not ent.alive:
                     continue
                 if id(ent) == xd_id:
@@ -3483,7 +3530,8 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
                 for _ae in attackers:
                     if id(_ae) not in engaged_entities:
                         engaged_entities.add(id(_ae))
-                        _aname = 'Warden' if _ae.kind == 'warden' else _ae.kind
+                        _aname = ('Warden' if _ae.kind == 'warden' else
+                                  'Archivist' if _ae.kind == 'archivist' else _ae.kind)
                         _push(f'The {_aname} is engaging you in combat!')
             else:
                 engaged_entities.clear()
