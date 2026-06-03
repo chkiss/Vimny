@@ -1780,8 +1780,8 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
         message = 'Sandbox — all mechanics active. Type :edit to enter editor mode.'
         msg_ttl = 60
     elif level == 'archivists_library':
-        message = ("The Archivist's Library — the catalogue is one ruined line. "
-                   "Type  :set wrap  to shelve it.")
+        message = ("The Archivist's Library — the whole catalogue has spilled "
+                   "into a single endless line.")
         msg_ttl = 80
 
     any_water     = any(ct == CellType.WATER for row in room.cells for ct in row)

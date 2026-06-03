@@ -83,7 +83,7 @@ The curriculum is defined in `content/levels.py` (canonical) and mirrored in `LE
 | 14 | The Sight Sanctum | `v` | Playable |
 | 15 | The Seekers' Labyrinth | `/ ? n N *` | Playable |
 | 16 | The Waypoint Sanctum | `` m ' ` `` | Playable |
-| 17 | The Archivist's Library | `:e :set` | Planned |
+| 17 | The Archivist's Library | `:set wrap  :e!  :w {file}` | Playable |
 | 17.1 | The Warden Pathfinder | (boss) | Planned |
 | 18 | The Operator's Vault | `d c` | Planned |
 | 19 | The Whole-Line Annex | `dd cc D S` | Planned |
@@ -169,6 +169,9 @@ The full command reference (also the hint-bar source) is `render/vim_commands.md
 | `m{a}` | set mark |
 | `` `{a} `` | to mark |
 | `'{a}` | to mark ↑ |
+| `:set wrap` | wrap lines |
+| `:e!` | reload file |
+| `:w {file}` | save as |
 | `d{m}` | delete |
 | `dd` | delete line |
 | `c{m}` | change |

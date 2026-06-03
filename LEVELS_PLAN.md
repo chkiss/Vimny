@@ -64,7 +64,7 @@ Curriculum order is the order of `LEVELS`. Blueprints: `blueprints/act_*.md`.
 | 14 | `sight_sanctum` | The Sight Sanctum | `v` |  |
 | 15 | `seekers_labyrinth` | The Seekers' Labyrinth | `/ ? n N *` |  |
 | 16 | `waypoint_sanctum` | The Waypoint Sanctum | `` m ' ` `` |  |
-| 17 | `archivists_library` | The Archivist's Library | `:e :set` |  |
+| 17 | `archivists_library` | The Archivist's Library | `:set wrap  :e!  :w {file}` |  |
 | 17.1 | `warden_pathfinder` | The Warden Pathfinder | — | boss |
 | 18 | `operators_vault` | The Operator's Vault | `d c` |  |
 | 19 | `whole_line_annex` | The Whole-Line Annex | `dd cc D S` |  |
