@@ -5234,129 +5234,138 @@ def _lib_frame(W: int, body: list, kinds: list, border: str = 'ancient') -> list
     return rows                 # each row is exactly W chars → (rows)*W total
 
 
-# A library floor drawn top-down: rows of book-stacks (each labelled), reading
-# tables, and the Archivist's desk. Full shelves are ▤▤▤, empty shelves □□□;
-# the four SUIT stacks stand empty until their folios are refiled (live). Non-suit
-# stacks are labelled with chess pieces; books resting on a table are ≡.
-# Decorative shelf labels that fill the hall wall-to-wall (always full shelves).
-_LIB_FILLERS = ['✦', '❋', '◈', '❖', '⬡', '✤', '⟡', '❉', '✣', '❀', '✿', '⚘', '✻', '❈']
-_LIB_DESK    = '╓─╖'                # the Archivist's small desk (top-right corner)
+# A library floor drawn top-down: rows of labelled book-stacks (full ▤▤, empty □□),
+# reading tables, and the Archivist's desk. 48 DISTINCT stack labels — the 4 card
+# suits, 5 chess pieces, and 39 ornaments — never duplicated within a page.
+_LIB_CHESS    = ['♚', '♛', '♜', '♝', '♞']
+_LIB_FILLERS  = ['✦', '❋', '◈', '❖', '⬡', '✤', '⟡', '❉', '✣', '❀', '✿', '⚘', '✻', '❈',
+                 '✠', '✢', '✥', '✧', '✩', '✪', '✫', '✬', '✭', '✮', '✯',
+                 '❂', '❄', '❅', '❆', '❇', '❊', '❍', '♔', '♕', '♖', '♗', '♘', '♙', '♪']
+_LIB_DESK     = '╓─╖'                # the Archivist's small desk
+_LIB_DESK_COL = 521                  # ...placed at the fixed logical column (0, 521)
 
 
-def _lib_table_band(inner: int, rng) -> list:
-    """A centred row of reading tables in the library's line-art, the chairs drawn as
-    ◠ along the top edge and ◡ along the bottom. Each table's surface is set sparsely
-    with 2-3 closed books ≡ and 1-2 open books ◫, with plenty of bare space. The two
-    surface rows are generated per-table. Returns 4 body rows."""
+def _lib_folio_tables(fill, rng) -> list:
+    """Pre-generate the two reading tables' contents (2 tables × 2 rows × 10 cells) for
+    a :e! folio — every cell packed, spelling the answer:
+      ('suit', g)  → all one suit (the correct folio for that suit)
+      ('mixsuit',) → a jumble of suits (wrong)
+      ('glyph', c) → label glyphs: one repeated if c else mixed (wrong either way)."""
+    w     = 10
+    suits = list(_LIB_SUIT_GLYPH.values())
+    one   = rng.choice(_LIB_FILLERS)
+    def cell():
+        if fill[0] == 'suit':    return fill[1]
+        if fill[0] == 'mixsuit': return rng.choice(suits)
+        return one if fill[1] else rng.choice(_LIB_FILLERS)
+    return [[[cell() for _ in range(w)] for _ in range(2)] for _ in range(2)]
+
+
+def _lib_table_band(inner: int, rng, tables=None) -> list:
+    """A centred row of two reading tables (chairs ◠/◡ along the edges). With tables=None
+    the surfaces are set sparsely with a few books (≡/◫) — the library at rest. Given
+    pre-generated `tables` (see _lib_folio_tables) the surfaces are PACKED instead, to
+    spell a folio's answer. Returns 4 body rows."""
     n, w, gap = 2, 10, '        '
     top = '┌' + ''.join('◠' if i % 3 == 0 else '─' for i in range(w)) + '┐'
     bot = '└' + ''.join('◡' if i % 3 == 0 else '─' for i in range(w)) + '┘'
 
-    def surfaces():                       # two interior rows for one table
-        cells = [[' '] * w, [' '] * w]
-        books = ['≡'] * rng.randint(2, 3) + ['◫'] * rng.randint(1, 2)
-        spots = [(r, c) for r in range(2) for c in range(0, w, 2)]   # spaced columns
-        rng.shuffle(spots)
-        for b, (r, c) in zip(books, spots):
-            cells[r][c] = b
+    def surfaces(content):
+        if content is None:               # the library: a few books, plenty of bare space
+            cells = [[' '] * w, [' '] * w]
+            books = ['≡'] * rng.randint(2, 3) + ['◫'] * rng.randint(1, 2)
+            spots = [(r, c) for r in range(2) for c in range(0, w, 2)]
+            rng.shuffle(spots)
+            for b, (r, c) in zip(books, spots):
+                cells[r][c] = b
+        else:
+            cells = [list(content[0]), list(content[1])]
         return ['│' + ''.join(cells[0]) + '│', '│' + ''.join(cells[1]) + '│']
 
-    surf = [surfaces() for _ in range(n)]
+    surf = [surfaces(None if tables is None else tables[k]) for k in range(n)]
     join = lambda parts: (' ' * len(gap)).join(parts)
-    return [
-        join([top] * n),
-        join([s[0] for s in surf]),
-        join([s[1] for s in surf]),
-        join([bot] * n),
-    ]
-
-
-def _lib_fill_band(inner: int, center: list, rng) -> tuple:
-    """A shelf band filling the inner width: the `center` stacks (a chess group or the
-    suit group) flanked by decorative filler stacks so the wall is packed. `center`
-    is a list of (glyph, full?). Full shelf = ▤▤, empty = □□."""
-    pitch  = 4                                  # 2-wide shelf + 2-space gap
-    ncells = max(len(center) + 4, inner // pitch)
-    side   = (ncells - len(center)) // 2
-    left   = [(rng.choice(_LIB_FILLERS), True) for _ in range(side)]
-    right  = [(rng.choice(_LIB_FILLERS), True) for _ in range(ncells - side - len(center))]
-    cells  = left + center + right
-    lab    = '  '.join(f'{g} ' for g, _ in cells)
-    shelf  = '  '.join('▤▤' if f else '□□' for _, f in cells)
-    return lab, shelf
+    return [join([top] * n), join([s[0] for s in surf]),
+            join([s[1] for s in surf]), join([bot] * n)]
 
 
 def _lib_title_row(inner: int, text: str) -> str:
-    """The title, centred, with the Archivist's small desk tucked into the top-right."""
+    """The title, centred. (The Archivist's desk is placed separately, at _LIB_DESK_COL.)"""
     row   = [' '] * inner
     start = max(0, (inner - len(text)) // 2)
     for i, ch in enumerate(text):
         if start + i < inner:
             row[start + i] = ch
-    for i, ch in enumerate(_LIB_DESK):
-        row[inner - len(_LIB_DESK) + i] = ch
     return ''.join(row)
 
 
-def _lib_catalog_spec(inner: int, filled, rng) -> dict:
+def _lib_floor_spec(inner: int, rng, filled=(), tables=None,
+                    title='L I B R A R Y') -> dict:
+    """A library-floor page: a title, two shelf bands (the chess group and the suit
+    group, packed out with UNIQUE filler labels — no duplicates), and the reading
+    tables. The four suit stacks stand empty (□□) until `filled`. Bookshelves render
+    ancient indigo, tables/desk ember. Pass pre-generated `tables` for a :e! folio;
+    None gives the sparse library."""
     g, F   = _LIB_SUIT_GLYPH, set(filled)
-    chess  = [(p, 1) for p in ('♞', '♜', '♝', '♛', '♚')]      # the chess pieces, grouped
-    suits  = [(g[s], s in F) for s in _LIB_SUITS]               # the four suits, grouped
-    cl, cs = _lib_fill_band(inner, chess, rng)
-    sl, ss = _lib_fill_band(inner, suits, rng)
-    table  = _lib_table_band(inner, rng)
-    body   = [_lib_title_row(inner, 'L I B R A R Y'), cl, cs, *table, sl, ss]
-    # bookshelves in ancient indigo; tables/chairs + the desk in warm ember.
+    ncells = min(24, max(9, inner // 4))          # stacks per band (capped: labels stay unique)
+    pool   = list(_LIB_FILLERS)
+    rng.shuffle(pool)
+    take   = lambda: (pool.pop() if pool else '·')
+
+    def band(center):                             # center: list of (glyph, full)
+        side  = (ncells - len(center)) // 2
+        left  = [(take(), True) for _ in range(side)]
+        right = [(take(), True) for _ in range(ncells - side - len(center))]
+        cells = left + center + right
+        lab   = '  '.join(f'{gl} ' for gl, _ in cells)
+        shelf = '  '.join('▤▤' if f else '□□' for _, f in cells)
+        return lab, shelf
+
+    cl, cs = band([(c, True) for c in _LIB_CHESS])
+    sl, ss = band([(g[s], s in F) for s in _LIB_SUITS])
+    table  = _lib_table_band(inner, rng, tables)
+    body   = [_lib_title_row(inner, title), cl, cs, *table, sl, ss]
     kinds  = ['ember', 'ancient', 'ancient', *(['ember'] * len(table)), 'ancient', 'ancient']
-    return {'suit': None, 'kind': 'ancient', 'border': 'ancient', 'body': body, 'kinds': kinds}
+    return {'kind': 'ancient', 'border': 'ancient', 'body': body, 'kinds': kinds}
 
 
-def _lib_suit_spec(suit: str) -> dict:
-    g    = _LIB_SUIT_GLYPH[suit]
-    band = ' '.join([g] * 7)
-    body = ['  '.join(suit.upper()), '',
-            '▤ ▤ ▤ ▤ ▤ ▤ ▤', band, '▤ ▤ ▤ ▤ ▤ ▤ ▤', band, '▤ ▤ ▤ ▤ ▤ ▤ ▤',
-            '', '', '']
-    return {'suit': suit, 'kind': 'ember', 'body': body}
-
-
-def _lib_decoy_spec(n: int) -> dict:
-    body = ['R U I N E D   L E A F', '',
-            '□ □ □ □ □ □ □', '▒ ░ ▓ ▒ ░ ▓ ▒', '□ □ □ □ □ □ □',
-            '░ ▓ ▒ ░ ▓ ▒ ░', '□ □ □ □ □ □ □', '', '', '']
-    return {'suit': None, 'kind': 'verdant', 'body': body}
-
-
-def _lib_finale_spec(inner: int, rng) -> dict:
-    g      = _LIB_SUIT_GLYPH
-    chess  = [(p, 1) for p in ('♞', '♜', '♝', '♛', '♚')]
-    suits  = [(g[s], 1) for s in _LIB_SUITS]
-    cl, cs = _lib_fill_band(inner, chess, rng)
-    sl, ss = _lib_fill_band(inner, suits, rng)
-    table  = _lib_table_band(inner, rng)
-    body   = [_lib_title_row(inner, 'L I B R A R Y   R E S T O R E D'), cl, cs, *table, sl, ss]
-    kinds  = ['ember', 'ancient', 'ancient', *(['ember'] * len(table)), 'ancient', 'ancient']
-    return {'suit': None, 'kind': 'ember', 'border': 'ancient', 'body': body, 'kinds': kinds}
+def _lib_place_desk(room) -> None:
+    """Set the Archivist's desk (ember) at the fixed logical column _LIB_DESK_COL, by
+    splitting the run it lands in, so it shows on every page at the same spot."""
+    c0 = _LIB_DESK_COL
+    if c0 + len(_LIB_DESK) > room.cols:
+        return
+    ru = room.char_run_at(0, c0)
+    if ru is None or ru is not room.char_run_at(0, c0 + len(_LIB_DESK) - 1):
+        return                                    # the desk spans a row edge — skip (rare)
+    i, s, off = room.char_runs.index(ru), list(ru.symbols), c0 - ru.col
+    for j, ch in enumerate(_LIB_DESK):
+        s[off + j] = ch
+    parts = []
+    if off > 0:
+        parts.append(CharRun(0, ru.col, tuple(s[:off]), ru.kind))
+    parts.append(CharRun(0, c0, tuple(_LIB_DESK), 'ember'))
+    tail = s[off + len(_LIB_DESK):]
+    if tail:
+        parts.append(CharRun(0, c0 + len(_LIB_DESK), tuple(tail), ru.kind))
+    room.char_runs[i:i + 1] = parts
 
 
 def _lib_layout(room, W: int) -> None:
-    """(Re)compose the current page at viewport width W: rebuild the wrapped buffer as
-    one CharRun PER display row (so bookshelves can stay indigo while the tables/desk
-    glow ember), resize the room, and keep the Archivist in bounds. The catalogue and
-    finale fill the whole wall and are generated from the seed (stable across resize).
-    Called by the builder and by main.run_dungeon whenever the width changes."""
+    """(Re)compose the current page at viewport width W as one CharRun PER display row
+    (shelves indigo, tables/desk ember), resize the room, place the desk at (0,521),
+    and keep the Archivist in bounds. Pages are generated from the seed (stable across
+    resize). Called by the builder and by main.run_dungeon when the width changes."""
     inner = max(8, W - 2)
     rng   = random.Random((room.seed or 0) ^ 0x5EED)
     if getattr(room, 'lib_done', None) == 'win':
-        spec = _lib_finale_spec(inner, rng)
+        spec = _lib_floor_spec(inner, rng, filled=_LIB_SUITS,
+                               title='L I B R A R Y   R E S T O R E D')
     elif getattr(room, 'lib_view', 'catalog') == 'catalog' or room.lib_idx < 0:
-        filled = [s for s in _LIB_SUITS if s in room.lib_filed]   # fills when filed under that name
-        spec = _lib_catalog_spec(inner, filled, rng)
-    else:
-        spec = room.lib_seq[room.lib_idx]
-    kinds  = spec.get('kinds') or [spec['kind']] * len(spec['body'])
-    border = spec.get('border', spec['kind'])
-    rows   = _lib_frame(W, spec['body'], kinds, border)
+        filled = [s for s in _LIB_SUITS if s in room.lib_filed]
+        spec = _lib_floor_spec(inner, rng, filled=filled)
+    else:                                         # a :e! folio — packed tables show the answer
+        spec = _lib_floor_spec(inner, rng, tables=room.lib_seq[room.lib_idx]['tables'])
+    rows = _lib_frame(W, spec['body'], spec['kinds'], spec['border'])
     room.cols      = sum(len(r) for r, _ in rows)
     room.cells     = [[CellType.FLOOR] * room.cols]
     room.char_runs = []
@@ -5364,6 +5373,8 @@ def _lib_layout(room, W: int) -> None:
     for rowstr, kind in rows:
         room.char_runs.append(CharRun(0, col, tuple(rowstr), kind))
         col += len(rowstr)
+    room.rebuild_indexes()
+    _lib_place_desk(room)
     # The Archivist paces the hall (see _enemy_tick); just keep him in bounds here.
     for e in room.entities:
         if e.kind == 'archivist':
@@ -5384,17 +5395,20 @@ def build_dungeon_archivists_library(seed: int) -> Dungeon:
     room.budget      = 2000       # generous; the loop is exploratory, never budget-gated
     room.answer      = ''
 
-    # Cadence: suit at indices 0,3,7,10 of an 11-long cycle; decoys elsewhere; loops.
+    # Cadence: a one-suit folio (the answer) at indices 0,3,7,10; decoys elsewhere; loops.
+    # Each folio's tables are pre-generated (width-independent) so they stay stable.
     suit_slots = [0, 3, 7, 10]
     suits      = list(_LIB_SUITS)
     rng.shuffle(suits)
     seq, decoy_n = [], 0
     for i in range(11):
         if i in suit_slots:
-            seq.append(_lib_suit_spec(suits[suit_slots.index(i)]))
+            S = suits[suit_slots.index(i)]
+            seq.append({'suit': S, 'tables': _lib_folio_tables(('suit', _LIB_SUIT_GLYPH[S]), rng)})
         else:
+            fill = ('mixsuit',) if decoy_n % 2 == 0 else ('glyph', rng.random() < 0.5)
             decoy_n += 1
-            seq.append(_lib_decoy_spec(decoy_n))
+            seq.append({'suit': None, 'tables': _lib_folio_tables(fill, rng)})
 
     room.lib_seq     = seq
     room.lib_idx     = -1         # index into the cycle of the manuscript last leafed to
@@ -5413,7 +5427,7 @@ def build_dungeon_archivists_library(seed: int) -> Dungeon:
     ]
     _lib_layout(room, _LIB_FALLBACK_W)
     arch = next(e for e in room.entities if e.kind == 'archivist')
-    arch.col = room.cols // 2                  # start him pacing mid-hall
+    arch.col = min(_LIB_DESK_COL, room.cols - 2)   # spawn at his desk, then pace off
 
     dungeon.rooms        = [room]
     dungeon.current_room = 0

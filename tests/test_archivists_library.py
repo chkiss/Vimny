@@ -50,6 +50,22 @@ def test_archivist_is_findable_by_f():
     assert _cell_char(d.room, arch.row, arch.col) == 'A'
 
 
+def test_unique_labels_folios_and_desk():
+    import collections
+    d = _dungeon()
+    r = d.room
+    dg._lib_layout(r, 72)
+    line = ''.join(''.join(ru.symbols) for ru in r.char_runs)
+    labelset = set(dg._LIB_FILLERS + dg._LIB_CHESS + list(dg._LIB_SUIT_GLYPH.values()))
+    counts = collections.Counter(ch for ch in line if ch in labelset)
+    assert all(c == 1 for c in counts.values())          # no duplicated stack labels
+    assert line[521:524] == '╓─╖'                         # the desk sits at (0, 521)
+    arch = next(e for e in r.entities if e.kind == 'archivist')
+    assert arch.col == 521                                # ...and the Archivist spawns there
+    # one-suit folios carry their suit (the answers); decoys carry none
+    assert sorted(it['suit'] for it in r.lib_seq if it['suit']) == sorted(dg._LIB_SUITS)
+
+
 def test_brief_dialogue_advances_by_steps_then_editing(monkeypatch):
     # Approaching starts the brief; each further step advances it; after the last
     # line the Archivist edits the buffer (books toggle) and Vim warns W11.
