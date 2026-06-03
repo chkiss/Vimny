@@ -5207,7 +5207,7 @@ def build_dungeon_sentence_corridor(seed: int) -> 'Dungeon':
 # (lib_*) and is driven by the hooks in main.run_dungeon.
 _LIB_SUITS      = ('hearts', 'diamonds', 'spades', 'clubs')
 _LIB_SUIT_GLYPH = {'hearts': '♥', 'diamonds': '♦', 'spades': '♠', 'clubs': '♣'}
-_LIB_BODY_ROWS  = 13            # text rows inside the page frame
+_LIB_BODY_ROWS  = 11            # text rows inside the page frame
 _LIB_FALLBACK_W = 78           # build-time width; main relayouts to the real viewport
 
 
@@ -5234,44 +5234,69 @@ def _lib_frame(W: int, body: list) -> str:
 # tables, and the Archivist's desk. Full shelves are ▤▤▤, empty shelves □□□;
 # the four SUIT stacks stand empty until their folios are refiled (live). Non-suit
 # stacks are labelled with chess pieces; books resting on a table are ≡.
-_LIB_GAP     = '   '
-_LIB_DESK    = '╞═══════════╡'      # the Archivist's desk (books ▤ sit on the row above)
-_LIB_TBL_N   = 2                    # reading tables across the hall
-_LIB_TBL_W   = 9                    # interior width of each table
+# Decorative shelf labels that fill the hall wall-to-wall (always full shelves).
+_LIB_FILLERS = ['✦', '❋', '◈', '❖', '⬡', '✤', '⟡', '❉', '✣', '❀', '✿', '⚘', '✻', '❈']
+_LIB_DESK    = '╓─╖'                # the Archivist's small desk (top-right corner)
 
 
-def _lib_table_band() -> list:
-    """A row of reading tables drawn in the library's own line-art (┌─┐│└┘), books
-    (≡) on each surface, two chairs (o) above and two below. Returns 5 body rows."""
-    w     = _LIB_TBL_W
-    gap   = '     '
-    chair = _lib_center('o     o', w + 2)            # 2 chairs over the table width
-    top   = '┌' + '─' * w + '┐'
-    books = '│' + _lib_center('≡ ≡ ≡ ≡', w) + '│'
-    surf  = '│' + _lib_center('≡ ≡ ≡ ≡', w) + '│'
-    bot   = '└' + '─' * w + '┘'
-    row   = lambda cell: gap.join([cell] * _LIB_TBL_N)
-    return [row(chair), row(top), row(books), row(surf), row(bot), row(chair)]
+def _lib_table_band(inner: int, rng) -> list:
+    """A centred row of reading tables in the library's line-art (┌─┐│└┘), with four
+    chairs (o) above and below each. The surfaces are randomly set with books —
+    ≡ (closed), ◫ (open, 1-2 per table) and bare spots. Returns 6 body rows."""
+    n, w, gap = 2, 11, '      '
+    def chairs():
+        c = [' '] * w
+        for k in range(4):
+            c[1 + k * (w - 3) // 3] = 'o'
+        return ' ' + ''.join(c) + ' '
+    def surface():
+        slots = (w + 1) // 2
+        opens = rng.randint(1, 2)
+        kinds = ['◫'] * opens + ['≡'] * rng.randint(1, slots - opens) + [' '] * slots
+        kinds = kinds[:slots]
+        rng.shuffle(kinds)
+        return '│' + _lib_center(' '.join(kinds), w) + '│'
+    top = '┌' + '─' * w + '┐'
+    bot = '└' + '─' * w + '┘'
+    row = lambda cell: gap.join([cell] * n)
+    return [row(chairs()), row(top), row(surface()), row(surface()), row(bot), row(chairs())]
 
 
-def _lib_band(stacks: list) -> tuple:
-    """One shelf-band from a list of (label, full?) → (label row, shelf row).
-    A full shelf is ▤▤▤; an empty shelf is □□□; labels are centred over each."""
-    lab   = _LIB_GAP.join(f' {lbl} ' for lbl, _ in stacks)
-    shelf = _LIB_GAP.join('▤▤▤' if full else '□□□' for _, full in stacks)
+def _lib_fill_band(inner: int, center: list, rng) -> tuple:
+    """A shelf band filling the inner width: the `center` stacks (a chess group or the
+    suit group) flanked by decorative filler stacks so the wall is packed. `center`
+    is a list of (glyph, full?). Full shelf = ▤▤, empty = □□."""
+    pitch  = 4                                  # 2-wide shelf + 2-space gap
+    ncells = max(len(center) + 4, inner // pitch)
+    side   = (ncells - len(center)) // 2
+    left   = [(rng.choice(_LIB_FILLERS), True) for _ in range(side)]
+    right  = [(rng.choice(_LIB_FILLERS), True) for _ in range(ncells - side - len(center))]
+    cells  = left + center + right
+    lab    = '  '.join(f'{g} ' for g, _ in cells)
+    shelf  = '  '.join('▤▤' if f else '□□' for _, f in cells)
     return lab, shelf
 
 
-def _lib_catalog_spec(filled=()) -> dict:
-    g, F = _LIB_SUIT_GLYPH, set(filled)
-    top = [('♞', 1), (g['hearts'], 'hearts' in F), ('♜', 1),
-           (g['diamonds'], 'diamonds' in F), ('♝', 1)]
-    bot = [('♟', 1), (g['spades'], 'spades' in F), ('♘', 1),
-           (g['clubs'], 'clubs' in F), ('♖', 1)]
-    l1, s1 = _lib_band(top)
-    l2, s2 = _lib_band(bot)
-    body = ['L I B R A R Y', l1, s1, *_lib_table_band(), l2, s2,
-            '▤   ▤   ▤   ▤   ▤', _LIB_DESK]
+def _lib_title_row(inner: int, text: str) -> str:
+    """The title, centred, with the Archivist's small desk tucked into the top-right."""
+    row   = [' '] * inner
+    start = max(0, (inner - len(text)) // 2)
+    for i, ch in enumerate(text):
+        if start + i < inner:
+            row[start + i] = ch
+    for i, ch in enumerate(_LIB_DESK):
+        row[inner - len(_LIB_DESK) + i] = ch
+    return ''.join(row)
+
+
+def _lib_catalog_spec(inner: int, filled, rng) -> dict:
+    g, F   = _LIB_SUIT_GLYPH, set(filled)
+    chess  = [(p, 1) for p in ('♞', '♜', '♝', '♛', '♚')]      # the chess pieces, grouped
+    suits  = [(g[s], s in F) for s in _LIB_SUITS]               # the four suits, grouped
+    cl, cs = _lib_fill_band(inner, chess, rng)
+    sl, ss = _lib_fill_band(inner, suits, rng)
+    body = [_lib_title_row(inner, 'L I B R A R Y'),
+            cl, cs, *_lib_table_band(inner, rng), sl, ss]
     return {'suit': None, 'kind': 'ancient', 'body': body}
 
 
@@ -5291,35 +5316,41 @@ def _lib_decoy_spec(n: int) -> dict:
     return {'suit': None, 'kind': 'verdant', 'body': body}
 
 
-def _lib_finale_spec() -> dict:
-    g = _LIB_SUIT_GLYPH
-    top = [(g['hearts'], 1), ('♜', 1), (g['diamonds'], 1), ('♝', 1), (g['spades'], 1)]
-    bot = [('♞', 1), (g['clubs'], 1), ('♘', 1), ('♖', 1), ('♛', 1)]
-    l1, s1 = _lib_band(top)
-    l2, s2 = _lib_band(bot)
-    body = ['L I B R A R Y   R E S T O R E D', l1, s1, *_lib_table_band(), l2, s2,
-            '▤   ▤   ▤   ▤   ▤', _LIB_DESK]
+def _lib_finale_spec(inner: int, rng) -> dict:
+    g      = _LIB_SUIT_GLYPH
+    chess  = [(p, 1) for p in ('♞', '♜', '♝', '♛', '♚')]
+    suits  = [(g[s], 1) for s in _LIB_SUITS]
+    cl, cs = _lib_fill_band(inner, chess, rng)
+    sl, ss = _lib_fill_band(inner, suits, rng)
+    body = [_lib_title_row(inner, 'L I B R A R Y   R E S T O R E D'),
+            cl, cs, *_lib_table_band(inner, rng), sl, ss]
     return {'suit': None, 'kind': 'ember', 'body': body}
 
 
 def _lib_layout(room, W: int) -> None:
     """(Re)compose the current page at viewport width W: rebuild the one-line buffer,
-    resize the room, and rest the Archivist at the bottom-right corner so $ presents.
+    resize the room, and seat the Archivist at his top-right desk. The catalogue and
+    finale fill the whole wall and are generated from the seed (stable across resize).
     Called by the builder and by main.run_dungeon whenever the width changes."""
+    inner = max(8, W - 2)
+    rng   = random.Random((room.seed or 0) ^ 0x5EED)
     if getattr(room, 'lib_done', None) == 'win':
-        spec = _lib_finale_spec()
+        spec = _lib_finale_spec(inner, rng)
     elif getattr(room, 'lib_view', 'catalog') == 'catalog' or room.lib_idx < 0:
-        filled = [s for s in _LIB_SUITS if room.lib_filed.get(s) == s]
-        spec = _lib_catalog_spec(filled)      # stacks fill in live as suits are filed
+        filled = [s for s in _LIB_SUITS if s in room.lib_filed]   # fills when filed under that name
+        spec = _lib_catalog_spec(inner, filled, rng)
     else:
         spec = room.lib_seq[room.lib_idx]
     line = _lib_frame(W, spec['body'])
     room.cols      = len(line)
     room.cells     = [[CellType.FLOOR] * room.cols]
     room.char_runs = [CharRun(0, 0, tuple(line), spec['kind'])]
+    # Seat the Archivist on his desk (top-right); present by reaching the hall's end ($).
+    didx = line.find(_LIB_DESK[0])
+    arch_col = didx + 1 if didx >= 0 else room.cols - 1
     for e in room.entities:
         if e.kind == 'archivist':
-            e.col = room.cols - 1          # bottom-right corner → reachable with $
+            e.col = arch_col
     room._lib_w = W
     room.rebuild_indexes()
 
