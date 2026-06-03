@@ -182,7 +182,7 @@ def _ent_cell_str(ent, room, r: int, c: int, mode, floor_bg: str) -> str:
     if ent.kind == 'entry_marker':
         return floor_bg + C.hint_fg() + S.PLAYER + rst
     if ent.kind == 'archivist':                       # friendly NPC (The Archivist's Library)
-        return floor_bg + C.exit_fg() + 'A' + rst
+        return floor_bg + C.key_gold_fg() + 'A' + rst
     return floor_bg + '?' + rst
 
 
