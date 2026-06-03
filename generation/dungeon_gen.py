@@ -5310,7 +5310,7 @@ def _lib_floor_spec(inner: int, rng, filled=(), fill=None, fill_rng=None,
     this page's own shelves, and exactly those bookcases are emptied — the books the
     Archivist pulled to pack it — so the empties always correspond to the table."""
     g       = _LIB_SUIT_GLYPH
-    F       = set(filled) if fill is None else set(_LIB_SUITS)
+    F       = set(filled)                          # suit stacks fill ONLY as the player saves them
     ncells  = min(24, max(9, inner // 4))         # stacks per band (capped: labels stay unique)
     pool    = list(_LIB_FILLERS)
     rng.shuffle(pool)
@@ -5336,8 +5336,11 @@ def _lib_floor_spec(inner: int, rng, filled=(), fill=None, fill_rng=None,
                     for _ in range(w)] for _ in range(2)] for _ in range(2)]
         empty  = {ch for t in tables for row in t for ch in row}
 
+    suit_set = set(g.values())
     def render(cells):
-        cells = [(gl, f and gl not in empty) for gl, f in cells]
+        # Suit stacks keep their saved state; only NON-suit bookcases are emptied to
+        # fill the table (suit folios show □□ simply because they aren't saved yet).
+        cells = [(gl, f if gl in suit_set else (f and gl not in empty)) for gl, f in cells]
         lab   = '  '.join(f'{gl} ' for gl, _ in cells)
         shelf = '  '.join('▤▤' if f else '□□' for _, f in cells)
         return lab, shelf
@@ -5397,8 +5400,10 @@ def _lib_layout(room, W: int) -> None:
         filled = [s for s in _LIB_SUITS if s in room.lib_filed]
         spec = _lib_floor_spec(inner, rng, filled=filled)
     else:                                         # a :e! folio — packed tables show the answer
+        filled = [s for s in _LIB_SUITS if s in room.lib_filed]   # saved suits stay filled here too
         frng = random.Random((room.seed or 0) ^ ((room.lib_idx + 1) * 0x9E37))
-        spec = _lib_floor_spec(inner, rng, fill=room.lib_seq[room.lib_idx]['fill'], fill_rng=frng)
+        spec = _lib_floor_spec(inner, rng, filled=filled,
+                               fill=room.lib_seq[room.lib_idx]['fill'], fill_rng=frng)
     rows = _lib_frame(W, spec['body'], spec['kinds'], spec['border'])
     room.cols      = sum(len(r) for r, _ in rows)
     room.cells     = [[CellType.FLOOR] * room.cols]

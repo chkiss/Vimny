@@ -1300,17 +1300,22 @@ def _enemy_tick(room, player) -> list:
         if ent.kind == 'archivist':
             w = getattr(room, '_wrap_w', 0) or 1
             if getattr(room, 'lib_hostile', False):
-                # Furious: quickest path to the player — a gj/gk hop (± a display line)
-                # to close a big gap, otherwise TWO cells a tick, halting adjacent.
+                # Furious: quickest path in the WRAPPED view — gj/gk straight to the
+                # player's display row (even one row away, never circling the file),
+                # then single/double steps along it, halting adjacent.
                 d = player.col - ent.col
-                if d:
-                    if abs(d) > w:
-                        step = w if d > 0 else -w
-                    else:
-                        step = (1 if d > 0 else -1) * min(2, abs(d) - 1)
-                    nc = min(max(0, ent.col + step), room.cols - 1)
-                    if step and (0, nc) != (player.row, player.col):
-                        room.move_entity(ent, 0, nc)
+                pr, ar = player.col // w, ent.col // w
+                if pr != ar:                            # different display rows → hop toward it
+                    nc = ent.col + (w if pr > ar else -w)
+                    if (0, nc) == (player.row, player.col):   # would land on him → sidestep first
+                        nc = ent.col + (1 if d > 0 else -1)
+                elif abs(d) > 1:                        # same row → close in (up to two cells)
+                    nc = ent.col + (1 if d > 0 else -1) * min(2, abs(d) - 1)
+                else:
+                    nc = ent.col                        # adjacent → the combat block strikes
+                nc = min(max(0, nc), room.cols - 1)
+                if nc != ent.col and (0, nc) != (player.row, player.col):
+                    room.move_entity(ent, 0, nc)
             elif getattr(room, 'lib_done', None) == 'win':
                 # Won: settle back beside his desk and stay within 0-4 cells of it (to
                 # the right, clear of the reward chests on its left).
