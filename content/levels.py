@@ -46,7 +46,7 @@ LEVELS = [
     {'display': '14',   'slug': 'sight_sanctum',         'name': 'The Sight Sanctum',          'commands': 'v', 'teaches': ['visual']},
     {'display': '15',   'slug': 'seekers_labyrinth',     'name': "The Seekers' Labyrinth",     'commands': '/ ? n N *', 'teaches': ['/', '*']},
     {'display': '16',   'slug': 'waypoint_sanctum',      'name': 'The Waypoint Sanctum',       'commands': "m ' `", 'teaches': ['mark']},
-    {'display': '17',   'slug': 'archivists_library',    'name': "The Archivist's Library",    'commands': ':set wrap  :e!  :w {suit}', 'teaches': []},
+    {'display': '17',   'slug': 'archivists_library',    'name': "The Archivist's Library",    'commands': ':set wrap  :e!  :w {file}', 'teaches': ['setwrap', 'reload', 'writeas']},
     {'display': '17.1', 'slug': 'warden_pathfinder',     'name': 'The Warden Pathfinder',      'type': 'boss', 'after': 'archivists_library', 'teaches': []},
     {'display': '18',   'slug': 'operators_vault',       'name': "The Operator's Vault",       'commands': 'd c', 'teaches': ['d', 'c', 's']},
     {'display': '19',   'slug': 'whole_line_annex',      'name': 'The Whole-Line Annex',       'commands': 'dd cc D S', 'teaches': ['S']},
