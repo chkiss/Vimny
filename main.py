@@ -1298,17 +1298,16 @@ def _enemy_tick(room, player) -> list:
         if not ent.alive:
             continue
         if ent.kind == 'archivist':
-            # The Archivist paces the hall: a two-column stride along the single row,
-            # turning at the ends, never onto the player. fA finds him anywhere.
+            # Paces the hall at random: short horizontal strides plus the odd gj/gk
+            # hop (± one display line = the wrap width), so he roams the wrapped floor
+            # in two dimensions. Never onto the player; fA finds him wherever he is.
             if ent.ai:
                 ent.ai_tick += 1
                 if ent.ai_tick % ent.ai_speed == 0:
-                    nc = ent.col + 2 * ent.move_dir
-                    if nc <= 1 or nc >= room.cols - 2:
-                        ent.move_dir *= -1
-                        nc = ent.col + 2 * ent.move_dir
-                    nc = min(max(1, nc), room.cols - 2)
-                    if (0, nc) != (player.row, player.col):
+                    w    = getattr(room, '_wrap_w', 0) or 1
+                    step = random.choice([-2, -1, 1, 2, -w, w])
+                    nc   = min(max(1, ent.col + step), room.cols - 2)
+                    if (0, nc) != (player.row, player.col) and nc != ent.col:
                         room.move_entity(ent, 0, nc)
             continue
         dist = _manhattan(player.row, player.col, ent.row, ent.col)
@@ -1660,29 +1659,41 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
         if level == 'archivists_library' and getattr(room, '_lib_w', None) != _lib_w():
             _lib_relayout()
 
-    def _lib_animate():
-        # The Archivist scurries the hall, scrambling the leaf in front of the
-        # reader, before it settles into the next manuscript. Skipped when there is
-        # no live terminal (tests / headless).
+    def _lib_vandalize_step():
+        # One pass of the vandalism: pull books off a few full shelves (▤→□), throw
+        # open some closed books (≡→◫), and spill more open books onto the tables.
+        if not room.char_runs:
+            return
+        syms  = list(room.char_runs[0].symbols)
+        shelf = [i for i, ch in enumerate(syms) if ch == '▤']
+        books = [i for i, ch in enumerate(syms) if ch in ('≡', '◫')]
+        spill = [nb for b in books for nb in (b - 1, b + 1)
+                 if 0 <= nb < len(syms) and syms[nb] == ' ']
+        for i in random.sample(shelf, min(len(shelf), random.randint(3, 6))):
+            syms[i] = '□'
+        for i in random.sample(books, min(len(books), random.randint(2, 4))):
+            syms[i] = '◫'
+        for i in random.sample(spill, min(len(spill), random.randint(2, 4))):
+            syms[i] = '◫'
+        room.char_runs = [CharRun(0, 0, tuple(syms), room.char_runs[0].kind)]
+        room.rebuild_indexes()
+
+    def _lib_scramble():
+        # The vandal at work: the Archivist darts all over the hall, ransacking the
+        # shelves and piling open books on the tables, in front of the reader.
         if not getattr(term, 'is_a_tty', False) or not room.char_runs:
             return
         import time as _t
         arch = next((e for e in room.entities if e.kind == 'archivist'), None)
-        base = list(room.char_runs[0].symbols)
-        kind = room.char_runs[0].kind
-        frame_glyphs = '▌▐▎█░▒▓·∘◦~≋'
-        n = len(base)
-        for _f in range(14):
-            syms = base[:]
-            for _ in range(20):
-                c = random.randrange(n)
-                if syms[c] not in '┌┐└┘─│':
-                    syms[c] = random.choice(frame_glyphs)
-            room.char_runs = [CharRun(0, 0, tuple(syms), kind)]
+        for _f in range(18):
+            _lib_vandalize_step()
             if arch is not None:
-                arch.col = random.randrange(1, max(2, room.cols - 1))
-            room.rebuild_indexes()
-            render_all(term, dungeon, player, budget, 'The Archivist is tidying the shelves…')
+                spots = [i for i, ch in enumerate(room.char_runs[0].symbols)
+                         if ch in ('▤', '□', '◫', '≡')]
+                if spots:
+                    arch.col = random.choice(spots)
+                    room.rebuild_indexes()
+            render_all(term, dungeon, player, budget, '')
             _t.sleep(0.05)
 
     def _lib_reload(force):
@@ -1691,11 +1702,9 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
             return
         if not force:
             player.error = 'E37: No write since last change (add ! to override)'
-            _push('E37: No write since last change (add ! to override)')
             return
         room.lib_idx  = (room.lib_idx + 1) % len(room.lib_seq)
         room.lib_view = 'leaf'
-        _lib_animate()
         _lib_relayout()
         _push('"library" 1 line  --reloaded--')
 
@@ -1725,25 +1734,9 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
                   'Some of my folios are still missing... a vandal is about...',
                   "If you don't mind helping me, try to find them."]
 
-    def _lib_edit_tick():
-        # The vandal/Archivist is at work: every so often a closed book (≡) opens (◫)
-        # or an open one shuts, and Vim warns the buffer changed underfoot (W11).
-        room.lib_edit_tick = getattr(room, 'lib_edit_tick', 0) + 1
-        if room.lib_edit_tick % 2 or not room.char_runs:
-            return
-        syms  = list(room.char_runs[0].symbols)
-        spots = [i for i, ch in enumerate(syms) if ch in ('≡', '◫')]
-        if not spots:
-            return
-        for c in random.sample(spots, min(len(spots), random.randint(1, 2))):
-            syms[c] = '◫' if syms[c] == '≡' else '≡'
-        room.char_runs = [CharRun(0, 0, tuple(syms), room.char_runs[0].kind)]
-        room.rebuild_indexes()
-        _push('W11: Buffer "library" has changed since editing started')
-
     def _lib_brief_step(near):
         # Post-wrap brief: line 1 on approach, each later line on the next step, then
-        # the Archivist begins editing the buffer in front of the reader.
+        # the Archivist tears into the shelves (scramble) and Vim warns W11.
         d = room.lib_dlg
         if d == 0:
             if near:
@@ -1756,8 +1749,10 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
         elif d == 3:
             if player.col != room.lib_dlg_col:
                 room.lib_dlg = 4               # the editing begins
+                _lib_scramble()               # he ransacks the shelves, in front of you
         if room.lib_dlg >= 4:
-            _lib_edit_tick()
+            # Vim's real "file changed underfoot" warning — red statusline, not dialogue.
+            player.error = 'W11: Warning: File "library" has changed since editing started'
 
     def _lib_present():
         if all(room.lib_filed.get(s) == s for s in _dg._LIB_SUITS):

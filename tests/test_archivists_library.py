@@ -58,6 +58,7 @@ def test_brief_dialogue_advances_by_steps_then_editing(monkeypatch):
 
     def _cap(term, dungeon, player, budget, message='', *a, **k):
         seen.append(message)
+        seen.append(getattr(player, 'error', '') or '')   # W11 rides the red statusline
 
     monkeypatch.setattr(main, 'render_all', _cap)
     term = Terminal()
