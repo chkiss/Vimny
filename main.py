@@ -1298,15 +1298,16 @@ def _enemy_tick(room, player) -> list:
         if not ent.alive:
             continue
         if ent.kind == 'archivist':
-            # The Archivist paces the hall: oscillate along the single row, turning
-            # at the ends, never stepping onto the player. fA finds him anywhere.
+            # The Archivist paces the hall: a two-column stride along the single row,
+            # turning at the ends, never onto the player. fA finds him anywhere.
             if ent.ai:
                 ent.ai_tick += 1
                 if ent.ai_tick % ent.ai_speed == 0:
-                    nc = ent.col + ent.move_dir
+                    nc = ent.col + 2 * ent.move_dir
                     if nc <= 1 or nc >= room.cols - 2:
                         ent.move_dir *= -1
-                        nc = ent.col + ent.move_dir
+                        nc = ent.col + 2 * ent.move_dir
+                    nc = min(max(1, nc), room.cols - 2)
                     if (0, nc) != (player.row, player.col):
                         room.move_entity(ent, 0, nc)
             continue
@@ -1708,18 +1709,12 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
         room.lib_view = 'catalog'                 # back to the floor — the stack fills in
         _lib_relayout()
         _push(f'"{name}" [New] 1 line written')
-        if all(s in room.lib_filed for s in _dg._LIB_SUITS):
-            _push('All four stacks filled.')
-            _push('Approach the Archivist (fA) to present them.')
-        else:
-            _push('The stack fills. Press  :e!  to leaf on.')
 
     def _lib_finale():
         room.lib_done = 'win'
         room.entities = [e for e in room.entities if e.kind != 'archivist']
         _lib_relayout()                          # draw the restored-library page
-        # Place the rewards a few steps LEFT of where $ left the player (the far
-        # corner): two chests first, then the exit — open, then step on to win.
+        # Lay the rewards near the end of the hall: two chests, then the exit.
         last = room.cols - 1
         room.add_entity(Entity(kind='chest_scroll', row=0, col=last - 2, scroll_id='display_move'))
         room.add_entity(Entity(kind='chest_scroll', row=0, col=last - 4, scroll_id='edit_name'))
@@ -1737,9 +1732,8 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
                 room.lib_briefed = True
                 _push("Great Vim — you've fixed my library!")
                 _push('But some folios are missing... a vandal must be about...')
-                _push(':e!  leafs the shelves;  :w <suit>  refiles one.')
             else:
-                _push('Folios still missing — :e!  to leaf,  :w <suit>  to refile.')
+                _push('Some folios are still missing...')
             return
         if all(room.lib_filed.get(s) == s for s in _dg._LIB_SUITS):
             _lib_finale()
@@ -2100,7 +2094,6 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
                                       + (_flag if _new else 'no' + _flag))
                             if _lib_wrap and _new and not getattr(room, 'lib_done', None):
                                 _push('You see someone pacing among the shelves!')
-                                _push('(fA to approach them.)')
                         else:
                             player.number_mode, _set_msg = _apply_set(
                                 player.number_mode, cmd[len('set'):])

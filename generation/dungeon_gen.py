@@ -5394,7 +5394,7 @@ def build_dungeon_archivists_library(seed: int) -> Dungeon:
     # off the first screen, and ':set wrap' folds the line in so the player sees him move.
     room.entities = [
         Entity(kind='entry_marker', row=0, col=0),
-        Entity(kind='archivist',    row=0, col=1, ai='wander', ai_speed=2, move_dir=1),
+        Entity(kind='archivist',    row=0, col=1, ai='wander', ai_speed=1, move_dir=1),
     ]
     _lib_layout(room, _LIB_FALLBACK_W)
     arch = next(e for e in room.entities if e.kind == 'archivist')
