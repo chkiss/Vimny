@@ -5,7 +5,7 @@
 > drifted here once and caused real bugs. Canonical sources:
 > - **Curriculum** (levels, command-unlock order): `content/levels.py` — mirrored in `LEVELS_PLAN.md` **Part 7**.
 > - **Command semantics**: the engine (`engine/`) + tests; quick reference in `README.md`.
-> - **Architecture, key files, conventions, budget formula**: `CLAUDE.md`.
+> - **Architecture, key files, conventions, budget formula**: `docs/ARCHITECTURE.md`.
 >
 > Section numbers below are intentionally non-contiguous. The stale or duplicated sections
 > (former §3 architecture, §4 visual tables, §6.1–6.3 command tables, §7–§11 systems/procgen,
@@ -35,7 +35,7 @@ Vimny is a terminal-first, dungeon crawler that teaches Vim through play. The du
 
 The overworld renders as Vim's netrw directory browser, decorated with a game frame. The player navigates it with `hjkl` and presses `Enter` to enter a dungeon.
 
-*(Illustrative mockup — dungeon names/levels here are not the canonical curriculum; see `content/levels.py`. The as-built overworld is a full netrw buffer (`render/overworld.py` / `run_overworld`): the mockup's `?:examine` / `I:inventory` keys are aspirational, while the shipped browser adds `D` (delete), `R` (rename), `:set number`, and learned-gated motions — see CLAUDE.md → Architecture rules.)*
+*(Illustrative mockup — dungeon names/levels here are not the canonical curriculum; see `content/levels.py`. The as-built overworld is a full netrw buffer (`render/overworld.py` / `run_overworld`): the mockup's `?:examine` / `I:inventory` keys are aspirational, while the shipped browser adds `D` (delete), `R` (rename), `:set number`, and learned-gated motions — see docs/ARCHITECTURE.md → Architecture rules.)*
 
 ```
 ┌──────────────────────────────────────────────────────────────────────────────┐
