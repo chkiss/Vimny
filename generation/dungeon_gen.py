@@ -5445,7 +5445,7 @@ def build_dungeon_archivists_library(seed: int) -> Dungeon:
     room.seed        = seed
     room.spawn_pos   = (0, 0)
     room.wrap_buffer = True
-    room.par         = 0          # contextual level — no par-forcing
+    room.par         = 20         # under-par target (the under-par message fires at the exit)
     room.budget      = 2000       # generous; the loop is exploratory, never budget-gated
     room.answer      = ''
 

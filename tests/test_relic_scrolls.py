@@ -17,6 +17,17 @@ def test_catalog_ids_are_unique():
     ids = [s['id'] for s in SCROLL_CATALOG]
     assert len(ids) == len(set(ids))
 
+def test_archivist_reward_scrolls_are_renderable():
+    # Regression: the Archivist's two reward scrolls crashed the codex (no dispatch
+    # entry). They must be in the catalogue with standard 'lines' content so the
+    # codex's standard-renderer fallback can show them.
+    from content.scrolls import DISPLAY_LINE_SCROLL, EDIT_BY_NAME_SCROLL
+    by_id = {s['id']: s for s in SCROLL_CATALOG}
+    assert by_id['display_move']['content'] is DISPLAY_LINE_SCROLL
+    assert by_id['edit_name']['content'] is EDIT_BY_NAME_SCROLL
+    for d in (DISPLAY_LINE_SCROLL, EDIT_BY_NAME_SCROLL):
+        assert isinstance(d.get('lines'), list) and d['lines']
+
 def test_pick_skips_discovered():
     discovered = RELIC_SCROLL_IDS[:-1]               # all but the last
     assert pick_relic_scroll(discovered) == RELIC_SCROLL_IDS[-1]
