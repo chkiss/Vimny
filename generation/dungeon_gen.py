@@ -5218,16 +5218,20 @@ def _lib_center(s: str, w: int) -> str:
     return ' ' * left + s + ' ' * (pad - left)
 
 
-def _lib_frame(W: int, body: list) -> str:
-    """Compose a framed 'page' as ONE wrap line: rows of EXACTLY W columns, so that
-    wrapping at the viewport width W redraws a perfect rectangle. The first W chars
-    are the top border, so even unwrapped the player sees ┌────┐ filling the view."""
+def _lib_frame(W: int, body: list, kinds: list, border: str = 'ancient') -> list:
+    """Compose a framed 'page' as rows of EXACTLY W columns (so wrapping at width W
+    redraws a perfect rectangle), each tagged with its colour `kind`. Returns a list
+    of (row_string, kind); the caller emits one CharRun per row so regions keep their
+    own colour. The first row is the top border, so even unwrapped the player sees a
+    ┌────┐ filling the view."""
     inner = max(1, W - 2)
-    rows  = ['┌' + '─' * inner + '┐']
+    rows  = [('┌' + '─' * inner + '┐', border)]
     for i in range(_LIB_BODY_ROWS):
-        rows.append('│' + _lib_center(body[i] if i < len(body) else '', inner) + '│')
-    rows.append('└' + '─' * inner + '┘')
-    return ''.join(rows)        # each row is exactly W chars → (rows)*W total
+        line = body[i] if i < len(body) else ''
+        k    = kinds[i] if i < len(kinds) else border
+        rows.append(('│' + _lib_center(line, inner) + '│', k))
+    rows.append(('└' + '─' * inner + '┘', border))
+    return rows                 # each row is exactly W chars → (rows)*W total
 
 
 # A library floor drawn top-down: rows of book-stacks (each labelled), reading
@@ -5300,9 +5304,11 @@ def _lib_catalog_spec(inner: int, filled, rng) -> dict:
     suits  = [(g[s], s in F) for s in _LIB_SUITS]               # the four suits, grouped
     cl, cs = _lib_fill_band(inner, chess, rng)
     sl, ss = _lib_fill_band(inner, suits, rng)
-    body = [_lib_title_row(inner, 'L I B R A R Y'),
-            cl, cs, *_lib_table_band(inner, rng), sl, ss]
-    return {'suit': None, 'kind': 'ancient', 'body': body}
+    table  = _lib_table_band(inner, rng)
+    body   = [_lib_title_row(inner, 'L I B R A R Y'), cl, cs, *table, sl, ss]
+    # bookshelves in ancient indigo; tables/chairs + the desk in warm ember.
+    kinds  = ['ember', 'ancient', 'ancient', *(['ember'] * len(table)), 'ancient', 'ancient']
+    return {'suit': None, 'kind': 'ancient', 'border': 'ancient', 'body': body, 'kinds': kinds}
 
 
 def _lib_suit_spec(suit: str) -> dict:
@@ -5327,14 +5333,16 @@ def _lib_finale_spec(inner: int, rng) -> dict:
     suits  = [(g[s], 1) for s in _LIB_SUITS]
     cl, cs = _lib_fill_band(inner, chess, rng)
     sl, ss = _lib_fill_band(inner, suits, rng)
-    body = [_lib_title_row(inner, 'L I B R A R Y   R E S T O R E D'),
-            cl, cs, *_lib_table_band(inner, rng), sl, ss]
-    return {'suit': None, 'kind': 'ember', 'body': body}
+    table  = _lib_table_band(inner, rng)
+    body   = [_lib_title_row(inner, 'L I B R A R Y   R E S T O R E D'), cl, cs, *table, sl, ss]
+    kinds  = ['ember', 'ancient', 'ancient', *(['ember'] * len(table)), 'ancient', 'ancient']
+    return {'suit': None, 'kind': 'ember', 'border': 'ancient', 'body': body, 'kinds': kinds}
 
 
 def _lib_layout(room, W: int) -> None:
-    """(Re)compose the current page at viewport width W: rebuild the one-line buffer,
-    resize the room, and seat the Archivist at his top-right desk. The catalogue and
+    """(Re)compose the current page at viewport width W: rebuild the wrapped buffer as
+    one CharRun PER display row (so bookshelves can stay indigo while the tables/desk
+    glow ember), resize the room, and keep the Archivist in bounds. The catalogue and
     finale fill the whole wall and are generated from the seed (stable across resize).
     Called by the builder and by main.run_dungeon whenever the width changes."""
     inner = max(8, W - 2)
@@ -5346,10 +5354,16 @@ def _lib_layout(room, W: int) -> None:
         spec = _lib_catalog_spec(inner, filled, rng)
     else:
         spec = room.lib_seq[room.lib_idx]
-    line = _lib_frame(W, spec['body'])
-    room.cols      = len(line)
+    kinds  = spec.get('kinds') or [spec['kind']] * len(spec['body'])
+    border = spec.get('border', spec['kind'])
+    rows   = _lib_frame(W, spec['body'], kinds, border)
+    room.cols      = sum(len(r) for r, _ in rows)
     room.cells     = [[CellType.FLOOR] * room.cols]
-    room.char_runs = [CharRun(0, 0, tuple(line), spec['kind'])]
+    room.char_runs = []
+    col = 0
+    for rowstr, kind in rows:
+        room.char_runs.append(CharRun(0, col, tuple(rowstr), kind))
+        col += len(rowstr)
     # The Archivist paces the hall (see _enemy_tick); just keep him in bounds here.
     for e in room.entities:
         if e.kind == 'archivist':

@@ -1666,22 +1666,23 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
             _lib_relayout()
 
     def _lib_vandalize_step():
-        # One pass of the ransacking: pull books off a few full shelves (▤→□) — but
-        # leave plenty standing — and pile the tables with a MIX of stacks (≡) and
-        # open books (◫).
+        # One pass of the ransacking, across the per-row runs: pull books off a few
+        # full shelves (▤→□) — but leave plenty standing — and pile the tables with a
+        # MIX of stacks (≡) and open books (◫).
         if not room.char_runs:
             return
-        syms  = list(room.char_runs[0].symbols)
-        shelf = [i for i, ch in enumerate(syms) if ch == '▤']
-        books = [i for i, ch in enumerate(syms) if ch in ('≡', '◫')]
-        spill = [nb for b in books for nb in (b - 1, b + 1)
-                 if 0 <= nb < len(syms) and syms[nb] == ' ']
+        syml  = [list(ru.symbols) for ru in room.char_runs]
+        shelf = [(r, j) for r, s in enumerate(syml) for j, ch in enumerate(s) if ch == '▤']
+        books = [(r, j) for r, s in enumerate(syml) for j, ch in enumerate(s) if ch in ('≡', '◫')]
+        spill = [(r, nb) for r, j in books for nb in (j - 1, j + 1)
+                 if 0 <= nb < len(syml[r]) and syml[r][nb] == ' ']
         if len(shelf) > 30:                       # stop once half the shelves are bare
-            for i in random.sample(shelf, min(len(shelf), random.randint(1, 3))):
-                syms[i] = '□'
-        for i in random.sample(spill, min(len(spill), random.randint(1, 3))):
-            syms[i] = random.choice(['≡', '◫', '◫'])   # a mix, leaning open
-        room.char_runs = [CharRun(0, 0, tuple(syms), room.char_runs[0].kind)]
+            for r, j in random.sample(shelf, min(len(shelf), random.randint(1, 3))):
+                syml[r][j] = '□'
+        for r, j in random.sample(spill, min(len(spill), random.randint(1, 3))):
+            syml[r][j] = random.choice(['≡', '◫', '◫'])   # a mix, leaning open
+        room.char_runs = [CharRun(ru.row, ru.col, tuple(syml[r]), ru.kind)
+                          for r, ru in enumerate(room.char_runs)]
         room.rebuild_indexes()
 
     def _lib_scramble():
@@ -1695,8 +1696,8 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
         for _f in range(12):
             _lib_vandalize_step()
             if arch is not None:
-                spots = [i for i, ch in enumerate(room.char_runs[0].symbols)
-                         if ch in ('▤', '□', '◫', '≡')]
+                spots = [ru.col + j for ru in room.char_runs
+                         for j, ch in enumerate(ru.symbols) if ch in ('▤', '□', '◫', '≡')]
                 if spots:
                     arch.col = random.choice(spots)
                     room.rebuild_indexes()
@@ -1772,14 +1773,21 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
                     room.lib_scramble_at = random.randint(6, 12)
                     _lib_scramble()
 
+    def _lib_strike(line):
+        # The Archivist turns on the player — lethal, as for presenting forged folios.
+        if getattr(room, 'lib_done', None):
+            return
+        room.lib_done = 'dead'
+        _push(line)
+        _push('The Archivist strikes you down.')
+        player.take_damage(player.max_hp + 20)
+
     def _lib_present():
         if all(room.lib_filed.get(s) == s for s in _dg._LIB_SUITS):
             _lib_finale()
             _push('"Flawless! My library is whole again — my gifts are yours."')
         else:
-            _push('"So YOU\'RE the pest mangling my folios!"')
-            _push('The Archivist strikes you down.')
-            player.take_damage(player.max_hp + 20)
+            _lib_strike('"So YOU\'RE the pest mangling my folios!"')
 
     if _start_edit:
         room.passable_walls = True
@@ -2898,6 +2906,15 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
                 else:
                     ed_undo.pop()
                     _push('Nothing to cut here.')
+            elif (level == 'archivists_library' and not getattr(room, 'lib_done', None)
+                  and any((lambda ru: ru and ru.symbols[player.col + _i - ru.col] != ' ')(
+                              room.char_run_at(player.row, player.col + _i))
+                          for _i in range(count))):
+                # x-ing anything but whitespace defaces the library — he turns on you.
+                _lib_strike('"You DARE deface my library, VANDAL?!"')
+                render_all(term, dungeon, player, budget, _pool_msg(),
+                           attack_pos=_attack_pos(), attack_sym=_attack_sym())
+                continue
             else:
                 interacted = False
                 cur = room.entity_at(player.row, player.col)
