@@ -148,11 +148,11 @@ Every game view — dungeon, overworld, transition screens — uses the same out
 
 | Quantity | Value |
 |---|---|
-| Frame outer width | **80 columns** |
+| Minimum terminal width | **80 columns** (the supported minimum) |
 | Frame inner width | 78 columns (80 − 2 border `│` characters) |
-| Maximum adaptive width | 120 columns on wider terminals |
+| Maximum adaptive width | **189 columns** on wider terminals (the overworld and The Archivist's Library lay out to this) |
 
-The frame fills terminal width between 80 and 120 columns. Every content line pads with trailing spaces to the full inner width — this is what keeps the right `│` border column-aligned even when content is short. Lines that do not fill to the inner width produce a ragged right border.
+The frame fills terminal width between 80 and 189 columns (clamped in `render/utils.py:inner_w`). Every content line pads with trailing spaces to the full inner width — this is what keeps the right `│` border column-aligned even when content is short. Lines that do not fill to the inner width produce a ragged right border.
 
 **Vertical**:
 

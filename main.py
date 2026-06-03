@@ -1300,13 +1300,16 @@ def _enemy_tick(room, player) -> list:
         if ent.kind == 'archivist':
             w = getattr(room, '_wrap_w', 0) or 1
             if getattr(room, 'lib_hostile', False):
-                # Furious: take the quickest path to the player — gj/gk (± a display
-                # line) to close the distance, then single steps — and stop adjacent.
+                # Furious: quickest path to the player — a gj/gk hop (± a display line)
+                # to close a big gap, otherwise TWO cells a tick, halting adjacent.
                 d = player.col - ent.col
                 if d:
-                    step = (w if d > 0 else -w) if abs(d) >= w else (1 if d > 0 else -1)
-                    nc   = min(max(0, ent.col + step), room.cols - 1)
-                    if (0, nc) != (player.row, player.col):
+                    if abs(d) > w:
+                        step = w if d > 0 else -w
+                    else:
+                        step = (1 if d > 0 else -1) * min(2, abs(d) - 1)
+                    nc = min(max(0, ent.col + step), room.cols - 1)
+                    if step and (0, nc) != (player.row, player.col):
                         room.move_entity(ent, 0, nc)
             elif ent.ai:
                 # Discrete gait: single-cell steps two at a time (a quick step-step),
