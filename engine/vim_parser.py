@@ -132,6 +132,8 @@ def parse(buf: str, mode: Mode) -> tuple[dict | None, str]:
             return {'type': 'motion', 'motion': 'gg', 'count': count_n, 'count_given': bool(count)}, buf[i+2:]
         if g2 in 'eE':
             return {'type': 'motion', 'motion': 'g' + g2, 'count': count_n}, buf[i+2:]
+        if g2 in 'jk':                             # gj / gk — move by DISPLAY line (wrap)
+            return {'type': 'motion', 'motion': 'g' + g2, 'count': count_n}, buf[i+2:]
         if g2 == 'v':                              # gv — reselect last visual span
             return {'type': 'enter_mode', 'mode': 'visual', 'reselect': True}, buf[i+2:]
         if g2 in ('~', 'u', 'U'):                  # case operator: g~{m} gu{m} gU{m}

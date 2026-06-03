@@ -1631,6 +1631,73 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
         if text not in msg_pool:
             msg_pool.append(text)
 
+    # ── The Archivist's Library (L17) — reload loop + reckoning ─────────────
+    def _lib_show(idx):
+        item = room.lib_catalog if idx < 0 else room.lib_seq[idx]
+        room.char_runs = [CharRun(0, 0, item['syms'], item['kind'])]
+        room.rebuild_indexes()
+        if player.col >= room.cols:
+            player.col = room.cols - 1
+
+    def _lib_reload(force):
+        if getattr(room, 'lib_done', None):
+            _push('The library is whole again — nothing left to reload.')
+            return
+        if not force:
+            player.error = 'E37: No write since last change (add ! to override)'
+            _push('E37: No write since last change (add ! to override)')
+            return
+        room.lib_idx = (room.lib_idx + 1) % len(room.lib_seq)
+        _lib_show(room.lib_idx)
+        _push('"library" 1 line  --reloaded-- (the Archivist keeps editing it)')
+
+    def _lib_file(name):
+        if getattr(room, 'lib_done', None):
+            return
+        if room.lib_idx < 0:
+            _push('Nothing leafed yet — press  :e!  to open a manuscript first.')
+            return
+        room.lib_filed[name] = room.lib_seq[room.lib_idx]['suit']
+        _push(f'"{name}" [New] 1 line written')
+        if all(s in room.lib_filed for s in _dg._LIB_SUITS):
+            _push('All four folios filed. Return to the Archivist (A) to present them.')
+
+    def _lib_finale():
+        g = _dg._LIB_SUIT_GLYPH
+        text = (f"   {g['hearts']} {g['diamonds']}   THE LIBRARY RESTORED   "
+                f"{g['spades']} {g['clubs']}      Every suit shelved in its place; the "
+                "Archivist bows low.   Open his two chests, then  :wq  to leave.   ")
+        room.char_runs = [CharRun(0, 0, _dg._lib_pad(text), 'ember')]
+        room.entities  = [e for e in room.entities if e.kind != 'archivist']
+        room.add_entity(Entity(kind='chest_scroll', row=0, col=6,  scroll_id='display_move'))
+        room.add_entity(Entity(kind='chest_scroll', row=0, col=12, scroll_id='edit_name'))
+        room.add_entity(Entity(kind='exit',         row=0, col=20))
+        room.rebuild_indexes()
+        room.lib_done = 'win'
+
+    def _lib_on_archivist():
+        if getattr(room, 'lib_done', None):
+            return
+        if not all(s in room.lib_filed for s in _dg._LIB_SUITS):
+            if not player.wrap:
+                _push("MY LIBRARY! It's all on ONE LINE — some fiend ran :set nowrap! "
+                      "Put it right with  :set wrap!")
+            elif not room.lib_briefed:
+                room.lib_briefed = True
+                _push("A reader, at last! A vandal corrupted my shelves. Leaf the "
+                      "manuscripts with  :e!  and file the four suits — :w hearts, "
+                      ":w diamonds, :w spades, :w clubs — then bring them to me.")
+            else:
+                _push('"File all four suits with  :w , then return to me."')
+            return
+        if all(room.lib_filed.get(s) == s for s in _dg._LIB_SUITS):
+            _lib_finale()
+            _push('The Archivist beams: "Flawless! My library is whole again."')
+        else:
+            _push('"So YOU\'RE the pest who has been MANGLING my folios!"  '
+                  'The Archivist hurls a curse and strikes you down.')
+            player.take_damage(player.max_hp + 20)
+
     if _start_edit:
         room.passable_walls = True
         if 'editor' not in player.known_commands:
@@ -1660,6 +1727,10 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
     elif level == 'dummy':
         message = 'Sandbox — all mechanics active. Type :edit to enter editor mode.'
         msg_ttl = 60
+    elif level == 'archivists_library':
+        message = ("The Archivist's Library — the catalogue is one ruined line. "
+                   "Type  :set wrap  to shelve it.")
+        msg_ttl = 80
 
     any_water     = any(ct == CellType.WATER for row in room.cells for ct in row)
     last_activity = time.time()
@@ -1787,7 +1858,15 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
                 msg_pool.clear()
                 msg_idx = 0
 
-                if cmd == 'w':
+                if (level == 'archivists_library' and cmd in ('e', 'e!')
+                        and not player.is_dead):
+                    _lib_reload(force=(cmd == 'e!'))
+
+                elif (level == 'archivists_library' and cmd.startswith('w ')
+                        and cmd[2:].strip() in _dg._LIB_SUITS):
+                    _lib_file(cmd[2:].strip())
+
+                elif cmd == 'w':
                     if edit_mode and player_name == 'admin':
                         path = SM.save_layout(dungeon.name, _serialize_room(room))
                         _push(f'Layout saved: {path.name}')
@@ -1941,7 +2020,8 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
                     # :set number/relativenumber + the boolean hlsearch/incsearch,
                     # each with toggle (!/inv), reset (&) and query (?) forms.
                     # Unlocked by the Waypoint Sanctum scroll ('setnum').
-                    if 'setnum' not in player.known_commands and player_name != 'admin':
+                    if ('setnum' not in player.known_commands and player_name != 'admin'
+                            and level != 'archivists_library'):
                         _push("You haven't learned :set yet.")
                     else:
                         _core, _act = _parse_set_mod(cmd[len('set'):])
@@ -2455,6 +2535,18 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
                     undo_stack.clear()
                     redo_stack.clear()
                     _push('The door seals shut behind you — there is no going back.')
+
+                # The Archivist's Library: stepping onto the Archivist talks / presents.
+                if level == 'archivists_library':
+                    _arch = next((e for e in room.entities
+                                  if e.kind == 'archivist' and e.alive), None)
+                    _on_arch = (_arch is not None
+                                and (player.row, player.col) == (_arch.row, _arch.col))
+                    if _on_arch and not room._lib_arch_flag:
+                        room._lib_arch_flag = True
+                        _lib_on_archivist()
+                    elif not _on_arch:
+                        room._lib_arch_flag = False
 
                 # Win / exit check
                 if ent is None:
@@ -4075,7 +4167,7 @@ def main():
                              'rune_halls', 'character_cataracts', 'goblin_gauntlet',
                              'wardens_keep', 'word_forge', 'backward_vaults', 'lineheads',
                              'warden_surveyor', 'sight_sanctum', 'seekers_labyrinth',
-                             'waypoint_sanctum', 'dummy'],
+                             'waypoint_sanctum', 'archivists_library', 'dummy'],
                     help='skip overworld and start at this level slug (debug)')
     args = ap.parse_args()
 

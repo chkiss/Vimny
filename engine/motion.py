@@ -233,6 +233,18 @@ def apply_motion(player, motion, count, room, target=None, count_given: bool = T
             moved |= move_player(player, -1, 0, room)
         elif motion == 'l':
             moved |= move_player(player, 0,  1, room)
+        elif motion in ('gj', 'gk'):
+            # gj/gk — move by DISPLAY line. On a wrapped single-line buffer that is
+            # ±(wrap width) columns; on an ordinary grid it falls back to j/k.
+            if getattr(room, 'wrap_buffer', False) and room.rows == 1:
+                w  = getattr(room, '_wrap_w', 0) or room.cols
+                nc = player.col + (w if motion == 'gj' else -w)
+                nc = max(0, min(nc, room.cols - 1))
+                if nc != player.col:
+                    player.col = nc
+                    moved = True
+            else:
+                moved |= move_player(player, 1 if motion == 'gj' else -1, 0, room)
         elif motion == '0':
             row = player.row
             left = player.col

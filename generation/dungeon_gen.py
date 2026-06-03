@@ -5197,3 +5197,96 @@ def build_dungeon_sentence_corridor(seed: int) -> 'Dungeon':
     dungeon.rooms        = [composite]
     dungeon.current_room = 0
     return dungeon
+
+
+# ── The Archivist's Library (L17) — one-line wrap_buffer + reload loop ───────
+# Mechanically unlike any other level: the whole dungeon is ONE logical line
+# (rows==1, wrap_buffer=True). ':set wrap' shelves it; ':e!' leafs through a
+# seed-shuffled cadence of suit folios and decoys; ':w {suit}' files a copy;
+# presenting forged folios to the Archivist is lethal. State lives on the room
+# (lib_*) and is driven by the hooks in main.run_dungeon.
+_LIB_SUITS      = ('hearts', 'diamonds', 'spades', 'clubs')
+_LIB_SUIT_GLYPH = {'hearts': '♥', 'diamonds': '♦', 'spades': '♠', 'clubs': '♣'}
+_LIB_WIDTH      = 360            # logical columns; wraps to the viewport at render time
+_LIB_ARCH_COL   = 2             # the Archivist sits two columns in from the start
+
+
+def _lib_pad(s: str) -> tuple:
+    """Trim/pad a manuscript to exactly _LIB_WIDTH columns of character cells."""
+    s = s[:_LIB_WIDTH]
+    return tuple(s.ljust(_LIB_WIDTH))
+
+
+def _lib_catalog() -> dict:
+    g = _LIB_SUIT_GLYPH
+    text = ("THE ARCHIVIST'S LIBRARY    Some fiend ran  :set nowrap  and my whole "
+            "catalogue spilled onto a single endless line.  Shelve it with  "
+            ":set wrap  — then leaf through the manuscripts with  :e!  and file each "
+            "suit under its name:   :w hearts   :w diamonds   :w spades   :w clubs.   "
+            f"The four folios I need:   {g['hearts']} hearts    {g['diamonds']} diamonds"
+            f"    {g['spades']} spades    {g['clubs']} clubs.   (Plain  :e  will not "
+            "reload — I am forever editing, so the buffer is never clean: use  :e!)")
+    return {'suit': None, 'syms': _lib_pad(text), 'kind': 'ancient'}
+
+
+def _lib_suit_folio(suit: str) -> dict:
+    g  = _LIB_SUIT_GLYPH[suit]
+    gg = (g + ' ') * 14
+    text = (f"{g} {g} {g}   THE {suit.upper()} FOLIO   {g} {g} {g}     A clean leaf, "
+            f"every margin inked with {suit}.    {gg}   If this is a suit you seek, "
+            f"file it now:   :w {suit}    {gg}")
+    return {'suit': suit, 'syms': _lib_pad(text), 'kind': 'ember'}
+
+
+def _lib_decoy(n: int) -> dict:
+    waves = '~ ' * 18
+    text = (f"≋ ≋ ≋   a water-stained leaf — the ink has run and no suit survives   "
+            f"≋ ≋ ≋     {waves}   do not file this one; press  :e!  for the next "
+            f"manuscript   ≋ ≋ ≋  (leaf {n})")
+    return {'suit': None, 'syms': _lib_pad(text), 'kind': 'verdant'}
+
+
+def build_dungeon_archivists_library(seed: int) -> Dungeon:
+    rng = random.Random(seed)
+    dungeon = Dungeon(name="The Archivist's Library", seed=seed)
+
+    room = Room(room_type=RoomType.ENTRY, rows=1, cols=_LIB_WIDTH)
+    room.cells       = [[CellType.FLOOR] * _LIB_WIDTH]
+    room.seed        = seed
+    room.spawn_pos   = (0, 0)
+    room.wrap_buffer = True
+    room.par         = 0          # contextual level — no par-forcing
+    room.budget      = 2000       # generous; the loop is exploratory, never budget-gated
+    room.answer      = ''
+
+    # Cadence: suit at indices 0,3,7,10 of an 11-long cycle; decoys elsewhere; loops.
+    suit_slots = [0, 3, 7, 10]
+    suits      = list(_LIB_SUITS)
+    rng.shuffle(suits)
+    seq, decoy_n = [], 0
+    for i in range(11):
+        if i in suit_slots:
+            seq.append(_lib_suit_folio(suits[suit_slots.index(i)]))
+        else:
+            decoy_n += 1
+            seq.append(_lib_decoy(decoy_n))
+
+    room.lib_seq     = seq
+    room.lib_catalog = _lib_catalog()
+    room.lib_idx     = -1         # -1 = the catalogue/index is showing
+    room.lib_filed   = {}         # suit-name -> the true suit of what was filed (None = decoy)
+    room.lib_done    = None       # None | 'win' | 'dead'
+    room.lib_briefed = False      # has the player seen the post-wrap brief?
+    room._lib_arch_flag = False   # debounces the on-Archivist trigger
+
+    # The current manuscript renders as one CharRun across row 0 (catalogue first).
+    room.char_runs = [CharRun(0, 0, room.lib_catalog['syms'], room.lib_catalog['kind'])]
+    room.entities  = [
+        Entity(kind='entry_marker', row=0, col=0),
+        Entity(kind='archivist',    row=0, col=_LIB_ARCH_COL),
+    ]
+    room.rebuild_indexes()
+
+    dungeon.rooms        = [room]
+    dungeon.current_room = 0
+    return dungeon

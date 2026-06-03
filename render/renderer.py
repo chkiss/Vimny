@@ -181,6 +181,8 @@ def _ent_cell_str(ent, room, r: int, c: int, mode, floor_bg: str) -> str:
         return floor_bg + C.key_fg() + S.KEY + rst
     if ent.kind == 'entry_marker':
         return floor_bg + C.hint_fg() + S.PLAYER + rst
+    if ent.kind == 'archivist':                       # friendly NPC (The Archivist's Library)
+        return floor_bg + C.exit_fg() + 'A' + rst
     return floor_bg + '?' + rst
 
 
@@ -319,6 +321,7 @@ def render_all(term: Terminal, dungeon: Dungeon, player: Player,
     if wrap_active:
         total_drows = wrap_total_rows(room.cols, content_w)
         dr_start    = wrap_scroll_start(player.col, room.cols, content_w, game_h)
+        room._wrap_w = content_w   # stash the live wrap width for gj/gk display-line motion
 
     def _gutter_wrap(drow):
         # The wrap buffer is ONE logical line: number only its first display row,
