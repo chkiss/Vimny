@@ -50,6 +50,33 @@ def test_archivist_is_findable_by_f():
     assert _cell_char(d.room, arch.row, arch.col) == 'A'
 
 
+def test_brief_dialogue_advances_by_steps_then_editing(monkeypatch):
+    # Approaching starts the brief; each further step advances it; after the last
+    # line the Archivist edits the buffer (books toggle) and Vim warns W11.
+    d = _dungeon()
+    seen = []
+
+    def _cap(term, dungeon, player, budget, message='', *a, **k):
+        seen.append(message)
+
+    monkeypatch.setattr(main, 'render_all', _cap)
+    term = Terminal()
+    script = (_cmd('set wrap')
+              + [_ks('f'), _ks('A'), _ks('f'), _ks('A')]      # approach → line 1
+              + [_ks('h')] * 6                                  # steps → lines 2,3, then editing
+              + _cmd('q'))
+    it = iter(script)
+    monkeypatch.setattr(term, 'inkey', lambda *a, **k: next(it, _ks('')))
+    main.run_dungeon(term, 'archivists_library', {}, player_name='admin', _dungeon=d)
+
+    blob = ' || '.join(seen)
+    assert "you've fixed my library" in blob
+    assert 'a vandal is about' in blob
+    assert 'try to find them' in blob
+    assert 'W11' in blob                 # the live editing warned the buffer changed
+    assert d.room.lib_dlg >= 4
+
+
 def test_builder_structure():
     d = _dungeon()
     r = d.room
