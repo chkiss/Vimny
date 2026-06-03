@@ -63,8 +63,8 @@ def _winning_script(d):
             keys += _cmd('e!')
             cur = (cur + 1) % len(d.room.lib_seq)
         keys += _cmd(f'w {suit}')
-    # the Archivist sits at col 2; spawn is col 0 → step right onto him
-    keys += [_ks('l'), _ks('l')]
+    # the Archivist rests at the far corner; $ jumps the player onto him to present
+    keys += [_ks('$')]
     return keys
 
 
@@ -103,7 +103,7 @@ def test_forgery_is_lethal(monkeypatch):
             keys += _cmd('e!')
             cur = (cur + 1) % len(d.room.lib_seq)
         keys += _cmd(f'w {wrong[suit]}')   # file this folio under a different suit's name
-    keys += [_ks('l'), _ks('l')]           # present forged folios
+    keys += [_ks('$')]                     # present forged folios
 
     monkeypatch.setattr(main, 'render_all', lambda *a, **k: None)
     term = Terminal()
