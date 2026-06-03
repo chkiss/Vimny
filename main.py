@@ -1679,7 +1679,8 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
             player.error = 'E37: No write since last change (add ! to override)'
             _push('E37: No write since last change (add ! to override)')
             return
-        room.lib_idx = (room.lib_idx + 1) % len(room.lib_seq)
+        room.lib_idx  = (room.lib_idx + 1) % len(room.lib_seq)
+        room.lib_view = 'leaf'
         _lib_animate()
         _lib_relayout()
         _push('"library" 1 line  --reloaded--')
@@ -1687,14 +1688,18 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
     def _lib_file(name):
         if getattr(room, 'lib_done', None):
             return
-        if room.lib_idx < 0:
-            _push('Nothing leafed yet — press  :e!  first.')
+        if room.lib_idx < 0 or getattr(room, 'lib_view', 'catalog') != 'leaf':
+            _push('No manuscript open — press  :e!  to leaf to one.')
             return
         room.lib_filed[name] = room.lib_seq[room.lib_idx]['suit']
+        room.lib_view = 'catalog'                 # back to the floor — the stack fills in
+        _lib_relayout()
         _push(f'"{name}" [New] 1 line written')
         if all(s in room.lib_filed for s in _dg._LIB_SUITS):
-            _push('All four folios filed.')
+            _push('All four stacks filled.')
             _push('Press  $  to bring them to the Archivist.')
+        else:
+            _push('The stack fills. Press  :e!  to leaf on.')
 
     def _lib_finale():
         room.lib_done = 'win'
