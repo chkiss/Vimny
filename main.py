@@ -1721,24 +1721,48 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
         room.add_entity(Entity(kind='exit',         row=0, col=last - 8))
         room.rebuild_indexes()
 
-    def _lib_on_archivist():
-        if getattr(room, 'lib_done', None):
+    _LIB_BRIEF = ["Great Vim — you've fixed my library!",
+                  'Some of my folios are still missing... a vandal is about...',
+                  "If you don't mind helping me, try to find them."]
+
+    def _lib_edit_tick():
+        # The vandal/Archivist is at work: every so often a closed book (≡) opens (◫)
+        # or an open one shuts, and Vim warns the buffer changed underfoot (W11).
+        room.lib_edit_tick = getattr(room, 'lib_edit_tick', 0) + 1
+        if room.lib_edit_tick % 2 or not room.char_runs:
             return
-        if not all(s in room.lib_filed for s in _dg._LIB_SUITS):
-            if not player.wrap:
-                _push('MY LIBRARY! All on ONE LINE!')
-                _push('Some fiend ran  :set nowrap  — put it right!')
-            elif not room.lib_briefed:
-                room.lib_briefed = True
-                _push("Great Vim — you've fixed my library!")
-                _push('But some folios are missing... a vandal must be about...')
-            else:
-                _push('Some folios are still missing...')
+        syms  = list(room.char_runs[0].symbols)
+        spots = [i for i, ch in enumerate(syms) if ch in ('≡', '◫')]
+        if not spots:
             return
+        for c in random.sample(spots, min(len(spots), random.randint(1, 2))):
+            syms[c] = '◫' if syms[c] == '≡' else '≡'
+        room.char_runs = [CharRun(0, 0, tuple(syms), room.char_runs[0].kind)]
+        room.rebuild_indexes()
+        _push('W11: Buffer "library" has changed since editing started')
+
+    def _lib_brief_step(near):
+        # Post-wrap brief: line 1 on approach, each later line on the next step, then
+        # the Archivist begins editing the buffer in front of the reader.
+        d = room.lib_dlg
+        if d == 0:
+            if near:
+                room.lib_dlg, room.lib_dlg_col = 1, player.col
+                _push(_LIB_BRIEF[0])
+        elif d < 3:
+            if player.col != room.lib_dlg_col:
+                room.lib_dlg, room.lib_dlg_col = d + 1, player.col
+                _push(_LIB_BRIEF[d])
+        elif d == 3:
+            if player.col != room.lib_dlg_col:
+                room.lib_dlg = 4               # the editing begins
+        if room.lib_dlg >= 4:
+            _lib_edit_tick()
+
+    def _lib_present():
         if all(room.lib_filed.get(s) == s for s in _dg._LIB_SUITS):
             _lib_finale()
-            _push('"Flawless! My library is whole again."')
-            _push('Open my two chests, then  :wq  to leave.')
+            _push('"Flawless! My library is whole again — my gifts are yours."')
         else:
             _push('"So YOU\'RE the pest mangling my folios!"')
             _push('The Archivist strikes you down.')
@@ -2590,18 +2614,31 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
                     redo_stack.clear()
                     _push('The door seals shut behind you — there is no going back.')
 
-                # The Archivist's Library: approaching the pacing Archivist (within a
-                # couple of columns — fA lands right on him) starts his dialogue. Only
-                # in the hall (the catalogue/finale), not while reading a manuscript.
-                if level == 'archivists_library' and getattr(room, 'lib_view', 'catalog') != 'leaf':
+                # The Archivist's Library: in the hall (catalogue), approaching the
+                # pacing Archivist drives his dialogue / the reckoning. Not while
+                # reading a manuscript, and not once the level is decided.
+                if (level == 'archivists_library'
+                        and getattr(room, 'lib_view', 'catalog') != 'leaf'
+                        and not getattr(room, 'lib_done', None)):
                     _arch = next((e for e in room.entities
                                   if e.kind == 'archivist' and e.alive), None)
                     _near = _arch is not None and abs(player.col - _arch.col) <= 2
-                    if _near and not room._lib_arch_flag:
-                        room._lib_arch_flag = True
-                        _lib_on_archivist()
-                    elif not _near:
-                        room._lib_arch_flag = False
+                    _all  = all(s in room.lib_filed for s in _dg._LIB_SUITS)
+                    if _all:                                  # present the filed folios
+                        if _near and not room._lib_arch_flag:
+                            room._lib_arch_flag = True
+                            _lib_present()
+                        elif not _near:
+                            room._lib_arch_flag = False
+                    elif not player.wrap:                     # pre-wrap panic
+                        if _near and not room._lib_arch_flag:
+                            room._lib_arch_flag = True
+                            _push('MY LIBRARY! All on ONE LINE!')
+                            _push('Some fiend ran  :set nowrap  — put it right!')
+                        elif not _near:
+                            room._lib_arch_flag = False
+                    else:                                     # post-wrap step-wise brief
+                        _lib_brief_step(_near)
 
                 # Win / exit check
                 if ent is None:
