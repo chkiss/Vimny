@@ -5391,16 +5391,15 @@ def _lib_layout(room, W: int) -> None:
     (shelves indigo, tables/desk ember), resize the room, place the desk at (0,521),
     and keep the Archivist in bounds. Pages are generated from the seed (stable across
     resize). Called by the builder and by main.run_dungeon when the width changes."""
-    inner = max(8, W - 2)
-    rng   = random.Random((room.seed or 0) ^ 0x5EED)
+    inner  = max(8, W - 2)
+    rng    = random.Random((room.seed or 0) ^ 0x5EED)
+    filled = [s for s in _LIB_SUITS if s in room.lib_filed]   # suit stacks the player has saved
     if getattr(room, 'lib_done', None) == 'win':
         spec = _lib_floor_spec(inner, rng, filled=_LIB_SUITS,
                                title='L I B R A R Y   R E S T O R E D')
     elif getattr(room, 'lib_view', 'catalog') == 'catalog' or room.lib_idx < 0:
-        filled = [s for s in _LIB_SUITS if s in room.lib_filed]
         spec = _lib_floor_spec(inner, rng, filled=filled)
     else:                                         # a :e! folio — packed tables show the answer
-        filled = [s for s in _LIB_SUITS if s in room.lib_filed]   # saved suits stay filled here too
         frng = random.Random((room.seed or 0) ^ ((room.lib_idx + 1) * 0x9E37))
         spec = _lib_floor_spec(inner, rng, filled=filled,
                                fill=room.lib_seq[room.lib_idx]['fill'], fill_rng=frng)
