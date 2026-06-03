@@ -5207,7 +5207,7 @@ def build_dungeon_sentence_corridor(seed: int) -> 'Dungeon':
 # (lib_*) and is driven by the hooks in main.run_dungeon.
 _LIB_SUITS      = ('hearts', 'diamonds', 'spades', 'clubs')
 _LIB_SUIT_GLYPH = {'hearts': '♥', 'diamonds': '♦', 'spades': '♠', 'clubs': '♣'}
-_LIB_BODY_ROWS  = 11            # text rows inside the page frame
+_LIB_BODY_ROWS  = 9             # text rows inside the page frame
 _LIB_FALLBACK_W = 78           # build-time width; main relayouts to the real viewport
 
 
@@ -5240,26 +5240,31 @@ _LIB_DESK    = '╓─╖'                # the Archivist's small desk (top-righ
 
 
 def _lib_table_band(inner: int, rng) -> list:
-    """A centred row of reading tables in the library's line-art (┌─┐│└┘), with four
-    chairs (o) above and below each. The surfaces are randomly set with books —
-    ≡ (closed), ◫ (open, 1-2 per table) and bare spots. Returns 6 body rows."""
-    n, w, gap = 2, 11, '      '
-    def chairs():
-        c = [' '] * w
-        for k in range(4):
-            c[1 + k * (w - 3) // 3] = 'o'
-        return ' ' + ''.join(c) + ' '
-    def surface():
-        slots = (w + 1) // 2
-        opens = rng.randint(1, 2)
-        kinds = ['◫'] * opens + ['≡'] * rng.randint(1, slots - opens) + [' '] * slots
-        kinds = kinds[:slots]
-        rng.shuffle(kinds)
-        return '│' + _lib_center(' '.join(kinds), w) + '│'
-    top = '┌' + '─' * w + '┐'
-    bot = '└' + '─' * w + '┘'
-    row = lambda cell: gap.join([cell] * n)
-    return [row(chairs()), row(top), row(surface()), row(surface()), row(bot), row(chairs())]
+    """A centred row of reading tables in the library's line-art, the chairs drawn as
+    ◠ along the top edge and ◡ along the bottom. Each table's surface is set sparsely
+    with 2-3 closed books ≡ and 1-2 open books ◫, with plenty of bare space. The two
+    surface rows are generated per-table. Returns 4 body rows."""
+    n, w, gap = 2, 10, '        '
+    top = '┌' + ''.join('◠' if i % 3 == 0 else '─' for i in range(w)) + '┐'
+    bot = '└' + ''.join('◡' if i % 3 == 0 else '─' for i in range(w)) + '┘'
+
+    def surfaces():                       # two interior rows for one table
+        cells = [[' '] * w, [' '] * w]
+        books = ['≡'] * rng.randint(2, 3) + ['◫'] * rng.randint(1, 2)
+        spots = [(r, c) for r in range(2) for c in range(0, w, 2)]   # spaced columns
+        rng.shuffle(spots)
+        for b, (r, c) in zip(books, spots):
+            cells[r][c] = b
+        return ['│' + ''.join(cells[0]) + '│', '│' + ''.join(cells[1]) + '│']
+
+    surf = [surfaces() for _ in range(n)]
+    join = lambda parts: (' ' * len(gap)).join(parts)
+    return [
+        join([top] * n),
+        join([s[0] for s in surf]),
+        join([s[1] for s in surf]),
+        join([bot] * n),
+    ]
 
 
 def _lib_fill_band(inner: int, center: list, rng) -> tuple:
