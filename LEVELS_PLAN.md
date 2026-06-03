@@ -88,7 +88,7 @@ Curriculum order is the order of `LEVELS`. Blueprints: `blueprints/act_*.md`.
 | 35 | `sentence_enclosure` | The Sentence Enclosure | `is as` |  |
 | 36 | `paragraph_enclosure` | The Paragraph Enclosure | `ip ap` |  |
 | 36.1 | `grandmasters_sanctum` | The Grandmaster's Sanctum | — | boss |
-| 37 | `spellwrights_forge` | The Spellwright's Forge | `:s///` |  |
+| 37 | `spellwrights_forge` | The Spellwright's Forge | `:s///  :g  &` |  |
 | 38 | `hall_of_echoes` | The Hall of Echoes | `q @ "` |  |
 | 38.1 | `warden_eternal` | The Warden Eternal | — | boss |
 | 99 | `dummy` | Dummy Dungeon | `d x s y p yy P` |  |

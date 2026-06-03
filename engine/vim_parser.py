@@ -140,6 +140,8 @@ def parse(buf: str, mode: Mode) -> tuple[dict | None, str]:
             return _operator_target('g' + g2, g2, buf, i + 2, count_n)
         if g2 == 'J':                              # gJ — join with no space at the seam
             return {'type': 'join', 'gap': False, 'count': count_n}, buf[i+2:]
+        if g2 == '&':                              # g& — repeat last :s over the whole file, with flags
+            return {'type': 'sub_repeat', 'whole_file': True, 'keep_flags': True}, buf[i+2:]
         return {'type': 'unknown'}, buf[i+2:]
 
     # f/F/t/T — need one more char
@@ -168,6 +170,10 @@ def parse(buf: str, mode: Mode) -> tuple[dict | None, str]:
     # J — join the next line onto this one (gJ, no space, handled in the g-branch)
     if ch == 'J':
         return {'type': 'join', 'gap': True, 'count': count_n}, buf[i+1:]
+
+    # & — repeat the last :s on the current line (no flags); g& did the whole file
+    if ch == '&':
+        return {'type': 'sub_repeat', 'whole_file': False, 'keep_flags': False}, buf[i+1:]
 
     # p / P — paste (standalone commands, not operator+motion)
     if ch == 'p':

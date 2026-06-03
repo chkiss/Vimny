@@ -63,6 +63,22 @@ class TestFindNext:
     def test_match_positions_sorted_reading_order(self):
         assert _match_positions(_abab(), 'ab') == [(3, 2), (5, 4)]
 
+    def test_matches_across_two_consecutive_runs(self):
+        # 'foo' and 'bar' are SEPARATE runs with a gap; the line reads 'foo bar', so a
+        # pattern spanning both (gap included) must match across them.
+        room = _room()
+        room.add_char_run(CharRun(3, 2, tuple('foo'), 'ancient'))
+        room.add_char_run(CharRun(3, 6, tuple('bar'), 'ancient'))
+        assert find_next(room, _p(3, 0), 'foo bar', True) == (3, 2)
+        assert find_next(room, _p(3, 0), 'oo.*ba', True) == (3, 3)   # regex across the gap
+
+    def test_all_occurrences_on_a_line_are_matches(self):
+        # 'a a a' on one row → three separate matches (n visits each), not one-per-run.
+        room = _room()
+        for c in (2, 4, 6):
+            room.add_char_run(CharRun(3, c, ('a',), 'ancient'))
+        assert _match_positions(room, 'a') == [(3, 2), (3, 4), (3, 6)]
+
 
 class TestWordUnderCursor:
     def test_word_from_cluster(self):

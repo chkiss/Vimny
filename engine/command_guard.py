@@ -116,6 +116,9 @@ def action_allowed(action: dict, known: list | set, edit_mode: bool = False) -> 
     if t == 'repeat':
         return 'dot' in known_set
 
+    if t == 'sub_repeat':                         # & / g& — repeat last :s
+        return 'subst' in known_set
+
     # interact (x), undo (u), redo (^R), command (:) — always allowed
     return True
 
@@ -171,4 +174,6 @@ def guard_message(action: dict, known: list | set = ()) -> str:
         return "You haven't learned the jump list yet."
     if t == 'mark':
         return "You haven't learned marks yet."
+    if t == 'sub_repeat':
+        return "You haven't learned :s (substitute) yet."
     return 'Command not available.'

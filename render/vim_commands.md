@@ -281,6 +281,15 @@
 | ip   |       | inner paragraph |
 | ap   |       | a paragraph     |
 
+## spellwrights_forge — substitute & global
+
+| keys        | token | desc            |
+|-------------|-------|-----------------|
+| :s/old/new/ | subst | substitute      |
+| :%s//g      |       | substitute all  |
+| :g/pat/d    |       | global delete   |
+| &           |       | repeat last :s  |
+
 ## hall_of_echoes — macros + named registers
 
 | keys  | token     | desc         |

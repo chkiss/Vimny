@@ -110,7 +110,7 @@ The curriculum is defined in `content/levels.py` (canonical) and mirrored in `LE
 | 35 | The Sentence Enclosure | `is as` | Planned |
 | 36 | The Paragraph Enclosure | `ip ap` | Planned |
 | 36.1 | The Grandmaster's Sanctum | (boss) | Planned |
-| 37 | The Spellwright's Forge | `:s///` | Planned |
+| 37 | The Spellwright's Forge | `:s///  :g  &` | Playable |
 | 38 | The Hall of Echoes | `q @ "` | Planned |
 | 38.1 | The Warden Eternal | (boss) | Planned |
 <!-- END GENERATED LEVELS TABLE -->
@@ -221,6 +221,10 @@ The full command reference (also the hint-bar source) is `render/vim_commands.md
 | `as` | a sentence |
 | `ip` | inner paragraph |
 | `ap` | a paragraph |
+| `:s/old/new/` | substitute |
+| `:%s//g` | substitute all |
+| `:g/pat/d` | global delete |
+| `&` | repeat last :s |
 | `q{a}` | record macro |
 | `@{a}` | play macro |
 | `@@` | repeat macro |

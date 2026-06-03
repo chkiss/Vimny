@@ -27,6 +27,10 @@ class Player:
     last_visual_cursor: tuple | None = None
     last_visual_mode: object = None           # Mode of the last visual selection, for gv
     last_search: tuple | None = None  # (pattern, forward) of the most recent search; used by n/N
+    last_sub: tuple | None = None     # (pattern, replacement, flags_str) of the last :s; for & / :s / g&
+    pending_recost_f: int = 0  # >0: next ;/, re-pays this (its f/F/t/T was undone — anti-exploit)
+    pending_recost_s: int = 0  # >0: next n/N re-pays this (its search was undone — anti-exploit)
+    pending_recost_c: int = 0  # >0: next . re-pays this (its change was undone — anti-exploit)
     search_forward: bool = True   # direction of the in-progress / or ? entry (for rendering)
     number_mode: str = 'none'     # ':set number' gutter in dungeons: 'none'|'number'|'relativenumber'
     hlsearch: bool = True         # ':set hlsearch' — paint all matches of the last search
