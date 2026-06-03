@@ -5241,8 +5241,8 @@ _LIB_CHESS    = ['♚', '♛', '♜', '♝', '♞']
 _LIB_FILLERS  = ['✦', '❋', '◈', '❖', '⬡', '✤', '⟡', '❉', '✣', '❀', '✿', '⚘', '✻', '❈',
                  '✠', '✢', '✥', '✧', '✩', '✪', '✫', '✬', '✭', '✮', '✯',
                  '❂', '❄', '❅', '❆', '❇', '❊', '❍', '♔', '♕', '♖', '♗', '♘', '♙', '♪']
-_LIB_DESK     = '╓─╖'                # the Archivist's small desk
-_LIB_DESK_COL = 521                  # ...placed at the fixed logical column (0, 521)
+_LIB_DESK       = '╓─╖'              # the Archivist's small desk
+_LIB_TBL_SURF2  = 5                  # body index of the reading table's 2nd surface row
 
 
 def _lib_folio_tables(fill, rng) -> list:
@@ -5328,10 +5328,20 @@ def _lib_floor_spec(inner: int, rng, filled=(), tables=None,
     return {'kind': 'ancient', 'border': 'ancient', 'body': body, 'kinds': kinds}
 
 
-def _lib_place_desk(room) -> None:
-    """Set the Archivist's desk (ember) at the fixed logical column _LIB_DESK_COL, by
-    splitting the run it lands in, so it shows on every page at the same spot."""
-    c0 = _LIB_DESK_COL
+def _lib_desk_col(W: int, body: list) -> int:
+    """Logical column for the desk: five cells left of the 1st reading table's 2nd
+    surface row. (The table content starts with the table's left │, centred by the
+    frame.)"""
+    drow     = _LIB_TBL_SURF2 + 1                 # +1 for the top border row
+    inner    = max(1, W - 2)
+    content  = body[_LIB_TBL_SURF2] if _LIB_TBL_SURF2 < len(body) else ''
+    left_pad = (inner - len(content)) // 2
+    return max(0, drow * W + 1 + left_pad - 5)
+
+
+def _lib_place_desk(room, c0: int) -> None:
+    """Set the Archivist's desk (ember) at logical column c0, splitting the run it lands
+    in so it keeps its own colour."""
     if c0 + len(_LIB_DESK) > room.cols:
         return
     ru = room.char_run_at(0, c0)
@@ -5374,10 +5384,14 @@ def _lib_layout(room, W: int) -> None:
         room.char_runs.append(CharRun(0, col, tuple(rowstr), kind))
         col += len(rowstr)
     room.rebuild_indexes()
-    _lib_place_desk(room)
-    # The Archivist paces the hall (see _enemy_tick); just keep him in bounds here.
+    room._lib_desk_col = _lib_desk_col(W, spec['body'])
+    _lib_place_desk(room, room._lib_desk_col)
+    # The Archivist sits at his desk until he first paces off (_enemy_tick); after that
+    # just keep him in bounds as the page re-flows.
     for e in room.entities:
         if e.kind == 'archivist':
+            if not getattr(room, '_lib_arch_paced', False):
+                e.col = room._lib_desk_col
             e.col = min(max(1, e.col), room.cols - 2)
     room._lib_w = W
     room.rebuild_indexes()
@@ -5417,7 +5431,8 @@ def build_dungeon_archivists_library(seed: int) -> Dungeon:
     room.lib_done    = None       # None | 'win' | 'dead'
     room.lib_dlg     = 0          # brief dialogue index (0 idle, 1-3 lines, 4 = editing)
     room.lib_dlg_col = 0          # player col when the last brief line was shown
-    room._lib_arch_flag = False   # debounces the on-Archivist (present/panic) trigger
+    room._lib_arch_flag  = False  # debounces the on-Archivist (present/panic) trigger
+    room._lib_arch_paced = False  # False until the Archivist first steps off his desk
 
     # The Archivist paces the hall (ai='wander' → oscillates in _enemy_tick); he starts
     # off the first screen, and ':set wrap' folds the line in so the player sees him move.
@@ -5425,9 +5440,7 @@ def build_dungeon_archivists_library(seed: int) -> Dungeon:
         Entity(kind='entry_marker', row=0, col=0),
         Entity(kind='archivist',    row=0, col=1, ai='wander', ai_speed=1, move_dir=1),
     ]
-    _lib_layout(room, _LIB_FALLBACK_W)
-    arch = next(e for e in room.entities if e.kind == 'archivist')
-    arch.col = min(_LIB_DESK_COL, room.cols - 2)   # spawn at his desk, then pace off
+    _lib_layout(room, _LIB_FALLBACK_W)   # seats the Archivist at his desk (he paces off later)
 
     dungeon.rooms        = [room]
     dungeon.current_room = 0

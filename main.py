@@ -1315,6 +1315,7 @@ def _enemy_tick(room, player) -> list:
                     nc = min(max(1, ent.col + ent.move_dir), room.cols - 2)
                     if (0, nc) != (player.row, player.col) and nc != ent.col:
                         room.move_entity(ent, 0, nc)
+                        room._lib_arch_paced = True   # he has stepped off his desk
             continue
         dist = _manhattan(player.row, player.col, ent.row, ent.col)
         if ent.kind == 'warden' and ent.tag != 'surveyor' and dist <= _ALERT_RADIUS:

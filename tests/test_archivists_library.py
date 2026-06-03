@@ -59,9 +59,10 @@ def test_unique_labels_folios_and_desk():
     labelset = set(dg._LIB_FILLERS + dg._LIB_CHESS + list(dg._LIB_SUIT_GLYPH.values()))
     counts = collections.Counter(ch for ch in line if ch in labelset)
     assert all(c == 1 for c in counts.values())          # no duplicated stack labels
-    assert line[521:524] == '╓─╖'                         # the desk sits at (0, 521)
+    dc = r._lib_desk_col                                  # desk: left of the 1st reading table
+    assert line[dc:dc + 3] == '╓─╖'
     arch = next(e for e in r.entities if e.kind == 'archivist')
-    assert arch.col == 521                                # ...and the Archivist spawns there
+    assert arch.col == dc                                 # ...and the Archivist spawns there
     # one-suit folios carry their suit (the answers); decoys carry none
     assert sorted(it['suit'] for it in r.lib_seq if it['suit']) == sorted(dg._LIB_SUITS)
 
