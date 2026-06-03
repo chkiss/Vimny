@@ -5389,7 +5389,6 @@ def build_dungeon_archivists_library(seed: int) -> Dungeon:
     room.lib_done    = None       # None | 'win' | 'dead'
     room.lib_dlg     = 0          # brief dialogue index (0 idle, 1-3 lines, 4 = editing)
     room.lib_dlg_col = 0          # player col when the last brief line was shown
-    room.lib_edit_tick = 0        # paces the Archivist's live book-editing (W11)
     room._lib_arch_flag = False   # debounces the on-Archivist (present/panic) trigger
 
     # The Archivist paces the hall (ai='wander' → oscillates in _enemy_tick); he starts
