@@ -2586,16 +2586,14 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
                     redo_stack.clear()
                     _push('The door seals shut behind you — there is no going back.')
 
-                # The Archivist's Library: stepping onto the Archivist talks / presents.
+                # The Archivist's Library: reaching the hall's end ($) calls the
+                # Archivist over — to brief you, or to receive the filed folios.
                 if level == 'archivists_library':
-                    _arch = next((e for e in room.entities
-                                  if e.kind == 'archivist' and e.alive), None)
-                    _on_arch = (_arch is not None
-                                and (player.row, player.col) == (_arch.row, _arch.col))
-                    if _on_arch and not room._lib_arch_flag:
+                    _at_end = player.col == room.cols - 1
+                    if _at_end and not room._lib_arch_flag:
                         room._lib_arch_flag = True
                         _lib_on_archivist()
-                    elif not _on_arch:
+                    elif not _at_end:
                         room._lib_arch_flag = False
 
                 # Win / exit check
