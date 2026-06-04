@@ -420,11 +420,12 @@ class TestApplyMotionJumps:
         assert (p.row, p.col) == (1, 1)
 
     def test_ngg_jumps_to_line_n(self):
-        # {n}gg → line n (row index n-1), first non-blank — mirrors {n}G
+        # {n}gg → line n, first non-blank — mirrors {n}G. Line 1 is the first standable
+        # row (grid row 1 here, the top border isn't a line), so line 3 = grid row 3.
         room = _bare_room()
         p = _player(5, 10)
         apply_motion(p, 'gg', 3, room, count_given=True)
-        assert (p.row, p.col) == (2, 1)
+        assert (p.row, p.col) == (3, 1)
 
 
 # ── apply_motion: ge gE backward word-end (Block E) ──────────────────────────
@@ -728,10 +729,11 @@ class TestApplyMotionColumnBar:
     """| — go to column n (1-indexed); bare | → column 1."""
 
     def test_bar_count_goes_to_column(self):
+        # column 1 is the first standable col (grid col 1 here), so 10| → grid col 10
         room = _bare_room()
         p = _player(3, 1)
-        apply_motion(p, '|', 10, room)          # 10| → col 9
-        assert p.col == 9
+        apply_motion(p, '|', 10, room)          # 10| → col 10
+        assert p.col == 10
 
     def test_bare_bar_goes_to_first_column(self):
         room = _bare_room()
@@ -742,8 +744,8 @@ class TestApplyMotionColumnBar:
     def test_bar_moves_left(self):
         room = _bare_room()
         p = _player(3, 18)
-        apply_motion(p, '|', 6, room)           # 6| → col 5, moving left
-        assert p.col == 5
+        apply_motion(p, '|', 6, room)           # 6| → col 6, moving left
+        assert p.col == 6
 
     def test_bar_clamps_to_room_width(self):
         room = _bare_room()

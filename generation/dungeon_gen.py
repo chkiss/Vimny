@@ -4248,6 +4248,7 @@ def _par_screen_vault(composite, return_path: bool = False):
     game_h = composite._game_h
     m_row, l_row = _screen_vault_key_rows(game_h)
     ROWS, COLS = composite.rows, composite.cols
+    BASE_ROW = composite.first_standable_row()    # line N → grid row BASE_ROW + N - 1
     H_COL  = _SCREEN_VAULT_H_KEY_COL
     M_COL  = _SCREEN_VAULT_M_KEY_COL
     L_COL  = _SCREEN_VAULT_L_KEY_COL
@@ -4369,9 +4370,11 @@ def _par_screen_vault(composite, return_path: bool = False):
                     _try((tr, fc, inv, ka, doors), 1, 'G')
                 break
 
-        # nG
+        # nG — line n → grid row BASE_ROW + n - 1 (the border isn't a line)
         for n in range(1, ROWS + 1):
-            tr2 = n - 1
+            tr2 = BASE_ROW + n - 1
+            if tr2 >= ROWS:
+                break
             fc2 = _fnb_simple(tr2, doors)
             if fc2 is None or (tr2, fc2) == (r, c):
                 continue
@@ -4853,6 +4856,7 @@ def _par_lineheads(composite, return_path: bool = False,
     Goal: reach _LINEHEADS_EXIT (only reachable once both doors are open).
     """
     ROWS, COLS = composite.rows, composite.cols
+    BASE_ROW = composite.first_standable_row()    # line N → grid row BASE_ROW + N - 1
     entry = composite.spawn_pos
     keys  = _LINEHEADS_KEYS
     doors = _LINEHEADS_DOORS
@@ -4940,9 +4944,10 @@ def _par_lineheads(composite, return_path: bool = False,
                         _try((rr, gc, km, hold, dm), 2, 'gg')
                     break
 
-            # {n}G: line n (1-based); scan down from row n-1 to a passable row, fnb
+            # {n}G: line n (1-based) → grid row BASE_ROW + n - 1 (border isn't a line),
+            # scanning down to a passable row, fnb
             for n in range(1, ROWS + 1):
-                rr = n - 1
+                rr = BASE_ROW + n - 1
                 while rr < ROWS and _fnb(rr, dm) is None:
                     rr += 1
                 if rr >= ROWS:

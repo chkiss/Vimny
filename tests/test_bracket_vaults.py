@@ -288,9 +288,9 @@ def test_moat_and_decoy_goblin_pit(seed):
 
 @pytest.mark.parametrize("path", [
     'G % l', 'G w l', 'L % l', 'L w l',     # G/L land in the decoy goblin pit (row 7)
-    '6G $ l', '6G f) l',                     # {N}G onto row 5 lands in the col-1 WALL pocket
-    '5G j $ p l',                            # reaches the door but has no key
-    '3G x 5G j $ p l', '3G x 4G 2j $ p l',   # {N}G can't reach the key (also in a pocket)
+    '6G $ l', '6G f) l',                     # {N}G onto a snake rung → col-1 pocket / decoy pit
+    '5G j $ p l',                            # reaches the door area but has no key
+    '3G x 5G j $ p l', '3G x 4G 2j $ p l',   # {N}G can't reach the key (lands in a pocket)
 ])
 def test_teleport_cheese_no_longer_wins(path):
     """Regression: par is the true minimum (10). No teleport beats the % snake.

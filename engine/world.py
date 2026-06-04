@@ -194,6 +194,24 @@ class Room:
         ent = self.entity_at(r, c)
         return ent is None or ent.kind not in ('locked_door', 'shield', 'seal_door', 'boss_seal')
 
+    def first_standable_row(self) -> int:
+        """Grid row of buffer line 1 — the first row with a FLOOR/CORRIDOR cell. The
+        bordering walls aren't lines, so line N = grid row first_standable_row() + N - 1
+        and `gg`/`1G` land here. Layout-based (ignores fog/doors) so numbering is stable."""
+        for r in range(self.rows):
+            row = self.cells[r]
+            if any(row[c] in (CellType.FLOOR, CellType.CORRIDOR) for c in range(self.cols)):
+                return r
+        return 0
+
+    def first_standable_col(self) -> int:
+        """Grid col of buffer column 1 — the first column with a FLOOR/CORRIDOR cell
+        (the left border isn't a column). Column N = first_standable_col() + N - 1."""
+        for c in range(self.cols):
+            if any(self.cells[r][c] in (CellType.FLOOR, CellType.CORRIDOR) for r in range(self.rows)):
+                return c
+        return 0
+
     def damage_wood_wall(self, r: int, c: int, half_steps: int = 1) -> bool:
         """Deal half_steps of damage to wood wall at (r, c).
 
