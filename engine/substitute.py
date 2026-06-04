@@ -150,6 +150,20 @@ def _expand(rep: str, get_group) -> str:
     return ''.join(out)
 
 
+def _grouper(m, s: int, e: int, text: str):
+    """A replacement group-getter for `_expand`: 0 → the effective match text [s,e),
+    1-9 → capture group n (or '' when the group didn't participate / doesn't exist)."""
+    def gg(i):
+        if i == 0:
+            return text[s:e]
+        try:
+            g = m.group(i)
+        except IndexError:
+            g = None
+        return g or ''
+    return gg
+
+
 def _sub_line(text: str, kinds: list, default_kind: str, vp, rep: str,
               glob: bool, count_only: bool):
     """(new_text, new_kinds, n) for one line. Replaces the effective span of each match
@@ -164,15 +178,7 @@ def _sub_line(text: str, kinds: list, default_kind: str, vp, rep: str,
         if s < last:                            # zero-width tangle — skip safely
             continue
         tp.append(text[last:s]); kp.append(kinds[last:s])
-
-        def gg(i, _m=m, _s=s, _e=e, _t=text):
-            if i == 0:
-                return _t[_s:_e]
-            try:
-                g = _m.group(i)
-            except (IndexError, Exception):     # noqa: BLE001 — any group failure → empty
-                g = None
-            return g or ''
+        gg = _grouper(m, s, e, text)
 
         if count_only:
             tp.append(text[s:e]); kp.append(kinds[s:e])
@@ -447,14 +453,7 @@ def _sub_line_confirm(text, kinds, default_kind, vp, rep, glob, confirm, row, lo
         if ans == 'l':                                   # last: do this one, then stop
             stop = True; ans = 'y'
 
-        def gg(i, _m=m, _s=s, _e=e, _t=text):
-            if i == 0:
-                return _t[_s:_e]
-            try:
-                g = _m.group(i)
-            except Exception:                            # noqa: BLE001
-                g = None
-            return g or ''
+        gg = _grouper(m, s, e, text)
 
         if ans == 'y':
             rt = _expand(rep, gg)

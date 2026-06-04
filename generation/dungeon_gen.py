@@ -1526,7 +1526,6 @@ def build_dungeon_dummy(seed: int) -> Dungeon:
         # cursor CLAMPS at the last floor cell; glyphs tipped against the wall fall off.
         CharRun(row=16, col=38, symbols=tuple('EDGE'),   kind='ember'),
     ]
-    composite.ledge_rows = {13, 14, 16}
 
     composite.par            = None
     composite.budget         = 99999

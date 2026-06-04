@@ -13,15 +13,6 @@ from __future__ import annotations
 from engine.vimregex import compile_vim
 
 
-def _first_offset(s: str, pattern: str) -> int:
-    """Column offset of the first match of `pattern` in `s`, or -1."""
-    vp = compile_vim(pattern)
-    if vp is not None:
-        span = vp.first_in(s)
-        return span[0] if span is not None else -1
-    return s.find(pattern)                              # literal fallback
-
-
 def _spans(s: str, pattern: str):
     """All non-overlapping (start, end) match spans of `pattern` in `s`."""
     vp = compile_vim(pattern)

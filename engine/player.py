@@ -45,13 +45,6 @@ class Player:
     # statusline error (e.g. E37); cleared on next keypress
     error: str = ''
 
-    def move(self, dr: int, dc: int, room_rows: int, room_cols: int) -> bool:
-        nr, nc = self.row + dr, self.col + dc
-        if 0 <= nr < room_rows and 0 <= nc < room_cols:
-            self.row, self.col = nr, nc
-            return True
-        return False
-
     def take_damage(self, half_hearts: int = 2):
         """Reduce HP. amount is in half-hearts (2 = 1 full heart)."""
         self.hp = max(0, self.hp - half_hearts)

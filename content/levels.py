@@ -80,12 +80,6 @@ LEVELS = [
 _BY_SLUG = {l['slug']: l for l in LEVELS}
 
 
-def display_number(slug: str) -> str:
-    """Human-facing level number (e.g. '5', '5.1'). Cosmetic only."""
-    lv = _BY_SLUG.get(slug)
-    return lv['display'] if lv else '?'
-
-
 def key_for_slug(slug: str) -> str:
     """The overworld row label (netrw 'filename'), derived from display + slug —
     e.g. 'dungeon_05_the_goblin_gauntlet'. The integer part of display is
@@ -142,14 +136,6 @@ def act_commands(slug: str) -> list:
 def level_type(slug: str) -> str:
     """Returns 'dungeon' (default), 'boss', or 'reliquary'."""
     return (_BY_SLUG.get(slug) or {}).get('type', 'dungeon')
-
-
-def is_reliquary(slug: str) -> bool:
-    return level_type(slug) == 'reliquary'
-
-
-def is_visible(level: dict, player_name: str) -> bool:
-    return not level.get('admin_only', False) or player_name == 'admin'
 
 
 def unlocks_after_slug(slug: str) -> str | None:

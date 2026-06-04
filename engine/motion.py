@@ -63,6 +63,8 @@ def _reveal_from(room, player_r: int, player_c: int) -> None:
             continue
         for dr, dc in ((-1, 0), (1, 0), (0, -1), (0, 1)):
             nr, nc = r + dr, c + dc
+            if not (0 <= nr < room.rows and 0 <= nc < room.cols):
+                continue
             if (nr, nc) not in reachable:
                 if room.cells[nr][nc] in (CellType.FLOOR, CellType.CORRIDOR, CellType.WATER):
                     reachable.add((nr, nc))
