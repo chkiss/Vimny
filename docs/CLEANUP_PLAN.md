@@ -87,12 +87,12 @@ latent robustness gap:
 ## F. Accuracy / documentation drift
 1. **`engine/modes.py:11-12`** — `Mode.SEARCH` / `Mode.MACRO_RECORD` comments say
    "(Block F — … not yet wired)". Both are fully wired. Update the comments.
-2. **`blueprints/act_*.md` (5217 lines).** ALREADY HANDLED — each file already opens with a
-   "⚠ Pre-implementation design doc — obsolete conventions; delete-on-implement" banner that
-   names `content/levels.py` / LEVELS_PLAN as canonical. Per that banner's own convention,
-   fully-shipped acts could be deleted (e.g. `act_2.md` is solely the Warden Surveyor, which
-   is built; built sections of `act_3` incl. L17 likewise). Left for the owner to prune so
-   design history isn't discarded without intent — not auto-deleted.
+2. **`blueprints/act_*.md`.** DONE — followed the banner's own "delete-on-implement" rule
+   for the levels that have since shipped: deleted `act_2.md` (whole file; its only level,
+   the Warden Surveyor 13.1, is built), and excised the §L17 (Archivist's Library) and §L37
+   (Spellwright's Forge) sections from `act_3.md` / `act_7.md`, updating each act's intro
+   "shipped — removed" log. Every remaining blueprint section is an UNBUILT level
+   (L17.1, L18–L36.x bosses, L38/L38.1), so they stay.
 3. **Curriculum status (not a bug).** 22 of 47 levels have generators; L37 The Spellwright's
    Forge is built but its prerequisites L18–L36 (`operators_vault`, `echo_vault`, … 25 levels)
    are not, so L37 isn't reachable by normal progression yet. Track as content status, not code.
