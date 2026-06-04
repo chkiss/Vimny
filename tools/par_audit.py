@@ -153,12 +153,17 @@ def nav_min(room, slug, game_h=25):
     return None, 'gated (exit unreachable by motion alone)'
 
 
-def _replay_confirms(slug, path):
+def _replay_confirms(slug, path, game_h=None):
     """Drive `path` through the REAL run_dungeon (the oracle): return the budget.spent the
     player first reaches the exit, or None if it never wins (budget/HP/gating/model gap).
-    Stubs the drawing paths; uses a non-admin player so command gating is realistic."""
+    Stubs the drawing paths; uses a non-admin player so command gating is realistic.
+    `game_h` forces the replay terminal height (= game_h + 8) so H/M/L land exactly as
+    the audit modelled them; None keeps the ambient terminal size."""
+    import os
     from blessed import Terminal
     from blessed.keyboard import Keystroke
+    if game_h is not None:
+        os.environ['LINES'], os.environ['COLUMNS'] = str(game_h + 8), '200'
     for fn in ('render_all', '_win_animation', '_fireworks_animation', '_starfield_victory',
                '_void_fall_animation', '_drown_animation', '_heart_container_animation',
                '_play_void_falls'):

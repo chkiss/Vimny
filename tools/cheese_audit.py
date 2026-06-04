@@ -25,9 +25,16 @@ import heapq
 import itertools
 
 import generation.dungeon_gen as dg
-from content.levels import LEVELS
+from content.levels import LEVELS, known_commands
 from engine.motion import _reveal_from
 import tools.par_audit as pa
+
+
+def _game_h_for(room, slug):
+    """The viewport height the level's par was computed with — screen_vault is built
+    with 33 (its room is taller, so the viewport scrolls and H/M/L are window-relative);
+    every other level's room fits, so any height ≥ rows gives the same H/M/L."""
+    return 33 if slug == 'screen_vault' else max(room.rows, 25)
 
 
 def _door_open_room(slug, open_doors):
@@ -65,6 +72,12 @@ def cheese_min(slug, game_h=25):
         return None, f'unsupported gating (keys={len(key_at)}, doors={len(door_at)})'
 
     motions, finds, has_count = pa._motions_for(slug)
+    # par_audit omits screen-relative H/M/L; in a dungeon the viewport is a deterministic
+    # function of the cursor row, so they ARE position-faithful — model them here.
+    known = set(known_commands(slug))
+    for m in ('H', 'M', 'L'):
+        if m in known and m not in motions:
+            motions.append(m)
     voids = pa._void_cells(base)
     max_n = max(base.rows, base.cols)
     goal  = base.exit_pos
@@ -140,13 +153,14 @@ def run():
         if not keys or not doors:
             continue                                  # only key/door-gated levels
         par = base.par
-        cost, path = cheese_min(slug)
+        gh = _game_h_for(base, slug)
+        cost, path = cheese_min(slug, game_h=gh)
         if cost is None:
             verdict = path
         elif par is None:
             verdict = f'(par=None) route={cost}'
         elif cost < par:
-            win = pa._replay_confirms(slug, path)
+            win = pa._replay_confirms(slug, path, game_h=gh)
             if win is not None and win < par:
                 findings.append((slug, par, win, path))
                 verdict = f'*** UNDER PAR: replay won in {win} (par {par})  ::  {path}'
