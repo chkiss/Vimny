@@ -1,4 +1,4 @@
-"""Tests for engine/budget.py — spend, undo, redo, remaining, is_over, status_color."""
+"""Tests for engine/budget.py — spend (frozen), remaining, is_over, status_color."""
 import pytest
 from engine.budget import Budget
 
@@ -78,71 +78,6 @@ class TestSpend:
         b.spend(5)
         b.spend(2)
         assert b.spent == 10
-
-
-class TestUndo:
-    def test_undo_reverses_last_spend(self):
-        b = Budget(10)
-        b.spend(3)
-        result = b.undo()
-        assert result is True
-        assert b.spent == 0
-
-    def test_undo_reverses_correct_cost(self):
-        b = Budget(20)
-        b.spend(2)
-        b.spend(5)
-        b.undo()
-        assert b.spent == 2
-
-    def test_undo_empty_history_returns_false(self):
-        b = Budget(10)
-        result = b.undo()
-        assert result is False
-        assert b.spent == 0
-
-    def test_undo_after_all_undone_returns_false(self):
-        b = Budget(10)
-        b.spend(3)
-        b.undo()
-        result = b.undo()
-        assert result is False
-
-    def test_multiple_undos_unwind_in_order(self):
-        b = Budget(20)
-        b.spend(1)
-        b.spend(3)
-        b.spend(2)
-        b.undo()
-        assert b.spent == 4
-        b.undo()
-        assert b.spent == 1
-        b.undo()
-        assert b.spent == 0
-
-
-class TestRedo:
-    def test_redo_adds_cost(self):
-        b = Budget(10)
-        b.spend(3)
-        b.undo()
-        b.redo(3)
-        assert b.spent == 3
-
-    def test_redo_default_cost_is_1(self):
-        b = Budget(10)
-        b.spend(2)
-        b.undo()
-        b.redo()
-        assert b.spent == 1
-
-    def test_redo_appends_to_history(self):
-        b = Budget(10)
-        b.spend(4)
-        b.undo()
-        b.redo(4)
-        b.undo()
-        assert b.spent == 0
 
 
 class TestStatusColor:

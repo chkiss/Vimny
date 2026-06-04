@@ -1703,6 +1703,16 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
         if text not in msg_pool:
             msg_pool.append(text)
 
+    def _blocked(action) -> bool:
+        """A gated command the player hasn't learned: explain why, render, and return
+        True so the call site reads `if not _action_allowed(...) and _blocked(action): continue`."""
+        nonlocal message, msg_ttl
+        _push(_guard_message(action, player.known_commands))
+        message = _pool_msg(); msg_ttl = _MSG_ROTATE_TTL
+        render_all(term, dungeon, player, budget, message,
+                   attack_pos=_attack_pos(), attack_sym=_attack_sym())
+        return True
+
     # ── :s / :g — buffer-shifting + confirm (c flag) callbacks ──────────────
     def _sub_insert_row(at):
         _insert_blank_row(room, at + 1, at, player)
@@ -2689,10 +2699,7 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
 
         # . — repeat last change
         if action['type'] == 'repeat':
-            if not _action_allowed(action, player.known_commands):
-                _push(_guard_message(action, player.known_commands))
-                message = _pool_msg(); msg_ttl = _MSG_ROTATE_TTL
-                render_all(term, dungeon, player, budget, message, attack_pos=_attack_pos(), attack_sym=_attack_sym())
+            if not _action_allowed(action, player.known_commands) and _blocked(action):
                 continue
             if not player.last_change:
                 _push('Nothing to repeat.')
@@ -2716,10 +2723,7 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
             motion = action['motion']
             target = action.get('target')
 
-            if not edit_mode and not _action_allowed(action, player.known_commands):
-                _push(_guard_message(action, player.known_commands))
-                message = _pool_msg(); msg_ttl = _MSG_ROTATE_TTL
-                render_all(term, dungeon, player, budget, message, attack_pos=_attack_pos(), attack_sym=_attack_sym())
+            if not edit_mode and not _action_allowed(action, player.known_commands) and _blocked(action):
                 continue
 
             jump_from = (player.row, player.col)
@@ -2919,10 +2923,7 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
                     _push('VISUAL mode not learned yet.')
 
         elif action['type'] == 'jump':
-            if not edit_mode and not _action_allowed(action, player.known_commands):
-                _push(_guard_message(action, player.known_commands))
-                message = _pool_msg(); msg_ttl = _MSG_ROTATE_TTL
-                render_all(term, dungeon, player, budget, message, attack_pos=_attack_pos(), attack_sym=_attack_sym())
+            if not edit_mode and not _action_allowed(action, player.known_commands) and _blocked(action):
                 continue
             dest = _jump_back(player) if action['dir'] == 'back' else _jump_forward(player)
             if dest is not None:
@@ -2934,10 +2935,7 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
                 _push('Jump list: nothing that way.')
 
         elif action['type'] == 'mark':
-            if not edit_mode and not _action_allowed(action, player.known_commands):
-                _push(_guard_message(action, player.known_commands))
-                message = _pool_msg(); msg_ttl = _MSG_ROTATE_TTL
-                render_all(term, dungeon, player, budget, message, attack_pos=_attack_pos(), attack_sym=_attack_sym())
+            if not edit_mode and not _action_allowed(action, player.known_commands) and _blocked(action):
                 continue
             cmd, reg = action['cmd'], action['reg']
             if cmd == 'm':
@@ -2965,20 +2963,14 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
                         redo_stack.clear()
 
         elif action['type'] == 'macro_record':
-            if not edit_mode and not _action_allowed(action, player.known_commands):
-                _push(_guard_message(action, player.known_commands))
-                message = _pool_msg(); msg_ttl = _MSG_ROTATE_TTL
-                render_all(term, dungeon, player, budget, message, attack_pos=_attack_pos(), attack_sym=_attack_sym())
+            if not edit_mode and not _action_allowed(action, player.known_commands) and _blocked(action):
                 continue
             recording_reg = action['reg']
             macro_buf = ''
             _push(f'recording @{recording_reg}')
 
         elif action['type'] == 'macro_play':
-            if not edit_mode and not _action_allowed(action, player.known_commands):
-                _push(_guard_message(action, player.known_commands))
-                message = _pool_msg(); msg_ttl = _MSG_ROTATE_TTL
-                render_all(term, dungeon, player, budget, message, attack_pos=_attack_pos(), attack_sym=_attack_sym())
+            if not edit_mode and not _action_allowed(action, player.known_commands) and _blocked(action):
                 continue
             reg = macro_last if action['reg'] == '@' else action['reg']
             keys = player.macros.get(reg) if reg else None
@@ -2994,10 +2986,7 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
                     budget.spend(2 + (len(str(count)) if count > 1 else 0))
 
         elif action['type'] in ('search_repeat', 'search_word'):
-            if not edit_mode and not _action_allowed(action, player.known_commands):
-                _push(_guard_message(action, player.known_commands))
-                message = _pool_msg(); msg_ttl = _MSG_ROTATE_TTL
-                render_all(term, dungeon, player, budget, message, attack_pos=_attack_pos(), attack_sym=_attack_sym())
+            if not edit_mode and not _action_allowed(action, player.known_commands) and _blocked(action):
                 continue
             if action['type'] == 'search_word':
                 word = _word_under_cursor(room, player)
@@ -3306,10 +3295,7 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
                             _push(seal_msg)
 
         elif not edit_mode and action['type'] == 'substitute':
-            if not _action_allowed(action, player.known_commands):
-                _push(_guard_message(action, player.known_commands))
-                message = _pool_msg(); msg_ttl = _MSG_ROTATE_TTL
-                render_all(term, dungeon, player, budget, message, attack_pos=_attack_pos(), attack_sym=_attack_sym())
+            if not _action_allowed(action, player.known_commands) and _blocked(action):
                 continue
             undo_stack.append(_snapshot(room, player, budget, ans=cmd_start_ans))
             redo_stack.clear()
@@ -3440,10 +3426,7 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
                 _push('Clipboard is empty.')
 
         elif action['type'] == 'replace':
-            if not edit_mode and not _action_allowed(action, player.known_commands):
-                _push(_guard_message(action, player.known_commands))
-                message = _pool_msg(); msg_ttl = _MSG_ROTATE_TTL
-                render_all(term, dungeon, player, budget, message, attack_pos=_attack_pos(), attack_sym=_attack_sym())
+            if not edit_mode and not _action_allowed(action, player.known_commands) and _blocked(action):
                 continue
             (ed_undo if edit_mode else undo_stack).append(
                 _ed_snapshot(room, player) if edit_mode else _snapshot(room, player, budget))
@@ -3457,10 +3440,7 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
                 _push('Nothing to replace.')
 
         elif action['type'] == 'case_char':
-            if not edit_mode and not _action_allowed(action, player.known_commands):
-                _push(_guard_message(action, player.known_commands))
-                message = _pool_msg(); msg_ttl = _MSG_ROTATE_TTL
-                render_all(term, dungeon, player, budget, message, attack_pos=_attack_pos(), attack_sym=_attack_sym())
+            if not edit_mode and not _action_allowed(action, player.known_commands) and _blocked(action):
                 continue
             (ed_undo if edit_mode else undo_stack).append(
                 _ed_snapshot(room, player) if edit_mode else _snapshot(room, player, budget))
@@ -3474,10 +3454,7 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
                 _push('Nothing to toggle.')
 
         elif action['type'] == 'join' and not edit_mode:
-            if not _action_allowed(action, player.known_commands):
-                _push(_guard_message(action, player.known_commands))
-                message = _pool_msg(); msg_ttl = _MSG_ROTATE_TTL
-                render_all(term, dungeon, player, budget, message, attack_pos=_attack_pos(), attack_sym=_attack_sym())
+            if not _action_allowed(action, player.known_commands) and _blocked(action):
                 continue
             undo_stack.append(_snapshot(room, player, budget))
             redo_stack.clear()
@@ -3491,10 +3468,7 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
                 _push(_EDGE_OF_WORLD_MSG if room._last_build_blocked == 'edge' else 'Nothing to join.')
 
         elif action['type'] == 'sub_repeat' and not edit_mode:
-            if not _action_allowed(action, player.known_commands):
-                _push(_guard_message(action, player.known_commands))
-                message = _pool_msg(); msg_ttl = _MSG_ROTATE_TTL
-                render_all(term, dungeon, player, budget, message, attack_pos=_attack_pos(), attack_sym=_attack_sym())
+            if not _action_allowed(action, player.known_commands) and _blocked(action):
                 continue
             _pre = _snapshot(room, player, budget, ans=cmd_start_ans)
             _sr_msg, _ns, _nl = _subst.repeat_normal(
@@ -3514,10 +3488,7 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
                 _push(_sr_msg)
 
         elif action['type'] == 'operator' and action['op'] in ('>', '<'):
-            if not edit_mode and not _action_allowed(action, player.known_commands):
-                _push(_guard_message(action, player.known_commands))
-                message = _pool_msg(); msg_ttl = _MSG_ROTATE_TTL
-                render_all(term, dungeon, player, budget, message, attack_pos=_attack_pos(), attack_sym=_attack_sym())
+            if not edit_mode and not _action_allowed(action, player.known_commands) and _blocked(action):
                 continue
             tobj = (resolve_text_object(action['textobj'], room, player)
                     if 'textobj' in action else compute_text_object(player, action, room))
@@ -3551,10 +3522,7 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
                 player.last_change = action
 
         elif action['type'] == 'operator' and action['op'] in ('g~', 'gu', 'gU'):
-            if not edit_mode and not _action_allowed(action, player.known_commands):
-                _push(_guard_message(action, player.known_commands))
-                message = _pool_msg(); msg_ttl = _MSG_ROTATE_TTL
-                render_all(term, dungeon, player, budget, message, attack_pos=_attack_pos(), attack_sym=_attack_sym())
+            if not edit_mode and not _action_allowed(action, player.known_commands) and _blocked(action):
                 continue
             tobj = (resolve_text_object(action['textobj'], room, player)
                     if 'textobj' in action else compute_text_object(player, action, room))
@@ -3570,10 +3538,7 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
                 player.last_change = action
 
         elif not edit_mode and action['type'] == 'operator':
-            if not _action_allowed(action, player.known_commands):
-                _push(_guard_message(action, player.known_commands))
-                message = _pool_msg(); msg_ttl = _MSG_ROTATE_TTL
-                render_all(term, dungeon, player, budget, message, attack_pos=_attack_pos(), attack_sym=_attack_sym())
+            if not _action_allowed(action, player.known_commands) and _blocked(action):
                 continue
             op   = action['op']
             if 'textobj' in action:
