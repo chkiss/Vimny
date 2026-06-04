@@ -1,5 +1,13 @@
 # Vimny — Clean-up Plan
 
+**Execution status (2026-06-03):** A.1, B, C, D.1, E, F.1 — **done & committed** (full
+suite green). F.2 — **already satisfied**: every `blueprints/act_*.md` already carries a
+prominent "⚠ Pre-implementation design doc — obsolete conventions; delete-on-implement"
+banner, so the finding was moot (corrected below). D.2 (render_all wrapper) — **deferred**:
+41 of 68 call sites are the full form but the message arg varies and many span multiple
+lines, so collapsing them is 41 hand-edits for a "nice-to-have" once the headline
+duplication (D.1) is gone; the churn/risk isn't worth it. G is follow-on work, not cleanup.
+
 A codebase audit for bugs, edge cases, bloat, cruft, duplication, and doc accuracy.
 Findings are ordered by category; each has a concrete location and a recommended action.
 Nothing here is urgent — the codebase is healthy (2440 tests green, no TODO/FIXME, no
@@ -76,10 +84,12 @@ latent robustness gap:
 ## F. Accuracy / documentation drift
 1. **`engine/modes.py:11-12`** — `Mode.SEARCH` / `Mode.MACRO_RECORD` comments say
    "(Block F — … not yet wired)". Both are fully wired. Update the comments.
-2. **`blueprints/act_*.md` (5217 lines).** Forward-looking design docs that have drifted from
-   the as-built game (e.g. `act_3.md` L17 was superseded by The Archivist's Library redesign;
-   `content/levels.py` is canonical). Add a "design notes — may be stale; `content/levels.py`
-   + `LEVELS_PLAN.md` are canonical" banner to each, or move them under `docs/design-archive/`.
+2. **`blueprints/act_*.md` (5217 lines).** ALREADY HANDLED — each file already opens with a
+   "⚠ Pre-implementation design doc — obsolete conventions; delete-on-implement" banner that
+   names `content/levels.py` / LEVELS_PLAN as canonical. Per that banner's own convention,
+   fully-shipped acts could be deleted (e.g. `act_2.md` is solely the Warden Surveyor, which
+   is built; built sections of `act_3` incl. L17 likewise). Left for the owner to prune so
+   design history isn't discarded without intent — not auto-deleted.
 3. **Curriculum status (not a bug).** 22 of 47 levels have generators; L37 The Spellwright's
    Forge is built but its prerequisites L18–L36 (`operators_vault`, `echo_vault`, … 25 levels)
    are not, so L37 isn't reachable by normal progression yet. Track as content status, not code.
