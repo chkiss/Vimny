@@ -34,6 +34,14 @@ Admin features: `:edit` enters editor mode on any dungeon; `:save <name>` writes
 - **void only where a path is guaranteed**: only `_place_runes_in_room`'s default kind set includes `void`. The first cave greedy-fills with void then calls **`_carve_void_path(composite, protected=…)`** — BFS a floor route (routing around `protected` guard cells) and delete void runs on it — to guarantee solvability. Other scatter zones use the void-free word set (`_WORD_RUNE_KINDS`).
 - **Deliberate non-normalized spacing**: The WORD Forge's `_l7_fill_row` keeps a **2–3 cell gap** on purpose — that spacing is what makes small-word `w` ≡ WORD `W`, which is the level's lesson. Don't normalize it to gap 1.
 
+## Par-solver toolkit (generation)
+The per-level `_par_<slug>` solvers compute each dungeon's minimum-keystroke par. They share a toolkit at the top of `dungeon_gen.py` — supply a `neighbors(node)` generator; the machinery is shared:
+- **`_dijkstra(start, is_goal, neighbors)`** / **`_bfs(...)`** — generic least-keystroke / uniform-cost search; return `(cost, prev, end_node)`, reconstruct with `_join_path`. Nodes must be orderable so heap/FIFO tie-breaks (hence the chosen path) match the old hand-written loops.
+- **`_count_moves(passable, r, c, max_n, landable=None, dirs=_DIRS)`** — count-n `hjkl` (n=1→1 key, n>1→`len(str(n))+1`). `landable` lets a void cell block landing while the count passes through; `dirs` sets scan order where a solver needs a non-default tie-break order.
+- **`_row_segment(passable_left, passable_right, c, cols)`** — wall/fog-bounded segment for `$`/`0`/`^`.
+- **`_word_motion_chain(step_fn, key, start, max_n, landable, base=1)`** — count-N word motions (`Nw`/`NW`/`Nge`…), chaining a per-level `_w`/`_W`/`_ge` step; `base=2` for two-key prefixes (`ge`/`gE`).
+- **Invariant**: refactors here must keep par + answer **byte-identical** across all levels/seeds (capture par/answer/budget before & after, diff) AND pass `tools/par_audit.py`. The per-level `_w/_b/_e/_W/_B/_E` etc. stay bespoke (their boundary rules differ per level). The analytic solvers (`_par_goblin_gauntlet`, `_par_wardens_keep`) and bespoke-motion ones (`%`, `H/M/L`, `/search`, sentence) are not on the toolkit.
+
 ## Mixed vocab token rules
 `art/_gen_runes.py` is the source of truth. Rules for mixed tokens:
 - **Decorative endpoints** (glyph appended to a complete word) are the preferred style — thematic connection beats visual match at endpoints.

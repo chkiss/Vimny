@@ -7,6 +7,112 @@ from engine.motion import _fog_unreachable, _cell_char
 from generation.room_gen import make_room, RUNE_CHAR as _RUNE_CHAR
 
 _DIR_CHAR = {(-1, 0): 'k', (1, 0): 'j', (0, -1): 'h', (0, 1): 'l'}
+_DIRS = ((-1, 0), (1, 0), (0, -1), (0, 1))   # k j h l — the order every solver scans
+
+
+# ── Par-solver toolkit ────────────────────────────────────────────────────────
+# Shared least-keystroke machinery behind the per-level `_par_<slug>` solvers.
+# Each solver supplies its own `neighbors` (its bespoke move set / constraints);
+# the driver, the count-move expansion, and the segment scan live here once.
+
+def _dijkstra(start, is_goal, neighbors):
+    """Generic least-keystroke search. ``neighbors(node)`` yields
+    ``(next_node, label, step_cost)`` triples; ``is_goal(node)`` ends the search.
+    Returns ``(cost, prev, end_node)`` — ``cost`` is None and ``end_node`` None if
+    unreachable; ``prev[node] = (parent, label)`` feeds :func:`_join_path`. Nodes
+    must be orderable so heap ties break exactly as the hand-written
+    ``heapq.heappush((cost, node))`` loops did, preserving each solver's path."""
+    dist = {start: 0}
+    prev = {start: None}
+    heap = [(0, start)]
+    while heap:
+        cost, node = heapq.heappop(heap)
+        if is_goal(node):
+            return cost, prev, node
+        if cost > dist.get(node, math.inf):
+            continue
+        for nxt, label, step in neighbors(node):
+            g = cost + step
+            if g < dist.get(nxt, math.inf):
+                dist[nxt] = g
+                prev[nxt] = (node, label)
+                heapq.heappush(heap, (g, nxt))
+    return None, prev, None
+
+
+def _bfs(start, is_goal, neighbors):
+    """Generic uniform-cost (unit-step) search — the BFS analogue of :func:`_dijkstra`,
+    preserving FIFO exploration order so equal-length paths match the hand-written
+    deque loops. ``neighbors(node)`` yields ``(next_node, label)`` pairs. Returns
+    ``(cost, prev, end_node)``."""
+    dist = {start: 0}
+    prev = {start: None}
+    q = deque([start])
+    while q:
+        node = q.popleft()
+        if is_goal(node):
+            return dist[node], prev, node
+        for nxt, label in neighbors(node):
+            if nxt not in dist:
+                dist[nxt] = dist[node] + 1
+                prev[nxt] = (node, label)
+                q.append(nxt)
+    return None, prev, None
+
+
+def _count_moves(passable, r, c, max_n, landable=None, dirs=_DIRS):
+    """Yield ``((nr, nc), label, cost)`` for count-n h/j/k/l moves from (r, c):
+    n=1 costs 1, n>1 costs ``len(str(n)) + 1``. ``passable(rr, cc)`` gates each
+    cell; the first blocked cell stops that direction (and all larger counts).
+    If ``landable`` is given, a cell that is passable but not landable (e.g. a void
+    rune) is skipped as a target while the count motion passes THROUGH it to larger
+    n — matching the engine's final-cell-only void check. ``dirs`` sets the scan
+    order (a solver whose hand-written loop ordered directions differently passes
+    its own order so heap tie-breaks — and thus the chosen path — stay identical)."""
+    for dr, dc in dirs:
+        ch = _DIR_CHAR[(dr, dc)]
+        for n in range(1, max_n + 1):
+            nr, nc = r + dr * n, c + dc * n
+            if not passable(nr, nc):
+                break
+            if landable is not None and not landable(nr, nc):
+                continue
+            yield (nr, nc), (ch if n == 1 else f'{n}{ch}'), (1 if n == 1 else len(str(n)) + 1)
+
+
+def _word_motion_chain(step_fn, key, start, max_n, landable, base=1):
+    """Yield ``((nr, nc), label, cost)`` for count-N word motions (Nw/Nb/Ne, NW/NB/NE,
+    Nge/NgE, …) by chaining ``step_fn`` from ``start``. A target is yielded only when
+    ``landable(nr, nc)``, but the chain advances through it either way — mirroring the
+    engine, where the motion always lands and a larger count steps onward even past a
+    cell that isn't a legal stop. ``base`` is the n=1 keystroke cost (1 for a single
+    key like w/W; 2 for a two-key prefix like ge/gE); n>1 costs ``len(str(n)) + base``."""
+    pos = start
+    for n in range(1, max_n):
+        nxt = step_fn(*pos)
+        if nxt is None:
+            return
+        if landable(*nxt):
+            yield nxt, (key if n == 1 else f'{n}{key}'), (base if n == 1 else len(str(n)) + base)
+        pos = nxt
+
+
+def _row_segment(passable_left, passable_right, c, cols):
+    """Inclusive (left, right) column bounds of the horizontal segment containing
+    column ``c``: scan left while ``passable_left(cc)``, right while
+    ``passable_right(cc)``. Powers $ / 0 / ^, which may block differently on each
+    side (e.g. fog only to the right)."""
+    left = c
+    for nc in range(c - 1, -1, -1):
+        if not passable_left(nc):
+            break
+        left = nc
+    right = c
+    for nc in range(c + 1, cols):
+        if not passable_right(nc):
+            break
+        right = nc
+    return left, right
 
 
 def _join_path(prev: dict, goal, merge_single: bool = True) -> str:
@@ -197,24 +303,18 @@ def _bfs_par(composite, return_path: bool = False):
     }
     entry = composite.spawn_pos
     goal  = composite.exit_pos
-    dist  = {entry: 0}
-    prev  = {entry: None}
-    q     = deque([entry])
-    while q:
-        r, c = q.popleft()
-        if (r, c) == goal:
-            if return_path:
-                return dist[goal], _join_path(prev, goal, merge_single=False)
-            return dist[goal]
-        for dr, dc in ((-1, 0), (1, 0), (0, -1), (0, 1)):
-            nb = (r + dr, c + dc)
-            if nb not in dist and composite.is_passable(*nb) and nb not in void_cells:
-                dist[nb] = dist[(r, c)] + 1
-                prev[nb] = ((r, c), _DIR_CHAR[(dr, dc)])
-                q.append(nb)
+
+    def passable(r, c):
+        return composite.is_passable(r, c) and (r, c) not in void_cells
+
+    def neighbors(node):
+        for (nr, nc), label, _cost in _count_moves(passable, node[0], node[1], 1):
+            yield (nr, nc), label
+
+    cost, prev, end = _bfs(entry, lambda node: node == goal, neighbors)
     if return_path:
-        return None, ''
-    return None
+        return (cost, _join_path(prev, end, merge_single=False)) if cost is not None else (None, '')
+    return cost
 
 # The Counting Crypts: Entry → Puzzle → Exit  ([count] prefix with hjkl + ^$0)
 _COUNTING_CRYPTS_PLAN = [
@@ -236,26 +336,11 @@ def _dijkstra_par_count(composite) -> int | None:
     goal  = composite.exit_pos
     max_n = max(composite.rows, composite.cols)
 
-    dist = {entry: 0}
-    heap = [(0, entry)]
+    def neighbors(node):
+        return _count_moves(composite.is_passable, node[0], node[1], max_n)
 
-    while heap:
-        cost, (r, c) = heapq.heappop(heap)
-        if (r, c) == goal:
-            return cost
-        if cost > dist.get((r, c), float('inf')):
-            continue
-        for dr, dc in ((-1, 0), (1, 0), (0, -1), (0, 1)):
-            for n in range(1, max_n + 1):
-                nr, nc = r + dr * n, c + dc * n
-                if not composite.is_passable(nr, nc):
-                    break  # wall stops this and all larger counts
-                move_cost = 1 if n == 1 else len(str(n)) + 1
-                new_cost  = cost + move_cost
-                if new_cost < dist.get((nr, nc), float('inf')):
-                    dist[(nr, nc)] = new_cost
-                    heapq.heappush(heap, (new_cost, (nr, nc)))
-    return None
+    cost, _prev, _end = _dijkstra(entry, lambda node: node == goal, neighbors)
+    return cost
 
 
 def _par_counting_crypts(composite, door_cols: list, return_path: bool = False):
@@ -293,80 +378,39 @@ def _par_counting_crypts(composite, door_cols: list, return_path: bool = False):
         fc = get_fog_col(closed)
         return fc >= 0 and col >= fc
 
-    start = (entry[0], entry[1], all_closed)
-    dist  = {start: 0}
-    prev  = {start: None}
-    heap  = [(0, start)]
-
-    while heap:
-        cost, (r, c, closed) = heapq.heappop(heap)
-        if (r, c) == goal:
-            if return_path:
-                return cost, _join_path(prev, (r, c, closed), merge_single=False)
-            return cost
-        if cost > dist.get((r, c, closed), float('inf')):
-            continue
-
-        def push(nr, nc, nc2, mc, lbl=''):
-            ns = (nr, nc, nc2)
-            g  = cost + mc
-            if g < dist.get(ns, float('inf')):
-                dist[ns] = g
-                prev[ns] = ((r, c, closed), lbl)
-                heapq.heappush(heap, (g, ns))
-
+    def neighbors(node):
+        r, c, closed = node
+        def passable(rr, cc):                       # walls + fog (fog gates the column)
+            return composite.is_passable(rr, cc) and not fog_blocks_col(cc, closed)
         # count h/j/k/l — stop at wall or fog
-        for dr, dc in ((-1, 0), (1, 0), (0, -1), (0, 1)):
-            ch = _DIR_CHAR[(dr, dc)]
-            for step in range(1, max_n + 1):
-                nr, nc = r + dr * step, c + dc * step
-                if not composite.is_passable(nr, nc) or fog_blocks_col(nc, closed):
-                    break
-                mc  = 1 if step == 1 else len(str(step)) + 1
-                lbl = ch if step == 1 else f'{step}{ch}'
-                push(nr, nc, closed, mc, lbl)
-
-        # $ — rightward to nearest wall/fog
-        best = None
-        for nc in range(c + 1, composite.cols):
-            if not composite.is_passable(r, nc) or fog_blocks_col(nc, closed):
-                break
-            best = nc
-        if best is not None:
-            push(r, best, closed, 1, '$')
-
-        # 0 — leftward to nearest wall
-        left = c
-        for nc in range(c - 1, -1, -1):
-            if not composite.is_passable(r, nc):
-                break
-            left = nc
-        if left != c:
-            push(r, left, closed, 1, '0')
-
-        # ^ — leftmost character in wall/fog-bounded segment
-        lb = c
-        for nc in range(c - 1, -1, -1):
-            if not composite.is_passable(r, nc):
-                break
-            lb = nc
-        rb = c
-        for nc in range(c + 1, composite.cols):
-            if not composite.is_passable(r, nc) or fog_blocks_col(nc, closed):
-                break
-            rb = nc
-        tgt = lb
-        for nc in range(lb, rb + 1):
+        for (nr, nc), label, cost in _count_moves(passable, r, c, max_n):
+            yield (nr, nc, closed), label, cost
+        # the wall-bounded (0: walls only) / wall+fog-bounded ($ ^: fog on the right) segment
+        left, right = _row_segment(
+            lambda cc: composite.is_passable(r, cc),
+            lambda cc: composite.is_passable(r, cc) and not fog_blocks_col(cc, closed),
+            c, composite.cols)
+        if right != c:                              # $ — rightward to wall/fog
+            yield (r, right, closed), '$', 1
+        if left != c:                               # 0 — leftward to wall
+            yield (r, left, closed), '0', 1
+        tgt = left                                  # ^ — leftmost char in the segment
+        for nc in range(left, right + 1):
             if composite.char_run_at(r, nc):
                 tgt = nc
                 break
         if tgt != c:
-            push(r, tgt, closed, 1, '^')
-
+            yield (r, tgt, closed), '^', 1
         # x — open door at current cell (player stays put)
         for i in range(n):
             if (closed >> i) & 1 and (r, c) in trigger[i]:
-                push(r, c, closed ^ (1 << i), 1, 'x')
+                yield (r, c, closed ^ (1 << i)), 'x', 1
+
+    start = (entry[0], entry[1], all_closed)
+    cost, prev, end = _dijkstra(start, lambda node: (node[0], node[1]) == goal, neighbors)
+    if return_path:
+        return cost, _join_path(prev, end, merge_single=False)
+    return cost
 
     if return_path:
         return None, ''
@@ -540,60 +584,28 @@ def _bfs_par_line(composite, return_path: bool = False,
         for i in range(len(ru.symbols)):
             rune_cols_by_row.setdefault(ru.row, []).append(ru.col + i)
 
-    # Per-cell targets: split each row into contiguous passable segments at walls.
-    dollar_of: dict[tuple, tuple] = {}
-    zero_of:   dict[tuple, tuple] = {}
-    hat_of:    dict[tuple, tuple] = {}
+    def neighbors(node):
+        r, c = node
+        for (nr, nc), label, _cost in _count_moves(composite.is_passable, r, c, 1):
+            yield (nr, nc), label                     # hjkl, each cost 1 (no counts here)
+        # wall-bounded segment containing (r, c) — no fog at the Line Halls
+        left, right = _row_segment(lambda cc: composite.is_passable(r, cc),
+                                   lambda cc: composite.is_passable(r, cc),
+                                   c, composite.cols)
+        if '$' in allow and right != c:
+            yield (r, right), '$'
+        if '0' in allow and left != c:
+            yield (r, left), '0'
+        if '^' in allow:
+            runes = [rc for rc in sorted(rune_cols_by_row.get(r, [])) if left <= rc <= right]
+            hat = runes[0] if runes else left
+            if hat != c:
+                yield (r, hat), '^'
 
-    for r in range(composite.rows):
-        segments: list[tuple[int, int]] = []
-        seg_start = None
-        for c in range(composite.cols):
-            if composite.is_passable(r, c):
-                if seg_start is None:
-                    seg_start = c
-            else:
-                if seg_start is not None:
-                    segments.append((seg_start, c - 1))
-                    seg_start = None
-        if seg_start is not None:
-            segments.append((seg_start, composite.cols - 1))
-
-        rcols = sorted(rune_cols_by_row.get(r, []))
-        for seg_l, seg_r in segments:
-            runes = [rc for rc in rcols if seg_l <= rc <= seg_r]
-            hat_dest = (r, runes[0]) if runes else (r, seg_l)
-            for c in range(seg_l, seg_r + 1):
-                dollar_of[(r, c)] = (r, seg_r)
-                zero_of[(r, c)]   = (r, seg_l)
-                hat_of[(r, c)]    = hat_dest
-
-    dist = {entry: 0}
-    prev = {entry: None}
-    q    = deque([entry])
-    while q:
-        r, c = q.popleft()
-        if (r, c) == goal:
-            if return_path:
-                return dist[goal], _join_path(prev, goal, merge_single=False)
-            return dist[goal]
-        d = dist[(r, c)]
-        for dr, dc in ((-1, 0), (1, 0), (0, -1), (0, 1)):
-            nb = (r + dr, c + dc)
-            if nb not in dist and composite.is_passable(*nb):
-                dist[nb] = d + 1
-                prev[nb] = ((r, c), _DIR_CHAR[(dr, dc)])
-                q.append(nb)
-        for nb, lbl in ((dollar_of.get((r, c)), '$'),
-                        (zero_of.get((r, c)),   '0'),
-                        (hat_of.get((r, c)),    '^')):
-            if lbl in allow and nb is not None and nb != (r, c) and nb not in dist:
-                dist[nb] = d + 1
-                prev[nb] = ((r, c), lbl)
-                q.append(nb)
+    cost, prev, end = _bfs(entry, lambda node: node == goal, neighbors)
     if return_path:
-        return None, ''
-    return None
+        return (cost, _join_path(prev, end, merge_single=False)) if cost is not None else (None, '')
+    return cost
 
 
 def build_dungeon_line_halls(seed: int) -> Dungeon:
@@ -863,79 +875,23 @@ def _dijkstra_par_wbe(composite, return_path: bool = False):
                     return (r, end)
         return None
 
-    dist = {entry: 0}
-    prev = {entry: None}
-    heap = [(0, entry)]
+    def landable(nr, nc):                            # a legal stop: passable, non-void
+        ru = composite.char_run_at(nr, nc)
+        return composite.is_passable(nr, nc) and not (ru and ru.kind == 'void')
 
-    while heap:
-        cost, (r, c) = heapq.heappop(heap)
-        if (r, c) == goal:
-            if return_path:
-                return cost, _join_path(prev, (r, c), merge_single=False)
-            return cost
-        if cost > dist.get((r, c), float('inf')):
-            continue
+    def neighbors(node):
+        r, c = node
+        # count h/j/k/l — void blocks landing but count passes through (engine behaviour)
+        yield from _count_moves(composite.is_passable, r, c, max_n, landable=landable)
+        # count w/b/e — chained Nw / Nb / Ne
+        yield from _word_motion_chain(_w, 'w', (r, c), max_n, landable)
+        yield from _word_motion_chain(_b, 'b', (r, c), max_n, landable)
+        yield from _word_motion_chain(_e, 'e', (r, c), max_n, landable)
 
-        def _push(nb, mc=1, lbl=''):
-            if nb is None:
-                return
-            nr, nc = nb
-            if not composite.is_passable(nr, nc):
-                return
-            ru = composite.char_run_at(nr, nc)
-            if ru and ru.kind == 'void':
-                return
-            g = cost + mc
-            if g < dist.get((nr, nc), float('inf')):
-                dist[(nr, nc)] = g
-                prev[(nr, nc)] = ((r, c), lbl)
-                heapq.heappush(heap, (g, (nr, nc)))
-
-        # count h/j/k/l — void blocks landing but count can bypass (engine behaviour)
-        for dr, dc in ((-1, 0), (1, 0), (0, -1), (0, 1)):
-            ch = _DIR_CHAR[(dr, dc)]
-            for n in range(1, max_n + 1):
-                nr, nc = r + dr * n, c + dc * n
-                if not composite.is_passable(nr, nc):
-                    break
-                ru = composite.char_run_at(nr, nc)
-                if ru and ru.kind == 'void':
-                    continue  # can't land here; larger n can bypass
-                mc  = 1 if n == 1 else len(str(n)) + 1
-                lbl = ch if n == 1 else f'{n}{ch}'
-                _push((nr, nc), mc, lbl)
-
-        # count-w/b/e: chain calls to model Nw, Nb, Ne
-        pos = (r, c)
-        for n in range(1, max_n):
-            nxt = _w(*pos)
-            if nxt is None:
-                break
-            mc  = 1 if n == 1 else len(str(n)) + 1
-            _push(nxt, mc, 'w' if n == 1 else f'{n}w')
-            pos = nxt
-
-        pos = (r, c)
-        for n in range(1, max_n):
-            nxt = _b(*pos)
-            if nxt is None:
-                break
-            mc  = 1 if n == 1 else len(str(n)) + 1
-            _push(nxt, mc, 'b' if n == 1 else f'{n}b')
-            pos = nxt
-
-        pos = (r, c)
-        for n in range(1, max_n):
-            nxt = _e(*pos)
-            if nxt is None:
-                break
-            mc  = 1 if n == 1 else len(str(n)) + 1
-            _push(nxt, mc, 'e' if n == 1 else f'{n}e')
-            pos = nxt
-
+    cost, prev, end = _dijkstra(entry, lambda node: node == goal, neighbors)
     if return_path:
-        return None, ''
-    return None
+        return (cost, _join_path(prev, end, merge_single=False)) if cost is not None else (None, '')
+    return cost
 
 
 def _cataracts_place_zone(composite, rng, rows, col_start, col_end,
@@ -1038,100 +994,39 @@ def _dijkstra_par_ftFT(composite, return_path: bool = False):
                 return (r, end) if _is_passable(r, end) else None
         return None
 
-    dist = {entry: 0}
-    prev = {entry: None}
-    heap = [(0, entry)]
+    def landable(nr, nc):            # a legal stop: floor/corridor, non-void, non-dynamite
+        ru = composite.char_run_at(nr, nc)
+        return (_is_passable(nr, nc) and (nr, nc) not in _dynamite_cells
+                and not (ru and ru.kind == 'void'))
 
-    while heap:
-        cost, (r, c) = heapq.heappop(heap)
-        if (r, c) == goal:
-            if return_path:
-                return cost, _join_path(prev, (r, c), merge_single=False)
-            return cost
-        if cost > dist.get((r, c), float('inf')):
-            continue
-
-        def _push(nb, mc=1, lbl=''):
-            if nb is None:
-                return
-            nr, nc = nb
-            if not _is_passable(nr, nc):
-                return
-            if (nr, nc) in _dynamite_cells:
-                return
-            ru = composite.char_run_at(nr, nc)
-            if ru and ru.kind == 'void':
-                return
-            g = cost + mc
-            if g < dist.get((nr, nc), float('inf')):
-                dist[(nr, nc)] = g
-                prev[(nr, nc)] = ((r, c), lbl)
-                heapq.heappush(heap, (g, (nr, nc)))
-
-        # count h/j/k/l
-        for dr, dc in ((-1, 0), (1, 0), (0, -1), (0, 1)):
-            ch = _DIR_CHAR[(dr, dc)]
-            for n in range(1, max_n + 1):
-                nr, nc = r + dr * n, c + dc * n
-                if not _is_passable(nr, nc):
-                    break
-                ru = composite.char_run_at(nr, nc)
-                if ru and ru.kind == 'void':
-                    continue
-                if (nr, nc) in _dynamite_cells:
-                    continue
-                mc  = 1 if n == 1 else len(str(n)) + 1
-                lbl = ch if n == 1 else f'{n}{ch}'
-                _push((nr, nc), mc, lbl)
-
-        # w / b / e (stop at water)
-        pos = (r, c)
-        for n in range(1, max_n):
-            nxt = _w(*pos)
-            if nxt is None:
-                break
-            mc = 1 if n == 1 else len(str(n)) + 1
-            _push(nxt, mc, 'w' if n == 1 else f'{n}w')
-            pos = nxt
-
-        pos = (r, c)
-        for n in range(1, max_n):
-            nxt = _b(*pos)
-            if nxt is None:
-                break
-            mc = 1 if n == 1 else len(str(n)) + 1
-            _push(nxt, mc, 'b' if n == 1 else f'{n}b')
-            pos = nxt
-
-        pos = (r, c)
-        for n in range(1, max_n):
-            nxt = _e(*pos)
-            if nxt is None:
-                break
-            mc = 1 if n == 1 else len(str(n)) + 1
-            _push(nxt, mc, 'e' if n == 1 else f'{n}e')
-            pos = nxt
-
-        # f / F / t / T — row-scoped, water-transparent, wall-stopped
+    def neighbors(node):
+        r, c = node
+        # count h/j/k/l (void + dynamite block landing; count passes through)
+        yield from _count_moves(_is_passable, r, c, max_n, landable=landable)
+        # w / b / e (these _w/_b/_e stop at water)
+        yield from _word_motion_chain(_w, 'w', (r, c), max_n, landable)
+        yield from _word_motion_chain(_b, 'b', (r, c), max_n, landable)
+        yield from _word_motion_chain(_e, 'e', (r, c), max_n, landable)
+        # f / F / t / T — row-scoped, water-transparent, wall-stopped; each costs 2 keys
         pts      = row_chars[r]
         wall_fwd = next((nc for nc in range(c + 1, COLS) if _scan_stops(r, nc)), COLS)
         wall_bwd = next((nc for nc in range(c - 1, -1, -1) if _scan_stops(r, nc)), -1)
-
         for nc, ch in pts:
             if nc > c and nc < wall_fwd:
-                if _is_passable(r, nc):
-                    _push((r, nc), 2, f'f{ch}')   # f + target char = 2 keys
-                if nc - 1 != c and _is_passable(r, nc - 1):
-                    _push((r, nc - 1), 2, f't{ch}')
+                if landable(r, nc):
+                    yield (r, nc), f'f{ch}', 2
+                if nc - 1 != c and landable(r, nc - 1):
+                    yield (r, nc - 1), f't{ch}', 2
             elif nc < c and nc > wall_bwd:
-                if _is_passable(r, nc):
-                    _push((r, nc), 2, f'F{ch}')
-                if nc + 1 != c and _is_passable(r, nc + 1):
-                    _push((r, nc + 1), 2, f'T{ch}')
+                if landable(r, nc):
+                    yield (r, nc), f'F{ch}', 2
+                if nc + 1 != c and landable(r, nc + 1):
+                    yield (r, nc + 1), f'T{ch}', 2
 
+    cost, prev, end = _dijkstra(entry, lambda node: node == goal, neighbors)
     if return_path:
-        return None, ''
-    return None
+        return (cost, _join_path(prev, end, merge_single=False)) if cost is not None else (None, '')
+    return cost
 
 
 def build_dungeon_rune_halls(seed: int) -> Dungeon:
@@ -2508,94 +2403,32 @@ def _dijkstra_par_WBE(composite, return_path=False):
                 return (r, _word_end(r, pos))
         return None
 
-    dist = {entry: 0}
-    prev = {entry: None}
-    heap = [(0, entry)]
-
-    while heap:
-        cost, (r, c) = heapq.heappop(heap)
-        if (r, c) == goal:
-            if return_path:
-                return cost, _join_path(prev, (r, c), merge_single=False)
-            return cost
-        if cost > dist.get((r, c), float('inf')):
-            continue
-
-        def _push(nb, mc=1, lbl=''):
-            if nb is None:
-                return
-            nr, nc = nb
-            if not _ok(nr, nc):
-                return
-            g = cost + mc
-            if g < dist.get((nr, nc), float('inf')):
-                dist[(nr, nc)] = g
-                prev[(nr, nc)] = ((r, c), lbl)
-                heapq.heappush(heap, (g, (nr, nc)))
-
-        # count h/j/k/l
-        for dr, dc in ((-1, 0), (1, 0), (0, -1), (0, 1)):
-            ch_d = _DIR_CHAR[(dr, dc)]
-            for n in range(1, max_n + 1):
-                nr2, nc2 = r + dr * n, c + dc * n
-                if not _ok(nr2, nc2):
-                    break
-                mc2  = 1 if n == 1 else len(str(n)) + 1
-                lbl2 = ch_d if n == 1 else f'{n}{ch_d}'
-                _push((nr2, nc2), mc2, lbl2)
-
-        # $: scan right via passability (void runes don't stop scan); skip if landing is void
-        best = None
-        for cc in range(c + 1, COLS):
-            if not composite.is_passable(r, cc):
-                break
-            best = cc
-        if best is not None and _ok(r, best):
-            _push((r, best), 1, '$')
-
-        # 0: scan left via passability; skip if landing is void
-        leftmost = c
-        for cc in range(c - 1, -1, -1):
-            if not composite.is_passable(r, cc):
-                break
-            leftmost = cc
-        if leftmost < c and _ok(r, leftmost):
-            _push((r, leftmost), 1, '0')
-
-        # ^: leftmost character in passability-bounded range; void as first character = lethal, don't push
-        left_b = c
-        for cc in range(c - 1, -1, -1):
-            if not composite.is_passable(r, cc):
-                break
-            left_b = cc
-        right_b = c
-        for cc in range(c + 1, COLS):
-            if not composite.is_passable(r, cc):
-                break
-            right_b = cc
-        for cc in range(left_b, right_b + 1):
-            ru2 = composite.char_run_at(r, cc)
-            if ru2:
+    def neighbors(node):
+        r, c = node
+        # count h/j/k/l — here a void cell BREAKS the count (via _ok), no bypass
+        yield from _count_moves(_ok, r, c, max_n)
+        # $ / 0 / ^ — scan by passability (void transparent), land only on _ok cells
+        left, right = _row_segment(lambda cc: composite.is_passable(r, cc),
+                                   lambda cc: composite.is_passable(r, cc),
+                                   c, COLS)
+        if right != c and _ok(r, right):
+            yield (r, right), '$', 1
+        if left != c and _ok(r, left):
+            yield (r, left), '0', 1
+        for cc in range(left, right + 1):          # ^ — first char terminates the scan
+            if composite.char_run_at(r, cc):
                 if _ok(r, cc):
-                    _push((r, cc), 1, '^')
-                break  # first character (void or not) terminates search
-
+                    yield (r, cc), '^', 1
+                break
         # chain w/b/e/W/B/E
         for fn, key in ((_w, 'w'), (_b, 'b'), (_e, 'e'),
                         (_W, 'W'), (_B, 'B'), (_E, 'E')):
-            pos2 = (r, c)
-            for n in range(1, max_n):
-                nxt = fn(*pos2)
-                if nxt is None:
-                    break
-                mc2  = 1 if n == 1 else len(str(n)) + 1
-                lbl2 = key if n == 1 else f'{n}{key}'
-                _push(nxt, mc2, lbl2)
-                pos2 = nxt
+            yield from _word_motion_chain(fn, key, (r, c), max_n, _ok)
 
+    cost, prev, end = _dijkstra(entry, lambda node: node == goal, neighbors)
     if return_path:
-        return None, ''
-    return None
+        return (cost, _join_path(prev, end, merge_single=False)) if cost is not None else (None, '')
+    return cost
 
 
 # ── Vocab tables (lazy-loaded from art/) ─────────────────────────────────
@@ -2881,131 +2714,38 @@ def _par_backward_vaults(composite, return_path: bool = False):
                 return (r, _word_end_L7(r, pos))
         return None
 
-    dist = {entry: 0}
-    prev = {entry: None}
-    heap = [(0, entry)]
-
-    while heap:
-        cost, (r, c) = heapq.heappop(heap)
-        if (r, c) == goal:
-            if return_path:
-                return cost, _join_path(prev, (r, c), merge_single=False)
-            return cost
-        if cost > dist.get((r, c), float('inf')):
-            continue
-
-        def _push(nb, mc=1, lbl=''):
-            if nb is None:
-                return
-            nr, nc = nb
-            if not _ok(nr, nc):
-                return
-            g = cost + mc
-            if g < dist.get((nr, nc), float('inf')):
-                dist[(nr, nc)] = g
-                prev[(nr, nc)] = ((r, c), lbl)
-                heapq.heappush(heap, (g, (nr, nc)))
-
-        # count j/k (vertical, step-by-step)
-        for dr, key in ((1, 'j'), (-1, 'k')):
-            for n in range(1, max_n + 1):
-                nr2 = r + dr * n
-                if nr2 < 0 or nr2 >= ROWS or not _ok(nr2, c):
-                    break
-                mc2  = 1 if n == 1 else len(str(n)) + 1
-                lbl2 = key if n == 1 else f'{n}{key}'
-                _push((nr2, c), mc2, lbl2)
-
-        # count h/l (horizontal, step-by-step)
-        for dc, key in ((1, 'l'), (-1, 'h')):
-            for n in range(1, max_n + 1):
-                nc2 = c + dc * n
-                if nc2 < 0 or nc2 >= COLS or not _ok(r, nc2):
-                    break
-                mc2  = 1 if n == 1 else len(str(n)) + 1
-                lbl2 = key if n == 1 else f'{n}{key}'
-                _push((r, nc2), mc2, lbl2)
-
-        # $: rightmost passable col in same row (skip void landing)
-        best_col = None
-        for cc in range(c + 1, COLS):
-            if not composite.is_passable(r, cc):
-                break
-            best_col = cc
-        if best_col is not None and _ok(r, best_col):
-            _push((r, best_col), 1, '$')
-
-        # 0: leftmost passable col
-        left_col = c
-        for cc in range(c - 1, -1, -1):
-            if not composite.is_passable(r, cc):
-                break
-            left_col = cc
-        if left_col < c and _ok(r, left_col):
-            _push((r, left_col), 1, '0')
-
-        # ^: first character in passability-bounded range (any direction from current col)
-        lb = c
-        for cc in range(c - 1, -1, -1):
-            if not composite.is_passable(r, cc):
-                break
-            lb = cc
-        rb = c
-        for cc in range(c + 1, COLS):
-            if not composite.is_passable(r, cc):
-                break
-            rb = cc
-        for cc in range(lb, rb + 1):
-            ru2 = composite.char_run_at(r, cc)
-            if ru2:
+    def neighbors(node):
+        r, c = node
+        # count j/k then h/l — this solver's scan order is j,k,l,h (kept for tie-breaks)
+        yield from _count_moves(_ok, r, c, max_n, dirs=((1, 0), (-1, 0), (0, 1), (0, -1)))
+        # $ / 0 / ^ — scan by passability, land only on _ok cells
+        left, right = _row_segment(lambda cc: composite.is_passable(r, cc),
+                                   lambda cc: composite.is_passable(r, cc),
+                                   c, COLS)
+        if right != c and _ok(r, right):
+            yield (r, right), '$', 1
+        if left != c and _ok(r, left):
+            yield (r, left), '0', 1
+        for cc in range(left, right + 1):          # ^ — first char terminates the scan
+            if composite.char_run_at(r, cc):
                 if _ok(r, cc):
-                    _push((r, cc), 1, '^')
-                break  # first character (void or not) terminates search
-
-        # count ge/gE (backward-end motions, chained); base cost +1 for the 'g' prefix.
-        # Pushed BEFORE w/b/e so that gE wins tiebreaks when 9b and gE reach the same
-        # cell at equal cost (2 ks each); gE is the pedagogically preferred motion.
-        # ge before gE: on the LT2 gap, ge and gE both cost 2 ks but ge is the simpler
-        # command taught first, so ge wins that tiebreak.
+                    yield (r, cc), '^', 1
+                break
+        # count ge/gE (backward-end, +1 base for the 'g' prefix) — BEFORE w/b/e so ge/gE
+        # win tie-breaks at equal cost (the pedagogically preferred motion); ge before gE.
         for fn, key in ((_ge, 'ge'), (_gE, 'gE')):
-            pos2 = (r, c)
-            for n in range(1, max_n):
-                nxt = fn(*pos2)
-                if nxt is None:
-                    break
-                mc2  = 2 if n == 1 else len(str(n)) + 2
-                lbl2 = key if n == 1 else f'{n}{key}'
-                _push(nxt, mc2, lbl2)
-                pos2 = nxt
-
-        # count W/B/E (WORD motions, chained) — before w/b/e so W/B/E win tiebreaks
-        # when both reach the same cell at equal cost (isolated uniform-type clusters).
+            yield from _word_motion_chain(fn, key, (r, c), max_n, _ok, base=2)
+        # count W/B/E (WORD) before w/b/e so they win equal-cost tie-breaks
         for fn, key in ((_W, 'W'), (_B, 'B'), (_E, 'E')):
-            pos2 = (r, c)
-            for n in range(1, max_n):
-                nxt = fn(*pos2)
-                if nxt is None:
-                    break
-                mc2  = 1 if n == 1 else len(str(n)) + 1
-                lbl2 = key if n == 1 else f'{n}{key}'
-                _push(nxt, mc2, lbl2)
-                pos2 = nxt
-
-        # count w/b/e (word motions, chained)
+            yield from _word_motion_chain(fn, key, (r, c), max_n, _ok)
+        # count w/b/e
         for fn, key in ((_w, 'w'), (_b, 'b'), (_e, 'e')):
-            pos2 = (r, c)
-            for n in range(1, max_n):
-                nxt = fn(*pos2)
-                if nxt is None:
-                    break
-                mc2  = 1 if n == 1 else len(str(n)) + 1
-                lbl2 = key if n == 1 else f'{n}{key}'
-                _push(nxt, mc2, lbl2)
-                pos2 = nxt
+            yield from _word_motion_chain(fn, key, (r, c), max_n, _ok)
 
+    cost, prev, end = _dijkstra(entry, lambda node: node == goal, neighbors)
     if return_path:
-        return None, ''
-    return None
+        return (cost, _join_path(prev, end, merge_single=False)) if cost is not None else (None, '')
+    return cost
 
 
 def build_dungeon_backward_vaults(seed: int) -> Dungeon:
