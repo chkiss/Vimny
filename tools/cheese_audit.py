@@ -26,18 +26,23 @@ import itertools
 
 import generation.dungeon_gen as dg
 from content.levels import LEVELS
+from engine.motion import _reveal_from
 import tools.par_audit as pa
 
 
 def _door_open_room(slug, open_doors):
     """A fresh build of `slug` (seed 42) with the locked_door entities at the cells in
-    `open_doors` removed — i.e. those doors unlocked. Cached per open-door set."""
+    `open_doors` removed — i.e. those doors unlocked. Opening a door in the engine also
+    clears the fog beyond it (`_reveal_from` after stepping onto the door), so we mirror
+    that: remove the doors, then reveal from each opened door cell. Cached per set."""
     room = getattr(dg, f'build_dungeon_{slug}')(42).rooms[0]
     for (dr, dc) in open_doors:
         for e in list(room.entities):
             if e.kind == 'locked_door' and (e.row, e.col) == (dr, dc):
                 room.remove_entity(e)
     room.rebuild_indexes()
+    for (dr, dc) in open_doors:
+        _reveal_from(room, dr, dc)
     return room
 
 
