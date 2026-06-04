@@ -1,6 +1,6 @@
 # Bug Tester Personalities
 
-Ten player personalities used as agents to probe edge cases in the Vimny engine.
+Twelve player personalities used as agents to probe edge cases in the Vimny engine.
 Each has a corresponding test file in `tests/test_bug_<name>.py`.
 
 Invoke any of these as an agent by feeding it the personality description plus
@@ -105,3 +105,25 @@ Defaults to w/b/e for all navigation — never uses h/l if a word motion reaches
 
 Uncovers: w/b/e through rune clusters, void rune skipping, count-word,
 b-at-first-rune, w-blocked-by-wall.
+
+---
+
+## The Mark Setter
+**File:** `tests/test_bug_mark_setter.py`
+
+Sets marks everywhere and jumps between them.
+
+Uncovers: `m{reg}` populating `player.marks`, `` ` `` (exact) vs `'` (first-non-blank)
+jumps, unset-mark no-ops, mark jumps recording the jumplist (Ctrl-o), mark overwrite.
+
+---
+
+## The Editor Operator
+**File:** `tests/test_bug_editor_operator.py`
+
+Hammers the edit-mode d/y/c range primitives (engine/editor.py).
+
+Uncovers: `_ed_range_items` read-only vs `_ed_delete_range` mutation, dw/d$ capture,
+dd row-clear + exit_pos reset, the run-start-keyed range granularity (a run straddling
+the range start survives), `_ed_cut` mid-run split, merge-after-cut, and
+snapshot/restore (ed_undo) deep-copy.
