@@ -82,6 +82,48 @@ def cheese_min(slug, game_h=25):
     max_n = max(base.rows, base.cols)
     goal  = base.exit_pos
 
+    # search edges (/ ? *) — the buffer (and thus matches) is fixed, so these depend
+    # only on the cursor cell. Use the REAL engine matcher (_match_positions is per-line,
+    # i.e. richer than the seekers par solver's substring model — so it can surface cheese
+    # the par model itself missed). Cost mirrors the game: /W⏎ = len(W)+2, each n = +1.
+    do_search = any(s in known for s in ('/', '?', '*'))
+    search_cache: dict = {}
+    if do_search:
+        from engine.search import _match_positions
+        distinct = sorted({''.join(ru.symbols) for ru in base.char_runs})
+        match_of = {W: _match_positions(base, W) for W in distinct}
+
+    def search_edges(r, c):
+        if not do_search:
+            return ()
+        if (r, c) in search_cache:
+            return search_cache[(r, c)]
+        out, cur = [], (r, c)
+        for W in distinct:
+            ms = match_of[W]
+            if not ms:
+                continue
+            if '/' in known:
+                fwd = [m for m in ms if m > cur] + [m for m in ms if m <= cur]
+                for k, tgt in enumerate(fwd):
+                    if tgt != cur and tgt not in voids:
+                        out.append((len(W) + 2 + k, tgt, f'/{W}⏎' + 'n' * k))
+            if '?' in known:
+                bwd = [m for m in reversed(ms) if m < cur] + [m for m in reversed(ms) if m >= cur]
+                for k, tgt in enumerate(bwd):
+                    if tgt != cur and tgt not in voids:
+                        out.append((len(W) + 2 + k, tgt, f'?{W}⏎' + 'n' * k))
+        if '*' in known:
+            ru = base.char_run_at(r, c)
+            if ru is not None:
+                ms = match_of.get(''.join(ru.symbols), [])
+                fwd = [m for m in ms if m > cur] + [m for m in ms if m <= cur]   # * wraps
+                for k, tgt in enumerate(fwd):
+                    if tgt != cur and tgt not in voids:
+                        out.append((1 + k, tgt, '*' + 'n' * k))
+        search_cache[(r, c)] = out
+        return out
+
     room_cache: dict = {}
     def room_for(opened):
         k = frozenset(opened)
@@ -119,6 +161,9 @@ def cheese_min(slug, game_h=25):
         for ncell, ec, lbl in pa._successors(room, *cell, motions, finds, has_count,
                                               game_h, max_n, voids):
             offer((ncell, held, opened), ec, lbl)
+        # search edges (/ ? *) — buffer is fixed, independent of door state
+        for ec, tgt, lbl in search_edges(*cell):
+            offer((tgt, held, opened), ec, lbl)
         # x — grab the key on this cell (overwrites the held one)
         if cell in key_at and key_at[cell] != held:
             offer((cell, key_at[cell], opened), pa.main._keystroke_cost(1, 'x'), 'x')
