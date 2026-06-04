@@ -9,6 +9,7 @@ from engine.modes import Mode
 from engine.text_object import TextObject, TextObjectType
 from engine.operator import (
     op_delete, op_yank, op_case, apply_indent, line_extent, _delete_cols, _capture_row,
+    _cursor_to_line_start, INDENT_WIDTH,
 )
 
 
@@ -132,12 +133,10 @@ def apply_visual(op: str, anchor, cursor, vmode, room, player):
         op_case(room, player, tobj, 'g~')
         return None
     if op in ('>', '<'):
-        amount = 2 if op == '>' else -2
+        amount = INDENT_WIDTH if op == '>' else -INDENT_WIDTH
         for r in range(tobj.start_row, tobj.end_row + 1):
             apply_indent(room, r, amount)
-        player.row = tobj.start_row
-        ext = line_extent(room, player.row)
-        player.col = ext[0] if ext else player.col
+        _cursor_to_line_start(room, player, tobj.start_row)
         return None
     return None
 

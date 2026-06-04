@@ -16,6 +16,9 @@ from engine.reflow import (
 _PASTABLE = (CellType.FLOOR, CellType.CORRIDOR)
 
 
+INDENT_WIDTH = 2   # columns one >>/<< shift adds or removes
+
+
 def line_extent(room, row: int):
     """(lo, hi) inclusive passable column extent of a row — the run between the
     stone walls — or None if the row has no passable cell."""
@@ -26,6 +29,15 @@ def line_extent(room, row: int):
                 lo = c
             hi = c
     return (lo, hi) if lo is not None else None
+
+
+def _cursor_to_line_start(room, player, row: int) -> None:
+    """Park the cursor on the first passable column of `row` (Vim's linewise
+    landing spot), clamped to the buffer; keeps the current column when the row
+    has no passable cell."""
+    player.row = min(row, room.rows - 1)
+    ext = line_extent(room, player.row)
+    player.col = ext[0] if ext else player.col
 
 
 def _capture_row(room, row: int, lo: int, hi: int) -> dict:
@@ -132,10 +144,7 @@ def _delete_cols(room, row: int, lo: int, hi: int) -> None:
             room.wood_damage.pop((row, c), None)
     for ent in [e for e in room.entities if e.row == row and lo <= e.col <= hi]:
         room.remove_entity(ent)
-        if ent.kind == 'exit':
-            room.exit_pos = None
-        elif ent.kind == 'entry_marker':
-            room.spawn_pos = (1, 1)
+        room._on_entity_destroyed(ent)
 
 
 def op_yank(room, player, text_obj) -> dict:
@@ -158,9 +167,7 @@ def op_delete(room, player, text_obj, collapse: bool = False) -> dict:
         for _ in range(len(spans)):
             if not remove_row(room, start, player):
                 break                                  # hit a border guard — stop collapsing
-        player.row = min(start, room.rows - 1)
-        ext = line_extent(room, player.row)
-        player.col = ext[0] if ext else player.col
+        _cursor_to_line_start(room, player, start)
         return clip
     _ext_cache: dict = {}
     for row, lo, hi in spans:
@@ -177,9 +184,7 @@ def op_delete(room, player, text_obj, collapse: bool = False) -> dict:
                 close_gap(room, row, lo, hi - lo + 1)   # ledge: pull the tail left
     # Cursor → start of the deleted region (vim-faithful).
     if linewise:
-        player.row = min(text_obj.start_row, room.rows - 1)
-        ext = line_extent(room, player.row)   # fresh call — cells may have changed
-        player.col = ext[0] if ext else player.col
+        _cursor_to_line_start(room, player, text_obj.start_row)   # fresh call — cells may have changed
     else:
         player.col = text_obj.start_col
     return clip
@@ -272,9 +277,7 @@ def op_case(room, player, text_obj, op: str) -> bool:
         if hi >= lo:
             changed |= _case_cols(room, row, lo, hi, op)
     if linewise:
-        player.row = min(text_obj.start_row, room.rows - 1)
-        ext = line_extent(room, player.row)
-        player.col = ext[0] if ext else player.col
+        _cursor_to_line_start(room, player, text_obj.start_row)
     else:
         player.col = text_obj.start_col
     return changed

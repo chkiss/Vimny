@@ -49,6 +49,7 @@ from engine.editor import (
     _clip_desc, _serialize_room, _deserialize_room,
 )
 import generation.dungeon_gen as _dg
+from generation.room_gen import RUNE_CHAR as _RUNE_CHAR
 from content.levels import LEVELS, is_unlocked, level_type, known_commands as _known_commands
 import save.save_manager as SM
 
@@ -1256,26 +1257,6 @@ def _do_warden_move(room, warden: Entity, player) -> str:
     return 'The Warden leaps!'
 
 
-def _try_warden_move(room, killed_goblin: Entity, player) -> str:
-    """After a goblin is killed, check if it was the last spawn of a living Warden.
-    If so, trigger that Warden's movement and shield reposition.
-    Returns a message string or '' if no movement occurred.
-    """
-    if not killed_goblin.summoner_uid:
-        return ''
-    warden = next(
-        (e for e in room._entity_by_kind.get('warden', [])
-         if e.alive and e.uid == killed_goblin.summoner_uid),
-        None,
-    )
-    if warden is None:
-        return ''
-    if any(e.alive and e.summoner_uid == warden.uid
-           for e in room._entity_by_kind.get('goblin', [])):
-        return ''
-    return _do_warden_move(room, warden, player)
-
-
 _ORTHO = ((-1, 0), (1, 0), (0, -1), (0, 1))  # up, down, left, right (vertical first)
 
 
@@ -1509,7 +1490,6 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
     insert_creg_pending = False  # INSERT <C-r> typed; next key names the register to paste
     insert_co_buf = None         # INSERT <C-o> active; accumulates one Normal command, then resumes INSERT
     search_creg_pending = False  # SEARCH <C-r> typed; next key names the register / <C-w> to insert
-    at_exit  = False   # player has stepped on the exit at some point
     last_saved_stars = progress.get(level, {}).get('stars', 0)
     won             = False  # win animation has been triggered
     _first_written_completion = False  # set on first :w/:wq that earns ≥1 star from 0
@@ -2173,7 +2153,6 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
                     ed_undo.clear()
                     ed_redo.clear()
                     key_buf         = ''
-                    at_exit         = False
                     won             = False
                     spotted_goblins      = set()
                     spotted_wardens      = set()
@@ -2204,9 +2183,8 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
                         _push('Usage:  :save <name>')
 
                 elif cmd.startswith('rune ') and edit_mode and player_name == 'admin':
-                    _RUNE_SYMS = {'ancient': '∘', 'verdant': '·', 'void': '○', 'ember': '◦'}
                     kind = cmd[5:].strip().lower()
-                    if kind not in _RUNE_SYMS:
+                    if kind not in _RUNE_CHAR:
                         _push(f'Unknown rune kind: {kind}  (ancient|verdant|void|ember)')
                     else:
                         r, c = player.row, player.col
@@ -2216,7 +2194,7 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
                         if existing:
                             room.remove_char_run(existing)
                         room.add_char_run(CharRun(row=r, col=c,
-                                                  symbols=(_RUNE_SYMS[kind],), kind=kind))
+                                                  symbols=(_RUNE_CHAR[kind],), kind=kind))
                         _merge_adjacent_char_runs(room, r)
                         _push(f'Placed {kind} rune.')
 
@@ -2846,14 +2824,7 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
                 if ent is None:
                     ent = room.entity_at(player.row, player.col)
                 if ent and ent.kind == 'exit' and not won:
-                    # Keystone-gated exit: blocked until all keystone entities are collected.
-                    _ks_alive = [e for e in room._entity_by_kind.get('keystone', []) if e.alive]
-                    if _ks_alive:
-                        _push(f'{len(_ks_alive)} keystone(s) still uncollected.')
-                        ent = None
-                if ent and ent.kind == 'exit' and not won:
                     won = True
-                    at_exit = True
                     _render('', attack_pos=_attack_pos(), attack_sym=_attack_sym())
                     iw  = _iw(term)
                     if level_type(level) == 'boss':
@@ -3159,20 +3130,6 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
                                                  _known_from_progress(progress))
                         else:
                             _push('The scroll case is empty — you hold every relic scroll.')
-                elif cur and cur.kind == 'keystone':
-                    undo_stack.append(_snapshot(room, player, budget, ans=cmd_start_ans))
-                    redo_stack.clear()
-                    room.kill_entity(cur)
-                    budget.spend(1)
-                    remaining = sum(
-                        1 for e in room._entity_by_kind.get('keystone', [])
-                        if e.alive
-                    )
-                    if remaining == 0:
-                        _push('All keystones collected — the exit is open!')
-                    else:
-                        _push(f'Keystone collected ({remaining} remaining).')
-                    interacted = True
                 elif cur and cur.kind == 'door':
                     undo_stack.append(_snapshot(room, player, budget, ans=cmd_start_ans))
                     redo_stack.clear()

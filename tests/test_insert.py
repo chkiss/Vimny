@@ -5,7 +5,7 @@ from engine.world import Room, RoomType, CellType, CharRun, Entity
 from engine.player import Player
 from engine.insert import (
     begin_insert, insert_char, insert_char_extend, insert_backspace,
-    _insert_blank_row, _last_content_col,
+    _insert_blank_row,
     replace_chars, replace_overtype, replace_restore,
 )
 
@@ -313,16 +313,6 @@ class TestReplaceMode:
         assert room.char_run_at(3, 6) is None and p.col == 6
         replace_restore(room, p, stack.pop())      # undo x@5 → original 'a'
         assert _cell(room, 3, 5) == 'a' and p.col == 5
-
-
-# ── _last_content_col helper ─────────────────────────────────────────────────
-
-def test_last_content_col():
-    room = _room()
-    room.add_char_run(CharRun(3, 2, ('a',), 'ancient'))
-    room.add_char_run(CharRun(3, 7, ('b', 'c'), 'ancient'))
-    assert _last_content_col(room, 3) == 8         # 'bc' ends at col 8
-    assert _last_content_col(room, 1) is None
 
 
 def test_A_in_goblin_gauntlet_row1_lands_at_line_end():

@@ -1,4 +1,4 @@
-"""Tests for engine/budget.py — spend (frozen), remaining, is_over, status_color."""
+"""Tests for engine/budget.py — spend (frozen), remaining, is_over."""
 import pytest
 from engine.budget import Budget
 
@@ -78,40 +78,3 @@ class TestSpend:
         b.spend(5)
         b.spend(2)
         assert b.spent == 10
-
-
-class TestStatusColor:
-    def test_ok_when_plenty_remaining(self):
-        b = Budget(20)
-        b.spend(5)   # remaining = 15
-        assert b.status_color() == 'ok'
-
-    def test_ok_at_boundary_4(self):
-        b = Budget(10)
-        b.spend(6)   # remaining = 4
-        assert b.status_color() == 'ok'
-
-    def test_low_at_3(self):
-        b = Budget(10)
-        b.spend(7)   # remaining = 3
-        assert b.status_color() == 'low'
-
-    def test_low_at_2(self):
-        b = Budget(10)
-        b.spend(8)   # remaining = 2
-        assert b.status_color() == 'low'
-
-    def test_crit_at_1(self):
-        b = Budget(10)
-        b.spend(9)   # remaining = 1
-        assert b.status_color() == 'crit'
-
-    def test_crit_at_0(self):
-        b = Budget(10)
-        b.spend(10)  # remaining = 0
-        assert b.status_color() == 'crit'
-
-    def test_crit_when_overspent(self):
-        b = Budget(5)
-        b.spend(8)   # remaining = -3
-        assert b.status_color() == 'crit'

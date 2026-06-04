@@ -285,8 +285,6 @@ def render_all(term: Terminal, dungeon: Dungeon, player: Player,
     number_mode = getattr(player, 'number_mode', 'none')
     gutter_w  = 0 if number_mode == 'none' else 4      # "123 "
     content_w = max(1, iw - gutter_w)
-    room_display_rows = min(room.rows, game_h)
-    room_display_cols = min(room.cols, content_w)
 
     # Viewport: centre on player (over the content width, right of the gutter)
     vr_start = max(0, min(player.row - game_h // 2,    room.rows - game_h))

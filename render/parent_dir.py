@@ -4,10 +4,10 @@ from blessed import Terminal
 from engine.player import Player
 import render.colors as C
 import render.symbols as S
+import render.netrw_chrome as NC
 from render.utils import inner_w as _iw
 
 _BASE_ENTRIES = ['saves/', 'scrolls/', 'world/']
-ENTRIES = _BASE_ENTRIES  # non-admin default; prefer entries_for()
 
 
 def entries_for(player: Player) -> list[str]:
@@ -22,40 +22,17 @@ def render_parent_dir(
     cursor_row: int,
     cmd_line: str | None = None,
 ) -> None:
-    iw      = _iw(term)
-    bfg     = C.border_fg()
-    rst     = C.normal_fg()
-    out     = []
-    entries = entries_for(player)
+    iw       = _iw(term)
+    bfg      = C.border_fg()
+    rst      = C.normal_fg()
+    out      = []
+    entries  = entries_for(player)
+    sl_label = '-- OVERWORLD --'
 
-    def border_h(left, right, fill=S.BOX_H):
-        return bfg + left + fill * iw + right + rst
-
-    # ── Top border ────────────────────────────────────────────────────────────
-    out.append(border_h(S.BOX_TL, S.BOX_TR))
-
-    # ── Status bar ────────────────────────────────────────────────────────────
-    full_h       = player.hp // 2
-    empty_h      = player.max_hp // 2 - full_h
-    hearts_plain = S.HEART_FULL * full_h + S.HEART_EMPTY * empty_h
-    hearts_col   = ((C.heart_full()  + S.HEART_FULL  + rst) * full_h +
-                    (C.heart_empty() + S.HEART_EMPTY + rst) * empty_h)
-    sl_label     = '-- OVERWORLD --'
-    name_tag     = '⌨  <' + player.name + '>'
-    left_cols    = len('Vimny  ') + len(name_tag) + 1 + len('  ') + len(hearts_plain) + len('  ')
-    sl_start     = (iw - len(sl_label)) // 2
-    mid_gap      = max(1, sl_start - left_cols)
-    right_pad    = max(0, iw - left_cols - mid_gap - len(sl_label))
-    out.append(bfg + S.BOX_V + rst +
-               C.normal_fg() + 'Vimny  ' + name_tag + rst +
-               '  ' + hearts_col + '  ' +
-               ' ' * mid_gap +
-               C.mode_normal() + sl_label + rst +
-               ' ' * right_pad +
-               bfg + S.BOX_V + rst)
-
-    # ── Separator ─────────────────────────────────────────────────────────────
-    out.append(border_h(S.BOX_LT, S.BOX_RT))
+    # ── Top border / status bar / separator ────────────────────────────────────
+    out.append(NC.border_h(iw, bfg, rst, S.BOX_TL, S.BOX_TR))
+    out.append(NC.status_bar(iw, bfg, rst, player, sl_label))
+    out.append(NC.border_h(iw, bfg, rst, S.BOX_LT, S.BOX_RT))
 
     game_h = term.height - 5
 
@@ -64,24 +41,9 @@ def render_parent_dir(
     enfc = C.entry_fg()
 
     def _row(is_cursor, vis, colored):
-        if is_cursor:
-            return (bfg + S.BOX_V + rst +
-                    sb + colored + rst + sb +
-                    ' ' * max(0, iw - vis) + rst +
-                    bfg + S.BOX_V + rst)
-        return (bfg + S.BOX_V + rst +
-                colored +
-                ' ' * max(0, iw - vis) +
-                bfg + S.BOX_V + rst)
+        return NC.listing_row(iw, bfg, rst, sb, is_cursor, vis, colored)
 
-    def _hdr(plain, colored=None):
-        pad = max(0, iw - len(plain))
-        return (bfg + S.BOX_V + rst +
-                (dfc + plain if colored is None else colored) + rst +
-                ' ' * pad + bfg + S.BOX_V + rst)
-
-    def _div():
-        return _hdr('" ' + '=' * (iw - 2))
+    _hdr, _div = NC.header_fns(iw, bfg, rst, dfc)
 
     ver    = '(netrw v13ny)'
     ndl    = '" Netrw Directory Listing'
@@ -117,27 +79,10 @@ def render_parent_dir(
     # ── Empty rows ────────────────────────────────────────────────────────────
     rows_used = len(hdr_rows) + 2 + len(entries)
     for _ in range(max(0, game_h - rows_used)):
-        out.append(bfg + S.BOX_V + rst + ' ' * iw + bfg + S.BOX_V + rst)
+        out.append(NC.empty_row(iw, bfg, rst))
 
-    # ── Statusline / command line ─────────────────────────────────────────────
-    sl_w  = iw
-
-    if cmd_line is not None:
-        cmd_text = ':' + cmd_line
-        sl_pad   = max(0, sl_w - len(cmd_text))
-        out.append(bfg + S.BOX_V + rst +
-                   C.mode_command() + cmd_text +
-                   rst + ' ' * sl_pad +
-                   bfg + S.BOX_V + rst)
-    else:
-        sl_right = f'{cursor_row + 1}/{len(entries) + 2} '
-        sl_mid   = max(0, sl_w - len(sl_label) - 2 - len(sl_right))
-        out.append(bfg + S.BOX_V + rst +
-                   C.mode_normal() + ' ' + sl_label + ' ' +
-                   rst + ' ' * sl_mid + sl_right +
-                   bfg + S.BOX_V + rst)
-
-    # ── Bottom border ─────────────────────────────────────────────────────────
-    out.append(border_h(S.BOX_BL, S.BOX_BR))
+    # ── Statusline / command line / bottom border ──────────────────────────────
+    out.append(NC.bottom_statusline(iw, bfg, rst, sl_label, cursor_row, len(entries) + 2, cmd_line))
+    out.append(NC.border_h(iw, bfg, rst, S.BOX_BL, S.BOX_BR))
 
     print(term.home + term.clear + '\n'.join(out), end='', flush=True)

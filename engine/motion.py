@@ -19,58 +19,45 @@ def move_player(player, dr, dc, room):
     return True
 
 
-def _fog_unreachable(room, start_r: int, start_c: int) -> None:
-    """Initialise room.fog_cells: all floor/corridor cells not visible from start.
+_FOG_BLOCK_KINDS = ('door', 'locked_door', 'seal_door', 'boss_seal')
+_FOGGABLE_CELLS  = (CellType.FLOOR, CellType.CORRIDOR, CellType.WATER)
 
-    Visibility is blocked at door and locked_door entities — BFS includes the
-    door cell itself (it's visible) but does not expand through it.
-    """
-    foggable: set = set()
-    for r in range(room.rows):
-        for c in range(room.cols):
-            if room.cells[r][c] in (CellType.FLOOR, CellType.CORRIDOR, CellType.WATER):
-                foggable.add((r, c))
 
-    reachable: set = set()
+def _flood_reachable(room, start_r: int, start_c: int) -> set:
+    """BFS flood of fog-visible cells (FLOOR/CORRIDOR/WATER) from a start cell.
+    A closed door entity blocks the spread — its own cell is reached (visible)
+    but the flood does not expand through it. Returns the reachable (r, c) set."""
+    reachable = {(start_r, start_c)}
     q = deque([(start_r, start_c)])
-    reachable.add((start_r, start_c))
     while q:
         r, c = q.popleft()
         ent = room.entity_at(r, c)
-        if ent and ent.kind in ('door', 'locked_door', 'seal_door', 'boss_seal'):
+        if ent and ent.kind in _FOG_BLOCK_KINDS:
             continue
         for dr, dc in ((-1, 0), (1, 0), (0, -1), (0, 1)):
-            nb = (r + dr, c + dc)
-            if nb not in reachable and nb in foggable:
-                reachable.add(nb)
-                q.append(nb)
+            nr, nc = r + dr, c + dc
+            if (nr, nc) in reachable:
+                continue
+            if (0 <= nr < room.rows and 0 <= nc < room.cols
+                    and room.cells[nr][nc] in _FOGGABLE_CELLS):
+                reachable.add((nr, nc))
+                q.append((nr, nc))
+    return reachable
 
-    room.fog_cells = foggable - reachable
+
+def _fog_unreachable(room, start_r: int, start_c: int) -> None:
+    """Initialise room.fog_cells: all floor/corridor/water cells not visible
+    from start (visibility blocked at closed doors; see _flood_reachable)."""
+    foggable = {(r, c) for r in range(room.rows) for c in range(room.cols)
+                if room.cells[r][c] in _FOGGABLE_CELLS}
+    room.fog_cells = foggable - _flood_reachable(room, start_r, start_c)
 
 
 def _reveal_from(room, player_r: int, player_c: int) -> None:
     """After a door opens, remove all cells now visible from player from fog_cells."""
     if not room.fog_cells:
         return
-
-    reachable: set = set()
-    q = deque([(player_r, player_c)])
-    reachable.add((player_r, player_c))
-    while q:
-        r, c = q.popleft()
-        ent = room.entity_at(r, c)
-        if ent and ent.kind in ('door', 'locked_door', 'seal_door', 'boss_seal'):
-            continue
-        for dr, dc in ((-1, 0), (1, 0), (0, -1), (0, 1)):
-            nr, nc = r + dr, c + dc
-            if not (0 <= nr < room.rows and 0 <= nc < room.cols):
-                continue
-            if (nr, nc) not in reachable:
-                if room.cells[nr][nc] in (CellType.FLOOR, CellType.CORRIDOR, CellType.WATER):
-                    reachable.add((nr, nc))
-                    q.append((nr, nc))
-
-    room.fog_cells -= reachable
+    room.fog_cells -= _flood_reachable(room, player_r, player_c)
 
 
 def _cell_char(room, r: int, c: int) -> str:

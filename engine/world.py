@@ -149,6 +149,15 @@ class Room:
         self._entity_map.pop((e.row, e.col), None)
         e.alive = False
 
+    def _on_entity_destroyed(self, e: Entity) -> None:
+        """Clear a landmark position when its marker entity is destroyed by an
+        editing op (reflow drown, x/dd cut, range delete): the exit marker frees
+        exit_pos; the entry marker resets spawn_pos to the default (1, 1)."""
+        if e.kind == 'exit':
+            self.exit_pos = None
+        elif e.kind == 'entry_marker':
+            self.spawn_pos = (1, 1)
+
     def move_entity(self, e: Entity, new_r: int, new_c: int) -> None:
         """Relocate an entity and keep the spatial index consistent."""
         self._entity_map.pop((e.row, e.col), None)
@@ -178,9 +187,6 @@ class Room:
                 self._char_run_rows.discard(ru.row)
 
     # ── Lookup methods (O(1) with indexes built) ───────────────────────────────
-
-    def cell(self, r: int, c: int) -> CellType:
-        return self.cells[r][c]
 
     def is_passable(self, r: int, c: int) -> bool:
         if r < 0 or r >= self.rows or c < 0 or c >= self.cols:

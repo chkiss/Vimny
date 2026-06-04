@@ -4,7 +4,7 @@ import heapq, math, os, random, unicodedata
 from collections import deque
 from engine.world import Dungeon, Room, RoomType, CellType, CharRun, Entity
 from engine.motion import _fog_unreachable, _cell_char
-from generation.room_gen import make_room
+from generation.room_gen import make_room, RUNE_CHAR as _RUNE_CHAR
 
 _DIR_CHAR = {(-1, 0): 'k', (1, 0): 'j', (0, -1): 'h', (0, 1): 'l'}
 
@@ -51,18 +51,17 @@ LEVEL_0_PLAN = [
 
 _RUNE_KINDS      = ['ancient', 'verdant', 'void', 'ember']
 _WORD_RUNE_KINDS = ['ancient', 'verdant', 'ember']   # non-void only
-_RUNE_CHAR = {
-    'ancient': '∘',
-    'verdant': '·',
-    'void':    '○',
-    'ember':   '⊙',
-}
+# Rune glyphs come from generation/room_gen.RUNE_CHAR (imported above) — the
+# single source of truth; the kind LISTS stay here (their order seeds rng.choice).
+
+_RUNE_MIN_LEN = 1     # normalized rune length range, identical for every kind
+_RUNE_MAX_LEN = 7
+
 
 def _make_rune_syms(rng, kind: str) -> tuple:
-    max_len = 2 if kind == 'void' else 7
-    min_len = 1 if kind == 'verdant' else 2
-    ch = _RUNE_CHAR[kind]
-    return tuple(ch for _ in range(rng.randint(min_len,max_len)))
+    """A rune run of a normalized random length (1.._RUNE_MAX_LEN) — the same rule
+    for every kind (void included)."""
+    return (_RUNE_CHAR[kind],) * rng.randint(_RUNE_MIN_LEN, _RUNE_MAX_LEN)
 
 # ── The Rune Halls layout constants ──────────────────────────────────────────────────
 _RUNE_HALLS_CORR_TOP_ROWS = (1, 4, 7, 10, 13)  # top row of each of the 5 corridors
@@ -101,29 +100,91 @@ _CHARACTER_CATARACTS_TEXT_C2  = " will be scribed in letters"             # 'w' 
 _CHARACTER_CATARACTS_TEXT_C3A = "so you can jump"                         # Zone A (cols 2-16)
 _CHARACTER_CATARACTS_TEXT_C3B = "quite easily to anything you can type"  # t! lands at col 69 before dynamite at 70
 
-def _place_runes_in_room(composite, rng, col_offset, room_rows, room_cols,
-                          total_rows, density):
-    """Scatter character runs inside one room of the composite grid."""
+def _scatter_row(composite, rng, row, c_start, c_end, kinds, blocked=frozenset()):
+    """Greedily fill columns ``c_start..c_end`` (inclusive) on ``row`` with random
+    character runs — a random kind from ``kinds`` and length 1.._RUNE_MAX_LEN, with
+    exactly one blank column between consecutive runs. The single, normalized
+    scatter primitive (gap = 1, inclusive right edge, no density knob).
+
+    Edge handling:
+      * A run whose natural length would overrun the right edge is clamped to fill
+        the remaining space, or one cell short (leaving a trailing space).
+      * Never two consecutive length-1 runs: after a length-1 run the next run is
+        forced to length ≥ 2. If there isn't room for that at the right edge, we
+        simply stop and leave the trailing cell empty — we never go back and
+        rewrite the penultimate run.
+      * ``blocked`` cells are never overlapped or touched (a placed run keeps a
+        one-cell side buffer); a forced skip past a blocked cell breaks the
+        length-1 chain."""
+    c = c_start
+    prev_len = 0
+    while c <= c_end:
+        avail   = c_end - c + 1
+        min_len = 2 if prev_len == 1 else 1
+        if avail < min_len:
+            break                              # no room for an allowed run → leave trailing space
+        natural = rng.randint(min_len, _RUNE_MAX_LEN)
+        kind    = rng.choice(kinds)
+        if natural <= avail:
+            width = natural
+        else:                                  # clamp: fill to the edge, or one short
+            width = max(min_len, avail - rng.randint(0, 1))
+        if blocked and any((row, cc) in blocked for cc in range(c - 1, c + width + 1)):
+            c += 1
+            prev_len = 0                       # a forced gap breaks the consecutive-run chain
+            continue
+        composite.char_runs.append(
+            CharRun(row=row, col=c, symbols=(_RUNE_CHAR[kind],) * width, kind=kind))
+        prev_len = width
+        c += width + 1                         # exactly one blank column between runs
+
+
+def _place_runes_in_room(composite, rng, col_offset, room_rows, room_cols, total_rows,
+                         kinds=_RUNE_KINDS):
+    """Greedily fill every interior row of one composite-grid room with character runs.
+    ``kinds`` defaults to the full set (incl. void); pass the void-free word set for
+    rooms that have no path-carving / passability retry of their own."""
     row_offset = (total_rows - room_rows) // 2
     col_end = col_offset + room_cols - 2
     for r in range(row_offset + 1, row_offset + room_rows - 1):
-        c = col_offset + 2
-        while c < col_end:
-            if rng.random() < density:
-                kind = rng.choice(_RUNE_KINDS)
-                placed = False
-                for _ in range(2):  # one retry for long characters at end
-                    syms = _make_rune_syms(rng, kind)
-                    width = len(syms)
-                    if c + width <= col_end:
-                        composite.char_runs.append(
-                            CharRun(row=r, col=c, symbols=syms, kind=kind))
-                        c += width + rng.randint(1, 3)
-                        placed = True
-                        break
-                if placed:
-                    continue
-            c += 1
+        _scatter_row(composite, rng, r, col_offset + 2, col_end, kinds)
+
+
+def _carve_void_path(composite, protected=frozenset()):
+    """Guarantee an entry→exit route through a void-packed room: BFS a floor path
+    (cells are passable terrain; void is a glyph overlay, so it doesn't block the
+    BFS) while routing AROUND any ``protected`` cells, then delete every void run
+    lying on that route. ``protected`` void runs (e.g. hard-coded guards) are kept
+    and steered around. Returns True if a route was secured."""
+    entry, goal = composite.spawn_pos, composite.exit_pos
+    prev = {entry: None}
+    q = deque([entry])
+    while q:
+        cur = q.popleft()
+        if cur == goal:
+            break
+        r, c = cur
+        for dr, dc in ((-1, 0), (1, 0), (0, -1), (0, 1)):
+            nb = (r + dr, c + dc)
+            if nb in prev or nb in protected:
+                continue
+            nr, nc = nb
+            if 0 <= nr < composite.rows and 0 <= nc < composite.cols \
+                    and composite.is_passable(nr, nc):
+                prev[nb] = cur
+                q.append(nb)
+    if goal not in prev:
+        return False
+    route, n = set(), goal
+    while n is not None:
+        route.add(n)
+        n = prev[n]
+    composite.char_runs = [
+        ru for ru in composite.char_runs
+        if not (ru.kind == 'void'
+                and any((ru.row, ru.col + i) in route for i in range(len(ru.symbols))))
+    ]
+    return True
 
 
 def _bfs_par(composite, return_path: bool = False):
@@ -342,7 +403,7 @@ def build_dungeon_first_cave(seed: int) -> Dungeon:
     # Must include the adjacent room walls (cols_l-1 and offsets[i+1]) so the
     # corridor is contiguous with each room's interior floor.
     for i in range(len(plan) - 1):
-        _, rows_l, cols_l = plan[i]
+        _, _, cols_l = plan[i]
         left_right_edge = offsets[i] + cols_l - 1   # right wall of left room
         right_left_edge = offsets[i + 1]             # left wall of right room
         mid = total_rows // 2
@@ -369,46 +430,44 @@ def build_dungeon_first_cave(seed: int) -> Dungeon:
     composite.exit_pos = (1, ex_c)
     composite.entities.append(Entity(kind='exit', row=1, col=ex_c))
 
-    # Place character runs in all three rooms — no safe rows, characters can appear
-    # anywhere including rows 4-5 (the corridor band).  Par is computed by BFS
-    # after placement.  If the characters block every path, retry with a new sub-seed
-    # (up to 20 attempts).
-    densities = {0: 0.20, 1: 0.28, 2: 0.20}
-    for attempt in range(20):
-        composite.char_runs.clear()
-        rune_rng = random.Random(rng.randint(0, 2**31))
-        for i, (_, room_rows, room_cols) in enumerate(plan):
-            _place_runes_in_room(composite, rune_rng, offsets[i],
-                                 room_rows, room_cols, total_rows, densities[i])
+    # Greedily fill all three rooms (void runes included), then guarantee a route.
+    composite.char_runs.clear()
+    rune_rng = random.Random(rng.randint(0, 2**31))
+    for i, (_, room_rows, room_cols) in enumerate(plan):
+        _place_runes_in_room(composite, rune_rng, offsets[i],
+                             room_rows, room_cols, total_rows)
 
-        # Hard-coded void guards: block (2, ex_c) and (3, ex_c) so the player
-        # cannot walk straight up from the corridor to the exit.  They must go
-        # right into Room 2, up to row 1, then press h to reach the exit.
-        # Remove any random character that would shadow these hard-coded voids.
-        for void_row in (2, 3):
-            composite.char_runs = [
-                ru for ru in composite.char_runs
-                if not (ru.row == void_row
-                        and ru.col <= ex_c < ru.col + len(ru.symbols))
-            ]
-        composite.char_runs.append(CharRun(row=2, col=ex_c, symbols=('○',), kind='void'))
-        composite.char_runs.append(CharRun(row=3, col=ex_c, symbols=('○',), kind='void'))
-
-        # Never leave a void rune sitting on the entry or exit itself.
-        entry_r, entry_c = composite.spawn_pos
-        exit_r,  exit_c  = composite.exit_pos
+    # Hard-coded void guards: block (2, ex_c) and (3, ex_c) so the player cannot
+    # walk straight up from the corridor to the exit.  They must go right into
+    # Room 2, up to row 1, then press h to reach the exit.  Remove any random
+    # character that would shadow these hard-coded voids.
+    for void_row in (2, 3):
         composite.char_runs = [
             ru for ru in composite.char_runs
-            if ru.kind != 'void' or not any(
-                (ru.row == r and ru.col <= c < ru.col + len(ru.symbols))
-                for r, c in ((entry_r, entry_c), (exit_r, exit_c))
-            )
+            if not (ru.row == void_row
+                    and ru.col <= ex_c < ru.col + len(ru.symbols))
         ]
+    composite.char_runs.append(CharRun(row=2, col=ex_c, symbols=('○',), kind='void'))
+    composite.char_runs.append(CharRun(row=3, col=ex_c, symbols=('○',), kind='void'))
 
-        par, path = _bfs_par(composite, return_path=True)
-        if par is not None:
-            break
-    else:
+    # Never leave a void rune sitting on the entry or exit itself.
+    entry_r, entry_c = composite.spawn_pos
+    exit_r,  exit_c  = composite.exit_pos
+    composite.char_runs = [
+        ru for ru in composite.char_runs
+        if ru.kind != 'void' or not any(
+            (ru.row == r and ru.col <= c < ru.col + len(ru.symbols))
+            for r, c in ((entry_r, entry_c), (exit_r, exit_c))
+        )
+    ]
+
+    # The greedy fill packs the cave with void; clear void off one floor route to
+    # the exit (steered around the row-2/3 guards so the forced detour survives),
+    # guaranteeing the level is solvable.
+    _carve_void_path(composite, protected={(2, ex_c), (3, ex_c)})
+
+    par, path = _bfs_par(composite, return_path=True)
+    if par is None:
         par, path = 100, ''
 
     # Budget: ceil(par × 1.4) per spec formula.
@@ -440,20 +499,25 @@ _LINE_HALLS_C_FIRST_RUNE = (_LINE_HALLS_C_ROW, 10)        # ^ lands here…
 _LINE_HALLS_EXIT = (_LINE_HALLS_C_ROW, 11)                # …then one l onto the exit
 
 def _tile_line_hall(rng, row: int, c0: int, c1: int, first_non_void: bool = True) -> list:
-    """Pack runes left→right across [c0, c1] with random kinds, lengths and 1–3
-    cell gaps (seeded by the dungeon seed, the way the other levels scatter
-    theirs).  The first rune placed is forced non-void: apply_motion ^ halts on
-    the first char_run of ANY kind while the par solver skips void, so a leading
-    void rune would desync them — and the ^ landing must be survivable.  Void
-    runes therefore only sit mid-hall (passed over by the line jumps) or right of
-    the exit, never on a cell a motion lands on."""
-    runs, c, first = [], c0, first_non_void
+    """Pack runes left→right across [c0, c1] with random kinds and lengths 1.._RUNE_MAX_LEN,
+    one blank column between runs — the normalized scatter rule (gap 1, clamp-to-fit,
+    never two consecutive length-1 runs). The first rune placed is forced non-void:
+    apply_motion ^ halts on the first char_run of ANY kind while the par solver skips
+    void, so a leading void rune would desync them. Void runes therefore only sit
+    mid-hall (passed over by the line jumps) or right of the exit."""
+    runs, c, first, prev_len = [], c0, first_non_void, 0
     while c <= c1:
+        avail   = c1 - c + 1
+        min_len = 2 if prev_len == 1 else 1
+        if avail < min_len:
+            break
         kind = rng.choice(_WORD_RUNE_KINDS) if first else rng.choice(_RUNE_KINDS)
         first = False
-        syms = list(_make_rune_syms(rng, kind))[:c1 - c + 1]   # trim a long rune to fit
-        runs.append(CharRun(row=row, col=c, symbols=tuple(syms), kind=kind))
-        c += len(syms) + rng.randint(1, 3)
+        natural = rng.randint(min_len, _RUNE_MAX_LEN)
+        width = natural if natural <= avail else max(min_len, avail - rng.randint(0, 1))
+        runs.append(CharRun(row=row, col=c, symbols=(_RUNE_CHAR[kind],) * width, kind=kind))
+        prev_len = width
+        c += width + 1
     return runs
 
 
@@ -636,7 +700,7 @@ def build_dungeon_counting_crypts(seed: int) -> Dungeon:
 
     # Carve corridors at mid rows (5-6)
     for i in range(len(plan) - 1):
-        _, rows_l, cols_l = plan[i]
+        _, _, cols_l = plan[i]
         left_right_edge = offsets[i] + cols_l - 1
         right_left_edge = offsets[i + 1]
         mid = total_rows // 2
@@ -666,13 +730,13 @@ def build_dungeon_counting_crypts(seed: int) -> Dungeon:
     ]
 
     # Decorative characters in entry and exit rooms; retry if any void blocks path.
-    for attempt in range(20):
+    for _ in range(20):
         composite.char_runs = list(void_wall)
         rune_rng = random.Random(rng.randint(0, 2**31))
         _place_runes_in_room(composite, rune_rng, offsets[0],
-                              plan[0][1], plan[0][2], total_rows, 0.18)
+                              plan[0][1], plan[0][2], total_rows, _WORD_RUNE_KINDS)
         _place_runes_in_room(composite, rune_rng, offsets[2],
-                              plan[2][1], plan[2][2], total_rows, 0.18)
+                              plan[2][1], plan[2][2], total_rows, _WORD_RUNE_KINDS)
 
         # Never place a void rune on the entry or exit cell itself
         entry_r, entry_c = composite.spawn_pos
@@ -718,9 +782,9 @@ def build_dungeon_counting_crypts(seed: int) -> Dungeon:
 # ── The Rune Halls helpers ───────────────────────────────────────────────────────────
 
 def _make_rune_corridor(composite, rng, row_top,
-                        col_start=None, col_end=None, density=0.65,
+                        col_start=None, col_end=None,
                         blocked: frozenset = frozenset()):
-    """Carve a 2-row CORRIDOR strip and fill it densely with non-void character runs.
+    """Carve a 2-row CORRIDOR strip and greedily fill it with non-void character runs.
 
     Leaves a 1-cell buffer at each end so characters reach the turn-room entrance.
     blocked: set of (row, col) cells that random characters must not overlap or
@@ -736,25 +800,8 @@ def _make_rune_corridor(composite, rng, row_top,
         composite.cells[row_top + 1][c] = CellType.CORRIDOR
 
     for row in (row_top, row_top + 1):
-        c = col_start + 1
-        while c <= col_end - 1:
-            if rng.random() < density:
-                kind  = rng.choice(_WORD_RUNE_KINDS)
-                placed = False
-                for _ in range(2):  # one retry for long characters at end
-                    syms  = _make_rune_syms(rng, kind)
-                    width = len(syms)
-                    if c + width - 1 <= col_end:
-                        if not any((row, cc) in blocked
-                                   for cc in range(c - 1, c + width + 1)):
-                            composite.char_runs.append(
-                                CharRun(row=row, col=c, symbols=syms, kind=kind))
-                            c += width + rng.randint(1, 2)
-                            placed = True
-                            break
-                if placed:
-                    continue
-            c += 1
+        _scatter_row(composite, rng, row, col_start + 1, col_end - 1,
+                     _WORD_RUNE_KINDS, blocked=blocked)
 
 
 def _dijkstra_par_wbe(composite, return_path: bool = False):
@@ -892,23 +939,12 @@ def _dijkstra_par_wbe(composite, return_path: bool = False):
 
 
 def _cataracts_place_zone(composite, rng, rows, col_start, col_end,
-                   density=0.55, blocked=frozenset()):
-    """Fill a character zone across the given rows between col_start and col_end."""
+                          blocked=frozenset()):
+    """Greedily fill character zones (each of ``rows`` between ``col_start`` and
+    ``col_end``) for the Cataracts — non-void word runes (ancient/verdant/ember)."""
     for r in rows:
-        c = col_start
-        while c <= col_end:
-            if rng.random() < density:
-                kind = rng.choice(('ancient', 'verdant'))
-                syms = _make_rune_syms(rng, kind)
-                w    = len(syms)
-                if c + w - 1 <= col_end:
-                    if not any((r, cc) in blocked
-                               for cc in range(c - 1, c + w + 1)):
-                        composite.char_runs.append(
-                            CharRun(row=r, col=c, symbols=syms, kind=kind))
-                        c += w + rng.randint(1, 2)
-                        continue
-            c += 1
+        _scatter_row(composite, rng, r, col_start, col_end, _WORD_RUNE_KINDS,
+                     blocked=blocked)
 
 
 def _dijkstra_par_ftFT(composite, return_path: bool = False):
@@ -1148,7 +1184,7 @@ def build_dungeon_rune_halls(seed: int) -> Dungeon:
         # Anchor character at C5 exit — last symbol (col 44) is the exit cell
         CharRun(row=13, col=42, symbols=('∘', '∘', '∘'), kind='ancient'),
         # Ember at right end of C1 — marks the turn into RT1
-        CharRun(row=1,  col=44, symbols=('◦', '◦', '◦'), kind='ember'),
+        CharRun(row=1,  col=44, symbols=('⊙', '⊙', '⊙'), kind='ember'),
         # Void guards at turn-room entries/exits
         CharRun(row=1,  col=45, symbols=('○', '○'), kind='void'),
         CharRun(row=2,  col=45, symbols=('○', '○'), kind='void'),
@@ -1261,7 +1297,7 @@ def build_dungeon_character_cataracts(seed: int) -> Dungeon:
         # C3 row 7 Zone B: t! lands at col 69 (before dynamite at col 70)
         CharRun(row=7, col=33, symbols=tuple(_CHARACTER_CATARACTS_TEXT_C3B), kind='ember'),
         # C5 exit anchor: last symbol at col 65 so `e` lands on the exit
-        CharRun(row=13, col=64, symbols=('◦', '◦'), kind='ember'),
+        CharRun(row=13, col=64, symbols=('⊙', '⊙'), kind='ember'),
     ]
 
     # ── Fixed entities ────────────────────────────────────────────────────────
@@ -1302,8 +1338,7 @@ def build_dungeon_character_cataracts(seed: int) -> Dungeon:
         _cataracts_place_zone(composite, rng2, (10, 11),  2,  24, blocked=blocked)  # C4 Zone A
         _cataracts_place_zone(composite, rng2, (10, 11), 52,  68, blocked=blocked)  # C4 Zone B
         # C5: dense character corridor for w/b/e practice; chest at col 20, exit anchor at col 64-65
-        _cataracts_place_zone(composite, rng2, (13, 14),  2,  63,
-                        density=0.60, blocked=blocked)
+        _cataracts_place_zone(composite, rng2, (13, 14),  2,  63, blocked=blocked)
 
         composite.rebuild_indexes()
         par, path = _dijkstra_par_ftFT(composite, return_path=True)
@@ -1510,7 +1545,7 @@ def build_dungeon_dummy(seed: int) -> Dungeon:
         CharRun(row=2, col=3,  symbols=('∘',), kind='ancient'),
         CharRun(row=2, col=8,  symbols=('·',), kind='verdant'),
         CharRun(row=2, col=13, symbols=('○',), kind='void'),
-        CharRun(row=2, col=17, symbols=('◦',), kind='ember'),
+        CharRun(row=2, col=17, symbols=('⊙',), kind='ember'),
         # ── Reflow pilot (engine/reflow.py): on a ledge row, editing flows and
         # content falls against the FIXED brinks — walls and void runes alike.
         # Three demos of the one law:
@@ -4654,7 +4689,7 @@ _SENTENCE_CORRIDOR_SENTENCES = [
 
 
 def _par_runic_archives(composite, return_path=False,
-                      disable_brace=False, disable_paren=False):
+                      disable_brace=False):
     """Minimum-keystroke Dijkstra for Paragraph Jumps (The Runic Archives).
 
     State = (row, col, has_key, door_open) where:
@@ -4662,7 +4697,6 @@ def _par_runic_archives(composite, return_path=False,
       door_open: 0 = locked_door blocking, 1 = door removed
 
     Available motions: hjkl, count-hjkl, 0, $, { } (unless disable_brace), x, p.
-    disable_paren accepted but ignored (no sentence jumps in this level).
     """
     ROWS, COLS = composite.rows, composite.cols
     KR, KC = _RUNIC_ARCHIVES_KEY_POS

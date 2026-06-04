@@ -77,35 +77,23 @@ def apply_set(number_mode: str, arg: str) -> tuple[str, str]:
     if arg in ('all&', 'all&vi', 'all&vim'):
         return 'none', ':set all&'
 
-    # trailing modifier: ? (query), ! (toggle), & (reset to default)
-    suffix = ''
-    if arg and arg[-1] in '?!&':
-        suffix, arg = arg[-1], arg[:-1]
-
-    # prefixes: inv (invert), no (turn off)
-    invert = off = False
-    if not suffix:
-        if arg.startswith('inv'):
-            invert, arg = True, arg[3:]
-        elif arg.startswith('no'):
-            off, arg = True, arg[2:]
-
-    opt = _ALIASES.get(arg)
+    # Reuse the shared affix grammar (no/inv/!/&/? → core + action).
+    core, action = parse_modifier(arg)
+    opt = _ALIASES.get(core)
     if opt is None:
-        full = arg + suffix if suffix else (('inv' if invert else 'no' if off else '') + arg)
-        return number_mode, f'Unknown option: :set {full}'
+        return number_mode, f'Unknown option: :set {arg}'
 
-    if suffix == '?':
+    if action == 'query':
         return number_mode, _echo(number_mode, opt)
-    if suffix == '&':
+    if action == 'reset':
         new = _set_on(number_mode, opt, _DEFAULT_ON[opt])
         return new, f':set {opt}&'
-    if suffix == '!' or invert:
+    if action == 'toggle':
         new = _set_on(number_mode, opt, not _is_on(number_mode, opt))
         return new, _echo(new, opt)
-    if off:
+    if action == 'off':
         new = _set_on(number_mode, opt, False)
         return new, f':set no{opt}'
-    # plain :set {opt} — turn it on
+    # action == 'on' — plain :set {opt}
     new = _set_on(number_mode, opt, True)
     return new, f':set {opt}'

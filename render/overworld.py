@@ -11,6 +11,7 @@ from blessed import Terminal
 from engine.player import Player
 import render.colors as C
 import render.symbols as S
+import render.netrw_chrome as NC
 from content.levels import is_unlocked, level_type, key_for_slug
 from render.utils import inner_w as _iw, subtree_lines, tree_glyph
 
@@ -63,35 +64,12 @@ def render_overworld(term: Terminal, player: Player, progress: dict,
     bfg = C.border_fg()
     rst = C.normal_fg()
     out = []
+    ow_label = '-- OVERWORLD --'
 
-    def border_h(left, right, fill=S.BOX_H):
-        return bfg + left + fill * iw + right + rst
-
-    # ── Row 0: top border ─────────────────────────────────────────────────────
-    out.append(border_h(S.BOX_TL, S.BOX_TR))
-
-    # ── Row 1: status bar ──────────────────────────────────────────────────────
-    full_h        = player.hp // 2
-    empty_h       = player.max_hp // 2 - full_h
-    hearts_plain  = S.HEART_FULL * full_h + S.HEART_EMPTY * empty_h
-    hearts_col    = ((C.heart_full()  + S.HEART_FULL  + rst) * full_h +
-                     (C.heart_empty() + S.HEART_EMPTY + rst) * empty_h)
-    ow_label      = '-- OVERWORLD --'
-    name_tag      = '⌨  <' + player.name + '>'
-    left_cols     = len('Vimny  ') + len(name_tag) + 1 + len('  ') + len(hearts_plain) + len('  ')
-    ow_start      = (iw - len(ow_label)) // 2
-    mid_gap       = max(1, ow_start - left_cols)
-    right_pad     = max(0, iw - left_cols - mid_gap - len(ow_label))
-    out.append(bfg + S.BOX_V + rst +
-               C.normal_fg() + 'Vimny  ' + name_tag + rst +
-               '  ' + hearts_col + '  ' +
-               ' ' * mid_gap +
-               C.mode_normal() + ow_label + rst +
-               ' ' * right_pad +
-               bfg + S.BOX_V + rst)
-
-    # ── Row 2: separator ───────────────────────────────────────────────────────
-    out.append(border_h(S.BOX_LT, S.BOX_RT))
+    # ── Rows 0–2: top border / status bar / separator ──────────────────────────
+    out.append(NC.border_h(iw, bfg, rst, S.BOX_TL, S.BOX_TR))
+    out.append(NC.status_bar(iw, bfg, rst, player, ow_label))
+    out.append(NC.border_h(iw, bfg, rst, S.BOX_LT, S.BOX_RT))
 
     # ── Line area ──────────────────────────────────────────────────────────────
     game_h = term.height - 5                  # rows available for the buffer
@@ -220,7 +198,7 @@ def render_overworld(term: Terminal, player: Player, progress: dict,
     for k, line in enumerate(vis_lines):
         out.append(_row(scroll_offset + k, line))
     for _ in range(max(0, avail - len(vis_lines))):
-        out.append(bfg + S.BOX_V + rst + ' ' * iw + bfg + S.BOX_V + rst)
+        out.append(NC.empty_row(iw, bfg, rst))
 
     # ── Vim statusline / command line ──────────────────────────────────────────
     def _bar(prefix_col, text):
@@ -241,21 +219,13 @@ def render_overworld(term: Terminal, player: Player, progress: dict,
     elif player.error:
         out.append(_bar(C.error_bg() + C.error_fg(), player.error))
     elif cmd_line is not None:
-        text = ':' + cmd_line
-        out.append(bfg + S.BOX_V + rst + C.mode_command() + text + rst +
-                   ' ' * max(0, iw - len(text)) + bfg + S.BOX_V + rst)
-        cur_y, cur_x = sl_y, 1 + len(text)
+        out.append(NC.bottom_statusline(iw, bfg, rst, ow_label, cursor, len(lines), cmd_line))
+        cur_y, cur_x = sl_y, 1 + len(':' + cmd_line)
     else:
-        sl_label = '-- OVERWORLD --'
-        sl_right = f'{cursor + 1}/{len(lines)} '
-        sl_mid   = max(0, iw - len(sl_label) - 2 - len(sl_right))
-        out.append(bfg + S.BOX_V + rst +
-                   C.mode_normal() + ' ' + sl_label + ' ' +
-                   rst + ' ' * sl_mid + sl_right +
-                   bfg + S.BOX_V + rst)
+        out.append(NC.bottom_statusline(iw, bfg, rst, ow_label, cursor, len(lines), None))
 
     # ── Bottom border ──────────────────────────────────────────────────────────
-    out.append(border_h(S.BOX_BL, S.BOX_BR))
+    out.append(NC.border_h(iw, bfg, rst, S.BOX_BL, S.BOX_BR))
 
     print(term.home + pad + ('\n' + pad).join(out), end='', flush=True)
     return scroll_offset, cur_y, cur_x + len(pad)

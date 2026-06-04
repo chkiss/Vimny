@@ -6,7 +6,7 @@ import pytest
 from engine.world import Room, RoomType, CellType, Entity
 from engine.player import Player
 from main import (
-    _enemy_tick, _try_warden_move, _do_warden_move,
+    _enemy_tick, _do_warden_move,
     _remove_warden_shields, _on_kill, _spawn_goblin,
 )
 
@@ -76,45 +76,6 @@ def test_dead_goblin_does_not_attack_via_enemy_tick():
     assert player.hp == before_hp, (
         "_enemy_tick must not deal damage via dead entities"
     )
-
-
-# ── Warden movement triggers ──────────────────────────────────────────────────
-
-def test_warden_no_move_when_second_spawn_still_alive():
-    """Killing one spawn must NOT trigger warden movement when another lives."""
-    room = _combat_room()
-    player = Player(row=4, col=1)
-    warden = Entity(kind='warden', row=4, col=25, max_hp=5, ai='')
-    room.add_entity(warden)
-    g1 = Entity(kind='goblin', row=4, col=18, max_hp=1, ai='chase',
-                summoner_uid=warden.uid)
-    g2 = Entity(kind='goblin', row=4, col=20, max_hp=1, ai='chase',
-                summoner_uid=warden.uid)
-    room.add_entity(g1)
-    room.add_entity(g2)
-
-    room.kill_entity(g1)
-    msg = _try_warden_move(room, g1, player)
-
-    assert msg == '', f"warden must not move while g2 still lives; got {msg!r}"
-    assert warden.row == 4
-
-
-def test_warden_moves_on_last_spawn_death():
-    """Killing the last spawn must trigger warden movement."""
-    room = _combat_room()
-    player = Player(row=4, col=1)
-    warden = Entity(kind='warden', row=4, col=25, max_hp=5, ai='')
-    room.add_entity(warden)
-    goblin = Entity(kind='goblin', row=4, col=20, max_hp=1, ai='chase',
-                    summoner_uid=warden.uid)
-    room.add_entity(goblin)
-
-    room.kill_entity(goblin)
-    msg = _try_warden_move(room, goblin, player)
-
-    assert msg == 'The Warden leaps!'
-    assert abs(warden.row - 4) >= 2, "Warden must leap at least 2 rows"
 
 
 # ── _on_kill key drops ────────────────────────────────────────────────────────

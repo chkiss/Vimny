@@ -212,7 +212,7 @@ def parse(buf: str, mode: Mode) -> tuple[dict | None, str]:
     # Ctrl-o / Ctrl-i (Tab) — jump list back / forward
     if ch == '\x0f':  # Ctrl-O
         return {'type': 'jump', 'dir': 'back', 'count': count_n}, buf[i+1:]
-    if ch == '\t' or ch == '\x09':  # Ctrl-I / Tab
+    if ch == '\t':  # Ctrl-I / Tab
         return {'type': 'jump', 'dir': 'forward', 'count': count_n}, buf[i+1:]
 
     # : — enter command mode

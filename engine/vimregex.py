@@ -51,15 +51,8 @@ class VimPattern:
 
     def finditer(self, s: str):
         """Yield (start, end) effective spans of non-overlapping matches."""
-        pos = 0
-        while pos <= len(s):
-            m = self._re.search(s, pos)
-            if not m:
-                return
-            start = m.start('_zs') if self.has_zs else m.start()
-            end   = m.start('_ze') if self.has_ze else m.end()
-            yield start, end
-            pos = m.end() + 1 if m.end() == m.start() else m.end()
+        for m in self.match_iter(s):
+            yield self.eff_span(m)
 
     def first_in(self, s: str):
         for span in self.finditer(s):

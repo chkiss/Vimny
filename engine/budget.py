@@ -20,9 +20,3 @@ class Budget:
     @property
     def is_over(self) -> bool:
         return self.spent > self.total
-
-    def status_color(self) -> str:
-        r = self.remaining
-        if r <= 1:   return 'crit'
-        if r <= 3:   return 'low'
-        return 'ok'

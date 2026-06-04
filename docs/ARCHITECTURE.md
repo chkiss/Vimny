@@ -19,6 +19,7 @@ Admin features: `:edit` enters editor mode on any dungeon; `:save <name>` writes
 | `content/levels.py` | Level defs; identity = immutable `slug`, `display` = cosmetic number; `known_commands(slug)` — **canonical curriculum source** |
 | `LEVELS_PLAN.md` (root) | Curriculum plan; **Part 7 table is GENERATED** from `content/levels.py` (`content/_gen_curriculum_table.py`); Part 8 = renumbering guide |
 | `render/renderer.py` | Pure read-only view of state (no mutation) |
+| `render/netrw_chrome.py` | Shared netrw chrome (border/status bar/listing row/banner/bottom statusline) used identically by `overworld.py`, `parent_dir.py`, `scroll_library.py` |
 | `render/overworld.py` | netrw overworld buffer (read-only) — `build_lines`, `default_cursor`, `render_overworld` |
 | `save/save_manager.py` | Player progress I/O + layout save (`~/.Vimny/layouts/`) |
 | `render/vim_commands.md` | Hint-bar text source — token→(keys, desc), parsed by `render/hint_bar.py` |
@@ -26,6 +27,12 @@ Admin features: `:edit` enters editor mode on any dungeon; `:save <name>` writes
 | `art/vocab_plain.txt` | Vocabulary source: typable-only tokens (no internal `w` splits); use for non-word-boundary levels |
 | `art/vocab_mixed.txt` | Vocabulary source: tokens with embedded Unicode punctuation; creates `w`/`b`/`e` boundaries but not `W`/`B`/`E`; use for levels teaching small-word vs WORD |
 | `art/_gen_runes.py` | Generator for both vocab files — edit this, not the txt files directly |
+
+## Rune scatter (generation)
+- **Glyph source of truth**: `generation/room_gen.RUNE_CHAR` (kind → glyph); `dungeon_gen` imports it as `_RUNE_CHAR`. Rune run length is normalized to **1.._RUNE_MAX_LEN (=7) for every kind** via `_make_rune_syms`.
+- **`_scatter_row(composite, rng, row, c_start, c_end, kinds, blocked=…)`** is the single scatter primitive: **greedy fill** (no density knob), random kind + length, **exactly one blank column between runs**, inclusive right edge. A run overrunning the edge is **clamped** to fill the remaining space (or one short — trailing space); **never two consecutive length-1 runs** (at the right edge it stops and leaves a trailing space rather than rewriting the penultimate run). Used by `_place_runes_in_room`, `_make_rune_corridor`, `_cataracts_place_zone`; `_tile_line_hall` follows the same rule with a forced non-void first run.
+- **void only where a path is guaranteed**: only `_place_runes_in_room`'s default kind set includes `void`. The first cave greedy-fills with void then calls **`_carve_void_path(composite, protected=…)`** — BFS a floor route (routing around `protected` guard cells) and delete void runs on it — to guarantee solvability. Other scatter zones use the void-free word set (`_WORD_RUNE_KINDS`).
+- **Deliberate non-normalized spacing**: The WORD Forge's `_l7_fill_row` keeps a **2–3 cell gap** on purpose — that spacing is what makes small-word `w` ≡ WORD `W`, which is the level's lesson. Don't normalize it to gap 1.
 
 ## Mixed vocab token rules
 `art/_gen_runes.py` is the source of truth. Rules for mixed tokens:
@@ -41,6 +48,7 @@ Admin features: `:edit` enters editor mode on any dungeon; `:save <name>` writes
 - `Budget.spend(cost)` where `cost = 1` (single step) or `len(str(n))+1` (count-n move).
 - `apply_motion` loops step-by-step; void rune check fires only on final cell (intentional — Vim-faithful).
 - Undo stack entries are either `(row, col, spent)` tuples (movement) or dicts with `entities`/`fog_col` keys (door-open).
+- **Destroying a landmark entity clears its position via `Room._on_entity_destroyed(ent)`** (exit→`exit_pos=None`, entry_marker→`spawn_pos=(1,1)`). Every editing op that removes an entity — reflow drown/`remove_row`, operator `_delete_cols`, editor cut/clear/range-delete — calls it; don't re-inline the `if ent.kind == 'exit'` check.
 - **Terminology — "character"/"CharRun", not "rune".** On-screen characters are `CharRun` objects (`room.char_runs`); in code, comments, and docstrings call them **characters** / **character runs**. Clips key the list under `'char_runs'`; the merge helper is `_merge_adjacent_char_runs`. "rune" is reserved for the THEME only: level names (The Rune Halls, The Runic Archives), the vocab pipeline (`art/_gen_runes.py`, `vocab_*.txt`), wizard poems, and `<kind> rune` type phrases (e.g. "void rune"). Do not use "rune" to mean a generic character or "rune cluster" to mean a word.
 - **Reflow grid (Vim line model), NOT an overlay grid:** editing flows like a real Vim line — insert/`x`/`d`/`s`/paste SHIFT content within the wall-bounded row (blanks are spaces, so a word past a gap is still pushed). Content shoved past a FIXED brink (any wall or void rune) is lost over the brink; water is movable and a wave sweeps any entity it reaches into the void (drown). `r`/`R` overwrite in place (correct Vim) and do not reflow. Charwise paste: `p` inserts after the cursor, `P` before; the cursor lands on the last pasted cell (including a creature — the `x`-attack position). Pasting a key onto a locked door unlocks it and steps the player onto the door (consistent with paste). Reflow is universal — `is_ledge` always True. Hold any new editing command to this model. See `engine/reflow.py`.
 - **Void runes are TEXT, not just terrain:** a `○` is a `CharRun` (kind=`void`) — `/`/`*` search it, `x` deletes it, and `:s` substitutes it. Substituting a void away fills the hole as ordinary text (replacement chars take the line's first non-void kind); an untouched void keeps kind=`void`. The reflow FIXED-brink rule (content shoved into a void falls off) governs only the push/pull editing ops (`i`/`x`/`d`/`p`), NOT the whole-line rewrite of `:s`. Anything drawn with a glyph (words, void runes) is text to `/`/`x`/`:s`; cell-terrain with no glyph (walls, water) is invisible to all three. See `engine/substitute.py` / `engine/search.py`.
@@ -54,6 +62,12 @@ Admin features: `:edit` enters editor mode on any dungeon; `:save <name>` writes
 - File I/O tests: `monkeypatch.setattr('save.save_manager.SAVES_DIR', tmp_path)` to avoid touching `~/.Vimny`.
 - Motion/editor tests: build a minimal `Room` fixture with `rebuild_indexes()` rather than using a full dungeon.
 - Key files: `tests/test_counting_crypts.py` (template for level tests), `engine/motion.py` and `engine/editor.py` (source for motion/editor tests).
+
+## Dead-code detection
+- `python -m pip install vulture` once, then `python -m vulture` (config in `pyproject.toml`).
+- Static analysis is blind to dynamic dispatch, so the config pre-ignores the `getattr`/slug families (`build_dungeon_*`, `_par_*`, color fns discovered by `render/color_palette.py`). A finding there is real.
+- At `min_confidence = 60` it also surfaces *candidates* that need human triage: module-level constant tables (e.g. unused glyphs in `render/symbols.py`) and enum members (`RoomType.SAFE/BOSS`) read only via `S.NAME` attribute access or from tests can be false positives — verify with a `grep` before deleting.
+- Complement with the produce/consume check for entity `kind` strings: a kind consumed (`.kind == 'x'`, `_entity_by_kind.get('x')`) but never produced (`Entity(kind='x')`) is dead dispatch — this is how the orphaned `keystone` mechanism was found.
 
 ## Known bugs
 None currently. Previously known bugs (now fixed):

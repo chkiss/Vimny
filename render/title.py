@@ -9,7 +9,6 @@ import render.symbols as S
 from content.levels import LEVELS
 from render.utils import inner_w as _iw
 
-FRAME_W      = 80
 NAME_MAX     = 20   # max adventurer name length
 _BOX_INNER_W = 48   # inner width of the wizard's quote box
 
@@ -344,8 +343,6 @@ def render_title(term: Terminal, cursor: int, has_save: bool,
             # and right side is coloured per-character
             matches = [i for i, c in enumerate(line) if c in _BOX_CLOSE_CHARS]
             split_idx = max(matches) if matches else -1
-            left  = line[:split_idx + 1] if split_idx >= 0 else ''
-            right = line[split_idx + 1:] if split_idx >= 0 else line
             left  = line[:split_idx + 1]
             right = line[split_idx + 1:]
             # Substitute dynamic quote text into box content lines 6-9

@@ -2,7 +2,7 @@
 import pytest
 from engine.world import Room, RoomType, CellType, Entity
 from engine.player import Player
-from main import _enemy_tick, _try_warden_move, _do_warden_move, _reposition_warden_shield, _on_kill, _remove_warden_shields
+from main import _enemy_tick, _do_warden_move, _reposition_warden_shield, _on_kill, _remove_warden_shields
 
 ROWS, COLS = 7, 30
 
@@ -117,57 +117,6 @@ def _combat_room():
     room.exit_pos = (4, 38)
     room.rebuild_indexes()
     return room
-
-
-def test_warden_moves_on_last_spawn_kill():
-    """Killing the last Warden-spawned goblin triggers Warden row movement."""
-    room   = _combat_room()
-    player = Player(row=4, col=1)
-    warden = Entity(kind='warden', row=4, col=25, max_hp=5, ai='')
-    room.add_entity(warden)
-    goblin = Entity(kind='goblin', row=4, col=20, max_hp=1, ai='chase',
-                    summoner_uid=warden.uid)
-    room.add_entity(goblin)
-
-    room.kill_entity(goblin)  # mirrors game loop: kill before calling _try_warden_move
-    msg = _try_warden_move(room, goblin, player)
-
-    assert msg == 'The Warden leaps!'
-    assert abs(warden.row - 4) >= 2, "Warden must leap at least 2 rows"
-
-
-def test_warden_no_move_when_spawns_remain():
-    """Killing one of two Warden-spawned goblins must NOT trigger movement."""
-    room   = _combat_room()
-    player = Player(row=4, col=1)
-    warden = Entity(kind='warden', row=4, col=25, max_hp=5, ai='')
-    room.add_entity(warden)
-    g1 = Entity(kind='goblin', row=4, col=18, max_hp=1, ai='chase', summoner_uid=warden.uid)
-    g2 = Entity(kind='goblin', row=4, col=20, max_hp=1, ai='chase', summoner_uid=warden.uid)
-    room.add_entity(g1)
-    room.add_entity(g2)
-
-    room.kill_entity(g1)  # g2 still alive
-    msg = _try_warden_move(room, g1, player)
-
-    assert msg == ''
-    assert warden.row == 4
-
-
-def test_warden_no_move_for_non_spawn_goblin():
-    """Killing a goblin that was NOT spawned by a Warden must not trigger movement."""
-    room   = _combat_room()
-    player = Player(row=4, col=1)
-    warden = Entity(kind='warden', row=4, col=25, max_hp=5, ai='')
-    room.add_entity(warden)
-    pre_placed = Entity(kind='goblin', row=4, col=10, max_hp=1, ai='chase')
-    # summoner_uid defaults to 0 — not linked to any Warden
-    room.add_entity(pre_placed)
-
-    msg = _try_warden_move(room, pre_placed, player)
-
-    assert msg == ''
-    assert warden.row == 4
 
 
 def test_shield_repositions_right_when_player_right():

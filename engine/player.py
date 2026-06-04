@@ -38,8 +38,6 @@ class Player:
     wrap: bool = False            # ':set wrap' — soft-wrap a single-line buffer across screen rows (The Archivist's Library). Off by default: only renders on Room.wrap_buffer rooms, which open nowrap.
     hl_suppressed: bool = False   # ':noh' cleared the current highlight (until the next search)
 
-    # command input buffer for gg, f{c}, m{c}, `{c}, '{c}
-    input_buf: str = ''
     # command-mode line
     cmd_line: str = ''
     # statusline error (e.g. E37); cleared on next keypress

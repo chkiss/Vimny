@@ -35,32 +35,37 @@ def _merge_adjacent_char_runs(room, r: int) -> None:
     room.rebuild_indexes()
 
 
+def _split_run_at(room, row: int, col: int):
+    """Remove the single character at (row, col), re-adding the parts of its run
+    on either side as split remnants. Returns the removed one-cell CharRun, or
+    None if no character run covers that cell."""
+    ru = room.char_run_at(row, col)
+    if ru is None:
+        return None
+    idx = col - ru.col
+    room.remove_char_run(ru)
+    if idx > 0:
+        room.add_char_run(CharRun(row=row, col=ru.col,
+                                  symbols=tuple(ru.symbols[:idx]), kind=ru.kind))
+    if idx + 1 < len(ru.symbols):
+        room.add_char_run(CharRun(row=row, col=col + 1,
+                                  symbols=tuple(ru.symbols[idx + 1:]), kind=ru.kind))
+    return CharRun(row=row, col=col, symbols=(ru.symbols[idx],), kind=ru.kind)
+
+
 def _ed_cut(room, r, c):
     """Remove the character/entity/wall at (r, c); return a clip item or None.
 
     For character runs: extracts only the single symbol at column c, leaving
     any remaining symbols as split remnants.
     """
-    ru = room.char_run_at(r, c)
-    if ru:
-        idx = c - ru.col
-        room.remove_char_run(ru)
-        if idx > 0:
-            room.add_char_run(CharRun(row=r, col=ru.col,
-                                      symbols=tuple(ru.symbols[:idx]), kind=ru.kind))
-        if idx + 1 < len(ru.symbols):
-            room.add_char_run(CharRun(row=r, col=c + 1,
-                                      symbols=tuple(ru.symbols[idx + 1:]), kind=ru.kind))
-        return {'type': 'rune',
-                'rune': CharRun(row=r, col=c,
-                                    symbols=(ru.symbols[idx],), kind=ru.kind)}
+    cut = _split_run_at(room, r, c)
+    if cut is not None:
+        return {'type': 'rune', 'rune': cut}
     ent = room.entity_at(r, c)
     if ent:
         room.remove_entity(ent)
-        if ent.kind == 'exit':
-            room.exit_pos = None
-        elif ent.kind == 'entry_marker':
-            room.spawn_pos = (1, 1)
+        room._on_entity_destroyed(ent)
         return {'type': 'entity', 'entity': ent}
     ct = room.cells[r][c]
     if ct in (CellType.WALL, CellType.WATER, CellType.WOOD_WALL):
@@ -151,10 +156,7 @@ def _ed_clear_row(room, r):
     room.entities = [e  for e  in room.entities if not (e.row == r and e.alive)]
     room.rebuild_indexes()
     for e in removed:
-        if e.kind == 'exit':
-            room.exit_pos = None
-        elif e.kind == 'entry_marker':
-            room.spawn_pos = (1, 1)
+        room._on_entity_destroyed(e)
 
 
 def _ed_range_items(room, r1, c1, r2, c2):
@@ -182,10 +184,7 @@ def _ed_delete_range(room, r1, c1, r2, c2):
     room.entities = [e  for e  in room.entities if id(e)  not in ent_ids]
     room.rebuild_indexes()
     for e in removed:
-        if e.kind == 'exit':
-            room.exit_pos = None
-        elif e.kind == 'entry_marker':
-            room.spawn_pos = (1, 1)
+        room._on_entity_destroyed(e)
     return items
 
 

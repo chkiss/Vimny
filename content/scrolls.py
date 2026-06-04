@@ -8,7 +8,6 @@ Line-kind tuples used in 'lines' lists:
   ('segs',   [(text, bold), …], desc)                ← key as bold/dim segments
   ('smudge', key, smudge_prefix, clear_tail, gate)  ← smudge block + dim tail
   ('smudge_seg', key_text, hide_prefix, desc)       ← key with its head smudged
-  ('v_sight',)                                       ← warden-sight special v row
 
 Smudge clarification:
   A ('smudge', …) line stays obscured until the command(s) it previews are in

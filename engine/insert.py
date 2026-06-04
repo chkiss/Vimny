@@ -8,7 +8,7 @@ cursor advances; Backspace removes the cell to the left. The grid is fixed, so
 from __future__ import annotations
 from engine.world import CellType, CharRun
 from engine.motion import _first_non_blank_col, _leftmost_passable, _rightmost_passable
-from engine.editor import _merge_adjacent_char_runs
+from engine.editor import _merge_adjacent_char_runs, _split_run_at
 from engine.reflow import is_ledge, open_gap, close_gap, extend_floor, _insert_blank_row
 
 INSERT_KIND = 'ember'           # kind tag for player-typed characters
@@ -16,23 +16,9 @@ _PASTABLE = (CellType.FLOOR, CellType.CORRIDOR)
 _VARIANTS_MUTATING = frozenset('oOsS')   # entry commands that change the room
 
 
-def _last_content_col(room, row: int):
-    """Rightmost column on `row` holding a character, or None."""
-    ends = [ru.col + len(ru.symbols) - 1 for ru in room.char_runs if ru.row == row]
-    return max(ends) if ends else None
-
-
 def _delete_at(room, row: int, col: int) -> None:
     """Remove the single character at (row, col), splitting its run."""
-    ru = room.char_run_at(row, col)
-    if ru is None:
-        return
-    idx = col - ru.col
-    room.remove_char_run(ru)
-    if idx > 0:
-        room.add_char_run(CharRun(row, ru.col, tuple(ru.symbols[:idx]), ru.kind))
-    if idx + 1 < len(ru.symbols):
-        room.add_char_run(CharRun(row, col + 1, tuple(ru.symbols[idx + 1:]), ru.kind))
+    _split_run_at(room, row, col)
 
 
 def _clear_row(room, row: int) -> None:
@@ -101,10 +87,11 @@ def begin_insert(room, player, variant: str, count: int = 1) -> None:
 def insert_char(room, player, ch: str, kind: str = INSERT_KIND) -> bool:
     """Place a one-cell character at the cursor and advance.
 
-    Overlay rows (the default everywhere) overwrite the cell in place. On a
-    ledge row the line reflows: the cursor cell and everything right of it slide
-    right by one, and any character shoved past the void brink falls in (see
-    engine/reflow.py). Returns False if the cursor is not on a pastable cell."""
+    Reflow is universal (`is_ledge` always True): the line reflows so the cursor
+    cell and everything right of it slide right by one, and any character shoved
+    past the void brink falls in (see engine/reflow.py). The `else` overwrite-in-
+    place branch is a retired-overlay future hook, currently unreachable. Returns
+    False if the cursor is not on a pastable cell."""
     r, c = player.row, player.col
     if not (0 <= c < room.cols) or room.cells[r][c] not in _PASTABLE:
         return False

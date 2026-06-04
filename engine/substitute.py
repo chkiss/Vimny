@@ -164,11 +164,12 @@ def _grouper(m, s: int, e: int, text: str):
     return gg
 
 
-def _sub_line(text: str, kinds: list, default_kind: str, vp, rep: str,
-              glob: bool, count_only: bool):
-    """(new_text, new_kinds, n) for one line. Replaces the effective span of each match
-    (zs/ze aware); non-`g` stops after the first. Unchanged characters keep their kind;
-    replacement characters take `default_kind`."""
+def _sub_line_core(text, kinds, vp, glob, decide):
+    """Rewrite one line by walking non-overlapping (zs/ze-aware) matches. For each
+    match, `decide(m, s, e)` returns (out_text, out_kinds, counted, stop): the text
+    and per-char kinds to emit for the match span, whether it counts toward `n`
+    (a real change), and whether to stop after it (overriding `glob`). Returns
+    (new_text, new_kinds, n)."""
     tp: list = []
     kp: list = []
     last = 0
@@ -178,21 +179,28 @@ def _sub_line(text: str, kinds: list, default_kind: str, vp, rep: str,
         if s < last:                            # zero-width tangle — skip safely
             continue
         tp.append(text[last:s]); kp.append(kinds[last:s])
-        gg = _grouper(m, s, e, text)
-
-        if count_only:
-            tp.append(text[s:e]); kp.append(kinds[s:e])
-        else:
-            rt = _expand(rep, gg)
-            tp.append(rt); kp.append([default_kind] * len(rt))
+        out_text, out_kinds, counted, stop = decide(m, s, e)
+        tp.append(out_text); kp.append(out_kinds)
         last = e
-        n += 1
-        if not glob:
+        if counted:
+            n += 1
+        if stop or not glob:
             break
-    if n == 0:
-        return text, kinds, 0
     tp.append(text[last:]); kp.append(kinds[last:])
     return ''.join(tp), [k for part in kp for k in part], n
+
+
+def _sub_line(text: str, kinds: list, default_kind: str, vp, rep: str,
+              glob: bool, count_only: bool):
+    """(new_text, new_kinds, n) for one line. Replaces the effective span of each match
+    (zs/ze aware); non-`g` stops after the first. Unchanged characters keep their kind;
+    replacement characters take `default_kind`."""
+    def decide(m, s, e):
+        if count_only:                          # :s///n — count matches, change nothing
+            return text[s:e], kinds[s:e], True, False
+        rt = _expand(rep, _grouper(m, s, e, text))
+        return rt, [default_kind] * len(rt), True, False
+    return _sub_line_core(text, kinds, vp, glob, decide)
 
 
 # ── addresses & ranges ───────────────────────────────────────────────────────
@@ -260,27 +268,34 @@ def split_range(cmd: str, room, player):
 
 
 # ── :s parsing ───────────────────────────────────────────────────────────────
-def _split_sep(body: str, sep: str):
-    """Split a /pat/rep/flags body on the separator, honouring backslash-escapes.
-    Returns [pat, rep, flagtail] (missing parts as None)."""
-    parts: list = []
+def _scan_field(body: str, sep: str, i: int = 0):
+    """Scan one separator-delimited field from `body` starting at `i`, honouring
+    backslash-escapes (an escaped sep is kept literally). Returns
+    (field_text, next_i, found_sep): next_i is just past the consumed separator,
+    or len(body) when the field ran to the end with no separator."""
     cur: list = []
-    i, n = 0, len(body)
+    n = len(body)
     while i < n:
         c = body[i]
         if c == '\\' and i + 1 < n:
             cur.append(c); cur.append(body[i + 1]); i += 2; continue
         if c == sep:
-            parts.append(''.join(cur)); cur = []; i += 1
-            if len(parts) == 2:                 # everything after the 2nd sep is the flag tail
-                parts.append(body[i:]); cur = []; i = n
-            continue
+            return ''.join(cur), i + 1, True
         cur.append(c); i += 1
-    if cur or len(parts) < 1:
-        parts.append(''.join(cur))
-    while len(parts) < 3:
-        parts.append(None)
-    return parts[0], parts[1], parts[2]
+    return ''.join(cur), i, False
+
+
+def _split_sep(body: str, sep: str):
+    """Split a /pat/rep/flags body on the separator, honouring backslash-escapes.
+    Returns (pat, rep, flagtail) with missing parts as None (a rep that ends the
+    body with no closing sep, e.g. ':s/a/', counts as absent)."""
+    pat, i, found1 = _scan_field(body, sep, 0)
+    if not found1:
+        return pat, None, None
+    rep, i, found2 = _scan_field(body, sep, i)
+    if not found2:
+        return pat, (rep or None), None
+    return pat, rep, body[i:]
 
 
 def parse_sub(rest: str, player):
@@ -409,7 +424,7 @@ def substitute(room, player, lo, hi, spec, *, confirm=None,
     player.last_search = (pat, True)            # :s sets the last search pattern too
     if last_changed is not None and not count_only:
         player.row = last_changed
-        player.col = _first_nonblank_col(room, last_changed)
+        player.col = _first_glyph_col(room, last_changed)
 
     if count_only:
         return f'{n_subs} matches on {n_lines} lines', n_subs, n_lines
@@ -436,35 +451,25 @@ def _resolve_replacement(rep, player):
 
 
 def _sub_line_confirm(text, kinds, default_kind, vp, rep, glob, confirm, row, lo):
-    """Like _sub_line but asks confirm(row, col_start, col_end) per match.
-    Returns (new_text, new_kinds, n)."""
-    tp, kp, last, n = [], [], 0, 0
-    stop = False
-    for m in vp.match_iter(text):
-        s, e = vp.eff_span(m)
-        if s < last:
-            continue
-        tp.append(text[last:s]); kp.append(kinds[last:s])
-        ans = 'n' if stop else confirm(row, lo + s, lo + e)
-        if ans == 'q':
-            stop = True; ans = 'n'
-        elif ans == 'a':
-            ans = 'y'; confirm = (lambda *a: 'y')        # 'all' from here on this line
-        if ans == 'l':                                   # last: do this one, then stop
-            stop = True; ans = 'y'
+    """Like _sub_line but asks confirm(row, col_start, col_end) per match
+    (the `c` flag's y/n/q/a/l flow). Returns (new_text, new_kinds, n)."""
+    state = {'stop': False, 'confirm': confirm}
 
-        gg = _grouper(m, s, e, text)
+    def decide(m, s, e):
+        ans = 'n' if state['stop'] else state['confirm'](row, lo + s, lo + e)
+        if ans == 'q':
+            state['stop'] = True; ans = 'n'
+        elif ans == 'a':
+            ans = 'y'; state['confirm'] = lambda *a: 'y'   # 'all' from here on this line
+        if ans == 'l':                                     # last: do this one, then stop
+            state['stop'] = True; ans = 'y'
 
         if ans == 'y':
-            rt = _expand(rep, gg)
-            tp.append(rt); kp.append([default_kind] * len(rt)); n += 1
-        else:
-            tp.append(text[s:e]); kp.append(kinds[s:e])
-        last = e
-        if not glob or stop:
-            break
-    tp.append(text[last:]); kp.append(kinds[last:])
-    return ''.join(tp), [k for part in kp for k in part], n
+            rt = _expand(rep, _grouper(m, s, e, text))
+            return rt, [default_kind] * len(rt), True, state['stop']
+        return text[s:e], kinds[s:e], False, state['stop']
+
+    return _sub_line_core(text, kinds, vp, glob, decide)
 
 
 def _write_line(room, player, row, new_text, new_kinds, lo, hi, default_kind, insert_row):
@@ -486,7 +491,10 @@ def _write_line(room, player, row, new_text, new_kinds, lo, hi, default_kind, in
         set_line_text(room, row + idx, seg_t[idx], lo, hi, seg_k[idx], default_kind)
 
 
-def _first_nonblank_col(room, row):
+def _first_glyph_col(room, row):
+    """Leftmost non-void glyph column on a row (0 if the row has no glyph). Note
+    this differs from motion._first_non_blank_col, which falls back to the leftmost
+    passable cell — here we want the first written character after a :s rewrite."""
     runs = [ru for ru in room._char_runs_by_row.get(row, []) if ru.kind != 'void']
     return min((ru.col for ru in runs), default=0)
 
@@ -511,14 +519,7 @@ def run_global(room, player, lo, hi, rest, *, confirm=None,
     sep = rest[i]
     body = rest[i + 1:]
     # split off pattern (up to the next unescaped sep); the rest is the command
-    j, n, pat = 0, len(body), []
-    while j < n:
-        if body[j] == '\\' and j + 1 < n:
-            pat.append(body[j:j + 2]); j += 2; continue
-        if body[j] == sep:
-            j += 1; break
-        pat.append(body[j]); j += 1
-    pattern = ''.join(pat)
+    pattern, j, _ = _scan_field(body, sep, 0)
     subcmd = body[j:].strip()
     pattern = _resolve_pattern(pattern, player)
     if not pattern:

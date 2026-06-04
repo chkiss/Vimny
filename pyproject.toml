@@ -1,0 +1,17 @@
+# Project tooling config. (Vimny has no build step — this file holds tool settings only.)
+
+[tool.vulture]
+# Dead-code detection.  Install once:  python -m pip install vulture
+# Run:                                  python -m vulture
+#
+# Vulture is static, so it cannot see anything resolved dynamically (getattr /
+# slug dispatch).  The ignore_names globs below suppress those known false
+# positives so a clean run means a *real* dead-code finding.  See the
+# "Dead-code detection" note in docs/ARCHITECTURE.md.
+paths = ["engine", "generation", "content", "render", "main.py"]
+min_confidence = 60
+ignore_names = [
+    "build_dungeon_*",   # resolved via getattr(module, f'build_dungeon_{slug}')
+    "_par_*",            # par-solvers resolved by slug alongside their builders
+    "expl_*",            # color fns discovered via getattr over dir(render.colors) in render/color_palette.py
+]

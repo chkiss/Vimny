@@ -1,13 +1,16 @@
 """Generate a single room with walls, floor, character runs, and entities."""
 from __future__ import annotations
 import random
-from engine.world import Room, RoomType, CellType, CharRun, Entity
+from engine.world import Room, RoomType, CellType, Entity
 
-RUNE_TYPES = {
-    'ancient': ('∘', '∘', '∘'),
-    'verdant': ('·', '·', '·'),
-    'void':    ('○', '○'),
-    'ember':   ('◦', '◦', '◦', '◦'),
+# Canonical rune glyph per kind — the single source of truth, shared with
+# generation/dungeon_gen.py (imported there as `_RUNE_CHAR`). Change a glyph here
+# and it changes everywhere a rune of that kind is drawn.
+RUNE_CHAR = {
+    'ancient': '∘',
+    'verdant': '·',
+    'void':    '○',
+    'ember':   '⊙',
 }
 
 def _blank_room(rows: int, cols: int) -> list[list[CellType]]:
@@ -17,37 +20,11 @@ def _blank_room(rows: int, cols: int) -> list[list[CellType]]:
             cells[r][c] = CellType.FLOOR
     return cells
 
-def _place_clusters(room: Room, rng: random.Random, density: float):
-    interior_cols = room.cols - 2  # exclude walls
-    interior_rows = room.rows - 2
-    placed: list[tuple[int,int,int]] = []  # (row, col_start, width)
-
-    for r in range(1, room.rows - 1):
-        c = 2
-        while c < room.cols - 3:
-            if rng.random() < density:
-                kind = rng.choice(list(RUNE_TYPES.keys()))
-                syms = RUNE_TYPES[kind]
-                width = len(syms)
-                if c + width < room.cols - 1:
-                    cluster = CharRun(row=r, col=c, symbols=syms, kind=kind)
-                    room.char_runs.append(cluster)
-                    placed.append((r, c, width))
-                    c += width + rng.randint(1, 3)
-                    continue
-            c += 1
-
-def make_room(room_type: RoomType, rows: int, cols: int, seed: int,
-              dungeon_level: int = 0) -> Room:
+def make_room(room_type: RoomType, rows: int, cols: int, seed: int) -> Room:
     rng = random.Random(seed)
     room = Room(room_type=room_type, rows=rows, cols=cols)
     room.seed = seed
     room.cells = _blank_room(rows, cols)
-
-    density = 0.15 + dungeon_level * 0.02
-
-    if room_type != RoomType.ENTRY:
-        _place_clusters(room, rng, density)
 
     # Entry point: top-left interior
     room.spawn_pos = (1, 1)

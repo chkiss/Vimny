@@ -127,10 +127,7 @@ def _push_one(room, row: int, at_col: int) -> None:
         elif fate == 'entity':                          # a wave sweeps the entity away
             ent = room.entity_at(row, nc)
             room.kill_entity(ent)
-            if ent.kind == 'exit':
-                room.exit_pos = None
-            elif ent.kind == 'entry_marker':
-                room.spawn_pos = (1, 1)
+            room._on_entity_destroyed(ent)
             keep_water.add(nc)                          # water rolls onto the swept cell
             room._last_drowns.append((row, nc))
         elif fate == 'sink':
@@ -165,6 +162,31 @@ def close_gap(room, row: int, at_col: int, width: int) -> None:
     _rewrite_glyphs(room, row, kept)
 
 
+def _shift_rows(room, player, moves, delta: int) -> None:
+    """Re-index every row coordinate of map state by ``delta`` for each row where
+    ``moves(row)`` is True: glyphs, the entities still present, exit/spawn, fog,
+    and (when ``player`` is given) marks and jumps. The caller is responsible for
+    the physical row insert/delete and for any on-pivot content removal; this only
+    slides what remains. Shared by ``_insert_blank_row`` (delta +1) and
+    ``remove_row`` (delta −1), which are vertical inverses."""
+    for ru in room.char_runs:
+        if moves(ru.row):
+            ru.row += delta
+    for e in room.entities:
+        if moves(e.row):
+            e.row += delta
+    if room.exit_pos and moves(room.exit_pos[0]):
+        room.exit_pos = (room.exit_pos[0] + delta, room.exit_pos[1])
+    if room.spawn_pos and moves(room.spawn_pos[0]):
+        room.spawn_pos = (room.spawn_pos[0] + delta, room.spawn_pos[1])
+    room.fog_cells = {((r + delta) if moves(r) else r, c) for (r, c) in room.fog_cells}
+    if player is not None:
+        for nm, (r, c) in list(player.marks.items()):
+            if moves(r):
+                player.marks[nm] = (r + delta, c)
+        player.jump_list = [((r + delta) if moves(r) else r, c) for (r, c) in player.jump_list]
+
+
 def _insert_blank_row(room, at_row: int, template_row: int, player=None) -> None:
     """Insert a blank row at index ``at_row``, copying the wall pattern of
     ``template_row``, and shift all content at/below ``at_row`` down by one — the
@@ -176,22 +198,7 @@ def _insert_blank_row(room, at_row: int, template_row: int, player=None) -> None
                for c in range(room.cols)]
     room.cells.insert(at_row, new_row)
     room.rows += 1
-    for ru in room.char_runs:
-        if ru.row >= at_row:
-            ru.row += 1
-    for e in room.entities:
-        if e.row >= at_row:
-            e.row += 1
-    if room.exit_pos and room.exit_pos[0] >= at_row:
-        room.exit_pos = (room.exit_pos[0] + 1, room.exit_pos[1])
-    if room.spawn_pos and room.spawn_pos[0] >= at_row:
-        room.spawn_pos = (room.spawn_pos[0] + 1, room.spawn_pos[1])
-    room.fog_cells = {((r + 1) if r >= at_row else r, c) for (r, c) in room.fog_cells}
-    if player is not None:                                 # marks/jumps below the insert shift down too
-        for nm, (r, c) in list(player.marks.items()):
-            if r >= at_row:
-                player.marks[nm] = (r + 1, c)
-        player.jump_list = [((r + 1) if r >= at_row else r, c) for (r, c) in player.jump_list]
+    _shift_rows(room, player, lambda r: r >= at_row, +1)
     room.rebuild_indexes()
 
 
@@ -210,29 +217,14 @@ def remove_row(room, at_row: int, player=None) -> bool:
         return False                                  # structural border row — never collapse
     del room.cells[at_row]
     room.rows -= 1
+    # Drop the cut row's own content, then slide everything below it up by one.
     room.char_runs = [ru for ru in room.char_runs if ru.row != at_row]
-    for ru in room.char_runs:
-        if ru.row > at_row:
-            ru.row -= 1
     for e in list(room.entities):
         if e.row == at_row:
             room.remove_entity(e)
-            if e.kind == 'exit':
-                room.exit_pos = None
-            elif e.kind == 'entry_marker':
-                room.spawn_pos = (1, 1)
-        elif e.row > at_row:
-            e.row -= 1
-    if room.exit_pos and room.exit_pos[0] > at_row:
-        room.exit_pos = (room.exit_pos[0] - 1, room.exit_pos[1])
-    if room.spawn_pos and room.spawn_pos[0] > at_row:
-        room.spawn_pos = (room.spawn_pos[0] - 1, room.spawn_pos[1])
-    room.fog_cells = {((r - 1) if r > at_row else r, c)
-                      for (r, c) in room.fog_cells if r != at_row}
-    if player is not None:                                 # marks/jumps below the cut shift up; on-cut clamp
-        player.marks = {nm: ((r - 1, c) if r > at_row else (at_row, c) if r == at_row else (r, c))
-                        for nm, (r, c) in player.marks.items()}
-        player.jump_list = [((r - 1) if r > at_row else r, c) for (r, c) in player.jump_list]
+            room._on_entity_destroyed(e)
+    room.fog_cells = {(r, c) for (r, c) in room.fog_cells if r != at_row}
+    _shift_rows(room, player, lambda r: r > at_row, -1)
     room.rebuild_indexes()
     return True
 
