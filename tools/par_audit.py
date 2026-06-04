@@ -176,6 +176,8 @@ def _replay_confirms(slug, path):
     it = iter(keys + [Keystroke(':'), Keystroke('w'), Keystroke('q'), Keystroke('\r')])
     term = Terminal(force_styling=False)
     term.inkey = lambda *a, **k: next(it, Keystroke(''))
+    import render.colors as _C       # key/door paths read colours directly in run_dungeon
+    _C.init(term)
     res = main.run_dungeon(term, slug, {}, player_name='p', _dungeon=d)
     return rec.get('spent') if (res and res.get('won')) else None
 
