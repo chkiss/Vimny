@@ -292,9 +292,10 @@ def apply_motion(player, motion, count, room, target=None, count_given: bool = T
         elif motion == '|':
             # {n}| → column n (1-indexed); bare | → column 1. Count is the target,
             # not a repeat, so walk toward it and stop at a wall/water brink, then
-            # break out of the count loop (mirrors G / gg).
+            # break out of the count loop (mirrors G / gg). Column 1 is the first
+            # standable column (the left border isn't a column).
             row = player.row
-            target_col = max(0, min(count - 1, room.cols - 1))
+            target_col = max(0, min(room.first_standable_col() + count - 1, room.cols - 1))
             best = player.col
             step = 1 if target_col > player.col else -1
             for c in range(player.col + step, target_col + step, step):
@@ -548,8 +549,9 @@ def apply_motion(player, motion, count, room, target=None, count_given: bool = T
         elif motion == 'G':
             # nG → line n; bare G → last line. Always land on first non-blank.
             # Scan inward from the target row if it is a wall (no passable cells).
+            # Line 1 is the first standable row (the top border wall isn't a line).
             if count_given:
-                target_row = max(0, min(count - 1, room.rows - 1))
+                target_row = max(0, min(room.first_standable_row() + count - 1, room.rows - 1))
                 direction = 1
             else:
                 target_row = room.rows - 1
@@ -572,9 +574,9 @@ def apply_motion(player, motion, count, room, target=None, count_given: bool = T
             # first non-blank, scanning downward to the first passable row.
             # Mirror of the G branch; independent of spawn/exit (Vim-faithful).
             if count_given:
-                target_row = max(0, min(count - 1, room.rows - 1))
+                target_row = max(0, min(room.first_standable_row() + count - 1, room.rows - 1))
             else:
-                target_row = 0
+                target_row = room.first_standable_row()
             col = None
             r = target_row
             while 0 <= r < room.rows:

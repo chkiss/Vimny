@@ -295,15 +295,17 @@ def render_all(term: Terminal, dungeon: Dungeon, player: Player,
     vc_start = max(0, vc_start)
 
     gnum_fg = C.hint_fg()                              # dim gutter ink
+    base_row = room.first_standable_row()              # grid row of line 1 (border isn't a line)
     def _gutter(room_r):
         if gutter_w == 0:
             return ''
-        if room_r >= room.rows:
+        # Rows at/above the border (before line 1) get a blank gutter — they aren't lines.
+        if room_r >= room.rows or room_r < base_row:
             return wall_bg + ' ' * gutter_w + rst
         if number_mode == 'relativenumber':
             n = 0 if room_r == player.row else abs(room_r - player.row)
         else:
-            n = room_r + 1
+            n = room_r - base_row + 1
         return gnum_fg + f'{n:>{gutter_w - 1}} ' + rst
 
     # ── Soft-wrap (':set wrap' on a single-line Room.wrap_buffer) ────────────
@@ -447,7 +449,9 @@ def render_all(term: Terminal, dungeon: Dungeon, player: Player,
         output.append(line)
 
     # ── Vim statusline / command line ─────────────────────────────────────
-    pos_str  = f'{player.row},{player.col}'
+    # 1-based line,col anchored at the first standable cell — matches the gutter and
+    # {N}G / {N}| (the border walls aren't line/column 1).
+    pos_str  = f'{player.row - room.first_standable_row() + 1},{player.col - room.first_standable_col() + 1}'
 
     if wrap_active:
         if total_drows <= game_h:
