@@ -1559,7 +1559,7 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
         vr, vc = max(0, vr), max(0, vc)
         scr_r = 3 + (expl_r - vr)
         scr_c = 1 + (expl_c - vc)
-        render_all(term, dungeon, player, budget, message,
+        _render(message,
                    attack_pos=_attack_pos(), attack_sym=_attack_sym())
         _explosion_animation(term, room, expl_r, expl_c, scr_r, scr_c, iw_now, game_h_now)
         for _dr in range(-3, 4):
@@ -1703,14 +1703,18 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
         if text not in msg_pool:
             msg_pool.append(text)
 
+    def _render(msg='', **kw):
+        """Render the dungeon. Drops the repeated (term, dungeon, player, budget) prefix;
+        message and any other args (attack_pos/attack_sym, heart_flash, …) pass through."""
+        render_all(term, dungeon, player, budget, msg, **kw)
+
     def _blocked(action) -> bool:
         """A gated command the player hasn't learned: explain why, render, and return
         True so the call site reads `if not _action_allowed(...) and _blocked(action): continue`."""
         nonlocal message, msg_ttl
         _push(_guard_message(action, player.known_commands))
         message = _pool_msg(); msg_ttl = _MSG_ROTATE_TTL
-        render_all(term, dungeon, player, budget, message,
-                   attack_pos=_attack_pos(), attack_sym=_attack_sym())
+        _render(message, attack_pos=_attack_pos(), attack_sym=_attack_sym())
         return True
 
     # ── :s / :g — buffer-shifting + confirm (c flag) callbacks ──────────────
@@ -1723,8 +1727,7 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
     def _sub_confirm(row, c0, c1):
         """The :s/c flag: show the match under the cursor, ask y/n/a/q/l."""
         player.row, player.col = row, c0
-        render_all(term, dungeon, player, budget,
-                   'replace with (y)es (n)o (a)ll (q)uit (l)ast?')
+        _render('replace with (y)es (n)o (a)ll (q)uit (l)ast?')
         while True:
             k = term.inkey(timeout=0.2)
             if not k:
@@ -1801,7 +1804,7 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
                 if spots:
                     arch.col = random.choice(spots)
                     room.rebuild_indexes()
-            render_all(term, dungeon, player, budget, '')
+            _render('')
             _t.sleep(0.05)
 
     def _lib_form_folio():
@@ -1833,7 +1836,7 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
             if arch is not None:
                 arch.col = random.randrange(1, max(2, room.cols - 1))
             room.rebuild_indexes()
-            render_all(term, dungeon, player, budget, '')
+            _render('')
             _t.sleep(0.05)
         _lib_relayout()                               # settle exactly on the folio
 
@@ -1999,7 +2002,7 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
     if level == 'archivists_library':
         _lib_relayout()                          # fit the page frame to the real viewport
 
-    render_all(term, dungeon, player, budget, message, attack_pos=_attack_pos(), attack_sym=_attack_sym())
+    _render(message, attack_pos=_attack_pos(), attack_sym=_attack_sym())
 
     while True:
         if level == 'archivists_library':
@@ -2014,7 +2017,7 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
                 macro_run_keys = 0
                 budget.frozen = False
                 _push('Macro aborted (too long / recursion).')
-                render_all(term, dungeon, player, budget, _pool_msg(), attack_pos=_attack_pos(), attack_sym=_attack_sym())
+                _render(_pool_msg(), attack_pos=_attack_pos(), attack_sym=_attack_sym())
                 continue
             key = _synth_key(macro_pending.popleft())
             from_macro = True
@@ -2031,7 +2034,7 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
                 player.macros[recording_reg] = macro_buf
                 recording_reg = None
                 macro_buf = ''
-                render_all(term, dungeon, player, budget, message, attack_pos=_attack_pos(), attack_sym=_attack_sym())
+                _render(message, attack_pos=_attack_pos(), attack_sym=_attack_sym())
                 continue
             rc = _record_char(key)
             if rc is not None:
@@ -2062,7 +2065,7 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
                     attack_flash_ttl = _ATTACK_FLASH_TTL
                     needs_render     = True
             if needs_render:
-                render_all(term, dungeon, player, budget, message,
+                _render(message,
                            attack_pos=_attack_pos(), attack_sym=_attack_sym())
             continue
 
@@ -2329,7 +2332,7 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
                 msg_idx = 0
                 message = _pool_msg()
                 msg_ttl = _MSG_ROTATE_TTL
-            render_all(term, dungeon, player, budget, message, attack_pos=_attack_pos(), attack_sym=_attack_sym())
+            _render(message, attack_pos=_attack_pos(), attack_sym=_attack_sym())
             continue
 
         # ── SEARCH mode (/ or ? pattern entry) ────────────────────────────────
@@ -2371,7 +2374,7 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
                 player.cmd_line = player.cmd_line[:-1]
             else:
                 player.cmd_line = _cmd_append(player.cmd_line, key)
-            render_all(term, dungeon, player, budget, message, attack_pos=_attack_pos(), attack_sym=_attack_sym())
+            _render(message, attack_pos=_attack_pos(), attack_sym=_attack_sym())
             continue
 
         # ── INSERT mode (admin text placement) ───────────────────────────────
@@ -2418,7 +2421,7 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
                                              room, _co_act.get('target'),
                                              count_given=_co_act.get('count_given', True))
                             insert_co_buf = None
-                    render_all(term, dungeon, player, budget, message, attack_pos=_attack_pos(), attack_sym=_attack_sym())
+                    _render(message, attack_pos=_attack_pos(), attack_sym=_attack_sym())
                     continue
 
                 if insert_creg_pending:
@@ -2434,24 +2437,24 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
                                 break
                             if insert_char(room, player, _tch):
                                 budget.spend(1)
-                    render_all(term, dungeon, player, budget, message, attack_pos=_attack_pos(), attack_sym=_attack_sym())
+                    _render(message, attack_pos=_attack_pos(), attack_sym=_attack_sym())
                     continue
 
                 if _kstr == '\x12' and _ins_ok('ins_paste'):     # <C-r> — paste a register
                     insert_creg_pending = True
-                    render_all(term, dungeon, player, budget, message, attack_pos=_attack_pos(), attack_sym=_attack_sym())
+                    _render(message, attack_pos=_attack_pos(), attack_sym=_attack_sym())
                     continue
                 if _kstr == '\x0f' and _ins_ok('ins_edit'):      # <C-o> — one Normal command
                     insert_co_buf = ''
-                    render_all(term, dungeon, player, budget, message, attack_pos=_attack_pos(), attack_sym=_attack_sym())
+                    _render(message, attack_pos=_attack_pos(), attack_sym=_attack_sym())
                     continue
                 if _kstr == '\x17' and _ins_ok('ins_edit'):      # <C-w> — delete word back
                     insert_delete_word_back(room, player)
-                    render_all(term, dungeon, player, budget, message, attack_pos=_attack_pos(), attack_sym=_attack_sym())
+                    _render(message, attack_pos=_attack_pos(), attack_sym=_attack_sym())
                     continue
                 if _kstr == '\x15' and _ins_ok('ins_edit'):      # <C-u> — delete to line start
                     insert_delete_to_start(room, player)
-                    render_all(term, dungeon, player, budget, message, attack_pos=_attack_pos(), attack_sym=_attack_sym())
+                    _render(message, attack_pos=_attack_pos(), attack_sym=_attack_sym())
                     continue
 
                 if key.name == 'KEY_BACKSPACE' or str(key) == '\x7f':
@@ -2470,13 +2473,13 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
                         elif insert_char(room, player, ch):
                             budget.spend(1)
                         if room._last_void_falls:          # ledge: a glyph went over the brink
-                            render_all(term, dungeon, player, budget, message,
+                            _render(message,
                                        attack_pos=_attack_pos(), attack_sym=_attack_sym())
                             _play_void_falls(term, dungeon, room, player)
                             message = 'Over the brink — into the void it tumbles!'
                             msg_ttl = 25
                         if room._last_drowns:              # ledge: a wave of water swept an entity away
-                            render_all(term, dungeon, player, budget, message,
+                            _render(message,
                                        attack_pos=_attack_pos(), attack_sym=_attack_sym())
                             for (dr, dc) in room._last_drowns:
                                 _drown_animation(term, *_void_screen_xy(term, room, player, dr, dc))
@@ -2485,7 +2488,7 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
                             msg_ttl = 25
                         cur_ru = room.char_run_at(player.row, player.col)
                         if cur_ru is not None and cur_ru.kind == 'void':   # typed yourself off the ledge
-                            render_all(term, dungeon, player, budget, message,
+                            _render(message,
                                        attack_pos=_attack_pos(), attack_sym=_attack_sym())
                             _void_fall_animation(term, *_void_screen_xy(term, room, player, player.row, player.col))
                             player.take_damage(2)                          # 1 full heart
@@ -2497,7 +2500,7 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
                             else:
                                 h, hh = player.hp // 2, '½' if player.hp % 2 else ''
                                 message = f'You typed yourself off the ledge!  ({h}{hh} ♥ remaining)'; msg_ttl = 25
-            render_all(term, dungeon, player, budget, message, attack_pos=_attack_pos(), attack_sym=_attack_sym())
+            _render(message, attack_pos=_attack_pos(), attack_sym=_attack_sym())
             continue
 
         # ── REPLACE mode (overtype; Backspace restores originals) ─────────────
@@ -2519,7 +2522,7 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
                         replace_stack.append(rec)
                         if not edit_mode:
                             budget.spend(1)
-            render_all(term, dungeon, player, budget, message, attack_pos=_attack_pos(), attack_sym=_attack_sym())
+            _render(message, attack_pos=_attack_pos(), attack_sym=_attack_sym())
             continue
 
         # ── VISUAL modes (v / V / Ctrl-v): extend selection, operate ────────────
@@ -2531,7 +2534,7 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
                 player.mode = Mode.NORMAL
                 player.visual_anchor = None
                 key_buf = ''
-                render_all(term, dungeon, player, budget, message, attack_pos=_attack_pos(), attack_sym=_attack_sym())
+                _render(message, attack_pos=_attack_pos(), attack_sym=_attack_sym())
                 continue
             raw = str(key) if not key.is_sequence else ''
             anchor = player.visual_anchor or (player.row, player.col)
@@ -2540,14 +2543,14 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
             if not key_buf and raw == 'o':                 # swap ends
                 player.row, player.col = anchor
                 player.visual_anchor = cursor
-                render_all(term, dungeon, player, budget, message, attack_pos=_attack_pos(), attack_sym=_attack_sym())
+                _render(message, attack_pos=_attack_pos(), attack_sym=_attack_sym())
                 continue
             want = _visual_mode_toggle(raw, str(key)) if not key_buf else None
             if want is not None:                           # v / V / Ctrl-v toggle / exit
                 player.mode = Mode.NORMAL if want == vmode else want
                 if player.mode == Mode.NORMAL:
                     player.visual_anchor = None
-                render_all(term, dungeon, player, budget, message, attack_pos=_attack_pos(), attack_sym=_attack_sym())
+                _render(message, attack_pos=_attack_pos(), attack_sym=_attack_sym())
                 continue
             if not key_buf and raw in ('/', '?'):          # search extends the selection
                 if not ('/' in player.known_commands or 'admin' in player.known_commands):
@@ -2560,19 +2563,19 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
                     player.mode = Mode.SEARCH
                     player.cmd_line = ''
                     player.search_forward = (raw == '/')
-                render_all(term, dungeon, player, budget, message, attack_pos=_attack_pos(), attack_sym=_attack_sym())
+                _render(message, attack_pos=_attack_pos(), attack_sym=_attack_sym())
                 continue
             if not key_buf and raw and raw in 'dycx~<>':
                 op = {'x': 'd', '~': 'g~'}.get(raw, raw)
                 if raw in 'dyc~<>' and not (
                         'visual_op' in player.known_commands or 'admin' in player.known_commands):
                     _push("You haven't learned visual operators yet.")
-                    render_all(term, dungeon, player, budget, message, attack_pos=_attack_pos(), attack_sym=_attack_sym())
+                    _render(message, attack_pos=_attack_pos(), attack_sym=_attack_sym())
                     continue
                 if not edit_mode and budget.remaining <= 0:
                     _push('Out of budget!  (Esc, then u to undo)')
                     message = _pool_msg(); msg_ttl = _MSG_ROTATE_TTL
-                    render_all(term, dungeon, player, budget, message, attack_pos=_attack_pos(), attack_sym=_attack_sym())
+                    _render(message, attack_pos=_attack_pos(), attack_sym=_attack_sym())
                     continue
                 undo_stack.append(_snapshot(room, player, budget,
                                             row=anchor[0], col=anchor[1],
@@ -2592,14 +2595,14 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
                 player.mode = Mode.INSERT if op == 'c' else Mode.NORMAL
                 player.last_change = {'type': 'visual_op', 'op': op}
                 key_buf = ''
-                render_all(term, dungeon, player, budget, message, attack_pos=_attack_pos(), attack_sym=_attack_sym())
+                _render(message, attack_pos=_attack_pos(), attack_sym=_attack_sym())
                 continue
             key_buf += raw
             # Text object: i/a (+ optional count) + object char selects the span
             # (viw, vaw, vi(, va", …).  In visual mode i/a are object prefixes.
             vt = parse_visual_textobj(key_buf)
             if vt == 'pending':
-                render_all(term, dungeon, player, budget, message, attack_pos=_attack_pos(), attack_sym=_attack_sym())
+                _render(message, attack_pos=_attack_pos(), attack_sym=_attack_sym())
                 continue
             if vt is not None:
                 _, textobj, tcount = vt
@@ -2620,7 +2623,7 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
                         player.row, player.col = tobj.end_row, tobj.end_col
                         if not edit_mode:
                             budget.spend(2 + (len(str(tcount)) if tcount > 1 else 0))
-                render_all(term, dungeon, player, budget, message, attack_pos=_attack_pos(), attack_sym=_attack_sym())
+                _render(message, attack_pos=_attack_pos(), attack_sym=_attack_sym())
                 continue
             # Otherwise: a motion that extends the selection (costs same as normal mode)
             v_action, key_buf = parse(key_buf, Mode.NORMAL)
@@ -2638,14 +2641,14 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
                         budget.spend(_keystroke_cost(v_count, v_motion))
             elif v_action is not None:
                 key_buf = ''                               # ignore non-motion keys in visual
-            render_all(term, dungeon, player, budget, message, attack_pos=_attack_pos(), attack_sym=_attack_sym())
+            _render(message, attack_pos=_attack_pos(), attack_sym=_attack_sym())
             continue
 
         # ── Normal mode ───────────────────────────────────────────────────────
         if key.name == 'KEY_ESCAPE':
             _apply_esc(player)
             key_buf = ''
-            render_all(term, dungeon, player, budget, message, attack_pos=_attack_pos(), attack_sym=_attack_sym())
+            _render(message, attack_pos=_attack_pos(), attack_sym=_attack_sym())
             continue
 
         raw     = str(key) if not key.is_sequence else ''
@@ -2653,13 +2656,13 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
         action, key_buf = parse(key_buf, player.mode)
 
         if action is None:
-            render_all(term, dungeon, player, budget, message, attack_pos=_attack_pos(), attack_sym=_attack_sym())
+            _render(message, attack_pos=_attack_pos(), attack_sym=_attack_sym())
             continue
 
         # Dead players may only enter command mode to type :e
         if player.is_dead and not (action['type'] == 'enter_mode'
                                    and action.get('mode') == 'command'):
-            render_all(term, dungeon, player, budget, message, attack_pos=_attack_pos(), attack_sym=_attack_sym())
+            _render(message, attack_pos=_attack_pos(), attack_sym=_attack_sym())
             continue
 
         # Out of budget: the path is spent.  No budget-costing action may proceed —
@@ -2667,7 +2670,7 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
         if not edit_mode and budget.remaining <= 0 and _budget_exhausted_blocks(action):
             _push('Out of budget!  (u to undo)')
             message = _pool_msg(); msg_ttl = _MSG_ROTATE_TTL
-            render_all(term, dungeon, player, budget, message, attack_pos=_attack_pos(), attack_sym=_attack_sym())
+            _render(message, attack_pos=_attack_pos(), attack_sym=_attack_sym())
             continue
 
         cur_combat_target = room.entity_at(player.row, player.col)
@@ -2704,7 +2707,7 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
             if not player.last_change:
                 _push('Nothing to repeat.')
                 message = _pool_msg(); msg_ttl = _MSG_ROTATE_TTL
-                render_all(term, dungeon, player, budget, message, attack_pos=_attack_pos(), attack_sym=_attack_sym())
+                _render(message, attack_pos=_attack_pos(), attack_sym=_attack_sym())
                 continue
             repeat_count = action.get('count', 1)
             action = dict(player.last_change)
@@ -2762,7 +2765,7 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
                     vc_start = max(0, min(player.col - iw  // 2,    room.cols - iw))
                     scr_r    = player.row - vr_start + 3
                     scr_c    = player.col - vc_start + 1
-                    render_all(term, dungeon, player, budget, message, attack_pos=_attack_pos(), attack_sym=_attack_sym())
+                    _render(message, attack_pos=_attack_pos(), attack_sym=_attack_sym())
                     _void_fall_animation(term, scr_r, scr_c)
                     player.take_damage(2)  # 1 full heart
                     player.row, player.col = prev_pos[0], prev_pos[1]
@@ -2773,7 +2776,7 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
                         h, hh = player.hp // 2, '½' if player.hp % 2 else ''
                         message = f'You fell into the void!  ({h}{hh} ♥ remaining)'
                         msg_ttl = 25
-                    render_all(term, dungeon, player, budget, message, attack_pos=_attack_pos(), attack_sym=_attack_sym())
+                    _render(message, attack_pos=_attack_pos(), attack_sym=_attack_sym())
                     continue
 
                 # Water: drown if landed on water cell (e.g. via $, 0, ^)
@@ -2784,7 +2787,7 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
                     vc_start = max(0, min(player.col - iw  // 2,    room.cols - iw))
                     scr_r    = player.row - vr_start + 3
                     scr_c    = player.col - vc_start + 1
-                    render_all(term, dungeon, player, budget, message, attack_pos=_attack_pos(), attack_sym=_attack_sym())
+                    _render(message, attack_pos=_attack_pos(), attack_sym=_attack_sym())
                     _drown_animation(term, scr_r, scr_c)
                     player.take_damage(2)  # 1 full heart
                     player.row, player.col = prev_pos[0], prev_pos[1]
@@ -2795,7 +2798,7 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
                         h, hh = player.hp // 2, '½' if player.hp % 2 else ''
                         message = f'You drowned!  ({h}{hh} ♥ remaining)'
                         msg_ttl = 25
-                    render_all(term, dungeon, player, budget, message, attack_pos=_attack_pos(), attack_sym=_attack_sym())
+                    _render(message, attack_pos=_attack_pos(), attack_sym=_attack_sym())
                     continue
 
                 # Dynamite: explode if stepped on
@@ -2851,7 +2854,7 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
                 if ent and ent.kind == 'exit' and not won:
                     won = True
                     at_exit = True
-                    render_all(term, dungeon, player, budget, '', attack_pos=_attack_pos(), attack_sym=_attack_sym())
+                    _render('', attack_pos=_attack_pos(), attack_sym=_attack_sym())
                     iw  = _iw(term)
                     if level_type(level) == 'boss':
                         _starfield_victory(term, iw, dungeon, player)
@@ -3087,7 +3090,7 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
                           for _i in range(count))):
                 # x-ing anything but whitespace defaces the library — he turns on you.
                 _lib_strike('"You DARE deface my library, VANDAL?!"')
-                render_all(term, dungeon, player, budget, _pool_msg(),
+                _render(_pool_msg(),
                            attack_pos=_attack_pos(), attack_sym=_attack_sym())
                 continue
             else:
@@ -3121,7 +3124,7 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
                             progress['extras'] = extras + [_chest_sid]
                         if _chest_sid not in player.known_commands:
                             player.known_commands = player.known_commands + [_chest_sid]
-                        render_all(term, dungeon, player, budget, _pool_msg(), attack_pos=_attack_pos(), attack_sym=_attack_sym())
+                        _render(_pool_msg(), attack_pos=_attack_pos(), attack_sym=_attack_sym())
                         _show_catalog_scroll(term, _iw(term), term.height - 8, _chest_sid,
                                              _known_from_progress(progress))
                     elif _drop is not None:
@@ -3137,7 +3140,7 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
                                 SM.save_scroll_text(_txt_title, _txt_body)
                         if _sid not in player.known_commands:
                             player.known_commands = player.known_commands + [_sid]
-                        render_all(term, dungeon, player, budget, _pool_msg(), attack_pos=_attack_pos(), attack_sym=_attack_sym())
+                        _render(_pool_msg(), attack_pos=_attack_pos(), attack_sym=_attack_sym())
                         # Gate the scroll's smudged lines on what the player has
                         # actually learned (their whole progress), not this level's
                         # frozen command set — otherwise replaying an early boss
@@ -3151,7 +3154,7 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
                             progress['extras'] = progress.get('extras', []) + [_wid]
                             if _wid not in player.known_commands:
                                 player.known_commands = player.known_commands + [_wid]
-                            render_all(term, dungeon, player, budget, _pool_msg(), attack_pos=_attack_pos(), attack_sym=_attack_sym())
+                            _render(_pool_msg(), attack_pos=_attack_pos(), attack_sym=_attack_sym())
                             _show_catalog_scroll(term, _iw(term), term.height - 8, _wid,
                                                  _known_from_progress(progress))
                         else:
@@ -3339,7 +3342,7 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
                              C.key_blue_fg() if _ktag == 'blue' else None)
                     undo_stack.append(_snapshot(room, player, budget, ans=cmd_start_ans))
                     redo_stack.clear()
-                    render_all(term, dungeon, player, budget, _pool_msg(), attack_pos=_attack_pos(), attack_sym=_attack_sym())
+                    _render(_pool_msg(), attack_pos=_attack_pos(), attack_sym=_attack_sym())
                     _unlock_animation(term, room, player,
                                       target.row, target.col,
                                       _iw(term), term.height - 8, _kclr)
@@ -3510,11 +3513,11 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
                 if not edit_mode:
                     budget.spend(_operator_cost(action))
                     if room._last_void_falls:
-                        render_all(term, dungeon, player, budget, message, attack_pos=_attack_pos(), attack_sym=_attack_sym())
+                        _render(message, attack_pos=_attack_pos(), attack_sym=_attack_sym())
                         _play_void_falls(term, dungeon, room, player)
                         message = 'Over the brink — into the void it tumbles!'; msg_ttl = 25
                     if room._last_drowns:
-                        render_all(term, dungeon, player, budget, message, attack_pos=_attack_pos(), attack_sym=_attack_sym())
+                        _render(message, attack_pos=_attack_pos(), attack_sym=_attack_sym())
                         for (dr, dc) in room._last_drowns:
                             _drown_animation(term, *_void_screen_xy(term, room, player, dr, dc))
                         room._last_drowns = []
@@ -3577,7 +3580,7 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
                 if tobj is None:
                     ed_undo.pop()
                     _push('No text object here.')
-                    render_all(term, dungeon, player, budget, _pool_msg(), attack_pos=_attack_pos(), attack_sym=_attack_sym())
+                    _render(_pool_msg(), attack_pos=_attack_pos(), attack_sym=_attack_sym())
                     continue
                 if op in ('d', 'c'):
                     items = _ed_delete_range(room, tobj.start_row, tobj.start_col, tobj.end_row, tobj.end_col)
@@ -3734,7 +3737,7 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
                 message = ''
                 msg_ttl = 0
 
-        render_all(term, dungeon, player, budget, message, attack_pos=_attack_pos(), attack_sym=_attack_sym())
+        _render(message, attack_pos=_attack_pos(), attack_sym=_attack_sym())
 
 
 # ── Save-select screen loop ───────────────────────────────────────────────────
