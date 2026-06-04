@@ -191,7 +191,10 @@ def _ed_delete_range(room, r1, c1, r2, c2):
 
 def _clip_desc(item) -> str:
     if item['type'] == 'rune':
-        return f"{item['rune'].kind} rune"
+        ru = item['rune']
+        if all(s == ' ' for s in ru.symbols):
+            return 'space'
+        return f"{ru.kind} rune"
     if item['type'] == 'entity':
         return item['entity'].kind
     ct = item.get('cell_type')

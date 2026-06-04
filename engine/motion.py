@@ -63,6 +63,8 @@ def _reveal_from(room, player_r: int, player_c: int) -> None:
             continue
         for dr, dc in ((-1, 0), (1, 0), (0, -1), (0, 1)):
             nr, nc = r + dr, c + dc
+            if not (0 <= nr < room.rows and 0 <= nc < room.cols):
+                continue
             if (nr, nc) not in reachable:
                 if room.cells[nr][nc] in (CellType.FLOOR, CellType.CORRIDOR, CellType.WATER):
                     reachable.add((nr, nc))
@@ -73,10 +75,12 @@ def _reveal_from(room, player_r: int, player_c: int) -> None:
 
 def _cell_char(room, r: int, c: int) -> str:
     """Return the printable character at (r, c) for f/F/t/T target matching."""
+    ent = room.entity_at(r, c)
+    if ent and ent.kind == 'archivist':
+        return 'A'                      # he paces over the library art; his glyph wins (fA finds him)
     ru = room.char_run_at(r, c)
     if ru:
         return ru.symbols[c - ru.col]
-    ent = room.entity_at(r, c)
     if ent:
         if ent.kind == 'dynamite':  return '!'
         if ent.kind == 'goblin':    return 'g'
@@ -233,6 +237,18 @@ def apply_motion(player, motion, count, room, target=None, count_given: bool = T
             moved |= move_player(player, -1, 0, room)
         elif motion == 'l':
             moved |= move_player(player, 0,  1, room)
+        elif motion in ('gj', 'gk'):
+            # gj/gk — move by DISPLAY line. On a wrapped single-line buffer that is
+            # ±(wrap width) columns; on an ordinary grid it falls back to j/k.
+            if getattr(room, 'wrap_buffer', False) and room.rows == 1:
+                w  = getattr(room, '_wrap_w', 0) or room.cols
+                nc = player.col + (w if motion == 'gj' else -w)
+                nc = max(0, min(nc, room.cols - 1))
+                if nc != player.col:
+                    player.col = nc
+                    moved = True
+            else:
+                moved |= move_player(player, 1 if motion == 'gj' else -1, 0, room)
         elif motion == '0':
             row = player.row
             left = player.col
@@ -273,6 +289,23 @@ def apply_motion(player, motion, count, room, target=None, count_given: bool = T
             if target != player.col:
                 player.col = target
                 moved = True
+        elif motion == '|':
+            # {n}| → column n (1-indexed); bare | → column 1. Count is the target,
+            # not a repeat, so walk toward it and stop at a wall/water brink, then
+            # break out of the count loop (mirrors G / gg). Column 1 is the first
+            # standable column (the left border isn't a column).
+            row = player.row
+            target_col = max(0, min(room.first_standable_col() + count - 1, room.cols - 1))
+            best = player.col
+            step = 1 if target_col > player.col else -1
+            for c in range(player.col + step, target_col + step, step):
+                if not _cross_water(room, row, c):
+                    break
+                best = c
+            if best != player.col:
+                player.col = best
+                moved = True
+            break
         elif motion == 'w':
             row = player.row
             cur = room.char_run_at(row, player.col)
@@ -516,8 +549,9 @@ def apply_motion(player, motion, count, room, target=None, count_given: bool = T
         elif motion == 'G':
             # nG → line n; bare G → last line. Always land on first non-blank.
             # Scan inward from the target row if it is a wall (no passable cells).
+            # Line 1 is the first standable row (the top border wall isn't a line).
             if count_given:
-                target_row = max(0, min(count - 1, room.rows - 1))
+                target_row = max(0, min(room.first_standable_row() + count - 1, room.rows - 1))
                 direction = 1
             else:
                 target_row = room.rows - 1
@@ -540,9 +574,9 @@ def apply_motion(player, motion, count, room, target=None, count_given: bool = T
             # first non-blank, scanning downward to the first passable row.
             # Mirror of the G branch; independent of spawn/exit (Vim-faithful).
             if count_given:
-                target_row = max(0, min(count - 1, room.rows - 1))
+                target_row = max(0, min(room.first_standable_row() + count - 1, room.rows - 1))
             else:
-                target_row = 0
+                target_row = room.first_standable_row()
             col = None
             r = target_row
             while 0 <= r < room.rows:

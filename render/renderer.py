@@ -127,14 +127,6 @@ def _reg_display(items: list) -> tuple[str, int]:
     return ''.join(parts), vis
 
 
-def _pad(s: str, width: int) -> str:
-    """Pad or truncate s to exactly width visible characters."""
-    # strip ANSI for length calc is complex; use len of raw string for now
-    # This works well when color codes are added outside pad calls
-    if len(s) < width:
-        return s + ' ' * (width - len(s))
-    return s[:width]
-
 def _ent_cell_str(ent, room, r: int, c: int, mode, floor_bg: str) -> str:
     """Return the colored terminal string for one entity cell (no trailing reset needed)."""
     rst = C.normal_fg()
@@ -181,7 +173,35 @@ def _ent_cell_str(ent, room, r: int, c: int, mode, floor_bg: str) -> str:
         return floor_bg + C.key_fg() + S.KEY + rst
     if ent.kind == 'entry_marker':
         return floor_bg + C.hint_fg() + S.PLAYER + rst
+    if ent.kind == 'archivist':                       # friendly NPC (The Archivist's Library)
+        return floor_bg + C.key_gold_fg() + 'A' + rst
     return floor_bg + '?' + rst
+
+
+# ── Soft-wrap layout helpers (':set wrap' on a single-line buffer) ──────────
+# Pure functions (no Terminal) so the wrap math is unit-testable in isolation.
+
+def wrap_total_rows(cols: int, width: int) -> int:
+    """Display rows a single logical line of `cols` columns occupies at `width`."""
+    if width <= 0:
+        return 1
+    return max(1, -(-cols // width))   # ceil division
+
+
+def wrap_scroll_start(cursor_col: int, cols: int, width: int, view_h: int) -> int:
+    """First display row to show so the cursor's display row sits centred, clamped
+    to [0, total_rows - view_h]."""
+    if width <= 0 or view_h <= 0:
+        return 0
+    total       = wrap_total_rows(cols, width)
+    cursor_drow = cursor_col // width
+    start       = cursor_drow - view_h // 2
+    return max(0, min(start, max(0, total - view_h)))
+
+
+def wrap_room_col(drow: int, screen_c: int, width: int) -> int:
+    """Logical column shown at display row `drow`, screen column `screen_c`."""
+    return drow * width + screen_c
 
 
 def render_all(term: Terminal, dungeon: Dungeon, player: Player,
@@ -275,15 +295,36 @@ def render_all(term: Terminal, dungeon: Dungeon, player: Player,
     vc_start = max(0, vc_start)
 
     gnum_fg = C.hint_fg()                              # dim gutter ink
+    base_row = room.first_standable_row()              # grid row of line 1 (border isn't a line)
     def _gutter(room_r):
         if gutter_w == 0:
             return ''
-        if room_r >= room.rows:
+        # Rows at/above the border (before line 1) get a blank gutter — they aren't lines.
+        if room_r >= room.rows or room_r < base_row:
             return wall_bg + ' ' * gutter_w + rst
         if number_mode == 'relativenumber':
             n = 0 if room_r == player.row else abs(room_r - player.row)
         else:
-            n = room_r + 1
+            n = room_r - base_row + 1
+        return gnum_fg + f'{n:>{gutter_w - 1}} ' + rst
+
+    # ── Soft-wrap (':set wrap' on a single-line Room.wrap_buffer) ────────────
+    wrap_active = (getattr(player, 'wrap', False)
+                   and getattr(room, 'wrap_buffer', False)
+                   and room.rows == 1)
+    if wrap_active:
+        total_drows = wrap_total_rows(room.cols, content_w)
+        dr_start    = wrap_scroll_start(player.col, room.cols, content_w, game_h)
+        room._wrap_w = content_w   # stash the live wrap width for gj/gk display-line motion
+
+    def _gutter_wrap(drow):
+        # The wrap buffer is ONE logical line: number only its first display row,
+        # blank gutter on continuation rows (Vim behaviour).
+        if gutter_w == 0:
+            return ''
+        if drow != 0:
+            return gnum_fg + ' ' * gutter_w + rst
+        n = 0 if number_mode == 'relativenumber' else 1
         return gnum_fg + f'{n:>{gutter_w - 1}} ' + rst
 
     base_floor_bg = C.floor_bg()
@@ -303,18 +344,98 @@ def render_all(term: Terminal, dungeon: Dungeon, player: Player,
     # match the cursor would jump to (the incsearch preview target).
     _hl_cells: set = set()
     _cur_cells: set = set()
-    if mode == Mode.SEARCH and player.cmd_line:
+    if mode == Mode.SEARCH and player.cmd_line and getattr(player, 'incsearch', True):
         _hl_cells = _match_cells(room, player.cmd_line)
         dest = _find_next(room, player, player.cmd_line, player.search_forward)
         if dest is not None:
             _cur_cells = {(dest[0], dest[1] + k) for k in range(len(player.cmd_line))}
-    elif getattr(player, 'last_search', None):
+    elif (getattr(player, 'last_search', None) and getattr(player, 'hlsearch', True)
+          and not getattr(player, 'hl_suppressed', False)):
         _hl_cells = _match_cells(room, player.last_search[0])
 
+    def _cell(room_r, room_c):
+        """Render one IN-BOUNDS room cell to its coloured string fragment.
+        Shared verbatim by the nowrap and wrap screen-row loops."""
+        if (_threat is not None and 'r0' in _threat
+                and _threat['r0'] <= room_r <= _threat['r1']
+                and _threat['c0'] <= room_c <= _threat['c1']):
+            floor_bg = threat_bg
+        elif _vis_active and _in_visual_sel(
+                player.visual_anchor, _vis_cursor, mode, room_r, room_c):
+            floor_bg = vis_bg
+        elif (room_r, room_c) in _cur_cells:
+            floor_bg = cur_bg
+        elif (room_r, room_c) in _hl_cells:
+            floor_bg = hl_bg
+        else:
+            floor_bg = base_floor_bg
+        ct = room.cells[room_r][room_c]
+
+        # Player?
+        if room_r == player.row and room_c == player.col:
+            ent_under  = room.entity_at(room_r, room_c)
+            show_under = ent_under and (
+                time.time() % _OVERLAP_PERIOD >= _OVERLAP_PERIOD / 2
+            )
+            if show_under:
+                return _ent_cell_str(ent_under, room, room_r, room_c, mode, floor_bg)
+            return floor_bg + C.player_fg() + S.PLAYER + C.normal_fg()
+
+        # Fog?
+        if (room_r, room_c) in room.fog_cells:
+            return wall_bg + ' ' + C.normal_fg()
+
+        # Entity?
+        ent = room.entity_at(room_r, room_c)
+        if ent and attack_sym and attack_pos == (room_r, room_c):
+            return floor_bg + term.color_rgb(220, 50, 50) + attack_sym + C.normal_fg()
+        if ent:
+            return _ent_cell_str(ent, room, room_r, room_c, mode, floor_bg)
+
+        # Character run?
+        ru = room.char_run_at(room_r, room_c)
+        if ru:
+            idx = room_c - ru.col
+            sym = ru.symbols[idx]
+            rfg = {'ancient': C.rune_ancient(), 'verdant': C.rune_verdant(),
+                   'void': C.rune_void(), 'ember': C.rune_ember()}.get(ru.kind, C.normal_fg())
+            return floor_bg + rfg + sym + C.normal_fg()
+
+        # Cell type
+        if ct == CellType.WATER:
+            ch, wr, wg, wb = _water_glyph(room_r, room_c)
+            return C.water_bg() + C.water_fg(wr, wg, wb) + ch + C.normal_fg()
+        elif ct == CellType.WALL:
+            return wall_bg + ' ' + C.normal_fg()
+        elif ct == CellType.WOOD_WALL:
+            if room.wood_damage.get((room_r, room_c), 0):
+                return (C.wood_wall_damaged_bg() + C.wood_wall_damaged_fg()
+                        + S.WOOD_WALL_DAMAGED + C.normal_fg())
+            return C.wood_wall_bg() + ' ' + C.normal_fg()
+        return floor_bg + ' ' + C.normal_fg()
+
     for screen_r in range(game_h):
+        if wrap_active:
+            # One logical line wrapped across screen rows (':set wrap'). The room
+            # stays 1×cols; only the view wraps, so _cell is reused unchanged.
+            drow = screen_r + dr_start
+            line = bfg + S.BOX_V + rst + _gutter_wrap(drow)
+            if drow >= total_drows:
+                # Past the wrapped line's end → Vim '~' filler row.
+                line += C.hint_fg() + '~' + rst + base_floor_bg + ' ' * (content_w - 1) + rst
+            else:
+                for screen_c in range(content_w):
+                    room_c = wrap_room_col(drow, screen_c, content_w)
+                    if room_c >= room.cols:
+                        line += base_floor_bg + ' ' + rst   # past line end on its last display row
+                    else:
+                        line += _cell(0, room_c)
+            line += bfg + S.BOX_V + rst
+            output.append(line)
+            continue
+
         room_r = screen_r + vr_start
         line   = bfg + S.BOX_V + rst + _gutter(room_r)
-
         if room_r >= room.rows:
             line += wall_bg + ' ' * content_w + rst
         else:
@@ -322,81 +443,26 @@ def render_all(term: Terminal, dungeon: Dungeon, player: Player,
                 room_c = screen_c + vc_start
                 if room_c >= room.cols:
                     line += wall_bg + ' ' + rst
-                    continue
-
-                if (_threat is not None and 'r0' in _threat
-                        and _threat['r0'] <= room_r <= _threat['r1']
-                        and _threat['c0'] <= room_c <= _threat['c1']):
-                    floor_bg = threat_bg
-                elif _vis_active and _in_visual_sel(
-                        player.visual_anchor, _vis_cursor, mode, room_r, room_c):
-                    floor_bg = vis_bg
-                elif (room_r, room_c) in _cur_cells:
-                    floor_bg = cur_bg
-                elif (room_r, room_c) in _hl_cells:
-                    floor_bg = hl_bg
                 else:
-                    floor_bg = base_floor_bg
-                ct = room.cells[room_r][room_c]
-
-                # Player?
-                if room_r == player.row and room_c == player.col:
-                    ent_under  = room.entity_at(room_r, room_c)
-                    show_under = ent_under and (
-                        time.time() % _OVERLAP_PERIOD >= _OVERLAP_PERIOD / 2
-                    )
-                    if show_under:
-                        line += _ent_cell_str(ent_under, room, room_r, room_c, mode, floor_bg)
-                    else:
-                        line += floor_bg + C.player_fg() + S.PLAYER + C.normal_fg()
-                    continue
-
-                # Fog?
-                if (room_r, room_c) in room.fog_cells:
-                    line += wall_bg + ' ' + C.normal_fg()
-                    continue
-
-                # Entity?
-                ent = room.entity_at(room_r, room_c)
-                if ent and attack_sym and attack_pos == (room_r, room_c):
-                    line += floor_bg + term.color_rgb(220, 50, 50) + attack_sym + C.normal_fg()
-                    continue
-                if ent:
-                    line += _ent_cell_str(ent, room, room_r, room_c, mode, floor_bg)
-                    continue
-
-                # Character run?
-                ru = room.char_run_at(room_r, room_c)
-                if ru:
-                    idx = room_c - ru.col
-                    sym = ru.symbols[idx]
-                    rfg = {'ancient': C.rune_ancient(), 'verdant': C.rune_verdant(),
-                           'void': C.rune_void(), 'ember': C.rune_ember()}.get(ru.kind, C.normal_fg())
-                    line += floor_bg + rfg + sym + C.normal_fg()
-                    continue
-
-                # Cell type
-                if ct == CellType.WATER:
-                    ch, wr, wg, wb = _water_glyph(room_r, room_c)
-                    line += C.water_bg() + C.water_fg(wr, wg, wb) + ch + C.normal_fg()
-                elif ct == CellType.WALL:
-                    line += wall_bg + ' ' + C.normal_fg()
-                elif ct == CellType.WOOD_WALL:
-                    if room.wood_damage.get((room_r, room_c), 0):
-                        line += (C.wood_wall_damaged_bg() + C.wood_wall_damaged_fg()
-                                 + S.WOOD_WALL_DAMAGED + C.normal_fg())
-                    else:
-                        line += C.wood_wall_bg() + ' ' + C.normal_fg()
-                else:
-                    line += floor_bg + ' ' + C.normal_fg()
-
+                    line += _cell(room_r, room_c)
         line += bfg + S.BOX_V + rst
         output.append(line)
 
     # ── Vim statusline / command line ─────────────────────────────────────
-    pos_str  = f'{player.row},{player.col}'
+    # 1-based line,col anchored at the first standable cell — matches the gutter and
+    # {N}G / {N}| (the border walls aren't line/column 1).
+    pos_str  = f'{player.row - room.first_standable_row() + 1},{player.col - room.first_standable_col() + 1}'
 
-    if room.rows <= game_h:
+    if wrap_active:
+        if total_drows <= game_h:
+            scroll = 'All'
+        elif dr_start == 0:
+            scroll = 'Top'
+        elif dr_start + game_h >= total_drows:
+            scroll = 'Bot'
+        else:
+            scroll = f'{int((dr_start + game_h // 2) / total_drows * 100)}%'
+    elif room.rows <= game_h:
         scroll = 'All'
     elif vr_start == 0:
         scroll = 'Top'
@@ -496,7 +562,9 @@ def render_all(term: Terminal, dungeon: Dungeon, player: Player,
 
     # ── Message bar ───────────────────────────────────────────────────────
     if message:
-        msg_text = message[:iw]
+        # Truncate to the viewport with an ellipsis; long dialogue is split into
+        # short pushes that rotate via the (n/m) pool, so each part fits on the bar.
+        msg_text = message if len(message) <= iw else message[:max(1, iw - 1)] + '…'
         msg_pad  = max(0, iw - len(msg_text))
         output.append(bfg + S.BOX_V + rst +
                       C.budget_low() + msg_text + rst + ' ' * msg_pad +

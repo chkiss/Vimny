@@ -5,7 +5,7 @@
 > drifted here once and caused real bugs. Canonical sources:
 > - **Curriculum** (levels, command-unlock order): `content/levels.py` — mirrored in `LEVELS_PLAN.md` **Part 7**.
 > - **Command semantics**: the engine (`engine/`) + tests; quick reference in `README.md`.
-> - **Architecture, key files, conventions, budget formula**: `CLAUDE.md`.
+> - **Architecture, key files, conventions, budget formula**: `docs/ARCHITECTURE.md`.
 >
 > Section numbers below are intentionally non-contiguous. The stale or duplicated sections
 > (former §3 architecture, §4 visual tables, §6.1–6.3 command tables, §7–§11 systems/procgen,
@@ -35,7 +35,7 @@ Vimny is a terminal-first, dungeon crawler that teaches Vim through play. The du
 
 The overworld renders as Vim's netrw directory browser, decorated with a game frame. The player navigates it with `hjkl` and presses `Enter` to enter a dungeon.
 
-*(Illustrative mockup — dungeon names/levels here are not the canonical curriculum; see `content/levels.py`. The as-built overworld is a full netrw buffer (`render/overworld.py` / `run_overworld`): the mockup's `?:examine` / `I:inventory` keys are aspirational, while the shipped browser adds `D` (delete), `R` (rename), `:set number`, and learned-gated motions — see CLAUDE.md → Architecture rules.)*
+*(Illustrative mockup — dungeon names/levels here are not the canonical curriculum; see `content/levels.py`. The as-built overworld is a full netrw buffer (`render/overworld.py` / `run_overworld`): the mockup's `?:examine` / `I:inventory` keys are aspirational, while the shipped browser adds `D` (delete), `R` (rename), `:set number`, and learned-gated motions — see docs/ARCHITECTURE.md → Architecture rules.)*
 
 ```
 ┌──────────────────────────────────────────────────────────────────────────────┐
@@ -148,11 +148,11 @@ Every game view — dungeon, overworld, transition screens — uses the same out
 
 | Quantity | Value |
 |---|---|
-| Frame outer width | **80 columns** |
+| Minimum terminal width | **80 columns** (the supported minimum) |
 | Frame inner width | 78 columns (80 − 2 border `│` characters) |
-| Maximum adaptive width | 120 columns on wider terminals |
+| Maximum adaptive width | **189 columns** on wider terminals (the overworld and The Archivist's Library lay out to this) |
 
-The frame fills terminal width between 80 and 120 columns. Every content line pads with trailing spaces to the full inner width — this is what keeps the right `│` border column-aligned even when content is short. Lines that do not fill to the inner width produce a ragged right border.
+The frame fills terminal width between 80 and 189 columns (clamped in `render/utils.py:inner_w`). Every content line pads with trailing spaces to the full inner width — this is what keeps the right `│` border column-aligned even when content is short. Lines that do not fill to the inner width produce a ragged right border.
 
 **Vertical**:
 

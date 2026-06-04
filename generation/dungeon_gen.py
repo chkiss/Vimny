@@ -1526,7 +1526,6 @@ def build_dungeon_dummy(seed: int) -> Dungeon:
         # cursor CLAMPS at the last floor cell; glyphs tipped against the wall fall off.
         CharRun(row=16, col=38, symbols=tuple('EDGE'),   kind='ember'),
     ]
-    composite.ledge_rows = {13, 14, 16}
 
     composite.par            = None
     composite.budget         = 99999
@@ -3652,7 +3651,22 @@ _WP_ANSWER = "ma 'a x ?cipher⏎ h x `a $ p l"
 
 
 def build_dungeon_waypoint_sanctum(seed: int) -> 'Dungeon':
-    """Marks: The Waypoint Sanctum.  See the module comment above for the design."""
+    """Marks: The Waypoint Sanctum.  See the module comment above for the design.
+
+    DESIGN NOTE — row-9 vault loot (relic scrolls + hearts): reaching it is meant
+    to be an emergent Vim feat (e.g. / to a row-10 word, then G$x to carve the
+    danger room open and clear the goblins), NOT a handed-out key puzzle. We
+    deliberately do NOT gate it with blue keys or void-rune brinks.
+    Budget does NOT meaningfully gate this: once the next level is unlocked the
+    player can replay and loot one chest per visit. The heart_containers are
+    safe (one-time per player via progress['collected_hearts']), but the relic
+    chests respawn each visit, so replaying farms a fresh relic each run until
+    the pool empties.
+    REBALANCING LEVERS, post-playtesting (only if farming proves undesirable):
+    (a) persist looted vault chests per-player, mirroring the collected_hearts
+    mechanism, so each chest yields at most one relic ever; and/or (b) a
+    warden/summoner guarding the vault band. Both need real tuning/judgement, so
+    deferred until there are more players than Joseph testing."""
     rng = random.Random(seed)
     R, C = _WP_ROWS, _WP_COLS
     dungeon = Dungeon(name='The Waypoint Sanctum', seed=seed)
@@ -3687,7 +3701,9 @@ def build_dungeon_waypoint_sanctum(seed: int) -> 'Dungeon':
     entities: list = []
     vault_cells: set = set()
     for i, X in enumerate(_WP_VAULT_COLS):
-        kind = 'heart_container' if i % 3 == 1 else 'chest'
+        # The row-9 vaults hold hearts and relic scrolls (the random pool); only
+        # the left-chamber nook holds the Numbered Ledger (see below).
+        kind = 'heart_container' if i % 3 == 1 else 'chest_scroll'
         carve(7, X)                                      # 'blue' door cell (in the seal)
         for r in (8, 9):                                 # box the shaft off the danger room
             cells[r][X - 1] = CellType.WALL
@@ -3750,7 +3766,7 @@ def build_dungeon_waypoint_sanctum(seed: int) -> 'Dungeon':
     composite.spawn_pos = _WP_SPAWN
     composite.exit_pos  = _WP_EXIT
     entities += [
-        Entity(kind='chest_scroll', row=_WP_SCROLL[0],      col=_WP_SCROLL[1]),
+        Entity(kind='chest_scroll', row=_WP_SCROLL[0],      col=_WP_SCROLL[1], scroll_id='setnum'),
         Entity(kind='locked_door',  row=_WP_SCROLL_DOOR[0], col=_WP_SCROLL_DOOR[1], tag='blue'),
         Entity(kind='locked_door',  row=_WP_LOCK[0],        col=_WP_LOCK[1],        tag='gold'),
         Entity(kind='exit',         row=_WP_EXIT[0],        col=_WP_EXIT[1]),
@@ -3771,53 +3787,121 @@ def build_dungeon_waypoint_sanctum(seed: int) -> 'Dungeon':
 
 # ── The Bracket Vaults layout constants ─────────────────────────────────────────────────
 #
-# Three-corridor snake layout (7 rows × 60 cols).
-# Each corridor row has ( at col _BRACKET_VAULTS_BRACKET_OPEN and ) at col _BRACKET_VAULTS_BRACKET_CLOSE.
-# Row 3 (middle) is filled with void runes everywhere EXCEPT the two bracket cells,
-# forcing the player to use % to cross it rather than manual h/l navigation.
+# Three-corridor snake layout (9 rows × 60 cols): rows 1/3/5 are the corridors, rows 2/4
+# the water gaps with a single CORRIDOR turn cell each, row 3 water except its two bracket
+# cells, row 6 a water moat and row 7 a decoy goblin pit. Each corridor row has ( at col
+# _BRACKET_VAULTS_BRACKET_OPEN and ) at col _BRACKET_VAULTS_BRACKET_CLOSE; WATER blocks manual
+# h/l, so % is the only way across — its authentic Vim use, jumping a parenthesised run.
 #
-# Right turn: col _BRACKET_VAULTS_BRACKET_CLOSE, rows 1-3 (single-column gap cell at row 2).
-# Left turn:  col _BRACKET_VAULTS_BRACKET_OPEN,  rows 3-5 (single-column gap cell at row 4).
+# Right turn: col _BRACKET_VAULTS_BRACKET_CLOSE, rows 1-3 (turn cell at row 2).
+# Left turn:  col _BRACKET_VAULTS_BRACKET_OPEN,  rows 3-5 (turn cell at row 4).
 #
-# Optimal path (par=7):  % 2j % 2j %
-#   Entry (1,1): % scans right, finds ( at col 4, jumps to ) at col 54.
-#   2j → (3,54) ).  % → (3,4) (.  2j → (5,4) (.  % → (5,54) EXIT.
-#   % at (1,1) is not on a bracket but Vim-style % scans right for the first
-#   bracket on the row — finds ( col 4 and jumps to its match ) col 54.
+# Anti-teleport: a {N}G goto-line teleport onto any snake rung must NOT shortcut the snake,
+# so every snake row (2-5) has a col-1 pocket (an unmatched ) sealed by a WALL at col 2) that
+# {N}G lands in instead. The exit is gated by a locked door opened with a floor_key that sits
+# on the row-2 turn cell — reachable only via the snake. See _par_bracket_vaults for par.
 #
-_BRACKET_VAULTS_ROWS          = 7
+_BRACKET_VAULTS_ROWS          = 9      # rows 1/3/5 = snake; 6 = water moat; 7 = decoy goblin pit
 _BRACKET_VAULTS_COLS          = 60
 _BRACKET_VAULTS_BRACKET_OPEN  = 4      # ( on each corridor row
-_BRACKET_VAULTS_BRACKET_CLOSE = 54     # ) on rows 1 & 3; right-turn column; exit column
+_BRACKET_VAULTS_BRACKET_CLOSE = 54     # ) on rows 1 & 3; right-turn column; locked-door column
 _BRACKET_VAULTS_CLOSE_R5      = 53     # ) on row 5 only (one left of CLS; exit sits at CLS)
 _BRACKET_VAULTS_CORR_ROWS     = (1, 3, 5)
+_BRACKET_VAULTS_MOAT_ROW      = 6      # full-water row sealing the decoy off from the snake
+_BRACKET_VAULTS_DECOY_ROW     = 7      # corridor below the moat: where G/L land — a goblin trap
+_BRACKET_VAULTS_DECOY_GOBLINS = (18, 33, 48)   # goblin columns on the decoy row
 _BRACKET_VAULTS_ENTRY         = (1, 1)
-_BRACKET_VAULTS_EXIT_POS      = (5, _BRACKET_VAULTS_BRACKET_CLOSE)
-_BRACKET_VAULTS_PAR           = 8       # % 2j % 2j % l  = 1+2+1+2+1+1 = 8 ks
-_BRACKET_VAULTS_ANSWER        = '% 2j % 2j % l'
+# The exit sits behind a locked door at CLS; the floor_key that opens it is on the row-2
+# right-turn cell (reachable only via the snake — a {N}G teleport lands in the col-1 pocket).
+_BRACKET_VAULTS_KEY_POS       = (2, _BRACKET_VAULTS_BRACKET_CLOSE)   # (2, 54) floor_key
+_BRACKET_VAULTS_DOOR_POS      = (5, _BRACKET_VAULTS_BRACKET_CLOSE)   # (5, 54) locked_door
+_BRACKET_VAULTS_EXIT_POS      = (5, _BRACKET_VAULTS_BRACKET_CLOSE + 1)  # (5, 55) one past the door
+_BRACKET_VAULTS_PAR           = 10      # % j x j % 2j $ p l = 1+1+1+1+1+2+1+1+1 = 10 ks
+_BRACKET_VAULTS_ANSWER        = '% j x j % 2j $ p l'   # % to (1,54); j x j grabs the key &
+                                                       # drops to (3,54); % 2j to (5,4); $ to
+                                                       # the ) by the door; p unlocks; l → exit
+# Rows 1 & 5 fill the span between ( and ) with randomly-chosen vocab words, so % jumps
+# across a real (...) expression — its authentic Vim use — not empty corridor. The words
+# are packed single-spaced with no gap to either bracket, so they exactly fill the span.
+_BRACKET_VAULTS_WORDS_MIN     = 10      # at least this many words per parenthesised row
+
+
+def _bracket_vaults_fill_words(rng, width: int, min_words: int = 10):
+    """Pick random vocab words that, joined by single spaces, EXACTLY fill `width`
+    columns using at least `min_words` words.
+
+    Words come from the plain vocab table, minus any token containing a bracket
+    (those would derail %). Since the vocab's shortest word is 3 chars, the packer
+    only ever leaves a remainder of 0 (close) or >= 4 (room for ' ' + a 3-char word),
+    never a 1-3 gap it can't fill; on the rare attempt that closes before reaching
+    min_words it just retries. Deterministic for a given rng.
+    """
+    _load_vocab_tables()
+    by_len = {n: [w for w in ws if not any(c in '()[]{}' for c in w)]
+              for n, ws in _VOCAB_PLAIN_BY_LEN.items()}
+    by_len = {n: ws for n, ws in by_len.items() if ws}
+    lens   = sorted(by_len)
+    minlen = lens[0]
+
+    for _ in range(4000):
+        words, used = [], 0
+        while used < width:
+            sep   = 0 if not words else 1
+            avail = width - used - sep
+            # Keep the remainder fillable: after this word, leave either 0 (done) or
+            # enough for another ' ' + shortest word.
+            cands = [L for L in lens
+                     if L <= avail and (avail - L == 0 or avail - L >= minlen + 1)]
+            if not cands:
+                break
+            # While short of the quota, prefer words that leave room to continue, and
+            # bias toward shorter words so we comfortably clear min_words.
+            if len(words) + 1 < min_words:
+                cands = [L for L in cands if avail - L >= minlen + 1] or cands
+            L = rng.choices(cands, weights=[1.0 / (x * x) for x in cands])[0]
+            words.append(rng.choice(by_len[L]))
+            used += sep + L
+        if used == width and len(words) >= min_words:
+            return words
+    # Extremely unlikely fallback: shortest words padded — caller widths make this dead code.
+    raise RuntimeError(f'could not pack {min_words}+ words into width {width}')
 
 
 def _par_bracket_vaults(composite, use_percent: bool = True, return_path: bool = False):
     """Minimum-keystroke Dijkstra for The Bracket Vaults.
 
-    Supported motions (all available at The Bracket Vaults):
-      h/l/j/k (count), $ 0 ^, % (if use_percent=True).
-
-    State = (row, col).
-    use_percent=False simulates the command-necessity test (% disabled).
+    The exit sits behind a locked door opened with the floor_key on the row-2 turn cell,
+    so State = (row, col, has_key, door_open). Motions: h/l/j/k (count), $ 0 ^,
+    % (if use_percent=True), x (grab the key on its cell), p (unlock the door one cell to
+    the right, stepping onto it). A closed door blocks standing on it AND every rightward
+    scan ($/^/%), exactly like the engine (a locked_door halts _cross_water).
+    use_percent=False simulates the command-necessity test (% disabled → water uncrossable).
     """
     ROWS, COLS = composite.rows, composite.cols
     entry = composite.spawn_pos
     goal  = composite.exit_pos
+    KEYR, KEYC   = _BRACKET_VAULTS_KEY_POS
+    DOORR, DOORC = _BRACKET_VAULTS_DOOR_POS
 
     _PAIRS_OPEN_L11  = {'(': ')', '[': ']', '{': '}'}
     _PAIRS_CLOSE_L11 = {')': '(', ']': '[', '}': '{'}
 
-    def _ok(r, c):
+    def _passable(r, c, do):
         if not composite.is_passable(r, c):
+            return False
+        if (r, c) == (DOORR, DOORC) and not do:   # locked door is a wall until opened
+            return False
+        return True
+
+    def _ok(r, c, do):
+        if not _passable(r, c, do):
             return False
         ru = composite.char_run_at(r, c)
         return not (ru and ru.kind == 'void')
+
+    def _blocks_scan(r, c, do):
+        return (composite.cells[r][c] in (CellType.WALL, CellType.WOOD_WALL)
+                or ((r, c) == (DOORR, DOORC) and not do))
 
     def _bracket_here(r, c):
         ru = composite.char_run_at(r, c)
@@ -3827,14 +3911,14 @@ def _par_bracket_vaults(composite, use_percent: bool = True, return_path: bool =
                 return ch
         return None
 
-    def _pct(r, c):
-        """Replicate motion.py % scan: same-row, nesting-aware, stops at walls."""
+    def _pct(r, c, do):
+        """Replicate motion.py % scan: same-row, nesting-aware, stops at walls/closed door."""
         bch   = _bracket_here(r, c)
         start = c if bch is not None else None
         # If not on a bracket, scan right for the first one (Vim behaviour).
         if start is None:
             for cc in range(c + 1, COLS):
-                if composite.cells[r][cc] in (CellType.WALL, CellType.WOOD_WALL):
+                if _blocks_scan(r, cc, do):
                     break
                 b = _bracket_here(r, cc)
                 if b is not None:
@@ -3847,7 +3931,7 @@ def _par_bracket_vaults(composite, use_percent: bool = True, return_path: bool =
         scan    = range(start, COLS) if forward else range(start, -1, -1)
         depth   = 0
         for cc in scan:
-            if composite.cells[r][cc] in (CellType.WALL, CellType.WOOD_WALL):
+            if _blocks_scan(r, cc, do):
                 break
             b = _bracket_here(r, cc)
             if b == bch:
@@ -3855,99 +3939,106 @@ def _par_bracket_vaults(composite, use_percent: bool = True, return_path: bool =
             elif b == want:
                 depth -= 1
                 if depth == 0:
-                    if _ok(r, cc) and cc != c:
+                    if _ok(r, cc, do) and cc != c:
                         return (r, cc)
                     return None
         return None
 
-    dist = {entry: 0}
-    prev = {entry: None}
-    heap = [(0, entry)]
+    start_state = (entry[0], entry[1], 0, 0)
+    dist = {start_state: 0}
+    prev = {start_state: None}
+    heap = [(0, start_state)]
     max_n = max(ROWS, COLS)
 
     while heap:
-        cost, (r, c) = heapq.heappop(heap)
+        cost, state = heapq.heappop(heap)
+        r, c, hk, do = state
         if (r, c) == goal:
             if return_path:
-                return cost, _join_path(prev, (r, c), merge_single=True)
+                return cost, _join_path(prev, state, merge_single=True)
             return cost
-        if cost > dist.get((r, c), float('inf')):
+        if cost > dist.get(state, float('inf')):
             continue
 
-        def _push(nb, mc=1, lbl=''):
-            if nb is None:
-                return
-            nr, nc = nb
-            if not _ok(nr, nc):
+        def _push(ns, mc=1, lbl=''):
+            if ns is None:
                 return
             g = cost + mc
-            if g < dist.get((nr, nc), float('inf')):
-                dist[(nr, nc)] = g
-                prev[(nr, nc)] = ((r, c), lbl)
-                heapq.heappush(heap, (g, (nr, nc)))
+            if g < dist.get(ns, float('inf')):
+                dist[ns] = g
+                prev[ns] = (state, lbl)
+                heapq.heappush(heap, (g, ns))
+
+        # x: pick up the floor key when standing on it
+        if (r, c) == (KEYR, KEYC) and hk == 0:
+            _push((r, c, 1, do), 1, 'x')
+
+        # p: unlock the locked door one cell to the right (steps onto it), consuming the key
+        if hk == 1 and do == 0 and (r, c + 1) == (DOORR, DOORC):
+            _push((DOORR, DOORC, 0, 1), 1, 'p')
 
         # j/k (vertical), h/l (horizontal) — with count
         for dr, key in ((1, 'j'), (-1, 'k')):
             for n in range(1, max_n + 1):
                 nr2 = r + dr * n
-                if nr2 < 0 or nr2 >= ROWS or not _ok(nr2, c):
+                if nr2 < 0 or nr2 >= ROWS or not _ok(nr2, c, do):
                     break
                 mc2  = 1 if n == 1 else len(str(n)) + 1
                 lbl2 = key if n == 1 else f'{n}{key}'
-                _push((nr2, c), mc2, lbl2)
+                _push((nr2, c, hk, do), mc2, lbl2)
 
         for dc, key in ((1, 'l'), (-1, 'h')):
             for n in range(1, max_n + 1):
                 nc2 = c + dc * n
-                if nc2 < 0 or nc2 >= COLS or not _ok(r, nc2):
+                if nc2 < 0 or nc2 >= COLS or not _ok(r, nc2, do):
                     break
                 mc2  = 1 if n == 1 else len(str(n)) + 1
                 lbl2 = key if n == 1 else f'{n}{key}'
-                _push((r, nc2), mc2, lbl2)
+                _push((r, nc2, hk, do), mc2, lbl2)
 
-        # $: rightmost passable+ok col in same row
+        # $: rightmost passable+ok col in same row (stops at a closed door)
         best_col = None
         for cc in range(c + 1, COLS):
-            if not composite.is_passable(r, cc):
+            if not _passable(r, cc, do):
                 break
             best_col = cc
-        if best_col is not None and _ok(r, best_col):
-            _push((r, best_col), 1, '$')
+        if best_col is not None and _ok(r, best_col, do):
+            _push((r, best_col, hk, do), 1, '$')
 
         # 0: leftmost passable+ok col in same row
         left_col = c
         for cc in range(c - 1, -1, -1):
-            if not composite.is_passable(r, cc):
+            if not _passable(r, cc, do):
                 break
             left_col = cc
-        if left_col < c and _ok(r, left_col):
-            _push((r, left_col), 1, '0')
+        if left_col < c and _ok(r, left_col, do):
+            _push((r, left_col, hk, do), 1, '0')
 
         # ^: first character (any kind) scanning from leftmost passable boundary.
         # Stops at the first character found (void or not); only pushes if _ok
         # (non-void).  Mirrors the game engine: void runes block ^ silently.
         lb = c
         for cc in range(c - 1, -1, -1):
-            if not composite.is_passable(r, cc):
+            if not _passable(r, cc, do):
                 break
             lb = cc
         rb = c
         for cc in range(c + 1, COLS):
-            if not composite.is_passable(r, cc):
+            if not _passable(r, cc, do):
                 break
             rb = cc
         for cc in range(lb, rb + 1):
             ru2 = composite.char_run_at(r, cc)
             if ru2:
-                if _ok(r, cc):
-                    _push((r, cc), 1, '^')
+                if _ok(r, cc, do):
+                    _push((r, cc, hk, do), 1, '^')
                 break  # first character (void or not) terminates search
 
         # %: matching bracket jump (disabled in command-necessity test)
         if use_percent:
-            nb_pct = _pct(r, c)
+            nb_pct = _pct(r, c, do)
             if nb_pct is not None:
-                _push(nb_pct, 1, '%')
+                _push((nb_pct[0], nb_pct[1], hk, do), 1, '%')
 
     if return_path:
         return None, ''
@@ -3957,24 +4048,25 @@ def _par_bracket_vaults(composite, use_percent: bool = True, return_path: bool =
 def build_dungeon_bracket_vaults(seed: int) -> Dungeon:
     """% (The Bracket Vaults).
 
-    Teaches `%` (bracket-matching jump) as the only way to cross a band of WATER.
-    Layout: three horizontal corridors (rows 1/3/5) in a snake pattern, with rows
-    2, 3 and 4 flooded.
+    Teaches `%` (bracket-matching jump) as the only way to cross a band of WATER, then
+    gates the exit behind a floor_key (x to grab) and a locked door (p to unlock).
+    Layout: three horizontal corridors (rows 1/3/5) in a snake pattern, with rows 2, 3
+    and 4 flooded. Rows 1 & 5 fill their ( ... ) span with treasure-words so % jumps a
+    real parenthesised run. Rows 2 and 4 are water except a single turn cell each; row 3
+    is water except its two bracket cells. Every snake row (2-5) carries a col-1 pocket
+    (unmatched ) + WALL at col 2) so a {N}G teleport is trapped there, not on the snake.
 
-    Rows 1 and 5 are open corridors.  Rows 2 and 4 are water except the single
-    turn cell on each.  Row 3 is water except at ( col 4 and ) col 54 — the only
-    landing cells.  WATER blocks manual h/l (is_passable is False); % scans across
-    the water to the matching bracket.
+    Right turn: col 54, rows 1-3.  Left turn: col 4, rows 3-5.  Row 5's ) sits at col 53;
+    the locked door is at (5,54) and the exit one cell further right at (5,55). The key is
+    on the row-2 turn cell (2,54), reachable only by the snake.
 
-    Right turn: col 54, rows 1-3.  Left turn: col 4, rows 3-5.  Row 5's ) sits at
-    col 53 with the exit one cell right at (5,54).
-
-    Optimal path (par=8):  % 2j % 2j % l
-      Entry (1,1): % → ) col 54.  2j → (3,54).  % → (3,4) (.  2j → (5,4) (.
-      % → (5,53) ).  l → (5,54) EXIT.
+    Optimal path (par=10):  % j x j % 2j $ p l
+      (1,1) % → (1,54) ).  j → (2,54) key, x grabs it.  j → (3,54).  % → (3,4) (.
+      2j → (5,4) (.  $ → (5,53) ) [the closed door halts $].  p unlocks the door and steps
+      onto (5,54).  l → (5,55) EXIT.
 
     Without %: par_no_% = None (the water band is uncrossable by hand).
-    Layout is deterministic; seed only colors bracket characters.
+    Layout is deterministic; seed only colors the bracket/word characters.
     """
     dungeon   = Dungeon(name='The Bracket Vaults', seed=seed)
     ROWS, COLS = _BRACKET_VAULTS_ROWS, _BRACKET_VAULTS_COLS
@@ -4012,6 +4104,27 @@ def build_dungeon_bracket_vaults(seed: int) -> Dungeon:
         if c != OPN and c != CLS:
             cells[3][c] = CellType.WATER
 
+    # ── Moat + decoy goblin pit (anti-teleport) ───────────────────────────────
+    # The exit sits on row 5, which used to be the LAST line — so G (last line) and
+    # L (bottom of screen) teleported straight to it and `% l` finished in 3, under
+    # par. Add a full-water moat (row 6) and a corridor decoy (row 7) BELOW it: now
+    # G/L land on row 7, sealed off from the snake by the moat, in a pit of goblins.
+    # The real exit on row 5 is interior and unreachable by any teleport.
+    MOAT, DECOY = _BRACKET_VAULTS_MOAT_ROW, _BRACKET_VAULTS_DECOY_ROW
+    for c in range(1, COLS - 1):
+        cells[MOAT][c]  = CellType.WATER
+        cells[DECOY][c] = CellType.CORRIDOR
+
+    # Anti-teleport pockets on EVERY snake row (2-5): a CORRIDOR cell at col 1 (holding an
+    # unmatched ) — see below) plus a stone WALL at col 2. A {N}G goto-line teleport onto
+    # any snake rung lands on that col-1 ) (the row's first-non-blank), sealed off from the
+    # snake by the wall — scans ($/%/f/0/^) cross water but HALT at a wall — so it can never
+    # reach the snake proper. Row 1 needs no pocket: its first-non-blank IS the snake's start
+    # ( at col 4, and finishing from there already costs more than par.
+    for br in (2, 3, 4, 5):
+        cells[br][1] = CellType.CORRIDOR
+        cells[br][2] = CellType.WALL
+
     # ── Place bracket CharRuns ────────────────────────────────────────────
     # Single-char CharRun at each bracket position so _bracket_at() in
     # motion.py can identify them via the character at that cell.  Row 5's ) sits
@@ -4027,6 +4140,29 @@ def build_dungeon_bracket_vaults(seed: int) -> Dungeon:
         close_col  = EXC if row == 5 else CLS
         runes.append(CharRun(row=row, col=OPN, symbols=('(',), kind=kind_open))
         runes.append(CharRun(row=row, col=close_col, symbols=(')',), kind=kind_close))
+    # Decorative brackets on the decoy row (so it reads like the rest; they lead nowhere).
+    runes.append(CharRun(row=DECOY, col=OPN, symbols=('(',), kind=rng.choice(_kinds)))
+    runes.append(CharRun(row=DECOY, col=CLS, symbols=(')',), kind=rng.choice(_kinds)))
+
+    # Random vocab words between the brackets on rows 1 & 5 — one CharRun per word with a
+    # single-column gap between, exactly filling ( ... ) with no space against either
+    # bracket. % ignores them (no brackets within) and jumps ( → ); they give the run real
+    # content to span. The packer guarantees >= _WORDS_MIN words sized to the exact span.
+    for wrow in (1, 5):
+        close_col = EXC if wrow == 5 else CLS
+        first_col = OPN + 1                         # flush against the (
+        width     = close_col - first_col           # cols first_col .. close_col-1
+        wc = first_col
+        for w in _bracket_vaults_fill_words(rng, width, _BRACKET_VAULTS_WORDS_MIN):
+            runes.append(CharRun(row=wrow, col=wc, symbols=tuple(w), kind=rng.choice(_kinds)))
+            wc += len(w) + 1
+
+    # Lone unmatched ) in each snake row's col-1 pocket (rows 2-5): it is that row's
+    # first-non-blank, so a {N}G teleport lands on it. From a ) the % scan runs LEFT, hits
+    # the col-0 wall and finds no match; the col-2 WALL blocks l/w/e/f/$/% rightward — so the
+    # teleport is trapped in the pocket with no route to the snake or the exit.
+    for br in (2, 3, 4, 5):
+        runes.append(CharRun(row=br, col=1, symbols=(')',), kind=rng.choice(_kinds)))
 
     composite.char_runs = runes
 
@@ -4035,6 +4171,17 @@ def build_dungeon_bracket_vaults(seed: int) -> Dungeon:
     composite.exit_pos = _BRACKET_VAULTS_EXIT_POS
     composite.entities = [Entity(kind='exit',
                                  row=_BRACKET_VAULTS_EXIT_POS[0], col=_BRACKET_VAULTS_EXIT_POS[1])]
+    # Floor key on the row-2 turn cell + locked door guarding the exit: the exit can't be
+    # reached by simply landing on it (a {N}G teleport is trapped in a col-1 pocket anyway),
+    # and the key sits where only the snake reaches it. Pick up with x, unlock with p.
+    composite.entities.append(Entity(kind='floor_key',
+                                     row=_BRACKET_VAULTS_KEY_POS[0], col=_BRACKET_VAULTS_KEY_POS[1]))
+    composite.entities.append(Entity(kind='locked_door',
+                                     row=_BRACKET_VAULTS_DOOR_POS[0], col=_BRACKET_VAULTS_DOOR_POS[1]))
+    # Goblins guarding the decoy pit — they punish a teleport-cheese (G/L) and can't
+    # cross the moat to the snake.
+    for gc in _BRACKET_VAULTS_DECOY_GOBLINS:
+        composite.entities.append(Entity(kind='goblin', row=DECOY, col=gc, max_hp=1, ai='chase'))
 
     composite.rebuild_indexes()
 
@@ -4101,6 +4248,7 @@ def _par_screen_vault(composite, return_path: bool = False):
     game_h = composite._game_h
     m_row, l_row = _screen_vault_key_rows(game_h)
     ROWS, COLS = composite.rows, composite.cols
+    BASE_ROW = composite.first_standable_row()    # line N → grid row BASE_ROW + N - 1
     H_COL  = _SCREEN_VAULT_H_KEY_COL
     M_COL  = _SCREEN_VAULT_M_KEY_COL
     L_COL  = _SCREEN_VAULT_L_KEY_COL
@@ -4222,9 +4370,11 @@ def _par_screen_vault(composite, return_path: bool = False):
                     _try((tr, fc, inv, ka, doors), 1, 'G')
                 break
 
-        # nG
+        # nG — line n → grid row BASE_ROW + n - 1 (the border isn't a line)
         for n in range(1, ROWS + 1):
-            tr2 = n - 1
+            tr2 = BASE_ROW + n - 1
+            if tr2 >= ROWS:
+                break
             fc2 = _fnb_simple(tr2, doors)
             if fc2 is None or (tr2, fc2) == (r, c):
                 continue
@@ -4706,6 +4856,7 @@ def _par_lineheads(composite, return_path: bool = False,
     Goal: reach _LINEHEADS_EXIT (only reachable once both doors are open).
     """
     ROWS, COLS = composite.rows, composite.cols
+    BASE_ROW = composite.first_standable_row()    # line N → grid row BASE_ROW + N - 1
     entry = composite.spawn_pos
     keys  = _LINEHEADS_KEYS
     doors = _LINEHEADS_DOORS
@@ -4793,9 +4944,10 @@ def _par_lineheads(composite, return_path: bool = False,
                         _try((rr, gc, km, hold, dm), 2, 'gg')
                     break
 
-            # {n}G: line n (1-based); scan down from row n-1 to a passable row, fnb
+            # {n}G: line n (1-based) → grid row BASE_ROW + n - 1 (border isn't a line),
+            # scanning down to a passable row, fnb
             for n in range(1, ROWS + 1):
-                rr = n - 1
+                rr = BASE_ROW + n - 1
                 while rr < ROWS and _fnb(rr, dm) is None:
                     rr += 1
                 if rr >= ROWS:
@@ -5178,5 +5330,373 @@ def build_dungeon_sentence_corridor(seed: int) -> 'Dungeon':
     composite.answer = answer
 
     dungeon.rooms        = [composite]
+    dungeon.current_room = 0
+    return dungeon
+
+
+# ── The Archivist's Library (L17) — one-line wrap_buffer + reload loop ───────
+# Mechanically unlike any other level: the whole dungeon is ONE logical line
+# (rows==1, wrap_buffer=True). ':set wrap' shelves it; ':e!' leafs through a
+# seed-shuffled cadence of suit folios and decoys; ':w {suit}' files a copy;
+# presenting forged folios to the Archivist is lethal. State lives on the room
+# (lib_*) and is driven by the hooks in main.run_dungeon.
+_LIB_SUITS      = ('hearts', 'diamonds', 'spades', 'clubs')
+_LIB_SUIT_GLYPH = {'hearts': '♥', 'diamonds': '♦', 'spades': '♠', 'clubs': '♣'}
+_LIB_BODY_ROWS  = 9             # text rows inside the page frame
+_LIB_FALLBACK_W = 78           # build-time width; main relayouts to the real viewport
+
+
+def _lib_center(s: str, w: int) -> str:
+    s = s[:w]
+    pad  = w - len(s)
+    left = pad // 2
+    return ' ' * left + s + ' ' * (pad - left)
+
+
+def _lib_frame(W: int, body: list, kinds: list, border: str = 'ancient') -> list:
+    """Compose a framed 'page' as rows of EXACTLY W columns (so wrapping at width W
+    redraws a perfect rectangle), each tagged with its colour `kind`. Returns a list
+    of (row_string, kind); the caller emits one CharRun per row so regions keep their
+    own colour. The first row is the top border, so even unwrapped the player sees a
+    ┌────┐ filling the view."""
+    inner = max(1, W - 2)
+    rows  = [('┌' + '─' * inner + '┐', border)]
+    for i in range(_LIB_BODY_ROWS):
+        line = body[i] if i < len(body) else ''
+        k    = kinds[i] if i < len(kinds) else border
+        rows.append(('│' + _lib_center(line, inner) + '│', k))
+    rows.append(('└' + '─' * inner + '┘', border))
+    return rows                 # each row is exactly W chars → (rows)*W total
+
+
+# A library floor drawn top-down: rows of labelled book-stacks (full ▤▤, empty □□),
+# reading tables, and the Archivist's desk. Stack labels are UNIQUE within a page —
+# the 4 card suits, 6 chess pieces, and a RANKED pool of 89 ornaments (crosses first,
+# then stars, snowflakes, florals, geometric & misc). The shelves fill the viewport
+# left-to-right and the ornament pool is drawn front-to-back, so a wider window simply
+# pulls in more glyphs in rank order. All glyphs are terminal width-1 (the wrapped page
+# must stay a perfect rectangle).
+_LIB_CHESS    = ['♚', '♛', '♜', '♝', '♞', '♟']
+_LIB_FILLERS  = ['✝', '✞', '✟', '✠', '✚', '✛', '✜', '✢', '✣', '†', '‡', '☩', '☦', '☨', '✙', '⁜',
+                 '✦', '✧', '✩', '✪', '✫', '✬', '✭', '✮', '✯', '✰', '★', '☆', '✱', '✲', '✴', '✵',
+                 '✶', '✷', '✸', '✹', '✺', '✳',
+                 '❀', '❁', '❂', '❃', '❄', '❅', '❆', '❇', '❈', '❉', '❊', '❋', '❍',
+                 '✿', '❦', '❧', '⁂', '⁕', '✾', '✽', '✼', '✻', '⚘', '☘',
+                 '◈', '◇', '◆', '❖', '⬡', '⬢', '⬣', '⟡', '⬠', '⬟', '⬨', '⬩',
+                 '♪', '♫', '♬', '♩', '⚜', '⚝', '☼',
+                 '❡', '❢', '☸', '☫', '⚹', '⚶', '⚸', '⸙']
+_LIB_DESK       = '╓─╖'              # the Archivist's small desk (ember)
+_LIB_TBL_SURF2  = 5                  # body index of the reading table's 2nd surface row
+_LIB_BORDER     = set('┌─┐│└┘◠◡')    # box-drawing glyphs — always drawn in ancient indigo
+
+
+def _lib_table_band(inner: int, rng, tables=None) -> list:
+    """A centred row of two reading tables (chairs ◠/◡ along the edges). With tables=None
+    the surfaces are set sparsely with a few books (≡/◫) — the library at rest. Given
+    pre-generated `tables` (see _lib_folio_tables) the surfaces are PACKED instead, to
+    spell a folio's answer. Returns 4 body rows."""
+    n, w, gap = 2, 10, '        '
+    top = '┌' + ''.join('◠' if i % 3 == 0 else '─' for i in range(w)) + '┐'
+    bot = '└' + ''.join('◡' if i % 3 == 0 else '─' for i in range(w)) + '┘'
+
+    def surfaces(content):
+        if content is None:               # the library: a few books, plenty of bare space
+            cells = [[' '] * w, [' '] * w]
+            books = ['≡'] * rng.randint(2, 3) + ['◫'] * rng.randint(1, 2)
+            spots = [(r, c) for r in range(2) for c in range(0, w, 2)]
+            rng.shuffle(spots)
+            for b, (r, c) in zip(books, spots):
+                cells[r][c] = b
+        else:
+            cells = [list(content[0]), list(content[1])]
+        return ['│' + ''.join(cells[0]) + '│', '│' + ''.join(cells[1]) + '│']
+
+    surf = [surfaces(None if tables is None else tables[k]) for k in range(n)]
+    join = lambda parts: (' ' * len(gap)).join(parts)
+    return [join([top] * n), join([s[0] for s in surf]),
+            join([s[1] for s in surf]), join([bot] * n)]
+
+
+def _lib_title_row(inner: int, text: str) -> str:
+    """The title, centred. (The Archivist's desk is placed separately, at _LIB_DESK_COL.)"""
+    row   = [' '] * inner
+    start = max(0, (inner - len(text)) // 2)
+    for i, ch in enumerate(text):
+        if start + i < inner:
+            row[start + i] = ch
+    return ''.join(row)
+
+
+def _lib_table_fill(fill, suit_glyphs, nonsuit_labels, frng):
+    """Choose the glyphs for a folio's tables, sampled from THIS page's shelves so the
+    empties always correspond. fill is one of:
+      ('suit', g)       — unmixed one suit  (the correct folio)
+      ('mixsuit',)      — a jumble of suits
+      ('nonsuit', True) — unmixed one non-suit label (chess piece or ornament)
+      ('nonsuit', False)— a jumble of non-suit labels
+    Returns (glyphs, unmixed?)."""
+    if fill[0] == 'suit':
+        return [fill[1]], True
+    if fill[0] == 'mixsuit':
+        return suit_glyphs, False
+    if fill[1]:                                   # unmixed non-suit
+        return [frng.choice(nonsuit_labels)], True
+    return frng.sample(nonsuit_labels, min(len(nonsuit_labels), 5)), False   # mixed non-suit
+
+
+def _lib_floor_spec(inner: int, rng, filled=(), fill=None, fill_rng=None,
+                    title='L I B R A R Y') -> dict:
+    """A library-floor page: a title, two shelf bands (the chess group and the suit
+    group, packed out with UNIQUE filler labels — no duplicates), and the reading
+    tables. Bookshelves render ancient indigo, tables/desk ember. Without `fill` it is
+    the sparse library and the four suit stacks stand empty (□□) until `filled`. With
+    a `fill` descriptor (a :e! folio) the tables are PACKED with glyphs sampled from
+    this page's own shelves, and exactly those bookcases are emptied — the books the
+    Archivist pulled to pack it — so the empties always correspond to the table."""
+    g       = _LIB_SUIT_GLYPH
+    F       = set(filled)                          # suit stacks fill ONLY as the player saves them
+    pool    = list(_LIB_FILLERS)                   # ranked: pulled front-to-back as the page widens
+    # Shelves per band scale to fill the viewport left-to-right, bounded by the label pool
+    # so every stack stays uniquely labelled (no duplicates, no '·' fallback).
+    ncells  = max(9, (inner + 2) // 4)
+    ncells  = min(ncells, (len(pool) + len(_LIB_CHESS) + len(_LIB_SUITS)) // 2)
+    take    = lambda: (pool.pop(0) if pool else '·')
+
+    nonsuit = list(_LIB_CHESS)                    # every non-suit label on this page
+
+    def make_band(center):                        # functional group centred; fillers flank both sides
+        n_fill = max(0, ncells - len(center))
+        left   = [take() for _ in range(n_fill // 2)]
+        right  = [take() for _ in range(n_fill - n_fill // 2)]
+        nonsuit.extend(left + right)              # fillers are non-suit labels
+        return [(gl, True) for gl in left] + center + [(gl, True) for gl in right]
+
+    chess_cells = make_band([(c, True) for c in _LIB_CHESS])
+    suit_cells  = make_band([(g[s], s in F) for s in _LIB_SUITS])
+
+    tables, empty = None, set()
+    if fill is not None:
+        glyphs, unmixed = _lib_table_fill(fill, list(g.values()), nonsuit, fill_rng or rng)
+        w = 10
+        tables = [[[(glyphs[0] if unmixed else (fill_rng or rng).choice(glyphs))
+                    for _ in range(w)] for _ in range(2)] for _ in range(2)]
+        empty  = {ch for t in tables for row in t for ch in row}
+
+    suit_set = set(g.values())
+    def render(cells):
+        # Suit stacks keep their saved state; only NON-suit bookcases are emptied to
+        # fill the table (suit folios show □□ simply because they aren't saved yet).
+        cells = [(gl, f if gl in suit_set else (f and gl not in empty)) for gl, f in cells]
+        lab   = '  '.join(f'{gl} ' for gl, _ in cells)
+        shelf = '  '.join('▤▤' if f else '□□' for _, f in cells)
+        return lab, shelf
+
+    cl, cs = render(chess_cells)
+    sl, ss = render(suit_cells)
+    table  = _lib_table_band(inner, rng, tables)
+    body   = [_lib_title_row(inner, title), cl, cs, *table, sl, ss]
+    # title + shelves + frame in ancient indigo; only the reading tables glow ember.
+    kinds  = ['ancient', 'ancient', 'ancient', *(['ember'] * len(table)), 'ancient', 'ancient']
+    return {'kind': 'ancient', 'border': 'ancient', 'body': body, 'kinds': kinds}
+
+
+def _lib_desk_col(W: int, body: list) -> int:
+    """Logical column for the desk: five cells left of the 1st reading table's 2nd
+    surface row. (The table content starts with the table's left │, centred by the
+    frame.)"""
+    drow     = _LIB_TBL_SURF2 + 1                 # +1 for the top border row
+    inner    = max(1, W - 2)
+    content  = body[_LIB_TBL_SURF2] if _LIB_TBL_SURF2 < len(body) else ''
+    left_pad = (inner - len(content)) // 2
+    return max(0, drow * W + 1 + left_pad - 5)
+
+
+def _lib_place_desk(room, c0: int) -> None:
+    """Set the Archivist's desk (ember) at logical column c0, splitting the run it lands
+    in so it keeps its own colour."""
+    if c0 + len(_LIB_DESK) > room.cols:
+        return
+    ru = room.char_run_at(0, c0)
+    if ru is None or ru is not room.char_run_at(0, c0 + len(_LIB_DESK) - 1):
+        return                                    # the desk spans a row edge — skip (rare)
+    i, s, off = room.char_runs.index(ru), list(ru.symbols), c0 - ru.col
+    for j, ch in enumerate(_LIB_DESK):
+        s[off + j] = ch
+    parts = []
+    if off > 0:
+        parts.append(CharRun(0, ru.col, tuple(s[:off]), ru.kind))
+    parts.append(CharRun(0, c0, tuple(_LIB_DESK), 'ember'))   # the desk glows amber
+    tail = s[off + len(_LIB_DESK):]
+    if tail:
+        parts.append(CharRun(0, c0 + len(_LIB_DESK), tuple(tail), ru.kind))
+    room.char_runs[i:i + 1] = parts
+
+
+def _lib_layout(room, W: int) -> None:
+    """(Re)compose the current page at viewport width W as one CharRun PER display row
+    (shelves indigo, tables/desk ember), resize the room, place the desk at (0,521),
+    and keep the Archivist in bounds. Pages are generated from the seed (stable across
+    resize). Called by the builder and by main.run_dungeon when the width changes."""
+    inner  = max(8, W - 2)
+    rng    = random.Random((room.seed or 0) ^ 0x5EED)
+    filled = [s for s in _LIB_SUITS if s in room.lib_filed]   # suit stacks the player has saved
+    if getattr(room, 'lib_done', None) == 'win':
+        spec = _lib_floor_spec(inner, rng, filled=_LIB_SUITS,
+                               title='L I B R A R Y   R E S T O R E D')
+    elif getattr(room, 'lib_view', 'catalog') == 'catalog' or room.lib_idx < 0:
+        spec = _lib_floor_spec(inner, rng, filled=filled)
+    else:                                         # a :e! folio — packed tables show the answer
+        frng = random.Random((room.seed or 0) ^ ((room.lib_idx + 1) * 0x9E37))
+        spec = _lib_floor_spec(inner, rng, filled=filled,
+                               fill=room.lib_seq[room.lib_idx]['fill'], fill_rng=frng)
+    rows = _lib_frame(W, spec['body'], spec['kinds'], spec['border'])
+    room.cols      = sum(len(r) for r, _ in rows)
+    room.cells     = [[CellType.FLOOR] * room.cols]
+    room.char_runs = []
+    col = 0
+    for rowstr, kind in rows:
+        # Split each row so box-drawing borders stay ancient indigo while the row's
+        # own content (table books, etc.) keeps its colour — e.g. blue table frames
+        # around amber books.
+        j, n = 0, len(rowstr)
+        while j < n:
+            border = rowstr[j] in _LIB_BORDER
+            k = j
+            while k < n and (rowstr[k] in _LIB_BORDER) == border:
+                k += 1
+            room.char_runs.append(CharRun(0, col + j, tuple(rowstr[j:k]),
+                                          'ancient' if border else kind))
+            j = k
+        col += n
+    room.rebuild_indexes()
+    room._lib_desk_col = _lib_desk_col(W, spec['body'])
+    _lib_place_desk(room, room._lib_desk_col)
+    # The Archivist sits at his desk until he first paces off (_enemy_tick); after that
+    # just keep him in bounds as the page re-flows.
+    for e in room.entities:
+        if e.kind == 'archivist':
+            if not getattr(room, '_lib_arch_paced', False):
+                e.col = room._lib_desk_col
+            e.col = min(max(1, e.col), room.cols - 2)
+    room._lib_w = W
+    room.rebuild_indexes()
+
+
+def build_dungeon_archivists_library(seed: int) -> Dungeon:
+    rng = random.Random(seed)
+    dungeon = Dungeon(name="The Archivist's Library", seed=seed)
+
+    room = Room(room_type=RoomType.ENTRY, rows=1, cols=_LIB_FALLBACK_W)
+    room.seed        = seed
+    room.spawn_pos   = (0, 0)
+    room.wrap_buffer = True
+    room.par         = 20         # under-par target (the under-par message fires at the exit)
+    room.budget      = 2000       # generous; the loop is exploratory, never budget-gated
+    room.answer      = ''
+
+    # Cadence: a one-suit folio (the only correct answer) at indices 0,3,7,10; decoys
+    # elsewhere, cycling through mixed suits, unmixed non-suits and mixed non-suits.
+    # Each folio carries only its FILL TYPE; the glyphs are sampled at render time from
+    # the page's own shelves (so the emptied bookcases always correspond).
+    suit_slots = [0, 3, 7, 10]
+    suits      = list(_LIB_SUITS)
+    rng.shuffle(suits)
+    _decoys    = [('mixsuit',), ('nonsuit', True), ('nonsuit', False)]
+    seq, decoy_n = [], 0
+    for i in range(11):
+        if i in suit_slots:
+            S = suits[suit_slots.index(i)]
+            seq.append({'suit': S, 'fill': ('suit', _LIB_SUIT_GLYPH[S])})
+        else:
+            seq.append({'suit': None, 'fill': _decoys[decoy_n % len(_decoys)]})
+            decoy_n += 1
+
+    room.lib_seq     = seq
+    room.lib_idx     = -1         # index into the cycle of the manuscript last leafed to
+    room.lib_view    = 'catalog'  # 'catalog' (the library floor) | 'leaf' (a manuscript)
+    room.lib_filed   = {}         # suit-name -> the true suit of what was filed (None = decoy)
+    room.lib_done    = None       # None | 'win' | 'dead'
+    room.lib_dlg     = 0          # brief dialogue index (0 idle, 1-3 lines, 4 = editing)
+    room.lib_dlg_col = 0          # player col when the last brief line was shown
+    room.lib_hostile = False      # True once he catches the player forging — he gives chase
+    room._lib_arch_flag  = False  # debounces the on-Archivist (present/panic) trigger
+    room._lib_arch_paced = False  # False until the Archivist first steps off his desk
+
+    # The Archivist paces the hall (ai='wander' → oscillates in _enemy_tick); he starts
+    # off the first screen, and ':set wrap' folds the line in so the player sees him move.
+    room.entities = [
+        Entity(kind='entry_marker', row=0, col=0),
+        Entity(kind='archivist',    row=0, col=1, ai='wander', ai_speed=1, move_dir=1,
+               hp=100, max_hp=100),   # tanky, but his 10-damage strike is what stops you
+    ]
+    _lib_layout(room, _LIB_FALLBACK_W)   # seats the Archivist at his desk (he paces off later)
+
+    dungeon.rooms        = [room]
+    dungeon.current_room = 0
+    return dungeon
+
+
+# ── The Spellwright's Forge (L37) — :s, :g, & ─────────────────────────────────
+# A warded workroom: corrupted incantations the apprentice must make TRUE before
+# the sanctum door opens. Two flaws to mend with ex-commands:
+#   • every line says "old" where the rite now reads "new"  →  :%s/old/new/g
+#   • two cursed verses must be struck out entirely         →  :g/cursed/d
+# When no line bears 'old' or 'curse', the seal at (action row, divider) dissolves
+# and the player walks through to the exit. x-erasing each glyph by hand blows the
+# budget — :s / :g are the efficient way (the lesson).
+_FORGE_ROWS, _FORGE_COLS = 13, 54
+_FORGE_DIV   = 42                       # full-height divider wall; sanctum to its right
+_FORGE_DOOR  = 6                        # the corridor row whose divider cell is the seal door
+_FORGE_WARDS = [(3, 'the old gods stir'),
+                (5, 'the old ways fade'),
+                (7, 'the old fire dies')]
+_FORGE_DECOYS = [(9,  'a cursed name'),
+                 (10, 'a cursed verse')]
+
+
+def _forge_text(room, row, col, text, kind):
+    for i, ch in enumerate(text):
+        if ch != ' ':
+            room.char_runs.append(CharRun(row, col + i, (ch,), kind))
+
+
+def build_dungeon_spellwrights_forge(seed: int) -> Dungeon:
+    rng = random.Random(seed)
+    dungeon = Dungeon(name="The Spellwright's Forge", seed=seed)
+    ROWS, COLS, W = _FORGE_ROWS, _FORGE_COLS, _FORGE_DIV
+
+    cells = [[CellType.WALL] * COLS for _ in range(ROWS)]
+    for r in range(1, ROWS - 1):
+        for c in range(1, W):                      # left workroom
+            cells[r][c] = CellType.FLOOR
+        for c in range(W + 1, COLS - 1):           # right sanctum
+            cells[r][c] = CellType.FLOOR
+    # col W is wall top-to-bottom except the seal door, which opens once the rites are true.
+
+    room = Room(room_type=RoomType.ENTRY, rows=ROWS, cols=COLS)
+    room.cells     = cells
+    room.seed      = seed
+    room.spawn_pos = (_FORGE_DOOR, 1)
+    room.exit_pos  = (_FORGE_DOOR, COLS - 2)
+    room.char_runs = []
+    for r, txt in _FORGE_WARDS:
+        _forge_text(room, r, 2, txt, 'ember')
+    for r, txt in _FORGE_DECOYS:
+        _forge_text(room, r, 2, txt, 'verdant')
+
+    room.entities = [
+        Entity(kind='entry_marker', row=_FORGE_DOOR, col=1),
+        Entity(kind='exit',         row=_FORGE_DOOR, col=COLS - 2),
+    ]
+    # The seal: the divider cell on the corridor row. main.run_dungeon opens it once
+    # the incantations are mended (no 'old' / no 'curse' remains).
+    room._forge_seal = (_FORGE_DOOR, W)
+
+    room.par    = 34          # :%s/old/new/g (13) + :g/cursed/d (10) + the walk to the exit
+    room.budget = 90          # generous; the rites are exploratory, never budget-gated
+    room.answer = ''
+
+    room.rebuild_indexes()
+    dungeon.rooms        = [room]
     dungeon.current_room = 0
     return dungeon

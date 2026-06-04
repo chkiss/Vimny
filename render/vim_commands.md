@@ -1,14 +1,15 @@
 # Vim Commands Reference
 #
 # Canonical source for hint-bar display text (read by render/hint_bar.py).
+# Command set + wording follow the Vim cheat sheet at https://vim.rtorr.com/.
 # One row per command (or tight group). Columns:
 #   keys     — exact keystroke(s) shown in the hint bar
 #   token    — known_commands() token (omitted when identical to keys)
 #   desc     — concise description, hint-bar style (2–4 words)
-# Section headers group rows by curriculum level for humans; the parser keys
-# rows by token, so section order/labels do not affect runtime.
+# Section headers group rows by level SLUG for humans (identity is the slug, never
+# a level number); the parser keys rows by token, so headers do not affect runtime.
 
-## Always-on (never gated, shown at L0 only)
+## Always-on (never gated)
 
 | keys  | token | desc                |
 |-------|-------|---------------------|
@@ -17,7 +18,7 @@
 | :q    |       | quit                |
 | :q!   |       | quit without saving |
 
-## L0 — basic movement
+## first_cave — basic movement
 
 | keys | token | desc  |
 |------|-------|-------|
@@ -26,7 +27,7 @@
 | k    |       | up    |
 | l    |       | right |
 
-## L1 — line motions
+## line_halls — line motions
 
 | keys | token | desc            |
 |------|-------|-----------------|
@@ -34,19 +35,19 @@
 | ^    |       | first non-blank |
 | $    |       | end of line     |
 
-## L1.1 — The Reliquary (delete char)
+## reliquary — delete char
 
 | keys | token | desc        |
 |------|-------|-------------|
 | x    |       | delete char |
 
-## L2 — count prefix
+## counting_crypts — count prefix
 
 | keys    | token | desc       |
 |---------|-------|------------|
 | [N]hjkl | count | count move |
 
-## L3 — word motions
+## rune_halls — word motions
 
 | keys | token | desc       |
 |------|-------|------------|
@@ -54,7 +55,7 @@
 | b    |       | word back  |
 | e    |       | word end   |
 
-## L4 — find char on line
+## character_cataracts — find char on line
 
 | keys  | token | desc              |
 |-------|-------|-------------------|
@@ -63,7 +64,7 @@
 | t{c}  | t     | before next char  |
 | T{c}  | T     | after prev char   |
 
-## L5 — repeat find + paste
+## goblin_gauntlet — repeat find + paste
 
 | keys | token | desc    |
 |------|-------|---------|
@@ -71,7 +72,7 @@
 | ,    |       | reverse |
 | p    |       | paste   |
 
-## L6 — WORD motions
+## word_forge — WORD motions
 
 | keys | token | desc       |
 |------|-------|------------|
@@ -79,14 +80,14 @@
 | B    |       | WORD back  |
 | E    |       | WORD end   |
 
-## L7 — backward word-end
+## backward_vaults — backward word-end
 
 | keys | token | desc          |
 |------|-------|---------------|
 | ge   |       | word-end back |
 | gE   |       | WORD-end back |
 
-## L8 — first/last line
+## lineheads — first/last line
 
 | keys  | token | desc          |
 |-------|-------|---------------|
@@ -94,7 +95,7 @@
 | gg    |       | first line    |
 | [N]G  |       | go to line N  |
 
-## L9 — screen position
+## screen_vault — screen position
 
 | keys | token | desc             |
 |------|-------|------------------|
@@ -102,33 +103,33 @@
 | M    |       | middle of screen |
 | L    |       | bottom of screen |
 
-## L10 — bracket match
+## bracket_vaults — bracket match
 
 | keys | token | desc          |
 |------|-------|---------------|
 | %    |       | match bracket |
 
-## L12 — paragraph / block jump
+## runic_archives — paragraph / block jump
 
 | keys | token | desc       |
 |------|-------|------------|
 | }    |       | next block |
 | {    |       | prev block |
 
-## L13 — sentence jump
+## sentence_corridor — sentence jump
 
 | keys | token | desc          |
 |------|-------|---------------|
 | )    |       | next sentence |
 | (    |       | prev sentence |
 
-## L14 — visual mode
+## sight_sanctum — visual mode
 
 | keys | token  | desc        |
 |------|--------|-------------|
 | v    | visual | visual mode |
 
-## L15 — search
+## seekers_labyrinth — search
 
 | keys    | token | desc        |
 |---------|-------|-------------|
@@ -138,7 +139,7 @@
 | N       |       | prev match  |
 | *       |       | search word |
 
-## L16 — marks
+## waypoint_sanctum — marks
 
 | keys  | token | desc      |
 |-------|-------|-----------|
@@ -146,7 +147,15 @@
 | `{a}  |       | to mark   |
 | '{a}  |       | to mark ↑ |
 
-## L18 — operators
+## archivists_library — buffers, wrap, save-as
+
+| keys      | token   | desc        |
+|-----------|---------|-------------|
+| :set wrap | setwrap | wrap lines  |
+| :e!       | reload  | reload file |
+| :w {file} | writeas | save as     |
+
+## operators_vault — operators
 
 | keys   | token | desc       |
 |--------|-------|------------|
@@ -156,13 +165,13 @@
 | cc     |       | change line|
 | s      |       | substitute |
 
-## L19 — substitute line
+## whole_line_annex — substitute line
 
 | keys | token | desc             |
 |------|-------|------------------|
 | S    |       | substitute line  |
 
-## L20 — yank + named registers
+## quartermaster — yank + named registers
 
 | keys     | token    | desc           |
 |----------|----------|----------------|
@@ -171,13 +180,13 @@
 | P        |          | paste before   |
 | "{r}{op} | register | named register |
 
-## L22 — repeat last change
+## echo_vault — repeat last change
 
 | keys | token | desc          |
 |------|-------|---------------|
 | .    | dot   | repeat change |
 
-## L23 — insert mode
+## inscription_halls — insert mode
 
 | keys | token  | desc           |
 |------|--------|----------------|
@@ -189,14 +198,14 @@
 | A    |        | append at end  |
 | Esc  |        | exit insert    |
 
-## L25 — replace
+## overwrite_halls — replace
 
 | keys  | token | desc         |
 |-------|-------|--------------|
 | r{c}  | r     | replace char |
 | R     |       | replace mode |
 
-## L26 — case change
+## case_chambers — case change
 
 | keys   | token | desc        |
 |--------|-------|-------------|
@@ -205,35 +214,35 @@
 | gu{m}  | gu    | lowercase   |
 | g~{m}  | g~    | toggle case |
 
-## L27 — join
+## joiners_gate — join
 
 | keys | token | desc           |
 |------|-------|----------------|
 | J    |       | join lines     |
 | gJ   |       | join, no space |
 
-## L28 — indent
+## alignment_halls — indent
 
 | keys  | token | desc   |
 |-------|-------|--------|
 | >{m}  | >     | indent |
 | <{m}  | <     | dedent |
 
-## L30 — word text objects
+## word_enclosure — word text objects
 
 | keys | token | desc       |
 |------|-------|------------|
 | iw   |       | inner word |
 | aw   |       | a word     |
 
-## L31 — paren text objects
+## bracket_enclosure — paren text objects
 
 | keys | token | desc    |
 |------|-------|---------|
 | i(   |       | inner ( |
 | a(   |       | a ()    |
 
-## L32 — bracket / brace text objects
+## brace_square_enclosure — bracket / brace text objects
 
 | keys | token | desc    |
 |------|-------|---------|
@@ -242,7 +251,7 @@
 | i{   |       | inner { |
 | a{   |       | a {}    |
 
-## L33 — quote text objects
+## quote_enclosure — quote text objects
 
 | keys | token | desc       |
 |------|-------|------------|
@@ -251,28 +260,37 @@
 | i'   |       | inner '    |
 | a'   |       | a ''       |
 
-## L34 — tag text objects
+## tag_enclosure — tag text objects
 
 | keys | token | desc      |
 |------|-------|-----------|
 | it   |       | inner tag |
 | at   |       | a tag     |
 
-## L35 — sentence text objects
+## sentence_enclosure — sentence text objects
 
 | keys | token | desc           |
 |------|-------|----------------|
 | is   |       | inner sentence |
 | as   |       | a sentence     |
 
-## L36 — paragraph text objects
+## paragraph_enclosure — paragraph text objects
 
 | keys | token | desc            |
 |------|-------|-----------------|
 | ip   |       | inner paragraph |
 | ap   |       | a paragraph     |
 
-## L38 — macros + named registers
+## spellwrights_forge — substitute & global
+
+| keys        | token | desc            |
+|-------------|-------|-----------------|
+| :s/old/new/ | subst | substitute      |
+| :%s//g      |       | substitute all  |
+| :g/pat/d    |       | global delete   |
+| &           |       | repeat last :s  |
+
+## hall_of_echoes — macros + named registers
 
 | keys  | token     | desc         |
 |-------|-----------|--------------|

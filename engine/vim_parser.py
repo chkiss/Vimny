@@ -5,7 +5,7 @@ Returns action dicts consumed by the game loop.
 from __future__ import annotations
 from engine.modes import Mode
 
-MOTIONS  = set('hjklwbeWBEGg0^${}()HML%' + ';,')
+MOTIONS  = set('hjklwbeWBEGg0^${}()HML%|' + ';,')
 OPERATORS = set('dyc><')
 COUNTS   = set('123456789')
 # text-object alias normalisation: ib/i)->i(, iB/i}->i{, i]->i[, i>->i<
@@ -132,12 +132,16 @@ def parse(buf: str, mode: Mode) -> tuple[dict | None, str]:
             return {'type': 'motion', 'motion': 'gg', 'count': count_n, 'count_given': bool(count)}, buf[i+2:]
         if g2 in 'eE':
             return {'type': 'motion', 'motion': 'g' + g2, 'count': count_n}, buf[i+2:]
+        if g2 in 'jk':                             # gj / gk — move by DISPLAY line (wrap)
+            return {'type': 'motion', 'motion': 'g' + g2, 'count': count_n}, buf[i+2:]
         if g2 == 'v':                              # gv — reselect last visual span
             return {'type': 'enter_mode', 'mode': 'visual', 'reselect': True}, buf[i+2:]
         if g2 in ('~', 'u', 'U'):                  # case operator: g~{m} gu{m} gU{m}
             return _operator_target('g' + g2, g2, buf, i + 2, count_n)
         if g2 == 'J':                              # gJ — join with no space at the seam
             return {'type': 'join', 'gap': False, 'count': count_n}, buf[i+2:]
+        if g2 == '&':                              # g& — repeat last :s over the whole file, with flags
+            return {'type': 'sub_repeat', 'whole_file': True, 'keep_flags': True}, buf[i+2:]
         return {'type': 'unknown'}, buf[i+2:]
 
     # f/F/t/T — need one more char
@@ -166,6 +170,10 @@ def parse(buf: str, mode: Mode) -> tuple[dict | None, str]:
     # J — join the next line onto this one (gJ, no space, handled in the g-branch)
     if ch == 'J':
         return {'type': 'join', 'gap': True, 'count': count_n}, buf[i+1:]
+
+    # & — repeat the last :s on the current line (no flags); g& did the whole file
+    if ch == '&':
+        return {'type': 'sub_repeat', 'whole_file': False, 'keep_flags': False}, buf[i+1:]
 
     # p / P — paste (standalone commands, not operator+motion)
     if ch == 'p':

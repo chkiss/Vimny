@@ -84,6 +84,21 @@ WAYPOINT_SCROLL = {
     ],
 }
 
+SETTERS_HAND_SCROLL = {
+    'title': "◈   The Setter's Hand   ◈",
+    'lines': [
+        ('dim',    '  The same ledger, its margins thick with shortcuts.'),
+        ('blank',),
+        ('cmd',    ':set nu!',   'flip it — on if off, off if on'),
+        ('cmd',    ':set invnu', 'the same flip, spelled in full'),
+        ('cmd',    ':set nu&',   'restore the option to its birthright'),
+        ('cmd',    ':set nu?',   'ask its state without changing it'),
+        ('cmd',    ':set all&',  'wipe every option back to default'),
+        ('blank',),
+        ('amber',  '  ! flips, & forgets, ? merely asks.'),
+    ],
+}
+
 OPERATOR_CODEX_SCROLL = {
     'title': "◈   The Operator's Codex   ◈",
     'lines': [
@@ -128,6 +143,155 @@ WHOLE_WORD_SCROLL = {
     ],
 }
 
+RECALLING_HAND_SCROLL = {
+    'title': '◈   The Recalling Hand   ◈',
+    'lines': [
+        ('dim',    '  Mid-inscription, the scribe summoned old ink.'),
+        ('blank',),
+        ('cmd',    'Ctrl-r "', 'paste the unnamed register while typing'),
+        ('cmd',    'Ctrl-r 0', 'paste your last yank'),
+        ('segs',   [('Ctrl-r ', True), ('{reg}', False)], 'paste any named register'),
+        ('cmd',    'Ctrl-r Ctrl-w', 'paste the word under the cursor'),
+        ('blank',),
+        ('amber',  '  No need to leave INSERT to recall what you kept.'),
+    ],
+}
+
+QUICK_ERASE_SCROLL = {
+    'title': '◈   The Quick Erase   ◈',
+    'lines': [
+        ('dim',    '  A slip of the chisel, mended without a pause.'),
+        ('blank',),
+        ('cmd',    'Ctrl-w', 'erase the word behind the cursor'),
+        ('cmd',    'Ctrl-u', 'erase back to the start of the line'),
+        ('cmd',    'Ctrl-o', 'one Normal-mode step, then keep typing'),
+        ('blank',),
+        ('dim',    '  Ctrl-o lets you leap, then writes resume.'),
+        ('blank',),
+        ('amber',  '  Stay in the flow; fix without stopping.'),
+    ],
+}
+
+PLUMB_LINE_SCROLL = {
+    'title': '◈   The Plumb Line   ◈',
+    'lines': [
+        ('dim',    '  The mason dropped a weighted cord to find true.'),
+        ('blank',),
+        ('cmd',    '|',   'to the first column'),
+        ('cmd',    '{n}|', 'to column n  (e.g. 10| → column ten)'),
+        ('blank',),
+        ('dim',    '  A wall or water halts the cord short.'),
+        ('blank',),
+        ('amber',  '  Name the column; arrive in one step.'),
+    ],
+}
+
+SEARCH_CRAFT_SCROLL = {
+    'title': '◈   The Lit Trail   ◈',
+    'lines': [
+        ('dim',    '  The tracker learned to light — and douse — the trail.'),
+        ('blank',),
+        ('cmd',    ':set hls',  'light every match of the last search'),
+        ('cmd',    ':noh',      'douse the glow (until you search again)'),
+        ('cmd',    ':set is',   'preview matches as you type the pattern'),
+        ('cmd',    'Ctrl-r Ctrl-w', 'pull the word under the cursor into /'),
+        ('blank',),
+        ('amber',  '  See the quarry before you give chase.'),
+    ],
+}
+
+WANDERERS_THREAD_SCROLL = {
+    'title': "◈   The Wanderer's Thread   ◈",
+    'lines': [
+        ('dim',    '  Every great leap pays out a thread behind you.'),
+        ('blank',),
+        ('cmd',    'Ctrl-o', 'follow the thread back to where you leapt FROM'),
+        ('cmd',    'Ctrl-i', 'wind it forward again'),
+        ('blank',),
+        ('dim',    '  Searches, G, gg, %, marks — each ties a knot.'),
+        ('blank',),
+        ('amber',  '  You can always find the way back.'),
+    ],
+}
+
+# ── Regex-for-search scrolls (Blocks B–F) ──────────────────────────────────
+# Gate token: 'regex' (granted by reading any one of these). Each teaches a
+# family of search atoms; they reveal once the searcher (/) is known.
+
+REGEX_CLASSES_SCROLL = {
+    'title': '◈   The Glyph-Kinds   ◈',
+    'lines': [
+        ('dim',    '  A searcher learns to name what it seeks.'),
+        ('blank',),
+        ('cmd',    '.',  'any single character'),
+        ('cmd',    '\\w', 'a word character  (\\W: not one)'),
+        ('cmd',    '\\d', 'a digit          (\\D: not one)'),
+        ('cmd',    '\\s', 'whitespace       (\\S: not one)'),
+        ('cmd',    '\\a', 'a letter   \\l lower   \\u UPPER'),
+        ('blank',),
+        ('amber',  '  Seek a kind, not only a character.'),
+    ],
+}
+
+REGEX_ANCHORS_SCROLL = {
+    'title': '◈   The Anchors & Bounds   ◈',
+    'lines': [
+        ('dim',    '  Where a thing sits matters as much as what it is.'),
+        ('blank',),
+        ('cmd',    '^',   'the start of the line'),
+        ('cmd',    '$',   'the end of the line'),
+        ('cmd',    '\\<',  'the start of a word'),
+        ('cmd',    '\\>',  'the end of a word'),
+        ('cmd',    '\\zs', 'begin the match here (\\ze: end it here)'),
+        ('blank',),
+        ('amber',  '  Anchor the search; the rest drifts to it.'),
+    ],
+}
+
+REGEX_QUANTIFIERS_SCROLL = {
+    'title': '◈   The Many & The Maybe   ◈',
+    'lines': [
+        ('dim',    '  One glyph may stand for none, or for a throng.'),
+        ('blank',),
+        ('cmd',    '*',     'zero or more of what precedes'),
+        ('cmd',    '\\+',    'one or more'),
+        ('cmd',    '\\?',    'zero or one  (optional)'),
+        ('cmd',    '\\{n}',  'exactly n   (\\{n,m}: n to m)'),
+        ('blank',),
+        ('amber',  '  Count the repetition, not the repeats.'),
+    ],
+}
+
+REGEX_COLLECTIONS_SCROLL = {
+    'title': '◈   The Gathered Glyphs   ◈',
+    'lines': [
+        ('dim',    '  Offer the searcher a choice of marks.'),
+        ('blank',),
+        ('cmd',    '[abc]',  'any one of a, b or c'),
+        ('cmd',    '[^abc]', 'any one EXCEPT a, b or c'),
+        ('cmd',    '[a-z]',  'any one in the range'),
+        ('cmd',    '\\|',     'this branch OR that one'),
+        ('cmd',    '\\( \\)',  'bind a group; \\. means a literal dot'),
+        ('blank',),
+        ('amber',  '  A set of doors, and the search picks one.'),
+    ],
+}
+
+REGEX_MAGIC_SCROLL = {
+    'title': '◈   The Magic Levels   ◈',
+    'lines': [
+        ('dim',    '  Why so many backslashes? Change the law.'),
+        ('blank',),
+        ('cmd',    '\\v', 'very magic — + ? ( ) | need no backslash'),
+        ('cmd',    '\\V', 'very nomagic — almost all glyphs literal'),
+        ('cmd',    '\\c', 'this search ignores case  (\\C: heeds it)'),
+        ('blank',),
+        ('dim',    '  \\v turns  \\(ab\\)\\+  into the cleaner  (ab)+'),
+        ('blank',),
+        ('amber',  '  Bend the grammar to fit the hand.'),
+    ],
+}
+
 WARDEN_ACT_SCROLL = {
     'title': "◈   The Warden's Act   ◈",
     'lines': [
@@ -140,6 +304,32 @@ WARDEN_ACT_SCROLL = {
         ('blank',),
         ('amber',  '  See. Select. Strike.'),
         ('dim',    '  The eye and the hand are one.'),
+    ],
+}
+
+
+DISPLAY_LINE_SCROLL = {
+    'title': "◈   The Wrapped Line   ◈",
+    'lines': [
+        ('dim',   '  A long line folds to fill the page.'),
+        ('dim',   '  j and k leap whole lines — here is a finer step.'),
+        ('blank',),
+        ('cmd',   'gj', 'down one DISPLAY line'),
+        ('cmd',   'gk', 'up one DISPLAY line'),
+        ('blank',),
+        ('amber', '  Walk the wrap, not the line.'),
+    ],
+}
+
+EDIT_BY_NAME_SCROLL = {
+    'title': "◈   The Named Folio   ◈",
+    'lines': [
+        ('dim',   '  Every dungeon is a file; every file has a name.'),
+        ('blank',),
+        ('cmd',   ':e {name}', 'open a buffer by its name'),
+        ('blank',),
+        ('dim',   '  :e alone reloads — :e {name} opens another.'),
+        ('amber', '  Call a folio by its name.'),
     ],
 }
 
@@ -182,6 +372,22 @@ SCROLL_CATALOG = [
         'content':    WAYPOINT_SCROLL,
     },
     {
+        'id':         'display_move',
+        'title':      'The Wrapped Line',
+        'dropped_by': "The Archivist's Library",
+        'level_slug': 'archivists_library',
+        'level_name': "The Archivist's Library",
+        'content':    DISPLAY_LINE_SCROLL,
+    },
+    {
+        'id':         'edit_name',
+        'title':      'The Named Folio',
+        'dropped_by': "The Archivist's Library",
+        'level_slug': 'archivists_library',
+        'level_name': "The Archivist's Library",
+        'content':    EDIT_BY_NAME_SCROLL,
+    },
+    {
         'id':         'd_op',
         'title':      "The Operator's Codex",
         'dropped_by': 'The Warden Pathfinder',
@@ -213,4 +419,128 @@ SCROLL_CATALOG = [
         'level_name': "The Grandmaster's Sanctum",
         'content':    WARDEN_ACT_SCROLL,
     },
+
+    # ── Relic scrolls — found, not act-gated. Each teaches a budget-safe
+    # flourish that can't beat a level's par (see design notes). id == the
+    # gating token where the scroll grants a new command.
+    {
+        'id':         'set_more',
+        'title':      "The Setter's Hand",
+        'dropped_by': 'A surveyor’s satchel',
+        'level_slug': 'waypoint_sanctum',
+        'level_name': 'The Waypoint Sanctum',
+        'content':    SETTERS_HAND_SCROLL,
+    },
+    {
+        'id':         'regex_classes',
+        'title':      'The Glyph-Kinds',
+        'dropped_by': 'A seeker’s field-notes',
+        'level_slug': 'seekers_labyrinth',
+        'level_name': "The Seekers' Labyrinth",
+        'content':    REGEX_CLASSES_SCROLL,
+    },
+    {
+        'id':         'regex_anchors',
+        'title':      'The Anchors & Bounds',
+        'dropped_by': 'A seeker’s field-notes',
+        'level_slug': 'seekers_labyrinth',
+        'level_name': "The Seekers' Labyrinth",
+        'content':    REGEX_ANCHORS_SCROLL,
+    },
+    {
+        'id':         'regex_quant',
+        'title':      'The Many & The Maybe',
+        'dropped_by': 'A seeker’s field-notes',
+        'level_slug': 'seekers_labyrinth',
+        'level_name': "The Seekers' Labyrinth",
+        'content':    REGEX_QUANTIFIERS_SCROLL,
+    },
+    {
+        'id':         'regex_collections',
+        'title':      'The Gathered Glyphs',
+        'dropped_by': 'A seeker’s field-notes',
+        'level_slug': 'seekers_labyrinth',
+        'level_name': "The Seekers' Labyrinth",
+        'content':    REGEX_COLLECTIONS_SCROLL,
+    },
+    {
+        'id':         'regex_magic',
+        'title':      'The Magic Levels',
+        'dropped_by': 'A seeker’s field-notes',
+        'level_slug': 'seekers_labyrinth',
+        'level_name': "The Seekers' Labyrinth",
+        'content':    REGEX_MAGIC_SCROLL,
+    },
+    {
+        'id':         'searchcraft',
+        'title':      'The Lit Trail',
+        'dropped_by': 'A tracker’s cache',
+        'level_slug': 'seekers_labyrinth',
+        'level_name': "The Seekers' Labyrinth",
+        'content':    SEARCH_CRAFT_SCROLL,
+    },
+    {
+        'id':         'jump',
+        'title':      "The Wanderer's Thread",
+        'dropped_by': 'A wayfarer’s pack',
+        'level_slug': 'waypoint_sanctum',
+        'level_name': 'The Waypoint Sanctum',
+        'content':    WANDERERS_THREAD_SCROLL,
+    },
+    {
+        'id':         'col_motion',
+        'title':      'The Plumb Line',
+        'dropped_by': 'A mason’s toolbox',
+        'level_slug': 'line_halls',
+        'level_name': 'The Line Halls',
+        'content':    PLUMB_LINE_SCROLL,
+    },
+    {
+        'id':         'ins_paste',
+        'title':      'The Recalling Hand',
+        'dropped_by': 'A scribe’s desk',
+        'level_slug': 'inscription_halls',
+        'level_name': 'The Inscription Halls',
+        'content':    RECALLING_HAND_SCROLL,
+    },
+    {
+        'id':         'ins_edit',
+        'title':      'The Quick Erase',
+        'dropped_by': 'A sculptor’s bench',
+        'level_slug': 'sculpting_chambers',
+        'level_name': 'The Sculpting Chambers',
+        'content':    QUICK_ERASE_SCROLL,
+    },
 ]
+
+
+# ── Relic ("safe") scroll pool ──────────────────────────────────────────────
+# Chests not tied to a specific level (no _SCROLL_DROPS entry) pull a random,
+# not-yet-discovered scroll from this pool. Every id here is a budget-safe
+# flourish that cannot beat a level's par (see the design discussion).
+#
+# TO ADD A NEW RELIC SCROLL:
+#   1. Author its <NAME>_SCROLL content dict above.
+#   2. Add a SCROLL_CATALOG entry (it lands in the library's `relics/` subtree).
+#   3. Add a _SCROLL_DISPATCH lambda in main.py (use _render_standard_scroll).
+#   4. Append its id to RELIC_SCROLL_IDS below.
+# The id DOUBLES AS the gating token it grants: on discovery it is written to
+# progress['extras'] and injected into player.known_commands, so name it to
+# match the token your command_guard / handler checks (e.g. 'jump', 'col_motion').
+RELIC_SCROLL_IDS = [
+    'set_more',
+    'regex_classes', 'regex_anchors', 'regex_quant', 'regex_collections', 'regex_magic',
+    'searchcraft', 'jump', 'col_motion', 'ins_paste', 'ins_edit',
+]
+
+
+def pick_relic_scroll(discovered, rng=None):
+    """Return a random relic-scroll id the player has NOT yet discovered, or
+    None once they hold them all. `discovered` is any iterable of extras ids;
+    `rng` is an optional random.Random for deterministic tests."""
+    import random as _random
+    have = set(discovered)
+    pool = [sid for sid in RELIC_SCROLL_IDS if sid not in have]
+    if not pool:
+        return None
+    return (rng or _random).choice(pool)

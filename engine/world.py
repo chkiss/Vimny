@@ -41,6 +41,8 @@ class Entity:
     origin_row:   int = -1  # starting row for bounded-oscillation entities (-1 = not set)
     move_dir:     int = 1   # oscillation direction: +1 = down (row+1), -1 = up (row-1)
     tag:          str = ''  # variant tag, e.g. 'gold' or 'red' for colored keys/doors
+    scroll_id:    str = ''  # chest_scroll only: the specific scroll this chest drops
+                            # ('' = pull a random relic scroll from the pool)
 
 @dataclass
 class CharRun:
@@ -68,7 +70,7 @@ class Room:
     answer_pos: int             = 0      # non-space chars of answer consumed by admin
     answer_diverged: bool       = False  # admin pressed a wrong key
     wood_damage: dict           = field(default_factory=dict)  # (r,c) -> half-steps received (1=cracked)
-    ledge_rows: set             = field(default_factory=set)   # rows that REFLOW (open to the void); empty = overlay (see engine/reflow.py)
+    wrap_buffer: bool           = False  # single-line text buffer (rows==1); ':set wrap' soft-wraps it across screen rows (The Archivist's Library)
 
     def __post_init__(self):
         self._entity_map:    dict = {}
@@ -78,7 +80,7 @@ class Room:
         self._char_runs_by_row:    dict = {}   # row -> list[CharRun]
         self._last_void_falls:     list = []   # (row,col,sym) shoved into the void by the last reflow op (engine/reflow.py)
         self._last_drowns:         list = []   # (row,col) goblins a reflow wave of water rolled over (engine/reflow.py)
-        self._last_build_blocked = None        # None | 'edge' | 'void' — why A/J's last ledge-build refused
+        self._last_build_blocked: str | None = None   # None | 'edge' | 'void' — why A/J's last ledge-build refused
 
     # ── Spatial index ──────────────────────────────────────────────────────────
 
@@ -100,6 +102,8 @@ class Room:
                 self._char_run_map[(ru.row, ru.col + i)] = ru
             self._char_runs_by_row.setdefault(ru.row, []).append(ru)
         self._char_run_rows = {ru.row for ru in self.char_runs}
+        if getattr(self, 'wrap_buffer', False):
+            return                       # single-line library: each region keeps its own colour
         # Normalize WORD colors: adjacent non-void clusters on the same row all
         # take the leftmost cluster's kind so a WORD renders in one color.
         by_row: dict = {}
@@ -189,6 +193,24 @@ class Room:
             return False
         ent = self.entity_at(r, c)
         return ent is None or ent.kind not in ('locked_door', 'shield', 'seal_door', 'boss_seal')
+
+    def first_standable_row(self) -> int:
+        """Grid row of buffer line 1 — the first row with a FLOOR/CORRIDOR cell. The
+        bordering walls aren't lines, so line N = grid row first_standable_row() + N - 1
+        and `gg`/`1G` land here. Layout-based (ignores fog/doors) so numbering is stable."""
+        for r in range(self.rows):
+            row = self.cells[r]
+            if any(row[c] in (CellType.FLOOR, CellType.CORRIDOR) for c in range(self.cols)):
+                return r
+        return 0
+
+    def first_standable_col(self) -> int:
+        """Grid col of buffer column 1 — the first column with a FLOOR/CORRIDOR cell
+        (the left border isn't a column). Column N = first_standable_col() + N - 1."""
+        for c in range(self.cols):
+            if any(self.cells[r][c] in (CellType.FLOOR, CellType.CORRIDOR) for r in range(self.rows)):
+                return c
+        return 0
 
     def damage_wood_wall(self, r: int, c: int, half_steps: int = 1) -> bool:
         """Deal half_steps of damage to wood wall at (r, c).

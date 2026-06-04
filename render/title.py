@@ -43,7 +43,7 @@ def _load_wisdom() -> list[dict]:
         start = text.index('{')
         end   = text.rindex('}') + 1
         return json.loads(text[start:end])['levels']
-    except Exception:
+    except (OSError, ValueError, KeyError):
         return []
 
 

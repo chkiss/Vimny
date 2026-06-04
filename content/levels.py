@@ -46,7 +46,7 @@ LEVELS = [
     {'display': '14',   'slug': 'sight_sanctum',         'name': 'The Sight Sanctum',          'commands': 'v', 'teaches': ['visual']},
     {'display': '15',   'slug': 'seekers_labyrinth',     'name': "The Seekers' Labyrinth",     'commands': '/ ? n N *', 'teaches': ['/', '*']},
     {'display': '16',   'slug': 'waypoint_sanctum',      'name': 'The Waypoint Sanctum',       'commands': "m ' `", 'teaches': ['mark']},
-    {'display': '17',   'slug': 'archivists_library',    'name': "The Archivist's Library",    'commands': ':e :set', 'teaches': []},
+    {'display': '17',   'slug': 'archivists_library',    'name': "The Archivist's Library",    'commands': ':set wrap  :e!  :w {file}', 'teaches': ['setwrap', 'reload', 'writeas']},
     {'display': '17.1', 'slug': 'warden_pathfinder',     'name': 'The Warden Pathfinder',      'type': 'boss', 'after': 'archivists_library', 'teaches': []},
     {'display': '18',   'slug': 'operators_vault',       'name': "The Operator's Vault",       'commands': 'd c', 'teaches': ['d', 'c', 's']},
     {'display': '19',   'slug': 'whole_line_annex',      'name': 'The Whole-Line Annex',       'commands': 'dd cc D S', 'teaches': ['S']},
@@ -70,7 +70,7 @@ LEVELS = [
     {'display': '35',   'slug': 'sentence_enclosure',    'name': 'The Sentence Enclosure',     'commands': 'is as', 'teaches': ['is', 'as']},
     {'display': '36',   'slug': 'paragraph_enclosure',   'name': 'The Paragraph Enclosure',    'commands': 'ip ap', 'teaches': ['ip', 'ap']},
     {'display': '36.1', 'slug': 'grandmasters_sanctum',  'name': "The Grandmaster's Sanctum",  'type': 'boss', 'after': 'paragraph_enclosure', 'teaches': []},
-    {'display': '37',   'slug': 'spellwrights_forge',    'name': "The Spellwright's Forge",    'commands': ':s///', 'teaches': []},
+    {'display': '37',   'slug': 'spellwrights_forge',    'name': "The Spellwright's Forge",    'commands': ':s///  :g  &', 'teaches': ['subst']},
     {'display': '38',   'slug': 'hall_of_echoes',        'name': 'The Hall of Echoes',         'commands': 'q @ "', 'teaches': ['q', '@', 'reg_named']},
     {'display': '38.1', 'slug': 'warden_eternal',        'name': 'The Warden Eternal',         'type': 'boss', 'after': 'hall_of_echoes', 'teaches': []},
     {'display': '99',   'slug': 'dummy',                 'name': 'Dummy Dungeon',              'commands': 'd x s y p yy P', 'admin_only': True, 'teaches': []},
@@ -78,12 +78,6 @@ LEVELS = [
 
 # ── Lookup map ──────────────────────────────────────────────────────────────
 _BY_SLUG = {l['slug']: l for l in LEVELS}
-
-
-def display_number(slug: str) -> str:
-    """Human-facing level number (e.g. '5', '5.1'). Cosmetic only."""
-    lv = _BY_SLUG.get(slug)
-    return lv['display'] if lv else '?'
 
 
 def key_for_slug(slug: str) -> str:
@@ -142,14 +136,6 @@ def act_commands(slug: str) -> list:
 def level_type(slug: str) -> str:
     """Returns 'dungeon' (default), 'boss', or 'reliquary'."""
     return (_BY_SLUG.get(slug) or {}).get('type', 'dungeon')
-
-
-def is_reliquary(slug: str) -> bool:
-    return level_type(slug) == 'reliquary'
-
-
-def is_visible(level: dict, player_name: str) -> bool:
-    return not level.get('admin_only', False) or player_name == 'admin'
 
 
 def unlocks_after_slug(slug: str) -> str | None:

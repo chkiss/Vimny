@@ -141,8 +141,8 @@ def test_entities_and_search_words(seed):
     assert (_WP_EXIT[0], _WP_EXIT[1], '') in ent['exit']
     assert (_WP_LOCK[0], _WP_LOCK[1], 'gold') in ent['locked_door']     # gold exit lock
     assert (_WP_KEY[0], _WP_KEY[1], 'gold') in ent['floor_key']         # gold key
-    # treasure teases: chests + hearts behind 'blue' locks (no blue key exists)
-    assert len(ent.get('chest', [])) + len(ent.get('heart_container', [])) >= 8
+    # treasure teases: relic-scroll chests + hearts behind 'blue' locks (no blue key)
+    assert len(ent.get('chest_scroll', [])) + len(ent.get('heart_container', [])) >= 8
     assert any(tag == 'blue' for (_, _, tag) in ent['locked_door'])
     # one real key word (backward) + the forward decoys; nothing else matches
     assert _positions(room, _WP_KEYWORD) == sorted([_WP_KEY_WORD_POS] + _WP_DECOY_POS)
@@ -218,9 +218,18 @@ def test_skipping_the_scroll_beats_par():
 
 
 # ── :set number gutter (the scroll's payoff) + scroll-drop wiring ────────────
-def test_left_room_scroll_grants_setnum():
+def test_only_the_left_nook_holds_the_numbered_ledger():
+    """The left-chamber nook chest carries scroll_id 'setnum' (the Numbered
+    Ledger); the row-9 vault chests carry no scroll_id, so they drop random
+    relic scrolls.  The level is no longer a per-level forced 'setnum' drop."""
     import main
-    assert main._SCROLL_DROPS['waypoint_sanctum'][0] == 'setnum'
+    room = _room(42)
+    nook = next(e for e in room.entities
+                if e.kind == 'chest_scroll' and (e.row, e.col) == _WP_SCROLL)
+    assert nook.scroll_id == 'setnum'
+    row9 = [e for e in room.entities if e.kind == 'chest_scroll' and e.row == 9]
+    assert row9 and all(e.scroll_id == '' for e in row9)
+    assert 'waypoint_sanctum' not in main._SCROLL_DROPS
 
 
 def test_set_number_renders_a_line_gutter(capsys):

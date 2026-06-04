@@ -27,8 +27,16 @@ class Player:
     last_visual_cursor: tuple | None = None
     last_visual_mode: object = None           # Mode of the last visual selection, for gv
     last_search: tuple | None = None  # (pattern, forward) of the most recent search; used by n/N
+    last_sub: tuple | None = None     # (pattern, replacement, flags_str) of the last :s; for & / :s / g&
+    pending_recost_f: int = 0  # >0: next ;/, re-pays this (its f/F/t/T was undone — anti-exploit)
+    pending_recost_s: int = 0  # >0: next n/N re-pays this (its search was undone — anti-exploit)
+    pending_recost_c: int = 0  # >0: next . re-pays this (its change was undone — anti-exploit)
     search_forward: bool = True   # direction of the in-progress / or ? entry (for rendering)
     number_mode: str = 'none'     # ':set number' gutter in dungeons: 'none'|'number'|'relativenumber'
+    hlsearch: bool = True         # ':set hlsearch' — paint all matches of the last search
+    incsearch: bool = True        # ':set incsearch' — preview matches while typing / or ?
+    wrap: bool = False            # ':set wrap' — soft-wrap a single-line buffer across screen rows (The Archivist's Library). Off by default: only renders on Room.wrap_buffer rooms, which open nowrap.
+    hl_suppressed: bool = False   # ':noh' cleared the current highlight (until the next search)
 
     # command input buffer for gg, f{c}, m{c}, `{c}, '{c}
     input_buf: str = ''
@@ -36,13 +44,6 @@ class Player:
     cmd_line: str = ''
     # statusline error (e.g. E37); cleared on next keypress
     error: str = ''
-
-    def move(self, dr: int, dc: int, room_rows: int, room_cols: int) -> bool:
-        nr, nc = self.row + dr, self.col + dc
-        if 0 <= nr < room_rows and 0 <= nc < room_cols:
-            self.row, self.col = nr, nc
-            return True
-        return False
 
     def take_damage(self, half_hearts: int = 2):
         """Reduce HP. amount is in half-hearts (2 = 1 full heart)."""

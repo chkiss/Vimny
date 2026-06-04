@@ -25,6 +25,9 @@ A terminal dungeon crawler that teaches Vim through play. The dungeons are text 
 
 - Python 3.9+
 - `blessed` library
+- A terminal **at least 80 columns** wide (the supported minimum). The playfield
+  grows with the window up to **189 columns** (the overworld and The Archivist's
+  Library use the extra width); beyond that it stops widening.
 
 ```bash
 pip install blessed
@@ -83,7 +86,7 @@ The curriculum is defined in `content/levels.py` (canonical) and mirrored in `LE
 | 14 | The Sight Sanctum | `v` | Playable |
 | 15 | The Seekers' Labyrinth | `/ ? n N *` | Playable |
 | 16 | The Waypoint Sanctum | `` m ' ` `` | Playable |
-| 17 | The Archivist's Library | `:e :set` | Planned |
+| 17 | The Archivist's Library | `:set wrap  :e!  :w {file}` | Playable |
 | 17.1 | The Warden Pathfinder | (boss) | Planned |
 | 18 | The Operator's Vault | `d c` | Planned |
 | 19 | The Whole-Line Annex | `dd cc D S` | Planned |
@@ -107,7 +110,7 @@ The curriculum is defined in `content/levels.py` (canonical) and mirrored in `LE
 | 35 | The Sentence Enclosure | `is as` | Planned |
 | 36 | The Paragraph Enclosure | `ip ap` | Planned |
 | 36.1 | The Grandmaster's Sanctum | (boss) | Planned |
-| 37 | The Spellwright's Forge | `:s///` | Planned |
+| 37 | The Spellwright's Forge | `:s///  :g  &` | Playable |
 | 38 | The Hall of Echoes | `q @ "` | Planned |
 | 38.1 | The Warden Eternal | (boss) | Planned |
 <!-- END GENERATED LEVELS TABLE -->
@@ -169,6 +172,9 @@ The full command reference (also the hint-bar source) is `render/vim_commands.md
 | `m{a}` | set mark |
 | `` `{a} `` | to mark |
 | `'{a}` | to mark ↑ |
+| `:set wrap` | wrap lines |
+| `:e!` | reload file |
+| `:w {file}` | save as |
 | `d{m}` | delete |
 | `dd` | delete line |
 | `c{m}` | change |
@@ -215,6 +221,10 @@ The full command reference (also the hint-bar source) is `render/vim_commands.md
 | `as` | a sentence |
 | `ip` | inner paragraph |
 | `ap` | a paragraph |
+| `:s/old/new/` | substitute |
+| `:%s//g` | substitute all |
+| `:g/pat/d` | global delete |
+| `&` | repeat last :s |
 | `q{a}` | record macro |
 | `@{a}` | play macro |
 | `@@` | repeat macro |
@@ -233,6 +243,8 @@ engine/
   vim_parser.py          Keystroke → action dict
   motion.py              apply_motion, move_player
   reflow.py              Reflow editing primitives (insert/delete/join/ledge-build)
+  search.py              / ? n N * # — Vim-regex search, matched per line
+  substitute.py          :s :g :v & — ex substitute & global
   budget.py              Budget tracking
 generation/
   dungeon_gen.py         build_dungeon_<slug> per level, Dijkstra par solvers

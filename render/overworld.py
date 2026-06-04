@@ -11,8 +11,8 @@ from blessed import Terminal
 from engine.player import Player
 import render.colors as C
 import render.symbols as S
-from content.levels import LEVELS, is_unlocked, level_type, key_for_slug
-from render.utils import inner_w as _iw
+from content.levels import is_unlocked, level_type, key_for_slug
+from render.utils import inner_w as _iw, subtree_lines, tree_glyph
 
 
 def build_lines(levels: list, custom_layouts: list) -> list:
@@ -24,11 +24,7 @@ def build_lines(levels: list, custom_layouts: list) -> list:
     lines.append({'type': 'self'})
     for lv in levels:
         lines.append({'type': 'level', 'level': lv})
-    if custom_layouts:
-        lines.append({'type': 'subhdr'})
-        last = len(custom_layouts) - 1
-        for ci, cl in enumerate(custom_layouts):
-            lines.append({'type': 'custom', 'layout': cl, 'last': ci == last})
+    lines += subtree_lines('custom/', custom_layouts, 'custom', 'layout')
     return lines
 
 
@@ -60,6 +56,10 @@ def render_overworld(term: Terminal, player: Player, progress: dict,
     """Render the overworld; returns (scroll_offset, cursor_y, cursor_x) so the
     caller can place the live cursor. ``number_mode`` ∈ {'number','relativenumber','none'}."""
     iw  = _iw(term)
+    # The box width is capped (inner_w maxes at 189-2); on a wider terminal, left-anchoring
+    # it would shove everything — including the centred columns — off to the left. Pad it
+    # so the whole box sits in the middle of the player's actual viewport.
+    pad = ' ' * max(0, (term.width - (iw + 2)) // 2)
     bfg = C.border_fg()
     rst = C.normal_fg()
     out = []
@@ -103,7 +103,16 @@ def render_overworld(term: Terminal, player: Player, progress: dict,
     GW = 0 if number_mode == 'none' else 4    # gutter width ("123 ")
     cw = max(1, iw - GW)                       # content width to the right of the gutter
 
-    ver    = '(netrw v13ny)'
+    # Fixed left/right columns so the command list reads as a centred MIDDLE column,
+    # independent of each row's own name length: the longest dungeon name defines the
+    # left column, the widest completion badge the right column. The command is then
+    # centred in the gap between them (names run longer than badges, so this sits right
+    # of the box centre — where it visually belongs).
+    name_col  = max((len(key_for_slug(ln['level']['slug'])) for ln in lines
+                     if ln['type'] == 'level'), default=0)
+    badge_col = len('[★★ COMPLETE]')
+
+    ver    = '(netrw v.132y)'
     ndl    = '" Netrw Directory Listing'
     qh_pfx = '"   Quick Help: '
     qh_prs = [('j/k', 'move'), ('gg/G', 'top/bot'), ('Enter', 'open'),
@@ -117,10 +126,16 @@ def render_overworld(term: Terminal, player: Player, progress: dict,
     }
 
     def _cols3(left, mid, right):
-        """Gaps to lay left | centred mid | right within the content width."""
-        if not mid or cw - len(left) - len(mid) - len(right) < 2:
+        """Gaps to lay left | mid | right, with mid centred in the gap BETWEEN the fixed
+        left column (longest name) and right column (widest badge) — so the commands form
+        a true middle column instead of drifting with each row's name length."""
+        if not mid:
             return None
-        mid_start = (cw - len(mid)) // 2
+        region_l = max(name_col, len(left)) + 1
+        region_r = cw - max(badge_col, len(right)) - 1
+        if region_r - region_l < len(mid):
+            return None
+        mid_start = region_l + (region_r - region_l - len(mid)) // 2
         mid_start = max(len(left) + 1, mid_start)
         mid_start = min(mid_start, cw - len(right) - len(mid) - 1)
         if mid_start < len(left) + 1:
@@ -138,10 +153,11 @@ def render_overworld(term: Terminal, player: Player, progress: dict,
             txt = '../' if t == 'parent' else './'
             return dfc + txt, len(txt)
         if t == 'subhdr':
-            return dfc + 'custom/', len('custom/')
+            label = line.get('label', 'custom/')
+            return dfc + label, len(label)
         if t == 'custom':
             name = line['layout'].get('layout_name', '?')
-            tree = '└' if line.get('last') else '├'
+            tree = tree_glyph(line.get('last'))
             badge, badge_col = '[CUSTOM]', C.mode_insert()
             nc = enfc if is_cursor else rst
             spaces = max(1, cw - 4 - len(name) - len(badge))
@@ -241,5 +257,5 @@ def render_overworld(term: Terminal, player: Player, progress: dict,
     # ── Bottom border ──────────────────────────────────────────────────────────
     out.append(border_h(S.BOX_BL, S.BOX_BR))
 
-    print(term.home + '\n'.join(out), end='', flush=True)
-    return scroll_offset, cur_y, cur_x
+    print(term.home + pad + ('\n' + pad).join(out), end='', flush=True)
+    return scroll_offset, cur_y, cur_x + len(pad)
