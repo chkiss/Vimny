@@ -127,14 +127,6 @@ def _reg_display(items: list) -> tuple[str, int]:
     return ''.join(parts), vis
 
 
-def _pad(s: str, width: int) -> str:
-    """Pad or truncate s to exactly width visible characters."""
-    # strip ANSI for length calc is complex; use len of raw string for now
-    # This works well when color codes are added outside pad calls
-    if len(s) < width:
-        return s + ' ' * (width - len(s))
-    return s[:width]
-
 def _ent_cell_str(ent, room, r: int, c: int, mode, floor_bg: str) -> str:
     """Return the colored terminal string for one entity cell (no trailing reset needed)."""
     rst = C.normal_fg()

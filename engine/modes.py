@@ -8,8 +8,8 @@ class Mode(Enum):
     VISUAL_LINE  = auto()
     VISUAL_BLOCK = auto()
     COMMAND = auto()
-    SEARCH       = auto()   # / and ? entry (Block F — search, not yet wired)
-    MACRO_RECORD = auto()   # q{char} recording (Block F — macros, not yet wired)
+    SEARCH       = auto()   # / and ? entry
+    MACRO_RECORD = auto()   # q{char} recording
 
 MODE_LABELS = {
     Mode.NORMAL:       '-- NORMAL --',

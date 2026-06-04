@@ -17,8 +17,8 @@ The left wall anchors the line; the right brink is where content falls off.
 
 Lost glyphs/water land in ``room._last_void_falls`` and swept entities in
 ``room._last_drowns`` so the presentation layer can animate them; the engine
-never touches the terminal. ``is_ledge`` is universally True — ``room.ledge_rows``
-is kept only as a hook for future per-row behaviour (the ledge-extending motions).
+never touches the terminal. ``is_ledge`` is universally True (the per-row
+overlay-vs-ledge distinction is retired).
 """
 from __future__ import annotations
 from engine.world import CharRun, CellType

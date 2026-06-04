@@ -70,7 +70,6 @@ class Room:
     answer_pos: int             = 0      # non-space chars of answer consumed by admin
     answer_diverged: bool       = False  # admin pressed a wrong key
     wood_damage: dict           = field(default_factory=dict)  # (r,c) -> half-steps received (1=cracked)
-    ledge_rows: set             = field(default_factory=set)   # rows that REFLOW (open to the void); empty = overlay (see engine/reflow.py)
     wrap_buffer: bool           = False  # single-line text buffer (rows==1); ':set wrap' soft-wraps it across screen rows (The Archivist's Library)
 
     def __post_init__(self):
@@ -81,7 +80,7 @@ class Room:
         self._char_runs_by_row:    dict = {}   # row -> list[CharRun]
         self._last_void_falls:     list = []   # (row,col,sym) shoved into the void by the last reflow op (engine/reflow.py)
         self._last_drowns:         list = []   # (row,col) goblins a reflow wave of water rolled over (engine/reflow.py)
-        self._last_build_blocked = None        # None | 'edge' | 'void' — why A/J's last ledge-build refused
+        self._last_build_blocked: str | None = None   # None | 'edge' | 'void' — why A/J's last ledge-build refused
 
     # ── Spatial index ──────────────────────────────────────────────────────────
 

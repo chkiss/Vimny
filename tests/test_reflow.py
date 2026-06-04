@@ -1,10 +1,8 @@
-"""Ledge-row reflow (PILOT) — the sanctioned exception to the fixed overlay grid.
+"""Reflow — universal Vim-line editing on every row (the overlay grid is retired).
 
-On a ledge row (opt-in via room.ledge_rows) editing flows like a real Vim line:
-inserting pushes content right and shoves overflow into the void; deleting pulls
-the tail left. Every *non*-ledge row keeps the overlay behaviour — the two
-regression tests at the bottom pin that down (a row is NOT a ledge just because
-it happens to carry a void rune; only membership in room.ledge_rows matters).
+Inserting pushes content right and shoves overflow past a fixed brink (wall/void);
+deleting pulls the tail left. `is_ledge` is always True, so a row reflows whether or
+not it carries a void rune — the regression tests at the bottom pin that down.
 """
 import pytest
 from engine.world import Room, RoomType, CellType, CharRun, Entity
@@ -20,7 +18,8 @@ from engine.text_object import TextObject, TextObjectType
 
 def _room(letters='abcd', start=5, void_start=9, void_n=5, cols=15, ledge=True):
     """Row 1 is a corridor (cols 1..cols-2); `letters` sit at `start`, and a run
-    of void runes marks the brink at `void_start`. Row 1 is a ledge iff `ledge`."""
+    of void runes marks the brink at `void_start`. (`ledge` is a no-op kept for call
+    sites — every row reflows now.)"""
     room = Room(room_type=RoomType.PUZZLE, rows=3, cols=cols)
     room.cells = [[CellType.FLOOR if (r == 1 and 0 < c < cols - 1) else CellType.WALL
                    for c in range(cols)] for r in range(3)]
@@ -28,8 +27,6 @@ def _room(letters='abcd', start=5, void_start=9, void_n=5, cols=15, ledge=True):
     if void_n:
         runes.append(CharRun(1, void_start, ('○',) * void_n, 'void'))
     room.char_runs = runes
-    if ledge:
-        room.ledge_rows = {1}
     room.rebuild_indexes()
     return room
 
@@ -200,12 +197,11 @@ def test_wall_edge_cursor_clamps_and_never_falls():
 # ── water is the one MOVABLE terrain: a wave shoves along and drowns goblins ──────
 
 def _wave_room(cols=15):
-    """Row 1: floor 1..cols-2, wall at cols-1, marked a ledge. The caller drops in
-    glyphs / a water puddle / a goblin, then calls rebuild_indexes()."""
+    """Row 1: floor 1..cols-2, wall at cols-1. The caller drops in glyphs / a water
+    puddle / a goblin, then calls rebuild_indexes()."""
     room = Room(room_type=RoomType.PUZZLE, rows=3, cols=cols)
     room.cells = [[CellType.FLOOR if (r == 1 and 0 < c < cols - 1) else CellType.WALL
                    for c in range(cols)] for r in range(3)]
-    room.ledge_rows = {1}
     return room
 
 
