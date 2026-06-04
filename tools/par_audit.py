@@ -68,6 +68,8 @@ def _apply(room, r, c, motion, count, target, game_h, voids):
                          count_given=(count > 1), game_h=game_h)
     if not moved or (p.row, p.col) in voids:   # don't LAND on a void rune (costs HP / can kill)
         return None
+    if not room.is_passable(p.row, p.col):     # $/%/0/^ can overshoot onto WATER — landing drowns
+        return None
     return (p.row, p.col)
 
 

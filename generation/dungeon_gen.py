@@ -3787,53 +3787,121 @@ def build_dungeon_waypoint_sanctum(seed: int) -> 'Dungeon':
 
 # ── The Bracket Vaults layout constants ─────────────────────────────────────────────────
 #
-# Three-corridor snake layout (7 rows × 60 cols).
-# Each corridor row has ( at col _BRACKET_VAULTS_BRACKET_OPEN and ) at col _BRACKET_VAULTS_BRACKET_CLOSE.
-# Row 3 (middle) is filled with void runes everywhere EXCEPT the two bracket cells,
-# forcing the player to use % to cross it rather than manual h/l navigation.
+# Three-corridor snake layout (9 rows × 60 cols): rows 1/3/5 are the corridors, rows 2/4
+# the water gaps with a single CORRIDOR turn cell each, row 3 water except its two bracket
+# cells, row 6 a water moat and row 7 a decoy goblin pit. Each corridor row has ( at col
+# _BRACKET_VAULTS_BRACKET_OPEN and ) at col _BRACKET_VAULTS_BRACKET_CLOSE; WATER blocks manual
+# h/l, so % is the only way across — its authentic Vim use, jumping a parenthesised run.
 #
-# Right turn: col _BRACKET_VAULTS_BRACKET_CLOSE, rows 1-3 (single-column gap cell at row 2).
-# Left turn:  col _BRACKET_VAULTS_BRACKET_OPEN,  rows 3-5 (single-column gap cell at row 4).
+# Right turn: col _BRACKET_VAULTS_BRACKET_CLOSE, rows 1-3 (turn cell at row 2).
+# Left turn:  col _BRACKET_VAULTS_BRACKET_OPEN,  rows 3-5 (turn cell at row 4).
 #
-# Optimal path (par=7):  % 2j % 2j %
-#   Entry (1,1): % scans right, finds ( at col 4, jumps to ) at col 54.
-#   2j → (3,54) ).  % → (3,4) (.  2j → (5,4) (.  % → (5,54) EXIT.
-#   % at (1,1) is not on a bracket but Vim-style % scans right for the first
-#   bracket on the row — finds ( col 4 and jumps to its match ) col 54.
+# Anti-teleport: a {N}G goto-line teleport onto any snake rung must NOT shortcut the snake,
+# so every snake row (2-5) has a col-1 pocket (an unmatched ) sealed by a WALL at col 2) that
+# {N}G lands in instead. The exit is gated by a locked door opened with a floor_key that sits
+# on the row-2 turn cell — reachable only via the snake. See _par_bracket_vaults for par.
 #
-_BRACKET_VAULTS_ROWS          = 7
+_BRACKET_VAULTS_ROWS          = 9      # rows 1/3/5 = snake; 6 = water moat; 7 = decoy goblin pit
 _BRACKET_VAULTS_COLS          = 60
 _BRACKET_VAULTS_BRACKET_OPEN  = 4      # ( on each corridor row
-_BRACKET_VAULTS_BRACKET_CLOSE = 54     # ) on rows 1 & 3; right-turn column; exit column
+_BRACKET_VAULTS_BRACKET_CLOSE = 54     # ) on rows 1 & 3; right-turn column; locked-door column
 _BRACKET_VAULTS_CLOSE_R5      = 53     # ) on row 5 only (one left of CLS; exit sits at CLS)
 _BRACKET_VAULTS_CORR_ROWS     = (1, 3, 5)
+_BRACKET_VAULTS_MOAT_ROW      = 6      # full-water row sealing the decoy off from the snake
+_BRACKET_VAULTS_DECOY_ROW     = 7      # corridor below the moat: where G/L land — a goblin trap
+_BRACKET_VAULTS_DECOY_GOBLINS = (18, 33, 48)   # goblin columns on the decoy row
 _BRACKET_VAULTS_ENTRY         = (1, 1)
-_BRACKET_VAULTS_EXIT_POS      = (5, _BRACKET_VAULTS_BRACKET_CLOSE)
-_BRACKET_VAULTS_PAR           = 8       # % 2j % 2j % l  = 1+2+1+2+1+1 = 8 ks
-_BRACKET_VAULTS_ANSWER        = '% 2j % 2j % l'
+# The exit sits behind a locked door at CLS; the floor_key that opens it is on the row-2
+# right-turn cell (reachable only via the snake — a {N}G teleport lands in the col-1 pocket).
+_BRACKET_VAULTS_KEY_POS       = (2, _BRACKET_VAULTS_BRACKET_CLOSE)   # (2, 54) floor_key
+_BRACKET_VAULTS_DOOR_POS      = (5, _BRACKET_VAULTS_BRACKET_CLOSE)   # (5, 54) locked_door
+_BRACKET_VAULTS_EXIT_POS      = (5, _BRACKET_VAULTS_BRACKET_CLOSE + 1)  # (5, 55) one past the door
+_BRACKET_VAULTS_PAR           = 10      # % j x j % 2j $ p l = 1+1+1+1+1+2+1+1+1 = 10 ks
+_BRACKET_VAULTS_ANSWER        = '% j x j % 2j $ p l'   # % to (1,54); j x j grabs the key &
+                                                       # drops to (3,54); % 2j to (5,4); $ to
+                                                       # the ) by the door; p unlocks; l → exit
+# Rows 1 & 5 fill the span between ( and ) with randomly-chosen vocab words, so % jumps
+# across a real (...) expression — its authentic Vim use — not empty corridor. The words
+# are packed single-spaced with no gap to either bracket, so they exactly fill the span.
+_BRACKET_VAULTS_WORDS_MIN     = 10      # at least this many words per parenthesised row
+
+
+def _bracket_vaults_fill_words(rng, width: int, min_words: int = 10):
+    """Pick random vocab words that, joined by single spaces, EXACTLY fill `width`
+    columns using at least `min_words` words.
+
+    Words come from the plain vocab table, minus any token containing a bracket
+    (those would derail %). Since the vocab's shortest word is 3 chars, the packer
+    only ever leaves a remainder of 0 (close) or >= 4 (room for ' ' + a 3-char word),
+    never a 1-3 gap it can't fill; on the rare attempt that closes before reaching
+    min_words it just retries. Deterministic for a given rng.
+    """
+    _load_vocab_tables()
+    by_len = {n: [w for w in ws if not any(c in '()[]{}' for c in w)]
+              for n, ws in _VOCAB_PLAIN_BY_LEN.items()}
+    by_len = {n: ws for n, ws in by_len.items() if ws}
+    lens   = sorted(by_len)
+    minlen = lens[0]
+
+    for _ in range(4000):
+        words, used = [], 0
+        while used < width:
+            sep   = 0 if not words else 1
+            avail = width - used - sep
+            # Keep the remainder fillable: after this word, leave either 0 (done) or
+            # enough for another ' ' + shortest word.
+            cands = [L for L in lens
+                     if L <= avail and (avail - L == 0 or avail - L >= minlen + 1)]
+            if not cands:
+                break
+            # While short of the quota, prefer words that leave room to continue, and
+            # bias toward shorter words so we comfortably clear min_words.
+            if len(words) + 1 < min_words:
+                cands = [L for L in cands if avail - L >= minlen + 1] or cands
+            L = rng.choices(cands, weights=[1.0 / (x * x) for x in cands])[0]
+            words.append(rng.choice(by_len[L]))
+            used += sep + L
+        if used == width and len(words) >= min_words:
+            return words
+    # Extremely unlikely fallback: shortest words padded — caller widths make this dead code.
+    raise RuntimeError(f'could not pack {min_words}+ words into width {width}')
 
 
 def _par_bracket_vaults(composite, use_percent: bool = True, return_path: bool = False):
     """Minimum-keystroke Dijkstra for The Bracket Vaults.
 
-    Supported motions (all available at The Bracket Vaults):
-      h/l/j/k (count), $ 0 ^, % (if use_percent=True).
-
-    State = (row, col).
-    use_percent=False simulates the command-necessity test (% disabled).
+    The exit sits behind a locked door opened with the floor_key on the row-2 turn cell,
+    so State = (row, col, has_key, door_open). Motions: h/l/j/k (count), $ 0 ^,
+    % (if use_percent=True), x (grab the key on its cell), p (unlock the door one cell to
+    the right, stepping onto it). A closed door blocks standing on it AND every rightward
+    scan ($/^/%), exactly like the engine (a locked_door halts _cross_water).
+    use_percent=False simulates the command-necessity test (% disabled → water uncrossable).
     """
     ROWS, COLS = composite.rows, composite.cols
     entry = composite.spawn_pos
     goal  = composite.exit_pos
+    KEYR, KEYC   = _BRACKET_VAULTS_KEY_POS
+    DOORR, DOORC = _BRACKET_VAULTS_DOOR_POS
 
     _PAIRS_OPEN_L11  = {'(': ')', '[': ']', '{': '}'}
     _PAIRS_CLOSE_L11 = {')': '(', ']': '[', '}': '{'}
 
-    def _ok(r, c):
+    def _passable(r, c, do):
         if not composite.is_passable(r, c):
+            return False
+        if (r, c) == (DOORR, DOORC) and not do:   # locked door is a wall until opened
+            return False
+        return True
+
+    def _ok(r, c, do):
+        if not _passable(r, c, do):
             return False
         ru = composite.char_run_at(r, c)
         return not (ru and ru.kind == 'void')
+
+    def _blocks_scan(r, c, do):
+        return (composite.cells[r][c] in (CellType.WALL, CellType.WOOD_WALL)
+                or ((r, c) == (DOORR, DOORC) and not do))
 
     def _bracket_here(r, c):
         ru = composite.char_run_at(r, c)
@@ -3843,14 +3911,14 @@ def _par_bracket_vaults(composite, use_percent: bool = True, return_path: bool =
                 return ch
         return None
 
-    def _pct(r, c):
-        """Replicate motion.py % scan: same-row, nesting-aware, stops at walls."""
+    def _pct(r, c, do):
+        """Replicate motion.py % scan: same-row, nesting-aware, stops at walls/closed door."""
         bch   = _bracket_here(r, c)
         start = c if bch is not None else None
         # If not on a bracket, scan right for the first one (Vim behaviour).
         if start is None:
             for cc in range(c + 1, COLS):
-                if composite.cells[r][cc] in (CellType.WALL, CellType.WOOD_WALL):
+                if _blocks_scan(r, cc, do):
                     break
                 b = _bracket_here(r, cc)
                 if b is not None:
@@ -3863,7 +3931,7 @@ def _par_bracket_vaults(composite, use_percent: bool = True, return_path: bool =
         scan    = range(start, COLS) if forward else range(start, -1, -1)
         depth   = 0
         for cc in scan:
-            if composite.cells[r][cc] in (CellType.WALL, CellType.WOOD_WALL):
+            if _blocks_scan(r, cc, do):
                 break
             b = _bracket_here(r, cc)
             if b == bch:
@@ -3871,99 +3939,106 @@ def _par_bracket_vaults(composite, use_percent: bool = True, return_path: bool =
             elif b == want:
                 depth -= 1
                 if depth == 0:
-                    if _ok(r, cc) and cc != c:
+                    if _ok(r, cc, do) and cc != c:
                         return (r, cc)
                     return None
         return None
 
-    dist = {entry: 0}
-    prev = {entry: None}
-    heap = [(0, entry)]
+    start_state = (entry[0], entry[1], 0, 0)
+    dist = {start_state: 0}
+    prev = {start_state: None}
+    heap = [(0, start_state)]
     max_n = max(ROWS, COLS)
 
     while heap:
-        cost, (r, c) = heapq.heappop(heap)
+        cost, state = heapq.heappop(heap)
+        r, c, hk, do = state
         if (r, c) == goal:
             if return_path:
-                return cost, _join_path(prev, (r, c), merge_single=True)
+                return cost, _join_path(prev, state, merge_single=True)
             return cost
-        if cost > dist.get((r, c), float('inf')):
+        if cost > dist.get(state, float('inf')):
             continue
 
-        def _push(nb, mc=1, lbl=''):
-            if nb is None:
-                return
-            nr, nc = nb
-            if not _ok(nr, nc):
+        def _push(ns, mc=1, lbl=''):
+            if ns is None:
                 return
             g = cost + mc
-            if g < dist.get((nr, nc), float('inf')):
-                dist[(nr, nc)] = g
-                prev[(nr, nc)] = ((r, c), lbl)
-                heapq.heappush(heap, (g, (nr, nc)))
+            if g < dist.get(ns, float('inf')):
+                dist[ns] = g
+                prev[ns] = (state, lbl)
+                heapq.heappush(heap, (g, ns))
+
+        # x: pick up the floor key when standing on it
+        if (r, c) == (KEYR, KEYC) and hk == 0:
+            _push((r, c, 1, do), 1, 'x')
+
+        # p: unlock the locked door one cell to the right (steps onto it), consuming the key
+        if hk == 1 and do == 0 and (r, c + 1) == (DOORR, DOORC):
+            _push((DOORR, DOORC, 0, 1), 1, 'p')
 
         # j/k (vertical), h/l (horizontal) — with count
         for dr, key in ((1, 'j'), (-1, 'k')):
             for n in range(1, max_n + 1):
                 nr2 = r + dr * n
-                if nr2 < 0 or nr2 >= ROWS or not _ok(nr2, c):
+                if nr2 < 0 or nr2 >= ROWS or not _ok(nr2, c, do):
                     break
                 mc2  = 1 if n == 1 else len(str(n)) + 1
                 lbl2 = key if n == 1 else f'{n}{key}'
-                _push((nr2, c), mc2, lbl2)
+                _push((nr2, c, hk, do), mc2, lbl2)
 
         for dc, key in ((1, 'l'), (-1, 'h')):
             for n in range(1, max_n + 1):
                 nc2 = c + dc * n
-                if nc2 < 0 or nc2 >= COLS or not _ok(r, nc2):
+                if nc2 < 0 or nc2 >= COLS or not _ok(r, nc2, do):
                     break
                 mc2  = 1 if n == 1 else len(str(n)) + 1
                 lbl2 = key if n == 1 else f'{n}{key}'
-                _push((r, nc2), mc2, lbl2)
+                _push((r, nc2, hk, do), mc2, lbl2)
 
-        # $: rightmost passable+ok col in same row
+        # $: rightmost passable+ok col in same row (stops at a closed door)
         best_col = None
         for cc in range(c + 1, COLS):
-            if not composite.is_passable(r, cc):
+            if not _passable(r, cc, do):
                 break
             best_col = cc
-        if best_col is not None and _ok(r, best_col):
-            _push((r, best_col), 1, '$')
+        if best_col is not None and _ok(r, best_col, do):
+            _push((r, best_col, hk, do), 1, '$')
 
         # 0: leftmost passable+ok col in same row
         left_col = c
         for cc in range(c - 1, -1, -1):
-            if not composite.is_passable(r, cc):
+            if not _passable(r, cc, do):
                 break
             left_col = cc
-        if left_col < c and _ok(r, left_col):
-            _push((r, left_col), 1, '0')
+        if left_col < c and _ok(r, left_col, do):
+            _push((r, left_col, hk, do), 1, '0')
 
         # ^: first character (any kind) scanning from leftmost passable boundary.
         # Stops at the first character found (void or not); only pushes if _ok
         # (non-void).  Mirrors the game engine: void runes block ^ silently.
         lb = c
         for cc in range(c - 1, -1, -1):
-            if not composite.is_passable(r, cc):
+            if not _passable(r, cc, do):
                 break
             lb = cc
         rb = c
         for cc in range(c + 1, COLS):
-            if not composite.is_passable(r, cc):
+            if not _passable(r, cc, do):
                 break
             rb = cc
         for cc in range(lb, rb + 1):
             ru2 = composite.char_run_at(r, cc)
             if ru2:
-                if _ok(r, cc):
-                    _push((r, cc), 1, '^')
+                if _ok(r, cc, do):
+                    _push((r, cc, hk, do), 1, '^')
                 break  # first character (void or not) terminates search
 
         # %: matching bracket jump (disabled in command-necessity test)
         if use_percent:
-            nb_pct = _pct(r, c)
+            nb_pct = _pct(r, c, do)
             if nb_pct is not None:
-                _push(nb_pct, 1, '%')
+                _push((nb_pct[0], nb_pct[1], hk, do), 1, '%')
 
     if return_path:
         return None, ''
@@ -3973,24 +4048,25 @@ def _par_bracket_vaults(composite, use_percent: bool = True, return_path: bool =
 def build_dungeon_bracket_vaults(seed: int) -> Dungeon:
     """% (The Bracket Vaults).
 
-    Teaches `%` (bracket-matching jump) as the only way to cross a band of WATER.
-    Layout: three horizontal corridors (rows 1/3/5) in a snake pattern, with rows
-    2, 3 and 4 flooded.
+    Teaches `%` (bracket-matching jump) as the only way to cross a band of WATER, then
+    gates the exit behind a floor_key (x to grab) and a locked door (p to unlock).
+    Layout: three horizontal corridors (rows 1/3/5) in a snake pattern, with rows 2, 3
+    and 4 flooded. Rows 1 & 5 fill their ( ... ) span with treasure-words so % jumps a
+    real parenthesised run. Rows 2 and 4 are water except a single turn cell each; row 3
+    is water except its two bracket cells. Every snake row (2-5) carries a col-1 pocket
+    (unmatched ) + WALL at col 2) so a {N}G teleport is trapped there, not on the snake.
 
-    Rows 1 and 5 are open corridors.  Rows 2 and 4 are water except the single
-    turn cell on each.  Row 3 is water except at ( col 4 and ) col 54 — the only
-    landing cells.  WATER blocks manual h/l (is_passable is False); % scans across
-    the water to the matching bracket.
+    Right turn: col 54, rows 1-3.  Left turn: col 4, rows 3-5.  Row 5's ) sits at col 53;
+    the locked door is at (5,54) and the exit one cell further right at (5,55). The key is
+    on the row-2 turn cell (2,54), reachable only by the snake.
 
-    Right turn: col 54, rows 1-3.  Left turn: col 4, rows 3-5.  Row 5's ) sits at
-    col 53 with the exit one cell right at (5,54).
-
-    Optimal path (par=8):  % 2j % 2j % l
-      Entry (1,1): % → ) col 54.  2j → (3,54).  % → (3,4) (.  2j → (5,4) (.
-      % → (5,53) ).  l → (5,54) EXIT.
+    Optimal path (par=10):  % j x j % 2j $ p l
+      (1,1) % → (1,54) ).  j → (2,54) key, x grabs it.  j → (3,54).  % → (3,4) (.
+      2j → (5,4) (.  $ → (5,53) ) [the closed door halts $].  p unlocks the door and steps
+      onto (5,54).  l → (5,55) EXIT.
 
     Without %: par_no_% = None (the water band is uncrossable by hand).
-    Layout is deterministic; seed only colors bracket characters.
+    Layout is deterministic; seed only colors the bracket/word characters.
     """
     dungeon   = Dungeon(name='The Bracket Vaults', seed=seed)
     ROWS, COLS = _BRACKET_VAULTS_ROWS, _BRACKET_VAULTS_COLS
@@ -4028,6 +4104,27 @@ def build_dungeon_bracket_vaults(seed: int) -> Dungeon:
         if c != OPN and c != CLS:
             cells[3][c] = CellType.WATER
 
+    # ── Moat + decoy goblin pit (anti-teleport) ───────────────────────────────
+    # The exit sits on row 5, which used to be the LAST line — so G (last line) and
+    # L (bottom of screen) teleported straight to it and `% l` finished in 3, under
+    # par. Add a full-water moat (row 6) and a corridor decoy (row 7) BELOW it: now
+    # G/L land on row 7, sealed off from the snake by the moat, in a pit of goblins.
+    # The real exit on row 5 is interior and unreachable by any teleport.
+    MOAT, DECOY = _BRACKET_VAULTS_MOAT_ROW, _BRACKET_VAULTS_DECOY_ROW
+    for c in range(1, COLS - 1):
+        cells[MOAT][c]  = CellType.WATER
+        cells[DECOY][c] = CellType.CORRIDOR
+
+    # Anti-teleport pockets on EVERY snake row (2-5): a CORRIDOR cell at col 1 (holding an
+    # unmatched ) — see below) plus a stone WALL at col 2. A {N}G goto-line teleport onto
+    # any snake rung lands on that col-1 ) (the row's first-non-blank), sealed off from the
+    # snake by the wall — scans ($/%/f/0/^) cross water but HALT at a wall — so it can never
+    # reach the snake proper. Row 1 needs no pocket: its first-non-blank IS the snake's start
+    # ( at col 4, and finishing from there already costs more than par.
+    for br in (2, 3, 4, 5):
+        cells[br][1] = CellType.CORRIDOR
+        cells[br][2] = CellType.WALL
+
     # ── Place bracket CharRuns ────────────────────────────────────────────
     # Single-char CharRun at each bracket position so _bracket_at() in
     # motion.py can identify them via the character at that cell.  Row 5's ) sits
@@ -4043,6 +4140,29 @@ def build_dungeon_bracket_vaults(seed: int) -> Dungeon:
         close_col  = EXC if row == 5 else CLS
         runes.append(CharRun(row=row, col=OPN, symbols=('(',), kind=kind_open))
         runes.append(CharRun(row=row, col=close_col, symbols=(')',), kind=kind_close))
+    # Decorative brackets on the decoy row (so it reads like the rest; they lead nowhere).
+    runes.append(CharRun(row=DECOY, col=OPN, symbols=('(',), kind=rng.choice(_kinds)))
+    runes.append(CharRun(row=DECOY, col=CLS, symbols=(')',), kind=rng.choice(_kinds)))
+
+    # Random vocab words between the brackets on rows 1 & 5 — one CharRun per word with a
+    # single-column gap between, exactly filling ( ... ) with no space against either
+    # bracket. % ignores them (no brackets within) and jumps ( → ); they give the run real
+    # content to span. The packer guarantees >= _WORDS_MIN words sized to the exact span.
+    for wrow in (1, 5):
+        close_col = EXC if wrow == 5 else CLS
+        first_col = OPN + 1                         # flush against the (
+        width     = close_col - first_col           # cols first_col .. close_col-1
+        wc = first_col
+        for w in _bracket_vaults_fill_words(rng, width, _BRACKET_VAULTS_WORDS_MIN):
+            runes.append(CharRun(row=wrow, col=wc, symbols=tuple(w), kind=rng.choice(_kinds)))
+            wc += len(w) + 1
+
+    # Lone unmatched ) in each snake row's col-1 pocket (rows 2-5): it is that row's
+    # first-non-blank, so a {N}G teleport lands on it. From a ) the % scan runs LEFT, hits
+    # the col-0 wall and finds no match; the col-2 WALL blocks l/w/e/f/$/% rightward — so the
+    # teleport is trapped in the pocket with no route to the snake or the exit.
+    for br in (2, 3, 4, 5):
+        runes.append(CharRun(row=br, col=1, symbols=(')',), kind=rng.choice(_kinds)))
 
     composite.char_runs = runes
 
@@ -4051,6 +4171,17 @@ def build_dungeon_bracket_vaults(seed: int) -> Dungeon:
     composite.exit_pos = _BRACKET_VAULTS_EXIT_POS
     composite.entities = [Entity(kind='exit',
                                  row=_BRACKET_VAULTS_EXIT_POS[0], col=_BRACKET_VAULTS_EXIT_POS[1])]
+    # Floor key on the row-2 turn cell + locked door guarding the exit: the exit can't be
+    # reached by simply landing on it (a {N}G teleport is trapped in a col-1 pocket anyway),
+    # and the key sits where only the snake reaches it. Pick up with x, unlock with p.
+    composite.entities.append(Entity(kind='floor_key',
+                                     row=_BRACKET_VAULTS_KEY_POS[0], col=_BRACKET_VAULTS_KEY_POS[1]))
+    composite.entities.append(Entity(kind='locked_door',
+                                     row=_BRACKET_VAULTS_DOOR_POS[0], col=_BRACKET_VAULTS_DOOR_POS[1]))
+    # Goblins guarding the decoy pit — they punish a teleport-cheese (G/L) and can't
+    # cross the moat to the snake.
+    for gc in _BRACKET_VAULTS_DECOY_GOBLINS:
+        composite.entities.append(Entity(kind='goblin', row=DECOY, col=gc, max_hp=1, ai='chase'))
 
     composite.rebuild_indexes()
 
