@@ -1,12 +1,13 @@
 # Vimny — Clean-up Plan
 
-**Execution status (2026-06-03):** A.1, B, C, D.1, E, F.1 — **done & committed** (full
-suite green). F.2 — **already satisfied**: every `blueprints/act_*.md` already carries a
-prominent "⚠ Pre-implementation design doc — obsolete conventions; delete-on-implement"
-banner, so the finding was moot (corrected below). D.2 (render_all wrapper) — **deferred**:
-41 of 68 call sites are the full form but the message arg varies and many span multiple
-lines, so collapsing them is 41 hand-edits for a "nice-to-have" once the headline
-duplication (D.1) is gone; the churn/risk isn't worth it. G is follow-on work, not cleanup.
+**Execution status (2026-06-03):** A.1, B, C, D.1, **D.2**, E, F.1 — **done & committed**
+(full suite green, 2432). F.2 — **already satisfied**: every `blueprints/act_*.md` already
+carries a prominent "⚠ Pre-implementation design doc — obsolete conventions;
+delete-on-implement" banner, so the finding was moot (corrected below). D.2 was done as a
+pure prefix-drop closure `_render(msg='', **kw)` (forwards every other arg unchanged), so all
+65 `run_dungeon` call sites convert behaviour-identically; the 3 `render_all` calls in
+`_heart_container_animation` (outside `run_dungeon`, no closure in scope) stay direct.
+G is follow-on work, not cleanup, so left out.
 
 A codebase audit for bugs, edge cases, bloat, cruft, duplication, and doc accuracy.
 Findings are ordered by category; each has a concrete location and a recommended action.
@@ -65,9 +66,11 @@ latent robustness gap:
    repeats 15 times verbatim. Extract a closure `_blocked(action) -> bool` that does the
    push+render and returns True, so call sites read `if _blocked(action): continue`.
    ~45 lines removed, one source of truth for the gate message.
-2. **`main.py` `render_all(term, dungeon, player, budget, …)` (×68).** The four leading args
-   are always the same. A thin `_render(message='', **kw)` closure (already have `_push`,
-   `_pool_msg`) would cut a lot of repetition and the risk of arg drift.
+2. **`main.py` `render_all(term, dungeon, player, budget, …)` (×68).** DONE. Added a
+   `_render(msg='', **kw)` closure that drops the four-arg prefix and forwards everything
+   else unchanged; all 65 `run_dungeon` calls now read `_render(...)`. The 3 calls inside
+   `_heart_container_animation` (a module-level helper, outside the closure's scope) stay as
+   direct `render_all`.
 3. **`engine/substitute.py` `gg` closure (lines 168 & 450).** The capture-group getter is
    defined verbatim in `_sub_line` and `_sub_line_confirm`. Hoist to a module-level
    `_grouper(m, s, e, text)` factory.
