@@ -6,7 +6,46 @@ Each has a corresponding test file in `tests/test_bug_<name>.py`.
 Invoke any of these as an agent by feeding it the personality description plus
 the room/dungeon state you want probed.
 
+These serve **two** purposes — don't stop at the first:
+1. **Crash / edge-case probing** (the `test_bug_*.py` unit suites, minimal fixtures).
+2. **Par integrity on the real levels** (see below) — DON'T MISS THIS.
+
 ---
+
+## Par integrity (run the personas on the REAL generated levels)
+
+`room.par` is meant to be the **true minimum keystrokes** to clear a level. A level's par
+is set by its `_par_<slug>` Dijkstra solver for the *taught* command set, and
+`tests/test_answer_paths.py` asserts the level's `answer` costs exactly that. The open
+question those don't cover: **can a DIFFERENT playstyle (command set) reach the exit in
+fewer keystrokes than par?** If yes, par is set too high.
+
+That's what the personas are for here. To run the check on a level:
+
+- Build the real dungeon: `generation.dungeon_gen.build_dungeon_<slug>(seed)`.
+- Drive the persona's keys through `main.run_dungeon(..., player_name='p', _dungeon=d)`
+  — use a **non-admin** player so command gating is realistic (the persona may only use
+  commands learned by that level).
+- Capture `budget.spent` the first frame the player stands on `room.exit_pos` (the win).
+- Compare to `room.par`. **Any completion with `spent < par` means par is above the
+  minimum — flag it.** (Init `render.colors`/`render.symbols` and stub the victory/scroll
+  animations, or the win frame raises `color_rgb`.)
+
+**Critical caveat — a par-probing persona must actually SOLVE the level.** Random
+key-spam (what the unit fixtures use) almost never reaches an exit, so it tells you
+nothing about par. To probe par, the persona must *navigate to the exit* using its
+favoured commands (e.g. the Line Ender clearing a level with only `$`/`0`/`^`/`j`, the
+Word Surfer with only `w`/`b`/`e`). Hand the agent the level geometry and let it plan the
+route; then measure its keystrokes.
+
+**Known-intentional sub-par cases (NOT bugs):** on search levels (`/ ? *`) par assumes
+you type the full highlighted term, but a shorter unique prefix lands the cursor for
+fewer keys — so an expert finishes under par by design (see README "par is not the
+absolute minimum on search levels"). Anything else under par is a real par-too-high bug.
+
+---
+
+## The Berserker
 
 ## The Berserker
 **File:** `tests/test_bug_berserker.py`
