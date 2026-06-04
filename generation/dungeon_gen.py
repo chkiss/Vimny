@@ -3458,8 +3458,9 @@ def build_dungeon_waypoint_sanctum(seed: int) -> 'Dungeon':
     # SANCTUM (rows 4-6), sealed above by the row-3 wall and below by the row-7 wall.
     # Row 5 is the mark row: a one-cell scroll nook at col 1 behind a 'blue' lock at
     # col 2, then the wordless corridor, the gold exit lock (43) + exit (44).  Rows 4
-    # & 6 are corridor only from col 5 — so their first-non-blank is the corridor,
-    # never the nook (this keeps M off the scroll; see the module comment).
+    # & 6 are corridor only from col 5; they are paved with a VOID MOAT below (so the
+    # { / } paragraph jumps can't use them to drop into the open corridor — see the
+    # void-moat note below).
     for c in range(5, 43):
         carve(4, c); carve(6, c)
     for c in range(1, 43):
@@ -3536,6 +3537,18 @@ def build_dungeon_waypoint_sanctum(seed: int) -> 'Dungeon':
                 c += L + 1
             else:
                 c += span + 1
+
+    # Void moat on the unlocked approach rows (4 & 6) flanking the mark row.
+    # They were wordless corridor — which made them { / } paragraph-jump targets:
+    # `}` from the key landed on row 4 and a single `j` dropped into the open
+    # corridor, bypassing the lock AND the mark (the cheese `( tc x } j $ p l` = 9).
+    # Paving them with void makes them non-blank, so `{`/`}` skip them and resolve
+    # onto row 5 — where _segment_left reaches the scroll nook behind the blue lock,
+    # trapping the jumper. The open corridor is now reachable only by `a (the exact
+    # mark), so marks are genuinely forced. The legit route never walks rows 4/6.
+    for r in (4, 6):
+        char_runs.append(CharRun(row=r, col=5,
+                                 symbols=tuple(_RUNE_CHAR['void'] * (43 - 5)), kind='void'))
 
     composite.char_runs = char_runs
     composite.spawn_pos = _WP_SPAWN

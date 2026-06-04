@@ -111,8 +111,13 @@ def test_dimensions_and_budget(seed):
 @pytest.mark.parametrize('seed', SEEDS)
 def test_corridor_is_wordless_and_walled_off(seed):
     room = _room(seed)
-    # the sanctum (rows 4-6) carries no characters -> can't be searched to
-    assert not any(4 <= ru.row <= 6 for ru in room.char_runs)
+    # the mark row (5) carries no characters and rows 4 & 6 carry ONLY the void
+    # trap moat (not searchable words) -> the sanctum still can't be searched home,
+    # and the { / } paragraph jumps that used to land on the wordless rows 4/6 now
+    # hit void (or resolve to the sealed nook), so marks stay the only way in.
+    assert not any(ru.row == 5 for ru in room.char_runs)
+    assert all(ru.kind == 'void' for ru in room.char_runs if ru.row in (4, 6))
+    assert any(ru.kind == 'void' and ru.row in (4, 6) for ru in room.char_runs)
     # the sanctum is sealed from the danger rooms above and below: the top seal is a
     # solid wall, the bottom seal a wall pierced only by keyless ('blue') vault doors
     # — every cell of both rows is impassable, so no foot route crosses.
