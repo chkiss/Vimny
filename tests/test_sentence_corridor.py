@@ -9,9 +9,11 @@ sentences, scattered horizontally and divided by wall-gaps:
 Teaches ) and ( — within a row AND across rows — plus that they land on
 sentence STARTS (the key/door sit at sentence ENDS, so the player must add $).
 ) is hard-forced: the key is on a 2nd-of-row sentence behind a wall-gap, and the
-line/screen/paragraph jumps the player already knows only reach a row's FIRST
-sentence. ( is the shortest backtrack but — like H/M/L — can be substituted by
-gg/{n}G + ), so it is taught/incentivized rather than infinitely forced.
+line/screen jumps the player already knows only reach a row's FIRST sentence.
+( is the shortest backtrack; the paragraph jumps { / } would otherwise undercut
+it (cheaper cross-row jump), so a void trap line above S1 makes them land on a
+void (a heart + bounce-back). ( can still be substituted by gg/{n}G + ), so it is
+taught/incentivized rather than infinitely forced.
 """
 import math
 import pytest
@@ -123,8 +125,9 @@ def test_answer_uses_both_parens(seed):
 def test_close_paren_required(seed):
     """Without ), the key (a 2nd-of-row sentence behind a wall-gap) is
     unreachable, so the door can't be unlocked and the exit can't be reached.
-    Line/screen jumps reach only a row's first sentence, so ) is genuinely
-    required even though the solver doesn't model them."""
+    Line/screen jumps reach only a row's first sentence, and the cross-row { / }
+    paragraph jumps land on the row-0 void trap, so ) is genuinely required even
+    though the solver doesn't model those motions."""
     room = build_dungeon_sentence_corridor(seed).rooms[0]
     cost = _par_sentence_corridor(room, no_close=True)
     assert cost is None or cost > room.budget, (

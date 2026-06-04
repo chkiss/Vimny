@@ -4417,8 +4417,9 @@ _SENTENCE_CORRIDOR_SEP_ROW  = 2              # all-wall stone row between the tw
 #   row 1:  S1 ·gap· S2 ·gap· S3 [door][exit]
 #   row 3:  S4 ·gap· S5 [key]
 # S3 (3rd of row 1) and S5 (2nd of row 3) sit behind wall-gaps, so the line /
-# screen / paragraph jumps the player already knows (G gg {n}G H M L { }) reach
-# only a row's FIRST sentence — ) is the sole way onto them.
+# screen jumps the player already knows (G gg {n}G H M L) reach only a row's FIRST
+# sentence — ) is the sole way onto them.  { / } would otherwise cross rows and
+# undercut ( as the backtrack, so a void trap line above S1 neutralises them.
 _SENTENCE_CORRIDOR_SENTENCES = [
     (1, 1,  'A sentence is one stride.'),
     (1, 29, 'Where does it end?'),
@@ -4928,11 +4929,14 @@ def _par_sentence_corridor(composite, return_path=False, no_close=False, no_open
     (unlock the locked_door to the right, stepping onto it).  no_close / no_open
     drop ) / ( for the command-necessity checks.
 
-    Line/screen jumps (G gg {n}G H M L { }) are intentionally NOT modelled: they
-    only reach the FIRST sentence of a row, so they never beat ) onto the key's or
-    door's sentence (both sit behind wall-gaps) — par is unaffected and ) stays
-    genuinely required.  ( CAN be replaced by gg/{n}G + ), so it is the
-    strongly-incentivized partner, not asserted as required.
+    { / } are intentionally NOT modelled because the build paves a VOID TRAP LINE
+    above the first sentence (row 0): `{`/`}` resolve onto it and landing on a void
+    costs a heart + bounces you back, so they can never undercut ( as the backtrack
+    (without it, `{` reached S3's start in one key — the cheese `4) $ x { $ p l` =
+    8).  G gg {n}G H M L reach only a row's FIRST sentence, so they never beat )
+    onto the key's/door's sentence either.  par is unaffected and ) stays genuinely
+    required.  ( CAN be replaced by gg/{n}G + ), so it is the strongly-incentivized
+    partner, not asserted as required.
     """
     from engine.motion import _sentence_starts_all
     ROWS, COLS = composite.rows, composite.cols
@@ -5049,9 +5053,10 @@ def build_dungeon_sentence_corridor(seed: int) -> 'Dungeon':
 
     The floor_key sits at the END of sentence 5 and the locked_door at the END of
     sentence 3.  Both host-sentences are the 2nd/3rd on their row, so the line /
-    screen / paragraph jumps the player already has (G gg {n}G H M L { }) reach
-    only a row's FIRST sentence — the ONLY way onto the key's and door's
-    sentences is ).  Reaching the key is mandatory, so ) is forced.
+    screen jumps the player already has (G gg {n}G H M L) reach only a row's FIRST
+    sentence — the ONLY way onto the key's and door's sentences is ).  Reaching the
+    key is mandatory, so ) is forced.  (The paragraph jumps { / } DO cross rows, so
+    a void trap line above S1 stops them undercutting ( — see below.)
 
     ) and ( land on sentence STARTS; the key and door are at sentence ENDS, so
     the player must add $ after each jump — the core lesson of the level.
@@ -5088,6 +5093,22 @@ def build_dungeon_sentence_corridor(seed: int) -> 'Dungeon':
     cells[dr][dc] = CellType.FLOOR
     cells[er][ec] = CellType.CORRIDOR
     cells[kr][kc] = CellType.CORRIDOR
+
+    # ── Void "trap line" above the first sentence (row 0 over S1's columns) ────
+    # { / } want a blank line to land on. Without one they fell through to row 1
+    # and landed at the cursor column's segment start, so `{` from the key (col 69)
+    # reached S3's start in ONE key, undercutting `3(` (the cheese: `4) $ x { $ p l`
+    # = 8). This strip is the topmost passable row, so `{`/`}` resolve onto it —
+    # but it is paved with VOID runes: landing costs a heart and bounces you back
+    # (main.py), so a cheeser reaching for `{` is punished and gains nothing,
+    # leaving `(` the shortest backtrack and par at 9. The par solver and the
+    # cheese audit both refuse to land on void, so par stays the true minimum.
+    # Spans only S1 (a dead-end stub off the spawn) ⇒ no wall-gap bypass.
+    _s1_r, _s1_c, _s1_text = _SENTENCE_CORRIDOR_SENTENCES[0]
+    for c in range(_s1_c, _s1_c + len(_s1_text)):
+        cells[0][c] = CellType.CORRIDOR
+    runes.append(CharRun(row=0, col=_s1_c,
+                         symbols=tuple(_RUNE_CHAR['void'] * len(_s1_text)), kind='void'))
 
     composite.spawn_pos = _SENTENCE_CORRIDOR_ENTRY
     composite.exit_pos  = _SENTENCE_CORRIDOR_EXIT
