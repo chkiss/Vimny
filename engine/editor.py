@@ -203,14 +203,18 @@ def _clip_desc(item) -> str:
     return 'floor'
 
 
+# Serialised cell encoding — single source of truth; the two directions are inverses.
+_CELL_CODE = {CellType.WALL: 'W', CellType.FLOOR: 'F', CellType.CORRIDOR: 'C',
+              CellType.WATER: 'A', CellType.WOOD_WALL: 'X'}
+_CODE_CELL = {code: cell for cell, code in _CELL_CODE.items()}
+
+
 def _deserialize_room(data: dict):
     """Reconstruct a Room from a dict produced by _serialize_room / save_layout."""
     from engine.world import Room, RoomType, CellType, CharRun, Entity
-    cell_map = {'W': CellType.WALL, 'F': CellType.FLOOR, 'C': CellType.CORRIDOR,
-                'A': CellType.WATER, 'X': CellType.WOOD_WALL}
     rows  = data['rows']
     cols  = data['cols']
-    cells = [[cell_map.get(c, CellType.FLOOR) for c in row] for row in data['cells']]
+    cells = [[_CODE_CELL.get(c, CellType.FLOOR) for c in row] for row in data['cells']]
     room  = Room(room_type=RoomType.ENTRY, rows=rows, cols=cols)
     room.cells    = cells
     room.char_runs    = [CharRun(row=r['row'], col=r['col'],
@@ -228,12 +232,10 @@ def _deserialize_room(data: dict):
 
 def _serialize_room(room) -> dict:
     """Serialise a Room to a JSON-safe dict for :save."""
-    cell_map = {CellType.WALL: 'W', CellType.FLOOR: 'F', CellType.CORRIDOR: 'C',
-                CellType.WATER: 'A', CellType.WOOD_WALL: 'X'}
     return {
         'rows':     room.rows,
         'cols':     room.cols,
-        'cells':    [[cell_map.get(c, 'F') for c in row] for row in room.cells],
+        'cells':    [[_CELL_CODE.get(c, 'F') for c in row] for row in room.cells],
         'char_runs':    [{'row': ru.row, 'col': ru.col,
                       'symbols': list(ru.symbols), 'kind': ru.kind}
                      for ru in room.char_runs],

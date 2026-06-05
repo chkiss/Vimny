@@ -42,10 +42,13 @@ Legend: 🔴 inaccuracy/bug · 🟡 duplication · 🟢 streamlining · ⚪ note
 - `scrolls.py` docstring: stale `('v_sight',)` line-kind removed (unused anywhere).
 - Orphaned-builder check ran: **no orphan `build_dungeon_*`** (the 25 LEVELS-without-builder are future/unimplemented curriculum entries, not dead code).
 
+**Applied later still (par-solver toolkit + cheese audit):**
+- 🟢🟢 **dungeon_gen par-solver toolkit** (#3) — DONE. Extracted `_dijkstra`/`_bfs`/`_count_moves`/`_row_segment`/`_word_motion_chain` and rewired **8 solvers** (`_bfs_par`, `_bfs_par_line`, `_dijkstra_par_count`, `_par_counting_crypts`, `_dijkstra_par_wbe`, `_dijkstra_par_ftFT`, `_dijkstra_par_WBE`, `_par_backward_vaults`); each verified par+answer **byte-identical** across all levels × 5 seeds + `par_audit` clean. Net −260 lines. The analytic (`goblin_gauntlet`, `wardens_keep`) and bespoke-motion (`%`, `H/M/L`, `/search`, sentence) solvers are intentionally NOT on the toolkit.
+- `tools/cheese_audit.py` (new) — key/door-aware "is par the true minimum over the full learned motion set?" audit; found + fixed cheeses in `sentence_corridor` (void trap line) and `waypoint_sanctum` (water moat). All key/door levels now clean.
+
 **Still deferred:**
-- 🟢🟢 **dungeon_gen par-solver toolkit** (#3 below) — par-integrity-critical, ~5700-line systemic rewrite of the `_bfs_par`/`_dijkstra_par_*`/`_par_<slug>` family (copy-pasted motion-expansion + Dijkstra). The scatter normalization did NOT touch these. Largest remaining dedup; gate behind per-level tests + `par_audit`.
 - ⚪/🔴 **motion scan-blocker set inconsistency** (`$`/`0`/`^` not stopping at `seal_door`) — a *behaviour* question, not a refactor. Needs a product decision before any code change; left unchanged.
-- 🟢 **minor, untouched**: motion word-motions (w/b/e/W/B/E) internal repetition (delicate, Vim-faithful — handle with care); editor `_serialize_room`/`_deserialize_room` define the cell_map twice (could derive one from the other); a dedicated **tests/ pass** (stale tests referencing removed symbols; duplicated fixtures → a conftest) was never done line-by-line.
+- 🟢 **minor, untouched**: editor `_serialize_room`/`_deserialize_room` define the cell_map twice (could derive one from the other); motion word-motions (w/b/e/W/B/E) internal repetition (delicate, Vim-faithful — handle with care); a dedicated **tests/ pass** (stale tests referencing removed symbols; duplicated fixtures → a conftest) was never done line-by-line.
 
 ---
 
