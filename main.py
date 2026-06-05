@@ -2082,7 +2082,21 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
                 msg_pool.clear()
                 msg_idx = 0
 
-                if (level == 'archivists_library' and cmd in ('e', 'e!')
+                if level == 'warden_pathfinder' and cmd == 'e wardenverse':
+                    if (getattr(room, 'warden_fled', False)
+                            and dungeon.current_room == 0 and len(dungeon.rooms) > 1):
+                        dungeon.current_room = 1             # follow him into the wardenverse
+                        room = dungeon.room
+                        player.row, player.col = room.spawn_pos
+                        player.wrap = False                  # the verse opens nowrap
+                        _push('You step into the wardenverse.  :set wrap to read the '
+                              'fold, gj/gk to follow him.')
+                    elif dungeon.current_room != 0:
+                        _push('You are already in the wardenverse.')
+                    else:
+                        _push('There is no wardenverse yet — break his shields first.')
+
+                elif (level == 'archivists_library' and cmd in ('e', 'e!')
                         and not player.is_dead):
                     _lib_reload(force=(cmd == 'e!'))
 
@@ -3168,7 +3182,7 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
                     interacted = True
                     # The Surveyor uses its own two-phase visual/teleport AI
                     # (wired separately); it never leaps-and-summons like the Keep.
-                    if cur.kind == 'warden' and cur.hp > 0 and cur.tag != 'surveyor':
+                    if cur.kind == 'warden' and cur.hp > 0 and cur.tag not in ('surveyor', 'verse'):
                         move_msg = _do_warden_move(room, cur, player)
                         if move_msg:
                             _push(move_msg)
@@ -3184,12 +3198,22 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
                         room.surveyor_threat = {'step': 'recover'}   # a tick to regain focus before re-entering visual mode
                         _push('The Warden leaps — you broke his focus!')
                     if cur.hp <= 0:
-                        room.kill_entity(cur)
-                        _reg_write(player, '"', entity_clip(cur), is_delete=True)
-                        if cur.kind == 'warden':
+                        if (cur.kind == 'warden' and cur.tag == 'pathfinder'
+                                and not getattr(room, 'warden_fled', False)):
+                            # Act 1 over: shields fall, the Warden flees the arena.
+                            room.warden_fled = True
+                            room.mega = None                 # the floor-cuts stop
+                            room.kill_entity(cur)
                             _remove_warden_shields(room)
-                            room.surveyor_threat = None      # clear any lingering telegraph
-                        _push(_on_kill(cur, player, room, level) or 'Enemy defeated!')
+                            _push('His shields shatter — the Warden retreated into the '
+                                  'wardenverse!  Try to follow him:  :e wardenverse')
+                        else:
+                            room.kill_entity(cur)
+                            _reg_write(player, '"', entity_clip(cur), is_delete=True)
+                            if cur.kind == 'warden':
+                                _remove_warden_shields(room)
+                                room.surveyor_threat = None  # clear any lingering telegraph
+                            _push(_on_kill(cur, player, room, level) or 'Enemy defeated!')
                     else:
                         _push(f'Hit! ({cur.hp}/{cur.max_hp} HP)')
                 elif cur and cur.kind == 'shield':
@@ -3616,6 +3640,9 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
                         *room._entity_by_kind.get('warden', []), *_arch_atk):
                 if not ent.alive:
                     continue
+                if (ent.kind == 'warden' and ent.tag == 'verse'
+                        and not getattr(player, 'wrap', False)):
+                    continue                  # :set nowrap breaks his focus — he cannot strike
                 if id(ent) == xd_id:
                     continue
                 if id(ent) not in prev_adjacent_ids:

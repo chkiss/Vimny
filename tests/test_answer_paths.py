@@ -81,6 +81,7 @@ _SKIP_LEVELS = {
     'build_dungeon_reliquary',     # The Reliquary (reward / chest room)
     'build_dungeon_wardens_keep',     # The Warden's Keep (boss)
     'build_dungeon_warden_surveyor',  # The Warden Surveyor (boss)
+    'build_dungeon_warden_pathfinder',  # The Warden Pathfinder (boss; two rooms, no keystroke par)
     'build_dungeon_dummy',  # Dummy Dungeon (test scaffold)
     'build_dungeon_archivists_library',  # The Archivist's Library (contextual :e!/:w loop; no keystroke par)
     'build_dungeon_spellwrights_forge',  # The Spellwright's Forge (:s/:g rites; no foot-path par solver)

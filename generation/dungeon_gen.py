@@ -5500,3 +5500,95 @@ def build_dungeon_spellwrights_forge(seed: int) -> Dungeon:
     dungeon.rooms        = [room]
     dungeon.current_room = 0
     return dungeon
+
+
+# ── The Warden Pathfinder (L17.1, Act III boss) ──────────────────────────────
+# Two rooms: the Arena (room 0) and the Wardenverse (room 1, a single-line wrap
+# buffer). Act 1 plays out in the Arena; when the Warden's shields fall he flees
+# and the player follows with `:e wardenverse` (handled in main.py). See
+# blueprints/act_3.md (L17.1) and engine/warden_mega.py.
+_PF_ROWS, _PF_COLS   = 24, 78
+_PF_MAIN_ROW         = 12
+_PF_PILLAR_ROWS      = (6, 12, 18)          # symmetric 3×3 grid of refuge stones
+_PF_PILLAR_COLS      = (20, 39, 58)
+_PF_WARDEN_START     = (12, 39)
+_PF_ECHO_CELLS       = ((6, 30), (18, 48), (6, 48), (18, 30))   # impostor Ws (symmetric)
+_PF_VERSE_COLS       = 120
+_PF_VERSE_WALL_EVERY = 12                   # in-line stone walls — block h/l/f/F/, gj/gk route around
+_PF_VERSE_TEXT = ("the cut you cannot see you cannot parry   "
+                  "every shield bares a back   follow the fold   ")
+
+
+def _pf_lay_verse(room, rng) -> None:
+    """Paper the single verse line with text, skipping the in-line wall cells."""
+    text = (_PF_VERSE_TEXT * (room.cols // len(_PF_VERSE_TEXT) + 1))
+    for c in range(1, room.cols - 1):
+        if room.cells[0][c] == CellType.FLOOR:
+            ch = text[c % len(text)]
+            if ch != ' ':
+                room.char_runs.append(CharRun(0, c, (ch,), 'ancient'))
+
+
+def build_dungeon_warden_pathfinder(seed: int) -> Dungeon:
+    from engine.warden_mega import init_mega
+    rng = random.Random(seed)
+
+    # ── Room 0: the Arena ───────────────────────────────────────────────────
+    R, C = _PF_ROWS, _PF_COLS
+    cells = [[CellType.WALL] * C for _ in range(R)]
+    for r in range(1, R - 1):
+        for c in range(1, C - 1):
+            cells[r][c] = CellType.FLOOR
+    arena = Room(room_type=RoomType.BOSS, rows=R, cols=C)
+    arena.cells     = cells
+    arena.seed      = seed
+    arena.spawn_pos = (_PF_MAIN_ROW, 2)
+    arena.exit_pos  = None                  # no exit here — Act 2 (the verse) is the finish
+    arena.char_runs = []
+    arena.entities  = []
+    arena.search_glyph_entities = True      # /W finds the Warden + echoes wherever they leap
+
+    pillars = [(r, c) for r in _PF_PILLAR_ROWS for c in _PF_PILLAR_COLS]
+    for (r, c) in pillars:
+        arena.char_runs.append(CharRun(r, c, ('▣',), 'ancient'))
+
+    arena.entities.append(Entity(kind='warden', row=_PF_WARDEN_START[0], col=_PF_WARDEN_START[1],
+                                 hp=3, max_hp=3, ai='', tag='pathfinder',
+                                 edit_immune=True, summon_timer=6))
+    arena.entities.append(Entity(kind='shield', row=_PF_WARDEN_START[0],
+                                 col=_PF_WARDEN_START[1] - 1))
+    for (r, c) in _PF_ECHO_CELLS:
+        arena.entities.append(Entity(kind='goblin', row=r, col=c, hp=1, max_hp=1, tag='echo'))
+
+    arena.rebuild_indexes()
+    init_mega(arena, pillars)
+    arena.par    = None
+    arena.budget = 160                      # provisional — refine once the par sim exists
+
+    # ── Room 1: the Wardenverse (single logical line, soft-wrapped) ─────────
+    VC = _PF_VERSE_COLS
+    vcells = [[CellType.FLOOR] * VC]
+    vcells[0][0] = vcells[0][VC - 1] = CellType.WALL
+    for c in range(_PF_VERSE_WALL_EVERY, VC - 4, _PF_VERSE_WALL_EVERY):
+        vcells[0][c] = CellType.WALL
+    verse = Room(room_type=RoomType.BOSS, rows=1, cols=VC)
+    verse.cells       = vcells
+    verse.seed        = seed
+    verse.wrap_buffer = True
+    verse.spawn_pos   = (0, 1)
+    verse.char_runs   = []
+    verse.entities    = []
+    _pf_lay_verse(verse, rng)
+    wcol = VC - 4
+    verse.entities.append(Entity(kind='warden', row=0, col=wcol, hp=3, max_hp=3,
+                                 ai='', tag='verse', edit_immune=True))
+    verse.exit_pos = (0, VC - 2)
+    verse.entities.append(Entity(kind='exit', row=0, col=VC - 2))
+    verse.rebuild_indexes()
+    verse.par    = None
+    verse.budget = 160
+
+    dungeon = Dungeon(name='The Warden Pathfinder', seed=seed)
+    dungeon.rooms        = [arena, verse]
+    dungeon.current_room = 0
+    return dungeon

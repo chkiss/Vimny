@@ -244,3 +244,30 @@ def test_cycle_returns_to_idle_and_rotates():
         room.mega['safe'] = MEGA._pick_safe(room, rng)
         seen |= room.mega['safe']
     assert len(seen) >= 2
+
+
+# ── builder: the two-room dungeon is wired (Act 1 arena + Act 2 wardenverse) ──
+
+def test_builder_makes_a_two_room_dungeon():
+    from generation.dungeon_gen import build_dungeon_warden_pathfinder as build
+    d = build(7)
+    assert len(d.rooms) == 2 and d.current_room == 0
+    arena, verse = d.rooms
+
+    # Arena (Act 1): grid pillars, mega armed, glyph-search, immune Warden + echoes
+    assert (arena.rows, arena.cols) == (24, 78)
+    assert len(arena.pillars) == 9                      # symmetric 3×3 grid
+    cols = sorted({c for _, c in arena.pillars}); rows = sorted({r for r, _ in arena.pillars})
+    assert len(cols) == 3 and len(rows) == 3            # a real lattice, not scatter
+    assert arena.search_glyph_entities and arena.mega['phase'] == 'idle'
+    warden = next(e for e in arena.entities if e.kind == 'warden')
+    assert warden.tag == 'pathfinder' and warden.edit_immune
+    assert sum(1 for e in arena.entities if e.kind == 'goblin' and e.tag == 'echo') == 4
+
+    # Wardenverse (Act 2): one-line wrap buffer with in-line walls + immune Warden + exit
+    assert verse.wrap_buffer and verse.rows == 1
+    walls = [c for c in range(verse.cols) if verse.cells[0][c] == CellType.WALL]
+    assert len(walls) >= 5                              # in-line barriers (gj/gk route around)
+    vw = next(e for e in verse.entities if e.kind == 'warden')
+    assert vw.tag == 'verse' and vw.edit_immune
+    assert verse.exit_pos is not None
