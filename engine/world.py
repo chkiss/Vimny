@@ -74,6 +74,7 @@ class Room:
     answer_diverged: bool       = False  # admin pressed a wrong key
     wood_damage: dict           = field(default_factory=dict)  # (r,c) -> half-steps received (1=cracked)
     wrap_buffer: bool           = False  # single-line text buffer (rows==1); ':set wrap' soft-wraps it across screen rows (The Archivist's Library)
+    search_glyph_entities: bool = False  # if True, / search overlays entity glyphs (so /W finds the Warden + echoes wherever they leap) — The Warden Pathfinder. Off elsewhere so par stays identical.
 
     def __post_init__(self):
         self._entity_map:    dict = {}

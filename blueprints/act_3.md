@@ -199,7 +199,7 @@ Act III primitives are **shipped** (visual L14; `/ * n N`+teleport L15; marks L1
 |------|-------|--------|-------|
 | Boss immune to visual-delete + parry message | all | **C-PF-1** | Keeps `v/W⏎x` from one-shotting the boss; core chipped by `x`. |
 | Mega-attack (telegraph → `remove_row` → `p`/`P` rebuild) | Act 1 | **C-PF-2** | Layer on leap/sweep; spare shield/door/exit; pillars immune. |
-| Impostor `W`s by color (not by glyph) | Act 1 | **C-PF-3** | Cosmetic color only; `/W` matches all; real one is visual-immune. |
+| Impostor `W`s by color (not by glyph) | Act 1 | **C-PF-3 — DONE (2026-06-05)** | Impostor = `goblin` `tag='echo'` rendered `boss_echo_fg` `W`; room flag `search_glyph_entities` overlays entity glyphs so `/W` finds the Warden + echoes wherever they leap (default off → par identical). Real one is visual-immune. Tests in `test_warden_pathfinder.py`. |
 | Pillar (`▣`): delete-immune + not an attack position | Act 1 | **C-PF-4** | New cell/flag; alcove geometry keeps Warden un-`x`-able from it. |
 | `:e warden.verse` chase into a 2nd `wrap_buffer` file; in-line stone walls block h-motion; `nowrap` breaks Warden focus | Act 2 | **C-PF-5** | Multi-buffer follow (extends Archivist `:e {name}`); the wrap/nowrap attack/defend toggle. |
 | `warden_phase_immune` on Entity | all | prior draft | Blocks Act II long-range motions in tight spots. |

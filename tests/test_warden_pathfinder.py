@@ -16,6 +16,7 @@ from engine.world import Room, RoomType, Entity, CellType, CharRun
 from engine.player import Player
 from engine.modes import Mode
 from engine.visual import apply_visual
+from engine.search import match_cells
 
 
 def _room(immune: bool) -> Room:
@@ -101,3 +102,44 @@ def test_yank_over_boss_is_not_a_parry():
     apply_visual('y', (2, 2), (2, 12), Mode.VISUAL, room, p)
     assert _warden_alive(room)
     assert p.last_parry is False          # yank isn't a cut — no "defended" message
+
+
+# ── C-PF-3: /W finds the Warden + echo impostors (room-scoped glyph search) ──
+
+def _hunt_room(glyph_search: bool) -> Room:
+    rows, cols = 5, 30
+    cells = [[CellType.FLOOR] * cols for _ in range(rows)]
+    for c in range(cols):
+        cells[0][c] = cells[rows - 1][c] = CellType.WALL
+    for r in range(rows):
+        cells[r][0] = cells[r][cols - 1] = CellType.WALL
+    room = Room(room_type=RoomType.BOSS, rows=rows, cols=cols, cells=cells,
+                search_glyph_entities=glyph_search)
+    room.add_entity(Entity(kind='warden', row=2, col=20, hp=5, max_hp=5, edit_immune=True))
+    room.add_entity(Entity(kind='goblin', row=2, col=6,  hp=1, max_hp=1, tag='echo'))   # impostor W
+    room.add_entity(Entity(kind='goblin', row=2, col=12, hp=1, max_hp=1, tag='echo'))   # impostor W
+    room.add_entity(Entity(kind='goblin', row=3, col=15, hp=1, max_hp=1))               # real minion → 'g'
+    room.rebuild_indexes()
+    return room
+
+
+def test_slash_W_finds_warden_and_echoes_when_flag_on():
+    room = _hunt_room(glyph_search=True)
+    cells = match_cells(room, 'W')
+    assert (2, 20) in cells     # the real Warden
+    assert (2, 6) in cells      # echo impostor
+    assert (2, 12) in cells     # echo impostor
+    assert (3, 15) not in cells # a plain goblin is 'g', not matched by /W
+
+
+def test_slash_g_finds_only_plain_goblin():
+    room = _hunt_room(glyph_search=True)
+    cells = match_cells(room, 'g')
+    assert (3, 15) in cells                         # the plain minion
+    assert not any(c in cells for c in [(2, 20), (2, 6), (2, 12)])  # Ws aren't 'g'
+
+
+def test_flag_off_search_ignores_entities():
+    room = _hunt_room(glyph_search=False)
+    assert match_cells(room, 'W') == set()          # no char-runs → nothing (par-safe default)
+    assert match_cells(room, 'g') == set()

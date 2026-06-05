@@ -27,20 +27,46 @@ def _spans(s: str, pattern: str):
         start = i + max(1, len(pattern))
 
 
+def _entity_glyph(ent):
+    """The visible letter an entity paints on its cell, for ``search_glyph_entities``
+    rooms — mirrors render/renderer.py and motion._cell_char. Returns None for kinds
+    that aren't 'searched as what you see' (doors/chests/etc.)."""
+    if ent.kind == 'warden':
+        return 'W'
+    if ent.kind == 'goblin':
+        return 'W' if ent.tag == 'echo' else 'g'   # 'echo' goblins are the Hunt's impostor Ws
+    if ent.kind == 'dynamite':
+        return '!'
+    return None
+
+
 def _line_string(room, row: int):
     """(text, base_col): the row read as ONE Vim line — every glyph in place, gaps
     between runs as spaces — so a pattern can span consecutive character runs (e.g.
     '/foo bar' across two words). All kinds are included (void glyphs are searchable
-    text, as before). base_col maps an offset back to an absolute column."""
+    text, as before). base_col maps an offset back to an absolute column.
+
+    On a ``room.search_glyph_entities`` room (The Warden Pathfinder), entity glyphs
+    are overlaid too — so ``/W`` finds the Warden and its echoes wherever they leap.
+    Default off: shipped levels search the char-run layer only (par stays identical)."""
     runs = room._char_runs_by_row.get(row, [])
-    if not runs:
+    glyphs = []
+    if getattr(room, 'search_glyph_entities', False):
+        for e in room.entities:
+            if e.alive and e.row == row:
+                g = _entity_glyph(e)
+                if g is not None:
+                    glyphs.append((e.col, g))
+    if not runs and not glyphs:
         return '', 0
-    lo = min(ru.col for ru in runs)
-    hi = max(ru.col + len(ru.symbols) for ru in runs)
+    lo = min([ru.col for ru in runs] + [c for c, _ in glyphs])
+    hi = max([ru.col + len(ru.symbols) for ru in runs] + [c + 1 for c, _ in glyphs])
     chars = [' '] * (hi - lo)
     for ru in runs:
         for i, s in enumerate(ru.symbols):
             chars[ru.col - lo + i] = s
+    for c, g in glyphs:                      # entity glyph renders on top of the text layer
+        chars[c - lo] = g
     return ''.join(chars), lo
 
 

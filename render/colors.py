@@ -23,6 +23,7 @@ def player_fg():     return _term.bright_white                    # cursor: shar
 def enemy_fg():      return _term.color_rgb(100, 155, 80)        # muted olive, enemy life
 def enemy_frozen():  return _term.color_rgb(80, 200, 240)        # ice-blue, frozen state
 def boss_fg():       return _term.color_rgb(210, 35, 45)         # hard red, critical threat
+def boss_echo_fg():  return _term.color_rgb(150, 80, 90)         # washed-out red, a false Warden (Hunt impostor)
 def heart_full():    return _term.color_rgb(215, 45, 45)         # arterial red, full HP
 def heart_half():    return _term.color_rgb(210, 135, 25)        # ember amber, half HP
 def heart_empty():   return _term.color_rgb(50, 50, 60)          # dim grey, spent HP

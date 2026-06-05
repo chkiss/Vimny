@@ -156,6 +156,8 @@ def _ent_cell_str(ent, room, r: int, c: int, mode, floor_bg: str) -> str:
         efg = C.enemy_frozen() if mode == Mode.VISUAL else C.enemy_fg()
         return floor_bg + efg + S.ENEMY_WANDERER + rst
     if ent.kind == 'goblin':
+        if ent.tag == 'echo':                       # a false Warden — looks like a W, a shade off
+            return floor_bg + C.boss_echo_fg() + 'W' + rst
         return floor_bg + C.enemy_fg() + 'g' + rst
     if ent.kind == 'warden':
         return floor_bg + C.boss_fg() + 'W' + rst

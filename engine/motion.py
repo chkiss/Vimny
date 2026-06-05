@@ -70,7 +70,7 @@ def _cell_char(room, r: int, c: int) -> str:
         return ru.symbols[c - ru.col]
     if ent:
         if ent.kind == 'dynamite':  return '!'
-        if ent.kind == 'goblin':    return 'g'
+        if ent.kind == 'goblin':    return 'W' if ent.tag == 'echo' else 'g'
         if ent.kind == 'warden':    return 'W'
         return '.'
     ct = room.cells[r][c]
