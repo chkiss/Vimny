@@ -10,426 +10,211 @@ clearly flagged assumed extensions).
 > L15 The Seekers' Labyrinth, L16 The Waypoint Sanctum, L17 The Archivist's Library.
 > Remaining below: L17.1.
 
-Revision applied: S1 terrain-∞ first, S2 tight budget fallback (document multiplier),
-S3 recompute par (true full solution), S4 block earlier commands. All review defects
-D1–D12 addressed.
-
 ---
 
 ## Level 17.1 — The Warden Pathfinder (ACT III BOSS)
 
-**Commands required (from Act III):** `%`, `/ ? n N`, `m ' \``, `:set`
-**Boss type:** Multi-phase Warden
+> **REVISED 2026-06-05.** Re-based on the current curriculum (previous boss is
+> `warden_surveyor` 13.1, so **Act III = L14–L17**), structured as **two acts**, around
+> vim *composition* and the real Warden AI. Directives:
+> 1. **Force every Act III command** — visual `v`, search `/ * n N`, marks `m ' \``,
+>    `:e`/`:e!`, `:set wrap`/`nowrap`, `gj`/`gk`, `:w`.
+> 2. **Commands compose; let the player feel powerful.** `v/W⏎x` is ONE command
+>    (visual + search-as-motion + delete) — a remote AoE that erases the whole span. The
+>    level embraces this, never special-cases an op, and adds no magic-word gates.
+> 3. **Bosses are immune to visual-delete** — the rule that keeps the AoE from
+>    trivializing the fight; the core is *chipped*, not one-shot.
+> 4. **Match the real Warden AI** — Wardens leap (`_do_warden_move`, 2–6 rows, shield
+>    flips to the player's side) and sweep (`_ws_erase_row`). Combat previews Act IV by
+>    escalating the sweep into a telegraphed `dd`/`p` cut-and-rebuild.
+
+**Act III commands this boss caps:**
+
+| Level | Command | Forced in |
+|-------|---------|-----------|
+| L14 Sight Sanctum | visual `v` (composed: `v/W⏎x`) | Act 1 — AoE + the Hunt |
+| L15 Seekers' Labyrinth | `/` `*` `n` `N` | Act 1 — the Hunt + relocating the leaping Warden |
+| L16 Waypoint Sanctum | marks `m ' \`` (2–4) | Act 1 — pillar-refuge vs. the mega-attack |
+| L17 Archivist's Library | `:e`, `:set wrap`/`nowrap`, `gj`/`gk`, `:e!`, `:w` | Act 2 — the Verse finale |
+
+**Structure:** Act 1 is the arena — strip the Warden's shields (visual + the Hunt) while
+surviving his leap/sweep/mega-attacks with pillar-marks. Shields down → he flees east into
+his verse, vulnerable. Act 2 is the Verse file — the **chase-corner kill**. No third act.
 
 ---
 
-### Grid
+### The one rule that makes it work: bosses are immune to visual-delete
 
-```
-Dims: 24 rows × 78 cols   (the Pathfinder's Arena)
-```
+`v/W⏎x` composes (`main.py:2325` — a search from visual mode extends the selection) and
+deletes the whole span. But `_kill_entities_in_span` (`engine/visual.py:59`) currently
+kills *every* entity in a visual span except `{exit, door, boss_seal}` — so today a single
+`v$x` would **one-shot the Warden**. Fix: **a boss core is visual-delete-immune** (add
+`warden`/a boss flag to the protected kinds). Then:
 
-Layout unchanged from original blueprint (phases in NW/SW/NE/SE chambers + arena floor).
-See original grid diagram — structural layout is sound. Defects are in phase mechanics
-only.
+- **`v/W⏎x` is the player's power tool** — a remote AoE that wipes summoned goblins, erases
+  floor glyphs, and shaves a lane across the whole selected span. The player is *meant* to
+  enjoy deleting huge chunks of the room.
+- **The boss core survives any visual sweep** and is wounded only by **normal-mode `x`**
+  (the established combat) from its open flank. When a `v`-delete span *contains* the
+  Warden, everything else in the span dies, the Warden stands, and a message fires:
+  **"The Warden's shield defended him from your cut!"** — the immunity reads as a parry.
+
+> **CHALLENGE C-PF-1 — DONE (2026-06-05).** Implemented as a per-entity
+> `Entity.edit_immune` flag (opt-in; zero risk to shipped bosses). Guarded at every
+> editing-delete chokepoint — `_delete_cols` (charwise/block), `remove_row` (linewise/dd),
+> and `_kill_entities_in_span` (visual). `apply_visual` sets `player.last_parry` when a
+> delete span covers an immune boss; `main.py` then emits **"The Warden's shield defended
+> him from your cut!"** Note: the *existing* `_PROTECTED_KINDS` check was already dead on
+> the delete path (`_delete_cols` removed entities first) — this is the real fix. Tests:
+> `tests/test_warden_pathfinder.py` (all 4 visual paths + AoE-still-clears-chaff + yank).
 
 ---
 
-### Boss Phases Table
+### The Warden — movement & combat (inherit the real AI; preview Act IV)
 
-| Phase | Trigger | Mechanic required | Chamber | What the player does |
-|-------|---------|-------------------|---------|---------------------|
-| **1** | Enter arena | `%` | NW Chamber | 3 `[ ]` void-interior pairs; `%` across each to reach shield keystone. |
-| **2** | Shield 1 down | `/n N` | SW Chamber | `/WARDEN<Enter>` finds first entity; `n` skips decoys; `N` back if overshoot; `x` each (decoys die in 1 hit, real Warden doesn't). |
-| **3** | Warden located | `m '` `` ` `` | NE Chamber | Non-linear keystone layout + Warden blocking. Must mark-jump to collect all three. See redesign below. |
-| **4** | Shield 2 down | `:set number` | SE Chamber | Warden's HP is hidden; blind `x` reflects damage (mirror trap); `:set number` reveals HP=3; player presses `x` exactly 3 times. |
-| **Final** | All shields down | `%` + `x` | Arena floor | Cross void bridge via `%`; `x` to deliver final blow. |
+- **Leap (`_do_warden_move`):** bounds to a random open row 2–6 away; `_reposition_warden_shield`
+  **flips its shield to the side facing the player.** Often lands off-screen → `/W` to
+  relocate it (search teleport).
+- **Summon:** 2 chasing goblins every ~6 turns within radius 5 — the chaff your `v/W⏎x`
+  AoE is for.
+- **Sweep (`_ws_erase_row` / `_ws_threat_span`):** a `v$`/`v0` sweep from itself to the
+  player-side edge, erasing that row's glyphs/floor.
+- **Mega-attack (new, telegraphed ~every 8 turns; Act IV preview; ACT 1 ONLY):** a 3-turn
+  banner *"THE WARDEN INHALES THE FLOOR…"* flashes a multi-row region; the Warden
+  **`dd`-cuts** it (reflow `remove_row`) — anyone on a deleted **non-pillar** cell falls
+  into the void — then **`p`/`P`-pastes** it back, shifted, so the doomed region and the
+  safe pillars differ each cycle. Previews L18 `d`, L19 `dd`, L20 `y`/`P`. (Stops once he
+  flees to the verse — there he is vulnerable, not rampaging.)
+
+> **CHALLENGE C-PF-2:** Mega-attack timer (flash → `remove_row` → `p`/`P`) layered on the
+> existing leap + sweep; never delete a shield, the verse door, or the exit; pillars carry
+> an immune flag. Tuning: cadence (8/3 a guess), swath size.
 
 ---
 
-### Detailed phase mechanics
+### Room layout (top-down)
 
-**Phase 1 — Bracket Gauntlet (NW Chamber, rows 3-5, cols 3-24): UNCHANGED**
-
-```
-#  [ V O I D ] [ V O I D ] [ V O I D ] [K]  #
-```
-
-Three `[ ]` pairs with void interior. Player must `%` across each. Third `]` lands on
-K (shield-1 keystone). This is structurally identical to L10 — no defect found in review.
-
-Phase 1 par: 3× (moves to bracket + `%`) + collect K.
-- `[` at col 5: `2l`=2; `%`=1 (→ col 12)
-- `[` at col 14: `2l`=2; `%`=1 (→ col 21)
-- `[` at col 23: `2l`=2; `%`=1 (→ col 30, K)
-- Collect K: 1 key (auto or bump)
-Phase 1 par: 2+1+2+1+2+1+1 = **10 keystrokes**
-
-**Phase 2 — Search Gauntlet (SW Chamber): CLARIFIED (D11 fix)**
+**Arena — normal multi-line grid, 24 rows × 78 cols (≈23 real linebreaks).** The Warden
+leaps around behind its flipping shield; the floor is dotted with **pillars `▣`**
+(mega-attack-immune refuges, out of `x` range of the Warden). West door = entrance; east
+door = the Warden's escape into the verse.
 
 ```
-#  [fog][decoy-W][fog][decoy-W][fog][decoy-W][fog][WARDEN-real][fog]  #
+ #########################################################################
+ #  ▣        W(impostor)                ▣              ▣                  #
+ #     ▣              W(imp)   W(imp)                          ▣          #
+[W]ENTER          ▣          [ W ]  shield→▒        ▣               [VERSE]E
+ #            ▣          W(imp)                    ▣                      #
+ #    ▣                       ▣              W(imp)            ▣          #
+ #########################################################################
 ```
 
-Four entities: 3 decoy goblins named `"WARDEN"` (HP=1), 1 real Warden (HP=5).
-All fogged initially.
+**Verse file — a SEPARATE buffer reached by `:e warden.verse`: one logical line, ~300
+cols, NO linebreaks, with stone-wall glyphs embedded along it.** Every on-screen row is a
+soft-`wrap` display row, not a real line (`wrap_buffer=True`, `rows==1`; opens `nowrap`).
+The only place `:set wrap`/`gj`/`gk` do anything. `:e` is forward progress, not a side-trip.
 
-`/WARDEN<Enter>` = 7 keys. First match may be a decoy or the real one.
-`n` = 1 key to advance to next match. `N` = 1 key to go back.
-Player tests each found entity with `x`:
-- Decoy: dies in 1 hit (HP=1). Confirmed decoy — continue with `n`.
-- Real Warden: survives 1 hit (HP=5). Confirmed real — phase 2 ends.
-
-**`:set number` is NOT required in Phase 2** (D11 fix — clarified). Decoys die in 1 hit
-regardless of whether HP is visible. The player identifies the real Warden by exclusion.
-The Phase 2 description no longer mentions HP visibility as useful here.
-
-Phase 2 par: `/WARDEN<Enter>`=7, then in best case `x` on first match (real) = 1 key;
-total = 8. Worst case: 3 decoys first = `n x n x n x x` = 3+3+1 = 7 more = 15. Average
-~12. Designer's estimate of ~12 is consistent.
-
-Phase 2 par estimate: **12 keystrokes** (average path; worst seed = 15).
-
-**Phase 3 — Mark Gauntlet (NE Chamber): REDESIGNED (D9 fix)**
-
-**Problem (from review):** Original layout had K-red(col54)→K-blue(col60)→K-green(col68)
-in linear left-to-right order. Player could walk straight through without marks. The Warden
-spawning at col 60 (K-blue's position, already passed) would be BEHIND the player, not
-blocking K-green.
-
-**Redesigned layout — U-shaped chamber (NE Chamber, rows 3-5, cols 52-75):**
-
-```
-  cols:  52  54  56  58  60  62  64  66  68  70  72  74
-row 3:  #  [K-red]  .  .  .  .  [wall-barrier]  .  [K-green]  #
-row 4:  #  .  .  .  .  [K-blue]  .  .  .  .  .  .  #
-row 5:  ####################################################
-```
-
-Precise specification:
-
-```
-Row 3: # [floor col 52-55] [WALL cols 56-64] [floor col 65-74] #
-Row 4: # [floor col 52-74, fully passable]                      #
-```
-
-- **K-red**: (3, 54) — upper-left arm, accessible only from row 4 via col 54 up to row 3.
-- **K-blue**: (4, 62) — center of lower passage.
-- **K-green**: (3, 70) — upper-right arm, accessible only from row 4 via col 70 up to row 3.
-- **Wall barrier**: row 3, cols 56-64 — solid wall separating left arm from right arm
-  in the upper row. The only connection between the two upper arms is through row 4.
-
-**Warden spawn trigger:** The Warden appears at **(4, 63)** — immediately to the RIGHT of
-K-blue — after K-blue is collected.
-
-**Sequence of events:**
-
-1. Player enters from col 52. Walks right on row 4.
-2. To collect K-red: player must go UP from (4, 54) to (3, 54). Then back DOWN to row 4.
-   Optimal: reach (4,54), `k`=1, collect K-red=1, `j`=1 back to row 4. Cost: 3 keys.
-3. Continue right on row 4 to K-blue at (4, 62). Collect K-blue. Cost: `8l`=2, collect=1.
-4. **Warden spawns at (4, 63)** — immediately to the right of the player who is at (4, 62).
-5. K-green is at (3, 70). To reach it: player must go RIGHT past col 63 (where Warden is)
-   on row 4, OR teleport past the Warden via mark-jump.
-6. **Without marks:** Player is at (4, 62). Warden at (4, 63). Player moves right → Warden
-   pushes back (combat: player takes damage but cannot pass). Player cannot reach (4, 70)
-   to go up to (3, 70) because Warden blocks the row. Attempting to squeeze past = death
-   (Warden attack on same cell).
-7. **With marks:** Before collecting K-blue, player set `ma` at (4, 52) (chamber entry)
-   or `mb` at (3, 54) (K-red's upper cell). After K-blue is collected and Warden spawns
-   at (4,63): player uses `` `a `` to jump to (4, 52) — behind Warden. Then walks right
-   around... wait, Warden is at (4, 63) and player is now at (4, 52) — still blocked.
-
-**Correction — the U-shape is key:**
-
-The wall at row 3, cols 56-64 means there are TWO one-cell-wide "portals" into the upper
-row: col 55 (left of wall) and col 65 (right of wall). K-green is at (3, 70), reachable
-only by going UP at col 65-74 range.
-
-After Warden spawns at (4, 63), the player at (4, 62) cannot move right past (4, 63).
-However, if the player had previously marked position (3, 54) as `ma` (K-red's cell, in
-the upper-left arm), they can:
-- `` `a `` → teleport to (3, 54), in the upper-left arm.
-- Walk right along row 3... but row 3 is WALLED at cols 56-64. Cannot reach (3, 70).
-
-This still doesn't work — the wall barrier blocks row 3 traversal.
-
-**Revised U-chamber design:**
-
-The U-shape must allow travel FROM the left arm TO the right arm via row 4 ONLY, and the
-Warden must spawn BETWEEN the left-arm access (col 55) and the right-arm access (col 65).
-
-Player journey:
-1. Enter at (4, 52). Go right.
-2. Branch UP at (4, 54): collect K-red at (3, 54). Set `ma` here.
-3. Return to row 4. Go right.
-4. Collect K-blue at (4, 60). **Warden spawns at (4, 62)** — between the wall ends.
-   Right-arm access is at (4, 65)→(3, 65+). Warden at (4, 62) blocks col 62-64 range.
-5. Without marks: player at (4, 60), Warden at (4, 62). Player cannot reach (4, 65).
-6. With `` `a ``: teleport to (3, 54). Row 3, left of wall. STILL blocked by wall.
-
-The problem: the wall-in-row-3 prevents using a mark in the upper arm to reach the upper
-right arm. The mark-jump must land somewhere that circumvents the Warden's block of row 4.
-
-**Final Phase 3 design — backtrack-requiring layout:**
-
-The chamber has a secondary entrance. The NE Chamber is connected to the arena floor
-(below) by TWO doors: one at col 55 (west door) and one at col 70 (east door). The
-Warden's spawn at col 62 BLOCKS the single-row-4 passage between the two doors.
-
-```
-Row 3: # [K-red col54] [wall cols 56-64] [K-green col 70] #
-Row 4: # [K-blue col 60] [Warden spawn col 62] [floor 65-74] #
-Row 5: #### [west-door col 55] #### [east-door col 70] ####
-```
-
-The arena floor (row 9 or equivalent) connects to both doors. To reach K-green after
-Warden spawns:
-- Player must EXIT via west door (returning to arena floor), walk right to east door, and
-  enter east door — arriving at (4, 70), then up to (3, 70) = K-green.
-- This "going around through the arena" costs: exit west door (~3k to row 9) + walk right
-  to east door (~15l) + enter east door (~3k to row 4) + reach K-green (up 1k) = 22+ keys.
-- With marks: set `mb` at the east-door threshold (4, 70) before the Warden spawns (player
-  must pass through it on entry — the chamber is entered from the east door OR the west door).
-
-**Wait — if the player enters from the west door and must pass the east door position to
-collect K-red and K-blue, they can set `mb` at (4, 70) as they pass it going left to K-red.
-Then after Warden spawns at col 62, `` `b `` teleports to (4, 70) — east of Warden — and
-the player climbs up to (3, 70) for K-green.**
-
-This works! The forcing argument:
-
-- Player enters NE chamber from west door at (5, 55), moves up to row 4.
-- Passes through (4, 70) on the way left to K-red. **Sets `mb` at (4, 70).**
-- Goes left to (3, 54) — K-red. Sets `ma` at (3, 54). Collects K-red.
-- Returns to row 4. Goes right. Collects K-blue at (4, 60).
-- **Warden spawns at (4, 62).** Player is at (4, 60), Warden at (4, 62). K-green at (3, 70).
-- Without marks: player must exit west (back through col 55 to arena, ~5+ keys left) then
-  traverse arena to east door (col 70, ~15 keys right) then enter east door (~5 keys up)
-  = ~25+ extra keys to reach K-green.
-- With `` `b ``: teleport to (4, 70) — 2 keys. Then `k` to (3, 70) = K-green: 1 key.
-  Total: 3 keys.
-- Savings: ~22 keys. Budget impact: decisive.
-
-**This is the true backtrack.** The player set `mb` at (4, 70) BEFORE the Warden spawned,
-anticipating the need. Without that mark, the only route to K-green is the long arena
-detour. The mark-jump is genuine and requires foresight.
-
-Phase 3 layout (final):
-
-```
-NE Chamber (rows 3-5, cols 52-75):
-
-Row 3:  #   [K-red col 54]   [WALL cols 56-69]   [K-green col 70]   #
-Row 4:  #   [floor, left arm 52-55] [K-blue col 60] [WARDEN-spawn col 62] [floor 63-75]  #
-Row 5:  ####[west-door col 55]#######################[east-door col 70]####
-
-Arena connection: west door (5,55) and east door (5,70) both connect to arena floor (row 9).
-```
-
-Phase 3 par (with marks):
-- Enter west door, move right to (4,70): `15l`=3 keys.
-- Set `mb` at (4,70): `mb`=2.
-- Move left to (3,54) via (4,54)→up: `16h`=3, `k`=1.
-- Set `ma` at (3,54): `ma`=2.
-- Collect K-red: 1.
-- Return to (4,54): `j`=1.
-- Move right to (4,60): `6l`=2.
-- Collect K-blue: 1. (Warden spawns at (4,62).)
-- `` `b `` to (4,70): 2.
-- `k` to (3,70): 1. Collect K-green: 1.
-- Collect = auto (on K-green cell): counted as 1.
-- Exit via east door: `5j`=2 (to row 9).
-Phase 3 par: 3+2+3+1+2+1+1+2+1+2+1+1+2 = **22 keystrokes**
-
-Phase 3 par (without marks) — arena detour:
-Enter west, move right to K-red: `2l`+`k`+collect=4. Return to row 4: `j`=1. Move right
-to K-blue: `6l`=2+collect=1. Warden blocks. Exit west: `3h`+`5j`=2+2=4. Move right in
-arena to east door at col 70: `15l`=3. Enter east door: `5k`=2. `k` to row 3: 1. Collect
-K-green: 1. Exit east door to arena: `6j`=2.
-No-marks par: 4+1+2+1+4+3+2+1+1+2 = **21 keystrokes** (approximately same as mark path!).
-
-**Problem again:** The arena detour only costs 2-3 extra keys beyond the mark path because
-count-moves compress the long horizontal run. The mark-jump saves ~22 manual steps but
-those steps only cost 3-4 keystrokes with count-moves.
-
-**CHALLENGE C-L17-1-Boss (critical, same root cause as C-L16-1):** Count-move compression
-eliminates the mark-forcing advantage in Phase 3. The arena detour (15 cells) costs `15l`
-= 3 keys. The mark-jump costs 2+1 = 3 keys. Essentially the same cost.
-
-**Resolution: forbid count-prefix in the NE Chamber during Phase 3** (extend C-L16-2 to
-boss rooms, or alternatively make the arena detour structurally longer by requiring door
-interaction sequences that each cost 1 key each, e.g. 20 door segments each requiring a
-single `l` = 20 keys vs. `` `b `` = 2 keys).
-
-**Alternative resolution (preferred):** Make the arena detour physically much longer by
-inserting a maze corridor between the west exit and the east entrance — 30+ individual
-floor cells requiring 1 key each. This is terrain forcing (S1): the detour is long by
-design, not by grid width.
-
-**Adopted fix for Phase 3:** Insert a 30-cell winding corridor (rows 6-8, cols 30-75)
-between west door and east door. No count-prefix block needed. Detour = 30 keys.
-Mark-jump = 2+1 = 3 keys. Saving = 27 keys. Budget decisive.
-
-Phase 3 revised par (marks): **22 keystrokes** (unchanged — mark path doesn't use detour).
-Phase 3 detour (no marks): 4+1+2+1+(detour 30 keys)+1+1+2 = **42 keystrokes**.
-
-Revised Phase 3 total no-marks: 42 keystrokes vs marks: 22 keystrokes. Saving: 20 keys.
-At budget including all phases, this gap is decisive.
-
-**Phase 4 — Final Config (SE Chamber): REDESIGNED (D10 fix)**
-
-**Problem (from review):** Player can spam `x` until exit door opens — `:set number` not
-genuinely required. Fix: mirror trap mechanic.
-
-**Redesigned Phase 4:**
-
-```
-SE Chamber (rows 13-15, cols 52-73):
-#  [WARDEN final form — HP=3, hidden until :set number]  #
-#  [scroll: "What you cannot see, you cannot fight."]    #
-#  [mirror-trap rune: "REFLECTOR" — reflects excess damage to player]  #
-#  [X EXIT portal — locked, opens when Warden HP=0 AND mirror intact] #
-```
-
-**Mirror Trap mechanic:** A `REFLECTOR` rune entity is present in the SE chamber. This
-entity is active while the Warden is alive. When the player presses `x` (attack), if
-the Warden's current HP is already 0, the damage is reflected back to the player (-1 HP
-per reflected `x`). Since the player likely enters Phase 4 with limited HP remaining
-from earlier phases, 2-3 reflected hits cause death.
-
-The exit portal opens ONLY when Warden HP = 0. The Warden starts at HP=3.
-
-**Without `:set number`:** The player does not know HP=3. To avoid reflection-death:
-- Spam `x` and hope to stop at exactly 3 — probability 1/N where N = number of `x`
-  presses the player is willing to try. With ~5 HP remaining and 1 reflected damage per
-  over-press: player can afford 0 over-presses. Effective probability of success without
-  knowledge ≈ 1/∞ (must press exactly 3 times with no feedback).
-- The scroll says "What you cannot see, you cannot fight." — contextual hint for `:set`.
-
-**With `:set number`:** Warden shows `WARDEN(3)`. Player presses `x` three times,
-watching HP count down: `WARDEN(2)` → `WARDEN(1)` → `WARDEN(0)`. Exit opens. Mirror
-trap never triggers. No reflected damage.
-
-**`:set number` is now genuinely required for safe completion.** Without it, the player
-faces certain death (any over-press reflects). `:set number` is a hard lock via risk
-rather than structure — but because the risk is deterministic (1 over-press = 1 death
-with reduced HP pool), it functionally forces the command.
-
-**CHALLENGE C-L17-2-Boss:** The mirror-trap reflected damage requires that `x` on a
-dead entity (HP=0) deals 1 damage to the player. This is a new engine behavior —
-currently `x` on a dead/absent entity is likely a no-op. The `REFLECTOR` entity or an
-HP-check on `x` dispatch must be implemented. A human must decide the implementation
-mechanism.
-
-Phase 4 par (with `:set number`):
-- `:set number<Enter>` = `:` `s` `e` `t` ` ` `n` `u` `m` `b` `e` `r` `Enter` = 12 keys.
-- 3× `x` = 3 keys.
-- Navigate to exit portal: ~5 keys.
-Phase 4 par: **20 keystrokes**
-
-(Previous blueprint said ~8. Corrected here per D12 — `:set number<Enter>` alone = 12
-keys. Total ~20 is accurate.)
+So: **arena = real linebreaks; verse = pure wrap, a different file.**
 
 ---
 
-### Par and budget (revised)
+### Act 1 — The Arena: visual + search + marks (strip the shields, survive)
 
-| Phase | Par (keystrokes) | Notes |
-|-------|-----------------|-------|
-| Phase 1 | 10 | 3 `%` crossings + collect |
-| Phase 2 | 12 | `/WARDEN`+`n`+`x` sequence (average seed) |
-| Phase 3 | 22 | Mark-guided collection with winding corridor detour |
-| Phase 4 | 20 | `:set number<Enter>` + 3×`x` + exit nav |
-| Transitions | 14 | Between chambers (arena traversal) |
+The Warden leaps, flips its shield to your side, summons goblins, sweeps rows, and — from
+the first chip — launches telegraphed **mega-attacks**. So marks are live immediately.
 
-**Par: 10+12+22+20+14 = 78 keystrokes**
-**Budget: ceil(78 × 1.4) = ceil(109.2) = 110**
+- **The AoE (visual):** `v/W⏎x` (or `v$x`, `v0x`) wipes summoned goblins and shaves glyphs
+  across the span — crowd control and clearing a lane to the Warden's open flank.
+- **The Hunt (search):** the Warden hides among impostors. **All of them — impostors and
+  the real Warden — are uppercase `W`**, so `/W` matches *every* one (faithful; there is NO
+  lowercase-`w`-renders-as-`W` cheat). Impostors are simply a **different color** — a
+  cosmetic tell, never a search difference. `v/W⏎x` across the cluster deletes the colored
+  impostors; **the one `W` left standing is the real Warden** (visual-immune, with the
+  "shield defended him from your cut!" message). `/W` + `n`/`N` also cycles matches; when he
+  leaps off-screen, `/W` snaps you to him.
+- **Marks (survival):** pillars `▣` are the only mega-attack-immune cells, scattered far
+  apart; the 3-turn warning is too short to *walk* between them, so you **bank `ma`/`mb`/…
+  on 2–4 pillars early** and `` ` ``-jump to whichever sits **outside this cycle's flashed
+  region** (the safe set rotates → one mark isn't enough). Between cycles, reposition to the
+  Warden's **unguarded side** (shield flipped away) and `x` to chip a shield/HP.
+- **Shields down → he flees.** Once stripped of protection, the Warden bolts through the
+  **east door into his verse**, vulnerable. Act 1 ends.
 
-(Previous blueprint: par=60, budget=84. Corrected per D12 — Phase 4 alone was
-undercounted by 12 keys; Phase 3 redesign adds 4 keys.)
+### Act 2 — The Verse file (the chase-corner KILL): `:e`, `:set wrap`/`nowrap`, `gj`/`gk`, `:e!`, `:w`
+
+The player **`:e warden.verse`** to follow into the one-line wrap buffer (opens `nowrap`;
+the Warden is off down the line, walled off). The verse line has **stone-wall glyphs
+embedded along it** — the crux of the toggle:
+
+- **`:set wrap` + `gj`/`gk` (ATTACK):** wrap folds the line into display rows; `j`/`k` are
+  inert (one logical line), and **`gj`/`gk` move you vertically across display rows, routing
+  *around* the in-line stone walls** — the only way to close on the Warden. Shields down, so
+  `x` on him now lands. (The single spot in the game where `gj`/`gk` is unavoidable —
+  cements the motion earned at the end of L17.)
+- **Without wrap:** horizontal motions (`F`/`f`/`/`/`l`) toward him **stop dead at the stone
+  walls** — you cannot reach him in `nowrap`.
+- **`:set nowrap` (DEFEND):** collapsing the verse **breaks the Warden's focus → he cannot
+  attack.** The fight is a toggle: `nowrap` to survive his telegraphed sweep, `wrap` to
+  resume the `gj`/`gk` approach and `x` him.
+- **`:e!` (reset):** a mistaken edit while dodging corrupts the verse; `:e!` reloads clean.
+- **`:w` (the kill):** corner him at the line-end, land the finishing `x`, and `:w` seals
+  the file — the Warden falls and the level is won. He is vulnerable and you are on the
+  chase; there is no further phase.
+
+---
+
+### Par and budget (estimate — confirm with solver)
+
+| Act | Par | Notes |
+|-----|-----|-------|
+| 1 arena | ~52 | `v/W⏎x` sweeps + Hunt, bank `ma`–`md`, survive ~2–3 mega-cycles, chip shields |
+| 2 verse | ~35 | `:e` + wrap/`gj`/`gk` chase + `nowrap` dodges + `x` + `:w` |
+| transitions | ~10 | door traversals |
+
+**Par ≈ 97 → Budget ceil(97 × 1.4) = 136.** (Estimate; mark/visual-aware solver or a
+hardcoded par must confirm.)
 
 ---
 
 ### Forcing / Teaching argument
 
-Each phase forces exactly one mechanic:
-- **Phase 1:** Void-interior `[ ]` pairs — `%` is the only safe gap-crosser (terrain-∞).
-- **Phase 2:** Decoy Wardens in fog — `/WARDEN<Enter>` + `n`/`N` is the only cheap
-  real-Warden locator (budget forces search vs. manual cell-check).
-- **Phase 3:** Warden blocks the only linear path to K-green — `` `b `` mark-jump (2 keys)
-  bypasses the 30-key winding detour (terrain+budget forcing, S1+S2).
-- **Phase 4:** Mirror trap reflects excess `x` → player death — `:set number` reveals HP=3
-  so player knows exactly when to stop. Without it, any over-press is fatal (structural
-  forcing via damage reflection).
-
-Act II motions (`G gg H M L } {`) are blocked by the Warden immunity flag
-(`warden_phase_immune: set[str]`) — no cheap path via earlier long-range motions.
+- **Visual + search (composed):** goblin chaff + the colored-impostor cluster reward
+  `v/W⏎x`; boss visual-immunity makes "the survivor is real" the natural Hunt; a leaping,
+  off-screen Warden makes `/W` the cheap relocator.
+- **Marks:** pillars are the only mega-attack-safe cells, scattered, 3-turn warning too
+  short to walk between → pre-set marks + `` ` ``-jumps, rotating safe set forcing **2–4**.
+- **`:e` + wrap + `gj`/`gk` + nowrap:** the Warden flees to a *different file* → `:e`; one
+  logical line walled along its length → `j`/`k` inert and horizontal motions blocked, so
+  `gj`/`gk` are the only approach; his sweep is lethal → `:set nowrap` breaks his focus.
+- **Act IV preview:** the mega-attack cuts (`dd`) and pastes (`p`/`P`) the arena.
 
 ---
 
-### Primitives
+### Primitives & challenges
 
-- All primitives from Levels 10-13.
-- Warden entity with multi-phase HP + shield — existing boss framework.
-- Decoy entities (`kind='goblin'`, `name="WARDEN"`) — existing.
-- Phase gating via HP thresholds — existing.
+Act III primitives are **shipped** (visual L14; `/ * n N`+teleport L15; marks L16;
+`:e`/`:e!`/`:set wrap`/`nowrap`/`gj`/`gk`/`:w` L17; Warden leap + `v`-sweep). The boss adds:
 
-**CHALLENGE C-L17-1-Boss:** Count-move compression threatens mark-forcing in Phase 3.
-Resolved by 30-cell winding corridor (terrain forcing). No engine change required for
-THIS fix, but the winding corridor must be physically laid out in the room builder.
-
-**CHALLENGE C-L17-2-Boss:** Mirror trap (`x` on HP=0 entity → player -1 HP). Requires
-new engine behavior: `x` dispatch checks if target entity HP ≤ 0; if so, applies damage
-to player and activates REFLECTOR effect. Must be implemented before Phase 4 runs.
-
-**CHALLENGE C-L17-3-Boss (existing):** Warden immunity flag `warden_phase_immune: set[str]`
-on Entity — motion dispatch checks before applying Act II motions. Already flagged in
-original blueprint; unchanged.
-
-**CHALLENGE C-L17-4-Boss:** All engine extensions from L10-L17 (`%`, last_search, n/N,
-marks, `:e`, `:set`) must be implemented before this boss level runs. The boss depends on
-all of them.
+| Item | Where | Status | Notes |
+|------|-------|--------|-------|
+| Boss immune to visual-delete + parry message | all | **C-PF-1** | Keeps `v/W⏎x` from one-shotting the boss; core chipped by `x`. |
+| Mega-attack (telegraph → `remove_row` → `p`/`P` rebuild) | Act 1 | **C-PF-2** | Layer on leap/sweep; spare shield/door/exit; pillars immune. |
+| Impostor `W`s by color (not by glyph) | Act 1 | **C-PF-3** | Cosmetic color only; `/W` matches all; real one is visual-immune. |
+| Pillar (`▣`): delete-immune + not an attack position | Act 1 | **C-PF-4** | New cell/flag; alcove geometry keeps Warden un-`x`-able from it. |
+| `:e warden.verse` chase into a 2nd `wrap_buffer` file; in-line stone walls block h-motion; `nowrap` breaks Warden focus | Act 2 | **C-PF-5** | Multi-buffer follow (extends Archivist `:e {name}`); the wrap/nowrap attack/defend toggle. |
+| `warden_phase_immune` on Entity | all | prior draft | Blocks Act II long-range motions in tight spots. |
 
 ---
 
 ### Self-check
 
-- (1) Scope: Boss uses all Act III mechanics. Acceptable for a boss level. Pass.
-- (2) Linkage: Each phase maps 1:1 to an Act III teaching level. Pass.
-- (3) Forced:
-  - Phase 1: void-gap forcing. Pass.
-  - Phase 2: decoy-fog forcing. Pass (D11 clarified — `:set` not needed in P2).
-  - Phase 3: winding detour + mark-jump (D9 redesign). Pass pending C-L17-1-Boss
-    (winding corridor must be built).
-  - Phase 4: mirror-trap forcing (D10 redesign). Pass pending C-L17-2-Boss.
-- (4) Boss: caps Act III at 17.1. Well-spaced after 13.1. Pass.
+- (1) Scope: all four Act III commands + Act IV cut/paste preview, in two acts. Pass.
+- (2) Linkage: visual→L14, search→L15, marks→L16, `:e`/wrap/`gj`/`gk`→L17. Pass.
+- (3) Faithfulness: `v` and `/` compose freely, never special-cased; impostors differ by
+  color not glyph; only rule is boss visual-immunity; no magic-word gates. Pass.
+- (4) Real AI: Warden leaps + flips shield + sweeps (inherited), not stationary. Pass.
+- (5) Marks live from the start; verse is the forward chase-finale (no return); `:set
+  nowrap` & `gj`/`gk` each unavoidable. Pass.
+- (6) Boss caps Act III at 17.1, well-spaced after 13.1. Pass — pending C-PF-1..5.
 
 ---
-
----
-
-## Engine Extensions Summary (Act III) — Revised
-
-All extensions below must be implemented before Act III runs, ordered by dependency:
-
-| Extension | Required by | Status | Notes |
-|-----------|------------|--------|-------|
-| `%` motion in `engine/motion.py` | L10, Boss P1, Boss Final | CHALLENGE C-L10-1 | Scan row for bracket glyph under cursor; jump to pair. Brackets: `[](){}` in RuneCluster. |
-| `player.last_search` (pattern + direction) | L15, Boss P2 | CHALLENGE C-L15-2 | Store after `/` or `?`. Used by `n`/`N`. |
-| `n`/`N` dispatch | L15, Boss P2 | CHALLENGE C-L15-2 | `find_next()` with stored pattern/direction. |
-| `/pattern` avatar teleport | L15, Boss P2 | CHALLENGE C-L15-1 | Critical: player avatar moves to match cell, not just cursor. Human decision required. |
-| Fog reveal on teleport | L15 | CHALLENGE C-L15-3 | Fog clears when avatar position changes. Likely free if fog tied to `player.row/col`. |
-| `player.marks` dict | L16, Boss P3 | CHALLENGE C-L16-2 | `{char: (row,col)}`. `m{a-z}` sets; `` `{a} `` and `'{a}` jump. |
-| `` `a ``/`'a` dispatch | L16, Boss P3 | CHALLENGE C-L16-2 | `` `a `` → exact (row,col); `'a` → first non-blank of marked row. |
-| Budget multiplier ×1.03 for L16 | L16 | CHALLENGE C-L16-3 | Near-zero slack; human must accept or redesign topology. |
-| Count-prefix forcing gap | L16 | CHALLENGE C-L16-1 | Count-move compression collapses mark budget advantage. Human decision required. |
-| `:set wrap` rendering (1-row buffer wrapped across screen rows + vertical display-line scroll) | L17 | CHALLENGE C-L17-1 | The risk — prove alone first. `Player.wrap` + `apply_set` wrap option (parsing free via `engine/options.py`); motion engine untouched (stays 1×N), view-only wrap. |
-| Reload loop: `:e`→E37, `:e!`→advance+reload, `:w {name}` save-as | L17 | CHALLENGE C-L17-2 | Per-level seed-shuffled suit sequence + filed-suit set; E37 message already in code; `:w {name}` = pure buffer→file write, no validation. |
-| Archivist `npc` entity + hostile state + scripted lethal hit | L17 | CHALLENGE C-L17-3 | New non-combat `npc` kind; dialogue state machine; forged-commit fires `take_damage ≥ max_hp` → reuses existing GAME OVER → `:e` fresh-restart convention (no new combat system). |
-| `gj`/`gk` (col ± W) + `:e {name}` reward tokens | L17 | CHALLENGE C-L17-4 | Granted by finale `chest_scroll`s after a clean assembly. |
-| `:set number` HP reveal | Boss P4 | (covered by L16) | Boss P4 reuses `:set number` (now shipped at L16 Waypoint Sanctum) to reveal the Warden's hidden HP — NOT an L17 dependency anymore. |
-| Mirror trap (x on dead entity → player damage) | Boss P4 | CHALLENGE C-L17-2-Boss | New engine behavior on `x` dispatch. |
-| Winding corridor (30-cell) in NE Chamber | Boss P3 | CHALLENGE C-L17-1-Boss | Must be laid out in room builder; no engine change, just map design. |
-| Warden immunity flag | Boss | CHALLENGE C-L17-3-Boss | `warden_phase_immune: set[str]` on Entity; checked in motion dispatch. |
-| Mark-aware par solver (or hardcoded par) | L16 | CHALLENGE C-L16-3 | Dijkstra state includes frozenset of mark positions, or hardcode par=49. |
