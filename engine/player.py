@@ -26,6 +26,7 @@ class Player:
     last_visual_anchor: tuple | None = None   # saved on operator-apply, for gv
     last_visual_cursor: tuple | None = None
     last_visual_mode: object = None           # Mode of the last visual selection, for gv
+    last_parry: bool = False                  # last visual-delete span covered an edit_immune boss (→ "shield defended" message)
     last_search: tuple | None = None  # (pattern, forward) of the most recent search; used by n/N
     last_sub: tuple | None = None     # (pattern, replacement, flags_str) of the last :s; for & / :s / g&
     pending_recost_f: int = 0  # >0: next ;/, re-pays this (its f/F/t/T was undone — anti-exploit)

@@ -43,6 +43,9 @@ class Entity:
     tag:          str = ''  # variant tag, e.g. 'gold' or 'red' for colored keys/doors
     scroll_id:    str = ''  # chest_scroll only: the specific scroll this chest drops
                             # ('' = pull a random relic scroll from the pool)
+    edit_immune:  bool = False  # True = survives editing-delete (visual/operator x/d/dd,
+                            # reflow remove_row); a boss parried by its shield, chipped
+                            # only by normal-mode x. See engine/visual + The Warden Pathfinder.
 
 @dataclass
 class CharRun:

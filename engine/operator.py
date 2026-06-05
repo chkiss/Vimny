@@ -142,7 +142,8 @@ def _delete_cols(room, row: int, lo: int, hi: int) -> None:
         if room.cells[row][c] in _WALL_CELLS:
             room.cells[row][c] = CellType.FLOOR
             room.wood_damage.pop((row, c), None)
-    for ent in [e for e in room.entities if e.row == row and lo <= e.col <= hi]:
+    for ent in [e for e in room.entities if e.row == row and lo <= e.col <= hi
+                and not e.edit_immune]:                    # a boss parries editing-delete
         room.remove_entity(ent)
         room._on_entity_destroyed(ent)
 

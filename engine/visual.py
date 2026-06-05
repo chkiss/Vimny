@@ -61,7 +61,8 @@ def _kill_entities_in_span(room, tobj) -> None:
         if (ent.alive
                 and tobj.start_row <= ent.row <= tobj.end_row
                 and tobj.start_col <= ent.col <= tobj.end_col
-                and ent.kind not in _PROTECTED_KINDS):
+                and ent.kind not in _PROTECTED_KINDS
+                and not ent.edit_immune):              # a boss parries the cut (see apply_visual)
             room.kill_entity(ent)
 
 
@@ -108,6 +109,11 @@ def _apply_charwise_multi(op: str, anchor, cursor, room, player):
 def apply_visual(op: str, anchor, cursor, vmode, room, player):
     """Apply `op` to the visual selection. Returns a register clip for d/y/c
     (None for ~ / > / <). Repositions the cursor to the selection start."""
+    # A delete whose span covers an edit-immune boss is parried: the rest of the
+    # span still dies (handled below), the boss survives, and the caller reports it.
+    player.last_parry = (op in ('d', 'c') and any(
+        e.alive and e.edit_immune and in_selection(anchor, cursor, vmode, e.row, e.col)
+        for e in room.entities))
     if vmode == Mode.VISUAL_BLOCK:
         return _apply_block(op, anchor, cursor, room, player)
 

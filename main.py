@@ -2565,6 +2565,8 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
                     _reg_write(player, '"', clip, is_delete=False)
                 elif op in ('d', 'c'):
                     _reg_write(player, '"', clip, is_delete=True)
+                if player.last_parry:
+                    _push("The Warden's shield defended him from your cut!")
                 budget.spend(1)
                 player.last_visual_anchor = anchor
                 player.last_visual_cursor = cursor

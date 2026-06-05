@@ -215,6 +215,8 @@ def remove_row(room, at_row: int, player=None) -> bool:
         return False
     if all(room.cells[at_row][c] in _WALLS for c in range(room.cols)):
         return False                                  # structural border row — never collapse
+    if any(e.alive and e.edit_immune for e in room.entities if e.row == at_row):
+        return False                                  # a boss stands here — its shield parries the cut
     del room.cells[at_row]
     room.rows -= 1
     # Drop the cut row's own content, then slide everything below it up by one.
