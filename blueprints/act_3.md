@@ -37,9 +37,15 @@ clearly flagged assumed extensions).
 | L16 Waypoint Sanctum | marks `m ' \`` (2–4) | Act 1 — pillar-refuge vs. the mega-attack |
 | L17 Archivist's Library | `:e`, `:set wrap`/`nowrap`, `gj`/`gk`, `:e!`, `:w` | Act 2 — the Verse finale |
 
-**Structure:** Act 1 is the arena — strip the Warden's shields (visual + the Hunt) while
-surviving his leap/sweep/mega-attacks with pillar-marks. Shields down → he flees east into
-his verse, vulnerable. Act 2 is the Verse file — the **chase-corner kill**. No third act.
+**Structure (revised 2026-06-05):** Act 1 is the arena — strip the Warden's shields
+(visual + the Hunt) while surviving his leap/swarm-summons/mega-attacks with pillar-marks.
+Shields down → he flees into the **wardenverse**. Act 2 — `:e wardenverse` into ONE long
+line that **wraps reactively to the terminal** (like the Library; no fixed fold, works
+80–189 cols): he *runs the wrapped line*, chased with `gj`/`gk` while `:set wrap` is on and
+**stilled by `:set nowrap`** (focus-break); `x` him down. His death **collapses the verse**
+and flings you back to the arena. Act 3 — mop up the leftover minions; when the verse has
+collapsed AND the last goblin is dead, the **key clatters to the floor** → opens the
+**locked treasure room** (loot + the exit). The verse has no exit of its own.
 
 ---
 

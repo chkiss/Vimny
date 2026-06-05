@@ -264,11 +264,17 @@ def test_builder_makes_a_two_room_dungeon():
     warden = next(e for e in arena.entities if e.kind == 'warden')
     assert warden.tag == 'pathfinder' and warden.edit_immune
     assert sum(1 for e in arena.entities if e.kind == 'goblin' and e.tag == 'echo') == 4
+    # Treasure room behind a locked door (the exit + loot live there; key drops in Act 3)
+    assert arena.exit_pos is not None
+    assert any(e.kind == 'locked_door' for e in arena.entities)
+    assert any(e.kind == 'exit' for e in arena.entities)
+    assert any(e.kind == 'heart_container' for e in arena.entities)
 
-    # Wardenverse (Act 2): one-line wrap buffer with in-line walls + immune Warden + exit
+    # Wardenverse (Act 2): ONE long line that wraps REACTIVELY (no fixed fold), immune
+    # Warden, and NO exit — his death collapses the verse (handled in main.py).
     assert verse.wrap_buffer and verse.rows == 1
-    walls = [c for c in range(verse.cols) if verse.cells[0][c] == CellType.WALL]
-    assert len(walls) >= 5                              # in-line barriers (gj/gk route around)
+    assert getattr(verse, 'wrap_width', 0) == 0         # reactive (folds to the live terminal width)
+    assert verse.cols >= 600                            # long enough to fold many times even at 189 cols
     vw = next(e for e in verse.entities if e.kind == 'warden')
     assert vw.tag == 'verse' and vw.edit_immune
-    assert verse.exit_pos is not None
+    assert verse.exit_pos is None                       # collapse, not a verse exit

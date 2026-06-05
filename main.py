@@ -1351,8 +1351,26 @@ def _enemy_tick(room, player) -> list:
                         room.move_entity(ent, 0, nc)
                         room._lib_arch_paced = True   # he has stepped off his desk
             continue
+        if ent.kind == 'warden' and ent.tag == 'verse':
+            # He runs the wrapped line: while ':set wrap' is on he chases through the
+            # display (hop a fold toward the player, then close along the row, like the
+            # hostile Archivist). ':set nowrap' breaks his focus and he holds still.
+            if getattr(player, 'wrap', False):
+                w = getattr(room, '_wrap_w', 0) or room.cols
+                d = player.col - ent.col
+                pr, ar = player.col // w, ent.col // w
+                if pr != ar:
+                    nc = ent.col + (w if pr > ar else -w)
+                elif abs(d) > 1:
+                    nc = ent.col + (1 if d > 0 else -1)
+                else:
+                    nc = ent.col
+                nc = min(max(1, nc), room.cols - 2)
+                if nc != ent.col and (0, nc) != (player.row, player.col):
+                    room.move_entity(ent, 0, nc)
+            continue
         dist = _manhattan(player.row, player.col, ent.row, ent.col)
-        if ent.kind == 'warden' and ent.tag != 'surveyor' and dist <= _ALERT_RADIUS:
+        if ent.kind == 'warden' and ent.tag not in ('surveyor', 'verse') and dist <= _ALERT_RADIUS:
             has_goblins = any(
                 e.alive and e.summoner_uid == ent.uid
                 for e in room._entity_by_kind.get('goblin', [])
@@ -2086,14 +2104,16 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
                 msg_idx = 0
 
                 if level == 'warden_pathfinder' and cmd == 'e wardenverse':
-                    if (getattr(room, 'warden_fled', False)
+                    if getattr(room, 'verse_collapsed', False):
+                        _push('The wardenverse has collapsed — there is nothing left to enter.')
+                    elif (getattr(room, 'warden_fled', False)
                             and dungeon.current_room == 0 and len(dungeon.rooms) > 1):
                         dungeon.current_room = 1             # follow him into the wardenverse
                         room = dungeon.room
                         player.row, player.col = room.spawn_pos
-                        player.wrap = False                  # the verse opens nowrap
-                        _push('You step into the wardenverse.  :set wrap to read the '
-                              'fold, gj/gk to follow him.')
+                        player.wrap = False                  # opens nowrap
+                        _push('You plunge into the wardenverse — it reshapes to your terminal.  '
+                              ':set wrap to fold the line, gj/gk to chase him, :set nowrap to still him.')
                     elif dungeon.current_room != 0:
                         _push('You are already in the wardenverse.')
                     else:
@@ -3232,15 +3252,24 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
                         else:
                             room.kill_entity(cur)
                             _reg_write(player, '"', entity_clip(cur), is_delete=True)
-                            if cur.kind == 'warden':
-                                _remove_warden_shields(room)
-                                room.surveyor_threat = None  # clear any lingering telegraph
-                                if cur.tag == 'verse':       # unseal the path to the exit
-                                    for sd in [e for e in room.entities
-                                               if e.alive and e.kind == 'seal_door']:
-                                        room.remove_entity(sd)
-                                    _push('The Warden unravels — the verse unseals.  Step through.')
-                            _push(_on_kill(cur, player, room, level) or 'Enemy defeated!')
+                            if cur.kind == 'warden' and cur.tag == 'verse':
+                                # The wardenverse collapses — fling the player back to the arena
+                                # to mop up the minions; the key drops there once they're cleared.
+                                arena = dungeon.rooms[0]
+                                arena.verse_collapsed = True
+                                dungeon.current_room = 0
+                                room = dungeon.room
+                                player.row, player.col = (12, 60)
+                                player.wrap = False
+                                msg_pool.clear()
+                                _push('You cut him down and the wardenverse collapses — you are '
+                                      'flung back into the arena!  Hunt down the last minions.')
+                                message = _pool_msg(); msg_ttl = _MSG_ROTATE_TTL
+                            else:
+                                if cur.kind == 'warden':
+                                    _remove_warden_shields(room)
+                                    room.surveyor_threat = None  # clear any lingering telegraph
+                                _push(_on_kill(cur, player, room, level) or 'Enemy defeated!')
                     else:
                         _push(f'Hit! ({cur.hp}/{cur.max_hp} HP)')
                 elif cur and cur.kind == 'shield':
@@ -3695,6 +3724,16 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
                 attack_flash_pos = (ent.row, ent.col)
                 attack_flash_on  = True
                 attack_flash_ttl = _ATTACK_FLASH_TTL
+
+            # Pathfinder Act 3: once the verse has collapsed AND the minions are cleared
+            # (whichever is later), the Warden's key clatters to the arena floor.
+            if (level == 'warden_pathfinder' and getattr(room, 'verse_collapsed', False)
+                    and not getattr(room, 'key_dropped', False)
+                    and not any(e.alive and e.kind == 'goblin' for e in room.entities)):
+                room.key_dropped = True
+                if _drop_key(room, 12, 40):
+                    _push('The last minion falls — a key clatters to the floor!  🗝  '
+                          '(step onto it, then  p  it onto the treasure door)')
 
             # Warden summon message
             if tick_msgs and not player.is_dead:

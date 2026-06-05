@@ -5513,12 +5513,20 @@ _PF_PILLAR_ROWS      = (5, 19)              # symmetric 2×3 grid of refuge ston
 _PF_PILLAR_COLS      = (20, 39, 58)         # bands, clear of the Warden/spawn row (12) and echoes
 _PF_WARDEN_START     = (12, 39)
 _PF_ECHO_CELLS       = ((6, 30), (18, 48), (6, 48), (18, 30))   # impostor Ws (symmetric)
-_PF_VERSE_COLS       = 160                  # one logical line, 4 folds of 40
-_PF_VERSE_FOLD       = 40                   # fixed soft-wrap width (room.wrap_width) — same on any terminal
-_PF_VERSE_WALLS      = (30, 70, 110)        # one stone per fold 0-2 (all at screen col 30): l stops here,
-                                            # so you MUST gj to the next display row to descend the fold
-_PF_VERSE_TEXT = ("the cut you cannot see you cannot parry   "
-                  "every shield bares a back   follow the fold   ")
+# Treasure room: a chamber behind a locked door on the east wall (every level has one).
+# The key drops in the arena once the wardenverse has collapsed AND the last minion is dead.
+_PF_TR_WALL          = 67                   # the column that seals the treasure room off
+_PF_DOOR             = (12, 67)             # locked-door gap in that wall
+_PF_TR_EXIT          = (12, 75)
+_PF_TR_HEART         = (10, 72)
+_PF_TR_SCROLL        = (14, 72)
+_PF_RETURN           = (12, 60)             # where the collapse flings the player back into the arena
+# The Wardenverse: ONE long logical line that wraps reactively to the terminal (like the
+# Archivist's Library) — many folds at any supported width (80–189 cols); no fixed fold.
+_PF_VERSE_COLS       = 720
+_PF_VERSE_TEXT = ("the cut you cannot see you cannot parry   so follow the fold   "
+                  "every shield bares a back   the warden runs the wrapped line   "
+                  "set nowrap to still him   gj and gk to chase him down   ")
 
 
 def _pf_lay_verse(room, rng) -> None:
@@ -5541,11 +5549,14 @@ def build_dungeon_warden_pathfinder(seed: int) -> Dungeon:
     for r in range(1, R - 1):
         for c in range(1, C - 1):
             cells[r][c] = CellType.FLOOR
+    for r in range(1, R - 1):               # seal the treasure room off (one locked-door gap)
+        if r != _PF_DOOR[0]:
+            cells[r][_PF_TR_WALL] = CellType.WALL
     arena = Room(room_type=RoomType.BOSS, rows=R, cols=C)
     arena.cells     = cells
     arena.seed      = seed
     arena.spawn_pos = (_PF_MAIN_ROW, 2)
-    arena.exit_pos  = None                  # no exit here — Act 2 (the verse) is the finish
+    arena.exit_pos  = _PF_TR_EXIT           # the exit lives in the treasure room, behind the locked door
     arena.char_runs = []
     arena.entities  = []
     arena.search_glyph_entities = True      # /W finds the Warden + echoes wherever they leap
@@ -5561,33 +5572,32 @@ def build_dungeon_warden_pathfinder(seed: int) -> Dungeon:
                                  col=_PF_WARDEN_START[1] - 1))
     for (r, c) in _PF_ECHO_CELLS:
         arena.entities.append(Entity(kind='goblin', row=r, col=c, hp=1, max_hp=1, tag='echo'))
+    arena.entities.append(Entity(kind='locked_door',     row=_PF_DOOR[0],     col=_PF_DOOR[1]))
+    arena.entities.append(Entity(kind='exit',            row=_PF_TR_EXIT[0],  col=_PF_TR_EXIT[1]))
+    arena.entities.append(Entity(kind='heart_container', row=_PF_TR_HEART[0], col=_PF_TR_HEART[1]))
+    arena.entities.append(Entity(kind='chest_scroll',    row=_PF_TR_SCROLL[0],col=_PF_TR_SCROLL[1]))
 
     arena.rebuild_indexes()
     init_mega(arena, pillars)
     arena.par    = None
     arena.budget = 160                      # provisional — refine once the par sim exists
 
-    # ── Room 1: the Wardenverse (single logical line, soft-wrapped) ─────────
+    # ── Room 1: the Wardenverse (ONE long line; wraps reactively to the terminal) ──
     VC = _PF_VERSE_COLS
     vcells = [[CellType.FLOOR] * VC]
     vcells[0][0] = vcells[0][VC - 1] = CellType.WALL
-    for c in _PF_VERSE_WALLS:
-        vcells[0][c] = CellType.WALL
     verse = Room(room_type=RoomType.BOSS, rows=1, cols=VC)
     verse.cells       = vcells
     verse.seed        = seed
-    verse.wrap_buffer = True
-    verse.wrap_width  = _PF_VERSE_FOLD       # fold identically on any terminal width
+    verse.wrap_buffer = True                 # ':set wrap' soft-wraps it to the live content width
     verse.spawn_pos   = (0, 1)
     verse.char_runs   = []
     verse.entities    = []
     _pf_lay_verse(verse, rng)
-    wcol = VC - 4                            # 156: in the last (clear) fold
-    verse.entities.append(Entity(kind='warden', row=0, col=wcol, hp=3, max_hp=3,
+    # The Warden runs the wrapped line; he's chased down (gj/gk) and stilled with :set nowrap.
+    verse.entities.append(Entity(kind='warden', row=0, col=VC - 6, hp=3, max_hp=3,
                                  ai='', tag='verse', edit_immune=True))
-    verse.entities.append(Entity(kind='seal_door', row=0, col=VC - 3))   # 157: opens when he dies
-    verse.exit_pos = (0, VC - 2)
-    verse.entities.append(Entity(kind='exit', row=0, col=VC - 2))
+    verse.exit_pos = None                    # no exit here — his death collapses the verse (main.py)
     verse.rebuild_indexes()
     verse.par    = None
     verse.budget = 160
