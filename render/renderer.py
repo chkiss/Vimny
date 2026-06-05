@@ -313,9 +313,13 @@ def render_all(term: Terminal, dungeon: Dungeon, player: Player,
                    and getattr(room, 'wrap_buffer', False)
                    and room.rows == 1)
     if wrap_active:
-        total_drows = wrap_total_rows(room.cols, content_w)
-        dr_start    = wrap_scroll_start(player.col, room.cols, content_w, game_h)
-        room._wrap_w = content_w   # stash the live wrap width for gj/gk display-line motion
+        # A room may pin a FIXED fold width (room.wrap_width) so the line wraps the same
+        # on any terminal (the Wardenverse needs its stone walls to land at fold edges);
+        # otherwise wrap to the live content width. Never exceed the visible width.
+        wrap_w = min(getattr(room, 'wrap_width', 0) or content_w, content_w)
+        total_drows = wrap_total_rows(room.cols, wrap_w)
+        dr_start    = wrap_scroll_start(player.col, room.cols, wrap_w, game_h)
+        room._wrap_w = wrap_w      # stash the live wrap width for gj/gk display-line motion
 
     def _gutter_wrap(drow):
         # The wrap buffer is ONE logical line: number only its first display row,
@@ -430,7 +434,10 @@ def render_all(term: Terminal, dungeon: Dungeon, player: Player,
                 line += C.hint_fg() + '~' + rst + base_floor_bg + ' ' * (content_w - 1) + rst
             else:
                 for screen_c in range(content_w):
-                    room_c = wrap_room_col(drow, screen_c, content_w)
+                    if screen_c >= wrap_w:
+                        line += base_floor_bg + ' ' + rst   # right of the fixed fold width
+                        continue
+                    room_c = wrap_room_col(drow, screen_c, wrap_w)
                     if room_c >= room.cols:
                         line += base_floor_bg + ' ' + rst   # past line end on its last display row
                     else:

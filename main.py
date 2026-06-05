@@ -1980,7 +1980,7 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
             msg_pool.append('You spotted a Warden!')
             if level == 'warden_pathfinder' and e.tag == 'pathfinder':
                 msg_pool.append('His shield blocks this row — circle above or below to '
-                                'his open flank, then x.  (v-cuts only glance off it.)')
+                                'his open flank, then x.  (He twists away from v-cuts.)')
     if msg_pool:
         message = _pool_msg()
         msg_ttl = _MSG_ROTATE_TTL
@@ -2586,8 +2586,14 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
                 elif op in ('d', 'c'):
                     _reg_write(player, '"', clip, is_delete=True)
                 if player.last_parry:
+                    # The Warden is a creature, not text — a line-cut can't pin him.
+                    # He twists out of the selection (bounds away in the arena); only x lands.
                     msg_pool.clear()
-                    _push("The Warden's shield turns your cut — chip his open flank with x!")
+                    for _w in [e for e in room.entities
+                               if e.alive and e.kind == 'warden' and e.edit_immune]:
+                        if room.rows > 2:
+                            _do_warden_move(room, _w, player)
+                    _push('The Warden twists out of your cut — only a precise x can land on him!')
                     message = _pool_msg(); msg_ttl = _MSG_ROTATE_TTL
                 budget.spend(1)
                 player.last_visual_anchor = anchor
@@ -3191,10 +3197,21 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
                         move_msg = _do_warden_move(room, cur, player)
                         if move_msg:
                             _push(move_msg)
-                        _side = random.choice((-1, 1))
-                        _spawn_goblin(room, cur.row, cur.col + _side * 3, summoner_uid=cur.uid)
+                        if cur.tag == 'pathfinder':
+                            # A real swarm, right where you stand — so `/W x` spam is punished.
+                            n = 0
+                            for (dr, dc) in ((0, 2), (0, -2), (2, 0), (-2, 0), (1, 2), (-1, -2)):
+                                if _spawn_goblin(room, player.row + dr, player.col + dc,
+                                                 summoner_uid=cur.uid):
+                                    n += 1
+                                if n >= 3:
+                                    break
+                            _push('The Warden howls — minions swarm in around you!')
+                        else:
+                            _side = random.choice((-1, 1))
+                            _spawn_goblin(room, cur.row, cur.col + _side * 3, summoner_uid=cur.uid)
+                            _push('The Warden summoned a goblin minion!')
                         cur.summon_timer = _WARDEN_SUMMON_INTERVAL
-                        _push('The Warden summoned a goblin minion!')
                     elif cur.kind == 'warden' and cur.hp > 0 and cur.tag == 'surveyor':
                         if cur.hp == 3:                      # just entered Phase 2 (2 HP spent)
                             _surveyor_regen()                # the eaten verse regrows
@@ -3218,6 +3235,11 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
                             if cur.kind == 'warden':
                                 _remove_warden_shields(room)
                                 room.surveyor_threat = None  # clear any lingering telegraph
+                                if cur.tag == 'verse':       # unseal the path to the exit
+                                    for sd in [e for e in room.entities
+                                               if e.alive and e.kind == 'seal_door']:
+                                        room.remove_entity(sd)
+                                    _push('The Warden unravels — the verse unseals.  Step through.')
                             _push(_on_kill(cur, player, room, level) or 'Enemy defeated!')
                     else:
                         _push(f'Hit! ({cur.hp}/{cur.max_hp} HP)')

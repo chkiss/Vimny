@@ -5513,8 +5513,10 @@ _PF_PILLAR_ROWS      = (5, 19)              # symmetric 2×3 grid of refuge ston
 _PF_PILLAR_COLS      = (20, 39, 58)         # bands, clear of the Warden/spawn row (12) and echoes
 _PF_WARDEN_START     = (12, 39)
 _PF_ECHO_CELLS       = ((6, 30), (18, 48), (6, 48), (18, 30))   # impostor Ws (symmetric)
-_PF_VERSE_COLS       = 120
-_PF_VERSE_WALL_EVERY = 12                   # in-line stone walls — block h/l/f/F/, gj/gk route around
+_PF_VERSE_COLS       = 160                  # one logical line, 4 folds of 40
+_PF_VERSE_FOLD       = 40                   # fixed soft-wrap width (room.wrap_width) — same on any terminal
+_PF_VERSE_WALLS      = (30, 70, 110)        # one stone per fold 0-2 (all at screen col 30): l stops here,
+                                            # so you MUST gj to the next display row to descend the fold
 _PF_VERSE_TEXT = ("the cut you cannot see you cannot parry   "
                   "every shield bares a back   follow the fold   ")
 
@@ -5569,19 +5571,21 @@ def build_dungeon_warden_pathfinder(seed: int) -> Dungeon:
     VC = _PF_VERSE_COLS
     vcells = [[CellType.FLOOR] * VC]
     vcells[0][0] = vcells[0][VC - 1] = CellType.WALL
-    for c in range(_PF_VERSE_WALL_EVERY, VC - 4, _PF_VERSE_WALL_EVERY):
+    for c in _PF_VERSE_WALLS:
         vcells[0][c] = CellType.WALL
     verse = Room(room_type=RoomType.BOSS, rows=1, cols=VC)
     verse.cells       = vcells
     verse.seed        = seed
     verse.wrap_buffer = True
+    verse.wrap_width  = _PF_VERSE_FOLD       # fold identically on any terminal width
     verse.spawn_pos   = (0, 1)
     verse.char_runs   = []
     verse.entities    = []
     _pf_lay_verse(verse, rng)
-    wcol = VC - 4
+    wcol = VC - 4                            # 156: in the last (clear) fold
     verse.entities.append(Entity(kind='warden', row=0, col=wcol, hp=3, max_hp=3,
                                  ai='', tag='verse', edit_immune=True))
+    verse.entities.append(Entity(kind='seal_door', row=0, col=VC - 3))   # 157: opens when he dies
     verse.exit_pos = (0, VC - 2)
     verse.entities.append(Entity(kind='exit', row=0, col=VC - 2))
     verse.rebuild_indexes()
