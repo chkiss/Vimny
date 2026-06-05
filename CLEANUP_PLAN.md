@@ -1,5 +1,9 @@
 # Vimny Clean-up Plan
 
+> ⏳ **DELETE OR UPDATE BY 2026-06-11** (7 days from 2026-06-04). This is a working
+> record of a completed cleanup pass — once the branch has landed, delete it (or fold
+> any still-relevant "left as-is" notes into `docs/ARCHITECTURE.md`).
+
 Status: **EXECUTED** (2026-06-04). The review below was carried out, then the
 safe/high-value items were applied. Full suite green throughout (2468 → 2460
 passing; the −8 are the removed `status_color`/`_last_content_col` tests).
