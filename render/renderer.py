@@ -335,6 +335,9 @@ def render_all(term: Terminal, dungeon: Dungeon, player: Player,
     hl_bg     = C.search_hl_bg()
     cur_bg    = C.search_cur_bg()
     _threat   = getattr(room, 'surveyor_threat', None)   # warden's telegraphed v-selection
+    _mega     = getattr(room, 'mega', None)              # Warden Pathfinder floor-cut
+    _mega_safe = _mega['safe'] if (_mega and _mega.get('phase') == 'warn') else set()
+    mega_safe_bg = C.mega_safe_bg()
     _vis_active = (mode in (Mode.VISUAL, Mode.VISUAL_LINE, Mode.VISUAL_BLOCK)
                    and getattr(player, 'visual_anchor', None) is not None)
     _vis_cursor = (player.row, player.col)
@@ -356,7 +359,9 @@ def render_all(term: Terminal, dungeon: Dungeon, player: Player,
     def _cell(room_r, room_c):
         """Render one IN-BOUNDS room cell to its coloured string fragment.
         Shared verbatim by the nowrap and wrap screen-row loops."""
-        if (_threat is not None and 'r0' in _threat
+        if (room_r, room_c) in _mega_safe:               # the lit refuge — jump here before the cut
+            floor_bg = mega_safe_bg
+        elif (_threat is not None and 'r0' in _threat
                 and _threat['r0'] <= room_r <= _threat['r1']
                 and _threat['c0'] <= room_c <= _threat['c1']):
             floor_bg = threat_bg

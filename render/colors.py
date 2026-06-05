@@ -19,6 +19,7 @@ def visual_sel_bg(): return _term.on_color_rgb(30, 50, 90)       # cold selectio
 def threat_sel_bg(): return _term.on_color_rgb(95, 20, 28)       # warden's gaze, blood-crimson
 def search_hl_bg():  return _term.on_color_rgb(70, 60, 12)       # hlsearch — dim amber glow
 def search_cur_bg(): return _term.on_color_rgb(150, 120, 18)     # incsearch target — bright amber
+def mega_safe_bg():  return _term.on_color_rgb(18, 70, 45)       # the lit refuge stone — safe green (Warden Pathfinder)
 def player_fg():     return _term.bright_white                    # cursor: sharp, no warmth
 def enemy_fg():      return _term.color_rgb(100, 155, 80)        # muted olive, enemy life
 def enemy_frozen():  return _term.color_rgb(80, 200, 240)        # ice-blue, frozen state

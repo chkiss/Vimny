@@ -20,6 +20,7 @@ from engine.world import Entity, CellType, CharRun, Dungeon
 from engine.motion import apply_motion, _apply_esc, _reveal_from, _first_non_blank_col
 from engine.text_object import compute_text_object, resolve_text_object
 from engine.search import find_next as _search_next, word_under_cursor as _word_under_cursor
+from engine.warden_mega import mega_tick
 from engine.options import apply_set as _apply_set, parse_modifier as _parse_set_mod
 from engine.macro import synth_key as _synth_key, record_char as _record_char
 from engine.jumplist import record_jump as _record_jump, jump_back as _jump_back, jump_forward as _jump_forward
@@ -1390,6 +1391,8 @@ def _enemy_tick(room, player) -> list:
         step = _detour_step(room, player, ent, dist)
         if step is not None:
             room.move_entity(ent, *step)
+    if getattr(room, 'mega', None):          # The Warden Pathfinder's floor-cut cadence
+        msgs += mega_tick(room, player, random)
     return msgs
 
 

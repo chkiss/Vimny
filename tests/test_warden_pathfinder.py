@@ -12,11 +12,14 @@ still dies, the boss stands, and ``player.last_parry`` is set so the UI can fire
 
 See blueprints/act_3.md (L17.1) and engine/visual.py.
 """
+import random
+
 from engine.world import Room, RoomType, Entity, CellType, CharRun
 from engine.player import Player
 from engine.modes import Mode
 from engine.visual import apply_visual
 from engine.search import match_cells
+from engine import warden_mega as MEGA
 
 
 def _room(immune: bool) -> Room:
@@ -143,3 +146,101 @@ def test_flag_off_search_ignores_entities():
     room = _hunt_room(glyph_search=False)
     assert match_cells(room, 'W') == set()          # no char-runs → nothing (par-safe default)
     assert match_cells(room, 'g') == set()
+
+
+# ── C-PF-2/4: mega-attack cadence + pillar-refuge forcing ──
+
+def _arena() -> Room:
+    rows, cols = 8, 30
+    cells = [[CellType.FLOOR] * cols for _ in range(rows)]
+    for c in range(cols):
+        cells[0][c] = cells[rows - 1][c] = CellType.WALL
+    for r in range(rows):
+        cells[r][0] = cells[r][cols - 1] = CellType.WALL
+    room = Room(room_type=RoomType.BOSS, rows=rows, cols=cols, cells=cells)
+    MEGA.init_mega(room, pillars=[(2, 5), (4, 12), (6, 20), (3, 25)])
+    return room
+
+
+def _run_to_strike(room, player, rng):
+    """Tick until the strike resolves; return all messages emitted."""
+    out = []
+    for _ in range(MEGA._MEGA_PERIOD + MEGA._MEGA_WARN + 1):
+        out += MEGA.mega_tick(room, player, rng)
+        if room.mega['phase'] == 'idle' and room.mega['cooldown'] == MEGA._MEGA_PERIOD and out:
+            break
+    return out
+
+
+def test_warning_fires_after_the_cooldown():
+    room = _arena()
+    p = _player(2, 5)
+    rng = random.Random(1)
+    msgs = []
+    for t in range(MEGA._MEGA_PERIOD):
+        msgs += MEGA.mega_tick(room, p, rng)
+    assert room.mega['phase'] == 'warn'                 # warning is up after PERIOD calm turns
+    assert any('INHALES' in m for m in msgs)
+    assert len(room.mega['safe']) == MEGA._MEGA_SAFE_K  # the telegraph lit a refuge
+    assert room.mega['safe'] <= room.pillars
+
+
+def test_strike_spares_a_player_on_the_safe_pillar():
+    room = _arena()
+    rng = random.Random(2)
+    # Advance to the warning so we know which pillar is lit, then stand on it.
+    for _ in range(MEGA._MEGA_PERIOD):
+        MEGA.mega_tick(room, _player(0, 0), rng)
+    safe = next(iter(room.mega['safe']))
+    p = _player(*safe)
+    hp0 = p.hp
+    for _ in range(MEGA._MEGA_WARN):
+        MEGA.mega_tick(room, p, rng)
+    assert p.hp == hp0                                  # sheltered → no damage
+
+
+def test_strike_hits_a_player_off_the_safe_pillar():
+    room = _arena()
+    rng = random.Random(2)
+    for _ in range(MEGA._MEGA_PERIOD):
+        MEGA.mega_tick(room, _player(0, 0), rng)
+    safe = next(iter(room.mega['safe']))
+    off = (safe[0], safe[1] + 1)                        # one cell off the lit stone
+    p = _player(*off)
+    hp0 = p.hp
+    for _ in range(MEGA._MEGA_WARN):
+        MEGA.mega_tick(room, p, rng)
+    assert p.hp == hp0 - MEGA._MEGA_DMG                 # caught in the open → fall damage
+
+
+def test_strike_culls_goblins_off_the_safe_pillars():
+    room = _arena()
+    rng = random.Random(3)
+    for _ in range(MEGA._MEGA_PERIOD):
+        MEGA.mega_tick(room, _player(0, 0), rng)
+    safe = next(iter(room.mega['safe']))
+    room.add_entity(Entity(kind='goblin', row=safe[0], col=safe[1], hp=1, max_hp=1))   # on the stone
+    room.add_entity(Entity(kind='goblin', row=1, col=1, hp=1, max_hp=1))               # in the open
+    room.rebuild_indexes()
+    p = _player(*safe)
+    for _ in range(MEGA._MEGA_WARN):
+        MEGA.mega_tick(room, p, rng)
+    survivors = {(e.row, e.col) for e in room.entities if e.kind == 'goblin' and e.alive}
+    assert safe in survivors          # goblin on the safe stone rode it out
+    assert (1, 1) not in survivors    # goblin in the open fell
+
+
+def test_cycle_returns_to_idle_and_rotates():
+    room = _arena()
+    rng = random.Random(4)
+    seen = set()
+    for _ in range(4):                                  # several full cycles
+        _run_to_strike(room, _player(2, 5), rng)
+        assert room.mega['phase'] == 'idle'
+    # over many cycles, different pillars get lit (rotation → forces multiple marks)
+    rng = random.Random(99)
+    for _ in range(12):
+        room.mega['phase'] = 'warn'; room.mega['timer'] = 1
+        room.mega['safe'] = MEGA._pick_safe(room, rng)
+        seen |= room.mega['safe']
+    assert len(seen) >= 2

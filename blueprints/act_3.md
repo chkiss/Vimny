@@ -79,12 +79,14 @@ kills *every* entity in a visual span except `{exit, door, boss_seal}` — so to
   AoE is for.
 - **Sweep (`_ws_erase_row` / `_ws_threat_span`):** a `v$`/`v0` sweep from itself to the
   player-side edge, erasing that row's glyphs/floor.
-- **Mega-attack (new, telegraphed ~every 8 turns; Act IV preview; ACT 1 ONLY):** a 3-turn
-  banner *"THE WARDEN INHALES THE FLOOR…"* flashes a multi-row region; the Warden
-  **`dd`-cuts** it (reflow `remove_row`) — anyone on a deleted **non-pillar** cell falls
-  into the void — then **`p`/`P`-pastes** it back, shifted, so the doomed region and the
-  safe pillars differ each cycle. Previews L18 `d`, L19 `dd`, L20 `y`/`P`. (Stops once he
-  flees to the verse — there he is vulnerable, not rampaging.)
+- **Mega-attack (new, telegraphed; Act IV preview; ACT 1 ONLY):** idle (8t) → warn (3t,
+  banner *"THE WARDEN INHALES THE FLOOR — only the lit stones will hold!"*) → strike. The
+  strike "tears the floor away and slams it back" — flavor of `dd` then `p`/`P`. Mechanically
+  it is **positional** (no terrain mutation — there is no VOID cell type, and this keeps
+  marks/the grid stable): anyone NOT on a **safe pillar** takes fall damage and goblins off
+  the stones are culled. Only a **rotating subset** of pillars is safe each cycle — the
+  telegraph lights them green — so one refuge is never enough. (Stops once he flees to the
+  verse — there he is vulnerable, not rampaging.)
 
 > **CHALLENGE C-PF-2:** Mega-attack timer (flash → `remove_row` → `p`/`P`) layered on the
 > existing leap + sweep; never delete a shield, the verse door, or the exit; pillars carry
@@ -95,19 +97,21 @@ kills *every* entity in a visual span except `{exit, door, boss_seal}` — so to
 ### Room layout (top-down)
 
 **Arena — normal multi-line grid, 24 rows × 78 cols (≈23 real linebreaks).** The Warden
-leaps around behind its flipping shield; the floor is dotted with **pillars `▣`**
-(mega-attack-immune refuges, out of `x` range of the Warden). West door = entrance; east
-door = the Warden's escape into the verse.
+leaps around behind its flipping shield; the floor carries a **symmetric grid of pillars
+`▣`** (refuge stones, out of `x` range of the Warden). West door = entrance; east door =
+the Warden's escape into the verse. Pillars are laid out on a regular lattice (e.g. every
+6th column × every 4th row), NOT scattered:
 
 ```
  #########################################################################
- #  ▣        W(impostor)                ▣              ▣                  #
- #     ▣              W(imp)   W(imp)                          ▣          #
-[W]ENTER          ▣          [ W ]  shield→▒        ▣               [VERSE]E
- #            ▣          W(imp)                    ▣                      #
- #    ▣                       ▣              W(imp)            ▣          #
+ #     ▣      ▣      ▣      ▣      ▣      ▣      ▣      ▣      ▣      ▣     #
+ #  W(imp)        W(imp)         [ W ] shield→▒        W(imp)             #
+[W]ENTER ▣      ▣      ▣      ▣      ▣      ▣      ▣      ▣      ▣  [VERSE]E
+ #                W(imp)                       W(imp)                     #
+ #     ▣      ▣      ▣      ▣      ▣      ▣      ▣      ▣      ▣      ▣     #
  #########################################################################
 ```
+(each cycle the telegraph lights one row/handful of these stones green — jump to a lit one)
 
 **Verse file — a SEPARATE buffer reached by `:e warden.verse`: one logical line, ~300
 cols, NO linebreaks, with stone-wall glyphs embedded along it.** Every on-screen row is a
@@ -132,11 +136,12 @@ the first chip — launches telegraphed **mega-attacks**. So marks are live imme
   impostors; **the one `W` left standing is the real Warden** (visual-immune, with the
   "shield defended him from your cut!" message). `/W` + `n`/`N` also cycles matches; when he
   leaps off-screen, `/W` snaps you to him.
-- **Marks (survival):** pillars `▣` are the only mega-attack-immune cells, scattered far
-  apart; the 3-turn warning is too short to *walk* between them, so you **bank `ma`/`mb`/…
-  on 2–4 pillars early** and `` ` ``-jump to whichever sits **outside this cycle's flashed
-  region** (the safe set rotates → one mark isn't enough). Between cycles, reposition to the
-  Warden's **unguarded side** (shield flipped away) and `x` to chip a shield/HP.
+- **Marks (survival):** pillars `▣` sit in a **symmetric grid** across the arena; only a
+  rotating subset is safe each cycle (lit green by the telegraph). The 3-turn warning is too
+  short to *walk* to the safe one, so you **bank `ma`/`mb`/… on the grid's pillars early**
+  and `` ` ``-jump to whichever is lit (the safe set rotates → one mark isn't enough).
+  Between cycles, reposition to the Warden's **unguarded side** (shield flipped away) and
+  `x` to chip a shield/HP.
 - **Shields down → he flees.** Once stripped of protection, the Warden bolts through the
   **east door into his verse**, vulnerable. Act 1 ends.
 
@@ -198,9 +203,9 @@ Act III primitives are **shipped** (visual L14; `/ * n N`+teleport L15; marks L1
 | Item | Where | Status | Notes |
 |------|-------|--------|-------|
 | Boss immune to visual-delete + parry message | all | **C-PF-1** | Keeps `v/W⏎x` from one-shotting the boss; core chipped by `x`. |
-| Mega-attack (telegraph → `remove_row` → `p`/`P` rebuild) | Act 1 | **C-PF-2** | Layer on leap/sweep; spare shield/door/exit; pillars immune. |
+| Mega-attack + pillar refuges | Act 1 | **C-PF-2/4 — DONE (2026-06-05)** | `engine/warden_mega.py`: idle(8t)→warn(3t)→strike cadence; strike damages anyone off a **safe pillar** (`take_damage 4`) and culls goblins; positional (no terrain mutation — there is no VOID cell type, and it keeps marks/grid stable). Only a rotating subset of pillars is **safe** each cycle (telegraph lights them green, `C.mega_safe_bg`) → forces 2–4 marks. Wired in `_enemy_tick`; tests in `test_warden_pathfinder.py`. **Pillar PLACEMENT (builder) must be a symmetric grid, not scatter.** |
 | Impostor `W`s by color (not by glyph) | Act 1 | **C-PF-3 — DONE (2026-06-05)** | Impostor = `goblin` `tag='echo'` rendered `boss_echo_fg` `W`; room flag `search_glyph_entities` overlays entity glyphs so `/W` finds the Warden + echoes wherever they leap (default off → par identical). Real one is visual-immune. Tests in `test_warden_pathfinder.py`. |
-| Pillar (`▣`): delete-immune + not an attack position | Act 1 | **C-PF-4** | New cell/flag; alcove geometry keeps Warden un-`x`-able from it. |
+| Pillar (`▣`) glyphs placed in a **symmetric grid** | Act 1 | folded into C-PF-2/4 / builder | `▣` char-runs at the grid cells + the same coords in `room.pillars`; geometry keeps the Warden out of `x`-range. Grid/symmetric, NOT random scatter. |
 | `:e warden.verse` chase into a 2nd `wrap_buffer` file; in-line stone walls block h-motion; `nowrap` breaks Warden focus | Act 2 | **C-PF-5** | Multi-buffer follow (extends Archivist `:e {name}`); the wrap/nowrap attack/defend toggle. |
 | `warden_phase_immune` on Entity | all | prior draft | Blocks Act II long-range motions in tight spots. |
 
