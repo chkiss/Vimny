@@ -5509,8 +5509,8 @@ def build_dungeon_spellwrights_forge(seed: int) -> Dungeon:
 # blueprints/act_3.md (L17.1) and engine/warden_mega.py.
 _PF_ROWS, _PF_COLS   = 24, 78
 _PF_MAIN_ROW         = 12
-_PF_PILLAR_ROWS      = (6, 12, 18)          # symmetric 3×3 grid of refuge stones
-_PF_PILLAR_COLS      = (20, 39, 58)
+_PF_PILLAR_ROWS      = (5, 19)              # symmetric 2×3 grid of refuge stones — top & bottom
+_PF_PILLAR_COLS      = (20, 39, 58)         # bands, clear of the Warden/spawn row (12) and echoes
 _PF_WARDEN_START     = (12, 39)
 _PF_ECHO_CELLS       = ((6, 30), (18, 48), (6, 48), (18, 30))   # impostor Ws (symmetric)
 _PF_VERSE_COLS       = 120

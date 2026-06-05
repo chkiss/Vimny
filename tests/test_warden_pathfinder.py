@@ -256,9 +256,10 @@ def test_builder_makes_a_two_room_dungeon():
 
     # Arena (Act 1): grid pillars, mega armed, glyph-search, immune Warden + echoes
     assert (arena.rows, arena.cols) == (24, 78)
-    assert len(arena.pillars) == 9                      # symmetric 3×3 grid
     cols = sorted({c for _, c in arena.pillars}); rows = sorted({r for r, _ in arena.pillars})
-    assert len(cols) == 3 and len(rows) == 3            # a real lattice, not scatter
+    assert len(arena.pillars) == len(rows) * len(cols)  # a full symmetric lattice, not scatter
+    assert len(cols) >= 2 and len(rows) >= 2
+    assert 12 not in rows                               # clear of the Warden/spawn row (no x-cuts a pillar)
     assert arena.search_glyph_entities and arena.mega['phase'] == 'idle'
     warden = next(e for e in arena.entities if e.kind == 'warden')
     assert warden.tag == 'pathfinder' and warden.edit_immune

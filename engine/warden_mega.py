@@ -28,7 +28,8 @@ _MEGA_SAFE_K = 1     # pillars that stay solid each cycle (rotates → forces ma
 def init_mega(room, pillars) -> None:
     """Arm the mega-attack on a room. ``pillars`` is an iterable of (row, col)."""
     room.pillars = set(pillars)
-    room.mega = {'phase': 'idle', 'cooldown': _MEGA_PERIOD, 'timer': 0, 'safe': set()}
+    room.mega = {'phase': 'idle', 'cooldown': _MEGA_PERIOD, 'timer': 0,
+                 'safe': set(), 'hit_player': None}
 
 
 def _pick_safe(room, rng) -> set:
@@ -52,6 +53,7 @@ def _strike(room, player) -> list[str]:
         msgs.append('You hold fast on the stone.')
     else:
         player.take_damage(_MEGA_DMG)
+        room.mega['hit_player'] = (player.row, player.col)   # → the loop flashes the collapse
         msgs.append('The floor falls away beneath you!')
     msgs.append('…and the Warden slams it back into place.')
     return msgs
@@ -63,6 +65,7 @@ def mega_tick(room, player, rng) -> list[str]:
     m = getattr(room, 'mega', None)
     if not m:
         return []
+    m['hit_player'] = None                  # only set on a strike turn; read by the loop after
     if m['phase'] == 'idle':
         m['cooldown'] -= 1
         if m['cooldown'] <= 0:

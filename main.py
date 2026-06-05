@@ -1978,6 +1978,9 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
         if e.alive and (e.row, e.col) not in room.fog_cells:
             spotted_wardens.add(id(e))
             msg_pool.append('You spotted a Warden!')
+            if level == 'warden_pathfinder' and e.tag == 'pathfinder':
+                msg_pool.append('His shield blocks this row — circle above or below to '
+                                'his open flank, then x.  (v-cuts only glance off it.)')
     if msg_pool:
         message = _pool_msg()
         msg_ttl = _MSG_ROTATE_TTL
@@ -2583,7 +2586,9 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
                 elif op in ('d', 'c'):
                     _reg_write(player, '"', clip, is_delete=True)
                 if player.last_parry:
-                    _push("The Warden's shield defended him from your cut!")
+                    msg_pool.clear()
+                    _push("The Warden's shield turns your cut — chip his open flank with x!")
+                    message = _pool_msg(); msg_ttl = _MSG_ROTATE_TTL
                 budget.spend(1)
                 player.last_visual_anchor = anchor
                 player.last_visual_cursor = cursor
@@ -3629,6 +3634,12 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
                          else None)
             tick_msgs = _enemy_tick(room, player)
             _surveyor_tick()                  # the Surveyor's telegraph → resolve cadence
+            _mega = getattr(room, 'mega', None)   # the floor-cut has no creature — flash where it hit
+            if _mega and _mega.get('hit_player'):
+                attack_flash_pos = _mega['hit_player']
+                attack_flash_sym = '✶'
+                attack_flash_on  = True
+                attack_flash_ttl = _ATTACK_FLASH_TTL
 
             # Any enemy now adjacent attacks (except the one the player just hit,
             # and except enemies that only became adjacent this turn — player gets
