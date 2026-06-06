@@ -5578,6 +5578,10 @@ def build_dungeon_warden_pathfinder(seed: int) -> Dungeon:
     arena.entities.append(Entity(kind='chest_scroll',    row=_PF_TR_SCROLL[0],col=_PF_TR_SCROLL[1]))
 
     arena.rebuild_indexes()
+    # Fog the treasure room (unreachable behind the locked door). Standard for every level —
+    # and it also makes the fogged cells non-passable, so line_extent stops at the wall and a
+    # `G vgg x` sweep can't reach across it into the treasure room.
+    _fog_unreachable(arena, _PF_MAIN_ROW, 2)
     init_mega(arena, pillars)
     arena.par    = None
     arena.budget = 160                      # provisional — refine once the par sim exists
