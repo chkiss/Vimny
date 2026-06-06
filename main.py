@@ -1366,7 +1366,8 @@ def _enemy_tick(room, player) -> list:
                 else:
                     nc = ent.col
                 nc = min(max(1, nc), room.cols - 2)
-                if nc != ent.col and (0, nc) != (player.row, player.col):
+                if (nc != ent.col and (0, nc) != (player.row, player.col)
+                        and room.is_passable(0, nc)):     # don't lodge him in a segment wall
                     room.move_entity(ent, 0, nc)
             continue
         dist = _manhattan(player.row, player.col, ent.row, ent.col)

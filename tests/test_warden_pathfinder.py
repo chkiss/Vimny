@@ -275,6 +275,8 @@ def test_builder_makes_a_two_room_dungeon():
     assert verse.wrap_buffer and verse.rows == 1
     assert getattr(verse, 'wrap_width', 0) == 0         # reactive (folds to the live terminal width)
     assert verse.cols >= 600                            # long enough to fold many times even at 189 cols
+    inner_walls = [c for c in range(1, verse.cols - 1) if verse.cells[0][c] == CellType.WALL]
+    assert len(inner_walls) >= 8                        # segment walls: $ / l stop here, gj/gk hop them
     vw = next(e for e in verse.entities if e.kind == 'warden')
     assert vw.tag == 'verse' and vw.edit_immune
     assert verse.exit_pos is None                       # collapse, not a verse exit

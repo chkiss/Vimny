@@ -5523,7 +5523,12 @@ _PF_TR_SCROLL        = (14, 72)
 _PF_RETURN           = (12, 60)             # where the collapse flings the player back into the arena
 # The Wardenverse: ONE long logical line that wraps reactively to the terminal (like the
 # Archivist's Library) — many folds at any supported width (80–189 cols); no fixed fold.
+# Sparse single-cell stone walls (every ~50 cols) split the line into segments: ALL
+# horizontal motion ($, w, e, f, {count}l) stops at a wall, so you can't $-skip to the
+# Warden — only gj/gk (a display-row hop ≥ the min content width, ~76) clears a single
+# stone, at ANY terminal width. Irregular spacing so a hop rarely lands ON a stone.
 _PF_VERSE_COLS       = 720
+_PF_VERSE_WALLS      = (47, 96, 152, 203, 261, 314, 368, 421, 479, 533, 588, 642)
 _PF_VERSE_TEXT = ("the cut you cannot see you cannot parry   so follow the fold   "
                   "every shield bares a back   the warden runs the wrapped line   "
                   "set nowrap to still him   gj and gk to chase him down   ")
@@ -5590,6 +5595,8 @@ def build_dungeon_warden_pathfinder(seed: int) -> Dungeon:
     VC = _PF_VERSE_COLS
     vcells = [[CellType.FLOOR] * VC]
     vcells[0][0] = vcells[0][VC - 1] = CellType.WALL
+    for c in _PF_VERSE_WALLS:                 # the segment walls — $ / l / w stop here; gj/gk hop over
+        vcells[0][c] = CellType.WALL
     verse = Room(room_type=RoomType.BOSS, rows=1, cols=VC)
     verse.cells       = vcells
     verse.seed        = seed
