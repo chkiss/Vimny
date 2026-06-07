@@ -1352,19 +1352,26 @@ def _enemy_tick(room, player) -> list:
                         room._lib_arch_paced = True   # he has stepped off his desk
             continue
         if ent.kind == 'warden' and ent.tag == 'verse':
-            # He walks the wardenverse, approaching the player along the line and stepping
-            # over the segment walls. (You still need :set wrap + gj/gk to REACH him; his
-            # approach and his blows do not depend on wrap.)
+            # He approaches the player THROUGH the wrapped display: gj/gk a whole fold toward
+            # the player's display row (so he comes UP when you're above him), then closes
+            # along that row. In nowrap the fold is the whole line, so he just walks it. He
+            # hits and is hit regardless of wrap.
+            w = getattr(room, '_wrap_w', 0) or room.cols
+            pr, ar = player.col // w, ent.col // w        # display rows
             d = player.col - ent.col
-            if abs(d) > 1:
-                step = 1 if d > 0 else -1
-                nc = ent.col + step
-                hops = 0
-                while 1 <= nc <= room.cols - 2 and not room.is_passable(0, nc) and hops < 8:
-                    nc += step; hops += 1                  # hop over a segment wall
-                if (1 <= nc <= room.cols - 2 and room.is_passable(0, nc)
-                        and (0, nc) != (player.row, player.col)):
-                    room.move_entity(ent, 0, nc)
+            if pr != ar:
+                nc = ent.col + (w if pr > ar else -w)     # gj (down) / gk (up) toward him
+            elif abs(d) > 1:
+                nc = ent.col + (1 if d > 0 else -1)       # same display row → close along it
+            else:
+                nc = ent.col
+            step = 1 if nc >= ent.col else -1
+            hops = 0
+            while 1 <= nc <= room.cols - 2 and not room.is_passable(0, nc) and hops < 8:
+                nc += step; hops += 1                      # skip over a segment wall
+            if (nc != ent.col and 1 <= nc <= room.cols - 2 and room.is_passable(0, nc)
+                    and (0, nc) != (player.row, player.col)):
+                room.move_entity(ent, 0, nc)
             continue
         dist = _manhattan(player.row, player.col, ent.row, ent.col)
         if ent.kind == 'warden' and ent.tag not in ('surveyor', 'verse') and dist <= _ALERT_RADIUS:
@@ -3236,6 +3243,15 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
                         _surveyor_teleport(cur)              # leap away (60% into a parenthetical)
                         room.surveyor_threat = {'step': 'recover'}   # a tick to regain focus before re-entering visual mode
                         _push('The Warden leaps — you broke his focus!')
+                    elif cur.kind == 'warden' and cur.hp > 0 and cur.tag == 'verse':
+                        player.take_damage(1)                # he trades blows on every exchange
+                        attack_flash_pos = (cur.row, cur.col)
+                        attack_flash_sym = '✕'
+                        attack_flash_on  = True
+                        attack_flash_ttl = _ATTACK_FLASH_TTL
+                        if player.is_dead:
+                            message = '** GAME OVER ** Type  :e  to re-load the dungeon.'
+                            msg_ttl = 2
                     if cur.hp <= 0:
                         if (cur.kind == 'warden' and cur.tag == 'pathfinder'
                                 and not getattr(room, 'warden_fled', False)):

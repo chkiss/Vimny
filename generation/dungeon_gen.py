@@ -5509,14 +5509,11 @@ def build_dungeon_spellwrights_forge(seed: int) -> Dungeon:
 # blueprints/act_3.md (L17.1) and engine/warden_mega.py.
 _PF_ROWS, _PF_COLS   = 24, 78
 _PF_MAIN_ROW         = 12
-# Nine equal blocks (3×3): two vertical + two horizontal divider walls, each pierced by
-# doorways. The Warden's mega-attack tears bands of rows; the blocks are where you shelter.
-_PF_VDIV             = (22, 44)             # vertical dividers → col-blocks 1-21 | 23-43 | 45-66
-_PF_HDIV             = (8, 15)              # horizontal dividers → row-blocks 1-7 | 9-14 | 16-22
-_PF_VGAPS            = (4, 11, 18)          # doorway rows through the vertical dividers
-_PF_HGAPS            = (11, 33, 55)         # doorway cols through the horizontal dividers
+# A big open hall with four stone COLUMNS at the inner vertices of a 3×3 grid (just
+# markers — the room stays open). The Warden's mega-attack tears bands of ROWS.
+_PF_COLUMNS          = ((8, 22), (8, 44), (15, 22), (15, 44))   # column cells (impassable)
 _PF_FIGHT            = (1, 22, 1, 66)       # fight area (mega tears floor only here; treasure is east)
-_PF_WARDEN_START     = (12, 39)            # middle-centre block
+_PF_WARDEN_START     = (12, 39)            # centre of the hall
 _PF_ECHO_CELLS       = ((6, 30), (18, 48), (6, 48), (18, 30))   # impostor Ws, spread across blocks
 # Treasure room: a chamber behind a locked door on the east wall (every level has one).
 # The key drops in the arena once the wardenverse has collapsed AND the last minion is dead.
@@ -5562,16 +5559,9 @@ def build_dungeon_warden_pathfinder(seed: int) -> Dungeon:
     for r in range(1, R - 1):               # seal the treasure room off (one locked-door gap)
         if r != _PF_DOOR[0]:
             cells[r][_PF_TR_WALL] = CellType.WALL
-    # Nine-block division of the fight area, with doorways through every divider.
-    fr0, fr1, fc0, fc1 = _PF_FIGHT
-    for vc in _PF_VDIV:
-        for r in range(fr0, fr1 + 1):
-            if r not in _PF_VGAPS:
-                cells[r][vc] = CellType.WALL
-    for hr in _PF_HDIV:
-        for c in range(fc0, fc1 + 1):
-            if c not in _PF_HGAPS:
-                cells[hr][c] = CellType.WALL
+    # Four stone columns at the inner vertices of a 3×3 grid — the hall stays open.
+    for (cr, cc) in _PF_COLUMNS:
+        cells[cr][cc] = CellType.WALL
     arena = Room(room_type=RoomType.BOSS, rows=R, cols=C)
     arena.cells     = cells
     arena.seed      = seed
@@ -5580,6 +5570,9 @@ def build_dungeon_warden_pathfinder(seed: int) -> Dungeon:
     arena.char_runs = []
     arena.entities  = []
     arena.search_glyph_entities = True      # /W finds the Warden + echoes wherever they leap
+
+    for (cr, cc) in _PF_COLUMNS:            # the column glyph (renders over the wall cell)
+        arena.char_runs.append(CharRun(cr, cc, ('▣',), 'ancient'))
 
     arena.entities.append(Entity(kind='warden', row=_PF_WARDEN_START[0], col=_PF_WARDEN_START[1],
                                  hp=3, max_hp=3, ai='', tag='pathfinder',

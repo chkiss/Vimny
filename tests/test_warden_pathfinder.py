@@ -247,12 +247,11 @@ def test_builder_makes_a_two_room_dungeon():
     assert len(d.rooms) == 2 and d.current_room == 0
     arena, verse = d.rooms
 
-    # Arena (Act 1): nine blocks, mega armed, glyph-search, immune Warden + echoes
+    # Arena (Act 1): a big OPEN hall with four stone columns at the 3×3 vertices
     assert (arena.rows, arena.cols) == (24, 78)
-    # 3×3 blocks: two vertical + two horizontal divider walls, each pierced by doorways
-    assert sum(1 for r in range(1, 23) if arena.cells[r][22] == CellType.WALL) >= 15   # a real divider
-    assert sum(1 for c in range(1, 67) if arena.cells[8][c] == CellType.WALL) >= 15
-    assert arena.cells[11][22] == CellType.FLOOR        # a doorway through the vertical divider
+    columns = [(r, c) for r in (8, 15) for c in (22, 44)]
+    assert all(arena.cells[r][c] == CellType.WALL for (r, c) in columns)   # the columns
+    assert arena.cells[12][33] == CellType.FLOOR and arena.cells[4][30] == CellType.FLOOR  # open hall
     assert arena.search_glyph_entities and arena.mega['phase'] == 'idle'
     assert arena.mega['bounds'][3] <= 66                # mega tears only the fight area, not the treasure
     warden = next(e for e in arena.entities if e.kind == 'warden')

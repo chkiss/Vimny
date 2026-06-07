@@ -144,7 +144,8 @@ def _first_non_blank_col(room, row: int):
         if room.is_passable(row, c):
             if left is None:
                 left = c
-            if room.char_run_at(row, c) is not None:
+            if (room.char_run_at(row, c) is not None
+                    or room.entity_at(row, c) is not None):   # an entity (key, foe…) is non-blank too
                 return c
     return left
 
