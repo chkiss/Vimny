@@ -6,7 +6,7 @@ This is how Vimny stays Vim-faithful — `yy` yanks the whole line including the
 spaces between characters (bounded by stone walls), not just the character runs.
 """
 from __future__ import annotations
-from engine.world import CellType, CharRun, Entity
+from engine.world import CellType, CharRun, Entity, strike_disguise
 from engine.text_object import TextObjectType
 from engine.editor import _merge_adjacent_char_runs
 from engine.reflow import (
@@ -144,6 +144,8 @@ def _delete_cols(room, row: int, lo: int, hi: int) -> None:
             room.wood_damage.pop((row, c), None)
     for ent in [e for e in room.entities if e.row == row and lo <= e.col <= hi
                 and not e.edit_immune]:                    # a boss parries editing-delete
+        if not strike_disguise(ent):                       # impostor W unmasks to 'g', survives
+            continue
         room.remove_entity(ent)
         room._on_entity_destroyed(ent)
 

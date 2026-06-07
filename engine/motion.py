@@ -136,6 +136,21 @@ def _rightmost_passable(room, row: int):
     return None
 
 
+# Passage/marker entities the player stands ON — transparent to ^/first-non-blank
+# (you walk through them). A key/foe/loot glyph, by contrast, counts as a character.
+_CARET_TRANSPARENT = frozenset({'door', 'locked_door', 'seal_door', 'exit',
+                                'entry_marker', 'boss_seal'})
+
+
+def _caret_stop(room, row: int, c: int) -> bool:
+    """True if column c on `row` is 'non-blank' for ^: it carries a character, or a
+    notable entity (a key, foe, or loot — not a floor-like door/exit you stand on)."""
+    if room.char_run_at(row, c) is not None:
+        return True
+    ent = room.entity_at(row, c)
+    return ent is not None and ent.kind not in _CARET_TRANSPARENT
+
+
 def _first_non_blank_col(room, row: int):
     """First-non-blank column on a row: the first character if any, else the
     leftmost passable column. None if the row has no passable cell."""
@@ -144,8 +159,7 @@ def _first_non_blank_col(room, row: int):
         if room.is_passable(row, c):
             if left is None:
                 left = c
-            if (room.char_run_at(row, c) is not None
-                    or room.entity_at(row, c) is not None):   # an entity (key, foe…) is non-blank too
+            if _caret_stop(room, row, c):     # a character or a notable entity (key, foe…)
                 return c
     return left
 
@@ -273,7 +287,7 @@ def apply_motion(player, motion, count, room, target=None, count_given: bool = T
                 right = c
             target = left
             for c in range(left, right + 1):
-                if room.char_run_at(row, c):
+                if _caret_stop(room, row, c):     # a character or a notable entity (key/foe/loot)
                     target = c
                     break
             if target != player.col:

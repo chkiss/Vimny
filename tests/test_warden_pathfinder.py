@@ -14,6 +14,7 @@ See blueprints/act_3.md (L17.1) and engine/visual.py.
 """
 import random
 
+import generation.dungeon_gen as dg
 from engine.world import Room, RoomType, Entity, CellType, CharRun
 from engine.player import Player
 from engine.modes import Mode
@@ -308,3 +309,43 @@ def test_x_strips_echo_disguise_then_kills(monkeypatch):
     assert any('disguise' in (m or '') for m in msgs)
     assert not echo.alive                               # two x's finished it
     assert echo.tag == ''                               # and it died a plain goblin
+
+
+def test_aoe_unmasks_echoes_instead_of_vanishing():
+    """A visual-delete AoE over impostor Ws unmasks them (→ live 'g' goblins,
+    tag='', 1 HP) rather than deleting them outright; a second AoE finishes them.
+    Mirrors the single-x reveal so AoE and x cost the same two hits."""
+    from engine.player import Player
+    from engine.modes import Mode
+    from engine.visual import apply_visual
+    arena = dg.build_dungeon_warden_pathfinder(7).rooms[0]
+    row = next(e.row for e in arena.entities if e.kind == 'goblin' and e.tag == 'echo')
+    cols = sorted(e.col for e in arena.entities
+                  if e.kind == 'goblin' and e.tag == 'echo' and e.row == row)
+    p = Player(); p.row, p.col = row, cols[0]
+    apply_visual('d', (row, cols[0]), (row, cols[-1]), Mode.VISUAL, arena, p)
+    unmasked = [e for e in arena.entities
+                if e.kind == 'goblin' and e.row == row and cols[0] <= e.col <= cols[-1]]
+    assert unmasked and all(e.alive and e.tag == '' and e.hp == 1 for e in unmasked)
+    # second sweep finishes the now-revealed goblins (removed from the room)
+    apply_visual('d', (row, cols[0]), (row, cols[-1]), Mode.VISUAL, arena, p)
+    assert not any(e.kind == 'goblin' and e.row == row and cols[0] <= e.col <= cols[-1]
+                   and e.alive for e in arena.entities)
+
+
+def test_caret_lands_on_key_not_passable_door():
+    """^ stops on a notable entity (a dropped key) but treats floor-like passage
+    markers (a door you stand on) as blank — regression for the post-collapse key."""
+    from engine.player import Player
+    from engine.motion import apply_motion
+    from engine.world import Entity
+    arena = dg.build_dungeon_warden_pathfinder(7).rooms[0]
+    for e in arena.entities:                              # post-collapse: foes cleared
+        if e.kind in ('goblin', 'warden', 'shield'):
+            e.alive = False
+    arena.rebuild_indexes()
+    arena.add_entity(Entity(kind='door', row=12, col=20))   # a passage marker, transparent to ^
+    arena.add_entity(Entity(kind='floor_key', row=12, col=40))
+    p = Player(); p.row, p.col = 12, 60
+    apply_motion(p, '^', 1, arena)
+    assert (p.row, p.col) == (12, 40)                     # past the door, onto the key

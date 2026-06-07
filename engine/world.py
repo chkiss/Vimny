@@ -49,6 +49,24 @@ class Entity:
     shade:        int = 0   # cosmetic colour index — the impostor Wardens (goblin tag='echo')
                             # each pick a slightly different red so the player sees a myriad.
 
+
+def strike_disguise(ent) -> bool:
+    """An editing-delete (visual/operator AoE) or `x` lands on `ent`.
+
+    A disguised impostor (goblin tag='echo', a false Warden) is REVEALED rather
+    than removed: the disguise sloughs off (→ a plain 'g' that `/W` no longer
+    finds) and it survives the hit. Returns True if the caller should remove the
+    entity, False if it only lost its disguise and lives on. Mirrors the x-combat
+    reveal in main.py so an AoE and a single x cost the same: hit to unmask, hit
+    to kill."""
+    if ent.kind == 'goblin' and ent.tag == 'echo':
+        ent.tag = ''
+        ent.hp -= 1
+        if ent.hp > 0:
+            return False
+    return True
+
+
 @dataclass
 class CharRun:
     row: int

@@ -53,19 +53,6 @@ def in_selection(anchor, cursor, vmode, r, c) -> bool:
     return True
 
 
-_PROTECTED_KINDS = frozenset({'exit', 'door', 'boss_seal'})
-
-
-def _kill_entities_in_span(room, tobj) -> None:
-    for ent in list(room.entities):
-        if (ent.alive
-                and tobj.start_row <= ent.row <= tobj.end_row
-                and tobj.start_col <= ent.col <= tobj.end_col
-                and ent.kind not in _PROTECTED_KINDS
-                and not ent.edit_immune):              # a boss parries the cut (see apply_visual)
-            room.kill_entity(ent)
-
-
 def _apply_charwise_multi(op: str, anchor, cursor, room, player):
     """Delete/yank a charwise multi-row selection with per-row column bounds.
 
@@ -132,8 +119,7 @@ def apply_visual(op: str, anchor, cursor, vmode, room, player):
     if op in ('d', 'c'):
         if op == 'd' and tobj.type is TextObjectType.LINEWISE:
             return op_delete(room, player, tobj, collapse=True)   # remove_row drops the rows' entities
-        clip = op_delete(room, player, tobj)
-        _kill_entities_in_span(room, tobj)
+        clip = op_delete(room, player, tobj)   # op_delete → _delete_cols removes/unmasks span entities
         return clip
     if op == 'g~':
         op_case(room, player, tobj, 'g~')
