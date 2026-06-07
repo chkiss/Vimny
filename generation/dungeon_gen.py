@@ -5584,15 +5584,26 @@ def build_dungeon_warden_pathfinder(seed: int) -> Dungeon:
     for (cr, cc) in _PF_COLUMNS:            # the column glyph (renders over the wall cell)
         arena.char_runs.append(CharRun(cr, cc, ('▣',), 'ancient'))
 
-    arena.entities.append(Entity(kind='warden', row=_PF_WARDEN_START[0], col=_PF_WARDEN_START[1],
-                                 hp=3, max_hp=3, ai='', tag='pathfinder',
-                                 edit_immune=True, summon_timer=6))
-    arena.entities.append(Entity(kind='shield', row=_PF_WARDEN_START[0],
-                                 col=_PF_WARDEN_START[1] - 1))
+    warden = Entity(kind='warden', row=_PF_WARDEN_START[0], col=_PF_WARDEN_START[1],
+                    hp=3, max_hp=3, ai='', tag='pathfinder',
+                    edit_immune=True, summon_timer=6)
+    shield = Entity(kind='shield', row=_PF_WARDEN_START[0], col=_PF_WARDEN_START[1] - 1)
+    arena.entities.append(warden)
+    arena.entities.append(shield)
+    echoes = []
     for (r, c, sh) in _PF_ECHO_CELLS:
         # hp=2: the first x strikes off the Warden-disguise (→ plain goblin), the second kills.
-        arena.entities.append(Entity(kind='goblin', row=r, col=c, hp=2, max_hp=2,
-                                     tag='echo', shade=sh))
+        g = Entity(kind='goblin', row=r, col=c, hp=2, max_hp=2, tag='echo', shade=sh)
+        echoes.append(g)
+        arena.entities.append(g)
+
+    # The real Warden isn't always the central one: half the time, swap him with a
+    # random impostor so `/W` + the visual-immunity tell are the only way to find him.
+    if rng.random() < 0.5:
+        decoy = rng.choice(echoes)
+        (warden.row, warden.col), (decoy.row, decoy.col) = \
+            (decoy.row, decoy.col), (warden.row, warden.col)
+        shield.row, shield.col = warden.row, warden.col - 1   # keep his shield at his flank
     arena.entities.append(Entity(kind='locked_door',     row=_PF_DOOR[0],     col=_PF_DOOR[1]))
     arena.entities.append(Entity(kind='exit',            row=_PF_TR_EXIT[0],  col=_PF_TR_EXIT[1]))
     arena.entities.append(Entity(kind='heart_container', row=_PF_TR_HEART[0], col=_PF_TR_HEART[1]))

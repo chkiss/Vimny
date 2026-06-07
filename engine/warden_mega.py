@@ -30,11 +30,15 @@ _MEGA_DMG    = 4     # half-hearts lost if caught on the floor when it gives way
 _VERBS = ('dd', 'd5k / d5j', 'dG / dgg')
 
 
+_ECHO_SHADES = 8     # palette size in render/colors.py (impostor red variants)
+
+
 def init_mega(room, bounds) -> None:
     """Arm the mega-attack. ``bounds`` = (r0, r1, c0, c1): the fight area whose
     floor can be torn (excludes the treasure room / border walls)."""
     room.mega = {'phase': 'idle', 'cooldown': _MEGA_PERIOD, 'timer': 0,
-                 'band': set(), 'level': 0, 'bounds': tuple(bounds), 'hit_player': None}
+                 'band': set(), 'level': 0, 'bounds': tuple(bounds),
+                 'hit_player': None, 'buried': []}
     room.torn = set()
 
 
@@ -65,9 +69,12 @@ def _tear(room, player) -> list[str]:
     torn = {(r, c) for r in room.mega['band'] for c in range(c0, c1 + 1)
             if room.cells[r][c] in (CellType.FLOOR, CellType.CORRIDOR)}
     room.torn |= torn
-    for e in list(room.entities):                  # minions caught over the gap fall
+    buried = []                                     # minions caught over the gap fall in…
+    for e in list(room.entities):
         if e.alive and e.kind == 'goblin' and (e.row, e.col) in torn:
+            buried.append(e.uid)                   # …and the Warden pastes them back later
             room.kill_entity(e)
+    room.mega['buried'] = buried
     msgs = ['The Warden tears the floor away!']
     if (player.row, player.col) in torn:
         player.take_damage(_MEGA_DMG)
@@ -101,9 +108,38 @@ def mega_tick(room, player, rng) -> list[str]:
         m['timer'] -= 1
         if m['timer'] <= 0:
             room.torn.clear()
+            redisguised = _paste_back(room, player, rng)
             m['phase'] = 'idle'
             m['cooldown'] = _MEGA_PERIOD
             m['level'] = (m['level'] + 1) % 3      # escalate, then cycle
+            if redisguised:
+                return ['…and the Warden slams the floor back — his minions rise, '
+                        'cloaked as Wardens once more!']
             return ['…and the Warden slams the floor back into place.']
         return []
     return []
+
+
+def _paste_back(room, player, rng) -> bool:
+    """The Warden pastes the floor back AND re-asserts his minions: the goblins he
+    buried this strike are restored (where the cell is now clear), and EVERY live
+    goblin is re-cloaked as a 2-HP false Warden (tag='echo'). So unmasked/half-cut
+    minions revert — the player must finish them between strikes. Returns True if
+    any goblin was (re)disguised."""
+    buried = set(room.mega.get('buried', ()))
+    for e in room.entities:                        # revive the ones that fell, if the cell is clear
+        if e.uid in buried and not e.alive:
+            if (room.is_passable(e.row, e.col)
+                    and (player.row, player.col) != (e.row, e.col)
+                    and room.entity_at(e.row, e.col) is None):
+                e.alive = True
+    room.mega['buried'] = []
+    n = 0
+    for e in room.entities:                        # re-cloak every live goblin into a false Warden
+        if e.alive and e.kind == 'goblin':
+            e.tag = 'echo'
+            e.hp = e.max_hp = 2
+            e.shade = rng.randrange(_ECHO_SHADES)
+            n += 1
+    room.rebuild_indexes()
+    return n > 0

@@ -24,12 +24,17 @@ clearly flagged assumed extensions).
 >   own red; each carries a `shade` index). The entry banner reads **"You see a myriad of
 >   Wardens!"** (the goblin count is suppressed). Each impostor has **2 HP**: the first
 >   `x` **strips the disguise** ("the disguise sloughs away: just a goblin!") — it becomes
->   a plain `g` that `/W` no longer finds — and the second `x` kills it. The real Warden
->   (visual-immune) hides among them.
+>   a plain `g` that `/W` no longer finds — and the second `x` kills it. An **AoE** (visual
+>   delete) **unmasks** the impostors it covers the same way (live `g`, 1 HP) rather than
+>   deleting them outright; a second sweep finishes them. The real Warden (visual-immune)
+>   hides among them, and his **start cell is randomised** (~50%: swapped with a random
+>   impostor) so he isn't always the central `W` — only `/W` + the visual-immunity tell find him.
 > - **Mega-attack = an escalating floor-TEAR** (`engine/warden_mega.py`): `dd` → `d5k/d5j`
 >   → `dG/dgg`, torn cells (`room.torn`) rendered as void and impassable, anyone caught
->   falls, then the Warden pastes the floor back after a few turns. (Not the old positional
->   "safe-pillar" model.)
+>   falls. After a few turns the Warden **pastes the floor back** — and on the paste he
+>   **restores the minions the tear buried** AND **re-cloaks every live goblin as a 2-HP
+>   false Warden** (`_paste_back`), so unmasked/half-cut minions revert between strikes.
+>   (Not the old positional "safe-pillar" model.)
 > - **Wardenverse = one long REACTIVELY-wrapping line** (no fixed fold; works 80–189 cols)
 >   with sparse stone walls so `$`/`l` stop and `gj`/`gk` is the way across. The Warden
 >   **walks/approaches** and **hits & is hit regardless of `:set wrap`** (wrap only matters

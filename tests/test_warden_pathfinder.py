@@ -240,6 +240,43 @@ def test_goblin_on_a_torn_row_is_culled():
     assert (r, 5) not in alive and (1, 3) in alive
 
 
+def test_paste_back_restores_buried_minions_and_redisguises():
+    """When the floor pastes back, the Warden restores the minions the tear buried
+    AND re-cloaks every live goblin as a 2-HP false Warden — so unmasked/half-cut
+    minions revert between strikes."""
+    room = _arena(); rng = random.Random(1); p = _player(1, 1)
+    _warn(room, p, rng)
+    band = room.mega['band']
+    r = next(iter(band))
+    buried = Entity(kind='goblin', row=r, col=5, hp=2, max_hp=2, tag='echo', shade=3)
+    safe_r = next(rr for rr in range(1, 19) if rr not in band)
+    survivor = Entity(kind='goblin', row=safe_r, col=6, hp=1, max_hp=1, tag='')  # unmasked
+    room.add_entity(buried); room.add_entity(survivor); room.rebuild_indexes()
+    for _ in range(MEGA._MEGA_WARN):                     # strike — buried minion falls
+        MEGA.mega_tick(room, p, rng)
+    assert not buried.alive
+    msgs = []
+    for _ in range(MEGA._MEGA_TORN):                     # paste — restore + re-cloak
+        msgs += MEGA.mega_tick(room, p, rng)
+    assert buried.alive and buried.tag == 'echo' and buried.hp == 2     # restored impostor
+    assert survivor.tag == 'echo' and survivor.hp == 2 and survivor.max_hp == 2  # re-disguised
+    assert any('cloaked as Wardens' in m for m in msgs)
+
+
+# ── C-PF-6: the real Warden's position is randomised among the impostors ───────
+def test_warden_position_varies_and_stays_valid():
+    seen = set()
+    for s in range(40):
+        a = dg.build_dungeon_warden_pathfinder(s).rooms[0]
+        w = next(e for e in a.entities if e.kind == 'warden')
+        sh = next(e for e in a.entities if e.kind == 'shield')
+        seen.add((w.row, w.col))
+        assert a.cells[w.row][w.col] == CellType.FLOOR        # never inside a column wall
+        assert (sh.row, sh.col) == (w.row, w.col - 1)         # shield stays at his flank
+    assert len(seen) >= 3                                     # not always the same cell
+    assert (12, 39) in seen                                   # …but sometimes still central
+
+
 # ── builder: the two-room dungeon is wired (Act 1 arena + Act 2 wardenverse) ──
 
 def test_builder_makes_a_two_room_dungeon():
