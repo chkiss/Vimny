@@ -202,6 +202,8 @@ class Room:
             return False
         if (r, c) in self.fog_cells:
             return False
+        if (r, c) in getattr(self, 'torn', ()):    # floor torn away by the Warden (temporary)
+            return False
         ent = self.entity_at(r, c)
         return ent is None or ent.kind not in ('locked_door', 'shield', 'seal_door', 'boss_seal')
 

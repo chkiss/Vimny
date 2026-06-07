@@ -339,9 +339,9 @@ def render_all(term: Terminal, dungeon: Dungeon, player: Player,
     hl_bg     = C.search_hl_bg()
     cur_bg    = C.search_cur_bg()
     _threat   = getattr(room, 'surveyor_threat', None)   # warden's telegraphed v-selection
-    _mega     = getattr(room, 'mega', None)              # Warden Pathfinder floor-cut
-    _mega_safe = _mega['safe'] if (_mega and _mega.get('phase') == 'warn') else set()
-    mega_safe_bg = C.mega_safe_bg()
+    _mega      = getattr(room, 'mega', None)             # Warden Pathfinder floor-tear
+    _mega_warn = (_mega['band'] if (_mega and _mega.get('phase') == 'warn') else set())
+    _torn      = getattr(room, 'torn', set())
     _vis_active = (mode in (Mode.VISUAL, Mode.VISUAL_LINE, Mode.VISUAL_BLOCK)
                    and getattr(player, 'visual_anchor', None) is not None)
     _vis_cursor = (player.row, player.col)
@@ -363,8 +363,8 @@ def render_all(term: Terminal, dungeon: Dungeon, player: Player,
     def _cell(room_r, room_c):
         """Render one IN-BOUNDS room cell to its coloured string fragment.
         Shared verbatim by the nowrap and wrap screen-row loops."""
-        if (room_r, room_c) in _mega_safe:               # the lit refuge — jump here before the cut
-            floor_bg = mega_safe_bg
+        if room_r in _mega_warn:                          # telegraphed doomed rows — clear off!
+            floor_bg = threat_bg
         elif (_threat is not None and 'r0' in _threat
                 and _threat['r0'] <= room_r <= _threat['r1']
                 and _threat['c0'] <= room_c <= _threat['c1']):
@@ -389,6 +389,10 @@ def render_all(term: Terminal, dungeon: Dungeon, player: Player,
             if show_under:
                 return _ent_cell_str(ent_under, room, room_r, room_c, mode, floor_bg)
             return floor_bg + C.player_fg() + S.PLAYER + C.normal_fg()
+
+        # Torn floor (Warden mega-attack) — a void pit until he pastes it back
+        if (room_r, room_c) in _torn:
+            return wall_bg + C.hint_fg() + '·' + C.normal_fg()
 
         # Fog?
         if (room_r, room_c) in room.fog_cells:

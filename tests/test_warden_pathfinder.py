@@ -148,102 +148,95 @@ def test_flag_off_search_ignores_entities():
     assert match_cells(room, 'g') == set()
 
 
-# ── C-PF-2/4: mega-attack cadence + pillar-refuge forcing ──
+# ── C-PF-2: mega-attack — escalating floor-tear (dd → d5 → dG) + paste-back ──
 
 def _arena() -> Room:
-    rows, cols = 8, 30
+    rows, cols = 20, 30
     cells = [[CellType.FLOOR] * cols for _ in range(rows)]
     for c in range(cols):
         cells[0][c] = cells[rows - 1][c] = CellType.WALL
     for r in range(rows):
         cells[r][0] = cells[r][cols - 1] = CellType.WALL
     room = Room(room_type=RoomType.BOSS, rows=rows, cols=cols, cells=cells)
-    MEGA.init_mega(room, pillars=[(2, 5), (4, 12), (6, 20), (3, 25)])
+    room.add_entity(Entity(kind='warden', row=10, col=15, hp=3, max_hp=3,
+                           tag='pathfinder', edit_immune=True))
+    room.rebuild_indexes()
+    MEGA.init_mega(room, (1, rows - 2, 1, cols - 2))
     return room
 
 
-def _run_to_strike(room, player, rng):
-    """Tick until the strike resolves; return all messages emitted."""
-    out = []
-    for _ in range(MEGA._MEGA_PERIOD + MEGA._MEGA_WARN + 1):
-        out += MEGA.mega_tick(room, player, rng)
-        if room.mega['phase'] == 'idle' and room.mega['cooldown'] == MEGA._MEGA_PERIOD and out:
-            break
-    return out
+def _warn(room, p, rng):
+    for _ in range(MEGA._MEGA_PERIOD):
+        MEGA.mega_tick(room, p, rng)
 
 
 def test_warning_fires_after_the_cooldown():
-    room = _arena()
-    p = _player(2, 5)
-    rng = random.Random(1)
+    room = _arena(); p = _player(2, 2); rng = random.Random(1)
     msgs = []
-    for t in range(MEGA._MEGA_PERIOD):
+    for _ in range(MEGA._MEGA_PERIOD):
         msgs += MEGA.mega_tick(room, p, rng)
-    assert room.mega['phase'] == 'warn'                 # warning is up after PERIOD calm turns
-    assert any('INHALES' in m for m in msgs)
-    assert len(room.mega['safe']) == MEGA._MEGA_SAFE_K  # the telegraph lit a refuge
-    assert room.mega['safe'] <= room.pillars
+    assert room.mega['phase'] == 'warn'                 # telegraph after PERIOD calm turns
+    assert room.mega['band']                            # rows about to be torn
+    assert any('WINDS UP' in m for m in msgs)
 
 
-def test_strike_spares_a_player_on_the_safe_pillar():
-    room = _arena()
-    rng = random.Random(2)
-    # Advance to the warning so we know which pillar is lit, then stand on it.
-    for _ in range(MEGA._MEGA_PERIOD):
-        MEGA.mega_tick(room, _player(0, 0), rng)
-    safe = next(iter(room.mega['safe']))
-    p = _player(*safe)
-    hp0 = p.hp
+def test_strike_tears_floor_then_pastes_it_back():
+    room = _arena(); p = _player(2, 2); rng = random.Random(1)   # far from the Warden's row
+    _warn(room, p, rng)
     for _ in range(MEGA._MEGA_WARN):
         MEGA.mega_tick(room, p, rng)
-    assert p.hp == hp0                                  # sheltered → no damage
+    assert room.torn and room.mega['phase'] == 'torn'   # floor is gone
+    for _ in range(MEGA._MEGA_TORN):
+        MEGA.mega_tick(room, p, rng)
+    assert not room.torn                                # …and the Warden pasted it back
+    assert room.mega['phase'] == 'idle' and room.mega['level'] == 1   # escalated
 
 
-def test_strike_hits_a_player_off_the_safe_pillar():
-    room = _arena()
-    rng = random.Random(2)
-    for _ in range(MEGA._MEGA_PERIOD):
-        MEGA.mega_tick(room, _player(0, 0), rng)
-    safe = next(iter(room.mega['safe']))
-    off = (safe[0], safe[1] + 1)                        # one cell off the lit stone
-    p = _player(*off)
-    hp0 = p.hp
+def test_caught_on_a_torn_row_takes_fall_damage():
+    room = _arena(); rng = random.Random(1)
+    _warn(room, _player(2, 2), rng)
+    r = next(iter(room.mega['band']))
+    p = _player(r, 5); hp0 = p.hp
     for _ in range(MEGA._MEGA_WARN):
         MEGA.mega_tick(room, p, rng)
-    assert p.hp == hp0 - MEGA._MEGA_DMG                 # caught in the open → fall damage
+    assert p.hp == hp0 - MEGA._MEGA_DMG                 # the floor gave way beneath you
 
 
-def test_strike_culls_goblins_off_the_safe_pillars():
-    room = _arena()
-    rng = random.Random(3)
-    for _ in range(MEGA._MEGA_PERIOD):
-        MEGA.mega_tick(room, _player(0, 0), rng)
-    safe = next(iter(room.mega['safe']))
-    room.add_entity(Entity(kind='goblin', row=safe[0], col=safe[1], hp=1, max_hp=1))   # on the stone
-    room.add_entity(Entity(kind='goblin', row=1, col=1, hp=1, max_hp=1))               # in the open
+def test_off_the_band_is_safe():
+    room = _arena(); rng = random.Random(1)
+    _warn(room, _player(2, 2), rng)
+    safe_r = next(r for r in range(1, 19) if r not in room.mega['band'])
+    p = _player(safe_r, 5); hp0 = p.hp
+    for _ in range(MEGA._MEGA_WARN):
+        MEGA.mega_tick(room, p, rng)
+    assert p.hp == hp0
+
+
+def test_attacks_escalate_dd_then_d5_then_dG():
+    room = _arena(); p = _player(2, 2); rng = random.Random(0)
+    sizes = []
+    for _ in range(3):
+        while room.mega['phase'] != 'warn':
+            MEGA.mega_tick(room, p, rng)
+        sizes.append(len(room.mega['band']))
+        while room.mega['phase'] != 'idle':
+            MEGA.mega_tick(room, p, rng)
+    assert sizes[0] == 1                                # dd — just his row
+    assert sizes[1] > sizes[0]                          # d5k/d5j — a wider band
+    assert sizes[2] > sizes[1]                          # dG/dgg — out to an edge
+
+
+def test_goblin_on_a_torn_row_is_culled():
+    room = _arena(); rng = random.Random(1)
+    _warn(room, _player(1, 1), rng)
+    r = next(iter(room.mega['band']))
+    room.add_entity(Entity(kind='goblin', row=r, col=5, hp=1, max_hp=1))   # over the gap
+    room.add_entity(Entity(kind='goblin', row=1, col=3, hp=1, max_hp=1))   # safe row
     room.rebuild_indexes()
-    p = _player(*safe)
     for _ in range(MEGA._MEGA_WARN):
-        MEGA.mega_tick(room, p, rng)
-    survivors = {(e.row, e.col) for e in room.entities if e.kind == 'goblin' and e.alive}
-    assert safe in survivors          # goblin on the safe stone rode it out
-    assert (1, 1) not in survivors    # goblin in the open fell
-
-
-def test_cycle_returns_to_idle_and_rotates():
-    room = _arena()
-    rng = random.Random(4)
-    seen = set()
-    for _ in range(4):                                  # several full cycles
-        _run_to_strike(room, _player(2, 5), rng)
-        assert room.mega['phase'] == 'idle'
-    # over many cycles, different pillars get lit (rotation → forces multiple marks)
-    rng = random.Random(99)
-    for _ in range(12):
-        room.mega['phase'] = 'warn'; room.mega['timer'] = 1
-        room.mega['safe'] = MEGA._pick_safe(room, rng)
-        seen |= room.mega['safe']
-    assert len(seen) >= 2
+        MEGA.mega_tick(room, _player(1, 1), rng)
+    alive = {(e.row, e.col) for e in room.entities if e.kind == 'goblin' and e.alive}
+    assert (r, 5) not in alive and (1, 3) in alive
 
 
 # ── builder: the two-room dungeon is wired (Act 1 arena + Act 2 wardenverse) ──
@@ -254,13 +247,14 @@ def test_builder_makes_a_two_room_dungeon():
     assert len(d.rooms) == 2 and d.current_room == 0
     arena, verse = d.rooms
 
-    # Arena (Act 1): grid pillars, mega armed, glyph-search, immune Warden + echoes
+    # Arena (Act 1): nine blocks, mega armed, glyph-search, immune Warden + echoes
     assert (arena.rows, arena.cols) == (24, 78)
-    cols = sorted({c for _, c in arena.pillars}); rows = sorted({r for r, _ in arena.pillars})
-    assert len(arena.pillars) == len(rows) * len(cols)  # a full symmetric lattice, not scatter
-    assert len(cols) >= 2 and len(rows) >= 2
-    assert 12 not in rows                               # clear of the Warden/spawn row (no x-cuts a pillar)
+    # 3×3 blocks: two vertical + two horizontal divider walls, each pierced by doorways
+    assert sum(1 for r in range(1, 23) if arena.cells[r][22] == CellType.WALL) >= 15   # a real divider
+    assert sum(1 for c in range(1, 67) if arena.cells[8][c] == CellType.WALL) >= 15
+    assert arena.cells[11][22] == CellType.FLOOR        # a doorway through the vertical divider
     assert arena.search_glyph_entities and arena.mega['phase'] == 'idle'
+    assert arena.mega['bounds'][3] <= 66                # mega tears only the fight area, not the treasure
     warden = next(e for e in arena.entities if e.kind == 'warden')
     assert warden.tag == 'pathfinder' and warden.edit_immune
     assert sum(1 for e in arena.entities if e.kind == 'goblin' and e.tag == 'echo') == 4

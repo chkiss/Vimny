@@ -101,7 +101,7 @@ SETTERS_HAND_SCROLL = {
 OPERATOR_CODEX_SCROLL = {
     'title': "◈   The Operator's Codex   ◈",
     'lines': [
-        ('dim',    '  In the Loom, they carved the grammar of unmaking.'),
+        ('dim',    '  In the dark, they carved the grammar of unmaking.'),
         ('blank',),
         ('cmd',    'd{m}', 'delete to motion'),
         ('cmd',    'dd  ', 'delete line'),

@@ -14,6 +14,21 @@ clearly flagged assumed extensions).
 
 ## Level 17.1 — The Warden Pathfinder (ACT III BOSS)
 
+> **AS BUILT (2026-06-07) — this supersedes the pillar/positional details below, which
+> are kept for design history.** The code + `tests/test_warden_pathfinder.py` are the
+> source of truth. Net of the playtest iterations:
+> - **Arena = nine equal blocks** (3×3, two vertical + two horizontal divider walls with
+>   doorways) — the old "pillar grid" is gone.
+> - **Mega-attack = an escalating floor-TEAR** (`engine/warden_mega.py`): `dd` → `d5k/d5j`
+>   → `dG/dgg`, torn cells (`room.torn`) rendered as void and impassable, anyone caught
+>   falls, then the Warden pastes the floor back after a few turns. (Not the old positional
+>   "safe-pillar" model.)
+> - **Wardenverse = one long REACTIVELY-wrapping line** (no fixed fold; works 80–189 cols)
+>   with sparse stone walls so `$`/`l` stop and `gj`/`gk` is the way across. The Warden
+>   **walks/approaches** and **hits & is hit regardless of `:set wrap`** (wrap only matters
+>   for *reaching* him). His death **collapses the verse** → back to the arena → clear the
+>   minions → a **key** drops → opens the **treasure room** (heart + scroll + exit).
+
 > **REVISED 2026-06-05.** Re-based on the current curriculum (previous boss is
 > `warden_surveyor` 13.1, so **Act III = L14–L17**), structured as **two acts**, around
 > vim *composition* and the real Warden AI. Directives:

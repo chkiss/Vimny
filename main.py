@@ -105,7 +105,7 @@ _MSG_ROTATE_TTL         = 10  # ticks per combat message (~1 s at 0.1 s inkey ti
 _SCROLL_TEXT_OPERATOR_CODEX = """\
 The Operator's Codex
 ====================
-In the Loom, they carved the grammar of unmaking.
+In the dark, they carved the grammar of unmaking.
 
   d{m}  ──  delete to motion
   dd    ──  delete line
@@ -1352,22 +1352,18 @@ def _enemy_tick(room, player) -> list:
                         room._lib_arch_paced = True   # he has stepped off his desk
             continue
         if ent.kind == 'warden' and ent.tag == 'verse':
-            # He runs the wrapped line: while ':set wrap' is on he chases through the
-            # display (hop a fold toward the player, then close along the row, like the
-            # hostile Archivist). ':set nowrap' breaks his focus and he holds still.
-            if getattr(player, 'wrap', False):
-                w = getattr(room, '_wrap_w', 0) or room.cols
-                d = player.col - ent.col
-                pr, ar = player.col // w, ent.col // w
-                if pr != ar:
-                    nc = ent.col + (w if pr > ar else -w)
-                elif abs(d) > 1:
-                    nc = ent.col + (1 if d > 0 else -1)
-                else:
-                    nc = ent.col
-                nc = min(max(1, nc), room.cols - 2)
-                if (nc != ent.col and (0, nc) != (player.row, player.col)
-                        and room.is_passable(0, nc)):     # don't lodge him in a segment wall
+            # He walks the wardenverse, approaching the player along the line and stepping
+            # over the segment walls. (You still need :set wrap + gj/gk to REACH him; his
+            # approach and his blows do not depend on wrap.)
+            d = player.col - ent.col
+            if abs(d) > 1:
+                step = 1 if d > 0 else -1
+                nc = ent.col + step
+                hops = 0
+                while 1 <= nc <= room.cols - 2 and not room.is_passable(0, nc) and hops < 8:
+                    nc += step; hops += 1                  # hop over a segment wall
+                if (1 <= nc <= room.cols - 2 and room.is_passable(0, nc)
+                        and (0, nc) != (player.row, player.col)):
                     room.move_entity(ent, 0, nc)
             continue
         dist = _manhattan(player.row, player.col, ent.row, ent.col)
@@ -3254,8 +3250,7 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
                             room.kill_entity(cur)
                             _reg_write(player, '"', entity_clip(cur), is_delete=True)
                             if cur.kind == 'warden' and cur.tag == 'verse':
-                                # The wardenverse collapses — fling the player back to the arena
-                                # to mop up the minions; the key drops there once they're cleared.
+                                # The wardenverse collapses — fling the player back to the arena.
                                 arena = dungeon.rooms[0]
                                 arena.verse_collapsed = True
                                 dungeon.current_room = 0
@@ -3263,8 +3258,16 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
                                 player.row, player.col = (12, 60)
                                 player.wrap = False
                                 msg_pool.clear()
-                                _push('You cut him down and the wardenverse collapses — you are '
-                                      'flung back into the arena!  Hunt down the last minions.')
+                                if any(e.alive and e.kind == 'goblin' for e in room.entities):
+                                    # minions remain — the key drops when the last one falls (per-turn check)
+                                    _push('You cut him down and the wardenverse collapses — you are '
+                                          'flung back into the arena!  Hunt down the last minions.')
+                                else:
+                                    # already clear — the collapse itself shakes the key loose
+                                    room.key_dropped = True
+                                    _drop_key(room, 12, 40)
+                                    _push('You cut him down and the wardenverse collapses — its '
+                                          'fall shakes a key loose onto the arena floor.  🗝')
                                 message = _pool_msg(); msg_ttl = _MSG_ROTATE_TTL
                             else:
                                 if cur.kind == 'warden':
@@ -3703,9 +3706,6 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
                         *room._entity_by_kind.get('warden', []), *_arch_atk):
                 if not ent.alive:
                     continue
-                if (ent.kind == 'warden' and ent.tag == 'verse'
-                        and not getattr(player, 'wrap', False)):
-                    continue                  # :set nowrap breaks his focus — he cannot strike
                 if id(ent) == xd_id:
                     continue
                 if id(ent) not in prev_adjacent_ids:

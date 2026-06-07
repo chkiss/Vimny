@@ -1,85 +1,109 @@
-"""The Warden Pathfinder's mega-attack (C-PF-2) + pillar refuges (C-PF-4).
+"""The Warden Pathfinder's mega-attack (C-PF-2): he tears the arena floor away.
 
-The Act-1 survival mechanic and the Act IV cut/paste preview. On a cadence the
-Warden telegraphs, then "tears the floor away" — every cell collapses except a
-rotating handful of **pillar** refuges (`▣`), then it pastes the floor back.
+The Act-1 pressure mechanic and the Act IV cut/paste preview. On a cadence the
+Warden winds up, then deletes a BAND of arena rows — simulating real Vim edits of
+escalating size:
 
-Why it forces 2–4 marks: pillars are scattered, and only a random subset is safe
-each cycle (revealed by the telegraph). The 3-turn warning is too short to *walk*
-to whichever pillar is safe, so the player pre-marks several pillars and
-`` ` ``-jumps to the lit one. One mark is never enough — the safe set rotates.
+    level 0   dd          — just his own row
+    level 1   d5k / d5j   — five rows up or down (random)
+    level 2   dG / dgg    — everything to the top or bottom edge (random)
 
-This module is pure (room + player + an rng), so the cut/strike/cadence is
-unit-testable without the render/main loop. The main loop calls ``mega_tick``
-once per player turn for the Pathfinder arena (``room.mega`` present); the
-renderer pulses ``room.mega['safe']`` during the warning.
+…then the band cycles back to dd. The torn floor stays gone for a few turns
+(``room.torn`` — rendered as void, impassable, anyone caught on it falls) and then
+the Warden **pastes it back** (p / P). The player survives by reading the 3-turn
+telegraph and getting off the doomed rows — into one of the arena's nine blocks.
 
-State lives in ``room.mega`` (a dict, seeded by ``init_mega``) and
-``room.pillars`` (a set of (row, col)). See blueprints/act_3.md (L17.1).
+Pure (room + player + rng), so the cadence/tear/restore is unit-testable. The main
+loop calls ``mega_tick`` once per turn for the arena; the renderer flashes the warn
+band and paints the torn cells. State lives in ``room.mega`` (see ``init_mega``) and
+``room.torn`` (a set of (row, col)). See blueprints/act_3.md (L17.1).
 """
 from __future__ import annotations
 
-_MEGA_PERIOD = 8     # turns of calm between mega-attacks (cooldown)
-_MEGA_WARN   = 3     # telegraph turns — the window to reach a lit pillar
-_MEGA_DMG    = 4     # half-hearts lost if caught off a safe pillar (2 hearts — heavy)
-_MEGA_SAFE_K = 1     # pillars that stay solid each cycle (rotates → forces many marks)
+from engine.world import CellType
+
+_MEGA_PERIOD = 7     # calm turns between attacks (cooldown)
+_MEGA_WARN   = 3     # telegraph turns — the window to clear the doomed rows
+_MEGA_TORN   = 3     # turns the floor stays gone before he pastes it back
+_MEGA_DMG    = 4     # half-hearts lost if caught on the floor when it gives way
+
+_VERBS = ('dd', 'd5k / d5j', 'dG / dgg')
 
 
-def init_mega(room, pillars) -> None:
-    """Arm the mega-attack on a room. ``pillars`` is an iterable of (row, col)."""
-    room.pillars = set(pillars)
+def init_mega(room, bounds) -> None:
+    """Arm the mega-attack. ``bounds`` = (r0, r1, c0, c1): the fight area whose
+    floor can be torn (excludes the treasure room / border walls)."""
     room.mega = {'phase': 'idle', 'cooldown': _MEGA_PERIOD, 'timer': 0,
-                 'safe': set(), 'hit_player': None}
+                 'band': set(), 'level': 0, 'bounds': tuple(bounds), 'hit_player': None}
+    room.torn = set()
 
 
-def _pick_safe(room, rng) -> set:
-    pillars = sorted(room.pillars)
-    if not pillars:
-        return set()
-    k = min(_MEGA_SAFE_K, len(pillars))
-    return set(rng.sample(pillars, k))
+def _warden_row(room):
+    for e in room.entities:
+        if e.alive and e.kind == 'warden' and e.tag == 'pathfinder':
+            return e.row
+    r0, r1, _, _ = room.mega['bounds']
+    return (r0 + r1) // 2
 
 
-def _strike(room, player) -> list[str]:
-    """Resolve the collapse: everything off a safe pillar falls; the Warden pastes
-    the floor back. Goblins off the safe stones die; the player takes fall damage
-    unless sheltered. The Warden itself rides its own attack (never harmed here)."""
-    safe = room.mega['safe']
-    for e in list(room.entities):
-        if e.alive and e.kind == 'goblin' and (e.row, e.col) not in safe:
+def _band_rows(room, rng) -> set:
+    """The rows this strike will tear, from the Warden's row outward by level."""
+    r0, r1, _, _ = room.mega['bounds']
+    wr = _warden_row(room)
+    lvl = room.mega['level']
+    if lvl == 0:                                   # dd — his row
+        lo = hi = wr
+    elif lvl == 1:                                 # d5k / d5j — five rows up or down
+        lo, hi = (wr - 5, wr) if rng.random() < 0.5 else (wr, wr + 5)
+    else:                                          # dG / dgg — to an edge
+        lo, hi = (r0, wr) if rng.random() < 0.5 else (wr, r1)
+    return set(range(max(r0, lo), min(r1, hi) + 1))
+
+
+def _tear(room, player) -> list[str]:
+    r0, r1, c0, c1 = room.mega['bounds']
+    torn = {(r, c) for r in room.mega['band'] for c in range(c0, c1 + 1)
+            if room.cells[r][c] in (CellType.FLOOR, CellType.CORRIDOR)}
+    room.torn |= torn
+    for e in list(room.entities):                  # minions caught over the gap fall
+        if e.alive and e.kind == 'goblin' and (e.row, e.col) in torn:
             room.kill_entity(e)
     msgs = ['The Warden tears the floor away!']
-    if (player.row, player.col) in safe:
-        msgs.append('You hold fast on the stone.')
-    else:
+    if (player.row, player.col) in torn:
         player.take_damage(_MEGA_DMG)
-        room.mega['hit_player'] = (player.row, player.col)   # → the loop flashes the collapse
-        msgs.append('The floor falls away beneath you!')
-    msgs.append('…and the Warden slams it back into place.')
+        room.mega['hit_player'] = (player.row, player.col)
+        msgs.append('The floor gives way beneath you!')
+    room.mega['phase'] = 'torn'
+    room.mega['timer'] = _MEGA_TORN
     return msgs
 
 
 def mega_tick(room, player, rng) -> list[str]:
-    """Advance the mega-attack one player turn. Returns banner messages (possibly
-    empty). No-op on rooms without ``room.mega``."""
+    """Advance the mega-attack one turn. Returns banner messages (maybe empty)."""
     m = getattr(room, 'mega', None)
     if not m:
         return []
-    m['hit_player'] = None                  # only set on a strike turn; read by the loop after
+    m['hit_player'] = None                         # only set on a strike turn; read by the loop
     if m['phase'] == 'idle':
         m['cooldown'] -= 1
         if m['cooldown'] <= 0:
             m['phase'] = 'warn'
             m['timer'] = _MEGA_WARN
-            m['safe'] = _pick_safe(room, rng)
-            return ['THE WARDEN INHALES THE FLOOR — only the lit stones will hold!']
+            m['band'] = _band_rows(room, rng)
+            return [f'THE WARDEN WINDS UP — {_VERBS[m["level"]]}!  Off the lit rows!']
         return []
-    # phase == 'warn'
-    m['timer'] -= 1
-    if m['timer'] <= 0:
-        msgs = _strike(room, player)
-        m['phase'] = 'idle'
-        m['cooldown'] = _MEGA_PERIOD
-        m['safe'] = set()
-        return msgs
+    if m['phase'] == 'warn':
+        m['timer'] -= 1
+        if m['timer'] <= 0:
+            return _tear(room, player)
+        return []
+    if m['phase'] == 'torn':
+        m['timer'] -= 1
+        if m['timer'] <= 0:
+            room.torn.clear()
+            m['phase'] = 'idle'
+            m['cooldown'] = _MEGA_PERIOD
+            m['level'] = (m['level'] + 1) % 3      # escalate, then cycle
+            return ['…and the Warden slams the floor back into place.']
+        return []
     return []
