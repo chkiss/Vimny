@@ -2006,9 +2006,6 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
         if e.alive and (e.row, e.col) not in room.fog_cells:
             spotted_wardens.add(id(e))
             msg_pool.append('You spotted a Warden!')
-            if level == 'warden_pathfinder' and e.tag == 'pathfinder':
-                msg_pool.append('His shield blocks this row — circle above or below to '
-                                'his open flank, then x.  (He twists away from v-cuts.)')
     if msg_pool:
         message = _pool_msg()
         msg_ttl = _MSG_ROTATE_TTL

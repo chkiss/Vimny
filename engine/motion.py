@@ -61,17 +61,22 @@ def _reveal_from(room, player_r: int, player_c: int) -> None:
 
 
 def _cell_char(room, r: int, c: int) -> str:
-    """Return the printable character at (r, c) for f/F/t/T target matching."""
+    """Return the printable character at (r, c) for f/F/t/T target matching.
+
+    A glyph entity (the foe/NPC/dynamite the renderer draws ON TOP) wins over any
+    char-run beneath it — so fA finds the Archivist and fW finds the Warden even
+    when he stands on text (the wardenverse). Entities with no glyph of their own
+    fall through to the character/terrain underneath."""
     ent = room.entity_at(r, c)
-    if ent and ent.kind == 'archivist':
-        return 'A'                      # he paces over the library art; his glyph wins (fA finds him)
+    if ent:
+        if ent.kind == 'archivist':  return 'A'   # paces over the library art
+        if ent.kind == 'dynamite':   return '!'
+        if ent.kind == 'goblin':     return 'W' if ent.tag == 'echo' else 'g'
+        if ent.kind == 'warden':     return 'W'
     ru = room.char_run_at(r, c)
     if ru:
         return ru.symbols[c - ru.col]
     if ent:
-        if ent.kind == 'dynamite':  return '!'
-        if ent.kind == 'goblin':    return 'W' if ent.tag == 'echo' else 'g'
-        if ent.kind == 'warden':    return 'W'
         return '.'
     ct = room.cells[r][c]
     return '#' if ct in (CellType.WALL, CellType.WOOD_WALL) else '.'

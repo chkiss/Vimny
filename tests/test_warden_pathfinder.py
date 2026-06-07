@@ -149,6 +149,24 @@ def test_flag_off_search_ignores_entities():
     assert match_cells(room, 'g') == set()
 
 
+def test_fW_finds_warden_standing_on_text():
+    """fW must find the Warden even when he stands ON char-run text (the
+    wardenverse): the glyph the renderer draws on top wins over the text beneath,
+    so _cell_char returns 'W'. Regression — text used to mask the glyph."""
+    from engine.motion import _cell_char, _apply_find
+    from engine.player import Player
+    rows, cols = 1, 20
+    cells = [[CellType.FLOOR] * cols]
+    room = Room(room_type=RoomType.BOSS, rows=rows, cols=cols, cells=cells)
+    room.add_char_run(CharRun(0, 0, tuple('abcdefghijklmnopqrs'), 'plain'))  # text under everything
+    room.add_entity(Entity(kind='warden', row=0, col=12, hp=3, max_hp=3,
+                           tag='verse', edit_immune=True))
+    room.rebuild_indexes()
+    assert _cell_char(room, 0, 12) == 'W'           # glyph beats the 'm' beneath it
+    p = Player(); p.row, p.col = 0, 2
+    assert _apply_find(p, 'f', 'W', room) and p.col == 12
+
+
 # ── C-PF-2: mega-attack — escalating floor-tear (dd → d5 → dG) + paste-back ──
 
 def _arena() -> Room:
