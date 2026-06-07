@@ -46,6 +46,8 @@ class Entity:
     edit_immune:  bool = False  # True = survives editing-delete (visual/operator x/d/dd,
                             # reflow remove_row); a boss parried by its shield, chipped
                             # only by normal-mode x. See engine/visual + The Warden Pathfinder.
+    shade:        int = 0   # cosmetic colour index — the impostor Wardens (goblin tag='echo')
+                            # each pick a slightly different red so the player sees a myriad.
 
 @dataclass
 class CharRun:

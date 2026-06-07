@@ -17,8 +17,15 @@ clearly flagged assumed extensions).
 > **AS BUILT (2026-06-07) — this supersedes the pillar/positional details below, which
 > are kept for design history.** The code + `tests/test_warden_pathfinder.py` are the
 > source of truth. Net of the playtest iterations:
-> - **Arena = nine equal blocks** (3×3, two vertical + two horizontal divider walls with
->   doorways) — the old "pillar grid" is gone.
+> - **Arena = a big OPEN hall** with four stone columns at the 3×3 inner vertices
+>   (`_PF_COLUMNS`) — the old "pillar grid" / "nine equal blocks" maze is gone.
+> - **Impostors = a CROWD of false Wardens.** The hall opens to ~17 goblins all disguised
+>   as the Warden (`tag='echo'`, a red `W` in a *spread of shades* centred on the boss's
+>   own red; each carries a `shade` index). The entry banner reads **"You see a myriad of
+>   Wardens!"** (the goblin count is suppressed). Each impostor has **2 HP**: the first
+>   `x` **strips the disguise** ("the disguise sloughs away: just a goblin!") — it becomes
+>   a plain `g` that `/W` no longer finds — and the second `x` kills it. The real Warden
+>   (visual-immune) hides among them.
 > - **Mega-attack = an escalating floor-TEAR** (`engine/warden_mega.py`): `dd` → `d5k/d5j`
 >   → `dG/dgg`, torn cells (`room.torn`) rendered as void and impassable, anyone caught
 >   falls, then the Warden pastes the floor back after a few turns. (Not the old positional
@@ -225,7 +232,7 @@ Act III primitives are **shipped** (visual L14; `/ * n N`+teleport L15; marks L1
 |------|-------|--------|-------|
 | Boss immune to visual-delete + parry message | all | **C-PF-1** | Keeps `v/W⏎x` from one-shotting the boss; core chipped by `x`. |
 | Mega-attack + pillar refuges | Act 1 | **C-PF-2/4 — DONE (2026-06-05)** | `engine/warden_mega.py`: idle(8t)→warn(3t)→strike cadence; strike damages anyone off a **safe pillar** (`take_damage 4`) and culls goblins; positional (no terrain mutation — there is no VOID cell type, and it keeps marks/grid stable). Only a rotating subset of pillars is **safe** each cycle (telegraph lights them green, `C.mega_safe_bg`) → forces 2–4 marks. Wired in `_enemy_tick`; tests in `test_warden_pathfinder.py`. **Pillar PLACEMENT (builder) must be a symmetric grid, not scatter.** |
-| Impostor `W`s by color (not by glyph) | Act 1 | **C-PF-3 — DONE (2026-06-05)** | Impostor = `goblin` `tag='echo'` rendered `boss_echo_fg` `W`; room flag `search_glyph_entities` overlays entity glyphs so `/W` finds the Warden + echoes wherever they leap (default off → par identical). Real one is visual-immune. Tests in `test_warden_pathfinder.py`. |
+| Impostor `W`s by color (not by glyph) | Act 1 | **C-PF-3 — DONE (2026-06-05; crowd+reveal 2026-06-07)** | Impostor = `goblin` `tag='echo'`, **2 HP**, rendered `boss_echo_fg(shade)` `W` in a *spread of shades* (`_ECHO_SHADES`) centred on the boss red; `Entity.shade` picks the variant. ~17 of them → entry banner **"You see a myriad of Wardens!"** (goblin count suppressed). First `x` strips the disguise (`tag→''`, becomes a plain `g`); second `x` kills. Room flag `search_glyph_entities` overlays glyphs so `/W` finds the Warden + still-disguised echoes wherever they leap (default off → par identical). Real one is visual-immune. Tests **C-PF-3/4** in `test_warden_pathfinder.py`. |
 | Pillar (`▣`) glyphs placed in a **symmetric grid** | Act 1 | folded into C-PF-2/4 / builder | `▣` char-runs at the grid cells + the same coords in `room.pillars`; geometry keeps the Warden out of `x`-range. Grid/symmetric, NOT random scatter. |
 | `:e wardenverse` chase into a 2nd `wrap_buffer` room; in-line walls; `nowrap` focus-break | Act 2 | **C-PF-5 — DONE (2026-06-05)** | Verse is a 2nd `Room` (`Dungeon.rooms[1]`); `:e wardenverse` switches `current_room` once `room.warden_fled`. In-line `WALL` cells block `h`/`l`/`F`/`/` (gj/gk route around); the verse Warden (`tag='verse'`, `edit_immune`) attacks only while `player.wrap`. Flee hook + message in the `x`-combat. **Provisional: par/budget, verse wall spacing, and combat balance need playtesting.** |
 | Builder `build_dungeon_warden_pathfinder` (two rooms, grid pillars) | both | **DONE (2026-06-05)** | `generation/dungeon_gen.py` (`_PF_*` constants). 24×78 arena + 1×120 verse. Structural test in `test_warden_pathfinder.py`. par=None/budget provisional. |

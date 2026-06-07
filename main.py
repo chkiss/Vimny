@@ -953,7 +953,8 @@ def _snapshot(room, player, budget, *, row=None, col=None, spent=None, ans=None)
                             goblin_free_turns=e.goblin_free_turns,
                             uid=e.uid, summoner_uid=e.summoner_uid,
                             origin_row=e.origin_row, move_dir=e.move_dir,
-                            tag=e.tag, scroll_id=e.scroll_id)
+                            tag=e.tag, scroll_id=e.scroll_id,
+                            edit_immune=e.edit_immune, shade=e.shade)
                      for e in room.entities],
         'char_runs': [CharRun(ru.row, ru.col, ru.symbols, ru.kind) for ru in room.char_runs],
         'cells':    [r[:] for r in room.cells],
@@ -1995,7 +1996,12 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
     for e in _entry_goblins:
         spotted_goblins.add(id(e))
     if _entry_goblins:
-        msg_pool.append(_goblin_msg(_goblin_sighting(len(_entry_goblins))))
+        if level == 'warden_pathfinder':
+            # Every goblin in the hall is disguised as the Warden — suppress the goblin
+            # count; the player just sees a crowd of red Ws.  x once to strip a disguise.
+            msg_pool.append('You see a myriad of Wardens!')
+        else:
+            msg_pool.append(_goblin_msg(_goblin_sighting(len(_entry_goblins))))
     for e in room._entity_by_kind.get('warden', []):
         if e.alive and (e.row, e.col) not in room.fog_cells:
             spotted_wardens.add(id(e))
@@ -3290,6 +3296,12 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
                                     _remove_warden_shields(room)
                                     room.surveyor_threat = None  # clear any lingering telegraph
                                 _push(_on_kill(cur, player, room, level) or 'Enemy defeated!')
+                    elif cur.kind == 'goblin' and cur.tag == 'echo':
+                        # First x strikes the Warden-disguise off — a plain goblin beneath,
+                        # which the next x will finish.  /W no longer finds it; it renders 'g'.
+                        cur.tag = ''
+                        _push('You strike a false Warden — the disguise sloughs away: '
+                              'just a goblin!')
                     else:
                         _push(f'Hit! ({cur.hp}/{cur.max_hp} HP)')
                 elif cur and cur.kind == 'shield':

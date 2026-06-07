@@ -23,7 +23,22 @@ def player_fg():     return _term.bright_white                    # cursor: shar
 def enemy_fg():      return _term.color_rgb(100, 155, 80)        # muted olive, enemy life
 def enemy_frozen():  return _term.color_rgb(80, 200, 240)        # ice-blue, frozen state
 def boss_fg():       return _term.color_rgb(210, 35, 45)         # hard red, critical threat
-def boss_echo_fg():  return _term.color_rgb(150, 80, 90)         # washed-out red, a false Warden (Hunt impostor)
+# Impostor Wardens (goblin tag='echo') — a spread of reds centred on the Warden's own
+# boss_fg (210,35,45). Index 0 is a near-perfect copy; the rest drift a shade off, so a
+# crowd of them reads as "a myriad of Wardens" with the real one hidden among them.
+_ECHO_SHADES = [
+    (210,  35,  45),   # 0 — the perfect impostor (= boss_fg)
+    (195,  55,  60),   # 1 — duskier
+    (225,  60,  50),   # 2 — hotter
+    (180,  40,  55),   # 3 — crimson-leaning
+    (205,  30,  70),   # 4 — rose-tinted
+    (170,  60,  48),   # 5 — brick
+    (220,  80,  72),   # 6 — washed pink
+    (160,  38,  46),   # 7 — deep oxblood
+]
+def boss_echo_fg(shade=0):                                       # a false Warden (Hunt impostor)
+    r, g, b = _ECHO_SHADES[shade % len(_ECHO_SHADES)]
+    return _term.color_rgb(r, g, b)
 def heart_full():    return _term.color_rgb(215, 45, 45)         # arterial red, full HP
 def heart_half():    return _term.color_rgb(210, 135, 25)        # ember amber, half HP
 def heart_empty():   return _term.color_rgb(50, 50, 60)          # dim grey, spent HP

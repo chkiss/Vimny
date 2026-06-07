@@ -256,7 +256,12 @@ def test_builder_makes_a_two_room_dungeon():
     assert arena.mega['bounds'][3] <= 66                # mega tears only the fight area, not the treasure
     warden = next(e for e in arena.entities if e.kind == 'warden')
     assert warden.tag == 'pathfinder' and warden.edit_immune
-    assert sum(1 for e in arena.entities if e.kind == 'goblin' and e.tag == 'echo') == 4
+    # A crowd of impostor Wardens (goblins, tag='echo') — each 2 HP (x strips the
+    # disguise, x again kills) and each a slightly different shade of red.
+    echoes = [e for e in arena.entities if e.kind == 'goblin' and e.tag == 'echo']
+    assert len(echoes) >= 12
+    assert all(e.hp == 2 and e.max_hp == 2 for e in echoes)
+    assert len({e.shade for e in echoes}) >= 4          # a spread of shades, not one flat red
     # Treasure room behind a locked door (the exit + loot live there; key drops in Act 3)
     assert arena.exit_pos is not None
     assert any(e.kind == 'locked_door' for e in arena.entities)
@@ -273,3 +278,33 @@ def test_builder_makes_a_two_room_dungeon():
     vw = next(e for e in verse.entities if e.kind == 'warden')
     assert vw.tag == 'verse' and vw.edit_immune
     assert verse.exit_pos is None                       # collapse, not a verse exit
+
+
+# ── C-PF-4: impostor reveal — x strips the disguise, x again kills ────────────
+def test_x_strips_echo_disguise_then_kills(monkeypatch):
+    """The first x on a false Warden (goblin tag='echo') sloughs the disguise off
+    (→ a plain goblin 'g' that /W no longer finds); the second x kills it.  The
+    entry message reads "a myriad of Wardens", not a goblin count."""
+    import main
+    import generation.dungeon_gen as dg
+    from blessed import Terminal
+    from blessed.keyboard import Keystroke
+
+    d = dg.build_dungeon_warden_pathfinder(7)
+    arena = d.rooms[0]
+    echo = next(e for e in arena.entities if e.kind == 'goblin' and e.tag == 'echo')
+    arena.spawn_pos = (echo.row, echo.col)              # stand the player right on an impostor
+
+    msgs = []
+    monkeypatch.setattr(main, 'render_all',
+                        lambda term, dungeon, player, budget, message='', *a, **k: msgs.append(message))
+    term = Terminal()
+    it = iter([Keystroke('x'), Keystroke('x'), Keystroke(':'),
+               Keystroke('q'), Keystroke('!'), Keystroke('\r')])
+    monkeypatch.setattr(term, 'inkey', lambda *a, **k: next(it, Keystroke('')))
+    main.run_dungeon(term, 'warden_pathfinder', {}, player_name='admin', _dungeon=d)
+
+    assert any('myriad of Wardens' in (m or '') for m in msgs)
+    assert any('disguise' in (m or '') for m in msgs)
+    assert not echo.alive                               # two x's finished it
+    assert echo.tag == ''                               # and it died a plain goblin
