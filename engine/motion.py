@@ -4,7 +4,7 @@ import unicodedata
 from collections import deque
 from engine.player import Player
 from engine.modes import Mode
-from engine.world import CellType
+from engine.world import CellType, entity_letter, CARET_TRANSPARENT
 
 
 def _apply_esc(player: Player) -> None:
@@ -66,17 +66,17 @@ def _cell_char(room, r: int, c: int) -> str:
     A glyph entity (the foe/NPC/dynamite the renderer draws ON TOP) wins over any
     char-run beneath it — so fA finds the Archivist and fW finds the Warden even
     when he stands on text (the wardenverse). Entities with no glyph of their own
-    fall through to the character/terrain underneath."""
+    fall through to the character/terrain underneath. The entity→letter map lives
+    in engine.world.entity_letter (shared with the renderer and search)."""
     ent = room.entity_at(r, c)
-    if ent:
-        if ent.kind == 'archivist':  return 'A'   # paces over the library art
-        if ent.kind == 'dynamite':   return '!'
-        if ent.kind == 'goblin':     return 'W' if ent.tag == 'echo' else 'g'
-        if ent.kind == 'warden':     return 'W'
+    if ent is not None:
+        g = entity_letter(ent)
+        if g is not None:
+            return g
     ru = room.char_run_at(r, c)
     if ru:
         return ru.symbols[c - ru.col]
-    if ent:
+    if ent is not None:
         return '.'
     ct = room.cells[r][c]
     return '#' if ct in (CellType.WALL, CellType.WOOD_WALL) else '.'
@@ -141,19 +141,14 @@ def _rightmost_passable(room, row: int):
     return None
 
 
-# Passage/marker entities the player stands ON — transparent to ^/first-non-blank
-# (you walk through them). A key/foe/loot glyph, by contrast, counts as a character.
-_CARET_TRANSPARENT = frozenset({'door', 'locked_door', 'seal_door', 'exit',
-                                'entry_marker', 'boss_seal'})
-
-
 def _caret_stop(room, row: int, c: int) -> bool:
     """True if column c on `row` is 'non-blank' for ^: it carries a character, or a
-    notable entity (a key, foe, or loot — not a floor-like door/exit you stand on)."""
+    notable entity (a key, foe, or loot — not a floor-like door/exit you stand on).
+    The pass-through set lives in engine.world.CARET_TRANSPARENT."""
     if room.char_run_at(row, c) is not None:
         return True
     ent = room.entity_at(row, c)
-    return ent is not None and ent.kind not in _CARET_TRANSPARENT
+    return ent is not None and ent.kind not in CARET_TRANSPARENT
 
 
 def _first_non_blank_col(room, row: int):

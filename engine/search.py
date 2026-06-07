@@ -11,6 +11,7 @@ See engine/vimregex.py for the supported atoms (\\w \\d . ^ $ \\< \\> * \\+
 """
 from __future__ import annotations
 from engine.vimregex import compile_vim
+from engine.world import entity_letter
 
 
 def _spans(s: str, pattern: str):
@@ -27,19 +28,6 @@ def _spans(s: str, pattern: str):
         start = i + max(1, len(pattern))
 
 
-def _entity_glyph(ent):
-    """The visible letter an entity paints on its cell, for ``search_glyph_entities``
-    rooms — mirrors render/renderer.py and motion._cell_char. Returns None for kinds
-    that aren't 'searched as what you see' (doors/chests/etc.)."""
-    if ent.kind == 'warden':
-        return 'W'
-    if ent.kind == 'goblin':
-        return 'W' if ent.tag == 'echo' else 'g'   # 'echo' goblins are the Hunt's impostor Ws
-    if ent.kind == 'dynamite':
-        return '!'
-    return None
-
-
 def _line_string(room, row: int):
     """(text, base_col): the row read as ONE Vim line — every glyph in place, gaps
     between runs as spaces — so a pattern can span consecutive character runs (e.g.
@@ -54,7 +42,7 @@ def _line_string(room, row: int):
     if getattr(room, 'search_glyph_entities', False):
         for e in room.entities:
             if e.alive and e.row == row:
-                g = _entity_glyph(e)
+                g = entity_letter(e)             # shared map (engine.world) — same letters as f/t + render
                 if g is not None:
                     glyphs.append((e.col, g))
     if not runs and not glyphs:

@@ -2,7 +2,7 @@
 from __future__ import annotations
 import time
 from blessed import Terminal
-from engine.world import Dungeon, CellType, Room, CharRun, Entity
+from engine.world import Dungeon, CellType, Room, CharRun, Entity, entity_letter
 from engine.player import Player
 from engine.modes import Mode, MODE_LABELS
 from engine.visual import in_selection as _in_visual_sel
@@ -151,16 +151,16 @@ def _ent_cell_str(ent, room, r: int, c: int, mode, floor_bg: str) -> str:
             return floor_bg + C.key_blue_fg() + sym + rst
         return floor_bg + C.locked_door_fg() + sym + rst
     if ent.kind == 'dynamite':
-        return floor_bg + C.dynamite_fg() + S.DYNAMITE + rst
+        return floor_bg + C.dynamite_fg() + entity_letter(ent) + rst
     if ent.kind == 'wanderer':
         efg = C.enemy_frozen() if mode == Mode.VISUAL else C.enemy_fg()
         return floor_bg + efg + S.ENEMY_WANDERER + rst
     if ent.kind == 'goblin':
         if ent.tag == 'echo':                       # a false Warden — looks like a W, a shade off
-            return floor_bg + C.boss_echo_fg(ent.shade) + 'W' + rst
-        return floor_bg + C.enemy_fg() + 'g' + rst
+            return floor_bg + C.boss_echo_fg(ent.shade) + entity_letter(ent) + rst
+        return floor_bg + C.enemy_fg() + entity_letter(ent) + rst
     if ent.kind == 'warden':
-        return floor_bg + C.boss_fg() + 'W' + rst
+        return floor_bg + C.boss_fg() + entity_letter(ent) + rst
     if ent.kind == 'shield':
         return floor_bg + C.boss_fg() + S.SHIELD + rst
     if ent.kind == 'heart_container':
@@ -176,7 +176,7 @@ def _ent_cell_str(ent, room, r: int, c: int, mode, floor_bg: str) -> str:
     if ent.kind == 'entry_marker':
         return floor_bg + C.hint_fg() + S.PLAYER + rst
     if ent.kind == 'archivist':                       # friendly NPC (The Archivist's Library)
-        return floor_bg + C.key_gold_fg() + 'A' + rst
+        return floor_bg + C.key_gold_fg() + entity_letter(ent) + rst
     return floor_bg + '?' + rst
 
 

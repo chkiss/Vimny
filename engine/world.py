@@ -67,6 +67,35 @@ def strike_disguise(ent) -> bool:
     return True
 
 
+# ── The entity glyph layer: ONE source of truth for what an entity paints ─────
+# Every targeting command (f/F/t/T, / ? * #, ^, gg/G) must agree with the glyph
+# the renderer draws ON TOP of the text/terrain. Historically each consumer
+# (render._ent_cell_str, motion._cell_char, search._entity_glyph, the caret
+# stops) kept its OWN copy of this map, and they drifted — the recurring class of
+# "the command can't see the entity sitting on text" bug. Define each fact once
+# here; the consumers import these and stay in lockstep.
+
+_ENTITY_LETTER = {'warden': 'W', 'dynamite': '!', 'archivist': 'A'}
+
+
+def entity_letter(ent) -> Optional[str]:
+    """The findable/searchable LETTER an entity paints — the character the renderer
+    shows on top of its cell — or None for kinds drawn as decorative symbols
+    (doors, keys, chests, hearts, exits, shields…) that aren't text-matchable by
+    f/t and /. This is what f/F/t/T and search target, and what the renderer's
+    letter-kinds draw, so changing a glyph here updates every command at once."""
+    if ent.kind == 'goblin':
+        return 'W' if ent.tag == 'echo' else 'g'   # echo goblins are the Hunt's impostor Ws
+    return _ENTITY_LETTER.get(ent.kind)
+
+
+# Floor-like markers the cursor passes THROUGH for ^ / first-non-blank (you stand
+# on them). Every OTHER live entity (a foe, key, chest, heart…) counts as content
+# the caret lands on.
+CARET_TRANSPARENT = frozenset({'door', 'locked_door', 'seal_door', 'exit',
+                               'entry_marker', 'boss_seal'})
+
+
 @dataclass
 class CharRun:
     row: int
