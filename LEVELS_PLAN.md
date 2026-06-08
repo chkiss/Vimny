@@ -66,13 +66,14 @@ Curriculum order is the order of `LEVELS`. Blueprints: `blueprints/act_*.md`.
 | 16 | `waypoint_sanctum` | The Waypoint Sanctum | `` m ' ` `` |  |
 | 17 | `archivists_library` | The Archivist's Library | `:set wrap  :e!  :w {file}` |  |
 | 17.1 | `warden_pathfinder` | The Warden Pathfinder | — | boss |
-| 18 | `operators_vault` | The Operator's Vault | `d c` |  |
-| 19 | `whole_line_annex` | The Whole-Line Annex | `dd cc D S` |  |
+| 18 | `operators_vault` | The Operator's Vault | `d{m}  dd  D` |  |
+| 19 | `cipher_cell` | The Cipher Cell | `s` |  |
 | 20 | `quartermaster` | The Quartermaster | `y yy P` |  |
-| 21 | `undo_sanctum` | The Undo Sanctum | — |  |
+| 21 | `undo_sanctum` | The Undo Sanctum | `u  ⌃R` |  |
 | 22 | `echo_vault` | The Echo Vault | `.` |  |
 | 22.1 | `warden_manifold` | The Warden Manifold | — | boss |
 | 23 | `inscription_halls` | The Inscription Halls | `i a` |  |
+| 23.5 | `whole_line_annex` | The Change Annex | `c{m}  cc  C  S` |  |
 | 24 | `sculpting_chambers` | The Sculpting Chambers | `I A o O` |  |
 | 25 | `overwrite_halls` | The Overwrite Halls | `r R` |  |
 | 26 | `case_chambers` | The Case Chambers | `~ g~ gU gu` |  |

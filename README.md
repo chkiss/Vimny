@@ -87,14 +87,15 @@ The curriculum is defined in `content/levels.py` (canonical) and mirrored in `LE
 | 15 | The Seekers' Labyrinth | `/ ? n N *` | Playable |
 | 16 | The Waypoint Sanctum | `` m ' ` `` | Playable |
 | 17 | The Archivist's Library | `:set wrap  :e!  :w {file}` | Playable |
-| 17.1 | The Warden Pathfinder | (boss) | Planned |
-| 18 | The Operator's Vault | `d c` | Planned |
-| 19 | The Whole-Line Annex | `dd cc D S` | Planned |
+| 17.1 | The Warden Pathfinder | (boss) | Playable |
+| 18 | The Operator's Vault | `d{m}  dd  D` | Planned |
+| 19 | The Cipher Cell | `s` | Planned |
 | 20 | The Quartermaster | `y yy P` | Planned |
-| 21 | The Undo Sanctum | — | Planned |
+| 21 | The Undo Sanctum | `u  ⌃R` | Planned |
 | 22 | The Echo Vault | `.` | Planned |
 | 22.1 | The Warden Manifold | (boss) | Planned |
 | 23 | The Inscription Halls | `i a` | Planned |
+| 23.5 | The Change Annex | `c{m}  cc  C  S` | Planned |
 | 24 | The Sculpting Chambers | `I A o O` | Planned |
 | 25 | The Overwrite Halls | `r R` | Planned |
 | 26 | The Case Chambers | `~ g~ gU gu` | Planned |
