@@ -105,6 +105,7 @@ OPERATOR_CODEX_SCROLL = {
         ('blank',),
         ('cmd',    'd{m}', 'delete to motion'),
         ('cmd',    'dd  ', 'delete line'),
+        ('smudge', 's   ', 's',  'ubstitute one character',    's'),
         ('smudge', 'y{m}', 'y',  'ank (copy without cutting)', 'y'),
         ('smudge', 'c{m}', 'ch', 'ange text (del + insert)',   'c'),
         ('blank',),
