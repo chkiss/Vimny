@@ -5506,7 +5506,7 @@ def build_dungeon_spellwrights_forge(seed: int) -> Dungeon:
 # Two rooms: the Arena (room 0) and the Wardenverse (room 1, a single-line wrap
 # buffer). Act 1 plays out in the Arena; when the Warden's shields fall he flees
 # and the player follows with `:e wardenverse` (handled in main.py). See
-# blueprints/act_3.md (L17.1) and engine/warden_mega.py.
+# engine/warden_mega.py and tests/test_warden_pathfinder.py (the as-built spec).
 _PF_ROWS, _PF_COLS   = 24, 78
 _PF_MAIN_ROW         = 12
 # A big open hall with four stone COLUMNS at the inner vertices of a 3×3 grid (just

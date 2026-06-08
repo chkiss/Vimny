@@ -10,7 +10,7 @@ only by normal-mode ``x``. When a delete span covers it, the rest of the span
 still dies, the boss stands, and ``player.last_parry`` is set so the UI can fire
 "The Warden's shield defended him from your cut!".
 
-See blueprints/act_3.md (L17.1) and engine/visual.py.
+This file IS the as-built spec for L17.1; see engine/visual.py and engine/warden_mega.py.
 """
 import random
 

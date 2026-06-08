@@ -88,11 +88,12 @@ latent robustness gap:
 1. **`engine/modes.py:11-12`** — `Mode.SEARCH` / `Mode.MACRO_RECORD` comments say
    "(Block F — … not yet wired)". Both are fully wired. Update the comments.
 2. **`blueprints/act_*.md`.** DONE — followed the banner's own "delete-on-implement" rule
-   for the levels that have since shipped: deleted `act_2.md` (whole file; its only level,
-   the Warden Surveyor 13.1, is built), and excised the §L17 (Archivist's Library) and §L37
-   (Spellwright's Forge) sections from `act_3.md` / `act_7.md`, updating each act's intro
-   "shipped — removed" log. Every remaining blueprint section is an UNBUILT level
-   (L17.1, L18–L36.x bosses, L38/L38.1), so they stay.
+   for the levels that have since shipped: deleted `act_2.md` (Warden Surveyor 13.1) and
+   `act_3.md` (whole file; its last remaining level, the Warden Pathfinder 17.1, shipped —
+   the as-built spec now lives in `tests/test_warden_pathfinder.py` + the engine), and
+   excised the §L17 (Archivist's Library) / §L37 (Spellwright's Forge) sections from the
+   other acts. Every remaining blueprint section (act_4–7) is an UNBUILT level
+   (L18–L36.x bosses, L38/L38.1), so they stay.
 3. **Curriculum status (not a bug).** 22 of 47 levels have generators; L37 The Spellwright's
    Forge is built but its prerequisites L18–L36 (`operators_vault`, `echo_vault`, … 25 levels)
    are not, so L37 isn't reachable by normal progression yet. Track as content status, not code.

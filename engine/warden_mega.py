@@ -11,12 +11,12 @@ escalating size:
 …then the band cycles back to dd. The torn floor stays gone for a few turns
 (``room.torn`` — rendered as void, impassable, anyone caught on it falls) and then
 the Warden **pastes it back** (p / P). The player survives by reading the 3-turn
-telegraph and getting off the doomed rows — into one of the arena's nine blocks.
+telegraph and getting off the doomed rows — into the open hall around the columns.
 
 Pure (room + player + rng), so the cadence/tear/restore is unit-testable. The main
 loop calls ``mega_tick`` once per turn for the arena; the renderer flashes the warn
 band and paints the torn cells. State lives in ``room.mega`` (see ``init_mega``) and
-``room.torn`` (a set of (row, col)). See blueprints/act_3.md (L17.1).
+``room.torn`` (a set of (row, col)). See tests/test_warden_pathfinder.py.
 """
 from __future__ import annotations
 
