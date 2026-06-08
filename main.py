@@ -3247,7 +3247,7 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
                         room.surveyor_threat = {'step': 'recover'}   # a tick to regain focus before re-entering visual mode
                         _push('The Warden leaps — you broke his focus!')
                     elif cur.kind == 'warden' and cur.hp > 0 and cur.tag == 'verse':
-                        player.take_damage(1)                # he trades blows on every exchange
+                        player.take_damage(2)                # 2 half-hearts (1 full heart) — he trades blows hard on every exchange
                         attack_flash_pos = (cur.row, cur.col)
                         attack_flash_sym = '✕'
                         attack_flash_on  = True
