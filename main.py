@@ -3761,6 +3761,17 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
                     _push('The last minion falls — a key clatters to the floor!  🗝  '
                           '(step onto it, then  p  it onto the treasure door)')
 
+            # The Operator's Vault: the vault door grinds open once every goblin is
+            # cut down (they die by d{motion}, which never routes through _on_kill).
+            if (level == 'operators_vault' and not getattr(room, 'vault_open', False)
+                    and not any(e.alive and e.kind == 'goblin' for e in room.entities)):
+                room.vault_open = True
+                door = next((e for e in room._entity_by_kind.get('locked_door', []) if e.alive), None)
+                if door is not None:
+                    _kill_door_group(room, door.row, door.col, 'locked_door')
+                    _reveal_from(room, door.row, door.col)
+                    _push('The last guard falls — the vault door grinds open.  🗝')
+
             # Warden summon message
             if tick_msgs and not player.is_dead:
                 _push(tick_msgs[0])

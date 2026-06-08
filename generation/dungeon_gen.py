@@ -5644,3 +5644,97 @@ def build_dungeon_warden_pathfinder(seed: int) -> Dungeon:
     dungeon.rooms        = [arena, verse]
     dungeon.current_room = 0
     return dungeon
+
+
+# ── The Operator's Vault (L18) ───────────────────────────────────────────────
+# The first operator level: teaches the {operator}{motion} grammar via DELETE.
+# Six single-row corridors, snaked together (boustrophedon), each guarded by a
+# chasing goblin that the player clears with one d-variant.  The corridors are
+# three rows apart so a goblin only wakes (Manhattan <= 5) once the player is in
+# its corridor — they stay contained on their own row.  Killing the sixth goblin
+# opens the locked door (wired in main.py) onto the treasure room.
+#
+#   row 3   →   dw     (delete a word, goblin in the gap after it)
+#   row 6   ←   db     (delete a word back)
+#   row 9   →   de     (delete to word end, goblin on the last letter)
+#   row 12  ←   d^     (delete back to the line start — sweeps the whole row)
+#   row 15  →   d$     (delete to the line end — sweeps the whole row)
+#   row 18  ←   dF!    (delete back to a target char '!')
+#
+# par/answer below; see tests/test_operators_vault.py for the executed solve.
+_OV_ROWS, _OV_COLS = 24, 60
+_OV_CORR_ROWS = (3, 6, 9, 12, 15, 18)
+_OV_LCOL, _OV_RCOL = 2, 57           # corridor floor spans these columns
+_OV_DOOR = (19, 2)                   # locked door below corridor 6's left end
+# answer keystrokes (operators written as separate single-key tokens: 'd w' = dw)
+_OV_ANSWER = ('w d w $ 3j '          # C1 row3  → dw
+              'b d b 0 3j '          # C2 row6  ← db
+              'w d e $ 3j '          # C3 row9  → de
+              'd ^ 0 3j '            # C4 row12 ← d^
+              'd $ $ 3j '            # C5 row15 → d$
+              'd F ! 0 2j $')        # C6 row18 ← dF! , then into the vault to the exit
+
+
+def build_dungeon_operators_vault(seed: int) -> Dungeon:
+    R, C = _OV_ROWS, _OV_COLS
+    cells = [[CellType.WALL] * C for _ in range(R)]
+
+    def floor(r, c0, c1):
+        for c in range(c0, c1 + 1):
+            cells[r][c] = CellType.FLOOR
+
+    for r in _OV_CORR_ROWS:                       # the six corridors
+        floor(r, _OV_LCOL, _OV_RCOL)
+    # vertical connectors (only the gap cells; corridor ends already floor),
+    # alternating right / left so the path snakes and never forms a bypass shaft.
+    cells[4][_OV_RCOL] = cells[5][_OV_RCOL]   = CellType.FLOOR   # C1→C2 (right)
+    cells[7][_OV_LCOL] = cells[8][_OV_LCOL]   = CellType.FLOOR   # C2→C3 (left)
+    cells[10][_OV_RCOL] = cells[11][_OV_RCOL] = CellType.FLOOR   # C3→C4 (right)
+    cells[13][_OV_LCOL] = cells[14][_OV_LCOL] = CellType.FLOOR   # C4→C5 (left)
+    cells[16][_OV_RCOL] = cells[17][_OV_RCOL] = CellType.FLOOR   # C5→C6 (right)
+    cells[19][_OV_LCOL] = CellType.FLOOR                          # C6→vault (the locked-door cell)
+    floor(20, _OV_LCOL, 13)                       # treasure walkway
+
+    room = Room(room_type=RoomType.COMBAT, rows=R, cols=C)
+    room.cells     = cells
+    room.seed      = seed
+    room.spawn_pos = (3, _OV_LCOL)
+    room.exit_pos  = (20, 13)
+    room.char_runs = []
+    room.entities  = []
+
+    def word(r, c, text, kind='ember'):
+        room.char_runs.append(CharRun(row=r, col=c, symbols=tuple(text), kind=kind))
+
+    def goblin(r, c):
+        room.entities.append(Entity(kind='goblin', row=r, col=c, hp=1, max_hp=1,
+                                    ai='chase', ai_speed=1))
+
+    # C1 (row 3, →): dw — a word, then the goblin in the gap before the next word.
+    word(3, 4, 'ambush'); goblin(3, 11); word(3, 13, 'fae')
+    # C2 (row 6, ←): db — goblin between two words, deleted by a backward word-cut.
+    word(6, 43, 'grim'); goblin(6, 48); word(6, 50, 'horde')
+    # C3 (row 9, →): de — goblin riding the last letter of the word.
+    word(9, 4, 'vermin'); goblin(9, 9)
+    # C4 (row 12, ←): d^ — goblin out right; d^ from the line end sweeps the row.
+    word(12, 4, 'rabble'); word(12, 26, 'filth'); goblin(12, 30)
+    # C5 (row 15, →): d$ — goblin out right; d$ from the line start sweeps the row.
+    word(15, 4, 'swarm'); word(15, 28, 'dregs'); goblin(15, 30)
+    # C6 (row 18, ←): dF! — a '!' target the backward find lands on.
+    word(18, 38, 'brute'); word(18, 45, '!', kind='ancient'); goblin(18, 48)
+
+    room.entities.append(Entity(kind='locked_door',     row=_OV_DOOR[0], col=_OV_DOOR[1]))
+    room.entities.append(Entity(kind='heart_container', row=20, col=6))
+    room.entities.append(Entity(kind='chest_scroll',    row=20, col=9))
+    room.entities.append(Entity(kind='exit',            row=20, col=13))
+
+    room.rebuild_indexes()
+    _fog_unreachable(room, room.spawn_pos[0], room.spawn_pos[1])  # hides the sealed vault
+    room.par    = 35
+    room.answer = _OV_ANSWER
+    room.budget = 49                              # ceil(35 * 1.4)
+
+    dungeon = Dungeon(name="The Operator's Vault", seed=seed)
+    dungeon.rooms        = [room]
+    dungeon.current_room = 0
+    return dungeon
