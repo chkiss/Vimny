@@ -1058,6 +1058,22 @@ def _kill_door_group(room, row: int, col: int, kind: str = 'door') -> None:
                     q.append(nb)
 
 
+def _operators_vault_open_if_clear(room) -> str:
+    """The Operator's Vault: open the locked vault door once every goblin is cut
+    down. Undo-safe — gated on a LIVE locked door still existing, not a one-shot
+    flag, so undoing the final kill (which restores both the goblin and the door)
+    re-locks the vault AND re-arms this; re-killing the goblin re-opens it.
+    Returns a banner message, or '' if nothing changed."""
+    if any(e.alive and e.kind == 'goblin' for e in room.entities):
+        return ''
+    door = next((e for e in room._entity_by_kind.get('locked_door', []) if e.alive), None)
+    if door is None:
+        return ''                                  # already open (or no vault)
+    _kill_door_group(room, door.row, door.col, 'locked_door')
+    _reveal_from(room, door.row, door.col)
+    return 'The last guard falls — the vault door grinds open.  🗝'
+
+
 def _spawn_goblin(room, row, col, summoner_uid: int = 0) -> Entity | None:
     for c in (col, col - 1, col + 1):
         if 0 <= c < room.cols and room.is_passable(row, c) and not room.entity_at(row, c):
@@ -3761,16 +3777,13 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
                     _push('The last minion falls — a key clatters to the floor!  🗝  '
                           '(step onto it, then  p  it onto the treasure door)')
 
-            # The Operator's Vault: the vault door grinds open once every goblin is
-            # cut down (they die by d{motion}, which never routes through _on_kill).
-            if (level == 'operators_vault' and not getattr(room, 'vault_open', False)
-                    and not any(e.alive and e.kind == 'goblin' for e in room.entities)):
-                room.vault_open = True
-                door = next((e for e in room._entity_by_kind.get('locked_door', []) if e.alive), None)
-                if door is not None:
-                    _kill_door_group(room, door.row, door.col, 'locked_door')
-                    _reveal_from(room, door.row, door.col)
-                    _push('The last guard falls — the vault door grinds open.  🗝')
+            # The Operator's Vault: open the vault once every goblin is cut down
+            # (they die by d{motion}, which never routes through _on_kill). Undo-safe
+            # (gated on the door, not a flag) — undo re-locks it, a re-kill re-opens.
+            if level == 'operators_vault':
+                _ov_msg = _operators_vault_open_if_clear(room)
+                if _ov_msg:
+                    _push(_ov_msg)
 
             # Warden summon message
             if tick_msgs and not player.is_dead:

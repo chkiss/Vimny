@@ -87,4 +87,31 @@ def test_answer_solves_the_vault(monkeypatch):
     assert state['hp'] == 6                           # unharmed — goblins cut down at range
     assert cap['budget'].spent == room.par            # solved in exactly par keystrokes
     assert not any(e.alive for e in room.entities if e.kind == 'goblin')
-    assert getattr(room, 'vault_open', False)
+    assert not any(e.alive and e.kind == 'locked_door' for e in room.entities)  # vault open
+
+
+# ── undo-safety: undo re-locks the vault, a re-kill re-opens it ───────────────
+def test_vault_open_is_undo_safe():
+    """The open is gated on the door, not a one-shot flag — so when undo restores
+    the final goblin AND re-locks the door, killing the goblin again re-opens it.
+    Regression: a `vault_open` flag would stick and leave the door permanently shut."""
+    room = _room()
+    door_alive = lambda: any(e.alive and e.kind == 'locked_door' for e in room.entities)
+
+    for g in [e for e in room.entities if e.kind == 'goblin']:   # clear the vault
+        room.kill_entity(g)
+    assert main._operators_vault_open_if_clear(room)             # door grinds open…
+    assert not door_alive()
+
+    # undo restores a live goblin and re-locks the door (what _snapshot/_pop do)
+    last = next(e for e in room.entities if e.kind == 'goblin')
+    last.alive = True
+    door = next(e for e in room.entities if e.kind == 'locked_door')
+    door.alive = True
+    room.rebuild_indexes()
+    assert door_alive()
+    assert main._operators_vault_open_if_clear(room) == ''       # stays locked: a goblin lives
+
+    room.kill_entity(last)                                       # cut it down again
+    assert main._operators_vault_open_if_clear(room)             # …and the vault re-opens
+    assert not door_alive()
