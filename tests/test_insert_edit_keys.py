@@ -3,8 +3,6 @@
 Engine-level coverage for <C-w> (delete word back) and <C-u> (delete to line
 start) via engine.insert, plus the clip→text flattening that backs <C-r>
 register paste in main.py."""
-import pytest
-
 from engine.world import Room, RoomType, CellType, CharRun
 from engine.player import Player
 from engine.insert import insert_delete_word_back, insert_delete_to_start

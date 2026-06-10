@@ -1,8 +1,6 @@
 """Blocks B–F — Vim-magic regex translation (engine/vimregex.py) and its use
 in engine/search.py. Verifies the atoms the scrolls teach, plus backward
 compatibility: a plain word still behaves like a literal substring search."""
-import pytest
-
 from engine.vimregex import compile_vim
 from engine.search import _match_positions, find_next, match_cells
 from engine.world import Room, CharRun, RoomType

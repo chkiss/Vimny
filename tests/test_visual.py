@@ -1,11 +1,10 @@
 """Tests for Block D2 — engine/visual.py: selection span, highlight membership,
 and operator application (charwise / linewise / block)."""
-import pytest
 from engine.world import Room, RoomType, CellType, CharRun
 from engine.player import Player
 from engine.modes import Mode
 from engine.text_object import TextObjectType
-from engine.visual import visual_span, in_selection, block_bounds, apply_visual
+from engine.visual import visual_span, in_selection, apply_visual
 
 ROWS, COLS = 7, 24
 

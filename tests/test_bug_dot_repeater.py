@@ -2,10 +2,8 @@
 
 Personality defined in agents/bug_testers.md.
 """
-import pytest
 from engine.vim_parser import parse
 from engine.modes import Mode
-from engine.world import Room, RoomType, CellType, Entity
 from engine.player import Player
 from engine.command_guard import action_allowed, guard_message
 

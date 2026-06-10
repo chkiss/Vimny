@@ -2,7 +2,6 @@
 
 Personality defined in agents/bug_testers.md.
 """
-import pytest
 from engine.world import Room, RoomType, CellType, Entity
 from engine.player import Player
 from engine.budget import Budget

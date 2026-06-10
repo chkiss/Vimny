@@ -6,7 +6,6 @@ flows (repeat after a paid find, undo of a discounted repeat, redo) are unaffect
 
 Driven through the real run_dungeon keystroke loop on a hand-built one-line room.
 """
-import pytest
 from blessed import Terminal
 from blessed.keyboard import Keystroke
 

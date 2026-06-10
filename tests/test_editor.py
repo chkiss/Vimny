@@ -1,11 +1,10 @@
 """Tests for engine/editor.py: snapshot/restore, cut/paste, merge, range ops."""
-import pytest
 from engine.world import Room, RoomType, CellType, Entity, CharRun
 from engine.player import Player
 from engine.editor import (
     _merge_adjacent_char_runs,
     _ed_cut, _ed_snapshot, _ed_restore, _ed_subst,
-    _ed_paste, _ed_row_items, _ed_clear_row,
+    _ed_paste, _ed_clear_row,
     _ed_range_items, _ed_delete_range,
     _clip_desc, _serialize_room, _deserialize_room,
 )

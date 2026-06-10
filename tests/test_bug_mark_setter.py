@@ -5,7 +5,6 @@ these drive the real keystroke loop (admin player bypasses gating) and inspect t
 captured Player: the marks dict, exact (`) vs first-non-blank (') jumps, unset
 marks, and the jumplist interaction.
 """
-import pytest
 from blessed import Terminal
 from blessed.keyboard import Keystroke
 

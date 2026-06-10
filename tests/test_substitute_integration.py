@@ -1,6 +1,5 @@
 """End-to-end :s / :g / & through the real run_dungeon loop: undo, the c (confirm)
 flag, :v / :g! inversion, and budget. Driven on plain custom rooms (admin player)."""
-import pytest
 from blessed import Terminal
 from blessed.keyboard import Keystroke
 

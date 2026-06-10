@@ -4,7 +4,6 @@ import pytest
 from generation.dungeon_gen import (
     build_dungeon_counting_crypts, _dijkstra_par_count, _par_counting_crypts, _COUNTING_CRYPTS_PLAN,
 )
-from engine.world import RoomType
 
 from tests import SEEDS
 

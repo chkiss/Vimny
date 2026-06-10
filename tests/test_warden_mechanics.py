@@ -10,8 +10,6 @@ Bug 2: _reposition_warden_shield now FLIPS the shield to the OPPOSITE
 import random
 from types import SimpleNamespace
 
-import pytest
-
 from engine.world import CellType, Entity, Room, RoomType
 from main import (
     _do_warden_move,

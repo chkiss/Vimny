@@ -2,10 +2,9 @@
 
 Personality defined in agents/bug_testers.md.
 """
-import pytest
 from engine.world import Room, RoomType, CellType, Entity, CharRun
 from engine.player import Player
-from engine.motion import apply_motion, _apply_find
+from engine.motion import apply_motion
 
 
 def _bare_room(rows=7, cols=40):

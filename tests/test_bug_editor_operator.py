@@ -4,7 +4,6 @@ Personality defined in agents/bug_testers.md. Exercises engine/editor.py's range
 helpers directly (no Terminal): the cut/range/clear/snapshot paths behind dw, d$,
 dd, yy, cw in :edit mode, plus the merge-after-cut and undo-restore invariants.
 """
-import pytest
 from engine.world import Room, RoomType, CellType, CharRun, Entity
 from engine.player import Player
 from engine.editor import (

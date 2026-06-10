@@ -3,7 +3,6 @@ to the match (Vim's search-as-motion), staying in visual mode with the anchor fi
 
 Driven through the real run_dungeon keystroke loop on a tiny hand-built dungeon, with
 render_all patched to snapshot (mode, cursor, anchor) every frame."""
-import pytest
 from blessed.keyboard import Keystroke
 from blessed import Terminal
 

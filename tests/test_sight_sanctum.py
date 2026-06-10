@@ -1,6 +1,5 @@
 """The Sight Sanctum: dungeon correctness and visual-mode undo tests."""
 import math
-import pytest
 from generation.dungeon_gen import build_dungeon_sight_sanctum
 from engine.world import Room, RoomType, CellType, CharRun, Entity
 from engine.player import Player

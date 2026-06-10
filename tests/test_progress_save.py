@@ -3,9 +3,6 @@
 Tests the actual progress-update block from main.py's run_overworld loop
 by importing the dispatch logic directly, so regressions in main.py are caught.
 """
-import types
-import importlib
-import sys
 
 
 def _progress_update(dung_result: dict, progress: dict, level: int) -> None:

@@ -1,5 +1,4 @@
 """Tests for engine/budget.py — spend (frozen), remaining, is_over."""
-import pytest
 from engine.budget import Budget
 
 

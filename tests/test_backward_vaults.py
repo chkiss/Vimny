@@ -4,8 +4,7 @@ from engine.world import CellType
 from generation.dungeon_gen import (
     build_dungeon_backward_vaults,
     _par_backward_vaults,
-    _BACKWARD_VAULTS_TOTAL_ROWS, _BACKWARD_VAULTS_TOTAL_COLS, _BACKWARD_VAULTS_CORR_ROWS,
-    _BACKWARD_VAULTS_TURN_SPANS,
+    _BACKWARD_VAULTS_CORR_ROWS, _BACKWARD_VAULTS_TURN_SPANS,
 )
 
 from tests import SEEDS

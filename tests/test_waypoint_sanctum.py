@@ -11,7 +11,6 @@ goblin horde.  'a reaches the optional scroll nook (sanctum row's first-left cel
 The sanctum sits high so M never lands on the scroll.  Structure fixed; only prose
 decor varies by seed.
 """
-import os
 import pytest
 
 from generation.dungeon_gen import (

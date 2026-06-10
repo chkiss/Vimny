@@ -1,8 +1,7 @@
 """Tests for combat / enemy-tick behaviour in main.py."""
-import pytest
 from engine.world import Room, RoomType, CellType, Entity
 from engine.player import Player
-from main import _enemy_tick, _do_warden_move, _reposition_warden_shield, _on_kill, _remove_warden_shields
+from main import _enemy_tick, _do_warden_move, _on_kill, _remove_warden_shields
 
 ROWS, COLS = 7, 30
 

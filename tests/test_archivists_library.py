@@ -4,7 +4,6 @@ the lethal-Archivist reckoning, driven through the real run_dungeon keystroke lo
 The suit order is seeded, so each test reads room.lib_seq to build its keystroke
 script (which name to :w at which manuscript) rather than hard-coding the order.
 """
-import pytest
 from blessed.keyboard import Keystroke
 from blessed import Terminal
 

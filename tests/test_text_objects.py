@@ -1,6 +1,5 @@
 """Tests for Block K — resolve_text_object: word, brackets (nesting), quotes,
 angle, paragraph, and sentence objects over the 2D grid. Tags (it/at) deferred."""
-import pytest
 from engine.world import Room, RoomType, CellType, CharRun
 from engine.player import Player
 from engine.text_object import resolve_text_object, TextObjectType

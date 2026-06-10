@@ -2,7 +2,6 @@
 not-yet-discovered scroll from this pool. Verifies catalog integrity and the
 picker's no-repeat / exhaustion behaviour."""
 import random
-import pytest
 
 from content.scrolls import SCROLL_CATALOG, RELIC_SCROLL_IDS, pick_relic_scroll
 

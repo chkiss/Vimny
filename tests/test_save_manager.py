@@ -1,7 +1,4 @@
 """Tests for save/save_manager.py — slug, round-trip I/O, progress helpers."""
-import json
-import pytest
-from pathlib import Path
 from save.save_manager import (
     _slug, save_for, load_for, list_saves, save_progress, load_progress,
     load_player_name, save_layout, list_layouts, delete_layout, rename_layout,

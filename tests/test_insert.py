@@ -1,6 +1,5 @@
 """Tests for Block G — engine/insert.py: insert-entry positioning (i a I A o O s S),
 INSERT typing/backspace, and blank-row insertion bookkeeping."""
-import pytest
 from engine.world import Room, RoomType, CellType, CharRun, Entity
 from engine.player import Player
 from engine.insert import (

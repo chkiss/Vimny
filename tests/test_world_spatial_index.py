@@ -1,5 +1,4 @@
 """Phase 2: spatial index correctness — entity_at / char_run_at and all mutation helpers."""
-import pytest
 from engine.world import Room, RoomType, CellType, Entity, CharRun
 
 

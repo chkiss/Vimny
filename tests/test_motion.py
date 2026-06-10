@@ -1,5 +1,4 @@
 """Tests for engine/motion.py: apply_motion, move_player, _cell_char, _fog_unreachable, _reveal_from."""
-import pytest
 from engine.world import Room, RoomType, CellType, Entity, CharRun
 from engine.player import Player
 from engine.motion import apply_motion, move_player, _fog_unreachable, _reveal_from, _cell_char

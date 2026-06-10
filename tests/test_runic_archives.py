@@ -19,7 +19,7 @@ from engine.world import CellType
 from generation.dungeon_gen import (
     _par_runic_archives,
     _RUNIC_ARCHIVES_ROWS, _RUNIC_ARCHIVES_COLS,
-    _RUNIC_ARCHIVES_ENTRY, _RUNIC_ARCHIVES_EXIT,
+    _RUNIC_ARCHIVES_EXIT,
     _RUNIC_ARCHIVES_KEY_POS, _RUNIC_ARCHIVES_DOOR_POS, _RUNIC_ARCHIVES_VOID_POS,
     _RUNIC_ARCHIVES_PAR, _RUNIC_ARCHIVES_ANSWER,
 )

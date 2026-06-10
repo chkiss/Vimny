@@ -2,11 +2,10 @@
 
 Personality defined in agents/bug_testers.md.
 """
-import pytest
 from engine.world import Room, RoomType, CellType, Entity
 from engine.player import Player
 from main import (
-    _enemy_tick, _do_warden_move,
+    _enemy_tick,
     _remove_warden_shields, _on_kill, _spawn_goblin,
 )
 

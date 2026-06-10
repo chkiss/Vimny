@@ -1,6 +1,5 @@
 """Tests for Block F search — engine/search.py: substring matching over clusters,
 forward/backward with wraparound, match-column landing, word-under-cursor."""
-import pytest
 from engine.world import Room, RoomType, CellType, CharRun
 from engine.player import Player
 from engine.search import find_next, word_under_cursor, _match_positions

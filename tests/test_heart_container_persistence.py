@@ -6,7 +6,6 @@ discards it, and a plain :q is blocked (E37) while the pickup is unsaved.  Regre
 pickup used to mutate `progress` immediately, so a heart survived an unsaved exit.
 
 Driven through the real run_dungeon loop on a tiny hand-built dungeon."""
-import pytest
 from blessed.keyboard import Keystroke
 from blessed import Terminal
 

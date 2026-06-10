@@ -4,7 +4,6 @@ Inserting pushes content right and shoves overflow past a fixed brink (wall/void
 deleting pulls the tail left. `is_ledge` is always True, so a row reflows whether or
 not it carries a void rune — the regression tests at the bottom pin that down.
 """
-import pytest
 from engine.world import Room, RoomType, CellType, CharRun, Entity
 from engine.player import Player
 from engine.reflow import (

@@ -5,7 +5,6 @@ annotations) requires Python 3.10+.  Using `from __future__ import
 annotations` defers evaluation so the syntax is safe on 3.9.
 """
 import importlib
-import sys
 
 
 MODULES = [

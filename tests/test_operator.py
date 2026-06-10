@@ -8,7 +8,7 @@ from engine.text_object import (
     TextObject, TextObjectType, classify, compute_text_object,
 )
 from engine.operator import (
-    line_extent, capture, op_yank, op_delete, op_paste, op_case, op_join, case_char,
+    line_extent, op_yank, op_delete, op_paste, op_case, op_join, case_char,
     apply_indent, INDENT_WIDTH,
 )
 
