@@ -1,6 +1,4 @@
 """The WORD Forge: dungeon correctness tests."""
-import math
-import heapq
 import pytest
 from generation.dungeon_gen import build_dungeon_word_forge, _dijkstra_par_WBE, _WORD_FORGE_UNTYPABLE_PUNCT
 
@@ -26,13 +24,7 @@ def test_par_matches_dijkstra(seed):
     )
 
 
-@pytest.mark.parametrize("seed", SEEDS)
-def test_budget_is_ceil_par_times_1_4(seed):
-    d = build_dungeon_word_forge(seed)
-    room = d.rooms[0]
-    assert room.budget == math.ceil(room.par * 1.4), (
-        f"seed={seed}: budget={room.budget} but ceil(par*1.4)={math.ceil(room.par*1.4)}"
-    )
+# (Budget formula: covered by the universal test in test_answer_paths.py.)
 
 
 @pytest.mark.parametrize("seed", SEEDS)

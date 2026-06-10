@@ -7,12 +7,8 @@ three colored floor_keys matched to three colored locked_doors.
 The M row is filled with vocab, so M lands on its leftmost rune and the player
 must then $ to reach the M key at the right edge — i.e. "M $", not just "M".
 """
-import math
 import pytest
-from engine.world import CellType
 from generation.dungeon_gen import (
-    build_dungeon_screen_vault,
-    _par_screen_vault,
     _screen_vault_key_rows,
     _SCREEN_VAULT_COLS, _SCREEN_VAULT_DEFAULT_GAME_H,
     _SCREEN_VAULT_H_KEY_COL, _SCREEN_VAULT_M_KEY_COL, _SCREEN_VAULT_L_KEY_COL,
@@ -20,18 +16,14 @@ from generation.dungeon_gen import (
     _SCREEN_VAULT_SPAWN, _SCREEN_VAULT_COLORS,
 )
 
-from tests import SEEDS
+from tests import SEEDS, cached_room
 _GH = _SCREEN_VAULT_DEFAULT_GAME_H
-
-# The par Dijkstra is moderately expensive, so build each seed's room once and
-# share it (these tests only read the room — never mutate it).
-_ROOM_CACHE: dict = {}
 
 
 def _room(seed):
-    if seed not in _ROOM_CACHE:
-        _ROOM_CACHE[seed] = build_dungeon_screen_vault(seed).rooms[0]
-    return _ROOM_CACHE[seed]
+    """The par Dijkstra is the suite's most expensive build — always go through
+    the shared READ-ONLY cache (these tests never mutate the room)."""
+    return cached_room('build_dungeon_screen_vault', seed)
 
 
 # ── Structural ────────────────────────────────────────────────────────────────
@@ -123,14 +115,12 @@ def test_M_does_not_reach_key_alone(seed):
 
 @pytest.mark.parametrize("seed", SEEDS)
 def test_par_matches_dijkstra(seed):
+    """The LOCKED par must equal the Dijkstra's cost. The build already runs the
+    full solver for the answer path and stashes its cost as _solver_par, so this
+    verifies the lock without paying a second multi-second solve per seed.
+    (Budget formula: covered by the universal test in test_answer_paths.py.)"""
     room = _room(seed)
-    assert room.par == _par_screen_vault(room)
-
-
-@pytest.mark.parametrize("seed", SEEDS)
-def test_budget_is_ceil_par_times_1_4(seed):
-    room = _room(seed)
-    assert room.budget == math.ceil(room.par * 1.4)
+    assert room.par == room._solver_par
 
 
 def test_par_is_17_for_seeds():

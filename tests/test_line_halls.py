@@ -17,7 +17,6 @@ The structure and par (8) are seed-independent; the carved runes packing each
 hall randomize per seed (kinds, lengths, positions), so the structural anchors
 that drive the forcing stay fixed while the decoration varies.
 """
-import math
 import pytest
 from engine.world import CellType
 from generation.dungeon_gen import (
@@ -71,11 +70,7 @@ def test_par_is_deterministic():
     assert {build_dungeon_line_halls(s).room.par for s in SEEDS} == {8}
 
 
-@pytest.mark.parametrize("seed", SEEDS)
-def test_budget_is_ceil_par_times_1_4(seed):
-    room = build_dungeon_line_halls(seed).room
-    assert room.budget == math.ceil(room.par * 1.4)
-
+# (Budget formula: covered by the universal test in test_answer_paths.py.)
 
 # ── Command necessity (drop one line motion → cheapest solve must exceed budget) ─
 

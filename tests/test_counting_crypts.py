@@ -90,13 +90,7 @@ def test_par_includes_keystroke_for_every_action(seed):
     )
 
 
-@pytest.mark.parametrize("seed", SEEDS)
-def test_budget_is_ceil_par_times_1_4(seed):
-    d = build_dungeon_counting_crypts(seed)
-    room = d.room
-    import math
-    assert room.budget == math.ceil(room.par * 1.4), \
-        f"seed={seed}: budget={room.budget} but ceil(par*1.4)={math.ceil(room.par*1.4)}"
+# (Budget formula: covered by the universal test in test_answer_paths.py.)
 
 
 @pytest.mark.parametrize("seed", SEEDS)

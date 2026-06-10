@@ -1,5 +1,4 @@
 """The Rune Halls: dungeon correctness tests."""
-import math
 import pytest
 from generation.dungeon_gen import build_dungeon_rune_halls, _dijkstra_par_wbe
 
@@ -25,13 +24,7 @@ def test_par_matches_dijkstra(seed):
     )
 
 
-@pytest.mark.parametrize("seed", SEEDS)
-def test_budget_is_ceil_par_times_1_4(seed):
-    d = build_dungeon_rune_halls(seed)
-    room = d.room
-    assert room.budget == math.ceil(room.par * 1.4), (
-        f"seed={seed}: budget={room.budget} but ceil(par*1.4)={math.ceil(room.par*1.4)}"
-    )
+# (Budget formula: covered by the universal test in test_answer_paths.py.)
 
 
 @pytest.mark.parametrize("seed", SEEDS)

@@ -1,9 +1,14 @@
-"""Answer-path correctness: each token must be an atomic keystroke for the level."""
+"""Answer-path correctness: each token must be an atomic keystroke for the level.
+
+Also home of the universal budget-formula test (budget == ceil(par × 1.4) for
+every level with a keystroke par) — the per-level copies were removed in its
+favour. Both universal tests read the shared build cache (tests.cached_room)."""
 import inspect
+import math
 import re
 import pytest
 import generation.dungeon_gen as _dg
-from generation.dungeon_gen import build_dungeon_first_cave, build_dungeon_line_halls
+from tests import cached_room
 
 SEEDS = [0, 1, 42, 999, 2**20 + 7]   # answer-path set: includes seed 0 by design; differs from tests.SEEDS
 
@@ -120,7 +125,7 @@ def test_answer_cost_equals_par(builder, seed):
     New build_dungeon_* functions are discovered automatically; a discovered
     level with no par/answer fails here (add it to _SKIP_LEVELS if intentional).
     """
-    room = builder(seed).rooms[0]
+    room = cached_room(builder.__name__, seed)
     if room.par is None or not room.answer.strip():
         pytest.fail(
             f"{builder.__name__}: par/answer not set. If this level has no "
@@ -134,12 +139,25 @@ def test_answer_cost_equals_par(builder, seed):
     )
 
 
+@pytest.mark.parametrize("builder,seed", _all_builder_params())
+def test_budget_is_ceil_par_times_1_4(builder, seed):
+    """budget == ceil(par × 1.4) for every level with a keystroke par.
+
+    THE budget-formula test: per-level copies were removed in favour of this
+    auto-discovered one, so a new level is covered the day its builder lands."""
+    room = cached_room(builder.__name__, seed)
+    assert room.budget == math.ceil(room.par * 1.4), (
+        f"{builder.__name__} seed={seed}: budget={room.budget}, "
+        f"ceil(par*1.4)={math.ceil(room.par * 1.4)}"
+    )
+
+
 class TestLevel0AnswerPath:
     """The First Cave has only h/j/k/l.  Answer must not use count notation."""
 
     def test_no_count_notation(self):
         for seed in SEEDS:
-            room = build_dungeon_first_cave(seed).room
+            room = cached_room('build_dungeon_first_cave', seed)
             for token in room.answer.split():
                 assert not _COUNT_RE.match(token), (
                     f"seed={seed}: count notation '{token}' in level-0 answer "
@@ -148,7 +166,7 @@ class TestLevel0AnswerPath:
 
     def test_token_count_equals_par(self):
         for seed in SEEDS:
-            room = build_dungeon_first_cave(seed).room
+            room = cached_room('build_dungeon_first_cave', seed)
             tokens = room.answer.split()
             assert len(tokens) == room.par, (
                 f"seed={seed}: answer has {len(tokens)} tokens but par={room.par}"
@@ -160,7 +178,7 @@ class TestLevel1AnswerPath:
 
     def test_no_count_notation(self):
         for seed in SEEDS:
-            room = build_dungeon_line_halls(seed).room
+            room = cached_room('build_dungeon_line_halls', seed)
             for token in room.answer.split():
                 assert not _COUNT_RE.match(token), (
                     f"seed={seed}: count notation '{token}' in level-1 answer"
@@ -168,7 +186,7 @@ class TestLevel1AnswerPath:
 
     def test_token_count_equals_par(self):
         for seed in SEEDS:
-            room = build_dungeon_line_halls(seed).room
+            room = cached_room('build_dungeon_line_halls', seed)
             tokens = room.answer.split()
             assert len(tokens) == room.par, (
                 f"seed={seed}: answer has {len(tokens)} tokens but par={room.par}"

@@ -71,6 +71,8 @@ The per-level `_par_<slug>` solvers compute each dungeon's minimum-keystroke par
 
 ## Test conventions
 - Dungeon tests: parametrize over `SEEDS = [1, 42, 999, 12345, 2**20 + 7]`; one test per property (reachability, par match, budget formula, command necessity, void safety).
+- **Read-only property tests share builds via `tests.cached_room(builder_name, seed)`** (lru_cache in `tests/__init__.py`) — a dungeon is built once per (builder, seed) for the whole run. NEVER mutate a cached room; a test that simulates play calls its builder directly for a private copy.
+- The budget formula (`budget == ceil(par × 1.4)`) and answer cost are asserted ONCE, universally, in `tests/test_answer_paths.py` (auto-discovered over every `build_dungeon_*`); don't add per-level copies.
 - Command necessity: BFS with restricted command set; assert `cost > room.budget`.
 - File I/O tests: `monkeypatch.setattr('save.save_manager.SAVES_DIR', tmp_path)` to avoid touching `~/.Vimny`.
 - Motion/editor tests: build a minimal `Room` fixture with `rebuild_indexes()` rather than using a full dungeon.

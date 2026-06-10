@@ -2,8 +2,9 @@
 
 For levels 0–4 each level's par equals its BFS/Dijkstra solver re-run on the
 final room (trivially passes today; catches future solver regressions). The
-Counting Crypts par is also validated in test_counting_crypts.py; the universal
-budget test here covers it alongside every other level.
+universal budget-formula and answer-cost tests live in test_answer_paths.py
+(auto-discovered over every builder); this file keeps the bespoke per-level
+par references. Rooms come from the shared READ-ONLY build cache.
 
 The Goblin Gauntlet par is checked against a hand-written reference
 (_par_goblin_gauntlet_reference below) that models its cheapest command set:
@@ -17,17 +18,13 @@ The Goblin Gauntlet par is checked against a hand-written reference
 import math
 import pytest
 from generation.dungeon_gen import (
-    build_dungeon_first_cave, build_dungeon_line_halls, build_dungeon_counting_crypts,
-    build_dungeon_rune_halls, build_dungeon_character_cataracts, build_dungeon_goblin_gauntlet,
-    build_dungeon_word_forge, build_dungeon_backward_vaults, build_dungeon_lineheads,
-    build_dungeon_wardens_keep, _par_wardens_keep,
+    _par_wardens_keep,
     _bfs_par, _bfs_par_line,
-    _par_counting_crypts,
     _dijkstra_par_wbe, _dijkstra_par_ftFT,
     _GOBLIN_GAUNTLET_CORR_ROWS, _GOBLIN_GAUNTLET_RIGHT_GOING,
 )
 
-from tests import SEEDS
+from tests import SEEDS, cached_room
 
 
 # ── level-5 reference helpers ─────────────────────────────────────────────────
@@ -90,52 +87,11 @@ def _par_goblin_gauntlet_reference(corr_data: list, gobs_17: list) -> int:
     return max(total, 10)
 
 
-# ── universal: budget == ceil(par × 1.4) for every level ─────────────────────
-
-@pytest.mark.parametrize("seed", SEEDS)
-@pytest.mark.parametrize("builder,slug", [
-    (build_dungeon_first_cave, 'first_cave'), (build_dungeon_line_halls, 'line_halls'), (build_dungeon_counting_crypts, 'counting_crypts'),
-    (build_dungeon_rune_halls, 'rune_halls'), (build_dungeon_character_cataracts, 'character_cataracts'), (build_dungeon_goblin_gauntlet, 'goblin_gauntlet'),
-    (build_dungeon_word_forge, 'word_forge'), (build_dungeon_backward_vaults, 'backward_vaults'), (build_dungeon_lineheads, 'lineheads'),
-])
-def test_budget_is_ceil_par_times_1_4(builder, slug, seed):
-    room = builder(seed).room
-    assert room.budget == math.ceil(room.par * 1.4), (
-        f"{slug} seed={seed}: budget={room.budget}, "
-        f"ceil(par*1.4)={math.ceil(room.par * 1.4)}"
-    )
-
-
-# ── universal: answer key length == par (catches Dijkstra cost-model bugs) ───
-
-@pytest.mark.parametrize("seed", SEEDS)
-@pytest.mark.parametrize("builder,slug", [
-    (build_dungeon_first_cave, 'first_cave'), (build_dungeon_line_halls, 'line_halls'), (build_dungeon_counting_crypts, 'counting_crypts'),
-    (build_dungeon_rune_halls, 'rune_halls'), (build_dungeon_character_cataracts, 'character_cataracts'), (build_dungeon_goblin_gauntlet, 'goblin_gauntlet'),
-    (build_dungeon_word_forge, 'word_forge'), (build_dungeon_backward_vaults, 'backward_vaults'), (build_dungeon_lineheads, 'lineheads'),
-])
-def test_answer_key_length_matches_par(builder, slug, seed):
-    """Non-space chars in room.answer must equal room.par.
-
-    Each character in the answer string is one keypress; the par is the total
-    keystroke budget cost for the optimal solution.  A mismatch means the
-    Dijkstra cost model diverges from _keystroke_cost in main.py.
-    """
-    room = builder(seed).room
-    if not room.answer:
-        return  # level has no answer key (e.g. the Warden's Keep boss)
-    ans_len = len(room.answer.replace(' ', ''))
-    assert ans_len == room.par, (
-        f"{slug} seed={seed}: answer has {ans_len} keypresses "
-        f"but par={room.par}"
-    )
-
-
 # ── The First Cave: par == BFS ────────────────────────────────────────────────
 
 @pytest.mark.parametrize("seed", SEEDS)
 def test_first_cave_par_matches_bfs(seed):
-    room = build_dungeon_first_cave(seed).room   # _fog_unreachable never called for The First Cave
+    room = cached_room('build_dungeon_first_cave', seed)   # _fog_unreachable never called for The First Cave
     expected = _bfs_par(room)
     assert expected is not None, f"seed={seed}: BFS found no path"
     assert room.par == expected, f"seed={seed}: par={room.par}, BFS={expected}"
@@ -145,7 +101,7 @@ def test_first_cave_par_matches_bfs(seed):
 
 @pytest.mark.parametrize("seed", SEEDS)
 def test_line_halls_par_matches_bfs(seed):
-    room = build_dungeon_line_halls(seed).room   # _fog_unreachable never called for The Line Halls
+    room = cached_room('build_dungeon_line_halls', seed)   # _fog_unreachable never called for The Line Halls
     expected = _bfs_par_line(room)
     assert expected is not None, f"seed={seed}: BFS found no path"
     assert room.par == expected, f"seed={seed}: par={room.par}, BFS={expected}"
@@ -155,7 +111,7 @@ def test_line_halls_par_matches_bfs(seed):
 
 @pytest.mark.parametrize("seed", SEEDS)
 def test_rune_halls_par_matches_dijkstra(seed):
-    room = build_dungeon_rune_halls(seed).room   # _fog_unreachable never called for The Rune Halls
+    room = cached_room('build_dungeon_rune_halls', seed)   # _fog_unreachable never called for The Rune Halls
     expected = _dijkstra_par_wbe(room)
     assert expected is not None, f"seed={seed}: Dijkstra found no path"
     assert room.par == expected, f"seed={seed}: par={room.par}, Dijkstra={expected}"
@@ -165,7 +121,7 @@ def test_rune_halls_par_matches_dijkstra(seed):
 
 @pytest.mark.parametrize("seed", SEEDS)
 def test_character_cataracts_par_matches_dijkstra(seed):
-    room = build_dungeon_character_cataracts(seed).room   # _fog_unreachable never called for The Character Cataracts
+    room = cached_room('build_dungeon_character_cataracts', seed)   # _fog_unreachable never called for The Character Cataracts
     expected = _dijkstra_par_ftFT(room)
     assert expected is not None, f"seed={seed}: Dijkstra found no path"
     assert room.par == expected, f"seed={seed}: par={room.par}, Dijkstra={expected}"
@@ -179,7 +135,7 @@ def test_goblin_gauntlet_par_matches_reference(seed):
     across right-going corridors (fg only on the first), and $ / 0 cross water
     to each connector in a single keystroke.
     """
-    room = build_dungeon_goblin_gauntlet(seed).room
+    room = cached_room('build_dungeon_goblin_gauntlet', seed)
     corr_data, gobs_17 = _extract_goblin_gauntlet_data(room)
     expected = _par_goblin_gauntlet_reference(corr_data, gobs_17)
     assert room.par == expected, (
@@ -197,7 +153,7 @@ def test_wardens_keep_completion_only():
     """
     expected_budget = math.ceil(_par_wardens_keep() * 1.4)
     for seed in SEEDS:
-        room = build_dungeon_wardens_keep(seed).room
+        room = cached_room('build_dungeon_wardens_keep', seed)
         assert room.par is None, f"seed={seed}: boss level must have par=None"
         assert room.budget == expected_budget, (
             f"seed={seed}: budget={room.budget}, expected {expected_budget}"

@@ -4356,12 +4356,16 @@ def build_dungeon_screen_vault(seed: int, game_h: int = _SCREEN_VAULT_DEFAULT_GA
     composite.rebuild_indexes()
 
     # ── Par / answer ──────────────────────────────────────────────────────────
-    # Par is locked at _SCREEN_VAULT_PAR (deterministic; test_level_10 runs the solver to
-    # verify).  The answer path is only shown to admin, so solve for it only when
-    # compute_answer is set — the Dijkstra is too slow to run on every load.
+    # Par is locked at _SCREEN_VAULT_PAR (deterministic).  The answer path is only
+    # shown to admin, so solve for it only when compute_answer is set — the
+    # Dijkstra is too slow to run on every load.  The solver's own cost rides
+    # along as _solver_par so the par-lock test can verify without re-solving.
     composite.par    = _SCREEN_VAULT_PAR
     composite.budget = math.ceil(_SCREEN_VAULT_PAR * 1.4)
-    composite.answer = _par_screen_vault(composite, return_path=True)[1] if compute_answer else ''
+    if compute_answer:
+        composite._solver_par, composite.answer = _par_screen_vault(composite, return_path=True)
+    else:
+        composite.answer = ''
 
     dungeon.rooms        = [composite]
     dungeon.current_room = 0
