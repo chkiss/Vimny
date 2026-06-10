@@ -230,6 +230,22 @@ class TestEdSnapshotRestore:
         _ed_restore(room, p, snap)
         assert room.char_run_at(3, 5) is not None  # index rebuilt
 
+    def test_snapshot_keeps_all_entity_fields(self):
+        """An editor undo must not cripple entities: combat stats, AI, colour tag
+        and edit-immunity all round-trip through snapshot/restore (clone_entity)."""
+        room = _make_room()
+        w = Entity(kind='warden', row=2, col=3, hp=5, max_hp=5, ai='chase',
+                   ai_speed=2, tag='pathfinder', edit_immune=True, scroll_id='x')
+        room.add_entity(w)
+        p = _player()
+        snap = _ed_snapshot(room, p)
+        room.entities.clear()
+        room.rebuild_indexes()
+        _ed_restore(room, p, snap)
+        r = room.entity_at(2, 3)
+        assert (r.max_hp, r.ai, r.ai_speed, r.tag, r.edit_immune, r.scroll_id, r.uid) \
+            == (5, 'chase', 2, 'pathfinder', True, 'x', w.uid)
+
 
 # ── _ed_subst ─────────────────────────────────────────────────────────────────
 
@@ -292,6 +308,15 @@ class TestEdPaste:
         e = room.entity_at(3, 7)
         assert e is not None
         assert e.kind == 'chest'
+
+    def test_paste_entity_keeps_combat_fields_with_fresh_uid(self):
+        room = _make_room()
+        src = Entity(kind='goblin', row=0, col=0, hp=1, max_hp=1, ai='chase',
+                     ai_speed=2, tag='echo')
+        _ed_paste(room, 3, 7, [{'type': 'entity', 'entity': src}])
+        e = room.entity_at(3, 7)
+        assert (e.max_hp, e.ai, e.ai_speed, e.tag) == (1, 'chase', 2, 'echo')
+        assert e.uid != src.uid                   # a paste is a NEW creature
 
     def test_paste_exit_entity_updates_exit_pos(self):
         room = _make_room()

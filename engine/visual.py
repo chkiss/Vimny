@@ -135,6 +135,12 @@ def apply_visual(op: str, anchor, cursor, vmode, room, player):
 
 def _apply_block(op: str, anchor, cursor, room, player):
     r1, r2, c1, c2 = block_bounds(anchor, cursor)
+    if op in ('>', '<'):                  # block indent shifts the whole LINES (Vim)
+        amount = INDENT_WIDTH if op == '>' else -INDENT_WIDTH
+        for r in range(r1, r2 + 1):
+            apply_indent(room, r, amount)
+        _cursor_to_line_start(room, player, r1)
+        return None
     rows = [_capture_row(room, r, c1, c2) for r in range(r1, r2 + 1)]
     if op in ('d', 'c'):
         for r in range(r1, r2 + 1):

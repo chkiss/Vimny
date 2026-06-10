@@ -16,7 +16,7 @@ from engine.modes import Mode
 from engine.budget import Budget
 from engine.vim_parser import parse, parse_visual_textobj
 from engine.command_guard import action_allowed as _action_allowed, guard_message as _guard_message
-from engine.world import Entity, CellType, CharRun, Dungeon
+from engine.world import Entity, CellType, CharRun, Dungeon, clone_entity
 from engine.motion import apply_motion, _apply_esc, _reveal_from, _first_non_blank_col
 from engine.text_object import compute_text_object, resolve_text_object, TextObjectType
 from engine.search import find_next as _search_next, word_under_cursor as _word_under_cursor
@@ -911,7 +911,7 @@ def _operator_cost(action: dict) -> int:
     return c
 
 
-def _calc_stars(won: bool, budget: Budget, room, player, level: int = 0) -> int:
+def _calc_stars(won: bool, budget: Budget, room, player, level: str = '') -> int:
     if not won:
         return 0
     if level_type(level) != 'dungeon':
@@ -947,15 +947,7 @@ def _snapshot(room, player, budget, *, row=None, col=None, spent=None, ans=None)
         'row':      player.row  if row   is None else row,
         'col':      player.col  if col   is None else col,
         'spent':    budget.spent if spent is None else spent,
-        'entities': [Entity(kind=e.kind, row=e.row, col=e.col, hp=e.hp, alive=e.alive,
-                            max_hp=e.max_hp, ai=e.ai, ai_speed=e.ai_speed,
-                            ai_tick=e.ai_tick, summon_timer=e.summon_timer,
-                            goblin_free_turns=e.goblin_free_turns,
-                            uid=e.uid, summoner_uid=e.summoner_uid,
-                            origin_row=e.origin_row, move_dir=e.move_dir,
-                            tag=e.tag, scroll_id=e.scroll_id,
-                            edit_immune=e.edit_immune, shade=e.shade)
-                     for e in room.entities],
+        'entities': [clone_entity(e) for e in room.entities],
         'char_runs': [CharRun(ru.row, ru.col, ru.symbols, ru.kind) for ru in room.char_runs],
         'cells':    [r[:] for r in room.cells],
         'rows':     room.rows,
@@ -2021,7 +2013,10 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
                    "into a single endless line.")
         msg_ttl = 80
 
-    any_water     = any(ct == CellType.WATER for row in room.cells for ct in row)
+    def _room_has_water() -> bool:
+        return any(ct == CellType.WATER for cells_row in room.cells for ct in cells_row)
+
+    any_water     = _room_has_water()
     last_activity = time.time()
 
     def _goblin_msg(base: str) -> str:
@@ -2168,6 +2163,9 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
                         room = dungeon.room
                         player.row, player.col = room.spawn_pos
                         player.wrap = False                  # opens nowrap
+                        undo_stack.clear()                   # old snapshots belong to the arena room
+                        redo_stack.clear()
+                        any_water = _room_has_water()
                         _push('You plunge into the wardenverse — it reshapes to your terminal.  '
                               ':set wrap to fold the line, gj/gk to chase him, :set nowrap to still him.')
                     elif dungeon.current_room != 0:
@@ -2257,6 +2255,7 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
                     door_open_hint_shown = set()
                     msg_pool             = []
                     msg_idx              = 0
+                    any_water            = _room_has_water()
                     _push('Dungeon restarted. Good luck.' if player_name != 'admin' else 'New dungeon loaded.')
 
                 elif cmd == 'edit' and player_name == 'admin':
@@ -3269,6 +3268,8 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
                     interacted = True
                 elif cur and (cur.kind in ('goblin', 'warden')
                               or (cur.kind == 'archivist' and getattr(room, 'lib_hostile', False))):
+                    undo_stack.append(_snapshot(room, player, budget, ans=cmd_start_ans))
+                    redo_stack.clear()
                     cur.hp -= 1
                     budget.spend(1)
                     interacted = True
@@ -3330,6 +3331,9 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
                                 room = dungeon.room
                                 player.row, player.col = (12, 60)
                                 player.wrap = False
+                                undo_stack.clear()           # verse snapshots can't restore the arena
+                                redo_stack.clear()
+                                any_water = _room_has_water()
                                 msg_pool.clear()
                                 if any(e.alive and e.kind == 'goblin' for e in room.entities):
                                     # minions remain — the key drops when the last one falls (per-turn check)
@@ -3356,6 +3360,8 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
                     else:
                         _push(f'Hit! ({cur.hp}/{cur.max_hp} HP)')
                 elif cur and cur.kind == 'shield':
+                    undo_stack.append(_snapshot(room, player, budget, ans=cmd_start_ans))
+                    redo_stack.clear()
                     room.kill_entity(cur)
                     _reg_write(player, '"', entity_clip(cur), is_delete=True)
                     budget.spend(1)
@@ -3367,6 +3373,11 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
                     player.max_hp += 2
                     room.kill_entity(cur)
                     budget.spend(1)
+                    # The upgrade is an undo BARRIER (like the seal door): snapshots
+                    # don't carry max_hp, so undoing past the pickup would revive the
+                    # heart while keeping the +2 — re-grab it and stack hearts forever.
+                    undo_stack.clear()
+                    redo_stack.clear()
                     # The +HP is yours for this run, but the upgrade only PERSISTS when
                     # the player writes (:w / :wq) — quitting with :q discards it, like
                     # any unsaved change.  Stage it here; commit at write time.
@@ -4656,11 +4667,7 @@ def run_overworld(term: Terminal, player: Player, progress: dict,
 def main():
     ap = argparse.ArgumentParser(description='Vimny — Vim dungeon crawler')
     ap.add_argument('--level', type=str, default=None,
-                    choices=['first_cave', 'line_halls', 'reliquary', 'counting_crypts',
-                             'rune_halls', 'character_cataracts', 'goblin_gauntlet',
-                             'wardens_keep', 'word_forge', 'backward_vaults', 'lineheads',
-                             'warden_surveyor', 'sight_sanctum', 'seekers_labyrinth',
-                             'waypoint_sanctum', 'archivists_library', 'dummy'],
+                    choices=[lv['slug'] for lv in LEVELS],
                     help='skip overworld and start at this level slug (debug)')
     args = ap.parse_args()
 

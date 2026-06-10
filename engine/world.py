@@ -1,5 +1,5 @@
 from __future__ import annotations
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace as _dc_replace
 from enum import Enum, auto
 from itertools import count as _count
 from typing import Optional
@@ -48,6 +48,15 @@ class Entity:
                             # only by normal-mode x. See engine/visual + The Warden Pathfinder.
     shade:        int = 0   # cosmetic colour index — the impostor Wardens (goblin tag='echo')
                             # each pick a slightly different red so the player sees a myriad.
+
+
+def clone_entity(e: Entity, fresh_uid: bool = False, **overrides) -> Entity:
+    """Field-complete Entity copy — the ONE way to snapshot/duplicate an entity,
+    so new fields can never silently drop out of a copy again. Keeps the uid
+    (snapshot identity) unless ``fresh_uid`` (a paste-back is a new creature)."""
+    if fresh_uid:
+        overrides.setdefault('uid', next(_uid_seq))
+    return _dc_replace(e, **overrides)
 
 
 def strike_disguise(ent) -> bool:

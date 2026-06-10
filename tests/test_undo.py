@@ -9,6 +9,10 @@ Covered actions
   door x        — dict format (interact handler)
   dynamite step — dict format (motion handler, upgraded from tuple at explosion time)
   locked_door p — dict format; key read from " (NOT consumed), door restored on undo
+  combat x      — dict format (strike snapshot; u revives the foe's HP + refunds the key)
+  shield x      — dict format (shield restored on undo)
+  heart_container x — undo BARRIER: stacks cleared (snapshots don't carry max_hp,
+                  so undoing past the pickup would let the +2 stack forever)
 
 Why an action can be missed
   test_all_entity_mutations_undoable hardcodes every entity-killing action.
@@ -325,6 +329,51 @@ def test_undo_without_a_key_is_normal():
     assert result == 'undo'
     assert (player.row, player.col) == (2, 1) and budget.spent == 0
     assert undo_stack == []
+
+
+def test_combat_x_undo_revives_hp_and_refunds_the_key():
+    """A combat strike pushes its own snapshot: u revives the foe's HP, refunds
+    exactly the strike's keystroke, and a redo re-lands it (no free hits)."""
+    from main import _snapshot, _pop_history_step
+    room = _corridor()
+    warden = Entity(kind='warden', row=2, col=5, hp=5, max_hp=5)
+    room.add_entity(warden)
+    player = Player(row=2, col=5)
+    budget = Budget(20)
+    budget.spent = 3
+    undo_stack, redo_stack = [], []
+
+    undo_stack.append(_snapshot(room, player, budget))      # the combat-branch push
+    warden.hp -= 1
+    budget.spend(1)
+
+    assert _pop_history_step(undo_stack, redo_stack, room, player, budget)
+    restored = room.entity_at(2, 5)
+    assert restored.hp == 5 and restored.max_hp == 5, "undo must revive the struck HP"
+    assert budget.spent == 3, "undo must refund exactly the strike's keystroke"
+
+    assert _pop_history_step(redo_stack, undo_stack, room, player, budget, is_redo=True)
+    assert room.entity_at(2, 5).hp == 4 and budget.spent == 4, "redo re-lands the hit"
+
+
+def test_shield_x_undo_restores_shield():
+    """x on a shield pushes a snapshot so u puts the shield back."""
+    from main import _snapshot, _pop_history_step
+    room = _corridor()
+    shield = Entity(kind='shield', row=2, col=6)
+    room.add_entity(shield)
+    player = Player(row=2, col=6)
+    budget = Budget(20)
+    undo_stack, redo_stack = [], []
+
+    undo_stack.append(_snapshot(room, player, budget))
+    room.kill_entity(shield)
+    budget.spend(1)
+    assert room.entity_at(2, 6) is None
+
+    _pop_history_step(undo_stack, redo_stack, room, player, budget)
+    restored = room.entity_at(2, 6)
+    assert restored is not None and restored.kind == 'shield' and restored.alive
 
 
 def test_cols_round_trip_after_buffer_double():

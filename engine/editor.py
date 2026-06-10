@@ -1,6 +1,6 @@
 """Admin editor helpers: snapshot/restore, cut/paste, range operations."""
 from __future__ import annotations
-from engine.world import CellType, CharRun, Entity
+from engine.world import CellType, CharRun, Entity, clone_entity
 
 _SUBST_CYCLE = {
     CellType.FLOOR:     CellType.WALL,
@@ -79,8 +79,7 @@ def _ed_snapshot(room, player) -> dict:
     return {
         'cells':       [row[:] for row in room.cells],
         'char_runs':       [CharRun(ru.row, ru.col, ru.symbols, ru.kind) for ru in room.char_runs],
-        'entities':    [Entity(kind=e.kind, row=e.row, col=e.col, hp=e.hp, alive=e.alive)
-                        for e in room.entities],
+        'entities':    [clone_entity(e) for e in room.entities],
         'exit_pos':    room.exit_pos,
         'spawn_pos':   room.spawn_pos,
         'wood_damage': dict(room.wood_damage),
@@ -127,7 +126,7 @@ def _ed_paste(room, r, start_c, items):
                 c += w
         elif item['type'] == 'entity':
             ent   = item['entity']
-            new_e = Entity(kind=ent.kind, row=r, col=c, hp=ent.hp)
+            new_e = clone_entity(ent, fresh_uid=True, row=r, col=c)
             room.add_entity(new_e)
             if ent.kind == 'exit':
                 room.exit_pos = (r, c)

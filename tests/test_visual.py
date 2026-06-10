@@ -156,3 +156,23 @@ class TestApplyVisual:
         assert _cell(room, 2, 2) == 'a' and _cell(room, 3, 2) == 'd'    # col 2 kept
         assert all(room.char_run_at(r, c) is None for r in (2, 3) for c in (3, 4))
         assert (p.row, p.col) == (2, 3)
+
+    def test_block_indent_shifts_spanned_lines(self):
+        # Block > indents every line the block spans (whole lines, like Vim).
+        room = _room()
+        room.add_char_run(CharRun(2, 3, ('a', 'b'), 'ancient'))
+        room.add_char_run(CharRun(3, 3, ('c', 'd'), 'ancient'))
+        room.add_char_run(CharRun(4, 3, ('e', 'f'), 'ancient'))         # outside the block
+        p = Player(row=2, col=3)
+        clip = apply_visual('>', (2, 3), (3, 4), Mode.VISUAL_BLOCK, room, p)
+        assert clip is None                                             # indent yields no register clip
+        assert _cell(room, 2, 5) == 'a' and _cell(room, 3, 5) == 'c'    # shifted by shiftwidth (2)
+        assert _cell(room, 4, 3) == 'e'                                 # row below the block untouched
+        assert p.row == 2
+
+    def test_block_dedent_clamps_at_wall(self):
+        room = _room()
+        room.add_char_run(CharRun(2, 2, ('a', 'b'), 'ancient'))         # 1 col off the left wall
+        p = Player(row=2, col=2)
+        apply_visual('<', (2, 2), (2, 3), Mode.VISUAL_BLOCK, room, p)
+        assert _cell(room, 2, 1) == 'a'                                 # pulled to the wall, not past it
