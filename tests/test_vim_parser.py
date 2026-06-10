@@ -496,3 +496,57 @@ class TestJoin:
     def test_g_incomplete_waits(self):
         action, rest = parse('g', Mode.NORMAL)
         assert action is None
+
+
+# ── Trailing-zero counts & count-before-register ─────────────────────────────
+# The 30l zero-split fix (a '0' after a started count is a digit, not the 0
+# motion) must hold in the operator grammar and visual text objects too.
+
+class TestTrailingZeroCounts:
+    def test_d10w_is_ten_words(self):
+        action, rest = parse('d10w', Mode.NORMAL)
+        assert action == {'type': 'operator', 'op': 'd', 'motion': 'w',
+                          'count': 1, 'motion_count': 10, 'motion_count_given': True}
+        assert rest == ''
+
+    def test_y20l_is_twenty_cells(self):
+        action, _ = parse('y20l', Mode.NORMAL)
+        assert action['motion'] == 'l' and action['motion_count'] == 20
+
+    def test_d0_still_deletes_to_line_start(self):
+        action, _ = parse('d0', Mode.NORMAL)
+        assert action['motion'] == '0' and action['motion_count'] == 1
+
+    def test_2d10w_outer_and_motion_counts(self):
+        action, _ = parse('2d10w', Mode.NORMAL)
+        assert action['count'] == 2 and action['motion_count'] == 10
+
+    def test_d100w(self):
+        action, _ = parse('d100w', Mode.NORMAL)
+        assert action['motion'] == 'w' and action['motion_count'] == 100
+
+    def test_visual_textobj_count_with_zero(self):
+        from engine.vim_parser import parse_visual_textobj
+        assert parse_visual_textobj('10iw') == ('object', 'iw', 10)
+
+    def test_visual_textobj_bare_zero_not_a_count(self):
+        from engine.vim_parser import parse_visual_textobj
+        assert parse_visual_textobj('0iw') is None   # '0' alone is the 0 motion
+
+
+class TestCountBeforeRegister:
+    def test_count_before_register_applies(self):
+        action, _ = parse('2"add', Mode.NORMAL)
+        assert action['register'] == 'a' and action['count'] == 2
+
+    def test_counts_on_both_sides_multiply(self):
+        action, _ = parse('2"a3dd', Mode.NORMAL)
+        assert action['count'] == 6
+
+    def test_register_alone_keeps_inner_count(self):
+        action, _ = parse('"a3dd', Mode.NORMAL)
+        assert action['count'] == 3
+
+    def test_count_before_register_paste(self):
+        action, _ = parse('3"ap', Mode.NORMAL)
+        assert action['type'] == 'paste' and action['count'] == 3

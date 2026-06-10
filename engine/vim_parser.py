@@ -23,7 +23,7 @@ def parse_visual_textobj(buf: str):
                                     incl. a bare count like '2' that may become '2j').
     """
     i = 0
-    while i < len(buf) and buf[i] in COUNTS:
+    while i < len(buf) and (buf[i] in COUNTS or (i and buf[i] == '0')):
         i += 1
     if i >= len(buf):
         return None                                # digits only / empty → motion parser
@@ -51,7 +51,8 @@ def _operator_target(op: str, double_ch: str, buf: str, j0: int, count_n: int):
 
     motion_count = ''
     j = j0
-    while j < len(buf) and buf[j] in COUNTS:
+    # '0' is a count digit only after a non-zero digit (else it's the 0 motion: d0)
+    while j < len(buf) and (buf[j] in COUNTS or (motion_count and buf[j] == '0')):
         motion_count += buf[j]
         j += 1
     if j >= len(buf):
@@ -121,6 +122,8 @@ def parse(buf: str, mode: Mode) -> tuple[dict | None, str]:
             return None, buf                           # waiting for the command
         if sub.get('type') in ('operator', 'paste', 'substitute'):
             sub['register'] = reg
+            if count:                                  # counts on both sides multiply: 2"a3dd = 6 lines
+                sub['count'] = sub.get('count', 1) * count_n
         return sub, rest
 
     # g-prefix: gg / ge / gE motions, and g~ / gu / gU case operators

@@ -83,7 +83,7 @@ The per-level `_par_<slug>` solvers compute each dungeon's minimum-keystroke par
 
 ## Known bugs
 None currently. Previously known bugs (now fixed):
-- `30l` trailing-zero split: fixed in `vim_parser.py` via `(count and buf[i] == '0')` guard.
+- `30l` trailing-zero split: fixed in `vim_parser.py` via `(count and buf[i] == '0')` guard. The same bug later resurfaced in the operator grammar (`d10w` parsed as `d0`+`w`) and visual text-object counts (`v10iw`) — fixed 2026-06-09 with the same guard in `_operator_target` / `parse_visual_textobj`. A count typed before a `"` register (`2"add`) was also dropped; counts now multiply (`2"a3dd` = 6 lines, Vim-faithful).
 - `3j 59l 3k` void bypass: fixed — fog wall at door column blocks count motions past it.
 - `x` then `u` left the character deleted (a free delete): fixed — the cut snapshot is taken BEFORE `_ed_cut` mutates the row, so undo restores the cut character.
 - undo-refund cheat (`fx`·`u`·`;` / `/pat`·`u`·`n` / change·`u`·`.` reached the target for 1 key): fixed — undoing a find/search/change arms a re-cost (`player.pending_recost_f/s/c`) so the next `;`/`n`/`.` re-pays the full original cost.
