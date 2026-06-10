@@ -1,6 +1,5 @@
 """Motion execution: apply_motion, move_player, and related helpers."""
 from __future__ import annotations
-import unicodedata
 from collections import deque
 from engine.player import Player
 from engine.modes import Mode
@@ -82,11 +81,41 @@ def _cell_char(room, r: int, c: int) -> str:
     return '#' if ct in (CellType.WALL, CellType.WOOD_WALL) else '.'
 
 
+# Vim's utf_class() (mbyte.c) class-1 PUNCTUATION ranges, reduced to a boolean.
+# The crucial entry is {0x20a0, 0x27ff} "all kinds of symbols": every suit,
+# planet, die, music note, gear and pentagram glyph this game uses is
+# PUNCTUATION in Vim — w/b/e stop on them, W/B/E sail over (verified against
+# `vim -u NONE`: a♠b → w stops on ♠; war☠den splits war|☠|den; an adjacent
+# symbol run like ♠♥♦ is ONE punctuation word). Codepoints >= 0x100 outside
+# these ranges default to word classes in Vim (Greek, Cyrillic, emoji, …).
+# Boolean simplification: Vim's distinct own-classes (super/subscripts,
+# braille — none appear in the game) are merged into "not a word char";
+# exotic-script punctuation singletons from Vim's table and the CJK blocks
+# are omitted as unreachable in the game's character universe.
+_VIM_NONWORD_RANGES = (
+    (0x2000, 0x206f),   # General Punctuation (†, ‡, ‽, ⁂, …)
+    (0x2070, 0x207f),   # superscripts  (own class in vim)
+    (0x2080, 0x2094),   # subscripts    (own class in vim)
+    (0x20a0, 0x27ff),   # "all kinds of symbols": math, ⌘, ☆…⛧, suits, dice…
+    (0x2800, 0x28ff),   # braille       (own class in vim)
+    (0x2900, 0x2998),   # arrows, brackets
+    (0x29d8, 0x29db), (0x29fc, 0x29fd),
+    (0x2e00, 0x2e7f),   # Supplemental Punctuation
+    (0x3001, 0x3020), (0x3030, 0x3030),   # ideographic punctuation
+)
+
+
 def _is_word_char(ch: str) -> bool:
-    if ch.isalpha() or ch.isdigit() or ch == '_':
-        return True
-    # Vim's utf_class() treats So (Symbol,Other) as word chars; Po and Sm are punctuation.
-    return unicodedata.category(ch) == 'So'
+    """Vim's word-class rule (default 'iskeyword' + utf_class), as a boolean.
+    ASCII: [0-9A-Za-z_]. Latin-1: 0xC0-0xFF are keyword chars (vim's default
+    iskeyword includes 192-255), the rest (°, §, ¶, ·, …) is punctuation.
+    Higher planes: punctuation per _VIM_NONWORD_RANGES, word otherwise."""
+    o = ord(ch)
+    if o < 0x80:
+        return ch.isalnum() or ch == '_'
+    if o < 0x100:
+        return o >= 0xC0
+    return not any(lo <= o <= hi for lo, hi in _VIM_NONWORD_RANGES)
 
 
 def _cross_water(room, r: int, c: int) -> bool:
@@ -711,6 +740,15 @@ def apply_motion(player, motion, count, room, target=None, count_given: bool = T
                 break
         elif motion in ('{', '}'):
             # Paragraph jump: a blank row = a passable row with no characters.
+            # The TARGET is Vim's — the first blank row in the direction — but
+            # the LANDING is the left edge of the segment holding the player's
+            # own column on that row, or NO MOVE if that column is walled
+            # there. `}`/`{` can never vault a wall/moat sideways into a
+            # sealed pocket, the entry, or the treasure room (a deliberate
+            # deviation from Vim, where blank-line jumps ignore obstructions;
+            # the old leftmost-cell and extreme-row fallbacks leaked exactly
+            # those teleports, and skipping ahead to a further blank row
+            # would mint long-range wormholes instead).
             row = player.row
             rng = range(row + 1, room.rows) if motion == '}' else range(row - 1, -1, -1)
             target_row = None
@@ -719,22 +757,12 @@ def apply_motion(player, motion, count, room, target=None, count_given: bool = T
                     target_row = r
                     break
             if target_row is None:
-                # No blank row in that direction: fall to the extreme passable row.
-                prows = [r for r in range(room.rows) if _leftmost_passable(room, r) is not None]
-                if prows:
-                    target_row = prows[-1] if motion == '}' else prows[0]
-            if target_row is None:
                 break
-            # Land at the left edge of the player's OWN segment on that row, so
-            # `}`/`{` can't vault a wall/moat into the entry or treasure room.
             tc = _segment_left(room, target_row, player.col)
-            if tc is None:
-                tc = _leftmost_passable(room, target_row)
-            if (target_row, tc) != (player.row, player.col):
-                player.row, player.col = target_row, tc
-                moved = True
-            else:
+            if tc is None or (target_row, tc) == (player.row, player.col):
                 break
+            player.row, player.col = target_row, tc
+            moved = True
         elif motion in ('(', ')'):
             # Sentence jump (buffer-wide): the next/previous sentence start
             # anywhere in the buffer — Vim-faithful, since sentences span lines.

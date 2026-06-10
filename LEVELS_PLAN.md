@@ -66,8 +66,8 @@ Curriculum order is the order of `LEVELS`. Blueprints: `blueprints/act_*.md`.
 | 16 | `waypoint_sanctum` | The Waypoint Sanctum | `` m ' ` `` |  |
 | 17 | `archivists_library` | The Archivist's Library | `:set wrap  :e!  :w {file}` |  |
 | 17.1 | `warden_pathfinder` | The Warden Pathfinder | — | boss |
-| 18 | `operators_vault` | The Operator's Vault | `d{m}  dd  D` |  |
-| 19 | `cipher_cell` | The Cipher Cell | `s` |  |
+| 18 | `operators_vault` | The Operator's Vault | `d{m}  dd` |  |
+| 19 | `cipher_cell` | The Cipher Cell | `s  D` |  |
 | 20 | `quartermaster` | The Quartermaster | `y yy P` |  |
 | 21 | `undo_sanctum` | The Undo Sanctum | `u  ⌃R` |  |
 | 22 | `echo_vault` | The Echo Vault | `.` |  |

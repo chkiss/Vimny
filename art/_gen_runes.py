@@ -1,15 +1,34 @@
 #!/usr/bin/env python3
 """
-Generate art/runes_plain.txt and art/runes_mixed.txt.
+Generate art/vocab_plain.txt and art/vocab_mixed.txt.
 
-Plain:  typable characters only; themed vocabulary.
-Mixed:  every word contains ≥1 untypable char, appearing at start/middle/end.
-        Words are CRAFTED with semantic meaning, not mechanical prefix+symbol.
+The division is FUNCTIONAL, keyed to the engine's word-class rule
+(engine.motion._is_word_char — Vim's utf_class, under which the entire
+untypable symbol set below is PUNCTUATION: vim's {0x20a0,0x27ff} "all kinds
+of symbols" range):
+
+Plain:  typable characters only, and each token is a SINGLE w-word — no
+        internal word-class break, so w/b/e treat it exactly like W/B/E do.
+Mixed:  every token carries an untypable symbol and/or an internal w/b/e word
+        break (typable punctuation like ':' or '^' breaks too — ':map' lives
+        here, not in plain). Words are CRAFTED with semantic meaning, not
+        mechanical prefix+symbol.
 """
 import pathlib
+import sys
 from collections import defaultdict
 
 BASE = pathlib.Path(__file__).parent
+sys.path.insert(0, str(BASE.parent))
+from engine.motion import _is_word_char   # the single source of word-class truth
+
+
+def _has_word_break(w: str) -> bool:
+    """True if w/b/e split the token into more than one sub-word — i.e. the
+    word-char class flips anywhere inside it. All the untypable symbols here
+    are punctuation in vim, so a symbol next to a letter flips the class; an
+    adjacent symbol RUN ('♠♥♦') stays one punctuation word (no flip)."""
+    return any(_is_word_char(a) != _is_word_char(b) for a, b in zip(w, w[1:]))
 
 # ── Untypable char sets ──────────────────────────────────────────────────────
 _ORIG  = '∘·◦§‽°¶†‡⁂≃≈∞∴⌘'
@@ -298,16 +317,23 @@ migrant tantrum aquifer mcurist minecart fortress migrants
 """.split()
 
 # ── Build plain dict ─────────────────────────────────────────────────────────
+# Typable tokens that SPLIT under w/b/e (':map', 'x^2+1', 'i++', …) are routed
+# to the mixed file — plain holds single w-words only.
 plain = defaultdict(list)
 seen_plain = set()
 BANNED = set('!○') | U_SET
+MOVED_TO_MIXED = []
 for w in VOCAB:
     if any(c in BANNED for c in w):
         continue
     n = len(w)
-    if 1 <= n <= 8 and w not in seen_plain:
+    if not (1 <= n <= 8) or w in seen_plain:
+        continue
+    seen_plain.add(w)
+    if _has_word_break(w):
+        MOVED_TO_MIXED.append(w)
+    else:
         plain[n].append(w)
-        seen_plain.add(w)
 
 # ── CRAFTED mixed words ──────────────────────────────────────────────────────
 # Symbols used:
@@ -966,7 +992,7 @@ mixed = defaultdict(list)
 seen_mixed = defaultdict(set)
 FORBIDDEN = set('!○')
 
-for w in RAW_MIXED:
+for w in RAW_MIXED + MOVED_TO_MIXED:
     w = w.strip()
     if not w:
         continue
@@ -975,35 +1001,54 @@ for w in RAW_MIXED:
     n = len(w)
     if not (1 <= n <= 8):
         continue
-    if not any(c in U_SET for c in w):
-        continue
+    if not (any(c in U_SET for c in w) or _has_word_break(w)):
+        continue                      # neither symbol nor word break — plain's job
     if w not in seen_mixed[n]:
         mixed[n].append(w)
         seen_mixed[n].add(w)
 
 # ── Verify ───────────────────────────────────────────────────────────────────
-def verify(label, data, expect_untypable):
+def _plain_err(w):
+    if any(c in U_SET for c in w):
+        return 'has-u'
+    if _has_word_break(w):
+        return 'splits'               # multi-word token — belongs in mixed
+    return ''
+
+
+def _mixed_err(w):
+    if not (any(c in U_SET for c in w) or _has_word_break(w)):
+        return 'plain-like'           # typable single word — belongs in plain
+    return ''
+
+
+def verify(label, data, check):
     ok = True
     for n, words in sorted(data.items()):
         bad = []
         for w in words:
-            has_u = any(c in U_SET for c in w)
-            if len(w) != n: bad.append(f'len({w!r})={len(w)}')
-            if expect_untypable and not has_u: bad.append(f'no-u:{w!r}')
-            if not expect_untypable and has_u: bad.append(f'has-u:{w!r}')
+            if len(w) != n:
+                bad.append(f'len({w!r})={len(w)}')
+            err = check(w)
+            if err:
+                bad.append(f'{err}:{w!r}')
         print(f'  {label} L{n}: {len(words):6d} words  errs={bad[:3]}')
-        if bad: ok = False
+        if bad:
+            ok = False
     return ok
 
 print('=== plain ===')
-verify('plain', plain, False)
+ok_p = verify('plain', plain, _plain_err)
 print('=== mixed ===')
-verify('mixed', mixed, True)
+ok_m = verify('mixed', mixed, _mixed_err)
+if not (ok_p and ok_m):
+    raise SystemExit('vocab verification FAILED — files not written')
 
 # ── Write files ──────────────────────────────────────────────────────────────
 def write_plain(path, data):
     lines = [
-        '# Vocab words (plain) — typable characters only.\n',
+        '# Vocab words (plain) — typable characters only, each a SINGLE w-word\n',
+        '# (no internal word-class break: w/b/e treat these exactly like W/B/E).\n',
         '# Themes: retro computing · dungeon crawler · vim/editor · D&D · Rogue · Wizardry · PLATO · Lynx · Dwarf Fortress.\n',
         '# Lengths 1-2: ≥10.  Lengths 3-8: ≥100 each.\n\n',
     ]
@@ -1018,9 +1063,11 @@ def write_plain(path, data):
 def write_mixed(path, data):
     ulist = ' '.join(ALL_U)
     lines = [
-        '# Vocab words (mixed) — each contains ≥1 untypable unicode char.\n',
-        '# Symbols appear at start, middle, or end — semantically meaningful.\n',
-        '# These create w/b/e word boundaries when adjacent to letters; W/B/E skips the whole token.\n',
+        '# Vocab words (mixed) — each token carries an untypable symbol and/or an\n',
+        '# internal w/b/e word break (typable punctuation like : ^ + breaks too).\n',
+        '# Every symbol below is PUNCTUATION in vim (utf_class 0x20a0-0x27ff): a\n',
+        '# symbol next to a letter breaks the word, while an adjacent symbol run\n',
+        '# reads as ONE punctuation word. W/B/E always take the whole token.\n',
         f'# Chars: {ulist}\n',
         '# All words carry a trailing space (wide-glyph terminal offset).\n\n',
     ]

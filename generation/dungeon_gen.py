@@ -3,7 +3,7 @@ from __future__ import annotations
 import heapq, math, os, random, unicodedata
 from collections import deque
 from engine.world import Dungeon, Room, RoomType, CellType, CharRun, Entity
-from engine.motion import _fog_unreachable, _cell_char
+from engine.motion import _fog_unreachable, _cell_char, _is_word_char
 from generation.room_gen import make_room, RUNE_CHAR as _RUNE_CHAR
 
 _DIR_CHAR = {(-1, 0): 'k', (1, 0): 'j', (0, -1): 'h', (0, 1): 'l'}
@@ -2225,9 +2225,9 @@ def _dijkstra_par_WBE(composite, return_path=False):
         return not (ru and ru.kind == 'void')
 
     # -- word/punct type helpers --
-    # Matches engine/_is_word_char: alpha/digit/_ plus Unicode So (Symbol,Other).
-    def _is_wc(ch):
-        return ch.isalpha() or ch.isdigit() or ch == '_' or unicodedata.category(ch) == 'So'
+    # THE engine word-class rule (vim utf_class) — never a local copy, so the
+    # solver can't drift from real play.
+    _is_wc = _is_word_char
 
     def _char_at(r, c):
         ru = composite.char_run_at(r, c)
@@ -2498,9 +2498,9 @@ def _par_backward_vaults(composite, return_path: bool = False):
         ru = composite.char_run_at(r, c)
         return not (ru and ru.kind == 'void')
 
-    # Matches engine/_is_word_char: alpha/digit/_ plus Unicode So (Symbol,Other).
-    def _is_wc(ch):
-        return ch.isalpha() or ch.isdigit() or ch == '_' or unicodedata.category(ch) == 'So'
+    # THE engine word-class rule (vim utf_class) — never a local copy, so the
+    # solver can't drift from real play.
+    _is_wc = _is_word_char
 
     def _char_at(r, c):
         ru = composite.char_run_at(r, c)
@@ -5648,34 +5648,117 @@ def build_dungeon_warden_pathfinder(seed: int) -> Dungeon:
 
 # ── The Operator's Vault (L18) ───────────────────────────────────────────────
 # The first operator level: teaches the {operator}{motion} grammar via DELETE.
-# Six single-row corridors, snaked together (boustrophedon), each guarded by a
-# chasing goblin that the player clears with one d-variant.  The corridors are
-# three rows apart so a goblin only wakes (Manhattan <= 5) once the player is in
-# its corridor — they stay contained on their own row.  Killing the sixth goblin
-# opens the locked door (wired in main.py) onto the treasure room.
+# Ten single-row corridors, snaked together (boustrophedon) three rows apart so
+# a guard only wakes (Manhattan <= 5) once the player enters its corridor.
+# Guards are ARMORED (hp 2): blade-to-blade x costs strikes and blood, but a
+# d-cut removes them outright — the operator IS the weapon. Each corridor
+# admits exactly one cheapest cut; everything else loses on keystrokes, landing
+# position, shredded treasure, or an oubliette:
 #
-#   row 3   →   dw     (delete a word, goblin in the gap after it)
-#   row 6   ←   db     (delete a word back)
-#   row 9   →   de     (delete to word end, goblin on the last letter)
-#   row 12  ←   d^     (delete back to the line start — sweeps the whole row)
-#   row 15  →   d$     (delete to the line end — sweeps the whole row)
-#   row 18  ←   dF!    (delete back to a target char '!')
+#   row  3  →  dw   guard in the gap after a word; the chest on the next
+#                   word's 2nd char dies to any wider cut; gold gate
+#   row  6  ←  db   word head one step from the shaft mouth — db's landing
+#                   beats d0's line-start overshoot
+#   row  9  →  de   guard riding the word's last letter; the chest in the gap
+#                   after it dies to d$ (and the gate blocks w's scan, so dw
+#                   can't fire)
+#   row 12  ←  dB   one guard rides a mixed token's HEAD, one waits beyond: db
+#                   only reaches the trailing subword — dB sweeps the WORD head
+#   row 15  →  dE   guard rides a mixed token's tail: de crawls subword ends;
+#                   the scroll chest past the gap punishes dW/d$
+#   row 18  ←  dF?  pack of three behind a '?' bait that sits ON the shaft
+#                   mouth — dF? lands you exactly there; d0 overshoots
+#   row 21  →  dW   guards across a mixed token and its gap: dE stops at the
+#                   token's tail; the chest on the next word punishes d$
+#   row 24  ←  d0   pack of three to sweep, one at the line head so a one-cast
+#                   db misses it; dd collapses the row into an oubliette
+#   row 27  →  d$   pack of three ahead with no character beyond the last, so
+#                   no find/word motion reaches them all
+#   row 30  ←  dd   dead-end overhang: the LAST pack paces a sealed ledge one
+#                   row below — dd cuts the floor line away, the ledge rises to
+#                   you, and a d$ reprise sweeps it; a second dd drops you into
+#                   the oubliette pocket below
 #
+# Gates are edit_immune locked doors (they also parry dd on their rows). Each
+# gated corridor's colored key drops beside its gate when that corridor's guard
+# group ('g1'/'g3'/'g7') is wiped; the untagged VAULT key drops by the vault
+# door once EVERY guard is down (both wired statelessly and undo-safely in
+# main._operators_vault_tick — gate tags are unique, so the tick looks doors up
+# live by tag and survives undo's entity-list replacement). Oubliettes: SEALED
+# 1-cell floor pockets under the corridors — dd's cursor parks on the collapsed
+# row's first passable column, i.e. inside the pocket; only u climbs out. The
+# first spacer under each corridor has a pocket at col 3, the second at col 1,
+# so even a chained dd just falls one pocket deeper (and the }/{ own-segment
+# landing rule keeps the pockets sealed against paragraph jumps). After every
+# cut the player travels by whichever is cheapest — single-digit counts or the
+# words left standing (no count in the answer exceeds 9); the connector shafts
+# after backward corridors sit AWAY from the line start so d0 overshoots their
+# mouths, while forward corridors end at $. Corridor text
+# is drawn fresh from the vocabulary files every seed — positions and lengths
+# are fixed (so par/answer hold for every seed), the letters never are.
 # par/answer below; see tests/test_operators_vault.py for the executed solve.
-_OV_ROWS, _OV_COLS = 24, 60
-_OV_CORR_ROWS = (3, 6, 9, 12, 15, 18)
-_OV_LCOL, _OV_RCOL = 2, 57           # corridor floor spans these columns
-_OV_DOOR = (19, 2)                   # locked door below corridor 6's left end
+_OV_ROWS, _OV_COLS = 35, 60
+_OV_CORR_ROWS = (3, 6, 9, 12, 15, 18, 21, 24, 27, 30)
+_OV_LCOL, _OV_RCOL = 2, 57            # corridor floor spans these columns
+# two-row connector shafts below corridors 1..9: (top_row, col). Forward (→)
+# corridors drop at the line end (col 57, one $ away); backward (←) ones drop
+# mid-line so 0 overshoots the mouth.
+_OV_SHAFTS = ((4, 57), (7, 7), (10, 57), (13, 7), (16, 57),
+              (19, 26), (22, 57), (25, 7), (28, 57))
+# the oubliette pockets: (row, col) — sealed 1-cell floor cells. Col 3 on every
+# first spacer row (catches a corridor dd), col 1 on every second spacer row
+# (catches a chained dd from inside the first pocket), plus the two under the
+# vault approach.
+_OV_POCKETS = tuple((r, 3) for r in (4, 7, 10, 13, 16, 19, 22, 25, 28)) + \
+              tuple((r, 1) for r in (5, 8, 11, 14, 17, 20, 23, 26, 29)) + \
+              ((32, 3), (33, 1))
+_OV_SPLIT_ROW  = 30                   # C10: floor 30..57 — a dead-end overhang
+_OV_LEDGE_ROW  = 31                   # the sealed ledge under it: floor 2..29
+_OV_VAULT_ROW  = 33                   # antechamber + vault: floor 5..19
+_OV_DOOR       = (33, 17)             # vault door (untagged); the EXIT is the prize
+_OV_KEY_DCOL   = 3                    # keys drop 3 cells before their door
 # answer keystrokes (operators written as separate single-key tokens: 'd w' = dw)
-_OV_ANSWER = ('w d w $ 3j '          # C1 row3  → dw
-              'b d b 0 3j '          # C2 row6  ← db
-              'w d e $ 3j '          # C3 row9  → de
-              'd ^ 0 3j '            # C4 row12 ← d^
-              'd $ $ 3j '            # C5 row15 → d$
-              'd F ! 0 2j $')        # C6 row18 ← dF! , then into the vault to the exit
+_OV_ANSWER = ('w d w 7l x l x 2l p $ 3j '     # C1  → dw; chest + gold key + gate
+              'd b h 3j '                     # C2  ← db lands by the shaft mouth
+              'd e w e x l x 2l p $ 3j '      # C3  → de; chest + blue key + gate
+              'd B h 3j '                     # C4  ← dB from the WORD head
+              'd E e 4l x $ 3j '              # C5  → dE; e rides the reflowed word
+              'd F ? 3j '                     # C6  ← dF? lands on the shaft mouth
+              'w d W e 7l x l x 2l p $ 3j '   # C7  → dW; chest + red key + gate
+              'd 0 5l 3j '                    # C8  ← d0 sweep (dd = oubliette)
+              'd $ $ 3j '                     # C9  → d$ sweep
+              'd d d $ 3l 2j 9l x 2l p 2l')   # C10 ← dd, ride down, d$, vault
+
+
+def _ov_pick(rng, table, length, used, pred=None):
+    """Draw a fresh vocab token of exactly `length` from a length-keyed table
+    (no repeats within the level; optional structural predicate)."""
+    pool = [t for t in table.get(length, ())
+            if t not in used and (pred is None or pred(t))]
+    tok = rng.choice(pool)
+    used.add(tok)
+    return tok
+
+
+def _ov_mixed_ok(tok: str) -> bool:
+    """A mixed token usable as an operator-lesson WORD: it must START on a word
+    character (B/W land on the token head) and break into subwords somewhere
+    inside (an internal non-word char), so the small-word motions w/b/e crawl
+    while W/B/E take the whole token."""
+    return _is_word_char(tok[0]) and any(not _is_word_char(c) for c in tok[1:-1])
+
+
+def _ov_plain_ok(tok: str) -> bool:
+    """A 'plain' token usable as a single word: every char a word char, so
+    w/b/e treat it as ONE word. The vocab file enforces this since the
+    2026-06-09 reclassification — kept as a guard so a future vocab edit
+    can't silently shift the lesson landings."""
+    return all(_is_word_char(c) for c in tok)
 
 
 def build_dungeon_operators_vault(seed: int) -> Dungeon:
+    rng = random.Random(seed)
+    _load_vocab_tables()
     R, C = _OV_ROWS, _OV_COLS
     cells = [[CellType.WALL] * C for _ in range(R)]
 
@@ -5683,56 +5766,125 @@ def build_dungeon_operators_vault(seed: int) -> Dungeon:
         for c in range(c0, c1 + 1):
             cells[r][c] = CellType.FLOOR
 
-    for r in _OV_CORR_ROWS:                       # the six corridors
+    for r in _OV_CORR_ROWS[:-1]:                  # corridors 1..9: full span
         floor(r, _OV_LCOL, _OV_RCOL)
-    # vertical connectors (only the gap cells; corridor ends already floor),
-    # alternating right / left so the path snakes and never forms a bypass shaft.
-    cells[4][_OV_RCOL] = cells[5][_OV_RCOL]   = CellType.FLOOR   # C1→C2 (right)
-    cells[7][_OV_LCOL] = cells[8][_OV_LCOL]   = CellType.FLOOR   # C2→C3 (left)
-    cells[10][_OV_RCOL] = cells[11][_OV_RCOL] = CellType.FLOOR   # C3→C4 (right)
-    cells[13][_OV_LCOL] = cells[14][_OV_LCOL] = CellType.FLOOR   # C4→C5 (left)
-    cells[16][_OV_RCOL] = cells[17][_OV_RCOL] = CellType.FLOOR   # C5→C6 (right)
-    cells[19][_OV_LCOL] = CellType.FLOOR                          # C6→vault (the locked-door cell)
-    floor(20, _OV_LCOL, 13)                       # treasure walkway
+    floor(_OV_SPLIT_ROW, 30, _OV_RCOL)            # C10: a dead-end overhang…
+    floor(_OV_LEDGE_ROW, _OV_LCOL, 29)            # …over the sealed vault ledge
+    for (top, col) in _OV_SHAFTS:                 # the connector shafts
+        cells[top][col] = cells[top + 1][col] = CellType.FLOOR
+    for (r, c) in _OV_POCKETS:                    # the oubliette pockets
+        cells[r][c] = CellType.FLOOR
+    cells[32][5] = CellType.FLOOR                 # ledge → antechamber drop
+    floor(_OV_VAULT_ROW, 5, 19)                   # antechamber + vault
 
     room = Room(room_type=RoomType.COMBAT, rows=R, cols=C)
     room.cells     = cells
     room.seed      = seed
     room.spawn_pos = (3, _OV_LCOL)
-    room.exit_pos  = (20, 13)
+    room.exit_pos  = (33, 19)
     room.char_runs = []
     room.entities  = []
 
     def word(r, c, text, kind='ember'):
         room.char_runs.append(CharRun(row=r, col=c, symbols=tuple(text), kind=kind))
 
-    def goblin(r, c):
-        room.entities.append(Entity(kind='goblin', row=r, col=c, hp=1, max_hp=1,
-                                    ai='chase', ai_speed=1))
+    def goblin(r, c, tag=''):
+        room.entities.append(Entity(kind='goblin', row=r, col=c, hp=2, max_hp=2,
+                                    ai='chase', ai_speed=1, tag=tag))
 
-    # C1 (row 3, →): dw — a word, then the goblin in the gap before the next word.
-    word(3, 4, 'ambush'); goblin(3, 11); word(3, 13, 'fae')
-    # C2 (row 6, ←): db — goblin between two words, deleted by a backward word-cut.
-    word(6, 43, 'grim'); goblin(6, 48); word(6, 50, 'horde')
-    # C3 (row 9, →): de — goblin riding the last letter of the word.
-    word(9, 4, 'vermin'); goblin(9, 9)
-    # C4 (row 12, ←): d^ — goblin out right; d^ from the line end sweeps the row.
-    word(12, 4, 'rabble'); word(12, 26, 'filth'); goblin(12, 30)
-    # C5 (row 15, →): d$ — goblin out right; d$ from the line start sweeps the row.
-    word(15, 4, 'swarm'); word(15, 28, 'dregs'); goblin(15, 30)
-    # C6 (row 18, ←): dF! — a '!' target the backward find lands on.
-    word(18, 38, 'brute'); word(18, 45, '!', kind='ancient'); goblin(18, 48)
+    def gate(r, c, color):
+        room.entities.append(Entity(kind='locked_door', row=r, col=c, tag=color,
+                                    edit_immune=True))
 
-    room.entities.append(Entity(kind='locked_door',     row=_OV_DOOR[0], col=_OV_DOOR[1]))
-    room.entities.append(Entity(kind='heart_container', row=20, col=6))
-    room.entities.append(Entity(kind='chest_scroll',    row=20, col=9))
-    room.entities.append(Entity(kind='exit',            row=20, col=13))
+    def chest(r, c):
+        room.entities.append(Entity(kind='chest_scroll', row=r, col=c))
+
+    # All corridor text is drawn fresh from the vocabulary files each seed —
+    # only the LENGTHS are fixed (the whole layout keys off them), never the
+    # letters. Mixed tokens additionally need the lesson structure
+    # (_ov_mixed_ok: word-char head + an internal subword break).
+    used: set = set()
+
+    def plain(n):
+        return _ov_pick(rng, _VOCAB_PLAIN_BY_LEN, n, used, _ov_plain_ok)
+
+    def mixed(n):
+        return _ov_pick(rng, _VOCAB_MIXED_BY_LEN, n, used, _ov_mixed_ok)
+
+    # C1 (row 3, →): dw — guard in the gap; the chest riding the next word's
+    # 2nd char dies to any wider cut, and the gold gate parries dd.
+    word(3, 7, plain(3)); goblin(3, 11, tag='g1'); word(3, 13, plain(3))
+    chest(3, 14)
+    gate(3, 18, 'gold')                           # key drops at 15 when g1 falls
+    # C2 (row 6, ←): db — the word head is one step from the shaft mouth at
+    # col 7; d0 also kills the guard but lands at col 2, one key worse.
+    word(6, 8, plain(4)); goblin(6, 14)
+    # C3 (row 9, →): de — guard riding the word's last letter; the chest in the
+    # gap dies to d$, and dw cannot even fire (the gate blocks the w-scan, so w
+    # has no target). The filler word beyond the gate reflows in after the cut
+    # and becomes the w/e path to the loot.
+    word(9, 12, plain(3)); goblin(9, 14, tag='g3')
+    chest(9, 16)
+    gate(9, 20, 'blue')                           # key drops at 17 when g3 falls
+    word(9, 22, plain(3))
+    # C4 (row 12, ←): dB — one guard rides the token HEAD, one waits beyond:
+    # db only reaches the trailing subword and misses the head guard.
+    word(12, 8, mixed(5)); goblin(12, 8); goblin(12, 15)
+    # C5 (row 15, →): dE — guard rides the token's tail (de crawls subword
+    # ends); the scroll chest in the gap punishes dW/d$; the far word reflows
+    # in as the path.
+    word(15, 12, mixed(6)); goblin(15, 17)
+    chest(15, 20)
+    word(15, 24, plain(4))
+    # C6 (row 18, ←): dF? — the '?' bait sits ON the shaft mouth (col 26): the
+    # cut sweeps the pack AND lands you on the way down. The decoy word blocks
+    # a one-cast db (b stops there first).
+    word(18, 26, '?', kind='ancient')
+    goblin(18, 30); goblin(18, 36); goblin(18, 42)
+    word(18, 46, plain(3))
+    # C7 (row 21, →): dW — dE stops at the token's tail and misses the gap
+    # guard; the chest riding the next word dies to d$ ($ stops at the gate);
+    # the word beyond the gate reflows in as the w/e path to the loot.
+    word(21, 30, mixed(5)); goblin(21, 34, tag='g7'); goblin(21, 37, tag='g7')
+    word(21, 40, plain(5))
+    chest(21, 41)
+    gate(21, 45, 'red')                           # key drops at 42 when g7 falls
+    word(21, 47, plain(3))
+    # C8 (row 24, ←): d0 — sweep the pack; the guard AT the line head makes a
+    # one-cast db miss; dd collapses the row into the oubliette below.
+    goblin(24, 3); word(24, 10, plain(6)); goblin(24, 20); goblin(24, 29)
+    # C9 (row 27, →): d$ — no character beyond the last guard, so no find or
+    # word motion reaches all three.
+    word(27, 12, plain(3)); goblin(27, 20); word(27, 25, plain(3))
+    goblin(27, 30); goblin(27, 40)
+    # C10 (row 30, ←) + the ledge: the LAST pack paces the sealed ledge below
+    # the overhang; dd drops the floor line, d$ sweeps the risen pack. The
+    # antechamber words are the w-path to the dropped vault key.
+    word(31, 4, plain(5)); goblin(31, 10); goblin(31, 16); goblin(31, 22)
+    word(33, 7, plain(4)); word(33, 12, plain(4))
+    # the vault: the door and the way out — the level's chests came earlier
+    room.entities.append(Entity(kind='locked_door', row=_OV_DOOR[0], col=_OV_DOOR[1],
+                                edit_immune=True))
+    room.entities.append(Entity(kind='exit', row=33, col=19))
+    # guard-group tag → gate color-tag (tags are unique; the key-drop tick in
+    # main.py resolves the LIVE door by tag, so undo replacing room.entities
+    # can never leave it holding a stale reference)
+    room._ov_groups = (('g1', 'gold'), ('g3', 'blue'), ('g7', 'red'))
 
     room.rebuild_indexes()
-    _fog_unreachable(room, room.spawn_pos[0], room.spawn_pos[1])  # hides the sealed vault
-    room.par    = 35
+    _fog_unreachable(room, room.spawn_pos[0], room.spawn_pos[1])
+    # The sealed ledge and the oubliette pockets stay VISIBLE — they are the
+    # warning — and dd's cursor-park needs them passable, hence unfogged.
+    room.fog_cells -= {(_OV_LEDGE_ROW, c) for c in range(_OV_LCOL, 30)}
+    room.fog_cells -= set(_OV_POCKETS)
+    room.fog_cells.discard((32, 5))
+    # …and so does the antechamber walkway up to the vault door (fog reveals
+    # only fire on door-opens, and the descent must stay passable after the
+    # collapse). The treasure BEHIND the door stays dark until it is unlocked.
+    room.fog_cells -= {(_OV_VAULT_ROW, c) for c in range(5, _OV_DOOR[1] + 1)}
+    room.par    = 93
     room.answer = _OV_ANSWER
-    room.budget = 49                              # ceil(35 * 1.4)
+    room.budget = 131                             # ceil(93 * 1.4)
 
     dungeon = Dungeon(name="The Operator's Vault", seed=seed)
     dungeon.rooms        = [room]

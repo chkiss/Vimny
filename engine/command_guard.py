@@ -49,6 +49,11 @@ def action_allowed(action: dict, known: list | set, edit_mode: bool = False) -> 
             return True
         if action.get('op') not in known_set:        # 'd' / 'y' / 'c' learned?
             return False
+        # D / C — the one-key to-line-end shorthands are their own lessons,
+        # gated separately from the d$/c$ grammar they abbreviate.
+        sh = action.get('shorthand')
+        if sh is not None and sh not in known_set:
+            return False
         if count > 1 and 'count' not in known_set:
             return False
         if action.get('motion_count', 1) > 1 and 'count' not in known_set:

@@ -88,8 +88,8 @@ The curriculum is defined in `content/levels.py` (canonical) and mirrored in `LE
 | 16 | The Waypoint Sanctum | `` m ' ` `` | Playable |
 | 17 | The Archivist's Library | `:set wrap  :e!  :w {file}` | Playable |
 | 17.1 | The Warden Pathfinder | (boss) | Playable |
-| 18 | The Operator's Vault | `d{m}  dd  D` | Planned |
-| 19 | The Cipher Cell | `s` | Planned |
+| 18 | The Operator's Vault | `d{m}  dd` | Playable |
+| 19 | The Cipher Cell | `s  D` | Planned |
 | 20 | The Quartermaster | `y yy P` | Planned |
 | 21 | The Undo Sanctum | `u  ⌃R` | Planned |
 | 22 | The Echo Vault | `.` | Planned |

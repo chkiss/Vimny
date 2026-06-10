@@ -47,3 +47,36 @@ def test_collecting_all_via_repeated_picks():
         assert sid not in discovered
         discovered.append(sid)
     assert set(discovered) == set(RELIC_SCROLL_IDS)
+
+
+# ── every scroll line must fit the parchment box ─────────────────────────────
+def test_every_scroll_line_fits_the_box():
+    """The standard renderer's box is 54 visible columns; a cmd row costs
+    indent(2) + key_w + arrow(9) + desc, where key_w is the scroll's longest
+    key. Regression for The Lit Trail spilling past the parchment borders."""
+    import content.scrolls as S
+
+    BOX_IW, sep, ind = 54, '  ────>  ', '  '
+    for nm in dir(S):
+        obj = getattr(S, nm)
+        if not (isinstance(obj, dict) and 'lines' in obj and 'title' in obj):
+            continue
+        lines = obj['lines']
+        key_w = max(([len(s[1]) for s in lines
+                      if s[0] in ('cmd', 'smudge', 'smudge_seg')]
+                     + [sum(len(t) for t, _ in s[1])
+                        for s in lines if s[0] == 'segs']), default=0)
+        for s in lines:
+            k = s[0]
+            if k in ('dim', 'amber'):
+                vis = len(s[1])
+            elif k in ('cmd', 'segs'):
+                vis = len(ind) + key_w + len(sep) + len(s[2])
+            elif k == 'smudge':
+                vis = len(ind) + key_w + len(sep) + len(s[2]) + len(s[3])
+            elif k == 'smudge_seg':
+                vis = len(ind) + key_w + len(sep) + len(s[3])
+            else:
+                continue
+            assert vis <= BOX_IW, f'{nm}: line {s!r} is {vis} cols (box is {BOX_IW})'
+        assert len(obj['title']) <= BOX_IW

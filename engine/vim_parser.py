@@ -162,10 +162,14 @@ def parse(buf: str, mode: Mode) -> tuple[dict | None, str]:
     if ch in OPERATORS:
         return _operator_target(ch, ch, buf, i + 1, count_n)
 
-    # Capital D/C
+    # Capital D/C — the to-line-end shorthands. Tagged so the command guard can
+    # gate them behind their own curriculum tokens ('D'/'C'): the shorthand is a
+    # SEPARATE lesson from d$/c$ (The Operator's Vault forces the two-key
+    # grammar; the one-key shorthands unlock later).
     if ch in 'DC':
         op = ch.lower()
-        return {'type': 'operator', 'op': op, 'motion': '$', 'count': count_n}, buf[i+1:]
+        return {'type': 'operator', 'op': op, 'motion': '$', 'count': count_n,
+                'shorthand': ch}, buf[i+1:]
 
     # J — join the next line onto this one (gJ, no space, handled in the g-branch)
     if ch == 'J':

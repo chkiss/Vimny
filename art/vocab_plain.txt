@@ -1,4 +1,5 @@
-# Vocab words (plain) — typable characters only.
+# Vocab words (plain) — typable characters only, each a SINGLE w-word
+# (no internal word-class break: w/b/e treat these exactly like W/B/E).
 # Themes: retro computing · dungeon crawler · vim/editor · D&D · Rogue · Wizardry · PLATO · Lynx · Dwarf Fortress.
 # Lengths 1-2: ≥10.  Lengths 3-8: ≥100 each.
 
@@ -15,7 +16,6 @@ map
 let
 var
 reg
-:wq
 wbe
 WBE
 hjk
@@ -192,15 +192,7 @@ qam
 v90
 v92
 bel
-e^x
-x^2
-a+b
-i++
-n-1
 0x0
-x=y
-a&b
-x|y
 age
 ago
 aid
@@ -397,10 +389,6 @@ redo
 mark
 jump
 fold
-:set
-:map
-:cmd
-:let
 rune
 void
 cave
@@ -572,11 +560,6 @@ hdsl
 head
 0xFF
 0b10
-3.14
-i+=1
-e^pi
-2^10
-pi*r
 gray
 teal
 lime
@@ -800,7 +783,6 @@ v01d
 z3r0
 k1ll
 g0ld
-d3@d
 d0wn
 s3gf
 lich
@@ -827,19 +809,7 @@ xmode
 count
 macro
 regex
-:help
-q:cmd
-%goto
-]next
-[prev
-:tabn
-:tabp
-:vspl
-:hspl
 5hjkl
-:next
-:prev
-:edit
 sword
 staff
 rogue
@@ -1005,9 +975,6 @@ wheat
 wrath
 wreck
 yacht
-e=mc2
-x^2+1
-i+=10
 about
 above
 abuse
@@ -1721,14 +1688,8 @@ sienna
 bisque
 salmon
 cobalt
-e=mc^2
 0xDEAD
 0xBEEF
-2^16-1
-pi*r^2
-f(x,y)
-a[n-1]
-i+=100
 acacia
 aurora
 basalt
@@ -2041,9 +2002,6 @@ mapping
 folding
 marking
 jumping
-:normal
-:global
-:visual
 replace
 pattern
 forward
@@ -2428,7 +2386,6 @@ callback
 register
 iterator
 movement
-:command
 dungeons
 darkness
 treasure

@@ -770,3 +770,54 @@ class TestApplyMotionDoor:
         p = _player(3, 1)
         apply_motion(p, 'f', 1, room, target='+')
         assert p.col == 1  # door no longer returns '+' from _cell_char; no jump
+
+
+# ── Word classes: pinned to REAL Vim (the north star) ────────────────────────
+# Reference behavior captured from `vim -u NONE` (v8.2) probes, 2026-06-09:
+#   a♠b cd   → w stops at charcols 2, 3, 5   (♠ is PUNCTUATION, its own word)
+#   war☠den  → splits war|☠|den
+#   a♠♥♦b    → the symbol run is ONE punctuation word
+# Vim's utf_class marks the whole U+20A0–U+27FF block ("all kinds of symbols")
+# as punctuation. A previous engine revision treated So-category symbols as
+# word chars — this class exists so that can never silently regress.
+
+class TestVimWordClasses:
+    def test_game_symbols_are_punctuation_like_in_vim(self):
+        from engine.motion import _is_word_char
+        for sym in '♠☠†°§·⌘∞♯⚙⛧☘‽¶⁂≈♂⚀♝':
+            assert not _is_word_char(sym), f'{sym!r} must be punctuation (vim utf_class)'
+        for wc in 'a9_éÿ×':
+            assert _is_word_char(wc), f'{wc!r} must be a word char (vim iskeyword)'
+
+    def test_w_stops_on_a_symbol_between_letters(self):
+        # vim: 'a♠b cd' → w lands on ♠, then b, then cd
+        room = _bare_room()
+        room.add_char_run(CharRun(row=3, col=2, symbols=('a', '♠', 'b'), kind='ember'))
+        room.add_char_run(CharRun(row=3, col=6, symbols=('c', 'd'), kind='ember'))
+        p = _player(3, 2)
+        apply_motion(p, 'w', 1, room)
+        assert p.col == 3                        # the ♠ — its own punctuation word
+        apply_motion(p, 'w', 1, room)
+        assert p.col == 4                        # then b
+        apply_motion(p, 'w', 1, room)
+        assert p.col == 6                        # then cd
+
+    def test_e_takes_a_symbol_run_as_one_word(self):
+        # vim: 'a♠♥♦b' → from a, w lands on ♠ and e runs to ♦ (one punct word)
+        room = _bare_room()
+        room.add_char_run(CharRun(row=3, col=2,
+                                  symbols=('a', '♠', '♥', '♦', 'b'), kind='ember'))
+        p = _player(3, 2)
+        apply_motion(p, 'w', 1, room)
+        assert p.col == 3
+        apply_motion(p, 'e', 1, room)
+        assert p.col == 5                        # end of the ♠♥♦ run
+
+    def test_b_lands_on_trailing_subword_of_split_token(self):
+        # vim: 'war☠den' splits — b from beyond lands on 'den', not 'war'
+        room = _bare_room()
+        room.add_char_run(CharRun(row=3, col=2,
+                                  symbols=tuple('war☠den'), kind='ember'))
+        p = _player(3, 12)
+        apply_motion(p, 'b', 1, room)
+        assert p.col == 6                        # 'den' — the trailing subword

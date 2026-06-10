@@ -184,14 +184,25 @@ def test_operators_blocked_until_learned(keys):
 
 @pytest.mark.parametrize("keys,op", [
     ('dd', 'd'), ('dw', 'd'), ('yy', 'y'), ('yw', 'y'),
-    ('cc', 'c'), ('cw', 'c'), ('C', 'c'),
+    ('cc', 'c'), ('cw', 'c'),
 ])
 def test_operators_allowed_once_learned(keys, op):
     # Once the operator (and its motion) are in known_commands, it works outside edit mode.
-    # ('$' included because C == c$ and the motion must also be known.)
     action = _parse(keys)
     known = ['h', 'j', 'k', 'l', 'w', '$', op]
     assert action_allowed(action, known, edit_mode=False)
+
+
+@pytest.mark.parametrize("keys,op,tok", [('D', 'd', 'D'), ('C', 'c', 'C')])
+def test_line_end_shorthands_need_their_own_token(keys, op, tok):
+    # D/C are one-key shorthands for d$/c$ and are gated as their OWN lessons:
+    # knowing the operator + '$' is not enough until the shorthand is learned
+    # (The Operator's Vault forces the two-key grammar; D unlocks at the Cipher
+    # Cell, C at the Change Annex).
+    action = _parse(keys)
+    known = ['h', 'j', 'k', 'l', 'w', '$', op]
+    assert not action_allowed(action, known, edit_mode=False)
+    assert action_allowed(action, known + [tok], edit_mode=False)
 
 
 @pytest.mark.parametrize("keys,tok", [('diw', 'iw'), ('ci(', 'i('), ('da"', 'a"')])

@@ -1,6 +1,8 @@
-# Vocab words (mixed) — each contains ≥1 untypable unicode char.
-# Symbols appear at start, middle, or end — semantically meaningful.
-# These create w/b/e word boundaries when adjacent to letters; W/B/E skips the whole token.
+# Vocab words (mixed) — each token carries an untypable symbol and/or an
+# internal w/b/e word break (typable punctuation like : ^ + breaks too).
+# Every symbol below is PUNCTUATION in vim (utf_class 0x20a0-0x27ff): a
+# symbol next to a letter breaks the word, while an adjacent symbol run
+# reads as ONE punctuation word. W/B/E always take the whole token.
 # Chars: ∘ · ◦ § ‽ ° ¶ † ‡ ⁂ ≃ ≈ ∞ ∴ ⌘ ☆ ☘ ☤ ☥ ☩ ☶ ☷ ☼ ☽ ☾ ☿ ♀ ♁ ♂ ♃ ♄ ♅ ♆ ♇ ♔ ♕ ♖ ♗ ♘ ♙ ♚ ♛ ♜ ♝ ♞ ♟ ♠ ♡ ♢ ♣ ♤ ♥ ♦ ♧ ♩ ♪ ♫ ♬ ♭ ♮ ♯ ♺ ♻ ⚀ ⚁ ⚂ ⚃ ⚄ ⚅ ⚆ ⚇ ⚈ ⚉ ⚊ ⚋ ⚌ ⚍ ⚎ ⚏ ⚐ ⚑ ⚒ ⚙ ⚜ ⚝ ⚞ ⚟ ⚛ ⛤ ⛥ ⛦ ⛧
 # All words carry a trailing space (wide-glyph terminal offset).
 
@@ -406,6 +408,15 @@ E♭m
 ∞=∞ 
 ≈∞+ 
 +∞≈ 
+:wq 
+e^x 
+x^2 
+a+b 
+i++ 
+n-1 
+x=y 
+a&b 
+x|y 
 
 # --- length 4 ---
 sid♩ 
@@ -512,6 +523,9 @@ q♦en
 b♝sh 
 r♜ok 
 kn♞t 
+F=ma 
+E=hf 
+mc^2 
 F♂ma 
 E♩hf 
 ☼mc2 
@@ -546,6 +560,16 @@ w3m☾
 6/8♩ 
 gc+♻ 
 ∴∞+∞ 
+:set 
+:map 
+:cmd 
+:let 
+3.14 
+i+=1 
+e^pi 
+2^10 
+pi*r 
+d3@d 
 
 # --- length 5 ---
 -273° 
@@ -709,6 +733,7 @@ lv99§
 hp99§ 
 §xp99 
 xp99§ 
+d3@dl 
 lich† 
 pla†o 
 dorf⚒ 
@@ -736,6 +761,21 @@ potn☤
 ⚞nop⚟ 
 ⚞eof⚟ 
 ⚞buf⚟ 
+:help 
+q:cmd 
+%goto 
+]next 
+[prev 
+:tabn 
+:tabp 
+:vspl 
+:hspl 
+:next 
+:prev 
+:edit 
+e=mc2 
+x^2+1 
+i+=10 
 
 # --- length 6 ---
 kn♞ght 
@@ -904,6 +944,7 @@ lv999§
 hp999§ 
 §xp999 
 xp999§ 
+d3@dl0 
 ava†ar 
 titan⚒ 
 siege⛧ 
@@ -925,6 +966,12 @@ e♝inks
 ⚞nop⚟7 
 ⚞eof⚟7 
 ⚞buf⚟7 
+e=mc^2 
+2^16-1 
+pi*r^2 
+f(x,y) 
+a[n-1] 
+i+=100 
 
 # --- length 7 ---
 d3@dl+† 
@@ -1085,6 +1132,8 @@ e^∞+π7k
 lv9999§ 
 §hp9999 
 hp9999§ 
+d3@dl0c 
+k3rn3l+ 
 n00b♟7k 
 can†rip 
 kes†rel 
@@ -1112,6 +1161,9 @@ lithic†
 zlevel⚒ 
 medusa♛ 
 ⚞vim⚟8k 
+:normal 
+:global 
+:visual 
 
 # --- length 8 ---
 h4x0r♕7k 
@@ -1270,6 +1322,7 @@ e^∞+π8kl
 lv99999§ 
 §hp99999 
 hp99999§ 
+d3@dl0ck 
 k3rn3l+⚙ 
 r00tk1t♔ 
 h4x0r♕8k 
@@ -1299,4 +1352,5 @@ aquifer⚒
 cantrip† 
 mahalit⛧ 
 mamorli§ 
+:command 
 

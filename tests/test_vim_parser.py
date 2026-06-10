@@ -165,11 +165,13 @@ class TestOperators:
 
     def test_D_shortcut(self):
         action, _ = parse('D', Mode.NORMAL)
-        assert action == {'type': 'operator', 'op': 'd', 'motion': '$', 'count': 1}
+        assert action == {'type': 'operator', 'op': 'd', 'motion': '$', 'count': 1,
+                          'shorthand': 'D'}
 
     def test_C_shortcut(self):
         action, _ = parse('C', Mode.NORMAL)
-        assert action == {'type': 'operator', 'op': 'c', 'motion': '$', 'count': 1}
+        assert action == {'type': 'operator', 'op': 'c', 'motion': '$', 'count': 1,
+                          'shorthand': 'C'}
 
     def test_operator_with_f_motion(self):
         action, _ = parse('dfx', Mode.NORMAL)
