@@ -45,7 +45,7 @@ from engine.insert import (
     replace_chars, replace_overtype, replace_restore,
 )
 from engine.editor import (
-    _merge_adjacent_char_runs, _ed_cut, _ed_snapshot, _ed_restore, _ed_subst,
+    _merge_adjacent_char_runs, _split_run_at, _ed_cut, _ed_snapshot, _ed_restore, _ed_subst,
     _ed_paste, _ed_row_items, _ed_clear_row, _ed_range_items, _ed_delete_range,
     _clip_desc, _serialize_room, _deserialize_room,
 )
@@ -3274,7 +3274,7 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
                     budget.spend(1)
                     _push('Key picked up — use p to unlock a door.')
                     interacted = True
-                elif cur and (cur.kind in ('goblin', 'warden')
+                elif cur and (cur.kind in ('goblin', 'warden', 'wanderer')
                               or (cur.kind == 'archivist' and getattr(room, 'lib_hostile', False))):
                     undo_stack.append(_snapshot(room, player, budget, ans=cmd_start_ans))
                     redo_stack.clear()
@@ -3414,16 +3414,23 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
                         interacted = True
 
                 if not interacted:
-                    # Snapshot BEFORE _ed_cut mutates — it removes the character on the
-                    # spot, so a snapshot taken afterwards captures the already-cut state
-                    # and 'u' would refund the keystroke without restoring the character
-                    # (a free delete). Push it only if something was actually cut.
+                    # Normal-mode x cuts TEXT (Vim's x) — char runs only. Walls,
+                    # doors and creatures are NOT cuttable here: entities die by
+                    # the combat/interact branches above and dynamite by its scan
+                    # (a count-x once carved walls and deleted locked doors /
+                    # goblins at range via the admin editor's _ed_cut — a cheese
+                    # that bypassed keys, combat, and geometry on every level).
+                    # Snapshot BEFORE the cut mutates — it removes the character on
+                    # the spot, so a snapshot taken afterwards captures the
+                    # already-cut state and 'u' would refund the keystroke without
+                    # restoring the character (a free delete). Push it only if
+                    # something was actually cut.
                     pre_cut   = _snapshot(room, player, budget, ans=cmd_start_ans)
                     cut_items = []
                     for _ci in range(count):
-                        item = _ed_cut(room, player.row, player.col + _ci)
-                        if item:
-                            cut_items.append(item)
+                        cut = _split_run_at(room, player.row, player.col + _ci)
+                        if cut is not None:
+                            cut_items.append({'type': 'rune', 'rune': cut})
                     if cut_items:
                         undo_stack.append(pre_cut)
                         redo_stack.clear()
