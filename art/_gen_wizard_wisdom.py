@@ -215,9 +215,9 @@ POEMS: list[tuple[str | None, str, list[str]]] = [
         "What's lifted waits in the register—",
         'P lays it back, just before the cursor.',
     ]),
-    ('undo_sanctum', 'u Ctrl-R', [             # The Undo Sanctum — u Ctrl-R
+    ('undo_sanctum', 'u <C-r>', [              # The Undo Sanctum — u <C-r>
         'u steps the last change back.',
-        'Ctrl-R steps it forward again.',
+        '<C-r> steps it forward again.',
         'Not retreat—the rope that lets you climb.',
         'Try the bold move; you can return.',
     ]),

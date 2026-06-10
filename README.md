@@ -91,7 +91,7 @@ The curriculum is defined in `content/levels.py` (canonical) and mirrored in `LE
 | 18 | The Operator's Vault | `d{m}  dd` | Playable |
 | 19 | The Cipher Cell | `s  D` | Planned |
 | 20 | The Quartermaster | `y yy P` | Planned |
-| 21 | The Undo Sanctum | `u  ⌃R` | Planned |
+| 21 | The Undo Sanctum | `u  <C-r>` | Planned |
 | 22 | The Echo Vault | `.` | Planned |
 | 22.1 | The Warden Manifold | (boss) | Planned |
 | 23 | The Inscription Halls | `i a` | Planned |

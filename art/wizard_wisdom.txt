@@ -323,11 +323,11 @@
     },
     {
       "introduces_slug": "undo_sanctum",
-      "name": "u Ctrl-R",
+      "name": "u <C-r>",
       "line_count": 4,
       "quote": [
         "         u steps the last change back.          ",
-        "         Ctrl-R steps it forward again.         ",
+        "         <C-r> steps it forward again.          ",
         "   Not retreat—the rope that lets you climb.    ",
         "       Try the bold move; you can return.       "
       ]
