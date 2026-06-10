@@ -27,8 +27,8 @@ from engine.jumplist import record_jump as _record_jump, jump_back as _jump_back
 from engine.registers import write_register as _reg_write, read_register as _reg_read
 from engine.visual import apply_visual, block_bounds
 from content.scrolls import (
-    # The eight scrolls below have bespoke codex renderers (_show_*); every other
-    # catalogue scroll renders from its 'lines' content via _show_catalog_scroll.
+    # Codex scroll content rendered by _show_scroll_by_id (_STD_SCROLLS map);
+    # every other catalogue scroll renders via _show_catalog_scroll.
     RELIQUARY_SCROLL, WARDEN_LEAP_SCROLL, WARDEN_SIGHT_SCROLL, WAYPOINT_SCROLL,
     OPERATOR_CODEX_SCROLL, ARCHIVISTS_METHOD_SCROLL,
     WHOLE_WORD_SCROLL, WARDEN_ACT_SCROLL,
@@ -71,6 +71,59 @@ def _cmd_append(cmd_line: str, key) -> str:
     if key.is_sequence:
         return cmd_line
     return cmd_line + str(key)
+
+class _CmdLine:
+    """Shared ':' command-line state for the netrw-style screens (overworld,
+    scroll library, parent dir, colors): accumulates typed input and Tab-completes
+    ':e <path>' against a fixed completion list. ``feed`` handles one key while
+    active; it returns the submitted command on Enter ('' on Escape / empty
+    Enter), or None while entry continues."""
+
+    def __init__(self, completions: list[str] | None = None):
+        self.completions = completions or []
+        self.active = False
+        self.line   = ''
+        self._reset_tab()
+
+    def _reset_tab(self) -> None:
+        self._matches: list[str] = []
+        self._idx = -1
+
+    def open(self) -> None:
+        self.active = True
+        self.line   = ''
+        self._reset_tab()
+
+    def feed(self, key) -> str | None:
+        if key.name == 'KEY_ESCAPE':
+            self.active = False
+            self.line   = ''
+            self._reset_tab()
+            return ''
+        if str(key) == '\t':
+            if self.line == 'e' or self.line.startswith('e '):
+                partial = self.line[2:] if self.line.startswith('e ') else ''
+                new_m   = [c for c in self.completions if c.startswith(partial)]
+                if new_m:
+                    if new_m != self._matches:
+                        self._matches, self._idx = new_m, 0
+                    else:
+                        self._idx = (self._idx + 1) % len(self._matches)
+                    self.line = 'e ' + self._matches[self._idx]
+            return None
+        if key.name == 'KEY_ENTER' or str(key) in ('\n', '\r'):
+            cmd = self.line.strip()
+            self.active = False
+            self.line   = ''
+            self._reset_tab()
+            return cmd
+        if key.name == 'KEY_BACKSPACE' or str(key) == '\x7f':
+            self.line = self.line[:-1]
+        else:
+            self.line = _cmd_append(self.line, key)
+        self._reset_tab()
+        return None
+
 
 def _clip_to_text(clip) -> str:
     """Flatten a register clip into plain text for INSERT-mode <C-r> paste.
@@ -343,27 +396,6 @@ def _show_reliquary_scroll(term: Terminal, iw: int, game_h: int,
     term.inkey()
 
 
-def _show_register_tutorial(term: Terminal, iw: int, game_h: int, progress: dict | None = None) -> None:
-    """Amber floating box explaining the \" register. Blocks until any key.
-
-    The d / c rows clarify once those commands have been learned (i.e. the
-    levels teaching them have been completed)."""
-    known = _known_from_progress(progress or {})
-    _show_reliquary_scroll(term, iw, game_h, known)
-
-
-def _show_warden_leap_scroll(term: Terminal, iw: int, game_h: int,
-                             known: set | None = None) -> None:
-    """Amber floating box previewing Act II structural motions (smudged)."""
-    _render_standard_scroll(term, iw, game_h, WARDEN_LEAP_SCROLL, known)
-
-
-def _show_warden_sight_scroll(term: Terminal, iw: int, game_h: int,
-                              known: set | None = None) -> None:
-    """Amber floating box introducing v (Visual mode)."""
-    _render_standard_scroll(term, iw, game_h, WARDEN_SIGHT_SCROLL, known)
-
-
 def _render_standard_scroll(term: Terminal, iw: int, game_h: int, content: dict,
                             known: set | None = None) -> None:
     """Render any scroll whose 'lines' list uses blank/dim/amber/cmd/smudge specs.
@@ -493,36 +525,6 @@ def _render_standard_scroll(term: Terminal, iw: int, game_h: int, content: dict,
     term.inkey()
 
 
-def _show_waypoint_scroll(term: Terminal, iw: int, game_h: int,
-                          known: set | None = None) -> None:
-    """Amber scroll teaching :set number (the Waypoint Sanctum's left-room reward)."""
-    _render_standard_scroll(term, iw, game_h, WAYPOINT_SCROLL, known)
-
-
-def _show_operator_codex_scroll(term: Terminal, iw: int, game_h: int,
-                                known: set | None = None) -> None:
-    """Operator's Codex (171) — d/dd clear; y/c clarify once learned."""
-    _render_standard_scroll(term, iw, game_h, OPERATOR_CODEX_SCROLL, known)
-
-
-def _show_archivists_method_scroll(term: Terminal, iw: int, game_h: int,
-                                   known: set | None = None) -> None:
-    """Archivist's Method (221) — y/yy/p clear; c clarifies once learned."""
-    _render_standard_scroll(term, iw, game_h, ARCHIVISTS_METHOD_SCROLL, known)
-
-
-def _show_whole_word_scroll(term: Terminal, iw: int, game_h: int,
-                            known: set | None = None) -> None:
-    """The Whole Word (291) — iw/aw clear; bracket/quote objects clarify once learned."""
-    _render_standard_scroll(term, iw, game_h, WHOLE_WORD_SCROLL, known)
-
-
-def _show_warden_act_scroll(term: Terminal, iw: int, game_h: int,
-                            known: set | None = None) -> None:
-    """The Warden's Act (361) — visual operators clear; gv clarifies once learned."""
-    _render_standard_scroll(term, iw, game_h, WARDEN_ACT_SCROLL, known)
-
-
 def _show_catalog_scroll(term: Terminal, iw: int, game_h: int,
                          scroll_id: str, known: set | None = None) -> None:
     """Render any SCROLL_CATALOG scroll by id via the standard renderer — used
@@ -535,19 +537,44 @@ def _show_catalog_scroll(term: Terminal, iw: int, game_h: int,
             return
 
 
+# The codex scrolls rendered by _render_standard_scroll, keyed by scroll id.
+# 'register' is the one bespoke renderer (_show_reliquary_scroll).
+_STD_SCROLLS = {
+    'leap':      WARDEN_LEAP_SCROLL,
+    'visual':    WARDEN_SIGHT_SCROLL,
+    'setnum':    WAYPOINT_SCROLL,
+    'd_op':      OPERATOR_CODEX_SCROLL,
+    'y_op':      ARCHIVISTS_METHOD_SCROLL,
+    'text_obj':  WHOLE_WORD_SCROLL,
+    'visual_op': WARDEN_ACT_SCROLL,
+}
+
+
+def _show_scroll_by_id(term: Terminal, iw: int, game_h: int,
+                       sid: str, known: set | None = None) -> None:
+    """Render any scroll by its id: 'register' gets the bespoke amber box, the
+    codex ids their _STD_SCROLLS content, anything else the catalogue renderer."""
+    if sid == 'register':
+        _show_reliquary_scroll(term, iw, game_h, known)
+    elif sid in _STD_SCROLLS:
+        _render_standard_scroll(term, iw, game_h, _STD_SCROLLS[sid], known)
+    else:
+        _show_catalog_scroll(term, iw, game_h, sid, known)
+
+
 # Each boss chest drops the scroll previewing the next act's commands; smudged
 # lines clarify as those commands are learned.  level → (scroll/extras id,
-# full-text title|None, full-text body|None, overlay fn).  The id is also the
-# command the boss GATES: it stays locked on the boss level until its scroll is
-# read (see run_dungeon's level-start extras injection).
+# full-text title|None, full-text body|None).  The id is also the command the
+# boss GATES: it stays locked on the boss level until its scroll is read (see
+# run_dungeon's level-start extras injection); rendering is _show_scroll_by_id.
 _SCROLL_DROPS = {
-    'reliquary':            ('register',  None,                     None,                          _show_reliquary_scroll),
-    'wardens_keep':         ('leap',      None,                     None,                          _show_warden_leap_scroll),
-    'warden_surveyor':      ('visual',    None,                     None,                          _show_warden_sight_scroll),
-    'warden_pathfinder':    ('d_op',      "The Operator's Codex",   _SCROLL_TEXT_OPERATOR_CODEX,    _show_operator_codex_scroll),
-    'warden_manifold':      ('y_op',      "The Archivist's Method", _SCROLL_TEXT_ARCHIVISTS_METHOD, _show_archivists_method_scroll),
-    'warden_scrivener':     ('text_obj',  'The Whole Word',         _SCROLL_TEXT_WHOLE_WORD,        _show_whole_word_scroll),
-    'grandmasters_sanctum': ('visual_op', "The Warden's Act",       _SCROLL_TEXT_WARDENS_ACT,       _show_warden_act_scroll),
+    'reliquary':            ('register',  None,                     None),
+    'wardens_keep':         ('leap',      None,                     None),
+    'warden_surveyor':      ('visual',    None,                     None),
+    'warden_pathfinder':    ('d_op',      "The Operator's Codex",   _SCROLL_TEXT_OPERATOR_CODEX),
+    'warden_manifold':      ('y_op',      "The Archivist's Method", _SCROLL_TEXT_ARCHIVISTS_METHOD),
+    'warden_scrivener':     ('text_obj',  'The Whole Word',         _SCROLL_TEXT_WHOLE_WORD),
+    'grandmasters_sanctum': ('visual_op', "The Warden's Act",       _SCROLL_TEXT_WARDENS_ACT),
 }
 
 
@@ -1033,7 +1060,6 @@ def _kill_door_group(room, row: int, col: int, kind: str = 'door') -> None:
     each treated as one unit — but matching entities in a non-adjacent row/col
     are left untouched.
     """
-    from collections import deque
     seen: set = set()
     q: deque = deque([(row, col)])
     while q:
@@ -1108,6 +1134,20 @@ def _spawn_goblin(room, row, col, summoner_uid: int = 0) -> Entity | None:
             return e
     return None
 
+
+# Level-entry banner: slug → (message, msg_ttl).
+_LEVEL_INTROS = {
+    'line_halls':          ('The Line Halls — navigate to the corridor, then use $ and ^', 50),
+    'reliquary':           ('The Reliquary — break the ward: x away the seal to reach the relic.', 60),
+    'counting_crypts':     ('The Counting Crypts — type [N] before hjkl: try 5j or 3l', 50),
+    'rune_halls':          ('The Rune Halls — w:next word  b:prev word  e:end of word', 60),
+    'character_cataracts': ('The Character Cataracts — f{c}:jump to char  t{c}:just before  F/T:backward', 60),
+    'wardens_keep':        ("The Warden's Keep — the shield follows you. Find the unguarded side.", 60),
+    'warden_surveyor':     ('The Warden Surveyor — survey his hall; w/b/e leap word to word, over the void.', 60),
+    'dummy':               ('Sandbox — all mechanics active. Type :edit to enter editor mode.', 60),
+    'archivists_library':  ("The Archivist's Library — the whole catalogue has spilled "
+                            'into a single endless line.', 80),
+}
 
 # Flavour shown when a cut creature is pasted back (op_paste revives it live).
 _PASTE_SPAWN_MSG = {
@@ -1606,8 +1646,7 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
         vr, vc = max(0, vr), max(0, vc)
         scr_r = 3 + (expl_r - vr)
         scr_c = 1 + (expl_c - vc)
-        _render(message,
-                   attack_pos=_attack_pos(), attack_sym=_attack_sym())
+        _render(message)
         _explosion_animation(term, room, expl_r, expl_c, scr_r, scr_c, iw_now, game_h_now)
         for _dr in range(-3, 4):
             for _dc in range(-3, 4):
@@ -1751,8 +1790,11 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
             msg_pool.append(text)
 
     def _render(msg='', **kw):
-        """Render the dungeon. Drops the repeated (term, dungeon, player, budget) prefix;
-        message and any other args (attack_pos/attack_sym, heart_flash, …) pass through."""
+        """Render the dungeon. Drops the repeated (term, dungeon, player, budget) prefix
+        and defaults attack_pos/attack_sym to the live attack-flash state; any other
+        args (heart_flash, …) pass through."""
+        kw.setdefault('attack_pos', _attack_pos())
+        kw.setdefault('attack_sym', _attack_sym())
         render_all(term, dungeon, player, budget, msg, **kw)
 
     def _blocked(action) -> bool:
@@ -1761,8 +1803,25 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
         nonlocal message, msg_ttl
         _push(_guard_message(action, player.known_commands))
         message = _pool_msg(); msg_ttl = _MSG_ROTATE_TTL
-        _render(message, attack_pos=_attack_pos(), attack_sym=_attack_sym())
+        _render(message)
         return True
+
+    def _animate_reflow_falls() -> None:
+        """Play the void-fall / drown animations the last reflow op queued
+        (room._last_void_falls / _last_drowns) and set the banner message."""
+        nonlocal message, msg_ttl
+        if room._last_void_falls:              # a glyph went over the brink
+            _render(message)
+            _play_void_falls(term, dungeon, room, player)
+            message = 'Over the brink — into the void it tumbles!'
+            msg_ttl = 25
+        if room._last_drowns:                  # a wave of water swept an entity away
+            _render(message)
+            for (dr, dc) in room._last_drowns:
+                _drown_animation(term, *_void_screen_xy(term, room, player, dr, dc))
+            room._last_drowns = []
+            message = 'A wave sweeps it away into the void!'
+            msg_ttl = 25
 
     # ── :s / :g — buffer-shifting + confirm (c flag) callbacks ──────────────
     def _sub_insert_row(at):
@@ -1984,34 +2043,8 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
         if 'editor' not in player.known_commands:
             player.known_commands = player.known_commands + ['editor']
 
-    if level == 'line_halls':
-        message = 'The Line Halls — navigate to the corridor, then use $ and ^'
-        msg_ttl = 50
-    elif level == 'reliquary':
-        message = 'The Reliquary — break the ward: x away the seal to reach the relic.'
-        msg_ttl = 60
-    elif level == 'counting_crypts':
-        message = 'The Counting Crypts — type [N] before hjkl: try 5j or 3l'
-        msg_ttl = 50
-    elif level == 'rune_halls':
-        message = 'The Rune Halls — w:next word  b:prev word  e:end of word'
-        msg_ttl = 60
-    elif level == 'character_cataracts':
-        message = 'The Character Cataracts — f{c}:jump to char  t{c}:just before  F/T:backward'
-        msg_ttl = 60
-    elif level == 'wardens_keep':
-        message = "The Warden's Keep — the shield follows you. Find the unguarded side."
-        msg_ttl = 60
-    elif level == 'warden_surveyor':
-        message = "The Warden Surveyor — survey his hall; w/b/e leap word to word, over the void."
-        msg_ttl = 60
-    elif level == 'dummy':
-        message = 'Sandbox — all mechanics active. Type :edit to enter editor mode.'
-        msg_ttl = 60
-    elif level == 'archivists_library':
-        message = ("The Archivist's Library — the whole catalogue has spilled "
-                   "into a single endless line.")
-        msg_ttl = 80
+    if level in _LEVEL_INTROS:
+        message, msg_ttl = _LEVEL_INTROS[level]
 
     def _room_has_water() -> bool:
         return any(ct == CellType.WATER for cells_row in room.cells for ct in cells_row)
@@ -2057,7 +2090,7 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
     if level == 'archivists_library':
         _lib_relayout()                          # fit the page frame to the real viewport
 
-    _render(message, attack_pos=_attack_pos(), attack_sym=_attack_sym())
+    _render(message)
 
     while True:
         if level == 'archivists_library':
@@ -2072,7 +2105,7 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
                 macro_run_keys = 0
                 budget.frozen = False
                 _push('Macro aborted (too long / recursion).')
-                _render(_pool_msg(), attack_pos=_attack_pos(), attack_sym=_attack_sym())
+                _render(_pool_msg())
                 continue
             key = _synth_key(macro_pending.popleft())
             from_macro = True
@@ -2089,7 +2122,7 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
                 player.macros[recording_reg] = macro_buf
                 recording_reg = None
                 macro_buf = ''
-                _render(message, attack_pos=_attack_pos(), attack_sym=_attack_sym())
+                _render(message)
                 continue
             rc = _record_char(key)
             if rc is not None:
@@ -2120,8 +2153,7 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
                     attack_flash_ttl = _ATTACK_FLASH_TTL
                     needs_render     = True
             if needs_render:
-                _render(message,
-                           attack_pos=_attack_pos(), attack_sym=_attack_sym())
+                _render(message)
             continue
 
         last_activity = time.time()
@@ -2405,7 +2437,7 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
                 msg_idx = 0
                 message = _pool_msg()
                 msg_ttl = _MSG_ROTATE_TTL
-            _render(message, attack_pos=_attack_pos(), attack_sym=_attack_sym())
+            _render(message)
             continue
 
         # ── SEARCH mode (/ or ? pattern entry) ────────────────────────────────
@@ -2447,7 +2479,7 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
                 player.cmd_line = player.cmd_line[:-1]
             else:
                 player.cmd_line = _cmd_append(player.cmd_line, key)
-            _render(message, attack_pos=_attack_pos(), attack_sym=_attack_sym())
+            _render(message)
             continue
 
         # ── INSERT mode (admin text placement) ───────────────────────────────
@@ -2494,7 +2526,7 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
                                              room, _co_act.get('target'),
                                              count_given=_co_act.get('count_given', True))
                             insert_co_buf = None
-                    _render(message, attack_pos=_attack_pos(), attack_sym=_attack_sym())
+                    _render(message)
                     continue
 
                 if insert_creg_pending:
@@ -2510,24 +2542,24 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
                                 break
                             if insert_char(room, player, _tch):
                                 budget.spend(1)
-                    _render(message, attack_pos=_attack_pos(), attack_sym=_attack_sym())
+                    _render(message)
                     continue
 
                 if _kstr == '\x12' and _ins_ok('ins_paste'):     # <C-r> — paste a register
                     insert_creg_pending = True
-                    _render(message, attack_pos=_attack_pos(), attack_sym=_attack_sym())
+                    _render(message)
                     continue
                 if _kstr == '\x0f' and _ins_ok('ins_edit'):      # <C-o> — one Normal command
                     insert_co_buf = ''
-                    _render(message, attack_pos=_attack_pos(), attack_sym=_attack_sym())
+                    _render(message)
                     continue
                 if _kstr == '\x17' and _ins_ok('ins_edit'):      # <C-w> — delete word back
                     insert_delete_word_back(room, player)
-                    _render(message, attack_pos=_attack_pos(), attack_sym=_attack_sym())
+                    _render(message)
                     continue
                 if _kstr == '\x15' and _ins_ok('ins_edit'):      # <C-u> — delete to line start
                     insert_delete_to_start(room, player)
-                    _render(message, attack_pos=_attack_pos(), attack_sym=_attack_sym())
+                    _render(message)
                     continue
 
                 if key.name == 'KEY_BACKSPACE' or str(key) == '\x7f':
@@ -2545,24 +2577,10 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
                                 message = _EDGE_OF_WORLD_MSG; msg_ttl = 25
                         elif insert_char(room, player, ch):
                             budget.spend(1)
-                        if room._last_void_falls:          # ledge: a glyph went over the brink
-                            _render(message,
-                                       attack_pos=_attack_pos(), attack_sym=_attack_sym())
-                            _play_void_falls(term, dungeon, room, player)
-                            message = 'Over the brink — into the void it tumbles!'
-                            msg_ttl = 25
-                        if room._last_drowns:              # ledge: a wave of water swept an entity away
-                            _render(message,
-                                       attack_pos=_attack_pos(), attack_sym=_attack_sym())
-                            for (dr, dc) in room._last_drowns:
-                                _drown_animation(term, *_void_screen_xy(term, room, player, dr, dc))
-                            room._last_drowns = []
-                            message = 'A wave sweeps it away into the void!'
-                            msg_ttl = 25
+                        _animate_reflow_falls()
                         cur_ru = room.char_run_at(player.row, player.col)
                         if cur_ru is not None and cur_ru.kind == 'void':   # typed yourself off the ledge
-                            _render(message,
-                                       attack_pos=_attack_pos(), attack_sym=_attack_sym())
+                            _render(message)
                             _void_fall_animation(term, *_void_screen_xy(term, room, player, player.row, player.col))
                             player.take_damage(2)                          # 1 full heart
                             safe_c = min(prev_ins[1], void_col(room, prev_ins[0]) - 1)
@@ -2573,7 +2591,7 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
                             else:
                                 h, hh = player.hp // 2, '½' if player.hp % 2 else ''
                                 message = f'You typed yourself off the ledge!  ({h}{hh} ♥ remaining)'; msg_ttl = 25
-            _render(message, attack_pos=_attack_pos(), attack_sym=_attack_sym())
+            _render(message)
             continue
 
         # ── REPLACE mode (overtype; Backspace restores originals) ─────────────
@@ -2595,7 +2613,7 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
                         replace_stack.append(rec)
                         if not edit_mode:
                             budget.spend(1)
-            _render(message, attack_pos=_attack_pos(), attack_sym=_attack_sym())
+            _render(message)
             continue
 
         # ── VISUAL modes (v / V / Ctrl-v): extend selection, operate ────────────
@@ -2607,7 +2625,7 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
                 player.mode = Mode.NORMAL
                 player.visual_anchor = None
                 key_buf = ''
-                _render(message, attack_pos=_attack_pos(), attack_sym=_attack_sym())
+                _render(message)
                 continue
             raw = str(key) if not key.is_sequence else ''
             anchor = player.visual_anchor or (player.row, player.col)
@@ -2616,14 +2634,14 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
             if not key_buf and raw == 'o':                 # swap ends
                 player.row, player.col = anchor
                 player.visual_anchor = cursor
-                _render(message, attack_pos=_attack_pos(), attack_sym=_attack_sym())
+                _render(message)
                 continue
             want = _visual_mode_toggle(raw, str(key)) if not key_buf else None
             if want is not None:                           # v / V / Ctrl-v toggle / exit
                 player.mode = Mode.NORMAL if want == vmode else want
                 if player.mode == Mode.NORMAL:
                     player.visual_anchor = None
-                _render(message, attack_pos=_attack_pos(), attack_sym=_attack_sym())
+                _render(message)
                 continue
             if not key_buf and raw in ('/', '?'):          # search extends the selection
                 if not ('/' in player.known_commands or 'admin' in player.known_commands):
@@ -2636,19 +2654,19 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
                     player.mode = Mode.SEARCH
                     player.cmd_line = ''
                     player.search_forward = (raw == '/')
-                _render(message, attack_pos=_attack_pos(), attack_sym=_attack_sym())
+                _render(message)
                 continue
             if not key_buf and raw and raw in 'dycx~<>':
                 op = {'x': 'd', '~': 'g~'}.get(raw, raw)
                 if raw in 'dyc~<>' and not (
                         'visual_op' in player.known_commands or 'admin' in player.known_commands):
                     _push("You haven't learned visual operators yet.")
-                    _render(message, attack_pos=_attack_pos(), attack_sym=_attack_sym())
+                    _render(message)
                     continue
                 if not edit_mode and budget.remaining <= 0:
                     _push('Out of budget!  (Esc, then u to undo)')
                     message = _pool_msg(); msg_ttl = _MSG_ROTATE_TTL
-                    _render(message, attack_pos=_attack_pos(), attack_sym=_attack_sym())
+                    _render(message)
                     continue
                 undo_stack.append(_snapshot(room, player, budget,
                                             row=anchor[0], col=anchor[1],
@@ -2683,14 +2701,14 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
                 player.mode = Mode.INSERT if op == 'c' else Mode.NORMAL
                 player.last_change = {'type': 'visual_op', 'op': op}
                 key_buf = ''
-                _render(message, attack_pos=_attack_pos(), attack_sym=_attack_sym())
+                _render(message)
                 continue
             key_buf += raw
             # Text object: i/a (+ optional count) + object char selects the span
             # (viw, vaw, vi(, va", …).  In visual mode i/a are object prefixes.
             vt = parse_visual_textobj(key_buf)
             if vt == 'pending':
-                _render(message, attack_pos=_attack_pos(), attack_sym=_attack_sym())
+                _render(message)
                 continue
             if vt is not None:
                 _, textobj, tcount = vt
@@ -2711,7 +2729,7 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
                         player.row, player.col = tobj.end_row, tobj.end_col
                         if not edit_mode:
                             budget.spend(2 + (len(str(tcount)) if tcount > 1 else 0))
-                _render(message, attack_pos=_attack_pos(), attack_sym=_attack_sym())
+                _render(message)
                 continue
             # Otherwise: a motion that extends the selection (costs same as normal mode)
             v_action, key_buf = parse(key_buf, Mode.NORMAL)
@@ -2729,14 +2747,14 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
                         budget.spend(_keystroke_cost(v_count, v_motion))
             elif v_action is not None:
                 key_buf = ''                               # ignore non-motion keys in visual
-            _render(message, attack_pos=_attack_pos(), attack_sym=_attack_sym())
+            _render(message)
             continue
 
         # ── Normal mode ───────────────────────────────────────────────────────
         if key.name == 'KEY_ESCAPE':
             _apply_esc(player)
             key_buf = ''
-            _render(message, attack_pos=_attack_pos(), attack_sym=_attack_sym())
+            _render(message)
             continue
 
         raw     = str(key) if not key.is_sequence else ''
@@ -2744,13 +2762,13 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
         action, key_buf = parse(key_buf, player.mode)
 
         if action is None:
-            _render(message, attack_pos=_attack_pos(), attack_sym=_attack_sym())
+            _render(message)
             continue
 
         # Dead players may only enter command mode to type :e
         if player.is_dead and not (action['type'] == 'enter_mode'
                                    and action.get('mode') == 'command'):
-            _render(message, attack_pos=_attack_pos(), attack_sym=_attack_sym())
+            _render(message)
             continue
 
         # Out of budget: the path is spent.  No budget-costing action may proceed —
@@ -2758,7 +2776,7 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
         if not edit_mode and budget.remaining <= 0 and _budget_exhausted_blocks(action):
             _push('Out of budget!  (u to undo)')
             message = _pool_msg(); msg_ttl = _MSG_ROTATE_TTL
-            _render(message, attack_pos=_attack_pos(), attack_sym=_attack_sym())
+            _render(message)
             continue
 
         cur_combat_target = room.entity_at(player.row, player.col)
@@ -2795,7 +2813,7 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
             if not player.last_change:
                 _push('Nothing to repeat.')
                 message = _pool_msg(); msg_ttl = _MSG_ROTATE_TTL
-                _render(message, attack_pos=_attack_pos(), attack_sym=_attack_sym())
+                _render(message)
                 continue
             repeat_count = action.get('count', 1)
             action = dict(player.last_change)
@@ -2847,14 +2865,9 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
                 # Void rune: fall animation, lose heart, respawn (skip in edit mode)
                 ru = room.char_run_at(player.row, player.col)
                 if not edit_mode and ru and ru.kind == 'void':
-                    iw    = _iw(term)
-                    game_h = term.height - 8
-                    vr_start = max(0, min(player.row - game_h // 2, room.rows - game_h))
-                    vc_start = max(0, min(player.col - iw  // 2,    room.cols - iw))
-                    scr_r    = player.row - vr_start + 3
-                    scr_c    = player.col - vc_start + 1
-                    _render(message, attack_pos=_attack_pos(), attack_sym=_attack_sym())
-                    _void_fall_animation(term, scr_r, scr_c)
+                    _render(message)
+                    _void_fall_animation(term, *_void_screen_xy(term, room, player,
+                                                                player.row, player.col))
                     player.take_damage(2)  # 1 full heart
                     player.row, player.col = prev_pos[0], prev_pos[1]
                     if player.is_dead:
@@ -2864,19 +2877,14 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
                         h, hh = player.hp // 2, '½' if player.hp % 2 else ''
                         message = f'You fell into the void!  ({h}{hh} ♥ remaining)'
                         msg_ttl = 25
-                    _render(message, attack_pos=_attack_pos(), attack_sym=_attack_sym())
+                    _render(message)
                     continue
 
                 # Water: drown if landed on water cell (e.g. via $, 0, ^)
                 if not edit_mode and room.cells[player.row][player.col] == CellType.WATER:
-                    iw    = _iw(term)
-                    game_h = term.height - 8
-                    vr_start = max(0, min(player.row - game_h // 2, room.rows - game_h))
-                    vc_start = max(0, min(player.col - iw  // 2,    room.cols - iw))
-                    scr_r    = player.row - vr_start + 3
-                    scr_c    = player.col - vc_start + 1
-                    _render(message, attack_pos=_attack_pos(), attack_sym=_attack_sym())
-                    _drown_animation(term, scr_r, scr_c)
+                    _render(message)
+                    _drown_animation(term, *_void_screen_xy(term, room, player,
+                                                            player.row, player.col))
                     player.take_damage(2)  # 1 full heart
                     player.row, player.col = prev_pos[0], prev_pos[1]
                     if player.is_dead:
@@ -2886,7 +2894,7 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
                         h, hh = player.hp // 2, '½' if player.hp % 2 else ''
                         message = f'You drowned!  ({h}{hh} ♥ remaining)'
                         msg_ttl = 25
-                    _render(message, attack_pos=_attack_pos(), attack_sym=_attack_sym())
+                    _render(message)
                     continue
 
                 # Dynamite: explode if stepped on
@@ -2935,7 +2943,7 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
                     ent = room.entity_at(player.row, player.col)
                 if ent and ent.kind == 'exit' and not won:
                     won = True
-                    _render('', attack_pos=_attack_pos(), attack_sym=_attack_sym())
+                    _render('')
                     iw  = _iw(term)
                     if level_type(level) == 'boss':
                         _starfield_victory(term, iw, dungeon, player)
@@ -3171,8 +3179,7 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
                           for _i in range(count))):
                 # x-ing anything but whitespace defaces the library — he turns on you.
                 _lib_strike('"You DARE deface my library, VANDAL?!"')
-                _render(_pool_msg(),
-                           attack_pos=_attack_pos(), attack_sym=_attack_sym())
+                _render(_pool_msg())
                 continue
             else:
                 interacted = False
@@ -3205,11 +3212,11 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
                             progress['extras'] = extras + [_chest_sid]
                         if _chest_sid not in player.known_commands:
                             player.known_commands = player.known_commands + [_chest_sid]
-                        _render(_pool_msg(), attack_pos=_attack_pos(), attack_sym=_attack_sym())
+                        _render(_pool_msg())
                         _show_catalog_scroll(term, _iw(term), term.height - 8, _chest_sid,
                                              _known_from_progress(progress))
                     elif _drop is not None:
-                        _sid, _txt_title, _txt_body, _show_fn = _drop
+                        _sid, _txt_title, _txt_body = _drop
                         # Discovery is recorded by extras membership, NOT by
                         # known_commands — admin has some ids (e.g. 'register')
                         # pre-injected, so gating on known_commands would skip
@@ -3221,12 +3228,13 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
                                 SM.save_scroll_text(_txt_title, _txt_body)
                         if _sid not in player.known_commands:
                             player.known_commands = player.known_commands + [_sid]
-                        _render(_pool_msg(), attack_pos=_attack_pos(), attack_sym=_attack_sym())
+                        _render(_pool_msg())
                         # Gate the scroll's smudged lines on what the player has
                         # actually learned (their whole progress), not this level's
                         # frozen command set — otherwise replaying an early boss
                         # re-smudges commands learned in later levels.
-                        _show_fn(term, _iw(term), term.height - 8, _known_from_progress(progress))
+                        _show_scroll_by_id(term, _iw(term), term.height - 8, _sid,
+                                           _known_from_progress(progress))
                     else:
                         # No scroll assigned to this level: pull a random, not-yet-
                         # discovered "safe" relic scroll from the library.
@@ -3235,7 +3243,7 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
                             progress['extras'] = progress.get('extras', []) + [_wid]
                             if _wid not in player.known_commands:
                                 player.known_commands = player.known_commands + [_wid]
-                            _render(_pool_msg(), attack_pos=_attack_pos(), attack_sym=_attack_sym())
+                            _render(_pool_msg())
                             _show_catalog_scroll(term, _iw(term), term.height - 8, _wid,
                                                  _known_from_progress(progress))
                         else:
@@ -3478,7 +3486,7 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
                              C.key_blue_fg() if _ktag == 'blue' else None)
                     undo_stack.append(_snapshot(room, player, budget, ans=cmd_start_ans))
                     redo_stack.clear()
-                    _render(_pool_msg(), attack_pos=_attack_pos(), attack_sym=_attack_sym())
+                    _render(_pool_msg())
                     _unlock_animation(term, room, player,
                                       target.row, target.col,
                                       _iw(term), term.height - 8, _kclr)
@@ -3648,16 +3656,7 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
                     player.col = nb
                 if not edit_mode:
                     budget.spend(_operator_cost(action))
-                    if room._last_void_falls:
-                        _render(message, attack_pos=_attack_pos(), attack_sym=_attack_sym())
-                        _play_void_falls(term, dungeon, room, player)
-                        message = 'Over the brink — into the void it tumbles!'; msg_ttl = 25
-                    if room._last_drowns:
-                        _render(message, attack_pos=_attack_pos(), attack_sym=_attack_sym())
-                        for (dr, dc) in room._last_drowns:
-                            _drown_animation(term, *_void_screen_xy(term, room, player, dr, dc))
-                        room._last_drowns = []
-                        message = 'A wave sweeps it away into the void!'; msg_ttl = 25
+                    _animate_reflow_falls()
                 player.last_change = action
 
         elif action['type'] == 'operator' and action['op'] in ('g~', 'gu', 'gU'):
@@ -3736,7 +3735,7 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
                 if tobj is None:
                     ed_undo.pop()
                     _push('No text object here.')
-                    _render(_pool_msg(), attack_pos=_attack_pos(), attack_sym=_attack_sym())
+                    _render(_pool_msg())
                     continue
                 if op in ('d', 'c'):
                     items = _ed_delete_range(room, tobj.start_row, tobj.start_col, tobj.end_row, tobj.end_col)
@@ -3921,7 +3920,7 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
                 message = ''
                 msg_ttl = 0
 
-        _render(message, attack_pos=_attack_pos(), attack_sym=_attack_sym())
+        _render(message)
 
 
 # ── Save-select screen loop ───────────────────────────────────────────────────
@@ -3987,32 +3986,15 @@ def run_scroll_library(term: Terminal, player: Player, progress: dict) -> str | 
     _SL_COMPLETIONS = ['../', 'saves/', 'world/']
 
     _known = _known_from_progress(progress)
-    # Only scrolls with a BESPOKE renderer need an entry here; every other catalogue
-    # scroll (the relic scrolls, the Archivist's rewards, …) renders through
-    # _show_catalog_scroll below, which reads its 'lines' content straight from the
-    # catalogue — so there is no per-scroll boilerplate to keep in sync.
-    _SCROLL_DISPATCH = {
-        'register':  lambda t, iw, gh: _show_register_tutorial(t, iw, gh, progress),
-        'leap':      lambda t, iw, gh: _show_warden_leap_scroll(t, iw, gh, _known),
-        'visual':    lambda t, iw, gh: _show_warden_sight_scroll(t, iw, gh, _known),
-        'setnum':    lambda t, iw, gh: _show_waypoint_scroll(t, iw, gh, _known),
-        'd_op':      lambda t, iw, gh: _show_operator_codex_scroll(t, iw, gh, _known),
-        'y_op':      lambda t, iw, gh: _show_archivists_method_scroll(t, iw, gh, _known),
-        'text_obj':  lambda t, iw, gh: _show_whole_word_scroll(t, iw, gh, _known),
-        'visual_op': lambda t, iw, gh: _show_warden_act_scroll(t, iw, gh, _known),
-    }
 
     discovered  = set(progress.get('extras', []))
     # start on the first actual scroll (skip ../ ./ and the first subtree header)
     cursor_row  = next((i for i, r in enumerate(_rows) if r['type'] == 'scroll'), 0)
-    cmd_active  = False
-    cmd_line    = ''
-    tab_matches: list[str] = []
-    tab_idx     = -1
+    cmdline     = _CmdLine(_SL_COMPLETIONS)
 
     def _render():
         render_scroll_library(term, player, progress, cursor_row,
-                              cmd_line if cmd_active else None)
+                              cmdline.line if cmdline.active else None)
 
     _render()
 
@@ -4021,28 +4003,9 @@ def run_scroll_library(term: Terminal, player: Player, progress: dict) -> str | 
         if not key:
             continue
 
-        if cmd_active:
-            if key.name == 'KEY_ESCAPE':
-                cmd_active  = False
-                cmd_line    = ''
-                tab_matches = []
-                tab_idx     = -1
-            elif str(key) == '\t':
-                if cmd_line == 'e' or cmd_line.startswith('e '):
-                    partial = cmd_line[2:] if cmd_line.startswith('e ') else ''
-                    new_m   = [c for c in _SL_COMPLETIONS if c.startswith(partial)]
-                    if new_m:
-                        if new_m != tab_matches:
-                            tab_matches, tab_idx = new_m, 0
-                        else:
-                            tab_idx = (tab_idx + 1) % len(tab_matches)
-                        cmd_line = 'e ' + tab_matches[tab_idx]
-            elif key.name == 'KEY_ENTER' or str(key) in ('\n', '\r'):
-                cmd         = cmd_line.strip()
-                cmd_active  = False
-                cmd_line    = ''
-                tab_matches = []
-                tab_idx     = -1
+        if cmdline.active:
+            cmd = cmdline.feed(key)
+            if cmd:
                 if cmd in ('q', 'q!'):
                     return None
                 _e_path = cmd[2:].rstrip('/') if cmd.startswith('e ') else ''
@@ -4052,14 +4015,6 @@ def run_scroll_library(term: Terminal, player: Player, progress: dict) -> str | 
                     return 'saves'
                 if _e_path in ('world',):
                     return None
-            elif key.name == 'KEY_BACKSPACE' or str(key) == '\x7f':
-                cmd_line    = cmd_line[:-1]
-                tab_matches = []
-                tab_idx     = -1
-            else:
-                cmd_line    = _cmd_append(cmd_line, key)
-                tab_matches = []
-                tab_idx     = -1
             _render()
             continue
 
@@ -4068,8 +4023,7 @@ def run_scroll_library(term: Terminal, player: Player, progress: dict) -> str | 
         if key.name == 'KEY_ESCAPE':
             return None
         elif raw == ':':
-            cmd_active = True
-            cmd_line   = ''
+            cmdline.open()
         elif raw == '-':
             return 'parent'
         elif raw == 'j':
@@ -4088,11 +4042,7 @@ def run_scroll_library(term: Terminal, player: Player, progress: dict) -> str | 
                     iw     = _iw(term)
                     game_h = term.height - 5
                     _render()
-                    _fn = _SCROLL_DISPATCH.get(scroll['id'])
-                    if _fn is not None:
-                        _fn(term, iw, game_h)
-                    else:                              # any other catalog scroll → standard renderer
-                        _show_catalog_scroll(term, iw, game_h, scroll['id'], _known)
+                    _show_scroll_by_id(term, iw, game_h, scroll['id'], _known)
                     seen = list(progress.get('scrolls_seen', []))
                     if scroll['id'] not in seen:
                         seen.append(scroll['id'])
@@ -4109,8 +4059,7 @@ def run_colors(term: Terminal, player: Player) -> None:
     from render.color_palette import render_color_palette, content_row_count
 
     scroll_top = 0
-    cmd_active = False
-    cmd_line   = ''
+    cmdline    = _CmdLine()
 
     def _max_scroll() -> int:
         from render.utils import inner_w as _iw
@@ -4121,7 +4070,7 @@ def run_colors(term: Terminal, player: Player) -> None:
 
     def _render():
         render_color_palette(term, player, scroll_top,
-                             cmd_line if cmd_active else None)
+                             cmdline.line if cmdline.active else None)
 
     _render()
 
@@ -4130,20 +4079,10 @@ def run_colors(term: Terminal, player: Player) -> None:
         if not key:
             continue
 
-        if cmd_active:
-            if key.name == 'KEY_ESCAPE':
-                cmd_active = False
-                cmd_line   = ''
-            elif key.name == 'KEY_ENTER' or str(key) in ('\n', '\r'):
-                cmd        = cmd_line.strip()
-                cmd_active = False
-                cmd_line   = ''
-                if cmd in ('q', 'q!') or cmd.startswith('e '):
-                    return
-            elif key.name == 'KEY_BACKSPACE' or str(key) == '\x7f':
-                cmd_line = cmd_line[:-1]
-            else:
-                cmd_line = _cmd_append(cmd_line, key)
+        if cmdline.active:
+            cmd = cmdline.feed(key)
+            if cmd and (cmd in ('q', 'q!') or cmd.startswith('e ')):
+                return
             _render()
             continue
 
@@ -4152,8 +4091,7 @@ def run_colors(term: Terminal, player: Player) -> None:
         if key.name == 'KEY_ESCAPE' or raw == '-':
             return
         elif raw == ':':
-            cmd_active = True
-            cmd_line   = ''
+            cmdline.open()
         elif raw == 'j':
             scroll_top = min(scroll_top + 1, _max_scroll())
         elif raw == 'k':
@@ -4180,14 +4118,11 @@ def run_parent_dir(term: Terminal, player: Player, progress: dict) -> str | None
     )
 
     cursor_row  = 2  # 0=../ 1=./ 2+=entries
-    cmd_active  = False
-    cmd_line    = ''
-    tab_matches: list[str] = []
-    tab_idx     = -1
+    cmdline     = _CmdLine(_PD_COMPLETIONS)
 
     def _render():
         render_parent_dir(term, player, cursor_row,
-                          cmd_line if cmd_active else None)
+                          cmdline.line if cmdline.active else None)
 
     _render()
 
@@ -4196,28 +4131,9 @@ def run_parent_dir(term: Terminal, player: Player, progress: dict) -> str | None
         if not key:
             continue
 
-        if cmd_active:
-            if key.name == 'KEY_ESCAPE':
-                cmd_active  = False
-                cmd_line    = ''
-                tab_matches = []
-                tab_idx     = -1
-            elif str(key) == '\t':
-                if cmd_line == 'e' or cmd_line.startswith('e '):
-                    partial = cmd_line[2:] if cmd_line.startswith('e ') else ''
-                    new_m   = [c for c in _PD_COMPLETIONS if c.startswith(partial)]
-                    if new_m:
-                        if new_m != tab_matches:
-                            tab_matches, tab_idx = new_m, 0
-                        else:
-                            tab_idx = (tab_idx + 1) % len(tab_matches)
-                        cmd_line = 'e ' + tab_matches[tab_idx]
-            elif key.name == 'KEY_ENTER' or str(key) in ('\n', '\r'):
-                cmd         = cmd_line.strip()
-                cmd_active  = False
-                cmd_line    = ''
-                tab_matches = []
-                tab_idx     = -1
+        if cmdline.active:
+            cmd = cmdline.feed(key)
+            if cmd:
                 if cmd in ('q', 'q!'):
                     return None
                 _e_path = cmd[2:].rstrip('/') if cmd.startswith('e ') else ''
@@ -4229,14 +4145,6 @@ def run_parent_dir(term: Terminal, player: Player, progress: dict) -> str | None
                     return 'colors'
                 if _e_path in ('world',):
                     return None
-            elif key.name == 'KEY_BACKSPACE' or str(key) == '\x7f':
-                cmd_line    = cmd_line[:-1]
-                tab_matches = []
-                tab_idx     = -1
-            else:
-                cmd_line    = _cmd_append(cmd_line, key)
-                tab_matches = []
-                tab_idx     = -1
             _render()
             continue
 
@@ -4245,8 +4153,7 @@ def run_parent_dir(term: Terminal, player: Player, progress: dict) -> str | None
         if key.name == 'KEY_ESCAPE':
             return None
         elif raw == ':':
-            cmd_active = True
-            cmd_line   = ''
+            cmdline.open()
         elif raw == 'j':
             cursor_row = min(cursor_row + 1, len(entries) + 1)
         elif raw == 'k':
@@ -4450,15 +4357,12 @@ def run_overworld(term: Terminal, player: Player, progress: dict,
         return False
 
     number_mode    = 'number'
-    cmd_active     = False
-    cmd_line       = ''
+    cmdline        = _CmdLine(_OW_COMPLETIONS)
     renaming       = None        # None, or the in-progress new-name buffer
     pending_delete = False
     pending_g      = False
     count_buf      = ''
     scroll_offset  = 0
-    tab_matches: list[str] = []
-    tab_idx        = -1
     avail          = max(1, term.height - 5)
 
     def _rebuild():
@@ -4471,7 +4375,7 @@ def run_overworld(term: Terminal, player: Player, progress: dict,
         nonlocal scroll_offset
         scroll_offset, cy, cx = render_overworld(
             term, player, progress, cursor, lines,
-            cmd_line=cmd_line if cmd_active else None,
+            cmd_line=cmdline.line if cmdline.active else None,
             number_mode=number_mode, deleting=pending_delete,
             renaming=renaming, scroll_offset=scroll_offset)
         print(term.move_yx(cy, cx) + (term.cvvis or term.cnorm), end='', flush=True)  # blinking cursor
@@ -4505,28 +4409,9 @@ def run_overworld(term: Terminal, player: Player, progress: dict,
             continue
 
         # ── Command mode ──────────────────────────────────────────────────────
-        if cmd_active:
-            if key.name == 'KEY_ESCAPE':
-                cmd_active  = False
-                cmd_line    = ''
-                tab_matches = []
-                tab_idx     = -1
-            elif str(key) == '\t':
-                if cmd_line == 'e' or cmd_line.startswith('e '):
-                    partial  = cmd_line[2:] if cmd_line.startswith('e ') else ''
-                    new_m    = [c for c in _OW_COMPLETIONS if c.startswith(partial)]
-                    if new_m:
-                        if new_m != tab_matches:
-                            tab_matches, tab_idx = new_m, 0
-                        else:
-                            tab_idx = (tab_idx + 1) % len(tab_matches)
-                        cmd_line = 'e ' + tab_matches[tab_idx]
-            elif key.name == 'KEY_ENTER' or str(key) in ('\n', '\r'):
-                cmd         = cmd_line.strip()
-                cmd_active  = False
-                cmd_line    = ''
-                tab_matches = []
-                tab_idx     = -1
+        if cmdline.active:
+            cmd = cmdline.feed(key)
+            if cmd:
                 if cmd in ('q', 'q!', 'wq'):
                     if cmd == 'wq':
                         SM.save_progress(progress, player.name)
@@ -4548,14 +4433,6 @@ def run_overworld(term: Terminal, player: Player, progress: dict,
                     if _e_path in ('..', '../'):
                         return _done({'action': 'parent_view', 'cursor': cursor})
                     # Unknown commands silently ignored
-            elif key.name == 'KEY_BACKSPACE' or str(key) == '\x7f':
-                cmd_line    = cmd_line[:-1]
-                tab_matches = []
-                tab_idx     = -1
-            else:
-                cmd_line    = _cmd_append(cmd_line, key)
-                tab_matches = []
-                tab_idx     = -1
             _render()
             continue
 
@@ -4596,8 +4473,7 @@ def run_overworld(term: Terminal, player: Player, progress: dict,
         count_buf = ''
 
         if raw == ':':
-            cmd_active = True
-            cmd_line   = ''
+            cmdline.open()
         elif raw == '-':
             return _done({'action': 'parent_view', 'cursor': cursor})
         elif raw == 'j':

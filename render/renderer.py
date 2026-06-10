@@ -332,7 +332,6 @@ def render_all(term: Terminal, dungeon: Dungeon, player: Player,
         return gnum_fg + f'{n:>{gutter_w - 1}} ' + rst
 
     base_floor_bg = C.floor_bg()
-    floor_bg = base_floor_bg
     wall_bg  = C.wall_bg()
     vis_bg   = C.visual_sel_bg()
     threat_bg = C.threat_sel_bg()

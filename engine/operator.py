@@ -213,9 +213,6 @@ def _place_row(room, row: int, start_col: int, rclip: dict) -> int:
     return last
 
 
-INDENT_WIDTH = 2                                # one shiftwidth, in columns
-
-
 def apply_indent(room, row: int, amount: int) -> int:
     """Shift the row's content by `amount` columns. A RIGHT indent (`>`, amount>0)
     REFLOWS: content slides right and whatever crosses the right brink falls into
