@@ -821,3 +821,40 @@ class TestVimWordClasses:
         p = _player(3, 12)
         apply_motion(p, 'b', 1, room)
         assert p.col == 6                        # 'den' — the trailing subword
+
+
+class TestWordMotionVoidStarts:
+    """Starting ON a void rune: a cluster TOUCHING the void is the same WORD
+    (void runes are text, so there is no gap), so W skips past it to the NEXT
+    word — while w lands on it (the small-word scans treat void as whitespace).
+    Pinned by the word-motion refactor's differential fuzz."""
+
+    def _void_room(self):
+        room = _bare_room()
+        room.add_char_run(CharRun(row=3, col=2,  symbols=('○', '○'), kind='void'))
+        room.add_char_run(CharRun(row=3, col=4,  symbols=('a', 'b'), kind='ancient'))
+        room.add_char_run(CharRun(row=3, col=9,  symbols=('z',),     kind='ember'))
+        return room
+
+    def test_W_from_void_skips_the_touching_word(self):
+        room = self._void_room()
+        p = _player(3, 3)                        # on the void; 'ab' touches at col 4
+        apply_motion(p, 'W', 1, room)
+        assert p.col == 9                        # 'ab' is the same WORD — skip to 'z'
+
+    def test_w_from_void_lands_on_the_touching_word(self):
+        room = self._void_room()
+        p = _player(3, 3)
+        apply_motion(p, 'w', 1, room)
+        assert p.col == 4                        # w treats the void as whitespace
+
+    def test_W_gap_void_blocks_the_leap_but_w_clears_it(self):
+        room = _bare_room()
+        room.add_char_run(CharRun(row=3, col=2, symbols=('a',), kind='ancient'))
+        room.add_char_run(CharRun(row=3, col=5, symbols=('○',), kind='void'))
+        room.add_char_run(CharRun(row=3, col=8, symbols=('z',), kind='ember'))
+        p = _player(3, 2)
+        assert apply_motion(p, 'W', 1, room) is False    # ○ in the gap stops W
+        p2 = _player(3, 2)
+        apply_motion(p2, 'w', 1, room)
+        assert p2.col == 8                               # ...but w leaps over it
