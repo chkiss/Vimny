@@ -245,11 +245,11 @@ POEMS: list[tuple[str | None, str, list[str]]] = [
         'o opens a fresh line below; O above.',
         'Four ways in, each to its own edge.',
     ]),
-    ('overwrite_halls', 'r R', [               # The Overwrite Halls — r R
-        'r swaps one letter and stays put.',
-        'R walks on, overwriting as it goes.',
-        'One wrong stone, or a whole run of them—',
-        'choose the tool to fit the flaw.',
+    ('overwrite_halls', 'R', [                 # The Overwrite Halls — R
+        'r struck one stone; R does not stop.',
+        'It walks the wall, overwriting as it goes.',
+        'A whole run of flaws under one steady hand—',
+        'Esc, and the new line stands.',
     ]),
     ('case_chambers', '~ g~ gU gu', [          # The Case Chambers — ~ g~ gU gu
         '~ turns the lamp on the letter below:',

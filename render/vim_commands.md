@@ -163,12 +163,19 @@
 | dd     |       | delete line|
 | c{m}   | c     | change     |
 | cc     |       | change line|
-| s      |       | substitute |
+
+## cipher_cell — replace + line-end delete
+
+| keys | token | desc               |
+|------|-------|--------------------|
+| r{c} | r     | replace char       |
+| D    | D     | delete to line end |
 
 ## whole_line_annex — substitute line
 
 | keys | token | desc             |
 |------|-------|------------------|
+| s    |       | substitute       |
 | S    |       | substitute line  |
 
 ## quartermaster — yank + named registers
@@ -198,12 +205,11 @@
 | A    |        | append at end  |
 | Esc  |        | exit insert    |
 
-## overwrite_halls — replace
+## overwrite_halls — replace mode
 
 | keys  | token | desc         |
 |-------|-------|--------------|
-| r{c}  | r     | replace char |
-| R     |       | replace mode |
+| R     | R     | replace mode |
 
 ## case_chambers — case change
 

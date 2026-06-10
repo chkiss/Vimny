@@ -89,15 +89,15 @@ The curriculum is defined in `content/levels.py` (canonical) and mirrored in `LE
 | 17 | The Archivist's Library | `:set wrap  :e!  :w {file}` | Playable |
 | 17.1 | The Warden Pathfinder | (boss) | Playable |
 | 18 | The Operator's Vault | `d{m}  dd` | Playable |
-| 19 | The Cipher Cell | `s  D` | Planned |
+| 19 | The Cipher Cell | `r  D` | Planned |
 | 20 | The Quartermaster | `y yy P` | Planned |
 | 21 | The Undo Sanctum | `u  <C-r>` | Planned |
 | 22 | The Echo Vault | `.` | Planned |
 | 22.1 | The Warden Manifold | (boss) | Planned |
 | 23 | The Inscription Halls | `i a` | Planned |
-| 23.5 | The Change Annex | `c{m}  cc  C  S` | Planned |
+| 23.5 | The Change Annex | `c{m}  cc  s  S  C` | Planned |
 | 24 | The Sculpting Chambers | `I A o O` | Planned |
-| 25 | The Overwrite Halls | `r R` | Planned |
+| 25 | The Overwrite Halls | `R` | Planned |
 | 26 | The Case Chambers | `~ g~ gU gu` | Planned |
 | 27 | The Joiner's Gate | `J gJ` | Planned |
 | 28 | The Alignment Halls | `>> <<` | Planned |
@@ -180,6 +180,8 @@ The full command reference (also the hint-bar source) is `render/vim_commands.md
 | `dd` | delete line |
 | `c{m}` | change |
 | `cc` | change line |
+| `r{c}` | replace char |
+| `D` | delete to line end |
 | `s` | substitute |
 | `S` | substitute line |
 | `y{m}` | yank |
@@ -194,7 +196,6 @@ The full command reference (also the hint-bar source) is `render/vim_commands.md
 | `I` | insert at start |
 | `A` | append at end |
 | `Esc` | exit insert |
-| `r{c}` | replace char |
 | `R` | replace mode |
 | `~` | toggle case |
 | `gU{m}` | uppercase |

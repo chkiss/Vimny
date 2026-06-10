@@ -378,13 +378,13 @@
     },
     {
       "introduces_slug": "overwrite_halls",
-      "name": "r R",
+      "name": "R",
       "line_count": 4,
       "quote": [
-        "       r swaps one letter and stays put.        ",
-        "      R walks on, overwriting as it goes.       ",
-        "    One wrong stone, or a whole run of them—    ",
-        "        choose the tool to fit the flaw.        "
+        "      r struck one stone; R does not stop.      ",
+        "   It walks the wall, overwriting as it goes.   ",
+        "  A whole run of flaws under one steady hand—   ",
+        "         Esc, and the new line stands.          "
       ]
     },
     {
