@@ -1,6 +1,6 @@
 """Assemble a dungeon from rooms joined by corridors into a single grid."""
 from __future__ import annotations
-import heapq, math, os, random, unicodedata
+import heapq, math, os, random
 from collections import deque
 from engine.world import Dungeon, Room, RoomType, CellType, CharRun, Entity
 from engine.motion import _fog_unreachable, _cell_char, _is_word_char
@@ -411,10 +411,6 @@ def _par_counting_crypts(composite, door_cols: list, return_path: bool = False):
     if return_path:
         return cost, _join_path(prev, end, merge_single=False)
     return cost
-
-    if return_path:
-        return None, ''
-    return None
 
 
 def build_dungeon_first_cave(seed: int) -> Dungeon:
@@ -5461,7 +5457,6 @@ def _forge_text(room, row, col, text, kind):
 
 
 def build_dungeon_spellwrights_forge(seed: int) -> Dungeon:
-    rng = random.Random(seed)
     dungeon = Dungeon(name="The Spellwright's Forge", seed=seed)
     ROWS, COLS, W = _FORGE_ROWS, _FORGE_COLS, _FORGE_DIV
 

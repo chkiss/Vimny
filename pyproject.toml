@@ -14,4 +14,5 @@ ignore_names = [
     "build_dungeon_*",   # resolved via getattr(module, f'build_dungeon_{slug}')
     "_par_*",            # par-solvers resolved by slug alongside their builders
     "expl_*",            # color fns discovered via getattr over dir(render.colors) in render/color_palette.py
+    "SAFE",              # RoomType.SAFE — constructed only by test fixtures (tests/ isn't scanned)
 ]

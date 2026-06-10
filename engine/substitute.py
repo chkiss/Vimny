@@ -107,7 +107,7 @@ def _expand(rep: str, get_group) -> str:
     i, n = 0, len(rep)
 
     def emit(s: str):
-        nonlocal case_one, case_run
+        nonlocal case_one                  # case_run is only read here
         for ch in s:
             if case_one == 'u':
                 ch = ch.upper(); case_one = None

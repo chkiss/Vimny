@@ -4063,7 +4063,6 @@ def run_colors(term: Terminal, player: Player) -> None:
     cmdline    = _CmdLine()
 
     def _max_scroll() -> int:
-        from render.utils import inner_w as _iw
         game_h    = term.height - 5
         reserved  = 7  # 6 hdr rows + ../
         visible_h = max(0, game_h - reserved)

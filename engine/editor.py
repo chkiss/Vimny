@@ -1,6 +1,8 @@
 """Admin editor helpers: snapshot/restore, cut/paste, range operations."""
 from __future__ import annotations
-from engine.world import CellType, CharRun, Entity, clone_entity, normalize_row_word_kinds
+from engine.world import (
+    CellType, CharRun, Entity, Room, RoomType, clone_entity, normalize_row_word_kinds,
+)
 
 _SUBST_CYCLE = {
     CellType.FLOOR:     CellType.WALL,
@@ -232,7 +234,6 @@ _CODE_CELL = {code: cell for cell, code in _CELL_CODE.items()}
 
 def _deserialize_room(data: dict):
     """Reconstruct a Room from a dict produced by _serialize_room / save_layout."""
-    from engine.world import Room, RoomType, CellType, CharRun, Entity
     rows  = data['rows']
     cols  = data['cols']
     cells = [[_CODE_CELL.get(c, CellType.FLOOR) for c in row] for row in data['cells']]
