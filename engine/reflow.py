@@ -22,7 +22,7 @@ overlay-vs-ledge distinction is retired).
 """
 from __future__ import annotations
 from engine.world import CharRun, CellType
-from engine.editor import _merge_adjacent_char_runs
+from engine.editor import _merge_adjacent_char_runs, _replace_row_runs
 
 _FLOORS = (CellType.FLOOR, CellType.CORRIDOR)
 _WALLS  = (CellType.WALL, CellType.WOOD_WALL)
@@ -83,10 +83,9 @@ def _row_glyphs(room, row: int) -> list:
 def _rewrite_glyphs(room, row: int, cells: list) -> None:
     """Replace the row's non-void glyphs with one character per ``[col, sym, kind]``,
     then merge. Void runes (and water cells) are untouched here."""
-    for ru in [r for r in room._char_runs_by_row.get(row, []) if r.kind != 'void']:
-        room.remove_char_run(ru)
-    for c, sym, kind in cells:
-        room.add_char_run(CharRun(row, c, (sym,), kind))
+    kept_void = [r for r in room._char_runs_by_row.get(row, []) if r.kind == 'void']
+    _replace_row_runs(room, row,
+                      kept_void + [CharRun(row, c, (sym,), kind) for c, sym, kind in cells])
     _merge_adjacent_char_runs(room, row)
 
 

@@ -1,6 +1,6 @@
 """Admin editor helpers: snapshot/restore, cut/paste, range operations."""
 from __future__ import annotations
-from engine.world import CellType, CharRun, Entity, clone_entity
+from engine.world import CellType, CharRun, Entity, clone_entity, normalize_row_word_kinds
 
 _SUBST_CYCLE = {
     CellType.FLOOR:     CellType.WALL,
@@ -11,8 +11,30 @@ _SUBST_CYCLE = {
 }
 
 
+def _replace_row_runs(room, r: int, merged: list) -> None:
+    """Swap row r's CharRuns for `merged`, updating the spatial indexes row-locally.
+    Every reflow push and paste funnels through the merge, so this must NOT pay a
+    full rebuild_indexes (which re-walks every run in the room)."""
+    for ru in room._char_runs_by_row.get(r, ()):
+        for i in range(len(ru.symbols)):
+            room._char_run_map.pop((r, ru.col + i), None)
+    if r in room._char_run_rows:
+        room.char_runs = [ru for ru in room.char_runs if ru.row != r]
+    room.char_runs.extend(merged)
+    for ru in merged:
+        for i in range(len(ru.symbols)):
+            room._char_run_map[(r, ru.col + i)] = ru
+    if merged:
+        room._char_runs_by_row[r] = list(merged)
+        room._char_run_rows.add(r)
+    else:
+        room._char_runs_by_row.pop(r, None)
+        room._char_run_rows.discard(r)
+
+
 def _merge_adjacent_char_runs(room, r: int) -> None:
-    """Merge adjacent same-kind CharRuns on row r into single clusters."""
+    """Merge adjacent same-kind CharRuns on row r into single clusters, then
+    normalize the row's WORD colors — row-scoped (no full index rebuild)."""
     row_runes = sorted(room._char_runs_by_row.get(r, []), key=lambda ru: ru.col)
     if len(row_runes) < 2:
         return
@@ -31,8 +53,8 @@ def _merge_adjacent_char_runs(room, r: int) -> None:
             cur_syms = list(nxt.symbols)
     merged.append(CharRun(row=r, col=cur_col,
                               symbols=tuple(cur_syms), kind=cur_kind))
-    room.char_runs = [ru for ru in room.char_runs if ru.row != r] + merged
-    room.rebuild_indexes()
+    _replace_row_runs(room, r, merged)
+    normalize_row_word_kinds(room, r)
 
 
 def _split_run_at(room, row: int, col: int):

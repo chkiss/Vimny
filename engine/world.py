@@ -165,31 +165,8 @@ class Room:
                 self._char_run_map[(ru.row, ru.col + i)] = ru
             self._char_runs_by_row.setdefault(ru.row, []).append(ru)
         self._char_run_rows = {ru.row for ru in self.char_runs}
-        if getattr(self, 'wrap_buffer', False):
-            return                       # single-line library: each region keeps its own colour
-        # Normalize WORD colors: adjacent non-void clusters on the same row all
-        # take the leftmost cluster's kind so a WORD renders in one color.
-        by_row: dict = {}
-        for ru in self.char_runs:
-            by_row.setdefault(ru.row, []).append(ru)
-        for row_runes in by_row.values():
-            row_runes.sort(key=lambda r: r.col)
-            i = 0
-            while i < len(row_runes):
-                ru = row_runes[i]
-                if ru.kind == 'void':
-                    i += 1
-                    continue
-                word_kind = ru.kind
-                j = i + 1
-                while j < len(row_runes):
-                    prev, curr = row_runes[j - 1], row_runes[j]
-                    if prev.col + len(prev.symbols) == curr.col and curr.kind != 'void':
-                        curr.kind = word_kind
-                        j += 1
-                    else:
-                        break
-                i = j
+        for r in self._char_runs_by_row:
+            normalize_row_word_kinds(self, r)
 
     def add_entity(self, e: Entity) -> None:
         self.entities.append(e)
@@ -302,6 +279,32 @@ class Room:
 
     def char_run_at(self, r: int, c: int) -> Optional[CharRun]:
         return self._char_run_map.get((r, c))
+
+def normalize_row_word_kinds(room: Room, row: int) -> None:
+    """Normalize WORD colors on one row: adjacent non-void clusters all take the
+    leftmost cluster's kind so a WORD renders in one color. Skipped on a
+    wrap_buffer room (single-line library: each region keeps its own colour).
+    Called by rebuild_indexes for every row and by the row-scoped merge."""
+    if getattr(room, 'wrap_buffer', False):
+        return
+    row_runes = sorted(room._char_runs_by_row.get(row, []), key=lambda r: r.col)
+    i = 0
+    while i < len(row_runes):
+        ru = row_runes[i]
+        if ru.kind == 'void':
+            i += 1
+            continue
+        word_kind = ru.kind
+        j = i + 1
+        while j < len(row_runes):
+            prev, curr = row_runes[j - 1], row_runes[j]
+            if prev.col + len(prev.symbols) == curr.col and curr.kind != 'void':
+                curr.kind = word_kind
+                j += 1
+            else:
+                break
+        i = j
+
 
 @dataclass
 class Dungeon:
