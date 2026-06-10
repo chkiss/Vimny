@@ -3965,6 +3965,7 @@ def run_save_select(term: Terminal) -> tuple[str, str]:
         elif key.name == 'KEY_ENTER' or raw in ('\n', '\r'):
             if saves:
                 name = SM.load_player_name(saves[cursor])
+                SM.touch_loaded(name)
                 return ('load', name)
 
         render_save_select(term, saves, cursor, deleting=pending_d)

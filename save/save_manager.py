@@ -1,4 +1,4 @@
-import json, os, pwd, re
+import json, os, pwd, re, time
 from pathlib import Path
 from typing import Optional
 
@@ -47,18 +47,39 @@ def load_for(player_name: str) -> Optional[dict]:
         return json.load(f)
 
 
+def touch_loaded(player_name: str) -> None:
+    """Record that this adventurer was just loaded (for newest-loaded ordering)."""
+    data = load_for(player_name)
+    if data is None:
+        return
+    data['last_loaded'] = time.time()
+    save_for(player_name, data)
+
+
 def list_saves() -> list[dict]:
-    """All saves sorted newest-first by file mtime."""
+    """All saves sorted by most-recently-loaded first.
+
+    Saves loaded since this ordering was introduced carry a 'last_loaded'
+    epoch timestamp; older saves fall back to their file mtime.
+    """
     if not SAVES_DIR.exists():
         return []
-    result = []
-    for p in sorted(SAVES_DIR.glob('*.json'), key=lambda f: -f.stat().st_mtime):
+    loaded: list[tuple[float, dict]] = []
+    for p in SAVES_DIR.glob('*.json'):
         try:
             with open(p) as f:
-                result.append(json.load(f))
+                data = json.load(f)
         except (json.JSONDecodeError, OSError):
-            pass
-    return result
+            continue
+        sort_key = data.get('last_loaded')
+        if sort_key is None:
+            try:
+                sort_key = p.stat().st_mtime
+            except OSError:
+                sort_key = 0.0
+        loaded.append((sort_key, data))
+    loaded.sort(key=lambda t: -t[0])
+    return [data for _, data in loaded]
 
 
 # ── Progress helpers ───────────────────────────────────────────────────────────

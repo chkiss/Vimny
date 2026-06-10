@@ -5,6 +5,7 @@ from pathlib import Path
 from save.save_manager import (
     _slug, save_for, load_for, list_saves, save_progress, load_progress,
     load_player_name, save_layout, list_layouts, delete_layout, rename_layout,
+    touch_loaded,
 )
 
 
@@ -91,6 +92,21 @@ class TestListSaves:
         results = list_saves()
         assert len(results) == 1
         assert results[0]['player_name'] == 'Alice'
+
+    def test_orders_by_last_loaded_newest_first(self, tmp_path, monkeypatch):
+        monkeypatch.setattr('save.save_manager.SAVES_DIR', tmp_path)
+        save_for('Alice', {'player_name': 'Alice', 'last_loaded': 100.0})
+        save_for('Bob',   {'player_name': 'Bob',   'last_loaded': 300.0})
+        save_for('Carol', {'player_name': 'Carol', 'last_loaded': 200.0})
+        order = [s['player_name'] for s in list_saves()]
+        assert order == ['Bob', 'Carol', 'Alice']
+
+    def test_touch_loaded_moves_save_to_front(self, tmp_path, monkeypatch):
+        monkeypatch.setattr('save.save_manager.SAVES_DIR', tmp_path)
+        save_for('Alice', {'player_name': 'Alice', 'last_loaded': 100.0})
+        save_for('Bob',   {'player_name': 'Bob',   'last_loaded': 300.0})
+        touch_loaded('Alice')
+        assert list_saves()[0]['player_name'] == 'Alice'
 
 
 # ── load_progress ─────────────────────────────────────────────────────────────
