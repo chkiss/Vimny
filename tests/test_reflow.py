@@ -105,6 +105,45 @@ def test_close_gap_pulls_the_tail_left():
     assert room._last_void_falls == []           # deletion never drops anything
 
 
+def test_close_gap_pull_stops_at_a_mid_row_wall():
+    """The pull mirrors the push's FIXED brinks: text beyond a mid-row wall is a
+    separate line and does NOT slide across it (the Cipher Cell's bolts shield
+    each beat's cipher from the previous beat's shear)."""
+    room = _room(letters='', void_n=0)
+    room.cells[1][8] = CellType.WALL             # a bolt mid-row
+    room.char_runs = [CharRun(1, 5, ('a',), 'ancient'),
+                      CharRun(1, 10, ('z',), 'ancient')]   # beyond the wall
+    room.rebuild_indexes()
+    close_gap(room, 1, 6, 1)
+    assert _text(room, 1) == {5: 'a', 10: 'z'}   # z did not cross the wall
+
+
+def test_close_gap_pull_stops_at_a_void_rune():
+    """A void rune is a FIXED brink for the pull too: text beyond the hole in
+    the world doesn't slide over it."""
+    room = _room(letters='', void_n=0)
+    room.char_runs = [CharRun(1, 5, ('a',), 'ancient'),
+                      CharRun(1, 8, ('○',), 'void'),
+                      CharRun(1, 10, ('z',), 'ancient')]
+    room.rebuild_indexes()
+    close_gap(room, 1, 6, 1)
+    assert _text(room, 1) == {5: 'a', 10: 'z'}
+    assert room.char_run_at(1, 8).kind == 'void'           # the hole itself stays
+
+
+def test_close_gap_pull_slides_past_an_entity():
+    """Entities are PERMEABLE to the pull (The Operator's Vault's par path
+    relies on corridor text sliding past its chests and keys) — a deliberate
+    asymmetry with the push, which loses a glyph shoved onto an entity."""
+    room = _room(letters='', void_n=0)
+    room.entities.append(Entity(kind='chest', row=1, col=8))
+    room.char_runs = [CharRun(1, 5, ('a',), 'ancient'),
+                      CharRun(1, 10, ('z',), 'ancient')]
+    room.rebuild_indexes()
+    close_gap(room, 1, 6, 1)
+    assert _text(room, 1) == {5: 'a', 9: 'z'}    # z slid past the chest
+
+
 # ── insert_char end-to-end ───────────────────────────────────────────────────────
 
 def test_insert_char_on_ledge_pushes_right_and_advances():

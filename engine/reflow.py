@@ -150,13 +150,26 @@ def open_gap(room, row: int, at_col: int, width: int = 1) -> list:
 
 def close_gap(room, row: int, at_col: int, width: int) -> None:
     """Pull the tail left to close a `width`-wide hole at at_col: glyphs at
-    column >= at_col+width move left by `width` (toward the anchored wall). Cells
+    column >= at_col+width move left by `width` (toward the anchored wall).
+
+    The pull stops at the first FIXED brink right of the hole — a wall or a void
+    rune — mirroring the rightward push (open_gap loses a glyph shoved into a
+    brink), so text beyond a mid-row wall segment or a void hole does NOT slide
+    across it: each brink-bounded stretch flows as its own line. Entities stay
+    PERMEABLE to the pull (text slides past a door or a creature — shipped
+    behaviour The Operator's Vault's par path relies on), a deliberate
+    asymmetry with the push, which loses a glyph shoved onto an entity. Cells
     inside the hole are assumed already removed by the caller. Nothing falls."""
+    limit = room.cols
+    for c in range(at_col + width, room.cols):
+        if _fixed_sink(room, row, c):
+            limit = c
+            break
     kept = []
     for col, sym, k in _row_glyphs(room, row):
-        if col >= at_col + width:
+        if at_col + width <= col < limit:
             kept.append([col - width, sym, k])
-        elif col < at_col:
+        elif col < at_col or col >= limit:
             kept.append([col, sym, k])
     _rewrite_glyphs(room, row, kept)
 
