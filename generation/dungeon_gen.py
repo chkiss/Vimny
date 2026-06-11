@@ -5898,7 +5898,6 @@ _CC_PLAQUE_ROW = 1                     # sealed plaque band: all WALL, glyphs em
                                        # Visible (no fog on this level), untouchable —
                                        # and with only ONE floor row in the dungeon, no
                                        # visual selection can ever straddle it.
-_CC_DECOR_ROW  = 4                     # sealed decay band (pure flavor)
 _CC_FLOOR_LO, _CC_FLOOR_HI = 1, 60
 _CC_SPAWN  = (2, 2)
 _CC_EXIT   = (2, 60)
@@ -5934,7 +5933,6 @@ _CC_COMBOS = (
     ('ruby', 'mint', 'fuzzy', 'acre'),
 )
 _CC_WARP_GLYPHS    = ('♄', '☿', '♆', '⚸')   # warped runes — untypable, punct class
-_CC_DECOR_GLYPHS   = ('░', '▒', '▓')        # crumbling masonry (sealed band only)
 _CC_PAR = 16                           # seed-invariant; tallied in the answer below
 
 
@@ -6012,13 +6010,6 @@ def build_dungeon_cipher_cell(seed: int) -> Dungeon:
     lay(_CC_ROW, _CC_WORD2_COL, word_2, 'ancient')
     for (lo, hi) in (_CC_ROT1, _CC_ROT2):
         lay(_CC_ROW, lo, rot_text(hi - lo + 1), 'ember')
-    # Decay band: sealed masonry flavor under the gauntlet row.
-    c = 3
-    while c < C - 8:
-        n = rng.randint(2, 6)
-        lay(_CC_DECOR_ROW, c,
-            ''.join(rng.choice(_CC_DECOR_GLYPHS) for _ in range(n)), 'ember')
-        c += n + rng.randint(2, 5)
 
     # The exit is edit-immune: the final D's span sweeps over its cell, and the
     # way out must not be deletable (nor the row dd-collapsible — immunity
