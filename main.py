@@ -926,6 +926,8 @@ def _keystroke_cost(count: int, motion: str = '') -> int:
 def _operator_cost(action: dict) -> int:
     """Keystroke cost of an operator command, e.g. dw=2, d3w=4, dd=2, gUiw=4, gUU=3."""
     count = action.get('count', 1)
+    if 'shorthand' in action:              # D / C — ONE physical keypress, not d+$
+        return (len(str(count)) if count > 1 else 0) + 1
     c = len(action['op'])                  # 'd'=1, 'gU'=2
     if count > 1:
         c += len(str(count))
@@ -1125,6 +1127,39 @@ def _operators_vault_tick(room, player) -> list:
     return msgs
 
 
+def _cipher_cell_tick(room, player) -> list:
+    """The Cipher Cell doors. STATELESS, hence undo-safe (the vault-tick
+    principle): every bolt is recomputed from the text each turn. A cipher bolt
+    stands open exactly while its word reads true — undoing the fix re-bars it,
+    re-fixing re-opens it; a jammed door stands open exactly while its residue
+    tail is sheared. Returns banner messages for anything that just changed."""
+    msgs = []
+
+    def _text_at(row, c0, n):
+        out = []
+        for c in range(c0, c0 + n):
+            ru = room.char_run_at(row, c)
+            out.append(ru.symbols[c - ru.col] if ru else ' ')
+        return ''.join(out)
+
+    def _set_bolt(pos, open_, opened_msg):
+        br, bc = pos
+        cur_open = room.cells[br][bc] != CellType.WALL
+        if open_ and not cur_open:
+            room.cells[br][bc] = CellType.FLOOR
+            msgs.append(opened_msg)
+        elif not open_ and cur_open and (player.row, player.col) != (br, bc):
+            room.cells[br][bc] = CellType.WALL     # undo restored the rot — re-bar
+
+    for (row, c0, word, pos) in getattr(room, '_cc_bolts', ()):
+        _set_bolt(pos, _text_at(row, c0, len(word)) == word,
+                  'The cipher reads true — the bolt grinds back!')
+    for (row, lo, hi, pos) in getattr(room, '_cc_tail_bolts', ()):
+        sheared = all(room.char_run_at(row, c) is None for c in range(lo, hi + 1))
+        _set_bolt(pos, sheared, 'The rot falls away — the jammed door swings open.')
+    return msgs
+
+
 def _spawn_goblin(room, row, col, summoner_uid: int = 0) -> Entity | None:
     for c in (col, col - 1, col + 1):
         if 0 <= c < room.cols and room.is_passable(row, c) and not room.entity_at(row, c):
@@ -1143,6 +1178,7 @@ _LEVEL_INTROS = {
     'rune_halls':          ('The Rune Halls — w:next word  b:prev word  e:end of word', 60),
     'character_cataracts': ('The Character Cataracts — f{c}:jump to char  t{c}:just before  F/T:backward', 60),
     'wardens_keep':        ("The Warden's Keep — the shield follows you. Find the unguarded side.", 60),
+    'cipher_cell':         ('The Cipher Cell — r strikes one true rune over the false; D shears the rot.', 60),
     'warden_surveyor':     ('The Warden Surveyor — survey his hall; w/b/e leap word to word, over the void.', 60),
     'dummy':               ('Sandbox — all mechanics active. Type :edit to enter editor mode.', 60),
     'archivists_library':  ("The Archivist's Library — the whole catalogue has spilled "
@@ -3863,6 +3899,12 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
                     room._ov_hinted = True
                     _push('A dead end — yet the last guards pace a sealed ledge below. '
                           'This floor is one rotten line: dd cuts it out from under you.')
+
+            # The Cipher Cell: bolts track their cipher words, the rusted key and
+            # the jammed door track their residue tails (stateless, undo-safe).
+            if level == 'cipher_cell':
+                for _cc_msg in _cipher_cell_tick(room, player):
+                    _push(_cc_msg)
 
             # Warden summon message
             if tick_msgs and not player.is_dead:

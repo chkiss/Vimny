@@ -203,11 +203,17 @@ POEMS: list[tuple[str | None, str, list[str]]] = [
         'The verb decides; the motion measures.',
         'dw, c$ — say both, and it is done.',
     ]),
-    ('whole_line_annex', 'dd cc', [            # The Whole-Line Annex — dd cc D S
-        'Double the letter: the whole line answers.',
-        'dd clears the row; cc clears and waits.',
-        'D and S strike from the cursor on.',
-        'One stroke for the span you stand on.',
+    ('cipher_cell', 'r D', [                   # The Cipher Cell — r D
+        'r swaps one letter and stays put—',
+        'strike the true rune over the false.',
+        'D shears the rot from cursor to wall.',
+        'Read what the cell forgot; write it back.',
+    ]),
+    ('whole_line_annex', 'c cc s S C', [       # The Change Annex — c cc s S C
+        'Double the letter: the whole line answers—',
+        'cc clears the row and waits for new words.',
+        's strikes one stone and opens to write;',
+        'C and S say the long things shortly.',
     ]),
     ('quartermaster', 'y yy P', [              # The Quartermaster — y yy P
         'y lifts the letters; nothing is cut.',

@@ -131,7 +131,14 @@ Chamber corridor widths are set so the taught motion exactly spans the required 
 
 ---
 
-## L19 — The Whole-Line Annex
+## L23.5 — The Change Annex (originally drafted as L19; renumbered)
+
+> The live curriculum split this section's commands: `dd` shipped with L18
+> (The Operator's Vault), `D` shipped with L19 (The Cipher Cell, built), and
+> `cc`/`s`/`S`/`C` are the Change Annex at display 23.5 — this section now
+> drafts THAT level. The `D`-vs-`d$` cost CHALLENGE below was resolved when
+> the Cipher Cell shipped: `_operator_cost` charges shorthand `D`/`C` as ONE
+> keypress.
 
 **Commands taught:** `dd` `cc` `D` `S`.
   Idiom family: operator-doubling acts on the whole line; `D` = `d$`; `S` = `cc`.
