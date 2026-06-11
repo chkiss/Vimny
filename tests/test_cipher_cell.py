@@ -1,15 +1,19 @@
 """The Cipher Cell (L19): dungeon correctness tests.
 
 Teaching goal: r (replace one char in place — the substitution-cipher tool) and
-D (delete to line end, ONE keypress). r is structurally forced: at L19 the
-player has no other way to produce a character (i is L23, s/c are 23.5, R is
-25) and the warped letters appear nowhere reachable, so x+p can transplant
-nothing. D is SOFT-forced (lineheads precedent): par assumes D; the d$ route
-costs par+2 and still fits the ×1.4 budget but loses the 2-star.
+D (delete to line end, ONE keypress), under ONE visible rule: make the lock row
+READ AS ITS PLAQUE. The plaque band shows each span's true state (a word, then
+blank); the lock row decays it with a warped rune (mend with r) and rot-text
+sprawling where the plaque is blank (shear with D).
 
-Gates run through main._cipher_cell_tick — stateless and undo-safe (the
-vault-tick principle): bolts track their cipher words, the rusted key and the
-jammed final door track their residue tails, every turn, from the text alone.
+r is structurally forced: at L19 the player has no other way to produce a
+character (i is L23, s/c are 23.5, R is 25) and the warped letters appear
+nowhere reachable, so x+p can transplant nothing. D is SOFT-forced (lineheads
+precedent): par assumes D; the d$ route costs par+2 and still fits the ×1.4
+budget but loses the 2-star.
+
+All four doors run through main._cipher_cell_tick — stateless and undo-safe
+(the vault-tick principle): every bolt is recomputed from the text each turn.
 """
 from collections import deque
 
@@ -26,8 +30,8 @@ from generation.dungeon_gen import (
     build_dungeon_cipher_cell,
     _CC_ROWS, _CC_COLS, _CC_ROW, _CC_PLAQUE_ROW,
     _CC_SPAWN, _CC_EXIT, _CC_BOLT_A, _CC_BOLT_B, _CC_BOLT_C, _CC_BOLT_D,
-    _CC_CIPHER_A_COL, _CC_CIPHER_B_COL, _CC_RESIDUE1, _CC_RESIDUE2,
-    _CC_TAIL1, _CC_TAIL2, _CC_WARP_A, _CC_PAR,
+    _CC_CIPHER_A_COL, _CC_CIPHER_B_COL, _CC_WORD1_COL, _CC_ROT1, _CC_ROT2,
+    _CC_SPAN1, _CC_SPAN2, _CC_WARP_A, _CC_PAR,
 )
 import pytest
 
@@ -48,7 +52,7 @@ def _run_text(room, row, c0, n):
 
 
 def _plaques(room):
-    """(word_a, word_b) read off the sealed plaque band."""
+    """(word_a, word_1, word_b, word_2) read off the sealed plaque band."""
     runs = sorted((ru for ru in room.char_runs if ru.row == _CC_PLAQUE_ROW),
                   key=lambda ru: ru.col)
     return [''.join(ru.symbols) for ru in runs]
@@ -83,7 +87,7 @@ def test_plaques_match_ciphers(seed):
     """Each cipher is its plaque word with the warped position(s) swapped to an
     untypable (non-word-class) glyph; the rest of the letters agree."""
     room = _room(seed)
-    word_a, word_b = _plaques(room)
+    word_a, _w1, word_b, _w2 = _plaques(room)
     warp_b = next(i for i in range(len(word_b) - 1) if word_b[i] == word_b[i + 1])
     ca = _run_text(room, _CC_ROW, _CC_CIPHER_A_COL, len(word_a))
     cb = _run_text(room, _CC_ROW, _CC_CIPHER_B_COL, len(word_b))
@@ -101,10 +105,10 @@ def test_plaques_match_ciphers(seed):
 
 @pytest.mark.parametrize("seed", SEEDS)
 def test_true_letter_scarcity(seed):
-    """The warped letters appear NOWHERE reachable (the whole gauntlet row), so
-    x+p can transplant nothing and r is the only fix."""
+    """The warped letters appear NOWHERE reachable (the whole gauntlet row, rot
+    soup included), so x+p can transplant nothing and r is the only fix."""
     room = _room(seed)
-    word_a, word_b = _plaques(room)
+    word_a, _w1, word_b, _w2 = _plaques(room)
     warp_b = next(i for i in range(len(word_b) - 1) if word_b[i] == word_b[i + 1])
     reachable = {s for ru in room.char_runs if ru.row == _CC_ROW for s in ru.symbols}
     assert word_a[_CC_WARP_A] not in reachable
@@ -112,13 +116,20 @@ def test_true_letter_scarcity(seed):
 
 
 @pytest.mark.parametrize("seed", SEEDS)
-def test_no_void_and_residue_is_punct(seed):
+def test_rot_is_legible_text_and_no_void(seed):
+    """The rot must read as TEXT — typable word-class letters, so 'D deletes
+    text' matches what the player sees (not wall-coloured cells) — sprawling
+    exactly where the plaque above is blank. No void runes anywhere."""
     room = _room(seed)
     assert all(ru.kind != 'void' for ru in room.char_runs)
-    for (lo, hi) in (_CC_RESIDUE1, _CC_RESIDUE2):
-        for c in range(lo, hi + 1):
-            ru = room.char_run_at(_CC_ROW, c)
-            assert ru is not None and not _is_word_char(ru.symbols[c - ru.col])
+    for (lo, hi) in (_CC_ROT1, _CC_ROT2):
+        glyphs = [ru.symbols[c - ru.col]
+                  for c in range(lo, hi + 1)
+                  for ru in [room.char_run_at(_CC_ROW, c)] if ru is not None]
+        assert glyphs, "the rot span must hold text"
+        assert all(_is_word_char(g) for g in glyphs), glyphs
+        for c in range(lo, hi + 1):                   # plaque blank above the rot
+            assert room.char_run_at(_CC_PLAQUE_ROW, c) is None
 
 
 # ── par / answer ──────────────────────────────────────────────────────────────
@@ -129,11 +140,11 @@ def test_par_is_locked_and_answer_tracks_the_combo(seed):
     letters are exactly the plaque letters under the warped positions. (Answer
     cost == par and the budget formula: covered by the universal tests.)"""
     room = _room(seed)
-    word_a, word_b = _plaques(room)
+    word_a, _w1, word_b, _w2 = _plaques(room)
     warp_b = next(i for i in range(len(word_b) - 1) if word_b[i] == word_b[i + 1])
     assert room.par == _CC_PAR
     toks = room.answer.split()
-    assert toks.count('D') == 2, "both tails are sheared with D on the par path"
+    assert toks.count('D') == 2, "both rot spans are sheared with D on the par path"
     assert f'r{word_a[_CC_WARP_A]}' in toks
     assert f'2r{word_b[warp_b]}' in toks, "the doubled warp is fixed with ONE count-r"
 
@@ -191,7 +202,7 @@ def test_exit_reachable_once_gates_open(seed):
 @pytest.mark.parametrize("seed", SEEDS)
 def test_tick_bolt_follows_the_cipher_both_ways(seed):
     room = build_dungeon_cipher_cell(seed).rooms[0]          # private (mutating)
-    word_a, _ = _plaques(room)
+    word_a = _plaques(room)[0]
     warp_col = _CC_CIPHER_A_COL + _CC_WARP_A
     glyph = room.char_run_at(_CC_ROW, warp_col).symbols[0]   # the warped rune
     p = Player(row=_CC_ROW, col=warp_col)
@@ -221,20 +232,32 @@ def _shear(room, row, lo, hi):
 
 
 @pytest.mark.parametrize("seed", SEEDS)
-def test_tick_jammed_doors_track_their_tails(seed):
+def test_tick_jammed_doors_track_their_rot(seed):
     room = build_dungeon_cipher_cell(seed).rooms[0]          # private (mutating)
     p = Player(row=_CC_ROW, col=2)
     main._cipher_cell_tick(room, p)
     assert room.cells[_CC_BOLT_B[0]][_CC_BOLT_B[1]] == CellType.WALL
     assert room.cells[_CC_BOLT_D[0]][_CC_BOLT_D[1]] == CellType.WALL
-    _shear(room, _CC_ROW, *_CC_TAIL1)
+    _shear(room, _CC_ROW, *_CC_ROT1)                         # the D shear (word kept)
     msgs = main._cipher_cell_tick(room, p)
     assert room.cells[_CC_BOLT_B[0]][_CC_BOLT_B[1]] == CellType.FLOOR
-    assert any('jammed' in m for m in msgs)
-    assert room.cells[_CC_BOLT_D[0]][_CC_BOLT_D[1]] == CellType.WALL   # tail 2 untouched
-    _shear(room, _CC_ROW, *_CC_TAIL2)
+    assert any('plaque' in m for m in msgs)
+    assert room.cells[_CC_BOLT_D[0]][_CC_BOLT_D[1]] == CellType.WALL   # rot 2 untouched
+    _shear(room, _CC_ROW, *_CC_ROT2)
     main._cipher_cell_tick(room, p)
     assert room.cells[_CC_BOLT_D[0]][_CC_BOLT_D[1]] == CellType.FLOOR
+
+
+@pytest.mark.parametrize("seed", SEEDS)
+def test_shearing_the_word_itself_keeps_the_bolt_shut(seed):
+    """The plaque says the word must REMAIN: a careless D from the word's start
+    (wiping word and rot alike) leaves the span mismatched and the bolt shut —
+    the precision rule, recoverable with u."""
+    room = build_dungeon_cipher_cell(seed).rooms[0]          # private (mutating)
+    p = Player(row=_CC_ROW, col=2)
+    _shear(room, _CC_ROW, _CC_WORD1_COL, _CC_SPAN1[1])       # word_1 + rot, all gone
+    main._cipher_cell_tick(room, p)
+    assert room.cells[_CC_BOLT_B[0]][_CC_BOLT_B[1]] == CellType.WALL
 
 
 # ── full answer playthrough through the real keystroke loop ───────────────────

@@ -1128,11 +1128,12 @@ def _operators_vault_tick(room, player) -> list:
 
 
 def _cipher_cell_tick(room, player) -> list:
-    """The Cipher Cell doors. STATELESS, hence undo-safe (the vault-tick
-    principle): every bolt is recomputed from the text each turn. A cipher bolt
-    stands open exactly while its word reads true — undoing the fix re-bars it,
-    re-fixing re-opens it; a jammed door stands open exactly while its residue
-    tail is sheared. Returns banner messages for anything that just changed."""
+    """The Cipher Cell doors — ONE rule: a bolt stands open exactly while its
+    span of the lock row READS AS ITS PLAQUE (the word, then blank where the
+    plaque is blank). STATELESS, hence undo-safe (the vault-tick principle):
+    every bolt is recomputed from the text each turn, so undoing a mend or a
+    shear re-bars the door and redoing the work re-opens it. Returns banner
+    messages for anything that just changed."""
     msgs = []
 
     def _text_at(row, c0, n):
@@ -1142,21 +1143,15 @@ def _cipher_cell_tick(room, player) -> list:
             out.append(ru.symbols[c - ru.col] if ru else ' ')
         return ''.join(out)
 
-    def _set_bolt(pos, open_, opened_msg):
+    for (row, c0, target, pos) in getattr(room, '_cc_bolts', ()):
         br, bc = pos
+        open_ = _text_at(row, c0, len(target)) == target
         cur_open = room.cells[br][bc] != CellType.WALL
         if open_ and not cur_open:
             room.cells[br][bc] = CellType.FLOOR
-            msgs.append(opened_msg)
+            msgs.append('The row reads as the plaque — the bolt grinds back!')
         elif not open_ and cur_open and (player.row, player.col) != (br, bc):
             room.cells[br][bc] = CellType.WALL     # undo restored the rot — re-bar
-
-    for (row, c0, word, pos) in getattr(room, '_cc_bolts', ()):
-        _set_bolt(pos, _text_at(row, c0, len(word)) == word,
-                  'The cipher reads true — the bolt grinds back!')
-    for (row, lo, hi, pos) in getattr(room, '_cc_tail_bolts', ()):
-        sheared = all(room.char_run_at(row, c) is None for c in range(lo, hi + 1))
-        _set_bolt(pos, sheared, 'The rot falls away — the jammed door swings open.')
     return msgs
 
 
@@ -1178,7 +1173,7 @@ _LEVEL_INTROS = {
     'rune_halls':          ('The Rune Halls — w:next word  b:prev word  e:end of word', 60),
     'character_cataracts': ('The Character Cataracts — f{c}:jump to char  t{c}:just before  F/T:backward', 60),
     'wardens_keep':        ("The Warden's Keep — the shield follows you. Find the unguarded side.", 60),
-    'cipher_cell':         ('The Cipher Cell — r strikes one true rune over the false; D shears the rot.', 60),
+    'cipher_cell':         ('The Cipher Cell — make each row read as its plaque: r mends a rune, D shears the rot.', 60),
     'warden_surveyor':     ('The Warden Surveyor — survey his hall; w/b/e leap word to word, over the void.', 60),
     'dummy':               ('Sandbox — all mechanics active. Type :edit to enter editor mode.', 60),
     'archivists_library':  ("The Archivist's Library — the whole catalogue has spilled "

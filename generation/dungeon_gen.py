@@ -5902,19 +5902,23 @@ _CC_DECOR_ROW  = 4                     # sealed decay band (pure flavor)
 _CC_FLOOR_LO, _CC_FLOOR_HI = 1, 60
 _CC_SPAWN  = (2, 2)
 _CC_EXIT   = (2, 60)
-# All four doors are BOLTS (wall cells managed by the tick). The two tail bolts
-# double as reflow shields: close_gap's leftward pull stops at a wall, so a
-# shear in one stretch can never drag the next beat's cipher across its bolt.
+# ONE rule opens every door: the lock row must READ AS ITS PLAQUE. The plaque
+# band above shows each span's true state — a word with a blank tail — and the
+# lock row decays it two ways: a warped rune where a letter belongs (mend it
+# with r) and rot-text sprawling past the word (shear it with D). All four
+# doors are BOLTS (wall cells managed by the tick). The two tail bolts double
+# as reflow shields: close_gap's leftward pull stops at a wall, so a shear in
+# one stretch can never drag the next beat's cipher across its bolt.
 _CC_BOLT_A = (2, 10)                   # cell A bolt — open while cipher A reads true
-_CC_BOLT_B = (2, 33)                   # jammed door — open while tail 1 is sheared
+_CC_BOLT_B = (2, 33)                   # jammed door — open while span 1 matches its plaque
 _CC_BOLT_C = (2, 43)                   # cell B bolt — cipher B
-_CC_BOLT_D = (2, 59)                   # the last jammed door — tail 2
+_CC_BOLT_D = (2, 59)                   # the last jammed door — span 2
 _CC_CIPHER_A_COL, _CC_CIPHER_B_COL = 4, 36
 _CC_WORD1_COL,  _CC_WORD2_COL  = 13, 46
-_CC_RESIDUE1 = (18, 31)                # residue glyph spans (walkable text)
-_CC_RESIDUE2 = (51, 58)
-_CC_TAIL1 = (18, 32)                   # tick threshold: glyph-free → bolt B opens
-_CC_TAIL2 = (51, 58)                   # tick threshold: glyph-free → bolt D opens
+_CC_ROT1 = (18, 32)                    # rot-text spans (walkable letter soup)
+_CC_ROT2 = (51, 58)
+_CC_SPAN1 = (13, 32)                   # plaque-match spans: word + blank tail
+_CC_SPAN2 = (46, 58)
 _CC_WARP_A = 2                         # warped letter index in word A (never 0: w must
                                        # land on the word before stepping to the warp)
 # Word combos: (cipher A, survivor 1, cipher B, survivor 2). Shapes are fixed so
@@ -5930,22 +5934,23 @@ _CC_COMBOS = (
     ('ruby', 'mint', 'fuzzy', 'acre'),
 )
 _CC_WARP_GLYPHS    = ('♄', '☿', '♆', '⚸')   # warped runes — untypable, punct class
-_CC_RESIDUE_GLYPHS = ('░', '▒', '▓')        # decay residue — untypable
-_CC_PAR = 14                           # seed-invariant; tallied in the answer below
+_CC_DECOR_GLYPHS   = ('░', '▒', '▓')        # crumbling masonry (sealed band only)
+_CC_PAR = 16                           # seed-invariant; tallied in the answer below
 
 
 def build_dungeon_cipher_cell(seed: int) -> Dungeon:
     """The Cipher Cell (L19): teaches r (replace one char, in place — the
     substitution-cipher tool) and D (delete to line end, ONE keypress).
 
-    A decayed prison row. Each cell bolt is warded by a cipher word whose warped
-    rune(s) must be struck true with r — the plaque above shows the real word,
-    sealed in the wall. Between the cells the corridor is furred with crumbled
-    residue jamming the next door; D shears a whole tail in one stroke and the
-    bolt grinds back. Geometry is fixed; the seed picks the word combo and the
-    glyph dressing, so par is seed-invariant and locked at _CC_PAR while the
-    answer's letters track the combo. All four doors run through
-    main._cipher_cell_tick — stateless and undo-safe.
+    A decayed prison row, read against the plaque band sealed in the wall above
+    it: ONE rule opens every door — make the lock row read as its plaque. The
+    plaques show each span's true state (a word, then blank); the row beneath
+    has decayed two ways: a warped rune where a letter belongs (mend it in
+    place with r) and rot-text sprawling where the plaque is blank (shear it to
+    the wall with D). Geometry is fixed; the seed picks the word combo, the
+    warp glyph and the rot soup, so par is seed-invariant and locked at
+    _CC_PAR while the answer's letters track the combo. All four doors run
+    through main._cipher_cell_tick — stateless and undo-safe.
     """
     rng = random.Random(seed)
     word_a, word_1, word_b, word_2 = rng.choice(_CC_COMBOS)
@@ -5953,11 +5958,25 @@ def build_dungeon_cipher_cell(seed: int) -> Dungeon:
     warp_glyph = rng.choice(_CC_WARP_GLYPHS)
 
     # True-letter scarcity — seals the x+p transplant leak (see _CC_COMBOS).
+    # The rot soup is drawn from an alphabet EXCLUDING the warp letters so it
+    # can't become a donor either.
     reachable_letters = set(word_1 + word_2) \
         | {ch for i, ch in enumerate(word_a) if i != _CC_WARP_A} \
         | {ch for i, ch in enumerate(word_b) if i not in (warp_b, warp_b + 1)}
     assert word_a[_CC_WARP_A] not in reachable_letters, (word_a, reachable_letters)
     assert word_b[warp_b] not in reachable_letters, (word_b, reachable_letters)
+    soup_abc = [ch for ch in 'abcdefghijklmnopqrstuvwxyz'
+                if ch not in (word_a[_CC_WARP_A], word_b[warp_b])]
+
+    def rot_text(n: int) -> str:
+        """`n` columns of decayed prose: letter-soup words with single gaps."""
+        out: list = []
+        while len(out) < n:
+            if out:
+                out.append(' ')
+            for _ in range(min(rng.randint(2, 4), n - len(out))):
+                out.append(rng.choice(soup_abc))
+        return ''.join(out[:n])
 
     R, C = _CC_ROWS, _CC_COLS
     cells = [[CellType.WALL] * C for _ in range(R)]
@@ -5971,28 +5990,34 @@ def build_dungeon_cipher_cell(seed: int) -> Dungeon:
     room.seed  = seed
 
     def lay(row, col, text, kind):
-        room.char_runs.append(CharRun(row, col, tuple(text), kind))
+        """Place `text` at (row, col); spaces become gaps between separate runs."""
+        c = col
+        for piece in text.split(' '):
+            if piece:
+                room.char_runs.append(CharRun(row, c, tuple(piece), kind))
+            c += len(piece) + 1
 
-    # Plaques: the true words, sealed in the wall band (visible, untouchable).
+    # Plaques: every span's TRUE state, sealed in the wall band (visible,
+    # untouchable). Where a plaque is blank, the row below must be too.
     lay(_CC_PLAQUE_ROW, _CC_CIPHER_A_COL, word_a, 'verdant')
+    lay(_CC_PLAQUE_ROW, _CC_WORD1_COL,   word_1, 'verdant')
     lay(_CC_PLAQUE_ROW, _CC_CIPHER_B_COL, word_b, 'verdant')
-    # Ciphers: the warped copies on the lock row.
+    lay(_CC_PLAQUE_ROW, _CC_WORD2_COL,   word_2, 'verdant')
+    # The lock row, decayed: warped ciphers and rot-text past the plain words.
     lay(_CC_ROW, _CC_CIPHER_A_COL,
         word_a[:_CC_WARP_A] + warp_glyph + word_a[_CC_WARP_A + 1:], 'ancient')
     lay(_CC_ROW, _CC_CIPHER_B_COL,
         word_b[:warp_b] + warp_glyph * 2 + word_b[warp_b + 2:], 'ancient')
-    # Survivors + residue tails.
     lay(_CC_ROW, _CC_WORD1_COL, word_1, 'ancient')
     lay(_CC_ROW, _CC_WORD2_COL, word_2, 'ancient')
-    for (lo, hi) in (_CC_RESIDUE1, _CC_RESIDUE2):
-        lay(_CC_ROW, lo,
-            ''.join(rng.choice(_CC_RESIDUE_GLYPHS) for _ in range(hi - lo + 1)), 'ember')
-    # Decay band: sealed flavor under the gauntlet row.
+    for (lo, hi) in (_CC_ROT1, _CC_ROT2):
+        lay(_CC_ROW, lo, rot_text(hi - lo + 1), 'ember')
+    # Decay band: sealed masonry flavor under the gauntlet row.
     c = 3
     while c < C - 8:
         n = rng.randint(2, 6)
         lay(_CC_DECOR_ROW, c,
-            ''.join(rng.choice(_CC_RESIDUE_GLYPHS) for _ in range(n)), 'ember')
+            ''.join(rng.choice(_CC_DECOR_GLYPHS) for _ in range(n)), 'ember')
         c += n + rng.randint(2, 5)
 
     # The exit is edit-immune: the final D's span sweeps over its cell, and the
@@ -6003,27 +6028,31 @@ def build_dungeon_cipher_cell(seed: int) -> Dungeon:
     room.spawn_pos = _CC_SPAWN
     room.exit_pos  = _CC_EXIT
 
-    # Gate specs read by main._cipher_cell_tick (stateless, undo-safe).
+    # Bolt specs read by main._cipher_cell_tick (stateless, undo-safe): each is
+    # (row, c0, target, bolt_pos) — the bolt stands open while the lock row's
+    # text over [c0, c0+len(target)) READS AS the target, i.e. as the plaque
+    # (the word, then blank where the plaque is blank).
+    def span_target(word, span):
+        lo, hi = span
+        return word + ' ' * (hi - lo + 1 - len(word))
     room._cc_bolts = [
         (_CC_ROW, _CC_CIPHER_A_COL, word_a, _CC_BOLT_A),
+        (_CC_ROW, _CC_SPAN1[0], span_target(word_1, _CC_SPAN1), _CC_BOLT_B),
         (_CC_ROW, _CC_CIPHER_B_COL, word_b, _CC_BOLT_C),
-    ]
-    room._cc_tail_bolts = [
-        (_CC_ROW, *_CC_TAIL1, _CC_BOLT_B),
-        (_CC_ROW, *_CC_TAIL2, _CC_BOLT_D),
+        (_CC_ROW, _CC_SPAN2[0], span_target(word_2, _CC_SPAN2), _CC_BOLT_D),
     ]
 
     room.rebuild_indexes()
     # Par tally (combo shapes identical, so this holds for every seed):
-    #   w w r?   (4)  → fix cipher A, bolt A grinds back
-    #   w D      (2)  → shear tail 1 from the survivor (wipes it too); bolt B opens
-    #   w w 2r?  (5)  → double-fix cipher B, bolt C opens
-    #   w D      (2)  → shear tail 2; bolt D opens
+    #   w w r?   (4)  → mend cipher A, bolt A grinds back
+    #   w w D    (3)  → to the rot past the plain word; shear it; bolt B opens
+    #   w w 2r?  (5)  → double-mend cipher B, bolt C opens
+    #   w w D    (3)  → shear rot 2; bolt D opens
     #   $        (1)  → walk out
     room.par    = _CC_PAR
     room.budget = math.ceil(_CC_PAR * 1.4)
-    room.answer = (f'w w r{word_a[_CC_WARP_A]} w D '
-                   f'w w 2r{word_b[warp_b]} w D $')
+    room.answer = (f'w w r{word_a[_CC_WARP_A]} w w D '
+                   f'w w 2r{word_b[warp_b]} w w D $')
 
     dungeon = Dungeon(name='The Cipher Cell', seed=seed)
     dungeon.rooms        = [room]
