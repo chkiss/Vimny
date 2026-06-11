@@ -1156,26 +1156,27 @@ def _cipher_cell_tick(room, player) -> list:
 
 
 def _quartermaster_tick(room, player) -> list:
-    """The Quartermaster's doors — the Cipher Cell rule at flame scale: a lock
-    cell BURNS while it matches the flame plaque sealed in the wall above it.
-    STATELESS, hence undo-safe (the vault-tick principle), and every anchor is
-    re-derived from the plaque glyphs each turn — plaques ride row shifts
-    (_shift_rows), so even a stray linewise paste can't desync the locks.
+    """The Quartermaster's doors — every cold brazier shows … embers; feed
+    each one a flame. STATELESS, hence undo-safe (the vault-tick principle):
+    everything is recomputed from the text each turn. Anchors are the stored
+    build coordinates (the Cipher Cell convention) — a self-inflicted dd or
+    linewise paste above them desyncs the doors until u.
 
     Three door families:
-      chain bolts — bolt k stands open while lock flames 0..k ALL burn
+      chain bolts — bolt k stands open while braziers 0..k ALL burn
         (cut the source and the hall darkens: copy, don't cut);
-      pedestals   — every unlit lock cell shows … embers (kind='pedestal'),
-        laid/swept here so a paste's open_gap can only shove them aside for
-        one turn and lighting one reads as embers → flame;
-      tier seal   — the cell above the exit draws open while the three rows
-        below the mural each burn at every mural column (yy + paste ×2).
+      embers      — every unlit brazier shows … (kind='pedestal'), laid/swept
+        here so a paste's open_gap can only shove them aside for one turn and
+        lighting one reads as embers → flame;
+      the seal    — on the LAST row, with the exit at the row's far end, so
+        every line jump (G/{n}G/H/M/L lands on a first non-blank) arrives
+        WEST of it; draws open while the beacon burns in three tiers
+        (yy + paste ×2) AND the whole depot chain burns.
     """
     msgs = []
-    plaques = [(ru.row, ru.col) for ru in room.char_runs
-               if ru.kind == 'flame'
-               and room.cells[ru.row][ru.col] in (CellType.WALL, CellType.WOOD_WALL)]
-    if not plaques:
+    chain    = getattr(room, '_qm_chain', ())
+    braziers = getattr(room, '_qm_braziers', ())
+    if not chain or not braziers:
         return msgs
 
     def lit(r, c):
@@ -1184,52 +1185,47 @@ def _quartermaster_tick(room, player) -> list:
         ru = room.char_run_at(r, c)
         return ru is not None and ru.symbols[c - ru.col] == _dg._QM_FLAME
 
-    # The mural is the maximal run of consecutive plaque rows at the bottom;
-    # everything above it is a chain plaque.
-    rows_ = sorted({r for r, _ in plaques})
-    mural = [rows_[-1]]
-    for r in reversed(rows_[:-1]):
-        if r != mural[0] - 1:
-            break
-        mural.insert(0, r)
-    tier_cols = sorted(c for r, c in plaques if r == mural[-1])
-
-    # Pedestal embers: lay at every unlit lock cell, sweep strays.
-    locks = [(r + 1, c) for r, c in plaques if room.is_passable(r + 1, c)]
-    unlit = {(r, c) for r, c in locks if not lit(r, c)}
+    # Embers: lay at every unlit brazier, sweep strays.
+    unlit = {rc for rc in (*chain, *braziers) if not lit(*rc)}
     for ru in [ru for ru in room.char_runs if ru.kind == 'pedestal']:
         if (ru.row, ru.col) not in unlit:
             room.remove_char_run(ru)
     for (r, c) in unlit:
-        if room.char_run_at(r, c) is None:
+        if room.is_passable(r, c) and room.char_run_at(r, c) is None:
             room.add_char_run(CharRun(r, c, (_dg._QM_EMBERS,), 'pedestal'))
 
     # Chain bolts (cumulative) on the hall row.
-    chain = sorted(rc for rc in locks if rc[0] < mural[0])
-    if chain:
-        hall_row = chain[0][0]
-        burning  = [lit(r, c) for r, c in chain]
-        for i, bc in enumerate(getattr(room, '_qm_bolt_cols', ())):
-            open_ = all(burning[:i + 1])
-            cur_open = room.cells[hall_row][bc] != CellType.WALL
-            if open_ and not cur_open:
-                room.cells[hall_row][bc] = CellType.FLOOR
-                msgs.append('The flame takes — the bolt grinds back!')
-            elif not open_ and cur_open and (player.row, player.col) != (hall_row, bc):
-                room.cells[hall_row][bc] = CellType.WALL
-                msgs.append('The chain is broken — the bolts grind shut!')
+    hall_row = chain[0][0]
+    burning  = [lit(r, c) for r, c in chain]
+    for i, bc in enumerate(getattr(room, '_qm_bolt_cols', ())):
+        open_ = all(burning[:i + 1])
+        cur_open = room.cells[hall_row][bc] != CellType.WALL
+        if open_ and not cur_open:
+            room.cells[hall_row][bc] = CellType.FLOOR
+            msgs.append('The flame takes — the bolt grinds back!')
+        elif not open_ and cur_open and (player.row, player.col) != (hall_row, bc):
+            room.cells[hall_row][bc] = CellType.WALL
+            msgs.append('The chain is broken — the bolts grind shut!')
 
-    # The tier seal: the cell above the exit (both shift together).
+    # The seal: same row as the exit (the exit rides any row shift with it).
     exit_e = next((e for e in room.entities if e.kind == 'exit'), None)
-    if exit_e is not None and exit_e.row > 0:
-        sr, sc = exit_e.row - 1, exit_e.col
-        tiers = all(lit(mural[-1] + k, c) for k in (1, 2, 3) for c in tier_cols)
+    if exit_e is not None:
+        base  = braziers[0][0]
+        tiers = all(lit(base + k, c) for k in (0, 1, 2) for (_, c) in braziers)
+        sr, sc = exit_e.row, getattr(room, '_qm_seal_col', exit_e.col - 1)
+        open_ = tiers and all(burning)
         cur_open = room.cells[sr][sc] != CellType.WALL
-        if tiers and not cur_open:
+        if open_ and not cur_open:
             room.cells[sr][sc] = CellType.FLOOR
-            msgs.append('The beacon burns in three tiers — the seal door draws open!')
-        elif not tiers and cur_open and (player.row, player.col) != (sr, sc):
+            msgs.append('The beacon burns in three tiers — the seal draws open!')
+        elif not open_ and cur_open and (player.row, player.col) != (sr, sc):
             room.cells[sr][sc] = CellType.WALL
+        # One-shot nudge: the beacon row burns, but one tier alone is no beacon.
+        if (not open_ and all(lit(r, c) for r, c in braziers)
+                and not getattr(room, '_qm_tier_hinted', False)):
+            room._qm_tier_hinted = True
+            msgs.append('The beacon is lit — yet one tier alone will not draw the seal. '
+                        'Raise the row itself: yy, then paste.')
     return list(dict.fromkeys(msgs))
 
 
@@ -1252,7 +1248,7 @@ _LEVEL_INTROS = {
     'character_cataracts': ('The Character Cataracts — f{c}:jump to char  t{c}:just before  F/T:backward', 60),
     'wardens_keep':        ("The Warden's Keep — the shield follows you. Find the unguarded side.", 60),
     'cipher_cell':         ('The Cipher Cell — make each row read as its plaque: r mends a rune, D shears the rot.', 60),
-    'quartermaster':       ('The Quartermaster — one flame still burns. yl lifts it, p/P set it down; yy raises the beacon row.', 60),
+    'quartermaster':       ('The Quartermaster — one flame still burns. yl lifts it, P lays it on the cold braziers (…); yy lifts a whole row.', 60),
     'warden_surveyor':     ('The Warden Surveyor — survey his hall; w/b/e leap word to word, over the void.', 60),
     'dummy':               ('Sandbox — all mechanics active. Type :edit to enter editor mode.', 60),
     'archivists_library':  ("The Archivist's Library — the whole catalogue has spilled "
