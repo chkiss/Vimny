@@ -1,22 +1,25 @@
-"""The Quartermaster (L20): dungeon correctness tests.
+"""The Beacon Tiers (L20, slug `quartermaster`): dungeon correctness tests.
 
 Teaching goal: y (yank — copy WITHOUT cutting) and P (paste before the cursor),
 with yy + paste raising whole rows. Every cold brazier shows … dying embers
 (kind='pedestal', tick-managed); feed each one a flame.
 
-Forcing: pasting is structural (nothing else can put a flame on a brazier —
-the glyph is untypable, so r/insert can never forge one). P specifically is
-structural at the beacon: three ADJACENT braziers flush against the west wall,
-so standing on the first, 3P fills all three while 3p (paste AFTER) leaves the
-leftmost cold — and no cell exists to its west to p from. The chain bolts are
-cumulative (bolt k needs braziers 0..k), so cut-and-carry routes must paste
-the source back — copy-don't-cut made visible. yy for the tiers ties with
-dd + 3P in cost (both Vim-real); the answer teaches yy.
+Forcing: pasting is structural, and doubly so under the FUEL RULE (a deliberate
+Vim exception): a charwise paste may lay a flame only onto a brazier — anywhere
+else "there is no fuel to hold that flame" (free no-op). Linewise paste is
+exempt (a yanked row's flames already sit in their braziers) — which is exactly
+why nine flames along one row can never stand in for three tiers. P is
+structural at the beacon: three ADJACENT braziers flush against the seal wall;
+3P fills all three, while 3p's third flame would overrun the fuel (blocked) —
+and at engine level (Vim baseline) 3p starts one cell late, leaving the
+leftmost cold. The chain bolts are cumulative (bolt k needs braziers 0..k), so
+cut-and-carry routes must paste the source back — copy-don't-cut made visible.
 
-Teleport audit: G/{n}G/H/M/L (long known) land on a row's FIRST non-blank, so
-the seal and the exit share the LAST row with the exit at its far END — every
-jump lands west of the seal and queues at the door (this replaced a shipped
-layout where bare G landed beside the exit).
+The exit sits in a one-cell POCKET behind the seal, WEST of the braziers —
+unreachable by walking from any direction but through the drawn seal
+(regression: a previous layout let the player walk down past the seal's east
+side), and unreachable by line jumps (G/{n}G/H/M/L land on a row's first
+non-blank = always a brazier's dots/flame; the exit is CARET_TRANSPARENT).
 
 All doors run through main._quartermaster_tick — stateless and undo-safe
 (the vault-tick principle), anchored on stored build coordinates (the Cipher
@@ -36,7 +39,7 @@ from content.levels import known_commands
 from generation.dungeon_gen import (
     build_dungeon_quartermaster,
     _QM_ROWS, _QM_COLS, _QM_HALL_ROW, _QM_SPAWN, _QM_SOURCE, _QM_PED1,
-    _QM_BOLT_COLS, _QM_BRAZIER_ROW, _QM_BRAZIER_COLS, _QM_EXIT_ROW,
+    _QM_BOLT_COLS, _QM_BRAZIER_ROW, _QM_BRAZIER_COLS,
     _QM_SEAL_COL, _QM_EXIT, _QM_FLAME, _QM_EMBERS, _QM_PAR,
 )
 import pytest
@@ -49,9 +52,10 @@ def _room(seed):
     return cached_room('build_dungeon_quartermaster', seed)
 
 
-def _flame_clip():
-    """A charwise clip holding the flame — what yl leaves in the register."""
-    return {'linewise': False, 'rows': [{'width': 1, 'char_runs': [
+def _flame_clip(width=1):
+    """A charwise clip holding the flame — what yl leaves in the register.
+    width > 1 emulates yw's flame-plus-trailing-blanks clip."""
+    return {'linewise': False, 'rows': [{'width': width, 'char_runs': [
         {'dcol': 0, 'symbols': (_QM_FLAME,), 'kind': 'flame'}]}]}
 
 
@@ -67,6 +71,18 @@ def _light(room, r, c, count=1, before=True):
     return p
 
 
+def _bfs(room):
+    seen, q = {room.spawn_pos}, deque([room.spawn_pos])
+    while q:
+        r, c = q.popleft()
+        for dr, dc in ((0, 1), (0, -1), (1, 0), (-1, 0)):
+            nb = (r + dr, c + dc)
+            if nb not in seen and room.is_passable(*nb):
+                seen.add(nb)
+                q.append(nb)
+    return seen
+
+
 # ── structure ─────────────────────────────────────────────────────────────────
 
 @pytest.mark.parametrize("seed", SEEDS)
@@ -76,11 +92,11 @@ def test_dimensions_and_anchors(seed):
     assert room.spawn_pos == _QM_SPAWN and room.exit_pos == _QM_EXIT
     exits = [e for e in room.entities if e.kind == 'exit']
     assert len(exits) == 1 and (exits[0].row, exits[0].col) == _QM_EXIT
-    assert exits[0].edit_immune, "the exit row must refuse dd-collapse"
+    assert exits[0].edit_immune, "the beacon row must refuse dd-collapse"
     # Build state == tick steady-state: the chain holds only the source flame.
     assert room.cells[_QM_HALL_ROW][_QM_BOLT_COLS[0]] == CellType.FLOOR
     assert room.cells[_QM_HALL_ROW][_QM_BOLT_COLS[1]] == CellType.WALL
-    assert room.cells[_QM_EXIT_ROW][_QM_SEAL_COL] == CellType.WALL
+    assert room.cells[_QM_EXIT[0]][_QM_SEAL_COL] == CellType.WALL
 
 
 @pytest.mark.parametrize("seed", SEEDS)
@@ -97,39 +113,29 @@ def test_initial_flames_and_embers(seed):
     assert len(flames) == 1, "the source is the only flame in the depot"
 
 
-@pytest.mark.parametrize("seed", SEEDS)
-def test_3P_fills_the_beacon_and_3p_leaves_the_left_cold(seed):
-    """The forced-P design, pinned through the real paste op: the braziers are
-    ADJACENT and flush against the west wall. Standing on the first, 3P fills
-    all three; 3p (paste AFTER the cursor) misses the leftmost — and no cell
-    exists to its west to p from."""
-    r, c0 = _QM_BRAZIER_ROW, _QM_BRAZIER_COLS[0]
-    assert _QM_BRAZIER_COLS == (c0, c0 + 1, c0 + 2), "braziers must be adjacent"
-
-    room = build_dungeon_quartermaster(SEEDS[0]).rooms[0]    # private (mutating)
-    assert room.is_passable(r, c0) and not room.is_passable(r, c0 - 1)
-    _light(room, r, c0, count=3, before=True)                # 3P
-    assert all(_glyph(room, r, c) == _QM_FLAME for c in _QM_BRAZIER_COLS)
-
-    room = build_dungeon_quartermaster(SEEDS[0]).rooms[0]    # fresh — now 3p
-    _light(room, r, c0, count=3, before=False)
-    assert _glyph(room, r, c0) != _QM_FLAME, "3p must leave the leftmost cold"
-    assert all(_glyph(room, r, c) == _QM_FLAME for c in (c0 + 1, c0 + 2))
-
-
-def test_flame_and_embers_are_untypable():
-    """r{char} types keyboard characters: neither the flame nor the embers can
-    ever be forged — pasting the register is structurally the only writer."""
-    assert not _QM_FLAME.isascii() and not _QM_EMBERS.isascii()
-
-
-# ── teleport audit (G / {n}G / H / M / L / gg) ────────────────────────────────
+# ── the exit pocket: sealed against walking AND jumping ───────────────────────
 
 @pytest.mark.parametrize("seed", SEEDS)
-def test_line_jumps_never_land_past_the_seal(seed):
-    """Line jumps land on a row's first non-blank — by design always WEST of
-    the seal, never on the exit. Regression: a previous layout put the exit in
-    a row-below alcove and bare G landed beside it."""
+def test_exit_unreachable_until_the_seal_draws(seed):
+    """With the doors AS BUILT the exit pocket is not reachable by walking at
+    all — regression for the shipped layout where the player could descend
+    past the seal's east side straight onto the exit row."""
+    room = build_dungeon_quartermaster(seed).rooms[0]        # private (mutating)
+    assert room.exit_pos not in _bfs(room)
+
+    room.cells[_QM_EXIT[0]][_QM_SEAL_COL] = CellType.FLOOR   # the seal draws open
+    for bc in _QM_BOLT_COLS:
+        room.cells[_QM_HALL_ROW][bc] = CellType.FLOOR
+    seen = _bfs(room)
+    assert room.exit_pos in seen
+    assert (_QM_BRAZIER_ROW, _QM_BRAZIER_COLS[0]) in seen
+
+
+@pytest.mark.parametrize("seed", SEEDS)
+def test_line_jumps_never_land_in_the_pocket(seed):
+    """Line jumps land on a row's first non-blank — on the beacon row that is
+    always a brazier's dots/flame (tick-maintained), never the pocket: the
+    exit entity is CARET_TRANSPARENT and the seal wall stands between."""
     room = build_dungeon_quartermaster(seed).rooms[0]        # private (mutating)
     jumps = ([('G', 1, False), ('gg', 1, False), ('H', 1, False),
               ('M', 1, False), ('L', 1, False)]
@@ -138,9 +144,83 @@ def test_line_jumps_never_land_past_the_seal(seed):
         p = Player(row=room.spawn_pos[0], col=room.spawn_pos[1])
         apply_motion(p, motion, count, room, count_given=count_given)
         assert (p.row, p.col) != _QM_EXIT, f"{count if count_given else ''}{motion}"
-        if p.row == _QM_EXIT_ROW:
-            assert p.col < _QM_SEAL_COL, (
-                f"{count if count_given else ''}{motion} landed east of the seal")
+        if p.row == _QM_EXIT[0]:
+            assert p.col > _QM_SEAL_COL, (
+                f"{count if count_given else ''}{motion} landed at/behind the seal")
+
+
+# ── the fuel rule: flames lie only in braziers ────────────────────────────────
+
+def test_fuel_rule_blocks_flames_off_brazier():
+    """Charwise flame pastes land only on braziers; the rest is 'no fuel'.
+    Covers the cheese battery: yw/ye-style clips on bare floor, count-pastes
+    overrunning the braziers — and the legit fills stay legal."""
+    room = _room(SEEDS[0])
+    blocked = main._flame_paste_blocked
+
+    hall_floor = Player(row=_QM_HALL_ROW, col=6)
+    assert blocked(room, hall_floor, _flame_clip(), True, 1)
+    assert blocked(room, hall_floor, _flame_clip(width=3), True, 1)   # yw clip
+    on_ped1 = Player(row=_QM_PED1[0], col=_QM_PED1[1])
+    assert not blocked(room, on_ped1, _flame_clip(), True, 1)         # legit P
+    assert blocked(room, on_ped1, _flame_clip(), False, 1)            # p lands at 15
+    b0 = Player(row=_QM_BRAZIER_ROW, col=_QM_BRAZIER_COLS[0])
+    assert not blocked(room, b0, _flame_clip(), True, 3)              # 3P fills
+    assert blocked(room, b0, _flame_clip(), False, 3), \
+        "3p's third flame overruns the fuel — blocked outright"
+    assert blocked(room, b0, _flame_clip(), True, 9)                  # nine in a row
+    assert not blocked(room, b0, {'linewise': True, 'rows': [{}]}, True, 9), \
+        "linewise paste is exempt — its flames are already held by braziers"
+    no_flame = {'linewise': False, 'rows': [{'width': 2, 'char_runs': [
+        {'dcol': 0, 'symbols': ('a', 'b'), 'kind': 'ancient'}]}]}
+    assert not blocked(room, hall_floor, no_flame, True, 1), \
+        "the rule governs flames only"
+
+
+@pytest.mark.parametrize("keys,label", [
+    ('wywllllP', 'yw then P on hall floor'),
+    ('wyelllp',  'ye then p on hall floor'),
+    ('^y0$P',    '^ y0 $ P — y0 is exclusive: the clip is blanks, never the flame'),
+    ('wylw P4G9P'.replace(' ', ''), 'nine flames in a row at the beacon'),
+])
+def test_cheese_battery_spreads_no_flame(keys, label, monkeypatch):
+    """The user-reported cheese attempts, key-for-key through run_dungeon:
+    none of them may put a flame anywhere beyond the source/legit braziers."""
+    dungeon = build_dungeon_quartermaster(SEEDS[0])
+    ks = [Keystroke(ch) for ch in keys]
+    ks += [Keystroke(':'), Keystroke('q'), Keystroke('!'), Keystroke('\r')]
+    monkeypatch.setattr(main, 'render_all', lambda *a, **k: None)
+    monkeypatch.setattr(main.time, 'sleep', lambda *a, **k: None)
+    term = Terminal()
+    it = iter(ks)
+    monkeypatch.setattr(term, 'inkey', lambda *a, **k: next(it, Keystroke('')))
+    main.run_dungeon(term, 'quartermaster', {}, player_name='Cheese',
+                     _dungeon=dungeon)
+    room = dungeon.rooms[0]
+    legit = {_QM_SOURCE, _QM_PED1} | {(_QM_BRAZIER_ROW, c) for c in _QM_BRAZIER_COLS}
+    flames = {(ru.row, ru.col) for ru in room.char_runs if _QM_FLAME in ru.symbols}
+    assert flames <= legit, f"{label}: flame escaped to {sorted(flames - legit)}"
+
+
+def test_engine_3p_starts_one_cell_late():
+    """The Vim baseline under the game rule: at ENGINE level 3p pastes after
+    the cursor, so from the first brazier the leftmost stays cold (the fuel
+    rule then blocks it in normal play because the third flame overruns)."""
+    r, c0 = _QM_BRAZIER_ROW, _QM_BRAZIER_COLS[0]
+    assert _QM_BRAZIER_COLS == (c0, c0 + 1, c0 + 2), "braziers must be adjacent"
+    room = build_dungeon_quartermaster(SEEDS[0]).rooms[0]    # private (mutating)
+    assert room.is_passable(r, c0) and not room.is_passable(r, c0 - 1)
+    _light(room, r, c0, count=3, before=False)               # 3p
+    assert _glyph(room, r, c0) != _QM_FLAME
+    room = build_dungeon_quartermaster(SEEDS[0]).rooms[0]    # fresh — 3P
+    _light(room, r, c0, count=3, before=True)
+    assert all(_glyph(room, r, c) == _QM_FLAME for c in _QM_BRAZIER_COLS)
+
+
+def test_flame_and_embers_are_untypable():
+    """r{char} types keyboard characters: neither the flame nor the embers can
+    ever be forged — pasting the register is structurally the only writer."""
+    assert not _QM_FLAME.isascii() and not _QM_EMBERS.isascii()
 
 
 # ── par / answer ──────────────────────────────────────────────────────────────
@@ -174,27 +254,7 @@ def test_curriculum_guard():
     for needed in ('y', 'P', 'p', 'd', 'D', 'r', 'count', '$', 'G'):
         assert needed in known
     for absent in ('insert', 's', 'c', 'R', 'register', 'reg_named'):
-        assert absent not in known, f"{absent!r} learned at or before the Quartermaster"
-
-
-# ── reachability (with the gates modeled open) ────────────────────────────────
-
-@pytest.mark.parametrize("seed", SEEDS)
-def test_exit_reachable_once_gates_open(seed):
-    room = build_dungeon_quartermaster(seed).rooms[0]        # private (mutating)
-    for bc in _QM_BOLT_COLS:
-        room.cells[_QM_HALL_ROW][bc] = CellType.FLOOR
-    room.cells[_QM_EXIT_ROW][_QM_SEAL_COL] = CellType.FLOOR
-    seen, q = {room.spawn_pos}, deque([room.spawn_pos])
-    while q:
-        r, c = q.popleft()
-        for dr, dc in ((0, 1), (0, -1), (1, 0), (-1, 0)):
-            nb = (r + dr, c + dc)
-            if nb not in seen and room.is_passable(*nb):
-                seen.add(nb)
-                q.append(nb)
-    assert room.exit_pos in seen
-    assert (_QM_BRAZIER_ROW, _QM_BRAZIER_COLS[0]) in seen
+        assert absent not in known, f"{absent!r} learned at or before the Beacon Tiers"
 
 
 # ── the tick: stateless, undo-safe ────────────────────────────────────────────
@@ -254,9 +314,8 @@ def test_tick_manages_the_ember_markers(seed):
 @pytest.mark.parametrize("seed", SEEDS)
 def test_seal_needs_three_tiers_and_the_whole_chain(seed):
     """The seal draws open only while the beacon burns in three tiers AND the
-    depot chain burns — checked through REAL row inserts, so the seal (same
-    row as the exit) must ride the shift. A teleport into the shrine that
-    skipped the hall brazier leaves the seal shut."""
+    depot chain burns — checked through REAL row inserts. A jump into the
+    beacon row that skipped the hall brazier leaves the seal shut."""
     from engine.reflow import _insert_blank_row
     from engine.world import CharRun
     room = build_dungeon_quartermaster(seed).rooms[0]        # private (mutating)
@@ -264,14 +323,16 @@ def test_seal_needs_three_tiers_and_the_whole_chain(seed):
 
     _light(room, _QM_BRAZIER_ROW, _QM_BRAZIER_COLS[0], count=3)   # 3P
     msgs = main._quartermaster_tick(room, p)
-    assert any('one tier alone' in m for m in msgs), "the one-shot yy nudge"
+    assert any('row upon row' in m for m in msgs), \
+        "the one-shot too-cold nudge fires when one tier stands alone (no command named)"
+    assert not any('yy' in m for m in msgs), "the nudge must not name the command"
     for k in (1, 2):                                         # the two linewise pastes
         _insert_blank_row(room, _QM_BRAZIER_ROW + k, _QM_BRAZIER_ROW, p)
         for c in _QM_BRAZIER_COLS:
             room.add_char_run(CharRun(_QM_BRAZIER_ROW + k, c, (_QM_FLAME,), 'flame'))
     main._quartermaster_tick(room, p)
     exit_e = next(e for e in room.entities if e.kind == 'exit')
-    assert exit_e.row == _QM_EXIT[0] + 2, "the exit rides the inserted rows"
+    assert exit_e.row == _QM_EXIT[0], "p-pastes insert BELOW — the exit holds its row"
     seal = (exit_e.row, _QM_SEAL_COL)
     assert room.cells[seal[0]][seal[1]] == CellType.WALL, (
         "three tiers alone must NOT draw the seal — the hall brazier is cold")

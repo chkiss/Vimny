@@ -265,134 +265,13 @@ Total (skipping optional keystone):                             69
 
 ---
 
-## L20 — The Quartermaster
+## L20 — The Beacon Tiers (BUILT — section deleted on implement)
 
-**Commands taught:** `y` (yank), `yy` (yank line), `y{motion}` variants (yw, ye, y$, y^),
-  and `p` / `P` (paste after / before cursor).
-New mechanics (count: 2):
-1. `y` as a read-only operator: yanks a span into the register without mutating the world.
-2. `p` / `P`: paste the register clip into the dungeon; `p` = after cursor, `P` = before.
-
-**Linkage:** Students know `d{motion}` removes rune clusters. `y{motion}` is the same grammar
-but non-destructive. `p`/`P` completes the copy-paste triad. `yy` is the line-doubling idiom
-(same family as `dd`). Teaching yank+paste together is essential — yank alone is useless
-without paste.
-
----
-
-### Grid
-
-**Dims:** 20 rows × 56 cols.
-
-The Quartermaster's depot: a central "vault" of rune crates (clusters). East wing has empty
-pedestals that must be filled with the correct rune pattern (yanked from the vault) to open
-the exit. The player must yank runes from a source row and paste them onto target pedestals.
-
-**Forcing is structural (S1 terrain-∞):** the pedestal zone requires rune clusters to be
-placed there; no other command can place runes; the door to the exit is sealed until pedestals
-are filled. There is no budget-margin argument — the forcing is layout-structural.
-
-```
-########################################################
-#@.......K...............................................#
-#........................................................#
-#  [SOURCE VAULT — rows of labeled rune clusters]        #
-#  rrrrrrrrrrrrrrrrrrrrrrrrrrrr (source row A)           #
-#  rrrrrrrrrrrrrrrrrrrrrrrrrrrr (source row B)           #
-#........................................................#
-#     ############################################      #
-#     # [PEDESTAL ZONE — rows 8–10]             #      #
-#     # ______  ______  ______  [empty targets] #      #
-#     # ______  ______  ______                  #      #
-#     # ______  ______  ______                  #      #
-#     ############################################      #
-#........................................................#
-#     ..................................D...............#
-#........................................................#
-#........................................................#
-#........................................................#
-#........................................................#
-#.......................................................X#
-########################################################
-```
-
-**Precise layout (20 r × 56 c):**
-
-```
-Row 0:  walls
-Row 1:  # @ . . K . . . . . . . . . . . . . . . . . . . . #
-Row 2:  passable floor
-Row 3:  [source row A] — rune clusters at cols 3–30
-Row 4:  [source row B] — rune clusters at cols 3–30
-Row 5:  passable floor
-Row 6:  passable floor
-Row 7:  wall strip (top of pedestal zone)
-Row 8:  pedestal row 1 — empty floor cells at cols 32–50
-Row 9:  pedestal row 2
-Row 10: pedestal row 3
-Row 11: wall strip (bottom of pedestal zone)
-Row 12: passable floor
-Row 13: passable floor
-Row 14: passable corridor with D at col 46
-Row 15–18: floor leading to exit
-Row 19: # . . . . . . . . . . . . . . . . . . . . . . . X #
-```
-
-- `@` at (1, 1).
-- `X` at (19, 54).
-- `K` (keystone) at (1, 5).
-- `D` (door) at (14, 46) — opens when all 3 pedestal rows are correctly filled.
-- Source rows A and B (rows 3–4): packed rune clusters, cols 3–30.
-- Pedestal zone: rows 8–10, cols 32–50. Initially empty passable floor.
-  Fill-check trigger: door opens when each pedestal row has at least one rune cluster.
-- Void strip above pedestal zone (row 7, cols 31–51): blocks north access to pedestal zone
-  from the source vault side, forcing the player to go around.
-
-**Optimal path (true full entry→exit):**
-
-```
-@ (1,1) → source row A (3,3):             2j 2l              cost:  4
-yy [yank whole row A]:                    yy                  cost:  2
-Navigate to pedestal row 8 (3,3)→(8,32):
-  south from row 3 to row 12 (below void strip): 9j           cost:  9
-  east to pedestal col 32:               20l                  cost: 20
-  north into pedestal zone row 8:        4k                   cost:  4
-P [paste before cursor, fills row 8]:    P                    cost:  1
-j P [fill row 9]:                        j P                  cost:  2
-j P [fill row 10]:                       j P                  cost:  2
-Exit pedestal zone south: 2j             2j                   cost:  2
-Navigate to door (14,46) from ~(12,32):  2j 14l               cost: 16
-Through door to exit (19,54):            5j 8l                cost: 13
-                                                         ──────────
-Total:                                                        75
-```
-
-**Par:** ~75 keystrokes (true entry→exit including void-strip detour navigation).
-**Budget:** ceil(75 × 1.4) = **105 keystrokes**.
-
-**Note on prior arithmetic error:** Previous draft stated "cost: 7" for the pedestal navigation
-and "cost: ~13" for exit navigation; actual counts are 33 and ~29 respectively. Par and budget
-corrected accordingly. Structural forceability is unaffected.
-
-**Forcing argument (S1 structural):**
-The pedestal fill is required to open the door. No command other than `p`/`P` can place rune
-clusters in the pedestal zone. `yy` is the only way to capture a full row for linewise paste
-(yanking one cluster at a time with `yw` places only one cluster per pedestal row, failing the
-fill-check). Forcing is structural, not budget-margin.
-
-**Primitives used:** rune clusters (source rows), empty pedestal cells, door (fill-trigger),
-keystone, void strip (routing constraint).
-
-**Assumptions:**
-- `yy` captures the entire passable extent of the current row as a linewise clip.
-- `p` with a linewise clip pastes onto the cursor's row. Pedestal rows are empty floor.
-- Fill-check trigger: `len(room._rune_by_row[row]) > 0` for all 3 pedestal rows.
-- Par solver state: (pos, clip_in_register, pedestal_fill_mask). Bounded: 1 clip value × 8 states.
-
-**Self-check:**
-- ≤3 new mechanics? YES: (1) `y`/`yy` yank, (2) `p`/`P` paste, (3) linewise vs charwise clip.
-- Forced? YES: structural (pedestal fill requires yank+paste; no alternative mechanism).
-- Par correctly computed? YES: ~75 (corrected from prior ~31; detour navigation now included).
+Built 2026-06-11 as **The Beacon Tiers** (slug `quartermaster`); this draft's
+pedestal-fill design was superseded during implementation (the engine's linewise
+paste inserts REAL rows — it cannot fill existing ones). See
+`generation/dungeon_gen.py::build_dungeon_quartermaster` and
+`tests/test_quartermaster.py` for the level as shipped.
 
 ---
 
@@ -827,7 +706,7 @@ decrease from any other attack. Implementation requires `immune_to` / `phase` on
 |-------|------|----------|-----|--------|---------|----------------------|
 | 18 | The Operator's Vault | `d{motion}` `c{motion}` | ~52 | 73 | S1 terrain-∞ (goblins block) + budget per chamber | Per-chamber alignment must be hand-tuned; count-motions handled by chamber geometry |
 | 19 | The Whole-Line Annex | `dd` `cc` `D` `S` | 69 | 97 | S1 terrain-∞ (void strips block bypass) | CHALLENGE: `D` ≡ `d$` cost (2=2); `D` taught as demo not forced. Par corrected from ~28 to 69. |
-| 20 | The Quartermaster | `y yy y{motion}` `p P` | ~75 | 105 | S1 structural (pedestal fill required) | Fill-check door trigger; par solver state (clip, fill_mask). Par corrected from ~31 to ~75. |
+| 20 | The Beacon Tiers (BUILT) | `y yy P` | 17 | 24 | Structural (fuel rule: flames paste only onto braziers) + 3P count-paste | Shipped 2026-06-11; see code/tests. |
 | 21 | The Undo Sanctum | `u` (+ `Ctrl-R` scroll) | N/A | RELAXED (999) | DEMO — not forced (Decision D1) | Must not accidentally make `u` budget-required |
 | 22 | The Echo Vault | `.` (dot-repeat via `de`) | 17 | 24 | S2 tight budget (`de×12`=29>24) + S1/S4 bypass blocking | `de` not `dw` (chains correctly); `dd` blocked by terrain/guard; count blocked by guard. |
 | 22.1 | The Warden Manifold | ALL Act IV (`dw d$ dd yy p v..d`) | ~102 | 160 (relaxed) | Per-phase immunity | CHALLENGE: `immune_to`/`phase` fields on Entity; visual-source tagging; Phase 4/5 split (yy then p). |

@@ -281,7 +281,7 @@ class Room:
         return self._char_run_map.get((r, c))
 
 # Mechanic-bearing kinds: their identity drives game rules (void = lethal sink,
-# flame/pedestal = the Quartermaster's locks), so a WORD-color normalization
+# flame/pedestal = the Beacon Tiers' locks), so a WORD-color normalization
 # must never repaint them.
 _PINNED_KINDS = ('void', 'flame', 'pedestal')
 

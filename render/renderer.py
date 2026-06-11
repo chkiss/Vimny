@@ -39,7 +39,7 @@ _WATER_PERIOD   = sum(d for _, _, d in _WATER_FRAMES)  # 24.8 s
 _OVERLAP_PERIOD = 0.7   # seconds per full blink cycle (player ↔ entity under feet)
 
 # ── Flame flicker ──────────────────────────────────────────────────────────────
-# kind='flame' glyphs (the Quartermaster's signal fire) flicker between shades
+# kind='flame' glyphs (the Beacon Tiers' signal fire) flicker between shades
 # of yellow and orange — color only, the glyph never changes shape.
 _FLAME_FRAMES = [
     ((255, 200,  40), 0.45),   # bright yellow flare

@@ -215,7 +215,7 @@ POEMS: list[tuple[str | None, str, list[str]]] = [
         's strikes one stone and opens to write;',
         'C and S say the long things shortly.',
     ]),
-    ('quartermaster', 'y yy P', [              # The Quartermaster — y yy P
+    ('quartermaster', 'y yy P', [              # The Beacon Tiers — y yy P
         'y lifts the letters; nothing is cut.',
         'yy takes the whole line in one reach.',
         "What's lifted waits in the register—",

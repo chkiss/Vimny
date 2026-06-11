@@ -6051,8 +6051,8 @@ def build_dungeon_cipher_cell(seed: int) -> Dungeon:
     return dungeon
 
 
-# ── The Quartermaster (L20) — y / yy / P ──────────────────────────────────────
-_QM_ROWS, _QM_COLS = 7, 48
+# ── The Beacon Tiers (L20) — y / yy / P ───────────────────────────────────────
+_QM_ROWS, _QM_COLS = 6, 48
 _QM_HALL_ROW = 1                        # the supply hall (floor cols 1..45)
 _QM_HALL_LO, _QM_HALL_HI = 1, 45
 _QM_SPAWN  = (1, 2)
@@ -6060,61 +6060,69 @@ _QM_SOURCE = (1, 4)                     # the one lit brazier — the flame to s
 _QM_PED1   = (1, 14)                    # hall brazier — lit with the first paste
 _QM_BOLT_COLS = (8, 18)                 # chain bolts A/B on the hall row: bolt k
                                         # stands open while flames 0..k ALL burn
-_QM_SHAFT_COL = 45                      # east shaft: hall → shrine (rows 2..3)
+_QM_SHAFT_COL = 45                      # east shaft: hall → beacon row (rows 2..3)
 _QM_BRAZIER_ROW = 4                     # the beacon row (floor cols 34..45)
 _QM_SHRINE_LO, _QM_SHRINE_HI = 34, 45
 _QM_BRAZIER_COLS = (34, 35, 36)         # three ADJACENT cold braziers, flush against
-                                        # the west wall: standing on the first, 3P
+                                        # the seal wall: standing on the first, 3P
                                         # fills all three; 3p (paste AFTER) leaves the
                                         # leftmost cold, and no cell exists to its west
-_QM_EXIT_ROW = 5                        # seal + exit share the LAST row (floor 34..44):
-_QM_SEAL_COL = 40                       # every line jump (G/{n}G/H/M/L) lands on a
-_QM_EXIT = (5, 44)                      # row's FIRST non-blank — always WEST of the
-                                        # seal — so teleports can't skirt the door
+_QM_SEAL_COL = 33                       # the seal: the brazier row's own west wall
+_QM_EXIT = (4, 32)                      # exit POCKET behind the seal — walled on every
+                                        # other side, so neither walking off the row's
+                                        # east end nor any line jump can reach it
+                                        # (G/{n}G/H/M/L land on a row's FIRST non-blank,
+                                        # which is always a brazier's dots/flame; the
+                                        # exit itself is CARET_TRANSPARENT)
 _QM_FLAME  = '🜂'                        # one width-1 glyph IS the flame (untypable,
                                         # so r/insert can never forge one)
 _QM_EMBERS = '…'                        # cold brazier: three dying embers, one cell
-_QM_PAR = 15                            # seed-invariant; tallied in the answer below
+_QM_PAR = 17                            # seed-invariant; tallied in the answer below
 
 
 def build_dungeon_quartermaster(seed: int) -> Dungeon:
-    """The Quartermaster (L20): teaches y (yank — copy WITHOUT cutting) and
+    """The Beacon Tiers (L20): teaches y (yank — copy WITHOUT cutting) and
     P (paste before the cursor); yy + paste raises whole rows.
 
     The depot's signal fire is down to one lit brazier; every cold brazier
     shows … dying embers — feed each one a flame. yl lifts the flame (the
-    register keeps it through every paste); P lays it down. The chain bolts
-    are cumulative — bolt k stands open only while braziers 0..k ALL burn —
-    so cutting the source visibly darkens the hall (copy, don't cut; u or a
-    paste-back recovers). The beacon row holds three ADJACENT cold braziers
-    flush against the west wall: standing on the first, 3P fills all three
-    in one stroke, while 3p (paste AFTER the cursor) leaves the leftmost
-    cold — and no cell exists to its west to p from, so P is structurally
-    the only fill. The finale: yy the lit beacon row and paste it twice —
-    the beacon must burn in three tiers, and the whole depot must burn,
-    to draw the seal on the last row open.
+    register keeps it through every paste); P lays it down — and ONLY onto
+    a brazier (main._flame_paste_blocked: "there is no fuel to hold that
+    flame" anywhere else; linewise paste is exempt — a yanked row's flames
+    already sit in their braziers). The chain bolts are cumulative — bolt k
+    stands open only while braziers 0..k ALL burn — so cutting the source
+    visibly darkens the hall (copy, don't cut; u or a paste-back recovers).
+    The beacon row holds three ADJACENT cold braziers flush against the
+    seal wall: standing on the first, 3P fills all three in one stroke,
+    while 3p (paste AFTER the cursor) leaves the leftmost cold — and no
+    cell exists to its west to p from, so P is structurally the only fill.
+    The finale: yy the lit beacon row and paste it twice — the beacon must
+    burn in three tiers, and the whole depot must burn, to draw the seal.
 
-    Teleport audit (G/{n}G/H/M/L are long known): line jumps land on a
-    row's first non-blank, so the seal and the exit share the LAST row with
-    the exit at its far END — every jump lands west of the seal and queues
-    at the door like everyone else. The shaft rows hold no glyphs, so jumps
-    there land on the shaft itself. Geometry is fixed (seed-invariant); all
-    doors run through main._quartermaster_tick — stateless and undo-safe.
+    The exit sits in a one-cell POCKET behind the seal, west of the
+    braziers — walled on every other side, so it cannot be walked into
+    from any direction but through the drawn seal. Teleport audit
+    (G/{n}G/H/M/L are long known): line jumps land on a row's first
+    non-blank, which on the beacon row is always a brazier's dots/flame
+    (the tick keeps one there every turn) and the exit entity itself is
+    CARET_TRANSPARENT — no jump lands in the pocket. The shaft rows hold
+    no glyphs, so jumps there land on the shaft itself. Geometry is fixed
+    (seed-invariant); all doors run through main._quartermaster_tick —
+    stateless and undo-safe.
     """
     R, C = _QM_ROWS, _QM_COLS
     cells = [[CellType.WALL] * C for _ in range(R)]
     for c in range(_QM_HALL_LO, _QM_HALL_HI + 1):
         cells[_QM_HALL_ROW][c] = CellType.FLOOR
-    for r in (2, 3):                                     # east shaft, hall → shrine
+    for r in (2, 3):                                     # east shaft, hall → beacon row
         cells[r][_QM_SHAFT_COL] = CellType.FLOOR
     for c in range(_QM_SHRINE_LO, _QM_SHRINE_HI + 1):
         cells[_QM_BRAZIER_ROW][c] = CellType.FLOOR
-    for c in range(_QM_SHRINE_LO, _QM_EXIT[1] + 1):      # last row stops AT the exit:
-        cells[_QM_EXIT_ROW][c] = CellType.FLOOR          # no descent past the seal
+    cells[_QM_EXIT[0]][_QM_EXIT[1]] = CellType.FLOOR     # the exit pocket
     # Build state == tick steady-state: the chain holds only the source flame,
     # so bolt A stands open and bolt B (and the seal) start shut.
     cells[_QM_HALL_ROW][_QM_BOLT_COLS[1]] = CellType.WALL
-    cells[_QM_EXIT_ROW][_QM_SEAL_COL] = CellType.WALL
+    cells[_QM_EXIT[0]][_QM_SEAL_COL] = CellType.WALL
 
     room = Room(room_type=RoomType.ENTRY, rows=R, cols=C)
     room.cells = cells
@@ -6145,12 +6153,12 @@ def build_dungeon_quartermaster(seed: int) -> Dungeon:
     #   4G          (2)  → line 4: land on the first cold beacon brazier
     #   3P          (2)  → one count-paste fills all three (3p leaves the left cold)
     #   y y p p     (4)  → yank the beacon row; raise it twice — three tiers burn
-    #   j $         (2)  → down, then to the line's end — through the drawn seal
+    #   k k h h     (4)  → back up the tiers, west through the drawn seal
     room.par    = _QM_PAR
     room.budget = math.ceil(_QM_PAR * 1.4)
-    room.answer = 'w y l w P 4G 3P y y p p j $'
+    room.answer = 'w y l w P 4G 3P y y p p k k h h'
 
-    dungeon = Dungeon(name='The Quartermaster', seed=seed)
+    dungeon = Dungeon(name='The Beacon Tiers', seed=seed)
     dungeon.rooms        = [room]
     dungeon.current_room = 0
     return dungeon

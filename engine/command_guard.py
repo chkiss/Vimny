@@ -91,7 +91,7 @@ def action_allowed(action: dict, known: list | set, edit_mode: bool = False) -> 
 
     if t == 'paste' and not edit_mode:
         if action.get('before'):
-            return 'P' in known_set   # P — taught at The Quartermaster
+            return 'P' in known_set   # P — taught at The Beacon Tiers
         return 'p' in known_set       # p — taught at The Goblin Gauntlet
 
     if t == 'enter_mode':

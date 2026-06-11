@@ -1155,8 +1155,34 @@ def _cipher_cell_tick(room, player) -> list:
     return msgs
 
 
+def _flame_paste_blocked(room, player, clip, before: bool, count: int) -> bool:
+    """The Beacon Tiers' fuel rule — a deliberate exception to Vim paste:
+    a CHARWISE paste may lay a flame only onto a brazier; anywhere else
+    "there is no fuel to hold that flame". Linewise paste is exempt (a
+    yanked row's flames are conceptually already held by their braziers —
+    and the rule is exactly why nine flames pasted along ONE row can never
+    stand in for three tiers: the beacon row only has three braziers).
+    True = block; the caller makes it a FREE no-op (no budget, no undo,
+    no register change). Mirrors op_paste's landing arithmetic."""
+    chain    = getattr(room, '_qm_chain', None)
+    braziers = getattr(room, '_qm_braziers', None)
+    if not chain or not clip or clip.get('linewise') or not clip.get('rows'):
+        return False
+    allowed = set(chain) | set(braziers or ())
+    rclip = clip['rows'][0]
+    width = max(rclip.get('width', 0), 1)
+    base  = player.col if before else player.col + 1
+    for copy in range(count):
+        for rd in rclip.get('char_runs', ()):
+            for k, sym in enumerate(rd['symbols']):
+                if sym == _dg._QM_FLAME and \
+                        (player.row, base + copy * width + rd['dcol'] + k) not in allowed:
+                    return True
+    return False
+
+
 def _quartermaster_tick(room, player) -> list:
-    """The Quartermaster's doors — every cold brazier shows … embers; feed
+    """The Beacon Tiers' doors — every cold brazier shows … embers; feed
     each one a flame. STATELESS, hence undo-safe (the vault-tick principle):
     everything is recomputed from the text each turn. Anchors are the stored
     build coordinates (the Cipher Cell convention) — a self-inflicted dd or
@@ -1221,11 +1247,12 @@ def _quartermaster_tick(room, player) -> list:
         elif not open_ and cur_open and (player.row, player.col) != (sr, sc):
             room.cells[sr][sc] = CellType.WALL
         # One-shot nudge: the beacon row burns, but one tier alone is no beacon.
+        # Deliberately names no command — the cold does the teaching.
         if (not open_ and all(lit(r, c) for r, c in braziers)
                 and not getattr(room, '_qm_tier_hinted', False)):
             room._qm_tier_hinted = True
-            msgs.append('The beacon is lit — yet one tier alone will not draw the seal. '
-                        'Raise the row itself: yy, then paste.')
+            msgs.append('The fire is true, but low. The seal stirs only for flame '
+                        'that climbs, row upon row.')
     return list(dict.fromkeys(msgs))
 
 
@@ -1248,7 +1275,7 @@ _LEVEL_INTROS = {
     'character_cataracts': ('The Character Cataracts — f{c}:jump to char  t{c}:just before  F/T:backward', 60),
     'wardens_keep':        ("The Warden's Keep — the shield follows you. Find the unguarded side.", 60),
     'cipher_cell':         ('The Cipher Cell — make each row read as its plaque: r mends a rune, D shears the rot.', 60),
-    'quartermaster':       ('The Quartermaster — one flame still burns. yl lifts it, P lays it on the cold braziers (…); yy lifts a whole row.', 60),
+    'quartermaster':       ('The Beacon Tiers — one flame remains. yl takes it without taking; P sets it on cold braziers (…); yy, a whole row.', 60),
     'warden_surveyor':     ('The Warden Surveyor — survey his hall; w/b/e leap word to word, over the void.', 60),
     'dummy':               ('Sandbox — all mechanics active. Type :edit to enter editor mode.', 60),
     'archivists_library':  ("The Archivist's Library — the whole catalogue has spilled "
@@ -3611,6 +3638,10 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
                 else:
                     _has_key = any(ed['tmpl'].get('kind') == 'floor_key' for ed in clip_entities)
                     player.error = 'E: Wrong key for this door' if _has_key else 'E: No key held'
+            elif _flame_paste_blocked(room, player, clip, before, count):
+                # The Beacon Tiers' fuel rule: flames lie only in braziers.
+                # A FREE no-op — nothing paid, nothing snapshotted.
+                _push('There is no fuel to hold that flame.')
             elif clip and any(rw.get('char_runs') or rw.get('entities') for rw in clip['rows']):
                 # One register for everything cut/yanked: lay characters back down and
                 # respawn cut creatures. count fans out copies (3p = 3 in a row).
@@ -3976,7 +4007,7 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
                 for _cc_msg in _cipher_cell_tick(room, player):
                     _push(_cc_msg)
 
-            # The Quartermaster: chain bolts, pedestal embers and the tier seal
+            # The Beacon Tiers: chain bolts, brazier embers and the tier seal
             # all track the flame plaques (stateless, undo-safe).
             if level == 'quartermaster':
                 for _qm_msg in _quartermaster_tick(room, player):
