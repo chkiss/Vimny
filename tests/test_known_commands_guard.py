@@ -319,11 +319,21 @@ def test_substitute_allowed_in_edit_mode():
 
 # ── Always-allowed actions ─────────────────────────────────────────────────────
 
-@pytest.mark.parametrize("keys", ['x', 'u', '\x12'])
-def test_interact_undo_redo_always_allowed(keys):
+@pytest.mark.parametrize("keys", ['x', 'u'])
+def test_interact_and_undo_always_allowed(keys):
     action = _parse(keys)
     assert action_allowed(action, [])
     assert action_allowed(action, _kc(0))
+
+
+def test_redo_requires_the_relic_token():
+    """<C-r> is granted by the 'redo' relic scroll (the Undo Sanctum level was
+    cancelled); u stays the always-on rope."""
+    action = _parse('\x12')
+    assert not action_allowed(action, [])
+    assert not action_allowed(action, _kc(0))
+    assert action_allowed(action, ['redo'])
+    assert action_allowed(action, ['admin'])
 
 
 @pytest.mark.parametrize("keys", ['ma', "'a", '`a'])

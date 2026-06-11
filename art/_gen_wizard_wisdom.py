@@ -221,7 +221,9 @@ POEMS: list[tuple[str | None, str, list[str]]] = [
         "What's lifted waits in the register—",
         'P lays it back, just before the cursor.',
     ]),
-    ('undo_sanctum', 'u <C-r>', [              # The Undo Sanctum — u <C-r>
+    # The Undo Sanctum was cancelled (u is always-on; <C-r> arrives by relic
+    # scroll) — its poem lives on in the generic pool as 'undo and redo'.
+    (None, 'undo and redo', [
         'u steps the last change back.',
         '<C-r> steps it forward again.',
         'Not retreat—the rope that lets you climb.',

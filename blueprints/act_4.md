@@ -275,72 +275,13 @@ paste inserts REAL rows — it cannot fill existing ones). See
 
 ---
 
-## L21 — The Undo Sanctum
+## L21 — The Undo Sanctum (CANCELLED 2026-06-11)
 
-**Commands taught:** `u` (undo). `Ctrl-R` (redo) is a **discoverable scroll reward**, not a
-forced lesson.
-
-> **DEMO LEVEL — NOT BUDGET-FORCED.**
-> Per Decision D1 in LEVELS_PLAN.md: `u` is a "light budget-return utility/demo."
-> Undo corrects mistakes; it is never the cheapest path to the exit.
-> The budget for this level is RELAXED (par × 2.0 or even uncapped) to allow
-> free experimentation with `u` without penalty.
-
-**Purpose:** Give the player a safe sandbox to experience `u` reversing their last action.
-The dungeon presents a sequence of "mistakes" — rune clusters that, if deleted, reveal a
-false path. The player is invited to delete them, see the consequence, and use `u` to restore.
-
----
-
-### Grid
-
-**Dims:** 10 rows × 36 cols.
-
-```
-####################################
-#@..K...............................#
-#...............∘∘∘ ··· ∘∘∘ ···....#
-#...[scroll: "try deleting a rune  #
-#    then press u to undo"]        #
-#..........∘∘∘ ··· ∘∘∘ ···.........#
-#...[scroll: "Ctrl-R redoes it"]   #
-#....................................#
-#....................................#
-#...................................X#
-####################################
-```
-
-**Precise layout (10 r × 36 c):**
-
-```
-Row 0: walls
-Row 1: # @ . K . . . . . . . . . . . . . . . . . . . . #
-Row 2: passable with 2–3 rune clusters (the "try deleting" targets)
-Row 3: scroll marker (entity: kind='scroll', text='Press dd on a rune…')
-Row 4: passable with 2–3 more rune clusters
-Row 5: scroll marker (entity: kind='scroll', text='Press u to undo. Ctrl-R to redo.')
-Row 6: passable
-Row 7: passable
-Row 8: passable
-Row 9: # . . . . . . . . . . . . . . . . . . . . . . X #
-```
-
-- `@` at (1, 1).
-- `X` at (9, 34).
-- `K` (keystone) at (1, 3).
-- Two scroll entities at rows 3 and 5.
-- Ctrl-R scroll reward in a side-room chest off row 6 (cols 28–33).
-- No door. No forced clearing. Player can walk from `@` to `X` in ~8 hjkl keys.
-
-**Par (informational, not budget-enforced):** ~12 keystrokes (straight path).
-**Budget:** RELAXED — set to 999 or uncapped.
-
-**Forcing argument:** N/A — explicitly not forced. `u` demonstrated via guided exploration.
-
-**Self-check:**
-- Demo level: explicitly marked. Budget relaxed. No forceability claim.
-- Ctrl-R as scroll reward: confirmed per Decision D1.
-- No new engine primitives required.
+The level was cut from the curriculum: `u` has been always-on since the first
+cave (a full snapshot rewind that even refunds budget), so a sandbox taught
+nothing new, and `<C-r>` is now granted by the **'redo' relic scroll**
+(`content/scrolls.py`, gated in `engine/command_guard.py`). The `redo` token
+may return to the curriculum later if a level earns it.
 
 ---
 
@@ -707,6 +648,6 @@ decrease from any other attack. Implementation requires `immune_to` / `phase` on
 | 18 | The Operator's Vault | `d{motion}` `c{motion}` | ~52 | 73 | S1 terrain-∞ (goblins block) + budget per chamber | Per-chamber alignment must be hand-tuned; count-motions handled by chamber geometry |
 | 19 | The Whole-Line Annex | `dd` `cc` `D` `S` | 69 | 97 | S1 terrain-∞ (void strips block bypass) | CHALLENGE: `D` ≡ `d$` cost (2=2); `D` taught as demo not forced. Par corrected from ~28 to 69. |
 | 20 | The Beacon Tiers (BUILT) | `y yy P` | 17 | 24 | Structural (fuel rule: flames paste only onto braziers) + 3P count-paste | Shipped 2026-06-11; see code/tests. |
-| 21 | The Undo Sanctum | `u` (+ `Ctrl-R` scroll) | N/A | RELAXED (999) | DEMO — not forced (Decision D1) | Must not accidentally make `u` budget-required |
+| 21 | (CANCELLED) The Undo Sanctum | — | — | — | u always-on; `<C-r>` via the 'redo' relic scroll | Cut 2026-06-11; token may return later. |
 | 22 | The Echo Vault | `.` (dot-repeat via `de`) | 17 | 24 | S2 tight budget (`de×12`=29>24) + S1/S4 bypass blocking | `de` not `dw` (chains correctly); `dd` blocked by terrain/guard; count blocked by guard. |
 | 22.1 | The Warden Manifold | ALL Act IV (`dw d$ dd yy p v..d`) | ~102 | 160 (relaxed) | Per-phase immunity | CHALLENGE: `immune_to`/`phase` fields on Entity; visual-source tagging; Phase 4/5 split (yy then p). |

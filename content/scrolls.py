@@ -214,6 +214,22 @@ WANDERERS_THREAD_SCROLL = {
     ],
 }
 
+# Grants <C-r> (redo) — u's other hand. u itself is always-on from the first
+# cave; this relic completes the pair. (The Undo Sanctum level was cancelled
+# 2026-06-11; the 'redo' token lives here now.)
+SECOND_STRIDE_SCROLL = {
+    'title': '◈   The Second Stride   ◈',
+    'lines': [
+        ('dim',    '  You stepped back. The footprint waited.'),
+        ('blank',),
+        ('cmd',    '<C-r>', 'redo what u took back'),
+        ('cmd',    '[count]<C-r>', 'redo that many steps'),
+        ('blank',),
+        ('dim',    '  Back and forward: u and this, one rope.'),
+        ('amber',  '  An undo is never a promise. Walk on.'),
+    ],
+}
+
 # ── Regex-for-search scrolls (Blocks B–F) ──────────────────────────────────
 # Gate token: 'regex' (granted by reading any one of these). Each teaches a
 # family of search atoms; they reveal once the searcher (/) is known.
@@ -488,6 +504,14 @@ SCROLL_CATALOG = [
         'content':    WANDERERS_THREAD_SCROLL,
     },
     {
+        'id':         'redo',
+        'title':      'The Second Stride',
+        'dropped_by': 'A pilgrim’s boot',
+        'level_slug': 'first_cave',
+        'level_name': 'The First Cave',
+        'content':    SECOND_STRIDE_SCROLL,
+    },
+    {
         'id':         'col_motion',
         'title':      'The Plumb Line',
         'dropped_by': 'A mason’s toolbox',
@@ -521,16 +545,16 @@ SCROLL_CATALOG = [
 #
 # TO ADD A NEW RELIC SCROLL:
 #   1. Author its <NAME>_SCROLL content dict above.
-#   2. Add a SCROLL_CATALOG entry (it lands in the library's `relics/` subtree).
-#   3. Add a _SCROLL_DISPATCH lambda in main.py (use _render_standard_scroll).
-#   4. Append its id to RELIC_SCROLL_IDS below.
+#   2. Add a SCROLL_CATALOG entry (it lands in the library's `relics/` subtree;
+#      rendering is automatic — main._show_catalog_scroll reads the catalog).
+#   3. Append its id to RELIC_SCROLL_IDS below.
 # The id DOUBLES AS the gating token it grants: on discovery it is written to
 # progress['extras'] and injected into player.known_commands, so name it to
 # match the token your command_guard / handler checks (e.g. 'jump', 'col_motion').
 RELIC_SCROLL_IDS = [
     'set_more',
     'regex_classes', 'regex_anchors', 'regex_quant', 'regex_collections', 'regex_magic',
-    'searchcraft', 'jump', 'col_motion', 'ins_paste', 'ins_edit',
+    'searchcraft', 'jump', 'redo', 'col_motion', 'ins_paste', 'ins_edit',
 ]
 
 

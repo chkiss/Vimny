@@ -333,8 +333,8 @@
       ]
     },
     {
-      "introduces_slug": "undo_sanctum",
-      "name": "u <C-r>",
+      "introduces_slug": null,
+      "name": "undo and redo",
       "line_count": 4,
       "quote": [
         "         u steps the last change back.          ",

@@ -124,7 +124,10 @@ def action_allowed(action: dict, known: list | set, edit_mode: bool = False) -> 
     if t == 'sub_repeat':                         # & / g& — repeat last :s
         return 'subst' in known_set
 
-    # interact (x), undo (u), redo (^R), command (:) — always allowed
+    if t == 'redo':                               # <C-r> — granted by a relic scroll;
+        return 'redo' in known_set                # u stays the always-on rope
+
+    # interact (x), undo (u), command (:) — always allowed
     return True
 
 
@@ -177,6 +180,8 @@ def guard_message(action: dict, known: list | set = ()) -> str:
         return "You haven't learned @ (macros) yet."
     if t == 'jump':
         return "You haven't learned the jump list yet."
+    if t == 'redo':
+        return "You haven't learned <C-r> (redo) yet."
     if t == 'mark':
         return "You haven't learned marks yet."
     if t == 'sub_repeat':

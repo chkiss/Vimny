@@ -69,7 +69,6 @@ Curriculum order is the order of `LEVELS`. Blueprints: `blueprints/act_*.md`.
 | 18 | `operators_vault` | The Operator's Vault | `d{m}  dd` |  |
 | 19 | `cipher_cell` | The Cipher Cell | `r  D` |  |
 | 20 | `quartermaster` | The Beacon Tiers | `y yy P` |  |
-| 21 | `undo_sanctum` | The Undo Sanctum | `u  <C-r>` |  |
 | 22 | `echo_vault` | The Echo Vault | `.` |  |
 | 22.1 | `warden_manifold` | The Warden Manifold | — | boss |
 | 23 | `inscription_halls` | The Inscription Halls | `i a` |  |

@@ -3279,6 +3279,10 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
                     _push(f'{done} change(s) undone.' if done else 'Nothing to undo.')
 
         elif action['type'] == 'redo':
+            # <C-r> is relic-gated ('redo' scroll); u stays the always-on rope.
+            if not edit_mode and not _action_allowed(action, player.known_commands) \
+                    and _blocked(action):
+                continue
             if edit_mode:
                 done = _ed_step_n(ed_redo, ed_undo, count, room, player)
             else:
