@@ -6162,3 +6162,149 @@ def build_dungeon_quartermaster(seed: int) -> Dungeon:
     dungeon.rooms        = [room]
     dungeon.current_room = 0
     return dungeon
+
+
+# ── The Echo Vault (L21) — . (dot-repeat) ─────────────────────────────────────
+_EV_ROWS, _EV_COLS = 4, 52
+_EV_PLAQUE_ROW = 1                     # sealed plaque band (wall row, glyphs embedded)
+_EV_ROW        = 2                     # the single gauntlet row — one floor row seals
+                                       # the plaques against any visual straddle (L19)
+_EV_FLOOR_LO, _EV_FLOOR_HI = 1, 49
+_EV_SPAWN = (2, 2)
+_EV_EXIT  = (2, 49)                    # behind the final bolt; the single sealed row
+                                       # means every line jump lands on the row's FIRST
+                                       # non-blank (col 4) and no other row can walk in
+# Segment columns. Shapes are FIXED across combos so par is seed-invariant:
+# phrase 1 = 4+3+4 letters, its letter warped at string offsets (1, 7, 10);
+# phrase 2 = 5+4 letters, warped at (3, 6); phrase 3 = word4 ⟨digit⟩ word3
+# ⟨digit×3⟩, digits warped at (5, 11, 12, 13) — the lone digit primes r, the
+# triple is the count-dot beat (3.).
+_EV_SEG1_COL, _EV_SEG2_COL, _EV_SEG3_COL = 4, 20, 33
+_EV_WARPS1 = (1, 7, 10)
+_EV_WARPS2 = (3, 6)
+_EV_WARP3_SINGLE, _EV_WARP3_TRIPLE = 5, (11, 12, 13)
+_EV_BOLT_A = (2, 18)                   # opens while segment 1 reads as its plaque
+_EV_BOLT_B = (2, 31)                   # … segment 2
+_EV_BOLT_C = (2, 48)                   # … segment 3 — the seal before the exit
+# Combos: (phrase1, letter1), (phrase2, letter2), (word4, word3, digit).
+# Each phrase carries its letter EXACTLY at the warp offsets, and no mend
+# letter (or the digit) appears ANYWHERE else in the vault (asserted at
+# build): every copy gets warped, so the cure exists nowhere reachable —
+# true scarcity, on top of the register self-seal.
+_EV_COMBOS = (
+    (('mend the seal', 'e'), ('guard rust', 'r'), ('lock', 'map', '7')),
+    (('mist ski mild', 'i'), ('burnt numb', 'n'), ('gate', 'map', '3')),
+    (('bold who boat', 'o'), ('crust salt', 's'), ('dial', 'rim', '5')),
+    (('mast sea malt', 'a'), ('burnt numb', 'n'), ('rope', 'dim', '9')),
+)
+_EV_PAR = 25                           # seed-invariant; tallied in the answer below
+
+
+def build_dungeon_echo_vault(seed: int) -> Dungeon:
+    """The Echo Vault (L21): teaches . (dot — repeat the last change).
+
+    The vault repeats what it hears: the SAME corruption has stamped itself
+    down every span — the same warped rune, over and over. Mend it once with
+    r; press . and the echo mends the next. ONE visible rule, the plaque
+    family's third member: each span's bolt stands open while the lock row
+    READS AS ITS PLAQUE (main._echo_vault_tick — stateless, undo-safe).
+
+    Why . is forced: the warp glyphs are UNTYPABLE (punctuation class), so
+    f/t/F/T and / can never target them; any cut (x, count-x, d{m}, D) only
+    breaks the plaque match (precision rule, u recovers); and the x+P
+    substitution idiom seals itself — cutting a warp overwrites the one
+    unnamed register with the warp, so P pastes the rot back. r is the only
+    mend, and . is its only discount (r{c}=2 keys, .=1) — the all-r route
+    costs +4 over par, within budget but losing the 2-star (house style).
+    A side gift of the punct class: w stops ON every warp, so the walk
+    between echoes is always w/w.
+
+    The final beat re-sizes the echo: a lone warped digit primes r{d}, and
+    its tripled twin falls to 3. — the same stroke, louder. Geometry is
+    fixed; the seed picks the word combo and the three warp glyphs, so par
+    is locked at _EV_PAR while the answer's letters track the combo.
+    """
+    rng = random.Random(seed)
+    (phrase1, l1), (phrase2, l2), (w4, w3, digit) = rng.choice(_EV_COMBOS)
+    g1, g2, g3 = rng.sample(_CC_WARP_GLYPHS, 3)
+    phrase3 = f'{w4} {digit} {w3} {digit * 3}'
+
+    # The shapes the par tally rests on — and TRUE mend-letter scarcity: each
+    # phrase holds its letter ONLY at the warped offsets, and no mend letter
+    # appears anywhere in the other segments, so nothing reachable can donate
+    # it (belt and braces — the register self-seal already blocks the
+    # P-then-x transplant economically).
+    assert tuple(i for i, ch in enumerate(phrase1) if ch == l1) == _EV_WARPS1, phrase1
+    assert tuple(i for i, ch in enumerate(phrase2) if ch == l2) == _EV_WARPS2, phrase2
+    assert tuple(i for i, ch in enumerate(phrase3) if ch == digit) \
+        == (_EV_WARP3_SINGLE, *_EV_WARP3_TRIPLE), phrase3
+    everything = phrase1 + phrase2 + phrase3
+    for cure, own in ((l1, phrase1), (l2, phrase2), (digit, phrase3)):
+        assert everything.count(cure) == own.count(cure), (cure, everything)
+
+    def warp(phrase: str, offsets, glyph: str) -> str:
+        out = list(phrase)
+        for i in offsets:
+            out[i] = glyph
+        return ''.join(out)
+
+    R, C = _EV_ROWS, _EV_COLS
+    cells = [[CellType.WALL] * C for _ in range(R)]
+    for c in range(_EV_FLOOR_LO, _EV_FLOOR_HI + 1):
+        cells[_EV_ROW][c] = CellType.CORRIDOR
+    for (br, bc) in (_EV_BOLT_A, _EV_BOLT_B, _EV_BOLT_C):
+        cells[br][bc] = CellType.WALL              # the bolts start shut
+
+    room = Room(room_type=RoomType.ENTRY, rows=R, cols=C)
+    room.cells = cells
+    room.seed  = seed
+
+    def lay(row, col, text, kind):
+        """Place `text` at (row, col); spaces become gaps between separate runs."""
+        c = col
+        for piece in text.split(' '):
+            if piece:
+                room.char_runs.append(CharRun(row, c, tuple(piece), kind))
+            c += len(piece) + 1
+
+    for col, true, lock in (
+        (_EV_SEG1_COL, phrase1, warp(phrase1, _EV_WARPS1, g1)),
+        (_EV_SEG2_COL, phrase2, warp(phrase2, _EV_WARPS2, g2)),
+        (_EV_SEG3_COL, phrase3,
+         warp(phrase3, (_EV_WARP3_SINGLE, *_EV_WARP3_TRIPLE), g3)),
+    ):
+        lay(_EV_PLAQUE_ROW, col, true, 'verdant')
+        lay(_EV_ROW, col, lock, 'ancient')
+
+    # The exit is edit-immune: a careless D sweeps toward its cell, and the
+    # way out must not be deletable (nor the row dd-collapsible).
+    room.entities.append(Entity(kind='exit', row=_EV_EXIT[0], col=_EV_EXIT[1],
+                                edit_immune=True))
+    room.spawn_pos = _EV_SPAWN
+    room.exit_pos  = _EV_EXIT
+
+    # Bolt specs read by main._echo_vault_tick (stateless, undo-safe): each is
+    # (row, c0, target, bolt_pos) — the bolt stands open while the lock row's
+    # text over [c0, c0+len(target)) READS AS the plaque.
+    room._ev_bolts = [
+        (_EV_ROW, _EV_SEG1_COL, phrase1, _EV_BOLT_A),
+        (_EV_ROW, _EV_SEG2_COL, phrase2, _EV_BOLT_B),
+        (_EV_ROW, _EV_SEG3_COL, phrase3, _EV_BOLT_C),
+    ]
+
+    room.rebuild_indexes()
+    # Par tally (combo shapes identical, so this holds for every seed):
+    #   w w r⟨l1⟩  w w .  w w .   (10) → mend once; the echo takes the other two
+    #   w w r⟨l2⟩  w .            (6)  → a new stroke re-primes the echo
+    #   w w r⟨d⟩   w w 3.         (8)  → the lone digit primes; 3. mends the triple
+    #   $                         (1)  → walk out through the drawn seal
+    room.par    = _EV_PAR
+    room.budget = math.ceil(_EV_PAR * 1.4)
+    room.answer = (f'w w r{l1} w w . w w . '
+                   f'w w r{l2} w . '
+                   f'w w r{digit} w w 3. $')
+
+    dungeon = Dungeon(name='The Echo Vault', seed=seed)
+    dungeon.rooms        = [room]
+    dungeon.current_room = 0
+    return dungeon

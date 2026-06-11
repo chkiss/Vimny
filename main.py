@@ -1155,6 +1155,33 @@ def _cipher_cell_tick(room, player) -> list:
     return msgs
 
 
+def _echo_vault_tick(room, player) -> list:
+    """The Echo Vault doors — the Cipher Cell rule, third member of the plaque
+    family: a bolt stands open exactly while its span of the lock row READS AS
+    ITS PLAQUE. STATELESS, hence undo-safe (the vault-tick principle): every
+    bolt is recomputed from the text each turn. Returns banner messages for
+    anything that just changed."""
+    msgs = []
+
+    def _text_at(row, c0, n):
+        out = []
+        for c in range(c0, c0 + n):
+            ru = room.char_run_at(row, c)
+            out.append(ru.symbols[c - ru.col] if ru else ' ')
+        return ''.join(out)
+
+    for (row, c0, target, pos) in getattr(room, '_ev_bolts', ()):
+        br, bc = pos
+        open_ = _text_at(row, c0, len(target)) == target
+        cur_open = room.cells[br][bc] != CellType.WALL
+        if open_ and not cur_open:
+            room.cells[br][bc] = CellType.FLOOR
+            msgs.append('The span is mended true — the bolt grinds back!')
+        elif not open_ and cur_open and (player.row, player.col) != (br, bc):
+            room.cells[br][bc] = CellType.WALL     # undo restored the blight — re-bar
+    return msgs
+
+
 def _flame_paste_blocked(room, player, clip, before: bool, count: int) -> bool:
     """The Beacon Tiers' fuel rule — a deliberate exception to Vim paste:
     a CHARWISE paste may lay a flame only onto a brazier; anywhere else
@@ -1276,6 +1303,7 @@ _LEVEL_INTROS = {
     'wardens_keep':        ("The Warden's Keep — the shield follows you. Find the unguarded side.", 60),
     'cipher_cell':         ('The Cipher Cell — make each row read as its plaque: r mends a rune, D shears the rot.', 60),
     'quartermaster':       ('The Beacon Tiers — one flame remains. yl takes it without taking; P sets it on cold braziers (…); yy, a whole row.', 60),
+    'echo_vault':          ('The Echo Vault — the same blight, stamped again and again. Mend one rune with r; then . repeats your last change.', 60),
     'warden_surveyor':     ('The Warden Surveyor — survey his hall; w/b/e leap word to word, over the void.', 60),
     'dummy':               ('Sandbox — all mechanics active. Type :edit to enter editor mode.', 60),
     'archivists_library':  ("The Archivist's Library — the whole catalogue has spilled "
@@ -2832,7 +2860,8 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
                 player.last_visual_mode = vmode
                 player.visual_anchor = None
                 player.mode = Mode.INSERT if op == 'c' else Mode.NORMAL
-                player.last_change = {'type': 'visual_op', 'op': op}
+                if op != 'y':                  # visual yank is not a change either
+                    player.last_change = {'type': 'visual_op', 'op': op}
                 key_buf = ''
                 _render(message)
                 continue
@@ -3871,7 +3900,9 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
                         _reg_write(player, reg, _clip, is_delete=True)
                         budget.spend(_operator_cost(action))
                         _push('Deleted.')
-                if not _op_blocked:
+                if not _op_blocked and op != 'y':
+                    # Yank is NOT a change (Vim): '.' must never repeat it, nor
+                    # may a stray y disarm the echo of a real change.
                     player.last_change = action
 
         elif edit_mode and action['type'] == 'operator':
@@ -4016,6 +4047,12 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
             if level == 'quartermaster':
                 for _qm_msg in _quartermaster_tick(room, player):
                     _push(_qm_msg)
+
+            # The Echo Vault: every bolt tracks its span-reads-as-plaque rule
+            # (stateless, undo-safe — the Cipher Cell's rule, third member).
+            if level == 'echo_vault':
+                for _ev_msg in _echo_vault_tick(room, player):
+                    _push(_ev_msg)
 
             # Warden summon message
             if tick_msgs and not player.is_dead:

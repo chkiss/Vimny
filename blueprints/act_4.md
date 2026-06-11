@@ -285,172 +285,14 @@ may return to the curriculum later if a level earns it.
 
 ---
 
-## L22 — The Echo Vault
+## L22 — The Echo Vault (BUILT — section deleted on implement)
 
-**Commands taught:** `.` (dot-repeat — repeat the last change).
-New mechanics (count: 1, the minimum):
-1. `.` repeats the last change (the exact operator+motion from the previous mutating keystroke).
-
-**Teaching command: `de` (not `dw`).**
-The engine's dot-repeat with `dw` does NOT chain through column-separated targets: after `dw`
-deletes a cluster, the cursor stays at `start_col` (now empty floor), and each subsequent `.`
-re-spans the same empty cells with a no-op `w` motion. `de` (INCLUSIVE motion) chains correctly:
-after `de` at col C deletes a cluster ending at col D, each `.` re-runs `de` from col C on
-empty floor — `e` scans forward to the end of the NEXT surviving cluster, so the span grows to
-cover that cluster and the goblin on it. This is verified from the engine motion model.
-Budget arithmetic is identical whether `dw` or `de` is the teaching command.
-
-**Linkage:** `.` is only useful when there is a repeatable last change. This level immediately
-follows L18 (operator grammar). Students have `de`, `dd`, `ce`, etc. as known changes. The
-level is designed around 12 identical targets, each exactly 1 `e`-motion apart, so the optimal
-sequence is `de . . . . . . . . . . .` (1 + 11 dots) vs `de de de ...` (2 × 12 = 24 keys).
-
----
-
-### Grid
-
-**Dims:** 12 rows × 62 cols.
-
-The Echo Vault is a single long corridor with 12 identical rune sentinels (goblins). Each
-goblin occupies a 1-cell alcove on the north wall of the corridor, separated from the main
-corridor by a 1-cell gap. The player clears the first with `de`, then chains `.` × 11.
-
-**S1 Terrain-∞ bypass blocking:**
-
-Each goblin's alcove is a 1-cell side niche (1 col wide × 1 row deep, north of row 1). The
-corridor is the main passable row. The goblins are reachable only from the corridor via `de`
-on the rune cluster at the alcove mouth. This layout has two bypass-blocking properties:
-
-1. **`dd` bypass blocked:** `dd` on the corridor row (row 1) deletes rune clusters on row 1
-   but does NOT reach the goblin entities in the 1-cell alcoves on row 0 (the alcove cells
-   are in a separate row). The door trigger requires all 12 goblins dead; `dd` on row 1
-   leaves all goblins alive in their alcoves. `dd` does not solve the level.
-
-2. **`d12e` count bypass blocked (S4):** Count-motions are available from L2. A command guard
-   at L22 disallows `count > 1` with the `e` motion (or with any operator-motion combination),
-   or equivalently the engine's operator guard for this level strips the count prefix. This
-   means `d12e` is not accepted; the player must use `.` to chain. Document this guard in
-   `content/levels.py` as a `blocked_commands` entry for L22.
-
-**Layout:**
-
-```
-##############################################################
-#nnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnn...........#  <- row 0: goblin alcoves
-#@.∘∘.∘∘.∘∘.∘∘.∘∘.∘∘.∘∘.∘∘.∘∘.∘∘.∘∘.∘∘..............D..X..#  <- row 1: main corridor
-##############################################################
-(rows 2–11: open floor, unreachable during the puzzle — walls at rows 2 and 11 encl. corridor)
-```
-
-Where `n` = 1-cell alcove containing a goblin (accessible only from row 1 via `de` or similar).
-The corridor is a 1-row channel (row 1 only), bounded by walls above (row 0 walls except alcoves)
-and below (row 2 wall).
-
-**Precise entity/rune placement (row 1, cols):**
-
-- Rune clusters (∘∘, width 2): cols 3–4, 6–7, 9–10, 12–13, 15–16, 18–19,
-  21–22, 24–25, 27–28, 30–31, 33–34, 36–37. (12 clusters, 2 wide, 1-col gap.)
-- Goblin alcoves (row 0, 1-cell niche): cols 3, 6, 9, 12, 15, 18, 21, 24, 27, 30, 33, 36.
-  Each goblin is in row 0, same col as the start of its cluster on row 1.
-  The alcove mouth on row 1 is the cluster start col. `de` on the cluster covers the goblin
-  because `_kill_entities_in_span` checks both row 0 (alcove) and row 1 (cluster) cells for
-  entities within the inclusive span. (Implementation note: the span for `de` at (1, C) is
-  inclusive of (1, C) to (1, D), where D = end of cluster. The goblin at (0, C) is one cell
-  north — the engine must check adjacent alcove cells for goblin entities killed by `de`.)
-  Alternatively (simpler): place goblins ON row 1 at the cluster start col. `de` kills them
-  since they are within the inclusive span. `dd` on row 1 deletes rune clusters and goblins,
-  BUT: the door trigger is "all goblins killed by a targeted single-cluster operator" tracked
-  via a per-goblin kill-source flag... this is complex. Use the SIMPLER approach:
-  
-**REVISED SIMPLEST LAYOUT (goblins on row 1, `dd` blocked by exit placement):**
-- Goblins and rune clusters on row 1.
-- Exit entity `X` is on row 1 at col 58, inside the `dd` span.
-- `dd` on row 1 deletes ALL entities in row 1 including the `X` exit entity via `_delete_cols`.
-  With `X` deleted, the door trigger cannot resolve (exit entity removed → level unwinnable).
-  The builder must ensure `X` is in a protected position OR flag `X` as `_PROTECTED_KINDS`.
-  **Actually:** `X` is already in `_PROTECTED_KINDS` = `{'exit', 'door', 'boss_seal'}` per
-  `visual.py`. So `_delete_cols` (non-visual path) will NOT remove `X`. `dd` still kills
-  all goblins. This approach does NOT block `dd`.
-
-**DEFINITIVE LAYOUT — use terrain to block `dd`:**
-Place the corridor so `dd` on the goblin+rune row also encompasses a WALL cell or a
-"poison rune" (kind='poison') that kills the player when deleted. This makes `dd` self-defeating.
-
-Specifically: immediately after the last cluster (col 38), place a poison rune at col 39.
-`dd` on row 1 would delete from col 1 to col 60 (full row), including col 39 (poison rune).
-Deleting a poison rune triggers "player takes damage = game over" (or level restart).
-The player learns not to use `dd` here by experiencing the consequence.
-
-This is a new primitive (poison rune). If unimplemented, fall back to:
-**S4 command guard:** Block `dd` explicitly via `blocked_commands` at L22. Document this guard.
-
-```
-##############################################################
-#@.∘∘.∘∘.∘∘.∘∘.∘∘.∘∘.∘∘.∘∘.∘∘.∘∘.∘∘.∘∘.!.............D..X#
-#  g  g  g  g  g  g  g  g  g  g  g  g  ^                   #
-##############################################################
-  [! = poison rune; ^ = note position]
-```
-
-Where goblins are at the same cols as cluster starts (row 1). `!` = poison rune at col 39.
-`dd` = game over (hits poison). `de . × 11` avoids col 39 (only spans within cluster fields).
-
-**Command guards for L22 (S4):**
-- `dd` blocked via terrain (poison rune) OR explicit `blocked_commands` entry.
-- `d12e` (count > 1) blocked via `blocked_commands = ['count_operator']` at L22.
-
-**Optimal path:**
-
-```
-Navigate from @ (1,1) to first rune (1,3):   l l              cost: 2
-de [defeat goblin 1 — inclusive e motion]:    de               cost: 2
-. [repeat de, defeat goblin 2]:               .                cost: 1
-. [goblin 3]:                                 .                cost: 1
-. [goblin 4]:                                 .                cost: 1
-. [goblin 5]:                                 .                cost: 1
-. [goblin 6]:                                 .                cost: 1
-. [goblin 7]:                                 .                cost: 1
-. [goblin 8]:                                 .                cost: 1
-. [goblin 9]:                                 .                cost: 1
-. [goblin 10]:                                .                cost: 1
-. [goblin 11]:                                .                cost: 1
-. [goblin 12]:                                .                cost: 1
-Navigate to X (1,58) after door opens:        20l              cost: 3
-                                                         ─────────────
-Total:                                                         17
-```
-
-**Par:** 17 keystrokes (true entry→exit).
-**Budget:** ceil(17 × 1.4) = **24 keystrokes**.
-
-**Revised forcing (S2 tight budget):**
-- `de × 12` = 24 keys + navigation 5 = **29 keystrokes > budget 24**. Fails.
-- `de . × 11` = 2 + 11 = 13 keys + navigation (ll + 20l = 5) = **17 ≤ budget 24**. Passes.
-- **Forced.** (Multiplier used: ×1.4, standard. Documents: 29 > 24.)
-- `dd` blocked by terrain (poison rune at col 39) OR `blocked_commands`.
-- `d12e` blocked by `blocked_commands` (count > 1 with operators at L22).
-
-**Primitives used:** rune clusters (12 identical, perfectly spaced), goblins (one per cluster),
-door (all-goblins-defeated trigger), poison rune (or command guard) blocking `dd` bypass,
-command guard blocking count-operator bypass.
-
-**Assumptions (CRITICAL — Dot Last-Change Model):**
-- The engine models "last change" as the exact operator+motion pair: `de`.
-- `de` from col C on a cluster (cols C to D, inclusive): cursor → col C (start). Last change = `de`.
-- `.` re-executes `de` from col C (now empty floor): `e` scans forward to end of next surviving
-  cluster (col D'), spanning [C, D']. Goblin at the new cluster's start col is within [C, D'] and
-  is killed. This chains through all 12 goblins without any `j` or navigation.
-- Navigation keystrokes (`l`, `l` at start; `20l` at end) do NOT reset last change, since they
-  are non-mutating. Only mutating operations set the last change register.
-- `blocked_commands` at L22: `['dd', 'count_operator']` (or equivalent guard names as implemented
-  in `main.py` / `content/levels.py`).
-
-**Self-check:**
-- ≤3 new mechanics? YES: exactly 1 (`.` dot-repeat).
-- Forced? YES: `de × 12` = 29 > budget 24; `de .×11` = 17 ≤ 24. Tight by design.
-- `dw` replaced by `de`? YES: chaining verified via inclusive-motion engine model.
-- `dd` bypass blocked? YES: terrain (poison rune) or command guard.
-- Count bypass blocked? YES: `blocked_commands` for count > 1 with operators.
+Built 2026-06-11 as display 21 (slug `echo_vault`). This draft's `de`-chain
+design was superseded: in the current curriculum `D`, `df{c}`/`dt{c}` partial
+sweeps and count-`x` all out-price a deletion chain, so the shipped level
+echoes **`r`** instead (untypable warp glyphs; plaque-family rule; `3.`
+count-dot finale). See `generation/dungeon_gen.py::build_dungeon_echo_vault`
+and `tests/test_echo_vault.py`.
 
 ---
 
@@ -649,5 +491,5 @@ decrease from any other attack. Implementation requires `immune_to` / `phase` on
 | 19 | The Whole-Line Annex | `dd` `cc` `D` `S` | 69 | 97 | S1 terrain-∞ (void strips block bypass) | CHALLENGE: `D` ≡ `d$` cost (2=2); `D` taught as demo not forced. Par corrected from ~28 to 69. |
 | 20 | The Beacon Tiers (BUILT) | `y yy P` | 17 | 24 | Structural (fuel rule: flames paste only onto braziers) + 3P count-paste | Shipped 2026-06-11; see code/tests. |
 | 21 | (CANCELLED) The Undo Sanctum | — | — | — | u always-on; `<C-r>` via the 'redo' relic scroll | Cut 2026-06-11; token may return later. |
-| 22 | The Echo Vault | `.` (dot-repeat via `de`) | 17 | 24 | S2 tight budget (`de×12`=29>24) + S1/S4 bypass blocking | `de` not `dw` (chains correctly); `dd` blocked by terrain/guard; count blocked by guard. |
+| 22 | The Echo Vault (BUILT, display 21) | `.` echoed off `r` | 25 | 35 | Untypable warps (f/t// can't target); cuts break the plaque; register self-seal | Shipped 2026-06-11; see code/tests. |
 | 22.1 | The Warden Manifold | ALL Act IV (`dw d$ dd yy p v..d`) | ~102 | 160 (relaxed) | Per-phase immunity | CHALLENGE: `immune_to`/`phase` fields on Entity; visual-source tagging; Phase 4/5 split (yy then p). |
