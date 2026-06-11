@@ -91,28 +91,28 @@ The curriculum is defined in `content/levels.py` (canonical) and mirrored in `LE
 | 18 | The Operator's Vault | `d{m}  dd` | Playable |
 | 19 | The Cipher Cell | `r  D` | Playable |
 | 20 | The Beacon Tiers | `y yy P` | Playable |
-| 22 | The Echo Vault | `.` | Planned |
-| 22.1 | The Warden Manifold | (boss) | Planned |
-| 23 | The Inscription Halls | `i a` | Planned |
-| 23.5 | The Change Annex | `c{m}  cc  s  S  C` | Planned |
-| 24 | The Sculpting Chambers | `I A o O` | Planned |
-| 25 | The Overwrite Halls | `R` | Planned |
-| 26 | The Case Chambers | `~ g~ gU gu` | Planned |
-| 27 | The Joiner's Gate | `J gJ` | Planned |
-| 28 | The Alignment Halls | `>> <<` | Planned |
-| 29 | The Indentation Sanctum | `>{m} <{m} =` | Planned |
-| 29.1 | The Warden Scrivener | (boss) | Planned |
-| 30 | The Word Enclosure | `iw aw` | Planned |
-| 31 | The Bracket Enclosure | `i( a(` | Planned |
-| 32 | The Brace & Square Enclosure | `i[ a[ i{ a{` | Planned |
-| 33 | The Quote Enclosure | `i" a" i' a'` | Planned |
-| 34 | The Tag Enclosure | `it at` | Planned |
-| 35 | The Sentence Enclosure | `is as` | Planned |
-| 36 | The Paragraph Enclosure | `ip ap` | Planned |
-| 36.1 | The Grandmaster's Sanctum | (boss) | Planned |
-| 37 | The Spellwright's Forge | `:s///  :g  &` | Playable |
-| 38 | The Hall of Echoes | `q @ "` | Planned |
-| 38.1 | The Warden Eternal | (boss) | Planned |
+| 21 | The Echo Vault | `.` | Planned |
+| 21.1 | The Warden Manifold | (boss) | Planned |
+| 22 | The Inscription Halls | `i a` | Planned |
+| 22.5 | The Change Annex | `c{m}  cc  s  S  C` | Planned |
+| 23 | The Sculpting Chambers | `I A o O` | Planned |
+| 24 | The Overwrite Halls | `R` | Planned |
+| 25 | The Case Chambers | `~ g~ gU gu` | Planned |
+| 26 | The Joiner's Gate | `J gJ` | Planned |
+| 27 | The Alignment Halls | `>> <<` | Planned |
+| 28 | The Indentation Sanctum | `>{m} <{m} =` | Planned |
+| 28.1 | The Warden Scrivener | (boss) | Planned |
+| 29 | The Word Enclosure | `iw aw` | Planned |
+| 30 | The Bracket Enclosure | `i( a(` | Planned |
+| 31 | The Brace & Square Enclosure | `i[ a[ i{ a{` | Planned |
+| 32 | The Quote Enclosure | `i" a" i' a'` | Planned |
+| 33 | The Tag Enclosure | `it at` | Planned |
+| 34 | The Sentence Enclosure | `is as` | Planned |
+| 35 | The Paragraph Enclosure | `ip ap` | Planned |
+| 35.1 | The Grandmaster's Sanctum | (boss) | Planned |
+| 36 | The Spellwright's Forge | `:s///  :g  &` | Playable |
+| 37 | The Hall of Echoes | `q @ "` | Planned |
+| 37.1 | The Warden Eternal | (boss) | Planned |
 <!-- END GENERATED LEVELS TABLE -->
 
 ## Commands

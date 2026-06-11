@@ -6,8 +6,9 @@ READ AS ITS PLAQUE. The plaque band shows each span's true state (a word, then
 blank); the lock row decays it with a warped rune (mend with r) and rot-text
 sprawling where the plaque is blank (shear with D).
 
-r is structurally forced: at L19 the player has no other way to produce a
-character (i is L23, s/c are 23.5, R is 25) and the warped letters appear
+r is structurally forced: at the Cipher Cell the player has no other way to
+produce a character (i: the Inscription Halls; s/c: the Change Annex; R: the
+Overwrite Halls — all later) and the warped letters appear
 nowhere reachable, so x+p can transplant nothing. D is SOFT-forced (lineheads
 precedent): par assumes D; the d$ route costs par+2 and still fits the ×1.4
 budget but loses the 2-star.

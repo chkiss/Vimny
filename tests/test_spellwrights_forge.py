@@ -1,4 +1,4 @@
-"""The Spellwright's Forge (L37): the :s / :g rites, driven through the real
+"""The Spellwright's Forge: the :s / :g rites, driven through the real
 run_dungeon keystroke loop. Mend every line ('old'→'new' via :%s, strike the
 'cursed' verses via :g/cursed/d); the sanctum seal dissolves and the exit opens."""
 import pytest
