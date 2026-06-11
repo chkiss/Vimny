@@ -6190,7 +6190,10 @@ _EV_BOLT_C = (2, 48)                   # … segment 3 — the seal before the e
 # Each phrase carries its letter EXACTLY at the warp offsets, and no mend
 # letter (or the digit) appears ANYWHERE else in the vault (asserted at
 # build): every copy gets warped, so the cure exists nowhere reachable —
-# true scarcity, on top of the register self-seal.
+# true scarcity, on top of the register self-seal. Combos are normally
+# ASSEMBLED from the vocab corpus per seed (_ev_pick_combo — the shapes stay
+# fixed, so par holds); this static table is the deterministic fallback for
+# a corpus that can't satisfy a draw.
 _EV_COMBOS = (
     (('mend the seal', 'e'), ('guard rust', 'r'), ('lock', 'map', '7')),
     (('mist ski mild', 'i'), ('burnt numb', 'n'), ('gate', 'map', '3')),
@@ -6198,6 +6201,36 @@ _EV_COMBOS = (
     (('mast sea malt', 'a'), ('burnt numb', 'n'), ('rope', 'dim', '9')),
 )
 _EV_PAR = 25                           # seed-invariant; tallied in the answer below
+
+
+def _ev_pick_combo(rng):
+    """Assemble a seed-random Echo Vault combo from the vocab corpus.
+
+    The SHAPES are fixed (they are what keeps par seed-invariant): phrase 1 =
+    4+3+4 letters with the mend letter exactly once per word at indices
+    1/2/1; phrase 2 = 5+4 with its letter at 3/0; phrase 3 = a free 4- and
+    3-letter word plus a digit. Cross-segment scarcity is enforced in the
+    pools (each mend letter appears nowhere in the other segments), so the
+    builder's asserts hold for every draw. Deterministic per seed; falls
+    back to the static _EV_COMBOS table if the corpus can't satisfy."""
+    _load_vocab_tables()
+    low = {n: [w for w in _VOCAB_PLAIN_BY_LEN.get(n, ())
+               if w.isalpha() and w.islower()] for n in (3, 4, 5)}
+    for _ in range(40):
+        l1, l2 = rng.sample('abcdefghijklmnopqrstuvwxyz', 2)
+        a = [w for w in low[4] if w[1] == l1 and w.count(l1) == 1 and l2 not in w]
+        b = [w for w in low[3] if w[2] == l1 and w.count(l1) == 1 and l2 not in w]
+        d = [w for w in low[5] if w[3] == l2 and w.count(l2) == 1 and l1 not in w]
+        e = [w for w in low[4] if w[0] == l2 and w.count(l2) == 1 and l1 not in w]
+        f = [w for w in low[4] if l1 not in w and l2 not in w]
+        g = [w for w in low[3] if l1 not in w and l2 not in w]
+        if len(a) < 2 or not (b and d and e and f and g):
+            continue
+        w1, w3 = rng.sample(a, 2)
+        return ((f'{w1} {rng.choice(b)} {w3}', l1),
+                (f'{rng.choice(d)} {rng.choice(e)}', l2),
+                (rng.choice(f), rng.choice(g), rng.choice('23456789')))
+    return rng.choice(_EV_COMBOS)
 
 
 def build_dungeon_echo_vault(seed: int) -> Dungeon:
@@ -6225,7 +6258,7 @@ def build_dungeon_echo_vault(seed: int) -> Dungeon:
     is locked at _EV_PAR while the answer's letters track the combo.
     """
     rng = random.Random(seed)
-    (phrase1, l1), (phrase2, l2), (w4, w3, digit) = rng.choice(_EV_COMBOS)
+    (phrase1, l1), (phrase2, l2), (w4, w3, digit) = _ev_pick_combo(rng)
     g1, g2, g3 = rng.sample(_CC_WARP_GLYPHS, 3)
     phrase3 = f'{w4} {digit} {w3} {digit * 3}'
 
