@@ -25,6 +25,7 @@ Always-on (never gated, not in `teaches`): u, :w, :q, :q!.
 Not yet gated (no token): :e :set (archivist), :s/// (spellwright), = (indent).
 """
 from __future__ import annotations
+import re
 
 LEVELS = [
     {'display': '0',    'slug': 'first_cave',            'name': 'The First Cave',             'commands': 'h j k l u :w :q :q!', 'teaches': ['h', 'j', 'k', 'l']},
@@ -82,9 +83,12 @@ _BY_SLUG = {l['slug']: l for l in LEVELS}
 
 
 def key_for_slug(slug: str) -> str:
-    """The overworld row label (netrw 'filename'), derived from display + slug —
-    e.g. 'dungeon_05_the_goblin_gauntlet'. The integer part of display is
-    zero-padded to two digits; the dummy sandbox is the one special case."""
+    """The overworld row label (netrw 'filename'), derived from display + NAME —
+    e.g. 'dungeon_05_the_goblin_gauntlet'. Deriving from the name (not the slug)
+    lets a level rename show on the overworld while the slug stays the immutable
+    identity. Apostrophes vanish ("The Warden's Keep" → the_wardens_keep); the
+    integer part of display is zero-padded to two digits; the dummy sandbox is
+    the one special case."""
     lv = _BY_SLUG.get(slug)
     if not lv:
         return slug
@@ -92,7 +96,8 @@ def key_for_slug(slug: str) -> str:
         return 'dummy_dungeon'
     intpart, _, frac = lv['display'].partition('.')
     num = intpart.zfill(2) + (f'.{frac}' if frac else '')
-    return f'dungeon_{num}_the_{slug}'
+    label = re.sub(r'[^a-z0-9]+', '_', lv['name'].replace("'", '').lower()).strip('_')
+    return f'dungeon_{num}_{label}'
 
 
 # ── Curriculum command set (slug, order-based) ──────────────────────────────────
