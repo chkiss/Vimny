@@ -280,9 +280,15 @@ class Room:
     def char_run_at(self, r: int, c: int) -> Optional[CharRun]:
         return self._char_run_map.get((r, c))
 
+# Mechanic-bearing kinds: their identity drives game rules (void = lethal sink,
+# flame/pedestal = the Quartermaster's locks), so a WORD-color normalization
+# must never repaint them.
+_PINNED_KINDS = ('void', 'flame', 'pedestal')
+
+
 def normalize_row_word_kinds(room: Room, row: int) -> None:
-    """Normalize WORD colors on one row: adjacent non-void clusters all take the
-    leftmost cluster's kind so a WORD renders in one color. Skipped on a
+    """Normalize WORD colors on one row: adjacent non-pinned clusters all take
+    the leftmost cluster's kind so a WORD renders in one color. Skipped on a
     wrap_buffer room (single-line library: each region keeps its own colour).
     Called by rebuild_indexes for every row and by the row-scoped merge."""
     if getattr(room, 'wrap_buffer', False):
@@ -291,14 +297,14 @@ def normalize_row_word_kinds(room: Room, row: int) -> None:
     i = 0
     while i < len(row_runes):
         ru = row_runes[i]
-        if ru.kind == 'void':
+        if ru.kind in _PINNED_KINDS:
             i += 1
             continue
         word_kind = ru.kind
         j = i + 1
         while j < len(row_runes):
             prev, curr = row_runes[j - 1], row_runes[j]
-            if prev.col + len(prev.symbols) == curr.col and curr.kind != 'void':
+            if prev.col + len(prev.symbols) == curr.col and curr.kind not in _PINNED_KINDS:
                 curr.kind = word_kind
                 j += 1
             else:

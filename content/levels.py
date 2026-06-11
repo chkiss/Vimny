@@ -50,7 +50,7 @@ LEVELS = [
     {'display': '17.1', 'slug': 'warden_pathfinder',     'name': 'The Warden Pathfinder',      'type': 'boss', 'after': 'archivists_library', 'teaches': []},
     {'display': '18',   'slug': 'operators_vault',       'name': "The Operator's Vault",       'commands': 'd{m}  dd', 'teaches': ['d']},
     {'display': '19',   'slug': 'cipher_cell',           'name': 'The Cipher Cell',            'commands': 'r  D', 'teaches': ['r', 'D']},
-    {'display': '20',   'slug': 'quartermaster',         'name': 'The Quartermaster',          'commands': 'y yy P', 'teaches': ['y', 'P', 'register']},
+    {'display': '20',   'slug': 'quartermaster',         'name': 'The Quartermaster',          'commands': 'y yy P', 'teaches': ['y', 'P']},
     {'display': '21',   'slug': 'undo_sanctum',          'name': 'The Undo Sanctum',           'commands': 'u  <C-r>', 'teaches': ['redo']},
     {'display': '22',   'slug': 'echo_vault',            'name': 'The Echo Vault',             'commands': '.', 'teaches': ['dot']},
     {'display': '22.1', 'slug': 'warden_manifold',       'name': 'The Warden Manifold',        'type': 'boss', 'after': 'echo_vault', 'teaches': []},

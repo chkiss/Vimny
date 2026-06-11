@@ -1155,6 +1155,84 @@ def _cipher_cell_tick(room, player) -> list:
     return msgs
 
 
+def _quartermaster_tick(room, player) -> list:
+    """The Quartermaster's doors — the Cipher Cell rule at flame scale: a lock
+    cell BURNS while it matches the flame plaque sealed in the wall above it.
+    STATELESS, hence undo-safe (the vault-tick principle), and every anchor is
+    re-derived from the plaque glyphs each turn — plaques ride row shifts
+    (_shift_rows), so even a stray linewise paste can't desync the locks.
+
+    Three door families:
+      chain bolts — bolt k stands open while lock flames 0..k ALL burn
+        (cut the source and the hall darkens: copy, don't cut);
+      pedestals   — every unlit lock cell shows … embers (kind='pedestal'),
+        laid/swept here so a paste's open_gap can only shove them aside for
+        one turn and lighting one reads as embers → flame;
+      tier seal   — the cell above the exit draws open while the three rows
+        below the mural each burn at every mural column (yy + paste ×2).
+    """
+    msgs = []
+    plaques = [(ru.row, ru.col) for ru in room.char_runs
+               if ru.kind == 'flame'
+               and room.cells[ru.row][ru.col] in (CellType.WALL, CellType.WOOD_WALL)]
+    if not plaques:
+        return msgs
+
+    def lit(r, c):
+        if not (0 <= r < room.rows and 0 <= c < room.cols):
+            return False
+        ru = room.char_run_at(r, c)
+        return ru is not None and ru.symbols[c - ru.col] == _dg._QM_FLAME
+
+    # The mural is the maximal run of consecutive plaque rows at the bottom;
+    # everything above it is a chain plaque.
+    rows_ = sorted({r for r, _ in plaques})
+    mural = [rows_[-1]]
+    for r in reversed(rows_[:-1]):
+        if r != mural[0] - 1:
+            break
+        mural.insert(0, r)
+    tier_cols = sorted(c for r, c in plaques if r == mural[-1])
+
+    # Pedestal embers: lay at every unlit lock cell, sweep strays.
+    locks = [(r + 1, c) for r, c in plaques if room.is_passable(r + 1, c)]
+    unlit = {(r, c) for r, c in locks if not lit(r, c)}
+    for ru in [ru for ru in room.char_runs if ru.kind == 'pedestal']:
+        if (ru.row, ru.col) not in unlit:
+            room.remove_char_run(ru)
+    for (r, c) in unlit:
+        if room.char_run_at(r, c) is None:
+            room.add_char_run(CharRun(r, c, (_dg._QM_EMBERS,), 'pedestal'))
+
+    # Chain bolts (cumulative) on the hall row.
+    chain = sorted(rc for rc in locks if rc[0] < mural[0])
+    if chain:
+        hall_row = chain[0][0]
+        burning  = [lit(r, c) for r, c in chain]
+        for i, bc in enumerate(getattr(room, '_qm_bolt_cols', ())):
+            open_ = all(burning[:i + 1])
+            cur_open = room.cells[hall_row][bc] != CellType.WALL
+            if open_ and not cur_open:
+                room.cells[hall_row][bc] = CellType.FLOOR
+                msgs.append('The flame takes — the bolt grinds back!')
+            elif not open_ and cur_open and (player.row, player.col) != (hall_row, bc):
+                room.cells[hall_row][bc] = CellType.WALL
+                msgs.append('The chain is broken — the bolts grind shut!')
+
+    # The tier seal: the cell above the exit (both shift together).
+    exit_e = next((e for e in room.entities if e.kind == 'exit'), None)
+    if exit_e is not None and exit_e.row > 0:
+        sr, sc = exit_e.row - 1, exit_e.col
+        tiers = all(lit(mural[-1] + k, c) for k in (1, 2, 3) for c in tier_cols)
+        cur_open = room.cells[sr][sc] != CellType.WALL
+        if tiers and not cur_open:
+            room.cells[sr][sc] = CellType.FLOOR
+            msgs.append('The beacon burns in three tiers — the seal door draws open!')
+        elif not tiers and cur_open and (player.row, player.col) != (sr, sc):
+            room.cells[sr][sc] = CellType.WALL
+    return list(dict.fromkeys(msgs))
+
+
 def _spawn_goblin(room, row, col, summoner_uid: int = 0) -> Entity | None:
     for c in (col, col - 1, col + 1):
         if 0 <= c < room.cols and room.is_passable(row, c) and not room.entity_at(row, c):
@@ -1174,6 +1252,7 @@ _LEVEL_INTROS = {
     'character_cataracts': ('The Character Cataracts — f{c}:jump to char  t{c}:just before  F/T:backward', 60),
     'wardens_keep':        ("The Warden's Keep — the shield follows you. Find the unguarded side.", 60),
     'cipher_cell':         ('The Cipher Cell — make each row read as its plaque: r mends a rune, D shears the rot.', 60),
+    'quartermaster':       ('The Quartermaster — one flame still burns. yl lifts it, p/P set it down; yy raises the beacon row.', 60),
     'warden_surveyor':     ('The Warden Surveyor — survey his hall; w/b/e leap word to word, over the void.', 60),
     'dummy':               ('Sandbox — all mechanics active. Type :edit to enter editor mode.', 60),
     'archivists_library':  ("The Archivist's Library — the whole catalogue has spilled "
@@ -3900,6 +3979,12 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
             if level == 'cipher_cell':
                 for _cc_msg in _cipher_cell_tick(room, player):
                     _push(_cc_msg)
+
+            # The Quartermaster: chain bolts, pedestal embers and the tier seal
+            # all track the flame plaques (stateless, undo-safe).
+            if level == 'quartermaster':
+                for _qm_msg in _quartermaster_tick(room, player):
+                    _push(_qm_msg)
 
             # Warden summon message
             if tick_msgs and not player.is_dead:

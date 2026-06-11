@@ -38,6 +38,30 @@ _WATER_FRAMES = [
 _WATER_PERIOD   = sum(d for _, _, d in _WATER_FRAMES)  # 24.8 s
 _OVERLAP_PERIOD = 0.7   # seconds per full blink cycle (player ↔ entity under feet)
 
+# ── Flame flicker ──────────────────────────────────────────────────────────────
+# kind='flame' glyphs (the Quartermaster's signal fire) flicker between shades
+# of yellow and orange — color only, the glyph never changes shape.
+_FLAME_FRAMES = [
+    ((255, 200,  40), 0.45),   # bright yellow flare
+    ((235, 140,  20), 0.60),   # orange body
+    ((255, 170,  30), 0.35),   # amber lick
+    ((205, 105,  10), 0.50),   # deep orange ebb
+]
+_FLAME_PERIOD = sum(d for _, d in _FLAME_FRAMES)
+
+
+def _flame_color(row: int, col: int) -> tuple[int, int, int]:
+    """(r, g, b) for a flame glyph at the current instant; spatial offset keeps
+    neighbouring flames out of phase, like the water."""
+    offset = (row * 0.83 + col * 0.41) % _FLAME_PERIOD
+    phase  = (time.time() + offset) % _FLAME_PERIOD
+    t = 0.0
+    for rgb, dur in _FLAME_FRAMES:
+        t += dur
+        if phase < t:
+            return rgb
+    return _FLAME_FRAMES[-1][0]
+
 
 def _water_glyph(row: int, col: int) -> tuple[str, int, int, int]:
     """Return (char, r, g, b) for a water cell at the current instant."""
@@ -409,8 +433,12 @@ def render_all(term: Terminal, dungeon: Dungeon, player: Player,
         if ru:
             idx = room_c - ru.col
             sym = ru.symbols[idx]
+            if ru.kind == 'flame':
+                return (floor_bg + term.color_rgb(*_flame_color(room_r, room_c))
+                        + sym + C.normal_fg())
             rfg = {'ancient': C.rune_ancient(), 'verdant': C.rune_verdant(),
-                   'void': C.rune_void(), 'ember': C.rune_ember()}.get(ru.kind, C.normal_fg())
+                   'void': C.rune_void(), 'ember': C.rune_ember(),
+                   'pedestal': C.rune_pedestal()}.get(ru.kind, C.normal_fg())
             return floor_bg + rfg + sym + C.normal_fg()
 
         # Cell type

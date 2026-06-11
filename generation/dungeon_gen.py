@@ -6058,3 +6058,131 @@ def build_dungeon_cipher_cell(seed: int) -> Dungeon:
     dungeon.rooms        = [room]
     dungeon.current_room = 0
     return dungeon
+
+
+# ── The Quartermaster (L20) — y / yy / P ──────────────────────────────────────
+_QM_ROWS, _QM_COLS = 14, 48
+_QM_PLAQUE_ROW = 1                      # sealed hall plaques (wall row, glyphs embedded)
+_QM_HALL_ROW   = 2                      # the supply hall (floor cols 1..45)
+_QM_HALL_LO, _QM_HALL_HI = 1, 45
+_QM_SPAWN  = (2, 2)
+_QM_SOURCE = (2, 4)                     # the one lit brazier — the flame to spread
+_QM_PED1   = (2, 14)                    # hall pedestal — lit with a plain paste
+_QM_BOLT_COLS = (8, 18, 30)             # chain bolts A/B/C on the hall row: bolt k
+                                        # stands open while flames 0..k ALL burn
+_QM_JUNCTION_COL = 24                   # hall → stub gap (row 3)
+_QM_STUB_ROW = 4                        # leftward dead-end stub
+_QM_STUB_LO  = 2
+_QM_PED2 = (4, 2)                       # the stub pedestal: LEFTMOST floor cell of its
+                                        # row — no cell ever exists to its left, so only
+                                        # P (paste at the cursor col) can light it
+_QM_DESCENT_COL = 45                    # east shaft: hall → shrine
+_QM_MURAL_ROWS = (6, 7, 8)              # sealed mural — the beacon shown in three tiers
+_QM_BRAZIER_ROW = 9                     # the shrine's real brazier row
+_QM_SHRINE_LO, _QM_SHRINE_HI = 34, 45
+_QM_TIER_COLS = (36, 38, 40)            # beacon flames; col 40 starts cold
+_QM_SLOT_COL  = 40
+_QM_WALK_ROW  = 10
+_QM_SEAL = (11, 34)                     # tier seal — re-derived from the exit each tick
+_QM_EXIT = (12, 34)
+_QM_FLAME  = '🜂'                        # one width-1 glyph IS the flame (untypable,
+                                        # so r/insert can never forge one)
+_QM_EMBERS = '…'                        # empty pedestal: three dying embers, one cell
+_QM_PAR = 28                            # seed-invariant; tallied in the answer below
+
+
+def build_dungeon_quartermaster(seed: int) -> Dungeon:
+    """The Quartermaster (L20): teaches y (yank — copy WITHOUT cutting) and
+    P (paste before the cursor); yy + paste raises whole rows.
+
+    The depot's signal fire is down to one lit brazier. ONE rule, inherited
+    from the Cipher Cell: a lock cell burns when it matches the flame plaque
+    sealed in the wall above it. yl lifts the flame (the register keeps it
+    through every paste); p/P set it down on the cold pedestals (… embers).
+    The chain bolts are cumulative — bolt k stands open only while flames
+    0..k ALL burn — so cutting the source visibly darkens the hall (copy,
+    don't cut; u or a paste-back recovers). The stub pedestal sits on the
+    leftmost floor cell of its row: P is structurally the only paste that
+    can reach it. The finale: complete the shrine's brazier row, yy it, and
+    paste it twice — the beacon must burn in three tiers (three consecutive
+    rows below the mural reading as the mural) to draw the seal door.
+
+    Geometry is fixed (the level is seed-invariant); all doors run through
+    main._quartermaster_tick — stateless and undo-safe, with every anchor
+    re-derived from the plaque glyphs so linewise pastes can't desync it.
+    """
+    R, C = _QM_ROWS, _QM_COLS
+    cells = [[CellType.WALL] * C for _ in range(R)]
+    for c in range(_QM_HALL_LO, _QM_HALL_HI + 1):
+        cells[_QM_HALL_ROW][c] = CellType.FLOOR
+    for c in range(_QM_STUB_LO, _QM_JUNCTION_COL + 1):
+        cells[_QM_STUB_ROW][c] = CellType.FLOOR
+    cells[3][_QM_JUNCTION_COL] = CellType.FLOOR          # hall → stub gap
+    for r in range(3, _QM_BRAZIER_ROW):                  # east descent shaft
+        cells[r][_QM_DESCENT_COL] = CellType.FLOOR
+    for r in (_QM_BRAZIER_ROW, _QM_WALK_ROW):
+        for c in range(_QM_SHRINE_LO, _QM_SHRINE_HI + 1):
+            cells[r][c] = CellType.FLOOR
+    for c in range(_QM_EXIT[1], _QM_EXIT[1] + 3):        # exit alcove below the seal
+        cells[_QM_EXIT[0]][c] = CellType.FLOOR
+    # Build state == tick steady-state: the chain holds only the source flame,
+    # so bolt A stands open and B/C (and the tier seal) start shut.
+    cells[_QM_HALL_ROW][_QM_BOLT_COLS[0]] = CellType.FLOOR
+    for bc in _QM_BOLT_COLS[1:]:
+        cells[_QM_HALL_ROW][bc] = CellType.WALL
+    cells[_QM_SEAL[0]][_QM_SEAL[1]] = CellType.WALL
+
+    room = Room(room_type=RoomType.ENTRY, rows=R, cols=C)
+    room.cells = cells
+    room.seed  = seed
+
+    def flame(r, c):
+        room.char_runs.append(CharRun(r, c, (_QM_FLAME,), 'flame'))
+
+    def embers(r, c):
+        room.char_runs.append(CharRun(r, c, (_QM_EMBERS,), 'pedestal'))
+
+    # Plaques — flame glyphs sealed in WALL cells (the tick derives every lock,
+    # bolt and tier from these, never from stored coordinates).
+    flame(_QM_PLAQUE_ROW, _QM_SOURCE[1])
+    flame(_QM_PLAQUE_ROW, _QM_PED1[1])
+    flame(_QM_PED2[0] - 1, _QM_PED2[1])                  # stub plaque, wall row 3
+    for r in _QM_MURAL_ROWS:
+        for c in _QM_TIER_COLS:
+            flame(r, c)
+    # The hall: one lit brazier, one cold pedestal.
+    flame(*_QM_SOURCE)
+    embers(*_QM_PED1)
+    embers(*_QM_PED2)
+    # The shrine's brazier row, one flame short of its mural.
+    for c in _QM_TIER_COLS:
+        if c == _QM_SLOT_COL:
+            embers(_QM_BRAZIER_ROW, c)
+        else:
+            flame(_QM_BRAZIER_ROW, c)
+
+    # The seal must not be deletable from under the level (nor the exit row
+    # dd-collapsible — immunity parries that, per the L18 refused-collapse rule).
+    room.entities.append(Entity(kind='exit', row=_QM_EXIT[0], col=_QM_EXIT[1],
+                                edit_immune=True))
+    room.spawn_pos = _QM_SPAWN
+    room.exit_pos  = _QM_EXIT
+    room._qm_bolt_cols = _QM_BOLT_COLS                   # read by main._quartermaster_tick
+
+    room.rebuild_indexes()
+    # Par tally (fixed geometry, so this holds for every seed):
+    #   w y l            (3)  → step to the flame; lift it (nothing is cut)
+    #   w P              (2)  → hall pedestal: paste lights it; bolt B grinds back
+    #   10l j j 0 P      (8)  → stub: 0 runs to the wall; only P reaches the cell
+    #   $ k k $ 7j       (7)  → chain complete, bolt C open; ride the hall down the shaft
+    #   B P              (2)  → the cold beacon slot; light it
+    #   y y p p          (4)  → yank the lit row; raise it twice — three tiers burn
+    #   2h 3j            (4)  → through the drawn seal to the exit
+    room.par    = _QM_PAR
+    room.budget = math.ceil(_QM_PAR * 1.4)
+    room.answer = 'w y l w P 10l j j 0 P $ k k $ 7j B P y y p p 2h 3j'
+
+    dungeon = Dungeon(name='The Quartermaster', seed=seed)
+    dungeon.rooms        = [room]
+    dungeon.current_room = 0
+    return dungeon

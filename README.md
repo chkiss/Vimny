@@ -90,7 +90,7 @@ The curriculum is defined in `content/levels.py` (canonical) and mirrored in `LE
 | 17.1 | The Warden Pathfinder | (boss) | Playable |
 | 18 | The Operator's Vault | `d{m}  dd` | Playable |
 | 19 | The Cipher Cell | `r  D` | Playable |
-| 20 | The Quartermaster | `y yy P` | Planned |
+| 20 | The Quartermaster | `y yy P` | Playable |
 | 21 | The Undo Sanctum | `u  <C-r>` | Planned |
 | 22 | The Echo Vault | `.` | Planned |
 | 22.1 | The Warden Manifold | (boss) | Planned |
@@ -187,7 +187,6 @@ The full command reference (also the hint-bar source) is `render/vim_commands.md
 | `y{m}` | yank |
 | `yy` | yank line |
 | `P` | paste before |
-| `"{r}{op}` | named register |
 | `.` | repeat change |
 | `i` | insert |
 | `a` | append |

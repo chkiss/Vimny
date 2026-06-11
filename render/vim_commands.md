@@ -178,14 +178,13 @@
 | s    |       | substitute       |
 | S    |       | substitute line  |
 
-## quartermaster — yank + named registers
+## quartermaster — yank + paste before
 
 | keys     | token    | desc           |
 |----------|----------|----------------|
 | y{m}     | y        | yank           |
 | yy       |          | yank line      |
 | P        |          | paste before   |
-| "{r}{op} | register | named register |
 
 ## echo_vault — repeat last change
 

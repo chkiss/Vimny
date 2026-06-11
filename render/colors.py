@@ -58,6 +58,7 @@ def rune_ancient():  return _term.color_rgb(90, 95, 175)         # indigo-slate,
 def rune_verdant():  return _term.color_rgb(70, 145, 75)         # moss amber, living rune
 def rune_void():     return _term.color_rgb(125, 55, 170)        # deep violet, erasure
 def rune_ember():    return _term.color_rgb(175, 100, 35)        # sepia amber, wizard warmth
+def rune_pedestal(): return _term.color_rgb(120, 70, 30)         # dying embers, a cold brazier
 
 def budget_ok():     return _term.color_rgb(0, 210, 90)          # phosphor green, plenty left
 def budget_low():    return _term.color_rgb(215, 195, 35)        # amber caution, watch it
