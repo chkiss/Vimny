@@ -113,6 +113,9 @@ OPERATOR_CODEX_SCROLL = {
     ],
 }
 
+# Dropped by the Warden Manifold. The yank rows are a clear-eyed RECAP (the
+# Beacon Tiers taught them, before the boss); the smudges preview the next
+# act: the writers (i at the Inscription Halls, c at the Change Annex).
 ARCHIVISTS_METHOD_SCROLL = {
     'title': "◈   The Archivist's Method   ◈",
     'lines': [
@@ -121,6 +124,7 @@ ARCHIVISTS_METHOD_SCROLL = {
         ('cmd',    'y{m}', 'yank (copy without cutting)'),
         ('cmd',    'yy  ', 'yank line'),
         ('cmd',    'p   ', 'put after cursor'),
+        ('smudge', 'i   ', 'in', 'sert — write where you stand', 'insert'),
         ('smudge', 'c{m}', 'ch', 'ange text (del + insert)', 'c'),
         ('blank',),
         ('amber',  '  d and y share the same register.'),

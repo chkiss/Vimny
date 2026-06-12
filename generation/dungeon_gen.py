@@ -6341,3 +6341,221 @@ def build_dungeon_echo_vault(seed: int) -> Dungeon:
     dungeon.rooms        = [room]
     dungeon.current_room = 0
     return dungeon
+
+
+# ── The Warden Manifold (21.1, Act IV boss) — "The Stamping Press" ────────────
+# Symmetric about the processional aisle (row 8): antechamber west, grand hall
+# east, friezes top and bottom, four podium niches in the quadrants, column
+# pairs flanking the aisle. He stamps; the player out-copies him.
+_WM_ROWS, _WM_COLS = 17, 66
+_WM_AXIS = 8                            # the aisle — the hall's mirror line
+# Antechamber (the opening ritual): interior rows 5..11, cols 2..12.
+_WM_SPAWN    = (8, 2)
+_WM_FLAME    = (8, 4)                   # the eternal flame — yl lifts it
+_WM_BRAZIERS = ((3, 9), (7, 12), (9, 12), (13, 9))
+                                        # a mirrored diamond. TWO reflow laws
+                                        # (both found live): one brazier per
+                                        # row (a later paste west of a lit
+                                        # flame shoves it off its brazier),
+                                        # and brazier rows must hold NO glyph
+                                        # anywhere east in the BUFFER row —
+                                        # open_gap shifts the whole line,
+                                        # straight across the dividing wall
+                                        # (rows 3/7/9/13 are glyph-free in
+                                        # the hall; 5/11 carry column shafts,
+                                        # 6/10 the wards)
+_WM_GATE     = (8, 13)                  # ritual gate: draws when all four burn
+# Grand hall: interior rows 2..14, cols 15..61.
+_WM_HALL_TOP, _WM_HALL_BOT = 2, 14
+_WM_HALL_LO,  _WM_HALL_HI  = 15, 61
+_WM_FRIEZE_ROWS = (1, 15)               # sealed wall rows wearing his stamp-marks
+_WM_COLUMN_COLS = (21, 31, 41, 51)      # column pairs at rows 4-5 and 11-12
+_WM_COLUMN_ROWS = (4, 5, 11, 12)
+# Podium niches (round order NW → NE → SW → SE); each is a 1-cell alcove walled
+# on three sides, its bolt facing the aisle. Bolts are DERIVED from the warden
+# entity each tick (entities ride row shifts), never stored.
+_WM_PODIUMS = ((3, 26), (3, 46), (13, 26), (13, 46))
+# Ward stamps (rows mirror about the aisle; west beats then east beats):
+_WM_WARD1 = (6, 18)                     # R1: d{m} — guarded ward-words, wall posts between
+_WM_WARD1_POSTS = (22, 27)              # close_gap stops at walls: each word its own line
+_WM_WARD2 = (6, 38)                     # R2: r + . — his stamp, four times, one warp each
+_WM_WARD3 = (10, 18)                    # R3: D — rot-tail with an echo rank standing on it
+_WM_WARD3_HI = 34
+_WM_WARD3_ECHOES = ((10, 20), (10, 24), (10, 28), (10, 32))
+_WM_WARD4 = (10, 40)                    # R4: yy + P — his true name must appear TWICE
+_WM_WARD4_ECHOES = ((3, 36), (5, 24), (5, 48), (7, 36),
+                    (9, 36), (11, 24), (11, 48), (13, 36))   # mirrored crowd
+_WM_HEARTS = ((4, 36), (12, 36))        # mirrored mercy — the windows cost blood
+_WM_SEAL = (8, 62)                      # draws when the press falls silent
+_WM_EXIT = (8, 63)                      # pocketed: walls above/below/east
+_WM_BUDGET = 220                        # relaxed (boss convention — no par)
+
+
+def build_dungeon_warden_manifold(seed: int) -> Dungeon:
+    """The Warden Manifold (Act IV boss): he stamps himself into the world —
+    wards of text, then copies of himself — and the player out-copies him
+    with the act's own verbs. No new commands; no keystroke par.
+
+    Opening ritual: the antechamber holds one eternal flame and four cold
+    braziers (… embers). yl lifts the flame, P lays it (the Beacon Tiers'
+    fuel rule is active via room._qm_chain); when all four burn, the ritual
+    gate draws and the hall stands open.
+
+    The fight (main._warden_manifold_tick): the Warden is edit_immune (every
+    operator parries — the engine's real all-or-nothing shield) and shelters
+    in a podium niche per round. Each round he has STAMPED a ward; breaking
+    it with the act's verb jams the press — echoes gutter, his bolt draws,
+    one x lands — and he re-manifests at the next podium and stamps again:
+      R1  d{m}   ward-words with a guard ON each (one cut takes both);
+                 wall posts between words pin the reflow per word
+      R2  r + .  his stamp four times, the same warp in each (the Echo
+                 Vault's seals: untypable warp, scarce true letter)
+      R3  D      a rot-tail with a rank of false Wardens standing on it —
+                 one D erases the crowd like text
+      R4  yy+P   his true name burns alone (kind='flame' — it flickers);
+                 the press demands it twice: only linewise paste can put a
+                 second row beneath it (r cannot write on blank floor)
+    Then the final stagger, the killing x, and the seal draws.
+
+    Ward checks are shift-proof (kind-counts on passable cells / substring
+    scans across rows), bolts derive from the warden entity, and the seal
+    derives from stored coords above the only insert row. The round counter
+    (room._wm_round) is boss state and survives undo — documented, the
+    Pathfinder convention. Geometry is fixed; the seed picks the vocabulary.
+    """
+    rng = random.Random(seed)
+    _load_vocab_tables()
+    low4 = [w for w in _VOCAB_PLAIN_BY_LEN.get(4, ()) if w.isalpha() and w.islower()]
+    low5 = [w for w in _VOCAB_PLAIN_BY_LEN.get(5, ()) if w.isalpha() and w.islower()]
+
+    # R2 first: a stampable word whose FIRST letter appears exactly once (the
+    # scarce cure). Warping index 0 fixes the lock SHAPE (`⚸num ⚸num …`), so
+    # the w-hop rhythm between stamps is seed-invariant — the Echo Vault's
+    # fixed-offsets rule.
+    word2 = letter2 = None
+    for _ in range(60):
+        w = rng.choice(low4)
+        if w.count(w[0]) == 1:
+            word2, warp_at = w, 0
+            letter2 = w[0]
+            break
+    assert word2 is not None
+    # Everything else must not donate letter2 (true scarcity, Echo Vault rule).
+    clean4 = [w for w in low4 if letter2 not in w]
+    clean5 = [w for w in low5 if letter2 not in w]
+    words1 = rng.sample(clean4, 3)                          # R1 ward-words
+    name   = f'{rng.choice(clean5)} {rng.choice(clean4)}'   # R4: his true name
+    soup_abc = [ch for ch in 'abcdefghijklmnopqrstuvwxyz' if ch != letter2]
+    warp_glyph = rng.choice(_CC_WARP_GLYPHS)
+
+    def rot_text(n: int) -> str:
+        out: list = []
+        while len(out) < n:
+            if out:
+                out.append(' ')
+            for _ in range(min(rng.randint(2, 4), n - len(out))):
+                out.append(rng.choice(soup_abc))
+        return ''.join(out[:n])
+
+    R, C = _WM_ROWS, _WM_COLS
+    cells = [[CellType.WALL] * C for _ in range(R)]
+    for r in range(3, 14):                                  # antechamber
+        for c in range(2, 13):
+            cells[r][c] = CellType.FLOOR
+    for r in range(_WM_HALL_TOP, _WM_HALL_BOT + 1):         # the grand hall
+        for c in range(_WM_HALL_LO, _WM_HALL_HI + 1):
+            cells[r][c] = CellType.FLOOR
+    for r in _WM_COLUMN_ROWS:                               # column pairs
+        for c in _WM_COLUMN_COLS:
+            cells[r][c] = CellType.WALL
+    for c in _WM_WARD1_POSTS:                               # R1 reflow posts
+        cells[_WM_WARD1[0]][c] = CellType.WALL
+    for (pr, pc) in _WM_PODIUMS:                            # podium niches
+        cells[pr][pc] = CellType.FLOOR
+        side = 1 if pr < _WM_AXIS else -1                   # bolt faces the aisle
+        cells[pr - side][pc] = CellType.WALL                # back wall
+        cells[pr][pc - 1] = CellType.WALL
+        cells[pr][pc + 1] = CellType.WALL
+        cells[pr + side][pc] = CellType.WALL                # the bolt, shut
+    cells[_WM_EXIT[0]][_WM_EXIT[1]] = CellType.FLOOR        # exit pocket
+    cells[_WM_SEAL[0]][_WM_SEAL[1]] = CellType.WALL         # behind its seal
+    cells[_WM_GATE[0]][_WM_GATE[1] + 1] = CellType.FLOOR    # threshold into the hall
+    cells[_WM_GATE[0]][_WM_GATE[1]] = CellType.WALL         # ritual gate, shut
+
+    room = Room(room_type=RoomType.ENTRY, rows=R, cols=C)
+    room.cells = cells
+    room.seed  = seed
+
+    def lay(row, col, text, kind):
+        c = col
+        for piece in text.split(' '):
+            if piece:
+                room.char_runs.append(CharRun(row, c, tuple(piece), kind))
+            c += len(piece) + 1
+
+    # The eternal flame and the four cold braziers (embers tick-managed).
+    room.char_runs.append(CharRun(*_WM_FLAME, (_QM_FLAME,), 'flame'))
+    for (r, c) in _WM_BRAZIERS:
+        room.char_runs.append(CharRun(r, c, (_QM_EMBERS,), 'pedestal'))
+
+    # Friezes: his stamp-marks pressed into the north and south walls —
+    # untypable symbols only (unsearchable, untargetable), mirrored rows,
+    # centered on the hall (37 cols at 20..56; hall center = col 38).
+    frieze = '♄  ▼  ☿  ▼  ♆  ▼  ⚸  ▼  ♆  ▼  ☿  ▼  ♄'
+    for fr in _WM_FRIEZE_ROWS:
+        lay(fr, 20, frieze, 'ember')
+    for r in _WM_COLUMN_ROWS:                               # column shafts
+        for c in _WM_COLUMN_COLS:
+            room.char_runs.append(CharRun(r, c, ('║',), 'ancient'))
+
+    # ROUND 1, stamped at build (the fight opens staged): three guarded
+    # ward-words, a stationary guard ON each word's head.
+    c = _WM_WARD1[1]
+    for w in words1:
+        lay(_WM_WARD1[0], c, w, 'ancient')
+        room.entities.append(Entity(kind='goblin', row=_WM_WARD1[0], col=c,
+                                    hp=1, max_hp=1, ai=''))
+        c += 5
+    # Later stamps, laid by the tick on each round transition.
+    word2_lock = word2[:warp_at] + warp_glyph + word2[warp_at + 1:]
+    room._wm_stamps = {
+        2: (_WM_WARD2[0], _WM_WARD2[1],
+            '  '.join([word2_lock] * 4), 'verdant'),
+        # NOTE the rot is 'ancient', not 'ember': r-typed mends carry
+        # INSERT_KIND ('ember') and the WORD-normalize repaints whole mended
+        # words with it, so an ember-based rot check would false-positive on
+        # the player's own R2 mends. 'ancient' is safe by TIME: ward 1's
+        # words must be gone before round 3 can exist.
+        3: (_WM_WARD3[0], _WM_WARD3[1],
+            rot_text(_WM_WARD3_HI - _WM_WARD3[1] + 1), 'ancient'),
+        4: (_WM_WARD4[0], _WM_WARD4[1], name, 'flame'),
+    }
+    room._wm_echo_spawns = {3: _WM_WARD3_ECHOES, 4: _WM_WARD4_ECHOES}
+    room._wm_word2, room._wm_name = word2, name
+    room._wm_gate, room._wm_seal = _WM_GATE, _WM_SEAL
+    room._wm_braziers = _WM_BRAZIERS
+
+    # The Warden: edit_immune (every operator parries), four x-windows of HP.
+    # tag='manifold' exempts him from the stock warden auto-summon — pressure
+    # ships QUIET here (the _wm_pressure hook decides later).
+    room.entities.append(Entity(kind='warden', row=_WM_PODIUMS[0][0],
+                                col=_WM_PODIUMS[0][1], hp=4, max_hp=4,
+                                ai='', tag='manifold', edit_immune=True))
+    for (r, c) in _WM_HEARTS:
+        room.entities.append(Entity(kind='heart_container', row=r, col=c))
+    room.entities.append(Entity(kind='exit', row=_WM_EXIT[0], col=_WM_EXIT[1],
+                                edit_immune=True))
+    room.spawn_pos = _WM_SPAWN
+    room.exit_pos  = _WM_EXIT
+    # The Beacon Tiers' fuel rule, reused: flames lie only in braziers.
+    room._qm_chain = (_WM_FLAME, *_WM_BRAZIERS)
+
+    room.rebuild_indexes()
+    room.par    = None                   # boss: no keystroke par (1-star win)
+    room.budget = _WM_BUDGET
+    room.answer = ''
+
+    dungeon = Dungeon(name='The Warden Manifold', seed=seed)
+    dungeon.rooms        = [room]
+    dungeon.current_room = 0
+    return dungeon

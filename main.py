@@ -1182,6 +1182,156 @@ def _echo_vault_tick(room, player) -> list:
     return msgs
 
 
+def _wm_row_text(room, r: int) -> str:
+    """The full text of row r (spaces where no character sits)."""
+    line = [' '] * room.cols
+    for ru in room._char_runs_by_row.get(r, []):
+        for k, sym in enumerate(ru.symbols):
+            if 0 <= ru.col + k < room.cols:
+                line[ru.col + k] = sym
+    return ''.join(line)
+
+
+def _wm_ward_broken(room, k: int) -> bool:
+    """Round k's ward state — shift-proof by design (kind-counts on passable
+    cells, substring scans across rows; never stored coordinates):
+      1: every guarded ward-word is gone (no 'ancient' text on the floor —
+         the column shafts are 'ancient' too, but they stand in wall cells)
+      2: his stamp reads TRUE four times (the warped copies mended with r/.)
+      3: the rot is sheared (also 'ancient' — safe by TIME, ward 1's words
+         predate round 3; NOT 'ember', which r-typed mends are repainted to)
+      4: his true name appears on TWO rows (yy + paste — the only writer)"""
+    if k == 1:
+        return not any(ru.kind == 'ancient' and room.is_passable(ru.row, ru.col)
+                       for ru in room.char_runs)
+    if k == 2:
+        word = getattr(room, '_wm_word2', None)
+        if not word:
+            return False
+        return sum(_wm_row_text(room, r).count(word)
+                   for r in range(room.rows)) >= 4
+    if k == 3:
+        return not any(ru.kind == 'ancient' and room.is_passable(ru.row, ru.col)
+                       for ru in room.char_runs)
+    if k == 4:
+        name = getattr(room, '_wm_name', None)
+        if not name:
+            return False
+        return sum(1 for r in range(room.rows)
+                   if name in _wm_row_text(room, r)) >= 2
+    return False
+
+
+def _wm_bolt_cell(room, warden) -> tuple:
+    """The active podium's bolt — DERIVED from the warden entity (entities
+    ride row shifts), facing the aisle."""
+    side = 1 if warden.row < _dg._WM_AXIS else -1
+    return (warden.row + side, warden.col)
+
+
+def _wm_pressure(room, player, round_no: int) -> list:
+    """Pressure hook — deliberately empty at ship. Candidates (decide after
+    the framework plays): goblin trickle between rounds, echo aggression
+    during edit rounds, the Pathfinder's mega. Returns banner messages."""
+    return []
+
+
+def _warden_manifold_tick(room, player) -> list:
+    """The Stamping Press — the Warden Manifold's round machine.
+
+    The Warden is edit_immune and shelters in a podium niche; each round he
+    has STAMPED a ward. Breaking it (each keyed to one Act-IV verb — see
+    _wm_ward_broken) jams the press: the round's echoes gutter, his bolt
+    draws, and ONE x lands before he re-manifests at the next podium and
+    stamps again. Ward checks and the bolt are shift-proof; the round
+    counter (room._wm_round) is boss state and survives undo (Pathfinder
+    convention — undo across a stamp restores the text but not the round).
+    The antechamber ritual (four braziers → the gate) and the final seal
+    are text-derived and stateless."""
+    msgs = []
+
+    # ── the opening ritual: four flames, then the gate draws ──
+    braziers = getattr(room, '_wm_braziers', ())
+    if braziers:
+        def lit(r, c):
+            ru = room.char_run_at(r, c)
+            return ru is not None and ru.symbols[c - ru.col] == _dg._QM_FLAME
+        unlit = {rc for rc in braziers if not lit(*rc)}
+        for ru in [ru for ru in room.char_runs if ru.kind == 'pedestal']:
+            if (ru.row, ru.col) not in unlit:
+                room.remove_char_run(ru)
+        for (r, c) in unlit:
+            if room.is_passable(r, c) and room.char_run_at(r, c) is None:
+                room.add_char_run(CharRun(r, c, (_dg._QM_EMBERS,), 'pedestal'))
+        gr, gc = room._wm_gate
+        gate_open = room.cells[gr][gc] != CellType.WALL
+        if not unlit and not gate_open:
+            room.cells[gr][gc] = CellType.FLOOR
+            msgs.append('Four flames burn as one — the ritual gate draws open!')
+        elif unlit and gate_open and (player.row, player.col) != (gr, gc):
+            room.cells[gr][gc] = CellType.WALL
+
+    warden = next((e for e in room.entities
+                   if e.kind == 'warden' and e.alive), None)
+
+    # ── the press has fallen: every copy gutters, the seal draws ──
+    if warden is None:
+        for e in [e for e in room.entities if e.alive and e.kind == 'goblin']:
+            room.kill_entity(e)
+            room._on_entity_destroyed(e)
+        sr, sc = room._wm_seal
+        if room.cells[sr][sc] == CellType.WALL:
+            room.cells[sr][sc] = CellType.FLOOR
+            msgs.append('The press falls silent — every echo gutters out. '
+                        'The seal draws open.')
+        return msgs
+
+    # ── the round machine ──
+    rnd  = getattr(room, '_wm_round', 1)
+    hits = warden.max_hp - warden.hp
+    bolt = _wm_bolt_cell(room, warden)
+
+    if hits >= rnd:
+        # Struck — he re-manifests at the next podium and STAMPS.
+        if (player.row, player.col) not in (bolt, (warden.row, warden.col)):
+            room.cells[bolt[0]][bolt[1]] = CellType.WALL  # the old niche seals
+            # (never onto the player — striking from inside leaves it ajar)
+        room._wm_round = rnd + 1
+        nr, nc = _dg._WM_PODIUMS[rnd]                     # next podium (0-based)
+        room.move_entity(warden, nr, nc)                  # re-indexes _entity_map
+        srow, scol, text, kind = room._wm_stamps[rnd + 1]
+        c = scol
+        for piece in text.split(' '):
+            if piece:
+                room.add_char_run(CharRun(srow, c, tuple(piece), kind))
+            c += len(piece) + 1
+        for i, (er, ec) in enumerate(room._wm_echo_spawns.get(rnd + 1, ())):
+            # hp=1: one strike gutters a copy outright (strike_disguise unmasks
+            # AND decrements — at hp 1 the unmasking IS the death), so one D
+            # erases the whole rank like text.
+            room.add_entity(Entity(kind='goblin', row=er, col=ec,
+                                   hp=1, max_hp=1, tag='echo', shade=i % 8))
+        msgs.append(('The press SLAMS — he re-manifests across the hall '
+                     'and stamps a new ward!'))
+        msgs.extend(_wm_pressure(room, player, rnd + 1))
+    elif _wm_ward_broken(room, rnd):
+        # Staggered — echoes gutter, the bolt draws: the x window.
+        for e in [e for e in room.entities
+                  if e.alive and e.kind == 'goblin' and e.tag == 'echo']:
+            room.kill_entity(e)
+            room._on_entity_destroyed(e)
+        if room.cells[bolt[0]][bolt[1]] == CellType.WALL:
+            room.cells[bolt[0]][bolt[1]] = CellType.FLOOR
+            msgs.append('The ward breaks — the press JAMS. He staggers '
+                        'behind his podium: strike now!')
+    else:
+        # Mid-round (or an undo restored the ward): the niche stands sealed.
+        if room.cells[bolt[0]][bolt[1]] != CellType.WALL \
+                and (player.row, player.col) != bolt:
+            room.cells[bolt[0]][bolt[1]] = CellType.WALL
+    return msgs
+
+
 def _flame_paste_blocked(room, player, clip, before: bool, count: int) -> bool:
     """The Beacon Tiers' fuel rule — a deliberate exception to Vim paste:
     a CHARWISE paste may lay a flame only onto a brazier; anywhere else
@@ -1304,6 +1454,7 @@ _LEVEL_INTROS = {
     'cipher_cell':         ('The Cipher Cell — make each row read as its plaque: r mends a rune, D shears the rot.', 60),
     'quartermaster':       ('The Beacon Tiers — one flame remains. yl takes it without taking; P sets it on cold braziers (…); yy, a whole row.', 60),
     'echo_vault':          ('The Echo Vault — the same blight, stamped again and again. Mend one rune with r; then . repeats your last change.', 60),
+    'warden_manifold':     ('The Warden Manifold — he stamps himself into the world. Light the four braziers; the ritual gate will draw.', 70),
     'warden_surveyor':     ('The Warden Surveyor — survey his hall; w/b/e leap word to word, over the void.', 60),
     'dummy':               ('Sandbox — all mechanics active. Type :edit to enter editor mode.', 60),
     'archivists_library':  ("The Archivist's Library — the whole catalogue has spilled "
@@ -1354,6 +1505,9 @@ def _held_key(player):
 
 def _on_kill(ent, player, room=None, level: str = '') -> str:
     if ent.kind == 'warden':
+        if level == 'warden_manifold':
+            # No key here — the seal is drawn by the tick once the hall empties.
+            return 'The final stamp never falls. The Warden Manifold is undone.'
         # Every Warden drops the key to its keep's locked exit door (no auto-open).
         if room is not None:
             _drop_key(room, ent.row, ent.col)
@@ -1617,7 +1771,8 @@ def _enemy_tick(room, player) -> list:
                 room.move_entity(ent, 0, nc)
             continue
         dist = _manhattan(player.row, player.col, ent.row, ent.col)
-        if ent.kind == 'warden' and ent.tag not in ('surveyor', 'verse') and dist <= _ALERT_RADIUS:
+        if ent.kind == 'warden' and ent.tag not in ('surveyor', 'verse', 'manifold') \
+                and dist <= _ALERT_RADIUS:
             has_goblins = any(
                 e.alive and e.summoner_uid == ent.uid
                 for e in room._entity_by_kind.get('goblin', [])
@@ -3449,7 +3604,10 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
                     interacted = True
                     # The Surveyor uses its own two-phase visual/teleport AI
                     # (wired separately); it never leaps-and-summons like the Keep.
-                    if cur.kind == 'warden' and cur.hp > 0 and cur.tag not in ('surveyor', 'verse'):
+                    # The Manifold re-manifests via its own round machine — the
+                    # tick moves him to the next podium, never a random leap.
+                    if cur.kind == 'warden' and cur.hp > 0 \
+                            and cur.tag not in ('surveyor', 'verse', 'manifold'):
                         move_msg = _do_warden_move(room, cur, player)
                         if move_msg:
                             _push(move_msg)
@@ -4053,6 +4211,12 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
             if level == 'echo_vault':
                 for _ev_msg in _echo_vault_tick(room, player):
                     _push(_ev_msg)
+
+            # The Warden Manifold: the ritual gate, the round machine and the
+            # final seal (see _warden_manifold_tick).
+            if level == 'warden_manifold':
+                for _wm_msg in _warden_manifold_tick(room, player):
+                    _push(_wm_msg)
 
             # Warden summon message
             if tick_msgs and not player.is_dead:

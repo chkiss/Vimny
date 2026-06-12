@@ -296,190 +296,18 @@ and `tests/test_echo_vault.py`.
 
 ---
 
-## 22.1 — The Warden Manifold (Act IV Boss)
+## 22.1 — The Warden Manifold (BUILT — section deleted on implement)
 
-**Commands taught:** None new. Caps Act IV — all operator+motion grammar.
-Format: Multi-phase boss where each phase of the Warden is immune to all operators EXCEPT
-one specific operator∘motion pair. The player must recognize which pair is required per phase.
-
-**Phase 4 redesign:** The original Phase 4 (`yy + p`, two commands) violated the one-operator-
-per-phase invariant. It is now split into **two separate phases** — Phase 4 = `yy` (yank,
-captures the Warden), Phase 5 = `p` (paste, places the captured Warden into the trap). The
-boss is now 6 phases (previously 5). This preserves the yank+paste teaching from L20 while
-respecting the single-operator-per-phase principle.
-
-**CHALLENGE — `immune_to` / `phase` fields (engine):**
-`engine/world.py` `Entity` dataclass has no `immune_to` field and no `phase` field.
-The per-phase immunity system (the core boss mechanic) requires engine extension:
-- `immune_to: frozenset = field(default_factory=frozenset)` — operators that deal 0 damage.
-- `phase: int = 0` — current phase (1–6).
-Both fields are absent from the current codebase. This is a concrete implementation dependency
-that must be resolved before the boss is buildable. A human designer must approve the Entity
-schema change. Until then, Phase immunity is an unimplemented CHALLENGE.
-
-Additionally: Phase 6 (visual-mode delete) requires tagging "was this delete initiated from
-visual mode?" The engine's `apply_visual()` path vs non-visual `op_delete` path must expose
-a `source: str` parameter. This is also unimplemented.
-
----
-
-### Overview
-
-The Warden Manifold is a 6-phase boss fight. Each phase, the Warden's "shield" (displayed as
-a glyph around it) indicates the only operator∘motion that can damage it. Other operators
-bounce off (0 damage). Between phases, the Warden may summon minions (goblins) that the player
-must clear to expose the Warden again.
-
-The boss room is a single large arena (20 r × 60 c) with the Warden `W` at center, keystone `K`
-at a safe side alcove, and the exit `X` sealed until all 6 phases are complete.
-
----
-
-### Grid
-
-```
-############################################################
-#..........................................................#
-#..........................................................#
-#...K.......................................................#
-#..........................................................#
-#..........................................................#
-#.......................[ARENA CENTER]......................#
-#..........................................................W#  <- Warden spawns center-right
-#..........................................................#
-#..........................................................#
-#..........................................................#
-#..........................................................#
-#..........................................................#
-#..........................................................#
-#..........................................................#
-#..........................................................#
-#..........................................................#
-#..........................................................#
-#..........................................................#
-#..........X.............................................  #
-############################################################
-```
-
-**Dims:** 20 rows × 60 cols.
-- `@` at (1, 1).
-- `W` (Warden) spawns at (9, 50) for phase 1. Repositions per phase.
-- `K` (keystone) at (3, 3).
-- `X` (exit) at (19, 11) — sealed behind a boss_seal door until phase 6 complete.
-- Arena: open floor, rows 1–18, cols 1–58. No interior walls.
-
----
-
-### Phase Table
-
-| Phase | Warden Position | Required Operator∘Motion | Shield Glyph | Minions | Notes |
-|-------|----------------|--------------------------|--------------|---------|-------|
-| 1 | (9, 50) | `dw` | `∘W∘` | None | Warden surrounded by word-rune clusters; only `dw` penetrates |
-| 2 | (5, 30) | `d$` / `D` | `W→` | 3 goblins | Clear goblins first; then `D` or `d$` on Warden's row |
-| 3 | (14, 20) | `dd` | `══W` | None | Full-line delete targets Warden's entire row |
-| 4 | (9, 40) | `yy` | `⇅W` | 2 goblins | Yank the Warden's row; the yank "captures" it (damage trigger on yank-of-warden-row) |
-| 5 | (16, 35) | `p` | `W⇓` | None | Paste the captured row onto the pedestal; Warden "released" takes damage |
-| 6 | (9, 30) | `v {motion} d` | `[W]` | 4 goblins | Visual-select the Warden's cluster span, then delete |
-
-**Phase 4 detail (`yy`):** The Warden is immune to everything except `yy` in this phase.
-`op_yank` on the Warden's row (which contains a "capture rune" cluster adjacent to the Warden)
-triggers "phase 4 hit" — the yank captures the Warden into the register. Damage = 1. This
-requires a post-yank check: if the yanked row contains a Warden entity, deal phase damage.
-This is simpler than the old "paste-as-damage" mechanic.
-
-**Phase 5 detail (`p`):** Immediately after Phase 4, the register contains the captured row
-(with the Warden's capture rune). A "pedestal" zone is revealed at row 16, cols 20–40. The
-player must navigate to row 15 (one above the pedestal) and press `p` — paste places the
-capture rune onto the pedestal, dealing the final Phase 5 damage. Warden transitions to Phase 6.
-This is a new trigger type: post-paste check for capture-rune on pedestal zone.
-
-**Note:** Phases 4 and 5 together replace the original single Phase 4 (`yy p`). The invariant
-"one operator per phase" is now satisfied. Each phase has a single required command.
-
----
-
-### Phase Mechanics Detail
-
-**Phase 1 (`dw`):**
-- Warden surrounded by 4 rune clusters (N/S/E/W). Each cluster kind='ancient' (∘∘∘).
-- `dw` from a position where `w` lands on the Warden's col deals 1 damage.
-- Other operators deal 0 damage (immunity — CHALLENGE: requires `immune_to` on Entity).
-- Warden has 3 HP for phase 1. After 3 `dw` hits → phase 2.
-- Warden AI: slowly drifts toward player (ai='chase', ai_speed=3).
-
-**Phase 2 (`D` / `d$`):**
-- Warden moves to (5, 30). Three goblins at (9, 20), (9, 30), (9, 40).
-- Only end-of-line operator (`D` or `d$`) deals damage. Player must be on Warden's row,
-  cursor to Warden's left.
-- Warden has 2 HP. Goblins have 1 HP (killable with `dw` or `x`).
-- After goblins cleared and 2 `D` hits → phase 3.
-
-**Phase 3 (`dd`):**
-- Warden moves to (14, 20). Warden's row surrounded by walls above/below (rows 13, 15).
-  Only `dd` on row 14 hits.
-- Warden has 2 HP. After 2 `dd` hits → phase 4.
-- Between hits, Warden drifts along row 14 (oscillates cols 10–50).
-
-**Phase 4 (`yy`):**
-- Warden at (9, 40). Two goblins at (5, 20), (5, 40).
-- Warden's row (row 9) has a "capture rune" cluster adjacent to the Warden entity.
-- `yy` (yank row 9) triggers phase 4 hit if yanked row contains Warden entity → 1 damage.
-- Warden has 1 HP. After 1 `yy` hit → phase 5.
-- Goblins must be cleared first (they block the clear sightline to row 9).
-
-**Phase 5 (`p`):**
-- Warden at (16, 35). Register holds the captured row from Phase 4.
-- A pedestal platform (target zone) revealed at row 16, cols 20–40.
-- Player navigates to row 15, presses `p` — paste places capture rune on pedestal → 1 damage.
-- Warden has 1 HP. After 1 `p` hit → phase 6.
-
-**Phase 6 (`v {motion} d`):**
-- Warden at (9, 30). Four goblins at (6, 10), (6, 30), (13, 10), (13, 30).
-- Warden surrounded by a 3×3 rune cluster grid. Player must `v`, extend selection to include
-  the Warden entity's col, then `d` — visual-select-delete hits the Warden.
-- Warden has 3 HP. After 3 visual-delete hits → boss defeated.
-- Warden AI: random walk (ai='wander', speed 2).
-- On defeat: boss_seal door at (19, 10) opens → exit at (19, 11) accessible.
-
----
-
-### Par / Budget
-
-The boss fight does not use a strict par/budget — it is a combat encounter. Each phase has
-a "par hit sequence":
-
-| Phase | Optimal Hit Sequence | Keys (per hit × HP) |
-|-------|---------------------|---------------------|
-| 1 | `navigate + dw` × 3 | ~6 + 3×(nav+2) ≈ 18 |
-| 2 | `3×(dw goblin) + 2×(navigate to row 5 + D)` | ~24 |
-| 3 | `navigate to row 14 + dd` × 2 | ~10 |
-| 4 | `2×(dw goblin) + navigate + yy` | ~12 |
-| 5 | `navigate to row 15 + p` | ~8 |
-| 6 | `4×(dw goblin) + 3×(navigate + v span d)` | ~30 |
-| Total | — | ~102 |
-
-**Boss budget (relaxed):** 160 keystrokes (~1.57× par). The boss is a capstone challenge.
-
-**Forcing argument (per phase):**
-Each phase's immunity forces the player to use that phase's operator. The Warden's HP does not
-decrease from any other attack. Implementation requires `immune_to` / `phase` on Entity
-(see CHALLENGE).
-
-**Assumptions:**
-- CHALLENGE: `Entity` dataclass needs `immune_to: frozenset` and `phase: int` fields.
-- CHALLENGE: Phase 5's visual-delete immunity requires tagging delete source (`source='visual'`
-  parameter through `apply_visual()` → `op_delete`).
-- Phase 4 yank-as-damage: post-yank check in dungeon tick — if `op_yank` row contains Warden
-  entity, deal phase damage. New trigger type; implement as post-action check.
-- Phase 5 paste-as-damage: post-paste check — if pasted row's capture rune overlaps pedestal
-  zone, deal phase damage. New trigger type.
-- `Ctrl-R` scroll (from L21) may be found in a chest in the boss room's safe alcove.
-
-**Self-check:**
-- Boss caps Act IV? YES — all Act IV commands used across 6 phases.
-- Each phase: single operator∘motion? YES (Phase 4 = `yy`, Phase 5 = `p`, split correctly).
-- One-operator-per-phase invariant? YES — Phase 4/5 split resolves the original compound defect.
-- CHALLENGES recorded? YES: `immune_to`/`phase` on Entity; visual-source tagging.
+Built 2026-06-12 as display 21.1, "The Stamping Press". This draft's
+selective-immunity design (`immune_to`/`phase` Entity fields, visual-source
+tagging) was never built: the shipped boss uses the engine's real
+all-or-nothing `edit_immune` parry plus STRUCTURAL rounds — he stamps wards
+of text and copies of himself, each round keyed to one Act-IV verb
+(d{m} → r+. → D → yy+P), with an antechamber brazier ritual (yl + P, the
+fuel rule) gating entry, a mirrored hall (friezes, colonnade, four podium
+niches), and a pressure hook deliberately left quiet. See
+`generation/dungeon_gen.py::build_dungeon_warden_manifold`,
+`main._warden_manifold_tick` and `tests/test_warden_manifold.py`.
 
 ---
 
@@ -492,4 +320,4 @@ decrease from any other attack. Implementation requires `immune_to` / `phase` on
 | 20 | The Beacon Tiers (BUILT) | `y yy P` | 17 | 24 | Structural (fuel rule: flames paste only onto braziers) + 3P count-paste | Shipped 2026-06-11; see code/tests. |
 | 21 | (CANCELLED) The Undo Sanctum | — | — | — | u always-on; `<C-r>` via the 'redo' relic scroll | Cut 2026-06-11; token may return later. |
 | 22 | The Echo Vault (BUILT, display 21) | `.` echoed off `r` | 25 | 35 | Untypable warps (f/t// can't target); cuts break the plaque; register self-seal | Shipped 2026-06-11; see code/tests. |
-| 22.1 | The Warden Manifold | ALL Act IV (`dw d$ dd yy p v..d`) | ~102 | 160 (relaxed) | Per-phase immunity | CHALLENGE: `immune_to`/`phase` fields on Entity; visual-source tagging; Phase 4/5 split (yy then p). |
+| 22.1 | The Warden Manifold (BUILT, display 21.1) | ALL Act IV (`d{m} r+. D yy+P`, x windows) | — | 220 (relaxed) | Structural rounds + edit_immune parry (no immunity engine) | Shipped 2026-06-12; see code/tests. |
