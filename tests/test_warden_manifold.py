@@ -3,8 +3,9 @@
 He stamps himself into the world — wards of text, then copies of himself —
 and the player out-copies him with the act's own verbs. The Warden is
 edit_immune (every operator parries; the engine's real all-or-nothing shield)
-and shelters in a podium niche per round; breaking the round's ward jams the
-press (echoes gutter, his bolt draws) for exactly one x. Opening ritual: an
+and shelters in a podium niche per round — fogged shut, solid stone from the
+hall; breaking the round's ward jams the press (echoes gutter, his bolt draws,
+the fog parts and /W finds him at last) for exactly one x. Opening ritual: an
 antechamber where the eternal flame must be spread to four braziers (yl + P,
 the Beacon Tiers' fuel rule active) before the ritual gate draws.
 
@@ -29,6 +30,7 @@ from blessed import Terminal
 import main
 from engine.motion import apply_motion
 from engine.player import Player
+from engine.search import match_cells
 from engine.world import CellType, Entity
 from content.levels import known_commands
 from generation.dungeon_gen import (
@@ -265,6 +267,51 @@ def test_round3_one_D_erases_the_rank(seed, monkeypatch):
     assert main._wm_ward_broken(room, 3)
 
 
+# ── fog of war: the searchable Warden ─────────────────────────────────────────
+# All four podium niches start fogged (solid stone from the hall); the stagger
+# parts the fog on the active niche, and only a REVEALED Warden is searchable —
+# /W then jumps the player straight onto him for the strike. The search overlay
+# skips fogged entities (engine/search._line_string), so the niche is no
+# teleport leak while the bolt is shut.
+
+@pytest.mark.parametrize("seed", SEEDS)
+def test_niches_start_fogged_and_warden_unsearchable(seed):
+    room = _room(seed)
+    assert room.search_glyph_entities, "/W must work once he is revealed"
+    assert set(_WM_PODIUMS) <= room.fog_cells, "every niche reads as stone"
+    assert match_cells(room, 'W') == set(), "fog hides him from search"
+
+
+@pytest.mark.parametrize("seed", SEEDS)
+def test_warden_stays_fogged_while_the_ward_stands(seed, monkeypatch):
+    """Mid-round (ward intact): the fog holds and /W finds nothing — search
+    cannot shortcut the ward."""
+    dungeon = build_dungeon_warden_manifold(seed)
+    room = dungeon.rooms[0]
+    ritual = ('llyl' + '5k5lP' + '4j3lP' + 'jjP' + '4j3hP' + '5k4lll')
+    _drive(dungeon, ritual + 'kkll' + '/W\r', monkeypatch)
+    w = _warden(room)
+    assert (w.row, w.col) in room.fog_cells
+    assert match_cells(room, 'W') == set()
+    assert w.hp == 4, "no strike landed through the fog"
+
+
+@pytest.mark.parametrize("seed", SEEDS)
+def test_ward_break_parts_fog_and_W_jumps_the_strike(seed, monkeypatch):
+    """The stagger reveals him; /W teleports the player onto his cell and the
+    x lands. The spent niche stays revealed; the next stays fogged."""
+    dungeon = build_dungeon_warden_manifold(seed)
+    room = dungeon.rooms[0]
+    ritual = ('llyl' + '5k5lP' + '4j3lP' + 'jjP' + '4j3hP' + '5k4lll')
+    r1 = 'kk' + 'll' + 'de' + 'j6lk' + 'de' + 'j5lk' + 'de'
+    _drive(dungeon, ritual + r1 + '/W\r' + 'x', monkeypatch)
+    w = _warden(room)
+    assert w.hp == 3 and (w.row, w.col) == _WM_PODIUMS[1]
+    assert _WM_PODIUMS[0] not in room.fog_cells, "the spent niche stays open"
+    assert _WM_PODIUMS[1] in room.fog_cells, "the next niche reads as stone"
+    assert match_cells(room, 'W') == set(), "re-manifested, he is hidden again"
+
+
 # ── the full fight ────────────────────────────────────────────────────────────
 
 @pytest.mark.parametrize("seed", SEEDS)
@@ -285,7 +332,7 @@ def test_full_fight_wins(seed, monkeypatch):
 def test_curriculum_guard():
     """The boss teaches nothing; everything it demands is already known."""
     known = set(known_commands('warden_manifold'))
-    for needed in ('d', 'D', 'r', 'dot', 'y', 'P', 'p', 'count', '$', 'G'):
+    for needed in ('d', 'D', 'r', 'dot', 'y', 'P', 'p', 'count', '$', 'G', '/'):
         assert needed in known
     for absent in ('insert', 'c', 's', 'R', 'subst'):
         assert absent not in known

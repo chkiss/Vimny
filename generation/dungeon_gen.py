@@ -6485,6 +6485,15 @@ def build_dungeon_warden_manifold(seed: int) -> Dungeon:
     room = Room(room_type=RoomType.ENTRY, rows=R, cols=C)
     room.cells = cells
     room.seed  = seed
+    # Each podium niche is fogged shut — from the hall it reads as solid stone.
+    # The tick parts the fog when that niche's bolt draws (the x-window): only a
+    # REVEALED Warden is searchable, so /W is dead until the ward breaks, then
+    # jumps the player straight onto him for the strike (x lands at one's own
+    # cell). The search overlay skips fogged entities, so during rounds 3-4 /W
+    # finds only the impostor echoes loose in the hall. Fog is never re-laid:
+    # the player may be standing in a spent niche (fog is impassable).
+    room.search_glyph_entities = True
+    room.fog_cells.update(_WM_PODIUMS)
 
     def lay(row, col, text, kind):
         c = col

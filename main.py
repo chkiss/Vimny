@@ -1242,7 +1242,10 @@ def _warden_manifold_tick(room, player) -> list:
     The Warden is edit_immune and shelters in a podium niche; each round he
     has STAMPED a ward. Breaking it (each keyed to one Act-IV verb — see
     _wm_ward_broken) jams the press: the round's echoes gutter, his bolt
-    draws, and ONE x lands before he re-manifests at the next podium and
+    draws, the niche FOG parts (all four niches start fogged — solid stone
+    from the hall — so /W finds him only while he is revealed and staggered;
+    fog is never re-laid, a spent niche may hold the player), and ONE x
+    lands before he re-manifests at the next podium and
     stamps again. Ward checks and the bolt are shift-proof; the round
     counter (room._wm_round) is boss state and survives undo (Pathfinder
     convention — undo across a stamp restores the text but not the round).
@@ -1315,15 +1318,18 @@ def _warden_manifold_tick(room, player) -> list:
                      'and stamps a new ward!'))
         msgs.extend(_wm_pressure(room, player, rnd + 1))
     elif _wm_ward_broken(room, rnd):
-        # Staggered — echoes gutter, the bolt draws: the x window.
+        # Staggered — echoes gutter, the bolt draws, the niche fog parts: the
+        # x window. A revealed Warden is searchable, so /W now jumps the
+        # player straight onto him (idempotent discard — derived, shift-proof).
+        room.fog_cells.discard((warden.row, warden.col))
         for e in [e for e in room.entities
                   if e.alive and e.kind == 'goblin' and e.tag == 'echo']:
             room.kill_entity(e)
             room._on_entity_destroyed(e)
         if room.cells[bolt[0]][bolt[1]] == CellType.WALL:
             room.cells[bolt[0]][bolt[1]] = CellType.FLOOR
-            msgs.append('The ward breaks — the press JAMS. He staggers '
-                        'behind his podium: strike now!')
+            msgs.append('The ward breaks — the press JAMS. The fog in his '
+                        'niche parts: strike now!')
     else:
         # Mid-round (or an undo restored the ward): the niche stands sealed.
         if room.cells[bolt[0]][bolt[1]] != CellType.WALL \

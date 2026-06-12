@@ -34,14 +34,17 @@ def _line_string(room, row: int):
     '/foo bar' across two words). All kinds are included (void glyphs are searchable
     text, as before). base_col maps an offset back to an absolute column.
 
-    On a ``room.search_glyph_entities`` room (The Warden Pathfinder), entity glyphs
-    are overlaid too — so ``/W`` finds the Warden and its echoes wherever they leap.
+    On a ``room.search_glyph_entities`` room (The Warden Pathfinder, The Warden
+    Manifold), entity glyphs are overlaid too — so ``/W`` finds the Warden and its
+    echoes wherever they leap. A FOGGED entity is skipped: the renderer draws blank
+    stone there, and what you cannot see you cannot search (the Manifold's niched
+    boss is unsearchable until his bolt draws and the fog parts).
     Default off: shipped levels search the char-run layer only (par stays identical)."""
     runs = room._char_runs_by_row.get(row, [])
     glyphs = []
     if getattr(room, 'search_glyph_entities', False):
         for e in room.entities:
-            if e.alive and e.row == row:
+            if e.alive and e.row == row and (e.row, e.col) not in room.fog_cells:
                 g = entity_letter(e)             # shared map (engine.world) — same letters as f/t + render
                 if g is not None:
                     glyphs.append((e.col, g))
