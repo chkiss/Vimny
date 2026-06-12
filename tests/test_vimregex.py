@@ -3,7 +3,7 @@ in engine/search.py. Verifies the atoms the scrolls teach, plus backward
 compatibility: a plain word still behaves like a literal substring search."""
 from engine.vimregex import compile_vim
 from engine.search import _match_positions, find_next, match_cells
-from engine.world import Room, CharRun, RoomType
+from engine.world import Room, CharRun, RoomType, CellType
 
 
 def _first(pattern, s):
@@ -92,6 +92,9 @@ def test_plain_word_is_literal():
 # ── integration with the grid matcher ──────────────────────────────────────
 def _room_with(runs):
     room = Room(room_type=RoomType.ENTRY, rows=10, cols=40)
+    # All-floor grid: search landings are passable-filtered (a match starting
+    # on an impassable cell is not a landing), so the scaffold needs real cells.
+    room.cells = [[CellType.FLOOR] * 40 for _ in range(10)]
     for (r, c, text) in runs:
         room.add_char_run(CharRun(r, c, tuple(text), 'ancient'))
     room.rebuild_indexes()

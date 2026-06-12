@@ -6757,7 +6757,11 @@ def build_dungeon_inscription_halls(seed: int) -> Dungeon:
         _IH_FORD_WORD, 'verdant')                            # ford plaque, south border
 
     room._ih_bolts = tuple(bolts)
-    room._ih_seal  = (_IH_FORD_WORD, _IH_SEAL)
+    # The seal answers only to the FINISHED HALLS: all four lesson words AND
+    # the bridge-word. Teleport motions may hop the bank gates (/, ), G — all
+    # passability-filtered, but the jetties are passable rows); nothing opens
+    # the way out except every inscription (teleport + walking audit).
+    room._ih_seal = ((*[w for (w, _m, _f) in lessons], _IH_FORD_WORD), _IH_SEAL)
 
     room.entities.append(Entity(kind='exit', row=_IH_EXIT[0], col=_IH_EXIT[1],
                                 edit_immune=True))

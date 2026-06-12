@@ -216,6 +216,104 @@ def test_line_jumps_never_cross_the_river(seed):
         assert (p.row, p.col) != _IH_EXIT
 
 
+def _reachable(room):
+    seen, q = {room.spawn_pos}, deque([room.spawn_pos])
+    while q:
+        r, c = q.popleft()
+        for dr, dc in ((0, 1), (0, -1), (1, 0), (-1, 0)):
+            nb = (r + dr, c + dc)
+            if nb not in seen and room.is_passable(*nb):
+                seen.add(nb)
+                q.append(nb)
+    return seen
+
+
+@pytest.mark.parametrize("seed", SEEDS)
+def test_every_known_motion_lands_passable_and_west(seed):
+    """The pressure sweep: every motion known by display 22, applied from
+    every passable cell, must land somewhere the engine accounts for —
+    a passable cell WEST of the river, or a WATER cell (the drown trap:
+    the main loop damages and bounces the player, the Bracket Vaults rule,
+    so $ on a jetty dunks you — punished, not a leak). Landing in a WALL
+    or on floor east of the river is the `)`-cheese class: a bug."""
+    room = build_dungeon_inscription_halls(seed).rooms[0]    # private (mutating)
+    # every cell a player could ever occupy: passable and west of the river
+    # (the exit pocket is passable but sealed — no motion reaches it, as the
+    # other access tests prove)
+    spots = {(r, c) for r in range(room.rows) for c in range(room.cols)
+             if room.is_passable(r, c) and c <= _IH_BANK}
+    targets = sorted({sym for ru in room.char_runs for sym in ru.symbols})
+    motions = ([(m, 1, False) for m in
+                ('h', 'j', 'k', 'l', 'w', 'b', 'e', 'W', 'B', 'E', 'ge', 'gE',
+                 '0', '^', '$', '(', ')', '{', '}', '%', 'G', 'gg',
+                 'H', 'M', 'L')]
+               + [(m, n, True) for m in ('h', 'j', 'k', 'l', 'w', 'e', 'G')
+                  for n in (2, 5, 9)])
+
+    def ok(p, what):
+        on_water = room.cells[p.row][p.col] == CellType.WATER
+        assert room.is_passable(p.row, p.col) or on_water, \
+            f"{what} landed in a wall at {(p.row, p.col)}"
+        if not on_water:                       # water landings drown + bounce
+            assert p.col <= _IH_BANK, \
+                f"{what} crossed the river to {(p.row, p.col)}"
+
+    for (r0, c0) in sorted(spots):
+        for motion, count, count_given in motions:
+            p = Player(row=r0, col=c0)
+            apply_motion(p, motion, count, room, count_given=count_given)
+            ok(p, f"{motion} from {(r0, c0)}")
+        for tgt in targets:
+            for fm in ('f', 'F', 't', 'T'):
+                p = Player(row=r0, col=c0)
+                apply_motion(p, fm, 1, room, target=tgt)
+                ok(p, f"{fm}{tgt} from {(r0, c0)}")
+
+
+@pytest.mark.parametrize("seed", SEEDS)
+def test_search_skips_the_walled_plaques(seed):
+    """/word, with the word standing only on the plaque (a wall band), finds
+    nothing — a match you cannot stand on is not a landing. Fragments on the
+    floor stay searchable."""
+    from engine.search import find_next
+    room = _room(seed)
+    p = Player(row=room.spawn_pos[0], col=room.spawn_pos[1])
+    for word, _gate in room._ih_bolts:
+        assert find_next(room, p, word, True) is None, \
+            "the plaque word must not be a search landing"
+    frag = ''.join(room.char_run_at(_IH_LESSON_ROWS[0], _IH_I_HEAD).symbols)
+    dest = find_next(room, p, frag, True)
+    assert dest is not None and room.is_passable(*dest)
+
+
+@pytest.mark.parametrize("seed", SEEDS)
+def test_teleport_ahead_cannot_win(seed, monkeypatch):
+    """The cheese that shipped: hop to the ford (bare G, or ) before the
+    landing filter), bridge it with 'agate' — the seal must hold until every
+    lesson word is written."""
+    dungeon = build_dungeon_inscription_halls(seed)
+    room = dungeon.rooms[0]
+    keys = ([Keystroke('G'), Keystroke('4'), Keystroke('l'), Keystroke('a')]
+            + [Keystroke(ch) for ch in 'gate'] + [ESC]
+            + [Keystroke(ch) for ch in 'lll'])
+    res = _drive(dungeon, keys, monkeypatch)
+    assert not res['won'], "the ford alone must never win"
+    assert room.cells[_IH_SEAL[0]][_IH_SEAL[1]] == CellType.WALL, \
+        "the seal answers only to the finished halls"
+    assert _IH_FORD_WORD in main._ih_floor_text(room, _IH_FORD_ROW), \
+        "(the bridge itself was honestly built)"
+
+    # sentence-hopping spam + the bridge: same answer
+    dungeon = build_dungeon_inscription_halls(seed)
+    room = dungeon.rooms[0]
+    keys = ([Keystroke(')')] * 10 + [Keystroke('$'), Keystroke('a')]
+            + [Keystroke(ch) for ch in 'gate'] + [ESC]
+            + [Keystroke(ch) for ch in 'lll'])
+    res = _drive(dungeon, keys, monkeypatch)
+    assert not res['won']
+    assert room.cells[_IH_SEAL[0]][_IH_SEAL[1]] == CellType.WALL
+
+
 # ── the lessons, driven for real ──────────────────────────────────────────────
 
 @pytest.mark.parametrize("seed", SEEDS)

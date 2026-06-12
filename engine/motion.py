@@ -332,6 +332,7 @@ def _sentence_starts_all(room) -> list:
 
 def apply_motion(player, motion, count, room, target=None, count_given: bool = True, game_h: int = 0):
     moved = False
+    _start = (player.row, player.col)     # word-motion landing guard (see return)
     for _ in range(count):
         if motion == 'h':
             moved |= move_player(player, 0, -1, room)
@@ -685,7 +686,12 @@ def apply_motion(player, motion, count, room, target=None, count_given: bool = T
         elif motion in ('(', ')'):
             # Sentence jump (buffer-wide): the next/previous sentence start
             # anywhere in the buffer — Vim-faithful, since sentences span lines.
-            starts = _sentence_starts_all(room)
+            # Only PASSABLE starts are landings: a plaque word sealed in a
+            # wall (or text across water/fog) begins a sentence the cursor
+            # can never stand on — without this filter, ) hopped the player
+            # into walls and straight past the Inscription Halls' bank gates.
+            starts = [s for s in _sentence_starts_all(room)
+                      if room.is_passable(*s)]
             cur = (player.row, player.col)
             if motion == ')':
                 nxt = [s for s in starts if s > cur]
@@ -716,6 +722,16 @@ def apply_motion(player, motion, count, room, target=None, count_given: bool = T
                 m, tgt = player.last_f
                 rev = {'f': 'F', 'F': 'f', 't': 'T', 'T': 't'}[m]
                 moved |= _apply_find(player, rev, tgt, room)
+    if moved and motion in ('w', 'b', 'e', 'W', 'B', 'E', 'ge', 'gE') \
+            and not room.is_passable(player.row, player.col):
+        # Word-motion landing guard: the scan helpers stop at walls, but the
+        # IN-WORD edge moves (b/B to a word's start, e/E to its end) walk the
+        # run itself — and a run may straddle floor and wall (the Inscription
+        # Halls' plaque crossing the promenade gap let B step INTO the wall
+        # band). A landing the cursor cannot stand on fails the whole motion
+        # (same rule as f/t, line jumps, search and the sentence jumps).
+        player.row, player.col = _start
+        moved = False
     return moved
 
 

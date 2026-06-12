@@ -64,14 +64,16 @@ def _line_string(room, row: int):
 def _match_positions(room, pattern: str) -> list:
     """All (row, col) match starts of `pattern`, matched per LINE (so a pattern may
     span consecutive runs and the same line may yield several matches), sorted in
-    reading order. A match STARTING in fog is skipped — the search jump lands the
-    cursor on the match start, fog is impassable, and what you cannot see you
-    cannot search (line jumps already skip fog via `is_passable`)."""
+    reading order. A match starting on an IMPASSABLE cell is skipped — the
+    search jump lands the cursor on the match start, and a cell you cannot
+    stand on is not a landing (fog, walls, water alike: plaque words sealed
+    in wall bands used to teleport the player INTO the wall and past closed
+    bolts). Same rule as line jumps (`_first_non_blank_col`) and `)`/`(`."""
     out = []
     for row in range(room.rows):
         s, base = _line_string(room, row)
         for start, _end in _spans(s, pattern):
-            if (row, base + start) not in room.fog_cells:
+            if room.is_passable(row, base + start):
                 out.append((row, base + start))
     out.sort()
     return out

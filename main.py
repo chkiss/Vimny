@@ -1232,31 +1232,41 @@ def _ih_floor_text(room, r: int) -> str:
 def _inscription_halls_tick(room, player) -> list:
     """The riverbank gates — the plaque rule, fourth member (Cipher mended,
     Beacon copied, Echo repeated, the Halls AUTHOR): each bank bolt stands
-    open while its lesson's word reads WHOLE somewhere on the floor, and the
-    ford seal while a floor row reads the bridge-word. Whole-row substring
-    scans on floor text only (shift-proof; plaques live in walls and never
-    count). STATELESS, hence undo-safe (the vault-tick principle): undoing
-    an inscription re-bars its gate."""
+    open while its lesson's word reads WHOLE somewhere on the floor; the
+    ford seal only while EVERY word does (the four lessons + the bridge —
+    teleport motions can hop the bank gates, but nothing wins unfinished).
+    Whole-row substring scans on floor text only (shift-proof; plaques live
+    in walls and never count). STATELESS, hence undo-safe (the vault-tick
+    principle): undoing an inscription re-bars its gate."""
     msgs = []
     floor_rows = [_ih_floor_text(room, r) for r in range(room.rows)]
 
     def written(word):
         return any(word in t for t in floor_rows)
 
-    gates = list(getattr(room, '_ih_bolts', ()))
-    if hasattr(room, '_ih_seal'):
-        gates.append(room._ih_seal)
-    for word, (gr, gc) in gates:
+    for word, (gr, gc) in getattr(room, '_ih_bolts', ()):
         is_open = room.cells[gr][gc] != CellType.WALL
         if written(word) and not is_open:
             room.cells[gr][gc] = CellType.FLOOR
-            if (gr, gc) == room._ih_seal[1]:
-                msgs.append('The river gives way before the written word — '
-                            'the seal draws open!')
-            else:
-                msgs.append('The word stands whole — the bank gate grinds open!')
+            msgs.append('The word stands whole — the bank gate grinds open!')
         elif not written(word) and is_open and (player.row, player.col) != (gr, gc):
             room.cells[gr][gc] = CellType.WALL     # undone — the gate re-bars
+
+    seal_words, (sr, sc) = room._ih_seal
+    all_written = all(written(w) for w in seal_words)
+    seal_open = room.cells[sr][sc] != CellType.WALL
+    if all_written and not seal_open:
+        room.cells[sr][sc] = CellType.FLOOR
+        msgs.append('Every word stands whole — the river yields, and the '
+                    'seal draws open!')
+    elif not all_written and seal_open and (player.row, player.col) != (sr, sc):
+        room.cells[sr][sc] = CellType.WALL
+    elif not all_written and written(seal_words[-1]) \
+            and player.row == sr and player.col > _dg._IH_BANK:
+        # standing on the dried ford with the bridge written but lessons
+        # unfinished — say why the way out still holds
+        msgs.append('The bridge holds — but the unfinished words upstream '
+                    'hold the seal.')
     return msgs
 
 
