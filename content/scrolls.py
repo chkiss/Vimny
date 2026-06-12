@@ -100,7 +100,9 @@ SETTERS_HAND_SCROLL = {
 
 # Dropped by the Warden Pathfinder — every row previews the OPERATOR act
 # ahead of it (d at the Operator's Vault, r at the Cipher Cell, y at the
-# Beacon Tiers, . at the Echo Vault, s/c at the Change Annex).
+# Beacon Tiers, . at the Echo Vault, s/c at the Change Annex). The closing
+# wisdom absorbed the retired Archivist's Method scroll, whose yank rows
+# duplicated this codex.
 OPERATOR_CODEX_SCROLL = {
     'title': "◈   The Operator's Codex   ◈",
     'lines': [
@@ -114,25 +116,7 @@ OPERATOR_CODEX_SCROLL = {
         ('smudge', 'c{m}', 'ch', 'ange text (del + insert)',   'c'),
         ('smudge', '.   ', 'r',  'epeat the last change',      'dot'),
         ('blank',),
-        ('amber',  '  "  holds what you cut.  Something awaits.'),
-    ],
-}
-
-# A RELIC now (any unassigned chest may drop it): the copyists' wisdom,
-# smudged until yank is learned — found early it reads as prophecy, after
-# the Beacon Tiers as method. It used to drop from the Warden Manifold,
-# which was backwards: that boss VALIDATES yank, and a boss scroll previews
-# the act AHEAD (the Inscriber's Hand below does that now).
-ARCHIVISTS_METHOD_SCROLL = {
-    'title': "◈   The Archivist's Method   ◈",
-    'lines': [
-        ('dim',    '  The Archivist copied before erasing. Wise.'),
-        ('blank',),
-        ('smudge', 'y{m}', 'y', 'ank (copy without cutting)', 'y'),
-        ('smudge', 'yy  ', 'y', 'ank the whole line',         'y'),
-        ('smudge', 'p   ', 'p', 'ut after the cursor',        'p'),
-        ('blank',),
-        ('amber',  '  d and y share the same register.'),
+        ('amber',  '  d and y share one register: "'),
         ('dim',    '  Paste before deleting — or lose your copy.'),
     ],
 }
@@ -468,14 +452,6 @@ SCROLL_CATALOG = [
     # flourish that can't beat a level's par (see design notes). id == the
     # gating token where the scroll grants a new command.
     {
-        'id':         'y_op',
-        'title':      "The Archivist's Method",
-        'dropped_by': "An archivist's satchel",
-        'level_slug': 'quartermaster',
-        'level_name': 'The Beacon Tiers',
-        'content':    ARCHIVISTS_METHOD_SCROLL,
-    },
-    {
         'id':         'set_more',
         'title':      "The Setter's Hand",
         'dropped_by': 'A surveyor’s satchel',
@@ -588,7 +564,7 @@ SCROLL_CATALOG = [
 # progress['extras'] and injected into player.known_commands, so name it to
 # match the token your command_guard / handler checks (e.g. 'jump', 'col_motion').
 RELIC_SCROLL_IDS = [
-    'set_more', 'y_op',
+    'set_more',
     'regex_classes', 'regex_anchors', 'regex_quant', 'regex_collections', 'regex_magic',
     'searchcraft', 'jump', 'redo', 'col_motion', 'ins_paste', 'ins_edit',
 ]

@@ -3,14 +3,14 @@
 He stamps himself into the world — wards of text, then copies of himself —
 and the player out-copies him with the act's own verbs. The Warden is
 edit_immune (every operator parries; the engine's real all-or-nothing shield)
-and shelters in a FOGGED podium niche per round; breaking the round's ward
-jams the press (copies gutter, his bolt draws, his fog parts and /W finds him
-at last) for exactly one x. Opening ritual: an antechamber where the eternal
+and shelters in a FOGGED podium niche behind each of his four WARDS in turn;
+breaking the ward jams the press (copies gutter, his bolt draws, his fog
+parts and /W finds him at last) for exactly one x. Opening ritual: an antechamber where the eternal
 flame must be spread to four braziers (yl + P, the Beacon Tiers' fuel rule
 active) — the gate draws AND the grand hall's fog parts. The whole hall is
 fogged until then: no jump (H/G{n}/gg/M/L), walk, or search enters early.
 
-Round → verb (see main._wm_ward_broken for the shift-proof checks):
+Ward → verb (see main._wm_ward_broken for the shift-proof checks):
   1  d{m}   three warding words that SAY what they are (lock, tomb, veil…);
             a wall post pins the reflow after each word and CRUMBLES when
             its word is cut
@@ -20,9 +20,10 @@ Round → verb (see main._wm_ward_broken for the shift-proof checks):
   3  D      a rot-tail with a rank of REAL Wardens standing on it; once the
             rot is half-cut, every keystroke DOUBLES the rank — one D or a
             flood
-  4  yy+pp  his flame row stamped LIT (🜂🜂🜂 at 10,44..46); yank the LINE
-            and paste twice — three flame rows, the 3×3 grid (the fuel rule
-            locks charwise flames to braziers, so only HIS row can copy)
+  4  yy+pp  his flame row stamped LIT — 🜂🜂🜂 at ruler (10,44)..(10,46),
+            grid (11,45..47); yank the LINE and paste twice — three flame
+            rows, the 3×3 grid (the fuel rule locks charwise flames to
+            braziers, so only HIS row can copy)
 
 After the press falls the seal draws and the treasure pocket's fog parts:
 a 3×2 vault behind the seal — exit center-west, heart container above,
@@ -66,7 +67,7 @@ def _room(seed):
 
 
 def _warden(room):
-    """The true Warden — tag='manifold' (round 3 floods the hall with
+    """The true Warden — tag='manifold' (ward 3 floods the hall with
     kind='warden' tag='stamp' copies, so kind alone is ambiguous)."""
     return next((e for e in room.entities
                  if e.kind == 'warden' and e.tag == 'manifold' and e.alive),
@@ -83,7 +84,7 @@ _STRIKE = '/W\rx'    # the search-jump strike: /W lands ON him, x at one's cell
 _RITUAL = 'llyl' + '5k5lP' + '4j3lP' + 'jjP' + '4j3hP' + '5k4lll'
 _R1     = 'kklldewdewde'                 # three cuts; posts crumble between
 _R3     = '7j0D'                         # one stroke — rot and rank together
-_R4     = '3kyypp'                       # yank his flame row, paste it twice
+_R4     = '2kyypp'                       # yank his flame row, paste it twice
 _LOOT   = '7k16l' + 'l' + 'lkx' + '2jx'  # seal → exit (win) → heart → chest
                                          # (7k: two pasted rows shifted him down)
 
@@ -131,7 +132,7 @@ def test_dimensions_and_anchors(seed):
     assert w is not None and (w.row, w.col) == _WM_PODIUMS[0]
     assert w.edit_immune, "every operator must parry on the boss"
     assert w.tag == 'manifold', "exempts auto-summon AND the post-x random leap"
-    assert w.max_hp == 4, "one x-window per round"
+    assert w.max_hp == 4, "one x-window per ward"
     assert room.cells[_WM_SEAL[0]][_WM_SEAL[1]] == CellType.WALL
     assert room.cells[_WM_GATE[0]][_WM_GATE[1]] == CellType.WALL
 
@@ -154,7 +155,7 @@ def test_hall_is_mirrored_about_the_aisle(seed):
 @pytest.mark.parametrize("seed", SEEDS)
 def test_no_columns_no_hall_hearts_no_guards(seed):
     """The redesign strips the colonnade, the mid-hall hearts, and the R1
-    guards: the warding words alone carry round 1."""
+    guards: the warding words alone carry ward 1."""
     room = _room(seed)
     assert not [ru for ru in room.char_runs if '║' in ru.symbols]
     hearts = [e for e in room.entities if e.kind == 'heart_container']
@@ -293,7 +294,7 @@ def test_flame_paste_blocked_off_brazier():
         "no charwise flame on his stamp cells — the grid must be linewise"
 
 
-# ── the round machine ─────────────────────────────────────────────────────────
+# ── the ward machine ──────────────────────────────────────────────────────────
 
 @pytest.mark.parametrize("seed", SEEDS)
 def test_operators_parry_on_the_warden(seed):
@@ -309,7 +310,7 @@ def test_operators_parry_on_the_warden(seed):
 
 
 @pytest.mark.parametrize("seed", SEEDS)
-def test_round1_posts_crumble_word_by_word(seed, monkeypatch):
+def test_ward1_posts_crumble_word_by_word(seed, monkeypatch):
     """Cut word 1 → its post falls; the next still stands. All three cuts
     break the ward; /W jumps the strike."""
     dungeon = build_dungeon_warden_manifold(seed)
@@ -325,7 +326,7 @@ def test_round1_posts_crumble_word_by_word(seed, monkeypatch):
     assert all(room.cells[row][p] == CellType.FLOOR for p in _WM_WARD1_POSTS)
     w = _warden(room)
     assert w.hp == 3 and (w.row, w.col) == _WM_PODIUMS[1]
-    assert room._wm_round == 2
+    assert room._wm_ward == 2
     assert room.entity_at(w.row, w.col) is w, "move_entity must re-index the map"
     assert _WM_PODIUMS[0] not in room.fog_cells, "the spent niche stays open"
     assert _WM_PODIUMS[1] in room.fog_cells, "the next niche reads as stone"
@@ -333,19 +334,17 @@ def test_round1_posts_crumble_word_by_word(seed, monkeypatch):
 
 
 @pytest.mark.parametrize("seed", SEEDS)
-def test_round2_solve_strike_within_the_window(seed, monkeypatch):
+def test_ward2_solve_strike_within_the_window(seed, monkeypatch):
     dungeon = build_dungeon_warden_manifold(seed)
     room = dungeon.rooms[0]
     _drive(dungeon, _RITUAL + _R1 + _STRIKE + _r2(room) + _STRIKE, monkeypatch)
     w = _warden(room)
     assert w.hp == 2 and (w.row, w.col) == _WM_PODIUMS[2]
-    word2 = room._wm_word2
-    assert not main._wm_ward_broken(room, 2) or True   # round is past; ward moot
-    assert room._wm_round == 3
+    assert room._wm_ward == 3
 
 
 @pytest.mark.parametrize("seed", SEEDS)
-def test_round2_mends_recorrupt_after_the_window(seed, monkeypatch):
+def test_ward2_mends_recorrupt_after_the_window(seed, monkeypatch):
     """Solve, then waste _WM_WARD2_WINDOW keystrokes: the stamps re-warp, the
     bolt re-bars, and his fog is re-laid (no /W into a sealed niche)."""
     dungeon = build_dungeon_warden_manifold(seed)
@@ -362,7 +361,7 @@ def test_round2_mends_recorrupt_after_the_window(seed, monkeypatch):
 
 
 @pytest.mark.parametrize("seed", SEEDS)
-def test_round2_recorrupted_stamps_can_be_resolved(seed, monkeypatch):
+def test_ward2_recorrupted_stamps_can_be_resolved(seed, monkeypatch):
     """After a re-corruption the same r + dots rhythm works again: line
     start, w onto the first warp (the warding words are long gone, so the
     stamps are the row's only words), mend, dots, strike."""
@@ -377,7 +376,7 @@ def test_round2_recorrupted_stamps_can_be_resolved(seed, monkeypatch):
 
 
 @pytest.mark.parametrize("seed", SEEDS)
-def test_round3_rank_is_real_wardens(seed, monkeypatch):
+def test_ward3_rank_is_real_wardens(seed, monkeypatch):
     dungeon = build_dungeon_warden_manifold(seed)
     room = dungeon.rooms[0]
     _drive(dungeon, _RITUAL + _R1 + _STRIKE + _r2(room) + _STRIKE, monkeypatch)
@@ -388,7 +387,7 @@ def test_round3_rank_is_real_wardens(seed, monkeypatch):
 
 
 @pytest.mark.parametrize("seed", SEEDS)
-def test_round3_partial_cut_doubles_per_keystroke(seed, monkeypatch):
+def test_ward3_partial_cut_doubles_per_keystroke(seed, monkeypatch):
     """x one rot char, then two keystrokes: 4 → 8 → 16. The flood is the
     punishment; D is the lesson."""
     dungeon = build_dungeon_warden_manifold(seed)
@@ -399,7 +398,7 @@ def test_round3_partial_cut_doubles_per_keystroke(seed, monkeypatch):
 
 
 @pytest.mark.parametrize("seed", SEEDS)
-def test_round3_one_D_shears_rot_and_rank(seed, monkeypatch):
+def test_ward3_one_D_shears_rot_and_rank(seed, monkeypatch):
     """The signature stroke: one D takes the rot and every Warden standing
     on it; the stagger gutters any copy left and no doubling ever primes."""
     dungeon = build_dungeon_warden_manifold(seed)
@@ -413,15 +412,15 @@ def test_round3_one_D_shears_rot_and_rank(seed, monkeypatch):
 
 
 @pytest.mark.parametrize("seed", SEEDS)
-def test_round4_flame_row_and_the_linewise_finale(seed, monkeypatch):
-    """Round 4 stamps his flame row LIT (🜂🜂🜂 at 10,44..46); yy + p + p
+def test_ward4_flame_row_and_the_linewise_finale(seed, monkeypatch):
+    """Ward 4 stamps his flame row LIT (🜂🜂🜂 at ruler 10,44..46); yy + p + p
     copies it into the 3×3 grid (real rows — he and his fog ride the
     shift) and the ward breaks."""
     dungeon = build_dungeon_warden_manifold(seed)
     room = dungeon.rooms[0]
     pre = _RITUAL + _R1 + _STRIKE + _r2(room) + _STRIKE + _R3 + _STRIKE
     _drive(dungeon, pre, monkeypatch)
-    assert room._wm_round == 4
+    assert room._wm_ward == 4
     assert any(ru.kind == 'flame' and (ru.row, ru.col) == _WM_WARD4
                and len(ru.symbols) == 3 for ru in room.char_runs), \
         "his flame row stamps LIT"
@@ -442,12 +441,12 @@ def test_round4_flame_row_and_the_linewise_finale(seed, monkeypatch):
 
 
 @pytest.mark.parametrize("seed", SEEDS)
-def test_undo_rewinds_the_round_with_the_world(seed, monkeypatch):
-    """Undoing the round-2 strike restores his HP, his podium AND the round
-    counter — so the next strike re-runs round 3 (the rot re-stamps), never
-    skipping ahead. Pins the grind exploit shut: with the round outside the
-    snapshot, an undone world read the NEXT ward as vacuously broken (no
-    rot = "sheared"), the bolt stood open, and he could be ground down
+def test_undo_rewinds_the_ward_with_the_world(seed, monkeypatch):
+    """Undoing the ward-2 strike restores his HP, his podium AND the ward
+    counter — so the next strike re-runs ward 3 (the rot re-stamps), never
+    skipping ahead. Pins the grind exploit shut: with the counter outside
+    the snapshot, an undone world read the NEXT ward as vacuously broken
+    (no rot = "sheared"), the bolt stood open, and he could be ground down
     strike after strike without re-solving anything."""
     dungeon = build_dungeon_warden_manifold(seed)
     room = dungeon.rooms[0]
@@ -455,15 +454,15 @@ def test_undo_rewinds_the_round_with_the_world(seed, monkeypatch):
            monkeypatch)
     w = _warden(room)
     assert w.hp == 3, "the strike is undone"
-    assert (w.row, w.col) == _WM_PODIUMS[1], "back at the round-2 podium"
-    assert room._wm_round == 2, "the round rewinds with the world"
+    assert (w.row, w.col) == _WM_PODIUMS[1], "back at the ward-2 podium"
+    assert room._wm_ward == 2, "the ward counter rewinds with the world"
 
     dungeon = build_dungeon_warden_manifold(seed)
     room = dungeon.rooms[0]
     _drive(dungeon, _RITUAL + _R1 + _STRIKE + _r2(room) + _STRIKE + 'u' + 'x',
            monkeypatch)
     w = _warden(room)
-    assert w.hp == 2 and room._wm_round == 3, "the re-strike re-enters round 3"
+    assert w.hp == 2 and room._wm_ward == 3, "the re-strike re-enters ward 3"
     assert main._wm_rot_cells(room) > 0, "the rot re-stamps — back to bottom-left"
 
 
@@ -472,7 +471,7 @@ def test_undo_rewinds_the_round_with_the_world(seed, monkeypatch):
 @pytest.mark.parametrize("seed", SEEDS)
 def test_full_fight_wins(seed, monkeypatch):
     """The canonical fight, key for key through run_dungeon: ritual, four
-    rounds, four /W strikes, the seal, the loot, the exit."""
+    wards, four /W strikes, the seal, the loot, the exit."""
     dungeon = build_dungeon_warden_manifold(seed)
     room = dungeon.rooms[0]
     result = _drive(dungeon, _fight_script(room), monkeypatch, finish=':wq\r')

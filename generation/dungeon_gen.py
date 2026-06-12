@@ -6370,7 +6370,7 @@ _WM_GATE     = (8, 13)                  # ritual gate: draws when all four burn
 _WM_HALL_TOP, _WM_HALL_BOT = 2, 14
 _WM_HALL_LO,  _WM_HALL_HI  = 15, 61
 _WM_FRIEZE_ROWS = (1, 15)               # sealed wall rows wearing his stamp-marks
-# Podium niches (round order NW → NE → SW → SE); each is a 1-cell alcove walled
+# Podium niches (ward order NW → NE → SW → SE); each is a 1-cell alcove walled
 # on three sides, its bolt facing the aisle. Bolts are DERIVED from the warden
 # entity each tick (entities ride row shifts), never stored.
 _WM_PODIUMS = ((3, 26), (3, 46), (13, 26), (13, 46))
@@ -6392,9 +6392,13 @@ _WM_WARD2_WINDOW = 8                    # keystrokes from solve to strike before
 _WM_WARD3 = (10, 18)                    # R3: D — rot-tail with a rank of REAL Wardens
 _WM_WARD3_HI = 34
 _WM_WARD3_RANK = ((10, 20), (10, 24), (10, 28), (10, 32))
-_WM_WARD4 = (10, 44)                    # R4: yy + p p — his flame row, stamped LIT
-                                        # (🜂🜂🜂 at 44..46); two linewise pastes
-                                        # make the 3×3 grid that breaks the ward
+_WM_WARD4 = (11, 45)                    # ward 4: yy + p p — his flame row, stamped
+                                        # LIT (🜂🜂🜂). Grid (11,45..47) = the
+                                        # game's ruler (10,44)..(10,46) — design
+                                        # talk uses RULER coords (grid − 1 here:
+                                        # display row/col = grid − first standable
+                                        # row/col + 1). Two linewise pastes make
+                                        # the 3×3 grid that breaks the ward.
 _WM_WARD4_ECHOES = ((3, 36), (5, 24), (5, 48), (7, 36),
                     (9, 36), (11, 24), (11, 48), (13, 36))   # mirrored crowd
 _WM_SEAL = (8, 62)                      # draws when the press falls silent
@@ -6421,10 +6425,10 @@ def build_dungeon_warden_manifold(seed: int) -> Dungeon:
 
     The fight (main._warden_manifold_tick): the Warden is edit_immune (every
     operator parries — the engine's real all-or-nothing shield) and shelters
-    in a fogged podium niche per round. Each round he has STAMPED a ward;
-    breaking it with the act's verb jams the press — echoes gutter, his bolt
+    in a fogged podium niche behind each of his four WARDS in turn; breaking
+    the ward with the act's verb jams the press — echoes gutter, his bolt
     draws, his fog parts (/W finds him at last), one x lands — and he
-    re-manifests at the next podium and stamps again:
+    re-manifests at the next podium and stamps the next ward:
       R1  d{m}   three warding words that SAY what they are (lock, tomb,
                  veil…); a wall post pins the reflow after each word and
                  CRUMBLES when its word is cut
@@ -6445,7 +6449,7 @@ def build_dungeon_warden_manifold(seed: int) -> Dungeon:
 
     Ward checks are shift-proof (kind-counts on floor cells / substring
     scans across rows), bolts derive from the warden entity, and the seal
-    derives from stored coords. The round counter RIDES the undo snapshot
+    derives from stored coords. The ward counter RIDES the undo snapshot
     (main._WM_UNDO_ATTRS — undo rewinds the fight with the world; the
     Pathfinder convention was a grind exploit here). Geometry is fixed;
     the seed picks the vocabulary.
@@ -6546,14 +6550,14 @@ def build_dungeon_warden_manifold(seed: int) -> Dungeon:
     for fr in _WM_FRIEZE_ROWS:
         lay(fr, 20, frieze, 'ember')
 
-    # ROUND 1, stamped at build (the fight opens staged): three warding
+    # WARD 1, stamped at build (the fight opens staged): three warding
     # words, unguarded — the words themselves say "cut me". A post follows
     # each of the first two; the tick crumbles a post when its word is cut.
     c = _WM_WARD1[1]
     for w in words1:
         lay(_WM_WARD1[0], c, w, 'ancient')
         c += 5
-    # Later stamps, laid by the tick on each round transition.
+    # Later stamps, laid by the tick on each ward transition.
     word2_lock = word2[:warp_at] + warp_glyph + word2[warp_at + 1:]
     room._wm_stamps = {
         2: (_WM_WARD2[0], _WM_WARD2[1],
@@ -6562,14 +6566,14 @@ def build_dungeon_warden_manifold(seed: int) -> Dungeon:
         # INSERT_KIND ('ember') and the WORD-normalize repaints whole mended
         # words with it, so an ember-based rot check would false-positive on
         # the player's own R2 mends. 'ancient' is safe by TIME: ward 1's
-        # words must be gone before round 3 can exist.
+        # words must be gone before ward 3 can exist.
         3: (_WM_WARD3[0], _WM_WARD3[1],
             rot_text(_WM_WARD3_HI - _WM_WARD3[1] + 1), 'ancient'),
         # R4: his flame row, stamped LIT. yy + p + p copies it twice — three
         # flame rows break the ward (_wm_ward_broken counts 🜂🜂🜂 rows).
         4: (_WM_WARD4[0], _WM_WARD4[1], _QM_FLAME * 3, 'flame'),
     }
-    # Round spawns: R3 is a rank of REAL Wardens (kind='warden', hp=1,
+    # Ward spawns: ward 3 is a rank of REAL Wardens (kind='warden', hp=1,
     # tag='stamp' — exempt from summon/leap, gutterable, NOT edit_immune so
     # one D shears rot and rank together); R4 the mirrored echo crowd.
     room._wm_spawns = {3: ('warden', 'stamp', _WM_WARD3_RANK),
