@@ -64,12 +64,15 @@ def _line_string(room, row: int):
 def _match_positions(room, pattern: str) -> list:
     """All (row, col) match starts of `pattern`, matched per LINE (so a pattern may
     span consecutive runs and the same line may yield several matches), sorted in
-    reading order."""
+    reading order. A match STARTING in fog is skipped — the search jump lands the
+    cursor on the match start, fog is impassable, and what you cannot see you
+    cannot search (line jumps already skip fog via `is_passable`)."""
     out = []
     for row in range(room.rows):
         s, base = _line_string(room, row)
         for start, _end in _spans(s, pattern):
-            out.append((row, base + start))
+            if (row, base + start) not in room.fog_cells:
+                out.append((row, base + start))
     out.sort()
     return out
 

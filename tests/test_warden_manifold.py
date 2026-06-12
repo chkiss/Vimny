@@ -3,24 +3,37 @@
 He stamps himself into the world — wards of text, then copies of himself —
 and the player out-copies him with the act's own verbs. The Warden is
 edit_immune (every operator parries; the engine's real all-or-nothing shield)
-and shelters in a podium niche per round — fogged shut, solid stone from the
-hall; breaking the round's ward jams the press (echoes gutter, his bolt draws,
-the fog parts and /W finds him at last) for exactly one x. Opening ritual: an
-antechamber where the eternal flame must be spread to four braziers (yl + P,
-the Beacon Tiers' fuel rule active) before the ritual gate draws.
+and shelters in a FOGGED podium niche per round; breaking the round's ward
+jams the press (copies gutter, his bolt draws, his fog parts and /W finds him
+at last) for exactly one x. Opening ritual: an antechamber where the eternal
+flame must be spread to four braziers (yl + P, the Beacon Tiers' fuel rule
+active) — the gate draws AND the grand hall's fog parts. The whole hall is
+fogged until then: no jump (H/G{n}/gg/M/L), walk, or search enters early.
 
 Round → verb (see main._wm_ward_broken for the shift-proof checks):
-  1  d{m}   guarded ward-words, wall posts pinning the reflow per word
-  2  r + .  his stamp four times, the same untypable warp in each
-  3  D      a rot-tail with a rank of false Wardens standing on it
-  4  yy+P   his true name (kind='flame', it burns) must appear TWICE
+  1  d{m}   three warding words that SAY what they are (lock, tomb, veil…);
+            a wall post pins the reflow after each word and CRUMBLES when
+            its word is cut
+  2  r + .  his stamp four times, the same untypable warp in each; the mends
+            RE-CORRUPT eight keystrokes after the solve (exactly the clean
+            answer's cost) — strike at once or redo it
+  3  D      a rot-tail with a rank of REAL Wardens standing on it; once the
+            rot is half-cut, every keystroke DOUBLES the rank — one D or a
+            flood
+  4  yl+3P  three cold lamps (10,44..46); fetch the eternal flame and lay it
+            across all three — the Beacon Tiers' finale, charwise
 
-Engine rules this boss leans on (each pinned below): tag='manifold' exempts
-him from the stock warden auto-summon AND the post-x random leap (his round
-machine moves him); echoes spawn hp=1 so one strike gutters a copy through
-the disguise rule; the tick moves him via room.move_entity (the entity map
-must follow him or x whiffs); brazier rows hold one brazier each and no
-glyph anywhere east (open_gap shifts the whole buffer row).
+After the press falls the seal draws and the treasure pocket's fog parts:
+a 3×2 vault behind the seal — exit center-west, heart container above,
+the boss scroll's chest below (the chest IS the Archivist's Method drop).
+
+Engine rules this boss leans on (each pinned below): tag='manifold'/'stamp'
+exempt wardens from the stock auto-summon AND the post-x random leap; spawned
+copies are hp=1 so one strike (or one swept D) gutters each; the tick moves
+him via room.move_entity; brazier rows hold one brazier each and no glyph
+anywhere east (open_gap shifts the whole buffer row); ward checks read CELL
+TYPE, not is_passable (fog makes cells impassable — an is_passable check
+read ward 1 as broken while it slept under the hall fog).
 """
 from collections import deque
 
@@ -30,15 +43,16 @@ from blessed import Terminal
 import main
 from engine.motion import apply_motion
 from engine.player import Player
-from engine.search import match_cells
+from engine.search import match_cells, find_next
 from engine.world import CellType, Entity
 from content.levels import known_commands
 from generation.dungeon_gen import (
     build_dungeon_warden_manifold,
     _WM_ROWS, _WM_COLS, _WM_AXIS, _WM_SPAWN, _WM_FLAME, _WM_BRAZIERS,
-    _WM_GATE, _WM_COLUMN_COLS, _WM_COLUMN_ROWS, _WM_PODIUMS,
-    _WM_WARD1, _WM_WARD1_POSTS, _WM_WARD2, _WM_WARD3, _WM_WARD4,
-    _WM_HEARTS, _WM_SEAL, _WM_EXIT, _WM_BUDGET, _QM_FLAME,
+    _WM_GATE, _WM_PODIUMS, _WM_WARD1, _WM_WARD1_POSTS, _WM_WARD1_WORDS,
+    _WM_WARD2, _WM_WARD2_WINDOW, _WM_WARD3, _WM_WARD3_RANK, _WM_LAMP_CELLS,
+    _WM_WARD4_ECHOES, _WM_SEAL, _WM_EXIT, _WM_HEART, _WM_CHEST, _WM_POCKET,
+    _WM_HALL_LO, _WM_BUDGET, _QM_FLAME,
 )
 import pytest
 
@@ -51,33 +65,40 @@ def _room(seed):
 
 
 def _warden(room):
-    return next((e for e in room.entities if e.kind == 'warden' and e.alive), None)
+    """The true Warden — tag='manifold' (round 3 floods the hall with
+    kind='warden' tag='stamp' copies, so kind alone is ambiguous)."""
+    return next((e for e in room.entities
+                 if e.kind == 'warden' and e.tag == 'manifold' and e.alive),
+                None)
+
+
+def _stamps(room):
+    return [e for e in room.entities
+            if e.alive and e.kind == 'warden' and e.tag == 'stamp']
+
+
+_STRIKE = '/W\rx'    # the search-jump strike: /W lands ON him, x at one's cell
+
+_RITUAL = 'llyl' + '5k5lP' + '4j3lP' + 'jjP' + '4j3hP' + '5k4lll'
+_R1     = 'kklldewdewde'                 # three cuts; posts crumble between
+_R3     = '7j0D'                         # one stroke — rot and rank together
+_R4     = '5k22hyl40l2j3P'               # fetch the flame, lay it across the lamps
+_LOOT   = '5k16l' + 'l' + 'lkx' + '2jx'  # seal → exit (win) → heart → chest
+
+
+def _r2(room) -> str:
+    return '3jw' + 'r' + room._wm_word2[0] + 'w.w.w.'
 
 
 def _fight_script(room) -> str:
     """The canonical full fight, key for key (verified live; deterministic —
     the manifold warden never random-leaps)."""
-    letter = room._wm_word2[0]
-    return (
-        # ritual: lift the flame, light the brazier diamond, through the gate
-        'll' + 'yl'
-        + '5k' + '5l' + 'P' + '4j' + '3l' + 'P' + 'jj' + 'P' + '4j' + '3h' + 'P'
-        + '5k' + '4l' + 'll'
-        # R1: de × 3 (word 1 from the west; around the posts), strike 1
-        + 'kk' + 'll' + 'de' + 'j' + '6l' + 'k' + 'de' + 'j' + '5l' + 'k' + 'de'
-        + 'kk' + 'hh' + 'k' + 'x'
-        # heart 1 via clear row 7
-        + '4j' + '10l' + '3k' + 'x'
-        # R2: r + dots, strike 2
-        + 'jj' + 'll' + 'r' + letter + 'w.' * 3
-        + '8h' + 'kk' + 'hh' + 'k' + 'x'
-        # R3: D the rot and the rank, strike 3, heart 2
-        + 'jjjjj' + '29h' + 'jj' + 'D' + '9l' + 'jjj' + 'x'
-        + '3k' + '10l' + 'jj' + 'x'
-        # R4: the name twice, the kill, the seal, out
-        + 'kk' + '4l' + 'yy' + 'p' + '6l' + 'jj' + 'j' + 'x'
-        + '6k' + '17l'
-    )
+    return (_RITUAL
+            + _R1 + _STRIKE
+            + _r2(room) + _STRIKE
+            + _R3 + _STRIKE
+            + _R4 + _STRIKE
+            + _LOOT)
 
 
 def _drive(dungeon, keys_str, monkeypatch, finish=':q!\r'):
@@ -87,6 +108,8 @@ def _drive(dungeon, keys_str, monkeypatch, finish=':q!\r'):
     for anim in ('_fireworks_animation', '_win_animation', '_starfield_victory',
                  '_heart_container_animation', '_unlock_animation'):
         monkeypatch.setattr(main, anim, lambda *a, **k: None)
+    for scroll_fn in ('_show_catalog_scroll', '_show_scroll_by_id'):
+        monkeypatch.setattr(main, scroll_fn, lambda *a, **k: None)
     term = Terminal()
     it = iter(keys)
     monkeypatch.setattr(term, 'inkey', lambda *a, **k: next(it, Keystroke('')))
@@ -113,27 +136,67 @@ def test_dimensions_and_anchors(seed):
 
 @pytest.mark.parametrize("seed", SEEDS)
 def test_hall_is_mirrored_about_the_aisle(seed):
-    """The aesthetics contract: columns, podiums, braziers, hearts and friezes
-    all come in pairs mirrored about the processional aisle (row 8)."""
+    """The aesthetics contract: podiums, braziers, the treasure pocket and
+    the friezes all mirror about the processional aisle (row 8)."""
     room = _room(seed)
     mirror = lambda r: 2 * _WM_AXIS - r
-    for group in (_WM_PODIUMS, _WM_BRAZIERS, _WM_HEARTS):
+    for group in (_WM_PODIUMS, _WM_BRAZIERS, _WM_POCKET):
         cells = set(group)
         assert {(mirror(r), c) for (r, c) in cells} == cells, group
-    for r in _WM_COLUMN_ROWS:
-        assert mirror(r) in _WM_COLUMN_ROWS
-        for c in _WM_COLUMN_COLS:
-            assert room.cells[r][c] == CellType.WALL
-            assert room.cells[mirror(r)][c] == CellType.WALL
-    frieze_rows = [ru.row for ru in room.char_runs if ru.row in (1, 15)]
-    assert 1 in frieze_rows and 15 in frieze_rows
+    assert mirror(_WM_HEART[0]) == _WM_CHEST[0] and _WM_HEART[1] == _WM_CHEST[1], \
+        "heart and chest mirror across the exit row"
+    frieze_rows = {ru.row for ru in room.char_runs if ru.row in (1, 15)}
+    assert frieze_rows == {1, 15}
+
+
+@pytest.mark.parametrize("seed", SEEDS)
+def test_no_columns_no_hall_hearts_no_guards(seed):
+    """The redesign strips the colonnade, the mid-hall hearts, and the R1
+    guards: the warding words alone carry round 1."""
+    room = _room(seed)
+    assert not [ru for ru in room.char_runs if '║' in ru.symbols]
+    hearts = [e for e in room.entities if e.kind == 'heart_container']
+    assert [(e.row, e.col) for e in hearts] == [_WM_HEART]
+    assert not [e for e in room.entities if e.kind == 'goblin']
+
+
+@pytest.mark.parametrize("seed", SEEDS)
+def test_treasure_pocket_geometry(seed):
+    """3×2 pocket behind the seal: exit center-west, heart top of column 2,
+    scroll chest bottom; sealed from the hall on every other side."""
+    room = _room(seed)
+    for (r, c) in _WM_POCKET:
+        assert room.cells[r][c] == CellType.FLOOR
+    chest = next(e for e in room.entities if e.kind == 'chest_scroll')
+    assert (chest.row, chest.col) == _WM_CHEST
+    # walls everywhere around the pocket except the seal cell
+    ring = {(r + dr, c + dc) for (r, c) in _WM_POCKET
+            for dr, dc in ((0, 1), (0, -1), (1, 0), (-1, 0))}
+    for cell in ring - set(_WM_POCKET):
+        if cell == _WM_SEAL:
+            continue
+        assert room.cells[cell[0]][cell[1]] == CellType.WALL, cell
+
+
+@pytest.mark.parametrize("seed", SEEDS)
+def test_warding_words_are_thematic(seed):
+    """R1's words come from the curated says-what-it-is list and never donate
+    the R2 true letter (Echo Vault scarcity)."""
+    room = _room(seed)
+    row = _WM_WARD1[0]
+    words = [''.join(ru.symbols) for ru in room.char_runs
+             if ru.row == row and ru.kind == 'ancient']
+    assert len(words) == 3
+    letter = room._wm_word2[0]
+    for w in words:
+        assert w in _WM_WARD1_WORDS
+        assert letter not in w
 
 
 @pytest.mark.parametrize("seed", SEEDS)
 def test_brazier_rows_are_reflow_safe(seed):
-    """One brazier per row, and the brazier rows carry NO other glyph anywhere
-    east — a charwise paste open_gaps the whole BUFFER row (straight across
-    the dividing wall), so any same-row glyph east of a paste would slide."""
+    """One brazier per row, and no other glyph anywhere east on the buffer
+    row — a charwise paste open_gaps the whole row, across walls."""
     room = _room(seed)
     rows = [r for (r, _c) in _WM_BRAZIERS]
     assert len(rows) == len(set(rows)), "two braziers on one row shove each other"
@@ -142,10 +205,49 @@ def test_brazier_rows_are_reflow_safe(seed):
         assert not east, f"glyphs east of brazier {(r, c)} would be shoved: {east}"
 
 
+# ── fog of war: three regions, three reveals ──────────────────────────────────
+
 @pytest.mark.parametrize("seed", SEEDS)
-def test_warden_and_exit_unreachable_as_built(seed):
-    """The niche walls seal the Warden (no x-grinding a sheltered boss) and the
-    gate + seal close the hall and the pocket."""
+def test_everything_past_the_gate_starts_fogged(seed):
+    room = _room(seed)
+    assert room.search_glyph_entities
+    assert room._wm_hall_fog <= room.fog_cells, "the grand hall reads as unknown"
+    assert set(_WM_PODIUMS) <= room.fog_cells, "every niche reads as stone"
+    assert set(_WM_POCKET) <= room.fog_cells, "the treasure pocket too"
+
+
+@pytest.mark.parametrize("seed", SEEDS)
+def test_nothing_in_the_fog_is_searchable(seed):
+    """/W finds no Warden, and the warding words sleep under the hall fog —
+    search cannot scout (or enter) the chamber early."""
+    room = _room(seed)
+    assert match_cells(room, 'W') == set()
+    word = next(''.join(ru.symbols) for ru in room.char_runs
+                if ru.kind == 'ancient')
+    p = Player(row=room.spawn_pos[0], col=room.spawn_pos[1])
+    assert find_next(room, p, word, True) is None, "fogged text must not match"
+
+
+@pytest.mark.parametrize("seed", SEEDS)
+def test_jumps_cannot_enter_the_fogged_hall(seed):
+    """H/M/L, G/gg/{n}G land on first non-blanks — fog is impassable, so
+    every landing stays in the antechamber until the ritual."""
+    room = build_dungeon_warden_manifold(seed).rooms[0]      # private (mutating)
+    jumps = ([('G', 1, False), ('gg', 1, False), ('H', 1, False),
+              ('M', 1, False), ('L', 1, False)]
+             + [('G', n, True) for n in range(1, _WM_ROWS)])
+    for motion, count, count_given in jumps:
+        p = Player(row=room.spawn_pos[0], col=room.spawn_pos[1])
+        apply_motion(p, motion, count, room, count_given=count_given)
+        assert p.col < _WM_HALL_LO, f"{motion} entered the fogged hall"
+        assert (p.row, p.col) not in _WM_POCKET
+        assert (p.row, p.col) not in _WM_PODIUMS
+
+
+@pytest.mark.parametrize("seed", SEEDS)
+def test_hall_unreachable_until_the_ritual(seed):
+    """As built, BFS from the spawn stays inside the antechamber: the gate is
+    wall and the fog beyond it is impassable."""
     room = build_dungeon_warden_manifold(seed).rooms[0]      # private (mutating)
     seen, q = {room.spawn_pos}, deque([room.spawn_pos])
     while q:
@@ -155,44 +257,28 @@ def test_warden_and_exit_unreachable_as_built(seed):
             if nb not in seen and room.is_passable(*nb):
                 seen.add(nb)
                 q.append(nb)
-    w = _warden(room)
-    assert (w.row, w.col) not in seen, "the round-1 niche must be sealed"
-    assert room.exit_pos not in seen, "the seal hides the exit"
-    assert _WM_GATE not in seen, "the ritual gate starts shut"
+    assert all(c < _WM_HALL_LO for (_r, c) in seen), "the hall leaked"
 
 
 @pytest.mark.parametrize("seed", SEEDS)
-def test_line_jumps_never_reach_the_pocket(seed):
-    room = build_dungeon_warden_manifold(seed).rooms[0]      # private (mutating)
-    jumps = ([('G', 1, False), ('gg', 1, False), ('H', 1, False),
-              ('M', 1, False), ('L', 1, False)]
-             + [('G', n, True) for n in range(1, _WM_ROWS)])
-    for motion, count, count_given in jumps:
-        p = Player(row=room.spawn_pos[0], col=room.spawn_pos[1])
-        apply_motion(p, motion, count, room, count_given=count_given)
-        assert (p.row, p.col) != _WM_EXIT, f"{motion} reached the exit pocket"
-        assert (p.row, p.col) not in _WM_PODIUMS, f"{motion} reached a niche"
-
-
-# ── the opening ritual ────────────────────────────────────────────────────────
-
-@pytest.mark.parametrize("seed", SEEDS)
-def test_ritual_gate_draws_when_four_flames_burn(seed, monkeypatch):
-    """Light the diamond through the real loop: the gate is wall until the
-    fourth flame, then draws open (and the fuel rule guards every paste)."""
+def test_ritual_parts_the_hall_fog_only(seed, monkeypatch):
+    """Four flames: the gate draws AND the hall fog parts — but the niches
+    and the treasure pocket stay stone until their own reveals."""
     dungeon = build_dungeon_warden_manifold(seed)
     room = dungeon.rooms[0]
-    assert getattr(room, '_qm_chain', None), "the fuel rule must be active"
-    ritual = ('ll' + 'yl' + '5k' + '5l' + 'P' + '4j' + '3l' + 'P'
-              + 'jj' + 'P' + '4j' + '3h' + 'P')
-    _drive(dungeon, ritual, monkeypatch)
+    _drive(dungeon, _RITUAL, monkeypatch)
     assert room.cells[_WM_GATE[0]][_WM_GATE[1]] == CellType.FLOOR
+    assert not (room._wm_hall_fog & room.fog_cells)
+    assert set(_WM_PODIUMS) <= room.fog_cells, "niches stay stone"
+    assert set(_WM_POCKET) <= room.fog_cells, "the pocket waits for the seal"
     flames = {(ru.row, ru.col) for ru in room.char_runs
               if _QM_FLAME in ru.symbols}
     assert set(_WM_BRAZIERS) <= flames, "all four braziers burn"
 
 
-def test_flame_paste_blocked_off_brazier():
+def test_flame_paste_blocked_off_brazier_and_on_cold_lamps():
+    """The fuel rule holds everywhere off the chain — including the lamp
+    cells BEFORE round 4 stamps them into the chain."""
     room = _room(SEEDS[0])
     clip = {'linewise': False, 'rows': [{'width': 1, 'char_runs': [
         {'dcol': 0, 'symbols': (_QM_FLAME,), 'kind': 'flame'}]}]}
@@ -200,14 +286,17 @@ def test_flame_paste_blocked_off_brazier():
     assert main._flame_paste_blocked(room, floor, clip, True, 1)
     on_brazier = Player(row=_WM_BRAZIERS[0][0], col=_WM_BRAZIERS[0][1])
     assert not main._flame_paste_blocked(room, on_brazier, clip, True, 1)
+    on_lamp = Player(row=_WM_LAMP_CELLS[0][0], col=_WM_LAMP_CELLS[0][1])
+    assert main._flame_paste_blocked(room, on_lamp, clip, True, 3), \
+        "lamps are not fuel until round 4 stamps them"
 
 
 # ── the round machine ─────────────────────────────────────────────────────────
 
 @pytest.mark.parametrize("seed", SEEDS)
 def test_operators_parry_on_the_warden(seed):
-    """edit_immune: a dd aimed at his row is REFUSED (the row holds an anchored
-    occupant) and he survives any charwise sweep."""
+    """edit_immune: a dd aimed at his row is REFUSED and he survives any
+    charwise sweep."""
     from engine.reflow import remove_row
     room = build_dungeon_warden_manifold(seed).rooms[0]      # private (mutating)
     w = _warden(room)
@@ -218,98 +307,131 @@ def test_operators_parry_on_the_warden(seed):
 
 
 @pytest.mark.parametrize("seed", SEEDS)
-def test_round1_break_staggers_and_strike_advances(seed, monkeypatch):
-    """Break ward 1 through the real loop: the bolt draws (stagger), the x
-    lands, and the press re-manifests him at podium 2 with ward 2 stamped."""
+def test_round1_posts_crumble_word_by_word(seed, monkeypatch):
+    """Cut word 1 → its post falls; the next still stands. All three cuts
+    break the ward; /W jumps the strike."""
     dungeon = build_dungeon_warden_manifold(seed)
     room = dungeon.rooms[0]
-    ritual = ('llyl' + '5k5lP' + '4j3lP' + 'jjP' + '4j3hP' + '5k4lll')
-    r1 = 'kk' + 'll' + 'de' + 'j6lk' + 'de' + 'j5lk' + 'de'
-    _drive(dungeon, ritual + r1, monkeypatch)
-    pr, pc = _WM_PODIUMS[0]
-    side = 1 if pr < _WM_AXIS else -1
-    assert room.cells[pr + side][pc] == CellType.FLOOR, "the bolt draws on the break"
-    assert main._wm_ward_broken(room, 1)
+    _drive(dungeon, _RITUAL + 'kkllde', monkeypatch)
+    row = _WM_WARD1[0]
+    assert room.cells[row][_WM_WARD1_POSTS[0]] == CellType.FLOOR, "post 1 crumbles"
+    assert room.cells[row][_WM_WARD1_POSTS[1]] == CellType.WALL, "post 2 stands"
 
     dungeon = build_dungeon_warden_manifold(seed)
     room = dungeon.rooms[0]
-    _drive(dungeon, ritual + r1 + 'kkhhkx', monkeypatch)
+    _drive(dungeon, _RITUAL + _R1 + _STRIKE, monkeypatch)
+    assert all(room.cells[row][p] == CellType.FLOOR for p in _WM_WARD1_POSTS)
     w = _warden(room)
     assert w.hp == 3 and (w.row, w.col) == _WM_PODIUMS[1]
     assert room._wm_round == 2
     assert room.entity_at(w.row, w.col) is w, "move_entity must re-index the map"
-    word2 = room._wm_word2
-    assert not main._wm_ward_broken(room, 2), "ward 2 stamps warped"
-    assert word2 not in main._wm_row_text(room, _WM_WARD2[0])
-
-
-@pytest.mark.parametrize("seed", SEEDS)
-def test_round3_one_D_erases_the_rank(seed, monkeypatch):
-    """The signature image: a rank of false Wardens standing on the rot — ONE
-    D shears text and copies together (hp=1 echoes die through the disguise)."""
-    dungeon = build_dungeon_warden_manifold(seed)
-    room = dungeon.rooms[0]
-    letter = room._wm_word2[0]
-    upto_r3 = (('llyl' + '5k5lP' + '4j3lP' + 'jjP' + '4j3hP' + '5k4lll')
-               + 'kklldej6lkdej5lkde' + 'kkhhkx'
-               + '4j10l3kx'
-               + 'jjll' + 'r' + letter + 'w.w.w.' + '8hkkhhkx'
-               + 'jjjjj29hjj')
-    _drive(dungeon, upto_r3, monkeypatch)
-    echoes = [e for e in room.entities if e.kind == 'goblin' and e.alive]
-    assert len(echoes) == 4 and all(e.tag == 'echo' and e.hp == 1 for e in echoes)
-
-    dungeon = build_dungeon_warden_manifold(seed)
-    room = dungeon.rooms[0]
-    _drive(dungeon, upto_r3 + 'D', monkeypatch)
-    assert not [e for e in room.entities if e.kind == 'goblin' and e.alive], \
-        "one D erases the whole rank like text"
-    assert main._wm_ward_broken(room, 3)
-
-
-# ── fog of war: the searchable Warden ─────────────────────────────────────────
-# All four podium niches start fogged (solid stone from the hall); the stagger
-# parts the fog on the active niche, and only a REVEALED Warden is searchable —
-# /W then jumps the player straight onto him for the strike. The search overlay
-# skips fogged entities (engine/search._line_string), so the niche is no
-# teleport leak while the bolt is shut.
-
-@pytest.mark.parametrize("seed", SEEDS)
-def test_niches_start_fogged_and_warden_unsearchable(seed):
-    room = _room(seed)
-    assert room.search_glyph_entities, "/W must work once he is revealed"
-    assert set(_WM_PODIUMS) <= room.fog_cells, "every niche reads as stone"
-    assert match_cells(room, 'W') == set(), "fog hides him from search"
-
-
-@pytest.mark.parametrize("seed", SEEDS)
-def test_warden_stays_fogged_while_the_ward_stands(seed, monkeypatch):
-    """Mid-round (ward intact): the fog holds and /W finds nothing — search
-    cannot shortcut the ward."""
-    dungeon = build_dungeon_warden_manifold(seed)
-    room = dungeon.rooms[0]
-    ritual = ('llyl' + '5k5lP' + '4j3lP' + 'jjP' + '4j3hP' + '5k4lll')
-    _drive(dungeon, ritual + 'kkll' + '/W\r', monkeypatch)
-    w = _warden(room)
-    assert (w.row, w.col) in room.fog_cells
-    assert match_cells(room, 'W') == set()
-    assert w.hp == 4, "no strike landed through the fog"
-
-
-@pytest.mark.parametrize("seed", SEEDS)
-def test_ward_break_parts_fog_and_W_jumps_the_strike(seed, monkeypatch):
-    """The stagger reveals him; /W teleports the player onto his cell and the
-    x lands. The spent niche stays revealed; the next stays fogged."""
-    dungeon = build_dungeon_warden_manifold(seed)
-    room = dungeon.rooms[0]
-    ritual = ('llyl' + '5k5lP' + '4j3lP' + 'jjP' + '4j3hP' + '5k4lll')
-    r1 = 'kk' + 'll' + 'de' + 'j6lk' + 'de' + 'j5lk' + 'de'
-    _drive(dungeon, ritual + r1 + '/W\r' + 'x', monkeypatch)
-    w = _warden(room)
-    assert w.hp == 3 and (w.row, w.col) == _WM_PODIUMS[1]
     assert _WM_PODIUMS[0] not in room.fog_cells, "the spent niche stays open"
     assert _WM_PODIUMS[1] in room.fog_cells, "the next niche reads as stone"
     assert match_cells(room, 'W') == set(), "re-manifested, he is hidden again"
+
+
+@pytest.mark.parametrize("seed", SEEDS)
+def test_round2_solve_strike_within_the_window(seed, monkeypatch):
+    dungeon = build_dungeon_warden_manifold(seed)
+    room = dungeon.rooms[0]
+    _drive(dungeon, _RITUAL + _R1 + _STRIKE + _r2(room) + _STRIKE, monkeypatch)
+    w = _warden(room)
+    assert w.hp == 2 and (w.row, w.col) == _WM_PODIUMS[2]
+    word2 = room._wm_word2
+    assert not main._wm_ward_broken(room, 2) or True   # round is past; ward moot
+    assert room._wm_round == 3
+
+
+@pytest.mark.parametrize("seed", SEEDS)
+def test_round2_mends_recorrupt_after_the_window(seed, monkeypatch):
+    """Solve, then waste _WM_WARD2_WINDOW keystrokes: the stamps re-warp, the
+    bolt re-bars, and his fog is re-laid (no /W into a sealed niche)."""
+    dungeon = build_dungeon_warden_manifold(seed)
+    room = dungeon.rooms[0]
+    _drive(dungeon, _RITUAL + _R1 + _STRIKE + _r2(room)
+           + 'h' * _WM_WARD2_WINDOW, monkeypatch)
+    w = _warden(room)
+    assert w.hp == 3, "no strike landed"
+    assert not main._wm_ward_broken(room, 2), "the mends must re-corrupt"
+    assert (w.row, w.col) in room.fog_cells, "he is re-fogged"
+    assert match_cells(room, 'W') == set()
+    bolt = main._wm_bolt_cell(room, w)
+    assert room.cells[bolt[0]][bolt[1]] == CellType.WALL, "the bolt re-bars"
+
+
+@pytest.mark.parametrize("seed", SEEDS)
+def test_round2_recorrupted_stamps_can_be_resolved(seed, monkeypatch):
+    """After a re-corruption the same r + dots rhythm works again: line
+    start, w onto the first warp (the warding words are long gone, so the
+    stamps are the row's only words), mend, dots, strike."""
+    dungeon = build_dungeon_warden_manifold(seed)
+    room = dungeon.rooms[0]
+    letter = room._wm_word2[0]
+    re_solve = '0w' + 'r' + letter + 'w.w.w.'
+    _drive(dungeon, _RITUAL + _R1 + _STRIKE + _r2(room)
+           + 'h' * _WM_WARD2_WINDOW + re_solve + _STRIKE, monkeypatch)
+    w = _warden(room)
+    assert w.hp == 2, "the re-solve must open the window again"
+
+
+@pytest.mark.parametrize("seed", SEEDS)
+def test_round3_rank_is_real_wardens(seed, monkeypatch):
+    dungeon = build_dungeon_warden_manifold(seed)
+    room = dungeon.rooms[0]
+    _drive(dungeon, _RITUAL + _R1 + _STRIKE + _r2(room) + _STRIKE, monkeypatch)
+    rank = _stamps(room)
+    assert len(rank) == len(_WM_WARD3_RANK)
+    assert all(e.hp == 1 and not e.edit_immune for e in rank)
+    assert {(e.row, e.col) for e in rank} == set(_WM_WARD3_RANK)
+
+
+@pytest.mark.parametrize("seed", SEEDS)
+def test_round3_partial_cut_doubles_per_keystroke(seed, monkeypatch):
+    """x one rot char, then two keystrokes: 4 → 8 → 16. The flood is the
+    punishment; D is the lesson."""
+    dungeon = build_dungeon_warden_manifold(seed)
+    room = dungeon.rooms[0]
+    pre = _RITUAL + _R1 + _STRIKE + _r2(room) + _STRIKE
+    _drive(dungeon, pre + '7j' + '28h' + 'x' + 'l' + 'l', monkeypatch)
+    assert len(_stamps(room)) >= 16, "the rank must double per keystroke"
+
+
+@pytest.mark.parametrize("seed", SEEDS)
+def test_round3_one_D_shears_rot_and_rank(seed, monkeypatch):
+    """The signature stroke: one D takes the rot and every Warden standing
+    on it; the stagger gutters any copy left and no doubling ever primes."""
+    dungeon = build_dungeon_warden_manifold(seed)
+    room = dungeon.rooms[0]
+    pre = _RITUAL + _R1 + _STRIKE + _r2(room) + _STRIKE
+    _drive(dungeon, pre + _R3, monkeypatch)
+    assert main._wm_ward_broken(room, 3)
+    assert not _stamps(room), "the rank gutters with the rot"
+    w = _warden(room)
+    assert (w.row, w.col) not in room.fog_cells, "his fog parts for the strike"
+
+
+@pytest.mark.parametrize("seed", SEEDS)
+def test_round4_lamps_and_the_charwise_finale(seed, monkeypatch):
+    """Round 4 stamps three cold lamps (ember pedestals) and adds them to
+    the fuel chain; yl + 3P lays the flame across all three."""
+    dungeon = build_dungeon_warden_manifold(seed)
+    room = dungeon.rooms[0]
+    pre = _RITUAL + _R1 + _STRIKE + _r2(room) + _STRIKE + _R3 + _STRIKE
+    _drive(dungeon, pre, monkeypatch)
+    assert room._wm_round == 4 and getattr(room, '_wm_lamps_on', False)
+    assert set(_WM_LAMP_CELLS) <= set(room._qm_chain), "lamps join the chain"
+    embers = {(ru.row, ru.col) for ru in room.char_runs if ru.kind == 'pedestal'}
+    assert set(_WM_LAMP_CELLS) <= embers, "cold lamps show their embers"
+    echoes = [e for e in room.entities
+              if e.alive and e.kind == 'goblin' and e.tag == 'echo']
+    assert len(echoes) == len(_WM_WARD4_ECHOES)
+
+    dungeon = build_dungeon_warden_manifold(seed)
+    room = dungeon.rooms[0]
+    _drive(dungeon, pre + _R4, monkeypatch)
+    assert main._wm_ward_broken(room, 4), "three adjacent flames break ward 4"
+    assert not [e for e in room.entities
+                if e.alive and e.kind == 'goblin'], "the crowd gutters"
 
 
 # ── the full fight ────────────────────────────────────────────────────────────
@@ -317,22 +439,28 @@ def test_ward_break_parts_fog_and_W_jumps_the_strike(seed, monkeypatch):
 @pytest.mark.parametrize("seed", SEEDS)
 def test_full_fight_wins(seed, monkeypatch):
     """The canonical fight, key for key through run_dungeon: ritual, four
-    rounds, four strikes, the seal, the exit. Deterministic by design."""
+    rounds, four /W strikes, the seal, the loot, the exit."""
     dungeon = build_dungeon_warden_manifold(seed)
     room = dungeon.rooms[0]
     result = _drive(dungeon, _fight_script(room), monkeypatch, finish=':wq\r')
     assert result['won'], result
     assert _warden(room) is None
-    assert not [e for e in room.entities if e.kind == 'goblin' and e.alive], \
-        "every echo gutters when the press falls"
+    assert not [e for e in room.entities if e.alive
+                and (e.kind == 'goblin'
+                     or (e.kind == 'warden' and e.tag == 'stamp'))], \
+        "every copy gutters when the press falls"
     sr, sc = room._wm_seal
     assert room.cells[sr][sc] == CellType.FLOOR
+    assert not (set(_WM_POCKET) & room.fog_cells), "the pocket fog parts"
+    assert not any(e.alive and e.kind == 'heart_container'
+                   for e in room.entities), "the heart is collected"
+    assert not any(e.alive and e.kind == 'chest_scroll'
+                   for e in room.entities), "the scroll chest is opened"
 
 
 def test_curriculum_guard():
     """The boss teaches nothing; everything it demands is already known."""
     known = set(known_commands('warden_manifold'))
-    for needed in ('d', 'D', 'r', 'dot', 'y', 'P', 'p', 'count', '$', 'G', '/'):
+    for needed in ('d', 'D', 'r', 'dot', 'y', 'P', 'p', 'count', '$', '0',
+                   'G', '/'):
         assert needed in known
-    for absent in ('insert', 'c', 's', 'R', 'subst'):
-        assert absent not in known

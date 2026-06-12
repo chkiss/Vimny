@@ -1195,14 +1195,20 @@ def _wm_row_text(room, r: int) -> str:
 def _wm_ward_broken(room, k: int) -> bool:
     """Round k's ward state — shift-proof by design (kind-counts on passable
     cells, substring scans across rows; never stored coordinates):
-      1: every guarded ward-word is gone (no 'ancient' text on the floor —
-         the column shafts are 'ancient' too, but they stand in wall cells)
+      1: every warding word is gone (no 'ancient' text on the floor)
       2: his stamp reads TRUE four times (the warped copies mended with r/.)
       3: the rot is sheared (also 'ancient' — safe by TIME, ward 1's words
          predate round 3; NOT 'ember', which r-typed mends are repainted to)
-      4: his true name appears on TWO rows (yy + paste — the only writer)"""
-    if k == 1:
-        return not any(ru.kind == 'ancient' and room.is_passable(ru.row, ru.col)
+      4: all three lamps burn — some row reads 🜂🜂🜂. Charwise pastes onto
+         the lamp cells are the only way to put three flames ADJACENT: the
+         fuel rule confines charwise flames to chain cells, and linewise
+         pastes stack rows vertically (one flame per row).
+    Floor-glyph checks use the CELL TYPE, not is_passable — fog makes a
+    cell impassable, and the ward-words sleep under the hall fog until the
+    ritual (an is_passable check read ward 1 as broken at level entry)."""
+    if k in (1, 3):
+        return not any(ru.kind == 'ancient'
+                       and room.cells[ru.row][ru.col] in _WM_FLOORS
                        for ru in room.char_runs)
     if k == 2:
         word = getattr(room, '_wm_word2', None)
@@ -1210,16 +1216,114 @@ def _wm_ward_broken(room, k: int) -> bool:
             return False
         return sum(_wm_row_text(room, r).count(word)
                    for r in range(room.rows)) >= 4
-    if k == 3:
-        return not any(ru.kind == 'ancient' and room.is_passable(ru.row, ru.col)
-                       for ru in room.char_runs)
     if k == 4:
-        name = getattr(room, '_wm_name', None)
-        if not name:
-            return False
-        return sum(1 for r in range(room.rows)
-                   if name in _wm_row_text(room, r)) >= 2
+        triple = _dg._QM_FLAME * 3
+        return any(triple in _wm_row_text(room, r) for r in range(room.rows))
     return False
+
+
+_WM_FLOORS = (CellType.FLOOR, CellType.CORRIDOR)
+
+
+def _wm_rot_cells(room) -> int:
+    """Cells of 'ancient' rot standing on floor (fog-independent)."""
+    return sum(len(ru.symbols) for ru in room.char_runs
+               if ru.kind == 'ancient'
+               and room.cells[ru.row][ru.col] in _WM_FLOORS)
+
+
+def _wm_set_char(room, r: int, c: int, ch: str) -> None:
+    """Overwrite one glyph in place (no reflow — the tick's own r, in effect)."""
+    ru = room.char_run_at(r, c)
+    if ru is not None:
+        i = c - ru.col
+        ru.symbols = ru.symbols[:i] + (ch,) + ru.symbols[i + 1:]
+
+
+def _wm_recorrupt(room) -> int:
+    """R2 punishment: every TRUE copy of his stamp warps again (index 0 →
+    the warp glyph). Returns how many copies blackened. Positions come from
+    a per-row text snapshot, so all copies found in one pass are warped."""
+    word = getattr(room, '_wm_word2', '')
+    warp = getattr(room, '_wm_warp', '')
+    if not word or not warp:
+        return 0
+    n = 0
+    for r in range(room.rows):
+        text = _wm_row_text(room, r)
+        i = text.find(word)
+        while i != -1:
+            _wm_set_char(room, r, i, warp)
+            n += 1
+            i = text.find(word, i + len(word))
+    return n
+
+
+def _wm_crumble_posts(room) -> list:
+    """R1: a wall post crumbles once the warding word WEST of it (its own
+    post-bounded segment of the ward row) is cut. Undo-safe for free: the
+    pre-edit cell snapshot holds the post as WALL, so undoing the cut
+    restores word and post together."""
+    msgs = []
+    row = _dg._WM_WARD1[0]
+    lo = _dg._WM_HALL_LO
+    for post in _dg._WM_WARD1_POSTS:
+        if room.cells[row][post] != CellType.WALL:
+            lo = post + 1
+            continue
+        if not any(ru.kind == 'ancient' and lo <= ru.col < post
+                   for ru in room._char_runs_by_row.get(row, [])):
+            room.cells[row][post] = CellType.FLOOR
+            msgs.append('The warding word is cut — its post crumbles to dust!')
+        lo = post + 1
+    return msgs
+
+
+def _wm_double_rank(room, player, spent: int) -> list:
+    """R3 pressure: once the rot is FIRST cut, every keystroke DOUBLES the
+    rank of stamp-Wardens while any rot remains (one D never primes it —
+    the rot dies whole and the stagger gutters the rank). New copies flood
+    outward from the rank over free floor, deterministic BFS order."""
+    cells0 = getattr(room, '_wm_rot0', None)
+    if cells0 is None:
+        return []
+    cur = _wm_rot_cells(room)
+    if cur == 0 or cur >= cells0:
+        room._wm_r3_spent0 = None              # whole, or sheared — not primed
+        return []
+    t0 = getattr(room, '_wm_r3_spent0', None)
+    if t0 is None:
+        room._wm_r3_spent0 = spent
+        return ['The half-cut rot SEETHES — finish it in one stroke, '
+                'or he multiplies!']
+    stamps = [e for e in room.entities
+              if e.alive and e.kind == 'warden' and e.tag == 'stamp']
+    target = min(len(_dg._WM_WARD3_RANK) * (2 ** max(0, spent - t0)), 256)
+    need = target - len(stamps)
+    if need <= 0 or not stamps:
+        return []
+    q = deque((e.row, e.col) for e in stamps)
+    seen = set(q)
+    placed = 0
+    while q and placed < need:
+        r, c = q.popleft()
+        for dr, dc in ((0, 1), (0, -1), (1, 0), (-1, 0)):
+            nb = (r + dr, c + dc)
+            if nb in seen or not room.is_passable(*nb):
+                continue
+            seen.add(nb)
+            q.append(nb)
+            if nb == (player.row, player.col) or room.entity_at(*nb) is not None:
+                continue
+            room.add_entity(Entity(kind='warden', row=nb[0], col=nb[1],
+                                   hp=1, max_hp=1, ai='', tag='stamp'))
+            placed += 1
+            if placed >= need:
+                break
+    if placed:
+        return [f'The press ROARS — the Wardens redouble! '
+                f'({len(stamps) + placed} stand)']
+    return []
 
 
 def _wm_bolt_cell(room, warden) -> tuple:
@@ -1236,30 +1340,40 @@ def _wm_pressure(room, player, round_no: int) -> list:
     return []
 
 
-def _warden_manifold_tick(room, player) -> list:
+def _warden_manifold_tick(room, player, spent: int = 0) -> list:
     """The Stamping Press — the Warden Manifold's round machine.
 
-    The Warden is edit_immune and shelters in a podium niche; each round he
-    has STAMPED a ward. Breaking it (each keyed to one Act-IV verb — see
-    _wm_ward_broken) jams the press: the round's echoes gutter, his bolt
-    draws, the niche FOG parts (all four niches start fogged — solid stone
-    from the hall — so /W finds him only while he is revealed and staggered;
-    fog is never re-laid, a spent niche may hold the player), and ONE x
-    lands before he re-manifests at the next podium and
-    stamps again. Ward checks and the bolt are shift-proof; the round
-    counter (room._wm_round) is boss state and survives undo (Pathfinder
-    convention — undo across a stamp restores the text but not the round).
-    The antechamber ritual (four braziers → the gate) and the final seal
-    are text-derived and stateless."""
+    The Warden is edit_immune and shelters in a FOGGED podium niche; each
+    round he has STAMPED a ward. Breaking it (each keyed to one Act-IV verb
+    — see _wm_ward_broken) jams the press: the round's copies gutter, his
+    bolt draws, his niche fog parts (only a revealed Warden is searchable —
+    /W jumps straight onto him), and ONE x lands before he re-manifests at
+    the next podium and stamps again. Round twists: R1's wall posts crumble
+    word by word; R2's mends RE-CORRUPT (and his fog re-laid) if the strike
+    is more than _WM_WARD2_WINDOW keystrokes behind the solve; R3's rank of
+    stamp-Wardens doubles per keystroke once the rot is half-cut. `spent` is
+    the running keystroke total (budget.spent) driving both timers.
+
+    Ward checks and the bolt are shift-proof; the round counter
+    (room._wm_round) is boss state and survives undo (Pathfinder convention
+    — undo across a stamp restores the text but not the round). The
+    antechamber ritual (four braziers → the gate + the HALL fog parts) and
+    the final seal (+ the treasure-pocket fog) are text-derived and
+    stateless."""
     msgs = []
 
-    # ── the opening ritual: four flames, then the gate draws ──
+    # ── the opening ritual: four flames → the gate + the hall's fog. The
+    # ember layer also serves round 4's lamps once they are stamped. ──
     braziers = getattr(room, '_wm_braziers', ())
     if braziers:
+        lamps = (_dg._WM_LAMP_CELLS
+                 if getattr(room, '_wm_lamps_on', False) else ())
+
         def lit(r, c):
             ru = room.char_run_at(r, c)
             return ru is not None and ru.symbols[c - ru.col] == _dg._QM_FLAME
-        unlit = {rc for rc in braziers if not lit(*rc)}
+        unlit_b = {rc for rc in braziers if not lit(*rc)}
+        unlit = unlit_b | {rc for rc in lamps if not lit(*rc)}
         for ru in [ru for ru in room.char_runs if ru.kind == 'pedestal']:
             if (ru.row, ru.col) not in unlit:
                 room.remove_char_run(ru)
@@ -1268,25 +1382,32 @@ def _warden_manifold_tick(room, player) -> list:
                 room.add_char_run(CharRun(r, c, (_dg._QM_EMBERS,), 'pedestal'))
         gr, gc = room._wm_gate
         gate_open = room.cells[gr][gc] != CellType.WALL
-        if not unlit and not gate_open:
+        if not unlit_b and not gate_open:
             room.cells[gr][gc] = CellType.FLOOR
-            msgs.append('Four flames burn as one — the ritual gate draws open!')
-        elif unlit and gate_open and (player.row, player.col) != (gr, gc):
+            room.fog_cells -= getattr(room, '_wm_hall_fog', frozenset())
+            msgs.append('Four flames burn as one — the gate draws, and the '
+                        'fog of the great hall parts!')
+        elif unlit_b and gate_open and (player.row, player.col) != (gr, gc):
             room.cells[gr][gc] = CellType.WALL
 
     warden = next((e for e in room.entities
-                   if e.kind == 'warden' and e.alive), None)
+                   if e.kind == 'warden' and e.tag == 'manifold' and e.alive),
+                  None)
 
-    # ── the press has fallen: every copy gutters, the seal draws ──
+    # ── the press has fallen: every copy gutters, the seal draws, the
+    # treasure pocket's fog parts ──
     if warden is None:
-        for e in [e for e in room.entities if e.alive and e.kind == 'goblin']:
+        for e in [e for e in room.entities if e.alive
+                  and (e.kind == 'goblin'
+                       or (e.kind == 'warden' and e.tag == 'stamp'))]:
             room.kill_entity(e)
             room._on_entity_destroyed(e)
         sr, sc = room._wm_seal
         if room.cells[sr][sc] == CellType.WALL:
             room.cells[sr][sc] = CellType.FLOOR
-            msgs.append('The press falls silent — every echo gutters out. '
-                        'The seal draws open.')
+            room.fog_cells -= getattr(room, '_wm_pocket_fog', frozenset())
+            msgs.append('The press falls silent — every copy gutters out. '
+                        'The seal draws open on the vault beyond.')
         return msgs
 
     # ── the round machine ──
@@ -1300,30 +1421,59 @@ def _warden_manifold_tick(room, player) -> list:
             room.cells[bolt[0]][bolt[1]] = CellType.WALL  # the old niche seals
             # (never onto the player — striking from inside leaves it ajar)
         room._wm_round = rnd + 1
+        room._wm_r2_spent0 = None
         nr, nc = _dg._WM_PODIUMS[rnd]                     # next podium (0-based)
         room.move_entity(warden, nr, nc)                  # re-indexes _entity_map
-        srow, scol, text, kind = room._wm_stamps[rnd + 1]
-        c = scol
-        for piece in text.split(' '):
-            if piece:
-                room.add_char_run(CharRun(srow, c, tuple(piece), kind))
-            c += len(piece) + 1
-        for i, (er, ec) in enumerate(room._wm_echo_spawns.get(rnd + 1, ())):
-            # hp=1: one strike gutters a copy outright (strike_disguise unmasks
-            # AND decrements — at hp 1 the unmasking IS the death), so one D
-            # erases the whole rank like text.
-            room.add_entity(Entity(kind='goblin', row=er, col=ec,
-                                   hp=1, max_hp=1, tag='echo', shade=i % 8))
+        if rnd + 1 in room._wm_stamps:
+            srow, scol, text, kind = room._wm_stamps[rnd + 1]
+            c = scol
+            for piece in text.split(' '):
+                if piece:
+                    room.add_char_run(CharRun(srow, c, tuple(piece), kind))
+                c += len(piece) + 1
+        if rnd + 1 == 3:
+            # arm the doubling timer's baseline: the rot as stamped
+            room._wm_rot0 = _wm_rot_cells(room)
+            room._wm_r3_spent0 = None
+        if rnd + 1 == 4:
+            # the three cold lamps: ember pedestals via the ritual layer,
+            # and the fuel chain grows so flames may now lie on them
+            room._wm_lamps_on = True
+            room._qm_chain = (*room._qm_chain, *_dg._WM_LAMP_CELLS)
+        kind, tag, spawn_cells = getattr(room, '_wm_spawns', {}).get(
+            rnd + 1, ('', '', ()))
+        for i, (er, ec) in enumerate(spawn_cells):
+            # hp=1: one strike gutters a copy outright, so one D erases a
+            # whole rank like text (stamp-Wardens are NOT edit_immune).
+            room.add_entity(Entity(kind=kind, row=er, col=ec, hp=1,
+                                   max_hp=1, ai='', tag=tag, shade=i % 8))
         msgs.append(('The press SLAMS — he re-manifests across the hall '
                      'and stamps a new ward!'))
         msgs.extend(_wm_pressure(room, player, rnd + 1))
     elif _wm_ward_broken(room, rnd):
-        # Staggered — echoes gutter, the bolt draws, the niche fog parts: the
-        # x window. A revealed Warden is searchable, so /W now jumps the
-        # player straight onto him (idempotent discard — derived, shift-proof).
+        # R2's window: the solve arms a timer; dawdle past it (without
+        # standing in the niche, one keystroke from the strike) and the
+        # mends re-corrupt, the bolt re-bars, his fog re-laid.
+        if rnd == 2:
+            t0 = getattr(room, '_wm_r2_spent0', None)
+            if t0 is None:
+                room._wm_r2_spent0 = spent
+            elif (spent - t0 >= _dg._WM_WARD2_WINDOW
+                  and (player.row, player.col)
+                  not in (bolt, (warden.row, warden.col))):
+                _wm_recorrupt(room)
+                room._wm_r2_spent0 = None
+                room.cells[bolt[0]][bolt[1]] = CellType.WALL
+                room.fog_cells.add((warden.row, warden.col))
+                msgs.append('Too slow — the corruption crawls back into '
+                            'his stamps!')
+                return msgs
+        # Staggered — copies gutter, the bolt draws, the niche fog parts:
+        # the x window. /W now jumps the player straight onto him.
         room.fog_cells.discard((warden.row, warden.col))
-        for e in [e for e in room.entities
-                  if e.alive and e.kind == 'goblin' and e.tag == 'echo']:
+        for e in [e for e in room.entities if e.alive
+                  and ((e.kind == 'goblin' and e.tag == 'echo')
+                       or (e.kind == 'warden' and e.tag == 'stamp'))]:
             room.kill_entity(e)
             room._on_entity_destroyed(e)
         if room.cells[bolt[0]][bolt[1]] == CellType.WALL:
@@ -1332,9 +1482,14 @@ def _warden_manifold_tick(room, player) -> list:
                         'niche parts: strike now!')
     else:
         # Mid-round (or an undo restored the ward): the niche stands sealed.
+        room._wm_r2_spent0 = None
         if room.cells[bolt[0]][bolt[1]] != CellType.WALL \
                 and (player.row, player.col) != bolt:
             room.cells[bolt[0]][bolt[1]] = CellType.WALL
+
+    msgs.extend(_wm_crumble_posts(room))
+    if rnd == 3:
+        msgs.extend(_wm_double_rank(room, player, spent))
     return msgs
 
 
@@ -1460,7 +1615,7 @@ _LEVEL_INTROS = {
     'cipher_cell':         ('The Cipher Cell — make each row read as its plaque: r mends a rune, D shears the rot.', 60),
     'quartermaster':       ('The Beacon Tiers — one flame remains. yl takes it without taking; P sets it on cold braziers (…); yy, a whole row.', 60),
     'echo_vault':          ('The Echo Vault — the same blight, stamped again and again. Mend one rune with r; then . repeats your last change.', 60),
-    'warden_manifold':     ('The Warden Manifold — he stamps himself into the world. Light the four braziers; the ritual gate will draw.', 70),
+    'warden_manifold':     ('The Warden Manifold — he stamps himself into the world. Light the four braziers; the gate will draw and the fog will part.', 70),
     'warden_surveyor':     ('The Warden Surveyor — survey his hall; w/b/e leap word to word, over the void.', 60),
     'dummy':               ('Sandbox — all mechanics active. Type :edit to enter editor mode.', 60),
     'archivists_library':  ("The Archivist's Library — the whole catalogue has spilled "
@@ -1512,6 +1667,8 @@ def _held_key(player):
 def _on_kill(ent, player, room=None, level: str = '') -> str:
     if ent.kind == 'warden':
         if level == 'warden_manifold':
+            if ent.tag == 'stamp':
+                return 'A stamped copy gutters out.'
             # No key here — the seal is drawn by the tick once the hall empties.
             return 'The final stamp never falls. The Warden Manifold is undone.'
         # Every Warden drops the key to its keep's locked exit door (no auto-open).
@@ -1777,7 +1934,8 @@ def _enemy_tick(room, player) -> list:
                 room.move_entity(ent, 0, nc)
             continue
         dist = _manhattan(player.row, player.col, ent.row, ent.col)
-        if ent.kind == 'warden' and ent.tag not in ('surveyor', 'verse', 'manifold') \
+        if ent.kind == 'warden' \
+                and ent.tag not in ('surveyor', 'verse', 'manifold', 'stamp') \
                 and dist <= _ALERT_RADIUS:
             has_goblins = any(
                 e.alive and e.summoner_uid == ent.uid
@@ -3613,7 +3771,8 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
                     # The Manifold re-manifests via its own round machine — the
                     # tick moves him to the next podium, never a random leap.
                     if cur.kind == 'warden' and cur.hp > 0 \
-                            and cur.tag not in ('surveyor', 'verse', 'manifold'):
+                            and cur.tag not in ('surveyor', 'verse',
+                                                'manifold', 'stamp'):
                         move_msg = _do_warden_move(room, cur, player)
                         if move_msg:
                             _push(move_msg)
@@ -4221,7 +4380,7 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
             # The Warden Manifold: the ritual gate, the round machine and the
             # final seal (see _warden_manifold_tick).
             if level == 'warden_manifold':
-                for _wm_msg in _warden_manifold_tick(room, player):
+                for _wm_msg in _warden_manifold_tick(room, player, budget.spent):
                     _push(_wm_msg)
 
             # Warden summon message
