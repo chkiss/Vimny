@@ -1,30 +1,31 @@
 """The Inscription Halls (display 22, slug `inscription_halls`): i and a.
 
-The first writer. A four-wide river crosses the dungeon north–south; lesson
-rows hang west of the bank like jetties, each read against the familiar
-verdant plaque sealed in the wall above it. The floor text is INCOMPLETE —
-the plaque shows the whole word — and a bank gate opens when the word is
-written whole (plaque rule, fourth member: Cipher mended, Beacon copied,
-Echo repeated, the Halls AUTHOR).
+The first writer. A four-wide river MEANDERS down the dungeon, its west edge
+drifting four columns west from headwater to ford; lesson jetties hang west
+of the bank, each read against the familiar verdant plaque sealed in the
+wall above it. The floor text is INCOMPLETE — the plaque shows the whole
+word (plaque rule, fourth member: Cipher mended, Beacon copied, Echo
+repeated, the Halls AUTHOR) — and each word written whole grinds open ONE of
+five stone walls stacked east of the ford before the exit. Five in series:
+nothing wins unfinished, however the player travels — the par route hops
+jetties with ( / ) / e (embraced: sentence jumps only optimize travel).
 
 Forcing (both hard, by geometry):
   i — the prefix lesson: the fragment head IS the row's first floor cell
-      (wall behind it), so only insert-AT-cursor can write the prefix;
-      `a` would need to stand inside the wall.
-  a — the suffix lesson: the fragment tail sits ON the bank with water at
-      the very next cell, so only insert-AFTER-cursor can write the suffix;
-      `i` would need to stand on the river. INK DISPLACES THE FLOOD: each
-      typed letter pushes that row's water back a cell (spilled over the
-      east wall and lost — engine: open_gap moves water; insert_char now
-      writes onto water cells).
-The ford finale: 'river' + a + 'gate' types a bridge clean across — the
-word IS the crossing — and the seal draws on the exit pocket.
+      (wall behind it), so only insert-AT-cursor can write the prefix.
+  a — the suffix lesson: the fragment tail sits ON the row's bank with water
+      at the very next cell, so only insert-AFTER-cursor can write the
+      suffix. INK DISPLACES THE FLOOD: each typed letter pushes that row's
+      water back a cell (spilled over the east wall and lost).
+The ford finale: 'river' + a + 'gate' types a bridge clean across — the word
+IS the crossing. The bridge-word owns the WESTMOST exit wall, so typed water
+always crushes against stone, never slides into an opened corridor.
 
 Scarcity (the Echo Vault discipline, pinned below): the missing letters
 exist nowhere cuttable, so x+p can never impersonate the verbs. Esc spends
 NOTHING (engine fact); insert answer tokens ('ica', 'agate') cost 1+chars.
-Vim-faithful Esc retreat (cursor steps back one column) shipped with this
-level — it is also the safety net off the water after an `a` at the bank.
+THE LANDING RULE (engine-wide, shipped from this level's playtests): no jump
+lands where the cursor cannot stand — pinned here by the known-motion sweep.
 """
 from collections import deque
 
@@ -37,11 +38,10 @@ from engine.player import Player
 from engine.world import CellType
 from content.levels import known_commands
 from generation.dungeon_gen import (
-    build_dungeon_inscription_halls, _ih_pick,
-    _IH_ROWS, _IH_COLS, _IH_RIVER_LO, _IH_RIVER_HI, _IH_BANK,
-    _IH_LESSON_ROWS, _IH_PLAQUE_ROWS, _IH_BOLT_ROWS, _IH_I_HEAD, _IH_A_WEST,
-    _IH_SPLITS, _IH_FORD_ROW, _IH_FORD_FRAG, _IH_FORD_WORD, _IH_SEAL,
-    _IH_EXIT, _IH_PAR,
+    build_dungeon_inscription_halls, _ih_pick, _ih_river_lo, _ih_bank,
+    _IH_ROWS, _IH_COLS, _IH_RIVER_W, _IH_LESSON_ROWS, _IH_PLAQUE_ROWS,
+    _IH_GAPS, _IH_I_HEAD, _IH_A_WEST, _IH_SPLITS, _IH_FORD_ROW,
+    _IH_FORD_FRAG, _IH_FORD_WORD, _IH_SEALS, _IH_EXIT, _IH_PAR,
 )
 import pytest
 import random
@@ -87,27 +87,37 @@ def _drive(dungeon, keys, monkeypatch, finish=':q!\r'):
                             _dungeon=dungeon)
 
 
-# ── structure: the river and the jetties ──────────────────────────────────────
+# ── structure: the meandering river and the jetties ───────────────────────────
 
 @pytest.mark.parametrize("seed", SEEDS)
 def test_dimensions_anchors_and_the_river(seed):
     room = _room(seed)
     assert (room.rows, room.cols) == (_IH_ROWS, _IH_COLS)
-    assert room.spawn_pos == (_IH_LESSON_ROWS[0], _IH_BANK)
+    assert room.spawn_pos == (_IH_LESSON_ROWS[0], _ih_bank(_IH_LESSON_ROWS[0]))
     assert room.exit_pos == _IH_EXIT
     assert room.par == _IH_PAR
-    # a TRUE river: four wide, every row top wall to bottom wall
     for r in range(1, _IH_ROWS - 1):
-        for c in range(_IH_RIVER_LO, _IH_RIVER_HI + 1):
+        lo = _ih_river_lo(r)
+        for c in range(lo, lo + _IH_RIVER_W):
             assert room.cells[r][c] == CellType.WATER, (r, c)
-        assert room.cells[r][_IH_RIVER_HI + 1] == CellType.WALL, \
+        assert room.cells[r][lo + _IH_RIVER_W] == CellType.WALL or \
+            (r, lo + _IH_RIVER_W) in _IH_SEALS, \
             "the east wall is the brink the flood spills over"
+
+
+def test_river_truly_meanders():
+    """The user's spec: no straight vertical borders — the river drifts a
+    net 4 columns west, one column at a time (contiguous, always 4 wide)."""
+    los = [_ih_river_lo(r) for r in range(1, _IH_ROWS - 1)]
+    assert los[0] - los[-1] == 4, "net drift of four columns west"
+    assert all(0 <= a - b <= 1 for a, b in zip(los, los[1:])), \
+        "the bank steps at most one column per row, always westward"
 
 
 @pytest.mark.parametrize("seed", SEEDS)
 def test_forcing_geometry(seed):
     """i-rows: the fragment head IS the first floor cell (wall behind);
-    a-rows: the fragment tail sits ON the bank (water beyond)."""
+    a-rows: the fragment tail sits ON the row's bank (water beyond)."""
     room = _room(seed)
     for i, r in enumerate(_IH_LESSON_ROWS):
         if i in (0, 2):
@@ -115,23 +125,26 @@ def test_forcing_geometry(seed):
             assert room.char_run_at(r, _IH_I_HEAD) is not None, \
                 "the fragment head is the row's first floor cell"
         else:
-            tail = room.char_run_at(r, _IH_BANK)
-            assert tail is not None, "the fragment tail sits on the bank"
-            assert room.cells[r][_IH_BANK + 1] == CellType.WATER
-    ford_tail = room.char_run_at(_IH_FORD_ROW, _IH_BANK)
-    assert ford_tail is not None, "'river' ends on the bank"
+            bank = _ih_bank(r)
+            assert room.char_run_at(r, bank) is not None, \
+                "the fragment tail sits on the bank"
+            assert room.cells[r][bank + 1] == CellType.WATER
+    assert room.char_run_at(_IH_FORD_ROW, _ih_bank(_IH_FORD_ROW)) is not None, \
+        "'river' ends on the ford's bank"
 
 
 @pytest.mark.parametrize("seed", SEEDS)
 def test_plaques_sealed_in_walls(seed):
     """The familiar plaque band: plaque glyphs stand in unwalkable cells
     (uncuttable, excluded from the floor-text scans) — EXCEPT the one cell
-    where each a-plaque crosses the promenade gap (rows 4/10, col 37).
-    Those two letters are fragment letters (already on the floor below), so
-    even cuttable they donate nothing the scarcity rule protects."""
+    where each a-plaque crosses its promenade connector. Those letters are
+    fragment letters (already on the floor below), so even cuttable they
+    donate nothing the scarcity rule protects."""
     room = _room(seed)
     plaque_rows = set(_IH_PLAQUE_ROWS) | {_IH_ROWS - 1}
-    crossings = {(4, _IH_BANK), (10, _IH_BANK)}
+    crossings = {(r, c) for (r, c) in _IH_GAPS if r in _IH_PLAQUE_ROWS}
+    lessons = _ih_pick(random.Random(seed))
+    by_prow = {r: i for i, r in enumerate(_IH_PLAQUE_ROWS)}
     seen = 0
     for ru in room.char_runs:
         if ru.row not in plaque_rows:
@@ -142,24 +155,33 @@ def test_plaques_sealed_in_walls(seed):
             cell = (ru.row, ru.col + k)
             if room.cells[cell[0]][cell[1]] == CellType.FLOOR:
                 assert cell in crossings, f"plaque glyph on open floor at {cell}"
-                lessons = {r: i for i, r in enumerate(_IH_PLAQUE_ROWS)}
-                idx = lessons[ru.row]
-                frag = _ih_pick(random.Random(seed))[idx][2]
-                assert sym in frag, "the crossing letter must be a fragment letter"
+                assert sym in lessons[by_prow[ru.row]][2], \
+                    "the crossing letter must be a fragment letter"
     assert seen == 5, "four lesson plaques + the ford plaque in the border"
 
 
 @pytest.mark.parametrize("seed", SEEDS)
-def test_gates_start_shut_despite_the_plaques(seed):
+def test_walls_start_shut_despite_the_plaques(seed):
     """The plaques SHOW every word from turn one — the completion scan must
-    read floor text only, or every gate would open at entry."""
+    read floor text only, or every exit wall would open at entry."""
     dungeon = build_dungeon_inscription_halls(seed)
     room = dungeon.rooms[0]
     p = Player(row=room.spawn_pos[0], col=room.spawn_pos[1])
     main._inscription_halls_tick(room, p)
-    for _w, (r, c) in room._ih_bolts:
+    for (r, c) in _IH_SEALS:
         assert room.cells[r][c] == CellType.WALL
-    assert room.cells[_IH_SEAL[0]][_IH_SEAL[1]] == CellType.WALL
+
+
+@pytest.mark.parametrize("seed", SEEDS)
+def test_five_walls_one_per_word_bridge_word_westmost(seed):
+    room = _room(seed)
+    assert len(room._ih_bolts) == 5
+    words = [w for (w, _cell) in room._ih_bolts]
+    cells = [cell for (_w, cell) in room._ih_bolts]
+    assert sorted(cells) == sorted(_IH_SEALS)
+    assert room._ih_bolts[0] == (_IH_FORD_WORD, _IH_SEALS[0]), \
+        "the bridge-word owns the WESTMOST wall (typed water crushes on it)"
+    assert len(set(words)) == 5
 
 
 # ── scarcity: typing is the only source ───────────────────────────────────────
@@ -169,7 +191,7 @@ def test_missing_letters_are_scarce(seed):
     """No missing letter exists anywhere cuttable (fragments + 'river'), and
     the four missing sets are pairwise disjoint — x+p can never impersonate
     i or a. Words are never substrings of each other or of the bridge-word
-    (the gate checks are substring scans)."""
+    (the wall checks are substring scans)."""
     lessons = _ih_pick(random.Random(seed))
     msets = [set(m) for (_w, m, _f) in lessons]
     cuttable = set(_IH_FORD_FRAG) | {ch for (_w, _m, f) in lessons for ch in f}
@@ -186,35 +208,7 @@ def test_missing_letters_are_scarce(seed):
         assert len(m) == _IH_SPLITS[i], "fixed splits — par invariance"
 
 
-# ── access: the pocket is sealed against everything ───────────────────────────
-
-@pytest.mark.parametrize("seed", SEEDS)
-def test_exit_unreachable_as_built(seed):
-    room = build_dungeon_inscription_halls(seed).rooms[0]    # private (mutating)
-    seen, q = {room.spawn_pos}, deque([room.spawn_pos])
-    while q:
-        r, c = q.popleft()
-        for dr, dc in ((0, 1), (0, -1), (1, 0), (-1, 0)):
-            nb = (r + dr, c + dc)
-            if nb not in seen and room.is_passable(*nb):
-                seen.add(nb)
-                q.append(nb)
-    assert _IH_EXIT not in seen, "the river and the seal hold"
-    assert all(c <= _IH_BANK for (_r, c) in seen), "nothing east of the bank walks"
-
-
-@pytest.mark.parametrize("seed", SEEDS)
-def test_line_jumps_never_cross_the_river(seed):
-    room = build_dungeon_inscription_halls(seed).rooms[0]    # private (mutating)
-    jumps = ([('G', 1, False), ('gg', 1, False), ('H', 1, False),
-              ('M', 1, False), ('L', 1, False)]
-             + [('G', n, True) for n in range(1, _IH_ROWS)])
-    for motion, count, count_given in jumps:
-        p = Player(row=room.spawn_pos[0], col=room.spawn_pos[1])
-        apply_motion(p, motion, count, room, count_given=count_given)
-        assert p.col <= _IH_BANK, f"{motion} crossed the river"
-        assert (p.row, p.col) != _IH_EXIT
-
+# ── access: the exit is five walls deep ───────────────────────────────────────
 
 def _reachable(room):
     seen, q = {room.spawn_pos}, deque([room.spawn_pos])
@@ -229,19 +223,38 @@ def _reachable(room):
 
 
 @pytest.mark.parametrize("seed", SEEDS)
+def test_exit_unreachable_as_built(seed):
+    room = build_dungeon_inscription_halls(seed).rooms[0]    # private (mutating)
+    seen = _reachable(room)
+    assert _IH_EXIT not in seen, "the river and the five walls hold"
+    assert all(c <= _ih_bank(r) for (r, c) in seen), \
+        "nothing east of the bank walks"
+
+
+@pytest.mark.parametrize("seed", SEEDS)
+def test_line_jumps_never_cross_the_river(seed):
+    room = build_dungeon_inscription_halls(seed).rooms[0]    # private (mutating)
+    jumps = ([('G', 1, False), ('gg', 1, False), ('H', 1, False),
+              ('M', 1, False), ('L', 1, False)]
+             + [('G', n, True) for n in range(1, _IH_ROWS)])
+    for motion, count, count_given in jumps:
+        p = Player(row=room.spawn_pos[0], col=room.spawn_pos[1])
+        apply_motion(p, motion, count, room, count_given=count_given)
+        assert p.col <= _ih_bank(p.row), f"{motion} crossed the river"
+        assert (p.row, p.col) != _IH_EXIT
+
+
+@pytest.mark.parametrize("seed", SEEDS)
 def test_every_known_motion_lands_passable_and_west(seed):
     """The pressure sweep: every motion known by display 22, applied from
-    every passable cell, must land somewhere the engine accounts for —
-    a passable cell WEST of the river, or a WATER cell (the drown trap:
-    the main loop damages and bounces the player, the Bracket Vaults rule,
-    so $ on a jetty dunks you — punished, not a leak). Landing in a WALL
-    or on floor east of the river is the `)`-cheese class: a bug."""
+    every passable west-side cell, must land somewhere the engine accounts
+    for — a passable cell west of the river, or a WATER cell (the drown
+    trap: the main loop damages and bounces the player, so $ on a jetty
+    dunks you — punished, not a leak). Landing in a WALL or on floor east
+    of the river is the `)`-cheese class: a bug. THE LANDING RULE's pin."""
     room = build_dungeon_inscription_halls(seed).rooms[0]    # private (mutating)
-    # every cell a player could ever occupy: passable and west of the river
-    # (the exit pocket is passable but sealed — no motion reaches it, as the
-    # other access tests prove)
     spots = {(r, c) for r in range(room.rows) for c in range(room.cols)
-             if room.is_passable(r, c) and c <= _IH_BANK}
+             if room.is_passable(r, c) and c <= _ih_bank(r)}
     targets = sorted({sym for ru in room.char_runs for sym in ru.symbols})
     motions = ([(m, 1, False) for m in
                 ('h', 'j', 'k', 'l', 'w', 'b', 'e', 'W', 'B', 'E', 'ge', 'gE',
@@ -255,7 +268,7 @@ def test_every_known_motion_lands_passable_and_west(seed):
         assert room.is_passable(p.row, p.col) or on_water, \
             f"{what} landed in a wall at {(p.row, p.col)}"
         if not on_water:                       # water landings drown + bounce
-            assert p.col <= _IH_BANK, \
+            assert p.col <= _ih_bank(p.row), \
                 f"{what} crossed the river to {(p.row, p.col)}"
 
     for (r0, c0) in sorted(spots):
@@ -279,6 +292,8 @@ def test_search_skips_the_walled_plaques(seed):
     room = _room(seed)
     p = Player(row=room.spawn_pos[0], col=room.spawn_pos[1])
     for word, _gate in room._ih_bolts:
+        if word == _IH_FORD_WORD:
+            continue
         assert find_next(room, p, word, True) is None, \
             "the plaque word must not be a search landing"
     frag = ''.join(room.char_run_at(_IH_LESSON_ROWS[0], _IH_I_HEAD).symbols)
@@ -287,45 +302,39 @@ def test_search_skips_the_walled_plaques(seed):
 
 
 @pytest.mark.parametrize("seed", SEEDS)
-def test_teleport_ahead_cannot_win(seed, monkeypatch):
-    """The cheese that shipped: hop to the ford (bare G, or ) before the
-    landing filter), bridge it with 'agate' — the seal must hold until every
-    lesson word is written."""
+def test_bridging_early_cannot_win(seed, monkeypatch):
+    """G + agate builds the bridge first — only the bridge-word's own wall
+    opens; four lesson walls still bar the exit. Nothing wins unfinished."""
     dungeon = build_dungeon_inscription_halls(seed)
     room = dungeon.rooms[0]
     keys = ([Keystroke('G'), Keystroke('4'), Keystroke('l'), Keystroke('a')]
             + [Keystroke(ch) for ch in 'gate'] + [ESC]
-            + [Keystroke(ch) for ch in 'lll'])
+            + [Keystroke(ch) for ch in 'lllllll'])
     res = _drive(dungeon, keys, monkeypatch)
-    assert not res['won'], "the ford alone must never win"
-    assert room.cells[_IH_SEAL[0]][_IH_SEAL[1]] == CellType.WALL, \
-        "the seal answers only to the finished halls"
-    assert _IH_FORD_WORD in main._ih_floor_text(room, _IH_FORD_ROW), \
-        "(the bridge itself was honestly built)"
-
-    # sentence-hopping spam + the bridge: same answer
-    dungeon = build_dungeon_inscription_halls(seed)
-    room = dungeon.rooms[0]
-    keys = ([Keystroke(')')] * 10 + [Keystroke('$'), Keystroke('a')]
-            + [Keystroke(ch) for ch in 'gate'] + [ESC]
-            + [Keystroke(ch) for ch in 'lll'])
-    res = _drive(dungeon, keys, monkeypatch)
-    assert not res['won']
-    assert room.cells[_IH_SEAL[0]][_IH_SEAL[1]] == CellType.WALL
+    assert not res['won'], "the bridge alone must never win"
+    assert room.cells[_IH_SEALS[0][0]][_IH_SEALS[0][1]] == CellType.FLOOR, \
+        "the bridge-word honestly opens its OWN wall"
+    for (r, c) in _IH_SEALS[1:]:
+        assert room.cells[r][c] == CellType.WALL, \
+            "the lesson walls hold until their words are written"
 
 
 # ── the lessons, driven for real ──────────────────────────────────────────────
 
 @pytest.mark.parametrize("seed", SEEDS)
 def test_full_playthrough_wins_par_perfect(seed, monkeypatch):
+    """The canonical sentence-hop route: ( / ) / e between jetties, i and a
+    at the triggers, the typed bridge, the five open walls, the exit."""
     dungeon = build_dungeon_inscription_halls(seed)
     room = dungeon.rooms[0]
     result = _drive(dungeon, _keys(room.answer), monkeypatch, finish=':wq\r')
     assert result['won'] and result['stars'] == 2, result
-    # the ford is bridged: row 13's water is gone, the word spans the river
+    lo = _ih_river_lo(_IH_FORD_ROW)
     assert all(room.cells[_IH_FORD_ROW][c] != CellType.WATER
-               for c in range(_IH_RIVER_LO, _IH_RIVER_HI + 1))
+               for c in range(lo, lo + _IH_RIVER_W))
     assert _IH_FORD_WORD in main._ih_floor_text(room, _IH_FORD_ROW)
+    for (r, c) in _IH_SEALS:
+        assert room.cells[r][c] == CellType.FLOOR, "all five walls open"
 
 
 @pytest.mark.parametrize("seed", SEEDS)
@@ -335,51 +344,48 @@ def test_suffix_typing_pushes_the_flood(seed, monkeypatch):
     dungeon = build_dungeon_inscription_halls(seed)
     room = dungeon.rooms[0]
     toks = room.answer.split()
-    upto_b = ' '.join(toks[:5])                       # through lesson B's a-token
+    upto_b = ' '.join(toks[:5])                       # ( i{..} ) e a{..}
     _drive(dungeon, _keys(upto_b), monkeypatch)
-    r = _IH_LESSON_ROWS[1]
-    k = _IH_SPLITS[1]
+    r, k = _IH_LESSON_ROWS[1], _IH_SPLITS[1]
     water = [c for c in range(room.cols) if room.cells[r][c] == CellType.WATER]
-    assert len(water) == (_IH_RIVER_HI - _IH_RIVER_LO + 1) - k, \
-        "one water cell spilled per typed letter"
-    assert room.cells[r][_IH_RIVER_LO] != CellType.WATER, "the bank cell is reclaimed"
+    assert len(water) == _IH_RIVER_W - k, "one water cell spilled per letter"
+    assert room.cells[r][_ih_river_lo(r)] != CellType.WATER, \
+        "the bank cell is reclaimed"
 
 
 @pytest.mark.parametrize("seed", SEEDS)
-def test_garbage_never_opens_the_seal(seed, monkeypatch):
-    """Typing the wrong letters dries nothing it shouldn't: the ford seal
-    answers only to the plaque's word."""
+def test_garbage_never_opens_the_walls(seed, monkeypatch):
+    """Typing the wrong letters at the ford dries the row but opens nothing:
+    the walls answer only to the plaques' words."""
     dungeon = build_dungeon_inscription_halls(seed)
     room = dungeon.rooms[0]
-    toks = room.answer.split()
-    pre = ' '.join(toks[:-3])                         # everything before 'agate'
-    garbage = _keys(pre) + [Keystroke('a')] + \
-        [Keystroke(ch) for ch in 'zzzz'] + [ESC]
-    _drive(dungeon, garbage, monkeypatch)
-    assert room.cells[_IH_SEAL[0]][_IH_SEAL[1]] == CellType.WALL
-    # the flood is gone on that row regardless — but the gate reads, not counts
+    keys = ([Keystroke('G'), Keystroke('4'), Keystroke('l'), Keystroke('a')]
+            + [Keystroke(ch) for ch in 'zzzz'] + [ESC])
+    _drive(dungeon, keys, monkeypatch)
+    for (r, c) in _IH_SEALS:
+        assert room.cells[r][c] == CellType.WALL
     assert _IH_FORD_WORD not in main._ih_floor_text(room, _IH_FORD_ROW)
 
 
 @pytest.mark.parametrize("seed", SEEDS)
-def test_undo_rebars_the_gate(seed, monkeypatch):
-    """One u unwinds the whole inscription (one snapshot per insert session)
-    and the tick re-bars the bank gate."""
+def test_undo_rebars_the_wall(seed, monkeypatch):
+    """One insert session is one snapshot: u past the movement entry unwrites
+    the word and the tick re-bars its wall."""
     dungeon = build_dungeon_inscription_halls(seed)
     room = dungeon.rooms[0]
     toks = room.answer.split()
-    lesson_a = ' '.join(toks[:2])                     # '9h i{..}'
-    _drive(dungeon, _keys(lesson_a, extra='l'), monkeypatch)   # l: tick opens the gate
-    word, (br, bc) = room._ih_bolts[0]
-    assert room.cells[br][bc] == CellType.FLOOR, "written whole — gate open"
+    lesson_a = ' '.join(toks[:2])                     # '( i{..}'
+    _drive(dungeon, _keys(lesson_a, extra='l'), monkeypatch)
+    word, (br, bc) = room._ih_bolts[1]                # lesson A's wall
+    assert room.cells[br][bc] == CellType.FLOOR, "written whole — wall open"
 
     dungeon = build_dungeon_inscription_halls(seed)
     room = dungeon.rooms[0]
     # u pops the 'l' movement first; the SECOND u pops the whole insert
     # session (one snapshot at entry) and unwrites the word.
     _drive(dungeon, _keys(lesson_a, extra='luul'), monkeypatch)
-    word, (br, bc) = room._ih_bolts[0]
-    assert room.cells[br][bc] == CellType.WALL, "undone — the gate re-bars"
+    word, (br, bc) = room._ih_bolts[1]
+    assert room.cells[br][bc] == CellType.WALL, "undone — the wall re-bars"
 
 
 def test_esc_steps_back_onto_written_ground(monkeypatch):
@@ -390,15 +396,14 @@ def test_esc_steps_back_onto_written_ground(monkeypatch):
     toks = room.answer.split()
     upto_b = ' '.join(toks[:5])
     _drive(dungeon, _keys(upto_b), monkeypatch)
-    # lesson B's row: the cell at the old bank+k is floor and holds a letter
     r, k = _IH_LESSON_ROWS[1], _IH_SPLITS[1]
-    assert room.cells[r][_IH_BANK + k] in _FLOORS
+    assert room.cells[r][_ih_bank(r) + k] in _FLOORS
 
 
 def test_curriculum_guard():
-    """The level teaches the 'insert' token; everything else it leans on is
-    already known (counts, hjkl, u)."""
+    """The level teaches the 'insert' token; everything else the par route
+    leans on is already known — including the sentence jumps."""
     known = set(known_commands('inscription_halls'))
     assert 'insert' in known
-    for needed in ('count', 'u' if 'u' in known else 'insert', 'G', '/'):
+    for needed in ('count', '(', 'G', '/'):
         assert needed in known

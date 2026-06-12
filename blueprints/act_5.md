@@ -51,14 +51,18 @@ see Open Decisions #3 (`>{m}` over motion spans).
 
 ## 22 — The Inscription Halls (`inscription_halls`) — `i a`
 
-**BUILT 2026-06-12** — see `generation/dungeon_gen.py::
-build_dungeon_inscription_halls` and `tests/test_inscription_halls.py`.
-As shipped: the river crossing (water writable — ink displaces the flood;
-engine change in `insert_char` + Vim-faithful Esc retreat), prefix/suffix
-hard-forcing by wall/water geometry, fragment scarcity via greedy vocab
-draw, the `rivergate` ford finale. Esc spends NOTHING (the old "Esc = 1"
-par assumption was wrong; insert answer tokens cost 1 + chars — Open
-Decision #4 below is RESOLVED).
+**BUILT 2026-06-12** (reworked twice after playtests) — see
+`generation/dungeon_gen.py::build_dungeon_inscription_halls` and
+`tests/test_inscription_halls.py`. As shipped: a MEANDERING river (drifts
+4 cols west, headwater to ford; water writable — ink displaces the flood;
+engine changes: `insert_char` water-write + Vim-faithful Esc retreat),
+prefix/suffix hard-forcing by wall/water geometry, fragment scarcity via
+greedy vocab draw, FIVE exit walls (one per word, bridge-word westmost),
+the `rivergate` ford finale, par 26 via the ( / ) / e sentence-hop route
+(embraced after a playtest beat the walking par). Two lasting laws came
+out of its playtests: Esc spends NOTHING (insert tokens cost 1 + chars —
+Open Decision #4 RESOLVED) and THE LANDING RULE (engine-wide: no jump
+lands where the cursor cannot stand; pressure-sweep test = the template).
 
 ---
 

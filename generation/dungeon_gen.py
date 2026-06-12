@@ -6620,31 +6620,53 @@ def build_dungeon_warden_manifold(seed: int) -> Dungeon:
 
 
 # ── The Inscription Halls (22) — the first writer ─────────────────────────────
-# A wide river crosses the dungeon north–south; lesson rows hang west of the
-# bank like jetties. Plaque rule, fourth member (Cipher mended, Beacon copied,
-# Echo repeated): here the floor text is INCOMPLETE — the plaque shows the
-# whole word, the floor a fragment; the bolt opens when the word is written
-# whole. i = the prefix lesson (fragment head flush against the dead-end wall:
-# only insert-AT-cursor can write there); a = the suffix lesson (fragment tail
-# on the bank, water at the very next cell: nowhere to stand for i — a writes
-# past yourself, and INK DISPLACES THE FLOOD, each letter pushing the river
-# back one cell, spilled over the east wall). The ford finale: 'river' + a +
-# 'gate' types a bridge clean across — the word IS the crossing.
-_IH_ROWS, _IH_COLS = 15, 46
-_IH_RIVER_LO, _IH_RIVER_HI = 38, 41     # the river: 4 wide, rows 1..13
-_IH_BANK = 37                           # the promenade column (river's west bank)
+# A wide river meanders north–south, drifting four columns west as it falls;
+# lesson rows hang west of the bank like jetties. Plaque rule, fourth member
+# (Cipher mended, Beacon copied, Echo repeated): here the floor text is
+# INCOMPLETE — the plaque shows the whole word, the floor a fragment. Each
+# word written whole grinds open ONE of five stone walls stacked before the
+# exit beyond the ford (lessons in any order; ( / ) sentence-hops between
+# jetties are the par route — embraced, not fought). i = the prefix lesson
+# (fragment head flush against the dead-end wall: only insert-AT-cursor can
+# write there); a = the suffix lesson (fragment tail on the bank, water at
+# the very next cell: nowhere to stand for i — a writes past yourself, and
+# INK DISPLACES THE FLOOD, each letter pushing the river back one cell,
+# spilled over the east wall). The ford finale: 'river' + a + 'gate' types a
+# bridge clean across — the word IS the crossing.
+_IH_ROWS, _IH_COLS = 15, 52
+# The river MEANDERS: 4 wide everywhere, drifting four columns west from the
+# headwater to the ford (rows 1..13; index = row, [0]/[14] unused borders).
+_IH_RIVER_W = 4
+_IH_RIVER_LO_BY_ROW = (0, 42, 42, 41, 41, 41, 40, 40, 40, 39, 39, 39, 38, 38, 0)
+
+
+def _ih_river_lo(r: int) -> int:
+    return _IH_RIVER_LO_BY_ROW[r]
+
+
+def _ih_bank(r: int) -> int:
+    """The west bank of row r — the last standable column before the water."""
+    return _ih_river_lo(r) - 1
+
+
 _IH_LESSON_ROWS = (2, 5, 8, 11)         # i, a, i, a (jetties off the bank)
 _IH_PLAQUE_ROWS = (1, 4, 7, 10)         # sealed band above each lesson
-_IH_BOLT_ROWS   = (3, 6, 9, 12)         # bank gates: open as each word completes
+# Promenade connectors: (row, col) gaps through the separator/plaque rows —
+# each pair shares a column passable on both neighbouring rows (the bank
+# drifts, so the column steps west going downstream).
+_IH_GAPS = ((3, 40), (4, 40), (6, 39), (7, 39), (9, 38), (10, 38), (12, 37))
 _IH_I_HEAD = 28                         # i-rows: fragment head = the row's FIRST floor
                                         # cell (wall at 27 — nowhere to stand for `a`)
 _IH_A_WEST = 29                         # a-rows: floor from here to the bank
 _IH_SPLITS = (2, 1, 1, 2)               # missing-letter counts (FIXED — par invariance)
 _IH_FORD_ROW = 13                       # 'river' at 33..37, tail on the bank
 _IH_FORD_FRAG, _IH_FORD_WORD = 'river', 'rivergate'
-_IH_SEAL = (13, 42)                     # opens when a row reads 'rivergate'
-_IH_EXIT = (13, 43)                     # pocket behind the seal, east bank
-_IH_PAR  = 37                           # hand-tallied along room.answer below;
+# Five stone walls stacked before the exit, east of the ford: each written
+# word grinds ONE open. The bridge-word owns the WESTMOST (42) — typed water
+# is always crushed against stone, never slid into an opened corridor.
+_IH_SEALS = ((13, 42), (13, 43), (13, 44), (13, 45), (13, 46))
+_IH_EXIT  = (13, 47)                    # beyond all five walls
+_IH_PAR   = 26                          # the ( / ) / e sentence-hop route (below);
                                         # insert costs 1 + chars (Esc spends nothing)
 
 # Deterministic fallback if the greedy draw can't fill all four slots
@@ -6699,38 +6721,41 @@ def _ih_pick(rng):
 def build_dungeon_inscription_halls(seed: int) -> Dungeon:
     """The Inscription Halls (the first writer: i and a).
 
-    Layout: rows 1..13 carry the RIVER at cols 38..41 (water — impassable,
-    movable; pushed cells spill over the east wall at 42 and are lost); the
-    bank promenade is col 37, gated row by row by bolts that open as each
-    lesson's word is written whole (main._inscription_halls_tick). i-rows
-    dead-end west at col 27 with the fragment head ON col 28 — stand on the
-    head, i writes under you, a physically cannot (col 27 is wall). a-rows
-    put the fragment tail ON the bank (col 37) with water at 38 — stand on
-    the tail, a writes past you onto the flood (ink displaces it), i
-    physically cannot (col 38 is water). The ford (row 13): 'river' + a +
-    'gate' → 'rivergate' bridges the water, the seal at (13,42) draws, the
-    exit waits at (13,43). The ford plaque is carved in the south border.
+    Layout: the RIVER (4 wide, water — impassable, movable) meanders down
+    rows 1..13, its west edge drifting 42 → 38 (four columns west; pushed
+    cells spill over the east wall and are lost). i-rows dead-end west at
+    col 27 with the fragment head ON col 28 — stand on the head, i writes
+    under you, a physically cannot (col 27 is wall). a-rows put the fragment
+    tail ON the row's bank with water at the very next cell — stand on the
+    tail, a writes past you onto the flood (ink displaces it), i physically
+    cannot. The ford (row 13): 'river' + a + 'gate' → 'rivergate' bridges
+    the water. FIVE stone walls stack east of the ford before the exit; each
+    word written whole grinds one open (main._inscription_halls_tick) — the
+    bridge-word owns the westmost, so typed water always crushes against
+    stone. The ford plaque is carved in the south border.
 
-    Scarcity (see _ih_pick) keeps x+p from impersonating the verbs; the
-    'insert' token gates everything (curriculum: teaches ['insert'])."""
+    The par route hops jetties with ( / ) / e (sentence jumps, embraced —
+    they only optimize travel; every word must still be written). Scarcity
+    (see _ih_pick) keeps x+p from impersonating the verbs; the 'insert'
+    token gates everything (curriculum: teaches ['insert'])."""
     rng = random.Random(seed)
     lessons = _ih_pick(rng)
 
     R, C = _IH_ROWS, _IH_COLS
     cells = [[CellType.WALL] * C for _ in range(R)]
-    for r in range(1, 14):                                   # the river
-        for c in range(_IH_RIVER_LO, _IH_RIVER_HI + 1):
+    for r in range(1, 14):                                   # the meandering river
+        for c in range(_ih_river_lo(r), _ih_river_lo(r) + _IH_RIVER_W):
             cells[r][c] = CellType.WATER
     for i, r in enumerate(_IH_LESSON_ROWS):                  # jetty rows
         lo = _IH_I_HEAD if i in (0, 2) else _IH_A_WEST
-        for c in range(lo, _IH_BANK + 1):
+        for c in range(lo, _ih_bank(r) + 1):
             cells[r][c] = CellType.FLOOR
-    for r in (4, 7, 10):                                     # promenade gaps
-        cells[r][_IH_BANK] = CellType.FLOOR                  # (plaque rows)
-    for c in range(_IH_A_WEST, _IH_BANK + 1):                # the ford row
+    for (r, c) in _IH_GAPS:                                  # promenade connectors
+        cells[r][c] = CellType.FLOOR
+    for c in range(_IH_A_WEST, _ih_bank(_IH_FORD_ROW) + 1):  # the ford row
         cells[_IH_FORD_ROW][c] = CellType.FLOOR
-    cells[_IH_EXIT[0]][_IH_EXIT[1]] = CellType.FLOOR         # exit pocket
-    # bolts (wall until each word completes) and the seal stay WALL at build
+    cells[_IH_EXIT[0]][_IH_EXIT[1]] = CellType.FLOOR         # beyond the five walls
+    # the five exit walls stay WALL at build (the tick opens one per word)
 
     room = Room(room_type=RoomType.ENTRY, rows=R, cols=C)
     room.cells = cells
@@ -6739,54 +6764,51 @@ def build_dungeon_inscription_halls(seed: int) -> Dungeon:
     def lay(row, col, text, kind):
         room.char_runs.append(CharRun(row, col, tuple(text), kind))
 
-    # Plaques (the familiar sealed band, verdant in the wall) + fragments.
-    bolts = []
+    # Plaques (the familiar sealed band, verdant in the wall) + fragments,
+    # and the five exit walls: the bridge-word takes the westmost seal; the
+    # lesson words take the rest in order.
+    walls = list(_IH_SEALS)
+    bolts = [(_IH_FORD_WORD, walls[0])]
     for i, (word, missing, frag) in enumerate(lessons):
         lrow, prow = _IH_LESSON_ROWS[i], _IH_PLAQUE_ROWS[i]
         if i in (0, 2):                                      # i: head missing
             lay(prow, _IH_I_HEAD, word, 'verdant')
             lay(lrow, _IH_I_HEAD, frag, 'ancient')
         else:                                                # a: tail missing
-            span_lo = _IH_RIVER_LO - len(frag)
+            span_lo = _ih_river_lo(lrow) - len(frag)
             lay(prow, span_lo, word, 'verdant')
             lay(lrow, span_lo, frag, 'ancient')
-        bolts.append((word, (_IH_BOLT_ROWS[i], _IH_BANK)))
-    lay(_IH_FORD_ROW, _IH_RIVER_LO - len(_IH_FORD_FRAG),
+        bolts.append((word, walls[i + 1]))
+    lay(_IH_FORD_ROW, _ih_river_lo(_IH_FORD_ROW) - len(_IH_FORD_FRAG),
         _IH_FORD_FRAG, 'ancient')                            # 'river' at 33..37
-    lay(R - 1, _IH_RIVER_LO - len(_IH_FORD_FRAG),
+    lay(R - 1, _ih_river_lo(_IH_FORD_ROW) - len(_IH_FORD_FRAG),
         _IH_FORD_WORD, 'verdant')                            # ford plaque, south border
 
     room._ih_bolts = tuple(bolts)
-    # The seal answers only to the FINISHED HALLS: all four lesson words AND
-    # the bridge-word. Teleport motions may hop the bank gates (/, ), G — all
-    # passability-filtered, but the jetties are passable rows); nothing opens
-    # the way out except every inscription (teleport + walking audit).
-    room._ih_seal = ((*[w for (w, _m, _f) in lessons], _IH_FORD_WORD), _IH_SEAL)
 
     room.entities.append(Entity(kind='exit', row=_IH_EXIT[0], col=_IH_EXIT[1],
                                 edit_immune=True))
-    room.spawn_pos = (_IH_LESSON_ROWS[0], _IH_BANK)
+    room.spawn_pos = (_IH_LESSON_ROWS[0], _ih_bank(_IH_LESSON_ROWS[0]))
     room.exit_pos  = _IH_EXIT
 
     room.rebuild_indexes()
     room.par    = _IH_PAR
     room.budget = math.ceil(_IH_PAR * 1.4)
-    # Canonical answer (drives the par; insert tokens 'i…'/'a…' cost
-    # 1 + len(text), Esc spends nothing — see tests/test_answer_paths).
-    # The ticks do NOT run during insert keys, so each gate opens on the
-    # first NORMAL action after Esc — the ford leg is 'l' (seal opens on
-    # its tick) then '2l' through the open seal onto the exit:
-    #   A (i,2): 9h i{2} 8l 3j   = 2+3+2+2
-    #   B (a,1): a{1} h 3j       = 2+1+2
-    #   C (i,1): 9h i{1} 9l 3j   = 2+2+2+2
-    #   D (a,2): a{2} 2h 2j      = 3+2+2
-    #   ford:    a{gate} l 2l    = 5+1+2        → total 37
+    # Canonical answer — the sentence-hop route (drives the par; insert
+    # tokens 'i…'/'a…' cost 1 + len(text), Esc spends nothing; ( ) e cost 1
+    # each — see tests/test_answer_paths). Ticks do NOT run during insert
+    # keys, so the walls open on the first NORMAL action after Esc:
+    #   A: ( i{2}        = 1+3
+    #   B: ) e a{1}      = 1+1+2
+    #   C: ) i{1}        = 1+2
+    #   D: ) e a{2}      = 1+1+3
+    #   ford: ) e agate l 6l = 1+1+5+1+2   → total 26
     m = [m_ for (_w, m_, _f) in lessons]
-    room.answer = (f'9h i{m[0]} 8l 3j '
-                   f'a{m[1]} h 3j '
-                   f'9h i{m[2]} 9l 3j '
-                   f'a{m[3]} 2h 2j '
-                   f'agate l 2l')
+    room.answer = (f'( i{m[0]} '
+                   f') e a{m[1]} '
+                   f') i{m[2]} '
+                   f') e a{m[3]} '
+                   f') e agate l 6l')
 
     dungeon = Dungeon(name='The Inscription Halls', seed=seed)
     dungeon.rooms        = [room]
