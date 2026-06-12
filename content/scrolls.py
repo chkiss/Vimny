@@ -98,6 +98,9 @@ SETTERS_HAND_SCROLL = {
     ],
 }
 
+# Dropped by the Warden Pathfinder — every row previews the OPERATOR act
+# ahead of it (d at the Operator's Vault, r at the Cipher Cell, y at the
+# Beacon Tiers, . at the Echo Vault, s/c at the Change Annex).
 OPERATOR_CODEX_SCROLL = {
     'title': "◈   The Operator's Codex   ◈",
     'lines': [
@@ -105,30 +108,51 @@ OPERATOR_CODEX_SCROLL = {
         ('blank',),
         ('cmd',    'd{m}', 'delete to motion'),
         ('cmd',    'dd  ', 'delete line'),
+        ('smudge', 'r{c}', 'r',  'eplace one character',       'r'),
         ('smudge', 's   ', 's',  'ubstitute one character',    's'),
         ('smudge', 'y{m}', 'y',  'ank (copy without cutting)', 'y'),
         ('smudge', 'c{m}', 'ch', 'ange text (del + insert)',   'c'),
+        ('smudge', '.   ', 'r',  'epeat the last change',      'dot'),
         ('blank',),
         ('amber',  '  "  holds what you cut.  Something awaits.'),
     ],
 }
 
-# Dropped by the Warden Manifold. The yank rows are a clear-eyed RECAP (the
-# Beacon Tiers taught them, before the boss); the smudges preview the next
-# act: the writers (i at the Inscription Halls, c at the Change Annex).
+# A RELIC now (any unassigned chest may drop it): the copyists' wisdom,
+# smudged until yank is learned — found early it reads as prophecy, after
+# the Beacon Tiers as method. It used to drop from the Warden Manifold,
+# which was backwards: that boss VALIDATES yank, and a boss scroll previews
+# the act AHEAD (the Inscriber's Hand below does that now).
 ARCHIVISTS_METHOD_SCROLL = {
     'title': "◈   The Archivist's Method   ◈",
     'lines': [
         ('dim',    '  The Archivist copied before erasing. Wise.'),
         ('blank',),
-        ('cmd',    'y{m}', 'yank (copy without cutting)'),
-        ('cmd',    'yy  ', 'yank line'),
-        ('cmd',    'p   ', 'put after cursor'),
-        ('smudge', 'i   ', 'in', 'sert — write where you stand', 'insert'),
-        ('smudge', 'c{m}', 'ch', 'ange text (del + insert)', 'c'),
+        ('smudge', 'y{m}', 'y', 'ank (copy without cutting)', 'y'),
+        ('smudge', 'yy  ', 'y', 'ank the whole line',         'y'),
+        ('smudge', 'p   ', 'p', 'ut after the cursor',        'p'),
         ('blank',),
         ('amber',  '  d and y share the same register.'),
         ('dim',    '  Paste before deleting — or lose your copy.'),
+    ],
+}
+
+# Dropped by the Warden Manifold — the boss validated the copyists' verbs
+# (d, r, y, .); every row here previews the WRITERS' act ahead: i/a at the
+# Inscription Halls, c at the Change Annex, o/O at the Sculpting Chambers,
+# R at the Overwrite Halls. All smudged until each is learned.
+INSCRIBERS_HAND_SCROLL = {
+    'title': "◈   The Inscriber's Hand   ◈",
+    'lines': [
+        ('dim',    '  You cut, copied, repeated. Now the hand writes.'),
+        ('blank',),
+        ('smudge', 'i   ', 'i',  'nsert — write before the cursor',  'insert'),
+        ('smudge', 'a   ', 'a',  'ppend — write after it',           'insert'),
+        ('smudge', 'c{m}', 'ch', 'ange text (delete + insert)',      'c'),
+        ('smudge', 'o/O ', 'o',  'pen a fresh line, below or above', 'o'),
+        ('smudge', 'R   ', 'R',  'eplace mode — overtype as you go', 'R'),
+        ('blank',),
+        ('amber',  '  Esc seals the ink.'),
     ],
 }
 
@@ -416,12 +440,12 @@ SCROLL_CATALOG = [
         'content':    OPERATOR_CODEX_SCROLL,
     },
     {
-        'id':         'y_op',
-        'title':      "The Archivist's Method",
+        'id':         'writers',
+        'title':      "The Inscriber's Hand",
         'dropped_by': 'The Warden Manifold',
         'level_slug': 'warden_manifold',
         'level_name': 'The Warden Manifold',
-        'content':    ARCHIVISTS_METHOD_SCROLL,
+        'content':    INSCRIBERS_HAND_SCROLL,
     },
     {
         'id':         'text_obj',
@@ -443,6 +467,14 @@ SCROLL_CATALOG = [
     # ── Relic scrolls — found, not act-gated. Each teaches a budget-safe
     # flourish that can't beat a level's par (see design notes). id == the
     # gating token where the scroll grants a new command.
+    {
+        'id':         'y_op',
+        'title':      "The Archivist's Method",
+        'dropped_by': "An archivist's satchel",
+        'level_slug': 'quartermaster',
+        'level_name': 'The Beacon Tiers',
+        'content':    ARCHIVISTS_METHOD_SCROLL,
+    },
     {
         'id':         'set_more',
         'title':      "The Setter's Hand",
@@ -556,7 +588,7 @@ SCROLL_CATALOG = [
 # progress['extras'] and injected into player.known_commands, so name it to
 # match the token your command_guard / handler checks (e.g. 'jump', 'col_motion').
 RELIC_SCROLL_IDS = [
-    'set_more',
+    'set_more', 'y_op',
     'regex_classes', 'regex_anchors', 'regex_quant', 'regex_collections', 'regex_magic',
     'searchcraft', 'jump', 'redo', 'col_motion', 'ins_paste', 'ins_edit',
 ]

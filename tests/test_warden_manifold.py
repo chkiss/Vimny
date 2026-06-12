@@ -20,12 +20,13 @@ Round → verb (see main._wm_ward_broken for the shift-proof checks):
   3  D      a rot-tail with a rank of REAL Wardens standing on it; once the
             rot is half-cut, every keystroke DOUBLES the rank — one D or a
             flood
-  4  yl+3P  three cold lamps (10,44..46); fetch the eternal flame and lay it
-            across all three — the Beacon Tiers' finale, charwise
+  4  yy+pp  his flame row stamped LIT (🜂🜂🜂 at 10,44..46); yank the LINE
+            and paste twice — three flame rows, the 3×3 grid (the fuel rule
+            locks charwise flames to braziers, so only HIS row can copy)
 
 After the press falls the seal draws and the treasure pocket's fog parts:
 a 3×2 vault behind the seal — exit center-west, heart container above,
-the boss scroll's chest below (the chest IS the Archivist's Method drop).
+the boss scroll's chest below (the chest IS the Inscriber's Hand drop).
 
 Engine rules this boss leans on (each pinned below): tag='manifold'/'stamp'
 exempt wardens from the stock auto-summon AND the post-x random leap; spawned
@@ -50,7 +51,7 @@ from generation.dungeon_gen import (
     build_dungeon_warden_manifold,
     _WM_ROWS, _WM_COLS, _WM_AXIS, _WM_SPAWN, _WM_FLAME, _WM_BRAZIERS,
     _WM_GATE, _WM_PODIUMS, _WM_WARD1, _WM_WARD1_POSTS, _WM_WARD1_WORDS,
-    _WM_WARD2, _WM_WARD2_WINDOW, _WM_WARD3, _WM_WARD3_RANK, _WM_LAMP_CELLS,
+    _WM_WARD2, _WM_WARD2_WINDOW, _WM_WARD3, _WM_WARD3_RANK, _WM_WARD4,
     _WM_WARD4_ECHOES, _WM_SEAL, _WM_EXIT, _WM_HEART, _WM_CHEST, _WM_POCKET,
     _WM_HALL_LO, _WM_BUDGET, _QM_FLAME,
 )
@@ -82,8 +83,9 @@ _STRIKE = '/W\rx'    # the search-jump strike: /W lands ON him, x at one's cell
 _RITUAL = 'llyl' + '5k5lP' + '4j3lP' + 'jjP' + '4j3hP' + '5k4lll'
 _R1     = 'kklldewdewde'                 # three cuts; posts crumble between
 _R3     = '7j0D'                         # one stroke — rot and rank together
-_R4     = '5k22hyl40l2j3P'               # fetch the flame, lay it across the lamps
-_LOOT   = '5k16l' + 'l' + 'lkx' + '2jx'  # seal → exit (win) → heart → chest
+_R4     = '3kyypp'                       # yank his flame row, paste it twice
+_LOOT   = '7k16l' + 'l' + 'lkx' + '2jx'  # seal → exit (win) → heart → chest
+                                         # (7k: two pasted rows shifted him down)
 
 
 def _r2(room) -> str:
@@ -276,9 +278,9 @@ def test_ritual_parts_the_hall_fog_only(seed, monkeypatch):
     assert set(_WM_BRAZIERS) <= flames, "all four braziers burn"
 
 
-def test_flame_paste_blocked_off_brazier_and_on_cold_lamps():
-    """The fuel rule holds everywhere off the chain — including the lamp
-    cells BEFORE round 4 stamps them into the chain."""
+def test_flame_paste_blocked_off_brazier():
+    """The fuel rule holds everywhere off the chain — including the R4 stamp
+    cells, so the 3×3 grid can never be assembled charwise."""
     room = _room(SEEDS[0])
     clip = {'linewise': False, 'rows': [{'width': 1, 'char_runs': [
         {'dcol': 0, 'symbols': (_QM_FLAME,), 'kind': 'flame'}]}]}
@@ -286,9 +288,9 @@ def test_flame_paste_blocked_off_brazier_and_on_cold_lamps():
     assert main._flame_paste_blocked(room, floor, clip, True, 1)
     on_brazier = Player(row=_WM_BRAZIERS[0][0], col=_WM_BRAZIERS[0][1])
     assert not main._flame_paste_blocked(room, on_brazier, clip, True, 1)
-    on_lamp = Player(row=_WM_LAMP_CELLS[0][0], col=_WM_LAMP_CELLS[0][1])
-    assert main._flame_paste_blocked(room, on_lamp, clip, True, 3), \
-        "lamps are not fuel until round 4 stamps them"
+    on_stamp = Player(row=_WM_WARD4[0], col=_WM_WARD4[1])
+    assert main._flame_paste_blocked(room, on_stamp, clip, True, 3), \
+        "no charwise flame on his stamp cells — the grid must be linewise"
 
 
 # ── the round machine ─────────────────────────────────────────────────────────
@@ -411,17 +413,19 @@ def test_round3_one_D_shears_rot_and_rank(seed, monkeypatch):
 
 
 @pytest.mark.parametrize("seed", SEEDS)
-def test_round4_lamps_and_the_charwise_finale(seed, monkeypatch):
-    """Round 4 stamps three cold lamps (ember pedestals) and adds them to
-    the fuel chain; yl + 3P lays the flame across all three."""
+def test_round4_flame_row_and_the_linewise_finale(seed, monkeypatch):
+    """Round 4 stamps his flame row LIT (🜂🜂🜂 at 10,44..46); yy + p + p
+    copies it into the 3×3 grid (real rows — he and his fog ride the
+    shift) and the ward breaks."""
     dungeon = build_dungeon_warden_manifold(seed)
     room = dungeon.rooms[0]
     pre = _RITUAL + _R1 + _STRIKE + _r2(room) + _STRIKE + _R3 + _STRIKE
     _drive(dungeon, pre, monkeypatch)
-    assert room._wm_round == 4 and getattr(room, '_wm_lamps_on', False)
-    assert set(_WM_LAMP_CELLS) <= set(room._qm_chain), "lamps join the chain"
-    embers = {(ru.row, ru.col) for ru in room.char_runs if ru.kind == 'pedestal'}
-    assert set(_WM_LAMP_CELLS) <= embers, "cold lamps show their embers"
+    assert room._wm_round == 4
+    assert any(ru.kind == 'flame' and (ru.row, ru.col) == _WM_WARD4
+               and len(ru.symbols) == 3 for ru in room.char_runs), \
+        "his flame row stamps LIT"
+    assert not main._wm_ward_broken(room, 4), "one flame row is not the grid"
     echoes = [e for e in room.entities
               if e.alive and e.kind == 'goblin' and e.tag == 'echo']
     assert len(echoes) == len(_WM_WARD4_ECHOES)
@@ -429,9 +433,38 @@ def test_round4_lamps_and_the_charwise_finale(seed, monkeypatch):
     dungeon = build_dungeon_warden_manifold(seed)
     room = dungeon.rooms[0]
     _drive(dungeon, pre + _R4, monkeypatch)
-    assert main._wm_ward_broken(room, 4), "three adjacent flames break ward 4"
+    assert main._wm_ward_broken(room, 4), "three flame rows break ward 4"
+    assert room.rows == _WM_ROWS + 2, "two REAL rows pasted in"
     assert not [e for e in room.entities
                 if e.alive and e.kind == 'goblin'], "the crowd gutters"
+    w = _warden(room)
+    assert (w.row, w.col) not in room.fog_cells, "his fog parts (it rode the shift)"
+
+
+@pytest.mark.parametrize("seed", SEEDS)
+def test_undo_rewinds_the_round_with_the_world(seed, monkeypatch):
+    """Undoing the round-2 strike restores his HP, his podium AND the round
+    counter — so the next strike re-runs round 3 (the rot re-stamps), never
+    skipping ahead. Pins the grind exploit shut: with the round outside the
+    snapshot, an undone world read the NEXT ward as vacuously broken (no
+    rot = "sheared"), the bolt stood open, and he could be ground down
+    strike after strike without re-solving anything."""
+    dungeon = build_dungeon_warden_manifold(seed)
+    room = dungeon.rooms[0]
+    _drive(dungeon, _RITUAL + _R1 + _STRIKE + _r2(room) + _STRIKE + 'u',
+           monkeypatch)
+    w = _warden(room)
+    assert w.hp == 3, "the strike is undone"
+    assert (w.row, w.col) == _WM_PODIUMS[1], "back at the round-2 podium"
+    assert room._wm_round == 2, "the round rewinds with the world"
+
+    dungeon = build_dungeon_warden_manifold(seed)
+    room = dungeon.rooms[0]
+    _drive(dungeon, _RITUAL + _R1 + _STRIKE + _r2(room) + _STRIKE + 'u' + 'x',
+           monkeypatch)
+    w = _warden(room)
+    assert w.hp == 2 and room._wm_round == 3, "the re-strike re-enters round 3"
+    assert main._wm_rot_cells(room) > 0, "the rot re-stamps — back to bottom-left"
 
 
 # ── the full fight ────────────────────────────────────────────────────────────

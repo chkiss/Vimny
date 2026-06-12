@@ -6392,7 +6392,9 @@ _WM_WARD2_WINDOW = 8                    # keystrokes from solve to strike before
 _WM_WARD3 = (10, 18)                    # R3: D — rot-tail with a rank of REAL Wardens
 _WM_WARD3_HI = 34
 _WM_WARD3_RANK = ((10, 20), (10, 24), (10, 28), (10, 32))
-_WM_LAMP_CELLS = ((10, 44), (10, 45), (10, 46))   # R4: three cold lamps — yl + 3P
+_WM_WARD4 = (10, 44)                    # R4: yy + p p — his flame row, stamped LIT
+                                        # (🜂🜂🜂 at 44..46); two linewise pastes
+                                        # make the 3×3 grid that breaks the ward
 _WM_WARD4_ECHOES = ((3, 36), (5, 24), (5, 48), (7, 36),
                     (9, 36), (11, 24), (11, 48), (13, 36))   # mirrored crowd
 _WM_SEAL = (8, 62)                      # draws when the press falls silent
@@ -6433,16 +6435,20 @@ def build_dungeon_warden_manifold(seed: int) -> Dungeon:
       R3  D      a rot-tail with a rank of REAL Wardens standing on it;
                  once the rot is first cut, every keystroke DOUBLES the
                  rank while any rot remains — one D, or a flood
-      R4  yl+3P  three cold lamps; fetch the eternal flame and lay it
-                 across all three (the Beacon Tiers' finale, charwise)
+      R4  yy+pp  his flame row, stamped LIT (🜂🜂🜂); yank the LINE and
+                 paste it twice — a 3×3 grid of flames breaks the ward
+                 (charwise flames are fuel-locked to the braziers, and
+                 linewise pastes stack one flame row per paste, so only
+                 copying HIS row can make three flame rows)
     Then the final stagger, the killing x, the seal draws, and the treasure
-    pocket's fog parts (heart + relic scroll behind the exit).
+    pocket's fog parts (heart + the boss scroll behind the exit).
 
-    Ward checks are shift-proof (kind-counts on passable cells / substring
+    Ward checks are shift-proof (kind-counts on floor cells / substring
     scans across rows), bolts derive from the warden entity, and the seal
-    derives from stored coords. The round counter (room._wm_round) is boss
-    state and survives undo — documented, the Pathfinder convention.
-    Geometry is fixed; the seed picks the vocabulary.
+    derives from stored coords. The round counter RIDES the undo snapshot
+    (main._WM_UNDO_ATTRS — undo rewinds the fight with the world; the
+    Pathfinder convention was a grind exploit here). Geometry is fixed;
+    the seed picks the vocabulary.
     """
     rng = random.Random(seed)
     _load_vocab_tables()
@@ -6547,8 +6553,7 @@ def build_dungeon_warden_manifold(seed: int) -> Dungeon:
     for w in words1:
         lay(_WM_WARD1[0], c, w, 'ancient')
         c += 5
-    # Later stamps, laid by the tick on each round transition. Round 4 is
-    # the lamps (no text stamp — the tick lays the cold pedestals itself).
+    # Later stamps, laid by the tick on each round transition.
     word2_lock = word2[:warp_at] + warp_glyph + word2[warp_at + 1:]
     room._wm_stamps = {
         2: (_WM_WARD2[0], _WM_WARD2[1],
@@ -6560,6 +6565,9 @@ def build_dungeon_warden_manifold(seed: int) -> Dungeon:
         # words must be gone before round 3 can exist.
         3: (_WM_WARD3[0], _WM_WARD3[1],
             rot_text(_WM_WARD3_HI - _WM_WARD3[1] + 1), 'ancient'),
+        # R4: his flame row, stamped LIT. yy + p + p copies it twice — three
+        # flame rows break the ward (_wm_ward_broken counts 🜂🜂🜂 rows).
+        4: (_WM_WARD4[0], _WM_WARD4[1], _QM_FLAME * 3, 'flame'),
     }
     # Round spawns: R3 is a rank of REAL Wardens (kind='warden', hp=1,
     # tag='stamp' — exempt from summon/leap, gutterable, NOT edit_immune so
@@ -6584,9 +6592,9 @@ def build_dungeon_warden_manifold(seed: int) -> Dungeon:
                                 edit_immune=True))
     room.spawn_pos = _WM_SPAWN
     room.exit_pos  = _WM_EXIT
-    # The Beacon Tiers' fuel rule, reused: flames lie only in braziers (the
-    # tick EXTENDS the chain with the three lamps when round 4 stamps them —
-    # before that, no flame can be parked on the lamp cells).
+    # The Beacon Tiers' fuel rule, reused: charwise flames lie only in
+    # braziers — so the R4 grid can only be built by copying his flame ROW
+    # (linewise paste is exempt; a yanked row's flames sit where they sat).
     room._qm_chain = (_WM_FLAME, *_WM_BRAZIERS)
 
     room.rebuild_indexes()

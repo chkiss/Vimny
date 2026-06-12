@@ -30,7 +30,7 @@ from content.scrolls import (
     # Codex scroll content rendered by _show_scroll_by_id (_STD_SCROLLS map);
     # every other catalogue scroll renders via _show_catalog_scroll.
     RELIQUARY_SCROLL, WARDEN_LEAP_SCROLL, WARDEN_SIGHT_SCROLL, WAYPOINT_SCROLL,
-    OPERATOR_CODEX_SCROLL, ARCHIVISTS_METHOD_SCROLL,
+    OPERATOR_CODEX_SCROLL, INSCRIBERS_HAND_SCROLL,
     WHOLE_WORD_SCROLL, WARDEN_ACT_SCROLL,
     pick_relic_scroll as _pick_relic_scroll,
 )
@@ -173,19 +173,18 @@ In the dark, they carved the grammar of unmaking.
   The register is the vessel.
 """
 
-_SCROLL_TEXT_ARCHIVISTS_METHOD = """\
-The Archivist's Method
-======================
-The Archivist copied before erasing. That was the discipline.
+_SCROLL_TEXT_INSCRIBERS_HAND = """\
+The Inscriber's Hand
+====================
+You cut, copied, repeated. Now the hand learns to write.
 
-  y{m}  ──  yank (copy without cutting)
-  yy    ──  yank line
-  p     ──  put after cursor
-  P     ──  Put before cursor
+  i     ──  insert — write before the cursor
+  a     ──  append — write after it
   c{m}  ──  change text (delete + insert)
+  o/O   ──  open a fresh line, below or above
+  R     ──  Replace mode — overtype as you go
 
-  d and y share the same register.
-  Paste before deleting, or lose your copy.
+  Esc seals the ink.
 """
 
 _SCROLL_TEXT_WHOLE_WORD = """\
@@ -544,7 +543,7 @@ _STD_SCROLLS = {
     'visual':    WARDEN_SIGHT_SCROLL,
     'setnum':    WAYPOINT_SCROLL,
     'd_op':      OPERATOR_CODEX_SCROLL,
-    'y_op':      ARCHIVISTS_METHOD_SCROLL,
+    'writers':   INSCRIBERS_HAND_SCROLL,
     'text_obj':  WHOLE_WORD_SCROLL,
     'visual_op': WARDEN_ACT_SCROLL,
 }
@@ -572,7 +571,7 @@ _SCROLL_DROPS = {
     'wardens_keep':         ('leap',      None,                     None),
     'warden_surveyor':      ('visual',    None,                     None),
     'warden_pathfinder':    ('d_op',      "The Operator's Codex",   _SCROLL_TEXT_OPERATOR_CODEX),
-    'warden_manifold':      ('y_op',      "The Archivist's Method", _SCROLL_TEXT_ARCHIVISTS_METHOD),
+    'warden_manifold':      ('writers',   "The Inscriber's Hand",   _SCROLL_TEXT_INSCRIBERS_HAND),
     'warden_scrivener':     ('text_obj',  'The Whole Word',         _SCROLL_TEXT_WHOLE_WORD),
     'grandmasters_sanctum': ('visual_op', "The Warden's Act",       _SCROLL_TEXT_WARDENS_ACT),
 }
@@ -961,6 +960,15 @@ def _build_dungeon(slug: str, seed: int, game_h: int = 33, admin: bool = False):
     return builder(seed)
 
 
+# The Warden Manifold's boss round state rides the undo snapshot — UNLIKE the
+# Pathfinder convention (round survives undo), and deliberately: with the
+# round outside the snapshot, undoing past a stamp restored a world where the
+# NEXT ward's check read vacuously broken (no rot = ward 3 "sheared"), so the
+# bolt stood open and the Warden could be ground down strike after strike
+# without re-solving anything. Undo now rewinds the round with the world.
+_WM_UNDO_ATTRS = ('_wm_round', '_wm_rot0', '_wm_r2_spent0', '_wm_r3_spent0')
+
+
 def _snapshot(room, player, budget, *, row=None, col=None, spent=None, ans=None) -> dict:
     """Undo/redo snapshot of all mutable game state.
 
@@ -972,6 +980,14 @@ def _snapshot(room, player, budget, *, row=None, col=None, spent=None, ans=None)
     """
     ap = ans[0] if ans is not None else room.answer_pos
     ad = ans[1] if ans is not None else room.answer_diverged
+    if hasattr(room, '_wm_stamps'):              # the Manifold (see above)
+        return dict(_base_snapshot(room, player, budget, row, col, spent, ap, ad),
+                    wm_state={k: getattr(room, k) for k in _WM_UNDO_ATTRS
+                              if hasattr(room, k)})
+    return _base_snapshot(room, player, budget, row, col, spent, ap, ad)
+
+
+def _base_snapshot(room, player, budget, row, col, spent, ap, ad) -> dict:
     return {
         'row':      player.row  if row   is None else row,
         'col':      player.col  if col   is None else col,
@@ -1021,6 +1037,12 @@ def _pop_history_step(src: list, dst: list, room, player, budget, is_redo: bool 
             room.exit_pos = item['exit_pos']
             room.spawn_pos = item['spawn_pos']
         room.fog_cells = item['fog_cells']
+        if 'wm_state' in item:                   # the Manifold's boss round state
+            for k in _WM_UNDO_ATTRS:
+                if k in item['wm_state']:
+                    setattr(room, k, item['wm_state'][k])
+                elif hasattr(room, k):
+                    delattr(room, k)
         room.rebuild_indexes()
         if 'answer_pos' in item:
             room.answer_pos      = item['answer_pos']
@@ -1199,10 +1221,11 @@ def _wm_ward_broken(room, k: int) -> bool:
       2: his stamp reads TRUE four times (the warped copies mended with r/.)
       3: the rot is sheared (also 'ancient' — safe by TIME, ward 1's words
          predate round 3; NOT 'ember', which r-typed mends are repainted to)
-      4: all three lamps burn — some row reads 🜂🜂🜂. Charwise pastes onto
-         the lamp cells are the only way to put three flames ADJACENT: the
-         fuel rule confines charwise flames to chain cells, and linewise
-         pastes stack rows vertically (one flame per row).
+      4: THREE rows read 🜂🜂🜂 — his stamped flame row plus two linewise
+         copies (yy + p + p), the 3×3 grid. Only copying HIS row can do it:
+         the fuel rule locks charwise flames to the braziers (no adjacent
+         pair can be assembled by hand) and every other yankable row holds
+         at most one flame.
     Floor-glyph checks use the CELL TYPE, not is_passable — fog makes a
     cell impassable, and the ward-words sleep under the hall fog until the
     ritual (an is_passable check read ward 1 as broken at level entry)."""
@@ -1218,7 +1241,8 @@ def _wm_ward_broken(room, k: int) -> bool:
                    for r in range(room.rows)) >= 4
     if k == 4:
         triple = _dg._QM_FLAME * 3
-        return any(triple in _wm_row_text(room, r) for r in range(room.rows))
+        return sum(1 for r in range(room.rows)
+                   if triple in _wm_row_text(room, r)) >= 3
     return False
 
 
@@ -1354,26 +1378,22 @@ def _warden_manifold_tick(room, player, spent: int = 0) -> list:
     stamp-Wardens doubles per keystroke once the rot is half-cut. `spent` is
     the running keystroke total (budget.spent) driving both timers.
 
-    Ward checks and the bolt are shift-proof; the round counter
-    (room._wm_round) is boss state and survives undo (Pathfinder convention
-    — undo across a stamp restores the text but not the round). The
-    antechamber ritual (four braziers → the gate + the HALL fog parts) and
-    the final seal (+ the treasure-pocket fog) are text-derived and
-    stateless."""
+    Ward checks and the bolt are shift-proof. The round counter and timers
+    (_WM_UNDO_ATTRS) ride the undo snapshot — undo rewinds the fight to the
+    round the world shows (deliberately NOT the Pathfinder convention: a
+    surviving round counter let undo open later bolts against earlier
+    worlds and grind him without re-solving). The antechamber ritual (four
+    braziers → the gate + the HALL fog parts) and the final seal (+ the
+    treasure-pocket fog) are text-derived and stateless."""
     msgs = []
 
-    # ── the opening ritual: four flames → the gate + the hall's fog. The
-    # ember layer also serves round 4's lamps once they are stamped. ──
+    # ── the opening ritual: four braziers → the gate + the hall's fog ──
     braziers = getattr(room, '_wm_braziers', ())
     if braziers:
-        lamps = (_dg._WM_LAMP_CELLS
-                 if getattr(room, '_wm_lamps_on', False) else ())
-
         def lit(r, c):
             ru = room.char_run_at(r, c)
             return ru is not None and ru.symbols[c - ru.col] == _dg._QM_FLAME
-        unlit_b = {rc for rc in braziers if not lit(*rc)}
-        unlit = unlit_b | {rc for rc in lamps if not lit(*rc)}
+        unlit = {rc for rc in braziers if not lit(*rc)}
         for ru in [ru for ru in room.char_runs if ru.kind == 'pedestal']:
             if (ru.row, ru.col) not in unlit:
                 room.remove_char_run(ru)
@@ -1382,12 +1402,12 @@ def _warden_manifold_tick(room, player, spent: int = 0) -> list:
                 room.add_char_run(CharRun(r, c, (_dg._QM_EMBERS,), 'pedestal'))
         gr, gc = room._wm_gate
         gate_open = room.cells[gr][gc] != CellType.WALL
-        if not unlit_b and not gate_open:
+        if not unlit and not gate_open:
             room.cells[gr][gc] = CellType.FLOOR
             room.fog_cells -= getattr(room, '_wm_hall_fog', frozenset())
-            msgs.append('Four flames burn as one — the gate draws, and the '
+            msgs.append('Five flames burn as one — the gate draws, and the '
                         'fog of the great hall parts!')
-        elif unlit_b and gate_open and (player.row, player.col) != (gr, gc):
+        elif unlit and gate_open and (player.row, player.col) != (gr, gc):
             room.cells[gr][gc] = CellType.WALL
 
     warden = next((e for e in room.entities
@@ -1435,11 +1455,6 @@ def _warden_manifold_tick(room, player, spent: int = 0) -> list:
             # arm the doubling timer's baseline: the rot as stamped
             room._wm_rot0 = _wm_rot_cells(room)
             room._wm_r3_spent0 = None
-        if rnd + 1 == 4:
-            # the three cold lamps: ember pedestals via the ritual layer,
-            # and the fuel chain grows so flames may now lie on them
-            room._wm_lamps_on = True
-            room._qm_chain = (*room._qm_chain, *_dg._WM_LAMP_CELLS)
         kind, tag, spawn_cells = getattr(room, '_wm_spawns', {}).get(
             rnd + 1, ('', '', ()))
         for i, (er, ec) in enumerate(spawn_cells):
