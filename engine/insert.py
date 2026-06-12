@@ -89,11 +89,20 @@ def insert_char(room, player, ch: str, kind: str = INSERT_KIND) -> bool:
 
     Reflow is universal (`is_ledge` always True): the line reflows so the cursor
     cell and everything right of it slide right by one, and any character shoved
-    past the void brink falls in (see engine/reflow.py). The `else` overwrite-in-
-    place branch is a retired-overlay future hook, currently unreachable. Returns
-    False if the cursor is not on a pastable cell."""
+    past the void brink falls in (see engine/reflow.py).
+
+    WATER is writable — ink displaces the flood: typing at a water cell pushes
+    the water rightward like any movable content (open_gap shifts water; a cell
+    spilling into a wall is lost over the brink) and the vacated cell is left
+    FLOOR with the new character on it. The cursor advances over water too, so
+    a word typed at the bank reclaims the flood cell by cell (The Inscription
+    Halls' river). The mirror of `A` carving floor into walls.
+
+    The `else` overwrite-in-place branch is a retired-overlay future hook,
+    currently unreachable. Returns False if the cursor is on a wall."""
     r, c = player.row, player.col
-    if not (0 <= c < room.cols) or room.cells[r][c] not in _PASTABLE:
+    writable = (*_PASTABLE, CellType.WATER)
+    if not (0 <= c < room.cols) or room.cells[r][c] not in writable:
         return False
     if is_ledge(room, r):
         ru = room.char_run_at(r, c)
@@ -101,11 +110,12 @@ def insert_char(room, player, ch: str, kind: str = INSERT_KIND) -> bool:
             room._last_void_falls.append((r, c, ch))
             return True
         open_gap(room, r, c, 1)                # push the line right; overflow falls
+        # (a water cell at c slid right with the push; _push_one left c FLOOR)
     else:
         _delete_at(room, r, c)                 # overwrite the cell in place
     room.add_char_run(CharRun(r, c, (ch,), kind))
     _merge_adjacent_char_runs(room, r)
-    if c + 1 < room.cols and room.cells[r][c + 1] in _PASTABLE:
+    if c + 1 < room.cols and room.cells[r][c + 1] in writable:
         player.col += 1
     return True
 

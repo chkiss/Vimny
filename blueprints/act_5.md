@@ -51,33 +51,14 @@ see Open Decisions #3 (`>{m}` over motion spans).
 
 ## 22 — The Inscription Halls (`inscription_halls`) — `i a`
 
-**The first writer.** Blank trigger cells want a glyph at exactly the right
-column; a door opens when the span reads as its plaque (the Cipher Cell's
-rule, but now the player AUTHORS the text instead of mending it).
-
-Mechanics: `i` writes at the cursor cell (shifting what's there rightward,
-reflow); `a` writes at cursor+1. Same act, two offsets.
-
-**Forcing (decided: hard-force both — the soft-`a` option from the old draft
-is rejected, consistent with every forcing decision this project has made):**
-- `i`-trigger: the plaque word must START at the first cell of a dead-end
-  slot approached from the right — the cursor stands ON the target cell with
-  wall behind; only `i` writes under the cursor (`a` writes one too far).
-- `a`-trigger: the mirror — target cell is the LAST cell before a right wall;
-  the player can stand only at target−1 (the target itself carries a glyph
-  that must be pushed off the brink as the new text lands — `a` from
-  target−1 writes at target; `i` writes a column short).
-- ⚠ Both mechanisms interact with reflow (insert shifts the row; brinks eat
-  the overflow). **Verify each trigger empirically against open_gap before
-  fixing par** — candidate variants if either leaks: void-rune neighbors
-  (landing = death), entity posts, or a 1-cell slot per trigger.
-- Anti-cheese to audit: `p` pasting yanked glyphs instead of typing (the
-  player owns y/p!). Either make the plaque words use glyphs that exist
-  nowhere else (vocab scarcity — the Echo Vault rule), or embrace paste as a
-  legal alternate path and budget for typing being cheaper.
-
-Par notes: typing cost = `i` (1) + chars (1 each) + `Esc` (1). Keep plaque
-words 3–4 chars, vocab-driven per seed with fixed lengths.
+**BUILT 2026-06-12** — see `generation/dungeon_gen.py::
+build_dungeon_inscription_halls` and `tests/test_inscription_halls.py`.
+As shipped: the river crossing (water writable — ink displaces the flood;
+engine change in `insert_char` + Vim-faithful Esc retreat), prefix/suffix
+hard-forcing by wall/water geometry, fragment scarcity via greedy vocab
+draw, the `rivergate` ford finale. Esc spends NOTHING (the old "Esc = 1"
+par assumption was wrong; insert answer tokens cost 1 + chars — Open
+Decision #4 below is RESOLVED).
 
 ---
 
@@ -275,6 +256,6 @@ resolved or rejected above)
    the annex is designed.
 3. **`>{m}` span-indent + `=` semantics** (engine task + design definition —
    see §28). The only engine work in the act.
-4. **Insert-cost model confirmation** — verify what each typed char and Esc
-   charge in `budget` before any act-V par is declared (S3 demands true
-   full-keystroke pars).
+4. ~~Insert-cost model confirmation~~ — RESOLVED at the Inscription Halls
+   build: each typed char spends 1, **Esc spends nothing** (main's INSERT
+   loop charges only `insert_char`). Pars use 1 + chars per insert.

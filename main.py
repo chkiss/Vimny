@@ -1215,6 +1215,51 @@ def _wm_row_text(room, r: int) -> str:
     return ''.join(line)
 
 
+def _ih_floor_text(room, r: int) -> str:
+    """Row r's text restricted to FLOOR/CORRIDOR cells — the Inscription
+    Halls' completion scans must NOT read the plaques (verdant words set in
+    wall cells, including the south-border ford plaque), only what stands
+    written on walkable stone."""
+    line = [' '] * room.cols
+    for ru in room._char_runs_by_row.get(r, []):
+        for k, sym in enumerate(ru.symbols):
+            c = ru.col + k
+            if 0 <= c < room.cols and room.cells[r][c] in _WM_FLOORS:
+                line[c] = sym
+    return ''.join(line)
+
+
+def _inscription_halls_tick(room, player) -> list:
+    """The riverbank gates — the plaque rule, fourth member (Cipher mended,
+    Beacon copied, Echo repeated, the Halls AUTHOR): each bank bolt stands
+    open while its lesson's word reads WHOLE somewhere on the floor, and the
+    ford seal while a floor row reads the bridge-word. Whole-row substring
+    scans on floor text only (shift-proof; plaques live in walls and never
+    count). STATELESS, hence undo-safe (the vault-tick principle): undoing
+    an inscription re-bars its gate."""
+    msgs = []
+    floor_rows = [_ih_floor_text(room, r) for r in range(room.rows)]
+
+    def written(word):
+        return any(word in t for t in floor_rows)
+
+    gates = list(getattr(room, '_ih_bolts', ()))
+    if hasattr(room, '_ih_seal'):
+        gates.append(room._ih_seal)
+    for word, (gr, gc) in gates:
+        is_open = room.cells[gr][gc] != CellType.WALL
+        if written(word) and not is_open:
+            room.cells[gr][gc] = CellType.FLOOR
+            if (gr, gc) == room._ih_seal[1]:
+                msgs.append('The river gives way before the written word — '
+                            'the seal draws open!')
+            else:
+                msgs.append('The word stands whole — the bank gate grinds open!')
+        elif not written(word) and is_open and (player.row, player.col) != (gr, gc):
+            room.cells[gr][gc] = CellType.WALL     # undone — the gate re-bars
+    return msgs
+
+
 def _wm_ward_broken(room, k: int) -> bool:
     """Ward k's state — shift-proof by design (kind-counts on floor cells,
     substring scans across rows; never stored coordinates):
@@ -1631,6 +1676,7 @@ _LEVEL_INTROS = {
     'cipher_cell':         ('The Cipher Cell — make each row read as its plaque: r mends a rune, D shears the rot.', 60),
     'quartermaster':       ('The Beacon Tiers — one flame remains. yl takes it without taking; P sets it on cold braziers (…); yy, a whole row.', 60),
     'echo_vault':          ('The Echo Vault — the same blight, stamped again and again. Mend one rune with r; then . repeats your last change.', 60),
+    'inscription_halls':   ('The Inscription Halls — the words were never finished. i writes before the cursor, a writes after; Esc seals the ink. Write them whole, and the river itself will yield.', 70),
     'warden_manifold':     ('The Warden Manifold — he stamps himself into the world. Light the four braziers; the gate will draw and the fog will part.', 70),
     'warden_surveyor':     ('The Warden Surveyor — survey his hall; w/b/e leap word to word, over the void.', 60),
     'dummy':               ('Sandbox — all mechanics active. Type :edit to enter editor mode.', 60),
@@ -2984,6 +3030,12 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
         if player.mode == Mode.INSERT:
             if key.name == 'KEY_ESCAPE':
                 player.mode = Mode.NORMAL
+                # Vim retreats one column on leaving INSERT. Also the safety
+                # net for water-writing: `a` at a bank hovers the cursor on
+                # the flood; the retreat steps back onto written ground.
+                if not edit_mode and player.col > 0 \
+                        and room.is_passable(player.row, player.col - 1):
+                    player.col -= 1
                 key_buf = ''
                 insert_creg_pending = False
                 insert_co_buf = None
@@ -4400,6 +4452,12 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
             if level == 'warden_manifold':
                 for _wm_msg in _warden_manifold_tick(room, player, budget.spent):
                     _push(_wm_msg)
+
+            # The Inscription Halls: bank gates + the ford seal track the
+            # written words (stateless, undo-safe — plaque rule, 4th member).
+            if level == 'inscription_halls':
+                for _ih_msg in _inscription_halls_tick(room, player):
+                    _push(_ih_msg)
 
             # Warden summon message
             if tick_msgs and not player.is_dead:

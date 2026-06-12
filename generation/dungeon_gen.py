@@ -6617,3 +6617,175 @@ def build_dungeon_warden_manifold(seed: int) -> Dungeon:
     dungeon.rooms        = [room]
     dungeon.current_room = 0
     return dungeon
+
+
+# ── The Inscription Halls (22) — the first writer ─────────────────────────────
+# A wide river crosses the dungeon north–south; lesson rows hang west of the
+# bank like jetties. Plaque rule, fourth member (Cipher mended, Beacon copied,
+# Echo repeated): here the floor text is INCOMPLETE — the plaque shows the
+# whole word, the floor a fragment; the bolt opens when the word is written
+# whole. i = the prefix lesson (fragment head flush against the dead-end wall:
+# only insert-AT-cursor can write there); a = the suffix lesson (fragment tail
+# on the bank, water at the very next cell: nowhere to stand for i — a writes
+# past yourself, and INK DISPLACES THE FLOOD, each letter pushing the river
+# back one cell, spilled over the east wall). The ford finale: 'river' + a +
+# 'gate' types a bridge clean across — the word IS the crossing.
+_IH_ROWS, _IH_COLS = 15, 46
+_IH_RIVER_LO, _IH_RIVER_HI = 38, 41     # the river: 4 wide, rows 1..13
+_IH_BANK = 37                           # the promenade column (river's west bank)
+_IH_LESSON_ROWS = (2, 5, 8, 11)         # i, a, i, a (jetties off the bank)
+_IH_PLAQUE_ROWS = (1, 4, 7, 10)         # sealed band above each lesson
+_IH_BOLT_ROWS   = (3, 6, 9, 12)         # bank gates: open as each word completes
+_IH_I_HEAD = 28                         # i-rows: fragment head = the row's FIRST floor
+                                        # cell (wall at 27 — nowhere to stand for `a`)
+_IH_A_WEST = 29                         # a-rows: floor from here to the bank
+_IH_SPLITS = (2, 1, 1, 2)               # missing-letter counts (FIXED — par invariance)
+_IH_FORD_ROW = 13                       # 'river' at 33..37, tail on the bank
+_IH_FORD_FRAG, _IH_FORD_WORD = 'river', 'rivergate'
+_IH_SEAL = (13, 42)                     # opens when a row reads 'rivergate'
+_IH_EXIT = (13, 43)                     # pocket behind the seal, east bank
+_IH_PAR  = 37                           # hand-tallied along room.answer below;
+                                        # insert costs 1 + chars (Esc spends nothing)
+
+# Deterministic fallback if the greedy draw can't fill all four slots
+# (shapes match _IH_SPLITS: head-2, tail-1, head-1, tail-2; verified against
+# every scarcity rule below).
+_IH_FALLBACK = (('only', 'on', 'ly'), ('wraith', 'h', 'wrait'),
+                ('flame', 'f', 'lame'), ('bliss', 'ss', 'bli'))
+
+
+def _ih_pick(rng):
+    """Four lesson words + splits: [0]/[2] miss their HEAD (i), [1]/[3] their
+    TAIL (a). Scarcity rules (the Echo Vault discipline — typing must be the
+    only source of the missing letters, or x+p impersonates i/a):
+      - the four missing-letter sets are pairwise disjoint;
+      - no missing letter appears in ANY floor fragment, nor in 'river'
+        (cuttable from the start; plaques sit in walls and cannot be cut);
+      - no word is a substring of another or of 'rivergate'
+        (bolt checks are whole-row substring scans on floor text).
+    Greedy over a shuffled pool (a blind 4-word draw almost never satisfies
+    the letter constraints; the greedy fill succeeds essentially always).
+    Returns [(word, missing, fragment) × 4]."""
+    _load_vocab_tables()
+    pool = sorted({w for n in (4, 5, 6) for w in _VOCAB_PLAIN_BY_LEN.get(n, ())
+                   if w.isalpha() and w.islower()})
+    rng.shuffle(pool)
+    lessons = []
+    for idx in range(4):
+        k = _IH_SPLITS[idx]
+        for w in pool:
+            if w in _IH_FORD_WORD \
+                    or any(w == lw or w in lw or lw in w
+                           for (lw, _m, _f) in lessons):
+                continue
+            if idx in (0, 2):
+                missing, frag = w[:k], w[k:]
+            else:
+                missing, frag = w[-k:], w[:-k]
+            ms = set(missing)
+            frag_letters = (set(_IH_FORD_FRAG) | set(frag)
+                            | {ch for (_w, _m, f) in lessons for ch in f})
+            if ms & frag_letters \
+                    or any(ms & set(m) for (_w, m, _f) in lessons) \
+                    or any(set(m) & set(frag) for (_w, m, _f) in lessons):
+                continue
+            lessons.append((w, missing, frag))
+            break
+        else:
+            return [tuple(t) for t in _IH_FALLBACK]
+    return lessons
+
+
+def build_dungeon_inscription_halls(seed: int) -> Dungeon:
+    """The Inscription Halls (the first writer: i and a).
+
+    Layout: rows 1..13 carry the RIVER at cols 38..41 (water — impassable,
+    movable; pushed cells spill over the east wall at 42 and are lost); the
+    bank promenade is col 37, gated row by row by bolts that open as each
+    lesson's word is written whole (main._inscription_halls_tick). i-rows
+    dead-end west at col 27 with the fragment head ON col 28 — stand on the
+    head, i writes under you, a physically cannot (col 27 is wall). a-rows
+    put the fragment tail ON the bank (col 37) with water at 38 — stand on
+    the tail, a writes past you onto the flood (ink displaces it), i
+    physically cannot (col 38 is water). The ford (row 13): 'river' + a +
+    'gate' → 'rivergate' bridges the water, the seal at (13,42) draws, the
+    exit waits at (13,43). The ford plaque is carved in the south border.
+
+    Scarcity (see _ih_pick) keeps x+p from impersonating the verbs; the
+    'insert' token gates everything (curriculum: teaches ['insert'])."""
+    rng = random.Random(seed)
+    lessons = _ih_pick(rng)
+
+    R, C = _IH_ROWS, _IH_COLS
+    cells = [[CellType.WALL] * C for _ in range(R)]
+    for r in range(1, 14):                                   # the river
+        for c in range(_IH_RIVER_LO, _IH_RIVER_HI + 1):
+            cells[r][c] = CellType.WATER
+    for i, r in enumerate(_IH_LESSON_ROWS):                  # jetty rows
+        lo = _IH_I_HEAD if i in (0, 2) else _IH_A_WEST
+        for c in range(lo, _IH_BANK + 1):
+            cells[r][c] = CellType.FLOOR
+    for r in (4, 7, 10):                                     # promenade gaps
+        cells[r][_IH_BANK] = CellType.FLOOR                  # (plaque rows)
+    for c in range(_IH_A_WEST, _IH_BANK + 1):                # the ford row
+        cells[_IH_FORD_ROW][c] = CellType.FLOOR
+    cells[_IH_EXIT[0]][_IH_EXIT[1]] = CellType.FLOOR         # exit pocket
+    # bolts (wall until each word completes) and the seal stay WALL at build
+
+    room = Room(room_type=RoomType.ENTRY, rows=R, cols=C)
+    room.cells = cells
+    room.seed  = seed
+
+    def lay(row, col, text, kind):
+        room.char_runs.append(CharRun(row, col, tuple(text), kind))
+
+    # Plaques (the familiar sealed band, verdant in the wall) + fragments.
+    bolts = []
+    for i, (word, missing, frag) in enumerate(lessons):
+        lrow, prow = _IH_LESSON_ROWS[i], _IH_PLAQUE_ROWS[i]
+        if i in (0, 2):                                      # i: head missing
+            lay(prow, _IH_I_HEAD, word, 'verdant')
+            lay(lrow, _IH_I_HEAD, frag, 'ancient')
+        else:                                                # a: tail missing
+            span_lo = _IH_RIVER_LO - len(frag)
+            lay(prow, span_lo, word, 'verdant')
+            lay(lrow, span_lo, frag, 'ancient')
+        bolts.append((word, (_IH_BOLT_ROWS[i], _IH_BANK)))
+    lay(_IH_FORD_ROW, _IH_RIVER_LO - len(_IH_FORD_FRAG),
+        _IH_FORD_FRAG, 'ancient')                            # 'river' at 33..37
+    lay(R - 1, _IH_RIVER_LO - len(_IH_FORD_FRAG),
+        _IH_FORD_WORD, 'verdant')                            # ford plaque, south border
+
+    room._ih_bolts = tuple(bolts)
+    room._ih_seal  = (_IH_FORD_WORD, _IH_SEAL)
+
+    room.entities.append(Entity(kind='exit', row=_IH_EXIT[0], col=_IH_EXIT[1],
+                                edit_immune=True))
+    room.spawn_pos = (_IH_LESSON_ROWS[0], _IH_BANK)
+    room.exit_pos  = _IH_EXIT
+
+    room.rebuild_indexes()
+    room.par    = _IH_PAR
+    room.budget = math.ceil(_IH_PAR * 1.4)
+    # Canonical answer (drives the par; insert tokens 'i…'/'a…' cost
+    # 1 + len(text), Esc spends nothing — see tests/test_answer_paths).
+    # The ticks do NOT run during insert keys, so each gate opens on the
+    # first NORMAL action after Esc — the ford leg is 'l' (seal opens on
+    # its tick) then '2l' through the open seal onto the exit:
+    #   A (i,2): 9h i{2} 8l 3j   = 2+3+2+2
+    #   B (a,1): a{1} h 3j       = 2+1+2
+    #   C (i,1): 9h i{1} 9l 3j   = 2+2+2+2
+    #   D (a,2): a{2} 2h 2j      = 3+2+2
+    #   ford:    a{gate} l 2l    = 5+1+2        → total 37
+    m = [m_ for (_w, m_, _f) in lessons]
+    room.answer = (f'9h i{m[0]} 8l 3j '
+                   f'a{m[1]} h 3j '
+                   f'9h i{m[2]} 9l 3j '
+                   f'a{m[3]} 2h 2j '
+                   f'agate l 2l')
+
+    dungeon = Dungeon(name='The Inscription Halls', seed=seed)
+    dungeon.rooms        = [room]
+    dungeon.current_room = 0
+    return dungeon
+

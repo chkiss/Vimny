@@ -49,6 +49,11 @@ def _token_ks_cost(token: str) -> int:
     m = _CNT_RE.match(token)
     if m:
         return len(m.group(1)) + 1
+    if len(token) >= 2 and token[0] in 'ia' and token[1:].isalpha():
+        # insert tokens ('ica', 'agate'): the entry key + each typed char
+        # spend 1; Esc spends NOTHING (main's INSERT loop only charges
+        # insert_char). The Inscription Halls' answers use these.
+        return len(token)
     return 1  # single key: 'j', '^', '$', 'v', ';', ',', etc.
 
 
