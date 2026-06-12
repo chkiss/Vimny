@@ -131,14 +131,17 @@ Chamber corridor widths are set so the taught motion exactly spans the required 
 
 ---
 
-## L23.5 — The Change Annex (originally drafted as L19; renumbered)
+## The Change Annex — MOVED to act_5.md §22.5
 
-> The live curriculum split this section's commands: `dd` shipped with L18
-> (The Operator's Vault), `D` shipped with L19 (The Cipher Cell, built), and
-> `cc`/`s`/`S`/`C` are the Change Annex at display 23.5 — this section now
-> drafts THAT level. The `D`-vs-`d$` cost CHALLENGE below was resolved when
-> the Cipher Cell shipped: `_operator_cost` charges shorthand `D`/`C` as ONE
-> keypress.
+The annex is part of the writers' act (display 22.5, slug
+`whole_line_annex`, teaches `c{m} cc s S C`) and its current draft lives in
+`blueprints/act_5.md` (rewritten 2026-06-12). This file's old section is
+deleted: `dd` shipped with the Operator's Vault, `D` with the Cipher Cell,
+and the `D`-vs-`d$` cost question was resolved by `_operator_cost` charging
+shorthands as one keypress. The old annex grid kept below history's
+void-strip dd/cc chambers — superseded; do not build from here.
+
+<!-- (section body removed 2026-06-12)
 
 **Commands taught:** `dd` `cc` `D` `S`.
   Idiom family: operator-doubling acts on the whole line; `D` = `d$`; `S` = `cc`.
@@ -262,6 +265,8 @@ Total (skipping optional keystone):                             69
 - Forced? YES: terrain-∞ via void strips for `dd` and `cc`. `D`/`S` taught as demo.
 - Par correctly computed? YES: 69 (corrected from prior erroneous ~28; `2j 15l` = 17, not 7).
 - CHALLENGE recorded? YES — `D` vs `d$` cost equality.
+
+(end of removed section) -->
 
 ---
 

@@ -3476,17 +3476,24 @@ def build_dungeon_waypoint_sanctum(seed: int) -> 'Dungeon':
     # locked door (facing UP into the sanctum) ever sees it.
     entities: list = []
     vault_cells: set = set()
+    first_chest = True
     for i, X in enumerate(_WP_VAULT_COLS):
         # The row-9 vaults hold hearts and relic scrolls (the random pool); only
-        # the left-chamber nook holds the Numbered Ledger (see below).
+        # the left-chamber nook holds the Numbered Ledger (see below). The FIRST
+        # vault chest is pinned to The Second Stride ('redo' — <C-r>): undo is
+        # always-on and refunds position + budget, so its other hand belongs to
+        # the player BEFORE the editing act begins — and a scroll about a
+        # waiting footprint belongs in the sanctum of marks.
         kind = 'heart_container' if i % 3 == 1 else 'chest_scroll'
+        sid = 'redo' if (kind == 'chest_scroll' and first_chest) else ''
+        first_chest = first_chest and kind != 'chest_scroll'
         carve(7, X)                                      # 'blue' door cell (in the seal)
         for r in (8, 9):                                 # box the shaft off the danger room
             cells[r][X - 1] = CellType.WALL
             cells[r][X + 1] = CellType.WALL
         cells[10][X] = CellType.WALL
         entities += [Entity(kind='locked_door', row=7, col=X, tag='blue'),
-                     Entity(kind=kind, row=9, col=X)]
+                     Entity(kind=kind, row=9, col=X, scroll_id=sid)]
         vault_cells |= {(7, X), (8, X), (9, X)}
     composite.cells = cells
     composite.seed = seed

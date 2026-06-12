@@ -516,11 +516,13 @@ SCROLL_CATALOG = [
         'content':    WANDERERS_THREAD_SCROLL,
     },
     {
+        # Pinned (not in the random pool): the FIRST vault chest of the
+        # Waypoint Sanctum — the marks level; "the footprint waited."
         'id':         'redo',
         'title':      'The Second Stride',
-        'dropped_by': 'A pilgrim’s boot',
-        'level_slug': 'first_cave',
-        'level_name': 'The First Cave',
+        'dropped_by': 'The Waypoint Sanctum',
+        'level_slug': 'waypoint_sanctum',
+        'level_name': 'The Waypoint Sanctum',
         'content':    SECOND_STRIDE_SCROLL,
     },
     {
@@ -566,7 +568,10 @@ SCROLL_CATALOG = [
 RELIC_SCROLL_IDS = [
     'set_more',
     'regex_classes', 'regex_anchors', 'regex_quant', 'regex_collections', 'regex_magic',
-    'searchcraft', 'jump', 'redo', 'col_motion', 'ins_paste', 'ins_edit',
+    'searchcraft', 'jump', 'col_motion', 'ins_paste', 'ins_edit',
+    # 'redo' is NOT here: The Second Stride is pinned to the Waypoint
+    # Sanctum's first vault chest (guaranteed, display 16 — before the
+    # editing act), not left to the random pool.
 ]
 
 

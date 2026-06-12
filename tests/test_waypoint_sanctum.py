@@ -222,17 +222,20 @@ def test_skipping_the_scroll_beats_par():
 
 
 # ── :set number gutter (the scroll's payoff) + scroll-drop wiring ────────────
-def test_only_the_left_nook_holds_the_numbered_ledger():
-    """The left-chamber nook chest carries scroll_id 'setnum' (the Numbered
-    Ledger); the row-9 vault chests carry no scroll_id, so they drop random
-    relic scrolls.  The level is no longer a per-level forced 'setnum' drop."""
+def test_nook_ledger_and_the_pinned_second_stride():
+    """The left-chamber nook chest carries 'setnum' (the Numbered Ledger).
+    Among the row-9 vault chests, exactly ONE is pinned to 'redo' (The
+    Second Stride — guaranteed here, BEFORE the editing act, instead of
+    floating in the random relic pool); the rest pull random relics."""
     import main
+    from content.scrolls import RELIC_SCROLL_IDS
     room = _room(42)
     nook = next(e for e in room.entities
                 if e.kind == 'chest_scroll' and (e.row, e.col) == _WP_SCROLL)
     assert nook.scroll_id == 'setnum'
     row9 = [e for e in room.entities if e.kind == 'chest_scroll' and e.row == 9]
-    assert row9 and all(e.scroll_id == '' for e in row9)
+    assert sorted(e.scroll_id for e in row9) == [''] * (len(row9) - 1) + ['redo']
+    assert 'redo' not in RELIC_SCROLL_IDS, "pinned chests leave the pool"
     assert 'waypoint_sanctum' not in main._SCROLL_DROPS
 
 
