@@ -210,10 +210,10 @@ POEMS: list[tuple[str | None, str, list[str]]] = [
         'Read what the cell forgot; write it back.',
     ]),
     ('whole_line_annex', 'c cc s S C', [       # The Change Annex — c cc s S C
-        'Double the letter: the whole line answers—',
-        'cc clears the row and waits for new words.',
-        's strikes one stone and opens to write;',
-        'C and S say the long things shortly.',
+        'd cuts the word, then drops the pen.',
+        'c takes the word and hands you the pen.',
+        's for a letter, S for the line, C to the end:',
+        'change cuts and writes in one breath.',
     ]),
     ('quartermaster', 'y yy P', [              # The Beacon Tiers — y yy P
         'y lifts the letters; nothing is cut.',

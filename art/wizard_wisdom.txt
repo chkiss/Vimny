@@ -315,10 +315,10 @@
       "name": "c cc s S C",
       "line_count": 4,
       "quote": [
-        "   Double the letter: the whole line answers—   ",
-        "   cc clears the row and waits for new words.   ",
-        "    s strikes one stone and opens to write;     ",
-        "      C and S say the long things shortly.      "
+        "      d cuts the word, then drops the pen.      ",
+        "    c takes the word and hands you the pen.     ",
+        " s for a letter, S for the line, C to the end:  ",
+        "     change cuts and writes in one breath.      "
       ]
     },
     {
