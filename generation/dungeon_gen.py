@@ -6666,7 +6666,7 @@ _IH_FORD_FRAG, _IH_FORD_WORD = 'river', 'rivergate'
 # is always crushed against stone, never slid into an opened corridor.
 _IH_SEALS = ((13, 42), (13, 43), (13, 44), (13, 45), (13, 46))
 _IH_EXIT  = (13, 47)                    # beyond all five walls
-_IH_PAR   = 26                          # the ( / ) / e sentence-hop route (below);
+_IH_PAR   = 25                          # the ( / ) / e sentence-hop route (below);
                                         # insert costs 1 + chars (Esc spends nothing)
 
 # Deterministic fallback if the greedy draw can't fill all four slots
@@ -6795,20 +6795,22 @@ def build_dungeon_inscription_halls(seed: int) -> Dungeon:
     room.par    = _IH_PAR
     room.budget = math.ceil(_IH_PAR * 1.4)
     # Canonical answer — the sentence-hop route (drives the par; insert
-    # tokens 'i…'/'a…' cost 1 + len(text), Esc spends nothing; ( ) e cost 1
-    # each — see tests/test_answer_paths). Ticks do NOT run during insert
-    # keys, so the walls open on the first NORMAL action after Esc:
+    # tokens 'i…'/'a…' cost 1 + len(text), Esc spends nothing; ( ) e $ cost
+    # 1 each — see tests/test_answer_paths). Ticks do NOT run during insert
+    # keys, so the final wall opens on the first NORMAL action after Esc —
+    # the first $ parks against it (and ticks it open), the second $ sails
+    # the whole opened corridor onto the exit (player-discovered, 25):
     #   A: ( i{2}        = 1+3
     #   B: ) e a{1}      = 1+1+2
     #   C: ) i{1}        = 1+2
     #   D: ) e a{2}      = 1+1+3
-    #   ford: ) e agate l 6l = 1+1+5+1+2   → total 26
+    #   ford: ) e agate $ $ = 1+1+5+1+1   → total 25
     m = [m_ for (_w, m_, _f) in lessons]
     room.answer = (f'( i{m[0]} '
                    f') e a{m[1]} '
                    f') i{m[2]} '
                    f') e a{m[3]} '
-                   f') e agate l 6l')
+                   f') e agate $ $')
 
     dungeon = Dungeon(name='The Inscription Halls', seed=seed)
     dungeon.rooms        = [room]
