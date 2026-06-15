@@ -68,8 +68,8 @@ lands where the cursor cannot stand; pressure-sweep test = the template).
 
 ## 22.5 — The Change Annex (`whole_line_annex`) — `c{m} cc s S C`
 
-(Absorbs the old act_4.md §L23.5 — that section is deleted; `dd` shipped at
-the Operator's Vault, `D` at the Cipher Cell.)
+(Absorbs the Change Annex draft from the retired Act IV blueprint; `dd`
+shipped at the Operator's Vault, `D` at the Cipher Cell.)
 
 **Change is delete + insert in one breath.** Plaque rule again: spans hold
 the WRONG word; the door wants the right one. `c{m}` clears the span and
