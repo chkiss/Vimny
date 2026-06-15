@@ -8,9 +8,9 @@
 > - **Architecture, key files, conventions, budget formula**: `docs/ARCHITECTURE.md`.
 >
 > Section numbers below are intentionally non-contiguous. The stale or duplicated sections
-> (former §3 architecture, §4 visual tables, §6.1–6.3 command tables, §7–§11 systems/procgen,
-> §13 save, and the build checklist) were removed in the 2026-05 prune. Retained sections keep
-> their **original numbers** so outside references (e.g. blueprints citing "SPEC §6.4") still resolve.
+> (former §3 architecture, §4 visual tables, §6.1–6.3 command tables, §6.4 substitution/mana,
+> §7–§11 systems/procgen, §13 save, and the build checklist) were removed in successive prunes.
+> Retained sections keep their **original numbers** so outside cross-references still resolve.
 
 ---
 
@@ -122,19 +122,9 @@ Every Vim navigation command has a direct, literal meaning in the dungeon. (Note
 Normal / Insert / Visual mode command **semantics** are canonical in the engine (`engine/`) +
 tests and summarized in `README.md`; the per-level unlock order is in `content/levels.py`
 (= `LEVELS_PLAN.md` Part 7). Basic Command mode (`:w` `:q` `:q!` `:wq` `:e` `:set number`) is
-covered by the save system and the curriculum. The one piece retained here is the **not-yet-built**
-substitution mechanic, which blueprints reference as "SPEC §6.4".
-
-### 6.4 Substitution & Arcane Mana (forward-looking / TBD)
-
-**Substitution spell** (a later mastery-tier unlock; costs Arcane Mana):
-| Command | Effect | Mana cost |
-|---|---|---|
-| `:s/{from}/{to}/` | Transform first match in current row | 1 |
-| `:s/{from}/{to}/g` | Transform all matches in current row | 3 |
-| `:%s/{from}/{to}/g` | Transform all matches in current room | 5 |
-
-Substitution applies to terrain (`wall`, `fire`, `ice`, `water`) and objects (`chest`, `door`, `lever`). Direct enemy transformation requires the `c` operator; `:s/` affects the environment only. Full scope and mana economy are TBD.
+covered by the save system and the curriculum. Substitution (`:s` / `:g` / `:v`
+/ `&`) shipped at The Spellwright's Forge, token-gated like every other command
+(no "mana" economy); its semantics live in `engine/substitute.py` + tests.
 
 ---
 
@@ -242,8 +232,6 @@ If the player has found the **Relative Numbers scroll** (a findable inventory it
 
 | Topic | Status | Notes |
 |---|---|---|
-| `:s/` mana economy | TBD | Drop rates, max stock, regeneration |
-| `c` operator Insert timeout | TBD | How long before transformation randomises |
 | Full spell vocabulary | TBD | Expand beyond initial 7 words |
 | Town of Normalmode | TBD | NPC dialogue, shop inventory, side quests |
 | Named registers (`"a`–`"z`) | TBD | Whether registers have distinct game-mechanic meaning |
