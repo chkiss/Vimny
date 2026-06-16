@@ -6,6 +6,13 @@
 > Commands: `q @ "`. Capstone act. The family is **power automation** — transform
 > many targets with a single compound command, then industrialise repetition.
 
+> ⚠ **STALE: "Arcane Mana" is retired (2026-06-15).** The Warden Eternal (38.1)
+> design below gates `:s/` behind a mana pool and cites "SPEC §6.4" — both gone.
+> Substitution shipped at The Spellwright's Forge token-gated (no mana), so this
+> boss needs a NEW forcing mechanism for `:s` (terrain-infinity or a token/relic
+> gate) before it can be built. Treat every "mana" reference here as a dead
+> placeholder, not live spec.
+
 **Design principles applied (Part 5 S1–S4):**
 - S1 — terrain-infinity first: where possible make the alternative path *impossible*
   (impassable terrain = infinite cost), not merely more expensive.
