@@ -1,3 +1,21 @@
+# Vimny — a Vim-teaching dungeon crawler.
+# Copyright (C) 2026 Chas Kissick
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see <https://www.gnu.org/licenses/>.
+#
+# SPDX-License-Identifier: GPL-3.0-or-later
+
 """Answer-path correctness: each token must be an atomic keystroke for the level.
 
 Also home of the universal budget-formula test (budget == ceil(par × 1.4) for
@@ -99,6 +117,24 @@ _SKIP_LEVELS = {
 }
 _XFAIL_LEVELS: dict = {}
 
+# Levels whose canonical answer is the raw keystroke tape (admin karaoke), not a
+# space-separated Vim-token string the generic cost model can read — e.g. the
+# Change Annex's `ce`/`cc`/`s` tokens carry their typed text inline (`cerune`,
+# `jccextern`), which `_token_ks_cost` does not parse. par is pinned instead by
+# the level's own driven playthrough test.
+_ANSWER_NOT_TOKENISED = {
+    'build_dungeon_whole_line_annex',  # ce/cc/s keystroke tape; tests/test_whole_line_annex.py
+    'build_dungeon_change_extension',  # S/C keystroke tape; tests/test_change_extension.py
+}
+
+# Levels with a documented NON-1.4 budget. The Change Annex / Extension use a
+# TIGHT margin (S2 by volume — below the trigger count, so the all-old route
+# overshoots); their exact budgets are pinned by their own playthrough tests.
+_NONSTANDARD_BUDGET = {
+    'build_dungeon_whole_line_annex',
+    'build_dungeon_change_extension',
+}
+
 from tests import SEEDS as _UNIVERSAL_SEEDS
 
 
@@ -131,6 +167,9 @@ def test_answer_cost_equals_par(builder, seed):
     New build_dungeon_* functions are discovered automatically; a discovered
     level with no par/answer fails here (add it to _SKIP_LEVELS if intentional).
     """
+    if builder.__name__ in _ANSWER_NOT_TOKENISED:
+        pytest.skip("answer is not a space-tokenised path (typed text has spaces); "
+                    "par pinned by the level's own playthrough test")
     room = cached_room(builder.__name__, seed)
     if room.par is None or not room.answer.strip():
         pytest.fail(
@@ -151,6 +190,9 @@ def test_budget_is_ceil_par_times_1_4(builder, seed):
 
     THE budget-formula test: per-level copies were removed in favour of this
     auto-discovered one, so a new level is covered the day its builder lands."""
+    if builder.__name__ in _NONSTANDARD_BUDGET:
+        pytest.skip("documented non-1.4 budget (tight S2 volume forcing); "
+                    "pinned by the level's own test")
     room = cached_room(builder.__name__, seed)
     assert room.budget == math.ceil(room.par * 1.4), (
         f"{builder.__name__} seed={seed}: budget={room.budget}, "

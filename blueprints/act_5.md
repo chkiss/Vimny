@@ -1,4 +1,4 @@
-# Act V Blueprints — The Writers (displays 22 → 28.1)
+# Act V Blueprints — The Writers (displays 22 → 30.1)
 
 > ⚠ **Pre-implementation design doc — delete-on-implement.** Delete a level's
 > section when it ships; delete the file when the act is built.
@@ -19,8 +19,10 @@
   lengths/positions (par seed-invariant); hand-tallied par + `room.answer` in
   separate operator/motion tokens; a real-keystroke `run_dungeon` playthrough
   test; **teleport + walking audit** (G/{n}G/gg/H/M/L land on first non-blanks;
-  audit walking from adjacent rows); reflow laws (open_gap shifts the whole
-  buffer row across walls; brinks eat shoved content).
+  audit walking from adjacent rows); reflow laws (BOTH open_gap PUSH and close_gap
+  PULL are segment-bounded — a mid-row wall/void rune is a hard line boundary; the
+  glyph against the wall falls INTO it, content on the far side is safe; so a clue
+  behind a wall survives an edit on either side).
 - Toolkit now available to every level: **fog regions** (impassable, blank,
   unsearchable, jump-proof — three-reveal pattern shipped in the Manifold),
   the **plaque-rule family** (span must read as its plaque: Cipher → Beacon →
@@ -35,10 +37,10 @@
 ## The act's arc
 
 The player has walked (Acts I–III) and cut/copied (Act IV). Act V writes:
-insert mode first (22), then change-as-one-verb (22.5), then text entry from
-line edges and whole new rows (23), overwriting (24), case (25), joining
-rows (26), and shoving lines sideways (27–28). The Scrivener (28.1) stamps it
-all shut. The act's repeated image: **the dungeon is unfinished — the player
+insert mode first (22), then change-as-one-verb (23) and its one-key
+shorthands (24), then text entry from line edges and whole new rows (25),
+overwriting (26), case (27), joining rows (28), and shoving lines sideways
+(29–30). The Scrivener (30.1) stamps it all shut. The act's repeated image: **the dungeon is unfinished — the player
 authors the missing stone.**
 
 Engine status: the whole act is already mechanically supported (insert mode +
@@ -66,37 +68,121 @@ lands where the cursor cannot stand; pressure-sweep test = the template).
 
 ---
 
-## 22.5 — The Change Annex (`whole_line_annex`) — `c{m} cc s S C`
+## 23 — The Change Annex (`whole_line_annex`) — `c{m} cc s`
 
-(Absorbs the Change Annex draft from the retired Act IV blueprint; `dd`
-shipped at the Operator's Vault, `D` at the Cipher Cell.)
+**BUILT 2026-06-26** (reworked twice after playtests) — see
+`generation/dungeon_gen.py::build_dungeon_whole_line_annex`,
+`main._whole_line_annex_tick`, and `tests/test_whole_line_annex.py`. As shipped:
+a hall of MISLABELLED doors (plaque rule, 5th member — the annex RELABELS). An
+OPEN block of eight lesson rows; each carries its wrong label on the floor EAST
+of the spine with the right plaque set in the WEST wall. Below, a spine-only
+THROAT row drops to the GATE corridor: the spine, a ROW of eight plaque-door
+bolts, then the exit (plain floor, east of them). Three door kinds, three verbs,
+word-first:
+- **word doors** (×4) — the label is one word off inside a kept phrase; `ce`
+  changes just that word (`cc` would force retyping the whole phrase).
+- **line doors** (×2) — the WHOLE line is one wrong word; `cc` rewrites it. The
+  cursor lands MID-row here (off the previous east-ending edit), so `cc`
+  (column-agnostic) saves the `0`/`^` the old `D`/`d$` rival needs to clear from
+  the line start. **Key learning: at column 0 the `D` shorthand TIES `cc`, so
+  the forcing only holds with the cursor away from the start — which the
+  consecutive-row block + east-ending edits provide for free.**
+- **rune doors** (×2) — one fused rune (◆) stands for two letters; `s` cuts it
+  and spells them out (`r` is one-for-one, `cw` overpays).
 
-**Change is delete + insert in one breath.** Plaque rule again: spans hold
-the WRONG word; the door wants the right one. `c{m}` clears the span and
-drops into insert atomically.
+Volume-forced (par 60, budget = par + TRIGGERS − 1 = 67; each change saves
+exactly one key over its d/x + i rival, so the all-old route (68) overshoots and
+is barred). `c{m}` is delete-then-insert with reflow, identical to `d`-then-`i`
+— terrain forcing stayed dead, as predicted. Finale is `G$` (2 keys: G to the
+gate row, $ east), not `02j$` (par dropped 62→60 after playtest). Labels start AT
+the spine column (no blank margin), so a `cc`/`S` word lands naturally aligned
+with every other label — there is no optional alignment space.
 
-Forcing model:
-- `c{m}` vs `d{m}` + `i`: saves exactly 1 key per change. Force by volume —
-  N change-triggers with margin < N — or by terrain: a `d` cut reflows the
-  row (close_gap pulls the tail left past the cut) BEFORE the insert, so a
-  d-then-i rewrite lands the new word against SHIFTED neighbors and breaks
-  an adjacent plaque; `c` holds the gap open until Esc. **Verify which model
-  the engine implements for `c` (gap-hold vs delete-then-insert) — if `c`
-  reflows identically, use volume-forcing only.**
-- `s` (= `x` + `i`, 1 key cheaper per single-char fix), `S` (= `cc`), `C`
-  (= `c$`): shorthands charged as ONE key (engine precedent: `_operator_cost`
-  charges `D` as one keypress; `C`/`S` gated on this level's tokens).
-  Teach as idioms; force `s` and `C` by volume where natural, accept `S` as
-  a demonstrated companion.
-- Old draft floated introducing `V` (visual-line) here with a `visual_line`
-  token — **still optional**; decide at build (Open Decision #2).
+**Four playtest laws baked in:**
+1. **PLAQUE IN THE WEST WALL.** Reflow is segment-bounded in BOTH directions —
+   a mid-row wall (or void rune) is a hard line boundary, so content on the far
+   side of a wall is never disturbed by an edit on the other side (`open_gap`
+   push and `close_gap` pull are symmetric since 2026-06-26). The plaque could
+   sit east behind a bolt and stay safe; it lives in the WEST wall here for the
+   OTHER two reasons — WALL cells are uncuttable (no `cc`/`D` wipes the answer
+   key) and excluded from the floor scans that read each label.
+2. **Nothing typed may contain a SPACE** — the admin karaoke answer matches
+   keystrokes with spaces stripped as separators, so a typed space is
+   unrepresentable. Hence line doors are a SINGLE word, and `room.answer` is the
+   real keystroke tape (`_wla_route`/`_wla_answer`). ENGINE FIX: insert-mode typed
+   chars now advance `answer_pos` too (every insert level's karaoke was silently
+   desyncing once it left NORMAL mode).
+3. **THE EXIT IS PLAIN FLOOR — NO GATED WALL.** (The first cut kept the exit WALL
+   until solved; rejected as non-Vim. The #1 principle is Vim-faithfulness.) The
+   barrier is GEOMETRY + the plaque-door bolts: the bolts stand in a row WEST of
+   the exit, the spine is each row's first standable cell, the throat row joins
+   the block to the gate ONLY at the spine — so every vertical jump (`G`/`L`/
+   `{n}G`/`H`/`M`) lands on the reachable spine, and `$`/`0`/`|` are segment-
+   bounded (they stop at the first shut bolt — `_cross_water`). No jump reaches
+   the exit until the bolts honestly open. The Inscription pattern (its exit sits
+   behind the river + walls for the same reason).
+4. **Intro hint stays atmospheric** — names the premise, never the keystrokes.
 
-Design device: a hall of mislabeled doors — every label is one word off
-("lock" where the door wants "veil"); the annex re-labels them.
+`V`/`S`/`C` stayed out (Open Decision #2; the shorthands are §24). Two opt-outs in
+`test_answer_paths.py`: `_NONSTANDARD_BUDGET` (tight) and `_ANSWER_NOT_TOKENISED`
+(the `ce`/`cc`/`s` keystroke tape isn't a parseable token string). The new-level
+skill (`.claude/commands/new-level.md`) gained the karaoke + hint + reflow + audit
+guidance.
 
 ---
 
-## 23 — The Sculpting Chambers (`sculpting_chambers`) — `I A o O`
+## 24 — The Change Extension (`change_extension`) — `S C`  ✅ BUILT 2026-06-26
+
+**BUILT** on the Annex chassis (`build_dungeon_change_extension`, par 70, budget
+77; finale `G$` not `02j$`; labels start AT the spine column so `S`/`C` words land
+naturally aligned, no blank margin; every C door FOLLOWS an S door so the cursor
+lands on the wrong tail and the route is `jC`, not `j^wC` — par dropped 78→70).
+Ten plaque-door rows: 4 S doors (a single 6-letter wrong word — `S` beats
+`cc` by one key), 4 C doors (a correct 4-letter prefix then a TWO-word wrong tail
+→ `C` from the tail beats `c$` by one, and `ce` stops a word short; the correct
+replacement is ONE word so the typed text holds no space), 1 `ce` word door and
+1 `s` rune door for reinforcement. Forcing by volume: the all-old cc/c$ route is
+par + 8, one past the budget (margin 7). The tick is the Annex's generic
+plaque-door scan (the room sets `_wla_doors`). Intro stays atmospheric. Pinned by
+`tests/test_change_extension.py` (97 tests). Two **engine fixes** shipped with it:
+- **`S` is now segment-bounded like `cc`** — `engine/insert._clear_row` cleared the
+  WHOLE buffer row (wiping the west-wall plaque); it now clears only the passable
+  `line_extent`, so `S` == `cc` exactly (a wall-embedded plaque survives both).
+- **C-door labels are laid as SEPARATE runs** with bare-floor gaps, not one run
+  with a space glyph: a space glyph is read as a punctuation 'word' that `w` stops
+  ON, so `j^w` would land on the space; separate runs let `w` skip the gap to the
+  wrong tail. The floor scan reconstructs the space, so the target reads the same.
+
+**The one-key shorthands.** The player owns the `c` operator (§23). `S` and
+`C` are the to-the-whole-line and to-end-of-line idioms — each does in ONE
+keypress what the player currently spends two on. They are gated on their own
+shorthand tokens (engine precedent: `_operator_cost` charges `D`/`C`/`S` as a
+single keypress via the `shorthand` tag; `command_guard` requires the token
+on top of the `c` operator).
+
+The split's whole point: `S` **is** `cc` and `C` **is** `c$`, one key cheaper
+each — so a single tight-par puzzle can never force `cc` AND `S` at once (`S`
+strictly dominates). Staging them as the *upgrade* lets each be forced
+honestly, mirroring the Operator's Vault → Cipher Cell `d$` → `D` lineage.
+
+Forcing model (S2 by volume — the savings are exactly 1 key/use, so margin
+must be < the use count):
+- `S` vs the `cc` learned last level: whole-line relabels return in greater
+  number, par tuned so the `cc` path (2 keys/line) blows the budget and only
+  `S` (1 key/line) clears it.
+- `C` vs `c$`: a bank of doors whose labels are correct up to some column and
+  wrong to the line's end — `C` from that column rewrites the tail in one key
+  where `c$` overpays by one per door.
+- Keep a few `c{m}`/`s` triggers scattered in so the level reinforces WHICH
+  tool, not just the two new ones (the Overwrite Halls' `r`-vs-`R` discipline).
+
+Design device: re-enter the mislabeled-door hall, now with longer labels and
+whole-line corruptions — the annex taught the verb, the extension teaches the
+one-key reflexes. Hand-tally par along the canonical `S`/`C` answer.
+
+---
+
+## 25 — The Sculpting Chambers (`sculpting_chambers`) — `I A o O`
 
 **The topology level — the act's spectacle.** All four are insert ENTRIES:
 `I`/`A` at line edges, `o`/`O` opening whole new rows.
@@ -126,7 +212,7 @@ Vault precedent: no Dijkstra once the buffer mutates).
 
 ---
 
-## 24 — The Overwrite Halls (`overwrite_halls`) — `R`
+## 26 — The Overwrite Halls (`overwrite_halls`) — `R`
 
 (Old draft taught `r`+`R`; `r` shipped at the Cipher Cell — this is now an
 `R`-only lesson, and the old compact-corridor design is void.)
@@ -149,7 +235,7 @@ Forcing arithmetic (S2 — tighter multiplier, document it):
 
 ---
 
-## 25 — The Case Chambers (`case_chambers`) — `~ g~ gU gu`
+## 27 — The Case Chambers (`case_chambers`) — `~ g~ gU gu`
 
 **Case is text the eye can't grep.** Plaques demand exact case patterns
 (`VeiL` vs `veil`); doors check the span case-sensitively (they already do —
@@ -168,7 +254,7 @@ Forcing (the old draft's math survives; keep):
 
 ---
 
-## 26 — The Joiner's Gate (`joiners_gate`) — `J gJ`
+## 28 — The Joiner's Gate (`joiners_gate`) — `J gJ`
 
 **Pull the world up into your line.** `J` appends the row below onto the
 current row with one space at the seam; `gJ` with none. (Engine: `op_join` =
@@ -191,7 +277,7 @@ Forcing instead:
 
 ---
 
-## 27 — The Alignment Halls (`alignment_halls`) — `>> <<`
+## 29 — The Alignment Halls (`alignment_halls`) — `>> <<`
 
 **Lines shove sideways.** `>>`/`<<` shift the row's text by INDENT_WIDTH=2
 within the wall-bounded row (`apply_indent`; right shifts can shove tails off
@@ -206,7 +292,7 @@ falls — asymmetry worth one explicit beat).
 
 ---
 
-## 28 — The Indentation Sanctum (`indentation_sanctum`) — `>{m} <{m} =`
+## 30 — The Indentation Sanctum (`indentation_sanctum`) — `>{m} <{m} =`
 
 **The operator form — act on rows you never visit.** A bank of rows must
 align; the rows between/around are WATER or void-ruled (unwalkable), so
@@ -224,7 +310,7 @@ per-row `>>` visits are impossible or unaffordable: `>{m}` (e.g. `>}` /
 
 ---
 
-## 28.1 — The Warden Scrivener (`warden_scrivener`) — boss
+## 30.1 — The Warden Scrivener (`warden_scrivener`) — boss
 
 **Rebuilt on the Manifold chassis** (the old five-phase immunity table is
 void): ward machine, fogged podium niches, `/W` strikes (`search_glyph_
@@ -255,11 +341,11 @@ resolved or rejected above)
 1. **Inscription Halls trigger mechanisms vs reflow** — the i/a hard-forcing
    variants must be verified against open_gap/brink behavior live before par
    is fixed (build-time verification, designer sign-off on the variant).
-2. **Introduce `V` (visual-line) at the Change Annex?** Old draft said yes
-   (token `visual_line`); curriculum currently doesn't list it. Decide when
-   the annex is designed.
+2. ~~Introduce `V` (visual-line) at the Change Annex?~~ — RESOLVED 2026-06-17
+   toward **no**: the Change Annex (§23) stays about the change verbs, not a
+   new mode. `V`/`visual_line` remains unlisted in the curriculum.
 3. **`>{m}` span-indent + `=` semantics** (engine task + design definition —
-   see §28). The only engine work in the act.
+   see §30). The only engine work in the act.
 4. ~~Insert-cost model confirmation~~ — RESOLVED at the Inscription Halls
    build: each typed char spends 1, **Esc spends nothing** (main's INSERT
    loop charges only `insert_char`). Pars use 1 + chars per insert.

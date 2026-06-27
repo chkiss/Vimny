@@ -1,3 +1,21 @@
+# Vimny — a Vim-teaching dungeon crawler.
+# Copyright (C) 2026 Chas Kissick
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see <https://www.gnu.org/licenses/>.
+#
+# SPDX-License-Identifier: GPL-3.0-or-later
+
 """Pure read-only renderer. Never mutates game state."""
 from __future__ import annotations
 import time
@@ -439,7 +457,19 @@ def render_all(term: Terminal, dungeon: Dungeon, player: Player,
             rfg = {'ancient': C.rune_ancient(), 'verdant': C.rune_verdant(),
                    'void': C.rune_void(), 'ember': C.rune_ember(),
                    'pedestal': C.rune_pedestal()}.get(ru.kind, C.normal_fg())
-            return floor_bg + rfg + sym + C.normal_fg()
+            # A glyph takes the BACKGROUND of the terrain it sits on, so a plaque
+            # carved into a wall reads as stone (matching the empty wall cells
+            # around it), not as floor. Floor/corridor glyphs keep floor_bg with
+            # its cursor-line / selection / search-highlight state.
+            if ct == CellType.WALL:
+                glyph_bg = wall_bg
+            elif ct == CellType.WOOD_WALL:
+                glyph_bg = C.wood_wall_bg()
+            elif ct == CellType.WATER:
+                glyph_bg = C.water_bg()
+            else:
+                glyph_bg = floor_bg
+            return glyph_bg + rfg + sym + C.normal_fg()
 
         # Cell type
         if ct == CellType.WATER:

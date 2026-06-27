@@ -24,6 +24,59 @@
 
 ---
 
+## Level 31 — The Selection Halls (`selection_halls`) — `V <C-v>`
+
+> ✅ **Current-conventions section** (added 2026-06-17). The legacy sections
+> below still use pre-slug numbering — ignore their `Level NN` labels and read
+> the slug + LEVELS_PLAN Part 7 for the canonical display. This level opens
+> Act VI as the **span-selection primer**: visual selection and text objects
+> are the two ways to hand a span to an operator (`Vd`, `viw`), so the player
+> learns to select *by eye* here before learning to select *by structure* in
+> the enclosures that follow.
+
+**Commands introduced:** `V` (visual_line) · `<C-v>` (visual_block) — the
+linewise and block siblings of charwise `v` (the Sight Sanctum, display 14).
+Each is gated on its own token (`visual_line` / `visual_block`); `command_guard`
+already enforces them, and the engine fully supports both modes
+(`engine/visual.py`, `Mode.VISUAL_LINE` / `VISUAL_BLOCK`; `main.py` maps
+`v`/`V`/`<C-v>`).
+
+**Why a level, and why here:** `V`/`<C-v>` overlap with tools the player owns
+— `3dd`, `>{m}`, `d}` already express many spans. Their UNIQUE value is the
+span you cannot cheaply count or name as a motion. Forcing must lean on that
+or the commands are out-priced.
+
+Forcing model:
+- `V` (S1 where possible): a **ragged, eye-counted line span** — a block of
+  corrupt rows whose count is hidden (fog you can't pre-count, or an irregular
+  run bounded by walls), so `{n}dd`/`{n}>>` can't be formed without first
+  pacing the rows (extra keys) while `Vjjj…{op}` grows the selection visually.
+  Apply any linewise op the player owns: `Vd` (= range `dd`), `V>` (range
+  indent — reuses Alignment Halls terrain), `Vy`.
+- `<C-v>` (S1): a **vertical stripe** of wrong cells down N rows that no
+  charwise/linewise tool reaches in one stroke — the killer app is
+  `<C-v>{n}j` then `I{text}<Esc>` / `c` / `r`, the edit propagating to every
+  selected row (column insert/change). Design a grid where the fix is columnar
+  (a sealed seam down the left of N doors) so block mode is the only one-pass
+  tool.
+- Keep a couple of `v` (charwise) triggers in so the level reinforces WHICH
+  visual mode, not just the two new ones (the Overwrite Halls' `r`-vs-`R`
+  discipline).
+
+Engine/laws to respect: the **landing rule** (selection-driven ops must leave
+the cursor somewhere standable), reflow laws (linewise `Vd` collapses real
+rows via `remove_row`; block edits shift each row independently), and the
+teleport+walking audit. Hand-tally par along the canonical `V`/`<C-v>` answer
+(no Dijkstra once the buffer mutates). Open question for build: whether block
+insert (`<C-v>I…<Esc>` multi-row propagation) needs any new test-template
+beyond the existing visual-op coverage — verify live.
+
+Design device: a **gallery of corrupt panels** — whole-row blights demand `V`,
+columnar seams demand `<C-v>`; the Sight Sanctum taught the player to *see* a
+span, the Selection Halls teach them to *take* one.
+
+---
+
 ## Level 30 — The Word Enclosure
 
 **Commands introduced:** `iw` `aw`

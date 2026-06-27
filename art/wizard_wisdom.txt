@@ -312,13 +312,24 @@
     },
     {
       "introduces_slug": "whole_line_annex",
-      "name": "c cc s S C",
+      "name": "c cc s",
       "line_count": 4,
       "quote": [
         "      d cuts the word, then drops the pen.      ",
         "    c takes the word and hands you the pen.     ",
-        " s for a letter, S for the line, C to the end:  ",
+        "    cc rewrites the line; s, a single rune.     ",
         "     change cuts and writes in one breath.      "
+      ]
+    },
+    {
+      "introduces_slug": "change_extension",
+      "name": "S C",
+      "line_count": 4,
+      "quote": [
+        "    cc you know—two strokes to mend a line.     ",
+        "     S does the same and asks for only one.     ",
+        "    c$ recut the tail; C is its single key.     ",
+        "   The practised hand spends less, says more.   "
       ]
     },
     {

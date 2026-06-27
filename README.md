@@ -65,54 +65,56 @@ Each dungeon is a text buffer. The floor is made of **characters, words, and spa
 The curriculum is defined in `content/levels.py` (canonical) and mirrored in `LEVELS_PLAN.md` Part 7. "Playable" means a generator is implemented; the rest are defined but not yet built. This table is generated — run `python3 content/_gen_curriculum_table.py` after curriculum changes.
 
 <!-- BEGIN GENERATED LEVELS TABLE -->
-| #    | Name                         | Commands                    | Status   |
-|------|------------------------------|-----------------------------|----------|
-| 0    | The First Cave               | `h j k l u :w :q :q!`       | Playable |
-| 1    | The Line Halls               | `^ $ 0`                     | Playable |
-| 1.1  | The Reliquary                | `x`                         | Playable |
-| 2    | The Counting Crypts          | `[count] prefix`            | Playable |
-| 3    | The Rune Halls               | `w b e`                     | Playable |
-| 4    | The Character Cataracts      | `f F t T`                   | Playable |
-| 5    | The Goblin Gauntlet          | `; , p`                     | Playable |
-| 5.1  | The Warden's Keep            | (boss)                      | Playable |
-| 6    | The WORD Forge               | `W B E`                     | Playable |
-| 7    | The Backward Vaults          | `ge gE`                     | Playable |
-| 8    | The Lineheads                | `G gg`                      | Playable |
-| 9    | The Screen Vault             | `H M L`                     | Playable |
-| 10   | The Bracket Vaults           | `%`                         | Playable |
-| 12   | The Runic Archives           | `} {`                       | Playable |
-| 13   | The Sentence Corridor        | `) (`                       | Playable |
-| 13.1 | The Warden Surveyor          | (boss)                      | Playable |
-| 14   | The Sight Sanctum            | `v`                         | Playable |
-| 15   | The Seekers' Labyrinth       | `/ ? n N *`                 | Playable |
-| 16   | The Waypoint Sanctum         | `` m ' ` ``                 | Playable |
-| 17   | The Archivist's Library      | `:set wrap  :e!  :w {file}` | Playable |
-| 17.1 | The Warden Pathfinder        | (boss)                      | Playable |
-| 18   | The Operator's Vault         | `d{m}  dd`                  | Playable |
-| 19   | The Cipher Cell              | `r  D`                      | Playable |
-| 20   | The Beacon Tiers             | `y yy P`                    | Playable |
-| 21   | The Echo Vault               | `.`                         | Playable |
-| 21.1 | The Warden Manifold          | (boss)                      | Playable |
-| 22   | The Inscription Halls        | `i a`                       | Playable |
-| 22.5 | The Change Annex             | `c{m}  cc  s  S  C`         | Planned  |
-| 23   | The Sculpting Chambers       | `I A o O`                   | Planned  |
-| 24   | The Overwrite Halls          | `R`                         | Planned  |
-| 25   | The Case Chambers            | `~ g~ gU gu`                | Planned  |
-| 26   | The Joiner's Gate            | `J gJ`                      | Planned  |
-| 27   | The Alignment Halls          | `>> <<`                     | Planned  |
-| 28   | The Indentation Sanctum      | `>{m} <{m} =`               | Planned  |
-| 28.1 | The Warden Scrivener         | (boss)                      | Planned  |
-| 29   | The Word Enclosure           | `iw aw`                     | Planned  |
-| 30   | The Bracket Enclosure        | `i( a(`                     | Planned  |
-| 31   | The Brace & Square Enclosure | `i[ a[ i{ a{`               | Planned  |
-| 32   | The Quote Enclosure          | `i" a" i' a'`               | Planned  |
-| 33   | The Tag Enclosure            | `it at`                     | Planned  |
-| 34   | The Sentence Enclosure       | `is as`                     | Planned  |
-| 35   | The Paragraph Enclosure      | `ip ap`                     | Planned  |
-| 35.1 | The Grandmaster's Sanctum    | (boss)                      | Planned  |
-| 36   | The Spellwright's Forge      | `:s///  :g  &`              | Playable |
-| 37   | The Hall of Echoes           | `q @ "`                     | Planned  |
-| 37.1 | The Warden Eternal           | (boss)                      | Planned  |
+| # | Name | Commands | Status |
+|---|---|---|---|
+| 0 | The First Cave | `h j k l u :w :q :q!` | Playable |
+| 1 | The Line Halls | `^ $ 0` | Playable |
+| 1.1 | The Reliquary | `x` | Playable |
+| 2 | The Counting Crypts | `[count] prefix` | Playable |
+| 3 | The Rune Halls | `w b e` | Playable |
+| 4 | The Character Cataracts | `f F t T` | Playable |
+| 5 | The Goblin Gauntlet | `; , p` | Playable |
+| 5.1 | The Warden's Keep | (boss) | Playable |
+| 6 | The WORD Forge | `W B E` | Playable |
+| 7 | The Backward Vaults | `ge gE` | Playable |
+| 8 | The Lineheads | `G gg` | Playable |
+| 9 | The Screen Vault | `H M L` | Playable |
+| 10 | The Bracket Vaults | `%` | Playable |
+| 12 | The Runic Archives | `} {` | Playable |
+| 13 | The Sentence Corridor | `) (` | Playable |
+| 13.1 | The Warden Surveyor | (boss) | Playable |
+| 14 | The Sight Sanctum | `v` | Playable |
+| 15 | The Seekers' Labyrinth | `/ ? n N *` | Playable |
+| 16 | The Waypoint Sanctum | `` m ' ` `` | Playable |
+| 17 | The Archivist's Library | `:set wrap  :e!  :w {file}` | Playable |
+| 17.1 | The Warden Pathfinder | (boss) | Playable |
+| 18 | The Operator's Vault | `d{m}  dd` | Playable |
+| 19 | The Cipher Cell | `r  D` | Playable |
+| 20 | The Beacon Tiers | `y yy P` | Playable |
+| 21 | The Echo Vault | `.` | Playable |
+| 21.1 | The Warden Manifold | (boss) | Playable |
+| 22 | The Inscription Halls | `i a` | Playable |
+| 23 | The Change Annex | `c{m}  cc  s` | Playable |
+| 24 | The Change Extension | `S  C` | Playable |
+| 25 | The Sculpting Chambers | `I A o O` | Planned |
+| 26 | The Overwrite Halls | `R` | Planned |
+| 27 | The Case Chambers | `~ g~ gU gu` | Planned |
+| 28 | The Joiner's Gate | `J gJ` | Planned |
+| 29 | The Alignment Halls | `>> <<` | Planned |
+| 30 | The Indentation Sanctum | `>{m} <{m} =` | Planned |
+| 30.1 | The Warden Scrivener | (boss) | Planned |
+| 31 | The Selection Halls | `V  <C-v>` | Planned |
+| 32 | The Word Enclosure | `iw aw` | Planned |
+| 33 | The Bracket Enclosure | `i( a(` | Planned |
+| 34 | The Brace & Square Enclosure | `i[ a[ i{ a{` | Planned |
+| 35 | The Quote Enclosure | `i" a" i' a'` | Planned |
+| 36 | The Tag Enclosure | `it at` | Planned |
+| 37 | The Sentence Enclosure | `is as` | Planned |
+| 38 | The Paragraph Enclosure | `ip ap` | Planned |
+| 38.1 | The Grandmaster's Sanctum | (boss) | Planned |
+| 39 | The Spellwright's Forge | `:s///  :g  &` | Playable |
+| 40 | The Hall of Echoes | `q @ "` | Planned |
+| 40.1 | The Warden Eternal | (boss) | Planned |
 <!-- END GENERATED LEVELS TABLE -->
 
 ## Commands
@@ -122,113 +124,117 @@ The full command reference (also the hint-bar source) is `render/vim_commands.md
 <details><summary>Show all commands</summary>
 
 <!-- BEGIN GENERATED COMMANDS TABLE -->
-| Command       | Effect              |
-|---------------|---------------------|
-| `u`           | undo                |
-| `:w`          | write (save)        |
-| `:q`          | quit                |
-| `:q!`         | quit without saving |
-| `h`           | left                |
-| `j`           | down                |
-| `k`           | up                  |
-| `l`           | right               |
-| `0`           | line start          |
-| `^`           | first non-blank     |
-| `$`           | end of line         |
-| `x`           | delete char         |
-| `[N]hjkl`     | count move          |
-| `w`           | word start          |
-| `b`           | word back           |
-| `e`           | word end            |
-| `f{c}`        | jump to char        |
-| `F{c}`        | jump back to char   |
-| `t{c}`        | before next char    |
-| `T{c}`        | after prev char     |
-| `;`           | repeat              |
-| `,`           | reverse             |
-| `p`           | paste               |
-| `W`           | WORD start          |
-| `B`           | WORD back           |
-| `E`           | WORD end            |
-| `ge`          | word-end back       |
-| `gE`          | WORD-end back       |
-| `G`           | last line           |
-| `gg`          | first line          |
-| `[N]G`        | go to line N        |
-| `H`           | top of screen       |
-| `M`           | middle of screen    |
-| `L`           | bottom of screen    |
-| `%`           | match bracket       |
-| `}`           | next block          |
-| `{`           | prev block          |
-| `)`           | next sentence       |
-| `(`           | prev sentence       |
-| `v`           | visual mode         |
-| `/{pat}`      | search              |
-| `?{pat}`      | search back         |
-| `n`           | next match          |
-| `N`           | prev match          |
-| `*`           | search word         |
-| `m{a}`        | set mark            |
-| `` `{a} ``    | to mark             |
-| `'{a}`        | to mark ↑           |
-| `:set wrap`   | wrap lines          |
-| `:e!`         | reload file         |
-| `:w {file}`   | save as             |
-| `d{m}`        | delete              |
-| `dd`          | delete line         |
-| `c{m}`        | change              |
-| `cc`          | change line         |
-| `r{c}`        | replace char        |
-| `D`           | delete to line end  |
-| `s`           | substitute          |
-| `S`           | substitute line     |
-| `y{m}`        | yank                |
-| `yy`          | yank line           |
-| `P`           | paste before        |
-| `.`           | repeat change       |
-| `i`           | insert              |
-| `a`           | append              |
-| `o`           | new line below      |
-| `O`           | new line above      |
-| `I`           | insert at start     |
-| `A`           | append at end       |
-| `Esc`         | exit insert         |
-| `R`           | replace mode        |
-| `~`           | toggle case         |
-| `gU{m}`       | uppercase           |
-| `gu{m}`       | lowercase           |
-| `g~{m}`       | toggle case         |
-| `J`           | join lines          |
-| `gJ`          | join, no space      |
-| `>{m}`        | indent              |
-| `<{m}`        | dedent              |
-| `iw`          | inner word          |
-| `aw`          | a word              |
-| `i(`          | inner (             |
-| `a(`          | a ()                |
-| `i[`          | inner [             |
-| `a[`          | a []                |
-| `i{`          | inner {             |
-| `a{`          | a {}                |
-| `i"`          | inner "             |
-| `a"`          | a ""                |
-| `i'`          | inner '             |
-| `a'`          | a ''                |
-| `it`          | inner tag           |
-| `at`          | a tag               |
-| `is`          | inner sentence      |
-| `as`          | a sentence          |
-| `ip`          | inner paragraph     |
-| `ap`          | a paragraph         |
-| `:s/old/new/` | substitute          |
-| `:%s//g`      | substitute all      |
-| `:g/pat/d`    | global delete       |
-| `&`           | repeat last :s      |
-| `q{a}`        | record macro        |
-| `@{a}`        | play macro          |
-| `@@`          | repeat macro        |
-| `"{a}`        | named reg           |
+| Command | Effect |
+|---|---|
+| `u` | undo |
+| `:w` | write (save) |
+| `:q` | quit |
+| `:q!` | quit without saving |
+| `h` | left |
+| `j` | down |
+| `k` | up |
+| `l` | right |
+| `0` | line start |
+| `^` | first non-blank |
+| `$` | end of line |
+| `x` | delete char |
+| `[N]hjkl` | count move |
+| `w` | word start |
+| `b` | word back |
+| `e` | word end |
+| `f{c}` | jump to char |
+| `F{c}` | jump back to char |
+| `t{c}` | before next char |
+| `T{c}` | after prev char |
+| `;` | repeat |
+| `,` | reverse |
+| `p` | paste |
+| `W` | WORD start |
+| `B` | WORD back |
+| `E` | WORD end |
+| `ge` | word-end back |
+| `gE` | WORD-end back |
+| `G` | last line |
+| `gg` | first line |
+| `[N]G` | go to line N |
+| `H` | top of screen |
+| `M` | middle of screen |
+| `L` | bottom of screen |
+| `%` | match bracket |
+| `}` | next block |
+| `{` | prev block |
+| `)` | next sentence |
+| `(` | prev sentence |
+| `v` | visual mode |
+| `/{pat}` | search |
+| `?{pat}` | search back |
+| `n` | next match |
+| `N` | prev match |
+| `*` | search word |
+| `m{a}` | set mark |
+| `` `{a} `` | to mark |
+| `'{a}` | to mark ↑ |
+| `:set wrap` | wrap lines |
+| `:e!` | reload file |
+| `:w {file}` | save as |
+| `d{m}` | delete |
+| `dd` | delete line |
+| `c{m}` | change |
+| `cc` | change line |
+| `r{c}` | replace char |
+| `D` | delete to line end |
+| `c{m}  cc` | change |
+| `s` | substitute |
+| `S` | substitute line |
+| `C` | change to end |
+| `y{m}` | yank |
+| `yy` | yank line |
+| `P` | paste before |
+| `.` | repeat change |
+| `i` | insert |
+| `a` | append |
+| `o` | new line below |
+| `O` | new line above |
+| `I` | insert at start |
+| `A` | append at end |
+| `Esc` | exit insert |
+| `R` | replace mode |
+| `~` | toggle case |
+| `gU{m}` | uppercase |
+| `gu{m}` | lowercase |
+| `g~{m}` | toggle case |
+| `J` | join lines |
+| `gJ` | join, no space |
+| `>{m}` | indent |
+| `<{m}` | dedent |
+| `V` | visual line |
+| `<C-v>` | visual block |
+| `iw` | inner word |
+| `aw` | a word |
+| `i(` | inner ( |
+| `a(` | a () |
+| `i[` | inner [ |
+| `a[` | a [] |
+| `i{` | inner { |
+| `a{` | a {} |
+| `i"` | inner " |
+| `a"` | a "" |
+| `i'` | inner ' |
+| `a'` | a '' |
+| `it` | inner tag |
+| `at` | a tag |
+| `is` | inner sentence |
+| `as` | a sentence |
+| `ip` | inner paragraph |
+| `ap` | a paragraph |
+| `:s/old/new/` | substitute |
+| `:%s//g` | substitute all |
+| `:g/pat/d` | global delete |
+| `&` | repeat last :s |
+| `q{a}` | record macro |
+| `@{a}` | play macro |
+| `@@` | repeat macro |
+| `"{a}` | named reg |
 <!-- END GENERATED COMMANDS TABLE -->
 
 </details>
@@ -275,3 +281,10 @@ pytest
 - **Everything is a buffer.** Dungeons are files; the overworld is a directory; `:w`, `:q`, `:e` are real mechanics.
 
 See `LEVELS_PLAN.md` for the curriculum and `SPEC.md` for design vision & UI.
+
+## License
+
+Vimny is free software, licensed under the **GNU General Public License v3.0** —
+see [`LICENSE`](LICENSE) for the full text. The only runtime dependency,
+[`blessed`](https://pypi.org/project/blessed/), is MIT-licensed and so
+GPL-compatible.

@@ -1,4 +1,22 @@
 #!/usr/bin/env python3
+# Vimny — a Vim-teaching dungeon crawler.
+# Copyright (C) 2026 Chas Kissick
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see <https://www.gnu.org/licenses/>.
+#
+# SPDX-License-Identifier: GPL-3.0-or-later
+
 """Source of truth for the Wizard Wisdom corpus — generates art/wizard_wisdom.txt.
 
 Edit the POEMS list here, then run `python3 art/_gen_wizard_wisdom.py`.
@@ -209,11 +227,17 @@ POEMS: list[tuple[str | None, str, list[str]]] = [
         'D shears the rot from cursor to wall.',
         'Read what the cell forgot; write it back.',
     ]),
-    ('whole_line_annex', 'c cc s S C', [       # The Change Annex — c cc s S C
+    ('whole_line_annex', 'c cc s', [           # The Change Annex — c cc s
         'd cuts the word, then drops the pen.',
         'c takes the word and hands you the pen.',
-        's for a letter, S for the line, C to the end:',
+        'cc rewrites the line; s, a single rune.',
         'change cuts and writes in one breath.',
+    ]),
+    ('change_extension', 'S C', [              # The Change Extension — S C
+        'cc you know—two strokes to mend a line.',
+        'S does the same and asks for only one.',
+        'c$ recut the tail; C is its single key.',
+        'The practised hand spends less, says more.',
     ]),
     ('quartermaster', 'y yy P', [              # The Beacon Tiers — y yy P
         'y lifts the letters; nothing is cut.',

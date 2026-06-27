@@ -1,3 +1,21 @@
+# Vimny — a Vim-teaching dungeon crawler.
+# Copyright (C) 2026 Chas Kissick
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see <https://www.gnu.org/licenses/>.
+#
+# SPDX-License-Identifier: GPL-3.0-or-later
+
 """Assemble a dungeon from rooms joined by corridors into a single grid."""
 from __future__ import annotations
 import heapq, math, os, random
@@ -6813,6 +6831,440 @@ def build_dungeon_inscription_halls(seed: int) -> Dungeon:
                    f') e agate $ $')
 
     dungeon = Dungeon(name='The Inscription Halls', seed=seed)
+    dungeon.rooms        = [room]
+    dungeon.current_room = 0
+    return dungeon
+
+
+# ── The Change Annex (23) — change is delete + insert in one breath ───────────
+# A hall of MISLABELLED doors. Every door's plaque (set in the wall to the WEST)
+# shows the word it wants; the label on the floor to the EAST shows the wrong
+# one. The plaque rule, fifth member (Cipher mended, Beacon copied, Echo
+# repeated, the Halls authored) — here the annex RELABELS, and the verb is
+# `change`:
+#   word doors — the label is ONE word off inside a phrase that is otherwise
+#                right; `ce` changes just that word. `cc` would force retyping
+#                the whole kept phrase, so the motion form is forced.
+#   line doors — the WHOLE line is one wrong word; `cc` rewrites it in one verb.
+#                The cursor lands MID-row here (off the previous east-ending
+#                edit), so cc (column-agnostic) honestly saves the `0`/`^` the
+#                old `D`/`d$` rival must spend to clear from the line start
+#                (its one-key rival `S` is withheld until §24).
+#   rune doors — one fused rune (◆) stands for two letters; `s` cuts it and
+#                spells them out, where `cw`/`r` overpay (r is one-for-one).
+# Forcing is by VOLUME (the blueprint's resolved engine reality: c is
+# delete-then-insert WITH reflow, identical to d-then-i, so terrain forcing is
+# dead — every change merely saves ONE key over its d/x+i rival). The eight
+# plaque-door bolts stand in a ROW across the gate corridor (the Inscription
+# pattern), and the budget margin is pinned BELOW the door count so the all-old
+# route overshoots.
+#
+# Three layout laws from the first playtest (all Vim-faithful — no state-toggled
+# walls beyond the plaque-rule doors the whole family already uses):
+#  - PLAQUE IN THE WEST WALL. Reflow is segment-bounded in BOTH directions: a
+#    mid-row wall (or void rune) is a hard line boundary, so content on the far
+#    side of a wall is never disturbed by an edit on the other side (push via
+#    open_gap and pull via close_gap are symmetric — see engine/reflow.py). The
+#    plaque could therefore live EAST of the label behind a bolt and stay safe;
+#    it sits in the WEST wall here for the OTHER two reasons — WALL cells are
+#    uncuttable (no `cc`/`D` can wipe the answer key) and excluded from the floor
+#    scans that read each label. (Earlier, before the push was segment-bounded,
+#    an east plaque on wall cells got erased on the first keystroke; that hazard
+#    is gone, but west-wall placement remains the simplest safe home.)
+#  - NOTHING THE PLAYER TYPES MAY CONTAIN A SPACE. The admin "karaoke" answer
+#    sheet matches keystrokes against room.answer with spaces stripped as
+#    separators, so a typed space is unrepresentable. Hence line doors are a
+#    SINGLE wrong word (not a phrase), and `room.answer` is the real keystroke
+#    string (see _wla_route / _wla_answer below).
+#  - THE EXIT IS PLAIN FLOOR, NOT A GATED WALL. The bolts stand in a row WEST of
+#    the exit on the gate row; the spine cell west of them is the row's first
+#    standable cell. So every vertical jump (G / L / {n}G / H / M) lands on the
+#    reachable spine, never the isolated exit, and `$`/`0`/`|` are segment-
+#    bounded (they stop at the first shut bolt — engine `_cross_water`). No jump
+#    can reach the exit until the bolts honestly open. (The first cut kept the
+#    exit cell WALL until solved — a non-Vim hack, now retired for geometry.)
+_WLA_ROWS, _WLA_COLS = 13, 23
+_WLA_PLQ_COL  = 1                    # plaques sit in the WEST wall (reflow-immune)
+_WLA_COL_S    = 11                   # the spine — the gate's first standable; on lesson rows it
+                                     # carries the label (no blank margin: the word a cc/S lands
+                                     # at the spine reads aligned with every other label)
+_WLA_LBL_COL  = _WLA_COL_S           # labels start AT the spine (= where cc/S drops the cursor)
+_WLA_LBL_END  = 21                   # label floor reaches this column (inclusive)
+_WLA_LESSON_ROWS = (2, 3, 4, 5, 6, 7, 8, 9)          # an open block, descended by j
+_WLA_THROAT_ROW  = 10                                # spine-ONLY row: the block joins the gate
+                                                     # only at the spine (so no east column of
+                                                     # the block drops past the bolts to the exit)
+_WLA_GATE_ROW    = 11                                # the gate corridor: spine · bolts · exit
+_WLA_GATE_COL0   = 12                                # first bolt column (one per lesson)
+_WLA_N_WORD, _WLA_N_LINE, _WLA_N_SENT = 4, 2, 2
+_WLA_TRIGGERS = _WLA_N_WORD + _WLA_N_LINE + _WLA_N_SENT     # 8 doors
+_WLA_EXIT = (_WLA_GATE_ROW, _WLA_GATE_COL0 + _WLA_TRIGGERS)  # plain floor, east of the bolts
+_WLA_PLACEHOLDER = '◆'               # the fused rune — `s` spells it out
+_WLA_PAR = 60                        # measured (drive); pinned by the playthrough test
+                                     # (finale is G$ = 2 keys, not 02j$ = 4)
+# Distinct words at FIXED lengths (par invariance needs fixed lengths, never
+# fixed letters): 4-letter for word/rune doors, 6-letter for the whole-line
+# doors — the deterministic fallback when the vocab draw comes up short.
+_WLA_FALLBACK_4 = (
+    'lock', 'veil', 'gate', 'bind', 'rune', 'dust', 'iron', 'moss',
+    'fern', 'silt', 'oath', 'wisp', 'mire', 'peat', 'gild', 'hush',
+)
+_WLA_FALLBACK_6 = ('cipher', 'shroud', 'beacon', 'warden')
+
+
+def _wla_pick(rng):
+    """Eight lessons, each a (label → target) relabelling at FIXED word lengths
+    so par is seed-invariant. Returns lesson dicts:
+      word — {'label': 'wrong ctx', 'target': 'right ctx', 'typed': 'right'}
+      line — {'label': 'wrongw',    'target': 'rightw',    'typed': 'rightw'}  (one word)
+      sent — {'label': '◆st ctx',   'target': 'fist ctx',  'typed': 'fi'}
+    No `typed` value contains a SPACE (the karaoke answer can't represent one) —
+    hence the single-word line doors. All words are drawn DISTINCT, which alone
+    guarantees door independence: no target is a substring of another or of any
+    label (a phrase needs its unique first word to match). Bolt scans are
+    whole-row substring scans."""
+    _load_vocab_tables()
+    def _pool(n, fallback):
+        p = sorted({w for w in _VOCAB_PLAIN_BY_LEN.get(n, ())
+                    if w.isalpha() and w.islower()})
+        rng.shuffle(p)
+        return p, list(fallback)
+    p4, fb4 = _pool(4, _WLA_FALLBACK_4)
+    p6, fb6 = _pool(6, _WLA_FALLBACK_6)
+    need4 = _WLA_N_WORD * 3 + _WLA_N_SENT * 2          # word: wrong/right/ctx; sent: wanted/ctx
+    need6 = _WLA_N_LINE                                 # one whole-line word per line door
+    w4 = iter(p4 if len(p4) >= need4 else fb4)
+    w6 = iter(p6 if len(p6) >= need6 else fb6)
+    lessons = []
+    for _ in range(_WLA_N_WORD):
+        wrong, right, ctx = next(w4), next(w4), next(w4)
+        lessons.append({'kind': 'word', 'label': f'{wrong} {ctx}',
+                        'target': f'{right} {ctx}', 'typed': right})
+    for _ in range(_WLA_N_LINE):
+        wrong, right = next(w6), next(w6)
+        lessons.append({'kind': 'line', 'label': wrong,
+                        'target': right, 'typed': right})
+    for _ in range(_WLA_N_SENT):
+        wanted, ctx = next(w4), next(w4)
+        lessons.append({'kind': 'sent',
+                        'label': f'{_WLA_PLACEHOLDER}{wanted[2:]} {ctx}',
+                        'target': f'{wanted} {ctx}', 'typed': wanted[:2]})
+    return lessons
+
+
+# Verb keys per door kind. ce changes to the word's end; cc the whole line; s a
+# single rune. Each is followed by typed text and an Esc (Esc spends nothing and
+# is omitted from the keystroke answer — it is a sequence key the karaoke tape
+# skips). `^` positions onto the label start; line doors (cc) need no column.
+_WLA_VERB = {'word': 'ce', 'line': 'cc', 'sent': 's'}
+
+
+def _wla_route(lessons):
+    """The canonical change route as a list of (printable_keys, typed) steps,
+    shared by the answer string and the playthrough test so they never drift.
+    Each step's keys are pressed, then `typed` is entered in INSERT and sealed
+    with Esc (callers add the Esc; it is not a printable answer key)."""
+    steps = []
+    for i, L in enumerate(lessons):
+        prefix = '' if i == 0 else ('j' if L['kind'] == 'line' else 'j^')
+        steps.append((prefix + _WLA_VERB[L['kind']], L['typed']))
+    steps.append(('G$', ''))           # G to the gate row (last line), $ east to the exit
+    return steps
+
+
+def _wla_answer(lessons):
+    """room.answer: the real keystroke tape (printable keys only — Esc omitted).
+    Spaces separate tokens for the karaoke display and are stripped when matched;
+    no `typed` value contains a space, so the tape is unambiguous."""
+    return ' '.join(keys + typed for keys, typed in _wla_route(lessons) if keys or typed)
+
+
+def build_dungeon_whole_line_annex(seed: int) -> Dungeon:
+    """The Change Annex (display 23: c{m}, cc, s).
+
+    An OPEN block of eight lesson rows (2..9). Each carries its WRONG label on
+    the floor (east of the spine) with the RIGHT plaque set in the WEST wall
+    (uncuttable, reflow-immune, excluded from the floor scans). Word doors come
+    first so the line-door cursor lands MID-row off the previous east-ending
+    edit, then the rune doors. Below the block runs the gate corridor (row 10):
+    the spine cell, then a ROW of eight plaque-door bolts, then the exit — plain
+    floor, east of them all. Each bolt opens while its label reads true; until
+    every bolt opens, walking east is barred and no jump reaches the exit (the
+    spine is each row's first standable cell, and `$`/`|` stop at the first shut
+    bolt). Word doors force `ce` (kept context), line doors force `cc` (whole
+    line), rune doors force `s` (a fused ◆). Forcing is by volume — see header."""
+    rng = random.Random(seed)
+    lessons = _wla_pick(rng)
+
+    R, C = _WLA_ROWS, _WLA_COLS
+    cells = [[CellType.WALL] * C for _ in range(R)]
+    for r in _WLA_LESSON_ROWS:                       # the open lesson block (label floor)
+        for c in range(_WLA_COL_S, _WLA_LBL_END + 1):
+            cells[r][c] = CellType.FLOOR
+    cells[_WLA_THROAT_ROW][_WLA_COL_S] = CellType.FLOOR  # spine-only throat: block → gate
+    cells[_WLA_GATE_ROW][_WLA_COL_S] = CellType.FLOOR    # the spine reaches the gate row
+    cells[_WLA_EXIT[0]][_WLA_EXIT[1]] = CellType.FLOOR   # the exit: plain floor, east of the bolts
+    # The bolt cells (the gate row, between the spine and the exit) stay WALL at
+    # build; the tick opens each when its label reads true. The exit needs no
+    # gating: the throat row joins the block to the gate ONLY at the spine, so no
+    # east column of the block drops onto the exit; the exit is never a row's
+    # first standable cell (jumps land on the spine) and `$` stops at the first
+    # shut bolt (engine `_cross_water`). It opens honestly, bolt by bolt.
+
+    room = Room(room_type=RoomType.ENTRY, rows=R, cols=C)
+    room.cells = cells
+    room.seed  = seed
+
+    def lay(row, col, text, kind):
+        room.char_runs.append(CharRun(row, col, tuple(text), kind))
+
+    doors = []
+    for i, lesson in enumerate(lessons):
+        lrow = _WLA_LESSON_ROWS[i]
+        lesson['row'] = lrow
+        lay(lrow, _WLA_LBL_COL, lesson['label'], 'ancient')    # wrong label, on the floor
+        lay(lrow, _WLA_PLQ_COL, lesson['target'], 'verdant')   # the plaque, in the WEST wall
+        doors.append((lesson['target'], (_WLA_GATE_ROW, _WLA_GATE_COL0 + i)))
+    room._wla_doors   = tuple(doors)
+    room._wla_lessons = tuple(lessons)
+
+    room.entities.append(Entity(kind='exit', row=_WLA_EXIT[0], col=_WLA_EXIT[1],
+                                edit_immune=True))
+    room.spawn_pos = (_WLA_LESSON_ROWS[0], _WLA_LBL_COL)       # on lesson 1's wrong word
+    room.exit_pos  = _WLA_EXIT
+
+    room.rebuild_indexes()
+    room.par    = _WLA_PAR
+    # TIGHT margin (S2 by volume): the all-old route is exactly par + TRIGGERS
+    # (each change saves one key over its d/x + i rival), so a margin of
+    # TRIGGERS − 1 makes that route overshoot by one while the change route
+    # clears at par. Pinned by tests/test_whole_line_annex.py.
+    room.budget = _WLA_PAR + _WLA_TRIGGERS - 1
+    room.answer = _wla_answer(lessons)     # the real keystroke tape (karaoke)
+
+    dungeon = Dungeon(name='The Change Annex', seed=seed)
+    dungeon.rooms        = [room]
+    dungeon.current_room = 0
+    return dungeon
+
+
+# ── display 24 · The Change Extension (S, C) ──────────────────────────────────
+# The one-key shorthands, on the Change Annex chassis (the sixth plaque-door
+# hall). The player owns the `c` operator (L23); now `S` (= `cc`, change the
+# whole line) and `C` (= `c$`, change to the line's end) each do in ONE keypress
+# what costs two. `S`/`C` are gated on their own tokens (engine: `S` is a
+# `substitute line=True`; `C` is an operator with `shorthand='C'`), exactly the
+# Operator's Vault → Cipher Cell `d$` → `D` lineage.
+#
+# Forcing is by VOLUME (S2), the Annex's model: each shorthand saves exactly one
+# key per use, so the margin must sit BELOW the use count. The eight shorthand
+# doors (4 S + 4 C) each cost +1 on the old two-key path (`cc`/`c$`), so the
+# all-old route is par + 8; a budget of par + 8 − 1 makes it overshoot by one
+# while the canonical S/C route clears at par. Two reinforcement doors (one `ce`
+# word door that must KEEP its trailing context, one `s` rune door) cost the same
+# on either route — they only drill WHICH tool, the Overwrite Halls' r-vs-R
+# discipline. The geometry, the WEST-wall plaques, the spine/throat/gate, and the
+# plain-floor exit are all the Annex's (see build_dungeon_whole_line_annex):
+#  - The C-door's TAIL is two wrong words so `ce` (change to word end) stops one
+#    word short — only `C`/`c$` rewrite the whole tail; the correct replacement is
+#    a SINGLE word, so the typed text never holds a space (the karaoke rule).
+#  - Reflow is now segment-bounded both ways (2026-06-26), so the plaque could sit
+#    east behind a bolt; it stays in the WEST wall here only to be uncuttable and
+#    off the floor scans.
+_CE_ROWS, _CE_COLS = 15, 29
+_CE_PLQ_COL  = 1                     # plaques in the WEST wall (uncuttable, off the scans)
+_CE_COL_S    = 11                    # the spine — the gate's first standable; on lesson rows it
+                                     # carries the label (no blank margin, so the word a cc/S
+                                     # lands at the spine reads aligned with every other label)
+_CE_LBL_COL  = _CE_COL_S             # labels start AT the spine (= where cc/S drops the cursor)
+_CE_LBL_END  = 27                    # label floor reaches this column (fits the longest C label)
+_CE_LESSON_ROWS = (2, 3, 4, 5, 6, 7, 8, 9, 10, 11)   # ten doors, an open block
+_CE_THROAT_ROW  = 12                                 # spine-ONLY row: block → gate
+_CE_GATE_ROW    = 13                                 # the gate corridor: spine · bolts · exit
+_CE_GATE_COL0   = 12                                 # first bolt column (one per door)
+# Door kinds in FIXED order (par invariance): S and C shorthands, two scattered
+# reinforcement doors. Four S, four C, one word (ce), one rune (s). EVERY C door
+# follows an S door so the cursor lands EXACTLY on the wrong tail's first cell (an
+# S word is 6 long; the C prefix+gap is 5, so the S word's last char sits on the
+# tail start) — `jC` then rewrites the tail with no `^w` to spend. Routing every C
+# this way keeps the navigation uniform and par honest (an earlier order let `jC`
+# undercut `j^wC` only on some doors).
+_CE_KIND_ORDER = ('sline', 'ceol', 'sline', 'ceol', 'word',
+                  'sline', 'ceol', 'rune', 'sline', 'ceol')
+_CE_TRIGGERS = len(_CE_KIND_ORDER)                   # 10 doors
+_CE_N_S = _CE_KIND_ORDER.count('sline')              # 4
+_CE_N_C = _CE_KIND_ORDER.count('ceol')               # 4
+_CE_SAVING = _CE_N_S + _CE_N_C                        # 8 doors that the shorthands shorten
+_CE_EXIT = (_CE_GATE_ROW, _CE_GATE_COL0 + _CE_TRIGGERS)   # plain floor, east of the bolts
+_CE_PLACEHOLDER = '◆'                # the fused rune — `s` spells it out
+_CE_PAR = 70                         # hand-tallied along the canonical S/C route (pinned by tests;
+                                     # finale G$ = 2 keys; C doors use jC, not j^wC)
+
+# Distinct words at FIXED lengths (par invariance needs fixed lengths): 6-letter
+# for the whole-line S doors (two per door — wrong label + right target), 4-letter
+# for the C tails / word / rune doors. Deterministic fallbacks when the vocab draw
+# is short. Eight 6-letter, twenty-one 4-letter are needed.
+_CE_FALLBACK_6 = ('cipher', 'shroud', 'beacon', 'warden',
+                  'cinder', 'mantle', 'fathom', 'quartz')
+_CE_FALLBACK_4 = (
+    'lock', 'veil', 'gate', 'bind', 'rune', 'dust', 'iron', 'moss',
+    'fern', 'silt', 'oath', 'wisp', 'mire', 'peat', 'gild', 'hush',
+    'kiln', 'tarn', 'wyrm', 'sear', 'lode', 'glen', 'rime', 'spar',
+)
+
+
+def _ce_pick(rng):
+    """Ten lessons, each a (label → target) relabelling at FIXED word lengths so
+    par is seed-invariant. Returns lesson dicts:
+      sline — {'label': 'wrongw', 'target': 'rightw', 'typed': 'rightw'}   (one 6-letter word)
+      ceol  — {'label': 'pre bad rot', 'target': 'pre fix', 'typed': 'fix'} (prefix kept, 2-word tail → 1)
+      word  — {'label': 'wrong ctx', 'target': 'right ctx', 'typed': 'right'}
+      rune  — {'label': '◆st ctx',   'target': 'fist ctx',  'typed': 'fi'}
+    All words are drawn DISTINCT across the level, which alone guarantees door
+    independence (no target is a substring of another label/target): every
+    space-bearing target needs a unique two-word sequence, and the only space-free
+    target — the 6-letter S word — cannot sit inside a 4-letter word. No `typed`
+    value contains a SPACE (the C tail collapses to a single word), so the karaoke
+    answer tape is unambiguous."""
+    _load_vocab_tables()
+    def _pool(n, need, fallback):
+        p = sorted({w for w in _VOCAB_PLAIN_BY_LEN.get(n, ())
+                    if w.isalpha() and w.islower()})
+        rng.shuffle(p)
+        return iter(p if len(p) >= need else list(fallback))
+    need4 = _CE_N_C * 4 + 3 + 2            # C: pre/badA/badB/right; word: wrong/right/ctx; rune: wanted/ctx
+    need6 = _CE_N_S * 2                    # S: wrong label + right target
+    w6 = _pool(6, need6, _CE_FALLBACK_6)
+    w4 = _pool(4, need4, _CE_FALLBACK_4)
+    lessons = []
+    for kind in _CE_KIND_ORDER:
+        if kind == 'sline':
+            wrong, right = next(w6), next(w6)
+            lessons.append({'kind': 'sline', 'label': wrong,
+                            'target': right, 'typed': right})
+        elif kind == 'ceol':
+            pre, badA, badB, right = next(w4), next(w4), next(w4), next(w4)
+            lessons.append({'kind': 'ceol', 'label': f'{pre} {badA} {badB}',
+                            'target': f'{pre} {right}', 'typed': right})
+        elif kind == 'word':
+            wrong, right, ctx = next(w4), next(w4), next(w4)
+            lessons.append({'kind': 'word', 'label': f'{wrong} {ctx}',
+                            'target': f'{right} {ctx}', 'typed': right})
+        else:                              # rune
+            wanted, ctx = next(w4), next(w4)
+            lessons.append({'kind': 'rune',
+                            'label': f'{_CE_PLACEHOLDER}{wanted[2:]} {ctx}',
+                            'target': f'{wanted} {ctx}', 'typed': wanted[:2]})
+    return lessons
+
+
+# Verb keys per door kind. S changes the whole line; C the line's tail; ce a word;
+# s a single fused rune. Each is followed by typed text and a free Esc (a sequence
+# key, omitted from the keystroke answer).
+_CE_VERB = {'sline': 'S', 'ceol': 'C', 'word': 'ce', 'rune': 's'}
+# Positioning prefix per kind (i > 0). S ignores the column. A C door always
+# follows an S door, so the cursor already sits on the wrong tail's first cell —
+# `j` alone suffices (no `^w`). ce/s want the label start (`^`). The first door
+# is an S door, so its prefix is empty.
+_CE_PREFIX = {'sline': 'j', 'ceol': 'j', 'word': 'j^', 'rune': 'j^'}
+
+
+def _ce_route(lessons):
+    """The canonical S/C route as a list of (printable_keys, typed) steps, shared
+    by the answer string and the playthrough test so they never drift. Each step's
+    keys are pressed, then `typed` is entered in INSERT and sealed with Esc (the
+    caller adds the Esc; it is not a printable answer key)."""
+    steps = []
+    for i, L in enumerate(lessons):
+        prefix = '' if i == 0 else _CE_PREFIX[L['kind']]
+        steps.append((prefix + _CE_VERB[L['kind']], L['typed']))
+    steps.append(('G$', ''))               # G to the gate row (last line), $ east to the exit
+    return steps
+
+
+def _ce_answer(lessons):
+    """room.answer: the real keystroke tape (printable keys only — Esc omitted).
+    Spaces separate tokens for the karaoke display and are stripped when matched;
+    no `typed` value contains a space, so the tape is unambiguous."""
+    return ' '.join(keys + typed for keys, typed in _ce_route(lessons) if keys or typed)
+
+
+def build_dungeon_change_extension(seed: int) -> Dungeon:
+    """The Change Extension (display 24: S, C).
+
+    The Change Annex chassis, now with the one-key shorthands. Ten lesson rows
+    (2..11) each carry a WRONG label on the floor (east of the spine) with the
+    RIGHT plaque set in the WEST wall (uncuttable, off the floor scans). Four
+    whole-line S doors (a single wrong word — `S` beats `cc`), four C doors (a
+    correct prefix then a two-word wrong tail — `C` beats `c$`, and `ce` stops a
+    word short), one `ce` word door and one `s` rune door for reinforcement.
+    Below runs the gate corridor (row 12 throat → row 13 gate): the spine, a ROW
+    of ten plaque-door bolts, then the exit — plain floor, east of them all. Each
+    bolt opens while its label reads true; the exit is barred until every bolt
+    opens, and no jump reaches it (spine = first standable, `$` stops at the first
+    shut bolt). Forcing is by volume — see header."""
+    rng = random.Random(seed)
+    lessons = _ce_pick(rng)
+
+    R, C = _CE_ROWS, _CE_COLS
+    cells = [[CellType.WALL] * C for _ in range(R)]
+    for r in _CE_LESSON_ROWS:                        # the open lesson block (label floor)
+        for c in range(_CE_COL_S, _CE_LBL_END + 1):
+            cells[r][c] = CellType.FLOOR
+    cells[_CE_THROAT_ROW][_CE_COL_S] = CellType.FLOOR  # spine-only throat: block → gate
+    cells[_CE_GATE_ROW][_CE_COL_S] = CellType.FLOOR    # the spine reaches the gate row
+    cells[_CE_EXIT[0]][_CE_EXIT[1]] = CellType.FLOOR   # the exit: plain floor, east of the bolts
+    # The bolt cells (gate row, between spine and exit) stay WALL at build; the
+    # tick opens each when its label reads true. The throat joins block→gate ONLY
+    # at the spine, so no east column drops onto the exit; the exit is never a
+    # row's first standable cell and `$` stops at the first shut bolt.
+
+    room = Room(room_type=RoomType.ENTRY, rows=R, cols=C)
+    room.cells = cells
+    room.seed  = seed
+
+    def lay(row, col, text, kind):
+        room.char_runs.append(CharRun(row, col, tuple(text), kind))
+
+    doors = []
+    for i, lesson in enumerate(lessons):
+        lrow = _CE_LESSON_ROWS[i]
+        lesson['row'] = lrow
+        if lesson['kind'] == 'ceol':
+            # Lay each word as its OWN run with a bare-floor gap between them, not
+            # one run with an embedded space glyph: a space glyph is a punctuation
+            # 'word' that `w` would stop ON (engine word-class quirk), so the C
+            # route's `w` must skip a real floor gap to land on the wrong tail. The
+            # floor scan reconstructs the space from the empty cell, so the target
+            # ('pre right') reads identically. (Word/rune doors never `w` across a
+            # space — they keep the L23 single-run shape.)
+            col = _CE_LBL_COL
+            for word in lesson['label'].split(' '):
+                lay(lrow, col, word, 'ancient')
+                col += len(word) + 1
+        else:
+            lay(lrow, _CE_LBL_COL, lesson['label'], 'ancient')  # wrong label, on the floor
+        lay(lrow, _CE_PLQ_COL, lesson['target'], 'verdant')    # the plaque, in the WEST wall
+        doors.append((lesson['target'], (_CE_GATE_ROW, _CE_GATE_COL0 + i)))
+    # The tick is the Annex's generic plaque-door scan, keyed on `room._wla_doors`.
+    room._wla_doors   = tuple(doors)
+    room._ce_lessons  = tuple(lessons)
+
+    room.entities.append(Entity(kind='exit', row=_CE_EXIT[0], col=_CE_EXIT[1],
+                                edit_immune=True))
+    room.spawn_pos = (_CE_LESSON_ROWS[0], _CE_LBL_COL)         # on door 1's wrong word
+    room.exit_pos  = _CE_EXIT
+
+    room.rebuild_indexes()
+    room.par    = _CE_PAR
+    # TIGHT margin (S2 by volume): the all-old route swaps S→cc and C→c$ (+1 key
+    # each over the shorthand), so it costs par + _CE_SAVING; a margin of
+    # _CE_SAVING − 1 makes that route overshoot by one while the S/C route clears
+    # at par. Pinned by tests/test_change_extension.py.
+    room.budget = _CE_PAR + _CE_SAVING - 1
+    room.answer = _ce_answer(lessons)      # the real keystroke tape (karaoke)
+
+    dungeon = Dungeon(name='The Change Extension', seed=seed)
     dungeon.rooms        = [room]
     dungeon.current_room = 0
     return dungeon

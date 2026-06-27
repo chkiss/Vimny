@@ -1,3 +1,21 @@
+# Vimny — a Vim-teaching dungeon crawler.
+# Copyright (C) 2026 Chas Kissick
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see <https://www.gnu.org/licenses/>.
+#
+# SPDX-License-Identifier: GPL-3.0-or-later
+
 """Reflow — universal Vim-line editing on every row (the overlay grid is retired).
 
 Inserting pushes content right and shoves overflow past a fixed brink (wall/void);
@@ -8,7 +26,7 @@ from engine.world import Room, RoomType, CellType, CharRun, Entity
 from engine.player import Player
 from engine.reflow import (
     is_ledge, void_col, open_gap, close_gap, remove_row, extend_floor, _insert_blank_row,
-    carve_floor, _double_cols, _MAX_COLS,
+    carve_floor, _double_cols, _MAX_COLS, split_line_down, _first_floor_col, _lands_on_floor,
 )
 from engine.insert import insert_char
 from engine.operator import op_delete
@@ -88,6 +106,35 @@ def test_open_gap_leaves_cells_left_of_the_cursor_untouched():
     open_gap(room, 1, 7, 1)                      # gap at col 7 → only c,d move
     assert _text(room, 1) == {5: 'a', 6: 'b', 8: 'c'}   # a,b fixed; c→8; d fell
     assert room._last_void_falls == [(1, 9, 'd')]
+
+
+def test_open_gap_push_stops_at_a_mid_row_wall():
+    """The push is SEGMENT-BOUNDED, symmetric with the pull: a mid-row wall is a
+    hard line boundary. The glyph shoved against the wall falls INTO it (the void
+    animation), but a run BEYOND the wall is a separate line and stays put — the
+    plaque-door family's east-of-a-wall plaque is safe from an edit to its west."""
+    room = _room(letters='', void_n=0)
+    room.cells[1][8] = CellType.WALL             # a bolt mid-row
+    room.char_runs = [CharRun(1, 6, ('a', 'b'), 'ancient'),   # ab at 6-7, hard against the wall
+                      CharRun(1, 10, ('z',), 'ancient')]      # beyond the wall — a separate line
+    room.rebuild_indexes()
+    fell = open_gap(room, 1, 6, 1)               # push at col 6
+    assert _text(room, 1) == {7: 'a', 10: 'z'}   # a→7; b fell into the wall; z untouched
+    assert fell == [(1, 8, 'b')]                 # b fell INTO the wall cell (col 8)
+
+
+def test_open_gap_push_stops_at_a_void_rune():
+    """A void rune bounds the push too: content past the hole does not slide over
+    it, and the glyph tipped into the rune is lost there."""
+    room = _room(letters='', void_n=0)
+    room.char_runs = [CharRun(1, 6, ('a', 'b'), 'ancient'),
+                      CharRun(1, 8, ('○',), 'void'),
+                      CharRun(1, 10, ('z',), 'ancient')]
+    room.rebuild_indexes()
+    fell = open_gap(room, 1, 6, 1)
+    assert _text(room, 1) == {7: 'a', 10: 'z'}   # a→7; b fell into the rune; z safe
+    assert fell == [(1, 8, 'b')]
+    assert room.char_run_at(1, 8).kind == 'void' # the rune itself stays
 
 
 # ── close_gap (delete / pull-left) ───────────────────────────────────────────────
@@ -431,3 +478,81 @@ def test_remove_row_shifts_player_marks_and_jumps_up():
     remove_row(room, 2, p)                            # remove row 2
     assert p.marks == {'a': (1, 2), 'b': (3, 4), 'c': (2, 3)}   # below shifts up; on-cut clamps to row 2
     assert p.jump_list == [(1, 1), (2, 7), (3, 0)]
+
+
+# ── split_line_down (insert-mode <Enter> — bounded vertical line-split) ──────────
+
+def test_split_line_down_drops_the_tail_to_the_next_line_col0():
+    """Head stays; the tail drops to the row below, re-aligned to that row's column 0
+    (its first floor cell — Vim-faithful), and the cursor parks there."""
+    room = _col_room(rows=6, cols=12)                 # floor interior cols 1..10
+    room.char_runs = [CharRun(1, 3, tuple('hello'), 'ancient')]   # 'hello' at 3..7 on row 1
+    room.rebuild_indexes()
+    p = Player(row=1, col=5)                           # cursor on the second 'l' (col 5)
+    fell = split_line_down(room, p)
+    assert _text(room, 1) == {3: 'h', 4: 'e'}          # head 'he' stays on row 1
+    assert _text(room, 2) == {1: 'l', 2: 'l', 3: 'o'}  # tail 'llo' → row 2 at col 0 (=1)
+    assert fell == []                                  # full-width row below: nothing lost
+    assert (p.row, p.col) == (2, 1)                    # cursor at the new line's col 0
+
+
+def test_split_line_down_never_grows_the_dungeon():
+    room = _col_room(rows=6, cols=12)
+    room.char_runs = [CharRun(1, 3, tuple('abc'), 'ancient')]
+    room.rebuild_indexes()
+    before = room.rows
+    split_line_down(room, Player(row=1, col=4))
+    assert room.rows == before                         # height is FIXED (unlike o / _insert_blank_row)
+
+
+def test_split_line_down_pushes_the_rows_below_straight_down():
+    room = _col_room(rows=6, cols=12)
+    room.char_runs = [CharRun(1, 3, tuple('ab'), 'ancient'),
+                      CharRun(2, 5, ('x',), 'ancient'),      # a row below
+                      CharRun(3, 6, ('y',), 'ancient')]
+    room.rebuild_indexes()
+    split_line_down(room, Player(row=1, col=5))         # split row 1 (cursor past 'ab' → empty tail)
+    assert _text(room, 1) == {3: 'a', 4: 'b'}           # head intact
+    assert _text(room, 3) == {5: 'x'}                   # row 2 → row 3, SAME column
+    assert _text(room, 4) == {6: 'y'}                   # row 3 → row 4, SAME column
+
+
+def test_split_line_down_spills_a_narrow_throat_tail_into_the_void():
+    """When the row below is a narrow throat (only the spine is floor), the tail's
+    first glyph lands on the spine and the rest fall into the void — the confirmed
+    'fist|gate' behaviour, the vertical mirror of open_gap's wall spill."""
+    room = _col_room(rows=6, cols=12)
+    for c in range(1, 11):                              # wall off row 2 except the spine col 1
+        if c != 1:
+            room.cells[2][c] = CellType.WALL
+    room.char_runs = [CharRun(1, 3, tuple('gate'), 'ancient')]   # 'gate' at 3..6 on row 1
+    room.rebuild_indexes()
+    p = Player(row=1, col=3)                            # cursor on 'g' → whole word is the tail
+    fell = split_line_down(room, p)
+    assert _text(room, 1) == {}                         # head empty (cursor at word start)
+    assert _text(room, 2) == {1: 'g'}                   # 'g' lands on the spine (col 0)
+    assert [s for _, _, s in fell] == ['a', 't', 'e']   # 'ate' fell into the void
+    assert (p.row, p.col) == (2, 1)
+
+
+def test_split_line_down_a_glyph_pushed_onto_an_entity_falls():
+    room = _col_room(rows=6, cols=12)
+    room.char_runs = [CharRun(1, 3, ('a',), 'ancient'),
+                      CharRun(2, 5, ('b',), 'ancient')]
+    room.add_entity(Entity(kind='goblin', row=3, col=5, max_hp=2))   # blocks where 'b' would land
+    room.rebuild_indexes()
+    fell = split_line_down(room, Player(row=1, col=4))   # row 2's 'b' shifts to row 3 col 5 → onto goblin
+    assert room.entity_at(3, 5).kind == 'goblin'         # the entity stays FIXED
+    assert (3, 5, 'b') in fell                            # the glyph fell instead of overwriting it
+    assert _text(room, 3) == {}
+
+
+def test_first_floor_col_and_lands_on_floor_helpers():
+    room = _col_room(rows=4, cols=10)                    # floor cols 1..8 on interior rows
+    assert _first_floor_col(room, 1) == 1                # column 0 of a corridor row
+    assert _first_floor_col(room, 0) is None             # all-wall border row
+    assert _lands_on_floor(room, 1, 1) is True
+    assert _lands_on_floor(room, 1, 0) is False          # the wall border
+    room.char_runs = [CharRun(1, 4, ('○',), 'void')]
+    room.rebuild_indexes()
+    assert _lands_on_floor(room, 1, 4) is False          # a void rune is not bare floor

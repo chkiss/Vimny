@@ -171,12 +171,19 @@
 | r{c} | r     | replace char       |
 | D    | D     | delete to line end |
 
-## whole_line_annex — substitute line
+## whole_line_annex — change (substitute char)
 
-| keys | token | desc             |
-|------|-------|------------------|
-| s    |       | substitute       |
-| S    |       | substitute line  |
+| keys     | token | desc       |
+|----------|-------|------------|
+| c{m}  cc | c     | change     |
+| s        |       | substitute |
+
+## change_extension — change shorthands
+
+| keys | token | desc            |
+|------|-------|-----------------|
+| S    |       | substitute line |
+| C    |       | change to end   |
 
 ## quartermaster — yank + paste before
 
@@ -232,6 +239,13 @@
 |-------|-------|--------|
 | >{m}  | >     | indent |
 | <{m}  | <     | dedent |
+
+## selection_halls — visual line / block
+
+| keys  | token        | desc          |
+|-------|--------------|---------------|
+| V     | visual_line  | visual line   |
+| <C-v> | visual_block | visual block  |
 
 ## word_enclosure — word text objects
 

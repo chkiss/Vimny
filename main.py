@@ -1,4 +1,22 @@
 #!/usr/bin/env python3
+# Vimny — a Vim-teaching dungeon crawler.
+# Copyright (C) 2026 Chas Kissick
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see <https://www.gnu.org/licenses/>.
+#
+# SPDX-License-Identifier: GPL-3.0-or-later
+
 """Vimny — entry point and main game loop."""
 from __future__ import annotations
 import random, time, argparse
@@ -37,7 +55,7 @@ from content.scrolls import (
 
 _JUMP_MOTIONS = frozenset({'G', 'gg', '%', '{', '}', '(', ')'})
 from engine.operator import op_delete, op_yank, op_paste, op_case, op_join, case_char, apply_indent, INDENT_WIDTH, entity_clip
-from engine.reflow import is_ledge, close_gap, void_col, _insert_blank_row, remove_row
+from engine.reflow import is_ledge, close_gap, void_col, _insert_blank_row, remove_row, split_line_down
 from engine import substitute as _subst
 from engine.insert import (
     begin_insert, insert_char, insert_char_extend, insert_backspace,
@@ -1257,6 +1275,44 @@ def _inscription_halls_tick(room, player) -> list:
     return msgs
 
 
+def _wla_floor_text(room, r: int) -> str:
+    """Row r's text restricted to FLOOR/CORRIDOR cells — the Change Annex's
+    door scans must read what stands WRITTEN on walkable stone, never the
+    plaques (verdant targets set in the wall cells of the door rows)."""
+    line = [' '] * room.cols
+    for ru in room._char_runs_by_row.get(r, []):
+        for k, sym in enumerate(ru.symbols):
+            c = ru.col + k
+            if 0 <= c < room.cols and room.cells[r][c] in _WM_FLOORS:
+                line[c] = sym
+    return ''.join(line)
+
+
+def _whole_line_annex_tick(room, player) -> list:
+    """The Change Annex bolts — the plaque rule, fifth member (Cipher mended,
+    Beacon copied, Echo repeated, the Halls authored, the Annex RELABELS): a
+    gate-row bolt stands open exactly while its plaque's word READS TRUE on the
+    floor. Whole-row substring scans on floor text only (shift-proof; the
+    plaques live in walls and never count). STATELESS, hence undo-safe (the
+    vault-tick principle): undoing a change re-bars its bolt. The exit itself is
+    plain floor east of the bolts — no gating needed; the bolts bar the way and
+    no jump can reach past them (see build_dungeon_whole_line_annex)."""
+    msgs = []
+    floor_rows = [_wla_floor_text(room, r) for r in range(room.rows)]
+
+    def written(target):
+        return any(target in t for t in floor_rows)
+
+    for target, (dr, dc) in getattr(room, '_wla_doors', ()):
+        is_open = room.cells[dr][dc] != CellType.WALL
+        if written(target) and not is_open:
+            room.cells[dr][dc] = CellType.FLOOR
+            msgs.append('The label reads true — the bolt grinds back!')
+        elif not written(target) and is_open and (player.row, player.col) != (dr, dc):
+            room.cells[dr][dc] = CellType.WALL     # undone — the bolt re-bars
+    return msgs
+
+
 def _wm_ward_broken(room, k: int) -> bool:
     """Ward k's state — shift-proof by design (kind-counts on floor cells,
     substring scans across rows; never stored coordinates):
@@ -1674,6 +1730,8 @@ _LEVEL_INTROS = {
     'quartermaster':       ('The Beacon Tiers — one flame remains. yl takes it without taking; P sets it on cold braziers (…); yy, a whole row.', 60),
     'echo_vault':          ('The Echo Vault — the same blight, stamped again and again. Mend one rune with r; then . repeats your last change.', 60),
     'inscription_halls':   ('The Inscription Halls — the words were never finished. i writes before the cursor, a writes after; Esc seals the ink. Write them whole, and the river itself will yield.', 70),
+    'whole_line_annex':    ('The Change Annex — every door is mislabelled. The plaque in the wall remembers the true word; the floor has it wrong. Change cuts what is wrong and writes what is right, in a single breath.', 70),
+    'change_extension':    ('The Change Extension — deeper into the mislabelled halls. Two strokes was the novice\'s way; a practised hand needs but one. Find where a single keystroke serves.', 70),
     'warden_manifold':     ('The Warden Manifold — he stamps himself into the world. Light the four braziers; the gate will draw and the fog will part.', 70),
     'warden_surveyor':     ('The Warden Surveyor — survey his hall; w/b/e leap word to word, over the void.', 60),
     'dummy':               ('Sandbox — all mechanics active. Type :edit to enter editor mode.', 60),
@@ -3109,11 +3167,35 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
                     _render(message)
                     continue
 
-                if key.name == 'KEY_BACKSPACE' or str(key) == '\x7f':
+                if key.name == 'KEY_ENTER' or str(key) in ('\n', '\r'):
+                    # <Enter> in INSERT — the bounded vertical line-split (mirror of
+                    # open_gap). The tail drops to the next line at col 0; rows below
+                    # shift straight down; the dungeon never grows, so anything pushed
+                    # over a wall / void rune falls into the void. Walls/entities stay
+                    # fixed. The whole insert session is one undo, so no extra snapshot.
+                    room._last_void_falls = []
+                    room._last_drowns     = []
+                    split_line_down(room, player)
+                    budget.spend(1)
+                    _animate_reflow_falls()
+                elif key.name == 'KEY_BACKSPACE' or str(key) == '\x7f':
                     insert_backspace(room, player)
                 elif not key.is_sequence:
                     ch = str(key)
                     if ch.isprintable() and len(ch) == 1:
+                        # Admin karaoke: typed INSERT chars advance the answer
+                        # tape too (the NORMAL-mode tracker at the top of the
+                        # loop never sees them), so a c{m}/i/a answer that
+                        # includes its typed text stays in sync. Esc is a
+                        # sequence key and is skipped, exactly as in NORMAL.
+                        if (player_name == 'admin' and room.answer
+                                and not room.answer_diverged):
+                            _ap = room.answer.replace(' ', '')
+                            if room.answer_pos < len(_ap):
+                                if ch == _ap[room.answer_pos]:
+                                    room.answer_pos += 1
+                                else:
+                                    room.answer_diverged = True
                         prev_ins = (player.row, player.col)
                         room._last_void_falls = []
                         room._last_drowns     = []
@@ -4455,6 +4537,13 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
             if level == 'inscription_halls':
                 for _ih_msg in _inscription_halls_tick(room, player):
                     _push(_ih_msg)
+
+            # The Change Annex / Change Extension: spine doors track the
+            # relabelled words (stateless, undo-safe — plaque rule). The Extension
+            # rides the same generic tick (its room sets `_wla_doors` too).
+            if level in ('whole_line_annex', 'change_extension'):
+                for _wla_msg in _whole_line_annex_tick(room, player):
+                    _push(_wla_msg)
 
             # Warden summon message
             if tick_msgs and not player.is_dead:

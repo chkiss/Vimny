@@ -72,25 +72,27 @@ Curriculum order is the order of `LEVELS`. Blueprints: `blueprints/act_*.md`.
 | 21 | `echo_vault` | The Echo Vault | `.` |  |
 | 21.1 | `warden_manifold` | The Warden Manifold | — | boss |
 | 22 | `inscription_halls` | The Inscription Halls | `i a` |  |
-| 22.5 | `whole_line_annex` | The Change Annex | `c{m}  cc  s  S  C` |  |
-| 23 | `sculpting_chambers` | The Sculpting Chambers | `I A o O` |  |
-| 24 | `overwrite_halls` | The Overwrite Halls | `R` |  |
-| 25 | `case_chambers` | The Case Chambers | `~ g~ gU gu` |  |
-| 26 | `joiners_gate` | The Joiner's Gate | `J gJ` |  |
-| 27 | `alignment_halls` | The Alignment Halls | `>> <<` |  |
-| 28 | `indentation_sanctum` | The Indentation Sanctum | `>{m} <{m} =` |  |
-| 28.1 | `warden_scrivener` | The Warden Scrivener | — | boss |
-| 29 | `word_enclosure` | The Word Enclosure | `iw aw` |  |
-| 30 | `bracket_enclosure` | The Bracket Enclosure | `i( a(` |  |
-| 31 | `brace_square_enclosure` | The Brace & Square Enclosure | `i[ a[ i{ a{` |  |
-| 32 | `quote_enclosure` | The Quote Enclosure | `i" a" i' a'` |  |
-| 33 | `tag_enclosure` | The Tag Enclosure | `it at` |  |
-| 34 | `sentence_enclosure` | The Sentence Enclosure | `is as` |  |
-| 35 | `paragraph_enclosure` | The Paragraph Enclosure | `ip ap` |  |
-| 35.1 | `grandmasters_sanctum` | The Grandmaster's Sanctum | — | boss |
-| 36 | `spellwrights_forge` | The Spellwright's Forge | `:s///  :g  &` |  |
-| 37 | `hall_of_echoes` | The Hall of Echoes | `q @ "` |  |
-| 37.1 | `warden_eternal` | The Warden Eternal | — | boss |
+| 23 | `whole_line_annex` | The Change Annex | `c{m}  cc  s` |  |
+| 24 | `change_extension` | The Change Extension | `S  C` |  |
+| 25 | `sculpting_chambers` | The Sculpting Chambers | `I A o O` |  |
+| 26 | `overwrite_halls` | The Overwrite Halls | `R` |  |
+| 27 | `case_chambers` | The Case Chambers | `~ g~ gU gu` |  |
+| 28 | `joiners_gate` | The Joiner's Gate | `J gJ` |  |
+| 29 | `alignment_halls` | The Alignment Halls | `>> <<` |  |
+| 30 | `indentation_sanctum` | The Indentation Sanctum | `>{m} <{m} =` |  |
+| 30.1 | `warden_scrivener` | The Warden Scrivener | — | boss |
+| 31 | `selection_halls` | The Selection Halls | `V  <C-v>` |  |
+| 32 | `word_enclosure` | The Word Enclosure | `iw aw` |  |
+| 33 | `bracket_enclosure` | The Bracket Enclosure | `i( a(` |  |
+| 34 | `brace_square_enclosure` | The Brace & Square Enclosure | `i[ a[ i{ a{` |  |
+| 35 | `quote_enclosure` | The Quote Enclosure | `i" a" i' a'` |  |
+| 36 | `tag_enclosure` | The Tag Enclosure | `it at` |  |
+| 37 | `sentence_enclosure` | The Sentence Enclosure | `is as` |  |
+| 38 | `paragraph_enclosure` | The Paragraph Enclosure | `ip ap` |  |
+| 38.1 | `grandmasters_sanctum` | The Grandmaster's Sanctum | — | boss |
+| 39 | `spellwrights_forge` | The Spellwright's Forge | `:s///  :g  &` |  |
+| 40 | `hall_of_echoes` | The Hall of Echoes | `q @ "` |  |
+| 40.1 | `warden_eternal` | The Warden Eternal | — | boss |
 | 99 | `dummy` | Dummy Dungeon | `d x s y p yy P` |  |
 <!-- END GENERATED CURRICULUM TABLE -->
 

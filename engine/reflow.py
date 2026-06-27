@@ -1,3 +1,21 @@
+# Vimny — a Vim-teaching dungeon crawler.
+# Copyright (C) 2026 Chas Kissick
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see <https://www.gnu.org/licenses/>.
+#
+# SPDX-License-Identifier: GPL-3.0-or-later
+
 """Reflow — Vimny's editing model: every row flows like a real Vim line.
 
 Editing is universal reflow (not an opt-in, and not an overlay grid). Inserting
@@ -10,7 +28,10 @@ is still pushed. What each thing does when shoved is decided by *what it is*:
                sweeps it into the void (a goblin drowns, a key is lost), the water
                rolling onto its cell.
   • a stone wall / a void rune — FIXED brinks. They never move; whatever is pushed
-               into one is lost over the brink (off the wall / into the hole).
+               into one is lost over the brink (off the wall / into the hole). A
+               brink also BOUNDS the reflow: each wall-bounded stretch flows as its
+               own line, so an edit never disturbs content on the far side of a wall
+               (push and pull are symmetric here — see _push_one / close_gap).
 
 The left wall anchors the line; the right brink is where content falls off.
 `r`/`R` overwrite in place (correct Vim) and don't come through here.
@@ -103,18 +124,31 @@ def _dest_fate(room, row: int, c: int) -> str:
 
 def _push_one(room, row: int, at_col: int) -> None:
     """One-cell rightward push at at_col (the Vim line model). Every movable cell
-    — a glyph or a water cell — at or right of at_col slides right by one. Blanks
-    are spaces: they shift implicitly as glyphs vacate and occupy cells, so a word
+    — a glyph or a water cell — at or right of at_col slides right by one, UP TO
+    the first fixed brink east of at_col (a wall or a void rune). Blanks are
+    spaces: they shift implicitly as glyphs vacate and occupy cells, so a word
     separated from the cursor by whitespace is STILL pushed (the shift travels
     through the gap; it doesn't stop at it). Each mover's fate is set by its
     destination: a brink loses it (room._last_void_falls); an entity is swept away
-    by water (room._last_drowns) but stops a glyph (which falls)."""
+    by water (room._last_drowns) but stops a glyph (which falls).
+
+    SEGMENT-BOUNDED, mirroring close_gap: the wall (or void rune) is a hard line
+    boundary. Only the brink-bounded stretch containing at_col reflows — the glyph
+    shoved against the wall falls INTO that wall cell (the void animation), but any
+    run BEYOND the wall stays put. Each wall-bounded stretch flows as its own line,
+    so a plaque set east of a wall is safe from an edit to its west (push and pull
+    are now symmetric on this point)."""
     glyphs = _row_glyphs(room, row)
     waters = [c for c in range(room.cols) if room.cells[row][c] == CellType.WATER]
-    final_glyphs = [[c, s, k] for (c, s, k) in glyphs if c < at_col]      # left side stays put
-    keep_water   = {c for c in waters if c < at_col}
-    movers = ([('glyph', c, s, k) for (c, s, k) in glyphs if c >= at_col]
-              + [('water', c, None, None) for c in waters if c >= at_col])
+    brink = room.cols                                  # first fixed brink at/east of at_col
+    for c in range(at_col, room.cols):
+        if _fixed_sink(room, row, c):
+            brink = c
+            break
+    final_glyphs = [[c, s, k] for (c, s, k) in glyphs if c < at_col or c >= brink]  # outside stays put
+    keep_water   = {c for c in waters if c < at_col or c >= brink}
+    movers = ([('glyph', c, s, k) for (c, s, k) in glyphs if at_col <= c < brink]
+              + [('water', c, None, None) for c in waters if at_col <= c < brink])
     for kind, c, s, k in movers:
         nc   = c + 1
         fate = _dest_fate(room, row, nc)
@@ -153,9 +187,10 @@ def close_gap(room, row: int, at_col: int, width: int) -> None:
     column >= at_col+width move left by `width` (toward the anchored wall).
 
     The pull stops at the first FIXED brink right of the hole — a wall or a void
-    rune — mirroring the rightward push (open_gap loses a glyph shoved into a
-    brink), so text beyond a mid-row wall segment or a void hole does NOT slide
-    across it: each brink-bounded stretch flows as its own line. Entities stay
+    rune — exactly as the rightward push does (open_gap is segment-bounded too:
+    it loses the glyph shoved into the brink and leaves the next segment put), so
+    text beyond a mid-row wall segment or a void hole does NOT slide across it in
+    EITHER direction: each brink-bounded stretch flows as its own line. Entities stay
     PERMEABLE to the pull (text slides past a door or a creature — shipped
     behaviour The Operator's Vault's par path relies on), a deliberate
     asymmetry with the push, which loses a glyph shoved onto an entity. Cells
@@ -172,6 +207,71 @@ def close_gap(room, row: int, at_col: int, width: int) -> None:
         elif col < at_col or col >= limit:
             kept.append([col, sym, k])
     _rewrite_glyphs(room, row, kept)
+
+
+def _first_floor_col(room, row: int):
+    """The row's 'column 0' — its first FLOOR/CORRIDOR cell (where `0`/`^` land),
+    or None for an all-wall row."""
+    if not (0 <= row < room.rows):
+        return None
+    for c in range(room.cols):
+        if room.cells[row][c] in _FLOORS:
+            return c
+    return None
+
+
+def _lands_on_floor(room, row: int, col: int) -> bool:
+    """A glyph pushed to (row, col) survives only on BARE floor — never a wall, a
+    void rune, an entity, or out of bounds (otherwise it falls into the void)."""
+    if not (0 <= row < room.rows and 0 <= col < room.cols):
+        return False
+    if room.cells[row][col] not in _FLOORS:
+        return False
+    if _void_rune_at(room, row, col):
+        return False
+    return room.entity_at(row, col) is None
+
+
+def split_line_down(room, player) -> list:
+    """Insert-mode <Enter>: the bounded vertical line-split — the vertical mirror of
+    `open_gap`. The HEAD (the cursor row's glyphs left of the cursor) stays put; the
+    TAIL (its glyphs at/after the cursor) becomes the next line, re-aligned to
+    column 0 (the row-below's first floor cell, Vim-faithful); every glyph in the
+    rows BELOW shifts straight DOWN one row, same columns. The dungeon NEVER grows
+    (unlike `o`/`_insert_blank_row`): a glyph pushed onto a wall / void rune /
+    entity, or off the bottom, falls into the void (`room._last_void_falls`). Walls,
+    void runes, and entities stay FIXED. The cursor moves to the new line's column
+    0 (where Vim parks it). Returns the fallen cells."""
+    r, c = player.row, player.col
+    dest0 = _first_floor_col(room, r + 1)
+    keep, moves = [], []
+    for gr in range(room.rows):
+        for col, sym, kind in _row_glyphs(room, gr):
+            if gr < r or (gr == r and col < c):
+                keep.append((gr, col, sym, kind))                 # above / head — fixed
+            elif gr == r:                                         # the tail → next line, col 0
+                ncol = (dest0 + (col - c)) if dest0 is not None else col
+                moves.append((r + 1, ncol, sym, kind))
+            else:                                                 # below — straight down
+                moves.append((gr + 1, col, sym, kind))
+    falls, placed = [], list(keep)
+    for nrow, ncol, sym, kind in moves:
+        if _lands_on_floor(room, nrow, ncol):
+            placed.append((nrow, ncol, sym, kind))
+        else:                                                     # off the brink → the void
+            rr = nrow if 0 <= nrow < room.rows else min(r + 1, room.rows - 1)
+            cc = ncol if 0 <= ncol < room.cols else max(0, room.cols - 1)
+            falls.append((rr, cc, sym))
+    for gr in range(r, room.rows):                                # rewrite only the changed rows
+        glyphs = [[col, sym, kind] for (pr, col, sym, kind) in placed if pr == gr]
+        _rewrite_glyphs(room, gr, glyphs)
+    room._last_void_falls = falls
+    nr = min(r + 1, room.rows - 1)
+    nc = _first_floor_col(room, nr)
+    if nc is None:                                                # no floor below — cursor stays
+        nr, nc = r, _first_floor_col(room, r)
+    player.row, player.col = nr, (nc if nc is not None else player.col)
+    return falls
 
 
 def _shift_rows(room, player, moves, delta: int) -> None:

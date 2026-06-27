@@ -1,3 +1,21 @@
+# Vimny — a Vim-teaching dungeon crawler.
+# Copyright (C) 2026 Chas Kissick
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see <https://www.gnu.org/licenses/>.
+#
+# SPDX-License-Identifier: GPL-3.0-or-later
+
 """Level definitions and command curriculum.
 
 Identity is the immutable ``slug`` — used by builders, tests, saves, scrolls,
@@ -59,25 +77,27 @@ LEVELS = [
     {'display': '21',   'slug': 'echo_vault',            'name': 'The Echo Vault',             'commands': '.', 'teaches': ['dot']},
     {'display': '21.1', 'slug': 'warden_manifold',       'name': 'The Warden Manifold',        'type': 'boss', 'after': 'echo_vault', 'teaches': []},
     {'display': '22',   'slug': 'inscription_halls',     'name': 'The Inscription Halls',      'commands': 'i a', 'teaches': ['insert']},
-    {'display': '22.5', 'slug': 'whole_line_annex',      'name': 'The Change Annex',           'commands': 'c{m}  cc  s  S  C', 'teaches': ['c', 's', 'S', 'C']},
-    {'display': '23',   'slug': 'sculpting_chambers',    'name': 'The Sculpting Chambers',     'commands': 'I A o O', 'teaches': []},
-    {'display': '24',   'slug': 'overwrite_halls',       'name': 'The Overwrite Halls',        'commands': 'R', 'teaches': ['R']},
-    {'display': '25',   'slug': 'case_chambers',         'name': 'The Case Chambers',          'commands': '~ g~ gU gu', 'teaches': ['~', 'gU', 'gu', 'g~']},
-    {'display': '26',   'slug': 'joiners_gate',          'name': "The Joiner's Gate",          'commands': 'J gJ', 'teaches': ['J', 'gJ']},
-    {'display': '27',   'slug': 'alignment_halls',       'name': 'The Alignment Halls',        'commands': '>> <<', 'teaches': ['>', '<']},
-    {'display': '28',   'slug': 'indentation_sanctum',   'name': 'The Indentation Sanctum',    'commands': '>{m} <{m} =', 'teaches': []},
-    {'display': '28.1', 'slug': 'warden_scrivener',      'name': 'The Warden Scrivener',       'type': 'boss', 'after': 'indentation_sanctum', 'teaches': []},
-    {'display': '29',   'slug': 'word_enclosure',        'name': 'The Word Enclosure',         'commands': 'iw aw', 'teaches': ['iw', 'aw']},
-    {'display': '30',   'slug': 'bracket_enclosure',     'name': 'The Bracket Enclosure',      'commands': 'i( a(', 'teaches': ['i(', 'a(']},
-    {'display': '31',   'slug': 'brace_square_enclosure', 'name': 'The Brace & Square Enclosure', 'commands': 'i[ a[ i{ a{', 'teaches': ['i[', 'a[', 'i{', 'a{']},
-    {'display': '32',   'slug': 'quote_enclosure',       'name': 'The Quote Enclosure',        'commands': 'i" a" i\' a\'', 'teaches': ['i"', 'a"', "i'", "a'"]},
-    {'display': '33',   'slug': 'tag_enclosure',         'name': 'The Tag Enclosure',          'commands': 'it at', 'teaches': ['it', 'at']},
-    {'display': '34',   'slug': 'sentence_enclosure',    'name': 'The Sentence Enclosure',     'commands': 'is as', 'teaches': ['is', 'as']},
-    {'display': '35',   'slug': 'paragraph_enclosure',   'name': 'The Paragraph Enclosure',    'commands': 'ip ap', 'teaches': ['ip', 'ap']},
-    {'display': '35.1', 'slug': 'grandmasters_sanctum',  'name': "The Grandmaster's Sanctum",  'type': 'boss', 'after': 'paragraph_enclosure', 'teaches': []},
-    {'display': '36',   'slug': 'spellwrights_forge',    'name': "The Spellwright's Forge",    'commands': ':s///  :g  &', 'teaches': ['subst']},
-    {'display': '37',   'slug': 'hall_of_echoes',        'name': 'The Hall of Echoes',         'commands': 'q @ "', 'teaches': ['q', '@', 'reg_named']},
-    {'display': '37.1', 'slug': 'warden_eternal',        'name': 'The Warden Eternal',         'type': 'boss', 'after': 'hall_of_echoes', 'teaches': []},
+    {'display': '23',   'slug': 'whole_line_annex',      'name': 'The Change Annex',           'commands': 'c{m}  cc  s', 'teaches': ['c', 's']},
+    {'display': '24',   'slug': 'change_extension',       'name': 'The Change Extension',       'commands': 'S  C', 'teaches': ['S', 'C']},
+    {'display': '25',   'slug': 'sculpting_chambers',    'name': 'The Sculpting Chambers',     'commands': 'I A o O', 'teaches': []},
+    {'display': '26',   'slug': 'overwrite_halls',       'name': 'The Overwrite Halls',        'commands': 'R', 'teaches': ['R']},
+    {'display': '27',   'slug': 'case_chambers',         'name': 'The Case Chambers',          'commands': '~ g~ gU gu', 'teaches': ['~', 'gU', 'gu', 'g~']},
+    {'display': '28',   'slug': 'joiners_gate',          'name': "The Joiner's Gate",          'commands': 'J gJ', 'teaches': ['J', 'gJ']},
+    {'display': '29',   'slug': 'alignment_halls',       'name': 'The Alignment Halls',        'commands': '>> <<', 'teaches': ['>', '<']},
+    {'display': '30',   'slug': 'indentation_sanctum',   'name': 'The Indentation Sanctum',    'commands': '>{m} <{m} =', 'teaches': []},
+    {'display': '30.1', 'slug': 'warden_scrivener',      'name': 'The Warden Scrivener',       'type': 'boss', 'after': 'indentation_sanctum', 'teaches': []},
+    {'display': '31',   'slug': 'selection_halls',       'name': 'The Selection Halls',        'commands': 'V  <C-v>', 'teaches': ['visual_line', 'visual_block']},
+    {'display': '32',   'slug': 'word_enclosure',        'name': 'The Word Enclosure',         'commands': 'iw aw', 'teaches': ['iw', 'aw']},
+    {'display': '33',   'slug': 'bracket_enclosure',     'name': 'The Bracket Enclosure',      'commands': 'i( a(', 'teaches': ['i(', 'a(']},
+    {'display': '34',   'slug': 'brace_square_enclosure', 'name': 'The Brace & Square Enclosure', 'commands': 'i[ a[ i{ a{', 'teaches': ['i[', 'a[', 'i{', 'a{']},
+    {'display': '35',   'slug': 'quote_enclosure',       'name': 'The Quote Enclosure',        'commands': 'i" a" i\' a\'', 'teaches': ['i"', 'a"', "i'", "a'"]},
+    {'display': '36',   'slug': 'tag_enclosure',         'name': 'The Tag Enclosure',          'commands': 'it at', 'teaches': ['it', 'at']},
+    {'display': '37',   'slug': 'sentence_enclosure',    'name': 'The Sentence Enclosure',     'commands': 'is as', 'teaches': ['is', 'as']},
+    {'display': '38',   'slug': 'paragraph_enclosure',   'name': 'The Paragraph Enclosure',    'commands': 'ip ap', 'teaches': ['ip', 'ap']},
+    {'display': '38.1', 'slug': 'grandmasters_sanctum',  'name': "The Grandmaster's Sanctum",  'type': 'boss', 'after': 'paragraph_enclosure', 'teaches': []},
+    {'display': '39',   'slug': 'spellwrights_forge',    'name': "The Spellwright's Forge",    'commands': ':s///  :g  &', 'teaches': ['subst']},
+    {'display': '40',   'slug': 'hall_of_echoes',        'name': 'The Hall of Echoes',         'commands': 'q @ "', 'teaches': ['q', '@', 'reg_named']},
+    {'display': '40.1', 'slug': 'warden_eternal',        'name': 'The Warden Eternal',         'type': 'boss', 'after': 'hall_of_echoes', 'teaches': []},
     {'display': '99',   'slug': 'dummy',                 'name': 'Dummy Dungeon',              'commands': 'd x s y p yy P', 'admin_only': True, 'teaches': []},
 ]
 

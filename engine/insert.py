@@ -1,3 +1,21 @@
+# Vimny — a Vim-teaching dungeon crawler.
+# Copyright (C) 2026 Chas Kissick
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see <https://www.gnu.org/licenses/>.
+#
+# SPDX-License-Identifier: GPL-3.0-or-later
+
 """Block G — insert-mode entry (i a I A o O s S) and INSERT-mode editing.
 
 Entry commands position the cursor (and, for o/O/s/S, mutate the room) before
@@ -22,9 +40,16 @@ def _delete_at(room, row: int, col: int) -> None:
 
 
 def _clear_row(room, row: int) -> None:
-    """Remove all character runs on a row (direct mutation; no operator system)."""
-    room.char_runs = [ru for ru in room.char_runs if ru.row != row]
-    room.rebuild_indexes()
+    """Clear the cursor LINE's content — the passable run between the stone walls
+    (`line_extent`), leaving anything embedded in the walls untouched. `S` IS `cc`:
+    both clear the line in place and are bounded by the wall segment, NOT the whole
+    buffer row, so a plaque/clue set in a wall cell survives an `S` exactly as it
+    survives a `cc` (the Change Annex / Extension plaque rule). The import is local
+    to keep the engine module load order flat."""
+    from engine.operator import line_extent, _delete_cols
+    ext = line_extent(room, row)
+    if ext is not None:
+        _delete_cols(room, row, ext[0], ext[1])
 
 
 def begin_insert(room, player, variant: str, count: int = 1) -> None:
