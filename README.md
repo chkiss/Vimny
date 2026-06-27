@@ -94,7 +94,7 @@ The curriculum is defined in `content/levels.py` (canonical) and mirrored in `LE
 | 21 | The Echo Vault | `.` | Playable |
 | 21.1 | The Warden Manifold | (boss) | Playable |
 | 22 | The Inscription Halls | `i a` | Playable |
-| 23 | The Change Annex | `c{m}  cc  s` | Playable |
+| 23 | The Change Annex | `c{m}  cE  cc  s` | Playable |
 | 24 | The Change Extension | `S  C` | Playable |
 | 25 | The Sculpting Chambers | `I A o O` | Planned |
 | 26 | The Overwrite Halls | `R` | Planned |

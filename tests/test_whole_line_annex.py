@@ -43,9 +43,11 @@ from engine.world import CellType
 from content.levels import known_commands
 from generation.dungeon_gen import (
     build_dungeon_whole_line_annex, _wla_pick, _wla_route, _wla_answer,
+    _whole_line_dissimilar, _WLA_VERB,
     _WLA_ROWS, _WLA_COLS, _WLA_COL_S, _WLA_LBL_COL, _WLA_LBL_END, _WLA_PLQ_COL,
     _WLA_LESSON_ROWS, _WLA_GATE_ROW, _WLA_GATE_COL0, _WLA_EXIT, _WLA_PAR,
     _WLA_TRIGGERS, _WLA_N_WORD, _WLA_N_LINE, _WLA_N_SENT, _WLA_PLACEHOLDER,
+    _WLA_WORD_LENS, _WLA_MIX_MIN,
 )
 
 
@@ -83,12 +85,15 @@ def _change_keys(lessons):
 
 def _old_keys(lessons):
     """The same route with every change swapped for its old d/x + i rival
-    (+1 key each): ce→de i, cc→0 D i (clear from the line start), s→x i."""
+    (+1 key each): ce→de i, cE→dE i (delete the whole WORD through the punctuation),
+    cc→0 D i (clear from the line start), s→x i."""
     out = []
     for i, L in enumerate(lessons):
         out += _K('' if i == 0 else ('j' if L['kind'] == 'line' else 'j^'))
         if L['kind'] == 'word':
             out += _K('de') + _K('i') + _K(L['typed']) + [ESC]
+        elif L['kind'] == 'wordmix':
+            out += _K('dE') + _K('i') + _K(L['typed']) + [ESC]
         elif L['kind'] == 'line':
             out += _K('0') + _K('D') + _K('i') + _K(L['typed']) + [ESC]
         else:
@@ -120,7 +125,8 @@ def test_dimensions_anchors_par_budget(seed):
     assert room.spawn_pos == (_WLA_LESSON_ROWS[0], _WLA_LBL_COL)
     assert room.exit_pos == _WLA_EXIT
     assert room.par == _WLA_PAR
-    # tight margin (S2 by volume): below the door count, so all-old overshoots
+    # forcing is by PAR (a count-s solve wins but misses stars); the budget stays
+    # generous (par + TRIGGERS - 1) — enough only to bar the truly-old d/x+i route
     assert room.budget == _WLA_PAR + _WLA_TRIGGERS - 1
     assert room.budget - room.par < _WLA_TRIGGERS
 
@@ -161,24 +167,34 @@ def test_bolts_start_walled_exit_is_plain_floor(seed):
 
 @pytest.mark.parametrize("seed", SEEDS)
 def test_lesson_mix(seed):
-    """Four word, two line, two rune doors, word doors first (so the line-door
-    cursor lands mid-row off the previous east-ending edit)."""
+    """Six word doors (lengths 4..14), the long three MIXED (kind 'wordmix', cE),
+    then two line, two rune doors — word doors first so the line-door cursor lands
+    mid-row off the previous east-ending edit."""
     room = _room(seed)
     kinds = [L['kind'] for L in room._wla_lessons]
-    assert kinds == (['word'] * _WLA_N_WORD + ['line'] * _WLA_N_LINE
-                     + ['sent'] * _WLA_N_SENT)
+    word_kinds = ['word' if n < _WLA_MIX_MIN else 'wordmix' for n in _WLA_WORD_LENS]
+    assert kinds == word_kinds + ['line'] * _WLA_N_LINE + ['sent'] * _WLA_N_SENT
+    assert [L['len'] for L in room._wla_lessons if 'len' in L] == list(_WLA_WORD_LENS)
 
 
 @pytest.mark.parametrize("seed", SEEDS)
 def test_label_target_shapes(seed):
-    """word: one word off (context kept). line: a single wrong word (no space —
-    the karaoke answer can't type one). sent: a fused ◆ → two letters."""
+    """word/wordmix: one word off (context kept) at the door's fixed length; the
+    long ones (>= _WLA_MIX_MIN) are MIXED — an internal punctuation mark, so `ce`
+    can't span them. line: a single wrong 6-letter word. sent: a fused ◆ → two
+    letters. No typed value holds a space (an internal hyphen is fine)."""
     for L in _wla_pick(random.Random(seed)):
         assert ' ' not in L['typed'], "no typed value may contain a space"
-        if L['kind'] == 'word':
+        if L['kind'] in ('word', 'wordmix'):
             lw, tw = L['label'].split(), L['target'].split()
-            assert lw[1] == tw[1] and lw[0] != tw[0]           # context kept
-            assert L['typed'] == tw[0] and len(L['typed']) == 4
+            assert lw[1] == tw[1] and lw[0] != tw[0]           # context kept, word changed
+            assert L['typed'] == tw[0] and len(L['typed']) == L['len']
+            if L['kind'] == 'wordmix':
+                assert L['len'] >= _WLA_MIX_MIN
+                assert not L['typed'].isalnum(), "mixed words carry punctuation (force cE)"
+                assert not lw[0].isalnum()
+            else:
+                assert L['typed'].isalpha() and L['len'] < _WLA_MIX_MIN
         elif L['kind'] == 'line':
             assert ' ' not in L['label'] and ' ' not in L['target']
             assert L['typed'] == L['target'] and L['label'] != L['target']
@@ -203,6 +219,35 @@ def test_doors_independent(seed):
                 assert t not in u, (t, u)
         for lb in labels:
             assert t not in lb, (t, lb)
+
+
+def test_line_doors_resist_cheap_old_tool_edits():
+    """The cc-forcing margin is a single key (budget = par + TRIGGERS - 1), so a
+    line door whose wrong/right words are SIMILAR could be rewritten more cheaply
+    than `cc` with an already-known tool (a `r`, a count-`s`, or a shared
+    prefix/suffix change) — letting a player clear the hall without ever pressing
+    `cc`. `_draw_whole_line_pair` forbids that: each line-door pair differs in the
+    first AND last char and in >= 4 positions. Scanned WIDE (not just the 5 SEEDS,
+    where the gap hid)."""
+    for seed in range(1000):
+        for L in _wla_pick(random.Random(seed)):
+            if L['kind'] == 'line':
+                assert _whole_line_dissimilar(L['label'], L['target']), \
+                    (seed, L['label'], L['target'])
+
+
+def test_word_doors_resist_cheap_old_tool_edits():
+    """The sharper L23 leak: a SIMILAR 4-letter word door can be rewritten with a
+    plain `r` (a pre-L23 tool) for fewer keys than `ce`, dropping the all-old route
+    under budget — so the whole hall falls with NO new command at all (no `c`, no
+    `s`; replay-confirmed on seed 247, `time`->`lime`). At 4 letters `_draw_whole_line_pair`
+    forces all four chars to differ, so the cheapest old rewrite is `de`+`i` = `ce`+1,
+    keeping the +1 forcing margin on every word door. Scanned WIDE."""
+    for seed in range(1000):
+        for L in _wla_pick(random.Random(seed)):
+            if L['kind'] == 'word':
+                wrong, right = L['label'].split()[0], L['target'].split()[0]
+                assert _whole_line_dissimilar(wrong, right), (seed, wrong, right)
 
 
 # ── access: the exit is eight changes deep, and no jump cheats it ─────────────
@@ -250,6 +295,55 @@ def test_full_change_route_wins_par_perfect(seed, monkeypatch):
     assert result['won'] and result['stars'] == 2, result
     for i in range(_WLA_TRIGGERS):
         assert room.cells[_bolt(i)[0]][_bolt(i)[1]] == CellType.FLOOR, "every bolt open"
+
+
+def _route_to(lessons, upto):
+    """Keys to solve doors [0, upto) the canonical way, then position (j^) on door
+    `upto`'s row — so a test can try a single verb on it in isolation."""
+    keys = []
+    for i, L in enumerate(lessons[:upto]):
+        keys += _K('' if i == 0 else ('j' if L['kind'] == 'line' else 'j^'))
+        keys += _K(_WLA_VERB[L['kind']]) + _K(L['typed']) + [ESC]
+    keys += _K('j^')
+    return keys
+
+
+@pytest.mark.parametrize("seed", SEEDS)
+def test_mixed_doors_force_cE(seed, monkeypatch):
+    """THE LESSON: on a MIXED door `ce` stops at the punctuation (the bolt stays
+    shut), only `cE` spans the whole WORD and opens it."""
+    lessons = build_dungeon_whole_line_annex(seed).rooms[0]._wla_lessons
+    mix_i = next(i for i, L in enumerate(lessons) if L['kind'] == 'wordmix')
+    for verb, should_open in (('ce', False), ('cE', True)):
+        dungeon = build_dungeon_whole_line_annex(seed)
+        room = dungeon.rooms[0]
+        keys = _route_to(room._wla_lessons, mix_i) + _K(verb) + _K(lessons[mix_i]['typed']) + [ESC]
+        _drive(dungeon, keys, monkeypatch, finish=':q!\r')
+        opened = room.cells[_bolt(mix_i)[0]][_bolt(mix_i)[1]] != CellType.WALL
+        assert opened is should_open, f"{verb} on a mixed door: opened={opened}"
+
+
+@pytest.mark.parametrize("seed", SEEDS)
+def test_count_s_solves_but_misses_par(seed, monkeypatch):
+    """Par-forcing, not budget-forcing: a count-`s` substitute OPENS every door
+    (it is correct, even on the mixed ones), so the player still WINS — but on the
+    three 2-digit doors `{n}s` spends one key more than `cE`, so the run lands over
+    par and scores ONE star where the `cE` route scores two. The sub-optimal tool
+    is allowed; it just isn't optimal."""
+    dungeon = build_dungeon_whole_line_annex(seed)
+    lessons = dungeon.rooms[0]._wla_lessons
+    keys = []
+    for i, L in enumerate(lessons):
+        pre = '' if i == 0 else ('j' if L['kind'] == 'line' else 'j^')
+        if L['kind'] in ('word', 'wordmix'):
+            keys += _K(pre + f"{L['len']}s") + _K(L['typed']) + [ESC]   # count-s, never c
+        elif L['kind'] == 'line':
+            keys += _K(pre + 'cc') + _K(L['typed']) + [ESC]
+        else:
+            keys += _K(pre + 's') + _K(L['typed']) + [ESC]
+    keys += _K('G$')
+    result = _drive(dungeon, keys, monkeypatch)
+    assert result['won'] and result['stars'] == 1, result   # wins, but misses par
 
 
 @pytest.mark.parametrize("seed", SEEDS)
@@ -308,19 +402,20 @@ def test_undo_rebars_the_bolt(seed, monkeypatch):
 
 @pytest.mark.parametrize("seed", SEEDS)
 def test_one_shut_bolt_bars_the_exit(seed, monkeypatch):
-    """Seven labels true leaves the eighth bolt shut, so the exit (plain floor,
-    east of the bolts) stays UNREACHABLE — the row of bolts is a series gate."""
+    """All labels but the last left true leaves the final bolt shut, so the exit
+    (plain floor, east of the bolts) stays UNREACHABLE — the bolts are a series gate."""
     dungeon = build_dungeon_whole_line_annex(seed)
     room = dungeon.rooms[0]
     lessons = room._wla_lessons
     keys = []
-    for i, L in enumerate(lessons[:-1]):             # drive only the first seven
+    for i, L in enumerate(lessons[:-1]):             # drive every door but the last
         keys += _K('' if i == 0 else ('j' if L['kind'] == 'line' else 'j^'))
-        keys += _K({'word': 'ce', 'line': 'cc', 'sent': 's'}[L['kind']])
+        keys += _K(_WLA_VERB[L['kind']])
         keys += _K(L['typed']) + [ESC]
     keys += _K('j')                                  # onto the gate row, no change
     _drive(dungeon, keys, monkeypatch, finish=':q!\r')
-    assert room.cells[_bolt(7)[0]][_bolt(7)[1]] == CellType.WALL, "8th bolt shut"
+    last = _WLA_TRIGGERS - 1
+    assert room.cells[_bolt(last)[0]][_bolt(last)[1]] == CellType.WALL, "last bolt shut"
     assert _WLA_EXIT not in _reachable(room), "one shut bolt still bars the exit"
 
 

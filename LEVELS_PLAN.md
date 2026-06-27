@@ -72,7 +72,7 @@ Curriculum order is the order of `LEVELS`. Blueprints: `blueprints/act_*.md`.
 | 21 | `echo_vault` | The Echo Vault | `.` |  |
 | 21.1 | `warden_manifold` | The Warden Manifold | — | boss |
 | 22 | `inscription_halls` | The Inscription Halls | `i a` |  |
-| 23 | `whole_line_annex` | The Change Annex | `c{m}  cc  s` |  |
+| 23 | `whole_line_annex` | The Change Annex | `c{m}  cE  cc  s` |  |
 | 24 | `change_extension` | The Change Extension | `S  C` |  |
 | 25 | `sculpting_chambers` | The Sculpting Chambers | `I A o O` |  |
 | 26 | `overwrite_halls` | The Overwrite Halls | `R` |  |

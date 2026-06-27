@@ -4093,7 +4093,7 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
             redo_stack.clear()
             begin_insert(room, player, 'S' if action.get('line') else 's', count)
             player.mode = Mode.INSERT
-            budget.spend(1)
+            budget.spend(_keystroke_cost(count))   # `s`=1, but `{n}s` costs its count digits too
             player.last_change = action
 
         elif edit_mode and action['type'] == 'substitute':

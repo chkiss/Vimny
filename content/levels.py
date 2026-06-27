@@ -77,7 +77,7 @@ LEVELS = [
     {'display': '21',   'slug': 'echo_vault',            'name': 'The Echo Vault',             'commands': '.', 'teaches': ['dot']},
     {'display': '21.1', 'slug': 'warden_manifold',       'name': 'The Warden Manifold',        'type': 'boss', 'after': 'echo_vault', 'teaches': []},
     {'display': '22',   'slug': 'inscription_halls',     'name': 'The Inscription Halls',      'commands': 'i a', 'teaches': ['insert']},
-    {'display': '23',   'slug': 'whole_line_annex',      'name': 'The Change Annex',           'commands': 'c{m}  cc  s', 'teaches': ['c', 's']},
+    {'display': '23',   'slug': 'whole_line_annex',      'name': 'The Change Annex',           'commands': 'c{m}  cE  cc  s', 'teaches': ['c', 's']},
     {'display': '24',   'slug': 'change_extension',       'name': 'The Change Extension',       'commands': 'S  C', 'teaches': ['S', 'C']},
     {'display': '25',   'slug': 'sculpting_chambers',    'name': 'The Sculpting Chambers',     'commands': 'I A o O', 'teaches': []},
     {'display': '26',   'slug': 'overwrite_halls',       'name': 'The Overwrite Halls',        'commands': 'R', 'teaches': ['R']},

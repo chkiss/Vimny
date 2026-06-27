@@ -41,6 +41,7 @@ from engine.world import CellType
 from content.levels import known_commands
 from generation.dungeon_gen import (
     build_dungeon_change_extension, _ce_pick, _ce_route, _ce_answer,
+    _whole_line_dissimilar,
     _CE_ROWS, _CE_COLS, _CE_COL_S, _CE_LBL_COL, _CE_LBL_END, _CE_PLQ_COL,
     _CE_LESSON_ROWS, _CE_THROAT_ROW, _CE_GATE_ROW, _CE_GATE_COL0, _CE_EXIT,
     _CE_PAR, _CE_TRIGGERS, _CE_SAVING, _CE_N_S, _CE_N_C, _CE_KIND_ORDER,
@@ -220,6 +221,23 @@ def test_doors_independent(seed):
                 assert t not in u, (t, u)
         for lb in labels:
             assert t not in lb, (t, lb)
+
+
+def test_s_doors_resist_cheap_old_tool_edits():
+    """The S/C-forcing margin is a single key (budget = par + SAVING - 1), so an
+    S door whose wrong/right words are SIMILAR could be rewritten more cheaply
+    than `cc`/`S` with an already-known tool (a `r`, a count-`s`, or a shared
+    prefix/suffix change). That alone clears the door for under a key and—since
+    the margin is exactly one—lets a player beat the hall WITHOUT ever pressing S
+    or C (replay-confirmed on the old generator, e.g. seed 1349's `strobe`→`strong`
+    via `4l2sng`). `_draw_whole_line_pair` forbids it: each S-door pair differs in
+    the first AND last char and in >= 4 positions, so the cheapest old-tool rewrite
+    is `{6}s` = `cc`'s cost, never less. Scanned WIDE (not just the 5 SEEDS)."""
+    for seed in range(1000):
+        for L in _ce_pick(random.Random(seed)):
+            if L['kind'] == 'sline':
+                assert _whole_line_dissimilar(L['label'], L['target']), \
+                    (seed, L['label'], L['target'])
 
 
 @pytest.mark.parametrize("seed", SEEDS)

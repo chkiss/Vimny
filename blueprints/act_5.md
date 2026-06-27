@@ -90,13 +90,30 @@ word-first:
 - **rune doors** (×2) — one fused rune (◆) stands for two letters; `s` cuts it
   and spells them out (`r` is one-for-one, `cw` overpays).
 
-Volume-forced (par 60, budget = par + TRIGGERS − 1 = 67; each change saves
-exactly one key over its d/x + i rival, so the all-old route (68) overshoots and
-is barred). `c{m}` is delete-then-insert with reflow, identical to `d`-then-`i`
-— terrain forcing stayed dead, as predicted. Finale is `G$` (2 keys: G to the
-gate row, $ east), not `02j$` (par dropped 62→60 after playtest). Labels start AT
-the spine column (no blank margin), so a `cc`/`S` word lands naturally aligned
-with every other label — there is no optional alignment space.
+Finale is `G$` (2 keys: G to the gate row, $ east). Labels start AT the spine
+column (no blank margin), so a `cc` word lands naturally aligned with every other
+label — there is no optional alignment space.
+
+**REDESIGNED 2026-06-27 — par-forcing + the `cE` length progression** (room now
+15×41, ten lesson rows, par 106, budget = par + TRIGGERS − 1 = 115). Two reasons
+drove it: (a) a pressure test found the old hall was clearable with NO new command
+(a similar word door could be fixed by a plain `r`; ~15% of seeds — closed by the
+dissimilarity gate), and worse, `c` was never actually FORCED — count-`s` ties
+`ce`/`cc` for free. (b) The fix is the user's forcing philosophy: **force by PAR,
+not budget.** The SIX word doors now LENGTHEN by two each row (4·6·8·10·12·14):
+- 4/6/8 plain — `ce` and `{n}s` cost the same, so count-`s` is *allowed*, not a cheat.
+- 10/12/14 MIXED — an internal punctuation mark (`fire-blade`). `ce` (word-class)
+  stops at the mark and leaves the bolt shut; only `cE` (WORD-class) spans the whole
+  token. And `{n}s` overpays the 2-digit count, so `cE` is the unique correct AND
+  par-optimal tool. A count-`s` solve still WINS — it just lands over par (1★ not 2★).
+- 2 line (`cc`) + 2 rune (`s`) doors round it out.
+Mixed words are laid as SEPARATE runs + a bare-floor gap (a space GLYPH reads as
+punctuation, so `E` would run through it — the L24 C-door fix). The compound words
+embed common words, so distinctness no longer guarantees independence: `_wla_pick`
+redraws against `_wla_independent`. Plaques live in a widened west wall (spine at
+col 21) to hold the ~19-char targets. ENGINE FIX: a `{n}s` substitute now charges
+its count digits (`budget.spend(_keystroke_cost(count))`, main.py) — it was a flat
+1, which made count-`s` *cheaper* than `cE` and inverted the whole forcing.
 
 **Four playtest laws baked in:**
 1. **PLAQUE IN THE WEST WALL.** Reflow is segment-bounded in BOTH directions —
@@ -175,6 +192,15 @@ must be < the use count):
   where `c$` overpays by one per door.
 - Keep a few `c{m}`/`s` triggers scattered in so the level reinforces WHICH
   tool, not just the two new ones (the Overwrite Halls' `r`-vs-`R` discipline).
+- WHOLE-LINE PAIRS MUST BE DISSIMILAR (`_draw_whole_line_pair`/`_whole_line_dissimilar`):
+  a single-key volume margin is fragile — if a whole-line door's wrong/right words
+  are similar (shared prefix/suffix, or Hamming < 4) a player can rewrite it with
+  `r`/count-`s` for less than `cc`/`S` and bypass the lesson entirely. Pressure-test
+  (2026-06-27) replay-confirmed a no-S/C win on ~0.2-1.6% of seeds (e.g. seed 1349
+  `strobe`→`strong` via `4l2sng`). Fix: every whole-line pair (L23 `line`, L24
+  `sline`) now differs in the FIRST and LAST char and in ≥4 positions, so the
+  cheapest old-tool rewrite ties `cc`. Pinned by `test_*_resist_cheap_old_tool_edits`
+  over 1000 seeds (the 5 SEEDS the rest of the suite uses all happened to be safe).
 
 Design device: re-enter the mislabeled-door hall, now with longer labels and
 whole-line corruptions — the annex taught the verb, the extension teaches the
