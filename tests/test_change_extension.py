@@ -1,22 +1,29 @@
-"""The Change Extension (display 24, slug `change_extension`): S, C.
+"""The Change Extension (slug `change_extension`): S, C.
 
 The one-key shorthands, on the Change Annex chassis (the sixth plaque-door
-hall). The player owns the `c` operator (L23); now `S` (= `cc`) and `C` (= `c$`)
+hall). The player owns the `c` operator (the Change Annex); now `S` (= `cc`) and `C` (= `c$`)
 each do in ONE keypress what costs two. A hall of mislabelled doors: every
 door's plaque (WEST wall) shows the word it wants; the floor label to the east
-shows the wrong one. Four kinds:
+shows the wrong one. Six kinds drill the distinct change verbs:
 
-  S doors    — the WHOLE line is one wrong word; `S` rewrites it (cc overpays 1).
-  C doors    — a correct prefix then a TWO-word wrong tail; `C` from the tail's
-               start rewrites it (c$ overpays 1; `ce` stops a word short). The
-               replacement is a single word, so the typed text holds no space.
-  word door  — one word off inside a kept phrase; `ce` keeps the context.
-  rune door  — a fused ◆ → two letters; `s` cuts it (reinforcement).
+  S doors     — the WHOLE line is one wrong word; `S` rewrites it (cc overpays 1).
+  C doors     — a correct prefix then a TWO-word wrong tail; `C` from the tail's
+                start rewrites it (c$ overpays 1; `ce` stops a word short). The
+                replacement is a single word, so the typed text holds no space.
+  word door   — one word off inside a kept phrase; `ce` keeps the context.
+  wordW door  — a ★-spanning WORD; `cE` crosses the symbol, `ce` stops at it
+                (changes only the head → wrong text → the bolt stays shut).
+  rune door   — a fused ◆ → two letters; `s` cuts it (reinforcement).
+  bracket door— a (bracketed) head on a kept stem; `c%` changes the bracket span
+                inclusively, keeping the stem (cE/s/C clobber the wrong extent).
 
-Forcing is by VOLUME (each shorthand saves exactly one key per use): the eight
-shorthand doors cost +1 each on the old cc/c$ path, so the all-old route is
-par + _CE_SAVING — one past the budget (margin _CE_SAVING − 1) — and is barred.
-The word/rune doors cost the same on either route; they only drill WHICH tool.
+Forcing is layered. VOLUME bars the all-old route: each shorthand saves exactly
+one key, so the six shorthand doors (3·S + 3·C) cost +1 each on the old cc/c$
+path — the all-old route is par + _CE_SAVING, one past the budget (margin
+_CE_SAVING − 1). GEOMETRY forces the granular doors: ce/cE/s/c% each produce the
+target only with the right verb, so a wrong verb leaves the floor mislabelled
+and the bolt shut (replay-confirmed: `ce` on a wordW door, `cE`/`s`/`C` on the
+bracket door).
 
 Laws asserted below:
   - PLAQUE IN THE WEST WALL — uncuttable and off the floor scans (reflow is now
@@ -45,7 +52,7 @@ from generation.dungeon_gen import (
     _CE_ROWS, _CE_COLS, _CE_COL_S, _CE_LBL_COL, _CE_LBL_END, _CE_PLQ_COL,
     _CE_LESSON_ROWS, _CE_THROAT_ROW, _CE_GATE_ROW, _CE_GATE_COL0, _CE_EXIT,
     _CE_PAR, _CE_TRIGGERS, _CE_SAVING, _CE_N_S, _CE_N_C, _CE_KIND_ORDER,
-    _CE_PREFIX, _CE_VERB, _CE_PLACEHOLDER,
+    _CE_PREFIX, _CE_VERB, _CE_PLACEHOLDER, _CE_SYMBOL,
 )
 
 import pytest
@@ -84,7 +91,7 @@ def _change_keys(lessons):
 
 def _old_keys(lessons):
     """The same route with each shorthand swapped for its two-key rival (+1 key
-    each): S→cc, C→c$. The word (ce) / rune (s) doors are unchanged — they have
+    each): S→cc, C→c$. The granular doors (ce/cE/s/c%) are unchanged — they have
     no cheaper rival; they cost the same on either route."""
     out = []
     for i, L in enumerate(lessons):
@@ -93,10 +100,8 @@ def _old_keys(lessons):
             out += _K('cc') + _K(L['typed']) + [ESC]
         elif L['kind'] == 'ceol':
             out += _K('c$') + _K(L['typed']) + [ESC]
-        elif L['kind'] == 'word':
-            out += _K('ce') + _K(L['typed']) + [ESC]
         else:
-            out += _K('s') + _K(L['typed']) + [ESC]
+            out += _K(_CE_VERB[L['kind']]) + _K(L['typed']) + [ESC]
     return out + _K('G$')
 
 
@@ -165,14 +170,17 @@ def test_bolts_start_walled_exit_is_plain_floor(seed):
 
 @pytest.mark.parametrize("seed", SEEDS)
 def test_lesson_mix(seed):
-    """Four S, four C, one word, one rune — the fixed order (par invariance);
-    door 0 is an S door so its route prefix is empty (S ignores the column)."""
+    """Three S, three C, one word, two wordW, two rune, one bracket — the fixed
+    order (par invariance); door 0 is an S door so its route prefix is empty (S
+    ignores the column)."""
     room = _room(seed)
     kinds = tuple(L['kind'] for L in room._ce_lessons)
     assert kinds == _CE_KIND_ORDER
     assert kinds[0] == 'sline'
-    assert kinds.count('sline') == _CE_N_S == 4
-    assert kinds.count('ceol') == _CE_N_C == 4
+    assert kinds.count('sline') == _CE_N_S == 3
+    assert kinds.count('ceol') == _CE_N_C == 3
+    assert kinds.count('wordW') == 2 and kinds.count('rune') == 2
+    assert kinds.count('word') == 1 and kinds.count('bracket') == 1
     # every C door follows an S door, so the cursor lands on the wrong tail and
     # `jC` rewrites it with no `^w` to spend (uniform nav, honest par)
     for i, k in enumerate(kinds):
@@ -184,7 +192,9 @@ def test_lesson_mix(seed):
 def test_label_target_shapes(seed):
     """sline: a single 6-letter word (no space). ceol: prefix kept, a two-word
     wrong tail collapses to ONE right word. word: one word off, context kept.
-    rune: a fused ◆ → two letters. No typed value holds a space."""
+    wordW: a ★-spanning WORD → a plain word, context kept. rune: a fused ◆ → two
+    letters. bracket: a (bracketed) head on a kept stem → a plain head. No typed
+    value holds a space."""
     for L in _ce_pick(random.Random(seed)):
         assert ' ' not in L['typed'], "no typed value may contain a space"
         if L['kind'] == 'sline':
@@ -201,6 +211,19 @@ def test_label_target_shapes(seed):
             lw, tw = L['label'].split(), L['target'].split()
             assert lw[1] == tw[1] and lw[0] != tw[0]      # context kept
             assert L['typed'] == tw[0] and len(L['typed']) == 4
+        elif L['kind'] == 'wordW':
+            lw, tw = L['label'].split(), L['target'].split()
+            assert _CE_SYMBOL in lw[0], "the head WORD spans the ★ (ce stops; cE crosses)"
+            assert lw[1] == tw[1], "context kept"
+            assert L['typed'] == tw[0] and len(L['typed']) == 4
+            assert _CE_SYMBOL not in tw[0], "the target head is plain"
+        elif L['kind'] == 'bracket':
+            lw, tw = L['label'].split(), L['target'].split()
+            assert lw[0].startswith('(') and ')' in lw[0], "a bracketed head"
+            assert lw[1] == tw[1], "context kept"
+            stem = lw[0].split(')', 1)[1]                  # '(co)il' → 'il'
+            assert tw[0] == L['typed'] + stem, "c% swaps only the bracket span"
+            assert len(L['typed']) == 2
         else:
             assert L['label'].startswith(_CE_PLACEHOLDER)
             tw = L['target'].split()
@@ -377,19 +400,21 @@ def test_undo_rebars_the_bolt(seed, monkeypatch):
 
 @pytest.mark.parametrize("seed", SEEDS)
 def test_one_shut_bolt_bars_the_exit(seed, monkeypatch):
-    """Nine labels true leaves the tenth bolt shut, so the exit (plain floor,
-    east of the bolts) stays UNREACHABLE — the row of bolts is a series gate."""
+    """All labels but the last true leaves the final bolt shut, so the exit
+    (plain floor, east of the bolts) stays UNREACHABLE — the bolts are a series
+    gate."""
     dungeon = build_dungeon_change_extension(seed)
     room = dungeon.rooms[0]
     lessons = room._ce_lessons
     keys = []
-    for i, L in enumerate(lessons[:-1]):               # drive only the first nine
+    for i, L in enumerate(lessons[:-1]):               # drive all but the last door
         keys += _K('' if i == 0 else _CE_PREFIX[L['kind']])
         keys += _K(_CE_VERB[L['kind']])
         keys += _K(L['typed']) + [ESC]
     keys += _K('j')                                    # toward the gate, no change
     _drive(dungeon, keys, monkeypatch, finish=':q!\r')
-    assert room.cells[_bolt(9)[0]][_bolt(9)[1]] == CellType.WALL, "10th bolt shut"
+    last = _CE_TRIGGERS - 1
+    assert room.cells[_bolt(last)[0]][_bolt(last)[1]] == CellType.WALL, "final bolt shut"
     assert _CE_EXIT not in _reachable(room), "one shut bolt still bars the exit"
 
 

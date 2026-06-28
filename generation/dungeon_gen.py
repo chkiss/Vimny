@@ -7251,57 +7251,68 @@ def build_dungeon_whole_line_annex(seed: int) -> Dungeon:
     return dungeon
 
 
-# ── display 24 · The Change Extension (S, C) ──────────────────────────────────
+# ── The Change Extension (S, C) ───────────────────────────────────────────────
 # The one-key shorthands, on the Change Annex chassis (the sixth plaque-door
-# hall). The player owns the `c` operator (L23); now `S` (= `cc`, change the
+# hall). The player owns the `c` operator (the Change Annex); now `S` (= `cc`, change the
 # whole line) and `C` (= `c$`, change to the line's end) each do in ONE keypress
 # what costs two. `S`/`C` are gated on their own tokens (engine: `S` is a
 # `substitute line=True`; `C` is an operator with `shorthand='C'`), exactly the
 # Operator's Vault → Cipher Cell `d$` → `D` lineage.
 #
-# Forcing is by VOLUME (S2), the Annex's model: each shorthand saves exactly one
-# key per use, so the margin must sit BELOW the use count. The eight shorthand
-# doors (4 S + 4 C) each cost +1 on the old two-key path (`cc`/`c$`), so the
-# all-old route is par + 8; a budget of par + 8 − 1 makes it overshoot by one
-# while the canonical S/C route clears at par. Two reinforcement doors (one `ce`
-# word door that must KEEP its trailing context, one `s` rune door) cost the same
-# on either route — they only drill WHICH tool, the Overwrite Halls' r-vs-R
-# discipline. The geometry, the WEST-wall plaques, the spine/throat/gate, and the
-# plain-floor exit are all the Annex's (see build_dungeon_whole_line_annex):
+# Forcing is layered. VOLUME (S2), the Annex's model, bars the all-old route:
+# each shorthand saves exactly one key per use, so the margin must sit BELOW the
+# use count. The six shorthand doors (3 S + 3 C) each cost +1 on the old two-key
+# path (`cc`/`c$`), so the all-old route is par + 6; a budget of par + 6 − 1 makes
+# it overshoot by one while the canonical S/C route clears at par. GEOMETRY forces
+# the six granular doors (one `ce` word, two `cE` WORD, two `s` rune, one `c%`
+# bracket): each opens its bolt ONLY when the floor reads its exact target, and a
+# wrong verb (e.g. `ce` on a `cE` door — it stops at the symbol) leaves the floor
+# mislabelled and the bolt shut. They cost the same on either route; they drill
+# WHICH tool, the Overwrite Halls' r-vs-R discipline. The geometry, the WEST-wall
+# plaques, the spine/throat/gate, and the plain-floor exit are all the Annex's
+# (see build_dungeon_whole_line_annex):
 #  - The C-door's TAIL is two wrong words so `ce` (change to word end) stops one
 #    word short — only `C`/`c$` rewrite the whole tail; the correct replacement is
 #    a SINGLE word, so the typed text never holds a space (the karaoke rule).
 #  - Reflow is now segment-bounded both ways (2026-06-26), so the plaque could sit
 #    east behind a bolt; it stays in the WEST wall here only to be uncuttable and
 #    off the floor scans.
-_CE_ROWS, _CE_COLS = 15, 29
+_CE_ROWS, _CE_COLS = 17, 29
 _CE_PLQ_COL  = 1                     # plaques in the WEST wall (uncuttable, off the scans)
 _CE_COL_S    = 11                    # the spine — the gate's first standable; on lesson rows it
                                      # carries the label (no blank margin, so the word a cc/S
                                      # lands at the spine reads aligned with every other label)
 _CE_LBL_COL  = _CE_COL_S             # labels start AT the spine (= where cc/S drops the cursor)
 _CE_LBL_END  = 27                    # label floor reaches this column (fits the longest C label)
-_CE_LESSON_ROWS = (2, 3, 4, 5, 6, 7, 8, 9, 10, 11)   # ten doors, an open block
-_CE_THROAT_ROW  = 12                                 # spine-ONLY row: block → gate
-_CE_GATE_ROW    = 13                                 # the gate corridor: spine · bolts · exit
+_CE_LESSON_ROWS = tuple(range(2, 14))                # twelve doors, an open block (rows 2..13)
+_CE_THROAT_ROW  = 14                                 # spine-ONLY row: block → gate
+_CE_GATE_ROW    = 15                                 # the gate corridor: spine · bolts · exit
 _CE_GATE_COL0   = 12                                 # first bolt column (one per door)
-# Door kinds in FIXED order (par invariance): S and C shorthands, two scattered
-# reinforcement doors. Four S, four C, one word (ce), one rune (s). EVERY C door
-# follows an S door so the cursor lands EXACTLY on the wrong tail's first cell (an
-# S word is 6 long; the C prefix+gap is 5, so the S word's last char sits on the
-# tail start) — `jC` then rewrites the tail with no `^w` to spend. Routing every C
-# this way keeps the navigation uniform and par honest (an earlier order let `jC`
-# undercut `j^wC` only on some doors).
-_CE_KIND_ORDER = ('sline', 'ceol', 'sline', 'ceol', 'word',
-                  'sline', 'ceol', 'rune', 'sline', 'ceol')
-_CE_TRIGGERS = len(_CE_KIND_ORDER)                   # 10 doors
-_CE_N_S = _CE_KIND_ORDER.count('sline')              # 4
-_CE_N_C = _CE_KIND_ORDER.count('ceol')               # 4
-_CE_SAVING = _CE_N_S + _CE_N_C                        # 8 doors that the shorthands shorten
+# Door kinds in FIXED order (par invariance). The hall now DRILLS WHICH change tool
+# fits, not just the shorthands: S (whole line) and C (to line end) the two new
+# one-key shorthands, against the granular c-tools they DON'T replace —
+#   ce      change a word, keep the trailing context;
+#   cE      change a symbol-spanning WORD (`ce` stops at the symbol, only `cE` /
+#           the whole-WORD motion rewrites it);
+#   s       fix a single fused rune;
+#   c%      change a bracketed span to its matching bracket (`ce` stops inside the
+#           brackets, `cE` eats the kept suffix, S/C clobber the context).
+# Three S, three C, one ce, two cE, two s, and the finale c%. EVERY C door follows
+# an S door so the cursor lands EXACTLY on the wrong tail's first cell (an S word is
+# 6 long; the C prefix+gap is 5, so the S word's last char sits on the tail start) —
+# `jC` then rewrites the tail with no `^w` to spend. The granular doors all `j^` to
+# the label start, so they nest anywhere a C does not.
+_CE_KIND_ORDER = ('sline', 'ceol', 'word', 'sline', 'ceol', 'wordW',
+                  'rune', 'sline', 'ceol', 'wordW', 'rune', 'bracket')
+_CE_TRIGGERS = len(_CE_KIND_ORDER)                   # 12 doors
+_CE_N_S = _CE_KIND_ORDER.count('sline')              # 3
+_CE_N_C = _CE_KIND_ORDER.count('ceol')               # 3
+_CE_SAVING = _CE_N_S + _CE_N_C                        # 6 doors that the shorthands shorten
 _CE_EXIT = (_CE_GATE_ROW, _CE_GATE_COL0 + _CE_TRIGGERS)   # plain floor, east of the bolts
 _CE_PLACEHOLDER = '◆'                # the fused rune — `s` spells it out
-_CE_PAR = 70                         # hand-tallied along the canonical S/C route (pinned by tests;
-                                     # finale G$ = 2 keys; C doors use jC, not j^wC)
+_CE_SYMBOL      = '★'                # the WORD-spanning symbol — `cE` crosses it, `ce` stops
+# par is COMPUTED from the canonical route once below (seed-invariant — every door's
+# keystrokes and typed text are fixed length); pinned by tests.
 
 # Distinct words at FIXED lengths (par invariance needs fixed lengths): 6-letter
 # for the whole-line S doors (two per door — wrong label + right target), 4-letter
@@ -7315,16 +7326,19 @@ _CE_FALLBACK_4 = (
     'lock', 'veil', 'gate', 'bind', 'rune', 'dust', 'iron', 'moss',
     'fern', 'silt', 'oath', 'wisp', 'mire', 'peat', 'gild', 'hush',
     'kiln', 'tarn', 'wyrm', 'sear', 'lode', 'glen', 'rime', 'spar',
+    'cove', 'dune', 'fang', 'helm', 'jade', 'reef', 'thaw', 'yarn',
 )
 
 
 def _ce_pick(rng):
-    """Ten lessons, each a (label → target) relabelling at FIXED word lengths so
-    par is seed-invariant. Returns lesson dicts:
-      sline — {'label': 'wrongw', 'target': 'rightw', 'typed': 'rightw'}   (one 6-letter word)
-      ceol  — {'label': 'pre bad rot', 'target': 'pre fix', 'typed': 'fix'} (prefix kept, 2-word tail → 1)
-      word  — {'label': 'wrong ctx', 'target': 'right ctx', 'typed': 'right'}
-      rune  — {'label': '◆st ctx',   'target': 'fist ctx',  'typed': 'fi'}
+    """Twelve lessons, each a (label → target) relabelling at FIXED word lengths
+    so par is seed-invariant. Returns lesson dicts:
+      sline  — {'label': 'wrongw', 'target': 'rightw', 'typed': 'rightw'}   (one 6-letter word)
+      ceol   — {'label': 'pre bad rot', 'target': 'pre fix', 'typed': 'fix'} (prefix kept, 2-word tail → 1)
+      word   — {'label': 'wrong ctx', 'target': 'right ctx', 'typed': 'right'}
+      wordW  — {'label': 'fr★ee ctx', 'target': 'step ctx', 'typed': 'step'}  (cE crosses ★, ce stops)
+      rune   — {'label': '◆st ctx',   'target': 'fist ctx',  'typed': 'fi'}
+      bracket— {'label': '(co)il ctx', 'target': 'buil ctx', 'typed': 'bu'}   (c% swaps the bracket span)
     All words are drawn DISTINCT across the level, which alone guarantees door
     independence (no target is a substring of another label/target): every
     space-bearing target needs a unique two-word sequence, and the only space-free
@@ -7337,7 +7351,11 @@ def _ce_pick(rng):
                     if w.isalpha() and w.islower()})
         rng.shuffle(p)
         return iter(p if len(p) >= need else list(fallback))
-    need4 = _CE_N_C * 4 + 3 + 2            # C: pre/badA/badB/right; word: wrong/right/ctx; rune: wanted/ctx
+    # 4-letter draws: C pre/badA/badB/right; word wrong/right/ctx; each cE
+    # src/right/ctx; each rune wanted/ctx; bracket src/typed-src/ctx.
+    need4 = (_CE_KIND_ORDER.count('ceol') * 4 + _CE_KIND_ORDER.count('word') * 3
+             + _CE_KIND_ORDER.count('wordW') * 3 + _CE_KIND_ORDER.count('rune') * 2
+             + _CE_KIND_ORDER.count('bracket') * 3)
     need6 = _CE_N_S * 2                    # S: wrong label + right target
     w6 = _pool(6, need6, _CE_FALLBACK_6)
     w4 = _pool(4, need4, _CE_FALLBACK_4)
@@ -7355,6 +7373,22 @@ def _ce_pick(rng):
             wrong, right, ctx = next(w4), next(w4), next(w4)
             lessons.append({'kind': 'word', 'label': f'{wrong} {ctx}',
                             'target': f'{right} {ctx}', 'typed': right})
+        elif kind == 'wordW':
+            # A symbol-spanning WORD: `ce` stops at the symbol (changes only the
+            # head), `cE` rewrites the whole WORD. Context word kept.
+            src, right, ctx = next(w4), next(w4), next(w4)
+            word_w = f'{src[:2]}{_CE_SYMBOL}{src[2:]}'     # e.g. 'mo★ss'
+            lessons.append({'kind': 'wordW', 'label': f'{word_w} {ctx}',
+                            'target': f'{right} {ctx}', 'typed': right})
+        elif kind == 'bracket':
+            # A bracketed head on a kept stem: `c%` changes '(' to its match ')'
+            # (just the bracketed bit), keeping the stem. `ce` stops inside, `cE`
+            # eats the stem, S/C clobber the context.
+            src, tsrc, ctx = next(w4), next(w4), next(w4)
+            junk, stem, fix = src[:2], src[2:], tsrc[:2]    # '(ju)st' -> 'fixst'
+            lessons.append({'kind': 'bracket',
+                            'label': f'({junk}){stem} {ctx}',
+                            'target': f'{fix}{stem} {ctx}', 'typed': fix})
         else:                              # rune
             wanted, ctx = next(w4), next(w4)
             lessons.append({'kind': 'rune',
@@ -7364,14 +7398,16 @@ def _ce_pick(rng):
 
 
 # Verb keys per door kind. S changes the whole line; C the line's tail; ce a word;
-# s a single fused rune. Each is followed by typed text and a free Esc (a sequence
-# key, omitted from the keystroke answer).
-_CE_VERB = {'sline': 'S', 'ceol': 'C', 'word': 'ce', 'rune': 's'}
+# cE a symbol-spanning WORD; s a single fused rune; c% a bracketed span. Each is
+# followed by typed text and a free Esc (a sequence key, omitted from the answer).
+_CE_VERB = {'sline': 'S', 'ceol': 'C', 'word': 'ce', 'wordW': 'cE',
+            'rune': 's', 'bracket': 'c%'}
 # Positioning prefix per kind (i > 0). S ignores the column. A C door always
 # follows an S door, so the cursor already sits on the wrong tail's first cell —
-# `j` alone suffices (no `^w`). ce/s want the label start (`^`). The first door
-# is an S door, so its prefix is empty.
-_CE_PREFIX = {'sline': 'j', 'ceol': 'j', 'word': 'j^', 'rune': 'j^'}
+# `j` alone suffices (no `^w`). The granular doors (ce/cE/s/c%) want the label
+# start (`^`). The first door is an S door, so its prefix is empty.
+_CE_PREFIX = {'sline': 'j', 'ceol': 'j', 'word': 'j^', 'wordW': 'j^',
+              'rune': 'j^', 'bracket': 'j^'}
 
 
 def _ce_route(lessons):
@@ -7394,8 +7430,25 @@ def _ce_answer(lessons):
     return ' '.join(keys + typed for keys, typed in _ce_route(lessons) if keys or typed)
 
 
+# Fixed typed length per door kind (par invariance): the whole-line S word is 6,
+# the C tail / word / cE replacement 4, the rune / bracket head 2.
+_CE_TYPED_LEN = {'sline': 6, 'ceol': 4, 'word': 4, 'wordW': 4, 'rune': 2, 'bracket': 2}
+
+
+def _ce_par() -> int:
+    """The canonical route's keystroke count, COMPUTED from _ce_route so it can
+    never drift from the verb/prefix maps. Seed-invariant — every door's keys and
+    typed text are fixed length — so a dummy lessons list with the right typed
+    lengths gives the exact par (no vocab draw needed)."""
+    dummy = [{'kind': k, 'typed': 'x' * _CE_TYPED_LEN[k]} for k in _CE_KIND_ORDER]
+    return sum(len(keys) + len(typed) for keys, typed in _ce_route(dummy))
+
+
+_CE_PAR = _ce_par()
+
+
 def build_dungeon_change_extension(seed: int) -> Dungeon:
-    """The Change Extension (display 24: S, C).
+    """The Change Extension (S, C).
 
     The Change Annex chassis, now with the one-key shorthands. Ten lesson rows
     (2..11) each carry a WRONG label on the floor (east of the spine) with the
@@ -7435,14 +7488,16 @@ def build_dungeon_change_extension(seed: int) -> Dungeon:
     for i, lesson in enumerate(lessons):
         lrow = _CE_LESSON_ROWS[i]
         lesson['row'] = lrow
-        if lesson['kind'] == 'ceol':
-            # Lay each word as its OWN run with a bare-floor gap between them, not
+        if lesson['kind'] in ('ceol', 'wordW', 'bracket'):
+            # Lay each token as its OWN run with a bare-floor gap between them, not
             # one run with an embedded space glyph: a space glyph is a punctuation
-            # 'word' that `w` would stop ON (engine word-class quirk), so the C
-            # route's `w` must skip a real floor gap to land on the wrong tail. The
-            # floor scan reconstructs the space from the empty cell, so the target
-            # ('pre right') reads identically. (Word/rune doors never `w` across a
-            # space — they keep the L23 single-run shape.)
+            # 'word' (engine word-class quirk), so `w` and the `cE`/`c%` WORD scans
+            # would treat the whole "head ctx" as ONE non-blank WORD and eat the
+            # context. A real floor gap is genuine whitespace, so `cE` stops at the
+            # head's end and the C route's `w` lands on the wrong tail. The floor
+            # scan reconstructs the space from the empty cell, so the target reads
+            # identically. (Word/rune doors never scan across the space — `ce`/`s`
+            # stop at the first letter-word end — so they keep the single-run shape.)
             col = _CE_LBL_COL
             for word in lesson['label'].split(' '):
                 lay(lrow, col, word, 'ancient')
