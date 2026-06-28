@@ -16,7 +16,7 @@
 #
 # SPDX-License-Identifier: GPL-3.0-or-later
 
-"""The Cipher Cell (L19): dungeon correctness tests.
+"""The Cipher Cell: dungeon correctness tests.
 
 Teaching goal: r (replace one char in place — the substitution-cipher tool) and
 D (delete to line end, ONE keypress), under ONE visible rule: make the lock row

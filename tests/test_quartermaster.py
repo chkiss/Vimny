@@ -16,7 +16,7 @@
 #
 # SPDX-License-Identifier: GPL-3.0-or-later
 
-"""The Beacon Tiers (L20, slug `quartermaster`): dungeon correctness tests.
+"""The Beacon Tiers (slug `quartermaster`): dungeon correctness tests.
 
 Teaching goal: y (yank — copy WITHOUT cutting) and P (paste before the cursor),
 with yy + paste raising whole rows. Every cold brazier shows … dying embers

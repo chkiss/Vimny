@@ -16,7 +16,7 @@
 #
 # SPDX-License-Identifier: GPL-3.0-or-later
 
-"""The Goblin Gauntlet (display 5, slug `goblin_gauntlet`): ; , p.
+"""The Goblin Gauntlet (slug `goblin_gauntlet`): ; , p.
 
 A combat gauntlet: cross each corridor's water by lining up the goblins with
 fg, then ; / , to repeat the find down the row, x to kill, p to drop the banked

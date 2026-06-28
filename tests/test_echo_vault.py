@@ -16,7 +16,7 @@
 #
 # SPDX-License-Identifier: GPL-3.0-or-later
 
-"""The Echo Vault (L21): dungeon correctness tests.
+"""The Echo Vault: dungeon correctness tests.
 
 Teaching goal: . (dot — repeat the last change), echoed off r. ONE visible
 rule, the plaque family's third member: each span's bolt stands open while

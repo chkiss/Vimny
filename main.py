@@ -2503,7 +2503,7 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
             else:
                 room.answer_diverged = True
 
-    # ── The Archivist's Library (L17) — reload loop + reckoning ─────────────
+    # ── The Archivist's Library — reload loop + reckoning ───────────────────
     def _lib_w():
         gut = 0 if getattr(player, 'number_mode', 'none') == 'none' else 4
         return max(12, _iw(term) - gut)

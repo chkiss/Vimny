@@ -612,8 +612,8 @@ RELIC_SCROLL_IDS = [
     'regex_classes', 'regex_anchors', 'regex_quant', 'regex_collections', 'regex_magic',
     'searchcraft', 'jump', 'col_motion', 'ins_paste', 'ins_edit',
     # 'redo' is NOT here: The Second Stride is pinned to the Waypoint
-    # Sanctum's first vault chest (guaranteed, display 16 — before the
-    # editing act), not left to the random pool.
+    # Sanctum's first vault chest (guaranteed — before the editing act),
+    # not left to the random pool.
 ]
 
 

@@ -16,7 +16,7 @@
 #
 # SPDX-License-Identifier: GPL-3.0-or-later
 
-"""The Operator's Vault (L18) — the first {operator}{motion} level (delete).
+"""The Operator's Vault — the first {operator}{motion} level (delete).
 
 Ten snaked corridors, each admitting exactly one cheapest d-variant (dw, db,
 de, dB, dE, dF?, dW, d0, d$, dd). Armored hp-2 guards make blade-to-blade x

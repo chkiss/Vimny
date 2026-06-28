@@ -1,4 +1,4 @@
-"""The Change Annex (display 23, slug `whole_line_annex`): c{m}, cc, s.
+"""The Change Annex (slug `whole_line_annex`): c{m}, cc, s.
 
 Change is delete + insert in one breath. A hall of mislabelled doors: every
 door's plaque (set in the WEST wall) shows the word it wants; the label on the

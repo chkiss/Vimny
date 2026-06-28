@@ -16,7 +16,7 @@
 #
 # SPDX-License-Identifier: GPL-3.0-or-later
 
-"""The Archivist's Library (L17): one-line wrap_buffer + the :e!/:w reload loop and
+"""The Archivist's Library: one-line wrap_buffer + the :e!/:w reload loop and
 the lethal-Archivist reckoning, driven through the real run_dungeon keystroke loop.
 
 The suit order is seeded, so each test reads room.lib_seq to build its keystroke

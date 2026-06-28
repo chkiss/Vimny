@@ -16,7 +16,7 @@
 #
 # SPDX-License-Identifier: GPL-3.0-or-later
 
-"""The Warden Pathfinder (L17.1, Act III boss) — mechanics.
+"""The Warden Pathfinder (Act III boss) — mechanics.
 
 C-PF-1: a boss core is immune to *editing*-delete. The player's Act III power
 combo `v/W⏎x` (visual + search-as-motion + delete) is a remote AoE that wipes

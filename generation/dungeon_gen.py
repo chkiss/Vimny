@@ -1863,7 +1863,7 @@ def build_dungeon_wardens_keep(seed: int) -> Dungeon:
     return dungeon
 
 
-# ── The Warden Surveyor (ACT II BOSS, caps L6-L13) ────────────────────────────
+# ── The Warden Surveyor (ACT II BOSS) ────────────────────────────────────────
 # A massive, vertically-scrolling hall papered with the warden's own verse
 # (English + readable Latin). Poems are laid as sentence char-runs so the act's
 # structural motions stay useful: '.!?' make )/( boundaries, '()' give % its
@@ -5186,7 +5186,7 @@ def build_dungeon_sentence_corridor(seed: int) -> 'Dungeon':
     return dungeon
 
 
-# ── The Archivist's Library (L17) — one-line wrap_buffer + reload loop ───────
+# ── The Archivist's Library — one-line wrap_buffer + reload loop ─────────────
 # Mechanically unlike any other level: the whole dungeon is ONE logical line
 # (rows==1, wrap_buffer=True). ':set wrap' shelves it; ':e!' leafs through a
 # seed-shuffled cadence of suit folios and decoys; ':w {suit}' files a copy;
@@ -5493,7 +5493,7 @@ def build_dungeon_archivists_library(seed: int) -> Dungeon:
     return dungeon
 
 
-# ── The Spellwright's Forge (L37) — :s, :g, & ─────────────────────────────────
+# ── The Spellwright's Forge — :s, :g, & ───────────────────────────────────────
 # A warded workroom: corrupted incantations the apprentice must make TRUE before
 # the sanctum door opens. Two flaws to mend with ex-commands:
 #   • every line says "old" where the rite now reads "new"  →  :%s/old/new/g
@@ -5611,7 +5611,7 @@ def build_dungeon_spellwrights_forge(seed: int) -> Dungeon:
     return dungeon
 
 
-# ── The Warden Pathfinder (L17.1, Act III boss) ──────────────────────────────
+# ── The Warden Pathfinder (Act III boss) ─────────────────────────────────────
 # Two rooms: the Arena (room 0) and the Wardenverse (room 1, a single-line wrap
 # buffer). Act 1 plays out in the Arena; when the Warden's shields fall he flees
 # and the player follows with `:e wardenverse` (handled in main.py). See
@@ -5755,7 +5755,7 @@ def build_dungeon_warden_pathfinder(seed: int) -> Dungeon:
     return dungeon
 
 
-# ── The Operator's Vault (L18) ───────────────────────────────────────────────
+# ── The Operator's Vault ─────────────────────────────────────────────────────
 # The first operator level: teaches the {operator}{motion} grammar via DELETE.
 # Ten single-row corridors, snaked together (boustrophedon) three rows apart so
 # a guard only wakes (Manhattan <= 5) once the player enters its corridor.
@@ -6001,7 +6001,7 @@ def build_dungeon_operators_vault(seed: int) -> Dungeon:
     return dungeon
 
 
-# ── The Cipher Cell (L19) — r + D ─────────────────────────────────────────────
+# ── The Cipher Cell — r + D ───────────────────────────────────────────────────
 _CC_ROWS, _CC_COLS = 6, 64
 _CC_ROW        = 2                     # the single gauntlet row (floor cols 1..60)
 _CC_PLAQUE_ROW = 1                     # sealed plaque band: all WALL, glyphs embedded.
@@ -6047,7 +6047,7 @@ _CC_PAR = 16                           # seed-invariant; tallied in the answer b
 
 
 def build_dungeon_cipher_cell(seed: int) -> Dungeon:
-    """The Cipher Cell (L19): teaches r (replace one char, in place — the
+    """The Cipher Cell: teaches r (replace one char, in place — the
     substitution-cipher tool) and D (delete to line end, ONE keypress).
 
     A decayed prison row, read against the plaque band sealed in the wall above
@@ -6161,7 +6161,7 @@ def build_dungeon_cipher_cell(seed: int) -> Dungeon:
     return dungeon
 
 
-# ── The Beacon Tiers (L20) — y / yy / P ───────────────────────────────────────
+# ── The Beacon Tiers — y / yy / P ─────────────────────────────────────────────
 _QM_ROWS, _QM_COLS = 6, 48
 _QM_HALL_ROW = 1                        # the supply hall (floor cols 1..45)
 _QM_HALL_LO, _QM_HALL_HI = 1, 45
@@ -6191,7 +6191,7 @@ _QM_PAR = 16                            # seed-invariant; tallied in the answer 
 
 
 def build_dungeon_quartermaster(seed: int) -> Dungeon:
-    """The Beacon Tiers (L20): teaches y (yank — copy WITHOUT cutting) and
+    """The Beacon Tiers: teaches y (yank — copy WITHOUT cutting) and
     P (paste before the cursor); yy + paste raises whole rows.
 
     The depot's signal fire is down to one lit brazier; every cold brazier
@@ -6276,11 +6276,11 @@ def build_dungeon_quartermaster(seed: int) -> Dungeon:
     return dungeon
 
 
-# ── The Echo Vault (L21) — . (dot-repeat) ─────────────────────────────────────
+# ── The Echo Vault — . (dot-repeat) ───────────────────────────────────────────
 _EV_ROWS, _EV_COLS = 4, 52
 _EV_PLAQUE_ROW = 1                     # sealed plaque band (wall row, glyphs embedded)
 _EV_ROW        = 2                     # the single gauntlet row — one floor row seals
-                                       # the plaques against any visual straddle (L19)
+                                       # the plaques against any visual straddle (as in the Cipher Cell)
 _EV_FLOOR_LO, _EV_FLOOR_HI = 1, 49
 _EV_SPAWN = (2, 2)
 _EV_EXIT  = (2, 49)                    # behind the final bolt; the single sealed row
@@ -6346,7 +6346,7 @@ def _ev_pick_combo(rng):
 
 
 def build_dungeon_echo_vault(seed: int) -> Dungeon:
-    """The Echo Vault (L21): teaches . (dot — repeat the last change).
+    """The Echo Vault: teaches . (dot — repeat the last change).
 
     The vault repeats what it hears: the SAME corruption has stamped itself
     down every span — the same warped rune, over and over. Mend it once with
@@ -7038,7 +7038,7 @@ _WLA_MIXED_POOLS = {10: _WLA_WORDS_10, 12: _WLA_WORDS_12, 14: _WLA_WORDS_14}
 def _whole_line_dissimilar(wrong: str, right: str) -> bool:
     """A change door's wrong/right words must lie far enough apart that NO cheaper
     old-tool rewrite can undercut the one-key margin that forces the taught change
-    (cc/ce at L23, S at L24): they must differ in the FIRST and the LAST character
+    (cc/ce in the Change Annex, S in the Change Extension): they must differ in the FIRST and the LAST character
     and in at least four positions. Because both ENDS differ, the changed span
     covers the whole word — so a contiguous `{n}s` costs exactly what `cc`/`ce`
     does (and on a 2-digit-length word, one MORE), and a scatter of `r`s (Hamming
@@ -7167,7 +7167,7 @@ def _wla_answer(lessons):
 
 
 def build_dungeon_whole_line_annex(seed: int) -> Dungeon:
-    """The Change Annex (display 23: c{m}, cE, cc, s).
+    """The Change Annex (c{m}, cE, cc, s).
 
     An OPEN block of ten lesson rows. Each carries its WRONG label on the floor
     (east of the spine) with the RIGHT plaque set in the WEST wall (uncuttable,

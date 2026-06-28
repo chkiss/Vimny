@@ -16,7 +16,7 @@
 #
 # SPDX-License-Identifier: GPL-3.0-or-later
 
-"""The Inscription Halls (display 22, slug `inscription_halls`): i and a.
+"""The Inscription Halls (slug `inscription_halls`): i and a.
 
 The first writer. A four-wide river MEANDERS down the dungeon, its west edge
 drifting four columns west from headwater to ford; lesson jetties hang west
@@ -264,7 +264,7 @@ def test_line_jumps_never_cross_the_river(seed):
 
 @pytest.mark.parametrize("seed", SEEDS)
 def test_every_known_motion_lands_passable_and_west(seed):
-    """The pressure sweep: every motion known by display 22, applied from
+    """The pressure sweep: every motion known by The Inscription Halls, applied from
     every passable west-side cell, must land somewhere the engine accounts
     for — a passable cell west of the river, or a WATER cell (the drown
     trap: the main loop damages and bounces the player, so $ on a jetty
