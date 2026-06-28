@@ -83,6 +83,30 @@ WARDEN_SIGHT_SCROLL = {
     ],
 }
 
+# Dropped by the Warden Surveyor — previews the SEARCH / MARK act ahead: search
+# (/ ? n N *) at the Seekers' Labyrinth, revealed; marks (m ` ') at the Waypoint
+# Sanctum, smudged until 'mark' is learned. Replaces the visual preview now that
+# Visual Mode moved later in the curriculum (it needs operators to be forceable).
+SURVEYORS_PATH_SCROLL = {
+    'title': "◈   The Surveyor's Path   ◈",
+    'lines': [
+        ('dim',    "  The Surveyor walked, naming the land."),
+        ('blank',),
+        ('cmd',    '/{pat}', 'search forward for a word'),
+        ('cmd',    '?{pat}', 'search backward — the mirror'),
+        ('cmd',    'n     ', 'next match, same direction'),
+        ('cmd',    'N     ', 'previous match, reversed'),
+        ('cmd',    '*     ', 'seek the word under the cursor'),
+        ('blank',),
+        ('dim',    "  And for the road home, set a stone:"),
+        ('smudge', 'm{a}  ', 'm', 'ark this spot, name it {a}', 'mark'),
+        ('smudge', '`{a}  ', 'leap to that exact ', 'mark',      'mark'),
+        ('smudge', "'{a}  ", 'leap to the ma',      "rk's line", 'mark'),
+        ('blank',),
+        ('amber',  '  Name a thing, and the way finds you.'),
+    ],
+}
+
 WAYPOINT_SCROLL = {
     'title': "◈   The Numbered Ledger   ◈",
     'lines': [
@@ -402,12 +426,12 @@ SCROLL_CATALOG = [
         'content':    WARDEN_LEAP_SCROLL,
     },
     {
-        'id':         'visual',
-        'title':      "The Warden's Sight",
+        'id':         'search',
+        'title':      "The Surveyor's Path",
         'dropped_by': 'The Warden Surveyor',
         'level_slug': 'warden_surveyor',
         'level_name': 'The Warden Surveyor',
-        'content':    WARDEN_SIGHT_SCROLL,
+        'content':    SURVEYORS_PATH_SCROLL,
     },
     {
         'id':         'setnum',

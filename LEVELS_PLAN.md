@@ -61,26 +61,26 @@ Curriculum order is the order of `LEVELS`. Blueprints: `blueprints/act_*.md`.
 | 12 | `runic_archives` | The Runic Archives | `} {` |  |
 | 13 | `sentence_corridor` | The Sentence Corridor | `) (` |  |
 | 13.1 | `warden_surveyor` | The Warden Surveyor | — | boss |
-| 14 | `sight_sanctum` | The Sight Sanctum | `v` |  |
-| 15 | `seekers_labyrinth` | The Seekers' Labyrinth | `/ ? n N *` |  |
-| 16 | `waypoint_sanctum` | The Waypoint Sanctum | `` m ' ` `` |  |
-| 17 | `archivists_library` | The Archivist's Library | `:set wrap  :e!  :w {file}` |  |
-| 17.1 | `warden_pathfinder` | The Warden Pathfinder | — | boss |
-| 18 | `operators_vault` | The Operator's Vault | `d{m}  dd` |  |
-| 19 | `cipher_cell` | The Cipher Cell | `r  D` |  |
-| 20 | `quartermaster` | The Beacon Tiers | `y yy P` |  |
-| 21 | `echo_vault` | The Echo Vault | `.` |  |
-| 21.1 | `warden_manifold` | The Warden Manifold | — | boss |
-| 22 | `inscription_halls` | The Inscription Halls | `i a` |  |
-| 23 | `whole_line_annex` | The Change Annex | `c{m}  cE  cc  s` |  |
-| 24 | `change_extension` | The Change Extension | `S  C` |  |
-| 25 | `sculpting_chambers` | The Sculpting Chambers | `I A o O` |  |
-| 26 | `overwrite_halls` | The Overwrite Halls | `R` |  |
-| 27 | `case_chambers` | The Case Chambers | `~ g~ gU gu` |  |
-| 28 | `joiners_gate` | The Joiner's Gate | `J gJ` |  |
-| 29 | `alignment_halls` | The Alignment Halls | `>> <<` |  |
-| 30 | `indentation_sanctum` | The Indentation Sanctum | `>{m} <{m} =` |  |
-| 30.1 | `warden_scrivener` | The Warden Scrivener | — | boss |
+| 14 | `seekers_labyrinth` | The Seekers' Labyrinth | `/ ? n N *` |  |
+| 15 | `waypoint_sanctum` | The Waypoint Sanctum | `` m ' ` `` |  |
+| 16 | `archivists_library` | The Archivist's Library | `:set wrap  :e!  :w {file}` |  |
+| 16.1 | `warden_pathfinder` | The Warden Pathfinder | — | boss |
+| 17 | `operators_vault` | The Operator's Vault | `d{m}  dd` |  |
+| 18 | `cipher_cell` | The Cipher Cell | `r  D` |  |
+| 19 | `quartermaster` | The Beacon Tiers | `y yy P` |  |
+| 20 | `echo_vault` | The Echo Vault | `.` |  |
+| 20.1 | `warden_manifold` | The Warden Manifold | — | boss |
+| 21 | `inscription_halls` | The Inscription Halls | `i a` |  |
+| 22 | `whole_line_annex` | The Change Annex | `c{m}  cE  cc  s` |  |
+| 23 | `change_extension` | The Change Extension | `S  C` |  |
+| 24 | `sculpting_chambers` | The Sculpting Chambers | `I A o O` |  |
+| 25 | `overwrite_halls` | The Overwrite Halls | `R` |  |
+| 26 | `case_chambers` | The Case Chambers | `~ g~ gU gu` |  |
+| 27 | `joiners_gate` | The Joiner's Gate | `J gJ` |  |
+| 28 | `alignment_halls` | The Alignment Halls | `>> <<` |  |
+| 29 | `indentation_sanctum` | The Indentation Sanctum | `>{m} <{m} =` |  |
+| 29.1 | `warden_scrivener` | The Warden Scrivener | — | boss |
+| 30 | `sight_sanctum` | The Sight Sanctum | `v` |  |
 | 31 | `selection_halls` | The Selection Halls | `V  <C-v>` |  |
 | 32 | `word_enclosure` | The Word Enclosure | `iw aw` |  |
 | 33 | `bracket_enclosure` | The Bracket Enclosure | `i( a(` |  |

@@ -364,8 +364,8 @@ POEMS: list[tuple[str | None, str, list[str]]] = [
     ('spellwrights_forge', ':s///', [          # The Spellwright's Forge — :s///
         ':s shifts one shape on a line.',
         ':%s reshapes the whole world at once.',
+        ':g/pat/d strikes every line bearing the curse.',
         'Name what is, then what shall be.',
-        'Rewrite gently—the glass remembers.',
     ]),
     ('hall_of_echoes', 'q @ "', [              # The Hall of Echoes — q @ "
         'qa captures your rhythm; q stills it.',

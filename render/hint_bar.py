@@ -88,8 +88,12 @@ _DEFAULT = 'h/j/k/l:move cursor  :w write (save)  :q quit  :q! quit without savi
 # ── Public API ────────────────────────────────────────────────────────────────
 
 # Some single curriculum tokens unlock a whole keystroke family that shares one
-# gate.  '/' (search) gates ? n N too — show them all on the hint bar.
-_FAMILY = {'/': ['/', '?{pat}', 'n', 'N']}
+# gate.  '/' (search) gates ? n N too — show them all on the hint bar.  Likewise the
+# one 'subst' gate unlocks the whole :s family — :%s//g, the :g/pat/d global delete,
+# and & — so the bar must show them all (otherwise :g/pat/d is gated-in but invisible,
+# and the player can't find the line-delete the Forge's cursed verses require).
+_FAMILY = {'/':     ['/', '?{pat}', 'n', 'N'],
+           'subst': ['subst', ':%s//g', ':g/pat/d', '&']}
 
 
 def _format(tokens) -> str:

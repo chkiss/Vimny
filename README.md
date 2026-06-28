@@ -83,26 +83,26 @@ The curriculum is defined in `content/levels.py` (canonical) and mirrored in `LE
 | 12 | The Runic Archives | `} {` | Playable |
 | 13 | The Sentence Corridor | `) (` | Playable |
 | 13.1 | The Warden Surveyor | (boss) | Playable |
-| 14 | The Sight Sanctum | `v` | Playable |
-| 15 | The Seekers' Labyrinth | `/ ? n N *` | Playable |
-| 16 | The Waypoint Sanctum | `` m ' ` `` | Playable |
-| 17 | The Archivist's Library | `:set wrap  :e!  :w {file}` | Playable |
-| 17.1 | The Warden Pathfinder | (boss) | Playable |
-| 18 | The Operator's Vault | `d{m}  dd` | Playable |
-| 19 | The Cipher Cell | `r  D` | Playable |
-| 20 | The Beacon Tiers | `y yy P` | Playable |
-| 21 | The Echo Vault | `.` | Playable |
-| 21.1 | The Warden Manifold | (boss) | Playable |
-| 22 | The Inscription Halls | `i a` | Playable |
-| 23 | The Change Annex | `c{m}  cE  cc  s` | Playable |
-| 24 | The Change Extension | `S  C` | Playable |
-| 25 | The Sculpting Chambers | `I A o O` | Planned |
-| 26 | The Overwrite Halls | `R` | Planned |
-| 27 | The Case Chambers | `~ g~ gU gu` | Planned |
-| 28 | The Joiner's Gate | `J gJ` | Planned |
-| 29 | The Alignment Halls | `>> <<` | Planned |
-| 30 | The Indentation Sanctum | `>{m} <{m} =` | Planned |
-| 30.1 | The Warden Scrivener | (boss) | Planned |
+| 14 | The Seekers' Labyrinth | `/ ? n N *` | Playable |
+| 15 | The Waypoint Sanctum | `` m ' ` `` | Playable |
+| 16 | The Archivist's Library | `:set wrap  :e!  :w {file}` | Playable |
+| 16.1 | The Warden Pathfinder | (boss) | Playable |
+| 17 | The Operator's Vault | `d{m}  dd` | Playable |
+| 18 | The Cipher Cell | `r  D` | Playable |
+| 19 | The Beacon Tiers | `y yy P` | Playable |
+| 20 | The Echo Vault | `.` | Playable |
+| 20.1 | The Warden Manifold | (boss) | Playable |
+| 21 | The Inscription Halls | `i a` | Playable |
+| 22 | The Change Annex | `c{m}  cE  cc  s` | Playable |
+| 23 | The Change Extension | `S  C` | Playable |
+| 24 | The Sculpting Chambers | `I A o O` | Planned |
+| 25 | The Overwrite Halls | `R` | Planned |
+| 26 | The Case Chambers | `~ g~ gU gu` | Planned |
+| 27 | The Joiner's Gate | `J gJ` | Planned |
+| 28 | The Alignment Halls | `>> <<` | Planned |
+| 29 | The Indentation Sanctum | `>{m} <{m} =` | Planned |
+| 29.1 | The Warden Scrivener | (boss) | Planned |
+| 30 | The Sight Sanctum | `v` | Playable |
 | 31 | The Selection Halls | `V  <C-v>` | Planned |
 | 32 | The Word Enclosure | `iw aw` | Planned |
 | 33 | The Bracket Enclosure | `i( a(` | Planned |

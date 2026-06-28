@@ -289,8 +289,8 @@ def test_boss_hint_shows_the_act_not_the_next_command():
     # the whole of act 2, in curriculum order; none of act 1's basics
     assert acts == ['W', 'B', 'E', 'ge', 'gE', 'G', 'gg', 'H', 'M', 'L', '%', '{', '}', '(', ')']
     assert not ({'h', 'j', 'k', 'l', 'x', 'count', 'f'} & set(acts))
-    # the next-act command the scroll gates is NOT part of the act
-    gated = main._SCROLL_DROPS['warden_surveyor'][0]        # 'visual'
+    # the next-act preview the scroll carries is NOT part of the act
+    gated = main._SCROLL_DROPS['warden_surveyor'][0]        # 'search'
     assert gated not in acts
     # the boss hint lists the act even if that command has leaked into `known`
     assert hint_text([gated], slug='warden_surveyor') == _format(acts)
@@ -354,11 +354,16 @@ def test_phase2_block_threat_is_the_ctrlv_rectangle():
     assert block_bounds((14, 40), (10, 30)) == (10, 14, 30, 40)   # order-independent
 
 
-def test_gated_command_is_taught_by_the_next_level():
-    """The id the boss locks until its scroll is read is what the following
-    teaching level introduces."""
+def test_surveyor_previews_the_search_act():
+    """The Warden Surveyor drops the SEARCH / MARK act preview (The Surveyor's
+    Path), and the level that follows it teaches the search keys that scroll
+    reveals. Visual Mode moved later in the curriculum (it is unforceable before
+    operators exist), so the surveyor no longer gates the literal 'visual' token —
+    'search' is an act-marker id, like the other bosses' 'd_op' / 'text_obj'."""
     from content.levels import LEVELS
-    gated = main._SCROLL_DROPS['warden_surveyor'][0]
+    sid = main._SCROLL_DROPS['warden_surveyor'][0]
+    assert sid == 'search' and sid in main._STD_SCROLLS
     idx = next(i for i, lv in enumerate(LEVELS) if lv['slug'] == 'warden_surveyor')
     nxt = next(lv for lv in LEVELS[idx + 1:] if lv.get('teaches'))
-    assert gated in nxt['teaches']
+    assert nxt['slug'] == 'seekers_labyrinth'
+    assert '/' in nxt['teaches']           # the scroll's revealed search keys

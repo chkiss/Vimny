@@ -97,17 +97,19 @@ def test_redo_reclears_the_arm():
 
 
 # ── search: n / N ────────────────────────────────────────────────────────────
-def test_search_costs_pattern_plus_two():
-    assert _play([_ks('/'), _ks('z'), _ks('\r')]) == (3, 20)   # len('z') + 2
+def test_search_costs_pattern_plus_one():
+    # '/' charged + len(pat) chars, closing Enter free → len('z') + 1 = 2
+    assert _play([_ks('/'), _ks('z'), _ks('\r')]) == (2, 20)
 
 
 def test_undo_then_n_repays_full_search_cost():
-    # /z⏎ → u → n  must cost the full 3 (re-pay), not 1.
-    assert _play([_ks('/'), _ks('z'), _ks('\r'), _ks('u'), _ks('n')]) == (3, 20)
+    # /z⏎ → u → n  must cost the full 2 (re-pay), not 1.
+    assert _play([_ks('/'), _ks('z'), _ks('\r'), _ks('u'), _ks('n')]) == (2, 20)
 
 
 def test_legit_n_after_paid_search_is_one():
-    assert _play([_ks('/'), _ks('z'), _ks('\r'), _ks('n')]) == (4, 30)
+    # /z⏎ (2) + n (1) = 3
+    assert _play([_ks('/'), _ks('z'), _ks('\r'), _ks('n')]) == (3, 30)
 
 
 def test_find_and_search_arms_are_independent():

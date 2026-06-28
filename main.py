@@ -47,7 +47,8 @@ from engine.visual import apply_visual, block_bounds
 from content.scrolls import (
     # Codex scroll content rendered by _show_scroll_by_id (_STD_SCROLLS map);
     # every other catalogue scroll renders via _show_catalog_scroll.
-    RELIQUARY_SCROLL, WARDEN_LEAP_SCROLL, WARDEN_SIGHT_SCROLL, WAYPOINT_SCROLL,
+    RELIQUARY_SCROLL, WARDEN_LEAP_SCROLL, WARDEN_SIGHT_SCROLL, SURVEYORS_PATH_SCROLL,
+    WAYPOINT_SCROLL,
     OPERATOR_CODEX_SCROLL, INSCRIBERS_HAND_SCROLL,
     WHOLE_WORD_SCROLL, WARDEN_ACT_SCROLL,
     pick_relic_scroll as _pick_relic_scroll,
@@ -558,7 +559,8 @@ def _show_catalog_scroll(term: Terminal, iw: int, game_h: int,
 # 'register' is the one bespoke renderer (_show_reliquary_scroll).
 _STD_SCROLLS = {
     'leap':      WARDEN_LEAP_SCROLL,
-    'visual':    WARDEN_SIGHT_SCROLL,
+    'visual':    WARDEN_SIGHT_SCROLL,   # orphaned: re-homes to the relocated v-lesson
+    'search':    SURVEYORS_PATH_SCROLL,
     'setnum':    WAYPOINT_SCROLL,
     'd_op':      OPERATOR_CODEX_SCROLL,
     'writers':   INSCRIBERS_HAND_SCROLL,
@@ -587,7 +589,7 @@ def _show_scroll_by_id(term: Terminal, iw: int, game_h: int,
 _SCROLL_DROPS = {
     'reliquary':            ('register',  None,                     None),
     'wardens_keep':         ('leap',      None,                     None),
-    'warden_surveyor':      ('visual',    None,                     None),
+    'warden_surveyor':      ('search',    None,                     None),
     'warden_pathfinder':    ('d_op',      "The Operator's Codex",   _SCROLL_TEXT_OPERATOR_CODEX),
     'warden_manifold':      ('writers',   "The Inscriber's Hand",   _SCROLL_TEXT_INSCRIBERS_HAND),
     'warden_scrivener':     ('text_obj',  'The Whole Word',         _SCROLL_TEXT_WHOLE_WORD),
@@ -932,8 +934,21 @@ _SPEAR_DIRS = {
 }
 
 
-def _keystroke_cost(count: int, motion: str = '') -> int:
-    base = 1 if count == 1 else len(str(count)) + 1
+def _count_prefix_cost(count: int, count_given: bool = False) -> int:
+    """Keystrokes spent on a typed count prefix: 0 when no count was typed (a bare
+    command), else the digits.  An *explicitly typed* count is real keypresses even
+    when it is 1 — `1p`/`1J`/`1dd` cost their digit; a redundant `1` is never free.
+    Solver-built actions omit count_given (default False), so a modelled count of 1
+    keeps the no-count price — only real keystrokes that typed a `1` pay for it."""
+    return len(str(count)) if (count_given or count > 1) else 0
+
+
+def _keystroke_cost(count: int, motion: str = '', count_given: bool = False) -> int:
+    # A bare motion (no count typed) is one keystroke; an *explicitly typed* count
+    # is real keypresses, even when it is 1 — `G`=1 but `1G`=2.  Typing a redundant
+    # `1` is never free: it's a wasteful 2-key way to do what `gg` does, so it must
+    # not undercut the count==1 discount that only a no-count motion earns.
+    base = 1 + _count_prefix_cost(count, count_given)
     # multi-character motions: one extra keypress per extra character required
     if motion in ('f', 'F', 't', 'T', 'gg', 'ge', 'gE', 'gJ'):
         base += 1
@@ -943,17 +958,18 @@ def _keystroke_cost(count: int, motion: str = '') -> int:
 def _operator_cost(action: dict) -> int:
     """Keystroke cost of an operator command, e.g. dw=2, d3w=4, dd=2, gUiw=4, gUU=3."""
     count = action.get('count', 1)
+    cg    = action.get('count_given', False)
     if 'shorthand' in action:              # D / C — ONE physical keypress, not d+$
-        return (len(str(count)) if count > 1 else 0) + 1
+        return _count_prefix_cost(count, cg) + 1
     c = len(action['op'])                  # 'd'=1, 'gU'=2
-    if count > 1:
-        c += len(str(count))
+    c += _count_prefix_cost(count, cg)
     if 'textobj' in action:                # diw, ci( … (i/a + obj char)
         return c + 2
     motion = action['motion']
     if motion == 'line':                   # dd / yy / gUU
         return c + 1
-    c += _keystroke_cost(action.get('motion_count', 1), motion)
+    c += _keystroke_cost(action.get('motion_count', 1), motion,
+                         action.get('motion_count_given', False))
     return c
 
 
@@ -1734,6 +1750,9 @@ _LEVEL_INTROS = {
     'change_extension':    ('The Change Extension — deeper into the mislabelled halls. Two strokes was the novice\'s way; a practised hand needs but one. Find where a single keystroke serves.', 70),
     'warden_manifold':     ('The Warden Manifold — he stamps himself into the world. Light the four braziers; the gate will draw and the fog will part.', 70),
     'warden_surveyor':     ('The Warden Surveyor — survey his hall; w/b/e leap word to word, over the void.', 60),
+    'spellwrights_forge':  ('The Spellwright\'s Forge — the old wards have rotted and cursed lines '
+                            'fester among the true. Mend what is corrupt, strike what is cursed, and '
+                            'spare what already rings true.', 70),
     'dummy':               ('Sandbox — all mechanics active. Type :edit to enter editor mode.', 60),
     'archivists_library':  ("The Archivist's Library — the whole catalogue has spilled "
                             'into a single endless line.', 80),
@@ -2444,19 +2463,45 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
                 return ch
 
     def _forge_check():
-        """The Spellwright's Forge: dissolve the sanctum seal once every line is mended
-        (no 'old' corruption and no 'curse' verse remain)."""
+        """The Spellwright's Forge: dissolve the sanctum seal once the spellwork RINGS
+        TRUE across all three chambers — every line that must REMAIN reads its exact text
+        (Chamber A mended old→new with /g, Chamber B's two verses mended pale→pure, B's
+        TRUE pale line untouched, Chamber C's sacred lines intact) AND no cursed line
+        survives.  Testing for the exact text (not merely the absence of 'old'/'cursed')
+        is deliberate: it forbids the snip mangle (`:%s/l//g` …) that once satisfied a bare
+        substring check for pennies, and it makes a whole-buffer `:%s/pale/pure/g` self-
+        defeating — it would wreck B's protected line, so its exact text would go missing."""
         seal = getattr(room, '_forge_seal', None)
         if seal is None:
             return
-        texts = [_subst.line_text(room, r)[0] for r in range(room.rows)]
-        if any('old' in t for t in texts) or any('curse' in t for t in texts):
-            return
+        texts  = [_subst.line_text(room, r)[0] for r in range(room.rows)]
+        mended = getattr(room, '_forge_mended', None) or []
+        # The WHOLE phrase must appear (substring tolerates the line's leading indent); a
+        # one-letter mangle ('the od gods…') or a half-mended /g-less ward can never match.
+        if not all(any(m in t for t in texts) for m in mended):
+            return                                    # a line is unmended, mangled, or wrecked
+        if any('curse' in t for t in texts):
+            return                                    # a cursed line still stands
         sr, sc = seal
         if room.cells[sr][sc] == CellType.WALL:
             room.cells[sr][sc] = CellType.FLOOR
         room._forge_seal = None
         _push('The wards dissolve — the spellwork rings true. The way opens!')
+
+    def _advance_answer(ch: str):
+        """Admin karaoke: advance the answer tape by one typed key (Enter passed as the
+        glyph '⏎', matching the tape's own Enter marker).  Spaces in the tape are visual
+        separators, stripped for matching.  Used for COMMAND-mode typing — the NORMAL-mode
+        tracker at the top of the loop never sees `:`-command chars — mirroring the
+        INSERT-mode advance.  Caller guarantees admin + a live tape."""
+        if room.answer_diverged:
+            return
+        _ap = room.answer.replace(' ', '')
+        if room.answer_pos < len(_ap):
+            if ch == _ap[room.answer_pos]:
+                room.answer_pos += 1
+            else:
+                room.answer_diverged = True
 
     # ── The Archivist's Library (L17) — reload loop + reckoning ─────────────
     def _lib_w():
@@ -2778,7 +2823,11 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
             if key.name == 'KEY_ESCAPE':
                 player.mode = Mode.NORMAL
                 player.cmd_line = ''
+                room._cmd_karaoke = False
             elif key.name == 'KEY_ENTER' or str(key) in ('\n', '\r'):
+                if getattr(room, '_cmd_karaoke', False):
+                    _advance_answer('⏎')                  # the tape marks Enter with ⏎
+                    room._cmd_karaoke = False
                 cmd = player.cmd_line.strip()
                 player.mode    = Mode.NORMAL
                 player.cmd_line = ''
@@ -3032,6 +3081,9 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
                 search_creg_pending = True
             else:
                 player.cmd_line = _cmd_append(player.cmd_line, key)
+                if (getattr(room, '_cmd_karaoke', False)
+                        and not key.is_sequence and len(str(key)) == 1):
+                    _advance_answer(str(key))              # karaoke: advance per typed cmd char
             if msg_pool:
                 msg_idx = 0
                 message = _pool_msg()
@@ -3045,7 +3097,11 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
                 player.mode = search_return_mode or Mode.NORMAL   # back to visual if launched there
                 search_return_mode = None
                 player.cmd_line = ''
+                room._search_karaoke = False
             elif key.name == 'KEY_ENTER' or str(key) in ('\n', '\r'):
+                if getattr(room, '_search_karaoke', False):
+                    _advance_answer('⏎')                  # the tape marks Enter with ⏎
+                    room._search_karaoke = False
                 pattern = player.cmd_line
                 fwd     = player.search_forward
                 # A search launched from visual mode is a MOTION that extends the
@@ -3066,7 +3122,7 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
                             _record_jump(player, (player.row, player.col))
                         player.row, player.col = dest
                         if not edit_mode:
-                            _scost = len(pattern) + 2
+                            _scost = len(pattern) + 1   # '/' charged, closing Enter free (terminator is free everywhere)
                             budget.spend(_scost)
                             player.pending_recost_s = 0      # a fresh search is paid
                             if not from_visual:
@@ -3078,6 +3134,9 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
                 player.cmd_line = player.cmd_line[:-1]
             else:
                 player.cmd_line = _cmd_append(player.cmd_line, key)
+                if (getattr(room, '_search_karaoke', False)
+                        and not key.is_sequence and len(str(key)) == 1):
+                    _advance_answer(str(key))              # karaoke: advance per pattern char
             _render(message)
             continue
 
@@ -3283,6 +3342,8 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
                     player.mode = Mode.SEARCH
                     player.cmd_line = ''
                     player.search_forward = (raw == '/')
+                    room._search_karaoke = (player_name == 'admin' and bool(room.answer)
+                                            and not room.answer_diverged)
                 _render(message)
                 continue
             if not key_buf and raw and raw in 'dycx~<>':
@@ -3341,7 +3402,7 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
                 _render(message)
                 continue
             if vt is not None:
-                _, textobj, tcount = vt
+                _, textobj, tcount, tcg = vt
                 key_buf = ''
                 if not (textobj in player.known_commands or 'admin' in player.known_commands):
                     _push("You haven't learned that text object yet.")
@@ -3358,7 +3419,7 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
                         player.visual_anchor = (tobj.start_row, tobj.start_col)
                         player.row, player.col = tobj.end_row, tobj.end_col
                         if not edit_mode:
-                            budget.spend(2 + (len(str(tcount)) if tcount > 1 else 0))
+                            budget.spend(2 + _count_prefix_cost(tcount, tcg))
                 _render(message)
                 continue
             # Otherwise: a motion that extends the selection (costs same as normal mode)
@@ -3374,7 +3435,7 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
                                          count_given=v_action.get('count_given', True),
                                          game_h=term.height - 8)
                     if moved and not edit_mode:
-                        budget.spend(_keystroke_cost(v_count, v_motion))
+                        budget.spend(_keystroke_cost(v_count, v_motion, v_action.get('count_given', False)))
             elif v_action is not None:
                 key_buf = ''                               # ignore non-motion keys in visual
             _render(message)
@@ -3446,6 +3507,7 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
                 _render(message)
                 continue
             repeat_count = action.get('count', 1)
+            repeat_cg    = action.get('count_given', False)   # was a count typed on the '.'?
             action = dict(player.last_change)
             if repeat_count != 1:
                 action['count'] = repeat_count
@@ -3455,7 +3517,7 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
             # (pending_recost_c). The re-dispatched handler charges full below; the
             # centralised settle (before the combat block) refunds down to the dot's cost.
             _dot_active = True
-            _dot_cost   = player.pending_recost_c or _keystroke_cost(repeat_count)
+            _dot_cost   = player.pending_recost_c or _keystroke_cost(repeat_count, '', repeat_cg)
             player.pending_recost_c = 0
 
         if action['type'] == 'motion':
@@ -3478,12 +3540,13 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
                     # pending_recost_f so the next ;/, re-pays the full cost instead of
                     # inheriting the refunded find for 1 key. A ;/, that settles that
                     # re-cost is tagged in turn, so undoing IT re-arms.
+                    _cg = action.get('count_given', False)
                     if motion in ('f', 'F', 't', 'T'):
-                        cost, player.pending_recost_f, mark = _keystroke_cost(count, motion), 0, 'f'
+                        cost, player.pending_recost_f, mark = _keystroke_cost(count, motion, _cg), 0, 'f'
                     elif motion in (';', ',') and player.pending_recost_f:
                         cost, player.pending_recost_f, mark = player.pending_recost_f, 0, 'f'
                     else:
-                        cost, mark = _keystroke_cost(count, motion), None
+                        cost, mark = _keystroke_cost(count, motion, _cg), None
                     budget.spend(cost)
                     undo_stack.append(prev_pos + ((mark, cost),) if mark else prev_pos)
                     redo_stack.clear()
@@ -3589,6 +3652,17 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
         elif action['type'] == 'enter_mode':
             m = action['mode']
             if m == 'command':
+                # Admin karaoke: track a `:`-command against the tape ONLY when the tape
+                # actually expects a ':' here — so the player's own :wq / :q! finish (after
+                # the tape is consumed) never diverges it, exactly as before.  cmd_start_ans
+                # snapshots the pre-`:` tape state so a :s/:g undo rewinds the playhead.
+                room._cmd_karaoke = False
+                if player_name == 'admin' and room.answer and not room.answer_diverged:
+                    cmd_start_ans = (room.answer_pos, room.answer_diverged)
+                    _ap = room.answer.replace(' ', '')
+                    if room.answer_pos < len(_ap) and _ap[room.answer_pos] == ':':
+                        room._cmd_karaoke = True
+                        room.answer_pos += 1                # consume the ':'
                 player.mode     = Mode.COMMAND
                 player.cmd_line = ''
             elif m == 'insert':
@@ -3622,6 +3696,11 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
                     player.mode = Mode.SEARCH
                     player.cmd_line = ''
                     player.search_forward = action.get('forward', True)
+                    # Karaoke: the '/' or '?' was already matched by the NORMAL tracker
+                    # (it isn't excluded like ':'); now track the pattern + Enter that
+                    # follow in SEARCH mode (which the top-of-loop tracker never sees).
+                    room._search_karaoke = (player_name == 'admin' and bool(room.answer)
+                                            and not room.answer_diverged)
                 else:
                     _push('Search not learned yet.')
             elif m in ('visual', 'visual_line', 'visual_block'):
@@ -3705,7 +3784,7 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
                     _push('Macro too long (recursion?).')
                 else:
                     macro_pending.extendleft(reversed(add))   # play next, in order
-                    budget.spend(2 + (len(str(count)) if count > 1 else 0))
+                    budget.spend(2 + _count_prefix_cost(count, action.get('count_given', False)))
 
         elif action['type'] in ('search_repeat', 'search_word'):
             if not edit_mode and not _action_allowed(action, player.known_commands) and _blocked(action):
@@ -3743,12 +3822,13 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
                     # Same anti-exploit accounting as f/;/, (see the motion branch): * / #
                     # establish the n/N register and tag their entry; an n/N that settles a
                     # re-cost (after the search was undone) re-pays the full search cost.
+                    _scg = action.get('count_given', False)
                     if action['type'] == 'search_word':
-                        cost, player.pending_recost_s, smark = _keystroke_cost(count, ''), 0, True
+                        cost, player.pending_recost_s, smark = _keystroke_cost(count, '', _scg), 0, True
                     elif player.pending_recost_s:
                         cost, player.pending_recost_s, smark = player.pending_recost_s, 0, True
                     else:
-                        cost, smark = _keystroke_cost(count, ''), False
+                        cost, smark = _keystroke_cost(count, '', _scg), False
                     budget.spend(cost)
                     undo_stack.append(prev_pos + (('s', cost),) if smark else prev_pos)
                     redo_stack.clear()
@@ -4093,7 +4173,7 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
             redo_stack.clear()
             begin_insert(room, player, 'S' if action.get('line') else 's', count)
             player.mode = Mode.INSERT
-            budget.spend(_keystroke_cost(count))   # `s`=1, but `{n}s` costs its count digits too
+            budget.spend(_keystroke_cost(count, '', action.get('count_given', False)))   # `s`=1; `{n}s` / `1s` pay their digits
             player.last_change = action
 
         elif edit_mode and action['type'] == 'substitute':
@@ -4138,7 +4218,7 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
                     _kill_door_group(room, target.row, target.col, kind='locked_door')
                     player.row, player.col = target.row, target.col   # paste moves you over: step onto the unlocked door
                     _reveal_from(room, player.row, player.col)
-                    budget.spend(_keystroke_cost(count, 'p'))
+                    budget.spend(_keystroke_cost(count, 'p', action.get('count_given', False)))
                     _push('Door unlocked!')
                 else:
                     _has_key = any(ed['tmpl'].get('kind') == 'floor_key' for ed in clip_entities)
@@ -4153,7 +4233,7 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
                 undo_stack.append(_snapshot(room, player, budget, ans=cmd_start_ans))
                 redo_stack.clear()
                 if op_paste(room, player, clip, before, count):
-                    budget.spend(_keystroke_cost(count, 'p'))
+                    budget.spend(_keystroke_cost(count, 'p', action.get('count_given', False)))
                     spawned = next((ed['tmpl']['kind'] for ed in clip_entities), None)
                     _push(_PASTE_SPAWN_MSG[spawned] if spawned in _PASTE_SPAWN_MSG else 'Pasted.')
                 else:
@@ -4229,7 +4309,7 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
             (ed_redo if edit_mode else redo_stack).clear()
             if replace_chars(room, player, action['char'], count):
                 if not edit_mode:
-                    budget.spend(2 + (len(str(count)) if count > 1 else 0))
+                    budget.spend(2 + _count_prefix_cost(count, action.get('count_given', False)))
                 player.last_change = action
             else:
                 (ed_undo if edit_mode else undo_stack).pop()
@@ -4243,7 +4323,7 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
             (ed_redo if edit_mode else redo_stack).clear()
             if case_char(room, player, count):
                 if not edit_mode:
-                    budget.spend(_keystroke_cost(count, '~'))
+                    budget.spend(_keystroke_cost(count, '~', action.get('count_given', False)))
                 player.last_change = action
             else:
                 (ed_undo if edit_mode else undo_stack).pop()
@@ -4256,7 +4336,7 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
             redo_stack.clear()
             gap = action.get('gap', True)
             if op_join(room, player, gap=gap, count=count):
-                budget.spend(_keystroke_cost(count, 'J' if gap else 'gJ'))
+                budget.spend(_keystroke_cost(count, 'J' if gap else 'gJ', action.get('count_given', False)))
                 player.last_change = action
                 _push(_EDGE_OF_WORLD_MSG if room._last_build_blocked == 'edge' else 'Joined.')
             else:

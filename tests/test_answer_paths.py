@@ -52,8 +52,8 @@ def _token_ks_cost(token: str) -> int:
       - f/F/t/T + target char (fr, Fw, t!, T!): base 2; with count: len+2
     """
     if token and token[0] in '/?' and token.endswith('⏎'):
-        # search: /pat⏎ or ?pat⏎ — '/' + len(pat) chars + ⏎ = len(pat)+2 (main.py)
-        return len(token[1:-1]) + 2
+        # search: /pat⏎ or ?pat⏎ — '/' charged + len(pat) chars, closing ⏎ free = len(pat)+1 (main.py)
+        return len(token[1:-1]) + 1
     if len(token) == 2 and token[0] in "m'`" and token[1].isalpha():
         return 2          # marks: m{a} set, '{a}/`{a} jump — two keys each (main.py)
     m = _GE_RE.match(token)

@@ -105,7 +105,7 @@ def _simulate(answer, room):
             dest = find_next(room, p, pat, fwd)
             assert dest is not None, f'{tok}: no match'
             p.row, p.col = dest
-            spent += len(pat) + 2
+            spent += len(pat) + 1            # '/' charged, closing Enter free
         elif tok in ('*', '#'):
             w = word_under_cursor(room, p)
             assert w is not None, f'* with no word under cursor at {(p.row, p.col)}'
@@ -144,8 +144,8 @@ def _simulate(answer, room):
 def test_dimensions_and_budget(seed):
     room = _room(seed)
     assert (room.rows, room.cols) == (17, 39)
-    assert room.par == _SEEKERS_PAR == 19
-    assert room.budget == 27                      # ceil(19 * 1.4)
+    assert room.par == _SEEKERS_PAR == 18
+    assert room.budget == 26                      # ceil(18 * 1.4)
 
 
 @pytest.mark.parametrize('seed', SEEDS)
@@ -213,7 +213,7 @@ def test_answer_solves_within_budget():
     room = _room(42)
     pos, spent, reached = _simulate(_SEEKERS_ANSWER, room)
     assert reached, f'answer ended at {pos}, not the exit {_SEEKERS_EXIT}'
-    assert spent == _SEEKERS_PAR == 19
+    assert spent == _SEEKERS_PAR == 18
     assert spent <= room.budget
 
 

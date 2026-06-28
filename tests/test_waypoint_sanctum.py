@@ -87,7 +87,7 @@ def _simulate(answer, room):
             dest = find_next(room, p, pat, fwd)
             assert dest is not None, f'{tok}: no match'
             p.row, p.col = dest
-            spent += len(pat) + 2
+            spent += len(pat) + 1            # '/' charged, closing Enter free
         elif tok in ('n', 'N'):
             pat, base = last
             p.row, p.col = find_next(room, p, pat, (not base) if tok == 'N' else base)
@@ -121,8 +121,8 @@ def _simulate(answer, room):
 def test_dimensions_and_budget(seed):
     room = _room(seed)
     assert (room.rows, room.cols) == (19, 46)
-    assert room.par == _WP_PAR == 20
-    assert room.budget == 28                       # ceil(20 * 1.4)
+    assert room.par == _WP_PAR == 15
+    assert room.budget == 21                       # ceil(15 * 1.4)
 
 
 @pytest.mark.parametrize('seed', SEEDS)
@@ -184,12 +184,30 @@ def test_apostrophe_reaches_scroll_backtick_reaches_lock(seed):
 
 @pytest.mark.parametrize('seed', SEEDS)
 def test_backward_search_is_the_direct_key_fetch(seed):
-    """From the scroll cell, ?cipher lands on the real key; /cipher hits a forward
+    """From the spawn, ?xyzzy lands on the real key word; /xyzzy hits a forward
     decoy first — so ? is the direct fetch (/ would need n-wrapping)."""
     room = _room(seed)
-    p = Player(row=_WP_SCROLL[0], col=_WP_SCROLL[1])
+    p = Player(row=_WP_SPAWN[0], col=_WP_SPAWN[1])
     assert find_next(room, p, _WP_KEYWORD, False) == _WP_KEY_WORD_POS
     assert find_next(room, p, _WP_KEYWORD, True) in _WP_DECOY_POS
+
+
+@pytest.mark.parametrize('seed', SEEDS)
+def test_key_is_sealed_in_a_search_only_pocket(seed):
+    """The gold key + its rune sit in a walled pocket: the search jumps land ON
+    them (cells stay corridor), but gg/G + a count-walk can't step in — the ring
+    of walls forces the ?xyzzy up-leg, mirroring how the moats force the mark home."""
+    room = _room(seed)
+    kr, kc = _WP_KEY
+    end = _WP_KEY_WORD_POS[1] + len(_WP_KEYWORD)              # right wall col
+    # the key + rune cells remain corridor so a search-jump can land on them
+    assert room.cells[kr][kc] == CellType.CORRIDOR
+    for i in range(len(_WP_KEYWORD)):
+        assert room.cells[_WP_KEY_WORD_POS[0]][_WP_KEY_WORD_POS[1] + i] == CellType.CORRIDOR
+    # the ring is solid: ceiling (row 1) + both flanks (row 2), so no foot path enters
+    assert room.cells[2][kc - 1] == CellType.WALL            # left flank
+    assert room.cells[2][end] == CellType.WALL               # right flank
+    assert all(room.cells[1][c] == CellType.WALL for c in range(kc - 1, end + 1))
 
 
 @pytest.mark.parametrize('seed', SEEDS)
@@ -221,22 +239,25 @@ def test_M_never_lands_on_the_scroll():
 
 
 # ── par path (structure is seed-independent: run once) ───────────────────────
-def test_answer_solves_within_budget_and_takes_the_scroll():
+def test_answer_solves_at_par_via_the_forced_search():
     room = _room(42)
     pos, spent, reached, got_scroll = _simulate(_WP_ANSWER, room)
     assert reached, f'answer ended at {pos}, not the exit {_WP_EXIT}'
-    assert got_scroll, 'the par route loots the :set number scroll via \'a'
-    assert spent == _WP_PAR == 20
+    assert not got_scroll, 'the par route is the lean forced-search line, no scroll detour'
+    assert spent == _WP_PAR == 15
     assert spent <= room.budget
 
 
-def test_skipping_the_scroll_beats_par():
+def test_taking_the_scroll_is_an_off_par_bonus():
+    """The scroll nook is a reward, not on the par path: detouring for it via 'a x
+    costs +3 over par, trading the second star for the relic.  (If it sat ON par,
+    skipping it would beat par — the old cheese this redesign removed.)"""
     room = _room(42)
-    skip = _WP_ANSWER.replace("'a x ", "")            # drop the scroll detour
-    pos, spent, reached, got_scroll = _simulate(skip, room)
-    assert reached and not got_scroll
-    assert spent == _WP_PAR - 3 == 17
-    assert spent < _WP_PAR
+    take = _WP_ANSWER.replace("ma ", "ma 'a x ", 1)   # insert the scroll detour
+    pos, spent, reached, got_scroll = _simulate(take, room)
+    assert reached and got_scroll
+    assert spent == _WP_PAR + 3 == 18
+    assert spent > _WP_PAR
 
 
 # ── :set number gutter (the scroll's payoff) + scroll-drop wiring ────────────

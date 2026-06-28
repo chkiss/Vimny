@@ -244,7 +244,7 @@ class TestStandaloneCommands:
 
     def test_count_s(self):
         action, _ = parse('3s', Mode.NORMAL)
-        assert action == {'type': 'substitute', 'count': 3}
+        assert action == {'type': 'substitute', 'count': 3, 'count_given': True}
 
     def test_colon_command_mode(self):
         action, _ = parse(':', Mode.NORMAL)
@@ -385,7 +385,7 @@ class TestMacros:
         assert parse('@@', Mode.NORMAL)[0] == {'type': 'macro_play', 'reg': '@', 'count': 1}
 
     def test_count_play(self):
-        assert parse('7@a', Mode.NORMAL)[0] == {'type': 'macro_play', 'reg': 'a', 'count': 7}
+        assert parse('7@a', Mode.NORMAL)[0] == {'type': 'macro_play', 'reg': 'a', 'count': 7, 'count_given': True}
 
 
 # ── Search (/ ? n N * #) ──────────────────────────────────────────────────────
@@ -420,7 +420,7 @@ class TestReplace:
         assert parse('rx', Mode.NORMAL)[0] == {'type': 'replace', 'char': 'x', 'count': 1}
 
     def test_count_r(self):
-        assert parse('3rx', Mode.NORMAL)[0] == {'type': 'replace', 'char': 'x', 'count': 3}
+        assert parse('3rx', Mode.NORMAL)[0] == {'type': 'replace', 'char': 'x', 'count': 3, 'count_given': True}
 
     def test_R_enters_replace_mode(self):
         assert parse('R', Mode.NORMAL)[0] == {'type': 'enter_mode', 'mode': 'replace'}
@@ -433,7 +433,7 @@ class TestCaseOperators:
         assert parse('~', Mode.NORMAL)[0] == {'type': 'case_char', 'count': 1}
 
     def test_count_tilde(self):
-        assert parse('3~', Mode.NORMAL)[0] == {'type': 'case_char', 'count': 3}
+        assert parse('3~', Mode.NORMAL)[0] == {'type': 'case_char', 'count': 3, 'count_given': True}
 
     @pytest.mark.parametrize("keys,op", [('g~w', 'g~'), ('gUw', 'gU'), ('guw', 'gu')])
     def test_case_op_with_motion(self, keys, op):
@@ -505,11 +505,11 @@ class TestJoin:
 
     def test_count_J(self):
         action, _ = parse('3J', Mode.NORMAL)
-        assert action == {'type': 'join', 'gap': True, 'count': 3}
+        assert action == {'type': 'join', 'gap': True, 'count': 3, 'count_given': True}
 
     def test_count_gJ(self):
         action, _ = parse('2gJ', Mode.NORMAL)
-        assert action == {'type': 'join', 'gap': False, 'count': 2}
+        assert action == {'type': 'join', 'gap': False, 'count': 2, 'count_given': True}
 
     def test_g_incomplete_waits(self):
         action, rest = parse('g', Mode.NORMAL)
@@ -545,7 +545,7 @@ class TestTrailingZeroCounts:
 
     def test_visual_textobj_count_with_zero(self):
         from engine.vim_parser import parse_visual_textobj
-        assert parse_visual_textobj('10iw') == ('object', 'iw', 10)
+        assert parse_visual_textobj('10iw') == ('object', 'iw', 10, True)
 
     def test_visual_textobj_bare_zero_not_a_count(self):
         from engine.vim_parser import parse_visual_textobj

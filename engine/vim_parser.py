@@ -51,21 +51,36 @@ def parse_visual_textobj(buf: str):
     if i + 1 >= len(buf):
         return 'pending'                           # have i/a, await the object char
     obj = _TEXTOBJ_NORMALIZE.get(buf[i+1], buf[i+1])
-    return ('object', buf[i] + obj, count)
+    return ('object', buf[i] + obj, count, i > 0)   # 4th: count was explicitly typed
 
 
-def _operator_target(op: str, double_ch: str, buf: str, j0: int, count_n: int):
+def _cg(action: dict, count) -> dict:
+    """Stamp ``count_given`` on a command action ONLY when an explicit count was typed
+    (``count`` is the raw count string — truthy iff digits preceded the command).  Bare
+    commands keep their original dict shape; cost code reads ``.get('count_given', False)``.
+    This is what makes a redundant `1` real keystrokes: `1p`/`1J`/`1dd` pay for the digit."""
+    if count:
+        action['count_given'] = True
+    return action
+
+
+def _operator_target(op: str, double_ch: str, buf: str, j0: int, count_n: int,
+                     count_given: bool = False):
     """Parse the target (motion / text object / find / linewise) following an
     operator. Shared by d/y/c and the g-case operators (g~/gu/gU).
 
     `op` is the operator token ('d', 'gU', …); `double_ch` is the char whose
     doubling means linewise (e.g. 'd'→dd, 'U'→gUU); `j0` is the buffer index of
-    the first char after the operator token. Returns (action|None, remaining).
+    the first char after the operator token; `count_given` is True when an explicit
+    operator count was typed (so `1dw` pays for its '1'). Returns (action|None, rest).
     """
     if j0 >= len(buf):
         return None, buf
+    # `cg` stamps the OPERATOR-level count_given (the '3' in 3dw / the '1' in 1dd) only
+    # when it was typed, so bare operators keep their dict shape.
+    cg = (lambda d: {**d, 'count_given': True}) if count_given else (lambda d: d)
     if buf[j0] == double_ch:                       # doubled → linewise (dd / gUU)
-        return {'type': 'operator', 'op': op, 'motion': 'line', 'count': count_n}, buf[j0+1:]
+        return cg({'type': 'operator', 'op': op, 'motion': 'line', 'count': count_n}), buf[j0+1:]
 
     motion_count = ''
     j = j0
@@ -82,25 +97,27 @@ def _operator_target(op: str, double_ch: str, buf: str, j0: int, count_n: int):
         if j + 1 >= len(buf):
             return None, buf
         obj = _TEXTOBJ_NORMALIZE.get(buf[j+1], buf[j+1])
-        return {'type': 'operator', 'op': op, 'textobj': m + obj,
-                'count': count_n, 'motion_count': mc}, buf[j+2:]
+        return cg({'type': 'operator', 'op': op, 'textobj': m + obj,
+                   'count': count_n, 'motion_count': mc}), buf[j+2:]
     if m == 'g':                                   # g-prefixed motion: gg / ge / gE
         if j + 1 >= len(buf):
             return None, buf
         g2 = buf[j+1]
         if g2 == 'g':
-            return {'type': 'operator', 'op': op, 'motion': 'gg', 'count': count_n, 'motion_count': mc, 'motion_count_given': bool(motion_count)}, buf[j+2:]
+            return cg({'type': 'operator', 'op': op, 'motion': 'gg', 'count': count_n,
+                       'motion_count': mc, 'motion_count_given': bool(motion_count)}), buf[j+2:]
         if g2 in 'eE':
-            return {'type': 'operator', 'op': op, 'motion': 'g' + g2, 'count': count_n, 'motion_count': mc}, buf[j+2:]
+            return cg({'type': 'operator', 'op': op, 'motion': 'g' + g2,
+                       'count': count_n, 'motion_count': mc}), buf[j+2:]
         return {'type': 'unknown'}, buf[j+2:]
     if m in 'fFtT':                                # find/till with target char
         if j + 1 >= len(buf):
             return None, buf
-        return {'type': 'operator', 'op': op, 'motion': m, 'target': buf[j+1],
-                'count': count_n, 'motion_count': mc}, buf[j+2:]
+        return cg({'type': 'operator', 'op': op, 'motion': m, 'target': buf[j+1],
+                   'count': count_n, 'motion_count': mc}), buf[j+2:]
     if m in MOTIONS:
-        return {'type': 'operator', 'op': op, 'motion': m, 'count': count_n,
-                'motion_count': mc, 'motion_count_given': bool(motion_count)}, buf[j+1:]
+        return cg({'type': 'operator', 'op': op, 'motion': m, 'count': count_n,
+                   'motion_count': mc, 'motion_count_given': bool(motion_count)}), buf[j+1:]
     return {'type': 'unknown'}, buf[j+1:]
 
 
@@ -158,9 +175,9 @@ def parse(buf: str, mode: Mode) -> tuple[dict | None, str]:
         if g2 == 'v':                              # gv — reselect last visual span
             return {'type': 'enter_mode', 'mode': 'visual', 'reselect': True}, buf[i+2:]
         if g2 in ('~', 'u', 'U'):                  # case operator: g~{m} gu{m} gU{m}
-            return _operator_target('g' + g2, g2, buf, i + 2, count_n)
+            return _operator_target('g' + g2, g2, buf, i + 2, count_n, bool(count))
         if g2 == 'J':                              # gJ — join with no space at the seam
-            return {'type': 'join', 'gap': False, 'count': count_n}, buf[i+2:]
+            return _cg({'type': 'join', 'gap': False, 'count': count_n}, count), buf[i+2:]
         if g2 == '&':                              # g& — repeat last :s over the whole file, with flags
             return {'type': 'sub_repeat', 'whole_file': True, 'keep_flags': True}, buf[i+2:]
         return {'type': 'unknown'}, buf[i+2:]
@@ -181,7 +198,7 @@ def parse(buf: str, mode: Mode) -> tuple[dict | None, str]:
 
     # Operators: d / y / c
     if ch in OPERATORS:
-        return _operator_target(ch, ch, buf, i + 1, count_n)
+        return _operator_target(ch, ch, buf, i + 1, count_n, bool(count))
 
     # Capital D/C — the to-line-end shorthands. Tagged so the command guard can
     # gate them behind their own curriculum tokens ('D'/'C'): the shorthand is a
@@ -189,12 +206,12 @@ def parse(buf: str, mode: Mode) -> tuple[dict | None, str]:
     # grammar; the one-key shorthands unlock later).
     if ch in 'DC':
         op = ch.lower()
-        return {'type': 'operator', 'op': op, 'motion': '$', 'count': count_n,
-                'shorthand': ch}, buf[i+1:]
+        return _cg({'type': 'operator', 'op': op, 'motion': '$', 'count': count_n,
+                    'shorthand': ch}, count), buf[i+1:]
 
     # J — join the next line onto this one (gJ, no space, handled in the g-branch)
     if ch == 'J':
-        return {'type': 'join', 'gap': True, 'count': count_n}, buf[i+1:]
+        return _cg({'type': 'join', 'gap': True, 'count': count_n}, count), buf[i+1:]
 
     # & — repeat the last :s on the current line (no flags); g& did the whole file
     if ch == '&':
@@ -202,21 +219,21 @@ def parse(buf: str, mode: Mode) -> tuple[dict | None, str]:
 
     # p / P — paste (standalone commands, not operator+motion)
     if ch == 'p':
-        return {'type': 'paste', 'before': False, 'count': count_n}, buf[i+1:]
+        return _cg({'type': 'paste', 'before': False, 'count': count_n}, count), buf[i+1:]
     if ch == 'P':
-        return {'type': 'paste', 'before': True, 'count': count_n}, buf[i+1:]
+        return _cg({'type': 'paste', 'before': True, 'count': count_n}, count), buf[i+1:]
 
     # s / S — substitute char / line (game-loop decides behaviour by mode)
     if ch == 's':
-        return {'type': 'substitute', 'count': count_n}, buf[i+1:]
+        return _cg({'type': 'substitute', 'count': count_n}, count), buf[i+1:]
     if ch == 'S':
-        return {'type': 'substitute', 'line': True, 'count': count_n}, buf[i+1:]
+        return _cg({'type': 'substitute', 'line': True, 'count': count_n}, count), buf[i+1:]
 
     # r{char} — replace char(s); R — REPLACE (overtype) mode
     if ch == 'r':
         if i + 1 >= len(buf):
             return None, buf                           # waiting for the replacement char
-        return {'type': 'replace', 'char': buf[i+1], 'count': count_n}, buf[i+2:]
+        return _cg({'type': 'replace', 'char': buf[i+1], 'count': count_n}, count), buf[i+2:]
     if ch == 'R':
         return {'type': 'enter_mode', 'mode': 'replace'}, buf[i+1:]
 
@@ -258,11 +275,11 @@ def parse(buf: str, mode: Mode) -> tuple[dict | None, str]:
 
     # . — repeat last change
     if ch == '.':
-        return {'type': 'repeat', 'count': count_n}, buf[i+1:]
+        return _cg({'type': 'repeat', 'count': count_n}, count), buf[i+1:]
 
     # ~ — toggle case of char(s) under cursor, advancing
     if ch == '~':
-        return {'type': 'case_char', 'count': count_n}, buf[i+1:]
+        return _cg({'type': 'case_char', 'count': count_n}, count), buf[i+1:]
 
     # Macros: q{reg} start recording (stop handled by the game loop); @{reg}/@@ play
     if ch == 'q':
@@ -272,7 +289,7 @@ def parse(buf: str, mode: Mode) -> tuple[dict | None, str]:
     if ch == '@':
         if i + 1 >= len(buf):
             return None, buf
-        return {'type': 'macro_play', 'reg': buf[i+1], 'count': count_n}, buf[i+2:]
+        return _cg({'type': 'macro_play', 'reg': buf[i+1], 'count': count_n}, count), buf[i+2:]
 
     # Search: / ? enter SEARCH mode; n/N repeat; * # search word under cursor
     if ch == '/':
@@ -280,12 +297,12 @@ def parse(buf: str, mode: Mode) -> tuple[dict | None, str]:
     if ch == '?':
         return {'type': 'enter_mode', 'mode': 'search', 'forward': False}, buf[i+1:]
     if ch == 'n':
-        return {'type': 'search_repeat', 'reverse': False, 'count': count_n}, buf[i+1:]
+        return _cg({'type': 'search_repeat', 'reverse': False, 'count': count_n}, count), buf[i+1:]
     if ch == 'N':
-        return {'type': 'search_repeat', 'reverse': True, 'count': count_n}, buf[i+1:]
+        return _cg({'type': 'search_repeat', 'reverse': True, 'count': count_n}, count), buf[i+1:]
     if ch == '*':
-        return {'type': 'search_word', 'forward': True, 'count': count_n}, buf[i+1:]
+        return _cg({'type': 'search_word', 'forward': True, 'count': count_n}, count), buf[i+1:]
     if ch == '#':
-        return {'type': 'search_word', 'forward': False, 'count': count_n}, buf[i+1:]
+        return _cg({'type': 'search_word', 'forward': False, 'count': count_n}, count), buf[i+1:]
 
     return {'type': 'unknown'}, buf[i+1:]

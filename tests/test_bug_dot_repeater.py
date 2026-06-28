@@ -36,13 +36,13 @@ def test_dot_parses_as_repeat():
 
 def test_3_dot_parses_with_count():
     action, remaining = parse('3.', Mode.NORMAL)
-    assert action == {'type': 'repeat', 'count': 3}
+    assert action == {'type': 'repeat', 'count': 3, 'count_given': True}
     assert remaining == ''
 
 
 def test_10_dot_parses_with_count():
     action, remaining = parse('10.', Mode.NORMAL)
-    assert action == {'type': 'repeat', 'count': 10}
+    assert action == {'type': 'repeat', 'count': 10, 'count_given': True}
     assert remaining == ''
 
 

@@ -63,7 +63,7 @@ def test_P_parses_as_paste_before_true():
 
 def test_3p_parses_with_count():
     action, remaining = parse('3p', Mode.NORMAL)
-    assert action == {'type': 'paste', 'before': False, 'count': 3}
+    assert action == {'type': 'paste', 'before': False, 'count': 3, 'count_given': True}
     assert remaining == ''
 
 

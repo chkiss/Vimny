@@ -32,15 +32,16 @@ from engine.modes import Mode
 
 # ── parser: [count](i|a)(obj), with alias normalisation ──────────────────────────
 @pytest.mark.parametrize('buf,expected', [
-    ('iw', ('object', 'iw', 1)),
-    ('aw', ('object', 'aw', 1)),
-    ('i(', ('object', 'i(', 1)),
-    ('ib', ('object', 'i(', 1)),     # alias ib -> i(
-    ('i)', ('object', 'i(', 1)),     # alias i) -> i(
-    ('iB', ('object', 'i{', 1)),     # alias iB -> i{
-    ('i]', ('object', 'i[', 1)),     # alias i] -> i[
-    ('a"', ('object', 'a"', 1)),
-    ('2iw', ('object', 'iw', 2)),    # count kept (cost), object resolved singly
+    # 4th element = count_given (was an explicit count typed?) — for the keystroke cost.
+    ('iw', ('object', 'iw', 1, False)),
+    ('aw', ('object', 'aw', 1, False)),
+    ('i(', ('object', 'i(', 1, False)),
+    ('ib', ('object', 'i(', 1, False)),     # alias ib -> i(
+    ('i)', ('object', 'i(', 1, False)),     # alias i) -> i(
+    ('iB', ('object', 'i{', 1, False)),     # alias iB -> i{
+    ('i]', ('object', 'i[', 1, False)),     # alias i] -> i[
+    ('a"', ('object', 'a"', 1, False)),
+    ('2iw', ('object', 'iw', 2, True)),     # count kept (cost), object resolved singly
 ])
 def test_complete_objects(buf, expected):
     assert pv(buf) == expected

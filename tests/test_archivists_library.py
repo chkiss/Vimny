@@ -56,6 +56,17 @@ def _suit_slots(d):
 
 
 # ── builder structure ───────────────────────────────────────────────────────
+def test_is_a_completion_only_level():
+    # The lesson (:set wrap / :e! / :w {suit}) is contextual ex-mode work that spends
+    # no keystroke budget, so there is no meaningful keystroke par — par=0 marks the
+    # level completion-only: _calc_stars guards `par > 0`, so a win is a flat 1-star
+    # (which still unlocks the next level), never 2.
+    d = _dungeon()
+    assert d.room.par == 0
+    assert main._calc_stars(True, type('B', (), {'spent': 0})(),
+                            d.room, type('P', (), {'hp': 6})(), 'archivists_library') == 1
+
+
 def test_archivist_is_findable_by_f():
     # The Archivist paces the hall (ai='wander') and fA must find him just like fg/fW
     # finds a goblin/Warden — his glyph wins over the library art under him.

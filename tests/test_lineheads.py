@@ -137,10 +137,12 @@ def test_par_matches_dijkstra(seed):
 
 def test_par_is_deterministic():
     """Key colors shuffle per seed, but both assignments are balanced — par stays
-    15 for every seed (regression guard). (Budget formula: covered by the
-    universal test in test_answer_paths.py.)"""
+    14 for every seed (regression guard). (Budget formula: covered by the
+    universal test in test_answer_paths.py.)  par=14, not 15: G/{n}G land on the
+    bottom key's column directly — the solver's first-non-blank mirrors the engine's
+    _caret_stop, which halts on a still-on-floor key (no redundant `l` to reach it)."""
     pars = {_room(s).par for s in SEEDS}
-    assert pars == {15}, f"expected par 15 for all seeds, got {pars}"
+    assert pars == {14}, f"expected par 14 for all seeds, got {pars}"
 
 
 # ── Command necessity ─────────────────────────────────────────────────────────

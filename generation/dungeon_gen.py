@@ -1520,7 +1520,13 @@ def _l5_place_near_runes(runes: list, rng, row: int,
             length = 1
             if c in occupied:
                 continue
-        word = rng.choice(word_tbl.get(length) or word_tbl[1])
+        # A decorative rune carrying 'g' (the goblin glyph) would hijack the
+        # fg/;/, find-scan — the cursor lands on the decoy instead of the goblin
+        # and a corridor's last goblin survives. Keep all near-side decor g-free.
+        choices = [w for w in (word_tbl.get(length) or word_tbl[1]) if 'g' not in w]
+        if not choices:
+            continue
+        word = rng.choice(choices)
         kind = rng.choice(kinds)
         runes.append(CharRun(row=row, col=c,
                                  symbols=tuple(word), kind=kind))
@@ -3119,7 +3125,7 @@ def build_dungeon_sight_sanctum(seed: int) -> Dungeon:
 #   • 2nd 'maze' (5,1): a GOLD door (5,6) seals the RED key in a one-cell stub (5,7).
 #   • the RED door (1,18) caps the exit (1,19); 'vault' (1,7) shares its corridor.
 #
-# Optimal route (par 19):  * n 0 x N $ p l x /vault⏎ $ p l
+# Optimal route (par 18):  * n 0 x N $ p l x /vault⏎ $ p l   (/vault⏎ = len+1: '/' charged, Enter free)
 #   * n    — 'maze'(1,1) → 2nd 'maze'(5,1) [a decoy] → 3rd 'maze'(11,15).
 #   0 x    — 0 halts on the gold key at (11,11) (left of the maze); x cuts it.
 #   N      — reverse the search: back to the 2nd 'maze'(5,1), the passed decoy.
@@ -3156,7 +3162,7 @@ _SEEKERS_WORD         = 'maze'                 # repeated search word (3 occurre
 _SEEKERS_WORD_POS     = [(1, 1), (5, 1), (11, 15)]
 _SEEKERS_DOORWORD     = 'vault'                # word beside the red door
 _SEEKERS_DOORWORD_POS = (1, 7)
-_SEEKERS_PAR          = 19
+_SEEKERS_PAR          = 18
 _SEEKERS_ANSWER       = '* n 0 x N $ p l x /vault⏎ $ p l'
 
 
@@ -3280,8 +3286,9 @@ def _par_seekers_labyrinth(composite, no_search: bool = False, return_path: bool
     so motions cross them.  x at a key cell loads the register; p beside a door
     opens it iff the held key's colour matches.  Search is modelled as composite
     edges: '/W⏎'/'?W⏎' + k·n reaches the k-th match forward/backward of any word W
-    (cost len(W)+2+k); '*' + k·n does the same for the word under the cursor
-    (cost 1+k).  no_search drops all search edges — the foot-only bound that
+    (cost len(W)+1+k — '/' charged, closing Enter free); '*' + k·n does the same
+    for the word under the cursor (cost 1+k).  no_search drops all search edges —
+    the foot-only bound that
     proves search is required (it dwarfs the budget).
     """
     from engine.player import Player
@@ -3348,10 +3355,10 @@ def _par_seekers_labyrinth(composite, no_search: bool = False, return_path: bool
                 continue
             fwd = [m for m in ms if m > cur] + [m for m in ms if m <= cur]   # wrap
             for k, tgt in enumerate(fwd):
-                out.append((len(W) + 2 + k, tgt, f'/{W}⏎' + 'n' * k))
+                out.append((len(W) + 1 + k, tgt, f'/{W}⏎' + 'n' * k))
             bwd = [m for m in reversed(ms) if m < cur] + [m for m in reversed(ms) if m >= cur]
             for k, tgt in enumerate(bwd):
-                out.append((len(W) + 2 + k, tgt, f'?{W}⏎' + 'n' * k))
+                out.append((len(W) + 1 + k, tgt, f'?{W}⏎' + 'n' * k))
         ru = composite.char_run_at(r, c)
         if ru is not None:
             ms = _matches(''.join(ru.symbols))
@@ -3411,17 +3418,21 @@ def _par_seekers_labyrinth(composite, no_search: bool = False, return_path: bool
 # for the gold key; the wordless corridor can't be searched back to, so a MARK is the
 # way home — and a mark/search teleport is the only SURVIVABLE way past the horde.
 #   • 'a (the sanctum row's first-left cell) -> the scroll nook's :set number scroll
-#     (optional — par includes the detour; skippers beat par).
+#     (an OFF-PAR bonus: grabbing it costs +3 over par, so a collector trades the
+#     second star for the relic — bonuses never sit ON the par path, else skipping
+#     them would beat par).
 #   • `a (exact mark) -> back to the spawn at the sanctum's centre.
-#   • the exit key sits BACKWARD (thin top band) with forward decoys (bottom room),
-#     so ? lands on it directly while / hits a decoy.
+#   • the exit key + its 'xyzzy' rune are sealed in a SEARCH-ONLY POCKET in the top
+#     band (walls ring them) — gg/G + a count-walk can't enter, only a ?xyzzy
+#     search-jump (which ignores walls) lands inside. So the search up-leg is forced
+#     the same way the moats force the mark down-leg. Forward decoys (bottom room)
+#     sit AFTER the spawn, so ? lands on the real rune while / hits a decoy.
 #   • the sanctum sits HIGH so M (middle-of-screen) always lands DOWN in the goblin
 #     room, never on the scroll nook — using M to cheat the scroll backfires lethally.
 # The exit is teleport-safe (not any jump target; behind the blocking exit lock).
 #
-# Optimal route (par 20, taking the scroll):
-#   ma · 'a x (scroll) · ?cipher⏎ h x (key) · `a $ (home, then line-end) · p l → exit
-# A skipper drops 'a x and finishes in 17 — under par.
+# Optimal route (par 16):
+#   ma · ?xyzzy⏎ h x (key) · `a $ (home, then line-end) · p l → exit
 _WP_ROWS, _WP_COLS = 19, 46
 _WP_CROW   = 5                     # sanctum corridor row (mark row; wordless)
 _WP_SCROLL = (5, 1)                # chest_scroll — sanctum row's first-left cell -> 'a
@@ -3429,14 +3440,15 @@ _WP_SCROLL_DOOR = (5, 4)           # 'blue' lock sealing the scroll nook ('a hop
 _WP_SPAWN  = (5, 23)               # spawn + mark -> centre of the sanctum corridor
 _WP_LOCK   = (5, 43)               # exit lock (gold)
 _WP_EXIT   = (5, 44)
-_WP_KEYWORD      = 'cipher'
+_WP_KEYWORD      = 'xyzzy'          # the magic word (Colossal Cave Adventure, 1977);
+                                   # a non-word, so it can never collide with vocab
 _WP_KEY_WORD_POS = (2, 30)         # exit key's word — thin TOP danger band (backward)
 _WP_KEY          = (2, 29)         # gold floor_key, just left of the word
 _WP_DECOY_POS    = [(11, 12), (13, 24), (15, 34)]  # forward decoys (open danger floor)
 _WP_DANGER_ROWS  = (1, 2, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17)
 _WP_VAULT_COLS   = (6, 10, 14, 18, 22, 26, 30, 34, 38, 42)  # vaults lining the sanctum underside
-_WP_PAR    = 20
-_WP_ANSWER = "ma 'a x ?cipher⏎ h x `a $ p l"
+_WP_PAR    = 15
+_WP_ANSWER = "ma ?xyzzy⏎ h x `a $ p l"
 
 
 def build_dungeon_waypoint_sanctum(seed: int) -> 'Dungeon':
@@ -3465,10 +3477,21 @@ def build_dungeon_waypoint_sanctum(seed: int) -> 'Dungeon':
     def carve(r, c):
         cells[r][c] = CellType.CORRIDOR
 
-    # Thin TOP danger band (rows 1-2) — holds the gold key + its 'cipher' word.
+    # Thin TOP danger band (rows 1-2) — holds the gold key + its 'xyzzy' word.
     for r in (1, 2):
         for c in range(1, C - 1):
             carve(r, c)
+    # SEARCH-ONLY POCKET: ring the gold key + its rune with walls so gg/G + a
+    # count-walk (`gg j 28l`) can't reach them — only a ?xyzzy search-jump, which
+    # ignores walls, lands inside. This forces the search up-leg exactly as the
+    # moats (below) force the mark down-leg. The pocket spans the key cell through
+    # the end of the rune; walls ceiling it (row 1) and flank it (row 2 sides).
+    _pkt_lo = _WP_KEY[1] - 1                                  # left wall (col 28)
+    _pkt_hi = _WP_KEY_WORD_POS[1] + len(_WP_KEYWORD)          # right wall (col 35)
+    for c in range(_pkt_lo, _pkt_hi + 1):
+        cells[1][c] = CellType.WALL                          # ceiling over the pocket
+    cells[2][_pkt_lo] = CellType.WALL                        # left wall
+    cells[2][_pkt_hi] = CellType.WALL                        # right wall
     # SANCTUM (rows 4-6), sealed above by the row-3 wall and below by the row-7 wall.
     # Row 5 is the mark row: a one-cell scroll nook at col 1 behind a 'blue' lock at
     # col 2, then the wordless corridor, the gold exit lock (43) + exit (44).  Rows 4
@@ -4682,15 +4705,19 @@ def _par_lineheads(composite, return_path: bool = False,
         ru = composite.char_run_at(r, c)
         return not (ru and ru.kind == 'void')
 
-    def _fnb(row, dm):
-        """First-non-blank col (matches motion._first_non_blank_col): first character
-        start, else leftmost passable; None if the row has no passable cell."""
+    def _fnb(row, dm, km):
+        """First-non-blank col — mirrors motion._first_non_blank_col + _caret_stop:
+        stop on the first character OR a still-on-floor key (a notable, non-caret-
+        transparent entity), else the leftmost passable col; None if the row has no
+        passable cell. A key already picked up (its km bit cleared) no longer stops
+        the caret — exactly as the engine deletes it from the room on `x`."""
+        on_floor = {keys[i] for i in range(len(keys)) if km >> i & 1}
         left = None
         for c in range(COLS):
             if _ok(row, c, dm):
                 if left is None:
                     left = c
-                if composite.char_run_at(row, c) is not None:
+                if composite.char_run_at(row, c) is not None or (row, c) in on_floor:
                     return c
         return left
 
@@ -4735,7 +4762,7 @@ def _par_lineheads(composite, return_path: bool = False,
         if not disable_line_jumps:
             # G: last line (scan up to a passable row), land on first-non-blank
             for rr in range(ROWS - 1, -1, -1):
-                gc = _fnb(rr, dm)
+                gc = _fnb(rr, dm, km)
                 if gc is not None:
                     if (rr, gc) != (r, c):
                         _try((rr, gc, km, hold, dm), 1, 'G')
@@ -4743,7 +4770,7 @@ def _par_lineheads(composite, return_path: bool = False,
 
             # gg: first line (scan down to a passable row), land on first-non-blank (2 ks)
             for rr in range(ROWS):
-                gc = _fnb(rr, dm)
+                gc = _fnb(rr, dm, km)
                 if gc is not None:
                     if (rr, gc) != (r, c):
                         _try((rr, gc, km, hold, dm), 2, 'gg')
@@ -4753,11 +4780,11 @@ def _par_lineheads(composite, return_path: bool = False,
             # scanning down to a passable row, fnb
             for n in range(1, ROWS + 1):
                 rr = BASE_ROW + n - 1
-                while rr < ROWS and _fnb(rr, dm) is None:
+                while rr < ROWS and _fnb(rr, dm, km) is None:
                     rr += 1
                 if rr >= ROWS:
                     continue
-                tc = _fnb(rr, dm)
+                tc = _fnb(rr, dm, km)
                 if (rr, tc) != (r, c):
                     _try((rr, tc, km, hold, dm), len(str(n)) + 1, f'{n}G')
 
@@ -4786,7 +4813,7 @@ def _par_lineheads(composite, return_path: bool = False,
             st_c = tc
         if st_c is not None:
             _try((r, st_c, km, hold, dm), 1, '0')
-        fb = _fnb(r, dm)
+        fb = _fnb(r, dm, km)
         if fb is not None and fb != c:
             _try((r, fb, km, hold, dm), 1, '^')
 
@@ -5415,7 +5442,12 @@ def build_dungeon_archivists_library(seed: int) -> Dungeon:
     room.seed        = seed
     room.spawn_pos   = (0, 0)
     room.wrap_buffer = True
-    room.par         = 20         # under-par target (the under-par message fires at the exit)
+    # Completion-only: the lesson here (:set wrap / :e! / :w {suit}) is contextual ex-mode
+    # work that spends NO keystroke budget, so a keystroke par would only meter the trailing
+    # walk to the exit — meaningless.  par=0 means no 2-star is possible (_calc_stars guards
+    # `par > 0`); a win is a flat 1-star that simply unlocks the next level.  The lesson stays
+    # forced: ANY win mechanically requires the :e!/:w {suit} forge loop.
+    room.par         = 0          # completion-only (unlock-the-next-level sandbox; no 2-star)
     room.budget      = 2000       # generous; the loop is exploratory, never budget-gated
     room.answer      = ''
 
@@ -5469,20 +5501,54 @@ def build_dungeon_archivists_library(seed: int) -> Dungeon:
 # When no line bears 'old' or 'curse', the seal at (action row, divider) dissolves
 # and the player walks through to the exit. x-erasing each glyph by hand blows the
 # budget — :s / :g are the efficient way (the lesson).
-_FORGE_ROWS, _FORGE_COLS = 13, 54
+_FORGE_ROWS, _FORGE_COLS = 20, 54
 _FORGE_DIV   = 42                       # full-height divider wall; sanctum to its right
-_FORGE_DOOR  = 6                        # the corridor row whose divider cell is the seal door
-_FORGE_WARDS = [(3, 'the old gods stir'),
-                (5, 'the old ways fade'),
-                (7, 'the old fire dies')]
-_FORGE_DECOYS = [(9,  'a cursed name'),
-                 (10, 'a cursed verse')]
+_FORGE_DOOR  = 6                        # the blank corridor row: spawn, seal door, exit
+# Three chambers, each forcing a different member of the :s / :g family more than once.
+# Vocabulary is rigorously separated so one chamber's global rite never reaches another:
+# no word outside Chamber A contains the substring 'old' (no cold/gold/holds/bond…), only
+# Chamber B carries 'pale'/'pure', only Chamber C carries 'cursed'.
+#
+# Chamber A — Ember Wards (rows 2-4): 'old' repeats WITHIN each line, so :s/old/new/
+# alone leaves remnants — only :%s/old/new/g mends a whole ward.  Drills the /g flag.
+_FORGE_A_WARDS   = [(2, 'old stone and old iron'),
+                    (3, 'old fire, old ash, old bone'),
+                    (4, 'old gods wake, old and grim')]
+# Chamber B — Selfsame Verses (rows 8-10): 'pale'→'pure', but the MIDDLE line's 'pale'
+# is TRUE (verdant) and must remain.  A whole-buffer :%s/pale/pure/g wrecks it; the two
+# corrupt (ember) lines straddle the protected one so no single range covers just them —
+# :s one, jj past the true line, & the other.  Drills surgical :s + the & repeat.
+_FORGE_B_CORRUPT = [(8, 'the pale ward'), (10, 'the pale rune')]
+_FORGE_B_KEEP    = (9, 'the pale truth remains')
+# Chamber C — Cursed Litany (rows 13-17): :g/cursed/d sweeps every cursed (ember) line at
+# once; the sacred (verdant) lines between them must remain (so a blanket delete fails).
+# Drills :g/pat/d and its selective, all-at-once global reach.
+_FORGE_C_CURSED  = [(13, 'a cursed name'), (15, 'a cursed oath'), (17, 'a cursed mark')]
+_FORGE_C_KEEP    = [(14, 'a sacred vow'), (16, 'a sacred bond')]
 
 
 def _forge_text(room, row, col, text, kind):
     for i, ch in enumerate(text):
         if ch != ' ':
             room.char_runs.append(CharRun(row, col + i, (ch,), kind))
+
+
+# The canonical three-rite solve, as an admin karaoke tape: Enter is the glyph '⏎' (so it
+# renders on the answer sheet and the live tracker can match an Enter keypress against it),
+# and spaces are visual token separators (stripped for matching, never typed).  Chamber A's
+# /g mend, then 8G + surgical :s + jj + & (Chamber B, sparing the protected verse), then
+# Chamber C's :g delete, then the walk out.  Tests translate ⏎→Enter and drop the spaces.
+# par is this solve's measured engine cost — constant across seeds; the playthrough pins it.
+_SPELLWRIGHTS_ANSWER = ':%s/old/new/g⏎ 8G :s/pale/pure/⏎ jj& :g/cursed/d⏎ 6G$'
+_SPELLWRIGHTS_PAR    = 45
+# 45 = :%s/old/new/g (13) + 8G (2) + :s/pale/pure/ (13) + jj (2) + & (1) + :g/cursed/d (11)
+#      + 6G$ (3).  Chamber B's two verses straddle the protected line, so no single command
+#      hits just them — the :s + & pair is the floor there; the cursor never lands on the
+#      door row after a rite, so the 3-key walk out is the floor too.
+
+
+def _par_spellwrights_forge():
+    return _SPELLWRIGHTS_PAR, _SPELLWRIGHTS_ANSWER
 
 
 def build_dungeon_spellwrights_forge(seed: int) -> Dungeon:
@@ -5503,22 +5569,41 @@ def build_dungeon_spellwrights_forge(seed: int) -> Dungeon:
     room.spawn_pos = (_FORGE_DOOR, 1)
     room.exit_pos  = (_FORGE_DOOR, COLS - 2)
     room.char_runs = []
-    for r, txt in _FORGE_WARDS:
+    for r, txt in _FORGE_A_WARDS:                 # Chamber A — corrupted ember wards
         _forge_text(room, r, 2, txt, 'ember')
-    for r, txt in _FORGE_DECOYS:
+    for r, txt in _FORGE_B_CORRUPT:               # Chamber B — corrupt verses (mend pale→pure)
+        _forge_text(room, r, 2, txt, 'ember')
+    _forge_text(room, _FORGE_B_KEEP[0], 2, _FORGE_B_KEEP[1], 'verdant')   # the TRUE pale ward
+    for r, txt in _FORGE_C_CURSED:                # Chamber C — cursed lines (delete)
+        _forge_text(room, r, 2, txt, 'ember')
+    for r, txt in _FORGE_C_KEEP:                  # the sacred lines (keep)
         _forge_text(room, r, 2, txt, 'verdant')
 
     room.entities = [
         Entity(kind='entry_marker', row=_FORGE_DOOR, col=1),
         Entity(kind='exit',         row=_FORGE_DOOR, col=COLS - 2),
     ]
-    # The seal: the divider cell on the corridor row. main.run_dungeon opens it once
-    # the incantations are mended (no 'old' / no 'curse' remains).
+    # The seal: the divider cell on the corridor row.  main._forge_check opens it once the
+    # incantations RING TRUE — every line that should REMAIN must read its exact text
+    # (Chamber A mended old→new with /g, Chamber B's two verses mended pale→pure, B's TRUE
+    # pale line untouched, Chamber C's sacred lines intact) AND no 'cursed' line survives.
+    # Demanding the exact text (not the mere absence of 'old'/'cursed') forbids the snip
+    # mangle (`:%s/l//g` etc.) that once satisfied a bare substring check for pennies.
     room._forge_seal = (_FORGE_DOOR, W)
+    # Every phrase that must be present when the rite is true (mended or deliberately kept):
+    room._forge_mended = (
+        [t.replace('old', 'new')   for _r, t in _FORGE_A_WARDS]    # A: /g-mended wards
+        + [t.replace('pale', 'pure') for _r, t in _FORGE_B_CORRUPT]  # B: surgically mended
+        + [_FORGE_B_KEEP[1]]                                         # B: the protected true line
+        + [t for _r, t in _FORGE_C_KEEP]                            # C: the sacred keep lines
+    )
 
-    room.par    = 34          # :%s/old/new/g (13) + :g/cursed/d (10) + the walk to the exit
-    room.budget = 90          # generous; the rites are exploratory, never budget-gated
-    room.answer = ''
+    # par is the true keystroke floor of the three rites + the walk out; measured by replay
+    # across seeds (content is fixed, so par is constant).  See tests/test_spellwrights_forge.
+    par, ans = _par_spellwrights_forge()
+    room.par    = par
+    room.budget = max(math.ceil(par * 1.4), 60)  # generous; the rites are exploratory
+    room.answer = ans
 
     room.rebuild_indexes()
     dungeon.rooms        = [room]
@@ -6102,7 +6187,7 @@ _QM_EXIT = (4, 32)                      # exit POCKET behind the seal — walled
 _QM_FLAME  = '🜂'                        # one width-1 glyph IS the flame (untypable,
                                         # so r/insert can never forge one)
 _QM_EMBERS = '…'                        # cold brazier: three dying embers, one cell
-_QM_PAR = 17                            # seed-invariant; tallied in the answer below
+_QM_PAR = 16                            # seed-invariant; tallied in the answer below
 
 
 def build_dungeon_quartermaster(seed: int) -> Dungeon:
@@ -6178,10 +6263,12 @@ def build_dungeon_quartermaster(seed: int) -> Dungeon:
     #   4G          (2)  → line 4: land on the first cold beacon brazier
     #   3P          (2)  → one count-paste fills all three (3p leaves the left cold)
     #   y y p p     (4)  → yank the beacon row; raise it twice — three tiers burn
-    #   k k h h     (4)  → back up the tiers, west through the drawn seal
+    #   k k 0       (3)  → back up the tiers; 0 walks west onto the exit (the seal
+    #                      is drawn open, so the beacon row's floor is contiguous —
+    #                      0 reaches the exit pocket in one key, not a 2-key hh walk)
     room.par    = _QM_PAR
     room.budget = math.ceil(_QM_PAR * 1.4)
-    room.answer = 'w y l w P 4G 3P y y p p k k h h'
+    room.answer = 'w y l w P 4G 3P y y p p k k 0'
 
     dungeon = Dungeon(name='The Beacon Tiers', seed=seed)
     dungeon.rooms        = [room]

@@ -559,8 +559,8 @@
       "quote": [
         "         :s shifts one shape on a line.         ",
         "     :%s reshapes the whole world at once.      ",
-        "       Name what is, then what shall be.        ",
-        "      Rewrite gently—the glass remembers.       "
+        " :g/pat/d strikes every line bearing the curse. ",
+        "       Name what is, then what shall be.        "
       ]
     },
     {
