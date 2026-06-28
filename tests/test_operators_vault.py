@@ -604,3 +604,11 @@ def test_deep_undo_unwinds_the_whole_solve(monkeypatch):
     assert cap['budget'].spent == 0                  # fully refunded
     assert (player.row, player.col) == room.spawn_pos
     assert room.is_passable(player.row, player.col)  # never parked inside a wall
+
+
+def test_hint_bar_surfaces_the_linewise_dd():
+    # Learning 'd' unlocks the linewise dd as well as d{m}; the bar bundles dd into the
+    # d keys cell (like c{m}  cc) so delete-line is never gated-in-but-invisible.
+    from render.hint_bar import hint_text
+    bar = hint_text(known_commands('operators_vault'), 'operators_vault')
+    assert 'd{m}' in bar and 'dd' in bar

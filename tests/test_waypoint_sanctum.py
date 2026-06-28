@@ -307,3 +307,14 @@ def test_set_number_renders_a_line_gutter(capsys):
     assert '  0 ' in relative                          # cursor line = 0 (relativenumber)
     assert '  0 ' not in plain                         # default: no gutter
     assert '  0 ' not in numbered                      # absolute mode never shows 0
+
+
+def test_hint_bar_surfaces_the_whole_mark_family():
+    # The one 'mark' gate unlocks set (m{a}) AND both jumps (`{a} '{a}) — but only the
+    # m{a} row carries the token, so the bar must expand the family (like / → ? n N) or
+    # the player can set a mark yet never see how to jump back to it.
+    from render.hint_bar import hint_text
+    from content.levels import known_commands
+    bar = hint_text(known_commands('waypoint_sanctum'), 'waypoint_sanctum')
+    assert 'm{a}' in bar
+    assert '`{a}' in bar and "'{a}" in bar             # both jump-to-mark keys shown

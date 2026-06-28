@@ -177,8 +177,7 @@ The full command reference (also the hint-bar source) is `render/vim_commands.md
 | `:set wrap` | wrap lines |
 | `:e!` | reload file |
 | `:w {file}` | save as |
-| `d{m}` | delete |
-| `dd` | delete line |
+| `d{m}  dd` | delete |
 | `c{m}` | change |
 | `cc` | change line |
 | `r{c}` | replace char |
@@ -187,17 +186,16 @@ The full command reference (also the hint-bar source) is `render/vim_commands.md
 | `s` | substitute |
 | `S` | substitute line |
 | `C` | change to end |
-| `y{m}` | yank |
-| `yy` | yank line |
+| `y{m}  yy` | yank |
 | `P` | paste before |
 | `.` | repeat change |
 | `i` | insert |
 | `a` | append |
-| `o` | new line below |
-| `O` | new line above |
+| `Esc` | exit insert |
 | `I` | insert at start |
 | `A` | append at end |
-| `Esc` | exit insert |
+| `o` | new line below |
+| `O` | new line above |
 | `R` | replace mode |
 | `~` | toggle case |
 | `gU{m}` | uppercase |

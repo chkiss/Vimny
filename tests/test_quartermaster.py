@@ -370,3 +370,12 @@ def test_seal_needs_three_tiers_and_the_whole_chain(seed):
 # for every seed by the universal test_answer_paths.py::test_answer_path_actually_wins.
 # (test_cheese_battery_spreads_no_flame above still drives run_dungeon for the
 # user-reported cheese routes — that negative forcing is NOT covered universally.)
+
+
+def test_hint_bar_surfaces_the_linewise_yy():
+    # Learning 'y' unlocks the linewise yy as well as y{m}; the bar bundles yy into the
+    # y keys cell (like c{m}  cc) so yank-line is never gated-in-but-invisible.
+    from render.hint_bar import hint_text
+    bar = hint_text(known_commands('quartermaster'), 'quartermaster')
+    assert 'y{m}' in bar and 'yy' in bar
+    assert 'P' in bar

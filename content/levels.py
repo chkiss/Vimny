@@ -78,7 +78,7 @@ LEVELS = [
     {'display': '21',   'slug': 'inscription_halls',     'name': 'The Inscription Halls',      'commands': 'i a', 'teaches': ['insert']},
     {'display': '22',   'slug': 'whole_line_annex',      'name': 'The Change Annex',           'commands': 'c{m}  cE  cc  s', 'teaches': ['c', 's']},
     {'display': '23',   'slug': 'change_extension',       'name': 'The Change Extension',       'commands': 'S  C', 'teaches': ['S', 'C']},
-    {'display': '24',   'slug': 'sculpting_chambers',    'name': 'The Sculpting Chambers',     'commands': 'I A o O', 'teaches': []},
+    {'display': '24',   'slug': 'sculpting_chambers',    'name': 'The Sculpting Chambers',     'commands': 'I A o O', 'teaches': ['I', 'A', 'o', 'O']},
     {'display': '25',   'slug': 'overwrite_halls',       'name': 'The Overwrite Halls',        'commands': 'R', 'teaches': ['R']},
     {'display': '26',   'slug': 'case_chambers',         'name': 'The Case Chambers',          'commands': '~ g~ gU gu', 'teaches': ['~', 'gU', 'gu', 'g~']},
     {'display': '27',   'slug': 'joiners_gate',          'name': "The Joiner's Gate",          'commands': 'J gJ', 'teaches': ['J', 'gJ']},

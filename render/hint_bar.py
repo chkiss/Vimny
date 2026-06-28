@@ -92,8 +92,14 @@ _DEFAULT = 'h/j/k/l:move cursor  :w write (save)  :q quit  :q! quit without savi
 # one 'subst' gate unlocks the whole :s family — :%s//g, the :g/pat/d global delete,
 # and & — so the bar must show them all (otherwise :g/pat/d is gated-in but invisible,
 # and the player can't find the line-delete the Forge's cursed verses require).
-_FAMILY = {'/':     ['/', '?{pat}', 'n', 'N'],
-           'subst': ['subst', ':%s//g', ':g/pat/d', '&']}
+# 'mark' gates set (m) AND both jumps (` ') — without expansion only m{a} shows and
+# the player can't see how to return to a mark.  'insert' gates a (append) alongside
+# i; the linewise operator forms dd/yy bundle into the d/y keys cell in vim_commands.md
+# (mirroring c{m}  cc), so they need no family entry.
+_FAMILY = {'/':      ['/', '?{pat}', 'n', 'N'],
+           'subst':  ['subst', ':%s//g', ':g/pat/d', '&'],
+           'mark':   ['mark', '`{a}', "'{a}"],
+           'insert': ['insert', 'a']}
 
 
 def _format(tokens) -> str:

@@ -157,12 +157,11 @@
 
 ## operators_vault — operators
 
-| keys   | token | desc       |
-|--------|-------|------------|
-| d{m}   | d     | delete     |
-| dd     |       | delete line|
-| c{m}   | c     | change     |
-| cc     |       | change line|
+| keys     | token | desc        |
+|----------|-------|-------------|
+| d{m}  dd | d     | delete      |
+| c{m}     | c     | change      |
+| cc       |       | change line |
 
 ## cipher_cell — replace + line-end delete
 
@@ -189,8 +188,7 @@
 
 | keys     | token    | desc           |
 |----------|----------|----------------|
-| y{m}     | y        | yank           |
-| yy       |          | yank line      |
+| y{m}  yy | y        | yank           |
 | P        |          | paste before   |
 
 ## echo_vault — repeat last change
@@ -201,15 +199,20 @@
 
 ## inscription_halls — insert mode
 
-| keys | token  | desc           |
-|------|--------|----------------|
-| i    | insert | insert         |
-| a    |        | append         |
-| o    |        | new line below |
-| O    |        | new line above |
-| I    |        | insert at start|
-| A    |        | append at end  |
-| Esc  |        | exit insert    |
+| keys | token  | desc        |
+|------|--------|-------------|
+| i    | insert | insert      |
+| a    |        | append      |
+| Esc  |        | exit insert |
+
+## sculpting_chambers — line-open / line-anchored insert
+
+| keys | token | desc            |
+|------|-------|-----------------|
+| I    |       | insert at start |
+| A    |       | append at end   |
+| o    |       | new line below  |
+| O    |       | new line above  |
 
 ## overwrite_halls — replace mode
 

@@ -164,11 +164,22 @@ def test_insert_mode_blocked_for_all_standard_levels(keys):
             f"'{keys}' should be blocked at level {level}"
 
 
-@pytest.mark.parametrize("keys", ['i', 'a', 'o', 'I', 'A', 'O'])
-def test_insert_mode_allowed_with_insert_token(keys):
+@pytest.mark.parametrize("keys", ['i', 'a'])
+def test_basic_insert_allowed_with_insert_token(keys):
+    # The basic insert lesson (Inscription Halls) teaches i/a under the 'insert' gate.
     action = _parse(keys)
     assert action_allowed(action, ['insert'])
     assert action_allowed(action, _kc(0) + ['insert'])
+
+
+@pytest.mark.parametrize("key", ['o', 'O', 'I', 'A'])
+def test_line_open_insert_needs_its_own_token_not_insert(key):
+    # One gate per lesson: o/O/I/A are The Sculpting Chambers' lesson, so the 'insert'
+    # token alone must NOT unlock them (else they'd be usable at Inscription Halls yet
+    # only shown three levels later — the unlocked-but-invisible bug).
+    action = _parse(key)
+    assert not action_allowed(action, ['insert'])
+    assert action_allowed(action, ['insert', key])
 
 
 @pytest.mark.parametrize("keys", ['v', 'V', '\x16'])

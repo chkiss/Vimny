@@ -425,3 +425,11 @@ def test_curriculum_guard():
     assert 'insert' in known
     for needed in ('count', '(', 'G', '/'):
         assert needed in known
+
+
+def test_hint_bar_surfaces_append():
+    # 'insert' gates both i and a (and o/O/I/A); without family expansion only i shows
+    # and append is gated-in-but-invisible.
+    from render.hint_bar import hint_text
+    bar = hint_text(known_commands('inscription_halls'), 'inscription_halls')
+    assert 'i:insert' in bar and 'a:append' in bar

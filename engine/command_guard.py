@@ -115,7 +115,14 @@ def action_allowed(action: dict, known: list | set, edit_mode: bool = False) -> 
     if t == 'enter_mode':
         m = action.get('mode', '')
         if m == 'insert':
-            return 'insert' in known_set
+            # One gate per lesson: the basic insert lesson teaches i/a; the line-open
+            # and line-anchored variants (o O I A) are their own lesson (The Sculpting
+            # Chambers) and gate on their own tokens, so the hint bar's tier for each
+            # level shows exactly the keys that level unlocks (no silent early unlock).
+            var = action.get('variant', 'i')
+            if var in ('i', 'a'):
+                return 'insert' in known_set
+            return var in known_set
         if m == 'replace':
             return 'R' in known_set
         if m == 'search':
