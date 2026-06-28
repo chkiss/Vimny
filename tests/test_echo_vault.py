@@ -295,13 +295,5 @@ def test_careless_D_keeps_the_bolt_shut(seed, monkeypatch):
     assert room.cells[_EV_BOLT_A[0]][_EV_BOLT_A[1]] == CellType.WALL
 
 
-# ── full answer playthrough through the real keystroke loop ───────────────────
-
-@pytest.mark.parametrize("seed", SEEDS)
-def test_answer_playthrough_wins_at_par(seed, monkeypatch):
-    """Type the answer key-for-key through run_dungeon as a normal player:
-    one r per letter, the echoes, the count-dot finale — par-perfect."""
-    dungeon = build_dungeon_echo_vault(seed)
-    keys_str = dungeon.rooms[0].answer.replace(' ', '')
-    result = _drive(dungeon, keys_str, monkeypatch, finish=':wq\r')
-    assert result['won'] and result['stars'] == 2, result
+# Full answer playthrough (canonical tape → run_dungeon → 2-star win) is covered
+# for every seed by the universal test_answer_paths.py::test_answer_path_actually_wins.

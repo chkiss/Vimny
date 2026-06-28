@@ -36,9 +36,6 @@ All four doors run through main._cipher_cell_tick — stateless and undo-safe
 """
 from collections import deque
 
-from blessed.keyboard import Keystroke
-from blessed import Terminal
-
 import main
 from engine.insert import replace_chars
 from engine.motion import _is_word_char
@@ -50,7 +47,7 @@ from generation.dungeon_gen import (
     _CC_ROWS, _CC_COLS, _CC_ROW, _CC_PLAQUE_ROW,
     _CC_SPAWN, _CC_EXIT, _CC_BOLT_A, _CC_BOLT_B, _CC_BOLT_C, _CC_BOLT_D,
     _CC_CIPHER_A_COL, _CC_CIPHER_B_COL, _CC_WORD1_COL, _CC_ROT1, _CC_ROT2,
-    _CC_SPAN1, _CC_SPAN2, _CC_WARP_A, _CC_PAR,
+    _CC_SPAN1, _CC_WARP_A, _CC_PAR,
 )
 import pytest
 
@@ -279,23 +276,5 @@ def test_shearing_the_word_itself_keeps_the_bolt_shut(seed):
     assert room.cells[_CC_BOLT_B[0]][_CC_BOLT_B[1]] == CellType.WALL
 
 
-# ── full answer playthrough through the real keystroke loop ───────────────────
-
-@pytest.mark.parametrize("seed", SEEDS)
-def test_answer_playthrough_wins_at_par(seed, monkeypatch):
-    """Type the answer key-for-key through run_dungeon as a normal player:
-    every gate opens in sequence and the run ends par-perfect (2 stars)."""
-    dungeon = build_dungeon_cipher_cell(seed)
-    keys = [Keystroke(ch) for ch in dungeon.rooms[0].answer.replace(' ', '')]
-    keys += [Keystroke(':'), Keystroke('w'), Keystroke('q'), Keystroke('\r')]
-
-    monkeypatch.setattr(main, 'render_all', lambda *a, **k: None)
-    monkeypatch.setattr(main.time, 'sleep', lambda *a, **k: None)
-    monkeypatch.setattr(main, '_fireworks_animation', lambda *a, **k: None)
-    monkeypatch.setattr(main, '_win_animation', lambda *a, **k: None)
-    term = Terminal()
-    it = iter(keys)
-    monkeypatch.setattr(term, 'inkey', lambda *a, **k: next(it, Keystroke('')))
-    result = main.run_dungeon(term, 'cipher_cell', {}, player_name='Normand',
-                              _dungeon=dungeon)
-    assert result['won'] and result['stars'] == 2, result
+# Full answer playthrough (canonical tape → run_dungeon → 2-star win) is covered
+# for every seed by the universal test_answer_paths.py::test_answer_path_actually_wins.

@@ -28,10 +28,6 @@ the cost-vs-par test (test_answer_paths) could not catch it because the tape's
 cost was correct; only an end-to-end replay reveals the lost win.
 """
 import pytest
-from blessed import Terminal
-from blessed.keyboard import Keystroke
-
-import main
 from generation.dungeon_gen import build_dungeon_goblin_gauntlet as _build
 from tests import SEEDS
 
@@ -49,26 +45,7 @@ def test_no_decor_rune_carries_the_goblin_glyph(seed):
     assert not offenders, f"decor runes carrying '{_GOBLIN_GLYPH}': {offenders}"
 
 
-@pytest.mark.parametrize("seed", SEEDS)
-def test_answer_playthrough_wins_two_stars(seed, monkeypatch):
-    """Replay the canonical answer tape key-for-key through run_dungeon: the
-    fg/;/, sweeps clear every goblin, p drops the key, and the run ends a
-    par-perfect 2-star win.  (This is the check that the g-rune bug failed.)"""
-    dungeon = _build(seed)
-    keys = [Keystroke(ch) for ch in dungeon.rooms[0].answer.replace(' ', '')]
-    keys += [Keystroke(':'), Keystroke('w'), Keystroke('q'), Keystroke('\r')]
-
-    monkeypatch.setattr(main, 'render_all', lambda *a, **k: None)
-    monkeypatch.setattr(main.time, 'sleep', lambda *a, **k: None)
-    for anim in ('_fireworks_animation', '_win_animation', '_combat_flash',
-                 '_death_animation', '_starfield_victory'):
-        if hasattr(main, anim):
-            monkeypatch.setattr(main, anim, lambda *a, **k: None)
-    term = Terminal()
-    import render.colors as _colors
-    _colors.init(term)                       # combat paths touch enemy_fg() etc.
-    it = iter(keys)
-    monkeypatch.setattr(term, 'inkey', lambda *a, **k: next(it, Keystroke('')))
-    result = main.run_dungeon(term, 'goblin_gauntlet', {}, player_name='Normand',
-                              _dungeon=dungeon)
-    assert result['won'] and result['stars'] == 2, result
+# The canonical fg/;/, + p playthrough (the end-to-end win that the g-rune bug
+# broke) is replayed for every seed by the universal
+# test_answer_paths.py::test_answer_path_actually_wins.  The decor-glyph invariant
+# above is the structural guard that keeps that win reachable.

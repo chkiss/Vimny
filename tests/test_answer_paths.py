@@ -25,6 +25,9 @@ import inspect
 import math
 import re
 import pytest
+from blessed import Terminal
+from blessed.keyboard import Keystroke
+import main
 import generation.dungeon_gen as _dg
 from tests import cached_room
 
@@ -197,6 +200,96 @@ def test_budget_is_ceil_par_times_1_4(builder, seed):
     assert room.budget == math.ceil(room.par * 1.4), (
         f"{builder.__name__} seed={seed}: budget={room.budget}, "
         f"ceil(par*1.4)={math.ceil(room.par * 1.4)}"
+    )
+
+
+# ── Universal replay-to-win test (drives each answer through run_dungeon) ─────
+#
+# test_answer_cost_equals_par proves answer_cost == par; it does NOT prove the
+# tape actually REACHES THE EXIT.  A tape can cost par yet fail to win — a decor
+# rune carrying a target glyph hijacks an f-scan (the goblin_gauntlet bug), or a
+# layout change strands the route.  Cost-only checks slip these every time; only
+# an end-to-end replay reveals the lost win.  This test replays every level's
+# canonical tape key-for-key through the real engine and asserts a par-perfect
+# 2-star win, across every answer-path seed.
+
+# game_h = term.height - 8 (main.py's motion call); the dungeons are built for the
+# default game height of 33 (dungeon_gen._SCREEN_VAULT_DEFAULT_GAME_H), so the
+# Screen Vault's viewport-relative H/M/L land on their keys only at height 41.
+_REPLAY_TERM_HEIGHT = 33 + 8
+
+# Levels whose tape enters INSERT/CHANGE mode, where a token-separating space is
+# an implicit <Esc> that the generic '⏎'→Enter / strip-spaces translation can't
+# express.  Each has a dedicated full-playthrough win test that drives the engine
+# with the right Esc placement, so they are win-covered there, not here.
+_REPLAY_OWN_TEST = {
+    'build_dungeon_inscription_halls': 'test_inscription_halls.py::test_full_playthrough_wins_par_perfect',
+    'build_dungeon_whole_line_annex':  'test_whole_line_annex.py::test_full_change_route_wins_par_perfect',
+    'build_dungeon_change_extension':  'test_change_extension.py::test_full_change_route_wins_par_perfect',
+}
+
+
+@pytest.fixture
+def _replay_env(monkeypatch):
+    """Headless engine for a faithful replay: silence rendering/animations, stub the
+    mid-dungeon scroll dismissals that read keys outside the main loop, and pin the
+    terminal height so viewport-relative motions (H/M/L) match real play."""
+    monkeypatch.setattr(main, 'render_all', lambda *a, **k: None)
+    monkeypatch.setattr(main.time, 'sleep', lambda *a, **k: None)
+    monkeypatch.setattr(Terminal, 'height', _REPLAY_TERM_HEIGHT)
+    for anim in ('_fireworks_animation', '_win_animation', '_combat_flash',
+                 '_death_animation', '_starfield_victory'):
+        if hasattr(main, anim):
+            monkeypatch.setattr(main, anim, lambda *a, **k: None)
+    # Mid-dungeon relic/reward scrolls read their dismiss key via a direct
+    # term.inkey() that bypasses the key loop; stub them so a replay never loses a
+    # tape key to a scroll sub-loop (the karaoke-audit artifact).
+    for fn in ('_show_scroll_by_id', '_render_standard_scroll',
+               '_show_reliquary_scroll', '_show_catalog_scroll'):
+        if hasattr(main, fn):
+            monkeypatch.setattr(main, fn, lambda *a, **k: None)
+
+
+def _drive_to_win(builder, seed):
+    """Replay builder(seed)'s canonical answer tape through run_dungeon as a real
+    (non-admin) player and return the {'won', 'stars', ...} result.  Builds fresh
+    (never the shared cache) because run_dungeon mutates the dungeon."""
+    dungeon = builder(seed)
+    slug = builder.__name__[len('build_dungeon_'):]
+    tape = dungeon.rooms[0].answer.replace(' ', '')          # spaces are visual separators
+    keys = [Keystroke('\r' if c == '⏎' else c) for c in tape]
+    keys += [Keystroke(c) for c in ':wq\r']                  # :wq returns the real win/stars
+    term = Terminal(force_styling=False)
+    import render.colors as _colors
+    _colors.init(term)                                       # combat/key colour paths touch color_rgb()
+    state = {'n': 0}
+    def _inkey(*a, **k):
+        if state['n'] < len(keys):
+            key = keys[state['n']]
+            state['n'] += 1
+            return key
+        raise AssertionError(
+            f"{slug}[{seed}]: the tape + :wq were exhausted without run_dungeon "
+            f"returning — the route never reached the exit and never quit (likely "
+            f"stranded, or left in a non-NORMAL mode so :wq was typed as text)."
+        )
+    term.inkey = _inkey
+    return main.run_dungeon(term, slug, {}, player_name='Normand', _dungeon=dungeon)
+
+
+@pytest.mark.parametrize("builder,seed", _all_builder_params())
+def test_answer_path_actually_wins(builder, seed, _replay_env):
+    """The canonical answer tape, replayed through run_dungeon, reaches the exit
+    and earns a par-perfect 2-star win.  Catches stranded routes, glyph-hijacked
+    motions, and engine/solver cost drift (an over-par replay drops to 1 star)."""
+    if builder.__name__ in _REPLAY_OWN_TEST:
+        pytest.skip("insert/change tape carries implicit <Esc>; win-replayed by "
+                    + _REPLAY_OWN_TEST[builder.__name__])
+    result = _drive_to_win(builder, seed)
+    assert result['won'] and result['stars'] == 2, (
+        f"{builder.__name__}[{seed}]: replaying the canonical answer tape did not "
+        f"yield a par-perfect 2-star win: {result}\n"
+        f"  answer: {builder(seed).rooms[0].answer!r}"
     )
 
 

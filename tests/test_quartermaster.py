@@ -366,24 +366,7 @@ def test_seal_needs_three_tiers_and_the_whole_chain(seed):
     assert room.cells[seal[0]][seal[1]] == CellType.WALL     # the seal re-bars
 
 
-# ── full answer playthrough through the real keystroke loop ───────────────────
-
-@pytest.mark.parametrize("seed", SEEDS)
-def test_answer_playthrough_wins_at_par(seed, monkeypatch):
-    """Type the answer key-for-key through run_dungeon as a normal player:
-    yank, paste, 4G, the count-paste 3P, the beacon raise — and the run ends
-    par-perfect (2 stars)."""
-    dungeon = build_dungeon_quartermaster(seed)
-    keys = [Keystroke(ch) for ch in dungeon.rooms[0].answer.replace(' ', '')]
-    keys += [Keystroke(':'), Keystroke('w'), Keystroke('q'), Keystroke('\r')]
-
-    monkeypatch.setattr(main, 'render_all', lambda *a, **k: None)
-    monkeypatch.setattr(main.time, 'sleep', lambda *a, **k: None)
-    monkeypatch.setattr(main, '_fireworks_animation', lambda *a, **k: None)
-    monkeypatch.setattr(main, '_win_animation', lambda *a, **k: None)
-    term = Terminal()
-    it = iter(keys)
-    monkeypatch.setattr(term, 'inkey', lambda *a, **k: next(it, Keystroke('')))
-    result = main.run_dungeon(term, 'quartermaster', {}, player_name='Normand',
-                              _dungeon=dungeon)
-    assert result['won'] and result['stars'] == 2, result
+# Full answer playthrough (canonical tape → run_dungeon → 2-star win) is covered
+# for every seed by the universal test_answer_paths.py::test_answer_path_actually_wins.
+# (test_cheese_battery_spreads_no_flame above still drives run_dungeon for the
+# user-reported cheese routes — that negative forcing is NOT covered universally.)
