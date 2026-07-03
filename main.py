@@ -3332,6 +3332,7 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
                         replace_stack.append(rec)
                         if not edit_mode:
                             budget.spend(1)
+                    _advance_answer(ch)     # karaoke: R-mode chars advance the tape too
             _render(message)
             continue
 
