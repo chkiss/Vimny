@@ -86,13 +86,13 @@ def begin_insert(room, player, variant: str, count: int = 1) -> None:
                 player.col = c
         return
     if variant == 'o':
-        _insert_blank_row(room, r + 1, r, player)
+        _insert_blank_row(room, r + 1, r, player, blank=True)  # a Vim blank line, not a row-clone
         player.row = r + 1
         c = _leftmost_passable(room, player.row)
         player.col = c if c is not None else 0
         return
     if variant == 'O':
-        _insert_blank_row(room, r, r, player)
+        _insert_blank_row(room, r, r, player, blank=True)       # blank line above (segment-width)
         c = _leftmost_passable(room, r)
         player.col = c if c is not None else 0
         return

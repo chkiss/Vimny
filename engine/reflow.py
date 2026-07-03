@@ -299,15 +299,51 @@ def _shift_rows(room, player, moves, delta: int) -> None:
         player.jump_list = [((r + delta) if moves(r) else r, c) for (r, c) in player.jump_list]
 
 
-def _insert_blank_row(room, at_row: int, template_row: int, player=None) -> None:
-    """Insert a blank row at index ``at_row``, copying the wall pattern of
-    ``template_row``, and shift all content at/below ``at_row`` down by one — the
-    vertical-ADD primitive behind o/O and the linewise paste of whole rows. When
-    ``player`` is given, its marks/jumps at or below the insert shift down too."""
+def _blank_line_span(room, row: int, col: int):
+    """The cursor's contiguous floor SEGMENT on ``row`` — the maximal run of
+    walkable cells (FLOOR/CORRIDOR) containing ``col`` — as ``(left, right)``, or
+    ``None`` if the cursor is not on floor. This is the width of the blank line
+    o/O open: Vim's 'empty line', framed by the walls that bound the cursor's own
+    segment (never wider than the floor already there)."""
+    if not (0 <= row < room.rows) or not (0 <= col < room.cols):
+        return None
+    if room.cells[row][col] not in _FLOORS:
+        return None
+    left = right = col
+    while left - 1 >= 0 and room.cells[row][left - 1] in _FLOORS:
+        left -= 1
+    while right + 1 < room.cols and room.cells[row][right + 1] in _FLOORS:
+        right += 1
+    return (left, right)
+
+
+def _insert_blank_row(room, at_row: int, template_row: int, player=None,
+                      blank: bool = False) -> None:
+    """Insert a row at index ``at_row`` and shift all content at/below ``at_row``
+    down by one — the vertical-ADD primitive. When ``player`` is given, its
+    marks/jumps at or below the insert shift down too. Two shapes of new row:
+
+      • ``blank=False`` (default) — CLONE the wall/floor structure of
+        ``template_row``. This is the row-copy behind linewise paste (p/P) and the
+        :s/:g line split, which reproduce an existing row's shape.
+      • ``blank=True`` — a Vim BLANK line for o/O: FLOOR across the cursor's
+        contiguous floor segment on ``template_row`` (``player.col`` the anchor),
+        WALL elsewhere. It never copies interior walls and is never wider than the
+        floor already there, so o/O can neither breach a border nor bridge a wall
+        column — that horizontal axis is A's (``extend_floor``). Falls back to the
+        clone shape when there is no player or the cursor is off floor.
+    """
     template_row = max(0, min(template_row, room.rows - 1))
-    new_row = [CellType.WALL if room.cells[template_row][c] in (CellType.WALL, CellType.WOOD_WALL)
-               else CellType.FLOOR
-               for c in range(room.cols)]
+    span = (_blank_line_span(room, template_row, player.col)
+            if (blank and player is not None) else None)
+    if span is not None:
+        left, right = span
+        new_row = [CellType.FLOOR if left <= c <= right else CellType.WALL
+                   for c in range(room.cols)]
+    else:
+        new_row = [CellType.WALL if room.cells[template_row][c] in _WALLS
+                   else CellType.FLOOR
+                   for c in range(room.cols)]
     room.cells.insert(at_row, new_row)
     room.rows += 1
     _shift_rows(room, player, lambda r: r >= at_row, +1)

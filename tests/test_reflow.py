@@ -27,7 +27,9 @@ from engine.player import Player
 from engine.reflow import (
     is_ledge, void_col, open_gap, close_gap, remove_row, extend_floor, _insert_blank_row,
     carve_floor, _double_cols, _MAX_COLS, split_line_down, _first_floor_col, _lands_on_floor,
+    _blank_line_span,
 )
+from engine.insert import begin_insert
 from engine.insert import insert_char
 from engine.operator import op_delete
 from engine.text_object import TextObject, TextObjectType
@@ -478,6 +480,60 @@ def test_remove_row_shifts_player_marks_and_jumps_up():
     remove_row(room, 2, p)                            # remove row 2
     assert p.marks == {'a': (1, 2), 'b': (3, 4), 'c': (2, 3)}   # below shifts up; on-cut clamps to row 2
     assert p.jump_list == [(1, 1), (2, 7), (3, 0)]
+
+
+# ── o / O open a Vim BLANK line (segment-width floor, no interior walls) ─────────
+
+def _pillar_room():
+    """A 5×12 room whose row 2 is split by a wall pillar at col 6: floor 1..5,
+    WALL 6, floor 7..10. The left and right segments never touch."""
+    room = Room(room_type=RoomType.PUZZLE, rows=5, cols=12)
+    room.cells = [[CellType.FLOOR if (0 < r < 4 and 0 < c < 11) else CellType.WALL
+                   for c in range(12)] for r in range(5)]
+    for r in range(5):
+        room.cells[r][6] = CellType.WALL          # a full wall column at col 6
+    room.rebuild_indexes()
+    return room
+
+
+def test_blank_line_span_is_the_cursor_segment():
+    room = _pillar_room()
+    assert _blank_line_span(room, 2, 3) == (1, 5)       # left segment, up to the pillar
+    assert _blank_line_span(room, 2, 8) == (7, 10)       # right segment, from the pillar
+    assert _blank_line_span(room, 2, 6) is None          # the pillar is not floor
+
+
+def test_o_opens_a_blank_line_the_width_of_the_cursor_segment():
+    """o opens a Vim blank line: FLOOR across the cursor's own floor segment and
+    WALL everywhere else. It copies NO interior walls and never bridges the wall
+    column (that is A's axis) — the far segment stays wall on the new row."""
+    room = _pillar_room()
+    p = Player(row=2, col=3)                              # left segment
+    begin_insert(room, p, 'o')
+    new = room.cells[3]                                   # the fresh blank line
+    assert [c for c in range(12) if new[c] == CellType.FLOOR] == [1, 2, 3, 4, 5]
+    assert new[6] == CellType.WALL                        # the column is NOT breached
+    assert all(new[c] == CellType.WALL for c in range(7, 12))  # far segment not cloned
+    assert new[0] == CellType.WALL and new[11] == CellType.WALL  # borders intact
+
+
+def test_O_opens_a_blank_line_no_interior_walls_from_the_right_segment():
+    room = _pillar_room()
+    p = Player(row=2, col=8)                              # right segment
+    begin_insert(room, p, 'O')
+    new = room.cells[2]                                   # O's blank line sits at the old row index
+    assert [c for c in range(12) if new[c] == CellType.FLOOR] == [7, 8, 9, 10]
+    assert new[6] == CellType.WALL and new[0] == CellType.WALL and new[11] == CellType.WALL
+
+
+def test_paste_clone_still_copies_the_row_structure():
+    """The default (blank=False) path — linewise paste / :s line split — is
+    untouched: it CLONES the template's wall pattern, pillar and all."""
+    room = _pillar_room()
+    _insert_blank_row(room, 3, template_row=2)            # no blank flag → clone
+    new = room.cells[3]
+    assert new[6] == CellType.WALL                        # pillar preserved…
+    assert new[1] == CellType.FLOOR and new[7] == CellType.FLOOR   # …and BOTH segments floor
 
 
 # ── split_line_down (insert-mode <Enter> — bounded vertical line-split) ──────────
