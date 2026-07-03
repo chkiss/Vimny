@@ -226,10 +226,17 @@ Forcing (all four S1 / terrain-∞ where possible):
   sealed in solid stone east of a corridor's end — the player must BUILD the
   corridor to it, glyph by glyph. ∞ without `A`. (Mind `_MAX_COLS`=200 and
   the edge-of-the-world message; keep the build short.)
-- `I`: first-non-blank insert — a plaque word must gain a prefix at the
-  line's start while the cursor is far right after the `A` work; `I` jumps +
-  inserts in one key. Budget-forced (savings per use > margin); the only
-  soft-forced command of the four — acceptable in this company.
+- `I`: first-non-blank insert — the level's FINALE and the exit gate itself.
+  One row is a PASSWORD: its floor shows only the TAIL of a phrase, the head
+  sheared off at the west (the plaque covers the WHOLE line, not a lone word).
+  After the last `A`-build the cursor sits at the far east; the player drops
+  onto the password row — a DIFFERENT line, so the far-east column carries over
+  — and `I` jumps to the line's start to type the missing head in one key. The
+  completed line reads true and drops the exit key: the final door opens.
+  NO NEW MECHANIC — this is the whole-line plaque-match (the Change Annex's
+  `_wla` floor-text tick) turned into a full-line password. Budget-forced (`I`
+  saves the westward walk over `^i`/`0i`); still the only soft-forced command of
+  the four, but now the capstone that unifies the act rather than a side plaque.
 
 Risks: row inserts shift everything below (constants go stale — derive all
 checks from text/entities, the Manifold discipline); the par solver from the

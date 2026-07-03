@@ -7529,3 +7529,106 @@ def build_dungeon_change_extension(seed: int) -> Dungeon:
     dungeon.current_room = 0
     return dungeon
 
+
+# ── The Sculpting Chambers (I A o O) ──────────────────────────────────────────
+# The topology lesson — the four insert-ENTRIES that reshape the stone, split by
+# axis so each does ONE thing (see the o/O engine change: o/O open a Vim BLANK
+# line, segment-width, never bridging a wall column — that axis is A's):
+#   • A  — the HORIZONTAL sculptor: `extend_floor` carves floor east THROUGH a
+#          wall column (the game's only wall→floor build). The vault's outer
+#          stone plugs the one corridor to the door; only A breaches it. ∞.
+#   • o/O — the VERTICAL sculptors: open a blank line below / above to carve a new
+#          verse of the vault's votive. The dedication must READ, line upon line,
+#          keep · seal · sesame · amen; only `seal` and the `same`-stub are given,
+#          so the player must OPEN the lines the other verses live on. `keep` sits
+#          ABOVE the topmost given line (only `O` reaches above) and `amen` BELOW
+#          the lowest (only `o` reaches below) — the two are forced apart by
+#          direction. ∞ (i/a cannot add a row).
+#   • I  — the votive's keystone: the `sesame` line is given only its tail
+#          (`same`); after the A-work the cursor sits far EAST, so `I` (first-non-
+#          blank insert, one key) jumps to the line start to prepend `se` →
+#          `sesame`. Soft-forced (`I` saves the ^i / 0i walk); the finale.
+# The vault door (a single gated cell) opens the instant the votive reads true —
+# the password drops the key. The tick (`_sculpting_chambers_tick`) is text- and
+# exit_pos-relative, so it is immune to the row shifts o/O/I cause (the Manifold
+# discipline). A cannot cheat the door: the door is a VERTICAL step off the
+# corridor's end (A builds east, never into it) and void runes cap every floor
+# edge A could otherwise build from toward it.
+_SC_ROWS, _SC_COLS = 9, 26
+_SC_WCOL = 9                        # the votive's verses start here (west of it: the plaques)
+_SC_PLQ  = 1                        # plaque column, in the WEST wall
+_SC_SEAL_ROW = 4                    # the given anchor line ('seal') at build
+_SC_PASS_ROW = 5                    # the given password line (tail 'same') just below it
+_SC_BAND = (_SC_WCOL, _SC_WCOL + 12)   # scan window for each row's leading verse
+_SC_TARGET = ('keep', 'seal', 'sesame', 'amen')   # the votive, read top → bottom
+_SC_SEAL_END = 13                   # the 'seal' segment's east edge — A's launch cell (bare gap)
+_SC_PLUG   = (14, 17)               # the solid stone A carves east THROUGH (seal row, all wall)
+_SC_EXIT_COL = 17                   # the vault door: (pass row, this col), a step SOUTH of A's landing
+
+
+# par is hand-tallied along the canonical route (no Dijkstra once the buffer
+# mutates): Okeep(5) jj(2) Ise(3) oamen(5) kk(2) Awxyz(5) j(1) = 23. The answer
+# tape is the same route; Esc is free/omitted, spaces separate tokens.
+_SC_PAR    = 23
+_SC_ANSWER = 'Okeep jj Ise oamen kk Awxyz j'
+
+
+def build_dungeon_sculpting_chambers(seed: int) -> Dungeon:
+    """The Sculpting Chambers (slug `sculpting_chambers`): I A o O.
+
+    A votive tablet the player carves open. `seal` and the `same`-stub are given;
+    O opens `keep` above, o opens `amen` below, I prepends `se` → `sesame`. When
+    the four verses read in order the vault door (a gated cell south of an
+    isolated corridor) unseals — but the corridor is walled off by a stone plug
+    that only A can breach. See the section header for the axis split."""
+    R, C = _SC_ROWS, _SC_COLS
+    cells = [[CellType.WALL] * C for _ in range(R)]
+
+    def floor(r, c0, c1):
+        for c in range(c0, c1 + 1):
+            cells[r][c] = CellType.FLOOR
+
+    sr, pr = _SC_SEAL_ROW, _SC_PASS_ROW
+    floor(sr, _SC_WCOL, _SC_SEAL_END)             # 'seal' segment (+ a bare col: A's launch cell)
+    floor(pr, _SC_WCOL, 15)                        # the password line (+ push room for `se`)
+    # East of the 'seal' segment is SOLID STONE (sr, 14..). A carves floor through
+    # it and lands on col _SC_EXIT_COL; the exit cell (pr, _SC_EXIT_COL) is a step
+    # SOUTH of that landing and stays WALL until the votive reads true. Nothing
+    # else east of the plug is pre-floor, so A's rightmost-passable launch is the
+    # 'seal' segment edge (col 13), not a stray corridor.
+
+    room = Room(room_type=RoomType.ENTRY, rows=R, cols=C)
+    room.cells = cells
+    room.seed  = seed
+
+    def lay(r, c, text, kind):
+        room.char_runs.append(CharRun(r, c, tuple(text), kind))
+
+    lay(sr, _SC_WCOL, 'seal', 'ancient')          # the given anchor verse
+    lay(pr, _SC_WCOL, 'same', 'ancient')          # the password's given tail
+    # The door is a step SOUTH of A's landing, so A (an east-builder) can never
+    # back-door it from the seal row — over-building east just runs dead into
+    # stone. The ONE void guard: stop an A-build east off the PASSWORD row, whose
+    # own east end DOES line up with the exit column.
+    lay(pr, 16, '○', 'void')                       # stops an A-build east off the password
+    # the votive reference, in the WEST wall (verdant plaques, one verse per line)
+    for k, word in enumerate(_SC_TARGET):
+        lay(sr - 1 + k, _SC_PLQ, word, 'verdant')
+
+    room._sc_target = _SC_TARGET
+    room._sc_band   = _SC_BAND
+
+    room.entities.append(Entity(kind='exit', row=pr, col=_SC_EXIT_COL, edit_immune=True))
+    room.spawn_pos = (sr, _SC_WCOL)               # on the 'seal' verse
+    room.exit_pos  = (pr, _SC_EXIT_COL)
+
+    room.rebuild_indexes()
+    room.par    = _SC_PAR
+    room.budget = math.ceil(_SC_PAR * 1.4)
+    room.answer = _SC_ANSWER
+
+    dungeon = Dungeon(name='The Sculpting Chambers', seed=seed)
+    dungeon.rooms        = [room]
+    dungeon.current_room = 0
+    return dungeon
+

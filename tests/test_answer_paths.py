@@ -128,6 +128,7 @@ _XFAIL_LEVELS: dict = {}
 _ANSWER_NOT_TOKENISED = {
     'build_dungeon_whole_line_annex',  # ce/cc/s keystroke tape; tests/test_whole_line_annex.py
     'build_dungeon_change_extension',  # S/C keystroke tape; tests/test_change_extension.py
+    'build_dungeon_sculpting_chambers',  # O/I/o/A insert tape; tests/test_sculpting_chambers.py
 }
 
 # Levels with a documented NON-1.4 budget. The Change Annex / Extension use a
@@ -226,6 +227,7 @@ _REPLAY_OWN_TEST = {
     'build_dungeon_inscription_halls': 'test_inscription_halls.py::test_full_playthrough_wins_par_perfect',
     'build_dungeon_whole_line_annex':  'test_whole_line_annex.py::test_full_change_route_wins_par_perfect',
     'build_dungeon_change_extension':  'test_change_extension.py::test_full_change_route_wins_par_perfect',
+    'build_dungeon_sculpting_chambers': 'test_sculpting_chambers.py::test_full_votive_route_wins_par_perfect',
 }
 
 

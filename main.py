@@ -1329,6 +1329,36 @@ def _whole_line_annex_tick(room, player) -> list:
     return msgs
 
 
+def _sc_leading_verse(room, r: int, c0: int, c1: int) -> str:
+    """The leftmost verse WRITTEN on floor within the band [c0, c1] of row r —
+    the first whitespace-delimited token of the floor text. The A-breach glyphs
+    sit east of a bare-floor gap, so the seal line still leads with 'seal'."""
+    return next(iter(_wla_floor_text(room, r)[c0:c1 + 1].split()), '')
+
+
+def _sculpting_chambers_tick(room, player) -> list:
+    """The Sculpting Chambers votive: the vault door (a single gated cell at
+    room.exit_pos) unseals exactly while the tablet's verses READ TRUE in order
+    — the leading verse of each inscribed row, top to bottom, equals the target
+    (keep · seal · sesame · amen). Text- and exit_pos-relative, so it rides the
+    row shifts o/O/I cause (the Manifold discipline); STATELESS, hence undo-safe
+    (undoing a verse re-seals the door)."""
+    target = getattr(room, '_sc_target', ())
+    if not target:
+        return []
+    c0, c1 = room._sc_band
+    seq = [v for v in (_sc_leading_verse(room, r, c0, c1) for r in range(room.rows)) if v]
+    done = tuple(seq) == tuple(target)
+    er, ec = room.exit_pos
+    is_open = room.cells[er][ec] != CellType.WALL
+    if done and not is_open:
+        room.cells[er][ec] = CellType.FLOOR
+        return ['The votive reads true — the vault door grinds open!']
+    if not done and is_open and (player.row, player.col) != (er, ec):
+        room.cells[er][ec] = CellType.WALL         # a verse undone — the door re-seals
+    return []
+
+
 def _wm_ward_broken(room, k: int) -> bool:
     """Ward k's state — shift-proof by design (kind-counts on floor cells,
     substring scans across rows; never stored coordinates):
@@ -1748,6 +1778,7 @@ _LEVEL_INTROS = {
     'inscription_halls':   ('The Inscription Halls — the words were never finished. i writes before the cursor, a writes after; Esc seals the ink. Write them whole, and the river itself will yield.', 70),
     'whole_line_annex':    ('The Change Annex — every door is mislabelled. The plaque in the wall remembers the true word; the floor has it wrong. Change cuts what is wrong and writes what is right, in a single breath.', 70),
     'change_extension':    ('The Change Extension — deeper into the mislabelled halls. Two strokes was the novice\'s way; a practised hand needs but one. Find where a single keystroke serves.', 70),
+    'sculpting_chambers':  ('The Sculpting Chambers — the vault answers only to its votive, carved into the stone line upon line. Open the verses that are missing, above and below; finish the one half-written; then breach the last course of stone to the door.', 70),
     'warden_manifold':     ('The Warden Manifold — he stamps himself into the world. Light the four braziers; the gate will draw and the fog will part.', 70),
     'warden_surveyor':     ('The Warden Surveyor — survey his hall; w/b/e leap word to word, over the void.', 60),
     'spellwrights_forge':  ('The Spellwright\'s Forge — the old wards have rotted and cursed lines '
@@ -4624,6 +4655,13 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
             if level in ('whole_line_annex', 'change_extension'):
                 for _wla_msg in _whole_line_annex_tick(room, player):
                     _push(_wla_msg)
+
+            # The Sculpting Chambers: the votive tablet unseals the vault door
+            # (stateless, undo-safe — plaque rule, on the vertical/horizontal
+            # sculpting axes; see _sculpting_chambers_tick).
+            if level == 'sculpting_chambers':
+                for _sc_msg in _sculpting_chambers_tick(room, player):
+                    _push(_sc_msg)
 
             # Warden summon message
             if tick_msgs and not player.is_dead:
