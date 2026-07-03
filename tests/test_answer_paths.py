@@ -129,6 +129,7 @@ _ANSWER_NOT_TOKENISED = {
     'build_dungeon_whole_line_annex',  # ce/cc/s keystroke tape; tests/test_whole_line_annex.py
     'build_dungeon_change_extension',  # S/C keystroke tape; tests/test_change_extension.py
     'build_dungeon_sculpting_chambers',  # O/I/o/A insert tape; tests/test_sculpting_chambers.py
+    'build_dungeon_overwrite_halls',   # R overtype tape; tests/test_overwrite_halls.py
 }
 
 # Levels with a documented NON-1.4 budget. The Change Annex / Extension use a
@@ -137,6 +138,7 @@ _ANSWER_NOT_TOKENISED = {
 _NONSTANDARD_BUDGET = {
     'build_dungeon_whole_line_annex',
     'build_dungeon_change_extension',
+    'build_dungeon_overwrite_halls',   # TIGHT: par + _OH_SAVING − 1 bars the all-S route
 }
 
 from tests import SEEDS as _UNIVERSAL_SEEDS
@@ -228,6 +230,7 @@ _REPLAY_OWN_TEST = {
     'build_dungeon_whole_line_annex':  'test_whole_line_annex.py::test_full_change_route_wins_par_perfect',
     'build_dungeon_change_extension':  'test_change_extension.py::test_full_change_route_wins_par_perfect',
     'build_dungeon_sculpting_chambers': 'test_sculpting_chambers.py::test_full_votive_route_wins_par_perfect',
+    'build_dungeon_overwrite_halls':   'test_overwrite_halls.py::test_full_R_route_wins_par_perfect',
 }
 
 

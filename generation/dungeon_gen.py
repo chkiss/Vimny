@@ -7632,3 +7632,109 @@ def build_dungeon_sculpting_chambers(seed: int) -> Dungeon:
     dungeon.current_room = 0
     return dungeon
 
+
+# ── The Overwrite Halls (R) ───────────────────────────────────────────────────
+# "Streams, not stitches." The player owns `r` (replace one) and `.` (repeat);
+# `R` (overtype mode) earns its place where corrections run in CONSECUTIVE cells.
+# Five mislabelled corridors, the Change-Annex chassis (WEST-wall plaque = the
+# true word; the floor has it wrong; a bolt opens when the floor reads true):
+#   • STREAM doors — a run of 3 consecutive VARIED wrong cells buried MID-word
+#     (correct prefix + run + correct suffix). `R` overtypes the run in place
+#     (`fx` to the run, `R` + the 3 right chars) and leaves the rest untouched.
+#     Every rival overpays: `.` repeats one char so a varied run kills it (the
+#     Echo Vault's lesson, inverted); the `r`-chain is `r{c}l` per cell = 3N−1;
+#     `S`/`cc` (known here) clobber the correct prefix+suffix and must retype the
+#     WHOLE word. FORCING by VOLUME: `R` saves _OH_SAVING keys over the cheapest
+#     rival (all-`S`) across the streams, and the budget sits one below that, so
+#     the fully-naive route overshoots (the Annex model).
+#   • STITCH doors — a SINGLE wrong cell in an otherwise-true word: `r` fixes it
+#     in two keys and `R` merely ties, so `r` stays the right tool. The lesson is
+#     WHICH — stream vs stitch (the Overwrite Halls' r-vs-R discipline).
+# Geometry / tick are the Annex's: spine (each row's first standable), a plaque
+# in the WEST wall, a spine-only throat joining the block to the gate row, a row
+# of bolts, and a plain-floor exit east of them (`_whole_line_annex_tick`, keyed
+# on room._wla_doors; R overwrites IN PLACE so the floor scan is shift-free).
+_OH_ROWS, _OH_COLS = 10, 24
+_OH_PLQ_COL = 1                     # the true word, in the WEST wall (cols 1..8)
+_OH_COL_S   = 10                    # the spine — the gate's first standable; the word floor start
+_OH_LBL_COL = _OH_COL_S            # the wrong word sits on the floor here
+_OH_LBL_END = 18                    # word floor reaches here (fits the 8-char stream words)
+_OH_LESSON_ROWS = (2, 3, 4, 5, 6)   # five corridors, descended by j
+_OH_THROAT_ROW  = 7                 # spine-only row: the block joins the gate
+_OH_GATE_ROW    = 8                 # the gate corridor: spine · bolts · exit
+_OH_GATE_COL0   = 11                # first bolt column (one per corridor)
+_OH_TRIGGERS    = len(_OH_LESSON_ROWS)
+_OH_EXIT = (_OH_GATE_ROW, _OH_GATE_COL0 + _OH_TRIGGERS)   # plain floor, east of the bolts
+_OH_RUN = 'xzq'                     # the 3-cell corruption every stream shares (fx finds it)
+
+# (kind, target, wrong). STREAM: a 3-cell varied run mid-word (fx→R fixes it,
+# S/cc/ce overpay). STITCH: one wrong cell (r's niche). Order interleaves them.
+_OH_LESSONS = (
+    ('stream', 'guardian', 'guar' + _OH_RUN + 'n'),   # guar·[dia→xzq]·n
+    ('stitch', 'sentry',   'sentxy'),                  # sent·[r→x]·y
+    ('stream', 'rampart',  'ra' + _OH_RUN + 'rt'),     # ra·[mpa→xzq]·rt
+    ('stitch', 'portal',   'portil'),                  # port·[a→i]·l
+    ('stream', 'bastion',  'ba' + _OH_RUN + 'on'),     # ba·[sti→xzq]·on
+)
+# par + the canonical tape, driven end-to-end (no Dijkstra — R overwrites in
+# place, but the fx-R-run route is hand-measured like the Annex). Route:
+#   fx Rdia · ^fx rr · ^fx Rmpa · ^fi ra · ^fx Rsti · ^jj$  = 38 keys.
+# Rivals measured on the SAME seed-invariant geometry: all-`S` (retype the whole
+# word) = 43, all-`r`-chain = 50. The budget bars the cheapest no-R route
+# (all-S) by one: par + _OH_SAVING(5) − 1 = 42 < 43.
+_OH_PAR    = 38
+_OH_ANSWER = 'fx Rdia j ^fx rr j ^fx Rmpa j ^fi ra j ^fx Rsti ^jj$'
+_OH_SAVING = 5
+
+
+def build_dungeon_overwrite_halls(seed: int) -> Dungeon:
+    """The Overwrite Halls (slug `overwrite_halls`): R.
+
+    Five mislabelled corridors on the Change-Annex chassis. STREAM doors bury a
+    run of consecutive varied wrong cells mid-word — only `R` (overtype) fixes
+    them without clobbering the correct prefix/suffix; STITCH doors have one wrong
+    cell where `r` still rules. See the section header for the forcing."""
+    R, C = _OH_ROWS, _OH_COLS
+    cells = [[CellType.WALL] * C for _ in range(R)]
+    for r in _OH_LESSON_ROWS:                        # the open corridor block
+        for c in range(_OH_COL_S, _OH_LBL_END + 1):
+            cells[r][c] = CellType.FLOOR
+    cells[_OH_THROAT_ROW][_OH_COL_S] = CellType.FLOOR   # spine-only throat
+    cells[_OH_GATE_ROW][_OH_COL_S]   = CellType.FLOOR   # the spine reaches the gate row
+    cells[_OH_EXIT[0]][_OH_EXIT[1]]  = CellType.FLOOR   # the exit: plain floor, east of the bolts
+    # the bolt cells (gate row, between spine and exit) stay WALL; the tick opens
+    # each when its corridor reads true.
+
+    room = Room(room_type=RoomType.ENTRY, rows=R, cols=C)
+    room.cells = cells
+    room.seed  = seed
+
+    def lay(r, c, text, kind):
+        room.char_runs.append(CharRun(r, c, tuple(text), kind))
+
+    doors = []
+    lessons = []
+    for i, (kind, target, wrong) in enumerate(_OH_LESSONS):
+        lrow = _OH_LESSON_ROWS[i]
+        lay(lrow, _OH_LBL_COL, wrong, 'ancient')             # the WRONG word, on the floor
+        lay(lrow, _OH_PLQ_COL, target, 'verdant')            # the true word, the WEST-wall plaque
+        doors.append((target, (_OH_GATE_ROW, _OH_GATE_COL0 + i)))
+        lessons.append({'kind': kind, 'target': target, 'wrong': wrong, 'row': lrow})
+    room._wla_doors    = tuple(doors)                        # reuse the Annex tick
+    room._oh_lessons   = tuple(lessons)
+
+    room.entities.append(Entity(kind='exit', row=_OH_EXIT[0], col=_OH_EXIT[1],
+                                edit_immune=True))
+    room.spawn_pos = (_OH_LESSON_ROWS[0], _OH_COL_S)         # on corridor 1, at the spine
+    room.exit_pos  = _OH_EXIT
+
+    room.rebuild_indexes()
+    room.par    = _OH_PAR
+    room.budget = _OH_PAR + _OH_SAVING - 1       # TIGHT (Annex model): all-S overshoots by one
+    room.answer = _OH_ANSWER
+
+    dungeon = Dungeon(name='The Overwrite Halls', seed=seed)
+    dungeon.rooms        = [room]
+    dungeon.current_room = 0
+    return dungeon
+

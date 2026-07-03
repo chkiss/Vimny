@@ -1779,6 +1779,7 @@ _LEVEL_INTROS = {
     'whole_line_annex':    ('The Change Annex — every door is mislabelled. The plaque in the wall remembers the true word; the floor has it wrong. Change cuts what is wrong and writes what is right, in a single breath.', 70),
     'change_extension':    ('The Change Extension — deeper into the mislabelled halls. Two strokes was the novice\'s way; a practised hand needs but one. Find where a single keystroke serves.', 70),
     'sculpting_chambers':  ('The Sculpting Chambers — the vault answers only to its votive, carved into the stone line upon line. Open the verses that are missing, above and below; finish the one half-written; then breach the last course of stone to the door.', 70),
+    'overwrite_halls':     ('The Overwrite Halls — the words have rotted in streaks. Where a single stone is wrong, r sets it right; but where the rot runs on, R walks the whole run under one hand. Mend each corridor to match its plaque.', 70),
     'warden_manifold':     ('The Warden Manifold — he stamps himself into the world. Light the four braziers; the gate will draw and the fog will part.', 70),
     'warden_surveyor':     ('The Warden Surveyor — survey his hall; w/b/e leap word to word, over the void.', 60),
     'spellwrights_forge':  ('The Spellwright\'s Forge — the old wards have rotted and cursed lines '
@@ -4653,7 +4654,7 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
             # The Change Annex / Change Extension: spine doors track the
             # relabelled words (stateless, undo-safe — plaque rule). The Extension
             # rides the same generic tick (its room sets `_wla_doors` too).
-            if level in ('whole_line_annex', 'change_extension'):
+            if level in ('whole_line_annex', 'change_extension', 'overwrite_halls'):
                 for _wla_msg in _whole_line_annex_tick(room, player):
                     _push(_wla_msg)
 
