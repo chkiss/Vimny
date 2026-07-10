@@ -1849,22 +1849,22 @@ def _spawn_goblin(room, row, col, summoner_uid: int = 0) -> Entity | None:
 
 # Level-entry banner: slug → (message, msg_ttl).
 _LEVEL_INTROS = {
-    'line_halls':          ('The Line Halls — navigate to the corridor, then use $ and ^', 50),
-    'reliquary':           ('The Reliquary — break the ward: x away the seal to reach the relic.', 60),
-    'counting_crypts':     ('The Counting Crypts — type [N] before hjkl: try 5j or 3l', 50),
-    'rune_halls':          ('The Rune Halls — w:next word  b:prev word  e:end of word', 60),
-    'character_cataracts': ('The Character Cataracts — f{c}:jump to char  t{c}:just before  F/T:backward', 60),
+    'line_halls':          ('The Line Halls — the corridors run long, and there is no patience for crawling. Learn to reach a line by its ends.', 50),
+    'reliquary':           ('The Reliquary — a relic waits behind a brittle ward. Break the seal, and it is yours.', 60),
+    'counting_crypts':     ('The Counting Crypts — the passages run deep, and a step at a time wastes a life. Move in numbers.', 50),
+    'rune_halls':          ('The Rune Halls — the runes gather into words. Learn to stride between them, not crawl letter by letter.', 60),
+    'character_cataracts': ('The Character Cataracts — a torrent of glyphs races past. Fix your eye on one and leap straight to it.', 60),
     'wardens_keep':        ("The Warden's Keep — the shield follows you. Find the unguarded side.", 60),
-    'cipher_cell':         ('The Cipher Cell — make each row read as its plaque: r mends a rune, D shears the rot.', 60),
-    'quartermaster':       ('The Beacon Tiers — one flame remains. yl takes it without taking; P sets it on cold braziers (…); yy, a whole row.', 60),
-    'echo_vault':          ('The Echo Vault — the same blight, stamped again and again. Mend one rune with r; then . repeats your last change.', 60),
-    'inscription_halls':   ('The Inscription Halls — the words were never finished. i writes before the cursor, a writes after; Esc seals the ink. Write them whole, and the river itself will yield.', 70),
+    'cipher_cell':         ('The Cipher Cell — every row is enciphered false. The true words are set in the walls; make the stone agree.', 60),
+    'quartermaster':       ('The Beacon Tiers — one flame survives, and the braziers stand cold. Carry the fire without snuffing it, and raise the beacon in its tiers.', 60),
+    'echo_vault':          ('The Echo Vault — one blight, stamped again and again down the hall. Mend it once, and let the fix echo after.', 60),
+    'inscription_halls':   ('The Inscription Halls — the words were never finished, and a river bars the way. Make them whole, and the water itself will yield.', 70),
     'whole_line_annex':    ('The Change Annex — every door is mislabelled. The plaque in the wall remembers the true word; the floor has it wrong. Change cuts what is wrong and writes what is right, in a single breath.', 70),
     'change_extension':    ('The Change Extension — deeper into the mislabelled halls. Two strokes was the novice\'s way; a practised hand needs but one. Find where a single keystroke serves.', 70),
     'sculpting_chambers':  ('The Sculpting Chambers — a votive lies half-cut in the stone, its verses broken and its lines run dry. The vault keeps faith with the whole prayer, and nothing less.', 70),
-    'overwrite_halls':     ('The Overwrite Halls — the words have rotted in streaks. Where a single stone is wrong, r sets it right; but where the rot runs on, R walks the whole run under one hand. Mend each corridor to match its plaque.', 70),
+    'overwrite_halls':     ('The Overwrite Halls — the words have rotted, some by a single stone, some in long streaks. Mend each corridor to match its plaque, and mind which rot runs on.', 70),
     'warden_manifold':     ('The Warden Manifold — he stamps himself into the world. Light the four braziers; the gate will draw and the fog will part.', 70),
-    'warden_surveyor':     ('The Warden Surveyor — survey his hall; w/b/e leap word to word, over the void.', 60),
+    'warden_surveyor':     ('The Warden Surveyor — he keeps a long hall where the floor falls away between the words. Cross it word by word, over the void.', 60),
     'spellwrights_forge':  ('The Spellwright\'s Forge — the old wards have rotted and cursed lines '
                             'fester among the true. Mend what is corrupt, strike what is cursed, and '
                             'spare what already rings true.', 70),
