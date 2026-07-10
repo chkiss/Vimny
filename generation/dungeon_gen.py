@@ -7568,14 +7568,13 @@ _SC_EXIT_COL = 16                   # the vault door: (pass row, this col), a st
 
 
 # par is hand-tallied along the canonical route (no Dijkstra once the buffer
-# mutates): Okeep(5) jj(2) Ise(3) oamen(5) kk(2) Ahew(4) jj(1) = 22. The finale is
-# `jj`, not `j`: carving is an INSERT, so the door only unseals on the first
-# NORMAL action after Esc — that first `j` is a free blocked move (the door grinds
-# open), the second steps through (the inscription-halls tick-lag idiom). Esc is
-# free/omitted; spaces separate tokens. The A-carve is the SPECIFIC word `hew`
+# mutates): Okeep(5) jj(2) Ise(3) oamen(5) kk(2) Ahew(4) j(1) = 22. The carve's
+# Esc fires the gate tick (main._content_ticks), so the door unseals the instant
+# `hew` is written and a single `j` steps through — no tick-lag filler move. Esc
+# is free/omitted; spaces separate tokens. The A-carve is the SPECIFIC word `hew`
 # (not arbitrary filler) — shown on the seal plaque.
 _SC_PAR    = 22
-_SC_ANSWER = 'Okeep jj Ise oamen kk Ahew jj'
+_SC_ANSWER = 'Okeep jj Ise oamen kk Ahew j'
 
 
 def build_dungeon_sculpting_chambers(seed: int) -> Dungeon:

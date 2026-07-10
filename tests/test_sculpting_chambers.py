@@ -60,13 +60,13 @@ def _K(s):
 # verses top-down (O keep · I se · o amen), climb to the seal line, carve the
 # named word `hew` into the stone (A), and drop south onto the door. The finale is
 # `jj` — carving is an INSERT, so the door only unseals on the first NORMAL action
-# after Esc (the first `j` is a free blocked move; the second steps through).
+# after Esc — the carve's Esc fires the gate tick, so a single `j` steps through.
 def _canon_keys():
     return (_K('O') + _K('keep') + [ESC]
             + _K('jj') + _K('I') + _K('se') + [ESC]
             + _K('o') + _K('amen') + [ESC]
             + _K('kk') + _K('A') + _K('hew') + [ESC]
-            + _K('jj'))
+            + _K('j'))
 
 
 def _drive(dungeon, keys, monkeypatch, finish=':wq\r', name='Scribe'):
@@ -186,11 +186,11 @@ def test_the_door_opens_only_when_the_whole_votive_reads(seed, monkeypatch):
 
 _DROP = {
     'O':  _K('jj') + _K('I') + _K('se') + [ESC] + _K('o') + _K('amen') + [ESC]
-          + _K('kk') + _K('A') + _K('hew') + [ESC] + _K('jj'),
+          + _K('kk') + _K('A') + _K('hew') + [ESC] + _K('j'),
     'o':  _K('O') + _K('keep') + [ESC] + _K('jj') + _K('I') + _K('se') + [ESC]
-          + _K('kk') + _K('A') + _K('hew') + [ESC] + _K('jj'),
+          + _K('kk') + _K('A') + _K('hew') + [ESC] + _K('j'),
     'I':  _K('O') + _K('keep') + [ESC] + _K('o') + _K('amen') + [ESC]
-          + _K('kk') + _K('A') + _K('hew') + [ESC] + _K('jj'),
+          + _K('kk') + _K('A') + _K('hew') + [ESC] + _K('j'),
     'A':  _K('O') + _K('keep') + [ESC] + _K('jj') + _K('I') + _K('se') + [ESC]
           + _K('o') + _K('amen') + [ESC] + _K('kk') + _K('jj'),
 }
@@ -226,7 +226,7 @@ def test_the_carve_must_read_the_named_word(monkeypatch):
     Carving `hew` opens it."""
     # do the whole votive, then carve a WRONG word — door stays sealed
     wrong = (_K('O') + _K('keep') + [ESC] + _K('jj') + _K('I') + _K('se') + [ESC]
-             + _K('o') + _K('amen') + [ESC] + _K('kk') + _K('A') + _K('xyz') + [ESC] + _K('jj'))
+             + _K('o') + _K('amen') + [ESC] + _K('kk') + _K('A') + _K('xyz') + [ESC] + _K('j'))
     dungeon = build_dungeon_sculpting_chambers(SEEDS[0])
     assert not _drive(dungeon, wrong, monkeypatch)['won'], "a wrong carve must not open the door"
     # the right carve wins (covered by the full route) — and the plaque names it
@@ -310,7 +310,7 @@ def test_answer_is_the_real_keystroke_tape(seed, monkeypatch):
     omitted, spaces separators). Driven as admin it advances answer_pos to the
     end without diverging."""
     room = _room(seed)
-    assert room.answer == 'Okeep jj Ise oamen kk Ahew jj'
+    assert room.answer == 'Okeep jj Ise oamen kk Ahew j'
     dungeon = build_dungeon_sculpting_chambers(seed)
     troom = dungeon.rooms[0]
     _drive(dungeon, _canon_keys(), monkeypatch, finish=':q!\r', name='admin')

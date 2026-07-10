@@ -2509,6 +2509,37 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
         if text not in msg_pool:
             msg_pool.append(text)
 
+    def _content_ticks() -> None:
+        """Run the buffer-content gate ticks (the plaque / votive / word gates that
+        open the instant their text READS TRUE) and surface their messages. Called
+        both in the per-turn dispatch AND on leaving INSERT/REPLACE (Esc), so an
+        edit that completes a gate opens it THIS turn — no one-Normal-action lag."""
+        if level == 'cipher_cell':
+            for _m in _cipher_cell_tick(room, player):
+                _push(_m)
+        if level == 'quartermaster':
+            for _m in _quartermaster_tick(room, player):
+                _push(_m)
+        if level == 'echo_vault':
+            for _m in _echo_vault_tick(room, player):
+                _push(_m)
+        if level == 'warden_manifold':
+            for _m in _warden_manifold_tick(room, player, budget.spent):
+                _push(_m)
+        if level == 'inscription_halls':
+            for _m in _inscription_halls_tick(room, player):
+                _push(_m)
+        if level in ('whole_line_annex', 'change_extension', 'overwrite_halls'):
+            for _m in _whole_line_annex_tick(room, player):
+                _push(_m)
+        if level == 'sculpting_chambers':
+            for _m in _sculpting_chambers_tick(room, player):
+                _push(_m)
+            _tw = getattr(room, '_sc_twinkle', None)
+            if _tw:
+                _sc_twinkle_animation(term, room, player, _tw, _iw(term), term.height - 8)
+                room._sc_twinkle = []
+
     def _render(msg='', **kw):
         """Render the dungeon. Drops the repeated (term, dungeon, player, budget) prefix
         and defaults attack_pos/attack_sym to the live attack-flash state; any other
@@ -3255,6 +3286,8 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
                 key_buf = ''
                 insert_creg_pending = False
                 insert_co_buf = None
+                if not edit_mode:
+                    _content_ticks()    # a completed write opens its gate THIS turn
             elif edit_mode:
                 r, c = player.row, player.col
                 if key.name == 'KEY_BACKSPACE' or str(key) == '\x7f':
@@ -3392,6 +3425,8 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
                     player.col -= 1                    # vim retreats one on Esc
                 replace_stack = []
                 key_buf = ''
+                if not edit_mode:
+                    _content_ticks()    # a completed overtype opens its gate THIS turn
             elif key.name == 'KEY_BACKSPACE' or str(key) == '\x7f':
                 if replace_stack:
                     replace_restore(room, player, replace_stack.pop())
@@ -4691,54 +4726,12 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
                     _push('A dead end — yet the last guards pace a sealed ledge below. '
                           'This floor is one rotten line: dd cuts it out from under you.')
 
-            # The Cipher Cell: bolts track their cipher words, the rusted key and
-            # the jammed door track their residue tails (stateless, undo-safe).
-            if level == 'cipher_cell':
-                for _cc_msg in _cipher_cell_tick(room, player):
-                    _push(_cc_msg)
-
-            # The Beacon Tiers: chain bolts, brazier embers and the tier seal
-            # all track the flame plaques (stateless, undo-safe).
-            if level == 'quartermaster':
-                for _qm_msg in _quartermaster_tick(room, player):
-                    _push(_qm_msg)
-
-            # The Echo Vault: every bolt tracks its span-reads-as-plaque rule
-            # (stateless, undo-safe — the Cipher Cell's rule, third member).
-            if level == 'echo_vault':
-                for _ev_msg in _echo_vault_tick(room, player):
-                    _push(_ev_msg)
-
-            # The Warden Manifold: the ritual gate, the ward machine and the
-            # final seal (see _warden_manifold_tick).
-            if level == 'warden_manifold':
-                for _wm_msg in _warden_manifold_tick(room, player, budget.spent):
-                    _push(_wm_msg)
-
-            # The Inscription Halls: bank gates + the ford seal track the
-            # written words (stateless, undo-safe — plaque rule, 4th member).
-            if level == 'inscription_halls':
-                for _ih_msg in _inscription_halls_tick(room, player):
-                    _push(_ih_msg)
-
-            # The Change Annex / Change Extension: spine doors track the
-            # relabelled words (stateless, undo-safe — plaque rule). The Extension
-            # rides the same generic tick (its room sets `_wla_doors` too).
-            if level in ('whole_line_annex', 'change_extension', 'overwrite_halls'):
-                for _wla_msg in _whole_line_annex_tick(room, player):
-                    _push(_wla_msg)
-
-            # The Sculpting Chambers: the votive tablet unseals the vault door
-            # (stateless, undo-safe — plaque rule, on the vertical/horizontal
-            # sculpting axes; see _sculpting_chambers_tick).
-            if level == 'sculpting_chambers':
-                for _sc_msg in _sculpting_chambers_tick(room, player):
-                    _push(_sc_msg)
-                _sc_tw = getattr(room, '_sc_twinkle', None)
-                if _sc_tw:
-                    _sc_twinkle_animation(term, room, player, _sc_tw,
-                                          _iw(term), term.height - 8)
-                    room._sc_twinkle = []
+            # The buffer-content gate ticks (Cipher Cell · Beacon Tiers · Echo
+            # Vault · Warden Manifold · Inscription Halls · Change Annex/Extension ·
+            # Overwrite Halls · Sculpting Chambers) — a bolt/door opens the instant
+            # its plaque/verse READS TRUE on the floor. Also fired on INSERT/REPLACE
+            # Esc so an edit opens its gate the same turn (see _content_ticks).
+            _content_ticks()
 
             # Warden summon message
             if tick_msgs and not player.is_dead:
