@@ -173,11 +173,11 @@ def _ent_cell_str(ent, room, r: int, c: int, mode, floor_bg: str) -> str:
     """Return the colored terminal string for one entity cell (no trailing reset needed)."""
     rst = C.normal_fg()
     if ent.kind == 'exit':
-        # A gated exit sits on a WALL cell until its puzzle is solved — show it as a
-        # locked vault door set in the stone, not a misleading open portal. It
-        # becomes the portal the instant the cell opens to floor.
+        # A gated exit sits on a WALL cell until its puzzle is solved — it is just
+        # STONE until then (don't draw the open portal over a wall). It becomes the
+        # portal the instant the cell is carved/opened to floor.
         if room.cells[r][c] == CellType.WALL:
-            return C.wall_bg() + C.locked_door_fg() + S.DOOR_LOCKED + rst
+            return C.wall_bg() + ' ' + rst
         return floor_bg + C.exit_fg() + S.EXIT + rst
     if ent.kind in ('chest', 'chest_key', 'chest_scroll'):
         return floor_bg + C.chest_fg() + S.CHEST + rst
