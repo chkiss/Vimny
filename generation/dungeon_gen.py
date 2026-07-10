@@ -7561,20 +7561,24 @@ _SC_SEAL_ROW = 4                    # the given anchor line ('seal') at build
 _SC_PASS_ROW = 5                    # the given password line (tail 'same') just below it
 _SC_BAND = (_SC_WCOL, _SC_WCOL + 12)   # scan window for each row's leading verse
 _SC_TARGET = ('keep', 'seal', 'sesame', 'amen')   # the votive, read top → bottom
-_SC_CARVE  = 'hew'                  # the word A must CARVE into the stone (shown on the seal plaque)
+_SC_CARVE  = 'hew'                  # the word A must CARVE into the seal line's stone (its plaque names it)
 _SC_SEAL_END = 13                   # the 'seal' segment's east edge — A's launch cell (bare gap)
-_SC_PLUG   = (14, 16)               # the solid stone A carves east THROUGH, spelling _SC_CARVE
-_SC_EXIT_COL = 16                   # the vault door: (pass row, this col), a step SOUTH of A's landing
+_SC_PLUG   = (14, 16)               # the solid stone east of 'seal' where A cuts _SC_CARVE
+_SC_EXIT_COL = 12                   # the vault door: a step SOUTH of the LAST verse (amen's end col)
+_SC_EXIT_ROW0 = _SC_PASS_ROW + 1    # at BUILD, one row below the password line; the o/O inserts
+                                    # slide it down so it ends up just below `amen` (exit_pos rides them)
 
 
-# par is hand-tallied along the canonical route (no Dijkstra once the buffer
-# mutates): Okeep(5) jj(2) Ise(3) oamen(5) kk(2) Ahew(4) j(1) = 22. The carve's
-# Esc fires the gate tick (main._content_ticks), so the door unseals the instant
-# `hew` is written and a single `j` steps through — no tick-lag filler move. Esc
-# is free/omitted; spaces separate tokens. The A-carve is the SPECIFIC word `hew`
-# (not arbitrary filler) — shown on the seal plaque.
-_SC_PAR    = 22
-_SC_ANSWER = 'Okeep jj Ise oamen kk Ahew j'
+# The route runs TOP-TO-BOTTOM, one act per line (the natural reading order):
+# O keep(5) · j(1) · A hew(4) · ^(1) · j(1) · I se(3) · o amen(5) · j(1) = 21.
+# The carve is line 2's act, done IN PLACE (not saved for last); `^` returns from
+# the cut to the spine to keep descending. The door sits below the LAST verse
+# (amen), so completing the votive drops you onto it — and the carve's / amen's
+# Esc fires the gate tick (main._content_ticks), so a single `j` steps through.
+# Esc is free/omitted; spaces separate tokens. The A-carve is the SPECIFIC word
+# `hew` (not filler) — named on the seal plaque (`seal hew`).
+_SC_PAR    = 21
+_SC_ANSWER = 'Okeep j Ahew ^ j Ise oamen j'
 
 
 def build_dungeon_sculpting_chambers(seed: int) -> Dungeon:
@@ -7595,11 +7599,12 @@ def build_dungeon_sculpting_chambers(seed: int) -> Dungeon:
     sr, pr = _SC_SEAL_ROW, _SC_PASS_ROW
     floor(sr, _SC_WCOL, _SC_SEAL_END)             # 'seal' segment (+ a bare col: A's launch cell)
     floor(pr, _SC_WCOL, 14)                        # the password line (fits 'sesame' + the `se` push)
-    # East of the 'seal' segment is SOLID STONE (sr, 14..). A carves floor through
-    # it and lands on col _SC_EXIT_COL; the exit cell (pr, _SC_EXIT_COL) is a step
-    # SOUTH of that landing and stays WALL until the votive reads true. Nothing
-    # else east of the plug is pre-floor, so A's rightmost-passable launch is the
-    # 'seal' segment edge (col 13), not a stray corridor.
+    # East of the 'seal' segment is SOLID STONE (sr, 14..). A cuts `hew` INTO it —
+    # a content inscription (only A writes into wall), NOT a path; the seal line's
+    # 2nd token must read `hew`. The vault door is elsewhere: a step SOUTH of the
+    # LAST verse (amen), which lands one row below the given password line —
+    # `_SC_EXIT_ROW0`. So the votive is carved top-to-bottom and the door drops you
+    # out at the bottom; A (an east-builder) can never back-door a door due south.
 
     room = Room(room_type=RoomType.ENTRY, rows=R, cols=C)
     room.cells = cells
@@ -7610,13 +7615,8 @@ def build_dungeon_sculpting_chambers(seed: int) -> Dungeon:
 
     lay(sr, _SC_WCOL, 'seal', 'ancient')          # the given anchor verse
     lay(pr, _SC_WCOL, 'same', 'ancient')          # the password's given tail
-    # The door is a step SOUTH of A's landing, so A (an east-builder) can never
-    # back-door it from the seal row — over-building east just runs dead into
-    # stone. The ONE void guard: stop an A-build east off the PASSWORD row, one
-    # cell short of the exit column.
-    lay(pr, _SC_EXIT_COL - 1, '○', 'void')         # stops an A-build east off the password
     # The votive reference, in the WEST wall (verdant plaques). The seal plaque
-    # ALSO carries the carve word `hew` (`seal hew`), so the A-build is a named
+    # ALSO carries the carve word `hew` (`seal hew`), so the A-cut is a named
     # sequence, not arbitrary filler. The tick keeps every plaque ALIGNED with its
     # verse as o/O insert rows (see _sculpting_chambers_tick).
     _plaque_text = {'seal': f'seal {_SC_CARVE}'}
@@ -7627,9 +7627,12 @@ def build_dungeon_sculpting_chambers(seed: int) -> Dungeon:
     room._sc_carve  = _SC_CARVE
     room._sc_band   = _SC_BAND
 
-    room.entities.append(Entity(kind='exit', row=pr, col=_SC_EXIT_COL, edit_immune=True))
+    # The door: a step SOUTH of the last verse (amen), one row below the given
+    # password line. It stays WALL until the votive + carve read true.
+    exit_pos = (_SC_EXIT_ROW0, _SC_EXIT_COL)
+    room.entities.append(Entity(kind='exit', row=exit_pos[0], col=exit_pos[1], edit_immune=True))
     room.spawn_pos = (sr, _SC_WCOL)               # on the 'seal' verse
-    room.exit_pos  = (pr, _SC_EXIT_COL)
+    room.exit_pos  = exit_pos
 
     room.rebuild_indexes()
     room.par    = _SC_PAR

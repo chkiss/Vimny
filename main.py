@@ -617,30 +617,42 @@ def _unlock_animation(term: Terminal, room, player,
 
 
 def _sc_twinkle_animation(term, room, player, moved, iw: int, game_h: int) -> None:
-    """Sparkle the WEST-wall plaques that just re-aligned to their verses (the
-    Sculpting Chambers) — the guidance visibly follows the engine as o/O insert
-    rows. `moved` = [(row, col, length), ...]; a few frames of shimmer, then the
-    next _render restores the settled plaque."""
+    """The Sculpting Chambers plaques following the engine as o/O insert rows.
+    `moved` = [(old_row, new_row, col, symbols), ...]. Two beats: (1) the plaque
+    SLIDES from its old row to its new one (clearing its trail); (2) at the new
+    row each letter is re-inked one-by-one in bright white and COOLS to verdant.
+    A transient overlay — the next _render restores the settled plaque."""
     vr = max(0, min(player.row - game_h // 2, room.rows - game_h))
     vc = max(0, min(player.col - iw    // 2,  room.cols - iw))
-    cells = []
-    for (rr, c0, ln) in moved:
-        for k in range(ln):
-            cc = c0 + k
-            ru = room.char_run_at(rr, cc)
-            ch = ru.symbols[cc - ru.col] if ru is not None else ' '
-            sr, sc = rr - vr + 3, cc - vc + 1
-            if 3 <= sr < 3 + game_h and 1 <= sc < 1 + iw:
-                cells.append((sr, sc, ch))
-    if not cells:
-        return
     wbg = C.wall_bg()
-    palette = [term.bright_white + term.bold, C.rune_verdant(),
-               term.bright_cyan + term.bold, C.rune_verdant()]
-    for frame in range(len(palette)):
-        clr = palette[frame]
-        for (sr, sc, ch) in cells:
-            print(term.move_yx(sr, sc) + wbg + clr + ch + term.normal, end='', flush=True)
+
+    def _draw(rr, c0, text, clr):
+        sr = rr - vr + 3
+        if not (3 <= sr < 3 + game_h):
+            return
+        for k, ch in enumerate(text):
+            sc = c0 + k - vc + 1
+            if 1 <= sc < 1 + iw:
+                print(term.move_yx(sr, sc) + wbg + clr + ch + term.normal, end='', flush=True)
+
+    dim_green = term.dim + C.rune_verdant()
+    # ── beat 1: slide each plaque from old row → new row, clearing the trail ──
+    for (old_r, new_r, c0, syms) in moved:
+        text = ''.join(syms)
+        step = 1 if new_r >= old_r else -1
+        path = list(range(old_r, new_r + step, step))
+        for i, rr in enumerate(path):
+            if i > 0:
+                _draw(path[i - 1], c0, ' ' * len(text), term.normal)   # wipe the last frame
+            _draw(rr, c0, text, dim_green)
+            time.sleep(0.09)
+    # ── beat 2: re-ink each landed plaque letter-by-letter, white cooling to green
+    for (old_r, new_r, c0, syms) in moved:
+        text = ''.join(syms)
+        for k in range(len(text)):
+            _draw(new_r, c0 + k, text[k], term.bright_white + term.bold)
+            time.sleep(0.06)
+        _draw(new_r, c0, text, C.rune_verdant())                       # cools to verdant
         time.sleep(0.05)
 
 
@@ -1389,9 +1401,10 @@ def _sc_realign_plaques(room) -> list:
         want = slot.get(word)
         if want is None or not (0 <= want < room.rows) or ru.row == want:
             continue
+        old_row = ru.row
         room.char_runs.remove(ru)
         room.char_runs.append(CharRun(want, ru.col, ru.symbols, ru.kind))
-        moved.append((want, ru.col, len(ru.symbols)))
+        moved.append((old_row, want, ru.col, ru.symbols))   # slide old→new, then re-ink
     if moved:
         room.rebuild_indexes()
     return moved
@@ -1848,7 +1861,7 @@ _LEVEL_INTROS = {
     'inscription_halls':   ('The Inscription Halls — the words were never finished. i writes before the cursor, a writes after; Esc seals the ink. Write them whole, and the river itself will yield.', 70),
     'whole_line_annex':    ('The Change Annex — every door is mislabelled. The plaque in the wall remembers the true word; the floor has it wrong. Change cuts what is wrong and writes what is right, in a single breath.', 70),
     'change_extension':    ('The Change Extension — deeper into the mislabelled halls. Two strokes was the novice\'s way; a practised hand needs but one. Find where a single keystroke serves.', 70),
-    'sculpting_chambers':  ('The Sculpting Chambers — the vault answers only to its votive, carved into the stone line upon line. Open the verses that are missing, above and below; finish the one half-written; then breach the last course of stone to the door.', 70),
+    'sculpting_chambers':  ('The Sculpting Chambers — the vault opens only when its whole votive is cut, line upon line: open the missing verses above and below, finish the half-written one, and cut the named word into the seal-line\'s stone. Work down the tablet; the door waits below the last verse.', 70),
     'overwrite_halls':     ('The Overwrite Halls — the words have rotted in streaks. Where a single stone is wrong, r sets it right; but where the rot runs on, R walks the whole run under one hand. Mend each corridor to match its plaque.', 70),
     'warden_manifold':     ('The Warden Manifold — he stamps himself into the world. Light the four braziers; the gate will draw and the fog will part.', 70),
     'warden_surveyor':     ('The Warden Surveyor — survey his hall; w/b/e leap word to word, over the void.', 60),

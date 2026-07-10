@@ -36,7 +36,7 @@ from content.levels import known_commands
 from generation.dungeon_gen import (
     build_dungeon_sculpting_chambers,
     _SC_ROWS, _SC_COLS, _SC_PAR, _SC_TARGET, _SC_BAND,
-    _SC_SEAL_ROW, _SC_PASS_ROW, _SC_WCOL, _SC_EXIT_COL,
+    _SC_SEAL_ROW, _SC_PASS_ROW, _SC_WCOL, _SC_EXIT_COL, _SC_EXIT_ROW0,
 )
 
 import math
@@ -56,16 +56,15 @@ def _K(s):
     return [Keystroke(ch) for ch in s]
 
 
-# The canonical votive route (shared by the tape and the playthrough): carve the
-# verses top-down (O keep · I se · o amen), climb to the seal line, carve the
-# named word `hew` into the stone (A), and drop south onto the door. The finale is
-# `jj` — carving is an INSERT, so the door only unseals on the first NORMAL action
-# after Esc — the carve's Esc fires the gate tick, so a single `j` steps through.
+# The canonical route runs TOP-TO-BOTTOM, one act per line (natural reading
+# order): O keep, down to seal + A hew (the carve is line 2, in place), `^` back to
+# the spine, down to sesame + I se, o amen, and a single `j` drops onto the door
+# below the last verse (the carve's/amen's Esc fires the gate tick).
 def _canon_keys():
-    return (_K('O') + _K('keep') + [ESC]
-            + _K('jj') + _K('I') + _K('se') + [ESC]
+    return (_K('O') + _K('keep') + [ESC] + _K('j')
+            + _K('A') + _K('hew') + [ESC] + _K('^') + _K('j')
+            + _K('I') + _K('se') + [ESC]
             + _K('o') + _K('amen') + [ESC]
-            + _K('kk') + _K('A') + _K('hew') + [ESC]
             + _K('j'))
 
 
@@ -92,7 +91,7 @@ def test_dimensions_anchors_par_budget(seed):
     room = _room(seed)
     assert (room.rows, room.cols) == (_SC_ROWS, _SC_COLS)
     assert room.spawn_pos == (_SC_SEAL_ROW, _SC_WCOL)
-    assert room.exit_pos == (_SC_PASS_ROW, _SC_EXIT_COL)
+    assert room.exit_pos == (_SC_EXIT_ROW0, _SC_EXIT_COL)
     assert room.par == _SC_PAR
     assert room.budget == math.ceil(_SC_PAR * 1.4)
 
@@ -114,12 +113,13 @@ def test_door_is_sealed_and_east_of_the_seal_line_is_stone(seed):
     """The exit cell is WALL at build (the votive unseals it), and the stone east
     of the `seal` segment is solid — A's only launch is the segment's east edge,
     not a stray corridor."""
+    from generation.dungeon_gen import _SC_PLUG
     room = build_dungeon_sculpting_chambers(seed).rooms[0]
     er, ec = room.exit_pos
     assert room.cells[er][ec] == CellType.WALL
-    # east of the seal segment (its bare launch cell) is wall, all the way to the
-    # exit column — nothing pre-floored for A to jump past.
-    for c in range(_SC_WCOL + 5, _SC_EXIT_COL + 1):
+    # east of the seal segment is SOLID STONE (the plug A cuts `hew` into) — nothing
+    # pre-floored, so A's launch is the segment edge, not a stray corridor.
+    for c in range(_SC_PLUG[0], _SC_PLUG[1] + 1):
         assert room.cells[_SC_SEAL_ROW][c] == CellType.WALL, c
 
 
@@ -167,6 +167,34 @@ def test_full_votive_route_wins_par_perfect(seed, monkeypatch):
     assert result['won'] and result['stars'] == 2, result
 
 
+def _drive_spent(keys, monkeypatch):
+    box = {}
+    orig = main._calc_stars
+    monkeypatch.setattr(main, '_calc_stars',
+                        lambda won, budget, room, player, level='':
+                            (box.__setitem__('spent', budget.spent),
+                             orig(won, budget, room, player, level))[1])
+    dungeon = build_dungeon_sculpting_chambers(SEEDS[0])
+    dungeon.rooms[0].budget = 999          # uncap: measure the true keystroke cost
+    result = _drive(dungeon, keys, monkeypatch)
+    return result['won'], box.get('spent')
+
+
+def test_no_cheaper_route_beats_par(monkeypatch):
+    """Anti-cheese (hand-par level): the top-to-bottom route spends EXACTLY par
+    (so par is not inflated above the driven route), and dropping the `^` that
+    returns from the cut does NOT yield a cheaper win — the cursor is stranded east
+    of the seal segment, so the descent breaks."""
+    won_g, spent_g = _drive_spent(_canon_keys(), monkeypatch)
+    assert won_g and spent_g == _SC_PAR, (won_g, spent_g)
+    # no `^` after the carve: the cursor sits east of the seal floor, so `j` cannot
+    # descend to sesame and the route cannot complete the votive cheaply
+    no_caret = (_K('O') + _K('keep') + [ESC] + _K('j') + _K('A') + _K('hew') + [ESC]
+                + _K('j') + _K('I') + _K('se') + [ESC] + _K('o') + _K('amen') + [ESC] + _K('j'))
+    won_n, spent_n = _drive_spent(no_caret, monkeypatch)
+    assert not (won_n and spent_n < _SC_PAR), "no winning route may spend less than par"
+
+
 @pytest.mark.parametrize("seed", SEEDS)
 def test_the_door_opens_only_when_the_whole_votive_reads(seed, monkeypatch):
     """Drive the votive, then read the tablet: the four verses stand in order and
@@ -184,36 +212,38 @@ def test_the_door_opens_only_when_the_whole_votive_reads(seed, monkeypatch):
 
 # ── each of I A o O is necessary (drop one → no win) ───────────────────────────
 
+# The canonical route with ONE act omitted — each must leave the vault sealed
+# (the votive verse or the carve is missing).
 _DROP = {
-    'O':  _K('jj') + _K('I') + _K('se') + [ESC] + _K('o') + _K('amen') + [ESC]
-          + _K('kk') + _K('A') + _K('hew') + [ESC] + _K('j'),
-    'o':  _K('O') + _K('keep') + [ESC] + _K('jj') + _K('I') + _K('se') + [ESC]
-          + _K('kk') + _K('A') + _K('hew') + [ESC] + _K('j'),
-    'I':  _K('O') + _K('keep') + [ESC] + _K('o') + _K('amen') + [ESC]
-          + _K('kk') + _K('A') + _K('hew') + [ESC] + _K('j'),
-    'A':  _K('O') + _K('keep') + [ESC] + _K('jj') + _K('I') + _K('se') + [ESC]
-          + _K('o') + _K('amen') + [ESC] + _K('kk') + _K('jj'),
+    'O':  _K('j') + _K('A') + _K('hew') + [ESC] + _K('^') + _K('j')
+          + _K('I') + _K('se') + [ESC] + _K('o') + _K('amen') + [ESC] + _K('j'),
+    'A':  _K('O') + _K('keep') + [ESC] + _K('j') + _K('^') + _K('j')
+          + _K('I') + _K('se') + [ESC] + _K('o') + _K('amen') + [ESC] + _K('j'),
+    'I':  _K('O') + _K('keep') + [ESC] + _K('j') + _K('A') + _K('hew') + [ESC]
+          + _K('^') + _K('j') + _K('o') + _K('amen') + [ESC] + _K('j'),
+    'o':  _K('O') + _K('keep') + [ESC] + _K('j') + _K('A') + _K('hew') + [ESC]
+          + _K('^') + _K('j') + _K('I') + _K('se') + [ESC] + _K('j'),
 }
 
 
 @pytest.mark.parametrize("cmd", sorted(_DROP))
 def test_each_insert_entry_is_necessary(cmd, monkeypatch):
     """Remove any one of I/A/o/O from the route and the vault never opens: O/o
-    carve the verses the votive needs, I finishes the password, A breaches the
-    stone to the door."""
+    carve the verses the votive needs, I finishes the password, A cuts the named
+    word into the seal line's stone."""
     dungeon = build_dungeon_sculpting_chambers(SEEDS[0])
     result = _drive(dungeon, _DROP[cmd], monkeypatch)
     assert not result['won'], f"dropping {cmd} still won"
 
 
 def test_A_alone_cannot_backdoor_the_sealed_door(monkeypatch):
-    """A breaches the stone, but with the votive UNwritten the door stays sealed —
-    A (an east-builder) can never carve into a cell that is a step SOUTH, and the
-    password row's east edge is void-capped. Breach + walk wins nothing."""
+    """`j A hew` alone — cut the stone with the votive UNwritten — never wins: the
+    door is a step SOUTH of the LAST verse, gated on the whole votive, and A (an
+    east-builder) can never carve into a cell due south. This is exactly the
+    'what stops me just carving?' case: the four verses are still required."""
     dungeon = build_dungeon_sculpting_chambers(SEEDS[0])
     room = dungeon.rooms[0]
-    # climb nowhere; just breach east off the seal line and try to reach the door
-    keys = _K('A') + _K('hewabc') + [ESC] + _K('j') + _K('jjjj')
+    keys = _K('j') + _K('A') + _K('hew') + [ESC] + _K('jjjj')
     result = _drive(dungeon, keys, monkeypatch, finish=':q!\r')
     assert not result['won']
     er, ec = room.exit_pos
@@ -310,7 +340,7 @@ def test_answer_is_the_real_keystroke_tape(seed, monkeypatch):
     omitted, spaces separators). Driven as admin it advances answer_pos to the
     end without diverging."""
     room = _room(seed)
-    assert room.answer == 'Okeep jj Ise oamen kk Ahew j'
+    assert room.answer == 'Okeep j Ahew ^ j Ise oamen j'
     dungeon = build_dungeon_sculpting_chambers(seed)
     troom = dungeon.rooms[0]
     _drive(dungeon, _canon_keys(), monkeypatch, finish=':q!\r', name='admin')
