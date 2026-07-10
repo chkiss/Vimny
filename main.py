@@ -1861,7 +1861,7 @@ _LEVEL_INTROS = {
     'inscription_halls':   ('The Inscription Halls — the words were never finished. i writes before the cursor, a writes after; Esc seals the ink. Write them whole, and the river itself will yield.', 70),
     'whole_line_annex':    ('The Change Annex — every door is mislabelled. The plaque in the wall remembers the true word; the floor has it wrong. Change cuts what is wrong and writes what is right, in a single breath.', 70),
     'change_extension':    ('The Change Extension — deeper into the mislabelled halls. Two strokes was the novice\'s way; a practised hand needs but one. Find where a single keystroke serves.', 70),
-    'sculpting_chambers':  ('The Sculpting Chambers — the vault opens only when its whole votive is cut, line upon line: open the missing verses above and below, finish the half-written one, and cut the named word into the seal-line\'s stone. Work down the tablet; the door waits below the last verse.', 70),
+    'sculpting_chambers':  ('The Sculpting Chambers — a votive lies half-cut in the stone, its verses broken and its lines run dry. The vault keeps faith with the whole prayer, and nothing less.', 70),
     'overwrite_halls':     ('The Overwrite Halls — the words have rotted in streaks. Where a single stone is wrong, r sets it right; but where the rot runs on, R walks the whole run under one hand. Mend each corridor to match its plaque.', 70),
     'warden_manifold':     ('The Warden Manifold — he stamps himself into the world. Light the four braziers; the gate will draw and the fog will part.', 70),
     'warden_surveyor':     ('The Warden Surveyor — survey his hall; w/b/e leap word to word, over the void.', 60),
