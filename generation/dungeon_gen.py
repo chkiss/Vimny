@@ -7677,14 +7677,18 @@ _OH_LESSONS = (
     ('stream', 'bastion',  'ba' + _OH_RUN + 'on'),     # ba·[sti→xzq]·on
 )
 # par + the canonical tape, driven end-to-end (no Dijkstra — R overwrites in
-# place, but the fx-R-run route is hand-measured like the Annex). Route:
-#   fx Rdia · ^fx rr · ^fx Rmpa · ^fi ra · ^fx Rsti · ^jj$  = 38 keys.
-# Rivals measured on the SAME seed-invariant geometry: all-`S` (retype the whole
-# word) = 43, all-`r`-chain = 50. The budget bars the cheapest no-R route
-# (all-S) by one: par + _OH_SAVING(5) − 1 = 42 < 43.
-_OH_PAR    = 38
-_OH_ANSWER = 'fx Rdia j ^fx rr j ^fx Rmpa j ^fi ra j ^fx Rsti ^jj$'
-_OH_SAVING = 5
+# place, but the fx-R-run route is hand-measured like the Annex). The route is
+# the GOLFED one — `F` (backward-find, NOT `^f`) back to each run, the C4 stitch
+# taken free (the descent lands the cursor on it), and `G$` (NOT `^jj$`) to the
+# door:  fx Rdia · Fx rr · Fx Rmpa · ra · Fx Rsti · G$  = 30 keys.
+# Rivals measured on the SAME seed-invariant geometry with the SAME golfed nav:
+# all-`S` (retype the whole word) = 39, all-`r`-chain = 42. The budget bars the
+# cheapest no-R route (all-S) by one: par + _OH_SAVING(9) − 1 = 38 < 39.
+# (An earlier hand-route used `^f`/`^jj$` and mis-set par to 38 — a nav cheese;
+# see tests/test_overwrite_halls.py::test_no_cheaper_nav_beats_par.)
+_OH_PAR    = 30
+_OH_ANSWER = 'fx Rdia j Fx rr j Fx Rmpa j ra j Fx Rsti G$'
+_OH_SAVING = 9
 
 
 def build_dungeon_overwrite_halls(seed: int) -> Dungeon:

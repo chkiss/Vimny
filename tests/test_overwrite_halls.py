@@ -55,10 +55,22 @@ def _bolt(i):
     return (_OH_GATE_ROW, _OH_GATE_COL0 + i)
 
 
-# The canonical R route (shared by the tape and the playthrough): for each stream
-# `fx` to the run then `R` the 3 right chars; for each stitch `r` the one cell;
-# then down the spine and east to the door.
+# The canonical R route (shared by the tape and the playthrough) — GOLFED: `F`
+# (backward-find) back to each run, the C4 stitch taken FREE (the descent lands
+# the cursor on it), and `G$` to the door. 30 keys.
 def _canon_keys():
+    return (_K('fx') + _K('R') + _K('dia') + [ESC] + _K('j')
+            + _K('Fx') + _K('rr') + _K('j')
+            + _K('Fx') + _K('R') + _K('mpa') + [ESC] + _K('j')
+            + _K('ra') + _K('j')
+            + _K('Fx') + _K('R') + _K('sti') + [ESC]
+            + _K('G') + _K('$'))
+
+
+# The OLD hand-route that mis-set par to 38: `^f` back to each run and `^jj$` to
+# the door — every one a wasteful stand-in for `F` / `G$`. It still wins, but
+# spends MORE than par; a golfer would never type it. Kept as a cheese regression.
+def _old_nav_keys():
     return (_K('fx') + _K('R') + _K('dia') + [ESC] + _K('j')
             + _K('^') + _K('fx') + _K('rr') + _K('j')
             + _K('^') + _K('fx') + _K('R') + _K('mpa') + [ESC] + _K('j')
@@ -71,11 +83,11 @@ def _all_S_keys():
     """The cheapest no-R route: change the whole word on each stream (S), r the
     stitches. Costs par + _OH_SAVING, one past the budget."""
     return (_K('S') + _K('guardian') + [ESC] + _K('j')
-            + _K('^') + _K('fx') + _K('rr') + _K('j')
+            + _K('Fx') + _K('rr') + _K('j')
             + _K('S') + _K('rampart') + [ESC] + _K('j')
-            + _K('^') + _K('fi') + _K('ra') + _K('j')
+            + _K('Fi') + _K('ra') + _K('j')
             + _K('S') + _K('bastion') + [ESC]
-            + _K('^') + _K('j') + _K('j') + _K('$'))
+            + _K('G') + _K('$'))
 
 
 def _drive(dungeon, keys, monkeypatch, finish=':wq\r', name='Scribe'):
@@ -92,6 +104,20 @@ def _drive(dungeon, keys, monkeypatch, finish=':wq\r', name='Scribe'):
     monkeypatch.setattr(term, 'inkey', lambda *a, **k: next(it, Keystroke('')))
     return main.run_dungeon(term, 'overwrite_halls', {}, player_name=name,
                             _dungeon=dungeon)
+
+
+def _drive_spent(keys, monkeypatch):
+    """Drive a route with an UNCAPPED budget and return (won, spent) — used to
+    audit whether any route beats par (a mis-set par = a cheese)."""
+    box = {}
+    orig = main._calc_stars
+    monkeypatch.setattr(main, '_calc_stars',
+                        lambda won, budget, room, player, level='':
+                            (box.__setitem__('spent', budget.spent), orig(won, budget, room, player, level))[1])
+    dungeon = build_dungeon_overwrite_halls(SEEDS[0])
+    dungeon.rooms[0].budget = 999          # uncap: measure the true keystroke cost
+    result = _drive(dungeon, keys, monkeypatch)
+    return result['won'], box.get('spent')
 
 
 # ── structure ─────────────────────────────────────────────────────────────────
@@ -194,6 +220,21 @@ def test_full_R_route_wins_par_perfect(seed, monkeypatch):
         assert room.cells[_bolt(i)[0]][_bolt(i)[1]] == CellType.FLOOR, "every bolt open"
 
 
+def test_no_cheaper_nav_beats_par(monkeypatch):
+    """Anti-cheese: par must be the MINIMUM keystroke cost, so NO winning route may
+    spend less than par. test_answer_paths only checks the canonical answer WINS —
+    it never checks par is minimal, which is how the first hand-route (`^f`, `^jj$`)
+    inflated par to 38 and slipped through. Here the golfed route is par, and the
+    wasteful old-nav route wins but spends strictly MORE (never less)."""
+    won_g, spent_g = _drive_spent(_canon_keys(), monkeypatch)
+    assert won_g and spent_g == _OH_PAR, (won_g, spent_g)
+    won_o, spent_o = _drive_spent(_old_nav_keys(), monkeypatch)
+    assert won_o and spent_o > _OH_PAR, "the ^f/^jj$ nav must cost MORE than par, not define it"
+    # the general invariant: neither driven route wins for less than par
+    for won, spent in ((won_g, spent_g), (won_o, spent_o)):
+        assert not (won and spent < _OH_PAR), "a winning route cheaper than par = a mis-set par"
+
+
 @pytest.mark.parametrize("seed", SEEDS)
 def test_all_S_route_is_barred(seed, monkeypatch):
     """Necessity, by volume: mending every stream with `S` (never `R`) costs
@@ -247,7 +288,7 @@ def test_answer_is_the_real_keystroke_tape(seed, monkeypatch):
     omitted, spaces separators). Driven as admin it advances answer_pos to the
     end without diverging — R-mode chars advance the tape too."""
     room = _room(seed)
-    assert room.answer == 'fx Rdia j ^fx rr j ^fx Rmpa j ^fi ra j ^fx Rsti ^jj$'
+    assert room.answer == 'fx Rdia j Fx rr j Fx Rmpa j ra j Fx Rsti G$'
     dungeon = build_dungeon_overwrite_halls(seed)
     troom = dungeon.rooms[0]
     _drive(dungeon, _canon_keys(), monkeypatch, finish=':q!\r', name='admin')
