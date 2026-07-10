@@ -7554,17 +7554,18 @@ def build_dungeon_change_extension(seed: int) -> Dungeon:
 # discipline). A cannot cheat the door: the door is a VERTICAL step off the
 # corridor's end (A builds east, never into it) and void runes cap every floor
 # edge A could otherwise build from toward it.
-_SC_ROWS, _SC_COLS = 9, 26
-_SC_WCOL = 9                        # the votive's verses start here (west of it: the plaques)
+_SC_ROWS, _SC_COLS = 9, 28
+_SC_WCOL = 13                       # the votive's verses start here — a 4-cell wall GAP (cols 9-12)
+                                    # breathes between the west-wall plaques and the carving floor
 _SC_PLQ  = 1                        # plaque column, in the WEST wall
 _SC_SEAL_ROW = 4                    # the given anchor line ('seal') at build
 _SC_PASS_ROW = 5                    # the given password line (tail 'same') just below it
 _SC_BAND = (_SC_WCOL, _SC_WCOL + 12)   # scan window for each row's leading verse
 _SC_TARGET = ('keep', 'seal', 'sesame', 'amen')   # the votive, read top → bottom
 _SC_CARVE  = 'hew'                  # the word A must CARVE into the seal line's stone (its plaque names it)
-_SC_SEAL_END = 13                   # the 'seal' segment's east edge — A's launch cell (bare gap)
-_SC_PLUG   = (14, 16)               # the solid stone east of 'seal' where A cuts _SC_CARVE
-_SC_EXIT_COL = 12                   # the vault door: a step SOUTH of the LAST verse (amen's end col)
+_SC_SEAL_END = 17                   # the 'seal' segment's east edge — A's launch cell (bare gap)
+_SC_PLUG   = (18, 20)               # the solid stone east of 'seal' where A cuts _SC_CARVE
+_SC_EXIT_COL = 16                   # the vault door: a step SOUTH of the LAST verse (amen's end col)
 _SC_EXIT_ROW0 = _SC_PASS_ROW + 1    # at BUILD, one row below the password line; the o/O inserts
                                     # slide it down so it ends up just below `amen` (exit_pos rides them)
 
@@ -7598,7 +7599,7 @@ def build_dungeon_sculpting_chambers(seed: int) -> Dungeon:
 
     sr, pr = _SC_SEAL_ROW, _SC_PASS_ROW
     floor(sr, _SC_WCOL, _SC_SEAL_END)             # 'seal' segment (+ a bare col: A's launch cell)
-    floor(pr, _SC_WCOL, 14)                        # the password line (fits 'sesame' + the `se` push)
+    floor(pr, _SC_WCOL, _SC_WCOL + 5)              # the password line (fits 'sesame' + the `se` push)
     # East of the 'seal' segment is SOLID STONE (sr, 14..). A cuts `hew` INTO it —
     # a content inscription (only A writes into wall), NOT a path; the seal line's
     # 2nd token must read `hew`. The vault door is elsewhere: a step SOUTH of the
