@@ -616,6 +616,34 @@ def _unlock_animation(term: Terminal, room, player,
     time.sleep(0.08)
 
 
+def _sc_twinkle_animation(term, room, player, moved, iw: int, game_h: int) -> None:
+    """Sparkle the WEST-wall plaques that just re-aligned to their verses (the
+    Sculpting Chambers) — the guidance visibly follows the engine as o/O insert
+    rows. `moved` = [(row, col, length), ...]; a few frames of shimmer, then the
+    next _render restores the settled plaque."""
+    vr = max(0, min(player.row - game_h // 2, room.rows - game_h))
+    vc = max(0, min(player.col - iw    // 2,  room.cols - iw))
+    cells = []
+    for (rr, c0, ln) in moved:
+        for k in range(ln):
+            cc = c0 + k
+            ru = room.char_run_at(rr, cc)
+            ch = ru.symbols[cc - ru.col] if ru is not None else ' '
+            sr, sc = rr - vr + 3, cc - vc + 1
+            if 3 <= sr < 3 + game_h and 1 <= sc < 1 + iw:
+                cells.append((sr, sc, ch))
+    if not cells:
+        return
+    wbg = C.wall_bg()
+    palette = [term.bright_white + term.bold, C.rune_verdant(),
+               term.bright_cyan + term.bold, C.rune_verdant()]
+    for frame in range(len(palette)):
+        clr = palette[frame]
+        for (sr, sc, ch) in cells:
+            print(term.move_yx(sr, sc) + wbg + clr + ch + term.normal, end='', flush=True)
+        time.sleep(0.05)
+
+
 # ── Animations ────────────────────────────────────────────────────────────────
 
 def _explosion_animation(term, room, expl_r, expl_c, scr_r, scr_c, iw, game_h):
@@ -1336,24 +1364,66 @@ def _sc_leading_verse(room, r: int, c0: int, c1: int) -> str:
     return next(iter(_wla_floor_text(room, r)[c0:c1 + 1].split()), '')
 
 
+def _sc_seal_row(room, c0: int, c1: int):
+    """The row whose floor verse leads with 'seal' — the votive's anchor (always
+    given, so always findable); the tablet's other slots are relative to it."""
+    return next((r for r in range(room.rows)
+                 if _sc_leading_verse(room, r, c0, c1) == 'seal'), None)
+
+
+def _sc_realign_plaques(room) -> list:
+    """Keep each WEST-wall plaque on the SAME row as the verse it names — o/O row-
+    inserts drift them, so re-lay any that moved and return those cells so the
+    render layer can TWINKLE them (the guidance visibly follows the engine). Slots
+    are relative to the 'seal' anchor verse on the floor, so this is shift-proof."""
+    target = getattr(room, '_sc_target', ())
+    c0, c1 = room._sc_band
+    seal_row = _sc_seal_row(room, c0, c1)
+    if seal_row is None:
+        return []
+    base = target.index('seal')
+    slot = {w: seal_row + (target.index(w) - base) for w in target}
+    moved = []
+    for ru in [r for r in room.char_runs if r.kind == 'verdant']:
+        word = (''.join(ru.symbols).split() or [''])[0]
+        want = slot.get(word)
+        if want is None or not (0 <= want < room.rows) or ru.row == want:
+            continue
+        room.char_runs.remove(ru)
+        room.char_runs.append(CharRun(want, ru.col, ru.symbols, ru.kind))
+        moved.append((want, ru.col, len(ru.symbols)))
+    if moved:
+        room.rebuild_indexes()
+    return moved
+
+
 def _sculpting_chambers_tick(room, player) -> list:
     """The Sculpting Chambers votive: the vault door (a single gated cell at
-    room.exit_pos) unseals exactly while the tablet's verses READ TRUE in order
-    — the leading verse of each inscribed row, top to bottom, equals the target
-    (keep · seal · sesame · amen). Text- and exit_pos-relative, so it rides the
-    row shifts o/O/I cause (the Manifold discipline); STATELESS, hence undo-safe
-    (undoing a verse re-seals the door)."""
+    room.exit_pos) unseals exactly while the tablet READS TRUE — the leading verse
+    of each inscribed row, top to bottom, equals the target (keep · seal · sesame
+    · amen) AND the seal row's second token is the carved word (`hew`). Each turn
+    the plaques RE-ALIGN to their verses (o/O drift them) and twinkle. Text- and
+    exit_pos-relative, so it rides the row shifts o/O/I cause (the Manifold
+    discipline); STATELESS, hence undo-safe (undoing a verse re-seals the door)."""
     target = getattr(room, '_sc_target', ())
     if not target:
         return []
+    moved = _sc_realign_plaques(room)
+    if moved:
+        room._sc_twinkle = moved       # the render layer sparkles the re-laid plaques
     c0, c1 = room._sc_band
     seq = [v for v in (_sc_leading_verse(room, r, c0, c1) for r in range(room.rows)) if v]
-    done = tuple(seq) == tuple(target)
+    votive = tuple(seq) == tuple(target)
+    carve = getattr(room, '_sc_carve', '')
+    seal_row = _sc_seal_row(room, c0, c1)
+    toks = _wla_floor_text(room, seal_row)[c0:c1 + 1].split() if seal_row is not None else []
+    carved = bool(carve) and len(toks) >= 2 and toks[1] == carve
+    done = votive and carved
     er, ec = room.exit_pos
     is_open = room.cells[er][ec] != CellType.WALL
     if done and not is_open:
         room.cells[er][ec] = CellType.FLOOR
-        return ['The votive reads true — the vault door grinds open!']
+        return ['The votive reads true, the stone is hewn — the vault door grinds open!']
     if not done and is_open and (player.row, player.col) != (er, ec):
         room.cells[er][ec] = CellType.WALL         # a verse undone — the door re-seals
     return []
@@ -4664,6 +4734,11 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
             if level == 'sculpting_chambers':
                 for _sc_msg in _sculpting_chambers_tick(room, player):
                     _push(_sc_msg)
+                _sc_tw = getattr(room, '_sc_twinkle', None)
+                if _sc_tw:
+                    _sc_twinkle_animation(term, room, player, _sc_tw,
+                                          _iw(term), term.height - 8)
+                    room._sc_twinkle = []
 
             # Warden summon message
             if tick_msgs and not player.is_dead:

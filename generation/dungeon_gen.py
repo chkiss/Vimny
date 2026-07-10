@@ -7561,16 +7561,21 @@ _SC_SEAL_ROW = 4                    # the given anchor line ('seal') at build
 _SC_PASS_ROW = 5                    # the given password line (tail 'same') just below it
 _SC_BAND = (_SC_WCOL, _SC_WCOL + 12)   # scan window for each row's leading verse
 _SC_TARGET = ('keep', 'seal', 'sesame', 'amen')   # the votive, read top → bottom
+_SC_CARVE  = 'hew'                  # the word A must CARVE into the stone (shown on the seal plaque)
 _SC_SEAL_END = 13                   # the 'seal' segment's east edge — A's launch cell (bare gap)
-_SC_PLUG   = (14, 17)               # the solid stone A carves east THROUGH (seal row, all wall)
-_SC_EXIT_COL = 17                   # the vault door: (pass row, this col), a step SOUTH of A's landing
+_SC_PLUG   = (14, 16)               # the solid stone A carves east THROUGH, spelling _SC_CARVE
+_SC_EXIT_COL = 16                   # the vault door: (pass row, this col), a step SOUTH of A's landing
 
 
 # par is hand-tallied along the canonical route (no Dijkstra once the buffer
-# mutates): Okeep(5) jj(2) Ise(3) oamen(5) kk(2) Awxyz(5) j(1) = 23. The answer
-# tape is the same route; Esc is free/omitted, spaces separate tokens.
-_SC_PAR    = 23
-_SC_ANSWER = 'Okeep jj Ise oamen kk Awxyz j'
+# mutates): Okeep(5) jj(2) Ise(3) oamen(5) kk(2) Ahew(4) jj(1) = 22. The finale is
+# `jj`, not `j`: carving is an INSERT, so the door only unseals on the first
+# NORMAL action after Esc — that first `j` is a free blocked move (the door grinds
+# open), the second steps through (the inscription-halls tick-lag idiom). Esc is
+# free/omitted; spaces separate tokens. The A-carve is the SPECIFIC word `hew`
+# (not arbitrary filler) — shown on the seal plaque.
+_SC_PAR    = 22
+_SC_ANSWER = 'Okeep jj Ise oamen kk Ahew jj'
 
 
 def build_dungeon_sculpting_chambers(seed: int) -> Dungeon:
@@ -7590,7 +7595,7 @@ def build_dungeon_sculpting_chambers(seed: int) -> Dungeon:
 
     sr, pr = _SC_SEAL_ROW, _SC_PASS_ROW
     floor(sr, _SC_WCOL, _SC_SEAL_END)             # 'seal' segment (+ a bare col: A's launch cell)
-    floor(pr, _SC_WCOL, 15)                        # the password line (+ push room for `se`)
+    floor(pr, _SC_WCOL, 14)                        # the password line (fits 'sesame' + the `se` push)
     # East of the 'seal' segment is SOLID STONE (sr, 14..). A carves floor through
     # it and lands on col _SC_EXIT_COL; the exit cell (pr, _SC_EXIT_COL) is a step
     # SOUTH of that landing and stays WALL until the votive reads true. Nothing
@@ -7608,14 +7613,19 @@ def build_dungeon_sculpting_chambers(seed: int) -> Dungeon:
     lay(pr, _SC_WCOL, 'same', 'ancient')          # the password's given tail
     # The door is a step SOUTH of A's landing, so A (an east-builder) can never
     # back-door it from the seal row — over-building east just runs dead into
-    # stone. The ONE void guard: stop an A-build east off the PASSWORD row, whose
-    # own east end DOES line up with the exit column.
-    lay(pr, 16, '○', 'void')                       # stops an A-build east off the password
-    # the votive reference, in the WEST wall (verdant plaques, one verse per line)
+    # stone. The ONE void guard: stop an A-build east off the PASSWORD row, one
+    # cell short of the exit column.
+    lay(pr, _SC_EXIT_COL - 1, '○', 'void')         # stops an A-build east off the password
+    # The votive reference, in the WEST wall (verdant plaques). The seal plaque
+    # ALSO carries the carve word `hew` (`seal hew`), so the A-build is a named
+    # sequence, not arbitrary filler. The tick keeps every plaque ALIGNED with its
+    # verse as o/O insert rows (see _sculpting_chambers_tick).
+    _plaque_text = {'seal': f'seal {_SC_CARVE}'}
     for k, word in enumerate(_SC_TARGET):
-        lay(sr - 1 + k, _SC_PLQ, word, 'verdant')
+        lay(sr - 1 + k, _SC_PLQ, _plaque_text.get(word, word), 'verdant')
 
     room._sc_target = _SC_TARGET
+    room._sc_carve  = _SC_CARVE
     room._sc_band   = _SC_BAND
 
     room.entities.append(Entity(kind='exit', row=pr, col=_SC_EXIT_COL, edit_immune=True))

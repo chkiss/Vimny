@@ -57,15 +57,16 @@ def _K(s):
 
 
 # The canonical votive route (shared by the tape and the playthrough): carve the
-# verses top-down (O keep · I se · o amen), climb to the seal line, breach the
-# stone (A), drop south onto the door. Esc seals each insert (free, omitted from
-# the answer tape).
+# verses top-down (O keep · I se · o amen), climb to the seal line, carve the
+# named word `hew` into the stone (A), and drop south onto the door. The finale is
+# `jj` — carving is an INSERT, so the door only unseals on the first NORMAL action
+# after Esc (the first `j` is a free blocked move; the second steps through).
 def _canon_keys():
     return (_K('O') + _K('keep') + [ESC]
             + _K('jj') + _K('I') + _K('se') + [ESC]
             + _K('o') + _K('amen') + [ESC]
-            + _K('kk') + _K('A') + _K('wxyz') + [ESC]
-            + _K('j'))
+            + _K('kk') + _K('A') + _K('hew') + [ESC]
+            + _K('jj'))
 
 
 def _drive(dungeon, keys, monkeypatch, finish=':wq\r', name='Scribe'):
@@ -74,7 +75,7 @@ def _drive(dungeon, keys, monkeypatch, finish=':wq\r', name='Scribe'):
     monkeypatch.setattr(main.time, 'sleep', lambda *a, **k: None)
     for anim in ('_fireworks_animation', '_win_animation', '_starfield_victory',
                  '_heart_container_animation', '_unlock_animation',
-                 '_void_fall_animation', '_drown_animation'):
+                 '_void_fall_animation', '_drown_animation', '_sc_twinkle_animation'):
         monkeypatch.setattr(main, anim, lambda *a, **k: None)
     monkeypatch.setattr(Terminal, 'height', property(lambda self: 41))
     term = Terminal()
@@ -185,13 +186,13 @@ def test_the_door_opens_only_when_the_whole_votive_reads(seed, monkeypatch):
 
 _DROP = {
     'O':  _K('jj') + _K('I') + _K('se') + [ESC] + _K('o') + _K('amen') + [ESC]
-          + _K('kk') + _K('A') + _K('wxyz') + [ESC] + _K('j'),
+          + _K('kk') + _K('A') + _K('hew') + [ESC] + _K('jj'),
     'o':  _K('O') + _K('keep') + [ESC] + _K('jj') + _K('I') + _K('se') + [ESC]
-          + _K('kk') + _K('A') + _K('wxyz') + [ESC] + _K('j'),
+          + _K('kk') + _K('A') + _K('hew') + [ESC] + _K('jj'),
     'I':  _K('O') + _K('keep') + [ESC] + _K('o') + _K('amen') + [ESC]
-          + _K('kk') + _K('A') + _K('wxyz') + [ESC] + _K('j'),
+          + _K('kk') + _K('A') + _K('hew') + [ESC] + _K('jj'),
     'A':  _K('O') + _K('keep') + [ESC] + _K('jj') + _K('I') + _K('se') + [ESC]
-          + _K('o') + _K('amen') + [ESC] + _K('kk') + _K('j'),
+          + _K('o') + _K('amen') + [ESC] + _K('kk') + _K('jj'),
 }
 
 
@@ -212,11 +213,27 @@ def test_A_alone_cannot_backdoor_the_sealed_door(monkeypatch):
     dungeon = build_dungeon_sculpting_chambers(SEEDS[0])
     room = dungeon.rooms[0]
     # climb nowhere; just breach east off the seal line and try to reach the door
-    keys = _K('A') + _K('wxyzab') + [ESC] + _K('j') + _K('jjjj')
+    keys = _K('A') + _K('hewabc') + [ESC] + _K('j') + _K('jjjj')
     result = _drive(dungeon, keys, monkeypatch, finish=':q!\r')
     assert not result['won']
     er, ec = room.exit_pos
     assert room.cells[er][ec] == CellType.WALL, "the door never unsealed"
+
+
+def test_the_carve_must_read_the_named_word(monkeypatch):
+    """The A-build is a NAMED sequence, not filler: the seal plaque shows `hew`,
+    and carving anything else leaves the votive-true tablet with the door SHUT.
+    Carving `hew` opens it."""
+    # do the whole votive, then carve a WRONG word — door stays sealed
+    wrong = (_K('O') + _K('keep') + [ESC] + _K('jj') + _K('I') + _K('se') + [ESC]
+             + _K('o') + _K('amen') + [ESC] + _K('kk') + _K('A') + _K('xyz') + [ESC] + _K('jj'))
+    dungeon = build_dungeon_sculpting_chambers(SEEDS[0])
+    assert not _drive(dungeon, wrong, monkeypatch)['won'], "a wrong carve must not open the door"
+    # the right carve wins (covered by the full route) — and the plaque names it
+    room = build_dungeon_sculpting_chambers(SEEDS[0]).rooms[0]
+    from generation.dungeon_gen import _SC_CARVE, _SC_SEAL_ROW, _SC_PLQ
+    plq = room.char_run_at(_SC_SEAL_ROW, _SC_PLQ)
+    assert _SC_CARVE in ''.join(plq.symbols), "the seal plaque must name the carve word"
 
 
 # ── o / O are forced APART by direction ───────────────────────────────────────
@@ -255,6 +272,29 @@ def test_undo_reseals_the_door(monkeypatch):
     assert room.cells[er][ec] == CellType.WALL, "door re-sealed"
 
 
+# ── plaques follow their verses as o/O insert rows ────────────────────────────
+
+def test_plaques_realign_with_their_verses_after_inserts(monkeypatch):
+    """o/O row-inserts drift the plaques; the tick re-lays each onto its verse's
+    slot (relative to the 'seal' anchor) and flags them for the twinkle. After the
+    full route every plaque sits DIRECTLY WEST of the verse it names."""
+    from generation.dungeon_gen import _SC_PLQ
+    dungeon = build_dungeon_sculpting_chambers(SEEDS[0])
+    room = dungeon.rooms[0]
+    _drive(dungeon, _canon_keys(), monkeypatch, finish=':q!\r')
+    c0, c1 = _SC_BAND
+    verse_row = {main._sc_leading_verse(room, r, c0, c1): r
+                 for r in range(room.rows)
+                 if main._sc_leading_verse(room, r, c0, c1)}
+    for ru in room.char_runs:
+        if ru.kind != 'verdant':
+            continue
+        word = ''.join(ru.symbols).split()[0]
+        if word in _SC_TARGET:
+            assert ru.row == verse_row[word], f"plaque {word!r} drifted off its verse"
+            assert ru.col == _SC_PLQ
+
+
 # ── curriculum + karaoke ──────────────────────────────────────────────────────
 
 def test_curriculum_teaches_the_four_insert_entries():
@@ -270,7 +310,7 @@ def test_answer_is_the_real_keystroke_tape(seed, monkeypatch):
     omitted, spaces separators). Driven as admin it advances answer_pos to the
     end without diverging."""
     room = _room(seed)
-    assert room.answer == 'Okeep jj Ise oamen kk Awxyz j'
+    assert room.answer == 'Okeep jj Ise oamen kk Ahew jj'
     dungeon = build_dungeon_sculpting_chambers(seed)
     troom = dungeon.rooms[0]
     _drive(dungeon, _canon_keys(), monkeypatch, finish=':q!\r', name='admin')
