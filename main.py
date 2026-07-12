@@ -277,26 +277,30 @@ def _smudge_gate_met(gate, known) -> bool:
     return all(t in known for t in tokens)
 
 
-def _water_stain(text: str, solid: int):
-    """Mask `text` as ink run from a water-damaged left edge.
+_STAIN_BLEED = 4    # how far the wet edge creeps past the solid stain
 
-    The first `solid` characters (left margin + the hidden command) are fully
-    obscured; from there the smudge bleeds rightward, heavy at the wet edge and
-    fading to clean text on the right, with an organic random speckle. Darker
-    shades (▓▒) cluster near the wet edge, lighter (░) toward the dry side.
-    Spaces are never smudged (the stain runs through ink, not gaps). Returns
-    (chars, smudged) parallel lists; deterministic per `text`.
+
+def _water_stain(text: str, solid: int):
+    """Mask `text` as ink run from a water-damaged left edge — the scroll was
+    DIPPED from the left, so the stain is one solid block over the first
+    `solid` characters (left margin + the hidden command), then a SHORT wet
+    edge of at most _STAIN_BLEED speckled characters, and the rest of the
+    line reads clean. (An earlier fade speckled the WHOLE tail with decaying
+    probability, eating random letters deep into the clear text — the clear
+    tail is the meaningful hint and must actually read.) Darker shades (▓▒)
+    at the wet edge, lighter (░) at its far side; spaces are never smudged
+    (the stain runs through ink, not gaps). Returns (chars, smudged) parallel
+    lists; deterministic per `text`.
     """
     rnd  = random.Random(text)          # stable pattern for a given line
-    n    = len(text)
-    span = max(1, n - solid)
     chars, smudged = [], []
     for i, ch in enumerate(text):
-        if i < solid:                   # wet edge: margin + command, always hidden
+        if i < solid:                   # the dip: margin + command, always hidden
             chars.append(rnd.choice('▒▓'))
             smudged.append(True)
             continue
-        p = (1 - (i - solid) / span) ** 1.4      # fade probability, 1 → 0
+        d = i - solid
+        p = (1 - d / _STAIN_BLEED) if d < _STAIN_BLEED else 0.0
         if ch != ' ' and rnd.random() < p:
             r = rnd.random()
             chars.append('▓' if r < p * 0.5 else ('▒' if r < p * 0.85 else '░'))
