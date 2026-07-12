@@ -95,11 +95,11 @@ The curriculum is defined in `content/levels.py` (canonical) and mirrored in `LE
 | 21 | The Inscription Halls | `i a` | Playable |
 | 22 | The Change Annex | `c{m}  cE  cc  s` | Playable |
 | 23 | The Change Extension | `S  C` | Playable |
-| 24 | The Sculpting Chambers | `I A o O` | Planned |
-| 25 | The Overwrite Halls | `R` | Planned |
-| 26 | The Case Chambers | `~ g~ gU gu` | Planned |
-| 27 | The Joiner's Gate | `J gJ` | Planned |
-| 28 | The Alignment Halls | `>> <<` | Planned |
+| 24 | The Sculpting Chambers | `I A o O` | Playable |
+| 25 | The Overwrite Halls | `R` | Playable |
+| 26 | The Case Chambers | `~ g~ gU gu` | Playable |
+| 27 | The Joiner's Gate | `J gJ` | Playable |
+| 28 | The Alignment Halls | `>> <<` | Playable |
 | 29 | The Indentation Sanctum | `>{m} <{m} =` | Planned |
 | 29.1 | The Warden Scrivener | (boss) | Planned |
 | 30 | The Sight Sanctum | `v` | Playable |

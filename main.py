@@ -55,7 +55,7 @@ from content.scrolls import (
 )
 
 _JUMP_MOTIONS = frozenset({'G', 'gg', '%', '{', '}', '(', ')'})
-from engine.operator import op_delete, op_yank, op_paste, op_case, op_join, case_char, apply_indent, INDENT_WIDTH, entity_clip
+from engine.operator import op_delete, op_yank, op_paste, op_case, op_join, case_char, apply_indent, apply_equalize, law_column, INDENT_WIDTH, entity_clip
 from engine.reflow import is_ledge, close_gap, void_col, _insert_blank_row, remove_row, split_line_down
 from engine import substitute as _subst
 from engine.insert import (
@@ -1426,6 +1426,57 @@ def _alignment_halls_tick(room, player) -> list:
     return msgs
 
 
+def _indentation_sanctum_tick(room, player) -> list:
+    """The Indentation Sanctum bolts. Gallery bolts are the Alignment rule (a
+    noun seated at the plumb register, exact col, any floor row). The RITE
+    bolt calls the SAME `law_column` the `=` operator applies — every rite
+    row's text intact and standing exactly where the law reads — so the
+    solver and the judge can never drift. Row-agnostic via the rite's anchor
+    line, STATELESS + FINAL SEAL (the hardened-chassis pattern)."""
+    msgs = []
+    reg = room._is_register
+    floor_rows = [_wla_floor_text(room, r) for r in range(room.rows)]
+
+    def seated(word):
+        return any(t[reg:reg + len(word)] == word for t in floor_rows)
+
+    def rite_lawful():
+        texts = room._is_rite_texts
+        anchor = next((r for r, t in enumerate(floor_rows)
+                       if t.strip() == texts[0]), None)
+        if anchor is None or anchor + len(texts) > room.rows:
+            return False
+        for k, expect in enumerate(texts):
+            r = anchor + k
+            line = floor_rows[r]
+            if line.strip() != expect:
+                return False
+            start = len(line) - len(line.lstrip())
+            if law_column(room, r) != start:
+                return False
+        return True
+
+    gr = room.exit_pos[0]
+    conditions = (all(seated(w) for w in room._is_g1_words),
+                  all(seated(w) for w in room._is_g2_words),
+                  rite_lawful())
+    for ok, dc in zip(conditions, room._is_bolts):
+        is_open = room.cells[gr][dc] != CellType.WALL
+        if ok and not is_open:
+            room.cells[gr][dc] = CellType.FLOOR
+            msgs.append('The bay stands as the law reads — the bolt grinds back!')
+        elif not ok and is_open and (player.row, player.col) != (gr, dc):
+            room.cells[gr][dc] = CellType.WALL     # disturbed — the bolt re-bars
+    er, ec = room.exit_pos
+    seal_open = room.cells[er][ec] != CellType.WALL
+    if all(conditions) and not seal_open:
+        room.cells[er][ec] = CellType.FLOOR
+        msgs.append('Every bay obeys its law — the final seal parts!')
+    elif not all(conditions) and seal_open and (player.row, player.col) != (er, ec):
+        room.cells[er][ec] = CellType.WALL         # undone — the seal returns
+    return msgs
+
+
 def _sc_leading_verse(room, r: int, c0: int, c1: int) -> str:
     """The leftmost verse WRITTEN on floor within the band [c0, c1] of row r —
     the first whitespace-delimited token of the floor text. The A-breach glyphs
@@ -1923,6 +1974,7 @@ _LEVEL_INTROS = {
     'case_chambers':       ('The Case Chambers — every word survives letter-perfect, yet every door stays shut. Look closer: the shapes of the letters lie. The plaques keep the true forms, small and tall.', 70),
     'joiners_gate':        ('The Joiner\'s Gate — the old inscriptions were split, line from line, and scattered down the stacks. Pull the world up into your row: some verses want a breath at the seam, some want none.', 70),
     'alignment_halls':     ('The Alignment Halls — a plumb line falls through the hall, and every word has slid from its station. Shove each line until its first letter stands on the register — and mind that the stone reads true in every shape.', 70),
+    'indentation_sanctum': ('The Indentation Sanctum — in these halls, the law is posted, and the equals sign applies it without asking whether it should. Where the law governs, one stroke sets every line to its station; where it does not, the same stroke lays the verses flat against the wall.', 70),
     'warden_manifold':     ('The Warden Manifold — he stamps himself into the world. Light the four braziers; the gate will draw and the fog will part.', 70),
     'warden_surveyor':     ('The Warden Surveyor — he keeps a long hall where the floor falls away between the words. Cross it word by word, over the void.', 60),
     'spellwrights_forge':  ('The Spellwright\'s Forge — the old wards have rotted and cursed lines '
@@ -2608,6 +2660,9 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
                 _push(_m)
         if level == 'alignment_halls':
             for _m in _alignment_halls_tick(room, player):
+                _push(_m)
+        if level == 'indentation_sanctum':
+            for _m in _indentation_sanctum_tick(room, player):
                 _push(_m)
         if level == 'sculpting_chambers':
             for _m in _sculpting_chambers_tick(room, player):
@@ -4577,6 +4632,33 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
                 player.error = _sr_msg
             elif _sr_msg:
                 _push(_sr_msg)
+
+        elif action['type'] == 'operator' and action['op'] == '=':
+            if not edit_mode and not _action_allowed(action, player.known_commands) and _blocked(action):
+                continue
+            tobj = (resolve_text_object(action['textobj'], room, player)
+                    if 'textobj' in action else compute_text_object(player, action, room))
+            if tobj is None:
+                _push('Nothing to equalize.')
+            else:
+                (ed_undo if edit_mode else undo_stack).append(
+                    _ed_snapshot(room, player) if edit_mode else _snapshot(room, player, budget))
+                (ed_redo if edit_mode else redo_stack).clear()
+                room._last_void_falls = []
+                room._last_drowns     = []
+                changed = False
+                for _ir in range(tobj.start_row, tobj.end_row + 1):
+                    changed |= apply_equalize(room, _ir)   # each row to the LAW's column
+                player.row = min(tobj.start_row, room.rows - 1)
+                nb = _first_non_blank_col(room, player.row)
+                if nb is not None:
+                    player.col = nb
+                if not edit_mode:
+                    budget.spend(_operator_cost(action))
+                    _animate_reflow_falls()
+                player.last_change = action
+                if not changed:
+                    _push('The lines already stand as the law reads.')
 
         elif action['type'] == 'operator' and action['op'] in ('>', '<'):
             if not edit_mode and not _action_allowed(action, player.known_commands) and _blocked(action):

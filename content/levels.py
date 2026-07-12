@@ -83,7 +83,7 @@ LEVELS = [
     {'display': '26',   'slug': 'case_chambers',         'name': 'The Case Chambers',          'commands': '~ g~ gU gu', 'teaches': ['~', 'gU', 'gu', 'g~']},
     {'display': '27',   'slug': 'joiners_gate',          'name': "The Joiner's Gate",          'commands': 'J gJ', 'teaches': ['J', 'gJ']},
     {'display': '28',   'slug': 'alignment_halls',       'name': 'The Alignment Halls',        'commands': '>> <<', 'teaches': ['>', '<']},
-    {'display': '29',   'slug': 'indentation_sanctum',   'name': 'The Indentation Sanctum',    'commands': '>{m} <{m} =', 'teaches': []},
+    {'display': '29',   'slug': 'indentation_sanctum',   'name': 'The Indentation Sanctum',    'commands': '>{m} <{m} =', 'teaches': ['=']},
     {'display': '29.1', 'slug': 'warden_scrivener',      'name': 'The Warden Scrivener',       'type': 'boss', 'after': 'indentation_sanctum', 'teaches': []},
     # The Sight Sanctum sits here with the selection/visual arc, relocated from
     # display 14 (2026-06-27): Visual Mode is unforceable until ranged operators

@@ -264,6 +264,78 @@ def apply_indent(room, row: int, amount: int) -> int:
     return amount
 
 
+def _floor_tokens(room, row: int):
+    """The row's LINE as text: glyphs within the passable extent (wall-embedded
+    plaques excluded, gaps as spaces), returned as (start_col, stripped_text).
+    (None, '') for a wall row or a bare-floor row."""
+    ext = line_extent(room, row)
+    if ext is None:
+        return None, ''
+    lo, hi = ext
+    cells = {}
+    for ru in room._char_runs_by_row.get(row, []):
+        for k, sym in enumerate(ru.symbols):
+            c = ru.col + k
+            if lo <= c <= hi:
+                cells[c] = sym
+    if not cells:
+        return None, ''
+    start = min(cells)
+    text = ''.join(cells.get(c, ' ') for c in range(start, max(cells) + 1))
+    return start, text
+
+
+def law_column(room, row: int):
+    """Vimny's `=` — the indentexpr socket. A room may post its own law as
+    `room._indent_law(room, row) -> col|None`; with none posted, the BLOCK LAW
+    governs (the dungeon's one built-in policy, the analogue of Vim's C
+    fallback — bare `=` is never policy-free):
+
+      a verse under a line ending in ':' stands one step (INDENT_WIDTH) deeper;
+      a verse whose first word is 'end' returns to its opener's station;
+      any other verse keeps its neighbor's station;
+      UNGOVERNED verse (a block with no ':' / 'end' structure) stands at the
+      wall — which is exactly how `=` mauls plain prose (the gg=G-in-markdown
+      disaster, kept faithfully).
+
+    The block is the maximal run of contiguous rows carrying text; the station
+    base is the row's segment start. Returns the lawful start column for `row`,
+    or None when the row has no line / no text (nothing to govern)."""
+    law = getattr(room, '_indent_law', None)
+    if law is not None:
+        return law(room, row)
+    ext = line_extent(room, row)
+    if ext is None or _floor_tokens(room, row)[0] is None:
+        return None
+    top = row
+    while top - 1 >= 0 and _floor_tokens(room, top - 1)[0] is not None:
+        top -= 1
+    base = ext[0]
+    depth = 0
+    for r in range(top, row + 1):
+        _, text = _floor_tokens(room, r)
+        stripped = text.strip()
+        if stripped.split()[0] == 'end':
+            depth = max(depth - 1, 0)
+        if r == row:
+            return base + INDENT_WIDTH * depth
+        if stripped.endswith(':'):
+            depth += 1
+    return base
+
+
+def apply_equalize(room, row: int) -> bool:
+    """`=` on one row: shift the line to the column the law assigns it.
+    Returns True if the row moved."""
+    target = law_column(room, row)
+    if target is None:
+        return False
+    start, _ = _floor_tokens(room, row)
+    if start is None or start == target:
+        return False
+    return apply_indent(room, row, target - start) != 0
+
+
 def _case_transform(op: str, sym: str) -> str:
     if op == 'gU':
         return sym.upper()

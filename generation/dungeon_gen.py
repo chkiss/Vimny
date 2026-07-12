@@ -8140,3 +8140,152 @@ def build_dungeon_alignment_halls(seed: int) -> Dungeon:
     dungeon.rooms        = [room]
     dungeon.current_room = 0
     return dungeon
+
+
+# ── The Indentation Sanctum (>{m} <{m} =) ─────────────────────────────────────
+# "In these halls, the law of = is posted." Vim's `=` is a POLICY SOCKET
+# (equalprg → indentexpr → the C fallback that mauls prose); Vimny's `=`
+# applies the BLOCK LAW (engine/operator.law_column — the posted edict):
+# a verse under a ':' line stands one step deeper, 'end' returns to its
+# opener's station, and UNGOVERNED verse stands at the wall — which is how
+# `=` wrecks plain text, kept faithfully as a playable trap.
+#
+# Three bays down one hall, one verb each (cannibalism solved by GEOGRAPHY):
+#   • the UNGOVERNED GALLERY — plain nouns 2 west of the plumb register:
+#     `>}` (2 keys) seats all three rows in one paragraph stroke. `=` here
+#     RAZES the bank to the wall (visibly wrong, `u` recovers): the player
+#     re-enacts the gg=G-in-markdown disaster on purpose.
+#   • the OVER-SHOVED GALLERY — mirror bank past the register: `<}`.
+#   • the SANCTUM'S RITE — a simple pseudocode block (fixed skeleton, ONE
+#     nesting level, seeded vocab in the slots — the Operator's Vault rule)
+#     whose rows are SCATTERED (+2/−2/0/+4 mixed): no uniform >{m}/<{m}
+#     stroke can satisfy it and the manual per-row chain is ~18 keys; `=}`
+#     (2 keys) snaps the whole rite to the law. The door check calls the
+#     SAME law_column the operator uses — solver and judge can never drift.
+#
+# FORCING BY PAR with a HAND-SET GENEROUS budget (non-1.4): the manual-mason
+# route (3>> banks, per-row >>/<</dot through the rite — no `=` ever) WINS at
+# 1 star (~30 keys, driven in tests); the budget bars only routes clumsier
+# than that. Blank FLOOR rows separate the bays, so `}` paragraph motions
+# bound each bank and j descends freely (no spine detours — the old draft's
+# water terrain is dropped: floor rows are {n}G-landable and water is
+# insert-bridgeable, so terrain-S1 was always a fiction).
+_IS_ROWS, _IS_COLS = 21, 27
+_IS_PLQ_COL = 1                     # gallery plaques (the true word), WEST wall
+_IS_COL_S   = 10                    # the spine — every row's first standable
+_IS_FLOOR_END = 25                  # the hall floor; past it, shoved tails fall
+_IS_REGISTER  = 16                  # the galleries' plumb line (│ in the wall)
+_IS_G1_ROWS = (2, 3, 4)             # ungoverned gallery: nouns at REGISTER−2
+_IS_G2_ROWS = (6, 7, 8)             # over-shoved gallery: nouns at REGISTER+2
+_IS_RITE_ROWS = (10, 11, 12, 13, 14, 15, 16)   # the rite block
+_IS_BLANK_ROWS = (5, 9, 17)         # bare floor: paragraph boundaries for }
+_IS_THROAT_ROW = 18                 # spine-only row: the hall joins the gate
+_IS_GATE_ROW   = 19                 # the gate corridor: spine · bolts · seal
+_IS_GATE_COL0  = 11                 # three bolts: gallery 1 · gallery 2 · rite
+_IS_TRIGGERS   = 3
+_IS_EXIT = (_IS_GATE_ROW, _IS_GATE_COL0 + _IS_TRIGGERS)   # the FINAL SEAL
+
+# The rite skeleton: (template, corrupt_col). Templates hold {v}/{n} slots
+# filled from the vocab per seed (structure and offsets FIXED — the answer
+# tape is position-based). True columns derive from the LAW (base 10):
+#   rite {n}:      10        corrupt 12  (+2)
+#     {v} {n}      12        corrupt 10  (−2)
+#     when {n}:    12        corrupt 14  (+2)
+#       {v} {n}    14        corrupt 14  ( 0 — already true: = is idempotent)
+#     end          12        corrupt 10  (−2)
+#     {v} {n}      12        corrupt 16  (+4)
+#   end            10        corrupt 12  (+2)
+_IS_RITE = (
+    ('rite {n}:', 12),
+    ('{v} {n}',   10),
+    ('when {n}:', 14),
+    ('{v} {n}',   14),
+    ('end',       10),
+    ('{v} {n}',   16),
+    ('end',       12),
+)
+_IS_NOUNS = ('oath', 'rune', 'veil', 'lamp', 'gate', 'ash',
+             'fern', 'moss', 'dust', 'iron', 'bell', 'loam')
+_IS_VERBS = ('bind', 'ward', 'mend', 'keep', 'cast', 'hew')
+# par + the canonical tape, driven end-to-end. GOLFED: `>}`/`<}`/`=}` take
+# each bay as one paragraph stroke (the blank courses bound them), the open
+# floor lets `4j` hop bay to bay with no spine detours, `G$` rides the open
+# bolts to the seal:  >} · 4j · <} · 4j · =} · G$  = 12 keys.
+# The manual-mason rival (no `=`): 3>> banks + per-row >>/<</dot through the
+# rite ≈ 30 — it WINS at 1 star under the hand-set budget below.
+_IS_PAR    = 12
+_IS_BUDGET = 31          # HAND-SET (non-1.4): manual-mason route (30) wins 1★
+_IS_ANSWER = '>} 4j <} 4j =} G$'
+
+
+def build_dungeon_indentation_sanctum(seed: int) -> Dungeon:
+    """The Indentation Sanctum (slug `indentation_sanctum`): >{m} <{m} =.
+
+    Two ungoverned galleries seat by paragraph shove (`>}`/`<}` — `=` there
+    razes to the wall, the markdown trap); the rite, a seeded pseudocode
+    block with scattered offsets, yields only to `=}` under the posted law.
+    See the section header for the forcing."""
+    rng = random.Random(seed)
+    R, C = _IS_ROWS, _IS_COLS
+    cells = [[CellType.WALL] * C for _ in range(R)]
+    hall_rows = _IS_G1_ROWS + _IS_G2_ROWS + _IS_RITE_ROWS + _IS_BLANK_ROWS
+    for r in hall_rows:                                  # one open hall
+        for c in range(_IS_COL_S, _IS_FLOOR_END + 1):
+            cells[r][c] = CellType.FLOOR
+    cells[_IS_THROAT_ROW][_IS_COL_S] = CellType.FLOOR    # spine-only throat
+    cells[_IS_GATE_ROW][_IS_COL_S]   = CellType.FLOOR    # the spine reaches the gate
+    # bolts AND the exit stay WALL — the tick opens them; the exit is the seal.
+
+    room = Room(room_type=RoomType.ENTRY, rows=R, cols=C)
+    room.cells = cells
+    room.seed  = seed
+
+    def lay(r, c, text, kind):
+        col = c
+        for part in text.split(' '):                     # separate CharRuns per word
+            if part:
+                room.char_runs.append(CharRun(r, col, tuple(part), kind))
+            col += len(part) + 1
+
+    lay(1, _IS_REGISTER, '│', 'verdant')                 # the plumb line, carved above
+
+    nouns = rng.sample(_IS_NOUNS, 6 + sum(t.count('{n}') for t, _ in _IS_RITE))
+    verbs = rng.sample(_IS_VERBS, sum(t.count('{v}') for t, _ in _IS_RITE))
+    g1_words, g2_words = nouns[:3], nouns[3:6]
+    slot_n, slot_v = iter(nouns[6:]), iter(verbs)
+
+    for rows, words, off in ((_IS_G1_ROWS, g1_words, -2), (_IS_G2_ROWS, g2_words, +2)):
+        for r, w in zip(rows, words):
+            lay(r, _IS_REGISTER + off, w, 'ancient')     # the mis-set noun
+            lay(r, _IS_PLQ_COL, w, 'verdant')            # its plaque, west wall
+
+    rite_texts = []
+    for (template, col), r in zip(_IS_RITE, _IS_RITE_ROWS):
+        text = template
+        while '{v}' in text:
+            text = text.replace('{v}', next(slot_v), 1)
+        while '{n}' in text:
+            text = text.replace('{n}', next(slot_n), 1)
+        lay(r, col, text, 'ancient')
+        rite_texts.append(text)
+
+    room._is_g1_words    = tuple(g1_words)
+    room._is_g2_words    = tuple(g2_words)
+    room._is_rite_texts  = tuple(rite_texts)
+    room._is_register    = _IS_REGISTER
+    room._is_bolts       = tuple(_IS_GATE_COL0 + i for i in range(_IS_TRIGGERS))
+
+    room.entities.append(Entity(kind='exit', row=_IS_EXIT[0], col=_IS_EXIT[1],
+                                edit_immune=True))
+    room.spawn_pos = (_IS_G1_ROWS[0], _IS_COL_S)         # atop gallery one
+    room.exit_pos  = _IS_EXIT
+
+    room.rebuild_indexes()
+    room.par    = _IS_PAR
+    room.budget = _IS_BUDGET
+    room.answer = _IS_ANSWER
+
+    dungeon = Dungeon(name='The Indentation Sanctum', seed=seed)
+    dungeon.rooms        = [room]
+    dungeon.current_room = 0
+    return dungeon

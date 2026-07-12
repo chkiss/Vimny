@@ -243,6 +243,12 @@
 | >{m}  | >     | indent |
 | <{m}  | <     | dedent |
 
+## indentation_sanctum — the law
+
+| keys  | token | desc          |
+|-------|-------|---------------|
+| ={m}  | =     | apply the law |
+
 ## selection_halls — visual line / block
 
 | keys  | token        | desc          |

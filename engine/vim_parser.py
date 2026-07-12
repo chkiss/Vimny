@@ -24,7 +24,7 @@ from __future__ import annotations
 from engine.modes import Mode
 
 MOTIONS  = set('hjklwbeWBEGg0^${}()HML%|' + ';,')
-OPERATORS = set('dyc><')
+OPERATORS = set('dyc><=')
 COUNTS   = set('123456789')
 # text-object alias normalisation: ib/i)->i(, iB/i}->i{, i]->i[, i>->i<
 _TEXTOBJ_NORMALIZE = {'b': '(', ')': '(', 'B': '{', '}': '{', ']': '[', '>': '<'}
