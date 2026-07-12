@@ -186,6 +186,23 @@ def test_the_page_sleeps_under_fog(seed):
                        for k in range(len(ru.symbols))), ru
 
 
+def test_enter_at_the_threshold_moves_no_carving(monkeypatch):
+    """Insert-mode <Enter> after the threshold word (playtest): the line-split
+    is bounded and GLYPHS IN STONE NEVER MOVE — it once cascaded every glyph
+    row below the cursor across the whole buffer and pushed the south margin
+    glosses off the world."""
+    dungeon = build_dungeon_warden_scrivener(SEEDS[0])
+    room = dungeon.rooms[0]
+    before = sorted((ru.row, ru.col, ''.join(ru.symbols), ru.kind)
+                    for ru in room.char_runs)
+    keys = _K('i') + _K(room._wsc_threshold) + [Keystroke('\r', name='KEY_ENTER')] + [ESC]
+    _drive(dungeon, keys, monkeypatch, finish=':q!\r')
+    after = sorted((ru.row, ru.col, ''.join(ru.symbols), ru.kind)
+                   for ru in room.char_runs)
+    gone = [x for x in before if x not in after]
+    assert not gone, f"carvings moved or fell: {gone}"
+
+
 def test_threshold_parts_the_fog(monkeypatch):
     dungeon = build_dungeon_warden_scrivener(SEEDS[0])
     room = dungeon.rooms[0]

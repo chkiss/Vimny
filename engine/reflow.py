@@ -244,11 +244,25 @@ def split_line_down(room, player) -> list:
     0 (where Vim parks it). Returns the fallen cells."""
     r, c = player.row, player.col
     dest0 = _first_floor_col(room, r + 1)
+    # The split is BOUNDED, like its horizontal mirror: the downward cascade
+    # stops at the first all-wall row below the cursor (a hard line boundary,
+    # exactly as a mid-row wall bounds open_gap) — rows past it are the far
+    # side of the wall and stay untouched. And GLYPHS IN STONE ARE NEVER
+    # TEXT: a wall-embedded carving (a plaque, a margin gloss) on any row
+    # stays fixed instead of riding the shift into the void (an insert-mode
+    # <Enter> once pushed a boss hall's border glosses off the world).
+    boundary = room.rows
+    for gr in range(r + 1, room.rows):
+        if all(room.cells[gr][cc] in _WALLS for cc in range(room.cols)):
+            boundary = gr
+            break
     keep, moves = [], []
     for gr in range(room.rows):
         for col, sym, kind in _row_glyphs(room, gr):
-            if gr < r or (gr == r and col < c):
-                keep.append((gr, col, sym, kind))                 # above / head — fixed
+            if room.cells[gr][col] in _WALLS:
+                keep.append((gr, col, sym, kind))                 # carved in stone — fixed
+            elif gr < r or (gr == r and col < c) or gr >= boundary:
+                keep.append((gr, col, sym, kind))                 # above / head / past the wall
             elif gr == r:                                         # the tail → next line, col 0
                 ncol = (dest0 + (col - c)) if dest0 is not None else col
                 moves.append((r + 1, ncol, sym, kind))
