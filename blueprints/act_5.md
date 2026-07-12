@@ -381,19 +381,77 @@ delete-and-retype):
 
 ## 30 — The Indentation Sanctum (`indentation_sanctum`) — `>{m} <{m} =`
 
-**The operator form — act on rows you never visit.** A bank of rows must
-align; the rows between/around are WATER or void-ruled (unwalkable), so
-per-row `>>` visits are impossible or unaffordable: `>{m}` (e.g. `>}` /
-`>3j`) indents the whole span from one standpoint. S1 via terrain.
+**"In these halls, the law of `=` is posted."** Real Vim's `=` has no
+behavior of its own — it is a SOCKET (`equalprg` → `indentexpr` → the C
+fallback) that applies whatever indent policy the buffer has loaded, and
+with nothing loaded it still applies the C default, which mauls prose (the
+`gg=G`-in-markdown disaster). That IS the lesson, made diegetic: every hall
+carves its governing law into the wall, `=` applies THE HALL'S law to the
+span — and where no law governs, `=` razes to the wall, wrong and
+recoverable. Faithful in spirit: the only unfaithful `=` would be one that
+pretends to have no policy.
 
-- **Engine prerequisite (the act's one real engine task):** verify/implement
-  `>{motion}` applying `apply_indent` to every row in the motion span without
-  cursor visits, plus the parser forms `>j`/`>}`/`3>>`. (`>>`/`<<` shipped at
-  the single-row level on 2026-05-30.)
-- `=` semantics must be DEFINED for Vimny (no filetype indent exists):
-  proposal — `={m}` aligns each row in the span to the row's plaque column
-  (the level's posted target), i.e. "make it read right" as one stroke; the
-  finale beat. Decide at build (Open Decision #3).
+**Three halls, one verb each — cannibalism solved by GEOGRAPHY, not gating:**
+the earlier draft's `=`-aligns-to-plaque was a magic solver (idempotent,
+count-free, direction-free) that out-priced `>{m}` on every door. Instead,
+`=` is only right where the law is right:
+
+1. **The Ungoverned Gallery (`>{m}`)** — plain verse, no rite structure; the
+   edict stone here is DEFACED. A uniform bank sits 2 west of its plumb
+   register: `>2j` (3 keys) seats three rows in one stroke. Using `=` here
+   applies the default law and RAZES the bank to the wall — visibly wrong,
+   `u` recovers: the player personally re-enacts the markdown gotcha.
+2. **The Over-shoved Gallery (`<{m}`)** — mirror: a uniform bank PAST the
+   register; `<2j` walks it home. `=` mis-razes here too.
+3. **The Sanctum (`={m}`, the finale)** — a RITE: a simple pseudocode block
+   whose true shape the posted law computes. Its rows are SCATTERED
+   (+2/−2/+4, heterogeneous), so no uniform `>{m}`/`<{m}` can fix them and
+   the per-row manual chain is unbounded; `=}` (2 keys) snaps the whole rite
+   true. The verb's honest niche: structured text under its right law.
+
+**The rite (pseudocode, kept simple).** `=` needs text with computable
+structure. One fixed skeleton, one nesting level, seeded words in the slots
+(the Operator's Vault rule — structure and offsets FIXED so the answer tape
+is position-based; only the vocab varies):
+
+      rite {noun}:            law: a verse under a line ending in ':'
+        {verb} {noun}              stands one step (+2) deeper;
+        when {noun}:               'end' returns to its opener's station;
+          {verb} {noun}            all else keeps its neighbor's station;
+        end                        UNGOVERNED verse stands at the wall.
+        {verb} {noun}
+      end
+
+   Keywords (`rite`/`when`/`end`, the `:`) are fixed; `{verb}`/`{noun}` draw
+   from the vocab per seed. The law is ONE tiny indenter shared by the door
+   check and the `=` engine — the check IS "every rite row stands where the
+   law says," so the two can never drift.
+
+**Engine work (the act's real task, now correctly scoped):** `>{m}`/`<{m}`
+are DONE (full operators since 2026-05-30; count-is-rows verified at the
+Alignment Halls). What's missing is `=`: add to OPERATORS (doubled `==`),
+gate on a NEW token `'='` (curriculum: `teaches` must become `['=']` — it is
+`[]` today and would ship `=` ungated), cost via the shared machinery, and
+the handler = per row in the span, compute the law's column and
+`apply_indent` to it. The law lives on the room (`room._indent_law` — the
+indentexpr socket, default raze-to-wall), so future levels can post laws.
+
+Forcing (by PAR, standard budget; the terrain-S1 claim is DEAD — floor rows
+are always `{n}G`-landable, and water is insert-bridgeable anyway; drop the
+water, it was never load-bearing):
+- Gallery 1: `>2j` = 3 vs per-row jump-and-shove ≈ 5/row, or `=` = wrong
+  content (bolt shut). Gallery 2 mirrors.
+- Sanctum: `=}` = 2 vs the cheapest manual mix ≥ ~10 across the scattered
+  rows; `>{m}`/`<{m}` uniform strokes CANNOT satisfy a heterogeneous bank.
+- `.` repeats `={m}`/`>{m}` motion-and-all — twin banks are dot-chains;
+  price it in par as usual.
+- PARITY LAW inherited: all offsets multiples of INDENT_WIDTH.
+- Full hardened-chassis battery: exact-column two-sided door checks, FINAL
+  SEAL exit, A-carve regression, jump audit.
+
+Open at build: whether gallery checks reuse `_alignment_halls_tick`'s
+register slice (likely — per-bank registers) and whether `==` gets its own
+beat (probably not; `={m}` subsumes it here, `==` can wait for a reprise).
 
 ---
 
