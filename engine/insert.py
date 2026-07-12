@@ -25,7 +25,7 @@ cursor advances; Backspace removes the cell to the left. The grid is fixed, so
 """
 from __future__ import annotations
 from engine.world import CellType, CharRun
-from engine.motion import _first_non_blank_col, _leftmost_passable, _rightmost_passable
+from engine.motion import _first_non_blank_col, _leftmost_passable
 from engine.editor import _merge_adjacent_char_runs, _split_run_at
 from engine.reflow import is_ledge, open_gap, close_gap, extend_floor, _insert_blank_row
 
@@ -73,17 +73,19 @@ def begin_insert(room, player, variant: str, count: int = 1) -> None:
             player.col = c
         return
     if variant == 'A':
-        # End of the LINE = just past the rightmost passable cell (the corridor /
-        # ledge edge), NOT just past the last character: trailing floor counts as
-        # trailing spaces, and Vim's A skips past them. Typing there builds new
-        # ledge into the void.
-        right = _rightmost_passable(room, r)
-        if right is not None:
-            player.col = min(right + 1, room.cols - 1)
-        else:
-            c = _leftmost_passable(room, r)
-            if c is not None:
-                player.col = c
+        # End of the LINE = just past the cursor's SEGMENT edge (the wall-bounded
+        # line, the boundary $ and 0 honour), NOT the row-global rightmost
+        # passable cell: a mid-row wall is a hard line boundary everywhere else,
+        # so A must not vault it (row-global A leapt shut gate bolts and landed
+        # the cursor inside the far wall). Trailing floor within the segment
+        # counts as trailing spaces and A skips past them; the wall/void just
+        # past the edge is where typing builds new ledge.
+        right = player.col
+        for c in range(player.col + 1, room.cols):
+            if not room.is_passable(r, c):
+                break
+            right = c
+        player.col = min(right + 1, room.cols - 1)
         return
     if variant == 'o':
         _insert_blank_row(room, r + 1, r, player, blank=True)  # a Vim blank line, not a row-clone

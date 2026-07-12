@@ -290,23 +290,44 @@ Forcing (the old draft's math survives; keep):
 ## 28 — The Joiner's Gate (`joiners_gate`) — `J gJ`
 
 **Pull the world up into your line.** `J` appends the row below onto the
-current row with one space at the seam; `gJ` with none. (Engine: `op_join` =
-`remove_row` + extend — shipped, undoable, snapshot-safe.)
+current row with one space at the seam and lands the cursor on the seam; `gJ`
+with none. (Engine: `op_join` = `remove_row` of the source + `carve_floor`
+eastward to seat the pulled-up glyphs — shipped, undoable, snapshot-safe.
+`{n}J` joins n lines.) The old draft's "make J/gJ non-undoable" stays
+REJECTED (u is the always-on rope).
 
-**The old draft's "make J/gJ non-undoable" is REJECTED** — it contradicts
-the game's undo philosophy (u is the always-on rope) and the engine.
-Forcing instead:
-- The JOIN itself is S1: the bridge content (a floor word the player must
-  stand on / a key glyph) lives on the row BELOW a chasm row; no motion
-  brings it up; only a join does. ∞ without J/gJ.
-- The J-vs-gJ CHOICE is content-forced per trigger: one door's plaque is two
-  words (`bind veil` — needs the seam space → `J`), another's is one fused
-  word (`bindveil` → `gJ`). A wrong variant + `u` + retry costs 2–3 keys —
-  budget for exactly one such retry (margin ≥ 3, < 6) and accept it: the
-  PLAQUE telegraphs the answer, so the retry is the player not reading, not
-  the design leaking.
-- `{n}J` joins n lines — a finale beat can ask for one 3-row join (3J),
-  echoing the count-dot finale of the Echo Vault.
+**Chassis: Annex join-doors, made SHIFT-PROOF.** Each lesson is a STACK of
+rows — the plaque keeps the true line, the floor has it split. Joining makes
+the upper row read true and the (case-sensitive, substring) tick opens the
+bolt. The J-vs-gJ choice is content-forced per door: a two-word plaque
+(`bind veil`) needs the seam space → `J`; a fused plaque (`bindveil`) → `gJ`.
+A wrong variant reads false, the bolt stays shut, `u` + retry costs a star,
+not the level.
+
+**J is a TERRAIN EDITOR — the level's real design work is containment:**
+- *Every join removes a row*, shifting all lower rows up — the gate, bolts,
+  and exit RIDE upward. Static `_wla_doors` coordinates break after one join:
+  the tick must re-derive the gate row from the EXIT ENTITY each turn (the
+  Beacon Tiers anchor pattern), keeping bolt COLUMNS fixed. Bolts bar
+  horizontally, so a gate that rides up intact is still a gate — design for
+  survivable collapse, not impossible collapse.
+- *J reaches the row below without standing on it* (unlike `dd`): a player
+  one row above any structural row can delete it, walls and all. The
+  teleport/access audit must hold in EVERY intermediate geometry, including
+  adversarial joins of spine/throat rows — test it, don't assume as-built.
+- *J builds floor east* to seat the joined text: keep joined spans short and
+  well west of the bolt column, and assert no join carves an unintended path.
+
+**Forcing is by PAR, not survival** (the old draft's "∞ without J" is FALSE —
+`i`/`a`/`A` have been owned since the Inscription Halls, so the player can
+always TYPE the missing word onto the upper row ~8 keys, or emulate a join
+with `de` + `k$p` ~6 keys, which even removes the original below). `J` = 1
+key, saving ~5–7 per door; with 4–5 doors the old-only route blows the
+STANDARD ×1.4 budget on volume alone. No tight margin, no retry arithmetic.
+
+**Finale: `4J`, not `3J`.** `3J` (2 keys) TIES `JJ` (2 keys) — no lesson.
+A four-row stack makes `4J` (2) beat `JJJ` (3) by one, echoing the Echo
+Vault's count-dot finale at the count where the count actually pays.
 
 ---
 

@@ -1350,15 +1350,22 @@ def _whole_line_annex_tick(room, player) -> list:
     gate-row bolt stands open exactly while its plaque's word READS TRUE on the
     floor. Whole-row substring scans on floor text only (shift-proof; the
     plaques live in walls and never count). STATELESS, hence undo-safe (the
-    vault-tick principle): undoing a change re-bars its bolt. The exit itself is
-    plain floor east of the bolts — no gating needed; the bolts bar the way and
-    no jump can reach past them (see build_dungeon_whole_line_annex)."""
+    vault-tick principle): undoing a change re-bars its bolt.
+
+    The exit is the FINAL SEAL — stone until every plaque reads true (built as
+    WALL; the renderer shows a sealed exit as plain stone). The bolts alone
+    used to bar the way, but `A` (learned at the Sculpting Chambers) builds
+    floor east of any standable cell and `o`/`O` fabricate fresh rows, so
+    "plain floor east of the bolts" is reachable by carving — the seal, not
+    the geometry, is what holds. Same diegesis as the sculpting vault door:
+    stone that opens on content, undo re-seals it."""
     msgs = []
     floor_rows = [_wla_floor_text(room, r) for r in range(room.rows)]
 
     def written(target):
         return any(target in t for t in floor_rows)
 
+    all_true = True
     for target, (dr, dc) in getattr(room, '_wla_doors', ()):
         is_open = room.cells[dr][dc] != CellType.WALL
         if written(target) and not is_open:
@@ -1366,6 +1373,15 @@ def _whole_line_annex_tick(room, player) -> list:
             msgs.append('The label reads true — the bolt grinds back!')
         elif not written(target) and is_open and (player.row, player.col) != (dr, dc):
             room.cells[dr][dc] = CellType.WALL     # undone — the bolt re-bars
+        all_true = all_true and written(target)
+    if getattr(room, '_wla_doors', ()):
+        er, ec = room.exit_pos                     # rides row shifts (_shift_rows)
+        seal_open = room.cells[er][ec] != CellType.WALL
+        if all_true and not seal_open:
+            room.cells[er][ec] = CellType.FLOOR
+            msgs.append('Every label reads true — the final seal parts!')
+        elif not all_true and seal_open and (player.row, player.col) != (er, ec):
+            room.cells[er][ec] = CellType.WALL     # undone — the seal returns
     return msgs
 
 

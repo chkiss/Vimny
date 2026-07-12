@@ -156,16 +156,18 @@ def test_plaque_is_in_the_west_wall(seed):
 
 
 @pytest.mark.parametrize("seed", SEEDS)
-def test_bolts_start_walled_exit_is_plain_floor(seed):
+def test_bolts_start_walled_exit_is_the_final_seal(seed):
     """Every gate bolt is WALL at build (the tick opens them per label). The
-    exit is PLAIN FLOOR — never a gated wall — and stays floor through a tick."""
+    exit is the FINAL SEAL — stone until every plaque reads true, and it stays
+    stone through a tick (A can carve floor east of the bolts since the
+    Sculpting Chambers, so the seal, not the geometry, holds the way)."""
     dungeon = build_dungeon_change_extension(seed)
     room = dungeon.rooms[0]
     p = Player(row=room.spawn_pos[0], col=room.spawn_pos[1])
     main._whole_line_annex_tick(room, p)
     for i in range(_CE_TRIGGERS):
         assert room.cells[_bolt(i)[0]][_bolt(i)[1]] == CellType.WALL
-    assert room.cells[_CE_EXIT[0]][_CE_EXIT[1]] == CellType.FLOOR
+    assert room.cells[_CE_EXIT[0]][_CE_EXIT[1]] == CellType.WALL
 
 
 @pytest.mark.parametrize("seed", SEEDS)

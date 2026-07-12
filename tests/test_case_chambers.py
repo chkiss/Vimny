@@ -324,6 +324,22 @@ def test_guu_and_gUU_both_fail_the_inverted_finale(monkeypatch):
         assert room.cells[_bolt(7)[0]][_bolt(7)[1]] == CellType.WALL, "bolt still shut"
 
 
+def test_A_carve_cannot_bypass_the_seal(monkeypatch):
+    """Anti-cheese (found 2026-07-12): `A` is known here and builds floor east.
+    The exit is the FINAL SEAL (stone until every plaque reads true) and `A` is
+    segment-bounded, so neither the throat-carve nor the gate-row A wins."""
+    dungeon = build_dungeon_case_chambers(SEEDS[0])
+    dungeon.rooms[0].budget = 999
+    keys = _K('jjjjjjjj') + _K('A') + _K('xxxxxxxxx') + [ESC] + _K('j')
+    result = _drive(dungeon, keys, monkeypatch)
+    assert not result['won'], "the throat-carve must not reach the sealed exit"
+    dungeon = build_dungeon_case_chambers(SEEDS[0])
+    dungeon.rooms[0].budget = 999
+    keys = _K('jjjjjjjjj') + _K('A') + [ESC] + _K('h')
+    result = _drive(dungeon, keys, monkeypatch)
+    assert not result['won'], "segment-bounded A must not vault the shut bolts"
+
+
 @pytest.mark.parametrize("seed", SEEDS)
 def test_undo_rebars_a_bolt(seed, monkeypatch):
     """A case sweep is one snapshot: gUU opens its bolt; `u` unwrites it and the

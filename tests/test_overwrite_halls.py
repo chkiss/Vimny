@@ -256,6 +256,27 @@ def test_dot_cannot_mend_a_varied_run(monkeypatch):
     assert room.cells[_bolt(0)[0]][_bolt(0)[1]] == CellType.WALL, "bolt still shut"
 
 
+def test_A_carve_cannot_bypass_the_seal(monkeypatch):
+    """Anti-cheese (found 2026-07-12): `A` is known here and builds floor east,
+    so a player could carve along the throat row and drop past the bolts — and
+    row-global `A` used to vault the shut bolts outright. The exit is now the
+    FINAL SEAL (stone until every plaque reads true) and `A` is segment-bounded,
+    so neither carve route wins."""
+    # carve the throat row east, then j down toward the exit
+    dungeon = build_dungeon_overwrite_halls(SEEDS[0])
+    dungeon.rooms[0].budget = 999
+    keys = _K('jjjjj') + _K('A') + _K('xxxxxx') + [ESC] + _K('j')
+    result = _drive(dungeon, keys, monkeypatch)
+    assert not result['won'], "the throat-carve must not reach the sealed exit"
+    # A on the gate row itself must stop at the cursor's segment (the spine)
+    dungeon = build_dungeon_overwrite_halls(SEEDS[0])
+    dungeon.rooms[0].budget = 999
+    room = dungeon.rooms[0]
+    keys = _K('jjjjjj') + _K('A') + [ESC] + _K('h')
+    result = _drive(dungeon, keys, monkeypatch)
+    assert not result['won'], "segment-bounded A must not vault the shut bolts"
+
+
 @pytest.mark.parametrize("seed", SEEDS)
 def test_undo_rebars_a_bolt(seed, monkeypatch):
     """One overtype run is one snapshot: `R`-ing a stream opens its bolt; `u`

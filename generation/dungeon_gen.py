@@ -7193,7 +7193,9 @@ def build_dungeon_whole_line_annex(seed: int) -> Dungeon:
             cells[r][c] = CellType.FLOOR
     cells[_WLA_THROAT_ROW][_WLA_COL_S] = CellType.FLOOR  # spine-only throat: block → gate
     cells[_WLA_GATE_ROW][_WLA_COL_S] = CellType.FLOOR    # the spine reaches the gate row
-    cells[_WLA_EXIT[0]][_WLA_EXIT[1]] = CellType.FLOOR   # the exit: plain floor, east of the bolts
+    # the exit cell STAYS WALL — the FINAL SEAL; the tick floors it when every
+    # plaque reads true (A/o can carve/fabricate floor, so geometry alone no
+    # longer bars the way east of the bolts — see _whole_line_annex_tick).
     # The bolt cells (the gate row, between the spine and the exit) stay WALL at
     # build; the tick opens each when its label reads true. The exit needs no
     # gating: the throat row joins the block to the gate ONLY at the spine, so no
@@ -7471,7 +7473,9 @@ def build_dungeon_change_extension(seed: int) -> Dungeon:
             cells[r][c] = CellType.FLOOR
     cells[_CE_THROAT_ROW][_CE_COL_S] = CellType.FLOOR  # spine-only throat: block → gate
     cells[_CE_GATE_ROW][_CE_COL_S] = CellType.FLOOR    # the spine reaches the gate row
-    cells[_CE_EXIT[0]][_CE_EXIT[1]] = CellType.FLOOR   # the exit: plain floor, east of the bolts
+    # the exit cell STAYS WALL — the FINAL SEAL; the tick floors it when every
+    # plaque reads true (A/o can carve/fabricate floor, so geometry alone no
+    # longer bars the way east of the bolts — see _whole_line_annex_tick).
     # The bolt cells (gate row, between spine and exit) stay WALL at build; the
     # tick opens each when its label reads true. The throat joins block→gate ONLY
     # at the spine, so no east column drops onto the exit; the exit is never a
@@ -7718,7 +7722,9 @@ def build_dungeon_overwrite_halls(seed: int) -> Dungeon:
             cells[r][c] = CellType.FLOOR
     cells[_OH_THROAT_ROW][_OH_COL_S] = CellType.FLOOR   # spine-only throat
     cells[_OH_GATE_ROW][_OH_COL_S]   = CellType.FLOOR   # the spine reaches the gate row
-    cells[_OH_EXIT[0]][_OH_EXIT[1]]  = CellType.FLOOR   # the exit: plain floor, east of the bolts
+    # the exit cell STAYS WALL — the FINAL SEAL; the tick floors it when every
+    # plaque reads true (A/o can carve/fabricate floor, so geometry alone no
+    # longer bars the way east of the bolts — see _whole_line_annex_tick).
     # the bolt cells (gate row, between spine and exit) stay WALL; the tick opens
     # each when its corridor reads true.
 
@@ -7854,7 +7860,9 @@ def build_dungeon_case_chambers(seed: int) -> Dungeon:
             cells[r][c] = CellType.FLOOR                     # $ ends ON the word
     cells[_CASE_THROAT_ROW][_CASE_COL_S] = CellType.FLOOR   # spine-only throat
     cells[_CASE_GATE_ROW][_CASE_COL_S]   = CellType.FLOOR   # the spine reaches the gate row
-    cells[_CASE_EXIT[0]][_CASE_EXIT[1]]  = CellType.FLOOR   # the exit: plain floor, east of the bolts
+    # the exit cell STAYS WALL — the FINAL SEAL; the tick floors it when every
+    # plaque reads true (A/o can carve/fabricate floor, so geometry alone no
+    # longer bars the way east of the bolts — see _whole_line_annex_tick).
     # the bolt cells (gate row, between spine and exit) stay WALL; the tick opens
     # each when its corridor's case reads true.
 
