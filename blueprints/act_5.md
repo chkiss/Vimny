@@ -457,40 +457,67 @@ beat (probably not; `={m}` subsumes it here, `==` can wait for a reprise).
 
 ## 30.1 — The Warden Scrivener (`warden_scrivener`) — boss
 
-**Rebuilt on the Manifold chassis** (the old five-phase immunity table is
-void): ward machine, fogged podium niches, `/W` strikes (`search_glyph_
-entities` + fog discipline), `edit_immune` parry, ward counter riding the
-undo snapshot, boss conventions (par=None, relaxed budget, `_SKIP_LEVELS`,
-deterministic scripted fight, 1-star win).
+**"The Unfinished Manuscript."** He has copied these halls for an age and
+finished nothing. The hall IS the page: margin glosses carved in the north
+and south borders, alcoves where he shelters, and passage after passage he
+refuses to complete. The player finishes his manuscript with the act's own
+verbs — the scrivener's crafts: correcting, overwriting, letterforms,
+joining lines, and RULING THE PAGE (`=` under the posted law — real scribes
+ruled every leaf before writing a word). The name stays; the ward list is
+re-based on the finished act.
 
-Sketch — **"The Unfinished Manuscript"**: the hall is a half-written page;
-each ward is a passage he refuses to finish, completed with one act-V verb:
-  1. `i`/`a` — a plaque sentence missing its opening word (write it in).
-  2. `c{m}` — his lie mid-sentence (change it true).
-  3. `R` — a corrupted stream overwritten in place (re-corruption timer,
-     ward-2 style, tuned).
-  4. `J` — the sentence's second half stranded on the row below (join it).
-  5. `>>` — the closing line out of its margin (align it; the seal column).
-Five wards → hp 5; the opening ritual in the antechamber should WRITE rather
-than paste (e.g. inscribe the word the lintel shows — an `i` warm-up).
-Pressure: decide after the framework plays (the `_wm_pressure` lesson).
+**Manifold chassis, join-hardened.** Ward machine, fogged alcove niches,
+`/W` strikes (`search_glyph_entities` + fog discipline), `edit_immune`
+parry, ward counter riding the undo snapshot, boss conventions (par=None,
+relaxed budget, `_SKIP_LEVELS`, scripted fight, 1-star win). NEW since the
+Manifold, because `J` and `=` are live all fight:
+- NO STATIC COORDINATES: every ward check is text-derived (substring /
+  law_column scans across all rows), the bolt derives from the warden
+  entity, and re-manifest positions derive from wall-carved ALCOVE MARKER
+  runs (glyphs ride `_shift_rows`; the Manifold's static podium coords
+  would re-manifest him into the wrong row after a mid-fight `J`).
+- COLON LINT: `=`'s block law reads any text, so no non-finale passage may
+  end a line with ':' or lead with 'end' (build-time assertion).
+- The A-carve/fabrication battery: the seal is stone until the fall.
+
+**Six beats, hp 5** (ritual ungated, one strike per stagger):
+  0. THE THRESHOLD (`i`, ritual) — the antechamber lintel carries a word in
+     stone; write it on the desk and the gate draws + the hall's fog parts.
+  1. WARD OF THE LIE (`c{m}`) — one wrong word mid-passage; the margin
+     gloss remembers the true line.
+  2. WARD OF THE ROT (`R`, TIMED) — a corrupted stream, re-rotting
+     _WSC_W2_WINDOW keystrokes after the solve (the Manifold R2 window —
+     deliberately the game's R-pressure debut; the Overwrite Halls stayed
+     untimed to save the timer for this reprise). The only timed ward.
+  3. WARD OF THE VOICE (case) — a passage taken down case-INVERTED with a
+     MIXED-case target ('Veil of Iron' shape): guu/gUU write the wrong
+     voice; only the toggle reads true.
+  4. WARD OF THE TORN PAGE (`J`) — the line's second half stranded on the
+     row below; the gloss shows the seam's breath. From here the arena
+     must already be shift-proof — this ward proves it.
+  5. WARD OF THE RULE (`=`, finale) — the closing passage is a rite block
+     (the Sanctum's skeleton), every line off its station; `=}` rules the
+     page in one stroke. The act's capstone; then the last stagger.
+Echo-goblin flourishes stamp with wards 4 and 5 and gutter on the stagger;
+the deeper pressure hook stays empty at ship (the `_wm_pressure` lesson).
 Treasure pocket behind the seal: heart + the **Whole Word** chest (the
-`text_obj` drop is already wired in `_SCROLL_DROPS` and previews Act VI —
-audit-correct).
+`text_obj` drop is already wired in `_SCROLL_DROPS` and previews Act VI).
+Intro names the SITUATION only (the codified spoiler law); the glosses and
+the lintel carry the persistent guidance.
 
 ---
 
 ## Open decisions (the live ones — everything else from the old draft is
 resolved or rejected above)
 
-1. **Inscription Halls trigger mechanisms vs reflow** — the i/a hard-forcing
-   variants must be verified against open_gap/brink behavior live before par
-   is fixed (build-time verification, designer sign-off on the variant).
+1. ~~Inscription Halls trigger mechanisms vs reflow~~ — RESOLVED at the
+   2026-06-12 build (i/a variants verified live; par fixed).
 2. ~~Introduce `V` (visual-line) at the Change Annex?~~ — RESOLVED 2026-06-17
    toward **no**: the Change Annex (§23) stays about the change verbs, not a
    new mode. `V`/`visual_line` remains unlisted in the curriculum.
-3. **`>{m}` span-indent + `=` semantics** (engine task + design definition —
-   see §30). The only engine work in the act.
+3. ~~`>{m}` span-indent + `=` semantics~~ — RESOLVED and BUILT 2026-07-12
+   (`>{m}` was already done; `=` shipped with the block law / posted-law
+   socket at the Indentation Sanctum — see §30).
 4. ~~Insert-cost model confirmation~~ — RESOLVED at the Inscription Halls
    build: each typed char spends 1, **Esc spends nothing** (main's INSERT
    loop charges only `insert_char`). Pars use 1 + chars per insert.

@@ -245,9 +245,16 @@ def apply_indent(room, row: int, amount: int) -> int:
     # plaque on the same row) are not part of any line and must neither move
     # nor anchor the shift (a plaque at col 1 made `leftmost` land inside the
     # wall: >> opened its gap in the wall segment — a no-op — and <<'s clamp
-    # math inverted).
+    # math inverted). Column overlap alone is NOT enough: a wall-embedded
+    # glyph WITHIN the extent's column range (an alcove marker mid-row) must
+    # stay in its stone too — cell-type checked, like _floor_tokens (a `=`
+    # dedent once dragged the Scrivener's ☿ marker out of its wall onto the
+    # floor).
     clusters = [ru for ru in room._char_runs_by_row.get(row, [])
-                if ru.col + len(ru.symbols) - 1 >= lo and ru.col <= hi]
+                if ru.col + len(ru.symbols) - 1 >= lo and ru.col <= hi
+                and any(room.cells[row][ru.col + k] in _LAW_FLOORS
+                        for k in range(len(ru.symbols))
+                        if lo <= ru.col + k <= hi)]
     if not clusters:
         return 0
     leftmost = min(ru.col for ru in clusters)
@@ -264,10 +271,17 @@ def apply_indent(room, row: int, amount: int) -> int:
     return amount
 
 
+_LAW_FLOORS = (CellType.FLOOR, CellType.CORRIDOR)
+
+
 def _floor_tokens(room, row: int):
-    """The row's LINE as text: glyphs within the passable extent (wall-embedded
-    plaques excluded, gaps as spaces), returned as (start_col, stripped_text).
-    (None, '') for a wall row or a bare-floor row."""
+    """The row's LINE as text: glyphs on FLOOR cells within the passable extent
+    (gaps as spaces), returned as (start_col, stripped_text). (None, '') for a
+    wall row or a bare-floor row. A glyph in stone is not part of any line —
+    wall-embedded carvings (plaques, alcove markers) inside the extent's
+    column range must neither feed the law nor anchor it; the check reads the
+    CELL TYPE, not is_passable, because fog makes floor impassable (the
+    Manifold lesson)."""
     ext = line_extent(room, row)
     if ext is None:
         return None, ''
@@ -276,7 +290,7 @@ def _floor_tokens(room, row: int):
     for ru in room._char_runs_by_row.get(row, []):
         for k, sym in enumerate(ru.symbols):
             c = ru.col + k
-            if lo <= c <= hi:
+            if lo <= c <= hi and room.cells[row][c] in _LAW_FLOORS:
                 cells[c] = sym
     if not cells:
         return None, ''

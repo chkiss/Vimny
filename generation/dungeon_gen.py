@@ -8299,3 +8299,220 @@ def build_dungeon_indentation_sanctum(seed: int) -> Dungeon:
     dungeon.rooms        = [room]
     dungeon.current_room = 0
     return dungeon
+
+
+# ── The Warden Scrivener (Act V boss) — "The Unfinished Manuscript" ───────────
+# He has copied these halls for an age and finished nothing. The hall IS the
+# page: margin glosses carved in the north and south borders, five fogged
+# alcoves where he shelters, and passage after passage he refuses to finish.
+# The player completes his manuscript with the act's own verbs — the
+# scrivener's crafts — and strikes him in the stagger after each ward breaks
+# (main._warden_scrivener_tick; the Manifold ward machine, JOIN-HARDENED).
+#
+# Six beats, hp 5 (the threshold is ungated):
+#   0  i        THE THRESHOLD — the antechamber lintel carries a word in
+#               stone; write it anywhere on the desk and the gate draws +
+#               the hall's fog parts (stateless, brazier-ritual analog).
+#   1  c{m}     WARD OF THE LIE — one wrong word mid-passage; the north
+#               margin gloss remembers the true line.
+#   2  R        WARD OF THE ROT (TIMED) — a corrupted stream; the mends
+#               re-rot _WSC_W2_WINDOW keystrokes after the solve (the
+#               Manifold R2 window — the game's R-pressure debut; the
+#               Overwrite Halls stayed untimed to save the timer for this).
+#   3  case     WARD OF THE VOICE — a passage taken down case-INVERTED with
+#               a MIXED-case target ('Veil of Iron' shape): guu/gUU write
+#               the wrong voice; only the toggle reads true.
+#   4  J        WARD OF THE TORN PAGE — the line's second half stranded on
+#               the row below; the south gloss shows the seam's breath.
+#   5  =        WARD OF THE RULE (finale) — the closing passage is a rite
+#               block (the Sanctum's skeleton), every line off its station;
+#               `=}` rules the page in one stroke. The act's capstone.
+#
+# JOIN-HARDENING (J and = are live all fight — NEW since the Manifold):
+#   • every ward check is TEXT-derived (substring / law_column scans across
+#     all rows) — no stored coordinates can go stale;
+#   • re-manifest positions derive from wall-carved ALCOVE MARKERS (a ♄-class
+#     glyph in each alcove's back wall; glyphs ride _shift_rows, where the
+#     Manifold's static podium coords would re-manifest him into the wrong
+#     row after a mid-fight J), and the later stamps are laid RELATIVE to the
+#     derived alcove row;
+#   • the block law ignores wall-embedded glyphs (the _floor_tokens cell-type
+#     filter), so the markers/glosses never feed `=`; and no non-finale text
+#     ends in ':' or leads with 'end' (the colon lint, asserted in tests);
+#   • the seal is stone until the fall (the A-carve battery holds).
+_WSC_ROWS, _WSC_COLS = 19, 66
+_WSC_AXIS  = 9                          # the aisle — bolts face it
+_WSC_SPAWN = (8, 3)
+_WSC_LINTEL = (5, 3)                    # the threshold word, carved over the desk
+_WSC_GATE   = (8, 13)                   # draws when the threshold word is written
+_WSC_HALL_TOP, _WSC_HALL_BOT = 2, 16
+_WSC_HALL_LO,  _WSC_HALL_HI  = 15, 61
+_WSC_MARGIN_ROWS = (1, 17)              # sealed border rows wearing the glosses
+_WSC_ALCOVES = ((3, 20), (15, 28), (3, 36), (15, 44), (3, 52))
+_WSC_SIDES   = (1, -1, 1, -1, 1)        # niche opens toward the aisle
+_WSC_MARKS   = ('♄', '☿', '♆', '⚸', '♅')   # back-wall markers (untypable)
+_WSC_W2_WINDOW = 8                      # keystrokes from solve to strike
+_WSC_SEAL  = (9, 62)                    # draws when the Scrivener falls
+_WSC_EXIT  = (9, 63)
+_WSC_HEART = (8, 64)
+_WSC_CHEST = (10, 64)                   # the Whole Word (text_obj, Act VI preview)
+_WSC_POCKET = tuple((r, c) for r in (8, 9, 10) for c in (63, 64))
+_WSC_BUDGET = 260                       # relaxed (boss convention — no par)
+_WSC_NOUNS = ('oath', 'rune', 'veil', 'lamp', 'gate', 'ash', 'fern', 'moss',
+              'dust', 'iron', 'bell', 'loam', 'reed', 'tarn', 'kiln', 'wick')
+_WSC_VERBS = ('binds', 'wards', 'mends', 'keeps', 'casts', 'hews', 'rules',
+              'seals')
+# Ward-1 passage row/col, and the later stamps as (alcove_dr, col) anchors —
+# rows are laid RELATIVE to the freshly derived alcove niche row so they ride
+# any earlier collapse. Ward 5's rite corrupt columns are offsets from the
+# hall's west edge (the law base): true stations 0,+2,+2,0 → laid +2,0,+4,+2.
+_WSC_W1 = (5, 17)
+_WSC_STAMP_ANCHORS = {
+    2: ((-8, 24),),                     # A2 niche row 15 → passage row 7
+    3: ((+2, 40),),                     # A3 niche row 3  → passage row 5
+    # The torn page: rows 10/11 are CLEAN rows — J pulls up EVERYTHING on the
+    # source row, so torn-half B must never share a row with other floor ink
+    # (the threshold word lives on aisle row 8).
+    4: ((-5, 46), (-4, 46)),            # A4 niche row 15 → rows 10, 11
+    5: ((+8, 17), (+9, 15), (+10, 19), (+11, 17)),   # A5 row 3 → rows 11..14
+}
+# Echo flourishes, as (alcove_dr, col) anchors like the stamps — the LAST
+# static coordinates in the machine were these spawn cells, and after an
+# adversarial mid-fight J an echo stood ON the shifted torn text, its 'W'
+# glyph overlaying the letters and breaking the search (found live, seed 1:
+# '/wick' read 'wiWk'). Relative-to-the-same-anchor keeps every offset
+# consistent forever; they gutter on the stagger.
+_WSC_SPAWNS = {4: ((-9, 50), (-6, 40)),
+               5: ((+7, 20), (+9, 30), (+3, 30), (+9, 50))}
+
+
+def build_dungeon_warden_scrivener(seed: int) -> Dungeon:
+    """The Warden Scrivener (Act V boss): the Unfinished Manuscript. No new
+    commands; no keystroke par; hp 5, one strike per stagger. See the section
+    header for the six beats and the join-hardening."""
+    rng = random.Random(seed)
+    _load_vocab_tables()
+
+    # Seeded words — ALL distinct (a stray repeat could break a ward early).
+    # Ward 3's capitalized nouns must not START with 'w': its mended target is
+    # the only CAPITALIZED floor text in the hall, and a floor 'W' collides
+    # with the Warden's own letter — /W would land the strike on the word and
+    # x would eat it (found live, seed 42: 'Gate of Wick' → 'Gate of ick').
+    nouns = rng.sample(_WSC_NOUNS, 9)
+    while nouns[3][0] == 'w' or nouns[4][0] == 'w':
+        nouns = rng.sample(_WSC_NOUNS, 9)
+    verbs = rng.sample(_WSC_VERBS, 5)
+    threshold = nouns[0]
+    true1  = f'{nouns[1]} {verbs[0]} {nouns[2]}'      # the passage as it should read
+    lie1   = f'{nouns[1]} {verbs[1]} {nouns[2]}'      # his lie, mid-sentence
+    long8  = [w for w in _VOCAB_PLAIN_BY_LEN.get(8, ())
+              if w.isalpha() and w.islower()]
+    word2  = rng.choice(long8)                        # the stream the rot eats
+    mid    = (len(word2) - 3) // 2
+    rot_abc = [ch for ch in 'abcdefghijklmnopqrstuvwxyz' if ch not in word2]
+    rot2   = ''.join(rng.sample(rot_abc, 3))
+    word2_rotted = word2[:mid] + rot2 + word2[mid + 3:]
+    target3 = f'{nouns[3].capitalize()} of {nouns[4].capitalize()}'
+    wrong3  = target3.swapcase()                      # the whole voice inverted
+    true4   = f'{nouns[5]} {verbs[2]} {nouns[6]}'     # the torn line, made whole
+    torn4a  = f'{nouns[5]} {verbs[2]}'
+    torn4b  = nouns[6]
+    rite_texts = (f'rite {nouns[7]}:', f'{verbs[3]} {nouns[7]}',
+                  f'{verbs[4]} {nouns[8]}', 'end')
+
+    R, C = _WSC_ROWS, _WSC_COLS
+    cells = [[CellType.WALL] * C for _ in range(R)]
+    for r in range(6, 11):                                  # the antechamber desk
+        for c in range(2, 13):
+            cells[r][c] = CellType.FLOOR
+    for r in range(_WSC_HALL_TOP, _WSC_HALL_BOT + 1):       # the great page
+        for c in range(_WSC_HALL_LO, _WSC_HALL_HI + 1):
+            cells[r][c] = CellType.FLOOR
+    for k, (pr, pc) in enumerate(_WSC_ALCOVES):             # his alcoves
+        side = _WSC_SIDES[k]
+        cells[pr][pc] = CellType.FLOOR
+        cells[pr - side][pc] = CellType.WALL                # back wall (the marker)
+        cells[pr][pc - 1] = CellType.WALL
+        cells[pr][pc + 1] = CellType.WALL
+        cells[pr + side][pc] = CellType.WALL                # the bolt, shut
+    for (r, c) in _WSC_POCKET:                              # treasure pocket
+        cells[r][c] = CellType.FLOOR
+    cells[_WSC_SEAL[0]][_WSC_SEAL[1]] = CellType.WALL       # behind its seal
+    cells[_WSC_GATE[0]][_WSC_GATE[1] + 1] = CellType.FLOOR  # threshold into the hall
+    cells[_WSC_GATE[0]][_WSC_GATE[1]] = CellType.WALL       # the gate, shut
+
+    room = Room(room_type=RoomType.ENTRY, rows=R, cols=C)
+    room.cells = cells
+    room.seed  = seed
+    room.search_glyph_entities = True
+
+    # Fog: the whole page (margins and glosses included) until the threshold
+    # ritual; each alcove until its stagger; the pocket until the fall.
+    hall_fog = frozenset(
+        (r, c) for r in range(1, 18) for c in range(14, 63)
+        if (r, c) not in _WSC_ALCOVES)
+    room._wsc_hall_fog   = hall_fog
+    room._wsc_pocket_fog = frozenset(_WSC_POCKET)
+    room.fog_cells.update(_WSC_ALCOVES)
+    room.fog_cells.update(hall_fog)
+    room.fog_cells.update(_WSC_POCKET)
+
+    def lay(row, col, text, kind):
+        c = col
+        for piece in text.split(' '):
+            if piece:
+                room.char_runs.append(CharRun(row, c, tuple(piece), kind))
+            c += len(piece) + 1
+
+    lay(*_WSC_LINTEL, threshold, 'verdant')                 # the threshold lintel
+    for k, (pr, pc) in enumerate(_WSC_ALCOVES):             # the alcove markers
+        lay(pr - _WSC_SIDES[k], pc, _WSC_MARKS[k], 'ember')
+    # Margin glosses — the manuscript's marginalia, carved in the border rows
+    # (wall-embedded: uncuttable, off the floor scans, and — via the
+    # _floor_tokens cell-type filter — invisible to the block law).
+    lay(1, _WSC_W1[1], true1, 'verdant')                    # north: the true line
+    lay(1, 40, target3, 'verdant')                          # north: the true voice
+    lay(17, 24, word2, 'verdant')                           # south: the whole stream
+    lay(17, 46, true4, 'verdant')                           # south: the whole line
+    lay(1, 15, '❦', 'ember')
+    lay(17, 60, '❦', 'ember')
+
+    # Ward 1, stamped at build (the fight opens staged): his lie on the page.
+    lay(_WSC_W1[0], _WSC_W1[1], lie1, 'ancient')
+
+    # Later stamps, laid by the tick at each re-manifest — rows RELATIVE to
+    # the freshly derived alcove niche (join-proof).
+    room._wsc_stamps = {
+        2: ((word2_rotted, 'ancient'),),
+        3: ((wrong3, 'ancient'),),
+        4: ((torn4a, 'ancient'), (torn4b, 'ancient')),
+        5: tuple((t, 'ancient') for t in rite_texts),
+    }
+    room._wsc_targets = {1: true1, 2: word2, 3: target3, 4: true4}
+    room._wsc_rite    = rite_texts
+    room._wsc_word2, room._wsc_rot2, room._wsc_rotmid = word2, rot2, mid
+    room._wsc_threshold = threshold
+    room._wsc_gate, room._wsc_seal = _WSC_GATE, _WSC_SEAL
+
+    # The Scrivener: edit_immune (every operator parries), five x-windows.
+    room.entities.append(Entity(kind='warden', row=_WSC_ALCOVES[0][0],
+                                col=_WSC_ALCOVES[0][1], hp=5, max_hp=5,
+                                ai='', tag='scrivener', edit_immune=True))
+    room.entities.append(Entity(kind='heart_container',
+                                row=_WSC_HEART[0], col=_WSC_HEART[1]))
+    room.entities.append(Entity(kind='chest_scroll',
+                                row=_WSC_CHEST[0], col=_WSC_CHEST[1]))
+    room.entities.append(Entity(kind='exit', row=_WSC_EXIT[0], col=_WSC_EXIT[1],
+                                edit_immune=True))
+    room.spawn_pos = _WSC_SPAWN
+    room.exit_pos  = _WSC_EXIT
+
+    room.rebuild_indexes()
+    room.par    = None                   # boss: no keystroke par (1-star win)
+    room.budget = _WSC_BUDGET
+    room.answer = ''
+
+    dungeon = Dungeon(name='The Warden Scrivener', seed=seed)
+    dungeon.rooms        = [room]
+    dungeon.current_room = 0
+    return dungeon
