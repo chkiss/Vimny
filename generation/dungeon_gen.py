@@ -7905,3 +7905,117 @@ def build_dungeon_case_chambers(seed: int) -> Dungeon:
     dungeon.current_room = 0
     return dungeon
 
+
+# ── The Joiner's Gate (J gJ) ──────────────────────────────────────────────────
+# "Pull the world up into your line." Four split inscriptions on the Annex
+# chassis: each lesson is a STACK of rows — the plaque keeps the true line, the
+# floor has it split one word per row. Joining makes the top row read true and
+# the (substring) tick opens the bolt. J leaves one space at the seam; gJ none;
+# {n}J joins n lines. The choice is CONTENT-forced per door: a two-word plaque
+# (`bind veil`) needs the seam space → J; a fused plaque (`wardstone`) → gJ; a
+# wrong variant reads false, the bolt stays shut, and `u` restores the stack.
+#
+# J is a TERRAIN EDITOR, so the chassis had to be hardened first (2026-07-12):
+#   • every join removes a row and slides the gate/bolts/exit UP —
+#     `_whole_line_annex_tick` derives the gate row from exit_pos each tick
+#     (which `_shift_rows` keeps true), so the bolts ride the collapses;
+#   • the gate row itself is join-proof: `remove_row` refuses a row holding an
+#     edit_immune entity, and the exit entity is edit_immune;
+#   • the exit is the FINAL SEAL (stone until every plaque reads true), so the
+#     floor J/A/o can fabricate never reaches a live exit.
+#
+# FORCING BY PAR (standard 1.4 budget): J = 1 key per door. The no-join rival
+# writes the missing words by hand (`ea` + the text, ~7 keys a door, ~12 for
+# the finale — A won't do: it appends past the trailing floor, stranding the
+# text far east of the seam, so the row never reads true) or emulates a join
+# with de + k$p (the paste lands at the floor's end, same stranding). With
+# four doors the all-old route is ~4x the budget.
+#
+# FINALE: `4J`, not `3J` — 3J (2 keys) TIES JJ (2 keys) and teaches nothing;
+# a four-row stack makes 4J (2) beat JJJ (3) by one, the count paying exactly
+# at the door where it's taught (the Echo Vault's count-dot echo).
+_JG_ROWS, _JG_COLS = 15, 29
+_JG_PLQ_COL = 1                     # the true line, in the WEST wall (cols 1..14)
+_JG_COL_S   = 15                    # the spine — every row's first standable
+_JG_LBL_COL = _JG_COL_S            # the split words sit on the floor here
+_JG_FLOOR_END = 27                  # uniform stack floor (holds the longest join)
+_JG_STACK_TOPS = (2, 4, 6, 8)       # each stack's TOP row (the join happens here)
+_JG_THROAT_ROW  = 12                # spine-only row: the block joins the gate
+_JG_GATE_ROW    = 13                # the gate corridor: spine · bolts · seal
+_JG_GATE_COL0   = 16                # first bolt column (one per stack)
+_JG_TRIGGERS    = len(_JG_STACK_TOPS)
+_JG_EXIT = (_JG_GATE_ROW, _JG_GATE_COL0 + _JG_TRIGGERS)   # the FINAL SEAL
+
+# (kind, target, split_rows). kind: 'J' (seam space), 'gJ' (fused), '4J' (the
+# count finale — three seams in one stroke).
+_JG_LESSONS = (
+    ('J',  'bind veil',     ('bind', 'veil')),
+    ('gJ', 'wardstone',     ('ward', 'stone')),
+    ('J',  'oath sworn',    ('oath', 'sworn')),
+    ('4J', 'the way is up', ('the', 'way', 'is', 'up')),
+)
+# par + the canonical tape, driven end-to-end (hand-measured — every join
+# collapses a row, so the next stack's top is always ONE j away; each join
+# lands the cursor on the seam, still on the uniform floor):
+#   J · j · gJ · j · J · j · 4J · G$  = 11 keys.
+_JG_PAR    = 11
+_JG_ANSWER = 'J j gJ j J j 4J G$'
+
+
+def build_dungeon_joiners_gate(seed: int) -> Dungeon:
+    """The Joiner's Gate (slug `joiners_gate`): J gJ.
+
+    Four split inscriptions on the (join-hardened) Annex chassis. Each stack
+    joins up into its plaque's line: two-word plaques take J's seam space,
+    fused plaques take gJ, and the four-row finale takes 4J — the count form
+    at the count where it first beats repeated J. See the section header."""
+    R, C = _JG_ROWS, _JG_COLS
+    cells = [[CellType.WALL] * C for _ in range(R)]
+    stack_rows = []
+    for top, (kind, target, split) in zip(_JG_STACK_TOPS, _JG_LESSONS):
+        stack_rows.extend(range(top, top + len(split)))
+    for r in stack_rows:                                 # uniform stack floor:
+        for c in range(_JG_COL_S, _JG_FLOOR_END + 1):    # wide enough to receive
+            cells[r][c] = CellType.FLOOR                 # the longest joined line
+    cells[_JG_THROAT_ROW][_JG_COL_S] = CellType.FLOOR    # spine-only throat
+    cells[_JG_GATE_ROW][_JG_COL_S]   = CellType.FLOOR    # the spine reaches the gate
+    # bolts AND the exit stay WALL — the tick opens the bolts per plaque and
+    # parts the FINAL SEAL when all four read true.
+
+    room = Room(room_type=RoomType.ENTRY, rows=R, cols=C)
+    room.cells = cells
+    room.seed  = seed
+
+    def lay(r, c, text, kind):
+        col = c
+        for part in text.split(' '):                     # separate CharRuns per word
+            if part:
+                room.char_runs.append(CharRun(r, col, tuple(part), kind))
+            col += len(part) + 1
+
+    doors = []
+    lessons = []
+    for i, (top, (kind, target, split)) in enumerate(zip(_JG_STACK_TOPS, _JG_LESSONS)):
+        for k, word in enumerate(split):
+            lay(top + k, _JG_LBL_COL, word, 'ancient')   # the split words, stacked
+        lay(top, _JG_PLQ_COL, target, 'verdant')         # the true line, west-wall plaque
+        doors.append((target, (_JG_GATE_ROW, _JG_GATE_COL0 + i)))
+        lessons.append({'kind': kind, 'target': target, 'split': split, 'top': top})
+    room._wla_doors  = tuple(doors)                      # the (hardened) Annex tick
+    room._jg_lessons = tuple(lessons)
+
+    room.entities.append(Entity(kind='exit', row=_JG_EXIT[0], col=_JG_EXIT[1],
+                                edit_immune=True))       # join-proof: remove_row refuses
+    room.spawn_pos = (_JG_STACK_TOPS[0], _JG_COL_S)      # atop stack 1, at the spine
+    room.exit_pos  = _JG_EXIT
+
+    room.rebuild_indexes()
+    room.par    = _JG_PAR
+    room.budget = math.ceil(_JG_PAR * 1.4)       # STANDARD: the hand-written rival is ~4x
+    room.answer = _JG_ANSWER
+
+    dungeon = Dungeon(name="The Joiner's Gate", seed=seed)
+    dungeon.rooms        = [room]
+    dungeon.current_room = 0
+    return dungeon
+

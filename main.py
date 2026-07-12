@@ -1365,14 +1365,20 @@ def _whole_line_annex_tick(room, player) -> list:
     def written(target):
         return any(target in t for t in floor_rows)
 
+    # The gate row is DERIVED from exit_pos each tick, not read from the door
+    # tuples: J (the Joiner's Gate) removes rows and everything below the cut
+    # slides up — _shift_rows keeps exit_pos true, so the live gate row rides
+    # with it (the entity-anchor rule). The tuples keep their build-time row;
+    # every chassis level lays its bolts on the exit's own row.
+    gr = room.exit_pos[0]
     all_true = True
-    for target, (dr, dc) in getattr(room, '_wla_doors', ()):
-        is_open = room.cells[dr][dc] != CellType.WALL
+    for target, (_dr, dc) in getattr(room, '_wla_doors', ()):
+        is_open = room.cells[gr][dc] != CellType.WALL
         if written(target) and not is_open:
-            room.cells[dr][dc] = CellType.FLOOR
+            room.cells[gr][dc] = CellType.FLOOR
             msgs.append('The label reads true — the bolt grinds back!')
-        elif not written(target) and is_open and (player.row, player.col) != (dr, dc):
-            room.cells[dr][dc] = CellType.WALL     # undone — the bolt re-bars
+        elif not written(target) and is_open and (player.row, player.col) != (gr, dc):
+            room.cells[gr][dc] = CellType.WALL     # undone — the bolt re-bars
         all_true = all_true and written(target)
     if getattr(room, '_wla_doors', ()):
         er, ec = room.exit_pos                     # rides row shifts (_shift_rows)
@@ -1880,6 +1886,7 @@ _LEVEL_INTROS = {
     'sculpting_chambers':  ('The Sculpting Chambers — a votive lies half-cut in the stone, its verses broken and its lines run dry. The vault keeps faith with the whole prayer, and nothing less.', 70),
     'overwrite_halls':     ('The Overwrite Halls — the words have rotted, some by a single stone, some in long streaks. Mend each corridor to match its plaque, and mind which rot runs on.', 70),
     'case_chambers':       ('The Case Chambers — every word survives letter-perfect, yet every door stays shut. Look closer: the shapes of the letters lie. The plaques keep the true forms, small and tall.', 70),
+    'joiners_gate':        ('The Joiner\'s Gate — the old inscriptions were split, line from line, and scattered down the stacks. Pull the world up into your row: some verses want a breath at the seam, some want none.', 70),
     'warden_manifold':     ('The Warden Manifold — he stamps himself into the world. Light the four braziers; the gate will draw and the fog will part.', 70),
     'warden_surveyor':     ('The Warden Surveyor — he keeps a long hall where the floor falls away between the words. Cross it word by word, over the void.', 60),
     'spellwrights_forge':  ('The Spellwright\'s Forge — the old wards have rotted and cursed lines '
@@ -2560,7 +2567,7 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
             for _m in _inscription_halls_tick(room, player):
                 _push(_m)
         if level in ('whole_line_annex', 'change_extension', 'overwrite_halls',
-                     'case_chambers'):
+                     'case_chambers', 'joiners_gate'):
             for _m in _whole_line_annex_tick(room, player):
                 _push(_m)
         if level == 'sculpting_chambers':
