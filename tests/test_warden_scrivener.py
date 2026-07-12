@@ -178,6 +178,12 @@ def test_the_page_sleeps_under_fog(seed):
     assert _match_positions(room, _lie_verb(room)) == []
     assert (_WSC_ALCOVES[0]) in room.fog_cells
     assert set(_WSC_POCKET) <= room.fog_cells
+    # NOTHING in the hall pokes past the veil (a gloss tail once overflowed
+    # the fog's east edge and showed at level open)
+    for ru in room.char_runs:
+        if ru.col >= 14:
+            assert all((ru.row, ru.col + k) in room.fog_cells
+                       for k in range(len(ru.symbols))), ru
 
 
 def test_threshold_parts_the_fog(monkeypatch):

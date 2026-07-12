@@ -8353,7 +8353,15 @@ _WSC_GATE   = (13, 13)                  # draws when the threshold word is writt
 _WSC_HALL_TOP, _WSC_HALL_BOT = 2, 20
 _WSC_HALL_LO,  _WSC_HALL_HI  = 15, 65
 _WSC_MARGIN_ROWS = (1, 21)              # sealed border rows wearing the glosses
-_WSC_ALCOVES = ((3, 30), (19, 40), (3, 50), (19, 60), (3, 20))
+# The columns encasing him stand SYMMETRIC across the hall (playtest): the
+# three north alcoves cut the hall in quarters (27/40/53 about center 40),
+# the two south alcoves cut it in thirds (32/48). The finale alcove is the
+# westmost — the rite lives at the west margin (the law's base).
+# A2 takes the west third, A4 the east: both south wards share row 16, and
+# J appends at the row's END OF CONTENT — the torn upper half must be the
+# row's EASTMOST tenant or the pulled-up word lands after the other ward's
+# mended text (found live: 'wick keeps … deadline loam').
+_WSC_ALCOVES = ((3, 40), (19, 32), (3, 53), (19, 48), (3, 27))
 _WSC_SIDES   = (1, -1, 1, -1, 1)        # niche opens toward the aisle
 _WSC_W2_WINDOW = 8                      # keystrokes from solve to strike
 _WSC_SEAL  = (13, 66)                   # draws when the Scrivener falls
@@ -8371,11 +8379,11 @@ _WSC_VERBS = ('binds', 'wards', 'mends', 'keeps', 'casts', 'hews', 'rules',
 # every ward sits three rows out from its alcove's niche (the rite, a 4-line
 # passage, RUNS rows +4..+7 below A5 and at the hall's WEST margin, cols
 # offset from the law base 15: true stations 0,+2,+2,0 → laid +2,0,+4,+2).
-_WSC_W1 = (6, 27)
+_WSC_W1 = (6, 34)
 _WSC_STAMP_ANCHORS = {
-    2: ((-3, 37),),                     # A2 niche row 19 → passage row 16
-    3: ((+3, 47),),                     # A3 niche row 3  → passage row 6
-    4: ((-3, 55), (-2, 55)),            # A4 niche row 19 → rows 16, 17
+    2: ((-3, 29),),                     # A2 niche row 19 → passage row 16
+    3: ((+3, 50),),                     # A3 niche row 3  → passage row 6
+    4: ((-3, 45), (-2, 45)),            # A4 niche row 19 → rows 16, 17 (EAST)
     5: ((+4, 17), (+5, 15), (+6, 19), (+7, 17)),   # A5 row 3 → rows 7..10
 }
 # Chorus goblins (plain 'g' — copies of NOTHING; playtest: echo-tagged
@@ -8383,7 +8391,7 @@ _WSC_STAMP_ANCHORS = {
 # stamps, on text-free rows (a goblin standing on a passage overlays its
 # letters and blinds the search). They gutter on the stagger.
 _WSC_SPAWNS = {4: ((-6, 45), (-7, 58)),
-               5: ((+2, 35), (+8, 30), (+8, 50), (+9, 40))}
+               5: ((+2, 35), (+8, 33), (+8, 50), (+9, 42))}
 
 
 def build_dungeon_warden_scrivener(seed: int) -> Dungeon:
@@ -8448,9 +8456,13 @@ def build_dungeon_warden_scrivener(seed: int) -> Dungeon:
 
     # Fog: the whole page (margins and glosses included) until the threshold
     # ritual; each alcove until its stagger; the pocket until the fall.
+    # Fog runs to the FULL east wall: the pocket cells keep their own fog set
+    # (excluded here so the ritual's hall reveal never unfogs them), and no
+    # gloss may poke past the veil (playtest: a south gloss once overflowed
+    # the fog's edge and its tail showed at level open).
     hall_fog = frozenset(
-        (r, c) for r in range(1, 22) for c in range(14, 67)
-        if (r, c) not in _WSC_ALCOVES)
+        (r, c) for r in range(1, 22) for c in range(14, _WSC_COLS - 1)
+        if (r, c) not in _WSC_ALCOVES and (r, c) not in _WSC_POCKET)
     room._wsc_hall_fog   = hall_fog
     room._wsc_pocket_fog = frozenset(_WSC_POCKET)
     room.fog_cells.update(_WSC_ALCOVES)
@@ -8469,11 +8481,9 @@ def build_dungeon_warden_scrivener(seed: int) -> Dungeon:
     # directly over/under their passages (wall-embedded: uncuttable, off the
     # floor scans, and invisible to the block law and the indent).
     lay(1, _WSC_W1[1], true1, 'verdant')                    # north: the true line
-    lay(1, 47, target3, 'verdant')                          # north: the true voice
-    lay(21, 37, word2, 'verdant')                           # south: the whole stream
-    lay(21, 55, true4, 'verdant')                           # south: the whole line
-    lay(1, 17, '❦', 'ember')
-    lay(21, 63, '❦', 'ember')
+    lay(1, 50, target3, 'verdant')                          # north: the true voice
+    lay(21, 29, word2, 'verdant')                           # south: the whole stream
+    lay(21, 45, true4, 'verdant')                           # south: the whole line
 
     # Ward 1, stamped at build (the fight opens staged): his lie on the page,
     # three rows under his first alcove.
