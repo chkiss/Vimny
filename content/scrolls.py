@@ -187,8 +187,10 @@ WHOLE_WORD_SCROLL = {
     'lines': [
         ('dim',    '  Position within the word ceased to matter.'),
         ('blank',),
-        ('cmd',    'iw', 'inner word  (anywhere in word)'),
-        ('cmd',    'aw', 'around word (includes space)'),
+        # the whole scroll is NEXT-tier (the Act VI preview): every command
+        # line sleeps under the dip until its text object is learned
+        ('smudge', 'iw',  'i',  'nner word  (anywhere in word)', 'iw'),
+        ('smudge', 'aw',  'a',  'round word (includes space)',   'aw'),
         ('blank',),
         ('smudge', 'i(',  'i',  'nner parens', 'i('),
         ('smudge', 'i"',  'in', 'side quotes', 'i"'),

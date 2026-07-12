@@ -496,17 +496,14 @@ def _render_standard_scroll(term: Terminal, iw: int, game_h: int, content: dict,
         k     = key_text.ljust(key_w)
         text  = f'{indent}{k}{sep}{desc}'
         solid = len(indent) + len(hide_prefix)
-        rnd   = random.Random(text)        # stable speckle for a given line
+        chars, smudged = _water_stain(text, solid)   # the same dip as every scroll
         painted, prev = '', None
-        for i, ch in enumerate(text):
-            if i < solid:
-                col, out = smudge, rnd.choice('▒▓')   # wet edge: blotted, spaces too
-            else:
-                col, out = body, ch                   # tail reads clean
+        for ch, is_s in zip(chars, smudged):
+            col = smudge if is_s else body
             if col != prev:
                 painted += col
                 prev = col
-            painted += out
+            painted += ch
         return row(len(text), painted + rst + inn)
 
     def body_row(s):  return row(len(s), body + s + rst)
