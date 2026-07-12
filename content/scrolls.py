@@ -188,7 +188,12 @@ WHOLE_WORD_SCROLL = {
         ('dim',    '  Position within the word ceased to matter.'),
         ('blank',),
         # the whole scroll is NEXT-tier (the Act VI preview): every command
-        # line sleeps under the dip until its text object is learned
+        # line sleeps under the dip until it is learned. The tier OPENS with
+        # sight (v at the Sight Sanctum, V at the Selection Halls), so the
+        # sight lines lead; the text objects follow in curriculum order.
+        ('smudge', 'v',   'select b', 'y sight, then strike',  'visual'),
+        ('smudge', 'V',   'whole li', 'nes in a single gaze',  'visual_line'),
+        ('blank',),
         ('smudge', 'iw',  'i',  'nner word  (anywhere in word)', 'iw'),
         ('smudge', 'aw',  'a',  'round word (includes space)',   'aw'),
         ('blank',),

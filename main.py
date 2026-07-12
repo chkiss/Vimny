@@ -211,6 +211,8 @@ The Whole Word
 ==============
 Position within the word ceased to matter.
 
+  v   ──  select by sight, then strike
+  V   ──  whole lines in a single gaze
   iw  ──  inner word  (from anywhere inside)
   aw  ──  around word (includes adjacent space)
   i(  ──  inner parens
