@@ -8019,3 +8019,124 @@ def build_dungeon_joiners_gate(seed: int) -> Dungeon:
     dungeon.current_room = 0
     return dungeon
 
+
+
+# ── The Alignment Halls (>> << + the case reprise) ────────────────────────────
+# "Lines shove sideways — and the register line keeps both truths." Five words
+# on the Annex block, each mis-SET from the shared REGISTER COLUMN (the plumb
+# line, marked by │ glyphs carved in the wall bands above and below the block)
+# and two of them mis-CASED as well — the Case Chambers' lesson, reprised one
+# level later. The west-wall plaque keeps the true word in its TRUE CASE; a
+# bolt stands open while its word reads true-cased with its first letter
+# EXACTLY on the register line (exact text at the exact column, any floor row —
+# `_alignment_halls_tick`, shift-/case-/o-proof, FINAL-SEAL exit).
+#
+# Forcing, against the REAL frontier (the old draft priced a 9-key
+# delete-retype; the true rival is cheaper):
+#   • a shift's rival is the INSERT-SHOVE (`i`+junk+Esc ≈ 4-5 keys vs `>>` 2)
+#     — junk passes the slice check, so it's a legal, LOSING route (1 star);
+#   • `<<` has no rival at all: a shifted line has no leading chars to `x`;
+#   • the case reprise is forced by PAR: the no-case-op rival (`R`/`r` retype
+#     after the shift) wins at ~+6 over par — inside the standard budget,
+#     out of the second star (the law, working as written);
+#   • `.` rides the indent: `>>` is a change, so rows 2 and 5 take their
+#     shift as dot (dot's third outing — r at the Echo Vault, now `>>`/`2>>`);
+#   • PARITY LAW: every offset is a multiple of INDENT_WIDTH=2 (an odd
+#     offset would be unreachable by the taught command — asserted in tests);
+#   • over-shift is real: one `>>` too many carries the word PAST the line
+#     and the bolt re-bars (the check is two-sided); `<<` walks it back, and
+#     the +2 row makes `<<` load-bearing, not remedial.
+_AH_ROWS, _AH_COLS = 10, 28
+_AH_PLQ_COL = 1                     # the true word, TRUE CASE, in the WEST wall
+_AH_COL_S   = 10                    # the spine — every row's first standable
+_AH_FLOOR_END = 25                  # the block floor; past it, shifted tails fall
+_AH_REGISTER  = 16                  # the plumb line: first letters sit HERE
+_AH_LESSON_ROWS = (2, 3, 4, 5, 6)   # the open block, descended by j
+_AH_BAND_ROWS   = (1, 7)            # wall bands carrying the │ plumb glyphs
+_AH_THROAT_ROW  = 7                 # spine-only row (shares the lower band)
+_AH_GATE_ROW    = 8                 # the gate corridor: spine · bolts · seal
+_AH_GATE_COL0   = 11                # first bolt column (one per lesson row)
+_AH_TRIGGERS    = len(_AH_LESSON_ROWS)
+_AH_EXIT = (_AH_GATE_ROW, _AH_REGISTER)   # the FINAL SEAL — on the plumb line
+
+# (kind, target, wrong, offset): the floor shows `wrong` starting at
+# REGISTER+offset. kinds: shift (case true, >> once) · upper (scattered wrong,
+# gUU, count-~ dies) · tilde (ONE wrong char, ~ taken free off <<'s cursor
+# snap) · pair (the COUNT lesson, Vim-true: `{n}>>` indents N ROWS, not one
+# row n times — the last two rows share the −2 offset and take ONE `2>>`;
+# the second of the pair is also the full case inversion, MIXED target,
+# only g~~ mends it).
+_AH_LESSONS = (
+    ('shift',  'lintel', 'lintel', -2),
+    ('upper',  'BEAM',   'bEaM',   -2),
+    ('tilde',  'Sill',   'sill',   +2),
+    ('pair',   'corbel', 'corbel', -2),
+    ('invert', 'Panel',  'pANEL',  -2),
+)
+# par + the canonical tape, hand-measured and driven end-to-end. GOLFED: the
+# row-3 shift is `.` (repeating >>), `<<` snaps the cursor onto the word's
+# first letter so the tilde fix is one key, `2>>` seats the LAST TWO rows in
+# one stroke (vs `>> j .` = 4 — the count saves one), and every indent op is
+# column-agnostic so the descent needs no nav:
+#   >> · .gUU · <<~ · 2>> · g~~ · G$  (+4 j)  = 21 keys.
+# Rivals: the no-case-op R-retype route = 27 (wins, 1 star — the reprise is
+# forced by PAR); the insert-shove ≈ 4-5 keys per shift (legal, losing).
+_AH_PAR    = 21
+_AH_ANSWER = '>> j .gUU j <<~ j 2>> j g~~ G$'
+
+
+def build_dungeon_alignment_halls(seed: int) -> Dungeon:
+    """The Alignment Halls (slug `alignment_halls`): >> << (+ the case reprise).
+
+    Five words mis-set from the register line, two mis-cased as well: `>>`/`<<`
+    seat each word's first letter exactly on the plumb column, the case verbs
+    from the Chambers make it read true, and `.` rides the indent. The bolt
+    check is exact-text-at-exact-column; the exit is the final seal. See the
+    section header for the forcing."""
+    R, C = _AH_ROWS, _AH_COLS
+    cells = [[CellType.WALL] * C for _ in range(R)]
+    for r in _AH_LESSON_ROWS:                            # the open block
+        for c in range(_AH_COL_S, _AH_FLOOR_END + 1):
+            cells[r][c] = CellType.FLOOR
+    cells[_AH_THROAT_ROW][_AH_COL_S] = CellType.FLOOR    # spine-only throat
+    cells[_AH_GATE_ROW][_AH_COL_S]   = CellType.FLOOR    # the spine reaches the gate
+    # bolts AND the exit stay WALL — the tick opens the bolts per seated word
+    # and parts the FINAL SEAL when all five stand on the register.
+
+    room = Room(room_type=RoomType.ENTRY, rows=R, cols=C)
+    room.cells = cells
+    room.seed  = seed
+
+    def lay(r, c, text, kind):
+        room.char_runs.append(CharRun(r, c, tuple(text), kind))
+
+    for br in _AH_BAND_ROWS:                             # the plumb line marks
+        lay(br, _AH_REGISTER, '│', 'verdant')
+
+    doors = []
+    lessons = []
+    for i, (kind, target, wrong, offset) in enumerate(_AH_LESSONS):
+        lrow = _AH_LESSON_ROWS[i]
+        lay(lrow, _AH_REGISTER + offset, wrong, 'ancient')   # mis-set (mis-cased) word
+        lay(lrow, _AH_PLQ_COL, target, 'verdant')            # the true form, west wall
+        doors.append((target, _AH_GATE_COL0 + i))
+        lessons.append({'kind': kind, 'target': target, 'wrong': wrong,
+                        'offset': offset, 'row': lrow})
+    room._ah_doors        = tuple(doors)
+    room._ah_register_col = _AH_REGISTER
+    room._ah_lessons      = tuple(lessons)
+
+    room.entities.append(Entity(kind='exit', row=_AH_EXIT[0], col=_AH_EXIT[1],
+                                edit_immune=True))
+    room.spawn_pos = (_AH_LESSON_ROWS[0], _AH_COL_S)     # on row one, at the spine
+    room.exit_pos  = _AH_EXIT
+
+    room.rebuild_indexes()
+    room.par    = _AH_PAR
+    room.budget = math.ceil(_AH_PAR * 1.4)   # STANDARD: R-retype wins at 1 star inside it
+    room.answer = _AH_ANSWER
+
+    dungeon = Dungeon(name='The Alignment Halls', seed=seed)
+    dungeon.rooms        = [room]
+    dungeon.current_room = 0
+    return dungeon

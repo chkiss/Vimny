@@ -237,11 +237,19 @@ def apply_indent(room, row: int, amount: int) -> int:
     the void (`open_gap`, recorded in room._last_void_falls). A LEFT dedent (`<`,
     amount<0) pulls content toward the left wall, clamped there (nothing falls —
     you cannot dedent past the wall). Returns the amount applied."""
-    clusters = list(room._char_runs_by_row.get(row, []))
     ext = line_extent(room, row)
-    if not clusters or ext is None:
+    if ext is None:
         return 0
     lo, hi = ext
+    # The LINE is the passable extent — glyphs embedded in walls (a west-wall
+    # plaque on the same row) are not part of any line and must neither move
+    # nor anchor the shift (a plaque at col 1 made `leftmost` land inside the
+    # wall: >> opened its gap in the wall segment — a no-op — and <<'s clamp
+    # math inverted).
+    clusters = [ru for ru in room._char_runs_by_row.get(row, [])
+                if ru.col + len(ru.symbols) - 1 >= lo and ru.col <= hi]
+    if not clusters:
+        return 0
     leftmost = min(ru.col for ru in clusters)
     if amount > 0:
         open_gap(room, row, leftmost, amount)       # reflow: overflow tumbles off the brink

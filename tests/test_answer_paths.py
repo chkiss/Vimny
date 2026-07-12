@@ -132,6 +132,7 @@ _ANSWER_NOT_TOKENISED = {
     'build_dungeon_overwrite_halls',   # R overtype tape; tests/test_overwrite_halls.py
     'build_dungeon_case_chambers',     # $~/gUU/./G$ multi-command tokens; tests/test_case_chambers.py
     'build_dungeon_joiners_gate',      # 4J/G$ multi-command tokens; tests/test_joiners_gate.py
+    'build_dungeon_alignment_halls',   # >>/.gUU/G$ multi-command tokens; tests/test_alignment_halls.py
 }
 
 # Levels with a documented NON-1.4 budget. The Change Annex / Extension use a
@@ -235,6 +236,7 @@ _REPLAY_OWN_TEST = {
     'build_dungeon_overwrite_halls':   'test_overwrite_halls.py::test_full_R_route_wins_par_perfect',
     'build_dungeon_case_chambers':     'test_case_chambers.py::test_full_case_route_wins_par_perfect',
     'build_dungeon_joiners_gate':      'test_joiners_gate.py::test_full_join_route_wins_par_perfect',
+    'build_dungeon_alignment_halls':   'test_alignment_halls.py::test_full_alignment_route_wins_par_perfect',
 }
 
 

@@ -331,18 +331,51 @@ Vault's count-dot finale at the count where the count actually pays.
 
 ---
 
-## 29 — The Alignment Halls (`alignment_halls`) — `>> <<`
+## 29 — The Alignment Halls (`alignment_halls`) — `>> <<` (+ case reprise)
 
-**Lines shove sideways.** `>>`/`<<` shift the row's text by INDENT_WIDTH=2
-within the wall-bounded row (`apply_indent`; right shifts can shove tails off
-brinks — that's a trap, not a bug: greedy `>>` near a void loses the plaque).
+**Lines shove sideways — and the register line keeps both truths.** `>>`/`<<`
+shift the row's text by INDENT_WIDTH=2 within the wall-bounded row
+(`apply_indent`; right shifts shove tails off the east brink — a trap, not a
+bug: greedy `>>` loses the word into the wall, `u` recovers). Engine is DONE:
+`>`/`<` are full operators (doubling, counts, `>{m}`), gated on their tokens.
 
-Forcing: column-alignment plaques (a lock glyph must SIT at ruler column N —
-the Cipher Cell check at exact columns). Per zone, `>>` (2 keys) vs
-delete-and-retype (~9 keys): savings ≈ 7/zone, 4+ zones, margin < savings.
-`{n}>>` = 3 keys for n shifts — teach it on a 2-shift zone. `<<` mirrors
-(over-shifted rows must come back; left dedent clamps at the wall, nothing
-falls — asymmetry worth one explicit beat).
+**Chassis: the Annex block with a PLUMB LINE.** Open lesson rows, west-wall
+plaques (the true word, TRUE CASE — the case data), spine, throat, bolts, and
+the FINAL-SEAL exit. One shared REGISTER COLUMN marked by `│` glyphs carved
+in the wall bands above and below the block; every word must sit with its
+first letter exactly on the line. The door check is EXACT-TEXT-AT-EXACT-
+COLUMN, case-sensitive, row-agnostic (any floor row whose slice at the
+register column equals the target — shift-proof and o/O-proof).
+
+**Case reprise (the Chambers, one level later):** two rows are mis-cased AS
+WELL as mis-set — aligning without re-casing (or re-casing without aligning)
+leaves the bolt shut. One scattered-wrong ALL-CAPS word (→ `gUU`, count-~
+still dies), one single-wrong-char word (→ `~`, taken free off `<<`'s cursor
+snap: `<<` lands on the word's first letter), one fully-inverted MIXED-case
+word (→ `g~~`; `guu`/`gUU` both write the wrong case). And a `.` reprise for
+free: `>>` is a change, so the second and fifth rows take their shift as
+`.` — dot's third outing (r → the Echo Vault; here it rides the indent).
+
+Forcing, measured against the REAL frontier (not the old draft's 9-key
+delete-and-retype):
+- The frontier rival for a shift is the INSERT-SHOVE: `i`+2 junk chars+Esc
+  pushes the row east for ~4 keys vs `>>`'s 2. Junk passes the slice check
+  (and typed SPACES read identically to bare floor), so the shove is a
+  legal, losing route — 1 star, never barred. `<<` has no such rival: a
+  shifted line has no leading chars, so `x` can't pull it west.
+- The no-case-op rival (`R`/`r` retype after the shift) wins at ~+6 over
+  par — inside the standard ×1.4 budget, out of the second star. That is
+  the law working: the reprise is forced by PAR.
+- `{n}>>` is Vim-true: the count is ROWS, not repetitions (`2>>` indents two
+  lines by one step — verified against the engine, which routes the count
+  into the linewise text object). Teach it on a PAIR of adjacent rows
+  sharing the same offset: one `2>>` (3 keys) vs `>> j .` (4) — the count
+  saves one, at the door where it's taught.
+- PARITY LAW: every offset is a multiple of INDENT_WIDTH=2, asserted in
+  tests — an odd offset is unreachable by the taught command.
+- Over-shift is a real state: one `>>` too many moves the word PAST the
+  line and the bolt re-bars (the exact-column check is two-sided); `<<`
+  walks it back. One row (+2 east) makes `<<` load-bearing, not remedial.
 
 ---
 

@@ -1391,6 +1391,41 @@ def _whole_line_annex_tick(room, player) -> list:
     return msgs
 
 
+def _alignment_halls_tick(room, player) -> list:
+    """The Alignment Halls bolts — the plaque rule at a COLUMN: a bolt stands
+    open exactly while its word reads TRUE-CASED with its first letter ON the
+    register line (exact text at the exact column, on ANY floor row — so the
+    check is shift-, case- and o/O-proof; the │ plumb glyphs in the wall bands
+    mark the column). Two-sided by construction: an over-shifted word reads
+    false again and the bolt re-bars. STATELESS + FINAL SEAL, the hardened-
+    chassis pattern (see _whole_line_annex_tick)."""
+    msgs = []
+    reg = room._ah_register_col
+    floor_rows = [_wla_floor_text(room, r) for r in range(room.rows)]
+
+    def seated(target):
+        return any(t[reg:reg + len(target)] == target for t in floor_rows)
+
+    gr = room.exit_pos[0]
+    all_true = True
+    for target, dc in getattr(room, '_ah_doors', ()):
+        is_open = room.cells[gr][dc] != CellType.WALL
+        if seated(target) and not is_open:
+            room.cells[gr][dc] = CellType.FLOOR
+            msgs.append('The word sits true on the line — the bolt grinds back!')
+        elif not seated(target) and is_open and (player.row, player.col) != (gr, dc):
+            room.cells[gr][dc] = CellType.WALL     # slid off / re-rotted — re-bars
+        all_true = all_true and seated(target)
+    er, ec = room.exit_pos
+    seal_open = room.cells[er][ec] != CellType.WALL
+    if all_true and not seal_open:
+        room.cells[er][ec] = CellType.FLOOR
+        msgs.append('Every word stands on the register — the final seal parts!')
+    elif not all_true and seal_open and (player.row, player.col) != (er, ec):
+        room.cells[er][ec] = CellType.WALL         # undone — the seal returns
+    return msgs
+
+
 def _sc_leading_verse(room, r: int, c0: int, c1: int) -> str:
     """The leftmost verse WRITTEN on floor within the band [c0, c1] of row r —
     the first whitespace-delimited token of the floor text. The A-breach glyphs
@@ -1887,6 +1922,7 @@ _LEVEL_INTROS = {
     'overwrite_halls':     ('The Overwrite Halls — the words have rotted, some by a single stone, some in long streaks. Mend each corridor to match its plaque, and mind which rot runs on.', 70),
     'case_chambers':       ('The Case Chambers — every word survives letter-perfect, yet every door stays shut. Look closer: the shapes of the letters lie. The plaques keep the true forms, small and tall.', 70),
     'joiners_gate':        ('The Joiner\'s Gate — the old inscriptions were split, line from line, and scattered down the stacks. Pull the world up into your row: some verses want a breath at the seam, some want none.', 70),
+    'alignment_halls':     ('The Alignment Halls — a plumb line falls through the hall, and every word has slid from its station. Shove each line until its first letter stands on the register — and mind that the stone reads true in every shape.', 70),
     'warden_manifold':     ('The Warden Manifold — he stamps himself into the world. Light the four braziers; the gate will draw and the fog will part.', 70),
     'warden_surveyor':     ('The Warden Surveyor — he keeps a long hall where the floor falls away between the words. Cross it word by word, over the void.', 60),
     'spellwrights_forge':  ('The Spellwright\'s Forge — the old wards have rotted and cursed lines '
@@ -2569,6 +2605,9 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
         if level in ('whole_line_annex', 'change_extension', 'overwrite_halls',
                      'case_chambers', 'joiners_gate'):
             for _m in _whole_line_annex_tick(room, player):
+                _push(_m)
+        if level == 'alignment_halls':
+            for _m in _alignment_halls_tick(room, player):
                 _push(_m)
         if level == 'sculpting_chambers':
             for _m in _sculpting_chambers_tick(room, player):
