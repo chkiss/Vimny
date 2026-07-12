@@ -1972,9 +1972,9 @@ _LEVEL_INTROS = {
     'sculpting_chambers':  ('The Sculpting Chambers — a votive lies half-cut in the stone, its verses broken and its lines run dry. The vault keeps faith with the whole prayer, and nothing less.', 70),
     'overwrite_halls':     ('The Overwrite Halls — the words have rotted, some by a single stone, some in long streaks. Mend each corridor to match its plaque, and mind which rot runs on.', 70),
     'case_chambers':       ('The Case Chambers — every word survives letter-perfect, yet every door stays shut. Look closer: the shapes of the letters lie. The plaques keep the true forms, small and tall.', 70),
-    'joiners_gate':        ('The Joiner\'s Gate — the old inscriptions were split, line from line, and scattered down the stacks. Pull the world up into your row: some verses want a breath at the seam, some want none.', 70),
-    'alignment_halls':     ('The Alignment Halls — a plumb line falls through the hall, and every word has slid from its station. Shove each line until its first letter stands on the register — and mind that the stone reads true in every shape.', 70),
-    'indentation_sanctum': ('The Indentation Sanctum — in these halls, the law is posted, and the equals sign applies it without asking whether it should. Where the law governs, one stroke sets every line to its station; where it does not, the same stroke lays the verses flat against the wall.', 70),
+    'joiners_gate':        ('The Joiner\'s Gate — the old inscriptions were split, line from line, and scattered down the stacks. What was one line must be one line again; the plaques remember how each read whole.', 70),
+    'alignment_halls':     ('The Alignment Halls — a plumb line falls through the hall, and every word has slid from its station. The plaques remember where each belongs.', 70),
+    'indentation_sanctum': ('The Indentation Sanctum — the law presides from the lintel, and the verses below have slid from their stations.', 70),
     'warden_manifold':     ('The Warden Manifold — he stamps himself into the world. Light the four braziers; the gate will draw and the fog will part.', 70),
     'warden_surveyor':     ('The Warden Surveyor — he keeps a long hall where the floor falls away between the words. Cross it word by word, over the void.', 60),
     'spellwrights_forge':  ('The Spellwright\'s Forge — the old wards have rotted and cursed lines '

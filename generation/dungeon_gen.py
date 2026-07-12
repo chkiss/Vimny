@@ -7799,14 +7799,18 @@ def build_dungeon_overwrite_halls(seed: int) -> Dungeon:
 # where the word ends, so `$` lands on the last LETTER — the tilde door's nav),
 # spine at the label column, a spine-only throat row, a row of eight bolts, and
 # a plain-floor exit east of them (`_whole_line_annex_tick` on room._wla_doors).
-_CASE_ROWS, _CASE_COLS = 13, 24
+_CASE_ROWS, _CASE_COLS = 13, 27
 _CASE_PLQ_COL = 1                     # the true form, in the WEST wall (cols 1..11)
-_CASE_COL_S   = 12                    # the spine — every row's first standable
+_CASE_COL_S   = 15                    # the spine — every row's first standable; a
+                                      # 3-col wall gap (12..14) breathes between the
+                                      # plaques and the floor (playtest 2026-07-12:
+                                      # an ADJACENT plaque run merged with the floor
+                                      # word and painted it plaque-colored)
 _CASE_LBL_COL = _CASE_COL_S            # the mis-cased word sits on the floor here
 _CASE_LESSON_ROWS = (2, 3, 4, 5, 6, 7, 8, 9)   # eight corridors, descended by j
 _CASE_THROAT_ROW  = 10                # spine-only row: the block joins the gate
 _CASE_GATE_ROW    = 11                # the gate corridor: spine · bolts · exit
-_CASE_GATE_COL0   = 13                # first bolt column (one per corridor)
+_CASE_GATE_COL0   = 16                # first bolt column (one per corridor)
 _CASE_TRIGGERS    = len(_CASE_LESSON_ROWS)
 _CASE_EXIT = (_CASE_GATE_ROW, _CASE_GATE_COL0 + _CASE_TRIGGERS)   # plain floor, east of the bolts
 
@@ -8247,6 +8251,12 @@ def build_dungeon_indentation_sanctum(seed: int) -> Dungeon:
                 room.char_runs.append(CharRun(r, col, tuple(part), kind))
             col += len(part) + 1
 
+    # THE LINTEL — the law is not a passing tip but a carving that presides
+    # over the whole playthrough (playtest 2026-07-12): two lines in the top
+    # wall bands, laid so the plumb │ falls exactly through the word-gap at
+    # the register column ("the law is │ posted").
+    lay(0, 6, 'in these halls', 'verdant')
+    lay(1, 6, 'the law is posted', 'verdant')            # gap lands at col 16
     lay(1, _IS_REGISTER, '│', 'verdant')                 # the plumb line, carved above
 
     nouns = rng.sample(_IS_NOUNS, 6 + sum(t.count('{n}') for t, _ in _IS_RITE))
