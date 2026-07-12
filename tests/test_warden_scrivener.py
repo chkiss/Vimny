@@ -27,7 +27,7 @@ from engine.world import CellType
 from content.levels import known_commands
 from generation.dungeon_gen import (
     build_dungeon_warden_scrivener,
-    _WSC_ROWS, _WSC_COLS, _WSC_BUDGET, _WSC_ALCOVES, _WSC_MARKS, _WSC_SIDES,
+    _WSC_ROWS, _WSC_COLS, _WSC_BUDGET, _WSC_ALCOVES, _WSC_SIDES,
     _WSC_SEAL, _WSC_EXIT, _WSC_POCKET, _WSC_GATE, _WSC_W1, _WSC_W2_WINDOW,
 )
 
@@ -90,7 +90,9 @@ def _fight_keys(room, upto=99):
     if upto < 5:
         return keys
     keys += _K('/rite\r') + _K('=3j') + strike                     # 5 the Rule
-    keys += _K('6j') + _K('10l') + _K('l') + _K('l') + _K('kx') + _K('2jx')
+    # loot: down the west margin, $ across the open seal into the pocket,
+    # heart, chest, then a step back west onto the exit
+    keys += _K('10j') + _K('$') + _K('kx') + _K('2jx') + _K('kh')
     return keys
 
 
@@ -130,14 +132,15 @@ def test_boss_conventions(seed):
 
 
 @pytest.mark.parametrize("seed", SEEDS)
-def test_markers_glosses_and_the_colon_lint(seed):
+def test_plain_stone_alcoves_and_the_colon_lint(seed):
     room = _room(seed)
-    # alcove markers: one per alcove, carved in its back WALL
+    # alcoves are PLAIN STONE (playtest: no sigils) and found by GEOMETRY —
+    # the derivation must agree with the build coords on the fresh room
     for k, (pr, pc) in enumerate(_WSC_ALCOVES):
         br = pr - _WSC_SIDES[k]
-        ru = room.char_run_at(br, pc)
-        assert ru is not None and ''.join(ru.symbols) == _WSC_MARKS[k]
+        assert room.char_run_at(br, pc) is None, "no sigil in the back wall"
         assert not room.is_passable(br, pc)
+        assert main._wsc_alcove_pos(room, k) == (pr, pc)
     # COLON LINT: no non-finale passage may end ':' or lead 'end' — the block
     # law reads any text, and a stray colon turns = into a ward-scrambler
     texts = [room._wsc_targets[k] for k in (1, 2, 3, 4)]
@@ -192,7 +195,7 @@ def test_threshold_parts_the_fog(monkeypatch):
 def _assert_fallen(room):
     assert _warden(room) is None
     assert not [e for e in room.entities if e.alive
-                and e.kind == 'goblin' and e.tag == 'echo'], "echoes gutter"
+                and e.kind == 'goblin' and e.tag == 'chorus'], "the chorus gutters"
     sr, sc = room._wsc_seal
     assert room.cells[sr][sc] == CellType.FLOOR, "the seal draws"
     assert not (set(_WSC_POCKET) & room.fog_cells), "the pocket fog parts"
@@ -221,7 +224,10 @@ def test_adversarial_join_cannot_break_the_press(seed, monkeypatch):
     room = dungeon.rooms[0]
     base = _fight_keys(room)
     cut = len(_fight_keys(room, upto=1.5))       # right after strike 1
-    keys = base[:cut] + _K('6jJ') + base[cut:]
+    # collapse row 16 — W2/W4's FUTURE stamp region (south of the pocket, so
+    # the plain-walking loot tail stays honest; every ward mechanism south of
+    # the cut must re-derive)
+    keys = base[:cut] + _K('12jJ') + base[cut:]
     rows0 = room.rows
     result = _drive(dungeon, keys, monkeypatch)
     assert result['won'], result

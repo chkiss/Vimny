@@ -1702,15 +1702,23 @@ def _wm_pressure(room, player, ward_no: int) -> list:
 
 
 def _wsc_alcove_pos(room, k: int) -> tuple:
-    """Alcove k's niche cell, DERIVED from its back-wall MARKER run (glyphs
-    ride _shift_rows, so a mid-fight J cannot strand the re-manifest the way
-    static podium coords would). Falls back to the build coords if the marker
-    is somehow gone."""
-    mark = _dg._WSC_MARKS[k]
+    """Alcove k's niche cell, DERIVED from its GEOMETRY: scan the alcove's own
+    column (columns never shift) for the niche silhouette — a non-wall cell
+    walled on both sides with its back to the wall. The structure rides
+    _shift_rows intact, so a mid-fight J cannot strand the re-manifest the
+    way static podium coords would; the walls stay plain stone (playtest:
+    no sigils). CELL-TYPE checks, not is_passable — the niche sleeps under
+    fog (the Manifold law). Falls back to the build coords if a collapse
+    somehow ate the silhouette."""
+    col = _dg._WSC_ALCOVES[k][1]
     side = _dg._WSC_SIDES[k]
-    for ru in room.char_runs:
-        if ru.kind == 'ember' and ru.symbols == (mark,):
-            return (ru.row + side, ru.col)
+    for r in range(1, room.rows - 1):
+        if (room.cells[r][col] not in (CellType.WALL,)
+                and room.cells[r][col - 1] == CellType.WALL
+                and room.cells[r][col + 1] == CellType.WALL
+                and 0 <= r - side < room.rows
+                and room.cells[r - side][col] == CellType.WALL):
+            return (r, col)
     return _dg._WSC_ALCOVES[k]
 
 
@@ -1814,7 +1822,7 @@ def _warden_scrivener_tick(room, player, spent: int = 0) -> list:
     # ── the manuscript stands finished: the seal draws, the pocket parts ──
     if warden is None:
         for e in [e for e in room.entities if e.alive
-                  and e.kind == 'goblin' and e.tag == 'echo']:
+                  and e.kind == 'goblin' and e.tag == 'chorus']:
             room.kill_entity(e)
             room._on_entity_destroyed(e)
         sr, sc = room._wsc_seal
@@ -1855,7 +1863,7 @@ def _warden_scrivener_tick(room, player, spent: int = 0) -> list:
                     and room.entity_at(er, ec) is None \
                     and (er, ec) != (player.row, player.col):
                 room.add_entity(Entity(kind='goblin', row=er, col=ec, hp=1,
-                                       max_hp=1, ai='', tag='echo'))
+                                       max_hp=1, ai='', tag='chorus'))
         msgs.append('The quill SCREAMS across the page — he re-manifests '
                     'and stamps an unfinished passage!')
         msgs.extend(_wm_pressure(room, player, ward + 1))
@@ -1880,7 +1888,7 @@ def _warden_scrivener_tick(room, player, spent: int = 0) -> list:
         # the x window. /W now jumps the player straight onto him.
         room.fog_cells.discard((warden.row, warden.col))
         for e in [e for e in room.entities if e.alive
-                  and e.kind == 'goblin' and e.tag == 'echo']:
+                  and e.kind == 'goblin' and e.tag == 'chorus']:
             room.kill_entity(e)
             room._on_entity_destroyed(e)
         if room.cells[bolt[0]][bolt[1]] == CellType.WALL:
