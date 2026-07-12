@@ -1863,6 +1863,7 @@ _LEVEL_INTROS = {
     'change_extension':    ('The Change Extension — deeper into the mislabelled halls. Two strokes was the novice\'s way; a practised hand needs but one. Find where a single keystroke serves.', 70),
     'sculpting_chambers':  ('The Sculpting Chambers — a votive lies half-cut in the stone, its verses broken and its lines run dry. The vault keeps faith with the whole prayer, and nothing less.', 70),
     'overwrite_halls':     ('The Overwrite Halls — the words have rotted, some by a single stone, some in long streaks. Mend each corridor to match its plaque, and mind which rot runs on.', 70),
+    'case_chambers':       ('The Case Chambers — every word survives letter-perfect, yet every door stays shut. Look closer: the shapes of the letters lie. The plaques keep the true forms, small and tall.', 70),
     'warden_manifold':     ('The Warden Manifold — he stamps himself into the world. Light the four braziers; the gate will draw and the fog will part.', 70),
     'warden_surveyor':     ('The Warden Surveyor — he keeps a long hall where the floor falls away between the words. Cross it word by word, over the void.', 60),
     'spellwrights_forge':  ('The Spellwright\'s Forge — the old wards have rotted and cursed lines '
@@ -2542,7 +2543,8 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
         if level == 'inscription_halls':
             for _m in _inscription_halls_tick(room, player):
                 _push(_m)
-        if level in ('whole_line_annex', 'change_extension', 'overwrite_halls'):
+        if level in ('whole_line_annex', 'change_extension', 'overwrite_halls',
+                     'case_chambers'):
             for _m in _whole_line_annex_tick(room, player):
                 _push(_m)
         if level == 'sculpting_chambers':

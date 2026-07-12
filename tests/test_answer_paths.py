@@ -130,6 +130,7 @@ _ANSWER_NOT_TOKENISED = {
     'build_dungeon_change_extension',  # S/C keystroke tape; tests/test_change_extension.py
     'build_dungeon_sculpting_chambers',  # O/I/o/A insert tape; tests/test_sculpting_chambers.py
     'build_dungeon_overwrite_halls',   # R overtype tape; tests/test_overwrite_halls.py
+    'build_dungeon_case_chambers',     # $~/gUU/./G$ multi-command tokens; tests/test_case_chambers.py
 }
 
 # Levels with a documented NON-1.4 budget. The Change Annex / Extension use a
@@ -231,6 +232,7 @@ _REPLAY_OWN_TEST = {
     'build_dungeon_change_extension':  'test_change_extension.py::test_full_change_route_wins_par_perfect',
     'build_dungeon_sculpting_chambers': 'test_sculpting_chambers.py::test_full_votive_route_wins_par_perfect',
     'build_dungeon_overwrite_halls':   'test_overwrite_halls.py::test_full_R_route_wins_par_perfect',
+    'build_dungeon_case_chambers':     'test_case_chambers.py::test_full_case_route_wins_par_perfect',
 }
 
 

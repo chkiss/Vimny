@@ -7755,3 +7755,145 @@ def build_dungeon_overwrite_halls(seed: int) -> Dungeon:
     dungeon.current_room = 0
     return dungeon
 
+
+# ── The Case Chambers (~ gU gu g~) ────────────────────────────────────────────
+# "Case is text the eye can't grep." Eight mislabelled corridors on the
+# Change-Annex chassis: every floor word is letter-perfect but the CASING rotted;
+# the WEST-wall plaque keeps the true form and the bolt opens when the floor
+# reads true (the tick's substring check is case-sensitive already). Case ops
+# edit IN PLACE — no reflow, shift-free floor scans, the Overwrite Halls model.
+#
+# Forcing, tool by tool (the lesson is WHICH, as in the Halls' r-vs-R):
+#   • TILDE doors — ONE wrong-case cell. `~` fixes it in a single key and is
+#     letter-independent; `r{c}` ties the nav but pays 2 for the fix.
+#   • UPPER/LOWER doors — a word whose target is all-caps (or all-lower) with
+#     the wrong cells SCATTERED (never contiguous). This kills count-~: wrong
+#     means needs-a-toggle, so `{n}~` over the span toggles the CORRECT cells
+#     too and the bolt stays shut; the ~-and-move chain overpays; gU/gu are
+#     idempotent SETS — one sweep fixes wrong and right alike. The golfed form
+#     is the doubled linewise (gUU from wherever the descent left the cursor);
+#     `gue`/`gUe` tie only from column 0. One lower door is the `.` echo of the
+#     previous `gue` (the Echo Vault's lesson, replayed on a new operator).
+#   • The gUE door — the target spans a ★ (a WORD, not a word): `e` stops at
+#     the symbol, so `gUe` mends half and the bolt stays shut; `gUE` sweeps it.
+#   • The guu door — TWO words across a bare-floor gap, cursor arriving
+#     mid-row (the previous tilde door's `~` advances east): `gu$` misses the
+#     head, `^gu$` pays 4; `guu` takes the whole line for 3.
+#   • The g~~ finale — a fully case-INVERTED two-word line with a MIXED-case
+#     target: `guu`/`gUU` both write the wrong case; only the toggle mends it.
+#     (`{n}~`/`g~$` from col 0 TIE at 3 keys — g~ is showcased, not priced out;
+#     a toggle-operator can never out-price the toggle-key, so the door's job
+#     is to make the linewise form the natural spelling.)
+# FORCING BY PAR (standard 1.4 budget): the cheapest no-case-op route is the
+# r-chain (2 keys per wrong cell + moves, and letter-dependent besides) or a
+# retype (S/R + the whole word) — both blow past the budget long before the
+# gate; the case-op route is the only par-priced one.
+#
+# Geometry / tick are the Annex's: per-row EXACT-FIT floors (the corridor ends
+# where the word ends, so `$` lands on the last LETTER — the tilde door's nav),
+# spine at the label column, a spine-only throat row, a row of eight bolts, and
+# a plain-floor exit east of them (`_whole_line_annex_tick` on room._wla_doors).
+_CASE_ROWS, _CASE_COLS = 13, 24
+_CASE_PLQ_COL = 1                     # the true form, in the WEST wall (cols 1..11)
+_CASE_COL_S   = 12                    # the spine — every row's first standable
+_CASE_LBL_COL = _CASE_COL_S            # the mis-cased word sits on the floor here
+_CASE_LESSON_ROWS = (2, 3, 4, 5, 6, 7, 8, 9)   # eight corridors, descended by j
+_CASE_THROAT_ROW  = 10                # spine-only row: the block joins the gate
+_CASE_GATE_ROW    = 11                # the gate corridor: spine · bolts · exit
+_CASE_GATE_COL0   = 13                # first bolt column (one per corridor)
+_CASE_TRIGGERS    = len(_CASE_LESSON_ROWS)
+_CASE_EXIT = (_CASE_GATE_ROW, _CASE_GATE_COL0 + _CASE_TRIGGERS)   # plain floor, east of the bolts
+
+# (kind, target, wrong) — same letters, only the CASE lies. Kinds:
+#   tilde  — one wrong cell (~'s niche; the first ends the word so `$` finds it,
+#            the second sits mid-word and its `~` leaves the cursor EAST so the
+#            next row is entered mid-line)
+#   upper  — all-caps target, wrongs scattered      → gUU (count-~ dies)
+#   lower  — all-lower target, wrongs scattered     → gue (from col 0)
+#   echo   — same shape as lower, right after it    → `.`
+#   upperW — the target spans ★, a WORD             → gUE (gUe mends half)
+#   lowerL — two words across a gap, entered mid-row → guu (^gu$ pays one more)
+#   invert — every letter case-flipped, MIXED target → g~~ (guu/gUU both wrong)
+_CASE_LESSONS = (
+    ('tilde',  'lantern',     'lanterN'),
+    ('upper',  'BULWARK',     'bUlWaRk'),
+    ('lower',  'wardens',     'wArDeNs'),
+    ('echo',   'granite',     'gRaNiTe'),
+    ('upperW', 'IRON★GATE',   'iRoN★gAtE'),
+    ('tilde',  'obelisk',     'obeliSk'),
+    ('lowerL', 'dim ember',   'DiM eMbEr'),
+    ('invert', 'Veil Bearer', 'vEIL bEARER'),
+)
+# par + the canonical tape, driven end-to-end (hand-measured like the Halls —
+# case ops act in place, no Dijkstra). The route is the GOLFED one: `$~` takes
+# the first tilde door (exact-fit floor puts `$` on the letter), `gUU` from
+# wherever `j` lands (linewise needs no `^`), `.` echoes the `gue`, `5l~` walks
+# to the buried stitch and leaves the cursor east so `guu` is forced over
+# `^gu$`, and `G$` rides the open bolts to the door:
+#   $~ · gUU · gue · . · gUE · 5l~ · guu · g~~ · G$  (+7 j)  = 30 keys.
+# Rivals on the same nav: the r-chain ≈ 70+, the S/R retype ≈ 60+ — both far
+# past the STANDARD budget (ceil(par × 1.4) = 42), so no tight margin needed.
+_CASE_PAR    = 30
+_CASE_ANSWER = '$~ j gUU j gue j . j gUE j 5l~ j guu j g~~ G$'
+
+
+def build_dungeon_case_chambers(seed: int) -> Dungeon:
+    """The Case Chambers (slug `case_chambers`): ~ gU gu g~.
+
+    Eight mislabelled corridors on the Change-Annex chassis where only the CASE
+    of each floor word rotted. Tilde doors carry one wrong cell (~'s niche);
+    scattered-wrong words force the idempotent gU/gu sweeps (count-~ toggles the
+    correct cells too); a ★-spanning WORD forces gUE; a mid-row entry forces the
+    doubled guu; the finale's fully-inverted MIXED-case line yields only to g~~.
+    See the section header for the full forcing."""
+    R, C = _CASE_ROWS, _CASE_COLS
+    cells = [[CellType.WALL] * C for _ in range(R)]
+    for i, (kind, target, wrong) in enumerate(_CASE_LESSONS):
+        r = _CASE_LESSON_ROWS[i]
+        for c in range(_CASE_COL_S, _CASE_COL_S + len(wrong)):   # EXACT-FIT corridor:
+            cells[r][c] = CellType.FLOOR                     # $ ends ON the word
+    cells[_CASE_THROAT_ROW][_CASE_COL_S] = CellType.FLOOR   # spine-only throat
+    cells[_CASE_GATE_ROW][_CASE_COL_S]   = CellType.FLOOR   # the spine reaches the gate row
+    cells[_CASE_EXIT[0]][_CASE_EXIT[1]]  = CellType.FLOOR   # the exit: plain floor, east of the bolts
+    # the bolt cells (gate row, between spine and exit) stay WALL; the tick opens
+    # each when its corridor's case reads true.
+
+    room = Room(room_type=RoomType.ENTRY, rows=R, cols=C)
+    room.cells = cells
+    room.seed  = seed
+
+    def lay(r, c, text, kind):
+        # split on spaces — a literal space glyph is a punctuation "word" (the
+        # Change Extension gotcha); the floor scan reconstructs the gap.
+        col = c
+        for part in text.split(' '):
+            if part:
+                room.char_runs.append(CharRun(r, col, tuple(part), kind))
+            col += len(part) + 1
+
+    doors = []
+    lessons = []
+    for i, (kind, target, wrong) in enumerate(_CASE_LESSONS):
+        lrow = _CASE_LESSON_ROWS[i]
+        lay(lrow, _CASE_LBL_COL, wrong, 'ancient')             # the mis-cased word, on the floor
+        lay(lrow, _CASE_PLQ_COL, target, 'verdant')            # the true form, the WEST-wall plaque
+        doors.append((target, (_CASE_GATE_ROW, _CASE_GATE_COL0 + i)))
+        lessons.append({'kind': kind, 'target': target, 'wrong': wrong, 'row': lrow})
+    room._wla_doors  = tuple(doors)                          # reuse the Annex tick
+    room._cc_lessons = tuple(lessons)
+
+    room.entities.append(Entity(kind='exit', row=_CASE_EXIT[0], col=_CASE_EXIT[1],
+                                edit_immune=True))
+    room.spawn_pos = (_CASE_LESSON_ROWS[0], _CASE_COL_S)         # on corridor 1, at the spine
+    room.exit_pos  = _CASE_EXIT
+
+    room.rebuild_indexes()
+    room.par    = _CASE_PAR
+    room.budget = math.ceil(_CASE_PAR * 1.4)       # STANDARD: volume alone bars the r-chain/retype
+    room.answer = _CASE_ANSWER
+
+    dungeon = Dungeon(name='The Case Chambers', seed=seed)
+    dungeon.rooms        = [room]
+    dungeon.current_room = 0
+    return dungeon
+
