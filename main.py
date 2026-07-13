@@ -43,7 +43,7 @@ from engine.options import apply_set as _apply_set, parse_modifier as _parse_set
 from engine.macro import synth_key as _synth_key, record_char as _record_char
 from engine.jumplist import record_jump as _record_jump, jump_back as _jump_back, jump_forward as _jump_forward
 from engine.registers import write_register as _reg_write, read_register as _reg_read
-from engine.visual import apply_visual, block_bounds
+from engine.visual import apply_visual, block_bounds, apply_visual_replace
 from content.scrolls import (
     # Codex scroll content rendered by _show_scroll_by_id (_STD_SCROLLS map);
     # every other catalogue scroll renders via _show_catalog_scroll.
@@ -2693,6 +2693,7 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
                                # — the typed run replays into every row on Esc
     insert_typed = ''          # chars typed this INSERT session — attached to
                                # last_change on Esc so '.' replays them (Vim-true)
+    visual_r_pending = False   # visual r typed; the next key is the overstrike char
     insert_creg_pending = False  # INSERT <C-r> typed; next key names the register to paste
     insert_co_buf = None         # INSERT <C-o> active; accumulates one Normal command, then resumes INSERT
     search_creg_pending = False  # SEARCH <C-r> typed; next key names the register / <C-w> to insert
@@ -3573,6 +3574,27 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
                                 player.number_mode, cmd[len('set'):])
                             _push(_set_msg)
 
+                elif cmd.isdigit():
+                    # :{n} — go to line n (Vim-true). Same semantics as {n}G
+                    # (lands on the row's first non-blank), gated on G, and
+                    # always a key dearer than {n}G (the colon) — never a golf.
+                    if 'G' not in player.known_commands and player_name != 'admin':
+                        _push("You haven't learned G/gg yet.")
+                    elif not edit_mode and budget.remaining <= 0:
+                        _push('Out of budget!  (u to undo)')
+                    else:
+                        _gn_from  = (player.row, player.col)
+                        _gn_spent = budget.spent
+                        moved = apply_motion(player, 'G', int(cmd), room, None,
+                                             count_given=True,
+                                             game_h=term.height - 8)
+                        if moved and not edit_mode:
+                            _record_jump(player, _gn_from)
+                            budget.spend(len(cmd) + 1)
+                            undo_stack.append((_gn_from[0], _gn_from[1], _gn_spent,
+                                               cmd_start_ans[0], cmd_start_ans[1]))
+                            redo_stack.clear()
+
                 elif _subst.looks_like_sg(cmd, room, player):
                     if 'subst' not in player.known_commands and player_name != 'admin':
                         player.error = 'E492: Not an editor command: ' + cmd
@@ -3879,11 +3901,34 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
                 player.mode = Mode.NORMAL
                 player.visual_anchor = None
                 key_buf = ''
+                visual_r_pending = False
                 _render(message)
                 continue
             raw = str(key) if not key.is_sequence else ''
             anchor = player.visual_anchor or (player.row, player.col)
             cursor = (player.row, player.col)
+            if visual_r_pending:
+                # the overstrike char for a visual r
+                visual_r_pending = False
+                if raw and raw.isprintable() and len(raw) == 1:
+                    undo_stack.append(_snapshot(room, player, budget,
+                                                row=anchor[0], col=anchor[1],
+                                                spent=player.visual_start_spent,
+                                                ans=cmd_start_ans))
+                    redo_stack.clear()
+                    apply_visual_replace(room, player, anchor, cursor, vmode, raw)
+                    budget.spend(2)                     # r + the char
+                    player.last_visual_anchor = anchor
+                    player.last_visual_cursor = cursor
+                    player.last_visual_mode = vmode
+                    player.visual_anchor = None
+                    player.mode = Mode.NORMAL
+                    player.last_change = {'type': 'visual_op', 'op': 'r'}
+                    if not edit_mode:
+                        _content_ticks()
+                        message = _pool_msg() or message
+                _render(message)
+                continue
             # Single-key visual commands (only when not mid multi-key motion)
             if not key_buf and raw == 'o':                 # swap ends
                 player.row, player.col = anchor
@@ -3920,6 +3965,96 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
                     player.search_forward = (raw == '/')
                     room._search_karaoke = (player_name == 'admin' and bool(room.answer)
                                             and not room.answer_diverged)
+                _render(message)
+                continue
+            if raw == 'r' and not key_buf:
+                # visual r{ch} — overstrike every selected character
+                if not ('visual_op' in player.known_commands
+                        or 'admin' in player.known_commands):
+                    _push("You haven't learned visual operators yet.")
+                elif not edit_mode and budget.remaining <= 0:
+                    _push('Out of budget!  (Esc, then u to undo)')
+                    message = _pool_msg(); msg_ttl = _MSG_ROTATE_TTL
+                else:
+                    visual_r_pending = True
+                _render(message)
+                continue
+            if raw == 'J' and key_buf in ('', 'g'):
+                # visual J / gJ — join every line the selection touches
+                _vj_gap = (key_buf == '')
+                key_buf = ''
+                if not ('visual_op' in player.known_commands
+                        or 'admin' in player.known_commands):
+                    _push("You haven't learned visual operators yet.")
+                    _render(message)
+                    continue
+                if not edit_mode and budget.remaining <= 0:
+                    _push('Out of budget!  (Esc, then u to undo)')
+                    message = _pool_msg(); msg_ttl = _MSG_ROTATE_TTL
+                    _render(message)
+                    continue
+                undo_stack.append(_snapshot(room, player, budget,
+                                            row=anchor[0], col=anchor[1],
+                                            spent=player.visual_start_spent,
+                                            ans=cmd_start_ans))
+                redo_stack.clear()
+                _r1 = min(anchor[0], cursor[0])
+                _joins = max(abs(anchor[0] - cursor[0]), 1)
+                player.row, player.col = _r1, min(anchor[1], cursor[1])
+                player.last_visual_anchor = anchor
+                player.last_visual_cursor = cursor
+                player.last_visual_mode = vmode
+                player.visual_anchor = None
+                player.mode = Mode.NORMAL
+                if op_join(room, player, gap=_vj_gap, count=_joins):
+                    budget.spend(1 if _vj_gap else 2)
+                    player.last_change = {'type': 'visual_op', 'op': 'J'}
+                    _push('Joined.')
+                else:
+                    undo_stack.pop()
+                    _push('Nothing to join.')
+                if not edit_mode:
+                    _content_ticks()
+                    message = _pool_msg() or message
+                _render(message)
+                continue
+            if raw == 'p' and not key_buf:
+                # visual p — paste OVER the selection: the selection dies to
+                # the unnamed register (Vim-true) and the held clip lands in
+                # its place
+                if not ('visual_op' in player.known_commands
+                        or 'admin' in player.known_commands):
+                    _push("You haven't learned visual operators yet.")
+                    _render(message)
+                    continue
+                if not edit_mode and budget.remaining <= 0:
+                    _push('Out of budget!  (Esc, then u to undo)')
+                    message = _pool_msg(); msg_ttl = _MSG_ROTATE_TTL
+                    _render(message)
+                    continue
+                _vp_clip = _reg_read(player, '"')
+                if _vp_clip is None:
+                    _push('Nothing in the register.')
+                    _render(message)
+                    continue
+                undo_stack.append(_snapshot(room, player, budget,
+                                            row=anchor[0], col=anchor[1],
+                                            spent=player.visual_start_spent,
+                                            ans=cmd_start_ans))
+                redo_stack.clear()
+                _vp_cut = apply_visual('d', anchor, cursor, vmode, room, player)
+                _reg_write(player, '"', _vp_cut, is_delete=True)
+                op_paste(room, player, _vp_clip, True, 1)
+                budget.spend(1)
+                player.last_visual_anchor = anchor
+                player.last_visual_cursor = cursor
+                player.last_visual_mode = vmode
+                player.visual_anchor = None
+                player.mode = Mode.NORMAL
+                player.last_change = {'type': 'visual_op', 'op': 'p'}
+                if not edit_mode:
+                    _content_ticks()
+                    message = _pool_msg() or message
                 _render(message)
                 continue
             if not key_buf and raw in ('I', 'A') and vmode == Mode.VISUAL_BLOCK:
@@ -4397,6 +4532,15 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
             macro_buf = ''
             _push(f'recording @{recording_reg}')
 
+        elif action['type'] == 'seal_exit':
+            # ZZ / ZQ — the sealed departure (relic scroll): replay the exact
+            # :wq / :q! ritual through the key queue, so the win/quit logic
+            # lives in one place. Free, like the : commands it abbreviates.
+            if not edit_mode and not _action_allowed(action, player.known_commands) and _blocked(action):
+                continue
+            macro_pending.extendleft(reversed(
+                ':q!\r' if action.get('discard') else ':wq\r'))
+
         elif action['type'] == 'macro_play':
             if not edit_mode and not _action_allowed(action, player.known_commands) and _blocked(action):
                 continue
@@ -4495,6 +4639,19 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
             _push(f'{done} change(s) redone.' if done else 'Nothing to redo.')
 
         elif action['type'] == 'interact':
+            if action.get('before'):
+                # X — delete BEFORE the cursor (Vim-true: the strike lands one
+                # west; the pull leaves the cursor on its own character, one
+                # column left). Gated on its own 'X' token (the Y/D/C rule).
+                if not edit_mode and not _action_allowed(action, player.known_commands) \
+                        and _blocked(action):
+                    continue
+                if player.col == 0 or not room.is_passable(player.row, player.col - 1):
+                    _push('Nothing before the cursor.')
+                    _render(message)
+                    continue
+                player.col = max(0, player.col - count)   # {n}X: the n chars west;
+                # the delete-count runs east from here = exactly those chars
             if edit_mode:
                 ed_undo.append(_ed_snapshot(room, player))
                 ed_redo.clear()

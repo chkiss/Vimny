@@ -490,9 +490,13 @@ def op_join(room, player, gap: bool = True, count: int = 1) -> bool:
         src = player.row + 1
         if src >= room.rows or line_extent(room, src) is None:
             break                                           # no next line (bottom wall / edge)
-        glyphs = sorted(_row_glyphs(room, src), key=lambda g: g[0])
-        ends = [ru.col + len(ru.symbols) - 1
-                for ru in room._char_runs_by_row.get(player.row, []) if ru.kind != 'void']
+        # GLYPHS IN STONE ARE NEVER TEXT (fifth enforcement site): a join
+        # pulls only FLOOR glyphs up — wall-carved plaques stay in the wall,
+        # and they don't count as the target row's content end either.
+        glyphs = sorted((g for g in _row_glyphs(room, src)
+                         if room.is_passable(src, g[0])), key=lambda g: g[0])
+        ends = [c for (c, _s, _k) in _row_glyphs(room, player.row)
+                if room.is_passable(player.row, c)]
         ext      = line_extent(room, player.row)
         seam_col = (max(ends) + 1) if ends else (ext[0] if ext else 0)
         base     = seam_col + (1 if gap else 0)             # where the joined glyphs begin

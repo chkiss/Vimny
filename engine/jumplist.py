@@ -29,7 +29,12 @@ _CAP = 100
 
 
 def record_jump(player, pos) -> None:
-    """Record `pos` (the position being jumped from). Drops any forward history."""
+    """Record `pos` (the position being jumped from). Drops any forward history.
+
+    Also sets the implicit ``'`` mark (Vim-true): ``''`` / ``` `` ``` jump
+    back to the spot you last jumped FROM — and since a mark-jump records a
+    jump itself, ``''`` toggles between the two positions."""
+    player.marks["'"] = pos
     jl = player.jump_list
     if player.jump_idx < len(jl):
         del jl[player.jump_idx:]          # leaving the middle: discard newer entries

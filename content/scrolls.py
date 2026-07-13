@@ -369,6 +369,19 @@ REGEX_MAGIC_SCROLL = {
     ],
 }
 
+SEALED_DEPARTURE_SCROLL = {
+    'title': '◈   The Sealed Departure   ◈',
+    'lines': [
+        ('dim',    '  The doorkeeper grew tired of the long farewell.'),
+        ('blank',),
+        ('cmd',    'ZZ', 'save and leave — :wq, two strokes'),
+        ('cmd',    'ZQ', 'abandon the page — :q!'),
+        ('blank',),
+        ('dim',    '  Hold the shift; strike twice.'),
+        ('amber',  '  The shortest goodbye still closes the book.'),
+    ],
+}
+
 # Re-purposed 2026-07-12: v{m}d/y/c moved to the Sight Sanctum's own lesson
 # (token visual_op is taught there), so the Grandmaster's drop now teaches the
 # visual FLOURISHES no level drills — the selection's finer handles.
@@ -593,6 +606,14 @@ SCROLL_CATALOG = [
         'content':    PLUMB_LINE_SCROLL,
     },
     {
+        'id':         'ZZ',
+        'title':      'The Sealed Departure',
+        'dropped_by': 'A doorkeeper’s ring of keys',
+        'level_slug': 'first_cave',
+        'level_name': 'The First Cave',
+        'content':    SEALED_DEPARTURE_SCROLL,
+    },
+    {
         'id':         'ins_paste',
         'title':      'The Recalling Hand',
         'dropped_by': 'A scribe’s desk',
@@ -628,6 +649,7 @@ RELIC_SCROLL_IDS = [
     'set_more',
     'regex_classes', 'regex_anchors', 'regex_quant', 'regex_collections', 'regex_magic',
     'searchcraft', 'jump', 'col_motion', 'ins_paste', 'ins_edit',
+    'ZZ',    # The Sealed Departure — ZZ/ZQ; free like the :wq/:q! they abbreviate
     # 'redo' is NOT here: The Second Stride is pinned to the Waypoint
     # Sanctum's first vault chest (guaranteed — before the editing act),
     # not left to the random pool.

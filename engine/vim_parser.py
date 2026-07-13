@@ -209,6 +209,21 @@ def parse(buf: str, mode: Mode) -> tuple[dict | None, str]:
         return _cg({'type': 'operator', 'op': op, 'motion': '$', 'count': count_n,
                     'shorthand': ch}, count), buf[i+1:]
 
+    # Y — Vim's default Y = yy. Tagged like D/C: the one-key shorthand is a
+    # SEPARATE lesson from yy (it undercuts yy by a key — ungated it would
+    # golf the Beacon Tiers' par), so it stays locked until taught.
+    if ch == 'Y':
+        return _cg({'type': 'operator', 'op': 'y', 'motion': 'line', 'count': count_n,
+                    'shorthand': 'Y'}, count), buf[i+1:]
+
+    # ZZ / ZQ — the sealed departure (:wq / :q!); granted by a relic scroll
+    if ch == 'Z':
+        if i + 1 >= len(buf):
+            return None, buf
+        if buf[i+1] in 'ZQ':
+            return {'type': 'seal_exit', 'discard': buf[i+1] == 'Q'}, buf[i+2:]
+        return {'type': 'unknown'}, buf[i+2:]
+
     # J — join the next line onto this one (gJ, no space, handled in the g-branch)
     if ch == 'J':
         return _cg({'type': 'join', 'gap': True, 'count': count_n}, count), buf[i+1:]
@@ -244,6 +259,11 @@ def parse(buf: str, mode: Mode) -> tuple[dict | None, str]:
     # x — interact (open door / loot chest)
     if ch == 'x':
         return {'type': 'interact', 'count': count_n}, buf[i+1:]
+    # X — delete BEFORE the cursor. Tagged with its own gate token (the Y/D/C
+    # rule): it undercuts 'h x' by a key, so it stays locked until taught.
+    if ch == 'X':
+        return _cg({'type': 'interact', 'count': count_n, 'before': True,
+                    'shorthand': 'X'}, count), buf[i+1:]
 
     # u / Ctrl-R
     if ch == 'u':

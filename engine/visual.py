@@ -172,6 +172,37 @@ def apply_visual(op: str, anchor, cursor, vmode, room, player):
     return None
 
 
+def apply_visual_replace(room, player, anchor, cursor, vmode, ch: str) -> bool:
+    """v/V/<C-v> + r{ch}: overstrike every selected CHARACTER with `ch`
+    (blank floor has no glyph and stays blank; voids are not text). The
+    cursor parks on the selection's start. Returns True if anything changed."""
+    r1, r2 = min(anchor[0], cursor[0]), max(anchor[0], cursor[0])
+    changed = False
+    for r in range(r1, r2 + 1):
+        for c in range(room.cols):
+            if not in_selection(anchor, cursor, vmode, r, c):
+                continue
+            if not room.is_passable(r, c):
+                continue
+            ru = room.char_run_at(r, c)
+            if ru is None or ru.kind == 'void':
+                continue
+            k = c - ru.col
+            syms = list(ru.symbols)
+            if syms[k] != ch:
+                syms[k] = ch
+                ru.symbols = tuple(syms)
+                changed = True
+    start = anchor if (anchor[0], anchor[1]) <= (cursor[0], cursor[1]) else cursor
+    if vmode == Mode.VISUAL_LINE:
+        _cursor_to_line_start(room, player, r1)
+    elif vmode == Mode.VISUAL_BLOCK:
+        player.row, player.col = r1, min(anchor[1], cursor[1])
+    else:
+        player.row, player.col = start
+    return changed
+
+
 def _apply_block(op: str, anchor, cursor, room, player):
     r1, r2, c1, c2 = block_bounds(anchor, cursor)
     if op in ('>', '<'):                  # block indent shifts the whole LINES (Vim)

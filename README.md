@@ -241,6 +241,26 @@ The full command reference (also the hint-bar source) is `render/vim_commands.md
 
 </details>
 
+### What Vim commands does Vimny not teach?
+
+Vimny aims for Vim-faithfulness in everything it *does* implement, but some
+commands are deliberately out of scope:
+
+- **Scrolling & viewport** — `zz` `zt` `zb` `<C-d>` `<C-u>` `<C-f>` `<C-b>`
+  `<C-e>` `<C-y>`: dungeons fit the screen; there is no viewport-scroll
+  model (`H`/`M`/`L` are the only screen-relative commands).
+- **`U` (vi's line-undo)** — `u` and the redo scroll (`<C-r>`) cover the
+  undo story; a third undo channel would complicate it for a key modern Vim
+  users rarely reach for.
+- **`gp` / `gP`, `g*` / `g#`, `gi`** — genuinely niche variants.
+- **Window/tab/buffer management, folds, completion, plugins** — Vimny is a
+  single buffer by design; each dungeon *is* the file.
+- **Not yet, by design** — `+` / `-` / `_` (and NORMAL-mode `Enter`): these
+  cheap line motions would change the optimal solution of many existing
+  levels, so they wait on a full re-balance. `Y`, `X`, and a few visual-mode
+  refinements exist in the engine and unlock at their own lessons, like `D`
+  and `C` before them.
+
 ## Project layout
 
 ```

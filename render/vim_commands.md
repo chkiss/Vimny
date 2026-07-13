@@ -128,7 +128,7 @@
 | keys      | token     | desc                 |
 |-----------|-----------|----------------------|
 | v         | visual    | visual mode          |
-| v{m}d/c/~ | visual_op | act on the selection |
+| v{m} d/c/~/p/r/J | visual_op | act on the selection |
 
 ## selection_halls — line & block selection
 

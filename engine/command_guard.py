@@ -154,6 +154,12 @@ def action_allowed(action: dict, known: list | set, edit_mode: bool = False) -> 
     if t == 'redo':                               # <C-r> — granted by a relic scroll;
         return 'redo' in known_set                # u stays the always-on rope
 
+    if t == 'interact' and action.get('shorthand') == 'X':
+        return 'X' in known_set                   # X — own lesson (the Y/D/C rule)
+
+    if t == 'seal_exit':                          # ZZ / ZQ — relic scroll
+        return 'ZZ' in known_set
+
     # interact (x), undo (u), command (:) — always allowed
     return True
 
@@ -213,4 +219,8 @@ def guard_message(action: dict, known: list | set = ()) -> str:
         return "You haven't learned marks yet."
     if t == 'sub_repeat':
         return "You haven't learned :s (substitute) yet."
+    if t == 'interact' and action.get('shorthand') == 'X':
+        return "You haven't learned X yet."
+    if t == 'seal_exit':
+        return "You haven't learned ZZ/ZQ yet."
     return 'Command not available.'
