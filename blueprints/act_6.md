@@ -24,190 +24,78 @@
 
 ---
 
-## Level 31 — The Bracket Enclosure
+## Display 33 — The Bracket Enclosure (`bracket_enclosure`) — `i( a(`
 
-**Commands introduced:** `i(` `a(`
-**Engine aliases:** `ib`→`i(`, `ab`→`a(`.
-**New mechanics (≤3):**
-1. Bracket scanning: engine walks left from cursor to find `(`, right for matching `)`.
-2. `i(` — inner parens: content between delimiters (exclusive).
-3. `a(` — around parens: content AND the delimiter glyphs themselves.
+> ✅ **Current-conventions proposal** (rewritten 2026-07-13; replaces the
+> legacy section, which was broken four ways against today's engine):
+> 1. its enclosures were full of GOBLINS — but goblins are entities, not
+>    text: a text-object delete doesn't kill them (deletes over creatures
+>    PARRY — the warden law), and "collect the keystone by bumping the `)`"
+>    invents an entity mechanic;
+> 2. its `da(` gate deleted a wall_rune `(` — glyphs in stone are never
+>    text (the same sin the legacy Word Enclosure committed);
+> 3. its forcing math priced only per-goblin `x` — `{n}x` from the content
+>    start is 2 keys and BEATS `di(` (3), and `dt)` ties it;
+> 4. keystones/choke walls/budget margins are all pre-chassis conventions.
 
-**Linkage:** Same "i = inner, a = around" rule from L25; now applied to a pair-delimited
-enclosure.  Both variants are independently forced by S1 terrain.
+**Commands introduced:** `i(` (inner parens) · `a(` (around — delimiters
+included, and NOTHING else: unlike `aw`, `a(` never takes whitespace).
+Engine complete: `_resolve_pair` with the `ib`/`ab`/`)` aliases, parser,
+gating. ONE drive-verify at build (the Word Enclosure probe, re-aimed): the
+husk and the scar surviving reflow's pull.
 
----
+**The diegesis — GEM SETTINGS.** The parens are settings; the content is the
+stone. Three verbs, three door types, discriminated by what remains:
+- `di(` PRIES THE STONE, keeps the setting: `w1 (rot) w2` → `w1 () w2` —
+  the empty husk stays on the floor and the exact-text door reads it;
+- `ci(` SETS A NEW STONE: → `w1 (cure) w2` — `ca(` would tear the setting
+  out with it and read false;
+- `da(` TEARS OUT THE WHOLE FITTING: → `w1  w2` — the double-gap scar
+  (a( takes no whitespace, so the Word Enclosure's scar reappears one
+  object up), while `di(` leaves `()` and reads false.
+No entities, no wall-deleting: the husk/stone/scar triple is pure text on
+the proven exact-text chassis.
 
-### Grid  (14 rows × 44 cols)
+**Forcing (by PAR, dot chains priced — the Word Enclosure laws carried up):**
+- **C1 the PRIED SETTING (`di(`, 3 rows + optional nested row):** contents
+  of DIFFERENT lengths with staggered paren positions, so the after-`di(`
+  cursor (the content start) lands INSIDE the next row's content —
+  `di( j . j .` chains at 1 key/row. The varied lengths break the count-x
+  dot chain (a replayed `{n}x` eats the wrong span and heals the seam —
+  dead); per-row `{n}x`/`dt)` pay 2-3 + repositioning every row. Walk-in
+  row 1 is undercut by 1 (`{n}x` = 2 vs `di(` = 3) — documented, the
+  chamber total still forces (the Word Enclosure precedent). One row's
+  stone is TWO WORDS (`(rot rot2)`): `diw` kills half and reads false —
+  the delimited span beats the word shape, the object-vs-object lesson.
+- **C2 the NEW STONE (`ci(` + cure, 2 rows, different cures):** the hop
+  lands mid-content (k ≥ 1), so `ct)` leaves the head in place — wrong
+  text, bolt shut; the full old cure is `dT(` + `ct)`-style two-op work;
+  `ca(`+cure fuses into the floor gap husk-less and reads false.
+- **C3 the TORN FITTING (`da(`, 2 rows):** honestly forced with NO arrival
+  trick — the old full removal is `F( df)` (5) vs `da(` (3), from anywhere
+  inside; `di(` leaves the husk and reads false; `.` reprises the second
+  row.
+- **Optional C1 finale — NESTING:** `(w1 (rot) w2)` — `di(` from inside the
+  inner pair takes the INNERMOST stone only; door `(w1 () w2)`. `dt)` from
+  the same spot happens to tie (it also stops at the inner `)`) —
+  showcase, not price-forced; include for the precision lesson if the
+  height budget allows.
 
-The grid is designed to be NARROW so exit navigation is short.
-
-```
-############################################
-#@..........................................#
-#..(ggg).(ggg).(ggg).......................#   row 2 — di( terrain-∞ forced (3 enclosures)
-#............................................#
-##############################################
-#............................................#
-##############################################
-#..(KGGGGG)..............................X..#   row 7 — di( terrain-∞ forced (K on `)`)
-#............................................#
-##############################################
-#............................................#
-##############################################
-#....(ggggg)................................#   row 12 — da( forced (wall_rune `(`)
-##############################################
-```
-
-**Dims:** 14 rows × 44 cols.  `@`=(1,1), `X`=(7,38).
-
-**Placement convention:** `(` and `)` delimiters are RuneCluster kind='void' (passable) unless
-marked wall_rune (blocking).  Goblins sit on floor cells between delimiters.
-
----
-
-### Row 2 — tutorial enclosures (di( terrain-∞ forced via keystone-on-delimiter)
-
-**Terrain-∞ strategy for `di(`:** Place a **keystone entity on the `)` delimiter cell** of
-each enclosure. The engine rule: `di(` clears content (cols between delimiters) but leaves
-both delimiter cells intact — the `)` keystone SURVIVES and can be collected (bumped).
-`da(` clears delimiter + content = `)` keystone DELETED = exit condition permanently broken.
-Therefore `da(` is **terrain-∞ forbidden** (destroys exit key), and `di(` is the only safe
-clear. No budget margin is needed — using `da(` makes the level uncompletable.
-
-```
-col:  2  3  4  5  6  7  8  9  10 11  12  13  14  15  16  17
-      (  g  g  g  )  (  g  g  g   )   (   g   g   g   )
-                K1               K2               K3
-```
-
-- Enclosure A: `(` col 2, goblins 3..4..5, `)` col 6.  **Keystone K1 at `)` col 6.**
-  Exit door locked until K1+K2+K3 collected.
-- `di(` from col 2: clears goblins 3..5; `)` at col 6 SURVIVES with K1 intact — collectible.
-- `da(` from col 2: clears cols 2..6 including `)` col 6 — K1 DELETED. Exit permanently locked.
-  Player cannot complete level. **S1 terrain-∞: `da(` = game-breaking (infinite cost).**
-- Enclosures B (cols 7..11, K2) and C (cols 12..16, K3) are identical.
-- Choke wall at (2,17): passage blocked until all three interior chokes are clear; the
-  K-keystones themselves do NOT gate the passage — the choke opens when goblin content is
-  removed. K collection is separate (bump `)` cell after `di(`).
-
-**Mechanics summary:** `di(` × 3 = clear goblins + preserve `)` keystones. Then collect K1,
-K2, K3 by bumping each `)` cell (1 key each = `x` on the `)` keystones). No manual `xxx`
-path can both clear goblins AND leave the `)` keystones intact — `x` on the goblin at col 3
-does NOT delete the `)` at col 6. So manual goblin-killing (by `x` on each goblin) CAN work,
-BUT: the choke wall at col 17 requires that the goblins at EXACTLY cols 3..5 be cleared;
-`x` on each (3 presses from inside the enclosure) = step inside + `xxx` = 4 keys vs `di(` = 3.
-With 3 enclosures: manual = 3×4 = 12 vs `di(` × 3 = 9. Saving = 3 keys.
+**Chassis (the proven bones — reuse):** spine + bays + full-reading plaques
++ gate bolts + FINAL SEAL + the shared exact-text tick (`room._ss_doors`);
+anchor column + light shaft with the stagger table keeping every hop and
+every dot-chain landing inside the next content span (lint it over many
+seeds, the Word Enclosure pattern); vocabulary per seed with fixed slot
+lengths, contents + cures + flanking words all distinct; par hand-tallied
+along the driven tape; the leanest rival driven WITH its own best dot usage
+to a 1★ win inside the standard 1.4 budget; karaoke tape literal (`ci(`
+cure typed inline; Esc omitted). Chamber-order law: the first chamber is
+walk-in (the player picks the landing) — put the tie-tolerant drill first
+and the arrival-forced chambers on hops. The Whole Word scroll's `i(` line
+clears at this level via the library re-render.
 
 ---
 
-### Row 7 — `da(` gate (S1 forced via wall_rune)
-
-```
-col:  2  3  4  5  6  7  8  9  10 11  ...  38
-      (  g  g  g  g  g  )              X
-```
-
-- `(` at col 2 is a **wall_rune entity** (blocks passage; kind='wall_rune').
-- `di(` from any col 2..7: clears goblins (cols 3..6) but leaves the `(` wall_rune at col 2.
-  Passage still blocked — player cannot reach X.
-- `da(` from any col 2..7: clears cols 2..7 including the wall_rune `(` → passage opens.
-- **S1 enforcement:** no alternate route to X; `di(` is physically insufficient (wall_rune
-  remains); `da(` is strictly required.  X is placed at (7,38) on the same row, so after
-  clearing the gate the player navigates right: `$` = 1 key.
-- NOTE: Row 7 enclosure has NO keystone on its `)` delimiter — `da(` is required and safe here.
-
----
-
-### Row 12 — additional `da(` practice (forced by S1)
-
-```
-col:  4  5  6  7  8  9
-      (  g  g  g  )
-```
-
-- `(` at col 4 is wall_rune (side-passage blocker).  `da(` required to pass.
-- No keystone on `)` here — `da(` is safe and required.
-- Side-branch dead-end teaching moment; not on critical path.
-
----
-
-### Par calculation (S3 — full entry→exit)
-
-Optimal path (row 2 enclosures A+B+C, collect keystones, row 7 gate → X):
-
-1. Navigate @(1,1) → (2,2): `j l` = 2 keys
-2. `di(` enclosure A: 3 keys; cursor at (2,2)
-3. Collect K1: bump `)` at col 6: `4l x` = 5 keys
-4. Navigate (2,6) → (2,7) [`(` of B]: `l` = 1 key
-5. `di(` enclosure B: 3 keys
-6. Collect K2: bump `)` at col 11: `4l x` = 5 keys
-7. Navigate (2,11) → (2,12) [`(` of C]: `l` = 1 key
-8. `di(` enclosure C: 3 keys
-9. Collect K3: bump `)` at col 16: `4l x` = 5 keys
-10. Navigate (2,16) → (7,2) [gate `(`]: `5j 0 l` = 7 keys
-11. `da(` gate: 3 keys
-12. Navigate to X at (7,38): `$` = 1 key
-
-**par = 2+3+5+1+3+5+1+3+5+7+3+1 = 39**
-
-Manual alternative (using `x` per goblin instead of `di(`):
-- Enclosure A (3 goblins): step inside `l`, then `x x x` = 4 keys (saves 0 vs `di(`=3 + 1
-  for step = 4). Same! But keystone on `)` is still collected separately: no change.
-  Actually: `di(` from col 2 = 3 keys total; manual from col 2 = `l x x x` = 4 keys. +1.
-- Enclosure B: same +1.
-- Enclosure C: same +1.
-- Gate: S1-forced; no alternative.
-Manual total = 2+4+5+1+4+5+1+4+5+7+3+1 = 42.
-
-**budget = ceil(39 × 1.1) = ceil(42.9) = 43.** Manual (42) < 43. Not forced!
-Use ×1.08: budget = ceil(39 × 1.08) = ceil(42.12) = 43. Still 42 < 43.
-Use ×1.06: budget = ceil(39 × 1.06) = ceil(41.34) = 42. Manual (42) = budget (42). TIE.
-Use ×1.05: budget = ceil(39 × 1.05) = ceil(40.95) = 41. Manual (42) > 41. ✓ STRICT.
-
-But the terrain-∞ forcing makes budget margin IRRELEVANT for `di(` on row 2: using `da(` on
-enclosures A/B/C destroys keystones K1/K2/K3 making the level uncompletable. The manual
-alternative (goblin-by-goblin `xxx`) is NOT using `da(` — it uses `x` and is allowed. So
-the budget forces `di(` over `lxxx` (1-key saving per enclosure).
-
-**STRICT-FORCED for `di(` (terrain-∞):** `da(` destroys keystones → impossible. `lxxx` is
-the only non-`di(` alternative, costing +1 key per enclosure × 3 = +3 keys total.
-
-**budget = ceil(39 × 1.08) = 43.** Manual `lxxx` path (42) < 43 — technically not forced
-by budget alone. Use **budget = 42; multiplier = ×1.07**. Manual (42) = budget → TIE still.
-**Use budget = 41; multiplier = ×1.05 (documented):** manual (42) > 41. ✓ STRICT.
-
-**Terrain-∞ for `da(` prohibited:** The real forcing for `di(` is S1 (using `da(` destroys
-keystones, making the level uncompletable). The budget also forces `di(` over manual `lxxx`
-at ×1.05. Two independent forcings; S1 terrain-∞ is primary.
-
-**par = 39; budget = 41; multiplier = ×1.05 (documented)**
-
-**STRICT-FORCED: YES — terrain-∞ (S1) for `da(` prohibition; S2 (×1.05) for `di(` vs
-manual `lxxx`.**
-
-Arithmetic: `da(` on row-2 enclosures deletes keystones → exit permanently locked (cost ∞).
-Manual `lxxx` path (42) > budget (41). Both independently force `di(`.
-
-**Self-check:**
-- [ ] `di(` on enclosure A (col 2..6) deletes goblins at cols 3..5; `(` col 2 and `)` col 6
-  remain intact; keystone entity at `)` col 6 survives and is collectible.
-- [ ] `da(` on enclosure A deletes cols 2..6 including `)` col 6 — keystone K1 deleted.
-  Exit door lock condition permanently unsatisfiable.
-- [ ] `da(` on row-7 gate (wall_rune `(`) clears cols 2..7 → passage opens. No keystone on
-  `)` here; `da(` is required and safe on row 7.
-- [ ] `_resolve_pair('(')` scans left from cursor col to find `(`, right for `)`.
-- [ ] par=39 verified (3 enclosures × `di(` + 3 keystone collects + gate + exit nav).
-
-**Primitives:** walls, floor, pit hazards, goblin entities, void-rune delimiter glyphs
-(passable), keystone entities placed ON `)` delimiter cells (terrain-∞ forces `di(` over
-`da(`), wall_rune `(` entity (blocking gate on row 7, forces `da(`).
-
-**Design note:** The keystones-on-delimiters mechanism is fully implementable with existing
-engine primitives. The keystone entity and the delimiter rune glyph coexist at the same cell.
-`di(` preserves the cell (and entity); `da(` deletes the cell and its entity. No new mechanic.
-
----
 
 ## Level 32 — The Brace & Square Enclosure
 
