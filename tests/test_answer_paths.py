@@ -138,6 +138,7 @@ _ANSWER_NOT_TOKENISED = {
     'build_dungeon_sight_sanctum',     # visual tape with typed cure + /q⏎ search; tests/test_sight_sanctum.py
     'build_dungeon_selection_halls',   # V/<C-v> tape (control keys untokenised); tests/test_selection_halls.py
     'build_dungeon_word_enclosure',    # diw/ciw+cure tape with typed text; tests/test_word_enclosure.py
+    'build_dungeon_bracket_enclosure', # di(/ci(+cure tape with typed text; tests/test_bracket_enclosure.py
 }
 
 # Levels with a documented NON-1.4 budget. The Change Annex / Extension use a
@@ -247,6 +248,7 @@ _REPLAY_OWN_TEST = {
     'build_dungeon_sight_sanctum':     'test_sight_sanctum.py::test_full_sight_route_wins_par_perfect',
     'build_dungeon_selection_halls':   'test_selection_halls.py::test_full_selection_route_wins_par_perfect',
     'build_dungeon_word_enclosure':    'test_word_enclosure.py::test_full_enclosure_route_wins_par_perfect',
+    'build_dungeon_bracket_enclosure': 'test_bracket_enclosure.py::test_full_setting_route_wins_par_perfect',
 }
 
 

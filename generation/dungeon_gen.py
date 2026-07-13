@@ -3614,6 +3614,145 @@ def build_dungeon_word_enclosure(seed: int) -> Dungeon:
     return dungeon
 
 
+# ── The Bracket Enclosure (i( a() ────────────────────────────────────────────────
+# GEM SETTINGS: the parens are settings, the content is the stone. Three
+# door types on the exact-text chassis, discriminated by what remains
+# (probe-verified):
+#   • C1 the PRIED SETTING (di(, 3 rows): `w1 (rot) w2` → `w1 () w2` — the
+#     empty husk stays and the door reads it. Stones of DIFFERENT lengths at
+#     staggered positions keep the `di( j . j .` chain landing inside the
+#     next stone (a replayed {n}x eats the wrong span — dead); dt)/dT( pay
+#     repositioning; dw/daw heal wrongly. Row 3's stone is TWO WORDS —
+#     diw kills half and reads false (the object-vs-object lesson).
+#   • C2 the NEW STONE (ci( + cure, 2 rows, different cures): → `w1 (cure)
+#     w2`; the hop lands mid-content so ct) leaves the head (wrong text);
+#     ca(+cure tears the setting out and fuses — reads false.
+#   • C3 the TORN FITTING (da(, 2 rows): → `w1  w2` — the double-gap scar
+#     (a( takes no whitespace); di( leaves the husk and reads false. da( is
+#     honestly forced from anywhere inside (F( df) = 5 vs 3); `(stone)` is
+#     ONE WORD, so dE-from-the-( ties only after an F(/h back.
+# Walk-in chamber first, arrival-forced chambers on hops (the chamber-order
+# law); rivals driven WITH their own best dot usage.
+_BE_ROWS, _BE_COLS = 15, 41
+_BE_SPINE  = 17                     # every row's first standable
+_BE_BAY_W  = 18                     # bay floor cols 18..39; east wall 40
+_BE_BAY_E  = 39
+_BE_PLQ_COL = 2                     # full true readings (≤14 chars)
+_BE_TEXT0  = 19                     # w1 starts here on every row
+_BE_C1_ROWS = (3, 4, 5)
+_BE_C2_ROWS = (7, 8)
+_BE_C3_ROWS = (10, 11)
+_BE_SHAFT_SEPS = ((6, 25), (9, 26))  # (row, col) — the hop landing columns
+_BE_THROAT = 12
+_BE_GATE   = 13
+_BE_BOLT0  = 18                     # bolts cols 18..20, one per chamber
+_BE_EXIT   = (13, 21)               # the FINAL SEAL
+# (row, w1 len, stone len, fitting '(' col): stone start = fitting + 1 =
+# TEXT0 + w1len + 2; staggered so the di( chain and every hop land INSIDE
+# the next stone (row 3's stone is 'ab cd' — 3+1+3 = 7, two words).
+_BE_C1_SHAPE = ((3, 5, 7, 25), (4, 4, 5, 24), (5, 4, 4, 24))
+_BE_C2_SHAPE = ((7, 3, 4, 23), (8, 3, 4, 23))
+_BE_C3_SHAPE = ((10, 4, 4, 24), (11, 3, 4, 23))
+_BE_PAR = 35            # hand-tallied along the driven tape (buffer mutates)
+
+
+def _be_draw_words(rng) -> dict:
+    """Draw the enclosure vocabulary (fixed slot lengths pin par and the
+    rival chains). Row 3's stone is two len-3 words; two typed cures (len 3);
+    all pairwise distinct."""
+    _load_vocab_tables()
+
+    def pool(length):
+        return [w for w in _VOCAB_PLAIN_BY_LEN.get(length, ())
+                if w.isalpha() and w == w.lower()]
+
+    for _ in range(80):
+        picks: list = []
+
+        def draw(length):
+            w = rng.choice(pool(length))
+            picks.append(w)
+            return w
+
+        rows = []
+        for i, (_r, w1l, stl, _fs) in enumerate(_BE_C1_SHAPE + _BE_C2_SHAPE
+                                                + _BE_C3_SHAPE):
+            stone = f'{draw(3)} {draw(3)}' if i == 0 else draw(stl)
+            rows.append((draw(w1l), stone, draw(5)))
+        cures = [draw(3), draw(3)]
+        if len(set(picks)) == len(picks):
+            return {'rows': rows, 'cures': cures}
+    raise ValueError('bracket_enclosure: no distinct draw after 80 tries')
+
+
+def build_dungeon_bracket_enclosure(seed: int) -> Dungeon:
+    """The Bracket Enclosure (slug `bracket_enclosure`): i( and a(.
+
+    Gem settings: di( pries the stone and keeps the husk, ci( sets a new
+    stone, da( tears the whole fitting out and leaves the scar. See the
+    section header for the forcing."""
+    rng = random.Random(seed)
+    words = _be_draw_words(rng)
+    shapes = _BE_C1_SHAPE + _BE_C2_SHAPE + _BE_C3_SHAPE
+
+    runs, targets = [], {}
+    for (r, w1l, stl, f_s), (w1, stone, w2) in zip(shapes, words['rows']):
+        w2_s = f_s + stl + 3                          # past '(stone) '
+        runs += [(r, _BE_TEXT0, w1), (r, f_s, f'({stone})'), (r, w2_s, w2)]
+        targets[r] = (w1, w2)
+    c1 = tuple(f'{targets[r][0]} () {targets[r][1]}' for r in _BE_C1_ROWS)
+    c2 = tuple(f'{targets[r][0]} ({c}) {targets[r][1]}'
+               for r, c in zip(_BE_C2_ROWS, words['cures']))
+    c3 = tuple(f'{targets[r][0]}  {targets[r][1]}' for r in _BE_C3_ROWS)
+    chambers = ((_BE_C1_ROWS, c1), (_BE_C2_ROWS, c2), (_BE_C3_ROWS, c3))
+
+    R, C = _BE_ROWS, _BE_COLS
+    cells = [[CellType.WALL] * C for _ in range(R)]
+    for r in range(2, _BE_GATE + 1):                     # the spine
+        cells[r][_BE_SPINE] = CellType.FLOOR
+    for rows, _t in chambers:                            # the bays
+        for r in rows:
+            for c in range(_BE_BAY_W, _BE_BAY_E + 1):
+                cells[r][c] = CellType.FLOOR
+    for r, c in _BE_SHAFT_SEPS:                          # the light shafts —
+        cells[r][c] = CellType.FLOOR                     # NOT the throat row
+
+    room = Room(room_type=RoomType.ENTRY, rows=R, cols=C)
+    room.cells = cells
+    room.seed  = seed
+
+    doors = []
+    for i, (rows, tgt) in enumerate(chambers):
+        doors.append((tgt, _BE_BOLT0 + i))
+        for pr, ptext in zip(rows, tgt):                 # full true readings
+            col = _BE_PLQ_COL
+            for part in ptext.split(' '):
+                if part:
+                    room.char_runs.append(CharRun(pr, col, tuple(part), 'verdant'))
+                col += len(part) + 1
+    for rr, cc, text in runs:
+        room.char_runs.append(CharRun(rr, cc, tuple(text), 'ancient'))
+    room._ss_doors = tuple(doors)                        # the shared exact-text tick
+    room._be_words = words
+
+    room.entities.append(Entity(kind='exit', row=_BE_EXIT[0], col=_BE_EXIT[1],
+                                edit_immune=True))
+    room.spawn_pos = (2, _BE_SPINE)
+    room.exit_pos  = _BE_EXIT
+
+    room.rebuild_indexes()
+    room.par    = _BE_PAR
+    room.budget = math.ceil(_BE_PAR * 1.4)   # STANDARD: the piecewise route wins at 1★
+    ca, cb = words['cures']
+    room.answer = (f'j w w l di( j . j . 2j ci( {ca} j ci( {cb} '
+                   f'2j da( j . G $')
+
+    dungeon = Dungeon(name='The Bracket Enclosure', seed=seed)
+    dungeon.rooms        = [room]
+    dungeon.current_room = 0
+    return dungeon
+
+
 # ── The Seekers' Labyrinth (search: / ? n N *) ──────────────────────────────────
 #
 # A frozen perfect maze (recursive-backtracker, 17×39).  Search ignores walls —
