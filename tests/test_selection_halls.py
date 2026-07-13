@@ -132,7 +132,9 @@ def test_par_answer_budget(seed):
     assert room.par == _SH_PAR
     assert room.budget == math.ceil(_SH_PAR * 1.4)
     L = room._sh_words['letter']
-    assert room.answer == f'j VU 2j Vu 2j V~ 2j 2jld 4j 2j3l~ 4j 2jI{L} G $'
+    # <C-v> shows as ^v — LOAD-BEARING on the tape (playtest: omitting it
+    # made the tape unplayable; a d2j swallowed a stripe row)
+    assert room.answer == f'j VU 2j Vu 2j V~ 2j ^v2jld 4j ^v2j3l~ 4j ^v2jI{L} G $'
 
 
 @pytest.mark.parametrize("seed", SEEDS)
@@ -267,6 +269,53 @@ def test_linewise_case_on_rect_names_is_dead(monkeypatch):
     room = dungeon.rooms[0]
     _drive(dungeon, _K('11jV2ju'), monkeypatch, finish=':q!\r')
     assert room.cells[_bolt(4)[0]][_bolt(4)[1]] == CellType.WALL
+
+
+def test_dot_replays_a_full_insert(monkeypatch):
+    """Vim-true '.': after i…Esc, dot replays the TYPED TEXT and the implicit
+    Esc — it does not park the player in INSERT (the 2026-07-12 gap)."""
+    dungeon = build_dungeon_selection_halls(0)
+    room = dungeon.rooms[0]
+    # stripe bay, blank floor at col 14: type on row 9, dot on row 10
+    _drive(dungeon, _K('7j') + _K('i') + _K('zz') + [ESC] + _K('j.') + _K('l'),
+           monkeypatch, finish=':q!\r')
+    assert _row_text(room, 9).startswith('zz')
+    assert _row_text(room, 10).startswith('zz'), "dot replayed text + Esc"
+
+
+def test_dot_replays_ciw_with_its_cure(monkeypatch):
+    """'.' after c{obj}+text repeats the whole change — the enclosure-era
+    drill. ciw on the VU word, dot on the Vu word two rows down."""
+    dungeon = build_dungeon_selection_halls(0)
+    room = dungeon.rooms[0]
+    # iw unlocks at the Word Enclosure (32) — drive as admin for the engine law
+    _drive(dungeon, _K('jllll') + _K('ciw') + _K('x') + [ESC] + _K('2j.'),
+           monkeypatch, finish=':q!\r', name='admin')
+    assert _row_text(room, 3) == 'x'
+    assert _row_text(room, 5) == 'x', "dot re-cut the word and retyped the cure"
+
+
+def test_gU_takes_a_text_object(monkeypatch):
+    """gUiw — the case operators accept text objects; sweeping the scrambled
+    word to UPPER opens the first chamber (the 4-key rival to VU)."""
+    dungeon = build_dungeon_selection_halls(0)
+    room = dungeon.rooms[0]
+    # iw unlocks at the Word Enclosure (32) — drive as admin for the engine law
+    _drive(dungeon, _K('jllll') + _K('gUiw'), monkeypatch, finish=':q!\r',
+           name='admin')
+    assert room.cells[_bolt(0)[0]][_bolt(0)[1]] == CellType.FLOOR
+
+
+def test_block_append_writes_past_the_right_edge(monkeypatch):
+    """<C-v> A — block append: the typed run lands one past the block's right
+    edge on EVERY selected row."""
+    dungeon = build_dungeon_selection_halls(0)
+    room = dungeon.rooms[0]
+    # block over cols 15-16 ('sh'/'cl'/'re'), A appends at col 17
+    _drive(dungeon, _K('7jll') + [CV] + _K('2jl') + _K('A') + _K('q') + [ESC],
+           monkeypatch, finish=':q!\r')
+    for r, w in zip(_SH_STRIPE_ROWS, room._sh_words['stripe']):
+        assert _row_text(room, r).startswith(w[:2] + 'q'), _row_text(room, r)
 
 
 def test_undo_rebars_bolt_and_seal(monkeypatch):

@@ -2689,6 +2689,8 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
     search_return_mode = None  # visual mode to resume after a / ? search launched from it
     block_ins = None           # live <C-v> I/c: {'rows': [...], 'col': c, 'buf': typed}
                                # — the typed run replays into every row on Esc
+    insert_typed = ''          # chars typed this INSERT session — attached to
+                               # last_change on Esc so '.' replays them (Vim-true)
     insert_creg_pending = False  # INSERT <C-r> typed; next key names the register to paste
     insert_co_buf = None         # INSERT <C-o> active; accumulates one Normal command, then resumes INSERT
     search_creg_pending = False  # SEARCH <C-r> typed; next key names the register / <C-w> to insert
@@ -3326,18 +3328,21 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
 
         # ── Admin answer tracking ─────────────────────────────────────────────
         if (player_name == 'admin' and room.answer
-                and not key.is_sequence and str(key) not in (':', '\x16')
+                and not key.is_sequence and str(key) != ':'
                 and player.mode in (Mode.NORMAL, Mode.VISUAL,
                                     Mode.VISUAL_LINE, Mode.VISUAL_BLOCK)):
-            # '\x16' (<C-v>) is omitted from the tape like Esc — control keys
-            # aren't printable tape glyphs; the ops after them ARE tracked.
+            # '\x16' (<C-v>) appears on the tape as the two glyphs '^v' — it
+            # is LOAD-BEARING (unlike Esc, a player following the tape cannot
+            # infer it), so it must be shown; the tracker consumes both tape
+            # chars for the one keystroke (the ⏎ precedent, widened).
+            _tk = '^v' if str(key) == '\x16' else str(key)
             if key_buf == '':
                 cmd_start_ans = (room.answer_pos, room.answer_diverged)
             if not room.answer_diverged:
                 _ans_plain = room.answer.replace(' ', '')
                 if room.answer_pos < len(_ans_plain):
-                    if str(key) == _ans_plain[room.answer_pos]:
-                        room.answer_pos += 1
+                    if _ans_plain.startswith(_tk, room.answer_pos):
+                        room.answer_pos += len(_tk)
                     else:
                         room.answer_diverged = True
 
@@ -3683,6 +3688,12 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
                     block_ins = None
                     if not edit_mode:
                         _animate_reflow_falls()
+                if not edit_mode and isinstance(player.last_change, dict):
+                    # '.' replays the whole change INCLUDING the typed text
+                    # (Vim-true — every INSERT entry records last_change first)
+                    player.last_change = {**player.last_change,
+                                          'typed': insert_typed}
+                insert_typed = ''
                 player.mode = Mode.NORMAL
                 # Vim retreats one column on leaving INSERT. Also the safety
                 # net for water-writing: `a` at a bank hovers the cursor on
@@ -3778,11 +3789,13 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
                     room._last_drowns     = []
                     split_line_down(room, player)
                     budget.spend(1)
+                    insert_typed += '\n'
                     _animate_reflow_falls()
                 elif key.name == 'KEY_BACKSPACE' or str(key) == '\x7f':
                     insert_backspace(room, player)
                     if block_ins is not None and block_ins['buf']:
                         block_ins['buf'] = block_ins['buf'][:-1]
+                    insert_typed = insert_typed[:-1]
                 elif not key.is_sequence:
                     ch = str(key)
                     if ch.isprintable() and len(ch) == 1:
@@ -3811,6 +3824,7 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
                             budget.spend(1)
                             if block_ins is not None:
                                 block_ins['buf'] += ch   # replayed per row on Esc
+                            insert_typed += ch           # '.' replays this on Esc
                         _animate_reflow_falls()
                         cur_ru = room.char_run_at(player.row, player.col)
                         if cur_ru is not None and cur_ru.kind == 'void':   # typed yourself off the ledge
@@ -3905,10 +3919,11 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
                                             and not room.answer_diverged)
                 _render(message)
                 continue
-            if not key_buf and raw == 'I' and vmode == Mode.VISUAL_BLOCK:
-                # Block insert: INSERT opens at the block's top-left; on Esc
-                # the typed run replays into every other selected row (the
-                # block_ins state; see the INSERT Esc handler).
+            if not key_buf and raw in ('I', 'A') and vmode == Mode.VISUAL_BLOCK:
+                # Block insert/append: INSERT opens at the block's top-left
+                # (I) or one past its right edge (A); on Esc the typed run
+                # replays into every other selected row (the block_ins state;
+                # see the INSERT Esc handler).
                 if not ('visual_op' in player.known_commands
                         or 'admin' in player.known_commands):
                     _push("You haven't learned visual operators yet.")
@@ -3920,16 +3935,18 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
                     _render(message)
                     continue
                 _r1, _r2, _c1, _c2 = block_bounds(anchor, cursor)
+                _icol = _c1 if raw == 'I' else min(_c2 + 1, room.cols - 1)
                 undo_stack.append(_snapshot(room, player, budget,
                                             row=anchor[0], col=anchor[1],
                                             spent=player.visual_start_spent,
                                             ans=cmd_start_ans))
                 redo_stack.clear()
-                player.row, player.col = _r1, _c1
+                player.row, player.col = _r1, _icol
                 player.visual_anchor = None
                 player.mode = Mode.INSERT
+                insert_typed = ''
                 block_ins = {'rows': list(range(_r1 + 1, _r2 + 1)),
-                             'col': _c1, 'buf': ''}
+                             'col': _icol, 'buf': ''}
                 budget.spend(1)
                 key_buf = ''
                 _render(message)
@@ -3979,6 +3996,8 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
                 player.last_visual_mode = vmode
                 player.visual_anchor = None
                 player.mode = Mode.INSERT if op == 'c' else Mode.NORMAL
+                if op == 'c':
+                    insert_typed = ''
                 if op == 'c' and vmode == Mode.VISUAL_BLOCK:
                     # Block change: like block insert, the typed cure replays
                     # into every other selected row on Esc.
@@ -4272,6 +4291,7 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
                     redo_stack.clear()
                     begin_insert(room, player, action.get('variant', 'i'), count)
                     player.mode = Mode.INSERT
+                    insert_typed = ''
                     budget.spend(1)
                     player.last_change = action
                 else:
@@ -4778,6 +4798,7 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
             redo_stack.clear()
             begin_insert(room, player, 'S' if action.get('line') else 's', count)
             player.mode = Mode.INSERT
+            insert_typed = ''
             budget.spend(_keystroke_cost(count, '', action.get('count_given', False)))   # `s`=1; `{n}s` / `1s` pay their digits
             player.last_change = action
 
@@ -5062,6 +5083,7 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
                     _reg_write(player, reg, op_delete(room, player, tobj), is_delete=True)
                     budget.spend(_operator_cost(action))
                     player.mode = Mode.INSERT
+                    insert_typed = ''
                 else:                          # 'd'
                     _rows_before = room.rows
                     _clip = op_delete(room, player, tobj, collapse=True)
@@ -5139,6 +5161,26 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
                 ed_undo.pop()
             else:
                 player.last_change = action
+
+        # ── '.' of an insert-family change: replay the RECORDED TEXT ─────────
+        # Vim-true: '.' after i…/a…/c{m}…/s… replays the whole change including
+        # the typed run and the implicit Esc — it does not park the player in
+        # INSERT. The re-dispatched action has already positioned the cursor
+        # and (for c/s) cut the span; here the recorded text types itself.
+        # The replay's spends are refunded by the settle below (dot = 1 key).
+        if (_dot_active and player.mode == Mode.INSERT
+                and not edit_mode and action.get('typed') is not None):
+            for _rch in action['typed']:
+                if _rch == '\n':
+                    split_line_down(room, player)
+                else:
+                    insert_char(room, player, _rch)
+            _animate_reflow_falls()
+            player.mode = Mode.NORMAL
+            insert_typed = ''
+            if player.col > 0 and room.is_passable(player.row, player.col - 1):
+                player.col -= 1                # the Esc retreat
+            _content_ticks()                   # the change completes THIS turn
 
         # ── '.' repeat cost + change re-cost accounting (centralised) ────────
         # If a change ran this iteration (last_change changed and an undo entry was

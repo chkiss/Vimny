@@ -3300,8 +3300,8 @@ def build_dungeon_sight_sanctum(seed: int) -> Dungeon:
 # FORCING BY PAR (standard 1.4 budget): the leanest old-only route (gUU/guu/
 # g~~ + per-row dot chains) wins at 1★ a few keys inside the budget — driven.
 # All six chambers anchor at the SHAFT column, so every hop is a plain {n}j
-# (the nav-golf audit); the answer tape omits <C-v> like Esc (control keys
-# are not tape glyphs).
+# (the nav-golf audit); the answer tape shows <C-v> as ^v — load-bearing,
+# unlike Esc, so it must be visible (the tracker eats both chars at once).
 _SH_ROWS, _SH_COLS = 23, 26
 _SH_SPINE  = 13                     # every row's first standable
 _SH_BAY_W  = 14                     # bay floor cols 14..24; east wall 25
@@ -3439,8 +3439,9 @@ def build_dungeon_selection_halls(seed: int) -> Dungeon:
     room.rebuild_indexes()
     room.par    = _SH_PAR
     room.budget = math.ceil(_SH_PAR * 1.4)   # STANDARD: the piecewise route wins at 1★
-    # the tape omits <C-v> (control keys, like Esc, are not tape glyphs)
-    room.answer = f'j VU 2j Vu 2j V~ 2j 2jld 4j 2j3l~ 4j 2jI{letter} G $'
+    # <C-v> shows on the tape as ^v (load-bearing, unlike Esc — a player
+    # following the tape must see it; the tracker eats both chars at once)
+    room.answer = f'j VU 2j Vu 2j V~ 2j ^v2jld 4j ^v2j3l~ 4j ^v2jI{letter} G $'
 
     dungeon = Dungeon(name='The Selection Halls', seed=seed)
     dungeon.rooms        = [room]

@@ -218,7 +218,41 @@ class TestSentence:
 
 # ── deferred: tags return None ─────────────────────────────────────────────────
 
-def test_tag_object_deferred():
-    room = _room()
-    _chars(room, 3, 2, '<a>x</a>')
-    assert resolve_text_object('it', room, _p(3, 4)) is None
+class TestTag:
+    def test_it_inner_content(self):
+        room = _room()
+        _chars(room, 3, 2, '<a>wick</a>')
+        t = resolve_text_object('it', room, _p(3, 6))
+        assert _span(t) == (3, 5, 3, 8)            # 'wick'
+
+    def test_at_includes_the_tags(self):
+        room = _room()
+        _chars(room, 3, 2, '<a>wick</a>')
+        t = resolve_text_object('at', room, _p(3, 6))
+        assert _span(t) == (3, 2, 3, 12)           # '<a>wick</a>'
+
+    def test_cursor_on_the_tag_itself(self):
+        room = _room()
+        _chars(room, 3, 2, '<a>wick</a>')
+        t = resolve_text_object('it', room, _p(3, 3))   # on the 'a' of <a>
+        assert _span(t) == (3, 5, 3, 8)
+
+    def test_nested_pairs_pick_the_innermost(self):
+        room = _room()
+        _chars(room, 3, 2, '<a><b>x</b>y</a>')
+        t = resolve_text_object('it', room, _p(3, 8))   # on the 'x'
+        assert _span(t) == (3, 8, 3, 8)                 # inner <b> pair
+        t = resolve_text_object('it', room, _p(3, 13))  # on the 'y'
+        assert _span(t) == (3, 5, 3, 13)                # outer <a> content
+
+    def test_empty_content_is_none_for_it(self):
+        room = _room()
+        _chars(room, 3, 2, '<a></a>')
+        assert resolve_text_object('it', room, _p(3, 3)) is None
+        t = resolve_text_object('at', room, _p(3, 3))
+        assert _span(t) == (3, 2, 3, 8)
+
+    def test_no_pair_is_none(self):
+        room = _room()
+        _chars(room, 3, 2, '<a>wick')                   # unclosed
+        assert resolve_text_object('it', room, _p(3, 6)) is None

@@ -134,7 +134,7 @@ def compute_text_object(player, action: dict, room) -> TextObject | None:
 # resolve_text_object computes a span from the cursor position (not a motion).
 # `textobj` is a canonical 2-char string: kind ('i'|'a') + object char, where the
 # parser has already normalised aliases (ib->i(, iB->i{, close brackets/quotes to
-# their canonical form). Tags (it/at) are deferred — they return None here.
+# their canonical form). Tags (it/at) resolve single-row <name>…</name> pairs.
 
 _PAIRS = {'(': ('(', ')'), '[': ('[', ']'), '{': ('{', '}'), '<': ('<', '>')}
 
@@ -255,6 +255,42 @@ def _resolve_quote(room, r, c, around, q):
     return TextObject(r, o + 1, r, cl - 1, TextObjectType.INCLUSIVE)
 
 
+def _resolve_tag(room, r, c, around):
+    """it/at — the innermost <name>…</name> pair enclosing the cursor, on the
+    cursor's row (dungeon tags are single-row inscriptions). `it` spans the
+    content between the tags; `at` spans open tag through close tag. Nesting
+    honoured: a stack pairs each </name> with its matching <name>."""
+    bounds = _row_bounds(room, r)
+    if bounds is None:
+        return None
+    lo, hi = bounds
+    line = ''.join(_sym_at(room, r, cc) or ' ' for cc in range(lo, hi + 1))
+
+    import re
+    stack, pairs = [], []
+    for m in re.finditer(r'<(/?)([A-Za-z][A-Za-z0-9]*)>', line):
+        closing, name = m.group(1), m.group(2)
+        if not closing:
+            stack.append((name, m.start(), m.end()))       # open: '<' .. past '>'
+        elif stack and stack[-1][0] == name:
+            _n, o_start, o_end = stack.pop()
+            pairs.append((o_start, o_end, m.start(), m.end()))
+    if not pairs:
+        return None
+    cur = c - lo
+    # innermost pair containing the cursor (anywhere from '<' of the open tag
+    # to '>' of the close tag) — smallest enclosing span wins
+    containing = [p for p in pairs if p[0] <= cur < p[3]]
+    if not containing:
+        return None
+    o_s, o_e, c_s, c_e = min(containing, key=lambda p: p[3] - p[0])
+    if around:
+        return TextObject(r, lo + o_s, r, lo + c_e - 1, TextObjectType.INCLUSIVE)
+    if o_e > c_s - 1:
+        return None                                        # empty content: <a></a>
+    return TextObject(r, lo + o_e, r, lo + c_s - 1, TextObjectType.INCLUSIVE)
+
+
 def _resolve_paragraph(room, r, c, around):
     if _row_blank(room, r):
         top = bot = r
@@ -322,4 +358,6 @@ def resolve_text_object(textobj: str, room, player) -> TextObject | None:
         return _resolve_paragraph(room, r, c, around)
     if obj == 's':
         return _resolve_sentence(room, r, c, around)
-    return None                                     # 't' (tag) deferred
+    if obj == 't':
+        return _resolve_tag(room, r, c, around)
+    return None
