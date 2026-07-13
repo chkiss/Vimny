@@ -24,161 +24,79 @@
 
 ---
 
-## Level 30 — The Word Enclosure
+## Display 32 — The Word Enclosure (`word_enclosure`) — `iw aw`
 
-**Commands introduced:** `iw` `aw`
-**New mechanics (≤3):**
-1. Text-object concept: operator argument that selects by semantic shape, not motion landing.
-2. `iw` — inner word: the rune cluster under the cursor (no trailing blank).
-3. `aw` — around word: inner word PLUS the trailing floor-blank run to the next cluster
-   (or leading blank when no trailing blank exists).
+> ✅ **Current-conventions proposal** (rewritten 2026-07-13; replaces the
+> legacy section, which was broken three ways against today's engine):
+> 1. its own par table admitted `xxx` TIES `diw` — worse, `{n}x` (2 keys)
+>    BEATS it, and its "cursor lands at col 5, the middle of cols 5..7"
+>    premise confuses start with middle;
+> 2. its cursor-traps and "dw is lethal" forcing used VOID runes as fences —
+>    but voids are lethal only as LANDING cells (deletes pass over them) and
+>    `x` deletes a void glyph outright, so the fence neither blocks `dw` nor
+>    survives an `x`;
+> 3. its `daw` "deletes the wall-cell" — wall cells are uncuttable stone
+>    (glyphs in stone are never text), and budget-multiplier forcing (×1.35)
+>    is deprecated: we force by PAR.
 
-**Linkage:** `iw`/`aw` are the simplest text objects; they generalise `dw`/`de`. `aw` teaches
-the "around = include separator" rule that carries through every later object.
+**Commands introduced:** `iw` (inner word) · `aw` (around word — the
+"include the separator" rule that carries through every later enclosure).
+Engine complete: resolvers, parser (`d2iw`, `viw`, `gUiw`), per-token gating,
+and — since 2026-07-13 — the dot-insert replay all exist. ONE drive-verify at
+build: the double-gap scar (below) surviving reflow's close_gap pull.
 
-**S4 — blocking `dw` bypass:** `dw` from the start of a cluster deletes cluster + trailing
-blank (equivalent to `daw`).  `dw` from the MIDDLE of a cluster deletes only from cursor to
-cluster end + trailing blank (NOT the full cluster).  The design therefore places the player
-cursor in the MIDDLE of each blocking rune so that `dw` leaves a partial cluster that does NOT
-clear the choke, while `diw` (whole cluster) does.  This makes `diw` strictly superior to `dw`
-for the choke-clearing puzzle.
+**The real lessons, priced honestly:**
+1. **`iw` is POSITION-INDEPENDENT** — from anywhere inside the word, where
+   `dw`/`de`/`{n}x` are cursor-relative. Force it by ARRIVAL: the chassis'
+   anchor alignment lands the cursor MID-WORD naturally (the previous op's
+   cursor + a plain {n}j hop — never a void trap). From mid-word the
+   piecewise fix is a two-op pair (`db` + `de`-ish, ~4/row) vs `diw` (3).
+2. **THE DOT GAP amplifies it** (new law — first level priced after the
+   dot-insert replay): `diw` is ONE change, so a column of aligned rot words
+   chains `diw j . j .` at 1 key/row. The piecewise pair is TWO changes —
+   dot repeats only the last one, so old pays ~4/row forever. Multi-row
+   drills make the text object win by miles, honestly.
+3. **`aw` vs `iw` is discriminated by the SCAR, on the exact-text chassis:**
+   deleting a MIDDLE word from `w1 rot w2`:
+   - `diw` removes the word only → the pull leaves BOTH separators:
+     `w1  w2` (double gap — the scar stays open);
+   - `daw` removes word + trailing separator → `w1 w2` (single gap, seam
+     healed).
+   Exact-row doors read the difference directly (internal spaces survive
+   `_wla_floor_text` + strip). No wall-deleting, no entity hacks.
+4. **`ciw` + typed cure closes the loop:** on `w1 rot w2`, `ciw`+cure →
+   `w1 cure w2`; `caw`+cure fuses → `w1 curew2` (wrong text, bolt shut).
+   The change-side discrimination, and dot repeats the WHOLE change now —
+   price the dot chain in the rival math.
 
----
+**Chambers (sketch — drive and re-golf at build, as always):**
+- **C1 the diw drill** (3 rows): column-aligned mid-row rot words; canonical
+  `diw j . j .`; doors = the double-gap targets `f'{a}  {b}'`. Rival: per-row
+  two-op piecewise, not dot-chainable — forced by ~2/row.
+- **C2 the ciw cure** (2 rows, different cures — no dot shortcut): doors
+  `f'{a} {cure} {b}'`; `caw` fuses and reads false; `ce`/`cw` from mid-word
+  cut the wrong span; count-`s` is position-relative.
+- **C3 the daw seam** (2 rows): doors = single-gap `f'{a} {b}'`; `diw` leaves
+  the scar and reads false (the two-sided law: `u` recovers). Optional count
+  finale `d2aw` on a double-rot row if the drive shows it pays.
+- Optional flourish: one end-of-line rot where `aw` takes the LEADING blank
+  (no trailing one) — teach it via the plaque, don't door it (stripped text
+  can't see trailing space, so it cannot be honestly doored).
 
-### Grid  (20 rows × 54 cols)
-
-```
-######################################################
-#@..................................................#
-#.....[RUN]..[AWAY]..[FAST]..........................#   row 2 — iw choke A (cursor trap)
-#....................................................#
-######################################################
-#....................................................#
-######################################################
-#.....[RUN]..[AWAY]..[FAST]..........................#   row 7 — iw choke B (cursor trap)
-#....................................................#
-######################################################
-#....................................................#
-######################################################
-#.....[hello].[space]................................#   row 12 — aw distinction puzzle
-#....................................................#   (trailing blank between hello/space)
-######################################################
-#....................................................#
-######################################################
-#....................................................#
-#..................................................X.#   row 17 exit
-######################################################
-#....................................................#
-######################################################
-```
-
-**Dims:** 20 rows × 54 cols.  `@`=(1,1), `X`=(17,50).
-
----
-
-### Puzzle A — `diw` choke (rows 2 and 7)
-
-**Cursor-trap mechanism (S4):** Each choke rune cluster `[RUN]` (cols 5..7) is preceded by a
-void-rune hazard at cols 2..4 that force the player to land exactly on col 5 (middle of the
-3-char cluster RUN occupying cols 5..7).  From col 5:
-- `dw` deletes col 5..7 + trailing blank at col 8 → equivalent to `daw`, leaves no cluster.
-- But col 8 is NOT a blank — it is a second void-rune hazard. So `dw` would attempt to eat
-  into the hazard and kill the player (void-rune is lethal), making `dw` unsafe.
-- `diw` from col 5 selects cols 5..7 (the whole cluster), leaves col 8 intact.
-
-Revised layout (row 2):
-
-```
-col:  1  2  3  4  5  6  7  8  9  10 11 12  13 14 15  16 17
-      .  V  V  V [R  U  N] V  .  [  A  W   A  Y]  .  [F  ...]
-```
-
-- `V` = void-rune hazard (lethal, passable only with `diw` text object that doesn't step).
-- Player lands at col 5 (forced by left-side hazard cols 2..4).
-- `diw` from col 5: selects cols 5..7, deletes `[RUN]`, clears choke wall at col 8 slot.
-- `dw` from col 5: would extend into col 8 (the right-side void `V`), causing death.
-- `[AWAY]` at cols 10..13 is a bystander rune — if the player clears it, no choke opens.
-- Choke: a CellType.WALL segment at (2,8) that opens ONLY when `[RUN]` is removed.
-
-Row 7 has the identical layout, requiring a second `diw` use.
-
-**S1 enforcement:** The void-rune hazards at col 8 make `dw` physically dangerous (infinite
-cost via death), not merely more expensive.  `diw` is the only safe command.
+**Chassis (the Sight Sanctum / Selection Halls bones — reuse):** spine +
+bays + full-reading plaques + gate-row bolts + FINAL SEAL; the shared
+exact-text tick (`room._ss_doors`); anchor column + light shaft so every hop
+is a plain `{n}j` (then run the nav-golf audit: `}` hops, `{n}G`, H/M/L, `e`
+does not cross rows); vocabulary drawn per seed with FIXED slot lengths +
+distinctness + a many-seed lint; hand-tallied par pinned by the driven
+2★ test; the leanest old-only rival (WITH its own best dot usage) driven to
+a 1★ win inside the standard 1.4 budget; karaoke tape = literal keystrokes
+(typed cures single tokens, no spaces; Esc omitted, ^v-class control keys
+visible). The Whole Word scroll's iw/aw lines clear at this level via the
+library re-render — no extra wiring.
 
 ---
 
-### Puzzle B — `aw` vs `iw` distinction (row 12)
-
-Layout:
-
-```
-col:  5  6  7  8  9  10  11 12  13 14 15 16 17
-     [h  e  l  l  o] [_] [s  p   a  c  e]
-```
-
-- `[hello]` cluster at cols 5..9.  Floor blank (passable) at col 10.  `[space]` cluster
-  at cols 11..15.
-- A choke wall at (12,10) blocks the corridor; the wall-cell is at col 10, which is the floor
-  blank BETWEEN the clusters.  The wall-cell is also the trailing blank that `aw` would include.
-- `diw` from col 5: selects cols 5..9 (inner word only).  Col 10 (the wall-blank) remains →
-  choke still blocked.
-- `daw` from col 5: selects cols 5..10 (word + trailing blank).  The wall-cell at col 10 is
-  deleted (a wall_rune blank entity) → choke opens.
-- **S1 enforcement:** `diw` is insufficient to open the choke (infinite-cost bypass because the
-  passage is literally still closed); `daw` is strictly required.
-
-After opening the choke, `[space]` cluster at cols 11..15 is an optional goblin-cluster.  The
-exit at (17,50) is reached by navigating right via `$` and down.
-
----
-
-### Par calculation (S3 — full entry→exit)
-
-Optimal path:
-1. Navigate @(1,1) → (2,5) [choke-A rune]: `j` `4l` = 5 keys
-2. `diw` [RUN] choke A: 3 keys
-3. Navigate (2,5) → (7,5) [choke-B rune]: `5j` = 5 keys
-4. `diw` [RUN] choke B: 3 keys
-5. Navigate (7,5) → (12,5) [hello cluster]: `5j` = 5 keys
-6. `daw` hello + blank: 3 keys
-7. Navigate (12,5) → (17,50) [exit]: `5j` `$` = 6 keys
-
-**par = 5+3+5+3+5+3+6 = 30**
-
-Manual alternative (using `x` on each char of [RUN], col 5..7):
-- At (2,5): `x x x` = 3 keys (clears cluster but hits void at col 8 on 4th step → death).
-  `x` on col 5 removes `R`; col 5 is now what was col 6 (`U`); second `x` removes `U`;
-  third `x` removes `N` — cluster gone, col 8 void never stepped on.  Total: 3 keys.  Same!
-- BUT: `dw` from col 5 is unsafe (void hazard at col 8); `xxx` from col 5 is 3 keys.
-  `diw` is 3 keys.  Tie broken by aw-puzzle: `diw` on hello leaves choke at col 10 open —
-  `diw` cannot open the passage, so player would need an extra step to handle col 10.
-- Manual path for aw-puzzle: `diw` + one extra key to remove the wall-blank entity = 4 keys
-  vs `daw` = 3 keys.  Saves 1 key.
-
-Budget multiplier: S1 void hazard makes `dw` impossible (infinite cost).  `xxx` ties `diw` but
-`daw` is required and saves vs `diw`+extra.  Set multiplier at ×1.35 (tighter than default 1.4):
-
-**budget = ceil(30 × 1.35) = 41**
-
-Manual path (diw×2 + diw on hello + extra col-10 key): 5+3+5+3+5+3+1+6 = 31 — exceeds 41? No.
-The forcing is primarily S1 (void hazard eliminates `dw`); `aw` forcing is S1 (choke won't open
-without it).  The 1.35× multiplier is conservative; the real forcing is terrain-∞.
-
-**par = 30; budget = 41; multiplier = ×1.35 (documented)**
-
----
-
-**Self-check:**
-- [ ] `diw` from col 5 on `[RUN]` selects cols 5..7; void at col 8 is NOT included (S4 safe).
-- [ ] `dw` from col 5 would extend into col 8 void → void-rune damage/death (S1).
-- [ ] `daw` from col 5 on `[hello]` selects cols 5..10 including the wall-blank entity (S1 choke).
-- [ ] `diw` from col 5 on `[hello]` selects cols 5..9 only; wall-blank at 10 survives → choke remains.
-- [ ] par=30 verified: no shorter path exists through both chokes and the aw-puzzle.
-
-**Primitives:** walls, floor, void-rune hazards (cols 2..4 and col 8 per choke), wall-blank entity
-(aw choke at col 10), rune clusters (word-targets), choke corridors.
-
----
 
 ## Level 31 — The Bracket Enclosure
 
