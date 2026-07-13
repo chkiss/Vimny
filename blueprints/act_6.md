@@ -68,13 +68,22 @@ twice (the charwise multi-row lesson) or does not exist at all — and for
 linewise/block that means `<C-v>`.
 
 Forcing model (revised):
-- **`V~` is V's honestly PRICE-FORCED chamber** (+1/line): a full-flip
-  MIXED-INVERSION line entered mid-row — scattered wrongs across the whole
-  line, so `gUU`/`guu` write wrong case (not idempotent-safe here), count-`~`
-  can't span it from the cursor, and `g~~` (3) / `^{n}~` (3) lose to `V~`
-  (2). This is the Case Chambers' g~~ finale re-armed one tier up — the
-  game's case thread pays off a third time. Two or three such lines make the
-  margin decisive.
+- **The CASE TRIO is V's honestly PRICE-FORCED wing** (+1 per line; the tax
+  is exactly the `g` prefix — the case ops are the only linewise ops whose
+  bare key isn't the operator form; `dd/yy/cc/>>/<</==` are all already 2
+  keys and tie):
+  - `V~` (2) vs `g~~` (3) / `^{n}~` (3, ≤9 cells): a full-flip
+    MIXED-INVERSION line entered mid-row — `gUU`/`guu` write wrong case,
+    count-`~` can't span it from the cursor;
+  - `VU` (2) vs `gUU` (3): a scattered-lowercase line that must read UPPER;
+  - `Vu` (2) vs `guu` (3): the mirror — and the TRAP-LESSON: in visual mode
+    `u` LOWERCASES the selection (Vim-true), it is NOT undo.
+  **ENGINE WORK:** the visual-op branch accepts only `dycx~<>` today — add
+  `U`/`u` mapping to `gU`/`gu` (op_case already takes them), gated on
+  `visual_op` like the rest; `u` must resolve to lowercase only when a
+  selection is live. This is the Case Chambers' trio re-armed one tier up —
+  the game's case thread pays off a third time, three chambers at one key
+  saved each.
 - **`Vd` is the taught idiom with DOCUMENTED TIES** (the Case Chambers
   precedent): teach it as see-before-you-cut — `V {n}j d` on a stack whose
   door punishes overshoot (the exact-text chassis: one row too far eats the
