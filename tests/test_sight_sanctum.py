@@ -33,8 +33,8 @@ from engine.search import _match_positions
 from content.levels import known_commands
 from generation.dungeon_gen import (
     build_dungeon_sight_sanctum,
-    _SS_ROWS, _SS_COLS, _SS_SPINE, _SS_BAY_W, _SS_BAY_E, _SS_CHAMBERS,
-    _SS_PLAQUES, _SS_CHEST, _SS_GATE, _SS_BOLT0, _SS_EXIT, _SS_PAR, _SS_ANSWER,
+    _SS_ROWS, _SS_COLS, _SS_SPINE, _SS_BAY_W, _SS_BAY_E,
+    _SS_PLQ_COL, _SS_CHEST, _SS_GATE, _SS_BOLT0, _SS_EXIT, _SS_PAR, _ss_answer,
 )
 from tests import SEEDS, cached_room
 
@@ -53,21 +53,30 @@ def _bolt(i):
     return (_SS_GATE, _SS_BOLT0 + i)
 
 
+def _letters(room):
+    """The seed's three tape letters: the two t-targets and the seal search."""
+    w = room._ss_words
+    return w['cut'][1][0], w['word'][1][0], w['seal'][1][0]
+
+
 # The canonical tape (== room.answer with Esc placed): select first, act
 # second — anchor-aligned down the light shaft, so every hop is a plain
-# {n}j. 33 keys.
-def _canon_keys():
-    return (_K('jelv2jtsd') + _K('4jv2jtgc') + _K('s') + [ESC]
-            + _K('4jvje~') + _K('3jv') + _K('/q\r') + _K('hd') + _K('G$'))
+# {n}j. 33 keys, letters drawn per seed.
+def _canon_keys(room):
+    a, b, x = _letters(room)
+    return (_K(f'jelv2jt{a}d') + _K(f'4jv2jt{b}c') + _K('s') + [ESC]
+            + _K('4jvje~') + _K('3jv') + _K(f'/{x}\r') + _K('hd') + _K('G$'))
 
 
 # The leanest old-only rival (cheese-audited): middle blight rows are never
 # cleared — doors check only the target rows — so no dd at all: D for heads,
 # ^dt{ch} for tails, i+s for the typed cure, count-~ for the case words.
 # Wins — inside the standard budget — but over par: 1 star.
-def _piecewise_rival_keys():
-    return (_K('jelD2j^dts') + _K('el2jD') + _K('is') + [ESC]
-            + _K('2j^dtg') + _K('el2j5~j^6~') + _K('hh2jD2j^dtq') + _K('G$'))
+def _piecewise_rival_keys(room):
+    a, b, x = _letters(room)
+    return (_K(f'jelD2j^dt{a}') + _K('el2jD') + _K('is') + [ESC]
+            + _K(f'2j^dt{b}') + _K('el2j5~j^6~') + _K(f'hh2jD2j^dt{x}')
+            + _K('G$'))
 
 
 def _drive(dungeon, keys, monkeypatch, finish=':wq\r', name='Scribe'):
@@ -114,14 +123,14 @@ def test_par_answer_budget(seed):
     room = _room(seed)
     assert room.par == _SS_PAR
     assert room.budget == math.ceil(_SS_PAR * 1.4)
-    assert room.answer == _SS_ANSWER
+    assert room.answer == _ss_answer(room._ss_words)
 
 
 @pytest.mark.parametrize("seed", SEEDS)
 def test_exit_and_bolts_start_sealed(seed):
     """The FINAL SEAL law: bolts and exit are STONE until their text holds."""
     room = _room(seed)
-    for i in range(len(_SS_CHAMBERS)):
+    for i in range(4):
         assert room.cells[_bolt(i)[0]][_bolt(i)[1]] == CellType.WALL
     assert room.cells[_SS_EXIT[0]][_SS_EXIT[1]] == CellType.WALL
 
@@ -156,22 +165,44 @@ def test_bolt_opens_the_instant_the_strike_lands(monkeypatch):
     THIS turn — no one-key lag before the banner/bolt."""
     dungeon = build_dungeon_sight_sanctum(0)
     room = dungeon.rooms[0]
-    _drive(dungeon, _K('jelv2jtsd'), monkeypatch, finish=':q!\r')
+    a, _b, _x = _letters(room)
+    _drive(dungeon, _K(f'jelv2jt{a}d'), monkeypatch, finish=':q!\r')
     assert room.cells[_bolt(0)[0]][_bolt(0)[1]] == CellType.FLOOR
 
 
 @pytest.mark.parametrize("seed", SEEDS)
-def test_q_is_pristine_level_wide(seed):
-    """The Seal's search anchor: 'q' occurs in exactly one FLOOR position (the
-    'q' of quill) — the plaque copy is sealed in the wall, which search skips."""
+def test_seal_initial_is_pristine_level_wide(seed):
+    """The Seal's search anchor: the tail's initial occurs in exactly one
+    FLOOR position (its own) — the plaque copy is sealed in the wall, which
+    search skips — so /{x}⏎ has one landing."""
     room = _room(seed)
-    positions = _match_positions(room, 'q')
-    assert len(positions) == 1, positions
-    (r, c), = positions
-    assert room.is_passable(r, c)
+    _a, _b, x = _letters(room)
+    s_tail = room._ss_words['seal'][1]
+    positions = _match_positions(room, x)
+    from generation.dungeon_gen import _SS_TAIL0
+    # every floor match lives inside the tail itself (the initial may recur
+    # within its own word — /{x}⏎ still lands on the head), none elsewhere
+    assert positions and positions[0] == (16, _SS_TAIL0), (x, positions)
+    assert all(r == 16 and c >= _SS_TAIL0 for r, c in positions), (x, positions)
     # and the wall copy exists but is not a landing
-    assert any(ru.col == 2 and ''.join(ru.symbols) == 'quill'
+    assert any(ru.col == _SS_PLQ_COL and ''.join(ru.symbols) == s_tail
                for ru in room.char_runs), "the plaque carries the true word"
+
+
+@pytest.mark.parametrize("seed", SEEDS)
+def test_case_plaques_carry_the_full_reading(seed):
+    """The plaque IS the row's whole true text — guard words included (a
+    one-word plaque beside a two-word row made no sense; playtest)."""
+    room = _room(seed)
+    gw, w1, w2, ge = room._ss_words['case']
+    plq = {}
+    for ru in room.char_runs:
+        if not room.is_passable(ru.row, ru.col):
+            plq.setdefault(ru.row, []).append(ru)
+    def reading(row):
+        return ' '.join(''.join(ru.symbols) for ru in sorted(plq[row], key=lambda r: r.col))
+    assert reading(11) == f'{gw} {w1}'
+    assert reading(12) == f'{w2} {ge}'
 
 
 def test_chest_grants_the_wardens_sight():
@@ -189,6 +220,20 @@ def test_curriculum_teaches_visual_and_visual_op():
     assert 'visual' in known and 'visual_op' in known
     # and neither sibling mode leaks in early (the per-token gate)
     assert 'visual_line' not in known and 'visual_block' not in known
+
+
+def test_word_draw_constraints_hold_across_many_seeds():
+    """The vocabulary lint, 300 seeds: every draw builds; the seal initial is
+    floor-unique (one /{x} landing); every door target is distinct."""
+    from generation.dungeon_gen import _SS_TAIL0
+    for seed in range(300):
+        room = build_dungeon_sight_sanctum(seed).rooms[0]
+        _a, _b, x = _letters(room)
+        positions = _match_positions(room, x)
+        assert positions[0] == (16, _SS_TAIL0), (seed, x, positions)
+        assert all(r == 16 and c >= _SS_TAIL0 for r, c in positions), (seed, x)
+        targets = [t for ts, _dc in room._ss_doors for t in ts]
+        assert len(set(targets)) == len(targets) == 8, (seed, targets)
 
 
 # ── the per-token visual gate ─────────────────────────────────────────────────
@@ -211,14 +256,15 @@ def test_v_gates_but_V_and_block_stay_locked():
 def test_full_sight_route_wins_par_perfect(seed, monkeypatch):
     dungeon = build_dungeon_sight_sanctum(seed)
     room = dungeon.rooms[0]
-    result = _drive(dungeon, _canon_keys(), monkeypatch)
+    result = _drive(dungeon, _canon_keys(room), monkeypatch)
     assert result['won'] and result['stars'] == 2, result
-    for i in range(len(_SS_CHAMBERS)):
+    for i in range(4):
         assert room.cells[_bolt(i)[0]][_bolt(i)[1]] == CellType.FLOOR
 
 
 def test_canonical_route_costs_exactly_par(monkeypatch):
-    won, spent = _drive_spent(_canon_keys(), monkeypatch)
+    room = _room(0)
+    won, spent = _drive_spent(_canon_keys(room), monkeypatch)
     assert won and spent == _SS_PAR, (won, spent)
 
 
@@ -227,7 +273,7 @@ def test_piecewise_route_wins_at_one_star(seed, monkeypatch):
     """THE LAW, driven: the no-visual D/dd/^dt/cc route WINS — inside the
     standard budget — but over par: 1 star. The sight is forced by PAR."""
     dungeon = build_dungeon_sight_sanctum(seed)
-    result = _drive(dungeon, _piecewise_rival_keys(), monkeypatch)
+    result = _drive(dungeon, _piecewise_rival_keys(dungeon.rooms[0]), monkeypatch)
     assert result['won'] and result['stars'] == 1, result
 
 
@@ -236,7 +282,7 @@ def test_admin_karaoke_tape_tracks_to_the_end(monkeypatch):
     consumes every char (⏎ marks the search Enter; Esc is skipped)."""
     dungeon = build_dungeon_sight_sanctum(0)
     room = dungeon.rooms[0]
-    _drive(dungeon, _canon_keys(), monkeypatch, name='admin')
+    _drive(dungeon, _canon_keys(room), monkeypatch, name='admin')
     assert not room.answer_diverged
     assert room.answer_pos == len(room.answer.replace(' ', ''))
 
@@ -246,7 +292,7 @@ def test_admin_karaoke_tape_tracks_to_the_end(monkeypatch):
 def test_undo_rebars_bolt_and_seal(monkeypatch):
     dungeon = build_dungeon_sight_sanctum(0)
     room = dungeon.rooms[0]
-    _drive(dungeon, _canon_keys()[:-2] + _K('l'), monkeypatch, finish=':q!\r')
+    _drive(dungeon, _canon_keys(room)[:-2] + _K('l'), monkeypatch, finish=':q!\r')
     assert room.cells[_bolt(3)[0]][_bolt(3)[1]] == CellType.FLOOR
     assert room.cells[_SS_EXIT[0]][_SS_EXIT[1]] == CellType.FLOOR, "the seal parted"
 
@@ -254,7 +300,7 @@ def test_undo_rebars_bolt_and_seal(monkeypatch):
     room = dungeon.rooms[0]
     # uu: the walk pushes its own snapshot; the second u reaches the Seal's d —
     # one u refunds the WHOLE selection (anchor + spent ride the snapshot)
-    _drive(dungeon, _canon_keys()[:-2] + _K('luu'), monkeypatch, finish=':q!\r')
+    _drive(dungeon, _canon_keys(room)[:-2] + _K('luu'), monkeypatch, finish=':q!\r')
     assert room.cells[_bolt(3)[0]][_bolt(3)[1]] == CellType.WALL, "re-bars"
     assert room.cells[_SS_EXIT[0]][_SS_EXIT[1]] == CellType.WALL, "re-seals"
 
@@ -294,7 +340,8 @@ def test_visual_case_toggle_spares_the_guard_words(monkeypatch):
     keep their case, and the bolt opens."""
     dungeon = build_dungeon_sight_sanctum(0)
     room = dungeon.rooms[0]
-    _drive(dungeon, _K('jelv2jtsd') + _K('4jv2jtgc') + _K('s') + [ESC]
+    a, b, _x = _letters(room)
+    _drive(dungeon, _K(f'jelv2jt{a}d') + _K(f'4jv2jt{b}c') + _K('s') + [ESC]
            + _K('4jvje~'), monkeypatch, finish=':q!\r')
     assert room.cells[_bolt(2)[0]][_bolt(2)[1]] == CellType.FLOOR
 
@@ -302,9 +349,11 @@ def test_visual_case_toggle_spares_the_guard_words(monkeypatch):
 def test_spine_detour_nav_costs_more_than_par(monkeypatch):
     """The nav-golf audit: routing bay-to-bay via the spine (0 + {n}j + e l)
     instead of the light shaft loses to the tape — par IS the cheapest nav."""
-    spine_variant = (_K('jelv2jtsd') + _K('04jel') + _K('v2jtgc') + _K('s')
+    room = _room(0)
+    a, b, x = _letters(room)
+    spine_variant = (_K(f'jelv2jt{a}d') + _K('04jel') + _K(f'v2jt{b}c') + _K('s')
                      + [ESC] + _K('04jww') + _K('vje~') + _K('03jel')
-                     + _K('v') + _K('/q\r') + _K('hd') + _K('G$'))
+                     + _K('v') + _K(f'/{x}\r') + _K('hd') + _K('G$'))
     won, spent = _drive_spent(spine_variant, monkeypatch)
     assert won and spent > _SS_PAR, (won, spent)
 
