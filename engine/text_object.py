@@ -157,14 +157,35 @@ def _row_blank(room, row) -> bool:
     return not any(room.char_run_at(row, c) is not None for c in range(room.cols))
 
 
-def _resolve_word(room, r, c, around):
+def _resolve_word(room, r, c, around, big=False):
+    """iw/aw (small word: one glyph CLASS — Vim's iskeyword vs punctuation)
+    and iW/aW (big WORD: any contiguous glyphs, whitespace-bounded)."""
+    from engine.motion import _is_word_char
     bounds = _row_bounds(room, r)
     if bounds is None:
         return None
     lo, hi = bounds
+
+    def _cls(col):
+        if not (lo <= col <= hi) or not room.is_passable(r, col):
+            return None
+        rr = room.char_run_at(r, col)
+        if rr is None or rr.kind == 'void':
+            return None
+        if big:
+            return 'G'                              # any glyph: one WORD
+        ch = rr.symbols[col - rr.col]
+        return 'w' if _is_word_char(ch) else 'p'    # Vim's word classes
+
     ru = room.char_run_at(r, c)
     if ru is not None and ru.kind != 'void':
-        ws, we = ru.col, ru.col + len(ru.symbols) - 1
+        k = _cls(c)
+        ws = c
+        while _cls(ws - 1) == k:
+            ws -= 1
+        we = c
+        while _cls(we + 1) == k:
+            we += 1
         if not around:
             return TextObject(r, ws, r, we, TextObjectType.INCLUSIVE)
         t = we + 1                                  # trailing whitespace run
@@ -350,6 +371,8 @@ def resolve_text_object(textobj: str, room, player) -> TextObject | None:
     r, c = player.row, player.col
     if obj == 'w':
         return _resolve_word(room, r, c, around)
+    if obj == 'W':
+        return _resolve_word(room, r, c, around, big=True)
     if obj in _PAIRS:
         return _resolve_pair(room, r, c, around, *_PAIRS[obj])
     if obj in ('"', "'", '`'):

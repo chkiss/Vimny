@@ -3468,13 +3468,18 @@ def build_dungeon_selection_halls(seed: int) -> Dungeon:
 #   • C3 the daw SEAM (2 rows, doors = single-gap): `dw` from the start
 #     would tie daw, so the arrival is mid-rot again (hh dw = 4 vs daw 3);
 #     diw leaves the scar and reads false; `.` repeats the daw on row two.
+#   • C4 the diW TOKEN (2 rows) · C5 the daW TOKEN (2 rows): MIXED stones
+#     (`rotA-rotB` — one WORD, three w-words). The CLASS lesson: diw/dw/de
+#     kill a subword and read false; the honest rival is the WORD family
+#     (dE/dW from the token START), which TIES ±1 — documented, the g~
+#     precedent. Scar doors for diW, seam doors for daW.
 #
 # THE DOT GAP (first level priced after the dot-insert replay, 2026-07-13):
 # a text object is ONE change, so it dot-chains down a column; the piecewise
 # fixes need re-positioning every row that dot can't provide. Rivals are
 # driven WITH their own best dot usage and win at 1★ inside the standard 1.4
 # budget. Vocabulary is drawn per seed with FIXED slot lengths.
-_WE_ROWS, _WE_COLS = 15, 40
+_WE_ROWS, _WE_COLS = 21, 40
 _WE_SPINE  = 17                     # every row's first standable
 _WE_BAY_W  = 18                     # bay floor cols 18..38; east wall 39
 _WE_BAY_E  = 38
@@ -3484,18 +3489,24 @@ _WE_SHAFT  = 26                     # the landing column: inside every rot it ho
 _WE_C1_ROWS = (3, 4, 5)
 _WE_C2_ROWS = (7, 8)
 _WE_C3_ROWS = (10, 11)
-_WE_SHAFT_SEPS = (6, 9)
-_WE_THROAT = 12
-_WE_GATE   = 13
-_WE_BOLT0  = 18                     # bolts cols 18..20, one per chamber
-_WE_EXIT   = (13, 21)               # the FINAL SEAL
+_WE_C4_ROWS = (13, 14)              # diW — mixed tokens
+_WE_C5_ROWS = (16, 17)              # daW
+_WE_SHAFT_SEPS = ((6, 26), (9, 26), (12, 24), (15, 24))   # (row, col)
+_WE_THROAT = 18
+_WE_GATE   = 19
+_WE_BOLT0  = 18                     # bolts cols 18..22, one per chamber
+_WE_EXIT   = (19, 23)               # the FINAL SEAL
 # (row, w1 len, rot len, rot start): rot start = TEXT0 + w1len + 1; staggered
 # so the diw chain lands inside the next rot, and the C2/C3 hop from the
 # shaft column arrives at rot start + 2 (ce/dw must pay the h's back).
 _WE_C1_SHAPE = ((3, 7, 5, 27), (4, 6, 4, 26), (5, 6, 3, 26))
 _WE_C2_SHAPE = ((7, 4, 4, 24), (8, 4, 4, 24))
-_WE_C3_SHAPE = ((10, 4, 4, 24), (11, 3, 4, 23))
-_WE_PAR = 34            # hand-tallied along the driven tape (buffer mutates)
+_WE_C3_SHAPE = ((10, 4, 4, 24), (11, 4, 4, 24))
+# mixed-token chambers: (row, w1 len, token len, token start) — the token is
+# rotA-rotB (two len-4 words hyphenated: ONE WORD, three w-words)
+_WE_C4_SHAPE = ((13, 3, 9, 23), (14, 3, 9, 23))
+_WE_C5_SHAPE = ((16, 3, 9, 23), (17, 3, 9, 23))
+_WE_PAR = 49            # hand-tallied along the driven tape (buffer mutates)
 
 
 def _we_draw_words(rng) -> dict:
@@ -3518,9 +3529,12 @@ def _we_draw_words(rng) -> dict:
             return w
 
         rows = [(draw(w1l), draw(rotl), draw(5)) for _r, w1l, rotl, _rs in shapes]
+        # mixed tokens for C4/C5: rotA-rotB (token len 9 = 4+1+4)
+        mixed = [(draw(w1l), f'{draw(4)}-{draw(4)}', draw(5))
+                 for _r, w1l, _tl, _ts in (_WE_C4_SHAPE + _WE_C5_SHAPE)]
         cures = [draw(3), draw(3)]
         if len(set(picks)) == len(picks):
-            return {'rows': rows, 'cures': cures}
+            return {'rows': rows, 'mixed': mixed, 'cures': cures}
     raise ValueError('word_enclosure: no distinct draw after 80 tries')
 
 
@@ -3540,11 +3554,18 @@ def build_dungeon_word_enclosure(seed: int) -> Dungeon:
         w2_s = rot_s + rotl + 1
         runs += [(r, _WE_TEXT0, w1), (r, rot_s, rot), (r, w2_s, w2)]
         targets[r] = (w1, w2)
+    for (r, _w1l, tokl, tok_s), (w1, tok, w2) in zip(
+            _WE_C4_SHAPE + _WE_C5_SHAPE, words['mixed']):
+        runs += [(r, _WE_TEXT0, w1), (r, tok_s, tok), (r, tok_s + tokl + 1, w2)]
+        targets[r] = (w1, w2)
     c1 = tuple(f'{targets[r][0]}  {targets[r][1]}' for r in _WE_C1_ROWS)  # the scar
     c2 = tuple(f'{targets[r][0]} {c} {targets[r][1]}'
                for r, c in zip(_WE_C2_ROWS, words['cures']))
     c3 = tuple(f'{targets[r][0]} {targets[r][1]}' for r in _WE_C3_ROWS)  # the seam
-    chambers = ((_WE_C1_ROWS, c1), (_WE_C2_ROWS, c2), (_WE_C3_ROWS, c3))
+    c4 = tuple(f'{targets[r][0]}  {targets[r][1]}' for r in _WE_C4_ROWS)  # scar
+    c5 = tuple(f'{targets[r][0]} {targets[r][1]}' for r in _WE_C5_ROWS)   # seam
+    chambers = ((_WE_C1_ROWS, c1), (_WE_C2_ROWS, c2), (_WE_C3_ROWS, c3),
+                (_WE_C4_ROWS, c4), (_WE_C5_ROWS, c5))
 
     R, C = _WE_ROWS, _WE_COLS
     cells = [[CellType.WALL] * C for _ in range(R)]
@@ -3554,8 +3575,8 @@ def build_dungeon_word_enclosure(seed: int) -> Dungeon:
         for r in rows:
             for c in range(_WE_BAY_W, _WE_BAY_E + 1):
                 cells[r][c] = CellType.FLOOR
-    for r in _WE_SHAFT_SEPS:                             # the light shaft —
-        cells[r][_WE_SHAFT] = CellType.FLOOR             # NOT the throat row
+    for r, c in _WE_SHAFT_SEPS:                          # the light shafts —
+        cells[r][c] = CellType.FLOOR                     # NOT the throat row
 
     room = Room(room_type=RoomType.ENTRY, rows=R, cols=C)
     room.cells = cells
@@ -3585,7 +3606,7 @@ def build_dungeon_word_enclosure(seed: int) -> Dungeon:
     room.budget = math.ceil(_WE_PAR * 1.4)   # STANDARD: the piecewise route wins at 1★
     ca, cb = words['cures']
     room.answer = (f'j w w diw j . j . 2j ciw {ca} j ciw {cb} '
-                   f'2j daw j . G $')
+                   f'2j daw j . 2j diW j . l 2j daW j . G $')
 
     dungeon = Dungeon(name='The Word Enclosure', seed=seed)
     dungeon.rooms        = [room]

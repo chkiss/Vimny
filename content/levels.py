@@ -91,7 +91,7 @@ LEVELS = [
     # selection) is taught HERE, not at the Grandmaster's drop.
     {'display': '30',   'slug': 'sight_sanctum',         'name': 'The Sight Sanctum',          'commands': 'v {m} d/c/~', 'teaches': ['visual', 'visual_op']},
     {'display': '31',   'slug': 'selection_halls',       'name': 'The Selection Halls',        'commands': 'V  <C-v>', 'teaches': ['visual_line', 'visual_block']},
-    {'display': '32',   'slug': 'word_enclosure',        'name': 'The Word Enclosure',         'commands': 'iw aw', 'teaches': ['iw', 'aw']},
+    {'display': '32',   'slug': 'word_enclosure',        'name': 'The Word Enclosure',         'commands': 'iw aw iW aW', 'teaches': ['iw', 'aw', 'iW', 'aW']},
     {'display': '33',   'slug': 'bracket_enclosure',     'name': 'The Bracket Enclosure',      'commands': 'i( a(', 'teaches': ['i(', 'a(']},
     {'display': '34',   'slug': 'brace_square_enclosure', 'name': 'The Brace & Square Enclosure', 'commands': 'i[ a[ i{ a{', 'teaches': ['i[', 'a[', 'i{', 'a{']},
     {'display': '35',   'slug': 'quote_enclosure',       'name': 'The Quote Enclosure',        'commands': 'i" a" i\' a\'', 'teaches': ['i"', 'a"', "i'", "a'"]},

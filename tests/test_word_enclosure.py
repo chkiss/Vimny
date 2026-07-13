@@ -29,10 +29,11 @@ from engine.world import CellType
 from content.levels import known_commands
 from generation.dungeon_gen import (
     build_dungeon_word_enclosure,
-    _WE_ROWS, _WE_COLS, _WE_SPINE, _WE_SHAFT, _WE_SHAFT_SEPS, _WE_THROAT,
+    _WE_ROWS, _WE_COLS, _WE_SPINE, _WE_SHAFT_SEPS, _WE_THROAT,
     _WE_GATE, _WE_BOLT0, _WE_EXIT, _WE_PAR,
-    _WE_C1_ROWS, _WE_C2_ROWS, _WE_C3_ROWS,
-    _WE_C1_SHAPE, _WE_C2_SHAPE, _WE_C3_SHAPE, _WE_TEXT0,
+    _WE_C1_ROWS, _WE_C2_ROWS, _WE_C3_ROWS, _WE_C4_ROWS, _WE_C5_ROWS,
+    _WE_C1_SHAPE, _WE_C2_SHAPE, _WE_C3_SHAPE, _WE_C4_SHAPE, _WE_C5_SHAPE,
+    _WE_TEXT0,
 )
 from tests import SEEDS, cached_room
 
@@ -57,7 +58,8 @@ def _bolt(i):
 def _canon_keys(room):
     ca, cb = room._we_words['cures']
     return (_K('jwwdiwj.j.') + _K('2jciw') + _K(ca) + [ESC]
-            + _K('jciw') + _K(cb) + [ESC] + _K('2jdawj.') + _K('G$'))
+            + _K('jciw') + _K(cb) + [ESC] + _K('2jdawj.')
+            + _K('2jdiWj.') + _K('l2jdaWj.') + _K('G$'))
 
 
 # The leanest old-only rival (WITH its own best dot usage): de needs each
@@ -66,7 +68,8 @@ def _canon_keys(room):
 def _piecewise_rival_keys(room):
     ca, cb = room._we_words['cures']
     return (_K('jwwdejh.j.') + _K('2jhhce') + _K(ca) + [ESC]
-            + _K('jhhce') + _K(cb) + [ESC] + _K('2jhhdwjh.') + _K('G$'))
+            + _K('jhhce') + _K(cb) + [ESC] + _K('2jhhdwj.')
+            + _K('2jhdEj.') + _K('l2jhdWj.') + _K('G$'))
 
 
 def _drive(dungeon, keys, monkeypatch, finish=':wq\r', name='Scribe'):
@@ -126,13 +129,13 @@ def test_par_answer_budget(seed):
     assert room.budget == math.ceil(_WE_PAR * 1.4)
     ca, cb = room._we_words['cures']
     assert room.answer == (f'j w w diw j . j . 2j ciw {ca} j ciw {cb} '
-                           f'2j daw j . G $')
+                           f'2j daw j . 2j diW j . l 2j daW j . G $')
 
 
 @pytest.mark.parametrize("seed", SEEDS)
 def test_exit_and_bolts_start_sealed(seed):
     room = _room(seed)
-    for i in range(3):
+    for i in range(5):
         assert room.cells[_bolt(i)[0]][_bolt(i)[1]] == CellType.WALL
     assert room.cells[_WE_EXIT[0]][_WE_EXIT[1]] == CellType.WALL
 
@@ -149,9 +152,9 @@ def test_spine_is_every_rows_first_standable(seed):
 @pytest.mark.parametrize("seed", SEEDS)
 def test_light_shaft_pierces_separators_but_not_the_throat(seed):
     room = _room(seed)
-    for r in _WE_SHAFT_SEPS:
-        assert room.cells[r][_WE_SHAFT] == CellType.FLOOR
-    assert room.cells[_WE_THROAT][_WE_SHAFT] == CellType.WALL
+    for r, c in _WE_SHAFT_SEPS:
+        assert room.cells[r][c] == CellType.FLOOR
+        assert room.cells[_WE_THROAT][c] == CellType.WALL
 
 
 @pytest.mark.parametrize("seed", SEEDS)
@@ -167,18 +170,26 @@ def test_word_draw_shapes_and_landings(seed):
     # C1 chain: each after-diw cursor (rot start) is inside the NEXT rot
     for (ra, _l1, _rl, sa), (rb, _l2, rlb, sb) in zip(_WE_C1_SHAPE, _WE_C1_SHAPE[1:]):
         assert sb <= sa < sb + rlb, "the stagger keeps the dot chain alive"
-    # the shaft lands two inside the C2/C3 rots (ce/dw pay the h's back)
+    # the shafts land inside the C2/C3 rots (ce/dw pay the h's back)
+    shaft = dict(_WE_SHAFT_SEPS)
     for r, _w1l, rotl, rot_s in (_WE_C2_SHAPE + _WE_C3_SHAPE[:1]):
-        assert rot_s < _WE_SHAFT < rot_s + rotl
-    picks = [w for triple in words['rows'] for w in triple] + words['cures']
+        assert rot_s < shaft[6] < rot_s + rotl
+    # the mixed tokens: two len-4 words hyphenated (one WORD, three w-words)
+    for (_r, _w1l, tokl, _ts), (w1, tok, w2) in zip(
+            _WE_C4_SHAPE + _WE_C5_SHAPE, words['mixed']):
+        assert len(tok) == tokl == 9 and tok[4] == '-'
+        assert (len(w1), len(w2)) == (3, 5)
+    picks = ([w for triple in words['rows'] for w in triple]
+             + [w for triple in words['mixed'] for w in triple]
+             + words['cures'])
     assert len(set(picks)) == len(picks)
 
 
 def test_curriculum_and_gating():
     known = known_commands('word_enclosure')
-    assert 'iw' in known and 'aw' in known
+    assert all(t in known for t in ('iw', 'aw', 'iW', 'aW'))
     prev = known_commands('selection_halls')
-    assert 'iw' not in prev and 'aw' not in prev
+    assert all(t not in prev for t in ('iw', 'aw', 'iW', 'aW'))
 
 
 # ── the forcing law, driven ──────────────────────────────────────────────────
@@ -189,7 +200,7 @@ def test_full_enclosure_route_wins_par_perfect(seed, monkeypatch):
     room = dungeon.rooms[0]
     result = _drive(dungeon, _canon_keys(room), monkeypatch)
     assert result['won'] and result['stars'] == 2, result
-    for i in range(3):
+    for i in range(5):
         assert room.cells[_bolt(i)[0]][_bolt(i)[1]] == CellType.FLOOR
 
 
@@ -271,6 +282,32 @@ def test_diw_on_the_seam_rows_reads_false(monkeypatch):
     assert room.cells[_bolt(2)[0]][_bolt(2)[1]] == CellType.WALL
 
 
+def test_diw_on_a_mixed_token_kills_a_subword_and_reads_false(monkeypatch):
+    """The CLASS lesson: iw stops at the hyphen — half the token remains and
+    the scar door stays barred; only iW takes the whole WORD."""
+    dungeon = build_dungeon_word_enclosure(0)
+    room = dungeon.rooms[0]
+    ca, cb = room._we_words['cures']
+    upto_c4 = (_K('jwwdiwj.j.') + _K('2jciw') + _K(ca) + [ESC]
+               + _K('jciw') + _K(cb) + [ESC] + _K('2jdawj.') + _K('2j'))
+    _drive(dungeon, upto_c4 + _K('diw'), monkeypatch, finish=':q!\r')
+    w1, tok, w2 = room._we_words['mixed'][0]
+    assert '-' in _row_text(room, _WE_C4_ROWS[0]), "the hyphen half remains"
+    assert room.cells[_bolt(3)[0]][_bolt(3)[1]] == CellType.WALL
+
+
+def test_dW_heals_the_seam_and_is_dead_for_the_token_scar(monkeypatch):
+    """dW eats the trailing gap — single gap where the C4 door wants the
+    double-gap scar (the reason the WORD-family rival must use dE)."""
+    dungeon = build_dungeon_word_enclosure(0)
+    room = dungeon.rooms[0]
+    ca, cb = room._we_words['cures']
+    upto_c4 = (_K('jwwdiwj.j.') + _K('2jciw') + _K(ca) + [ESC]
+               + _K('jciw') + _K(cb) + [ESC] + _K('2jdawj.') + _K('2j'))
+    _drive(dungeon, upto_c4 + _K('hdW'), monkeypatch, finish=':q!\r')
+    assert room.cells[_bolt(3)[0]][_bolt(3)[1]] == CellType.WALL
+
+
 def test_undo_rebars_bolt_and_seal(monkeypatch):
     dungeon = build_dungeon_word_enclosure(0)
     room = dungeon.rooms[0]
@@ -281,7 +318,7 @@ def test_undo_rebars_bolt_and_seal(monkeypatch):
     room = dungeon.rooms[0]
     # uu: the walk pushes a snapshot; the second u reaches the dotted daw
     _drive(dungeon, _canon_keys(room)[:-2] + _K('luu'), monkeypatch, finish=':q!\r')
-    assert room.cells[_bolt(2)[0]][_bolt(2)[1]] == CellType.WALL, "re-bars"
+    assert room.cells[_bolt(4)[0]][_bolt(4)[1]] == CellType.WALL, "re-bars"
     assert room.cells[_WE_EXIT[0]][_WE_EXIT[1]] == CellType.WALL, "re-seals"
 
 

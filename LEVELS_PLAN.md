@@ -82,7 +82,7 @@ Curriculum order is the order of `LEVELS`. Blueprints: `blueprints/act_*.md`.
 | 29.1 | `warden_scrivener` | The Warden Scrivener | — | boss |
 | 30 | `sight_sanctum` | The Sight Sanctum | `v {m} d/c/~` |  |
 | 31 | `selection_halls` | The Selection Halls | `V  <C-v>` |  |
-| 32 | `word_enclosure` | The Word Enclosure | `iw aw` |  |
+| 32 | `word_enclosure` | The Word Enclosure | `iw aw iW aW` |  |
 | 33 | `bracket_enclosure` | The Bracket Enclosure | `i( a(` |  |
 | 34 | `brace_square_enclosure` | The Brace & Square Enclosure | `i[ a[ i{ a{` |  |
 | 35 | `quote_enclosure` | The Quote Enclosure | `i" a" i' a'` |  |

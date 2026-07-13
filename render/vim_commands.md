@@ -266,10 +266,12 @@
 
 ## word_enclosure — word text objects
 
-| keys | token | desc       |
-|------|-------|------------|
-| iw   |       | inner word |
-| aw   |       | a word     |
+| keys | token | desc         |
+|------|-------|--------------|
+| iw   |       | inner word   |
+| aw   |       | a word       |
+| iW   |       | inner WORD   |
+| aW   |       | a WORD       |
 
 ## bracket_enclosure — paren text objects
 

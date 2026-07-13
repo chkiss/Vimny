@@ -103,8 +103,8 @@ The curriculum is defined in `content/levels.py` (canonical) and mirrored in `LE
 | 29 | The Indentation Sanctum | `>{m} <{m} =` | Playable |
 | 29.1 | The Warden Scrivener | (boss) | Playable |
 | 30 | The Sight Sanctum | `v {m} d/c/~` | Playable |
-| 31 | The Selection Halls | `V  <C-v>` | Planned |
-| 32 | The Word Enclosure | `iw aw` | Planned |
+| 31 | The Selection Halls | `V  <C-v>` | Playable |
+| 32 | The Word Enclosure | `iw aw iW aW` | Playable |
 | 33 | The Bracket Enclosure | `i( a(` | Planned |
 | 34 | The Brace & Square Enclosure | `i[ a[ i{ a{` | Planned |
 | 35 | The Quote Enclosure | `i" a" i' a'` | Planned |
@@ -167,6 +167,8 @@ The full command reference (also the hint-bar source) is `render/vim_commands.md
 | `(` | prev sentence |
 | `v` | visual mode |
 | `v{m}d/c/~` | act on the selection |
+| `V` | select whole lines |
+| `<C-v>` | select a block |
 | `/{pat}` | search |
 | `?{pat}` | search back |
 | `n` | next match |
