@@ -3051,28 +3051,28 @@ def build_dungeon_word_forge(seed: int) -> Dungeon:
 
 # ── The Sight Sanctum (v + operators on the selection) ─────────────────────────
 # "First behold, then strike." The Act VI opener: SELECT FIRST, ACT SECOND,
-# performed with the operator classes mastered across Acts IV–V. Four chapels
+# performed with the operator classes mastered across Acts IV–V. Four chambers
 # on the hardened Annex chassis (west spine, exact-text doors, gate-row bolts,
 # FINAL SEAL exit); each door opens while its plaque's words read true — EXACT
 # whole-row text, so the kept words must SURVIVE the strike (a linewise dd/dj
 # that eats a kept word is a dead route, the anti-cheese that prices the
-# chapels).
+# chambers).
 #
 # The honest wins of charwise v (everything else ties operator+motion by ±1):
 #   • the ragged charwise MULTI-ROW span — normal mode has NO charwise
 #     multi-row operator, so v{span}d / v{span}c do in ONE op what costs
-#     D + j + dd + ^ + dt{ch} piecewise (the Cut and Word chapels);
+#     D + j + dd + ^ + dt{ch} piecewise (the Cut and Word chambers);
 #   • the SEARCH-EXTENDED selection — /{pat} from visual is a motion that
 #     grows the live selection across rows; no operator takes a search
-#     (the Seal chapel: v /q⏎ h d beats the eye-led v 2j tq d by one).
-# The Case chapel is a SHOWCASE, not price-forced: v j ~ (3) TIES g~j (3) —
+#     (the Seal chamber: v /q⏎ h d beats the eye-led v 2j tq d by one).
+# The Case chamber is a SHOWCASE, not price-forced: v j ~ (3) TIES g~j (3) —
 # ~ can never be price-forced against g~ (the Case Chambers law), but the
 # one-key ~ on a live selection is the taught idiom.
 #
 # FORCING BY PAR (standard 1.4 budget): the piecewise old route (D/dd/dt/cc)
-# solves every chapel and WINS — at 1★, ~8 keys over par. Decoy initials
+# solves every chamber and WINS — at 1★, ~8 keys over par. Decoy initials
 # seeded in the blight ('s' for sill, 'g' for gate) price out lazy one-char
-# searches in the vj-chapels (each decoy costs an n), while the Seal's 'q' is
+# searches in the vj-chambers (each decoy costs an n), while the Seal's 'q' is
 # PRISTINE level-wide — the one named thing, so the search lesson lands.
 # Blight rows that must survive in part carry their kept word at the row EDGE
 # (head at line start, tail at line end) — middle rows of a charwise
@@ -3083,32 +3083,43 @@ _SS_BAY_W  = 11                     # bay floor cols 11..25; east wall 26
 _SS_BAY_E  = 25
 _SS_PLQ_COL = 2                     # true words, carved in the WEST wall band
 _SS_CHEST  = (2, 9)                 # nook west of the spawn: the Warden's Sight
+_SS_SHAFT  = 16                     # the sight-line: a one-cell light shaft
+                                    # through each bay separator at the anchor
+                                    # column, so the plain j-hop (4j/3j) rides
+                                    # straight from strike to next anchor (the
+                                    # spine stays every row's first standable)
 _SS_THROAT = 17                     # spine-only row joins the bays to the gate
 _SS_GATE   = 18
-_SS_BOLT0  = 11                     # bolts cols 11..14, one per chapel
+_SS_BOLT0  = 11                     # bolts cols 11..14, one per chamber
 _SS_EXIT   = (18, 15)               # the FINAL SEAL — stone until all read true
 
 # (bay rows, floor runs [(row, col, text, kind)], door targets). Blight is '#'
 # ('ancient'); kept words 'ancient' too — the plaques ('verdant') repeat the
 # true words in the wall. The 's'/'g' decoys live only on rows the t-motion
 # never scans (t is row-local; / is buffer-wide and pays an n per decoy).
-_SS_CHAPELS = (
+_SS_CHAMBERS = (
     # Cut (v 2j ts d): head 'veil' row-start, tail 'sill' row-end, full middle
     ('cut',  (3, 4, 5),
      ((3, 12, 'veil'), (3, 16, '##s###s###'),
       (4, 12, '#####s###s####'),
       (5, 12, '#########'), (5, 21, 'sill')),
      ('veil', 'sill')),
-    # Word (v 2j tg c sigil): all-blight head row — the cure is TYPED
+    # Word (v 2j tg c s): kept head 'ward', the cure is TYPED — 'wards'.
+    # The head aligns the anchor at col 16, so the 4j hop from the Cut
+    # chamber lands ON it (and the post-Esc cursor lands on the Case anchor)
     ('word', (7, 8, 9),
-     ((7, 12, '###g####g#####'),
+     ((7, 12, 'ward'), (7, 16, '##g#####g#'),
       (8, 12, '######g#######'),
       (9, 12, '#########'), (9, 21, 'gate')),
-     ('sigil', 'gate')),
-    # Case (v j ~): two full-flip rows, one selection — the showcase tie
+     ('wards', 'gate')),
+    # Case (v j e ~): two flipped words with GUARD words outside the span —
+    # 'dim' west of the anchor (top row toggles anchor→line end), 'ash' east
+    # of the cursor (bottom row toggles line start→cursor). The linewise g~j
+    # flips the guards too and reads false: per-row charwise ~ is forced.
     ('case', (11, 12),
-     ((11, 12, 'PSALM'), (12, 12, 'GROTTO')),
-     ('psalm', 'grotto')),
+     ((11, 12, 'dim'), (11, 16, 'PSALM'),
+      (12, 12, 'GROTTO'), (12, 19, 'ash')),
+     ('dim psalm', 'grotto ash')),
     # Seal (v /q⏎ h d): 'q' is unique in the level — name what you see
     ('seal', (14, 15, 16),
      ((14, 12, 'amen'), (14, 16, '##########'),
@@ -3116,60 +3127,60 @@ _SS_CHAPELS = (
       (16, 12, '#########'), (16, 21, 'quill')),
      ('amen', 'quill')),
 )
-# Plaque rows: each chapel's true words beside the rows they must appear on.
-_SS_PLAQUES = ((3, 'veil'), (5, 'sill'), (7, 'sigil'), (9, 'gate'),
+# Plaque rows: each chamber's true words beside the rows they must appear on.
+_SS_PLAQUES = ((3, 'veil'), (5, 'sill'), (7, 'wards'), (9, 'gate'),
                (11, 'psalm'), (12, 'grotto'), (14, 'amen'), (16, 'quill'))
 
 # The canonical tape, driven end-to-end (hand-measured — the buffer mutates,
-# so no Dijkstra):
-#   j wel  v 2j ts d  0        — Cut:   11
-#   4j w   v 2j tg c sigil 0   — Word:  15
-#   4j     v j ~                — Case:   5
-#   3j el  v /q⏎ h d            — Seal:   9
-#   G $                         — exit:   2
-_SS_PAR    = 42
-_SS_ANSWER = 'j w e l v 2j ts d 0 4j w v 2j tg c sigil 0 4j v j ~ 3j e l v /q⏎ h d G $'
+# so no Dijkstra). The chambers are ANCHOR-ALIGNED at col 16: each op leaves
+# the cursor where the next bay's plain j-hop lands on the next anchor, so no
+# {n}G / } / H-M-L golf can undercut the tape (the nav-golf audit, driven):
+#   j e l   v 2j ts d    — Cut:   9   (cursor → the anchor, col 16)
+#   4j      v 2j tg c s  — Word:  9   (post-Esc cursor → col 16)
+#   4j      v j e ~      — Case:  6   (cursor → selection start, col 16)
+#   3j      v /q⏎ h d    — Seal:  7
+#   G $                  — exit:  2
+_SS_PAR    = 33
+_SS_ANSWER = 'j e l v 2j ts d 4j v 2j tg c s 4j v j e ~ 3j v /q⏎ h d G $'
 
 
 def build_dungeon_sight_sanctum(seed: int) -> Dungeon:
     """The Sight Sanctum (slug `sight_sanctum`): v + d/c/~ on the selection.
 
-    Four chapels on the hardened Annex chassis — select first, act second.
-    The Cut and Word chapels force the charwise multi-row span (no normal-
-    mode equivalent); the Case chapel showcases the one-key ~ on a selection;
-    the Seal chapel forces the search-extended selection on the level's one
+    Four chambers on the hardened Annex chassis — select first, act second.
+    The Cut and Word chambers force the charwise multi-row span (no normal-
+    mode equivalent); the Case chamber showcases the one-key ~ on a selection;
+    the Seal chamber forces the search-extended selection on the level's one
     pristine letter. See the section header for the full forcing."""
     R, C = _SS_ROWS, _SS_COLS
     cells = [[CellType.WALL] * C for _ in range(R)]
     for r in range(2, _SS_GATE + 1):                     # the spine
         cells[r][_SS_SPINE] = CellType.FLOOR
-    for _name, rows, _runs, _targets in _SS_CHAPELS:     # the bays
+    for _name, rows, _runs, _targets in _SS_CHAMBERS:     # the bays
         for r in rows:
             for c in range(_SS_BAY_W, _SS_BAY_E + 1):
                 cells[r][c] = CellType.FLOOR
     cells[_SS_CHEST[0]][_SS_CHEST[1]] = CellType.FLOOR   # the scroll nook
+    for r in (6, 10, 13):                                # the light shaft —
+        cells[r][_SS_SHAFT] = CellType.FLOOR             # NOT the throat row:
+    # the gate row is still reachable only along the spine (teleport audit)
     # gate row: spine only — bolts and the exit STAY WALL (the FINAL SEAL);
-    # the tick floors each bolt as its chapel reads true, the seal last.
+    # the tick floors each bolt as its chamber reads true, the seal last.
 
     room = Room(room_type=RoomType.ENTRY, rows=R, cols=C)
     room.cells = cells
     room.seed  = seed
 
     doors = []
-    for i, (_name, _rows, runs, targets) in enumerate(_SS_CHAPELS):
+    for i, (_name, _rows, runs, targets) in enumerate(_SS_CHAMBERS):
         for rr, cc, text in runs:
             room.char_runs.append(CharRun(rr, cc, tuple(text), 'ancient'))
         doors.append((targets, _SS_BOLT0 + i))
     room._ss_doors = tuple(doors)
     for pr, word in _SS_PLAQUES:                          # true words, in the wall
         room.char_runs.append(CharRun(pr, _SS_PLQ_COL, tuple(word), 'verdant'))
-    # the lintel — the sanctum's presiding lesson, in carved stone (one run
-    # per word: a literal space glyph is a punctuation "word", and it would
-    # render a floor-looking gap in the wall band)
-    room.char_runs.append(CharRun(0, 7,  tuple('first'),  'verdant'))
-    room.char_runs.append(CharRun(0, 13, tuple('behold'), 'verdant'))
-    room.char_runs.append(CharRun(1, 8,  tuple('then'),   'verdant'))
-    room.char_runs.append(CharRun(1, 13, tuple('strike'), 'verdant'))
+    # no lintel: floating carved words over the spawn read as a locked door
+    # (playtest 2026-07-12) — the credo lives in the intro hint instead
 
     room.entities.append(Entity(kind='exit', row=_SS_EXIT[0], col=_SS_EXIT[1],
                                 edit_immune=True))

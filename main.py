@@ -1430,7 +1430,7 @@ def _alignment_halls_tick(room, player) -> list:
 
 def _sight_sanctum_tick(room, player) -> list:
     """The Sight Sanctum bolts — the plaque rule as EXACT whole-row text: a
-    chapel's bolt stands open exactly while EVERY one of its true words reads
+    chamber's bolt stands open exactly while EVERY one of its true words reads
     as the complete (stripped) text of some floor row. Exact matching is what
     prices the level: the kept words must SURVIVE the strike (a linewise cut
     that eats one is a dead route), and a half-cleared row still reads false.
@@ -1449,7 +1449,7 @@ def _sight_sanctum_tick(room, player) -> list:
         is_open = room.cells[gr][dc] != CellType.WALL
         if held(targets) and not is_open:
             room.cells[gr][dc] = CellType.FLOOR
-            msgs.append('The chapel reads true — the bolt grinds back!')
+            msgs.append("The chamber's words read true — the bolt grinds back!")
         elif not held(targets) and is_open and (player.row, player.col) != (gr, dc):
             room.cells[gr][dc] = CellType.WALL     # undone — the bolt re-bars
         all_true = all_true and held(targets)
@@ -1457,7 +1457,7 @@ def _sight_sanctum_tick(room, player) -> list:
     seal_open = room.cells[er][ec] != CellType.WALL
     if all_true and not seal_open:
         room.cells[er][ec] = CellType.FLOOR
-        msgs.append('Every chapel reads true — the final seal parts!')
+        msgs.append('Every chamber reads true — the final seal parts!')
     elif not all_true and seal_open and (player.row, player.col) != (er, ec):
         room.cells[er][ec] = CellType.WALL         # undone — the seal returns
     return msgs
@@ -2216,7 +2216,7 @@ _LEVEL_INTROS = {
     'joiners_gate':        ('The Joiner\'s Gate — the old inscriptions were split, line from line, and scattered down the stacks. What was one line must be one line again; the plaques remember how each read whole.', 70),
     'alignment_halls':     ('The Alignment Halls — a plumb line falls through the hall, and every word has slid from its station. The plaques remember where each belongs.', 70),
     'indentation_sanctum': ('The Indentation Sanctum — the law presides from the lintel, and the verses below have slid from their stations.', 70),
-    'sight_sanctum': ('The Sight Sanctum — the rot here spreads in ragged patches no single stroke can span. The keepers of this place beheld before they struck.', 70),
+    'sight_sanctum': ('The Sight Sanctum — the rot here spreads in ragged patches no single stroke can span. The keepers of this place had one law: first behold, then strike.', 70),
     'warden_scrivener':    ('The Warden Scrivener — he has copied these halls for an age and finished nothing. The great page waits, passage by passage, for a truer hand.', 70),
     'warden_manifold':     ('The Warden Manifold — he stamps himself into the world. Light the four braziers; the gate will draw and the fog will part.', 70),
     'warden_surveyor':     ('The Warden Surveyor — he keeps a long hall where the floor falls away between the words. Cross it word by word, over the void.', 60),
@@ -3925,6 +3925,9 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
                 if op != 'y':                  # visual yank is not a change either
                     player.last_change = {'type': 'visual_op', 'op': op}
                 key_buf = ''
+                if not edit_mode and player.mode == Mode.NORMAL:
+                    _content_ticks()   # the strike opens its gate THIS turn (the
+                    message = _pool_msg() or message   # insert-Esc rule; c ticks on its own Esc)
                 _render(message)
                 continue
             key_buf += raw

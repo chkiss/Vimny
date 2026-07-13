@@ -136,6 +136,20 @@ class TestApplyVisual:
         apply_visual('g~', (3, 2), (3, 4), Mode.VISUAL, room, p)
         assert (_cell(room, 3, 2), _cell(room, 3, 3), _cell(room, 3, 4)) == ('A', 'b', 'C')
 
+    def test_charwise_multirow_case_toggle_per_row_bounds(self):
+        # Vim-true: v-selection ~ toggles ONLY the span — text west of the
+        # anchor (top row) and east of the cursor (bottom row) keeps its case
+        room = _room()
+        room.add_char_run(CharRun(2, 1, ('d', 'i', 'M', 'X'), 'ancient'))  # cols 1-4
+        room.add_char_run(CharRun(3, 1, ('Y', 'y', 'a', 's'), 'ancient'))  # cols 1-4
+        p = Player(row=2, col=3)
+        apply_visual('g~', (2, 3), (3, 2), Mode.VISUAL, room, p)
+        assert (_cell(room, 2, 1), _cell(room, 2, 2)) == ('d', 'i')  # west of anchor kept
+        assert (_cell(room, 2, 3), _cell(room, 2, 4)) == ('m', 'x')  # anchor→line end flipped
+        assert (_cell(room, 3, 1), _cell(room, 3, 2)) == ('y', 'Y')  # line start→cursor flipped
+        assert (_cell(room, 3, 3), _cell(room, 3, 4)) == ('a', 's')  # east of cursor kept
+        assert (p.row, p.col) == (2, 3)                              # cursor → span start
+
     def test_charwise_multirow_delete_partial_rows(self):
         # anchor=(2,3) cursor=(4,5): top row deletes cols 3+, bottom row deletes up to col 5
         room = _room()

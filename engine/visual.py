@@ -128,6 +128,26 @@ def apply_visual(op: str, anchor, cursor, vmode, room, player):
     # Charwise multi-row: use per-row column bounds, not linewise
     if vmode == Mode.VISUAL and ar != cr and op in ('d', 'c', 'y'):
         return _apply_charwise_multi(op, anchor, cursor, room, player)
+    if vmode == Mode.VISUAL and ar != cr and op == 'g~':
+        # Vim-true: v-selection ~ toggles ONLY the selected span — top row
+        # from the anchor column to line end, middle rows whole, bottom row
+        # from line start to the cursor column (never the full lines: text
+        # outside the selection keeps its case).
+        if ar <= cr:
+            r1, c_top, r2, c_bot = ar, ac, cr, cc
+        else:
+            r1, c_top, r2, c_bot = cr, cc, ar, ac
+        for r in range(r1, r2 + 1):
+            ext = line_extent(room, r)
+            if ext is None:
+                continue
+            lo = max(c_top, ext[0]) if r == r1 else ext[0]
+            hi = min(c_bot, ext[1]) if r == r2 else ext[1]
+            if lo <= hi:
+                op_case(room, player, TextObject(r, lo, r, hi,
+                                                 TextObjectType.INCLUSIVE), 'g~')
+        player.row, player.col = r1, c_top
+        return None
 
     tobj = visual_span(anchor, cursor, vmode, room)
     if op == 'y':

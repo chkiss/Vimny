@@ -33,7 +33,7 @@ from engine.search import _match_positions
 from content.levels import known_commands
 from generation.dungeon_gen import (
     build_dungeon_sight_sanctum,
-    _SS_ROWS, _SS_COLS, _SS_SPINE, _SS_BAY_W, _SS_BAY_E, _SS_CHAPELS,
+    _SS_ROWS, _SS_COLS, _SS_SPINE, _SS_BAY_W, _SS_BAY_E, _SS_CHAMBERS,
     _SS_PLAQUES, _SS_CHEST, _SS_GATE, _SS_BOLT0, _SS_EXIT, _SS_PAR, _SS_ANSWER,
 )
 from tests import SEEDS, cached_room
@@ -54,19 +54,20 @@ def _bolt(i):
 
 
 # The canonical tape (== room.answer with Esc placed): select first, act
-# second — v 2j ts d (Cut), v 2j tg c sigil (Word), v j ~ (Case),
-# v /q⏎ h d (Seal). 42 keys.
+# second — anchor-aligned down the light shaft, so every hop is a plain
+# {n}j. 33 keys.
 def _canon_keys():
-    return (_K('jwelv2jtsd0') + _K('4jwv2jtgc') + _K('sigil') + [ESC] + _K('0')
-            + _K('4jvj~') + _K('3jelv') + _K('/q\r') + _K('hd') + _K('G$'))
+    return (_K('jelv2jtsd') + _K('4jv2jtgc') + _K('s') + [ESC]
+            + _K('4jvje~') + _K('3jv') + _K('/q\r') + _K('hd') + _K('G$'))
 
 
-# The piecewise no-visual rival: D / dd / ^dt{ch} / cc per chapel, g~j for the
-# Case rows. Wins — inside the standard budget — but over par: 1 star.
+# The leanest old-only rival (cheese-audited): middle blight rows are never
+# cleared — doors check only the target rows — so no dd at all: D for heads,
+# ^dt{ch} for tails, i+s for the typed cure, count-~ for the case words.
+# Wins — inside the standard budget — but over par: 1 star.
 def _piecewise_rival_keys():
-    return (_K('jwelDjdd^dts0') + _K('2jw') + _K('cc') + _K('sigil') + [ESC]
-            + _K('jdd^dtg0') + _K('2j') + _K('g~j') + _K('3jelDjdd^dtq')
-            + _K('G$'))
+    return (_K('jelD2j^dts') + _K('el2jD') + _K('is') + [ESC]
+            + _K('2j^dtg') + _K('el2j5~j^6~') + _K('hh2jD2j^dtq') + _K('G$'))
 
 
 def _drive(dungeon, keys, monkeypatch, finish=':wq\r', name='Scribe'):
@@ -120,7 +121,7 @@ def test_par_answer_budget(seed):
 def test_exit_and_bolts_start_sealed(seed):
     """The FINAL SEAL law: bolts and exit are STONE until their text holds."""
     room = _room(seed)
-    for i in range(len(_SS_CHAPELS)):
+    for i in range(len(_SS_CHAMBERS)):
         assert room.cells[_bolt(i)[0]][_bolt(i)[1]] == CellType.WALL
     assert room.cells[_SS_EXIT[0]][_SS_EXIT[1]] == CellType.WALL
 
@@ -136,6 +137,27 @@ def test_spine_is_every_rows_first_standable(seed):
             continue
         expect = _SS_CHEST[1] if r == _SS_CHEST[0] else _SS_SPINE
         assert cols[0] == expect, f"row {r} first standable {cols[0]}"
+
+
+@pytest.mark.parametrize("seed", SEEDS)
+def test_light_shaft_pierces_separators_but_not_the_throat(seed):
+    """The sight-line: one floor cell at the anchor column through each bay
+    separator (the {n}j hops ride it) — but the throat row stays spine-only,
+    so the gate row is reachable only along the spine (teleport audit)."""
+    from generation.dungeon_gen import _SS_SHAFT, _SS_THROAT
+    room = _room(seed)
+    for r in (6, 10, 13):
+        assert room.cells[r][_SS_SHAFT] == CellType.FLOOR
+    assert room.cells[_SS_THROAT][_SS_SHAFT] == CellType.WALL
+
+
+def test_bolt_opens_the_instant_the_strike_lands(monkeypatch):
+    """The insert-Esc rule for visual ops: the Cut chamber's d opens its bolt
+    THIS turn — no one-key lag before the banner/bolt."""
+    dungeon = build_dungeon_sight_sanctum(0)
+    room = dungeon.rooms[0]
+    _drive(dungeon, _K('jelv2jtsd'), monkeypatch, finish=':q!\r')
+    assert room.cells[_bolt(0)[0]][_bolt(0)[1]] == CellType.FLOOR
 
 
 @pytest.mark.parametrize("seed", SEEDS)
@@ -191,7 +213,7 @@ def test_full_sight_route_wins_par_perfect(seed, monkeypatch):
     room = dungeon.rooms[0]
     result = _drive(dungeon, _canon_keys(), monkeypatch)
     assert result['won'] and result['stars'] == 2, result
-    for i in range(len(_SS_CHAPELS)):
+    for i in range(len(_SS_CHAMBERS)):
         assert room.cells[_bolt(i)[0]][_bolt(i)[1]] == CellType.FLOOR
 
 
@@ -238,7 +260,7 @@ def test_undo_rebars_bolt_and_seal(monkeypatch):
 
 
 def test_linewise_cut_that_eats_a_kept_word_is_a_dead_route(monkeypatch):
-    """The anti-cheese: dj on the Cut chapel's head row eats 'veil' — the
+    """The anti-cheese: dj on the Cut chamber's head row eats 'veil' — the
     exact-text door must NOT open however much blight also died."""
     dungeon = build_dungeon_sight_sanctum(0)
     room = dungeon.rooms[0]
@@ -248,13 +270,43 @@ def test_linewise_cut_that_eats_a_kept_word_is_a_dead_route(monkeypatch):
     assert room.cells[gr][room.exit_pos[1]] == CellType.WALL
 
 
-def test_half_cleared_chapel_stays_shut(monkeypatch):
+def test_half_cleared_chamber_stays_shut(monkeypatch):
     """Exact-row matching: clearing only the head row ('veil' true, 'sill'
     still buried) leaves the bolt barred."""
     dungeon = build_dungeon_sight_sanctum(0)
     room = dungeon.rooms[0]
-    _drive(dungeon, _K('jwelD'), monkeypatch, finish=':q!\r')
+    _drive(dungeon, _K('jelD'), monkeypatch, finish=':q!\r')
     assert room.cells[_bolt(0)[0]][_bolt(0)[1]] == CellType.WALL
+
+
+def test_linewise_case_toggle_is_a_dead_route(monkeypatch):
+    """The Case chamber's guard words: g~j flips 'dim' and 'ash' too, so the
+    whole-lines toggle reads false — per-row charwise v~ is the only cure."""
+    dungeon = build_dungeon_sight_sanctum(0)
+    room = dungeon.rooms[0]
+    _drive(dungeon, _K('9jg~j'), monkeypatch, finish=':q!\r')
+    assert room.cells[_bolt(2)[0]][_bolt(2)[1]] == CellType.WALL
+
+
+def test_visual_case_toggle_spares_the_guard_words(monkeypatch):
+    """Vim-true multi-row charwise ~: only the selected span flips — 'dim'
+    (west of the anchor, top row) and 'ash' (east of the cursor, bottom row)
+    keep their case, and the bolt opens."""
+    dungeon = build_dungeon_sight_sanctum(0)
+    room = dungeon.rooms[0]
+    _drive(dungeon, _K('jelv2jtsd') + _K('4jv2jtgc') + _K('s') + [ESC]
+           + _K('4jvje~'), monkeypatch, finish=':q!\r')
+    assert room.cells[_bolt(2)[0]][_bolt(2)[1]] == CellType.FLOOR
+
+
+def test_spine_detour_nav_costs_more_than_par(monkeypatch):
+    """The nav-golf audit: routing bay-to-bay via the spine (0 + {n}j + e l)
+    instead of the light shaft loses to the tape — par IS the cheapest nav."""
+    spine_variant = (_K('jelv2jtsd') + _K('04jel') + _K('v2jtgc') + _K('s')
+                     + [ESC] + _K('04jww') + _K('vje~') + _K('03jel')
+                     + _K('v') + _K('/q\r') + _K('hd') + _K('G$'))
+    won, spent = _drive_spent(spine_variant, monkeypatch)
+    assert won and spent > _SS_PAR, (won, spent)
 
 
 def test_no_jump_lands_on_the_sealed_exit(monkeypatch):
