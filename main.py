@@ -2218,6 +2218,7 @@ _LEVEL_INTROS = {
     'indentation_sanctum': ('The Indentation Sanctum — the law presides from the lintel, and the verses below have slid from their stations.', 70),
     'sight_sanctum': ('The Sight Sanctum — the rot here spreads in ragged patches no single stroke can span. The keepers of this place had one law: first behold, then strike.', 70),
     'selection_halls': ('The Selection Halls — a gallery of corrupt panels: some rotted whole lines at a time, some down a single seam. The restorers here took each span in one grasp.', 70),
+    'word_enclosure': ('The Word Enclosure — rot has taken root in the middle of the inscriptions. The wardens here did not aim their cuts; they named the shape, and the shape was taken whole.', 70),
     'warden_scrivener':    ('The Warden Scrivener — he has copied these halls for an age and finished nothing. The great page waits, passage by passage, for a truer hand.', 70),
     'warden_manifold':     ('The Warden Manifold — he stamps himself into the world. Light the four braziers; the gate will draw and the fog will part.', 70),
     'warden_surveyor':     ('The Warden Surveyor — he keeps a long hall where the floor falls away between the words. Cross it word by word, over the void.', 60),
@@ -2919,7 +2920,7 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
         if level == 'indentation_sanctum':
             for _m in _indentation_sanctum_tick(room, player):
                 _push(_m)
-        if level in ('sight_sanctum', 'selection_halls'):
+        if level in ('sight_sanctum', 'selection_halls', 'word_enclosure'):
             for _m in _sight_sanctum_tick(room, player):   # the shared exact-text tick
                 _push(_m)
         if level == 'sculpting_chambers':

@@ -3449,6 +3449,150 @@ def build_dungeon_selection_halls(seed: int) -> Dungeon:
     return dungeon
 
 
+# ── The Word Enclosure (iw aw) ──────────────────────────────────────────────────
+# The first text objects: select by SHAPE, not by landing. Three chambers on
+# the exact-text chassis, discriminated by THE SCAR (probe-verified): deleting
+# a middle word from `w1 rot w2` with diw leaves BOTH separators — `w1  w2`,
+# the double-gap scar — while daw takes the trailing one too: `w1 w2`, the
+# seam healed. The doors read the one-space difference directly.
+#
+#   • C1 the diw DRILL (3 rows, doors = double-gap targets): rot words of
+#     DIFFERENT lengths at STAGGERED starts, so the after-diw cursor (the
+#     deletion start) always lands INSIDE the next row's rot — `diw j . j .`
+#     chains at 1 key/row. The piecewise rival (`de` needs the word START
+#     each row) pays an h per stagger; dw/daw heal the seam and read false.
+#   • C2 the ciw CURE (2 rows, different cures — no dot shortcut): the hop
+#     lands two INSIDE the rot (the previous Esc parks the cursor exactly on
+#     the next anchor), so `ce` pays hh first; `caw` fuses the typed cure
+#     into w2 and reads false; count-s is position-relative.
+#   • C3 the daw SEAM (2 rows, doors = single-gap): `dw` from the start
+#     would tie daw, so the arrival is mid-rot again (hh dw = 4 vs daw 3);
+#     diw leaves the scar and reads false; `.` repeats the daw on row two.
+#
+# THE DOT GAP (first level priced after the dot-insert replay, 2026-07-13):
+# a text object is ONE change, so it dot-chains down a column; the piecewise
+# fixes need re-positioning every row that dot can't provide. Rivals are
+# driven WITH their own best dot usage and win at 1★ inside the standard 1.4
+# budget. Vocabulary is drawn per seed with FIXED slot lengths.
+_WE_ROWS, _WE_COLS = 15, 40
+_WE_SPINE  = 17                     # every row's first standable
+_WE_BAY_W  = 18                     # bay floor cols 18..38; east wall 39
+_WE_BAY_E  = 38
+_WE_PLQ_COL = 2                     # full true readings (≤14 chars, cols 2..15)
+_WE_TEXT0  = 19                     # w1 starts here on every row
+_WE_SHAFT  = 26                     # the landing column: inside every rot it hops to
+_WE_C1_ROWS = (3, 4, 5)
+_WE_C2_ROWS = (7, 8)
+_WE_C3_ROWS = (10, 11)
+_WE_SHAFT_SEPS = (6, 9)
+_WE_THROAT = 12
+_WE_GATE   = 13
+_WE_BOLT0  = 18                     # bolts cols 18..20, one per chamber
+_WE_EXIT   = (13, 21)               # the FINAL SEAL
+# (row, w1 len, rot len, rot start): rot start = TEXT0 + w1len + 1; staggered
+# so the diw chain lands inside the next rot, and the C2/C3 hop from the
+# shaft column arrives at rot start + 2 (ce/dw must pay the h's back).
+_WE_C1_SHAPE = ((3, 7, 5, 27), (4, 6, 4, 26), (5, 6, 3, 26))
+_WE_C2_SHAPE = ((7, 4, 4, 24), (8, 4, 4, 24))
+_WE_C3_SHAPE = ((10, 4, 4, 24), (11, 3, 4, 23))
+_WE_PAR = 34            # hand-tallied along the driven tape (buffer mutates)
+
+
+def _we_draw_words(rng) -> dict:
+    """Draw the enclosure vocabulary (fixed slot lengths pin par and the
+    rival chains). Seven (w1, rot, w2) triples + two typed cures (len 3),
+    all pairwise distinct."""
+    _load_vocab_tables()
+
+    def pool(length):
+        return [w for w in _VOCAB_PLAIN_BY_LEN.get(length, ())
+                if w.isalpha() and w == w.lower()]
+
+    shapes = _WE_C1_SHAPE + _WE_C2_SHAPE + _WE_C3_SHAPE
+    for _ in range(80):
+        picks: list = []
+
+        def draw(length):
+            w = rng.choice(pool(length))
+            picks.append(w)
+            return w
+
+        rows = [(draw(w1l), draw(rotl), draw(5)) for _r, w1l, rotl, _rs in shapes]
+        cures = [draw(3), draw(3)]
+        if len(set(picks)) == len(picks):
+            return {'rows': rows, 'cures': cures}
+    raise ValueError('word_enclosure: no distinct draw after 80 tries')
+
+
+def build_dungeon_word_enclosure(seed: int) -> Dungeon:
+    """The Word Enclosure (slug `word_enclosure`): iw and aw.
+
+    Select by shape, not by landing: the diw drill (dot-chained down the
+    staggered rots), the ciw cure (caw fuses and reads false), and the daw
+    seam (diw leaves the scar). See the section header for the forcing."""
+    rng = random.Random(seed)
+    words = _we_draw_words(rng)
+    shapes = _WE_C1_SHAPE + _WE_C2_SHAPE + _WE_C3_SHAPE
+
+    # per-row runs + each chamber's door targets
+    runs, targets = [], {}
+    for (r, w1l, rotl, rot_s), (w1, rot, w2) in zip(shapes, words['rows']):
+        w2_s = rot_s + rotl + 1
+        runs += [(r, _WE_TEXT0, w1), (r, rot_s, rot), (r, w2_s, w2)]
+        targets[r] = (w1, w2)
+    c1 = tuple(f'{targets[r][0]}  {targets[r][1]}' for r in _WE_C1_ROWS)  # the scar
+    c2 = tuple(f'{targets[r][0]} {c} {targets[r][1]}'
+               for r, c in zip(_WE_C2_ROWS, words['cures']))
+    c3 = tuple(f'{targets[r][0]} {targets[r][1]}' for r in _WE_C3_ROWS)  # the seam
+    chambers = ((_WE_C1_ROWS, c1), (_WE_C2_ROWS, c2), (_WE_C3_ROWS, c3))
+
+    R, C = _WE_ROWS, _WE_COLS
+    cells = [[CellType.WALL] * C for _ in range(R)]
+    for r in range(2, _WE_GATE + 1):                     # the spine
+        cells[r][_WE_SPINE] = CellType.FLOOR
+    for rows, _t in chambers:                            # the bays
+        for r in rows:
+            for c in range(_WE_BAY_W, _WE_BAY_E + 1):
+                cells[r][c] = CellType.FLOOR
+    for r in _WE_SHAFT_SEPS:                             # the light shaft —
+        cells[r][_WE_SHAFT] = CellType.FLOOR             # NOT the throat row
+
+    room = Room(room_type=RoomType.ENTRY, rows=R, cols=C)
+    room.cells = cells
+    room.seed  = seed
+
+    doors = []
+    for i, (rows, tgt) in enumerate(chambers):
+        doors.append((tgt, _WE_BOLT0 + i))
+        for pr, ptext in zip(rows, tgt):                 # full true readings
+            col = _WE_PLQ_COL
+            for part in ptext.split(' '):
+                if part:
+                    room.char_runs.append(CharRun(pr, col, tuple(part), 'verdant'))
+                col += len(part) + 1
+    for rr, cc, text in runs:
+        room.char_runs.append(CharRun(rr, cc, tuple(text), 'ancient'))
+    room._ss_doors = tuple(doors)                        # the shared exact-text tick
+    room._we_words = words
+
+    room.entities.append(Entity(kind='exit', row=_WE_EXIT[0], col=_WE_EXIT[1],
+                                edit_immune=True))
+    room.spawn_pos = (2, _WE_SPINE)
+    room.exit_pos  = _WE_EXIT
+
+    room.rebuild_indexes()
+    room.par    = _WE_PAR
+    room.budget = math.ceil(_WE_PAR * 1.4)   # STANDARD: the piecewise route wins at 1★
+    ca, cb = words['cures']
+    room.answer = (f'j w w diw j . j . 2j ciw {ca} j ciw {cb} '
+                   f'2j daw j . G $')
+
+    dungeon = Dungeon(name='The Word Enclosure', seed=seed)
+    dungeon.rooms        = [room]
+    dungeon.current_room = 0
+    return dungeon
+
+
 # ── The Seekers' Labyrinth (search: / ? n N *) ──────────────────────────────────
 #
 # A frozen perfect maze (recursive-backtracker, 17×39).  Search ignores walls —
