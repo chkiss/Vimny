@@ -49,34 +49,80 @@ all check the mode's own token). The engine fully supports both modes
 span you cannot cheaply count or name as a motion. Forcing must lean on that
 or the commands are out-priced.
 
-Forcing model:
-- `V` (S1 where possible): a **ragged, eye-counted line span** — a block of
-  corrupt rows whose count is hidden (fog you can't pre-count, or an irregular
-  run bounded by walls), so `{n}dd`/`{n}>>` can't be formed without first
-  pacing the rows (extra keys) while `Vjjj…{op}` grows the selection visually.
-  Apply any linewise op the player owns: `Vd` (= range `dd`), `V>` (range
-  indent — reuses Alignment Halls terrain), `Vy`.
-- `<C-v>` (S1): a **vertical stripe** of wrong cells down N rows that no
-  charwise/linewise tool reaches in one stroke — the killer app is
-  `<C-v>{n}j` then `I{text}<Esc>` / `c` / `r`, the edit propagating to every
-  selected row (column insert/change). Design a grid where the fix is columnar
-  (a sealed seam down the left of N doors) so block mode is the only one-pass
-  tool.
-- Keep a couple of `v` (charwise) triggers in so the level reinforces WHICH
-  visual mode, not just the two new ones (the Overwrite Halls' `r`-vs-`R`
-  discipline).
+**THE PRICE TRUTH (revised 2026-07-12, from the Sight Sanctum build + a live
+probe of `d}`):** the old forcing sketch above the strikeout does not survive
+arithmetic. Every uniform linewise op has an equal-or-cheaper normal form —
+`Vd`≡`{n}dd` (V loses by 1 with count nav, ties without), `V>`≡`{n}>>`,
+`V}d` loses to `d}` (2 keys — **probed: Vimny's `d}` is LINEWISE and
+collapses the whole paragraph**), and "the count is hidden by fog" does not
+survive the par-law test (a replayed `{n}dd` with perfect knowledge still
+types 4 keys — knowledge is free in the forcing math; the Sight Sanctum
+learned this the hard way). **V can never be price-forced. It is the g~ law
+one tier up.** Where visual DOES win on price is wherever the normal form
+needs a piece of information twice (the charwise multi-row lesson) or does
+not exist at all — and for linewise/block that means `<C-v>`.
 
-Engine/laws to respect: the **landing rule** (selection-driven ops must leave
-the cursor somewhere standable), reflow laws (linewise `Vd` collapses real
-rows via `remove_row`; block edits shift each row independently), and the
-teleport+walking audit. Hand-tally par along the canonical `V`/`<C-v>` answer
-(no Dijkstra once the buffer mutates). Open question for build: whether block
-insert (`<C-v>I…<Esc>` multi-row propagation) needs any new test-template
-beyond the existing visual-op coverage — verify live.
+Forcing model (revised):
+- **`V` is the taught idiom with DOCUMENTED TIES** (the Case Chambers
+  precedent): teach it as see-before-you-cut — `V {n}j d` on a stack whose
+  door punishes overshoot (the exact-text chassis: one row too far eats the
+  kept boundary row and the bolt never opens; `u` recovers). The canonical
+  tape uses V; the tests document the `{n}dd` tie/±1 and drive the overshoot
+  as a dead route. One honest near-win to include: `V /{x}⏎ d` — linewise
+  delete DOWN TO A NAMED ROW (no operator takes a search; established at the
+  Sight Sanctum) — ties `{n}dd` at n ≥ 10 with a 1-char pattern, and is the
+  route that needs no counting. Make the V-stack ≥ 10 rows so the tie holds.
+- **`<C-v>` carries the PRICE forcing** — the block ops have NO normal-mode
+  equivalent, and the gap scales with row count (the same shape as the Sight
+  Sanctum's charwise multi-row chambers, one dimension up):
+  - **block delete**: a vertical STRIPE of blight cells down k rows, mid-word
+    (each row's word heals when the same column span dies). One
+    `<C-v> {k}j {m}l d` vs a per-row `{n}x` chain ≈ k×(3-4 keys + nav).
+    k ≥ 4 forces by a mile.
+  - **block case (`g~` — ALREADY engine-supported, `_apply_block`)**: a
+    RECTANGLE of wrong-cased letters spanning k rows × m cols, guard letters
+    outside the rectangle on every row (the Case chamber's guard-word trick,
+    squared) — per-row `g~`/count-`~` chains pay per row, the block toggle
+    pays once. The game's third case reprise, and the first honestly
+    price-forced ~ at scale.
+  - **block insert (`<C-v> {k}j I {text} Esc`) — THE FINALE, and ENGINE
+    WORK**: `_apply_block`'s `c` deletes per-row but the INSERT lands only on
+    the anchor row — **per-row propagation of typed text on Esc is NOT
+    implemented** (nor is `I` from block mode). Build it Vim-true: capture
+    the typed run once, replay it into every selected row's columns on Esc,
+    each row reflowing independently (open_gap per row); one undo snapshot
+    for the whole block edit; karaoke tracks the typed chars once. This is
+    the Warden's Act scroll's teased flourish, taught properly. Level use: a
+    missing COLUMN of letters down k door-rows (every row lost the same
+    letter of its word) — one block insert heals the gallery.
+- Keep one `v` (charwise) trigger so the level reinforces WHICH visual mode
+  (the Overwrite Halls' r-vs-R discipline).
 
-Design device: a **gallery of corrupt panels** — whole-row blights demand `V`,
-columnar seams demand `<C-v>`; the Sight Sanctum taught the player to *see* a
-span, the Selection Halls teach them to *take* one.
+**Chassis (proven at the Sight Sanctum — reuse, don't reinvent):** exact
+whole-row-text doors + gate-row bolts + FINAL SEAL exit; kept words at row
+edges only; ANCHOR-ALIGNMENT + a light shaft so plain `{n}j` hops land each
+station's anchor (then run the nav-golf audit: `e` does NOT cross rows, `}`
+hops to blank-row spine cells for 1 key, `{n}G` lands the fnb of row n+1,
+H/M/L are 1-key jumps — drive every candidate before pinning par); vocabulary
+drawn per seed with FIXED slot lengths (par and rival counts stay pinned),
+distinctness + pristine-initial constraints, and a many-seed lint test.
+Karaoke: typed block-insert text is part of the tape (no spaces — the space
+law); visual ops call `_content_ticks` so bolts open on the op itself.
+
+Engine/laws to respect: the **landing rule**, reflow laws (linewise `Vd`
+collapses real rows via `remove_row` — edit_immune rows refuse; block edits
+shift each row independently), the teleport+walking audit, and the per-token
+gate (shipped: `visual_line`/`visual_block` are this level's own; `visual_op`
+arrives already-known from display 30, so every op works the moment the mode
+does). Hand-tally par along the driven canonical answer (no Dijkstra once
+the buffer mutates); drive the leanest old-only rival (remember the Sight
+Sanctum's lesson: rows that need not survive need not be cleared — audit for
+the no-op-at-all route) and assert it wins at 1★ inside the standard budget.
+
+Design device: a **gallery of corrupt panels** — whole-row blights take `V`
+(the idiom), columnar seams and rectangles take `<C-v>` (the forcing); the
+Sight Sanctum taught the player to *see* a span, the Selection Halls teach
+them to *take* one in every shape.
 
 ---
 
