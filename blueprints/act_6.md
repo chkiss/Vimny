@@ -24,112 +24,6 @@
 
 ---
 
-## Level 30 — The Sight Sanctum (`sight_sanctum`) — `v` + operators on the selection
-
-> ✅ **Current-conventions section** (added 2026-07-12). This is THE Act VI
-> opener and a BIG lesson: not just "press v", but the whole rite —
-> **select first, act second** — performed with every operator CLASS the
-> player mastered across Acts IV–V (cut, copy, change, case, law). The
-> current `build_dungeon_sight_sanctum` is a 5×21 placeholder stub
-> (`v$x` twice); this section replaces it wholesale — same slug, new level.
-
-**Commands introduced:** `v` (token `visual`) **and the visual operators**
-`d y c ~ < >` on a selection (token `visual_op`).
-
-**Curriculum/plumbing edits this level requires (do these first):**
-1. `content/levels.py` — `sight_sanctum` `teaches: ['visual', 'visual_op']`,
-   `commands: 'v  (then d y c ~ on the selection)'`; rerun the table generator.
-2. **Re-home `visual_op`** — today it is granted only by the Grandmaster's
-   drop ("The Warden's Act", display 38.1; `main.py` `_SCROLL_DROPS`), which
-   would leave this level's operators locked. With `visual_op` taught here,
-   the Warden's Act scroll must be re-purposed — retarget it to the visual
-   FLOURISHES the game never teaches in a level (`gv` reselect, `o` swap-ends,
-   `<C-v>I…<Esc>` block insert) or to an Act VII preview. **Open decision at
-   build time; do not ship a dead scroll.**
-3. **Gating bug** — `engine/command_guard.py:130` gates all three visual
-   entries (`visual`/`visual_line`/`visual_block`) on the single `visual`
-   token, so learning `v` here would pre-unlock `V`/`<C-v>` before the
-   Selection Halls. Split the gate per token (+ guard tests).
-4. `x` on a selection is deliberately EXEMPT from `visual_op`
-   (`main.py` ~3834: `raw in 'dyc~<>'` check excludes `x`) — it is the freebie
-   that lets the opening nave work the moment `v` is learned. Keep that.
-5. The orphaned `WARDEN_SIGHT_SCROLL` (`main.py` `_STD_SCROLLS['visual']`,
-   marked "re-homes to the relocated v-lesson") becomes this level's reward
-   chest scroll.
-
-**Why v is a big lesson, not a small one:** every operator the player owns
-takes a MOTION argument and gambles on where it lands. Visual mode inverts
-the contract: you SEE the span before you commit. The lesson lands only if
-the level makes the player perform that inversion with operators they already
-trust — otherwise `v` reads as a redundant synonym for `d{m}`. So the sanctum
-is a **nave + four chapels + a final seal**, one operator class per chapel,
-each forced by a span that no normal-mode motion names cheaply.
-
-**The chapels (forcing model, PAR not budget — an old-only route must still
-win, at 1★):**
-
-- **Nave — the first strike (`v` + `x`, free with `visual`):** a corridor of
-  void runes cleared by `v$x` (the placeholder's one good idea, kept as the
-  threshold rite). Teaches enter / extend / strike / Esc-collapses-back with
-  zero new operator gating.
-- **Chapel of the Cut (`d`):** a **ragged charwise multi-row blight** — starts
-  mid-line on one row, ends mid-line two rows below. This is the crown jewel:
-  normal mode has NO charwise multi-row operator (old route = `D`, `dd`,
-  `d{f-motion}` — three ops plus navigation), while `v jj e d` is one op.
-  `_apply_charwise_multi` in `engine/visual.py` already implements the
-  per-row bounds; the chapel just has to demand them.
-- **Chapel of the Word (`c`):** a corrupt span running **mid-word to
-  mid-word** — no `cw`/`ce`/`cf{ch}` names it without overshoot the walls
-  punish (S1: the overshoot would cut a load-bearing plaque word, parried /
-  wrong-text so the door won't tick). `v {span} c {token}` writes the cure.
-  Typed text must be ONE token (karaoke law — no spaces in typed text).
-- **Chapel of the Case (`~`):** an irregular span crossing several word
-  boundaries that must flip case exactly (reinforces the Case Chambers, as
-  the Alignment Halls reinforced case). In visual, `~` is ONE key where
-  normal mode pays `g~{motion}` per word — v is inherently cheaper here, the
-  easiest honest PAR gap in the level.
-- **Chapel of the Eye (`y`):** an exact phrase sits mid-line **bounded by
-  look-alike decoys** (`{n}yl` would need counting; `yf{ch}` grabs a decoy
-  suffix). `v {span} y`, walk to the seal socket, `p`. Reuses the register
-  plumbing from the Beacon Tiers; the socket is a whole-line-annex-style
-  text-match door.
-- **Final seal — the named sight (`v` + `/{pat}⏎` + `d`):** the engine
-  already lets `/`/`?` EXTEND a live selection (`main.py` visual handler,
-  `search_return_mode`). The capstone: a blight whose far end is beyond eye
-  count but carries a readable name — `v /seal⏎ d` reaches it in one act.
-  "Name what you see, and the sight will reach it." This is the one moment
-  the level teaches something with no normal-mode analogue at any price,
-  and it composes two prior acts (search + operators). Gate the geometry so
-  this door is the FINAL SEAL (stone until the win condition; no fabricated
-  floor).
-
-**Indent (`>`/`<`) is deliberately left out** of the chapels: charwise-v `>`
-shifts whole LINES (linewise semantics leaking through a charwise selection),
-which muddies the model right before the Selection Halls teach `V>` properly.
-Don't teach it here; don't block it either.
-
-**Laws to respect (all already learned the hard way — see docs/ARCHITECTURE.md
-and the status memory):** intro names the situation, never the trap (the
-"select first, act second" credo belongs on a carved lintel, not the tip);
-teleport audit by geometry; FINAL SEAL exit; plaques in wall cells;
-`Esc` in visual returns the cursor to the anchor (test it — players will
-bail out of selections constantly); visual ops push ONE undo snapshot with
-the anchor's position (`_snapshot(..., row=anchor[0], ...)`) so `u` after a
-botched selection restores cleanly — assert per chapel; par is hand-tallied
-along the driven answer route (buffer mutates — no Dijkstra) and pinned by
-the 2★ playthrough test; each chapel's old-only route driven in a test and
-asserted to win at 1★ (cost > par).
-
-**Answer tape:** one generator shared by builder + playthrough test. The `/`
-pattern and Enter ARE tracked in SEARCH mode (`room._search_karaoke`), so the
-final-seal keys belong in the tape; `Esc` is omitted as always.
-
-**Scale:** boss-adjacent but not a boss — think Indentation Sanctum size
-(~23×70), five stations on one spine, standard `ceil(par*1.4)` budget,
-normal par/stars.
-
----
-
 ## Level 31 — The Selection Halls (`selection_halls`) — `V <C-v>`
 
 > ✅ **Current-conventions section** (added 2026-06-17). The legacy sections
@@ -141,10 +35,12 @@ normal par/stars.
 > the enclosures that follow.
 
 **Commands introduced:** `V` (visual_line) · `<C-v>` (visual_block) — the
-linewise and block siblings of charwise `v` (the Sight Sanctum, display 30).
-Each is gated on its own token (`visual_line` / `visual_block`) — but note
-`command_guard.py:130` currently collapses all three onto `visual` (split it
-when building the Sight Sanctum, see above). The engine fully supports both modes
+linewise and block siblings of charwise `v` (the Sight Sanctum, display 30 —
+BUILT 2026-07-12, which also taught `visual_op`, so every linewise/block op
+here unlocks the moment the mode does). Each is gated on its own token
+(`visual_line` / `visual_block`); the per-token gate split shipped with the
+Sight Sanctum (command_guard + the in-visual mode toggle + the NORMAL entry
+all check the mode's own token). The engine fully supports both modes
 (`engine/visual.py`, `Mode.VISUAL_LINE` / `VISUAL_BLOCK`; `main.py` maps
 `v`/`V`/`<C-v>`).
 

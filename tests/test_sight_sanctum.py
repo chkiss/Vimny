@@ -16,215 +16,259 @@
 #
 # SPDX-License-Identifier: GPL-3.0-or-later
 
-"""The Sight Sanctum: dungeon correctness and visual-mode undo tests."""
+"""The Sight Sanctum (v + operators on the selection): structure, forcing law,
+seal/bolt discipline, karaoke tape, and the per-token visual gate."""
 import math
-from generation.dungeon_gen import build_dungeon_sight_sanctum
-from engine.world import Room, RoomType, CellType, CharRun, Entity
-from engine.player import Player
-from engine.budget import Budget
+
+import pytest
+from blessed.keyboard import Keystroke
+from blessed import Terminal
+
+import main
+from engine.command_guard import action_allowed
+from engine.vim_parser import parse
 from engine.modes import Mode
-from engine.motion import apply_motion
-from engine.visual import apply_visual
-from main import _pop_history_step, _snapshot
+from engine.world import CellType
+from engine.search import _match_positions
+from content.levels import known_commands
+from generation.dungeon_gen import (
+    build_dungeon_sight_sanctum,
+    _SS_ROWS, _SS_COLS, _SS_SPINE, _SS_BAY_W, _SS_BAY_E, _SS_CHAPELS,
+    _SS_PLAQUES, _SS_CHEST, _SS_GATE, _SS_BOLT0, _SS_EXIT, _SS_PAR, _SS_ANSWER,
+)
+from tests import SEEDS, cached_room
+
+ESC = Keystroke('\x1b', name='KEY_ESCAPE')
 
 
-# ── helpers ──────────────────────────────────────────────────────────────────
-
-def _dungeon():
-    return build_dungeon_sight_sanctum(0)
+def _room(seed=0):
+    return cached_room('build_dungeon_sight_sanctum', seed)
 
 
-def _budget(total=15, spent=0):
-    b = Budget(total)
-    b.spent = spent
-    return b
+def _K(s):
+    return [Keystroke(ch) for ch in s]
+
+
+def _bolt(i):
+    return (_SS_GATE, _SS_BOLT0 + i)
+
+
+# The canonical tape (== room.answer with Esc placed): select first, act
+# second — v 2j ts d (Cut), v 2j tg c sigil (Word), v j ~ (Case),
+# v /q⏎ h d (Seal). 42 keys.
+def _canon_keys():
+    return (_K('jwelv2jtsd0') + _K('4jwv2jtgc') + _K('sigil') + [ESC] + _K('0')
+            + _K('4jvj~') + _K('3jelv') + _K('/q\r') + _K('hd') + _K('G$'))
+
+
+# The piecewise no-visual rival: D / dd / ^dt{ch} / cc per chapel, g~j for the
+# Case rows. Wins — inside the standard budget — but over par: 1 star.
+def _piecewise_rival_keys():
+    return (_K('jwelDjdd^dts0') + _K('2jw') + _K('cc') + _K('sigil') + [ESC]
+            + _K('jdd^dtg0') + _K('2j') + _K('g~j') + _K('3jelDjdd^dtq')
+            + _K('G$'))
+
+
+def _drive(dungeon, keys, monkeypatch, finish=':wq\r', name='Scribe'):
+    keys = list(keys) + _K(finish)
+    monkeypatch.setattr(main, 'render_all', lambda *a, **k: None)
+    monkeypatch.setattr(main.time, 'sleep', lambda *a, **k: None)
+    for anim in ('_fireworks_animation', '_win_animation', '_starfield_victory',
+                 '_heart_container_animation', '_unlock_animation',
+                 '_void_fall_animation', '_drown_animation'):
+        monkeypatch.setattr(main, anim, lambda *a, **k: None)
+    monkeypatch.setattr(Terminal, 'height', property(lambda self: 41))
+    term = Terminal()
+    it = iter(keys)
+    monkeypatch.setattr(term, 'inkey', lambda *a, **k: next(it, Keystroke('')))
+    return main.run_dungeon(term, 'sight_sanctum', {}, player_name=name,
+                            _dungeon=dungeon)
+
+
+def _drive_spent(keys, monkeypatch, seed=0):
+    box = {}
+    orig = main._calc_stars
+    monkeypatch.setattr(main, '_calc_stars',
+                        lambda won, budget, room, player, level='':
+                            (box.__setitem__('spent', budget.spent),
+                             orig(won, budget, room, player, level))[1])
+    result = _drive(build_dungeon_sight_sanctum(seed), keys, monkeypatch)
+    return result['won'], box.get('spent')
 
 
 # ── dungeon structure ─────────────────────────────────────────────────────────
 
-def test_layout_dimensions():
-    room = _dungeon().rooms[0]
-    assert room.rows == 5
-    assert room.cols == 21
+@pytest.mark.parametrize("seed", SEEDS)
+def test_layout_and_identity(seed):
+    room = _room(seed)
+    assert (room.rows, room.cols) == (_SS_ROWS, _SS_COLS)
+    assert room.spawn_pos == (2, _SS_SPINE)
+    assert room.exit_pos == _SS_EXIT
+    exit_ent = next(e for e in room.entities if e.kind == 'exit')
+    assert (exit_ent.row, exit_ent.col) == _SS_EXIT and exit_ent.edit_immune
 
 
-def test_entry_position():
-    room = _dungeon().rooms[0]
-    assert room.spawn_pos == (1, 1)
+@pytest.mark.parametrize("seed", SEEDS)
+def test_par_answer_budget(seed):
+    room = _room(seed)
+    assert room.par == _SS_PAR
+    assert room.budget == math.ceil(_SS_PAR * 1.4)
+    assert room.answer == _SS_ANSWER
 
 
-def test_exit_entity_position():
-    room = _dungeon().rooms[0]
-    exit_ent = next((e for e in room.entities if e.kind == 'exit'), None)
-    assert exit_ent is not None
-    assert (exit_ent.row, exit_ent.col) == (3, 1)
+@pytest.mark.parametrize("seed", SEEDS)
+def test_exit_and_bolts_start_sealed(seed):
+    """The FINAL SEAL law: bolts and exit are STONE until their text holds."""
+    room = _room(seed)
+    for i in range(len(_SS_CHAPELS)):
+        assert room.cells[_bolt(i)[0]][_bolt(i)[1]] == CellType.WALL
+    assert room.cells[_SS_EXIT[0]][_SS_EXIT[1]] == CellType.WALL
 
 
-def test_dynamite_position():
-    room = _dungeon().rooms[0]
-    dyn = next((e for e in room.entities if e.kind == 'dynamite'), None)
-    assert dyn is not None
-    assert (dyn.row, dyn.col) == (3, 2)
+@pytest.mark.parametrize("seed", SEEDS)
+def test_spine_is_every_rows_first_standable(seed):
+    """The teleport audit: no jump may land east of the spine — every floor
+    row's westmost passable cell is the spine (except the chest nook row)."""
+    room = _room(seed)
+    for r in range(room.rows):
+        cols = [c for c in range(room.cols) if room.is_passable(r, c)]
+        if not cols:
+            continue
+        expect = _SS_CHEST[1] if r == _SS_CHEST[0] else _SS_SPINE
+        assert cols[0] == expect, f"row {r} first standable {cols[0]}"
 
 
-def test_top_corridor_void_runes_bounded():
-    # Voids only appear in row 1 cols 2-19; entry cell (1,1) always clear.
-    room = _dungeon().rooms[0]
-    assert room.char_run_at(1, 1) is None, "entry cell must not have a void rune"
-    for col in range(2, 20):
-        ru = room.char_run_at(1, col)
-        if ru is not None:
-            assert ru.kind == 'void', f"(1,{col}) non-void rune unexpected"
+@pytest.mark.parametrize("seed", SEEDS)
+def test_q_is_pristine_level_wide(seed):
+    """The Seal's search anchor: 'q' occurs in exactly one FLOOR position (the
+    'q' of quill) — the plaque copy is sealed in the wall, which search skips."""
+    room = _room(seed)
+    positions = _match_positions(room, 'q')
+    assert len(positions) == 1, positions
+    (r, c), = positions
+    assert room.is_passable(r, c)
+    # and the wall copy exists but is not a landing
+    assert any(ru.col == 2 and ''.join(ru.symbols) == 'quill'
+               for ru in room.char_runs), "the plaque carries the true word"
 
 
-def test_top_corridor_voids_spawn_at_roughly_60_pct():
-    # Over many seeds, void coverage in row 1 should be ~60%.
-    counts = []
-    for seed in range(50):
-        room = build_dungeon_sight_sanctum(seed).rooms[0]
-        counts.append(sum(1 for c in range(2, 20) if room.char_run_at(1, c) is not None))
-    avg = sum(counts) / len(counts)
-    assert 7 <= avg <= 13, f"expected ~10.8 voids on average, got {avg:.1f}"
+def test_chest_grants_the_wardens_sight():
+    room = _room(0)
+    chest = next(e for e in room.entities if e.kind == 'chest_scroll')
+    assert (chest.row, chest.col) == _SS_CHEST
+    assert chest.scroll_id == 'visual'
+    from content.scrolls import SCROLL_CATALOG
+    entry = next(s for s in SCROLL_CATALOG if s['id'] == 'visual')
+    assert entry['level_slug'] == 'sight_sanctum'
 
 
-def test_bottom_corridor_void_runes_bounded():
-    # Voids only appear in row 3 cols 3-18; exit (3,1), dynamite (3,2), and (3,19) always clear.
-    room = _dungeon().rooms[0]
-    assert room.char_run_at(3, 1) is None, "exit cell must not have a void rune"
-    assert room.char_run_at(3, 2) is None, "dynamite cell must not have a void rune"
-    assert room.char_run_at(3, 19) is None, "col 19 of row 3 must always be clear"
-    for col in range(3, 19):
-        ru = room.char_run_at(3, col)
-        if ru is not None:
-            assert ru.kind == 'void', f"(3,{col}) non-void rune unexpected"
+def test_curriculum_teaches_visual_and_visual_op():
+    known = known_commands('sight_sanctum')
+    assert 'visual' in known and 'visual_op' in known
+    # and neither sibling mode leaks in early (the per-token gate)
+    assert 'visual_line' not in known and 'visual_block' not in known
 
 
-def test_gap_is_passable():
-    room = _dungeon().rooms[0]
-    assert room.cells[2][18] != CellType.WALL
-    assert room.cells[2][19] != CellType.WALL
+# ── the per-token visual gate ─────────────────────────────────────────────────
+
+def test_v_gates_but_V_and_block_stay_locked():
+    known = known_commands('sight_sanctum')
+    v_action, _ = parse('v', Mode.NORMAL)
+    V_action, _ = parse('V', Mode.NORMAL)
+    b_action, _ = parse('\x16', Mode.NORMAL)
+    assert action_allowed(v_action, known)
+    assert not action_allowed(V_action, known), "V is the Selection Halls' own"
+    assert not action_allowed(b_action, known), "<C-v> is the Selection Halls' own"
+    prev = known_commands('warden_scrivener')
+    assert not action_allowed(v_action, prev), "v unlearned before the Sanctum"
 
 
-def test_row2_otherwise_wall():
-    room = _dungeon().rooms[0]
-    for col in range(0, 18):
-        assert room.cells[2][col] == CellType.WALL, f"(2,{col}) should be wall"
+# ── the forcing law, driven ──────────────────────────────────────────────────
+
+@pytest.mark.parametrize("seed", SEEDS)
+def test_full_sight_route_wins_par_perfect(seed, monkeypatch):
+    dungeon = build_dungeon_sight_sanctum(seed)
+    room = dungeon.rooms[0]
+    result = _drive(dungeon, _canon_keys(), monkeypatch)
+    assert result['won'] and result['stars'] == 2, result
+    for i in range(len(_SS_CHAPELS)):
+        assert room.cells[_bolt(i)[0]][_bolt(i)[1]] == CellType.FLOOR
 
 
-def test_budget_and_par():
-    room = _dungeon().rooms[0]
-    assert room.par == 11
-    assert room.budget == math.ceil(11 * 1.4)
+def test_canonical_route_costs_exactly_par(monkeypatch):
+    won, spent = _drive_spent(_canon_keys(), monkeypatch)
+    assert won and spent == _SS_PAR, (won, spent)
 
 
-# ── visual-mode undo: the anchor bug ─────────────────────────────────────────
-#
-# Sequence: v $ d   (enter visual at (1,1), extend to (1,19), delete)
-# Bug: the undo snapshot captured the cursor position (1,19) and current budget
-#      spend (2), so `u` returned the player to col 19 with 2 keystrokes already
-#      charged — not to the anchor (1,1) with a clean slate.
-# Fix: snapshot uses (row, col) = anchor and spent = value before v was pressed.
-#
-# These tests build a minimal room with a known void at (1,10) so they are
-# independent of the randomised seed used by _dungeon().
-
-def _room_with_void():
-    """5×21 room matching the Sight Sanctum layout, with a single known void at (1,10)."""
-    room = Room(rows=5, cols=21, room_type=RoomType.ENTRY)
-    cells = [[CellType.WALL] * 21 for _ in range(5)]
-    for c in range(1, 20):
-        cells[1][c] = CellType.CORRIDOR
-    cells[2][18] = CellType.CORRIDOR
-    cells[2][19] = CellType.CORRIDOR
-    for c in range(1, 20):
-        cells[3][c] = CellType.CORRIDOR
-    room.cells = cells
-    room.char_runs.append(CharRun(row=1, col=10, symbols=('○',), kind='void'))
-    room.entities.append(Entity(kind='exit',     row=3, col=1))
-    room.entities.append(Entity(kind='dynamite', row=3, col=2))
-    room.spawn_pos = (1, 1)
-    room.rebuild_indexes()
-    return room
+@pytest.mark.parametrize("seed", SEEDS)
+def test_piecewise_route_wins_at_one_star(seed, monkeypatch):
+    """THE LAW, driven: the no-visual D/dd/^dt/cc route WINS — inside the
+    standard budget — but over par: 1 star. The sight is forced by PAR."""
+    dungeon = build_dungeon_sight_sanctum(seed)
+    result = _drive(dungeon, _piecewise_rival_keys(), monkeypatch)
+    assert result['won'] and result['stars'] == 1, result
 
 
-def test_visual_delete_undo_restores_to_anchor_not_cursor_end():
-    """u after v$d must land the player at (1,1) (anchor), not (1,19) (cursor-end)."""
-    room = _room_with_void()
-    player = Player(row=1, col=1)
-    budget = _budget(spent=0)
-    undo_stack, redo_stack = [], []
-
-    pre_v_spent = budget.spent          # 0
-    player.mode = Mode.VISUAL
-    player.visual_anchor = (1, 1)
-    player.visual_start_spent = pre_v_spent
-    budget.spend(1)
-
-    apply_motion(player, '$', 1, room)
-    budget.spend(1)
-    assert player.col == 19
-
-    anchor = player.visual_anchor       # (1, 1)
-    cursor = (player.row, player.col)   # (1, 19)
-
-    undo_stack.append(_snapshot(room, player, budget,
-                                row=anchor[0], col=anchor[1],
-                                spent=player.visual_start_spent))
-    apply_visual('d', anchor, cursor, Mode.VISUAL, room, player)
-    budget.spend(1)
-    player.mode = Mode.NORMAL
-    player.visual_anchor = None
-
-    assert player.col == 1, "apply_visual repositions cursor to selection start"
-    assert room.char_run_at(1, 10) is None, "void rune must be cleared after delete"
-
-    _pop_history_step(undo_stack, redo_stack, room, player, budget)
-
-    assert player.row == 1
-    assert player.col == 1, (
-        f"undo must return to anchor (1,1), not cursor-end; got col={player.col}"
-    )
-    assert budget.spent == 0, (
-        f"undo must restore pre-v budget (0), got {budget.spent}"
-    )
-    assert room.char_run_at(1, 10) is not None, "void rune must be restored by undo"
+def test_admin_karaoke_tape_tracks_to_the_end(monkeypatch):
+    """The answer is the literal tape: driving it as admin never diverges and
+    consumes every char (⏎ marks the search Enter; Esc is skipped)."""
+    dungeon = build_dungeon_sight_sanctum(0)
+    room = dungeon.rooms[0]
+    _drive(dungeon, _canon_keys(), monkeypatch, name='admin')
+    assert not room.answer_diverged
+    assert room.answer_pos == len(room.answer.replace(' ', ''))
 
 
-def test_visual_delete_undo_restores_dynamite():
-    """u after vF!x in bottom corridor must restore the dynamite entity."""
-    room = _room_with_void()
-    player = Player(row=3, col=19)
-    budget = _budget(spent=6)
-    undo_stack, redo_stack = [], []
+# ── seal / bolt discipline ───────────────────────────────────────────────────
 
-    pre_v_spent = budget.spent
-    player.mode = Mode.VISUAL
-    player.visual_anchor = (3, 19)
-    player.visual_start_spent = pre_v_spent
-    budget.spend(1)
+def test_undo_rebars_bolt_and_seal(monkeypatch):
+    dungeon = build_dungeon_sight_sanctum(0)
+    room = dungeon.rooms[0]
+    _drive(dungeon, _canon_keys()[:-2] + _K('l'), monkeypatch, finish=':q!\r')
+    assert room.cells[_bolt(3)[0]][_bolt(3)[1]] == CellType.FLOOR
+    assert room.cells[_SS_EXIT[0]][_SS_EXIT[1]] == CellType.FLOOR, "the seal parted"
 
-    # F! — move cursor left to dynamite at (3,2)
-    from engine.motion import _apply_find
-    _apply_find(player, 'F', '!', room)
-    budget.spend(1)
-    assert player.col == 2, f"F! must land on dynamite at col 2, got {player.col}"
+    dungeon = build_dungeon_sight_sanctum(0)
+    room = dungeon.rooms[0]
+    # uu: the walk pushes its own snapshot; the second u reaches the Seal's d —
+    # one u refunds the WHOLE selection (anchor + spent ride the snapshot)
+    _drive(dungeon, _canon_keys()[:-2] + _K('luu'), monkeypatch, finish=':q!\r')
+    assert room.cells[_bolt(3)[0]][_bolt(3)[1]] == CellType.WALL, "re-bars"
+    assert room.cells[_SS_EXIT[0]][_SS_EXIT[1]] == CellType.WALL, "re-seals"
 
-    anchor = player.visual_anchor
-    cursor = (player.row, player.col)
 
-    undo_stack.append(_snapshot(room, player, budget,
-                                row=anchor[0], col=anchor[1],
-                                spent=player.visual_start_spent))
-    apply_visual('d', anchor, cursor, Mode.VISUAL, room, player)
-    budget.spend(1)
-    player.mode = Mode.NORMAL
-    player.visual_anchor = None
+def test_linewise_cut_that_eats_a_kept_word_is_a_dead_route(monkeypatch):
+    """The anti-cheese: dj on the Cut chapel's head row eats 'veil' — the
+    exact-text door must NOT open however much blight also died."""
+    dungeon = build_dungeon_sight_sanctum(0)
+    room = dungeon.rooms[0]
+    _drive(dungeon, _K('jdj'), monkeypatch, finish=':q!\r')
+    gr = room.exit_pos[0]           # dj collapsed rows — the gate rode the shift
+    assert room.cells[gr][_SS_BOLT0] == CellType.WALL
+    assert room.cells[gr][room.exit_pos[1]] == CellType.WALL
 
-    assert room.entity_at(3, 2) is None or not room.entity_at(3, 2).alive
 
-    _pop_history_step(undo_stack, redo_stack, room, player, budget)
+def test_half_cleared_chapel_stays_shut(monkeypatch):
+    """Exact-row matching: clearing only the head row ('veil' true, 'sill'
+    still buried) leaves the bolt barred."""
+    dungeon = build_dungeon_sight_sanctum(0)
+    room = dungeon.rooms[0]
+    _drive(dungeon, _K('jwelD'), monkeypatch, finish=':q!\r')
+    assert room.cells[_bolt(0)[0]][_bolt(0)[1]] == CellType.WALL
 
-    dyn = room.entity_at(3, 2)
-    assert dyn is not None and dyn.alive, "undo must restore the dynamite entity"
-    assert player.col == 19, "undo must return to anchor col 19"
-    assert budget.spent == pre_v_spent, "undo must restore pre-v budget"
+
+def test_no_jump_lands_on_the_sealed_exit(monkeypatch):
+    """G / $ discipline while the seal holds: G lands the gate row ON the
+    spine, and $ stops at the first shut bolt."""
+    dungeon = build_dungeon_sight_sanctum(0)
+    room = dungeon.rooms[0]
+
+    seen = {}
+    orig = main._calc_stars
+    def spy(won, budget, room_, player, level=''):
+        seen['pos'] = (player.row, player.col)
+        return orig(won, budget, room_, player, level)
+    monkeypatch.setattr(main, '_calc_stars', spy)
+    result = _drive(dungeon, _K('G$'), monkeypatch, finish=':wq\r')
+    assert not result['won']
+    assert seen['pos'] == (_SS_GATE, _SS_SPINE), seen

@@ -135,6 +135,7 @@ _ANSWER_NOT_TOKENISED = {
     'build_dungeon_joiners_gate',      # 4J/G$ multi-command tokens; tests/test_joiners_gate.py
     'build_dungeon_alignment_halls',   # >>/.gUU/G$ multi-command tokens; tests/test_alignment_halls.py
     'build_dungeon_indentation_sanctum',  # >}/4j/G$ multi-command tokens; tests/test_indentation_sanctum.py
+    'build_dungeon_sight_sanctum',     # visual tape with typed cure + /q⏎ search; tests/test_sight_sanctum.py
 }
 
 # Levels with a documented NON-1.4 budget. The Change Annex / Extension use a
@@ -241,6 +242,7 @@ _REPLAY_OWN_TEST = {
     'build_dungeon_joiners_gate':      'test_joiners_gate.py::test_full_join_route_wins_par_perfect',
     'build_dungeon_alignment_halls':   'test_alignment_halls.py::test_full_alignment_route_wins_par_perfect',
     'build_dungeon_indentation_sanctum': 'test_indentation_sanctum.py::test_full_law_route_wins_par_perfect',
+    'build_dungeon_sight_sanctum':     'test_sight_sanctum.py::test_full_sight_route_wins_par_perfect',
 }
 
 

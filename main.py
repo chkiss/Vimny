@@ -227,13 +227,11 @@ Position within the word ceased to matter.
 _SCROLL_TEXT_WARDENS_ACT = """\
 The Warden's Act
 ================
-The Sight became the Hand.
-What the eye marks, the hand unmakes.
+The Sight became second nature. These remain.
 
-  v{m}d  ──  select range, delete
-  v{m}y  ──  select range, yank
-  v{m}c  ──  select range, change
-  gv     ──  reselect last visual span
+  gv             ──  reselect the last visual span
+  o              ──  in Visual: swap to the other end
+  <C-v>I…<Esc>   ──  block insert — write down every row
 
   See. Select. Strike.
   The eye and the hand are one.
@@ -1430,6 +1428,41 @@ def _alignment_halls_tick(room, player) -> list:
     return msgs
 
 
+def _sight_sanctum_tick(room, player) -> list:
+    """The Sight Sanctum bolts — the plaque rule as EXACT whole-row text: a
+    chapel's bolt stands open exactly while EVERY one of its true words reads
+    as the complete (stripped) text of some floor row. Exact matching is what
+    prices the level: the kept words must SURVIVE the strike (a linewise cut
+    that eats one is a dead route), and a half-cleared row still reads false.
+    Row-agnostic (charwise ops don't shift rows, but the piecewise dd route
+    does), case-sensitive, two-sided, STATELESS + FINAL SEAL — the hardened-
+    chassis pattern (see _whole_line_annex_tick)."""
+    msgs = []
+    texts = {_wla_floor_text(room, r).strip() for r in range(room.rows)}
+
+    def held(targets):
+        return all(t in texts for t in targets)
+
+    gr = room.exit_pos[0]
+    all_true = True
+    for targets, dc in getattr(room, '_ss_doors', ()):
+        is_open = room.cells[gr][dc] != CellType.WALL
+        if held(targets) and not is_open:
+            room.cells[gr][dc] = CellType.FLOOR
+            msgs.append('The chapel reads true — the bolt grinds back!')
+        elif not held(targets) and is_open and (player.row, player.col) != (gr, dc):
+            room.cells[gr][dc] = CellType.WALL     # undone — the bolt re-bars
+        all_true = all_true and held(targets)
+    er, ec = room.exit_pos
+    seal_open = room.cells[er][ec] != CellType.WALL
+    if all_true and not seal_open:
+        room.cells[er][ec] = CellType.FLOOR
+        msgs.append('Every chapel reads true — the final seal parts!')
+    elif not all_true and seal_open and (player.row, player.col) != (er, ec):
+        room.cells[er][ec] = CellType.WALL         # undone — the seal returns
+    return msgs
+
+
 def _indentation_sanctum_tick(room, player) -> list:
     """The Indentation Sanctum bolts. Gallery bolts are the Alignment rule (a
     noun seated at the plumb register, exact col, any floor row). The RITE
@@ -2183,6 +2216,7 @@ _LEVEL_INTROS = {
     'joiners_gate':        ('The Joiner\'s Gate — the old inscriptions were split, line from line, and scattered down the stacks. What was one line must be one line again; the plaques remember how each read whole.', 70),
     'alignment_halls':     ('The Alignment Halls — a plumb line falls through the hall, and every word has slid from its station. The plaques remember where each belongs.', 70),
     'indentation_sanctum': ('The Indentation Sanctum — the law presides from the lintel, and the verses below have slid from their stations.', 70),
+    'sight_sanctum': ('The Sight Sanctum — the rot here spreads in ragged patches no single stroke can span. The keepers of this place beheld before they struck.', 70),
     'warden_scrivener':    ('The Warden Scrivener — he has copied these halls for an age and finished nothing. The great page waits, passage by passage, for a truer hand.', 70),
     'warden_manifold':     ('The Warden Manifold — he stamps himself into the world. Light the four braziers; the gate will draw and the fog will part.', 70),
     'warden_surveyor':     ('The Warden Surveyor — he keeps a long hall where the floor falls away between the words. Cross it word by word, over the void.', 60),
@@ -2879,6 +2913,9 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
                 _push(_m)
         if level == 'indentation_sanctum':
             for _m in _indentation_sanctum_tick(room, player):
+                _push(_m)
+        if level == 'sight_sanctum':
+            for _m in _sight_sanctum_tick(room, player):
                 _push(_m)
         if level == 'sculpting_chambers':
             for _m in _sculpting_chambers_tick(room, player):
@@ -3812,6 +3849,16 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
                 continue
             want = _visual_mode_toggle(raw, str(key)) if not key_buf else None
             if want is not None:                           # v / V / Ctrl-v toggle / exit
+                # Switching INTO a sibling mode is gated per token, same as
+                # entering it from NORMAL (pressing the current mode's own key
+                # exits, which is always allowed).
+                _wtok = {Mode.VISUAL: 'visual', Mode.VISUAL_LINE: 'visual_line',
+                         Mode.VISUAL_BLOCK: 'visual_block'}[want]
+                if want != vmode and not (_wtok in player.known_commands
+                                          or 'admin' in player.known_commands):
+                    _push(f"You haven't learned {_wtok} mode yet.")
+                    _render(message)
+                    continue
                 player.mode = Mode.NORMAL if want == vmode else want
                 if player.mode == Mode.NORMAL:
                     player.visual_anchor = None
@@ -4190,7 +4237,12 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
                 else:
                     _push('Search not learned yet.')
             elif m in ('visual', 'visual_line', 'visual_block'):
-                if 'visual' in player.known_commands or 'admin' in player.known_commands:
+                # Per-token gate (the insert-variant rule): v at the Sight
+                # Sanctum; V / <C-v> are the Selection Halls' own tokens.
+                # gv restores whichever mode was last used, so it gates on the
+                # base 'visual' token.
+                _vtok = 'visual' if action.get('reselect') else m
+                if _vtok in player.known_commands or 'admin' in player.known_commands:
                     if action.get('reselect'):                # gv — restore last selection
                         if player.last_visual_anchor is not None:
                             player.mode = player.last_visual_mode or Mode.VISUAL

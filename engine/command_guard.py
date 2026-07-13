@@ -128,7 +128,9 @@ def action_allowed(action: dict, known: list | set, edit_mode: bool = False) -> 
         if m == 'search':
             return '/' in known_set
         if m in ('visual', 'visual_line', 'visual_block'):
-            return 'visual' in known_set
+            # One gate per lesson (the insert-variant rule): charwise v is the
+            # Sight Sanctum's token; V and <C-v> are the Selection Halls' own.
+            return m in known_set
 
     if t == 'search_repeat':                      # n / N
         return '/' in known_set

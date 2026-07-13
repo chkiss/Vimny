@@ -80,7 +80,7 @@ Curriculum order is the order of `LEVELS`. Blueprints: `blueprints/act_*.md`.
 | 28 | `alignment_halls` | The Alignment Halls | `>> <<` |  |
 | 29 | `indentation_sanctum` | The Indentation Sanctum | `>{m} <{m} =` |  |
 | 29.1 | `warden_scrivener` | The Warden Scrivener | — | boss |
-| 30 | `sight_sanctum` | The Sight Sanctum | `v` |  |
+| 30 | `sight_sanctum` | The Sight Sanctum | `v {m} d/c/~` |  |
 | 31 | `selection_halls` | The Selection Halls | `V  <C-v>` |  |
 | 32 | `word_enclosure` | The Word Enclosure | `iw aw` |  |
 | 33 | `bracket_enclosure` | The Bracket Enclosure | `i( a(` |  |

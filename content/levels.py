@@ -85,12 +85,11 @@ LEVELS = [
     {'display': '28',   'slug': 'alignment_halls',       'name': 'The Alignment Halls',        'commands': '>> <<', 'teaches': ['>', '<']},
     {'display': '29',   'slug': 'indentation_sanctum',   'name': 'The Indentation Sanctum',    'commands': '>{m} <{m} =', 'teaches': ['=']},
     {'display': '29.1', 'slug': 'warden_scrivener',      'name': 'The Warden Scrivener',       'type': 'boss', 'after': 'indentation_sanctum', 'teaches': []},
-    # The Sight Sanctum sits here with the selection/visual arc, relocated from
-    # display 14 (2026-06-27): Visual Mode is unforceable until ranged operators
-    # exist (with only x, v{m}x == {n}x and jumps skip the void-clearing).
-    # PLACEHOLDER — to be redesigned into the real v-lesson; keeps slug
-    # sight_sanctum + teaches ['visual'].
-    {'display': '30',   'slug': 'sight_sanctum',         'name': 'The Sight Sanctum',          'commands': 'v', 'teaches': ['visual']},
+    # The Sight Sanctum opens the act (relocated from display 14, 2026-06-27:
+    # Visual Mode is unforceable until ranged operators exist). It teaches the
+    # rite — select first, act second — so 'visual_op' (operators on a
+    # selection) is taught HERE, not at the Grandmaster's drop.
+    {'display': '30',   'slug': 'sight_sanctum',         'name': 'The Sight Sanctum',          'commands': 'v {m} d/c/~', 'teaches': ['visual', 'visual_op']},
     {'display': '31',   'slug': 'selection_halls',       'name': 'The Selection Halls',        'commands': 'V  <C-v>', 'teaches': ['visual_line', 'visual_block']},
     {'display': '32',   'slug': 'word_enclosure',        'name': 'The Word Enclosure',         'commands': 'iw aw', 'teaches': ['iw', 'aw']},
     {'display': '33',   'slug': 'bracket_enclosure',     'name': 'The Bracket Enclosure',      'commands': 'i( a(', 'teaches': ['i(', 'a(']},

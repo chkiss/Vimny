@@ -125,9 +125,10 @@
 
 ## sight_sanctum — visual mode
 
-| keys | token  | desc        |
-|------|--------|-------------|
-| v    | visual | visual mode |
+| keys      | token     | desc                 |
+|-----------|-----------|----------------------|
+| v         | visual    | visual mode          |
+| v{m}d/c/~ | visual_op | act on the selection |
 
 ## seekers_labyrinth — search
 

@@ -369,15 +369,17 @@ REGEX_MAGIC_SCROLL = {
     ],
 }
 
+# Re-purposed 2026-07-12: v{m}d/y/c moved to the Sight Sanctum's own lesson
+# (token visual_op is taught there), so the Grandmaster's drop now teaches the
+# visual FLOURISHES no level drills — the selection's finer handles.
 WARDEN_ACT_SCROLL = {
     'title': "◈   The Warden's Act   ◈",
     'lines': [
-        ('dim',    '  The Sight became the Hand.'),
+        ('dim',    '  The Sight became second nature. These remain.'),
         ('blank',),
-        ('cmd',    'v{m}d', 'select range, delete'),
-        ('cmd',    'v{m}y', 'select range, yank'),
-        ('cmd',    'v{m}c', 'select range, change'),
-        ('smudge', 'gv',    '',  'reselect last visual span', 'visual'),
+        ('cmd',    'gv',       'reselect the last visual span'),
+        ('cmd',    'o',        'in Visual: swap ends'),
+        ('cmd',    '<C-v>I…<Esc>', 'block insert, every row at once'),
         ('blank',),
         ('amber',  '  See. Select. Strike.'),
         ('dim',    '  The eye and the hand are one.'),
@@ -479,6 +481,14 @@ SCROLL_CATALOG = [
         'level_slug': 'warden_manifold',
         'level_name': 'The Warden Manifold',
         'content':    INSCRIBERS_HAND_SCROLL,
+    },
+    {
+        'id':         'visual',
+        'title':      "The Warden's Sight",
+        'dropped_by': 'The Sight Sanctum',
+        'level_slug': 'sight_sanctum',
+        'level_name': 'The Sight Sanctum',
+        'content':    WARDEN_SIGHT_SCROLL,
     },
     {
         'id':         'text_obj',

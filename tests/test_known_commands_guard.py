@@ -190,10 +190,15 @@ def test_visual_mode_blocked_for_all_standard_levels(keys):
             f"'{keys!r}' should be blocked at level {level}"
 
 
-@pytest.mark.parametrize("keys", ['v', 'V', '\x16'])
-def test_visual_mode_allowed_with_visual_token(keys):
+@pytest.mark.parametrize("keys,token", [('v', 'visual'), ('V', 'visual_line'),
+                                        ('\x16', 'visual_block')])
+def test_visual_mode_gates_per_token(keys, token):
+    """One gate per lesson: v is the Sight Sanctum's; V and <C-v> are the
+    Selection Halls' own tokens — learning v must NOT pre-unlock them."""
     action = _parse(keys)
-    assert action_allowed(action, ['visual'])
+    assert action_allowed(action, [token])
+    if token != 'visual':
+        assert not action_allowed(action, ['visual'])
 
 
 def test_command_mode_always_allowed():

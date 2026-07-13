@@ -100,9 +100,9 @@ The curriculum is defined in `content/levels.py` (canonical) and mirrored in `LE
 | 26 | The Case Chambers | `~ g~ gU gu` | Playable |
 | 27 | The Joiner's Gate | `J gJ` | Playable |
 | 28 | The Alignment Halls | `>> <<` | Playable |
-| 29 | The Indentation Sanctum | `>{m} <{m} =` | Planned |
-| 29.1 | The Warden Scrivener | (boss) | Planned |
-| 30 | The Sight Sanctum | `v` | Playable |
+| 29 | The Indentation Sanctum | `>{m} <{m} =` | Playable |
+| 29.1 | The Warden Scrivener | (boss) | Playable |
+| 30 | The Sight Sanctum | `v {m} d/c/~` | Playable |
 | 31 | The Selection Halls | `V  <C-v>` | Planned |
 | 32 | The Word Enclosure | `iw aw` | Planned |
 | 33 | The Bracket Enclosure | `i( a(` | Planned |
@@ -166,6 +166,7 @@ The full command reference (also the hint-bar source) is `render/vim_commands.md
 | `)` | next sentence |
 | `(` | prev sentence |
 | `v` | visual mode |
+| `v{m}d/c/~` | act on the selection |
 | `/{pat}` | search |
 | `?{pat}` | search back |
 | `n` | next match |
@@ -205,6 +206,7 @@ The full command reference (also the hint-bar source) is `render/vim_commands.md
 | `gJ` | join, no space |
 | `>{m}` | indent |
 | `<{m}` | dedent |
+| `={m}` | apply the law |
 | `V` | visual line |
 | `<C-v>` | visual block |
 | `iw` | inner word |
