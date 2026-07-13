@@ -57,13 +57,25 @@ arithmetic. Every uniform linewise op has an equal-or-cheaper normal form —
 collapses the whole paragraph**), and "the count is hidden by fog" does not
 survive the par-law test (a replayed `{n}dd` with perfect knowledge still
 types 4 keys — knowledge is free in the forcing math; the Sight Sanctum
-learned this the hard way). **V can never be price-forced. It is the g~ law
-one tier up.** Where visual DOES win on price is wherever the normal form
-needs a piece of information twice (the charwise multi-row lesson) or does
-not exist at all — and for linewise/block that means `<C-v>`.
+learned this the hard way). **V's uniform-op forms can never be price-forced
+— EXCEPT the case op** (user-found, 2026-07-12): `V~` is **2 keys** where the
+whole-line toggle's cheapest normal forms are `g~~` (3 — the g-prefix is the
+tax) or `^{n}~` (3, and only for lines ≤ 9 cells). Every g-prefixed DOUBLED
+operator pays 3 keys where V pays mode+op = 2 — the case op is the one whose
+bare key (`~`) isn't the operator form, so V banks the difference. Elsewhere,
+visual wins on price only where the normal form needs a piece of information
+twice (the charwise multi-row lesson) or does not exist at all — and for
+linewise/block that means `<C-v>`.
 
 Forcing model (revised):
-- **`V` is the taught idiom with DOCUMENTED TIES** (the Case Chambers
+- **`V~` is V's honestly PRICE-FORCED chamber** (+1/line): a full-flip
+  MIXED-INVERSION line entered mid-row — scattered wrongs across the whole
+  line, so `gUU`/`guu` write wrong case (not idempotent-safe here), count-`~`
+  can't span it from the cursor, and `g~~` (3) / `^{n}~` (3) lose to `V~`
+  (2). This is the Case Chambers' g~~ finale re-armed one tier up — the
+  game's case thread pays off a third time. Two or three such lines make the
+  margin decisive.
+- **`Vd` is the taught idiom with DOCUMENTED TIES** (the Case Chambers
   precedent): teach it as see-before-you-cut — `V {n}j d` on a stack whose
   door punishes overshoot (the exact-text chassis: one row too far eats the
   kept boundary row and the bolt never opens; `u` recovers). The canonical
