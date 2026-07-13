@@ -245,6 +245,16 @@
       ]
     },
     {
+      "introduces_slug": "selection_halls",
+      "name": "V <C-v>",
+      "line_count": 3,
+      "quote": [
+        "    V takes lines whole, however you stand;     ",
+        "     Ctrl-v cuts a window through the page.     ",
+        "   Shape the sight to the wound, then strike.   "
+      ]
+    },
+    {
       "introduces_slug": "seekers_labyrinth",
       "name": "/ ? n N *",
       "line_count": 4,

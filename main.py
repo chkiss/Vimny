@@ -2217,6 +2217,7 @@ _LEVEL_INTROS = {
     'alignment_halls':     ('The Alignment Halls — a plumb line falls through the hall, and every word has slid from its station. The plaques remember where each belongs.', 70),
     'indentation_sanctum': ('The Indentation Sanctum — the law presides from the lintel, and the verses below have slid from their stations.', 70),
     'sight_sanctum': ('The Sight Sanctum — the rot here spreads in ragged patches no single stroke can span. The keepers of this place had one law: first behold, then strike.', 70),
+    'selection_halls': ('The Selection Halls — a gallery of corrupt panels: some rotted whole lines at a time, some down a single seam. The restorers here took each span in one grasp.', 70),
     'warden_scrivener':    ('The Warden Scrivener — he has copied these halls for an age and finished nothing. The great page waits, passage by passage, for a truer hand.', 70),
     'warden_manifold':     ('The Warden Manifold — he stamps himself into the world. Light the four braziers; the gate will draw and the fog will part.', 70),
     'warden_surveyor':     ('The Warden Surveyor — he keeps a long hall where the floor falls away between the words. Cross it word by word, over the void.', 60),
@@ -2686,6 +2687,8 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
     _MACRO_MAX     = 10000
     count_tutorial_shown = False
     search_return_mode = None  # visual mode to resume after a / ? search launched from it
+    block_ins = None           # live <C-v> I/c: {'rows': [...], 'col': c, 'buf': typed}
+                               # — the typed run replays into every row on Esc
     insert_creg_pending = False  # INSERT <C-r> typed; next key names the register to paste
     insert_co_buf = None         # INSERT <C-o> active; accumulates one Normal command, then resumes INSERT
     search_creg_pending = False  # SEARCH <C-r> typed; next key names the register / <C-w> to insert
@@ -2914,8 +2917,8 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
         if level == 'indentation_sanctum':
             for _m in _indentation_sanctum_tick(room, player):
                 _push(_m)
-        if level == 'sight_sanctum':
-            for _m in _sight_sanctum_tick(room, player):
+        if level in ('sight_sanctum', 'selection_halls'):
+            for _m in _sight_sanctum_tick(room, player):   # the shared exact-text tick
                 _push(_m)
         if level == 'sculpting_chambers':
             for _m in _sculpting_chambers_tick(room, player):
@@ -3323,9 +3326,11 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
 
         # ── Admin answer tracking ─────────────────────────────────────────────
         if (player_name == 'admin' and room.answer
-                and not key.is_sequence and str(key) != ':'
+                and not key.is_sequence and str(key) not in (':', '\x16')
                 and player.mode in (Mode.NORMAL, Mode.VISUAL,
                                     Mode.VISUAL_LINE, Mode.VISUAL_BLOCK)):
+            # '\x16' (<C-v>) is omitted from the tape like Esc — control keys
+            # aren't printable tape glyphs; the ops after them ARE tracked.
             if key_buf == '':
                 cmd_start_ans = (room.answer_pos, room.answer_diverged)
             if not room.answer_diverged:
@@ -3661,6 +3666,23 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
         # ── INSERT mode (admin text placement) ───────────────────────────────
         if player.mode == Mode.INSERT:
             if key.name == 'KEY_ESCAPE':
+                if block_ins is not None:
+                    # Block insert (<C-v> I… / c…): on Esc the typed run
+                    # replays into every other selected row at the anchor
+                    # column, each row reflowing independently (Vim-true).
+                    # The replay is not typing: it spends no budget and does
+                    # not advance the karaoke tape.
+                    _br, _bc = player.row, player.col
+                    for _row in block_ins['rows']:
+                        if not room.is_passable(_row, block_ins['col']):
+                            continue        # Vim skips lines the block misses
+                        player.row, player.col = _row, block_ins['col']
+                        for _bch in block_ins['buf']:
+                            insert_char(room, player, _bch)
+                    player.row, player.col = _br, _bc
+                    block_ins = None
+                    if not edit_mode:
+                        _animate_reflow_falls()
                 player.mode = Mode.NORMAL
                 # Vim retreats one column on leaving INSERT. Also the safety
                 # net for water-writing: `a` at a bank hovers the cursor on
@@ -3759,6 +3781,8 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
                     _animate_reflow_falls()
                 elif key.name == 'KEY_BACKSPACE' or str(key) == '\x7f':
                     insert_backspace(room, player)
+                    if block_ins is not None and block_ins['buf']:
+                        block_ins['buf'] = block_ins['buf'][:-1]
                 elif not key.is_sequence:
                     ch = str(key)
                     if ch.isprintable() and len(ch) == 1:
@@ -3785,6 +3809,8 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
                                 message = _EDGE_OF_WORLD_MSG; msg_ttl = 25
                         elif insert_char(room, player, ch):
                             budget.spend(1)
+                            if block_ins is not None:
+                                block_ins['buf'] += ch   # replayed per row on Esc
                         _animate_reflow_falls()
                         cur_ru = room.char_run_at(player.row, player.col)
                         if cur_ru is not None and cur_ru.kind == 'void':   # typed yourself off the ledge
@@ -3879,9 +3905,40 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
                                             and not room.answer_diverged)
                 _render(message)
                 continue
-            if not key_buf and raw and raw in 'dycx~<>':
-                op = {'x': 'd', '~': 'g~'}.get(raw, raw)
-                if raw in 'dyc~<>' and not (
+            if not key_buf and raw == 'I' and vmode == Mode.VISUAL_BLOCK:
+                # Block insert: INSERT opens at the block's top-left; on Esc
+                # the typed run replays into every other selected row (the
+                # block_ins state; see the INSERT Esc handler).
+                if not ('visual_op' in player.known_commands
+                        or 'admin' in player.known_commands):
+                    _push("You haven't learned visual operators yet.")
+                    _render(message)
+                    continue
+                if not edit_mode and budget.remaining <= 0:
+                    _push('Out of budget!  (Esc, then u to undo)')
+                    message = _pool_msg(); msg_ttl = _MSG_ROTATE_TTL
+                    _render(message)
+                    continue
+                _r1, _r2, _c1, _c2 = block_bounds(anchor, cursor)
+                undo_stack.append(_snapshot(room, player, budget,
+                                            row=anchor[0], col=anchor[1],
+                                            spent=player.visual_start_spent,
+                                            ans=cmd_start_ans))
+                redo_stack.clear()
+                player.row, player.col = _r1, _c1
+                player.visual_anchor = None
+                player.mode = Mode.INSERT
+                block_ins = {'rows': list(range(_r1 + 1, _r2 + 1)),
+                             'col': _c1, 'buf': ''}
+                budget.spend(1)
+                key_buf = ''
+                _render(message)
+                continue
+            if not key_buf and raw and raw in 'dycx~<>Uu':
+                # U / u on a live selection are the case SETS (gU / gu) —
+                # Vim-true: u with a selection lowercases, it is NOT undo.
+                op = {'x': 'd', '~': 'g~', 'U': 'gU', 'u': 'gu'}.get(raw, raw)
+                if raw in 'dyc~<>Uu' and not (
                         'visual_op' in player.known_commands or 'admin' in player.known_commands):
                     _push("You haven't learned visual operators yet.")
                     _render(message)
@@ -3922,6 +3979,12 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
                 player.last_visual_mode = vmode
                 player.visual_anchor = None
                 player.mode = Mode.INSERT if op == 'c' else Mode.NORMAL
+                if op == 'c' and vmode == Mode.VISUAL_BLOCK:
+                    # Block change: like block insert, the typed cure replays
+                    # into every other selected row on Esc.
+                    _r1, _r2, _c1, _c2 = block_bounds(anchor, cursor)
+                    block_ins = {'rows': list(range(_r1 + 1, _r2 + 1)),
+                                 'col': _c1, 'buf': ''}
                 if op != 'y':                  # visual yank is not a change either
                     player.last_change = {'type': 'visual_op', 'op': op}
                 key_buf = ''

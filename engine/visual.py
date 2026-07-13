@@ -29,6 +29,7 @@ from engine.operator import (
     op_delete, op_yank, op_case, apply_indent, line_extent, _delete_cols, _capture_row,
     _cursor_to_line_start, INDENT_WIDTH,
 )
+from engine.reflow import is_ledge, close_gap
 
 
 def block_bounds(anchor, cursor):
@@ -128,11 +129,11 @@ def apply_visual(op: str, anchor, cursor, vmode, room, player):
     # Charwise multi-row: use per-row column bounds, not linewise
     if vmode == Mode.VISUAL and ar != cr and op in ('d', 'c', 'y'):
         return _apply_charwise_multi(op, anchor, cursor, room, player)
-    if vmode == Mode.VISUAL and ar != cr and op == 'g~':
-        # Vim-true: v-selection ~ toggles ONLY the selected span — top row
-        # from the anchor column to line end, middle rows whole, bottom row
-        # from line start to the cursor column (never the full lines: text
-        # outside the selection keeps its case).
+    if vmode == Mode.VISUAL and ar != cr and op in ('g~', 'gU', 'gu'):
+        # Vim-true: v-selection ~/U/u case-ops ONLY the selected span — top
+        # row from the anchor column to line end, middle rows whole, bottom
+        # row from line start to the cursor column (never the full lines:
+        # text outside the selection keeps its case).
         if ar <= cr:
             r1, c_top, r2, c_bot = ar, ac, cr, cc
         else:
@@ -145,7 +146,7 @@ def apply_visual(op: str, anchor, cursor, vmode, room, player):
             hi = min(c_bot, ext[1]) if r == r2 else ext[1]
             if lo <= hi:
                 op_case(room, player, TextObject(r, lo, r, hi,
-                                                 TextObjectType.INCLUSIVE), 'g~')
+                                                 TextObjectType.INCLUSIVE), op)
         player.row, player.col = r1, c_top
         return None
 
@@ -159,8 +160,8 @@ def apply_visual(op: str, anchor, cursor, vmode, room, player):
             return op_delete(room, player, tobj, collapse=True)   # remove_row drops the rows' entities
         clip = op_delete(room, player, tobj)   # op_delete → _delete_cols removes/unmasks span entities
         return clip
-    if op == 'g~':
-        op_case(room, player, tobj, 'g~')
+    if op in ('g~', 'gU', 'gu'):
+        op_case(room, player, tobj, op)
         return None
     if op in ('>', '<'):
         amount = INDENT_WIDTH if op == '>' else -INDENT_WIDTH
@@ -183,9 +184,12 @@ def _apply_block(op: str, anchor, cursor, room, player):
     if op in ('d', 'c'):
         for r in range(r1, r2 + 1):
             _delete_cols(room, r, c1, c2)
-    elif op == 'g~':
+            if is_ledge(room, r):
+                close_gap(room, r, c1, c2 - c1 + 1)   # Vim-true: each row's
+                # tail pulls left independently after a block delete
+    elif op in ('g~', 'gU', 'gu'):
         for r in range(r1, r2 + 1):
-            op_case(room, player, TextObject(r, c1, r, c2, TextObjectType.INCLUSIVE), 'g~')
+            op_case(room, player, TextObject(r, c1, r, c2, TextObjectType.INCLUSIVE), op)
     player.row, player.col = r1, c1
     if op in ('d', 'y', 'c'):
         return {'linewise': r1 != r2, 'rows': rows}

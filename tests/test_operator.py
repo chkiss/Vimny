@@ -484,7 +484,7 @@ class TestCaseOperators:
         t = TextObject(3, 0, 3, COLS - 1, TextObjectType.LINEWISE)
         op_case(room, p, t, 'gU')
         assert _syms(room, 3, 2) == 'A' and _syms(room, 3, 8) == 'BC'
-        assert p.col == 1                          # first passable col
+        assert p.col == 2                          # Vim-true: first NON-BLANK
 
 
 class TestIndent:

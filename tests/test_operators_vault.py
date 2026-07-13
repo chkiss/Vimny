@@ -200,8 +200,8 @@ def test_oubliette_pockets_are_sealed_empty_floor():
 
 def test_par_and_budget():
     room = _room()
-    assert room.par == 93
-    assert room.budget == math.ceil(room.par * 1.4) == 131
+    assert room.par == 92        # dd's Vim-true fnb landing saved a key (2026-07-12)
+    assert room.budget == math.ceil(room.par * 1.4) == 129
     assert room.answer.strip()
     # travel discipline: counts stay single-digit (a human can count to 9),
     # and word motions appear only where they beat or tie the count move.
@@ -371,7 +371,8 @@ def test_c10_dd_raises_the_ledge_and_a_second_dd_is_the_oubliette():
     p = Player(row=30, col=57)
     assert remove_row(room, 30, p)
     _cursor_to_line_start(room, p, 30)
-    assert (p.row, p.col) == (30, 2)                 # riding the risen ledge
+    assert (p.row, p.col) == (30, 4)                 # riding the risen ledge —
+    # Vim-true: dd parks on the ledge's first NON-BLANK (its word, col 4)
     assert {(e.row, e.col) for e in _guards(room, 30)} == \
         {(30, 10), (30, 16), (30, 22)}               # the last pack, now on your line
     assert room.exit_pos == (32, 19)                 # the vault slid up with the cut

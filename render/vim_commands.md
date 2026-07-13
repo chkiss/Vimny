@@ -130,6 +130,13 @@
 | v         | visual    | visual mode          |
 | v{m}d/c/~ | visual_op | act on the selection |
 
+## selection_halls — line & block selection
+
+| keys      | token        | desc                  |
+|-----------|--------------|-----------------------|
+| V         | visual_line  | select whole lines    |
+| <C-v>     | visual_block | select a block        |
+
 ## seekers_labyrinth — search
 
 | keys    | token | desc        |

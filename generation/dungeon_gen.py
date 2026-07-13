@@ -3274,6 +3274,180 @@ def build_dungeon_sight_sanctum(seed: int) -> Dungeon:
     return dungeon
 
 
+# ── The Selection Halls (V <C-v>) ───────────────────────────────────────────────
+# The gallery of corrupt panels: whole-row blights take V (the idiom),
+# columnar seams and rectangles take <C-v> (the forcing). Six chambers on the
+# exact-text chassis (spine, anchor-aligned light shaft, gate-row bolts,
+# FINAL SEAL — the Sight Sanctum's proven bones):
+#
+#   • THE CASE TRIO (V, honestly price-forced — the g-prefix tax; user-found):
+#     VU (2) beats gUU (3) on a scattered-case line that must read UPPER;
+#     Vu (2) beats guu (3) on the mirror (and in visual, u LOWERCASES — it is
+#     not undo, the trap-lesson); V~ (2) beats g~~ (3) on a full-flip
+#     MIXED-case target (swapcased display — VU/Vu both write wrong case).
+#     Linewise ops need no anchor column, so the chambers are single rows.
+#   • BLOCK STRIPE (<C-v> 2j l d): three words share a 2-col blight seam at
+#     the anchor column; one block delete heals all three (each row close-gaps
+#     independently). Old route = 2x + dot per row, ~6 keys vs 5.
+#   • BLOCK RECTANGLE (<C-v> 2j 3l ~): three PROPER NAMES (capital initial —
+#     the guard the linewise Vu would destroy) with chars 2-5 wrong-cased; one
+#     block toggle vs count-~ chains (~10) or per-row v-spans (dead: the top
+#     row of a charwise multi-row span runs to line END and eats the tail).
+#   • BLOCK INSERT (<C-v> 2j I {x} Esc — THE FINALE, new engine): three words
+#     lost the SAME letter at the same column; the typed letter replays into
+#     every selected row on Esc. Old route = i{x}Esc + jl. dot chain (~8 vs 5).
+#
+# FORCING BY PAR (standard 1.4 budget): the leanest old-only route (gUU/guu/
+# g~~ + per-row dot chains) wins at 1★ a few keys inside the budget — driven.
+# All six chambers anchor at the SHAFT column, so every hop is a plain {n}j
+# (the nav-golf audit); the answer tape omits <C-v> like Esc (control keys
+# are not tape glyphs).
+_SH_ROWS, _SH_COLS = 23, 26
+_SH_SPINE  = 13                     # every row's first standable
+_SH_BAY_W  = 14                     # bay floor cols 14..24; east wall 25
+_SH_BAY_E  = 24
+_SH_PLQ_COL = 2                     # full true readings, in the WEST wall band
+_SH_TEXT0  = 15                     # multi-part rows start here
+_SH_SHAFT  = 17                     # the anchor column + the light shaft
+_SH_CASE_ROWS  = (3, 5, 7)          # VU · Vu · V~, one row each
+_SH_STRIPE_ROWS = (9, 10, 11)       # block delete
+_SH_RECT_ROWS   = (13, 14, 15)      # block case toggle
+_SH_INS_ROWS    = (17, 18, 19)      # block insert
+_SH_SHAFT_SEPS  = (4, 6, 8, 12, 16) # separators the shaft pierces
+_SH_THROAT = 20                     # spine-only (teleport audit)
+_SH_GATE   = 21
+_SH_BOLT0  = 14                     # bolts cols 14..19, one per chamber
+_SH_EXIT   = (21, 20)               # the FINAL SEAL
+_SH_PAR    = 35
+
+
+def _sh_flip_mask(word: str) -> str:
+    """The V~ chamber's MIXED-case target: odd indices upper — both cases
+    always present (len ≥ 2), so neither VU nor Vu can write it."""
+    return ''.join(ch.upper() if i % 2 else ch for i, ch in enumerate(word))
+
+
+def _sh_scramble(word: str, rng, upper_target: bool) -> str:
+    """A scattered-case display for a case chamber: at least one letter of
+    each case, and never equal to the target (nor to the opposite sweep)."""
+    for _ in range(40):
+        out = ''.join(ch.upper() if rng.random() < 0.5 else ch for ch in word)
+        if out != word and out != word.upper() and any(c.isupper() for c in out) \
+                and any(c.islower() for c in out):
+            return out
+    return word[:1].upper() + word[1:] if not upper_target else word[:1] + word[1:].upper()
+
+
+def _sh_draw_words(rng) -> dict:
+    """Draw the gallery vocabulary (fixed slot lengths pin par and the rival
+    chains): three len-6 case words; three len-5 stripe words; three len-8
+    rectangle names; three len-7 insert words SHARING the letter at index 2
+    (the one typed cure). All thirteen pairwise distinct."""
+    _load_vocab_tables()
+
+    def pool(length):
+        return [w for w in _VOCAB_PLAIN_BY_LEN.get(length, ())
+                if w.isalpha() and w == w.lower()]
+
+    for _ in range(80):
+        case3  = rng.sample(pool(6), 3)
+        stripe = rng.sample(pool(5), 3)
+        rect   = rng.sample(pool(8), 3)
+        by_l: dict = {}
+        for w in pool(7):
+            by_l.setdefault(w[2], []).append(w)
+        letters = [l for l, ws in by_l.items() if len(ws) >= 3]
+        if not letters:
+            continue
+        letter = rng.choice(letters)
+        ins = rng.sample(by_l[letter], 3)
+        picks = case3 + stripe + rect + ins
+        if len(set(picks)) == len(picks):
+            return {'case': case3, 'stripe': stripe, 'rect': rect,
+                    'ins': ins, 'letter': letter}
+    raise ValueError('selection_halls: no distinct draw after 80 tries')
+
+
+def build_dungeon_selection_halls(seed: int) -> Dungeon:
+    """The Selection Halls (slug `selection_halls`): V and <C-v>.
+
+    Six chambers — the case trio (V's honest price win, the g-prefix tax),
+    then the block stripe, rectangle, and insert (<C-v>'s ops with no
+    normal-mode form at all). See the section header for the full forcing."""
+    rng = random.Random(seed)
+    words = _sh_draw_words(rng)
+    up6, lo6, fl6 = words['case']
+    letter = words['letter']
+
+    # (bay rows, floor runs, door targets) — built per seed
+    chambers = []
+    t0, an = _SH_TEXT0, _SH_SHAFT
+    # the case trio: word at the ANCHOR column (fnb == the shaft, so every
+    # post-op cursor sits where the next {n}j hop needs it)
+    chambers.append(((3,), ((3, an, _sh_scramble(up6, rng, True)),), (up6.upper(),)))
+    chambers.append(((5,), ((5, an, _sh_scramble(lo6, rng, False)),), (lo6,)))
+    fl_target = _sh_flip_mask(fl6)
+    chambers.append(((7,), ((7, an, fl_target.swapcase()),), (fl_target,)))
+    # the block stripe: 2-col '##' seam at the anchor across all three rows
+    runs = []
+    for r, w in zip(_SH_STRIPE_ROWS, words['stripe']):
+        runs += [(r, t0, w[:2]), (r, an, '##'), (r, an + 2, w[2:])]
+    chambers.append((_SH_STRIPE_ROWS, tuple(runs), tuple(words['stripe'])))
+    # the block rectangle: proper names, chars 2-5 wrong-cased at cols 17-20
+    runs, targets = [], []
+    for r, w in zip(_SH_RECT_ROWS, words['rect']):
+        name = w.capitalize()
+        runs.append((r, t0, name[:2] + name[2:6].upper() + name[6:]))
+        targets.append(name)
+    chambers.append((_SH_RECT_ROWS, tuple(runs), tuple(targets)))
+    # the block insert: every word lost its index-2 letter (the anchor col)
+    runs = []
+    for r, w in zip(_SH_INS_ROWS, words['ins']):
+        runs.append((r, t0, w[:2] + w[3:]))
+    chambers.append((_SH_INS_ROWS, tuple(runs), tuple(words['ins'])))
+
+    R, C = _SH_ROWS, _SH_COLS
+    cells = [[CellType.WALL] * C for _ in range(R)]
+    for r in range(2, _SH_GATE + 1):                     # the spine
+        cells[r][_SH_SPINE] = CellType.FLOOR
+    for rows, _runs, _targets in chambers:               # the bays
+        for r in rows:
+            for c in range(_SH_BAY_W, _SH_BAY_E + 1):
+                cells[r][c] = CellType.FLOOR
+    for r in _SH_SHAFT_SEPS:                             # the light shaft —
+        cells[r][_SH_SHAFT] = CellType.FLOOR             # NOT the throat row
+
+    room = Room(room_type=RoomType.ENTRY, rows=R, cols=C)
+    room.cells = cells
+    room.seed  = seed
+
+    doors = []
+    for i, (rows, runs, targets) in enumerate(chambers):
+        for rr, cc, text in runs:
+            room.char_runs.append(CharRun(rr, cc, tuple(text), 'ancient'))
+        doors.append((targets, _SH_BOLT0 + i))
+        for pr, ptext in zip(rows, targets):             # full true readings
+            room.char_runs.append(CharRun(pr, _SH_PLQ_COL, tuple(ptext), 'verdant'))
+    room._ss_doors = tuple(doors)                        # the shared exact-text tick
+    room._sh_words = words
+
+    room.entities.append(Entity(kind='exit', row=_SH_EXIT[0], col=_SH_EXIT[1],
+                                edit_immune=True))
+    room.spawn_pos = (2, _SH_SPINE)
+    room.exit_pos  = _SH_EXIT
+
+    room.rebuild_indexes()
+    room.par    = _SH_PAR
+    room.budget = math.ceil(_SH_PAR * 1.4)   # STANDARD: the piecewise route wins at 1★
+    # the tape omits <C-v> (control keys, like Esc, are not tape glyphs)
+    room.answer = f'j VU 2j Vu 2j V~ 2j 2jld 4j 2j3l~ 4j 2jI{letter} G $'
+
+    dungeon = Dungeon(name='The Selection Halls', seed=seed)
+    dungeon.rooms        = [room]
+    dungeon.current_room = 0
+    return dungeon
+
+
 # ── The Seekers' Labyrinth (search: / ? n N *) ──────────────────────────────────
 #
 # A frozen perfect maze (recursive-backtracker, 17×39).  Search ignores walls —
@@ -6004,7 +6178,10 @@ _OV_ANSWER = ('w d w 7l x l x 2l p $ 3j '     # C1  → dw; chest + gold key + g
               'w d W e 7l x l x 2l p $ 3j '   # C7  → dW; chest + red key + gate
               'd 0 5l 3j '                    # C8  ← d0 sweep (dd = oubliette)
               'd $ $ 3j '                     # C9  → d$ sweep
-              'd d d $ 3l 2j 9l x 2l p 2l')   # C10 ← dd, ride down, d$, vault
+              'd d d $ l 2j 9l x 2l p 2l')    # C10 ← dd, ride down, d$, vault
+                                              # (dd lands Vim-true on the risen
+                                              # ledge's FIRST NON-BLANK, col 4
+                                              # — one l to the vault approach)
 
 
 def _ov_pick(rng, table, length, used, pred=None):
@@ -6159,9 +6336,9 @@ def build_dungeon_operators_vault(seed: int) -> Dungeon:
     # only fire on door-opens, and the descent must stay passable after the
     # collapse). The treasure BEHIND the door stays dark until it is unlocked.
     room.fog_cells -= {(_OV_VAULT_ROW, c) for c in range(5, _OV_DOOR[1] + 1)}
-    room.par    = 93
-    room.answer = _OV_ANSWER
-    room.budget = 131                             # ceil(93 * 1.4)
+    room.par    = 92                              # dd's Vim-true fnb landing
+    room.answer = _OV_ANSWER                      # (2026-07-12) saved a key
+    room.budget = math.ceil(92 * 1.4)
 
     dungeon = Dungeon(name="The Operator's Vault", seed=seed)
     dungeon.rooms        = [room]

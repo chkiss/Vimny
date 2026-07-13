@@ -191,6 +191,11 @@ POEMS: list[tuple[str | None, str, list[str]]] = [
         'Move, and the trail glows behind—',
         'all it crosses, held until you act.',
     ]),
+    ('selection_halls', 'V <C-v>', [            # The Selection Halls — V <C-v>
+        'V takes lines whole, however you stand;',
+        'Ctrl-v cuts a window through the page.',
+        'Shape the sight to the wound, then strike.',
+    ]),
     ('seekers_labyrinth', '/ ? n N *', [       # The Seekers' Labyrinth — / ? n N *
         '/ casts a name down the hall ahead;',
         '? sends the same call back. n, N follow.',

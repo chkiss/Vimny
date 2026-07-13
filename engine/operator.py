@@ -50,12 +50,14 @@ def line_extent(room, row: int):
 
 
 def _cursor_to_line_start(room, player, row: int) -> None:
-    """Park the cursor on the first passable column of `row` (Vim's linewise
-    landing spot), clamped to the buffer; keeps the current column when the row
-    has no passable cell."""
+    """Park the cursor on the FIRST NON-BLANK of `row` (Vim's linewise landing
+    spot — dd/>>/V-ops land on the first character, not the first column),
+    falling back to the first passable column on a bare row; keeps the current
+    column when the row has no passable cell."""
+    from engine.motion import _first_non_blank_col
     player.row = min(row, room.rows - 1)
-    ext = line_extent(room, player.row)
-    player.col = ext[0] if ext else player.col
+    fnb = _first_non_blank_col(room, player.row)
+    player.col = fnb if fnb is not None else player.col
 
 
 def _capture_row(room, row: int, lo: int, hi: int) -> dict:
