@@ -6869,6 +6869,20 @@ def build_dungeon_operators_vault(seed: int) -> Dungeon:
         cells[top][col] = cells[top + 1][col] = CellType.FLOOR
     for (r, c) in _OV_POCKETS:                    # the oubliette pockets
         cells[r][c] = CellType.FLOOR
+    # Ground water seeps along the west face (playtest 2026-07-18): cols 1-2
+    # of each FIRST spacer row are WATER, so every col-1 oubliette reads as a
+    # visible pit across the water (the stone-fog law: water is open sight)
+    # while staying walk-unreachable. FIRST spacer rows only — water on the
+    # second spacer row would touch the NEXT corridor and ladder the fog
+    # flood down the west face, unfogging every gate-sealed corridor from
+    # spawn (this level's fog reveals corridor-by-corridor as gates open;
+    # each pool joins only ITS corridor's fog region, so the pits surface
+    # with their own corridor's reveal). No scan runs on a spacer row, so
+    # the water needs no mist; the rest of the stone is untouched.
+    for r in _OV_CORR_ROWS[:-1]:
+        for c in (1, 2):
+            if cells[r + 1][c] == CellType.WALL:
+                cells[r + 1][c] = CellType.WATER
     cells[32][5] = CellType.FLOOR                 # ledge → antechamber drop
     floor(_OV_VAULT_ROW, 5, 19)                   # antechamber + vault
 
