@@ -3509,7 +3509,8 @@ def build_dungeon_selection_halls(seed: int) -> Dungeon:
 
     room.rebuild_indexes()
     room.par    = _SH_PAR
-    room.budget = 108   # GENEROUS hand-set (old-route min 107 + 1): the four
+    room.budget = 110   # GENEROUS hand-set (old-route min 109 + 1; the route
+    # pays two count-x digit charges since the 2026-07-19 {n}x law): the four
     # panels' bay wall EATS the old P-then-delete juggle's displaced word
     # (the void-push), so the honest old route must RETYPE two panels and
     # rebuild a third — visual p is terrain-forced, and 1.4·par (90) would
@@ -3990,6 +3991,153 @@ def build_dungeon_brace_square_enclosure(seed: int) -> Dungeon:
                    f'2j di{{ j . 2j di{{ j di[ 2j da{{ G $')
 
     dungeon = Dungeon(name='The Brace & Square Enclosure', seed=seed)
+    dungeon.rooms        = [room]
+    dungeon.current_room = 0
+    return dungeon
+
+
+# ── The Quote Enclosure (i" a" i' a') ───────────────────────────────────────
+#
+# Quotes have no matching pair — Vim pairs them by scanning the LINE — and
+# that buys the level its headline lesson: the quote objects work from
+# ANYWHERE WEST of the pair (the resolver seeks forward), so every strike
+# here is thrown from the spine, no navigation into the setting at all.
+# Five chambers on the exact-text chassis (_sight_sanctum_tick):
+#   C1 (rows 3-4)   di" husk ×2, the second by dot     → 'w1 "" w2'
+#   C2 (rows 6-7)   ci" cures (typed, single tokens)   → 'w1 "cure" w2'
+#   C3 (rows 9-10)  di' — the quote-mark switch (a blind '.' off C2 replays
+#                   ci"+text and finds no double quote here: a costed no-op)
+#   C4 (rows 12-13) THE WHITESPACE QUIRK: da" / da' span the quotes PLUS the
+#                   trailing space (Vim-true), so the fitting tears out to a
+#                   SINGLE gap 'w1 w2' — where da( left the double-gap scar.
+#   C5 (row 15)     THE SEEK'S LIMIT: 'w1 "" "jjj" w2' — the forward seek
+#                   takes the FIRST pair, which is already empty (di" from
+#                   the spine is a no-op), so the player must aim: 2f" onto
+#                   the second pair's opening mark, then di".
+#
+# Forcing audit (why par 47 needs the objects): the objects fire from the
+# spine while every old tool must first walk in (f"/w cost 2-3 keys before a
+# {n}x or dt" even starts); % does not speak quotes; D/cc raze the kept
+# words. C5's f-navigation route ties the object route (6 = 6) — a tie,
+# never a win.
+_QE_ROWS, _QE_COLS = 19, 44
+_QE_SPINE   = 20                     # every row's first standable
+_QE_BAY_W   = 21                     # bay floor cols 21..42; east wall 43
+_QE_BAY_E   = 42
+_QE_PLQ_COL = 2                      # full true readings (≤17 chars)
+_QE_TEXT0   = 22                     # w1 starts here on every row (len 4)
+_QE_C1_ROWS = (3, 4)
+_QE_C2_ROWS = (6, 7)
+_QE_C3_ROWS = (9, 10)
+_QE_C4_ROWS = (12, 13)
+_QE_C5_ROWS = (15,)
+_QE_SHAFT_SEPS = ((5, 28), (8, 30), (11, 28), (14, 27))
+_QE_THROAT  = 16
+_QE_GATE    = 17
+_QE_BOLTS   = {'c1': 21, 'c2': 22, 'c3': 23, 'c4': 24, 'c5': 25}
+_QE_EXIT    = (17, 26)               # the FINAL SEAL, east of every bolt
+# (row, junk len, quote char); w1 is len 4 on every row so the opening
+# quote sits at col 27 throughout — the chained landings stay inside or
+# west of each next pair, which is all the forward seek needs.
+_QE_SHAPE = ((3, 3, '"'), (4, 4, '"'), (6, 5, '"'), (7, 4, '"'),
+             (9, 4, "'"), (10, 3, "'"), (12, 5, '"'), (13, 4, "'"),
+             (15, 3, '"'))
+_QE_PAR = 47            # hand-tallied along the driven tape (spine strikes)
+
+
+def _qe_draw_words(rng) -> dict:
+    """Draw the enclosure vocabulary (fixed slot lengths pin par and the
+    rival chains): nine w1 (len 4), nine junks (per-shape lens), nine w2
+    (len 5), two typed cures (len 3); all pairwise distinct."""
+    _load_vocab_tables()
+
+    def pool(length):
+        return [w for w in _VOCAB_PLAIN_BY_LEN.get(length, ())
+                if w.isalpha() and w == w.lower()]
+
+    for _ in range(80):
+        picks: list = []
+
+        def draw(length):
+            w = rng.choice(pool(length))
+            picks.append(w)
+            return w
+
+        rows = [(draw(4), draw(jl), draw(5)) for (_r, jl, _q) in _QE_SHAPE]
+        cures = [draw(3), draw(3)]
+        if len(set(picks)) == len(picks):
+            return {'rows': rows, 'cures': cures}
+    raise ValueError('quote_enclosure: no distinct draw after 80 tries')
+
+
+def build_dungeon_quote_enclosure(seed: int) -> Dungeon:
+    """The Quote Enclosure (slug `quote_enclosure`): i" a" i' a' — strike
+    the quoted settings from the spine; the seek does the walking."""
+    rng = random.Random(seed)
+    words = _qe_draw_words(rng)
+
+    runs, targets = [], {}
+    for (r, jl, q), (w1, junk, w2) in zip(_QE_SHAPE, words['rows']):
+        if r in _QE_C5_ROWS:                       # 'w1 "" "jjj" w2'
+            fit = f'{q}{q} {q}{junk}{q}'
+        else:                                      # 'w1 "junk" w2'
+            fit = f'{q}{junk}{q}'
+        w2_s = _QE_TEXT0 + 5 + len(fit) + 1
+        runs += [(r, _QE_TEXT0, w1), (r, _QE_TEXT0 + 5, fit), (r, w2_s, w2)]
+        targets[r] = (w1, w2, q)
+    ca, cb = words['cures']
+    c1 = tuple(f'{targets[r][0]} "" {targets[r][1]}' for r in _QE_C1_ROWS)
+    c2 = tuple(f'{targets[r][0]} "{c}" {targets[r][1]}'
+               for r, c in zip(_QE_C2_ROWS, words['cures']))
+    c3 = tuple(f"{targets[r][0]} '' {targets[r][1]}" for r in _QE_C3_ROWS)
+    c4 = tuple(f'{targets[r][0]} {targets[r][1]}' for r in _QE_C4_ROWS)
+    c5 = (f'{targets[15][0]} "" "" {targets[15][1]}',)
+    doors = ((c1, _QE_BOLTS['c1']), (c2, _QE_BOLTS['c2']),
+             (c3, _QE_BOLTS['c3']), (c4, _QE_BOLTS['c4']),
+             (c5, _QE_BOLTS['c5']))
+
+    R, C = _QE_ROWS, _QE_COLS
+    cells = [[CellType.WALL] * C for _ in range(R)]
+    for r in range(2, _QE_GATE + 1):                     # the spine
+        cells[r][_QE_SPINE] = CellType.FLOOR
+    for r, _jl, _q in _QE_SHAPE:                         # the bays
+        for c in range(_QE_BAY_W, _QE_BAY_E + 1):
+            cells[r][c] = CellType.FLOOR
+    for r, c in _QE_SHAFT_SEPS:                          # the light shafts —
+        cells[r][c] = CellType.FLOOR                     # NOT the throat row
+
+    room = Room(room_type=RoomType.ENTRY, rows=R, cols=C)
+    room.cells = cells
+    room.seed  = seed
+
+    # Full true readings, carved row-aligned into the west wall.
+    plaque_rows = (_QE_C1_ROWS + _QE_C2_ROWS + _QE_C3_ROWS
+                   + _QE_C4_ROWS + _QE_C5_ROWS)
+    plaque_texts = list(c1) + list(c2) + list(c3) + list(c4) + list(c5)
+    for pr, ptext in zip(plaque_rows, plaque_texts):
+        col = _QE_PLQ_COL
+        for part in ptext.split(' '):
+            if part:
+                room.char_runs.append(CharRun(pr, col, tuple(part), 'verdant'))
+            col += len(part) + 1
+    for rr, cc, text in runs:
+        room.char_runs.append(CharRun(rr, cc, tuple(text), 'ancient'))
+    room._ss_doors = doors                               # the shared exact-text tick
+    room._qe_words = words
+
+    room.entities.append(Entity(kind='exit', row=_QE_EXIT[0], col=_QE_EXIT[1],
+                                edit_immune=True))
+    room.spawn_pos = (2, _QE_SPINE)
+    room.exit_pos  = _QE_EXIT
+
+    room.rebuild_indexes()
+    room.par    = _QE_PAR
+    room.budget = math.ceil(_QE_PAR * 1.4)  # STANDARD: the walk-in route wins at 1★
+    room.answer = (f'j di" j . 2j ci" {ca} j ci" {cb} '
+                   f"2j di' j . 2j da\" j da' "
+                   f'2j 2f" di" G $')
+
+    dungeon = Dungeon(name='The Quote Enclosure', seed=seed)
     dungeon.rooms        = [room]
     dungeon.current_room = 0
     return dungeon

@@ -108,7 +108,7 @@ The curriculum is defined in `content/levels.py` (canonical) and mirrored in `LE
 | 32 | The Word Enclosure | `iw aw iW aW` | Playable |
 | 33 | The Bracket Enclosure | `i( a(` | Playable |
 | 34 | The Brace & Square Enclosure | `i[ a[ i{ a{` | Playable |
-| 35 | The Quote Enclosure | `i" a" i' a'` | Planned |
+| 35 | The Quote Enclosure | `i" a" i' a'` | Playable |
 | 36 | The Tag Enclosure | `it at` | Planned |
 | 37 | The Sentence Enclosure | `is as` | Planned |
 | 38 | The Paragraph Enclosure | `ip ap` | Planned |

@@ -2314,6 +2314,7 @@ _LEVEL_INTROS = {
     'word_enclosure': ('The Word Enclosure — rot has taken root in the middle of the inscriptions. The wardens here did not aim their cuts; they named the shape, and the shape was taken whole.', 70),
     'bracket_enclosure': ('The Bracket Enclosure — a jeweller\'s gallery: every inscription holds a stone in its setting, and every stone has gone bad. Pry the stone, keep the setting — or tear the whole fitting out.', 70),
     'brace_square_enclosure': ('The Brace & Square Enclosure — deeper vaults, richer settings: square fittings, braced caskets, and at the heart a casket WITHIN a fitting. The old jewellers read the metal under their hands before they cut.', 70),
+    'quote_enclosure': ('The Quote Enclosure — a gallery of quoted settings, every one holding a rotten word between its marks. The old scribes never stepped up to the shelves: they read the marks from the aisle, and struck from there.', 70),
     'binders_reliquary': ('The Binder\'s Reliquary — still water splits the vault, too wide to step and too deep to wade. On the far shore a single word is legible, and beyond it, the binder\'s last work.', 70),
     'warden_scrivener':    ('The Warden Scrivener — he has copied these halls for an age and finished nothing. The great page waits, passage by passage, for a truer hand.', 70),
     'warden_manifold':     ('The Warden Manifold — he stamps himself into the world. Light the four braziers; the gate will draw and the fog will part.', 70),
@@ -3019,7 +3020,8 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
             for _m in _indentation_sanctum_tick(room, player):
                 _push(_m)
         if level in ('sight_sanctum', 'selection_halls', 'word_enclosure',
-                     'bracket_enclosure', 'brace_square_enclosure'):
+                     'bracket_enclosure', 'brace_square_enclosure',
+                     'quote_enclosure'):
             for _m in _sight_sanctum_tick(room, player):   # the shared exact-text tick
                 _push(_m)
         if level == 'sculpting_chambers':
@@ -5113,7 +5115,11 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
                                    _clip_from_cut_chars(cut_items, player.col), is_delete=True)
                         if is_ledge(room, player.row):
                             close_gap(room, player.row, player.col, count)   # ledge: pull the tail left
-                        budget.spend(1)
+                        # `x`=1; `{n}x` pays its count digits — the count-s
+                        # law (2026-07-19: a flat 1 made {n}x undercut the
+                        # quote objects and inverted the Enclosure forcing).
+                        budget.spend(_keystroke_cost(count, '',
+                                                     action.get('count_given', False)))
                         if len(cut_items) > 1:
                             _push(f'Cut {len(cut_items)} characters')
                         else:

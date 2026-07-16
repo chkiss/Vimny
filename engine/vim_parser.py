@@ -258,7 +258,7 @@ def parse(buf: str, mode: Mode) -> tuple[dict | None, str]:
 
     # x — interact (open door / loot chest)
     if ch == 'x':
-        return {'type': 'interact', 'count': count_n}, buf[i+1:]
+        return _cg({'type': 'interact', 'count': count_n}, count), buf[i+1:]
     # X — delete BEFORE the cursor. Tagged with its own gate token (the Y/D/C
     # rule): it undercuts 'h x' by a key, so it stays locked until taught.
     if ch == 'X':

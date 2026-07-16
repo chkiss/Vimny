@@ -212,7 +212,8 @@ class TestStandaloneCommands:
 
     def test_x_interact_count(self):
         action, _ = parse('5x', Mode.NORMAL)
-        assert action == {'type': 'interact', 'count': 5}
+        # count_given: {n}x pays its count digits (the count-s law, 2026-07-19)
+        assert action == {'type': 'interact', 'count': 5, 'count_given': True}
 
     def test_u_undo(self):
         action, _ = parse('u', Mode.NORMAL)

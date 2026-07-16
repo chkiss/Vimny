@@ -141,6 +141,7 @@ _ANSWER_NOT_TOKENISED = {
     'build_dungeon_word_enclosure',    # diw/ciw+cure tape with typed text; tests/test_word_enclosure.py
     'build_dungeon_bracket_enclosure', # di(/ci(+cure tape with typed text; tests/test_bracket_enclosure.py
     'build_dungeon_brace_square_enclosure',  # di[/ci[+cure/di{ tape with typed text; tests/test_brace_square_enclosure.py
+    'build_dungeon_quote_enclosure',   # di"/ci"+cure tape with typed text; tests/test_quote_enclosure.py
 }
 
 # Levels with a documented NON-1.4 budget. The Change Annex / Extension use a
@@ -151,7 +152,7 @@ _NONSTANDARD_BUDGET = {
     'build_dungeon_change_extension',
     'build_dungeon_overwrite_halls',   # TIGHT: par + _OH_SAVING − 1 bars the all-S route
     'build_dungeon_indentation_sanctum',  # GENEROUS hand-set: the manual-mason route wins 1★
-    'build_dungeon_selection_halls',   # GENEROUS hand-set 108: the void-push forces visual p
+    'build_dungeon_selection_halls',   # GENEROUS hand-set 110: the void-push forces visual p
 }
 
 from tests import SEEDS as _UNIVERSAL_SEEDS
@@ -253,6 +254,7 @@ _REPLAY_OWN_TEST = {
     'build_dungeon_word_enclosure':    'test_word_enclosure.py::test_full_enclosure_route_wins_par_perfect',
     'build_dungeon_bracket_enclosure': 'test_bracket_enclosure.py::test_full_setting_route_wins_par_perfect',
     'build_dungeon_brace_square_enclosure': 'test_brace_square_enclosure.py::test_canonical_run_wins_at_par',
+    'build_dungeon_quote_enclosure': 'test_quote_enclosure.py::test_canonical_run_wins_at_par',
 }
 
 

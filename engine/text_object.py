@@ -270,7 +270,25 @@ def _resolve_quote(room, r, c, around, q):
         return None
     o, cl = chosen
     if around:
-        return TextObject(r, o, r, cl, TextObjectType.INCLUSIVE)
+        # Vim-true a-quote whitespace: a" spans the quotes PLUS the trailing
+        # whitespace (all of it, up to the next glyph) — or, when nothing
+        # trails, the leading whitespace instead. This is why da" leaves the
+        # single gap `w1 w2` where da( left the double-gap scar.
+        end = cl
+        cc = cl + 1
+        while (cc <= hi and _sym_at(room, r, cc) is None
+               and room.is_passable(r, cc)):
+            end = cc
+            cc += 1
+        if end > cl:
+            return TextObject(r, o, r, end, TextObjectType.INCLUSIVE)
+        start = o
+        cc = o - 1
+        while (cc >= lo and _sym_at(room, r, cc) is None
+               and room.is_passable(r, cc)):
+            start = cc
+            cc -= 1
+        return TextObject(r, start, r, cl, TextObjectType.INCLUSIVE)
     if o + 1 > cl - 1:
         return None
     return TextObject(r, o + 1, r, cl - 1, TextObjectType.INCLUSIVE)

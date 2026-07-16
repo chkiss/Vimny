@@ -132,8 +132,18 @@ class TestQuotes:
     def test_inner_quote(self):
         assert _span(resolve_text_object('i"', self._r(), _p(3, 3))) == (3, 3, 3, 4)
 
-    def test_around_quote(self):
-        assert _span(resolve_text_object('a"', self._r(), _p(3, 3))) == (3, 2, 3, 5)
+    def test_around_quote_spans_the_trailing_whitespace(self):
+        # Vim-true (2026-07-19): a" includes the trailing whitespace up to
+        # the next glyph — why da" leaves the single gap 'w1 w2' where da(
+        # left the double-gap scar.
+        assert _span(resolve_text_object('a"', self._r(), _p(3, 3))) == (3, 2, 3, 7)
+
+    def test_around_quote_trailing_run_reaches_the_line_end(self):
+        # Vim-true: with no glyph after the pair, a" eats ALL the trailing
+        # whitespace — here the bare floor out to the row's edge.
+        room = self._r()
+        span = _span(resolve_text_object('a"', room, _p(3, 9)))
+        assert span[:3] == (3, 8, 3) and span[3] > 11, span
 
     def test_cursor_before_selects_next_pair(self):
         # cursor at col 6 (between the two strings) → next pair (8-11)

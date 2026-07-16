@@ -67,7 +67,8 @@ def _canon_keys(room):
 # insert only RE-ENTERS insert), r + dot for the stamp — and for the four
 # panels, cut-then-paste ONCE (the bay wall eats the pushed word — the
 # void-push) then RETYPE the rest: visual p is terrain-forced. Wins at 1★
-# only because the budget is hand-set generous (108 = old min + 1).
+# only because the budget is hand-set generous (110 = old min 109 + 1; the
+# route pays two count-x digit charges under the 2026-07-19 {n}x law).
 def _rival_keys(room):
     w = room._sh_words
     pa = w['panels']
@@ -139,7 +140,7 @@ def test_layout_and_identity(seed):
 def test_par_answer_budget(seed):
     room = _room(seed)
     assert room.par == _SH_PAR
-    assert room.budget == 108, "GENEROUS hand-set: old min 107 + 1 (the void-push)"
+    assert room.budget == 110, "GENEROUS hand-set: old min 109 + 1 (the void-push)"
     L, sl = room._sh_words['letter'], room._sh_words['stamp_letter']
     # <C-v> shows as ^v — LOAD-BEARING on the tape (playtest: omitting it
     # made the tape unplayable; a d2j swallowed a stripe row)
