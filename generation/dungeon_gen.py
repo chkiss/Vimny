@@ -6166,6 +6166,25 @@ def build_dungeon_sentence_corridor(seed: int) -> 'Dungeon':
     runes.append(CharRun(row=0, col=_s1_c,
                          symbols=tuple(_RUNE_CHAR['void'] * len(_s1_text)), kind='void'))
 
+    # ── Waterworks (2026-07-18): the inter-sentence gaps and the row-2
+    # separator are MISTED WATER, not stone — every sentence is visible from
+    # spawn (the stone-fog law) while the physics hold: water bars feet, and
+    # the mist stops $ / f at each sentence's end exactly as the stone gap
+    # did (the par route's `$ → key` depends on that bound). Word motions
+    # never cross water; ) ( land on sentence starts as before.
+    mist: set = set()
+    for r in (1, 3):
+        span = [c for c in range(COLS) if cells[r][c] != CellType.WALL]
+        for c in range(min(span), max(span) + 1):
+            if cells[r][c] == CellType.WALL:
+                cells[r][c] = CellType.WATER
+                mist.add((r, c))
+    for c in range(1, COLS - 1):
+        if cells[2][c] == CellType.WALL:
+            cells[2][c] = CellType.WATER
+            mist.add((2, c))
+    composite.fog_cells = mist
+
     composite.spawn_pos = _SENTENCE_CORRIDOR_ENTRY
     composite.exit_pos  = _SENTENCE_CORRIDOR_EXIT
     composite.entities = [

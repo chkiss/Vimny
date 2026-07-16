@@ -48,9 +48,9 @@ _JUMP_ENTRY_DESIGN = {
                                          # are deliberately unfogged so the dd
                                          # fall can land (west-face water makes
                                          # the col-1 pits visible pools)
-    'build_dungeon_sentence_corridor',   # ( ) jump-entry pockets
-    # waypoint_sanctum left the list 2026-07-18: the waterworks conversion
-    # (misted water seals/pocket/vault boxes) made every hall visible.
+    # waypoint_sanctum and sentence_corridor left the list 2026-07-18: the
+    # waterworks conversions (misted water seals / gaps) made every hall
+    # and sentence visible.
 }
 _SCRIPTED_FOG |= _JUMP_ENTRY_DESIGN
 

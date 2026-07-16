@@ -68,11 +68,17 @@ def test_entry_and_exit_passable(seed):
 
 
 @pytest.mark.parametrize("seed", SEEDS)
-def test_separator_row_is_all_wall(seed):
-    """The stone row between the two sentence rows blocks all j/k crossing,
-    so the only way between rows is a sentence jump."""
+def test_separator_row_is_all_impassable(seed):
+    """The separator between the two sentence rows blocks all j/k crossing,
+    so the only way between rows is a sentence jump. Since the 2026-07-18
+    waterworks it is MISTED WATER (visible, scan-blocking) framed by the
+    border walls — every cell impassable either way."""
     room = build_dungeon_sentence_corridor(seed).rooms[0]
-    assert all(ct == CellType.WALL for ct in room.cells[_SENTENCE_CORRIDOR_SEP_ROW])
+    sep = _SENTENCE_CORRIDOR_SEP_ROW
+    for c, ct in enumerate(room.cells[sep]):
+        assert not room.is_passable(sep, c)
+        if ct == CellType.WATER:
+            assert (sep, c) in room.fog_cells    # the mist bars the scans
 
 
 @pytest.mark.parametrize("seed", SEEDS)
