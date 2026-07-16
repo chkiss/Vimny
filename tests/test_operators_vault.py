@@ -52,7 +52,10 @@ from tests import SEEDS
 def _room(seed=7, defog=False):
     room = dg.build_dungeon_operators_vault(seed).rooms[0]
     if defog:
-        room.fog_cells = set()
+        # Clear the revealable fog only — the west channel's MIST is
+        # permanent in play (reveal floods skip it), so tests keep it too:
+        # it is what bounds 0 / ^ at col 2 on the corridor rows.
+        room.fog_cells = set(room.mist_cells)
     return room
 
 

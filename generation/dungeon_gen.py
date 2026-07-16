@@ -7029,13 +7029,16 @@ def build_dungeon_operators_vault(seed: int) -> Dungeon:
     room.fog_cells -= {p for p in _OV_POCKETS if p[0] <= 29}
     # The west-face misted channel (see the note above): laid after the fog
     # flood so the build flood saw stone, permanently misted thereafter.
-    for r in range(_OV_CORR_ROWS[0] + 1, _OV_SPLIT_ROW):
-        if r not in _OV_CORR_ROWS:
-            for c in (1, 2):
-                if room.cells[r][c] == CellType.WALL:
-                    room.cells[r][c] = CellType.WATER
-                    room.fog_cells.add((r, c))
-                    room.mist_cells.add((r, c))
+    # Every WALL cell in the strip converts — including the corridor rows'
+    # own col-1 stubs (playtest 2026-07-19: they read as interruptions), so
+    # the seep runs unbroken top to bottom. On a corridor row only col 1 is
+    # stone (col 2 is its floor), and the mist keeps 0 / ^ landing at col 2.
+    for r in range(_OV_CORR_ROWS[0], _OV_SPLIT_ROW):
+        for c in (1, 2):
+            if room.cells[r][c] == CellType.WALL:
+                room.cells[r][c] = CellType.WATER
+                room.fog_cells.add((r, c))
+                room.mist_cells.add((r, c))
     room.par    = 92                              # dd's Vim-true fnb landing
     room.answer = _OV_ANSWER                      # (2026-07-12) saved a key
     room.budget = math.ceil(92 * 1.4)
