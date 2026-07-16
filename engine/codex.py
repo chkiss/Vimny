@@ -190,6 +190,14 @@ class CodexPane:
 def scroll_sections(catalog, discovered):
     """The Codex's standing matter: one section per DISCOVERED catalog
     scroll, in catalog order, each rendered as plain text lines."""
+    def flat(x):
+        """Scroll fields may be rich segments — a list of (text, hl) tuples
+        (e.g. the Numbered Ledger's ':set nu|mber'). The Codex is plain text."""
+        if isinstance(x, str):
+            return x
+        return ''.join(seg[0] if isinstance(seg, (tuple, list)) else str(seg)
+                       for seg in x)
+
     out = []
     have = set(discovered or ())
     for entry in catalog:
@@ -202,11 +210,11 @@ def scroll_sections(catalog, discovered):
                 if tag == 'blank':
                     body.append('')
                 elif tag == 'cmd':
-                    body.append(f'  {line[1]:<8} {line[2]}')
+                    body.append(f'  {flat(line[1]):<8} {flat(line[2])}')
                 elif tag == 'smudge':
-                    body.append(f'  {line[1]:<8} {line[2]}{line[3]}')
+                    body.append(f'  {flat(line[1]):<8} {flat(line[2])}{flat(line[3])}')
                 else:                              # dim / amber
-                    body.append(line[1])
+                    body.append(flat(line[1]))
         else:                                      # the kv shape (the Unnamed
             body.append(content.get('intro', ''))  # Register scroll)
             p = content.get('p_text')

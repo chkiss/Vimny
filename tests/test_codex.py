@@ -148,6 +148,17 @@ def test_every_catalog_scroll_binds_into_the_codex():
     assert len(secs) == len(SCROLL_CATALOG)
     reg_body = dict((t, b) for t, b in secs)['The Unnamed Register']
     assert any(x.strip().startswith('x') for x in reg_body)
+    # Every bound line must be plain text — rich (text, hl) segments (the
+    # Numbered Ledger, the Recalling Hand) flatten (zR crash, 2026-07-16)...
+    for title, body in secs:
+        for ln in body:
+            assert isinstance(ln, str), (title, ln)
+    # ...and the whole open book must render.
+    pane = CodexPane(secs)
+    pane.open_all()
+    pane.to_bottom()
+    for text, _cur, _ridge in pane.render_rows(30, 56):
+        assert isinstance(text, str)
 
 
 def test_scroll_sections_only_binds_discovered_scrolls():
