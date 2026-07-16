@@ -152,13 +152,19 @@ def test_corridor_loot_is_scroll_chests_and_no_treasure_hoard():
     assert behind == []
 
 
-def test_vault_is_sealed_and_fogged_until_opened():
+def test_vault_is_sealed_and_fogged_until_arrival():
+    # The stone law (2026-07-19): everything below the C10 overhang sleeps
+    # dark at build — the ledge, the walkway and the vault — and the tick's
+    # per-key door-blocked _reveal_from lights it only when the collapse
+    # drops the player in (the dd park is fog-blind for that fall). The
+    # corridor pockets stay visible: they are the warning, and sight passes
+    # the gate grilles.
     room = _room()
     assert room.exit_pos == (33, 19)
-    assert room.exit_pos in room.fog_cells           # the way out, dark behind the door
-    assert (33, 16) not in room.fog_cells            # …but the walkway shows
-    assert (31, 10) not in room.fog_cells            # the sealed ledge shows too
-    assert (4, 3) not in room.fog_cells              # and the oubliette pockets
+    assert room.exit_pos in room.fog_cells           # the way out, dark
+    assert (33, 16) in room.fog_cells                # the walkway too
+    assert (31, 10) in room.fog_cells                # and the sealed ledge
+    assert (4, 3) not in room.fog_cells              # but not the pockets
 
 
 @pytest.mark.parametrize('seed', SEEDS)

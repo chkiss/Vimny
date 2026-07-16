@@ -38,21 +38,9 @@ _SCRIPTED_FOG = {
     'build_dungeon_dummy',               # admin sandbox
 }
 
-# Levels whose DESIGN enters walk-unreachable areas by jump or search —
-# fogging them breaks their tuned physics (fog = impassable, so } / ( ) / }
-# landings shift and searches into the area die). Documented, not fixed:
-# a redesign under the stone law would be a level rework, not a fog patch.
-_JUMP_ENTRY_DESIGN = {
-    'build_dungeon_operators_vault',     # own fog choreography (corridor-by-
-                                         # corridor reveal); the oubliette pits
-                                         # are deliberately unfogged so the dd
-                                         # fall can land (west-face water makes
-                                         # the col-1 pits visible pools)
-    # waypoint_sanctum and sentence_corridor left the list 2026-07-18: the
-    # waterworks conversions (misted water seals / gaps) made every hall
-    # and sentence visible.
-}
-_SCRIPTED_FOG |= _JUMP_ENTRY_DESIGN
+# (The one-time jump-entry exemption list emptied 2026-07-19: waypoint and
+# sentence_corridor via the waterworks; operators_vault via natural fog +
+# its tick's per-key door-blocked _reveal_from.)
 
 
 def _builders():

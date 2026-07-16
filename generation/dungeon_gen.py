@@ -4524,10 +4524,11 @@ def build_dungeon_waypoint_sanctum(seed: int) -> 'Dungeon':
         sid = 'redo' if (kind == 'chest_scroll' and first_chest) else ''
         first_chest = first_chest and kind != 'chest_scroll'
         carve(7, X)                                      # 'blue' door cell (in the seal)
-        for r in (8, 9):                                 # moat the shaft off the danger room
-            moat(r, X - 1)
-            moat(r, X + 1)
-        moat(10, X)
+        for r in (8, 9):                                 # box the shaft off the danger room
+            cells[r][X - 1] = CellType.WALL              # (stone, like the scroll nook —
+            cells[r][X + 1] = CellType.WALL              # playtest 2026-07-19: a chest is
+        cells[10][X] = CellType.WALL                     # a surprise, not an exhibit)
+        mist.add((8, X)); mist.add((9, X))               # the shaft sleeps under fog
         entities += [Entity(kind='locked_door', row=7, col=X, tag='blue'),
                      Entity(kind=kind, row=9, col=X, scroll_id=sid)]
         vault_cells |= {(7, X), (8, X), (9, X)}
@@ -6160,11 +6161,14 @@ def build_dungeon_sentence_corridor(seed: int) -> 'Dungeon':
     # leaving `(` the shortest backtrack and par at 9. The par solver and the
     # cheese audit both refuse to land on void, so par stays the true minimum.
     # Spans only S1 (a dead-end stub off the spawn) ⇒ no wall-gap bypass.
+    # Shaved to THREE runes (playtest 2026-07-19): every jump that resolves
+    # onto this row lands on its FIRST standable cell — the strip head — so
+    # a 3-rune stub traps exactly as the old full-sentence pave did.
     _s1_r, _s1_c, _s1_text = _SENTENCE_CORRIDOR_SENTENCES[0]
-    for c in range(_s1_c, _s1_c + len(_s1_text)):
+    for c in range(_s1_c, _s1_c + 3):
         cells[0][c] = CellType.CORRIDOR
     runes.append(CharRun(row=0, col=_s1_c,
-                         symbols=tuple(_RUNE_CHAR['void'] * len(_s1_text)), kind='void'))
+                         symbols=tuple(_RUNE_CHAR['void'] * 3), kind='void'))
 
     # ── Waterworks (2026-07-18): the inter-sentence gaps and the row-2
     # separator are MISTED WATER, not stone — every sentence is visible from
@@ -7018,15 +7022,15 @@ def build_dungeon_operators_vault(seed: int) -> Dungeon:
 
     room.rebuild_indexes()
     _fog_unreachable(room, room.spawn_pos[0], room.spawn_pos[1])
-    # The sealed ledge and the oubliette pockets stay VISIBLE — they are the
-    # warning — and dd's cursor-park needs them passable, hence unfogged.
-    room.fog_cells -= {(_OV_LEDGE_ROW, c) for c in range(_OV_LCOL, 30)}
-    room.fog_cells -= set(_OV_POCKETS)
-    room.fog_cells.discard((32, 5))
-    # …and so does the antechamber walkway up to the vault door (fog reveals
-    # only fire on door-opens, and the descent must stay passable after the
-    # collapse). The treasure BEHIND the door stays dark until it is unlocked.
-    room.fog_cells -= {(_OV_VAULT_ROW, c) for c in range(5, _OV_DOOR[1] + 1)}
+    # (2026-07-19) Only the CORRIDOR pockets are subtracted: they are the
+    # visible pits (the warning), they're audit-clean — sight passes the
+    # gate grilles — and fogging them phase-shifts the goblin AI against
+    # the canonical tape (fog is impassable; a pocket mouth is a move
+    # option). The ledge, the antechamber, its two pockets and the vault
+    # sleep dark until the C10 collapse drops the player in — the tick's
+    # per-key door-blocked _reveal_from lights them from where they land
+    # (the dd park is fog-blind for exactly this fall).
+    room.fog_cells -= {p for p in _OV_POCKETS if p[0] <= 29}
     room.par    = 92                              # dd's Vim-true fnb landing
     room.answer = _OV_ANSWER                      # (2026-07-12) saved a key
     room.budget = math.ceil(92 * 1.4)

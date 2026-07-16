@@ -54,9 +54,24 @@ def _cursor_to_line_start(room, player, row: int) -> None:
     spot — dd/>>/V-ops land on the first character, not the first column),
     falling back to the first passable column on a bare row; keeps the current
     column when the row has no passable cell."""
-    from engine.motion import _first_non_blank_col
+    from engine.motion import _first_non_blank_col, _caret_stop
     player.row = min(row, room.rows - 1)
     fnb = _first_non_blank_col(room, player.row)
+    if fnb is None:
+        # A collapse may drop the cursor onto a row the fog still hides
+        # (the Operator's Vault ledge): the fall is physical, so park by
+        # the SAME first-non-blank rule IGNORING fog — first character,
+        # else first floor cell — and let the level's reveal tick light
+        # the room from where the player lands.
+        left = None
+        for c in range(room.cols):
+            if room.cells[player.row][c] in (CellType.FLOOR, CellType.CORRIDOR):
+                if left is None:
+                    left = c
+                if _caret_stop(room, player.row, c):
+                    left = c
+                    break
+        fnb = left
     player.col = fnb if fnb is not None else player.col
 
 
