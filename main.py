@@ -2220,6 +2220,7 @@ _LEVEL_INTROS = {
     'selection_halls': ('The Selection Halls — a gallery of corrupt panels: some rotted whole lines at a time, some down a single seam. The restorers here took each span in one grasp.', 70),
     'word_enclosure': ('The Word Enclosure — rot has taken root in the middle of the inscriptions. The wardens here did not aim their cuts; they named the shape, and the shape was taken whole.', 70),
     'bracket_enclosure': ('The Bracket Enclosure — a jeweller\'s gallery: every inscription holds a stone in its setting, and every stone has gone bad. Pry the stone, keep the setting — or tear the whole fitting out.', 70),
+    'brace_square_enclosure': ('The Brace & Square Enclosure — deeper vaults, richer settings: square fittings, braced caskets, and at the heart a casket WITHIN a fitting. The old jewellers read the metal under their hands before they cut.', 70),
     'warden_scrivener':    ('The Warden Scrivener — he has copied these halls for an age and finished nothing. The great page waits, passage by passage, for a truer hand.', 70),
     'warden_manifold':     ('The Warden Manifold — he stamps himself into the world. Light the four braziers; the gate will draw and the fog will part.', 70),
     'warden_surveyor':     ('The Warden Surveyor — he keeps a long hall where the floor falls away between the words. Cross it word by word, over the void.', 60),
@@ -2923,7 +2924,7 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
             for _m in _indentation_sanctum_tick(room, player):
                 _push(_m)
         if level in ('sight_sanctum', 'selection_halls', 'word_enclosure',
-                     'bracket_enclosure'):
+                     'bracket_enclosure', 'brace_square_enclosure'):
             for _m in _sight_sanctum_tick(room, player):   # the shared exact-text tick
                 _push(_m)
         if level == 'sculpting_chambers':

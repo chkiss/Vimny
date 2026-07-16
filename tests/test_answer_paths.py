@@ -139,6 +139,7 @@ _ANSWER_NOT_TOKENISED = {
     'build_dungeon_selection_halls',   # V/<C-v> tape (control keys untokenised); tests/test_selection_halls.py
     'build_dungeon_word_enclosure',    # diw/ciw+cure tape with typed text; tests/test_word_enclosure.py
     'build_dungeon_bracket_enclosure', # di(/ci(+cure tape with typed text; tests/test_bracket_enclosure.py
+    'build_dungeon_brace_square_enclosure',  # di[/ci[+cure/di{ tape with typed text; tests/test_brace_square_enclosure.py
 }
 
 # Levels with a documented NON-1.4 budget. The Change Annex / Extension use a
@@ -250,6 +251,7 @@ _REPLAY_OWN_TEST = {
     'build_dungeon_selection_halls':   'test_selection_halls.py::test_full_selection_route_wins_par_perfect',
     'build_dungeon_word_enclosure':    'test_word_enclosure.py::test_full_enclosure_route_wins_par_perfect',
     'build_dungeon_bracket_enclosure': 'test_bracket_enclosure.py::test_full_setting_route_wins_par_perfect',
+    'build_dungeon_brace_square_enclosure': 'test_brace_square_enclosure.py::test_canonical_run_wins_at_par',
 }
 
 

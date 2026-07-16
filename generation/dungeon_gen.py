@@ -3791,6 +3791,168 @@ def build_dungeon_bracket_enclosure(seed: int) -> Dungeon:
     return dungeon
 
 
+# ── The Brace & Square Enclosure (i[ a[ i{ a{) ──────────────────────────────
+#
+# Level 33 taught inside-vs-around on one delimiter family; with two more the
+# lesson becomes CHOOSING the object — reading the delimiter under your hand —
+# and, in the nest chamber, resolving AMBIGUITY: from one cursor position
+# inside `[{junk} flank]`, di{ and di[ carve different spans. Five chambers on
+# the exact-text chassis (_sight_sanctum_tick):
+#   C1 (rows 3-4)   di[ husk ×2, the second by dot   → 'w1 [] w2'
+#   C2 (rows 6-7)   ci[ cures (typed, single tokens) → 'w1 [cure] w2'
+#   C3 (rows 9-10)  di{ + dot (the family switch — a blind '.' straight off
+#                   C2 replays ci[+text and finds no [ here: a costed no-op)
+#   C4 (rows 12-13) THE NEST, twin mirrored rows: `w1 [{jjj} bbb] w2`.
+#                   Row 12's door wants only the braces emptied (di{); row
+#                   13's wants the square gutted whole (di[) — same landing
+#                   column, two different correct objects. Twin bolts sit at
+#                   the CENTER of the gate run (cols 25-26), plaques ember /
+#                   pedestal so the pair reads as a matched set.
+#   C5 (row 15)     da{ scar                          → 'w1  w2'
+#
+# Forcing audit (why par 45 needs the objects):
+#   • every hop lands MID-junk (never at junk start), so `{n}x` pays a
+#     positioning key the object doesn't;
+#   • d% kills the delimiters, so it can never match a husk target; on the
+#     scar row it needs an h first (h d% = 3, a tie with da{, never a win);
+#   • dT[/dt] need the junk edge, which the landings don't give;
+#   • row 3's stone is two words (no single-count x chain).
+_BSQ_ROWS, _BSQ_COLS = 19, 48
+_BSQ_SPINE   = 22                    # every row's first standable
+_BSQ_BAY_W   = 23                    # bay floor cols 23..45; east wall 46
+_BSQ_BAY_E   = 45
+_BSQ_PLQ_COL = 2                     # full true readings (≤19 chars)
+_BSQ_TEXT0   = 24                    # w1 starts here on every row
+_BSQ_C1_ROWS = (3, 4)
+_BSQ_C2_ROWS = (6, 7)
+_BSQ_C3_ROWS = (9, 10)
+_BSQ_C4_ROWS = (12, 13)
+_BSQ_C5_ROWS = (15,)
+_BSQ_SHAFT_SEPS = ((5, 30), (8, 31), (11, 31), (14, 29))
+_BSQ_THROAT  = 16
+_BSQ_GATE    = 17
+_BSQ_BOLT0   = 23                    # bolts 23..28: C1 C2 C4a C4b C3 C5
+_BSQ_BOLTS   = {'c1': 23, 'c2': 24, 'c4a': 25, 'c4b': 26, 'c3': 27, 'c5': 28}
+_BSQ_EXIT    = (17, 29)              # the FINAL SEAL, east of every bolt
+# (row, w1 len, junk/stone len, delimiter open col = TEXT0 + w1len + 1)
+_BSQ_C1_SHAPE = ((3, 5, 7, 30), (4, 4, 5, 29))       # row 3 stone = 'aaa bbb'
+_BSQ_C2_SHAPE = ((6, 3, 4, 28), (7, 3, 4, 28))
+_BSQ_C3_SHAPE = ((9, 4, 4, 29), (10, 5, 5, 30))
+_BSQ_C4_SHAPE = ((12, 3, 3, 28), (13, 3, 3, 28))     # mirrored twins
+_BSQ_C5_SHAPE = ((15, 3, 5, 28),)
+_BSQ_PAR = 45           # hand-tallied along the driven tape (j % entry)
+
+
+def _bsq_draw_words(rng) -> dict:
+    """Draw the enclosure vocabulary (fixed slot lengths pin par and the
+    rival chains). Row 3's stone is two len-3 words; C4's twins carry a len-3
+    junk and a len-3 flank each; two typed cures (len 3); all distinct."""
+    _load_vocab_tables()
+
+    def pool(length):
+        return [w for w in _VOCAB_PLAIN_BY_LEN.get(length, ())
+                if w.isalpha() and w == w.lower()]
+
+    shapes = (_BSQ_C1_SHAPE + _BSQ_C2_SHAPE + _BSQ_C3_SHAPE
+              + _BSQ_C4_SHAPE + _BSQ_C5_SHAPE)
+    for _ in range(80):
+        picks: list = []
+
+        def draw(length):
+            w = rng.choice(pool(length))
+            picks.append(w)
+            return w
+
+        rows, flanks = [], {}
+        for i, (r, w1l, stl, _fs) in enumerate(shapes):
+            stone = f'{draw(3)} {draw(3)}' if i == 0 else draw(stl)
+            rows.append((draw(w1l), stone, draw(5)))
+            if r in _BSQ_C4_ROWS:
+                flanks[r] = draw(3)
+        cures = [draw(3), draw(3)]
+        if len(set(picks)) == len(picks):
+            return {'rows': rows, 'cures': cures, 'flanks': flanks}
+    raise ValueError('brace_square_enclosure: no distinct draw after 80 tries')
+
+
+def build_dungeon_brace_square_enclosure(seed: int) -> Dungeon:
+    """The Brace & Square Enclosure (slug `brace_square_enclosure`):
+    i[ a[ i{ a{ — choose the object; in the nest, choose the DEPTH."""
+    rng = random.Random(seed)
+    words = _bsq_draw_words(rng)
+    shapes = (_BSQ_C1_SHAPE + _BSQ_C2_SHAPE + _BSQ_C3_SHAPE
+              + _BSQ_C4_SHAPE + _BSQ_C5_SHAPE)
+
+    runs, targets = [], {}
+    for (r, w1l, stl, f_s), (w1, stone, w2) in zip(shapes, words['rows']):
+        if r in _BSQ_C4_ROWS:                          # `w1 [{jjj} bbb] w2`
+            fit = f'[{{{stone}}} {words["flanks"][r]}]'
+        elif r in _BSQ_C1_ROWS + _BSQ_C2_ROWS:         # `w1 [stone] w2`
+            fit = f'[{stone}]'
+        else:                                          # `w1 {stone} w2`
+            fit = f'{{{stone}}}'
+        w2_s = f_s + len(fit) + 1
+        runs += [(r, _BSQ_TEXT0, w1), (r, f_s, fit), (r, w2_s, w2)]
+        targets[r] = (w1, w2)
+    ca, cb = words['cures']
+    c1  = tuple(f'{targets[r][0]} [] {targets[r][1]}' for r in _BSQ_C1_ROWS)
+    c2  = tuple(f'{targets[r][0]} [{c}] {targets[r][1]}'
+                for r, c in zip(_BSQ_C2_ROWS, words['cures']))
+    c3  = tuple(f'{targets[r][0]} {{}} {targets[r][1]}' for r in _BSQ_C3_ROWS)
+    c4a = (f'{targets[12][0]} [{{}} {words["flanks"][12]}] {targets[12][1]}',)
+    c4b = (f'{targets[13][0]} [] {targets[13][1]}',)
+    c5  = tuple(f'{targets[r][0]}  {targets[r][1]}' for r in _BSQ_C5_ROWS)
+    doors = ((c1, _BSQ_BOLTS['c1']), (c2, _BSQ_BOLTS['c2']),
+             (c3, _BSQ_BOLTS['c3']), (c4a, _BSQ_BOLTS['c4a']),
+             (c4b, _BSQ_BOLTS['c4b']), (c5, _BSQ_BOLTS['c5']))
+    plaques = {**{r: (t, 'verdant') for r, t in zip(_BSQ_C1_ROWS, c1)},
+               **{r: (t, 'verdant') for r, t in zip(_BSQ_C2_ROWS, c2)},
+               **{r: (t, 'verdant') for r, t in zip(_BSQ_C3_ROWS, c3)},
+               12: (c4a[0], 'ember'), 13: (c4b[0], 'pedestal'),
+               15: (c5[0], 'verdant')}
+
+    R, C = _BSQ_ROWS, _BSQ_COLS
+    cells = [[CellType.WALL] * C for _ in range(R)]
+    for r in range(2, _BSQ_GATE + 1):                    # the spine
+        cells[r][_BSQ_SPINE] = CellType.FLOOR
+    for r, _w1l, _stl, _fs in shapes:                    # the bays
+        for c in range(_BSQ_BAY_W, _BSQ_BAY_E + 1):
+            cells[r][c] = CellType.FLOOR
+    for r, c in _BSQ_SHAFT_SEPS:                         # the light shafts —
+        cells[r][c] = CellType.FLOOR                     # NOT the throat row
+
+    room = Room(room_type=RoomType.ENTRY, rows=R, cols=C)
+    room.cells = cells
+    room.seed  = seed
+
+    for pr, (ptext, colour) in plaques.items():          # full true readings
+        col = _BSQ_PLQ_COL
+        for part in ptext.split(' '):
+            if part:
+                room.char_runs.append(CharRun(pr, col, tuple(part), colour))
+            col += len(part) + 1
+    for rr, cc, text in runs:
+        room.char_runs.append(CharRun(rr, cc, tuple(text), 'ancient'))
+    room._ss_doors = doors                               # the shared exact-text tick
+    room._bsq_words = words
+
+    room.entities.append(Entity(kind='exit', row=_BSQ_EXIT[0], col=_BSQ_EXIT[1],
+                                edit_immune=True))
+    room.spawn_pos = (2, _BSQ_SPINE)
+    room.exit_pos  = _BSQ_EXIT
+
+    room.rebuild_indexes()
+    room.par    = _BSQ_PAR
+    room.budget = math.ceil(_BSQ_PAR * 1.4)  # STANDARD: the piecewise route wins at 1★
+    room.answer = (f'j % di[ j . 2j ci[ {ca} j ci[ {cb} '
+                   f'2j di{{ j . 2j di{{ j di[ 2j da{{ G $')
+
+    dungeon = Dungeon(name='The Brace & Square Enclosure', seed=seed)
+    dungeon.rooms        = [room]
+    dungeon.current_room = 0
+    return dungeon
+
+
 # ── The Seekers' Labyrinth (search: / ? n N *) ──────────────────────────────────
 #
 # A frozen perfect maze (recursive-backtracker, 17×39).  Search ignores walls —
