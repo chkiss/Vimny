@@ -103,16 +103,17 @@ OTHER_END_SCROLL = {
 }
 
 
-# Relic — the implicit ' mark. Usable only once marks are learned (the ''
-# jump itself is gated on 'mark'), so an early drop teases without cheesing.
+# Relic — the implicit ' mark. The '' jump rides the 'mark' gate (level 15),
+# so the drop itself is held back until marks are learned (_RELIC_PREREQ)
+# rather than smudging a relic the player couldn't use.
 WAY_BACK_SCROLL = {
     'title': '◈   The Way Back   ◈',
     'lines': [
         ('dim',    '  I lost my place a thousand times before'),
         ('dim',    '  I learned the dungeon keeps it for me.'),
         ('blank',),
-        ('smudge', "''", 'the line you last j', 'umped from',  'mark'),
-        ('smudge', '``', 'the very spot, colu', 'mn and all',  'mark'),
+        ('cmd',    "''", 'the line you last jumped from'),
+        ('cmd',    '``', 'the very spot, column and all'),
         ('blank',),
         ('dim',    "  Each leap lays a new footprint, so ''"),
         ('dim',    '  twice is a toggle: there, and back again.'),
@@ -698,22 +699,33 @@ RELIC_SCROLL_IDS = [
     'ZZ',    # The Sealed Departure — ZZ/ZQ; free like the :wq/:q! they abbreviate
     'swap_ends',  # The Other End — o / O / gv (selection shaping; no cost surface)
     'jump_back',  # The Way Back — '' / `` ; the JUMP stays gated on 'mark'
-                  # (level 15), so an early drop only teases: cheese-audited —
-                  # no pre-15 par can use it, and at 15+ '' ties `a / n / gg
-                  # returns in every canonical tape
+                  # (level 15). Not smudged: the drop is held back instead —
+                  # see _RELIC_PREREQ. Cheese-audited: at 15+ '' ties
+                  # `a / n / gg returns in every canonical tape.
     # 'redo' is NOT here: The Second Stride is pinned to the Waypoint
     # Sanctum's first vault chest (guaranteed — before the editing act),
     # not left to the random pool.
 ]
 
+# Relic ids that must not DROP until a curriculum token is learned. Used when a
+# scroll's command rides an existing gate (so the scroll grants nothing itself):
+# rather than smudging a relic — a dead drop — hold it out of the pool.
+_RELIC_PREREQ = {
+    'jump_back': 'mark',   # '' / `` are the implicit-mark jumps
+}
 
-def pick_relic_scroll(discovered, rng=None):
+
+def pick_relic_scroll(discovered, rng=None, known=None):
     """Return a random relic-scroll id the player has NOT yet discovered, or
     None once they hold them all. `discovered` is any iterable of extras ids;
-    `rng` is an optional random.Random for deterministic tests."""
+    `known` (iterable of learned tokens) filters ids whose _RELIC_PREREQ is
+    unmet; `rng` is an optional random.Random for deterministic tests."""
     import random as _random
     have = set(discovered)
-    pool = [sid for sid in RELIC_SCROLL_IDS if sid not in have]
+    known_set = set(known or ())
+    pool = [sid for sid in RELIC_SCROLL_IDS
+            if sid not in have
+            and (sid not in _RELIC_PREREQ or _RELIC_PREREQ[sid] in known_set)]
     if not pool:
         return None
     return (rng or _random).choice(pool)

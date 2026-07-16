@@ -4772,7 +4772,8 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
                     else:
                         # No scroll assigned to this level: pull a random, not-yet-
                         # discovered "safe" relic scroll from the library.
-                        _wid = _pick_relic_scroll(progress.get('extras', []))
+                        _wid = _pick_relic_scroll(progress.get('extras', []),
+                                                  known=_known_from_progress(progress))
                         if _wid is not None:
                             progress['extras'] = progress.get('extras', []) + [_wid]
                             if _wid not in player.known_commands:
