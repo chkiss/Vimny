@@ -136,6 +136,7 @@
 |-----------|--------------|-----------------------|
 | V         | visual_line  | select whole lines    |
 | <C-v>     | visual_block | select a block        |
+| <C-v>{m} I/A |           | block insert / append |
 
 ## seekers_labyrinth — search
 

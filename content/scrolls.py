@@ -108,15 +108,16 @@ OTHER_END_SCROLL = {
 WAY_BACK_SCROLL = {
     'title': '◈   The Way Back   ◈',
     'lines': [
-        ('dim',    '  Every leap leaves a footprint where it began.'),
+        ('dim',    '  I lost my place a thousand times before'),
+        ('dim',    '  I learned the dungeon keeps it for me.'),
         ('blank',),
-        ('smudge', "''", 'back to where you l', 'ast leapt from', 'mark'),
-        ('smudge', '``', 'the same, to the e', 'xact column',    'mark'),
+        ('smudge', "''", 'the line you last j', 'umped from',  'mark'),
+        ('smudge', '``', 'the very spot, colu', 'mn and all',  'mark'),
         ('blank',),
-        ('dim',    "  Leap again and the footprint moves —"),
-        ('dim',    "  '' toggles between the two."),
+        ('dim',    "  Each leap lays a new footprint, so ''"),
+        ('dim',    '  twice is a toggle: there, and back again.'),
         ('blank',),
-        ('amber',  '  You always know where you just were.'),
+        ('amber',  '  No leap is ever one-way here.'),
     ],
 }
 
