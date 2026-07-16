@@ -122,6 +122,26 @@ WAY_BACK_SCROLL = {
     ],
 }
 
+
+# Relic — the ex line-number address. :{n} lands exactly where {n}G lands but
+# is one key dearer (the colon), so it can never undercut a par; what it
+# teaches is the ADDRESS idea, which the Spellwright's ranges later build on.
+# Rides the 'G' gate — pool-held until G is learned (_RELIC_PREREQ).
+NUMBERED_DOORS_SCROLL = {
+    'title': '◈   The Numbered Doors   ◈',
+    'lines': [
+        ('dim',    '  Type : and the dungeon leans in to listen.'),
+        ('blank',),
+        ('cmd',    ':{n}', 'go to line n, first non-blank'),
+        ('blank',),
+        ('dim',    '  Same landing as {n}G — but the ledger'),
+        ('dim',    '  keeps numbers for grander work: pairs'),
+        ('dim',    '  of them mark a range for later spells.'),
+        ('blank',),
+        ('amber',  '  Know the address, know the way.'),
+    ],
+}
+
 # Dropped by the Warden Surveyor — previews the SEARCH / MARK act ahead: search
 # (/ ? n N *) at the Seekers' Labyrinth, revealed; marks (m ` ') at the Waypoint
 # Sanctum, smudged until 'mark' is learned. Replaces the visual preview now that
@@ -661,6 +681,14 @@ SCROLL_CATALOG = [
         'content':    WAY_BACK_SCROLL,
     },
     {
+        'id':         'line_addr',
+        'title':      'The Numbered Doors',
+        'dropped_by': 'A porter’s ledger',
+        'level_slug': 'lineheads',
+        'level_name': 'The Lineheads',
+        'content':    NUMBERED_DOORS_SCROLL,
+    },
+    {
         'id':         'ins_paste',
         'title':      'The Recalling Hand',
         'dropped_by': 'A scribe’s desk',
@@ -698,6 +726,9 @@ RELIC_SCROLL_IDS = [
     'searchcraft', 'jump', 'col_motion', 'ins_paste', 'ins_edit',
     'ZZ',    # The Sealed Departure — ZZ/ZQ; free like the :wq/:q! they abbreviate
     'swap_ends',  # The Other End — o / O / gv (selection shaping; no cost surface)
+    'line_addr',  # The Numbered Doors — :{n} ; rides the 'G' gate (level 8),
+                  # pool-held until then; always a key dearer than {n}G, so
+                  # it can never golf a par
     'jump_back',  # The Way Back — '' / `` ; the JUMP stays gated on 'mark'
                   # (level 15). Not smudged: the drop is held back instead —
                   # see _RELIC_PREREQ. Cheese-audited: at 15+ '' ties
@@ -712,6 +743,7 @@ RELIC_SCROLL_IDS = [
 # rather than smudging a relic — a dead drop — hold it out of the pool.
 _RELIC_PREREQ = {
     'jump_back': 'mark',   # '' / `` are the implicit-mark jumps
+    'line_addr': 'G',      # :{n} rides the G gate
 }
 
 

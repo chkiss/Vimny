@@ -52,13 +52,16 @@ def test_pick_skips_discovered():
 def test_prereq_relics_wait_for_their_token():
     from content.scrolls import _RELIC_PREREQ
     assert _RELIC_PREREQ['jump_back'] == 'mark'
-    # Before marks are learned, jump_back never drops...
+    assert _RELIC_PREREQ['line_addr'] == 'G'
+    # Before the prerequisite is learned, a gated relic never drops...
     for seed in range(20):
-        assert pick_relic_scroll([], random.Random(seed)) != 'jump_back'
+        assert pick_relic_scroll([], random.Random(seed)) not in _RELIC_PREREQ
     # ...and with everything else discovered, the pool reads empty until then.
     others = [sid for sid in RELIC_SCROLL_IDS if sid != 'jump_back']
     assert pick_relic_scroll(others) is None
     assert pick_relic_scroll(others, known=['mark']) == 'jump_back'
+    others = [sid for sid in RELIC_SCROLL_IDS if sid != 'line_addr']
+    assert pick_relic_scroll(others, known=['G']) == 'line_addr'
 
 def test_pick_returns_none_when_exhausted():
     assert pick_relic_scroll(RELIC_SCROLL_IDS) is None
@@ -72,7 +75,7 @@ def test_pick_is_deterministic_with_rng():
 def test_collecting_all_via_repeated_picks():
     discovered: list = []
     while (sid := pick_relic_scroll(discovered, random.Random(len(discovered)),
-                                    known=['mark'])) is not None:
+                                    known=['mark', 'G'])) is not None:
         assert sid not in discovered
         discovered.append(sid)
     assert set(discovered) == set(RELIC_SCROLL_IDS)
