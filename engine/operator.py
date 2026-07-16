@@ -434,9 +434,16 @@ def op_paste(room, player, clip: dict, before: bool, count: int = 1) -> bool:
         nrows    = len(clip['rows'])
         total    = nrows * count
         base_row = player.row if before else player.row + 1
-        tmpl     = player.row                                 # copy the cursor row's wall pattern
+        tmpl     = player.row
         for k in range(total):
-            _insert_blank_row(room, base_row + k, tmpl, player)   # grow real rows, shifting the map down
+            # A pasted line is TEXT, not a terrain photocopy: the new row is a
+            # Vim BLANK line across the cursor's segment (the o/O shape), and
+            # the yanked glyphs are laid onto it. A full-row cell CLONE leaked
+            # far-side structure through walls — the Beacon Tiers playtest
+            # (2026-07-18) walked into a cloned exit pocket the seal had never
+            # opened (P parks on the pasted row's first standable, which was
+            # the pocket copy).
+            _insert_blank_row(room, base_row + k, tmpl, player, blank=True)
         for copy in range(count):
             for i, rclip in enumerate(clip['rows']):
                 row = base_row + copy * nrows + i
