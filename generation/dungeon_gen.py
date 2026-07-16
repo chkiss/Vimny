@@ -4143,6 +4143,178 @@ def build_dungeon_quote_enclosure(seed: int) -> Dungeon:
     return dungeon
 
 
+# ── The Tag Enclosure (it at) ───────────────────────────────────────────────
+#
+# Tags are NAMED delimiters — <name>…</name>, paired by a stack, innermost
+# wins — and unlike the quote objects they do NOT seek: the cursor must
+# stand within the element (a blind spine strike is nothing here; the
+# player pays one f> walk-in, then the dot-chains ride the aligned
+# geometry). Five chambers on the exact-text chassis:
+#   C1 (rows 3-4)   dit husk ×2, the second by dot   → 'w1 <n></n> w2'
+#   C2 (rows 6-7)   cit cures (typed, single tokens) → 'w1 <n>cure</n> w2'
+#   C3 (rows 9-10)  dat + dot — the whole element torn out. NOTE the gap:
+#                   at spans the TAGS ONLY (no whitespace rule), so the
+#                   tear leaves the DOUBLE gap 'w1  w2' — the da( scar,
+#                   where the quote gallery's da" left the single.
+#   C4 (rows 12-13) THE NEST, by NAME: <no><ni>jjj</ni></no> — from one
+#                   landing column, dit empties the innermost; on the twin
+#                   row dat tears the whole inner element out, leaving the
+#                   outer husk '<no></no>'.
+#   C5 (row 15)     THE AIM: '<na></na> <nb>jjj</nb>' — the landing sits in
+#                   the FIRST element, already empty (dit no-ops); f< steps
+#                   to the second element's mark, then dit.
+#
+# Forcing audit (why par 48 needs the objects): dit/dat resolve the whole
+# element from any cell inside it, while {n}x pays its count digits plus
+# the walk to the content start, d2f> pays a key over dat, and ct< pays
+# the walk cit doesn't; % speaks the angle brackets but lands on single
+# marks, not name-matched pairs.
+_TE_ROWS, _TE_COLS = 19, 60
+_TE_SPINE   = 28                     # every row's first standable
+_TE_BAY_W   = 29                     # bay floor cols 29..57; east wall 58
+_TE_BAY_E   = 57
+_TE_PLQ_COL = 2                      # full true readings (≤25 chars, < spine)
+_TE_TEXT0   = 30                     # w1 starts here (len 4); element at 35
+_TE_C1_ROWS = (3, 4)
+_TE_C2_ROWS = (6, 7)
+_TE_C3_ROWS = (9, 10)
+_TE_C4_ROWS = (12, 13)               # nest rows carry NO w1/w2 (plaque width)
+_TE_C5_ROWS = (15,)
+_TE_SHAFT_SEPS = ((5, 40), (8, 42), (11, 35), (14, 35))
+_TE_THROAT  = 16
+_TE_GATE    = 17
+_TE_BOLTS   = {'c1': 29, 'c2': 30, 'c3': 31, 'c4': 32, 'c5': 33}
+_TE_EXIT    = (17, 34)               # the FINAL SEAL, east of every bolt
+# (row, junk len); tag names are len 3 throughout, so on standard rows the
+# open tag sits at col 35 and the content at col 40 — the chained landings
+# stay inside each next element.
+_TE_SHAPE = ((3, 3), (4, 4), (6, 3), (7, 4), (9, 5), (10, 4),
+             (12, 3), (13, 3), (15, 3))
+_TE_PAR = 48            # hand-tallied along the driven tape (one f> walk-in)
+
+
+def _te_draw_words(rng) -> dict:
+    """Draw the enclosure vocabulary: seven w1/w2 pairs (standard rows),
+    nine junks, THIRTEEN len-3 tag names (nest rows and C5 carry two each),
+    two typed cures; all pairwise distinct."""
+    _load_vocab_tables()
+
+    def pool(length):
+        return [w for w in _VOCAB_PLAIN_BY_LEN.get(length, ())
+                if w.isalpha() and w == w.lower()]
+
+    std_rows = [r for r, _jl in _TE_SHAPE
+                if r not in _TE_C4_ROWS + _TE_C5_ROWS]
+    for _ in range(80):
+        picks: list = []
+
+        def draw(length):
+            w = rng.choice(pool(length))
+            picks.append(w)
+            return w
+
+        rows = {}
+        for r, jl in _TE_SHAPE:
+            if r in _TE_C4_ROWS:                 # (outer, inner, junk)
+                rows[r] = (draw(3), draw(3), draw(jl))
+            elif r in _TE_C5_ROWS:               # (first, second, junk)
+                rows[r] = (draw(3), draw(3), draw(jl))
+            else:                                # (w1, name, junk, w2)
+                rows[r] = (draw(4), draw(3), draw(jl), draw(5))
+        cures = [draw(3), draw(3)]
+        if len(set(picks)) == len(picks):
+            return {'rows': rows, 'cures': cures, 'std_rows': std_rows}
+    raise ValueError('tag_enclosure: no distinct draw after 80 tries')
+
+
+def build_dungeon_tag_enclosure(seed: int) -> Dungeon:
+    """The Tag Enclosure (slug `tag_enclosure`): it at — name the element,
+    and the innermost answers."""
+    rng = random.Random(seed)
+    words = _te_draw_words(rng)
+
+    runs = []
+    plaques = []                                          # (row, target text)
+    doors_targets = {k: [] for k in ('c1', 'c2', 'c3', 'c4', 'c5')}
+    ca, cb = words['cures']
+    for r, _jl in _TE_SHAPE:
+        w = words['rows'][r]
+        if r in _TE_C4_ROWS:
+            no, ni, junk = w
+            text = f'<{no}><{ni}>{junk}</{ni}></{no}>'
+            runs.append((r, _TE_TEXT0, text))
+            tgt = (f'<{no}><{ni}></{ni}></{no}>' if r == _TE_C4_ROWS[0]
+                   else f'<{no}></{no}>')
+            doors_targets['c4'].append(tgt)
+            plaques.append((r, tgt))
+        elif r in _TE_C5_ROWS:
+            na, nb, junk = w
+            text = f'<{na}></{na}> <{nb}>{junk}</{nb}>'
+            runs.append((r, _TE_TEXT0, text))
+            tgt = f'<{na}></{na}> <{nb}></{nb}>'
+            doors_targets['c5'].append(tgt)
+            plaques.append((r, tgt))
+        else:
+            w1, name, junk, w2 = w
+            fit = f'<{name}>{junk}</{name}>'
+            runs += [(r, _TE_TEXT0, w1), (r, _TE_TEXT0 + 5, fit),
+                     (r, _TE_TEXT0 + 5 + len(fit) + 1, w2)]
+            if r in _TE_C1_ROWS:
+                tgt = f'{w1} <{name}></{name}> {w2}'
+                doors_targets['c1'].append(tgt)
+            elif r in _TE_C2_ROWS:
+                cure = ca if r == _TE_C2_ROWS[0] else cb
+                tgt = f'{w1} <{name}>{cure}</{name}> {w2}'
+                doors_targets['c2'].append(tgt)
+            else:                                # C3: the double-gap tear
+                tgt = f'{w1}  {w2}'
+                doors_targets['c3'].append(tgt)
+            plaques.append((r, tgt))
+    doors = tuple((tuple(doors_targets[k]), _TE_BOLTS[k])
+                  for k in ('c1', 'c2', 'c3', 'c4', 'c5'))
+
+    R, C = _TE_ROWS, _TE_COLS
+    cells = [[CellType.WALL] * C for _ in range(R)]
+    for r in range(2, _TE_GATE + 1):                     # the spine
+        cells[r][_TE_SPINE] = CellType.FLOOR
+    for r, _jl in _TE_SHAPE:                             # the bays
+        for c in range(_TE_BAY_W, _TE_BAY_E + 1):
+            cells[r][c] = CellType.FLOOR
+    for r, c in _TE_SHAFT_SEPS:                          # the light shafts —
+        cells[r][c] = CellType.FLOOR                     # NOT the throat row
+
+    room = Room(room_type=RoomType.ENTRY, rows=R, cols=C)
+    room.cells = cells
+    room.seed  = seed
+
+    for pr, ptext in plaques:                            # full true readings
+        col = _TE_PLQ_COL
+        for part in ptext.split(' '):
+            if part:
+                room.char_runs.append(CharRun(pr, col, tuple(part), 'verdant'))
+            col += len(part) + 1
+    for rr, cc, text in runs:
+        room.char_runs.append(CharRun(rr, cc, tuple(text), 'ancient'))
+    room._ss_doors = doors                               # the shared exact-text tick
+    room._te_words = words
+
+    room.entities.append(Entity(kind='exit', row=_TE_EXIT[0], col=_TE_EXIT[1],
+                                edit_immune=True))
+    room.spawn_pos = (2, _TE_SPINE)
+    room.exit_pos  = _TE_EXIT
+
+    room.rebuild_indexes()
+    room.par    = _TE_PAR
+    room.budget = math.ceil(_TE_PAR * 1.4)  # STANDARD: the walk-in route wins at 1★
+    room.answer = (f'j f> dit j . 2j cit {ca} j cit {cb} '
+                   f'2j dat j . 2j dit j dat 2j f< dit G $')
+
+    dungeon = Dungeon(name='The Tag Enclosure', seed=seed)
+    dungeon.rooms        = [room]
+    dungeon.current_room = 0
+    return dungeon
+
+
 # ── The Binder's Reliquary (:h — the Codex) ─────────────────────────────────
 #
 # A second reliquary (display 14.1, after the Seekers' Labyrinth), on the
