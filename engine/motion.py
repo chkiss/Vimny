@@ -783,6 +783,8 @@ def _apply_find(player, motion: str, target: str, room) -> bool:
     for nc in scan:
         if room.cells[row][nc] in (CellType.WALL, CellType.WOOD_WALL):
             break
+        if (row, nc) in room.fog_cells:
+            break            # fog stops scans — the $ / 0 / ^ / search law
         ent = room.entity_at(row, nc)
         if ent and ent.kind in _SCAN_BLOCK:
             break

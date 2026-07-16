@@ -16,9 +16,10 @@
 #
 # SPDX-License-Identifier: GPL-3.0-or-later
 
-"""The Binder's Reliquary (:h — the Codex): one forced round-trip through
-the book, and reading is free."""
-import math
+"""The Binder's Reliquary (:h — the Codex): a water-split vault crossed only
+by /search; the Codex chest waits BEYOND the pass-word, and :h opens nothing
+until the book is in hand."""
+from collections import deque
 
 import pytest
 from blessed.keyboard import Keystroke
@@ -30,8 +31,8 @@ from content.levels import LEVELS
 from content.scrolls import SCROLL_CATALOG, RELIC_SCROLL_IDS
 from generation.dungeon_gen import (
     build_dungeon_binders_reliquary,
-    _BND_ROWS, _BND_COLS, _BND_LECTERN, _BND_KEY_ROWS, _BND_TEXT0,
-    _BND_GATE, _BND_BOLT, _BND_EXIT, _BND_PAR,
+    _BND_ROWS, _BND_COLS, _BND_AR, _BND_WATER_COLS, _BND_SPAWN,
+    _BND_WORD_COL, _BND_CHEST, _BND_EXIT, _BND_BUDGET,
 )
 from tests import SEEDS, cached_room
 
@@ -47,10 +48,16 @@ def _K(s):
 
 
 def _answer_keys(room):
-    # The tape plus ONE dismiss key for the lectern scroll screen after x.
-    keys = _K('x') + [Keystroke(' ')]
-    for tok in room.answer.split(' ')[1:]:
-        keys += _K(tok)
+    # room.answer with ⏎ realized as Enter, plus ONE dismiss key for the
+    # Codex Key scroll screen after the chest x.
+    keys = []
+    for tok in room.answer.split(' '):
+        if tok.endswith('⏎'):
+            keys += _K(tok[:-1]) + [ENTER]
+        else:
+            keys += _K(tok)
+        if tok == 'x':
+            keys.append(Keystroke(' '))
     return keys
 
 
@@ -70,17 +77,6 @@ def _drive(dungeon, keys, monkeypatch, finish=':wq\r', name='Scribe'):
                             _dungeon=dungeon)
 
 
-def _drive_spent(dungeon, keys, monkeypatch):
-    box = {}
-    orig = main._calc_stars
-    monkeypatch.setattr(main, '_calc_stars',
-                        lambda won, budget, room, player, level='':
-                            (box.__setitem__('spent', budget.spent),
-                             orig(won, budget, room, player, level))[1])
-    result = _drive(dungeon, keys, monkeypatch)
-    return result, box.get('spent')
-
-
 # ── curriculum & catalog wiring ──────────────────────────────────────────────
 
 def test_curriculum_entry():
@@ -91,8 +87,9 @@ def test_curriculum_entry():
     assert lv['teaches'] == ['help']
 
 
-def test_readers_key_is_a_named_scroll_not_a_relic():
-    assert any(s['id'] == 'readers_key' for s in SCROLL_CATALOG)
+def test_codex_key_is_a_named_scroll_not_a_relic():
+    entry = next(s for s in SCROLL_CATALOG if s['id'] == 'readers_key')
+    assert entry['title'] == 'The Codex Key'
     assert 'readers_key' not in RELIC_SCROLL_IDS
 
 
@@ -102,56 +99,101 @@ def test_readers_key_is_a_named_scroll_not_a_relic():
 def test_layout_and_identity(seed):
     room = _room(seed)
     assert (room.rows, room.cols) == (_BND_ROWS, _BND_COLS)
-    assert room.spawn_pos == _BND_LECTERN
-    lectern = next(e for e in room.entities if e.kind == 'chest_scroll')
-    assert (lectern.row, lectern.col) == _BND_LECTERN
-    assert lectern.scroll_id == 'readers_key'
+    assert room.spawn_pos == _BND_SPAWN
+    chest = next(e for e in room.entities if e.kind == 'chest_scroll')
+    assert (chest.row, chest.col) == _BND_CHEST
+    assert chest.scroll_id == 'readers_key'
     exit_ent = next(e for e in room.entities if e.kind == 'exit')
     assert (exit_ent.row, exit_ent.col) == _BND_EXIT and exit_ent.edit_immune
+    assert room.par is None and room.budget == _BND_BUDGET
 
 
 @pytest.mark.parametrize("seed", SEEDS)
-def test_door_starts_sealed_and_not_already_true(seed):
+def test_water_channel_splits_the_vault_full_height(seed):
     room = _room(seed)
-    assert room.cells[_BND_GATE][_BND_BOLT] == CellType.WALL
-    assert room.cells[_BND_EXIT[0]][_BND_EXIT[1]] == CellType.WALL
-    (targets, _dc), = room._ss_doors
-    texts = {main._wla_floor_text(room, r).strip() for r in range(room.rows)}
-    assert targets[0] not in texts
+    for r in range(1, room.rows - 1):
+        for c in _BND_WATER_COLS:
+            assert room.cells[r][c] == CellType.WATER
+            assert not room.is_passable(r, c)
 
 
 @pytest.mark.parametrize("seed", SEEDS)
-def test_colophon_names_the_true_key(seed):
+def test_chest_and_exit_lie_beyond_the_word(seed):
+    # The order of the far shore is fixed: word, THEN chest, THEN exit —
+    # the Codex is looted only after the pass-word crossing.
     room = _room(seed)
-    true_word = room._bnd_words['keys'][room._bnd_words['true']]
+    word = room._bnd_word
+    assert _BND_WORD_COL > max(_BND_WATER_COLS)
+    assert _BND_CHEST[1] > _BND_WORD_COL + len(word) - 1
+    assert _BND_EXIT[1] > _BND_CHEST[1]
+
+
+@pytest.mark.parametrize("seed", SEEDS)
+def test_the_word_is_the_only_text_on_the_far_shore(seed):
+    room = _room(seed)
+    far = [ru for ru in room.char_runs if ru.col > max(_BND_WATER_COLS)]
+    assert len(far) == 1
+    ru = far[0]
+    assert (ru.row, ru.col) == (_BND_AR, _BND_WORD_COL)
+    assert ''.join(ru.symbols) == room._bnd_word
+    # ...and no near-shore frieze glyph is alphabetic (no false search bait).
+    for fr in (r for r in room.char_runs if r is not ru):
+        assert not any(s.isalpha() for s in fr.symbols)
+
+
+@pytest.mark.parametrize("seed", SEEDS)
+def test_answer_and_colophon(seed):
+    room = _room(seed)
+    assert room.answer == f'/{room._bnd_word}⏎ e 2l x l'
     (title, body), = room._codex_extra
     assert title == "The Binder's Colophon"
-    page_tokens = {t.strip('.,;') for ln in body for t in ln.split()}
-    assert true_word in page_tokens
-    # ...and no counterfeit key appears on the page.
-    for i, w in enumerate(room._bnd_words['keys']):
-        if i != room._bnd_words['true']:
-            assert w not in page_tokens
+    assert any(':h {name}' in ln for ln in body)
+
+
+# ── the crossing is search-only ──────────────────────────────────────────────
+
+@pytest.mark.parametrize("seed", SEEDS)
+def test_far_shore_unreachable_by_walking(seed):
+    room = _room(seed)
+    seen, dq = {room.spawn_pos}, deque([room.spawn_pos])
+    while dq:
+        r, c = dq.popleft()
+        for dr, dc in ((0, 1), (0, -1), (1, 0), (-1, 0)):
+            nr, nc = r + dr, c + dc
+            if (nr, nc) not in seen and 0 <= nr < room.rows and 0 <= nc < room.cols \
+                    and room.is_passable(nr, nc):
+                seen.add((nr, nc))
+                dq.append((nr, nc))
+    assert _BND_EXIT not in seen and _BND_CHEST not in seen
+    assert all(c <= max(_BND_WATER_COLS) for _r, c in seen)
 
 
 @pytest.mark.parametrize("seed", SEEDS)
-def test_words_distinct_and_rows_shaped(seed):
+def test_mist_lies_on_the_water(seed):
     room = _room(seed)
-    words = room._bnd_words
-    assert len(set(words['keys']) | set(words['junk'])) == 8
-    for i, r in enumerate(_BND_KEY_ROWS):
-        text = main._wla_floor_text(room, r).strip()
-        assert text == f'{words["junk"][i]} {words["keys"][i]}'
-        assert len(text) == 9
+    for r in range(1, room.rows - 1):
+        for c in _BND_WATER_COLS:
+            assert (r, c) in room.fog_cells
+    # ...and ONLY on the water — the far shore stays visible/searchable.
+    assert all(c in _BND_WATER_COLS for _r, c in room.fog_cells)
 
 
-@pytest.mark.parametrize("seed", SEEDS)
-def test_par_answer_budget(seed):
-    room = _room(seed)
-    assert room.par == _BND_PAR
-    assert room.budget == math.ceil(_BND_PAR * 1.4)
-    ops = ['4x' if i == room._bnd_words['true'] else '9x' for i in range(4)]
-    assert room.answer == f'x 2j {ops[0]} j {ops[1]} j {ops[2]} j {ops[3]} G l'
+def test_only_search_crosses_the_mist(monkeypatch):
+    # The cheese audit: $ and f{ch} are scans (the mist stops them at the
+    # bank); G/gg land on the row's first standable (the near shore). Every
+    # one of them, driven, leaves the player west of the water.
+    dungeon = build_dungeon_binders_reliquary(0)
+    word = dungeon.rooms[0]._bnd_word
+    seen = {}
+    orig = main._calc_stars
+    def spy(won, budget, room_, player, level=''):
+        seen['pos'] = (player.row, player.col)
+        return orig(won, budget, room_, player, level)
+    monkeypatch.setattr(main, '_calc_stars', spy)
+    keys = _K('$Ggg$') + _K('f' + word[0]) + _K('t' + word[0])
+    result = _drive(dungeon, keys, monkeypatch, finish=':wq\r')
+    assert not result['won']
+    assert seen['pos'][1] < min(_BND_WATER_COLS), seen
 
 
 # ── playthroughs ─────────────────────────────────────────────────────────────
@@ -159,82 +201,54 @@ def test_par_answer_budget(seed):
 @pytest.mark.parametrize("seed", SEEDS)
 def test_answer_tape_wins_at_par(seed, monkeypatch):
     dungeon = build_dungeon_binders_reliquary(seed)
-    result, spent = _drive_spent(dungeon, _answer_keys(dungeon.rooms[0]),
-                                 monkeypatch)
-    assert result['won'] and spent == _BND_PAR
-    assert result['stars'] == 0                     # reliquaries are unstarred
+    result = _drive(dungeon, _answer_keys(dungeon.rooms[0]), monkeypatch)
+    assert result['won']
+    assert result['stars'] == 0                    # reliquaries are unstarred
+
+
+def test_h_refuses_until_the_codex_is_in_hand(monkeypatch):
+    # Before the chest: 'help' is taught by the level, but there is no book —
+    # :h must refuse. After looting, it opens (and reading stays free).
+    dungeon = build_dungeon_binders_reliquary(0)
+    room = dungeon.rooms[0]
+    tape = _answer_keys(room)                      # capture BEFORE driving —
+    seen = {}                                      # a run clears room.answer
+    orig = main._calc_stars                        # for non-admin players
+    def spy(won, budget, room_, player, level=''):
+        seen['pane'] = getattr(player, 'codex_pane', None)
+        seen['spent'] = budget.spent
+        return orig(won, budget, room_, player, level)
+    monkeypatch.setattr(main, '_calc_stars', spy)
+
+    early = _K(':h') + [ENTER]
+    result = _drive(dungeon, early, monkeypatch, finish=':wq\r')
+    assert seen['pane'] is None and not result['won']
+
+    keys = tape[:-1]                               # cross + loot, hold at chest
+    keys += _K(':h binder') + [ENTER] + _K('jj') + _K(':q') + [ENTER]
+    keys += _K('l')                                # step onto the exit
+    result = _drive(dungeon, keys, monkeypatch)
+    assert result['won'] and seen['pane'] is None
 
 
 def test_reading_the_codex_is_free(monkeypatch):
-    # The full intended run — open the book, land on the colophon, read,
-    # close — spends exactly the same as the never-reads tape.
-    dungeon = build_dungeon_binders_reliquary(0)
-    room = dungeon.rooms[0]
-    keys = (_K('x') + [Keystroke(' ')]
-            + _K(':h binder') + [ENTER]             # focus moves into the pane
-            + _K('jjgg') + _K('/turns') + [ENTER]   # browse + search, all free
-            + _K(':q') + [ENTER])                   # close the WINDOW, not the game
-    for tok in room.answer.split(' ')[1:]:
-        keys += _K(tok)
-    result, spent = _drive_spent(dungeon, keys, monkeypatch)
-    assert result['won'] and spent == _BND_PAR
-
-
-def test_q_closes_the_window_before_it_quits_the_game(monkeypatch):
-    # Vim-true: with the pane open, :q! closes the WINDOW; the game only
-    # ends on the second :q! — so the pane must swallow exactly one.
-    dungeon = build_dungeon_binders_reliquary(0)
-    keys = (_K('x') + [Keystroke(' ')] + _K(':h binder') + [ENTER]
-            + _K(':q!') + [ENTER])                  # captured by the pane
-    result = _drive(dungeon, keys, monkeypatch, finish=':q!\r')
-    assert not result['won']
-
-
-def test_h_is_gated_until_taught(monkeypatch):
-    # Drive a level BEFORE 14.1 (the labyrinth's known set): :h must refuse.
-    from generation.dungeon_gen import build_dungeon_first_cave
-    dungeon = build_dungeon_first_cave(0)
-    seen = {}
+    # Same run with and without the read — identical spend.
+    spends = []
     orig = main._calc_stars
-    def spy(won, budget, room_, player, level=''):
-        seen['pane'] = getattr(player, 'codex_pane', None)
-        return orig(won, budget, room_, player, level)
-    monkeypatch.setattr(main, '_calc_stars', spy)
-    monkeypatch.setattr(main, 'render_all', lambda *a, **k: None)
-    monkeypatch.setattr(main.time, 'sleep', lambda *a, **k: None)
-    monkeypatch.setattr(Terminal, 'height', property(lambda self: 41))
-    term = Terminal()
-    keys = _K(':h') + [ENTER] + _K(':q!') + [ENTER]
-    it = iter(keys)
-    monkeypatch.setattr(term, 'inkey', lambda *a, **k: next(it, Keystroke('')))
-    main.run_dungeon(term, 'first_cave', {}, player_name='Scribe',
-                     _dungeon=dungeon)
-    assert seen.get('pane') is None
-
-
-def test_wrong_guess_is_recoverable_within_budget(monkeypatch):
-    # Raze the true row by mistake, undo, then run the honest tape.
-    dungeon = build_dungeon_binders_reliquary(0)
-    room = dungeon.rooms[0]
-    t = room._bnd_words['true']
-    keys = _K('x') + [Keystroke(' ')] + _K('2j')
-    keys += _K(f'{t}j' if t else '')                # descend to the true row
-    keys += _K('9xu')                               # the mis-strike, undone
-    keys += _K(f'{t}k' if t else '')                # climb back
-    for tok in room.answer.split(' ')[2:]:
-        keys += _K(tok)
-    result, spent = _drive_spent(dungeon, keys, monkeypatch)
-    assert result['won'] and spent <= room.budget
-
-
-def test_no_jump_lands_on_the_sealed_exit(monkeypatch):
-    dungeon = build_dungeon_binders_reliquary(0)
-    seen = {}
-    orig = main._calc_stars
-    def spy(won, budget, room_, player, level=''):
-        seen['pos'] = (player.row, player.col)
-        return orig(won, budget, room_, player, level)
-    monkeypatch.setattr(main, '_calc_stars', spy)
-    result = _drive(dungeon, _K('G$'), monkeypatch, finish=':wq\r')
-    assert not result['won']
-    assert seen['pos'][0] != _BND_GATE, seen
+    for read in (False, True):
+        dungeon = build_dungeon_binders_reliquary(0)
+        room = dungeon.rooms[0]
+        box = {}
+        def spy(won, budget, room_, player, level='', _box=box):
+            _box['spent'] = budget.spent
+            return orig(won, budget, room_, player, level)
+        monkeypatch.setattr(main, '_calc_stars', spy)
+        keys = _answer_keys(room)[:-1]
+        if read:
+            keys += (_K(':h') + [ENTER] + _K('zRjjzM') + _K('/binder') + [ENTER]
+                     + _K(':q') + [ENTER])
+        keys += _K('l')
+        result = _drive(dungeon, keys, monkeypatch)
+        assert result['won']
+        spends.append(box['spent'])
+    assert spends[0] == spends[1]

@@ -2305,7 +2305,7 @@ _LEVEL_INTROS = {
     'word_enclosure': ('The Word Enclosure — rot has taken root in the middle of the inscriptions. The wardens here did not aim their cuts; they named the shape, and the shape was taken whole.', 70),
     'bracket_enclosure': ('The Bracket Enclosure — a jeweller\'s gallery: every inscription holds a stone in its setting, and every stone has gone bad. Pry the stone, keep the setting — or tear the whole fitting out.', 70),
     'brace_square_enclosure': ('The Brace & Square Enclosure — deeper vaults, richer settings: square fittings, braced caskets, and at the heart a casket WITHIN a fitting. The old jewellers read the metal under their hands before they cut.', 70),
-    'binders_reliquary': ('The Binder\'s Reliquary — on the lectern lies the bound Codex, every scroll you have gathered stitched into one book. Four keys were cut for the door; the binder recorded which one turns.', 70),
+    'binders_reliquary': ('The Binder\'s Reliquary — still water splits the vault, too wide to step and too deep to wade. On the far shore a single word is legible, and beyond it, the binder\'s last work.', 70),
     'warden_scrivener':    ('The Warden Scrivener — he has copied these halls for an age and finished nothing. The great page waits, passage by passage, for a truer hand.', 70),
     'warden_manifold':     ('The Warden Manifold — he stamps himself into the world. Light the four braziers; the gate will draw and the fog will part.', 70),
     'warden_surveyor':     ('The Warden Surveyor — he keeps a long hall where the floor falls away between the words. Cross it word by word, over the void.', 60),
@@ -2404,6 +2404,7 @@ def _check_seal_broken(room) -> str:
     if any(ru.row == sr for ru in room.char_runs):
         return ''                                      # seal not fully erased
     room.cells[sr][sc] = CellType.FLOOR
+    room.fog_cells.clear()                             # the sanctum is revealed
     return 'The seal is broken — the ward dissolves and the way opens!'
 
 
@@ -3009,8 +3010,7 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
             for _m in _indentation_sanctum_tick(room, player):
                 _push(_m)
         if level in ('sight_sanctum', 'selection_halls', 'word_enclosure',
-                     'bracket_enclosure', 'brace_square_enclosure',
-                     'binders_reliquary'):
+                     'bracket_enclosure', 'brace_square_enclosure'):
             for _m in _sight_sanctum_tick(room, player):   # the shared exact-text tick
                 _push(_m)
         if level == 'sculpting_chambers':
@@ -3673,8 +3673,14 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
                     # :h [{name}] — open the Codex read-only in a split and move
                     # focus into it (Vim's :help, made diegetic). Reading is
                     # free: neither the command nor any pane key spends budget.
+                    # Gated on actually HOLDING the Codex ('readers_key', the
+                    # Binder's chest grant) — the level's 'help' token alone
+                    # isn't a book in your hands.
                     if 'help' not in player.known_commands and player_name != 'admin':
                         _push("You haven't learned :h yet.")
+                    elif ('readers_key' not in player.known_commands
+                          and player_name != 'admin'):
+                        _push('You carry no codex to open.')
                     else:
                         from engine.codex import CodexPane, scroll_sections
                         from content.scrolls import SCROLL_CATALOG

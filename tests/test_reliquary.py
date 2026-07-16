@@ -167,6 +167,28 @@ def test_friezes_only_off_the_action_row(seed):
             assert room.cells[ru.row][c] == CellType.FLOOR
 
 
+# ── Fog of war (playtest 2026-07-17: the sanctum was visible from spawn) ─────
+
+@pytest.mark.parametrize("seed", SEEDS)
+def test_sanctum_sleeps_under_fog_until_the_seal_breaks(seed):
+    room = _room(seed)
+    W = dg._RELIQUARY_WALL_COL
+    # Everything right of the divider — chest, exit, friezes — starts fogged...
+    for r in range(1, room.rows - 1):
+        for c in range(W + 1, room.cols - 1):
+            assert (r, c) in room.fog_cells, (r, c)
+    assert (dg._RELIQUARY_CHEST in room.fog_cells)
+    # ...and nothing on the approach side is.
+    for r in range(1, room.rows - 1):
+        for c in range(1, W):
+            assert (r, c) not in room.fog_cells, (r, c)
+    # Breaking the seal lifts the fog with the ward.
+    room.char_runs = [ru for ru in room.char_runs
+                      if ru.row != dg._RELIQUARY_ACTION_ROW]
+    assert _check_seal_broken(room)
+    assert not room.fog_cells
+
+
 def test_randomizes_across_seeds():
     words   = {''.join(_seal_run(_room(s)).symbols) for s in range(40)}
     friezes = {tuple((ru.row, ru.col, ru.symbols) for ru in sorted(

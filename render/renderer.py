@@ -527,10 +527,10 @@ def render_all(term: Terminal, dungeon: Dungeon, player: Player,
         output.append(line)
 
     # ── The Codex pane (:h) — a horizontal split over the game area ────────
-    # Vim-true: :help opens another file read-only in a split at the TOP
-    # (Vim's default with 'splitbelow' off) and moves focus into it. The
-    # pane replaces the TOP rows of the game area; the dungeon stays
-    # visible below, untouched (the pane is a pure view).
+    # :help opens another file read-only in a split and moves focus into it.
+    # Vim's default puts help at the TOP; ours opens BELOW — the 'splitbelow'
+    # house style (user preference 2026-07-17: the dungeon stays put up top).
+    # The pane replaces the BOTTOM rows of the game area (a pure view).
     pane = getattr(player, 'codex_pane', None)
     if pane is not None:
         pane_h = max(6, min(game_h // 2, game_h - 2))
@@ -561,7 +561,7 @@ def render_all(term: Terminal, dungeon: Dungeon, player: Player,
             pane_lines.append(bfg + S.BOX_V + rst + C.floor_bg()
                               + C.mode_command() + body + rst
                               + bfg + S.BOX_V + rst)
-        output[3: 3 + pane_h] = pane_lines
+        output[3 + game_h - pane_h: 3 + game_h] = pane_lines
 
     # ── Vim statusline / command line ─────────────────────────────────────
     # 1-based line,col anchored at the first standable cell — matches the gutter and

@@ -135,7 +135,7 @@ READERS_KEY_SCROLL = {
         ('cmd',    ':h       ', 'open the Codex to its index'),
         ('cmd',    'za       ', 'unfold / fold a section'),
         ('cmd',    'zR       ', 'unRoll the whole book'),
-        ('cmd',    'zM       ', 'fold More — roll it shut'),
+        ('cmd',    'zM       ', 'Moor it shut, every page furled'),
         ('cmd',    ':q       ', 'close the book, back to the hall'),
         ('blank',),
         ('dim',    '  Reading is free — the ledger counts no page.'),

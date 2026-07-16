@@ -1360,6 +1360,11 @@ def build_dungeon_reliquary(seed: int) -> Dungeon:
     composite.budget = 35
     composite.answer = _reliquary_answer(word)
 
+    # The sanctum sleeps under fog until the seal breaks (playtest 2026-07-17:
+    # the divider hid nothing — the relic and exit were visible from spawn).
+    # Standard reachability fog; _check_seal_broken lifts it with the ward.
+    _fog_unreachable(composite, *composite.spawn_pos)
+
     composite.rebuild_indexes()
     dungeon.rooms        = [composite]
     dungeon.current_room = 0
@@ -3955,98 +3960,91 @@ def build_dungeon_brace_square_enclosure(seed: int) -> Dungeon:
 
 # ── The Binder's Reliquary (:h — the Codex) ─────────────────────────────────
 #
-# A second reliquary (display 14.1, after the Seekers' Labyrinth): the moment
-# the command load has outgrown memory and the player can SEARCH is the
-# moment the Codex earns its keep. On the lectern: the bound Codex and its
-# instruction scroll (The Codex Key — :h, za, zR/zM, :q).
+# A second reliquary (display 14.1, after the Seekers' Labyrinth), on the
+# FIRST Reliquary's two-chamber chassis — but the divider is WATER, not
+# stone (redesigned 2026-07-17 after playtest). Water is transparent: the
+# binder's pass-word is legible on the far shore. MIST (fog) lies on the
+# channel, so every line-scoped scan stops at the bank — $ / 0 / ^ by
+# _cross_water's fog check, f/F/t/T by the scan-fog law — while teleports
+# (G/H/M/L/{n}G) land on the row's first standable, the NEAR shore. Search
+# alone crosses: /{word}⏎ — the Labyrinth's lesson, cashed in. The bound
+# Codex waits BEYOND the
+# word (chest after crossing, never before), so :h cannot be opened until
+# the Codex is actually in hand (the command is gated on the 'readers_key'
+# grant, not just the level's 'help' token).
 #
-# The puzzle forces one round-trip through the book. Four candidate rows read
-# `jnk word` — four keys cut for the door, three counterfeit. The Codex's
-# room-bound page (The Binder's Colophon, room._codex_extra) names the one
-# that turns. Every row takes the SAME strike — '9x' razes a counterfeit row
-# whole, '4x' strips the junk off the true key ({n}x is charged ONE key: x is
-# an interact-priced strike, counts free) — so par is seed-constant (12,
-# lectern included) whichever slot the true key lands in. The door is the
-# exact-text chassis: the true key alone as a stripped row. Reliquaries are
-# unstarred (level_type != 'dungeon'), so par is a pace-marker, not a prize.
-_BND_ROWS, _BND_COLS = 10, 30
-_BND_LECTERN = (2, 6)                # spawn ON the lectern; x opens it
-_BND_KEY_ROWS = (4, 5, 6, 7)
-_BND_TEXT0 = 6                       # 'jnk wordk' cols 6..14
-_BND_GATE  = 8
-_BND_BOLT  = 14
-_BND_EXIT  = (8, 15)
-_BND_PAR   = 12
+# Reward room: par None (reliquaries are unstarred), generous fixed budget.
+_BND_ROWS, _BND_COLS = 7, 24
+_BND_AR          = 3                  # the action row: spawn, word, chest, exit
+_BND_WATER_COLS  = (12, 13)           # full-height channel; left 1..11, right 14..22
+_BND_SPAWN       = (3, 1)
+_BND_WORD_COL    = 15                 # pass-word cols 15..19 (len 5)
+_BND_CHEST       = (3, 21)
+_BND_EXIT        = (3, 22)
+_BND_FRIEZE_ROWS = (1, 5)             # LEFT chamber only — the far shore is bare
+_BND_BUDGET      = 30
 
 
-# Words of the colophon's fixed prose — no candidate may collide with them,
-# or the page would name a counterfeit.
-_BND_COLOPHON_PROSE = frozenset(
-    'four keys were cut for the reliquary door '
-    'three are counterfeit only turns'.split())
-
-
-def _bnd_draw_words(rng) -> dict:
-    """Four len-5 candidate keys + four len-3 junk stubs, all distinct and
-    none colliding with the colophon's prose; one seeded true index."""
+def _bnd_draw_word(rng) -> str:
+    """The binder's pass-word: one len-5 vocab word."""
     _load_vocab_tables()
-
-    def pool(length):
-        return [w for w in _VOCAB_PLAIN_BY_LEN.get(length, ())
-                if w.isalpha() and w == w.lower()
-                and w not in _BND_COLOPHON_PROSE]
-
-    for _ in range(80):
-        keys = [rng.choice(pool(5)) for _ in range(4)]
-        junk = [rng.choice(pool(3)) for _ in range(4)]
-        if len(set(keys) | set(junk)) == 8:
-            return {'keys': keys, 'junk': junk, 'true': rng.randrange(4)}
-    raise ValueError('binders_reliquary: no distinct draw after 80 tries')
+    pool = [w for w in _VOCAB_PLAIN_BY_LEN.get(5, ())
+            if w.isalpha() and w == w.lower()]
+    return rng.choice(pool)
 
 
 def build_dungeon_binders_reliquary(seed: int) -> Dungeon:
     """The Binder's Reliquary (slug `binders_reliquary`): the Codex (:h)."""
     rng = random.Random(seed)
-    words = _bnd_draw_words(rng)
-    true_word = words['keys'][words['true']]
+    word = _bnd_draw_word(rng)
 
     R, C = _BND_ROWS, _BND_COLS
     cells = [[CellType.WALL] * C for _ in range(R)]
-    for r in range(2, _BND_GATE):
-        for c in range(2, 17):
-            cells[r][c] = CellType.FLOOR
+    for r in range(1, R - 1):
+        for c in range(1, C - 1):
+            cells[r][c] = (CellType.WATER if c in _BND_WATER_COLS
+                           else CellType.FLOOR)
 
     room = Room(room_type=RoomType.ENTRY, rows=R, cols=C)
     room.cells = cells
     room.seed  = seed
 
-    for i, r in enumerate(_BND_KEY_ROWS):
-        text = f'{words["junk"][i]} {words["keys"][i]}'
-        room.char_runs.append(CharRun(r, _BND_TEXT0, tuple(text), 'ancient'))
+    # The pass-word on the far shore — the only text across the water, so
+    # the crossing search is unambiguous. Friezes stay on the near shore.
+    room.char_runs.append(CharRun(_BND_AR, _BND_WORD_COL, tuple(word), 'ember'))
+    for fr in _BND_FRIEZE_ROWS:
+        _place_frieze(room, rng, fr, 1, _BND_WATER_COLS[0] - 1)
+    room._bnd_word = word
 
-    room._ss_doors = (((true_word,), _BND_BOLT),)     # the shared exact-text tick
-    room._bnd_words = words
-    # The room-bound Codex page the door forces the player to read.
+    # Mist on the water: permanent fog over the channel only. The far shore
+    # stays visible and searchable; the scans stop at the bank.
+    room.fog_cells = {(r, c) for r in range(1, R - 1) for c in _BND_WATER_COLS}
+
+    # The Codex's own first page, bound in at the water's edge.
     room._codex_extra = ((
         "The Binder's Colophon",
         ['',
-         '  Four keys were cut for the reliquary door;',
-         f'  three are counterfeit. Only {true_word} turns.',
+         '  Bound at the water\'s edge. Every scroll you',
+         '  carry is stitched into this book; ask for any',
+         '  page by name — :h {name} — and it will open.',
          ''],
     ),)
 
-    room.entities.append(Entity(kind='chest_scroll', row=_BND_LECTERN[0],
-                                col=_BND_LECTERN[1], scroll_id='readers_key'))
-    room.entities.append(Entity(kind='exit', row=_BND_EXIT[0], col=_BND_EXIT[1],
-                                edit_immune=True))
-    room.spawn_pos = _BND_LECTERN
+    room.entities = [
+        Entity(kind='chest_scroll', row=_BND_CHEST[0], col=_BND_CHEST[1],
+               scroll_id='readers_key'),
+        Entity(kind='exit', row=_BND_EXIT[0], col=_BND_EXIT[1],
+               edit_immune=True),
+    ]
+    room.spawn_pos = _BND_SPAWN
     room.exit_pos  = _BND_EXIT
 
     room.rebuild_indexes()
-    room.par    = _BND_PAR
-    room.budget = math.ceil(_BND_PAR * 1.4)  # room to mis-guess once and undo
-    ops = ['4x' if i == words['true'] else '9x' for i in range(4)]
-    room.answer = f'x 2j {ops[0]} j {ops[1]} j {ops[2]} j {ops[3]} G l'
+    room.par    = None                            # reward room, like the first
+    room.budget = _BND_BUDGET
+    # /{word}⏎ lands on the word's first glyph; e to its end, step to the
+    # lectern, loot, step out. (Enter is free; '/' + the word are charged.)
+    room.answer = f'/{word}⏎ e 2l x l'
 
     dungeon = Dungeon(name="The Binder's Reliquary", seed=seed)
     dungeon.rooms        = [room]
