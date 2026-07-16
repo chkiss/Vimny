@@ -202,6 +202,8 @@ def test_exit_reachable_once_gates_open(seed):
     room = build_dungeon_cipher_cell(seed).rooms[0]          # private (mutating)
     for pos in (_CC_BOLT_A, _CC_BOLT_B, _CC_BOLT_C, _CC_BOLT_D):
         room.cells[pos[0]][pos[1]] = CellType.FLOOR
+    from engine.motion import auto_fog_tick
+    auto_fog_tick(room, *room.spawn_pos)     # sight crosses the opened gates
     seen, q = {room.spawn_pos}, deque([room.spawn_pos])
     while q:
         r, c = q.popleft()

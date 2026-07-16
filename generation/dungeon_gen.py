@@ -21,7 +21,8 @@ from __future__ import annotations
 import heapq, math, os, random
 from collections import deque
 from engine.world import Dungeon, Room, RoomType, CellType, CharRun, Entity
-from engine.motion import _fog_unreachable, _cell_char, _is_word_char
+from engine.motion import (_fog_unreachable, _cell_char, _is_word_char,
+                           apply_stone_fog)
 from generation.room_gen import make_room, RUNE_CHAR as _RUNE_CHAR
 
 _DIR_CHAR = {(-1, 0): 'k', (1, 0): 'j', (0, -1): 'h', (0, 1): 'l'}
@@ -1294,6 +1295,42 @@ def _place_frieze(composite, rng, row: int, c0: int, c1: int) -> None:
             c += rng.randint(1, 2)
 
 
+def _place_frieze_sym(composite, rng, rows, c0: int, c1: int) -> None:
+    """Ornamental friezes with the masons' discipline (playtest 2026-07-17):
+    ONE seeded pattern, mirrored left↔right, stamped identically on every
+    row in `rows` — so the top and bottom courses match and each reads as a
+    palindrome about the chamber's centre."""
+    width = c1 - c0 + 1
+    half  = (width + 1) // 2
+    kinds: dict = {}                       # offset → rune kind (left half)
+    off = 0
+    while off < half:
+        if rng.random() < 0.55:
+            kind = rng.choice(('ancient', 'verdant'))
+            n    = min(rng.randint(1, 3), half - off)
+            for i in range(off, off + n):
+                kinds[i] = kind
+            off += n + rng.randint(1, 2)
+        else:
+            off += rng.randint(1, 2)
+    for i, k in list(kinds.items()):       # the mirror
+        kinds[width - 1 - i] = k
+    for row in rows:
+        c = 0
+        while c < width:                   # group cells into contiguous runs
+            if c in kinds:
+                kind, n = kinds[c], 1
+                while c + n < width and kinds.get(c + n) == kind:
+                    n += 1
+                composite.char_runs.append(
+                    CharRun(row=row, col=c0 + c,
+                            symbols=tuple(_RUNE_CHAR[kind] for _ in range(n)),
+                            kind=kind))
+                c += n
+            else:
+                c += 1
+
+
 def _reliquary_answer(word: str) -> str:
     """Representative solve path (informational — reliquary has no par)."""
     seal_col = _RELIQUARY_WALL_COL - len(word)
@@ -1352,8 +1389,8 @@ def build_dungeon_reliquary(seed: int) -> Dungeon:
     ]
     # Ornamental friezes (randomized per seed) line both chambers — never the
     # action row, so they can't be mistaken for the seal.
+    _place_frieze_sym(composite, rng, _RELIQUARY_FRIEZE_ROWS, 1, W - 1)  # approach
     for fr in _RELIQUARY_FRIEZE_ROWS:
-        _place_frieze(composite, rng, fr, 1, W - 1)            # left chamber
         _place_frieze(composite, rng, fr, W + 1, COLS - 2)     # right sanctum
 
     composite.par    = None
@@ -4012,8 +4049,7 @@ def build_dungeon_binders_reliquary(seed: int) -> Dungeon:
     # The pass-word on the far shore — the only text across the water, so
     # the crossing search is unambiguous. Friezes stay on the near shore.
     room.char_runs.append(CharRun(_BND_AR, _BND_WORD_COL, tuple(word), 'ember'))
-    for fr in _BND_FRIEZE_ROWS:
-        _place_frieze(room, rng, fr, 1, _BND_WATER_COLS[0] - 1)
+    _place_frieze_sym(room, rng, _BND_FRIEZE_ROWS, 1, _BND_WATER_COLS[0] - 1)
     room._bnd_word = word
 
     # Mist on the water: permanent fog over the channel only. The far shore
@@ -6552,6 +6588,7 @@ def build_dungeon_spellwrights_forge(seed: int) -> Dungeon:
     room.answer = ans
 
     room.rebuild_indexes()
+    apply_stone_fog(room)                 # sealed pockets sleep under fog
     dungeon.rooms        = [room]
     dungeon.current_room = 0
     return dungeon
@@ -7104,6 +7141,7 @@ def build_dungeon_cipher_cell(seed: int) -> Dungeon:
     room.answer = (f'w w r{word_a[_CC_WARP_A]} w w D '
                    f'w w 2r{word_b[warp_b]} w w D $')
 
+    apply_stone_fog(room)                 # sealed pockets sleep under fog
     dungeon = Dungeon(name='The Cipher Cell', seed=seed)
     dungeon.rooms        = [room]
     dungeon.current_room = 0
@@ -7398,6 +7436,7 @@ def build_dungeon_echo_vault(seed: int) -> Dungeon:
                    f'w w r{l2} w . '
                    f'w w r{digit} w w 3. $')
 
+    apply_stone_fog(room)                 # sealed pockets sleep under fog
     dungeon = Dungeon(name='The Echo Vault', seed=seed)
     dungeon.rooms        = [room]
     dungeon.current_room = 0
@@ -7866,6 +7905,7 @@ def build_dungeon_inscription_halls(seed: int) -> Dungeon:
                    f') e a{m[3]} '
                    f') e agate $ $')
 
+    apply_stone_fog(room)                 # sealed pockets sleep under fog
     dungeon = Dungeon(name='The Inscription Halls', seed=seed)
     dungeon.rooms        = [room]
     dungeon.current_room = 0

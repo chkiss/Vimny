@@ -442,6 +442,10 @@ def render_all(term: Terminal, dungeon: Dungeon, player: Player,
 
         # Fog?
         if (room_r, room_c) in room.fog_cells:
+            if room.cells[room_r][room_c] == CellType.WATER:
+                # Mist ON water reads as hazy water, not stone — the channel
+                # stays visibly a channel (scans still stop at the fog).
+                return C.water_bg() + C.hint_fg() + '~' + C.normal_fg()
             return wall_bg + ' ' + C.normal_fg()
 
         # Entity?

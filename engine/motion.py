@@ -70,6 +70,50 @@ def _fog_unreachable(room, start_r: int, start_c: int) -> None:
     room.fog_cells = foggable - _flood_reachable(room, start_r, start_c)
 
 
+def _vision_flood(room, start_r: int, start_c: int) -> set:
+    """BFS flood of STONE-bounded sight from a cell: spreads through every
+    floor/corridor/water cell and straight past entities (a door is a grille
+    you can see through — unlike _flood_reachable's door-blocked spread).
+    Only wall cells stop the eye — every other cell type (a brazier
+    pedestal, a lava rune floor) is transparent even if not foggable. This
+    is the fog LAW's visibility model: what stone hides, fog hides; what a
+    door or water merely bars, you see."""
+    stone = (CellType.WALL, CellType.WOOD_WALL)
+    seen = {(start_r, start_c)}
+    q = deque([(start_r, start_c)])
+    while q:
+        r, c = q.popleft()
+        for dr, dc in ((-1, 0), (1, 0), (0, -1), (0, 1)):
+            nr, nc = r + dr, c + dc
+            if (nr, nc) in seen:
+                continue
+            if (0 <= nr < room.rows and 0 <= nc < room.cols
+                    and room.cells[nr][nc] not in stone):
+                seen.add((nr, nc))
+                q.append((nr, nc))
+    return seen
+
+
+def apply_stone_fog(room) -> None:
+    """Initialise fog by the stone law — every foggable cell the eye cannot
+    reach from spawn (walls-only _vision_flood) starts fogged — and mark the
+    room `auto_fog` so the main loop re-reveals as walls open (a sealed
+    pocket unfogs the moment its door becomes floor and sight crosses).
+    Rooms with SCRIPTED fog (Manifold, Scrivener) must NOT use this: the
+    auto-reveal would instantly clear their re-laid fog."""
+    foggable = {(r, c) for r in range(room.rows) for c in range(room.cols)
+                if room.cells[r][c] in _FOGGABLE_CELLS}
+    room.fog_cells |= foggable - _vision_flood(room, *room.spawn_pos)
+    room.auto_fog = True
+
+
+def auto_fog_tick(room, player_r: int, player_c: int) -> None:
+    """Re-reveal for auto_fog rooms: lift fog from every cell now visible
+    from the player (walls-only sight). Called each tick by the main loop."""
+    if getattr(room, 'auto_fog', False) and room.fog_cells:
+        room.fog_cells -= _vision_flood(room, player_r, player_c)
+
+
 def _reveal_from(room, player_r: int, player_c: int) -> None:
     """After a door opens, remove all cells now visible from player from fog_cells."""
     if not room.fog_cells:

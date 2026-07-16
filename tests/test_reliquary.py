@@ -189,6 +189,28 @@ def test_sanctum_sleeps_under_fog_until_the_seal_breaks(seed):
     assert not room.fog_cells
 
 
+@pytest.mark.parametrize("seed", SEEDS)
+def test_approach_friezes_are_symmetric(seed):
+    # The masons' discipline: the approach chamber's top and bottom courses
+    # are identical, and each is a palindrome about the chamber's centre.
+    room = _room(seed)
+    c0, c1 = 1, dg._RELIQUARY_WALL_COL - 1
+    width = c1 - c0 + 1
+    rows = {}
+    for fr in dg._RELIQUARY_FRIEZE_ROWS:
+        cells = {}
+        for ru in room.char_runs:
+            if ru.row == fr and ru.col <= c1:
+                for i, _s in enumerate(ru.symbols):
+                    cells[ru.col + i] = ru.kind
+        rows[fr] = cells
+    a, b = (rows[fr] for fr in dg._RELIQUARY_FRIEZE_ROWS)
+    assert a == b, "top and bottom courses must match"
+    assert a, "expected approach friezes"
+    mirrored = {c0 + (width - 1 - (c - c0)): k for c, k in a.items()}
+    assert a == mirrored, "each course must be a palindrome"
+
+
 def test_randomizes_across_seeds():
     words   = {''.join(_seal_run(_room(s)).symbols) for s in range(40)}
     friezes = {tuple((ru.row, ru.col, ru.symbols) for ru in sorted(

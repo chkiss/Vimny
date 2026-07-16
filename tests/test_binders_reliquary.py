@@ -169,6 +169,26 @@ def test_far_shore_unreachable_by_walking(seed):
 
 
 @pytest.mark.parametrize("seed", SEEDS)
+def test_near_shore_friezes_are_symmetric(seed):
+    room = _room(seed)
+    c0, c1 = 1, min(_BND_WATER_COLS) - 1
+    width = c1 - c0 + 1
+    rows = {}
+    for fr in (1, 5):
+        cells = {}
+        for ru in room.char_runs:
+            if ru.row == fr and ru.col <= c1:
+                for i, _s in enumerate(ru.symbols):
+                    cells[ru.col + i] = ru.kind
+        rows[fr] = cells
+    a, b = rows[1], rows[5]
+    assert a == b, "top and bottom courses must match"
+    assert a, "expected near-shore friezes"
+    mirrored = {c0 + (width - 1 - (c - c0)): k for c, k in a.items()}
+    assert a == mirrored, "each course must be a palindrome"
+
+
+@pytest.mark.parametrize("seed", SEEDS)
 def test_mist_lies_on_the_water(seed):
     room = _room(seed)
     for r in range(1, room.rows - 1):

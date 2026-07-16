@@ -35,7 +35,8 @@ from engine.budget import Budget
 from engine.vim_parser import parse, parse_visual_textobj
 from engine.command_guard import action_allowed as _action_allowed, guard_message as _guard_message
 from engine.world import Entity, CellType, CharRun, Dungeon, clone_entity
-from engine.motion import apply_motion, _apply_esc, _reveal_from, _first_non_blank_col
+from engine.motion import (apply_motion, _apply_esc, _reveal_from,
+                           _first_non_blank_col, auto_fog_tick as _auto_fog_tick)
 from engine.text_object import compute_text_object, resolve_text_object, TextObjectType
 from engine.search import find_next as _search_next, word_under_cursor as _word_under_cursor
 from engine.warden_mega import mega_tick
@@ -3027,6 +3028,9 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
         args (heart_flash, …) pass through."""
         kw.setdefault('attack_pos', _attack_pos())
         kw.setdefault('attack_sym', _attack_sym())
+        # Stone-law fog re-reveal (auto_fog rooms only): what the eye can now
+        # reach — through opened doors, over water — sheds its fog per frame.
+        _auto_fog_tick(dungeon.room, player.row, player.col)
         render_all(term, dungeon, player, budget, msg, **kw)
 
     def _blocked(action) -> bool:

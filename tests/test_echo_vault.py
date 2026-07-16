@@ -218,6 +218,8 @@ def test_exit_reachable_once_bolts_open(seed):
     assert assert_unreached not in seen, "the exit is sealed as built"
     for pos in (_EV_BOLT_A, _EV_BOLT_B, _EV_BOLT_C):
         room.cells[pos[0]][pos[1]] = CellType.FLOOR
+    from engine.motion import auto_fog_tick
+    auto_fog_tick(room, *room.spawn_pos)     # sight crosses the opened bolts
     seen, q = {room.spawn_pos}, deque([room.spawn_pos])
     while q:
         r, c = q.popleft()
