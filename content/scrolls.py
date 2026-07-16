@@ -127,14 +127,15 @@ WAY_BACK_SCROLL = {
 # the Codex's instructions. :h opens the bound Codex read-only in a split and
 # moves focus into it (Vim's :help, made diegetic); every section is a fold.
 READERS_KEY_SCROLL = {
-    'title': "◈   The Reader's Key   ◈",
+    'title': '◈   The Codex Key   ◈',
     'lines': [
         ('dim',    '  A bound codex, and a habit to bind to it.'),
         ('blank',),
         ('cmd',    ':h {name}', 'open the Codex to a page'),
         ('cmd',    ':h       ', 'open the Codex to its index'),
         ('cmd',    'za       ', 'unfold / fold a section'),
-        ('cmd',    'zR  zM   ', 'open the whole book / shut it'),
+        ('cmd',    'zR       ', 'unRoll the whole book'),
+        ('cmd',    'zM       ', 'fold More — roll it shut'),
         ('cmd',    ':q       ', 'close the book, back to the hall'),
         ('blank',),
         ('dim',    '  Reading is free — the ledger counts no page.'),
@@ -703,7 +704,7 @@ SCROLL_CATALOG = [
     },
     {
         'id':         'readers_key',
-        'title':      "The Reader's Key",
+        'title':      'The Codex Key',
         'dropped_by': "The Binder's lectern",
         'level_slug': 'binders_reliquary',
         'level_name': "The Binder's Reliquary",

@@ -3958,7 +3958,7 @@ def build_dungeon_brace_square_enclosure(seed: int) -> Dungeon:
 # A second reliquary (display 14.1, after the Seekers' Labyrinth): the moment
 # the command load has outgrown memory and the player can SEARCH is the
 # moment the Codex earns its keep. On the lectern: the bound Codex and its
-# instruction scroll (The Reader's Key — :h, za, zR/zM, :q).
+# instruction scroll (The Codex Key — :h, za, zR/zM, :q).
 #
 # The puzzle forces one round-trip through the book. Four candidate rows read
 # `jnk word` — four keys cut for the door, three counterfeit. The Codex's

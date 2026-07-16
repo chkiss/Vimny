@@ -164,7 +164,7 @@ def test_every_catalog_scroll_binds_into_the_codex():
 def test_scroll_sections_only_binds_discovered_scrolls():
     assert scroll_sections(SCROLL_CATALOG, []) == []
     secs = scroll_sections(SCROLL_CATALOG, ['readers_key'])
-    assert len(secs) == 1 and secs[0][0] == "The Reader's Key"
+    assert len(secs) == 1 and secs[0][0] == 'The Codex Key'
     assert any(':h {name}' in ln for ln in secs[0][1])
 
 

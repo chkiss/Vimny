@@ -210,9 +210,10 @@ def scroll_sections(catalog, discovered):
                 if tag == 'blank':
                     body.append('')
                 elif tag == 'cmd':
-                    body.append(f'  {flat(line[1]):<8} {flat(line[2])}')
+                    body.append(f'  {flat(line[1]):<9} ──>  {flat(line[2])}')
                 elif tag == 'smudge':
-                    body.append(f'  {flat(line[1]):<8} {flat(line[2])}{flat(line[3])}')
+                    body.append(f'  {flat(line[1]):<9} ──>  '
+                                f'{flat(line[2])}{flat(line[3])}')
                 else:                              # dim / amber
                     body.append(flat(line[1]))
         else:                                      # the kv shape (the Unnamed
