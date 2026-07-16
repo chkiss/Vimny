@@ -23,7 +23,7 @@ Returns action dicts consumed by the game loop.
 from __future__ import annotations
 from engine.modes import Mode
 
-MOTIONS  = set('hjklwbeWBEGg0^${}()HML%|' + ';,')
+MOTIONS  = set('hjklwbeWBEGg0^${}()HML%|' + ';,' + '+-_')
 OPERATORS = set('dyc><=')
 COUNTS   = set('123456789')
 # text-object alias normalisation: ib/i)->i(, iB/i}->i{, i]->i[, i>->i<

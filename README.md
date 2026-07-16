@@ -88,13 +88,13 @@ The curriculum is defined in `content/levels.py` (canonical) and mirrored in `LE
 | 16 | The Archivist's Library | `:set wrap  :e!  :w {file}` | Playable |
 | 16.1 | The Warden Pathfinder | (boss) | Playable |
 | 17 | The Operator's Vault | `d{m}  dd` | Playable |
-| 18 | The Cipher Cell | `r  D` | Playable |
+| 18 | The Cipher Cell | `r  D  X` | Playable |
 | 19 | The Beacon Tiers | `y yy P` | Playable |
 | 20 | The Echo Vault | `.` | Playable |
 | 20.1 | The Warden Manifold | (boss) | Playable |
 | 21 | The Inscription Halls | `i a` | Playable |
 | 22 | The Change Annex | `c{m}  cE  cc  s` | Playable |
-| 23 | The Change Extension | `S  C` | Playable |
+| 23 | The Change Extension | `S  C  Y` | Playable |
 | 24 | The Sculpting Chambers | `I A o O` | Playable |
 | 25 | The Overwrite Halls | `R` | Playable |
 | 26 | The Case Chambers | `~ g~ gU gu` | Playable |
@@ -105,7 +105,7 @@ The curriculum is defined in `content/levels.py` (canonical) and mirrored in `LE
 | 30 | The Sight Sanctum | `v {m} d/c/~` | Playable |
 | 31 | The Selection Halls | `V  <C-v>` | Playable |
 | 32 | The Word Enclosure | `iw aw iW aW` | Playable |
-| 33 | The Bracket Enclosure | `i( a(` | Planned |
+| 33 | The Bracket Enclosure | `i( a(` | Playable |
 | 34 | The Brace & Square Enclosure | `i[ a[ i{ a{` | Planned |
 | 35 | The Quote Enclosure | `i" a" i' a'` | Planned |
 | 36 | The Tag Enclosure | `it at` | Planned |
@@ -166,7 +166,7 @@ The full command reference (also the hint-bar source) is `render/vim_commands.md
 | `)` | next sentence |
 | `(` | prev sentence |
 | `v` | visual mode |
-| `v{m}d/c/~` | act on the selection |
+| `v{m} d/c/~/p/r/J` | act on the selection |
 | `V` | select whole lines |
 | `<C-v>` | select a block |
 | `/{pat}` | search |
@@ -185,10 +185,12 @@ The full command reference (also the hint-bar source) is `render/vim_commands.md
 | `cc` | change line |
 | `r{c}` | replace char |
 | `D` | delete to line end |
+| `X` | delete before cursor |
 | `c{m}  cc` | change |
 | `s` | substitute |
 | `S` | substitute line |
 | `C` | change to end |
+| `Y` | yank line |
 | `y{m}  yy` | yank |
 | `P` | paste before |
 | `.` | repeat change |
@@ -209,10 +211,10 @@ The full command reference (also the hint-bar source) is `render/vim_commands.md
 | `>{m}` | indent |
 | `<{m}` | dedent |
 | `={m}` | apply the law |
-| `V` | visual line |
-| `<C-v>` | visual block |
 | `iw` | inner word |
 | `aw` | a word |
+| `iW` | inner WORD |
+| `aW` | a WORD |
 | `i(` | inner ( |
 | `a(` | a () |
 | `i[` | inner [ |

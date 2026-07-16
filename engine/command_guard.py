@@ -38,6 +38,10 @@ _MOTION_GUARD: dict[str, str] = {
     '%': '%',
     '{': '{',  '}': '}',  '(': '(',  ')': ')',
     '|': 'col_motion',
+    # + - _ (and NORMAL Enter ≡ +): the linewise steps — one future
+    # lesson token, deliberately untaught until the post-Act-VI slot
+    # (cheap fnb-landing steps golf several existing pars if freed early)
+    '+': 'line_step', '-': 'line_step', '_': 'line_step',
 }
 
 

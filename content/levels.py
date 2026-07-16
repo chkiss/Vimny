@@ -67,7 +67,7 @@ LEVELS = [
     {'display': '16',   'slug': 'archivists_library',    'name': "The Archivist's Library",    'commands': ':set wrap  :e!  :w {file}', 'teaches': ['setwrap', 'reload', 'writeas']},
     {'display': '16.1', 'slug': 'warden_pathfinder',     'name': 'The Warden Pathfinder',      'type': 'boss', 'after': 'archivists_library', 'teaches': []},
     {'display': '17',   'slug': 'operators_vault',       'name': "The Operator's Vault",       'commands': 'd{m}  dd', 'teaches': ['d']},
-    {'display': '18',   'slug': 'cipher_cell',           'name': 'The Cipher Cell',            'commands': 'r  D', 'teaches': ['r', 'D']},
+    {'display': '18',   'slug': 'cipher_cell',           'name': 'The Cipher Cell',            'commands': 'r  D  X', 'teaches': ['r', 'D', 'X']},
     {'display': '19',   'slug': 'quartermaster',         'name': 'The Beacon Tiers',           'commands': 'y yy P', 'teaches': ['y', 'P']},
     # The Undo Sanctum (slug undo_sanctum) was CANCELLED 2026-06-11: u is
     # always-on, and <C-r> is granted by the 'redo' relic scroll instead
@@ -77,7 +77,7 @@ LEVELS = [
     {'display': '20.1', 'slug': 'warden_manifold',       'name': 'The Warden Manifold',        'type': 'boss', 'after': 'echo_vault', 'teaches': []},
     {'display': '21',   'slug': 'inscription_halls',     'name': 'The Inscription Halls',      'commands': 'i a', 'teaches': ['insert']},
     {'display': '22',   'slug': 'whole_line_annex',      'name': 'The Change Annex',           'commands': 'c{m}  cE  cc  s', 'teaches': ['c', 's']},
-    {'display': '23',   'slug': 'change_extension',       'name': 'The Change Extension',       'commands': 'S  C', 'teaches': ['S', 'C']},
+    {'display': '23',   'slug': 'change_extension',       'name': 'The Change Extension',       'commands': 'S  C  Y', 'teaches': ['S', 'C', 'Y']},
     {'display': '24',   'slug': 'sculpting_chambers',    'name': 'The Sculpting Chambers',     'commands': 'I A o O', 'teaches': ['I', 'A', 'o', 'O']},
     {'display': '25',   'slug': 'overwrite_halls',       'name': 'The Overwrite Halls',        'commands': 'R', 'teaches': ['R']},
     {'display': '26',   'slug': 'case_chambers',         'name': 'The Case Chambers',          'commands': '~ g~ gU gu', 'teaches': ['~', 'gU', 'gu', 'g~']},

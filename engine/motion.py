@@ -360,6 +360,25 @@ def apply_motion(player, motion, count, room, target=None, count_given: bool = T
             moved |= move_player(player, -1, 0, room)
         elif motion == 'l':
             moved |= move_player(player, 0,  1, room)
+        elif motion in ('+', '-'):
+            # + / - (and NORMAL Enter ≡ +): one line down/up, landing on the
+            # row's FIRST NON-BLANK (Vim-true). No move if the target row has
+            # no standable fnb.
+            nr = player.row + (1 if motion == '+' else -1)
+            if 0 <= nr < room.rows:
+                fnb = _first_non_blank_col(room, nr)
+                if fnb is not None and room.is_passable(nr, fnb):
+                    player.row, player.col = nr, fnb
+                    moved = True
+        elif motion == '_':
+            # _ : first non-blank, [count]-1 lines down ({1}_ ≡ ^)
+            nr = player.row + (count - 1)
+            if 0 <= nr < room.rows:
+                fnb = _first_non_blank_col(room, nr)
+                if fnb is not None and room.is_passable(nr, fnb):
+                    player.row, player.col = nr, fnb
+                    moved = True
+            break                                    # count is the target, not a repeat
         elif motion in ('gj', 'gk'):
             # gj/gk — move by DISPLAY line. On a wrapped single-line buffer that is
             # ±(wrap width) columns; on an ordinary grid it falls back to j/k.

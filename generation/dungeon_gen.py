@@ -3086,7 +3086,6 @@ _SS_BAY_E  = 28
 _SS_PLQ_COL = 2                     # the full true readings, in the WEST wall
                                     # band (cols 2..11 — wide enough for the
                                     # Case chamber's two-word rows)
-_SS_CHEST  = (2, 12)                # nook west of the spawn: the Warden's Sight
 _SS_TEXT0  = 15                     # floor words start two east of the spine
 _SS_SHAFT  = 19                     # the sight-line: a one-cell light shaft
                                     # through each bay separator at the anchor
@@ -3226,7 +3225,6 @@ def build_dungeon_sight_sanctum(seed: int) -> Dungeon:
         for r in rows:
             for c in range(_SS_BAY_W, _SS_BAY_E + 1):
                 cells[r][c] = CellType.FLOOR
-    cells[_SS_CHEST[0]][_SS_CHEST[1]] = CellType.FLOOR   # the scroll nook
     for r in _SS_SHAFT_ROWS:                             # the light shaft —
         cells[r][_SS_SHAFT] = CellType.FLOOR             # NOT the throat row:
     # the gate row is still reachable only along the spine (teleport audit)
@@ -3258,8 +3256,6 @@ def build_dungeon_sight_sanctum(seed: int) -> Dungeon:
 
     room.entities.append(Entity(kind='exit', row=_SS_EXIT[0], col=_SS_EXIT[1],
                                 edit_immune=True))
-    room.entities.append(Entity(kind='chest_scroll', row=_SS_CHEST[0],
-                                col=_SS_CHEST[1], scroll_id='visual'))
     room.spawn_pos = (2, _SS_SPINE)
     room.exit_pos  = _SS_EXIT
 
@@ -3302,7 +3298,7 @@ def build_dungeon_sight_sanctum(seed: int) -> Dungeon:
 # All six chambers anchor at the SHAFT column, so every hop is a plain {n}j
 # (the nav-golf audit); the answer tape shows <C-v> as ^v — load-bearing,
 # unlike Esc, so it must be visible (the tracker eats both chars at once).
-_SH_ROWS, _SH_COLS = 23, 26
+_SH_ROWS, _SH_COLS = 32, 26
 _SH_SPINE  = 13                     # every row's first standable
 _SH_BAY_W  = 14                     # bay floor cols 14..24; east wall 25
 _SH_BAY_E  = 24
@@ -3313,12 +3309,16 @@ _SH_CASE_ROWS  = (3, 5, 7)          # VU · Vu · V~, one row each
 _SH_STRIPE_ROWS = (9, 10, 11)       # block delete
 _SH_RECT_ROWS   = (13, 14, 15)      # block case toggle
 _SH_INS_ROWS    = (17, 18, 19)      # block insert
-_SH_SHAFT_SEPS  = (4, 6, 8, 12, 16) # separators the shaft pierces
-_SH_THROAT = 20                     # spine-only (teleport audit)
-_SH_GATE   = 21
-_SH_BOLT0  = 14                     # bolts cols 14..19, one per chamber
-_SH_EXIT   = (21, 20)               # the FINAL SEAL
-_SH_PAR    = 35
+_SH_STAMP_ROWS  = (21, 22, 23)      # block overstrike (<C-v> r)
+_SH_PANEL_ROWS  = (25, 26, 27, 28)  # the four panels (visual p, the swap)
+_SH_PANEL_FLK   = 15                # panel flank word (len 3) at cols 15..17
+_SH_PANEL_W0    = 19                # panel word (len 6) at cols 19..24
+_SH_SHAFT_SEPS  = (4, 6, 8, 12, 16, 20, 24)  # separators the shaft pierces
+_SH_THROAT = 29                     # spine-only (teleport audit)
+_SH_GATE   = 30
+_SH_BOLT0  = 14                     # bolts cols 14..21, one per chamber
+_SH_EXIT   = (30, 22)               # the FINAL SEAL
+_SH_PAR    = 64
 
 
 def _sh_flip_mask(word: str) -> str:
@@ -3361,10 +3361,24 @@ def _sh_draw_words(rng) -> dict:
             continue
         letter = rng.choice(letters)
         ins = rng.sample(by_l[letter], 3)
-        picks = case3 + stripe + rect + ins
+        # the stamp: three len-6 words sharing the letter at index 2 — one
+        # block overstrike heals all three
+        by_l6: dict = {}
+        for w in pool(6):
+            by_l6.setdefault(w[2], []).append(w)
+        letters6 = [l for l, ws in by_l6.items() if len(ws) >= 3]
+        if not letters6:
+            continue
+        stamp_letter = rng.choice(letters6)
+        stamp = rng.sample(by_l6[stamp_letter], 3)
+        panels = rng.sample(pool(6), 4)          # the 4-cycle panel words
+        flanks = rng.sample(pool(3), 4)
+        picks = case3 + stripe + rect + ins + stamp + panels + flanks
         if len(set(picks)) == len(picks):
             return {'case': case3, 'stripe': stripe, 'rect': rect,
-                    'ins': ins, 'letter': letter}
+                    'ins': ins, 'letter': letter,
+                    'stamp': stamp, 'stamp_letter': stamp_letter,
+                    'panels': panels, 'flanks': flanks}
     raise ValueError('selection_halls: no distinct draw after 80 tries')
 
 
@@ -3405,6 +3419,21 @@ def build_dungeon_selection_halls(seed: int) -> Dungeon:
     for r, w in zip(_SH_INS_ROWS, words['ins']):
         runs.append((r, t0, w[:2] + w[3:]))
     chambers.append((_SH_INS_ROWS, tuple(runs), tuple(words['ins'])))
+    # the restorer's stamp: one wrong cell ('#') at the anchor column of all
+    # three rows — <C-v> 2j r{stamp_letter}
+    runs = []
+    for r, w in zip(_SH_STAMP_ROWS, words['stamp']):
+        runs.append((r, t0, w[:2] + '#' + w[3:]))
+    chambers.append((_SH_STAMP_ROWS, tuple(runs), tuple(words['stamp'])))
+    # the four panels: each row holds the PREVIOUS row's true word (a 4-cycle
+    # rotated one frame down); flanks make every row's reading distinct
+    runs, targets_p = [], []
+    for i, r in enumerate(_SH_PANEL_ROWS):
+        wrong = words['panels'][(i - 1) % 4]     # row i wears panel i-1
+        runs += [(r, _SH_PANEL_FLK, words['flanks'][i]),
+                 (r, _SH_PANEL_W0, wrong)]
+        targets_p.append(f"{words['flanks'][i]} {words['panels'][i]}")
+    chambers.append((_SH_PANEL_ROWS, tuple(runs), tuple(targets_p)))
 
     R, C = _SH_ROWS, _SH_COLS
     cells = [[CellType.WALL] * C for _ in range(R)]
@@ -3438,10 +3467,16 @@ def build_dungeon_selection_halls(seed: int) -> Dungeon:
 
     room.rebuild_indexes()
     room.par    = _SH_PAR
-    room.budget = math.ceil(_SH_PAR * 1.4)   # STANDARD: the piecewise route wins at 1★
+    room.budget = 108   # GENEROUS hand-set (old-route min 107 + 1): the four
+    # panels' bay wall EATS the old P-then-delete juggle's displaced word
+    # (the void-push), so the honest old route must RETYPE two panels and
+    # rebuild a third — visual p is terrain-forced, and 1.4·par (90) would
+    # make the old route unwinnable (the 1★ law). Indentation precedent.
     # <C-v> shows on the tape as ^v (load-bearing, unlike Esc — a player
     # following the tape must see it; the tracker eats both chars at once)
-    room.answer = f'j VU 2j Vu 2j V~ 2j ^v2jld 4j ^v2j3l~ 4j ^v2jI{letter} G $'
+    sl = words['stamp_letter']
+    room.answer = (f'j VU 2j Vu 2j V~ 2j ^v2jld 4j ^v2j3l~ 4j ^v2jI{letter} '
+                   f'4j ^v2jr{sl} 4j w ye 3j vep k vbp k vbp k vbp G $')
 
     dungeon = Dungeon(name='The Selection Halls', seed=seed)
     dungeon.rooms        = [room]
@@ -3653,7 +3688,7 @@ _BE_EXIT   = (13, 21)               # the FINAL SEAL
 _BE_C1_SHAPE = ((3, 5, 7, 25), (4, 4, 5, 24), (5, 4, 4, 24))
 _BE_C2_SHAPE = ((7, 3, 4, 23), (8, 3, 4, 23))
 _BE_C3_SHAPE = ((10, 4, 4, 24), (11, 3, 4, 23))
-_BE_PAR = 35            # hand-tallied along the driven tape (buffer mutates)
+_BE_PAR = 33            # hand-tallied along the driven tape (j % entry)
 
 
 def _be_draw_words(rng) -> dict:
@@ -3744,7 +3779,10 @@ def build_dungeon_bracket_enclosure(seed: int) -> Dungeon:
     room.par    = _BE_PAR
     room.budget = math.ceil(_BE_PAR * 1.4)   # STANDARD: the piecewise route wins at 1★
     ca, cb = words['cures']
-    room.answer = (f'j w w l di( j . j . 2j ci( {ca} j ci( {cb} '
+    # nav golf (user-found in playtest): % from the spine scans to the first
+    # '(' and jumps to its MATCH — j % lands ON the ')' and di( resolves
+    # from the delimiter. Two keys under the w-walk.
+    room.answer = (f'j % di( j . j . 2j ci( {ca} j ci( {cb} '
                    f'2j da( j . G $')
 
     dungeon = Dungeon(name='The Bracket Enclosure', seed=seed)

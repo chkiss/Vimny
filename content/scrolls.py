@@ -79,7 +79,44 @@ WARDEN_SIGHT_SCROLL = {
         ('dim',   '  Use verbs and nouns just as you would'),
         ('dim',   '  in Normal Mode, and return with Esc.'),
         ('blank',),
+        ('cmd',   'v{m}p',    'paste OVER the selection (it swaps'),
+        ('dim',   '          into the register — nothing is lost)'),
+        ('cmd',   'v{m}r{c}', 'overstrike every selected character'),
+        ('blank',),
         ('amber', '  See before you strike.'),
+    ],
+}
+
+
+# Pinned to the Selection Halls' chest — the selection's finer handles.
+OTHER_END_SCROLL = {
+    'title': '◈   The Other End   ◈',
+    'lines': [
+        ('dim',    '  The frame is held from either corner.'),
+        ('blank',),
+        ('cmd',    'o', "jump to the selection's other end"),
+        ('cmd',    'O', 'in a block: the other corner, same row'),
+        ('cmd',    'gv', 'reselect what you last held'),
+        ('blank',),
+        ('amber',  '  Stretch from whichever hand is free.'),
+    ],
+}
+
+
+# Relic — the implicit ' mark. Usable only once marks are learned (the ''
+# jump itself is gated on 'mark'), so an early drop teases without cheesing.
+WAY_BACK_SCROLL = {
+    'title': '◈   The Way Back   ◈',
+    'lines': [
+        ('dim',    '  Every leap leaves a footprint where it began.'),
+        ('blank',),
+        ('smudge', "''", 'back to where you l', 'ast leapt from', 'mark'),
+        ('smudge', '``', 'the same, to the e', 'xact column',    'mark'),
+        ('blank',),
+        ('dim',    "  Leap again and the footprint moves —"),
+        ('dim',    "  '' toggles between the two."),
+        ('blank',),
+        ('amber',  '  You always know where you just were.'),
     ],
 }
 
@@ -377,8 +414,8 @@ SEALED_DEPARTURE_SCROLL = {
         ('cmd',    'ZZ', 'save and leave — :wq, two strokes'),
         ('cmd',    'ZQ', 'abandon the page — :q!'),
         ('blank',),
-        ('dim',    '  Hold the shift; strike twice.'),
-        ('amber',  '  The shortest goodbye still closes the book.'),
+        ('dim',    '  Hold shift; knock twice.'),
+        ('amber',  "  The shortest goodbye still locks up 'fore bed."),
     ],
 }
 
@@ -496,14 +533,6 @@ SCROLL_CATALOG = [
         'content':    INSCRIBERS_HAND_SCROLL,
     },
     {
-        'id':         'visual',
-        'title':      "The Warden's Sight",
-        'dropped_by': 'The Sight Sanctum',
-        'level_slug': 'sight_sanctum',
-        'level_name': 'The Sight Sanctum',
-        'content':    WARDEN_SIGHT_SCROLL,
-    },
-    {
         'id':         'text_obj',
         'title':      'The Whole Word',
         'dropped_by': 'The Warden Scrivener',
@@ -614,6 +643,22 @@ SCROLL_CATALOG = [
         'content':    SEALED_DEPARTURE_SCROLL,
     },
     {
+        'id':         'swap_ends',
+        'title':      'The Other End',
+        'dropped_by': 'A framer’s workbench',
+        'level_slug': 'selection_halls',
+        'level_name': 'The Selection Halls',
+        'content':    OTHER_END_SCROLL,
+    },
+    {
+        'id':         'jump_back',
+        'title':      'The Way Back',
+        'dropped_by': 'A wayfarer’s bootprint',
+        'level_slug': 'waypoint_sanctum',
+        'level_name': 'The Waypoint Sanctum',
+        'content':    WAY_BACK_SCROLL,
+    },
+    {
         'id':         'ins_paste',
         'title':      'The Recalling Hand',
         'dropped_by': 'A scribe’s desk',
@@ -650,6 +695,11 @@ RELIC_SCROLL_IDS = [
     'regex_classes', 'regex_anchors', 'regex_quant', 'regex_collections', 'regex_magic',
     'searchcraft', 'jump', 'col_motion', 'ins_paste', 'ins_edit',
     'ZZ',    # The Sealed Departure — ZZ/ZQ; free like the :wq/:q! they abbreviate
+    'swap_ends',  # The Other End — o / O / gv (selection shaping; no cost surface)
+    'jump_back',  # The Way Back — '' / `` ; the JUMP stays gated on 'mark'
+                  # (level 15), so an early drop only teases: cheese-audited —
+                  # no pre-15 par can use it, and at 15+ '' ties `a / n / gg
+                  # returns in every canonical tape
     # 'redo' is NOT here: The Second Stride is pinned to the Waypoint
     # Sanctum's first vault chest (guaranteed — before the editing act),
     # not left to the random pool.

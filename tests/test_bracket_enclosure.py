@@ -51,12 +51,13 @@ def _bolt(i):
     return (_BE_GATE, _BE_BOLT0 + i)
 
 
-# The canonical tape (== room.answer with Esc placed): pry the stones (di(
-# chained by dot), set the new stones (ci( + cure), tear the fittings out
-# (da( with a dot reprise). 35 keys; the cures vary by seed.
+# The canonical tape (== room.answer with Esc placed): the % entry (j %
+# scans to the '(' and lands on its match — user-found nav golf), pry the
+# stones (di( chained by dot), set the new stones (ci( + cure), tear the
+# fittings out (da( with a dot reprise). 33 keys; the cures vary by seed.
 def _canon_keys(room):
     ca, cb = room._be_words['cures']
-    return (_K('jwwldi(j.j.') + _K('2jci(') + _K(ca) + [ESC]
+    return (_K('j%di(j.j.') + _K('2jci(') + _K(ca) + [ESC]
             + _K('jci(') + _K(cb) + [ESC] + _K('2jda(j.') + _K('G$'))
 
 
@@ -124,7 +125,7 @@ def test_par_answer_budget(seed):
     assert room.par == _BE_PAR
     assert room.budget == math.ceil(_BE_PAR * 1.4)
     ca, cb = room._be_words['cures']
-    assert room.answer == (f'j w w l di( j . j . 2j ci( {ca} j ci( {cb} '
+    assert room.answer == (f'j % di( j . j . 2j ci( {ca} j ci( {cb} '
                            f'2j da( j . G $')
 
 
@@ -227,12 +228,12 @@ def test_di_paren_keeps_the_husk_and_da_paren_leaves_the_scar(monkeypatch):
     dungeon = build_dungeon_bracket_enclosure(0)
     room = dungeon.rooms[0]
     w1, _stone, w2 = room._be_words['rows'][0]
-    _drive(dungeon, _K('jwwldi('), monkeypatch, finish=':q!\r')
+    _drive(dungeon, _K('j%di('), monkeypatch, finish=':q!\r')
     assert _row_text(room, _BE_C1_ROWS[0]) == f'{w1} () {w2}', "the husk stays"
 
     dungeon = build_dungeon_bracket_enclosure(0)
     room = dungeon.rooms[0]
-    _drive(dungeon, _K('jwwlda('), monkeypatch, finish=':q!\r')
+    _drive(dungeon, _K('j%da('), monkeypatch, finish=':q!\r')
     assert _row_text(room, _BE_C1_ROWS[0]) == f'{w1}  {w2}', "the scar"
     assert room.cells[_bolt(0)[0]][_bolt(0)[1]] == CellType.WALL, \
         "the husk door does not accept the scar"
@@ -243,7 +244,7 @@ def test_diw_kills_half_the_two_word_stone(monkeypatch):
     one and the husk door stays barred; only di( takes the delimited span."""
     dungeon = build_dungeon_bracket_enclosure(0)
     room = dungeon.rooms[0]
-    _drive(dungeon, _K('jwwldiw'), monkeypatch, finish=':q!\r')
+    _drive(dungeon, _K('j%bdiw'), monkeypatch, finish=':q!\r')
     assert '(' in _row_text(room, _BE_C1_ROWS[0])
     assert room.cells[_bolt(0)[0]][_bolt(0)[1]] == CellType.WALL
 
@@ -254,7 +255,7 @@ def test_ca_paren_tears_the_setting_and_reads_false(monkeypatch):
     dungeon = build_dungeon_bracket_enclosure(0)
     room = dungeon.rooms[0]
     ca, _cb = room._be_words['cures']
-    _drive(dungeon, _K('jwwldi(j.j.2jca(') + _K(ca) + [ESC],
+    _drive(dungeon, _K('j%di(j.j.2jca(') + _K(ca) + [ESC],
            monkeypatch, finish=':q!\r')
     assert '(' not in _row_text(room, _BE_C2_ROWS[0])
     assert room.cells[_bolt(1)[0]][_bolt(1)[1]] == CellType.WALL

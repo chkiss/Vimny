@@ -177,6 +177,7 @@
 |------|-------|--------------------|
 | r{c} | r     | replace char       |
 | D    | D     | delete to line end |
+| X    | X     | delete before cursor |
 
 ## whole_line_annex — change (substitute char)
 
@@ -191,6 +192,7 @@
 |------|-------|-----------------|
 | S    |       | substitute line |
 | C    |       | change to end   |
+| Y    | Y     | yank line       |
 
 ## quartermaster — yank + paste before
 
@@ -256,13 +258,6 @@
 | keys  | token | desc          |
 |-------|-------|---------------|
 | ={m}  | =     | apply the law |
-
-## selection_halls — visual line / block
-
-| keys  | token        | desc          |
-|-------|--------------|---------------|
-| V     | visual_line  | visual line   |
-| <C-v> | visual_block | visual block  |
 
 ## word_enclosure — word text objects
 

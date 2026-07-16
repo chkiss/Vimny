@@ -149,6 +149,7 @@ _NONSTANDARD_BUDGET = {
     'build_dungeon_change_extension',
     'build_dungeon_overwrite_halls',   # TIGHT: par + _OH_SAVING − 1 bars the all-S route
     'build_dungeon_indentation_sanctum',  # GENEROUS hand-set: the manual-mason route wins 1★
+    'build_dungeon_selection_halls',   # GENEROUS hand-set 108: the void-push forces visual p
 }
 
 from tests import SEEDS as _UNIVERSAL_SEEDS

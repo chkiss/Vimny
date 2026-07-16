@@ -3935,6 +3935,21 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
                 player.visual_anchor = cursor
                 _render(message)
                 continue
+            if not key_buf and raw == 'O':
+                # O — in BLOCK mode swap the horizontal corners (stay on the
+                # same row, cursor to the other side of the rectangle); in
+                # charwise/linewise it is o (Vim-true). Selection shaping
+                # only — every op reads min/max bounds, so this can never
+                # change what an operator does (no cheese surface).
+                if vmode == Mode.VISUAL_BLOCK:
+                    _oc = anchor[1]
+                    player.visual_anchor = (anchor[0], player.col)
+                    player.col = _oc
+                else:
+                    player.row, player.col = anchor
+                    player.visual_anchor = cursor
+                _render(message)
+                continue
             want = _visual_mode_toggle(raw, str(key)) if not key_buf else None
             if want is not None:                           # v / V / Ctrl-v toggle / exit
                 # Switching INTO a sibling mode is gated per token, same as
@@ -4201,6 +4216,27 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
         if key.name == 'KEY_ESCAPE':
             _apply_esc(player)
             key_buf = ''
+            _render(message)
+            continue
+
+        if (key.name == 'KEY_ENTER' or str(key) in ('\n', '\r')) and not key_buf:
+            # NORMAL-mode Enter ≡ + (Vim-true): one line down to the first
+            # non-blank. Gated with the line-step lesson token.
+            _enter_action = {'type': 'motion', 'motion': '+', 'count': 1}
+            if not edit_mode and not _action_allowed(_enter_action, player.known_commands):
+                _blocked(_enter_action)
+                continue
+            if not edit_mode and budget.remaining <= 0:
+                _push('Out of budget!  (u to undo)')
+                _render(message)
+                continue
+            _ent_pre = (player.row, player.col, budget.spent,
+                        cmd_start_ans[0], cmd_start_ans[1])
+            if apply_motion(player, '+', 1, room, None, game_h=term.height - 8):
+                if not edit_mode:
+                    budget.spend(1)
+                    undo_stack.append(_ent_pre)
+                    redo_stack.clear()
             _render(message)
             continue
 

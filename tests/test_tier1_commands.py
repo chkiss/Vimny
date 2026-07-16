@@ -100,9 +100,10 @@ def test_X_deletes_before_the_cursor(monkeypatch):
     assert len(_row_text(room, _SH_CASE_ROWS[0])) == 5, "one char gone, from the west side"
 
 
-def test_X_is_locked_without_its_token(monkeypatch):
-    _res, room = _drive(_K('j7lX'), monkeypatch)   # Scribe: 'X' unlearned
-    assert len(_row_text(room, _SH_CASE_ROWS[0])) == 6, "nothing deleted"
+def test_X_works_for_the_scribe_once_taught(monkeypatch):
+    # X joined the Cipher Cell's teaches (display 18) — known by display 31
+    _res, room = _drive(_K('j7lX'), monkeypatch)
+    assert len(_row_text(room, _SH_CASE_ROWS[0])) == 5
 
 
 # ── visual p / r / J ─────────────────────────────────────────────────────────

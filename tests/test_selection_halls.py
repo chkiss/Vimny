@@ -52,27 +52,36 @@ def _bolt(i):
     return (_SH_GATE, _SH_BOLT0 + i)
 
 
-# The canonical tape (== room.answer with <C-v>/Esc placed — control keys
-# are omitted from the tape like Esc). 35 keys; the typed cure varies by seed.
+# The canonical tape (== room.answer with <C-v>/Esc placed; ^v on the tape
+# is the <C-v> keystroke). 64 keys; the typed letters vary by seed.
 def _canon_keys(room):
-    L = room._sh_words['letter']
+    w = room._sh_words
     return (_K('jVU2jVu2jV~2j') + [CV] + _K('2jld') + _K('4j') + [CV]
-            + _K('2j3l~') + _K('4j') + [CV] + _K('2jI') + _K(L) + [ESC]
-            + _K('G$'))
+            + _K('2j3l~') + _K('4j') + [CV] + _K('2jI') + _K(w['letter']) + [ESC]
+            + _K('4j') + [CV] + _K('2jr') + _K(w['stamp_letter'])
+            + _K('4jwye3jvepkvbpkvbpkvbp') + _K('G$'))
 
 
-# The leanest old-only rival: gUU/guu/g~~ for the trio (the 3-key doubled
-# forms), 2x + dot down the stripe, count-~ chains over the rectangle, and a
-# hand insert per row (dot after an insert only RE-ENTERS insert — it does
-# not replay the text — so the chain is typed out). Wins at 1★.
+# The leanest old-only rival: gUU/guu/g~~ for the trio, 2x + dot down the
+# stripe, count-~ chains over the rectangle, hand inserts (dot after an
+# insert only RE-ENTERS insert), r + dot for the stamp — and for the four
+# panels, cut-then-paste ONCE (the bay wall eats the pushed word — the
+# void-push) then RETYPE the rest: visual p is terrain-forced. Wins at 1★
+# only because the budget is hand-set generous (108 = old min + 1).
 def _rival_keys(room):
-    L = room._sh_words['letter']
+    w = room._sh_words
+    pa = w['panels']
     keys = (_K('jgUU2jguu2jg~~2j') + _K('2xj.j.') + _K('2j')
             + _K('4~j4h.j4h.') + _K('4h2j'))
     for i in range(3):
-        keys += _K('i') + _K(L) + [ESC]
+        keys += _K('i') + _K(w['letter']) + [ESC]
         if i < 2:
             keys += _K('j')
+    keys += _K('2j^2lr') + _K(w['stamp_letter']) + _K('j^2l.j^2l.')
+    keys += _K('2j^w6x') + _K('3j^wP')
+    keys += _K('k^wce') + _K(pa[2]) + [ESC]
+    keys += _K('k^wce') + _K(pa[1]) + [ESC]
+    keys += _K('k^ea') + _K(' ' + pa[0]) + [ESC]
     return keys + _K('G$')
 
 
@@ -130,17 +139,18 @@ def test_layout_and_identity(seed):
 def test_par_answer_budget(seed):
     room = _room(seed)
     assert room.par == _SH_PAR
-    assert room.budget == math.ceil(_SH_PAR * 1.4)
-    L = room._sh_words['letter']
+    assert room.budget == 108, "GENEROUS hand-set: old min 107 + 1 (the void-push)"
+    L, sl = room._sh_words['letter'], room._sh_words['stamp_letter']
     # <C-v> shows as ^v — LOAD-BEARING on the tape (playtest: omitting it
     # made the tape unplayable; a d2j swallowed a stripe row)
-    assert room.answer == f'j VU 2j Vu 2j V~ 2j ^v2jld 4j ^v2j3l~ 4j ^v2jI{L} G $'
+    assert room.answer == (f'j VU 2j Vu 2j V~ 2j ^v2jld 4j ^v2j3l~ 4j ^v2jI{L} '
+                           f'4j ^v2jr{sl} 4j w ye 3j vep k vbp k vbp k vbp G $')
 
 
 @pytest.mark.parametrize("seed", SEEDS)
 def test_exit_and_bolts_start_sealed(seed):
     room = _room(seed)
-    for i in range(6):
+    for i in range(8):
         assert room.cells[_bolt(i)[0]][_bolt(i)[1]] == CellType.WALL
     assert room.cells[_SH_EXIT[0]][_SH_EXIT[1]] == CellType.WALL
 
@@ -172,7 +182,12 @@ def test_word_draw_slot_shapes(seed):
     assert [len(x) for x in w['rect']] == [8, 8, 8]
     assert [len(x) for x in w['ins']] == [7, 7, 7]
     assert all(x[2] == w['letter'] for x in w['ins'])
-    picks = w['case'] + w['stripe'] + w['rect'] + w['ins']
+    assert [len(x) for x in w['stamp']] == [6, 6, 6]
+    assert all(x[2] == w['stamp_letter'] for x in w['stamp'])
+    assert [len(x) for x in w['panels']] == [6, 6, 6, 6]
+    assert [len(x) for x in w['flanks']] == [3, 3, 3, 3]
+    picks = (w['case'] + w['stripe'] + w['rect'] + w['ins']
+             + w['stamp'] + w['panels'] + w['flanks'])
     assert len(set(picks)) == len(picks)
 
 
@@ -190,7 +205,7 @@ def test_full_selection_route_wins_par_perfect(seed, monkeypatch):
     room = dungeon.rooms[0]
     result = _drive(dungeon, _canon_keys(room), monkeypatch)
     assert result['won'] and result['stars'] == 2, result
-    for i in range(6):
+    for i in range(8):
         assert room.cells[_bolt(i)[0]][_bolt(i)[1]] == CellType.FLOOR
 
 
@@ -326,10 +341,10 @@ def test_undo_rebars_bolt_and_seal(monkeypatch):
 
     dungeon = build_dungeon_selection_halls(0)
     room = dungeon.rooms[0]
-    # uu: the walk pushes a snapshot; the second u reaches the block insert —
-    # ONE u refunds the whole block edit (typed text + every propagated row)
+    # uu: the walk pushes a snapshot; the second u reaches the final vbp —
+    # ONE u refunds the whole visual paste-over
     _drive(dungeon, _canon_keys(room)[:-2] + _K('luu'), monkeypatch, finish=':q!\r')
-    assert room.cells[_bolt(5)[0]][_bolt(5)[1]] == CellType.WALL, "re-bars"
+    assert room.cells[_bolt(7)[0]][_bolt(7)[1]] == CellType.WALL, "re-bars"
     assert room.cells[_SH_EXIT[0]][_SH_EXIT[1]] == CellType.WALL, "re-seals"
 
 

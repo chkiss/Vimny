@@ -34,7 +34,7 @@ from content.levels import known_commands
 from generation.dungeon_gen import (
     build_dungeon_sight_sanctum,
     _SS_ROWS, _SS_COLS, _SS_SPINE, _SS_BAY_W, _SS_BAY_E,
-    _SS_PLQ_COL, _SS_CHEST, _SS_GATE, _SS_BOLT0, _SS_EXIT, _SS_PAR, _ss_answer,
+    _SS_PLQ_COL, _SS_GATE, _SS_BOLT0, _SS_EXIT, _SS_PAR, _ss_answer,
 )
 from tests import SEEDS, cached_room
 
@@ -142,10 +142,8 @@ def test_spine_is_every_rows_first_standable(seed):
     room = _room(seed)
     for r in range(room.rows):
         cols = [c for c in range(room.cols) if room.is_passable(r, c)]
-        if not cols:
-            continue
-        expect = _SS_CHEST[1] if r == _SS_CHEST[0] else _SS_SPINE
-        assert cols[0] == expect, f"row {r} first standable {cols[0]}"
+        if cols:
+            assert cols[0] == _SS_SPINE, f"row {r} first standable {cols[0]}"
 
 
 @pytest.mark.parametrize("seed", SEEDS)
@@ -205,14 +203,10 @@ def test_case_plaques_carry_the_full_reading(seed):
     assert reading(12) == f'{w2} {ge}'
 
 
-def test_chest_grants_the_wardens_sight():
+def test_no_chest_in_the_sanctum():
+    # playtest 2026-07-16: the spawn-nook chest read as clutter — removed
     room = _room(0)
-    chest = next(e for e in room.entities if e.kind == 'chest_scroll')
-    assert (chest.row, chest.col) == _SS_CHEST
-    assert chest.scroll_id == 'visual'
-    from content.scrolls import SCROLL_CATALOG
-    entry = next(s for s in SCROLL_CATALOG if s['id'] == 'visual')
-    assert entry['level_slug'] == 'sight_sanctum'
+    assert not any(e.kind == 'chest_scroll' for e in room.entities)
 
 
 def test_curriculum_teaches_visual_and_visual_op():

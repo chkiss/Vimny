@@ -66,13 +66,13 @@ Curriculum order is the order of `LEVELS`. Blueprints: `blueprints/act_*.md`.
 | 16 | `archivists_library` | The Archivist's Library | `:set wrap  :e!  :w {file}` |  |
 | 16.1 | `warden_pathfinder` | The Warden Pathfinder | — | boss |
 | 17 | `operators_vault` | The Operator's Vault | `d{m}  dd` |  |
-| 18 | `cipher_cell` | The Cipher Cell | `r  D` |  |
+| 18 | `cipher_cell` | The Cipher Cell | `r  D  X` |  |
 | 19 | `quartermaster` | The Beacon Tiers | `y yy P` |  |
 | 20 | `echo_vault` | The Echo Vault | `.` |  |
 | 20.1 | `warden_manifold` | The Warden Manifold | — | boss |
 | 21 | `inscription_halls` | The Inscription Halls | `i a` |  |
 | 22 | `whole_line_annex` | The Change Annex | `c{m}  cE  cc  s` |  |
-| 23 | `change_extension` | The Change Extension | `S  C` |  |
+| 23 | `change_extension` | The Change Extension | `S  C  Y` |  |
 | 24 | `sculpting_chambers` | The Sculpting Chambers | `I A o O` |  |
 | 25 | `overwrite_halls` | The Overwrite Halls | `R` |  |
 | 26 | `case_chambers` | The Case Chambers | `~ g~ gU gu` |  |
