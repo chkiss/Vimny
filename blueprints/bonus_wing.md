@@ -57,7 +57,9 @@ the tight-budget Overwrite Halls stretch is long past).
 
 ## Post-wing roadmap (not this file's scope)
 
-- Windows / tabs / buffer management — post-game (README roadmap).
+- Windows / tabs / buffer management — post-game (README roadmap). Includes
+  `<C-w>w` pane switching (decided 2026-07-16): until that act, the Codex
+  pane is deliberately MODAL — focus stays in the book until :q.
 - The Surveyor's Census relic (`<C-g>` introspection family) ships as a
   scroll + zero-budget handlers, independent of the wing (see scroll drafts
   approved 2026-07-16: The Craftsman's "Census Stone").

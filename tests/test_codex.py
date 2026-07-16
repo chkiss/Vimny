@@ -140,6 +140,16 @@ def test_render_rows_marks_ridges_and_follows_the_cursor():
 
 # ── the standing matter ──────────────────────────────────────────────────────
 
+def test_every_catalog_scroll_binds_into_the_codex():
+    # Regression: the Unnamed Register uses the kv shape, not tagged lines —
+    # a full-catalog player must still open the book (KeyError 2026-07-16).
+    all_ids = [s['id'] for s in SCROLL_CATALOG]
+    secs = scroll_sections(SCROLL_CATALOG, all_ids)
+    assert len(secs) == len(SCROLL_CATALOG)
+    reg_body = dict((t, b) for t, b in secs)['The Unnamed Register']
+    assert any(x.strip().startswith('x') for x in reg_body)
+
+
 def test_scroll_sections_only_binds_discovered_scrolls():
     assert scroll_sections(SCROLL_CATALOG, []) == []
     secs = scroll_sections(SCROLL_CATALOG, ['readers_key'])

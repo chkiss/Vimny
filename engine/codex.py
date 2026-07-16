@@ -195,16 +195,27 @@ def scroll_sections(catalog, discovered):
     for entry in catalog:
         if entry['id'] not in have:
             continue
-        body = []
-        for line in entry['content']['lines']:
-            tag = line[0]
-            if tag == 'blank':
-                body.append('')
-            elif tag == 'cmd':
-                body.append(f'  {line[1]:<8} {line[2]}')
-            elif tag == 'smudge':
-                body.append(f'  {line[1]:<8} {line[2]}{line[3]}')
-            else:                                  # dim / amber
-                body.append(line[1])
+        content, body = entry['content'], []
+        if 'lines' in content:                     # the standard tagged shape
+            for line in content['lines']:
+                tag = line[0]
+                if tag == 'blank':
+                    body.append('')
+                elif tag == 'cmd':
+                    body.append(f'  {line[1]:<8} {line[2]}')
+                elif tag == 'smudge':
+                    body.append(f'  {line[1]:<8} {line[2]}{line[3]}')
+                else:                              # dim / amber
+                    body.append(line[1])
+        else:                                      # the kv shape (the Unnamed
+            body.append(content.get('intro', ''))  # Register scroll)
+            p = content.get('p_text')
+            if p:
+                body.append(f'  "{p.strip()}')
+            body.append('')
+            for key, desc, _gate in content.get('kv_rows', ()):
+                body.append(f'  {key:<8} {desc.rstrip()}')
+            body.append('')
+            body.append(content.get('outro', ''))
         out.append((entry['title'], body))
     return out
