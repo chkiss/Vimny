@@ -4468,12 +4468,23 @@ def build_dungeon_waypoint_sanctum(seed: int) -> 'Dungeon':
     # ignores walls, lands inside. This forces the search up-leg exactly as the
     # moats (below) force the mark down-leg. The pocket spans the key cell through
     # the end of the rune; walls ceiling it (row 1) and flank it (row 2 sides).
-    _pkt_lo = _WP_KEY[1] - 1                                  # left wall (col 28)
-    _pkt_hi = _WP_KEY_WORD_POS[1] + len(_WP_KEYWORD)          # right wall (col 35)
+    # (Waterworks conversion 2026-07-18: the pocket ring, the sanctum seals
+    # and the vault boxes are MISTED WATER, not stone — everything is
+    # visible, per the stone-fog law, while walking / scans stay barred:
+    # water blocks feet, the mist on it blocks $ / 0 / ^ / f scans, and
+    # { } skip flooded rows exactly as they skipped the walls.)
+    mist: set = set()
+
+    def moat(r, c):
+        cells[r][c] = CellType.WATER
+        mist.add((r, c))
+
+    _pkt_lo = _WP_KEY[1] - 1                                  # left bank (col 28)
+    _pkt_hi = _WP_KEY_WORD_POS[1] + len(_WP_KEYWORD)          # right bank (col 35)
     for c in range(_pkt_lo, _pkt_hi + 1):
-        cells[1][c] = CellType.WALL                          # ceiling over the pocket
-    cells[2][_pkt_lo] = CellType.WALL                        # left wall
-    cells[2][_pkt_hi] = CellType.WALL                        # right wall
+        moat(1, c)                                           # water over the pocket
+    moat(2, _pkt_lo)                                         # left bank
+    moat(2, _pkt_hi)                                         # right bank
     # SANCTUM (rows 4-6), sealed above by the row-3 wall and below by the row-7 wall.
     # Row 5 is the mark row: a one-cell scroll nook at col 1 behind a 'blue' lock at
     # col 2, then the wordless corridor, the gold exit lock (43) + exit (44).  Rows 4
@@ -4486,6 +4497,8 @@ def build_dungeon_waypoint_sanctum(seed: int) -> 'Dungeon':
     for c in range(5, 43):
         cells[4][c] = CellType.WATER          # water moat flanking the mark row
         cells[6][c] = CellType.WATER
+    for c in range(1, C - 1):
+        moat(3, c)                            # the sanctum's upper seal, flooded
     for c in range(1, 43):
         carve(5, c)
     carve(5, 43); carve(5, 44)           # exit-lock + exit cells
@@ -4511,15 +4524,19 @@ def build_dungeon_waypoint_sanctum(seed: int) -> 'Dungeon':
         sid = 'redo' if (kind == 'chest_scroll' and first_chest) else ''
         first_chest = first_chest and kind != 'chest_scroll'
         carve(7, X)                                      # 'blue' door cell (in the seal)
-        for r in (8, 9):                                 # box the shaft off the danger room
-            cells[r][X - 1] = CellType.WALL
-            cells[r][X + 1] = CellType.WALL
-        cells[10][X] = CellType.WALL
+        for r in (8, 9):                                 # moat the shaft off the danger room
+            moat(r, X - 1)
+            moat(r, X + 1)
+        moat(10, X)
         entities += [Entity(kind='locked_door', row=7, col=X, tag='blue'),
                      Entity(kind=kind, row=9, col=X, scroll_id=sid)]
         vault_cells |= {(7, X), (8, X), (9, X)}
+    for c in range(1, C - 1):
+        if cells[7][c] == CellType.WALL:
+            moat(7, c)                            # the lower seal, flooded too
     composite.cells = cells
     composite.seed = seed
+    composite.fog_cells = mist                    # mist on every converted pool
 
     # Reserved cells (no prose decor / no goblins): key, key word, decoys, vaults.
     reserved: set = {_WP_KEY} | vault_cells

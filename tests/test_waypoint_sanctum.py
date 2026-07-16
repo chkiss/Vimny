@@ -135,11 +135,18 @@ def test_corridor_is_wordless_and_walled_off(seed):
     assert not any(ru.row == 5 for ru in room.char_runs)
     assert all(room.cells[4][c] == CellType.WATER for c in range(5, 43))
     assert all(room.cells[6][c] == CellType.WATER for c in range(5, 43))
-    # the sanctum is sealed from the danger rooms above and below: the top seal is a
-    # solid wall, the bottom seal a wall pierced only by keyless ('blue') vault doors
-    # — every cell of both rows is impassable, so no foot route crosses.
-    assert all(room.cells[3][c] == CellType.WALL for c in range(room.cols))
+    # the sanctum is sealed from the danger rooms above and below: since the
+    # 2026-07-18 waterworks both seals are MISTED WATER pierced only by the
+    # keyless ('blue') vault doors — every cell of both rows is impassable
+    # (water + fog), so no foot route crosses, and the mist blocks the
+    # $ / 0 / ^ / f scans like the stone it replaced.
+    for c in range(1, room.cols - 1):
+        assert room.cells[3][c] == CellType.WATER
+        assert (3, c) in room.fog_cells
     assert all(not room.is_passable(7, c) for c in range(room.cols))
+    for c in range(1, room.cols - 1):
+        if room.cells[7][c] == CellType.WATER:
+            assert (7, c) in room.fog_cells
     # the prose danger rooms DO carry text (search fodder + the key word)
     assert any(ru.row in (1, 2) for ru in room.char_runs)
     assert any(8 <= ru.row <= 17 for ru in room.char_runs)
@@ -204,10 +211,13 @@ def test_key_is_sealed_in_a_search_only_pocket(seed):
     assert room.cells[kr][kc] == CellType.CORRIDOR
     for i in range(len(_WP_KEYWORD)):
         assert room.cells[_WP_KEY_WORD_POS[0]][_WP_KEY_WORD_POS[1] + i] == CellType.CORRIDOR
-    # the ring is solid: ceiling (row 1) + both flanks (row 2), so no foot path enters
-    assert room.cells[2][kc - 1] == CellType.WALL            # left flank
-    assert room.cells[2][end] == CellType.WALL               # right flank
-    assert all(room.cells[1][c] == CellType.WALL for c in range(kc - 1, end + 1))
+    # the ring is misted water: over the ceiling (row 1) and both flanks
+    # (row 2) — no foot path enters, no $ / f scan crosses the mist, and
+    # the key + rune stay VISIBLE across the water (the stone-fog law).
+    for rc in ([(2, kc - 1), (2, end)]
+               + [(1, c) for c in range(kc - 1, end + 1)]):
+        assert room.cells[rc[0]][rc[1]] == CellType.WATER, rc
+        assert rc in room.fog_cells, rc
 
 
 @pytest.mark.parametrize('seed', SEEDS)

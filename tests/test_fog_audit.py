@@ -43,9 +43,14 @@ _SCRIPTED_FOG = {
 # landings shift and searches into the area die). Documented, not fixed:
 # a redesign under the stone law would be a level rework, not a fog patch.
 _JUMP_ENTRY_DESIGN = {
-    'build_dungeon_operators_vault',     # oubliette pits: 'the visible pit IS a way in'
+    'build_dungeon_operators_vault',     # own fog choreography (corridor-by-
+                                         # corridor reveal); the oubliette pits
+                                         # are deliberately unfogged so the dd
+                                         # fall can land (west-face water makes
+                                         # the col-1 pits visible pools)
     'build_dungeon_sentence_corridor',   # ( ) jump-entry pockets
-    'build_dungeon_waypoint_sanctum',    # search-fetch into stone-hidden halls
+    # waypoint_sanctum left the list 2026-07-18: the waterworks conversion
+    # (misted water seals/pocket/vault boxes) made every hall visible.
 }
 _SCRIPTED_FOG |= _JUMP_ENTRY_DESIGN
 
