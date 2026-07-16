@@ -144,6 +144,8 @@ def test_exit_unreachable_until_the_seal_draws(seed):
     room.cells[_QM_EXIT[0]][_QM_SEAL_COL] = CellType.FLOOR   # the seal draws open
     for bc in _QM_BOLT_COLS:
         room.cells[_QM_HALL_ROW][bc] = CellType.FLOOR
+    from engine.motion import auto_fog_tick
+    auto_fog_tick(room, *room.spawn_pos)     # sight crosses the opened doors
     seen = _bfs(room)
     assert room.exit_pos in seen
     assert (_QM_BRAZIER_ROW, _QM_BRAZIER_COLS[0]) in seen
@@ -227,10 +229,12 @@ def test_engine_3p_starts_one_cell_late():
     r, c0 = _QM_BRAZIER_ROW, _QM_BRAZIER_COLS[0]
     assert _QM_BRAZIER_COLS == (c0, c0 + 1, c0 + 2), "braziers must be adjacent"
     room = build_dungeon_quartermaster(SEEDS[0]).rooms[0]    # private (mutating)
+    room.fog_cells.clear()                   # engine baseline — not a fog test
     assert room.is_passable(r, c0) and not room.is_passable(r, c0 - 1)
     _light(room, r, c0, count=3, before=False)               # 3p
     assert _glyph(room, r, c0) != _QM_FLAME
     room = build_dungeon_quartermaster(SEEDS[0]).rooms[0]    # fresh — 3P
+    room.fog_cells.clear()
     _light(room, r, c0, count=3, before=True)
     assert all(_glyph(room, r, c) == _QM_FLAME for c in _QM_BRAZIER_COLS)
 
@@ -247,13 +251,15 @@ def test_flame_and_embers_are_untypable():
 def test_par_is_locked_and_answer_uses_the_lesson(seed):
     """par is seed-invariant (fixed geometry); the par path yanks the flame
     (y l), pastes before twice (the hall brazier + the count-paste 3P), and
-    raises the beacon with y y + two pastes. (Answer cost == par and the
+    raises the beacon with y y + p P (below then above — the P leaves the
+    cursor one row under the seal row, saving the second k of the old p p
+    route; player-found golf 2026-07-18). (Answer cost == par and the
     budget formula: covered by the universal tests.)"""
     room = _room(seed)
     assert room.par == _QM_PAR
     toks = room.answer.split()
     assert '3P' in toks, "the beacon fill is ONE count-paste"
-    assert toks.count('P') == 1 and toks.count('p') == 2
+    assert toks.count('P') == 2 and toks.count('p') == 1
     assert toks.count('y') == 3, "one yl + one yy on the par path"
 
 
@@ -341,7 +347,7 @@ def test_seal_needs_three_tiers_and_the_whole_chain(seed):
 
     _light(room, _QM_BRAZIER_ROW, _QM_BRAZIER_COLS[0], count=3)   # 3P
     msgs = main._quartermaster_tick(room, p)
-    assert any('row upon row' in m for m in msgs), \
+    assert any('no more braziers' in m for m in msgs), \
         "the one-shot too-cold nudge fires when one tier stands alone (no command named)"
     assert not any('yy' in m for m in msgs), "the nudge must not name the command"
     for k in (1, 2):                                         # the two linewise pastes

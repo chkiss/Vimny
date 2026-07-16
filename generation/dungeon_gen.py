@@ -7174,7 +7174,7 @@ _QM_EXIT = (4, 32)                      # exit POCKET behind the seal — walled
 _QM_FLAME  = '🜂'                        # one width-1 glyph IS the flame (untypable,
                                         # so r/insert can never forge one)
 _QM_EMBERS = '…'                        # cold brazier: three dying embers, one cell
-_QM_PAR = 16                            # seed-invariant; tallied in the answer below
+_QM_PAR = 15                            # seed-invariant; tallied in the answer below
 
 
 def build_dungeon_quartermaster(seed: int) -> Dungeon:
@@ -7249,13 +7249,18 @@ def build_dungeon_quartermaster(seed: int) -> Dungeon:
     #   w P         (2)  → hall brazier: paste lights it; bolt B grinds back
     #   4G          (2)  → line 4: land on the first cold beacon brazier
     #   3P          (2)  → one count-paste fills all three (3p leaves the left cold)
-    #   y y p p     (4)  → yank the beacon row; raise it twice — three tiers burn
-    #   k k 0       (3)  → back up the tiers; 0 walks west onto the exit (the seal
-    #                      is drawn open, so the beacon row's floor is contiguous —
-    #                      0 reaches the exit pocket in one key, not a 2-key hh walk)
+    #   y y p P     (4)  → yank the beacon row; one tier below, one ABOVE the
+    #                      copy — three tiers burn at rows 4/5/6 and the P
+    #                      leaves the cursor ONE row under the seal row (the
+    #                      exit row never shifts: p's insert is below it, P's
+    #                      is below it too). Player-found golf (2026-07-18);
+    #                      the old p p route paid an extra k to climb back.
+    #   k 0         (2)  → up to the seal row; 0 walks west onto the exit
     room.par    = _QM_PAR
     room.budget = math.ceil(_QM_PAR * 1.4)
-    room.answer = 'w y l w P 4G 3P y y p p k k 0'
+    room.answer = 'w y l w P 4G 3P y y p P k 0'
+
+    apply_stone_fog(room)                 # the exit pocket sleeps under fog
 
     dungeon = Dungeon(name='The Beacon Tiers', seed=seed)
     dungeon.rooms        = [room]
@@ -7759,7 +7764,7 @@ _IH_FORD_FRAG, _IH_FORD_WORD = 'river', 'rivergate'
 # is always crushed against stone, never slid into an opened corridor.
 _IH_SEALS = ((13, 42), (13, 43), (13, 44), (13, 45), (13, 46))
 _IH_EXIT  = (13, 47)                    # beyond all five walls
-_IH_PAR   = 25                          # the ( / ) / e sentence-hop route (below);
+_IH_PAR   = 24                          # the ( / ) / e sentence-hop route (below);
                                         # insert costs 1 + chars (Esc spends nothing)
 
 # Deterministic fallback if the greedy draw can't fill all four slots
@@ -7889,21 +7894,21 @@ def build_dungeon_inscription_halls(seed: int) -> Dungeon:
     room.budget = math.ceil(_IH_PAR * 1.4)
     # Canonical answer — the sentence-hop route (drives the par; insert
     # tokens 'i…'/'a…' cost 1 + len(text), Esc spends nothing; ( ) e $ cost
-    # 1 each — see tests/test_answer_paths). Ticks do NOT run during insert
-    # keys, so the final wall opens on the first NORMAL action after Esc —
-    # the first $ parks against it (and ticks it open), the second $ sails
-    # the whole opened corridor onto the exit (player-discovered, 25):
+    # 1 each — see tests/test_answer_paths). Since the 2026-07-10 engine fix
+    # gate ticks fire ON the insert Esc, so the seals stand open before the
+    # first NORMAL key — a single $ sails the whole corridor onto the exit
+    # (the old tape's second $ was the pre-fix tick lag; playtest 2026-07-18):
     #   A: ( i{2}        = 1+3
     #   B: ) e a{1}      = 1+1+2
     #   C: ) i{1}        = 1+2
     #   D: ) e a{2}      = 1+1+3
-    #   ford: ) e agate $ $ = 1+1+5+1+1   → total 25
+    #   ford: ) e agate $ = 1+1+5+1   → total 24
     m = [m_ for (_w, m_, _f) in lessons]
     room.answer = (f'( i{m[0]} '
                    f') e a{m[1]} '
                    f') i{m[2]} '
                    f') e a{m[3]} '
-                   f') e agate $ $')
+                   f') e agate $')
 
     apply_stone_fog(room)                 # sealed pockets sleep under fog
     dungeon = Dungeon(name='The Inscription Halls', seed=seed)

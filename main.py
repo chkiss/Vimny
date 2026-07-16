@@ -2266,8 +2266,8 @@ def _quartermaster_tick(room, player) -> list:
         if (not open_ and all(lit(r, c) for r, c in braziers)
                 and not getattr(room, '_qm_tier_hinted', False)):
             room._qm_tier_hinted = True
-            msgs.append('The fire is true, but low. The seal stirs only for flame '
-                        'that climbs, row upon row.')
+            msgs.append('The seal seems to be melting, but needs more heat! '
+                        'Alas, there are no more braziers...')
     return list(dict.fromkeys(msgs))
 
 

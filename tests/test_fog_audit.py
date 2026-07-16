@@ -46,8 +46,6 @@ _JUMP_ENTRY_DESIGN = {
     'build_dungeon_operators_vault',     # oubliette pits: 'the visible pit IS a way in'
     'build_dungeon_sentence_corridor',   # ( ) jump-entry pockets
     'build_dungeon_waypoint_sanctum',    # search-fetch into stone-hidden halls
-    'build_dungeon_quartermaster',       # flame crosses stone; braziers + exit
-                                         # pocket deliberately visible
 }
 _SCRIPTED_FOG |= _JUMP_ENTRY_DESIGN
 
