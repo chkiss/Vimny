@@ -1428,6 +1428,90 @@ def _alignment_halls_tick(room, player) -> list:
     return msgs
 
 
+def _codex_feed(player, key):
+    """One keystroke into the open Codex pane (:help semantics — the pane has
+    focus). Motions over visible rows (a closed fold is ONE line), za/zR/zM
+    folds, / ? n N search, and :q to close the window. Everything is free."""
+    pane = player.codex_pane
+    k = str(key)
+
+    # active /search input
+    if pane.search_input is not None:
+        if key.name == 'KEY_ESCAPE':
+            pane.search_input = None
+        elif key.name == 'KEY_ENTER' or k in ('\n', '\r'):
+            pat = pane.search_input
+            pane.search_input = None
+            if not pane.search(pat):
+                pane.message = f'E486: Pattern not found: {pat or pane.search_pat}'
+        elif key.name == 'KEY_BACKSPACE' or k == '\x7f':
+            pane.search_input = pane.search_input[:-1]
+        elif not key.is_sequence:
+            pane.search_input += k
+        return
+
+    # active :command input
+    if pane.cmd_input is not None:
+        if key.name == 'KEY_ESCAPE':
+            pane.cmd_input = None
+        elif key.name == 'KEY_ENTER' or k in ('\n', '\r'):
+            cmd = pane.cmd_input.strip()
+            pane.cmd_input = None
+            if cmd in ('q', 'q!', 'wq', 'x'):
+                player.codex_pane = None       # :q closes the WINDOW (Vim-true)
+            else:
+                pane.message = f'E492: Not a codex command: {cmd}'
+        elif key.name == 'KEY_BACKSPACE' or k == '\x7f':
+            pane.cmd_input = pane.cmd_input[:-1]
+        elif not key.is_sequence:
+            pane.cmd_input += k
+        return
+
+    pane.message = ''
+    if key.is_sequence and key.name not in ('KEY_ESCAPE',):
+        return
+    pending = getattr(pane, '_pending', '')
+    count   = getattr(pane, '_count', '')
+
+    if pending == 'z':
+        pane._pending = ''
+        if k == 'a':
+            pane.toggle_fold()
+        elif k == 'R':
+            pane.open_all()
+        elif k == 'M':
+            pane.close_all()
+        return
+    if pending == 'g':
+        pane._pending = ''
+        if k == 'g':
+            pane.to_top()
+        return
+
+    if k.isdigit() and (k != '0' or count):
+        pane._count = count + k
+        return
+    n = int(count) if count else 1
+    pane._count = ''
+
+    if k == 'j':
+        pane.move(n)
+    elif k == 'k':
+        pane.move(-n)
+    elif k == 'G':
+        pane.to_bottom()
+    elif k in ('z', 'g'):
+        pane._pending = k
+    elif k == '/':
+        pane.search_input = ''
+    elif k == 'n':
+        pane.search('')
+    elif k == 'N':
+        pane.search('', backward=True)
+    elif k == ':':
+        pane.cmd_input = ''
+
+
 def _sight_sanctum_tick(room, player) -> list:
     """The Sight Sanctum bolts — the plaque rule as EXACT whole-row text: a
     chamber's bolt stands open exactly while EVERY one of its true words reads
@@ -2221,6 +2305,7 @@ _LEVEL_INTROS = {
     'word_enclosure': ('The Word Enclosure — rot has taken root in the middle of the inscriptions. The wardens here did not aim their cuts; they named the shape, and the shape was taken whole.', 70),
     'bracket_enclosure': ('The Bracket Enclosure — a jeweller\'s gallery: every inscription holds a stone in its setting, and every stone has gone bad. Pry the stone, keep the setting — or tear the whole fitting out.', 70),
     'brace_square_enclosure': ('The Brace & Square Enclosure — deeper vaults, richer settings: square fittings, braced caskets, and at the heart a casket WITHIN a fitting. The old jewellers read the metal under their hands before they cut.', 70),
+    'binders_reliquary': ('The Binder\'s Reliquary — on the lectern lies the bound Codex, every scroll you have gathered stitched into one book. Four keys were cut for the door; the binder recorded which one turns.', 70),
     'warden_scrivener':    ('The Warden Scrivener — he has copied these halls for an age and finished nothing. The great page waits, passage by passage, for a truer hand.', 70),
     'warden_manifold':     ('The Warden Manifold — he stamps himself into the world. Light the four braziers; the gate will draw and the fog will part.', 70),
     'warden_surveyor':     ('The Warden Surveyor — he keeps a long hall where the floor falls away between the words. Cross it word by word, over the void.', 60),
@@ -2924,7 +3009,8 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
             for _m in _indentation_sanctum_tick(room, player):
                 _push(_m)
         if level in ('sight_sanctum', 'selection_halls', 'word_enclosure',
-                     'bracket_enclosure', 'brace_square_enclosure'):
+                     'bracket_enclosure', 'brace_square_enclosure',
+                     'binders_reliquary'):
             for _m in _sight_sanctum_tick(room, player):   # the shared exact-text tick
                 _push(_m)
         if level == 'sculpting_chambers':
@@ -3331,6 +3417,14 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
         last_activity = time.time()
         player.error = ''   # clear any statusline error on the next keypress
 
+        # ── The Codex pane has focus while open (:help semantics) ────────────
+        # Reading is free: no pane key spends budget, and no pane key reaches
+        # the dungeon (or the karaoke tracker) until :q closes the window.
+        if getattr(player, 'codex_pane', None) is not None:
+            _codex_feed(player, key)
+            _render(message)
+            continue
+
         # ── Admin answer tracking ─────────────────────────────────────────────
         if (player_name == 'admin' and room.answer
                 and not key.is_sequence and str(key) != ':'
@@ -3574,6 +3668,28 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
                             player.number_mode, _set_msg = _apply_set(
                                 player.number_mode, cmd[len('set'):])
                             _push(_set_msg)
+
+                elif cmd == 'h' or cmd == 'help' or cmd.startswith(('h ', 'help ')):
+                    # :h [{name}] — open the Codex read-only in a split and move
+                    # focus into it (Vim's :help, made diegetic). Reading is
+                    # free: neither the command nor any pane key spends budget.
+                    if 'help' not in player.known_commands and player_name != 'admin':
+                        _push("You haven't learned :h yet.")
+                    else:
+                        from engine.codex import CodexPane, scroll_sections
+                        from content.scrolls import SCROLL_CATALOG
+                        _sections = scroll_sections(SCROLL_CATALOG,
+                                                    progress.get('extras', []))
+                        _sections += list(getattr(room, '_codex_extra', ()))
+                        if not _sections:
+                            _push('The Codex is empty — no pages bound yet.')
+                        else:
+                            _arg = cmd.split(' ', 1)[1].strip() if ' ' in cmd else ''
+                            _pane = CodexPane(_sections)
+                            if _arg and not _pane.jump_to(_arg):
+                                _push(f'E149: Sorry, no help for {_arg}')
+                            else:
+                                player.codex_pane = _pane
 
                 elif cmd.isdigit():
                     # :{n} — go to line n (Vim-true). Same semantics as {n}G

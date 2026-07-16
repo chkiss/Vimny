@@ -137,6 +137,14 @@
 | V         | visual_line  | select whole lines    |
 | <C-v>     | visual_block | select a block        |
 
+## binders_reliquary — the Codex
+
+| keys      | token | desc                     |
+|-----------|-------|--------------------------|
+| :h {name} | help  | open the Codex to a page |
+| za        |       | unfold / fold a section  |
+| :q        |       | close the book           |
+
 ## seekers_labyrinth — search
 
 | keys    | token | desc        |

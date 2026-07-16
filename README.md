@@ -84,6 +84,7 @@ The curriculum is defined in `content/levels.py` (canonical) and mirrored in `LE
 | 13 | The Sentence Corridor | `) (` | Playable |
 | 13.1 | The Warden Surveyor | (boss) | Playable |
 | 14 | The Seekers' Labyrinth | `/ ? n N *` | Playable |
+| 14.1 | The Binder's Reliquary | `:h za :q` | Playable |
 | 15 | The Waypoint Sanctum | `` m ' ` `` | Playable |
 | 16 | The Archivist's Library | `:set wrap  :e!  :w {file}` | Playable |
 | 16.1 | The Warden Pathfinder | (boss) | Playable |
@@ -169,6 +170,9 @@ The full command reference (also the hint-bar source) is `render/vim_commands.md
 | `v{m} d/c/~/p/r/J` | act on the selection |
 | `V` | select whole lines |
 | `<C-v>` | select a block |
+| `:h {name}` | open the Codex to a page |
+| `za` | unfold / fold a section |
+| `:q` | close the book |
 | `/{pat}` | search |
 | `?{pat}` | search back |
 | `n` | next match |

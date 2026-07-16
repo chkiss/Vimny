@@ -123,6 +123,27 @@ WAY_BACK_SCROLL = {
 }
 
 
+# The Binder's Reliquary lectern scroll (named chest, NOT in the relic pool):
+# the Codex's instructions. :h opens the bound Codex read-only in a split and
+# moves focus into it (Vim's :help, made diegetic); every section is a fold.
+READERS_KEY_SCROLL = {
+    'title': "◈   The Reader's Key   ◈",
+    'lines': [
+        ('dim',    '  A bound codex, and a habit to bind to it.'),
+        ('blank',),
+        ('cmd',    ':h {name}', 'open the Codex to a page'),
+        ('cmd',    ':h       ', 'open the Codex to its index'),
+        ('cmd',    'za       ', 'unfold / fold a section'),
+        ('cmd',    'zR  zM   ', 'open the whole book / shut it'),
+        ('cmd',    ':q       ', 'close the book, back to the hall'),
+        ('blank',),
+        ('dim',    '  Reading is free — the ledger counts no page.'),
+        ('blank',),
+        ('amber',  '  Ask the book; it was bound to answer.'),
+    ],
+}
+
+
 # Relic — the ex line-number address. :{n} lands exactly where {n}G lands but
 # is one key dearer (the colon), so it can never undercut a par; what it
 # teaches is the ADDRESS idea, which the Spellwright's ranges later build on.
@@ -679,6 +700,14 @@ SCROLL_CATALOG = [
         'level_slug': 'waypoint_sanctum',
         'level_name': 'The Waypoint Sanctum',
         'content':    WAY_BACK_SCROLL,
+    },
+    {
+        'id':         'readers_key',
+        'title':      "The Reader's Key",
+        'dropped_by': "The Binder's lectern",
+        'level_slug': 'binders_reliquary',
+        'level_name': "The Binder's Reliquary",
+        'content':    READERS_KEY_SCROLL,
     },
     {
         'id':         'line_addr',

@@ -526,6 +526,42 @@ def render_all(term: Terminal, dungeon: Dungeon, player: Player,
         line += bfg + S.BOX_V + rst
         output.append(line)
 
+    # ── The Codex pane (:h) — a horizontal split over the game area ────────
+    # Vim-true: :help opens another file read-only in a split and moves focus
+    # into it. The pane replaces the BOTTOM rows of the game area; the
+    # dungeon stays visible above, untouched (the pane is a pure view).
+    pane = getattr(player, 'codex_pane', None)
+    if pane is not None:
+        pane_h = max(6, min(game_h // 2, game_h - 2))
+        body_h = pane_h - 1                     # row 0 is the pane's statusline
+        title  = '  THE CODEX  [RO]  '
+        bar = (bfg + S.BOX_V + rst
+               + C.mode_command() + title + rst
+               + C.hint_fg() + '─' * max(0, iw - len(title)) + rst
+               + bfg + S.BOX_V + rst)
+        pane_lines = [bar]
+        rows = pane.render_rows(body_h, iw - 2)
+        # An active /search or :cmd input takes over the pane's last row.
+        input_line = None
+        if pane.search_input is not None:
+            input_line = '/' + pane.search_input
+        elif pane.cmd_input is not None:
+            input_line = ':' + pane.cmd_input
+        if input_line is not None:
+            rows = rows[:-1]
+        for text, is_cur, is_ridge in rows:
+            fg = C.rune_ember() if is_ridge else C.normal_fg()
+            bg = C.visual_sel_bg() if is_cur else C.floor_bg()
+            body = ' ' + text[:iw - 2].ljust(iw - 2) + ' '
+            pane_lines.append(bfg + S.BOX_V + rst + bg + fg + body
+                              + rst + bfg + S.BOX_V + rst)
+        if input_line is not None:
+            body = ' ' + input_line[:iw - 2].ljust(iw - 2) + ' '
+            pane_lines.append(bfg + S.BOX_V + rst + C.floor_bg()
+                              + C.mode_command() + body + rst
+                              + bfg + S.BOX_V + rst)
+        output[3 + game_h - pane_h: 3 + game_h] = pane_lines
+
     # ── Vim statusline / command line ─────────────────────────────────────
     # 1-based line,col anchored at the first standable cell — matches the gutter and
     # {N}G / {N}| (the border walls aren't line/column 1).

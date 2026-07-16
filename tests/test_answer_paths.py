@@ -140,6 +140,7 @@ _ANSWER_NOT_TOKENISED = {
     'build_dungeon_word_enclosure',    # diw/ciw+cure tape with typed text; tests/test_word_enclosure.py
     'build_dungeon_bracket_enclosure', # di(/ci(+cure tape with typed text; tests/test_bracket_enclosure.py
     'build_dungeon_brace_square_enclosure',  # di[/ci[+cure/di{ tape with typed text; tests/test_brace_square_enclosure.py
+    'build_dungeon_binders_reliquary',  # chest x + exact-text door; tests/test_binders_reliquary.py
 }
 
 # Levels with a documented NON-1.4 budget. The Change Annex / Extension use a
@@ -252,6 +253,7 @@ _REPLAY_OWN_TEST = {
     'build_dungeon_word_enclosure':    'test_word_enclosure.py::test_full_enclosure_route_wins_par_perfect',
     'build_dungeon_bracket_enclosure': 'test_bracket_enclosure.py::test_full_setting_route_wins_par_perfect',
     'build_dungeon_brace_square_enclosure': 'test_brace_square_enclosure.py::test_canonical_run_wins_at_par',
+    'build_dungeon_binders_reliquary': 'test_binders_reliquary.py::test_answer_tape_wins_at_par',
 }
 
 

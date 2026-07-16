@@ -266,6 +266,17 @@
       ]
     },
     {
+      "introduces_slug": "binders_reliquary",
+      "name": ":h za :q",
+      "line_count": 4,
+      "quote": [
+        "      No one remembers every key. I bound       ",
+        "       a book so you would never have to:       ",
+        "   :h opens it beside you, za unfolds a page,   ",
+        "     :q closes the book — never the world.      "
+      ]
+    },
+    {
       "introduces_slug": "waypoint_sanctum",
       "name": "m ' `",
       "line_count": 4,

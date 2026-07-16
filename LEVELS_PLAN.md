@@ -62,6 +62,7 @@ Curriculum order is the order of `LEVELS`. Blueprints: `blueprints/act_*.md`.
 | 13 | `sentence_corridor` | The Sentence Corridor | `) (` |  |
 | 13.1 | `warden_surveyor` | The Warden Surveyor | — | boss |
 | 14 | `seekers_labyrinth` | The Seekers' Labyrinth | `/ ? n N *` |  |
+| 14.1 | `binders_reliquary` | The Binder's Reliquary | `:h za :q` | reliquary |
 | 15 | `waypoint_sanctum` | The Waypoint Sanctum | `` m ' ` `` |  |
 | 16 | `archivists_library` | The Archivist's Library | `:set wrap  :e!  :w {file}` |  |
 | 16.1 | `warden_pathfinder` | The Warden Pathfinder | — | boss |

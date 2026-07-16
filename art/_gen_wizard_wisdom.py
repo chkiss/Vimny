@@ -202,6 +202,12 @@ POEMS: list[tuple[str | None, str, list[str]]] = [
         '* takes the word beneath your feet',
         'and hunts its echo through the stone.',
     ]),
+    ('binders_reliquary', ':h za :q', [        # The Binder's Reliquary — the Codex
+        'No one remembers every key. I bound',
+        'a book so you would never have to:',
+        ':h opens it beside you, za unfolds a page,',
+        ':q closes the book — never the world.',
+    ]),
     ('waypoint_sanctum', "m ' `", [            # The Waypoint Sanctum — m ' `
         'ma sets a stone you can name.',
         '`a returns to it, exact.',
