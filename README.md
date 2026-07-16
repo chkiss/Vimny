@@ -254,9 +254,12 @@ commands are deliberately out of scope:
 - **`U` (vi's line-undo)** — `u` and the redo scroll (`<C-r>`) cover the
   undo story; a third undo channel would complicate it for a key modern Vim
   users rarely reach for.
-- **`gp` / `gP`, `g*` / `g#`, `gi`** — genuinely niche variants.
-- **Window/tab/buffer management, folds, completion, plugins** — Vimny is a
-  single buffer by design; each dungeon *is* the file.
+- **`g*` / `g#`, `gi`** — planned for a post-game g-family bonus level
+  (with `gp`/`gP` and `g_`), not the main curriculum.
+- **Window/tab/buffer management** — on the post-game roadmap (after the
+  final boss); until then Vimny is a single buffer by design; each dungeon
+  *is* the file. Folds are under consideration for the same era.
+- **Completion, plugins, ex-mode scripting** — out of scope.
 - **Not yet, by design** — `+` / `-` / `_` (and NORMAL-mode `Enter`): these
   cheap line motions would change the optimal solution of many existing
   levels, so they wait on a full re-balance. `Y`, `X`, and a few visual-mode
