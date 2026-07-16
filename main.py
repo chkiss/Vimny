@@ -2308,7 +2308,7 @@ _LEVEL_INTROS = {
     'joiners_gate':        ('The Joiner\'s Gate — the old inscriptions were split, line from line, and scattered down the stacks. What was one line must be one line again; the plaques remember how each read whole.', 70),
     'alignment_halls':     ('The Alignment Halls — a plumb line falls through the hall, and every word has slid from its station. The plaques remember where each belongs.', 70),
     'indentation_sanctum': ('The Indentation Sanctum — the law presides from the lintel, and the verses below have slid from their stations.', 70),
-    'sentence_corridor': ('The Sentence Corridor — two verses parted by still water, and a mist that clings to every pool. Nothing pierces the mist: not a stride, not a sweep of the eye along the line — though the far shore reads clear. A sentence steps over it whole.', 70),
+    'sentence_corridor': ('The Sentence Corridor — two verses parted by still water, and a mist that clings to the pool. The far shore reads clear, but you can\'t reliably jump to the far wall from here.', 70),
     'sight_sanctum': ('The Sight Sanctum — the rot here spreads in ragged patches no single stroke can span. The keepers of this place had one law: first behold, then strike.', 70),
     'selection_halls': ('The Selection Halls — a gallery of corrupt panels: some rotted whole lines at a time, some down a single seam. The restorers here took each span in one grasp.', 70),
     'word_enclosure': ('The Word Enclosure — rot has taken root in the middle of the inscriptions. The wardens here did not aim their cuts; they named the shape, and the shape was taken whole.', 70),

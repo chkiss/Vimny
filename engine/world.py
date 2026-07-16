@@ -144,6 +144,10 @@ class Room:
     par: Optional[int]          = None
     seed: Optional[int]         = None
     fog_cells: set              = field(default_factory=set)  # (r,c) pairs not yet visible
+    mist_cells: set             = field(default_factory=set)  # PERMANENT scenic mist over water:
+                                                              # a subset of fog_cells that reveal
+                                                              # floods neither cross nor clear
+                                                              # (immutable per level — no snapshot)
     passable_walls: bool        = False  # if True, walls are walkable (editor mode)
     answer: str                 = ''     # keystroke solution shown to admin
     answer_pos: int             = 0      # non-space chars of answer consumed by admin

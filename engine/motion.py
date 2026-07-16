@@ -55,10 +55,18 @@ def _flood_reachable(room, start_r: int, start_c: int) -> set:
             nr, nc = r + dr, c + dc
             if (nr, nc) in reachable:
                 continue
-            if (0 <= nr < room.rows and 0 <= nc < room.cols
+            if not (0 <= nr < room.rows and 0 <= nc < room.cols
                     and room.cells[nr][nc] in _FOGGABLE_CELLS):
-                reachable.add((nr, nc))
-                q.append((nr, nc))
+                continue
+            if (nr, nc) in room.mist_cells:
+                continue      # MIST: permanent haze is never reached NOR
+                              # revealed — light stops at it, so a misted
+                              # channel can't ladder a fog flood (nor a
+                              # reveal) past a gate. Ordinary fogged water
+                              # (a pool inside a to-be-revealed region)
+                              # still conducts and clears normally.
+            reachable.add((nr, nc))
+            q.append((nr, nc))
     return reachable
 
 

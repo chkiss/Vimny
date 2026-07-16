@@ -4054,7 +4054,8 @@ def build_dungeon_binders_reliquary(seed: int) -> Dungeon:
 
     # Mist on the water: permanent fog over the channel only. The far shore
     # stays visible and searchable; the scans stop at the bank.
-    room.fog_cells = {(r, c) for r in range(1, R - 1) for c in _BND_WATER_COLS}
+    room.fog_cells  = {(r, c) for r in range(1, R - 1) for c in _BND_WATER_COLS}
+    room.mist_cells = set(room.fog_cells)         # permanent: reveals skip it
 
     # The Codex's own first page, bound in at the water's edge.
     room._codex_extra = ((
@@ -4525,10 +4526,9 @@ def build_dungeon_waypoint_sanctum(seed: int) -> 'Dungeon':
         first_chest = first_chest and kind != 'chest_scroll'
         carve(7, X)                                      # 'blue' door cell (in the seal)
         for r in (8, 9):                                 # box the shaft off the danger room
-            cells[r][X - 1] = CellType.WALL              # (stone, like the scroll nook —
-            cells[r][X + 1] = CellType.WALL              # playtest 2026-07-19: a chest is
-        cells[10][X] = CellType.WALL                     # a surprise, not an exhibit)
-        mist.add((8, X)); mist.add((9, X))               # the shaft sleeps under fog
+            cells[r][X - 1] = CellType.WALL              # (stone flanks; the treasure
+            cells[r][X + 1] = CellType.WALL              # shows THROUGH the door — a
+        cells[10][X] = CellType.WALL                     # grille, per the stone-fog law)
         entities += [Entity(kind='locked_door', row=7, col=X, tag='blue'),
                      Entity(kind=kind, row=9, col=X, scroll_id=sid)]
         vault_cells |= {(7, X), (8, X), (9, X)}
@@ -4537,7 +4537,8 @@ def build_dungeon_waypoint_sanctum(seed: int) -> 'Dungeon':
             moat(7, c)                            # the lower seal, flooded too
     composite.cells = cells
     composite.seed = seed
-    composite.fog_cells = mist                    # mist on every converted pool
+    composite.fog_cells  = set(mist)              # mist on every converted pool
+    composite.mist_cells = set(mist)              # …permanent: reveals skip it
 
     # Reserved cells (no prose decor / no goblins): key, key word, decoys, vaults.
     reserved: set = {_WP_KEY} | vault_cells
@@ -6187,7 +6188,8 @@ def build_dungeon_sentence_corridor(seed: int) -> 'Dungeon':
         if cells[2][c] == CellType.WALL:
             cells[2][c] = CellType.WATER
             mist.add((2, c))
-    composite.fog_cells = mist
+    composite.fog_cells  = set(mist)
+    composite.mist_cells = set(mist)              # permanent: reveals skip it
 
     composite.spawn_pos = _SENTENCE_CORRIDOR_ENTRY
     composite.exit_pos  = _SENTENCE_CORRIDOR_EXIT
@@ -6909,20 +6911,14 @@ def build_dungeon_operators_vault(seed: int) -> Dungeon:
         cells[top][col] = cells[top + 1][col] = CellType.FLOOR
     for (r, c) in _OV_POCKETS:                    # the oubliette pockets
         cells[r][c] = CellType.FLOOR
-    # Ground water seeps along the west face (playtest 2026-07-18): cols 1-2
-    # of each FIRST spacer row are WATER, so every col-1 oubliette reads as a
-    # visible pit across the water (the stone-fog law: water is open sight)
-    # while staying walk-unreachable. FIRST spacer rows only — water on the
-    # second spacer row would touch the NEXT corridor and ladder the fog
-    # flood down the west face, unfogging every gate-sealed corridor from
-    # spawn (this level's fog reveals corridor-by-corridor as gates open;
-    # each pool joins only ITS corridor's fog region, so the pits surface
-    # with their own corridor's reveal). No scan runs on a spacer row, so
-    # the water needs no mist; the rest of the stone is untouched.
-    for r in _OV_CORR_ROWS[:-1]:
-        for c in (1, 2):
-            if cells[r + 1][c] == CellType.WALL:
-                cells[r + 1][c] = CellType.WATER
+    # A misted channel runs the whole west face (playtest 2026-07-19): cols
+    # 1-2 of every spacer row are WATER under MIST, one continuous seep
+    # linking the pools so the col-1 oubliettes are seen ACROSS WATER, not
+    # through stone. The mist matters twice: fogged water conducts no
+    # reveal flood (engine law), so the channel cannot ladder this level's
+    # corridor-by-corridor fog past the gates — and it bars the $ / f
+    # scans as the stone did. Converted AFTER _fog_unreachable (below), so
+    # the build flood sees stone here too.
     cells[32][5] = CellType.FLOOR                 # ledge → antechamber drop
     floor(_OV_VAULT_ROW, 5, 19)                   # antechamber + vault
 
@@ -7031,6 +7027,15 @@ def build_dungeon_operators_vault(seed: int) -> Dungeon:
     # per-key door-blocked _reveal_from lights them from where they land
     # (the dd park is fog-blind for exactly this fall).
     room.fog_cells -= {p for p in _OV_POCKETS if p[0] <= 29}
+    # The west-face misted channel (see the note above): laid after the fog
+    # flood so the build flood saw stone, permanently misted thereafter.
+    for r in range(_OV_CORR_ROWS[0] + 1, _OV_SPLIT_ROW):
+        if r not in _OV_CORR_ROWS:
+            for c in (1, 2):
+                if room.cells[r][c] == CellType.WALL:
+                    room.cells[r][c] = CellType.WATER
+                    room.fog_cells.add((r, c))
+                    room.mist_cells.add((r, c))
     room.par    = 92                              # dd's Vim-true fnb landing
     room.answer = _OV_ANSWER                      # (2026-07-12) saved a key
     room.budget = math.ceil(92 * 1.4)
