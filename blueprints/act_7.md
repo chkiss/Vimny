@@ -1,5 +1,10 @@
 # Act VII — Mastery Blueprints
 
+> Display renumbering 2026-07-16: "Level 38" below = current display **40**
+> (`hall_of_echoes`), "38.1" = **40.1** (`warden_eternal`). The BONUS WING
+> (blueprints/bonus_wing.md) slots between them on the main chain, pushing
+> the final boss's display out when it ships.
+
 > ⚠ **Pre-implementation design doc — obsolete conventions; delete-on-implement.** Uses pre-slug naming (e.g. `RuneCluster` → now `CharRun`; level numbers are now the cosmetic `display` field) — don't copy these symbols. **Delete a level's section when that level ships, and the whole file once its act is built.** See LEVELS_PLAN Part 8.
 
 > Levels 38 and 38.1 (L37 The Spellwright's Forge has shipped — section removed).
