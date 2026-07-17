@@ -43,15 +43,17 @@ def _K(s):
     return [Keystroke(ch) for ch in s]
 
 
-# The canonical tape (== room.answer): mend the first echo while recording
-# into "a — ^ renormalises the column, so the j that ends each mend makes
-# the macro position-independent — then 4@a replays down the hall.
-CANON = 'jqa^wdawwxjq4@aG$'
+# The canonical tape (== room.answer): the j RIDES INSIDE the macro — record
+# the row-advance as the macro's FIRST key, not a separate leading j, so the
+# recording mends the first echo and every replay steps down first. ^
+# renormalises the column, making the macro position-independent; 4@a replays
+# down the hall. (Recording the j saves the redundant leading j — 13, not 14.)
+CANON = 'qaj^wdawwxq4@aG$'
 
 # The leanest old-only rival: the straight manual mend, five times over.
 # The dot cannot ride here at all — each mend ends with x, so `.` never
 # holds the daw when the next row needs it (the two-changes-per-row law).
-# Wins, at 1★ (43 ≤ budget 45 > par 14).
+# Wins, at 1★ (43 ≤ budget 45 > par 13).
 RIVAL = 'j' + '^wdawwxj' * 5 + 'G$'
 
 
@@ -99,7 +101,7 @@ def test_par_answer_budget(seed):
     room = _room(seed)
     assert room.par == _HE_PAR
     assert room.budget == _HE_BUDGET          # GENEROUS hand-set (non-1.4)
-    assert room.answer == 'j qa ^ w daw w x j q 4@a G $'
+    assert room.answer == 'qa j ^ w daw w x q 4@a G $'
 
 
 @pytest.mark.parametrize("seed", SEEDS)

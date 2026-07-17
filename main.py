@@ -55,7 +55,7 @@ from content.scrolls import (
     RELIQUARY_SCROLL, WARDEN_LEAP_SCROLL, WARDEN_SIGHT_SCROLL, SURVEYORS_PATH_SCROLL,
     WAYPOINT_SCROLL,
     OPERATOR_CODEX_SCROLL, INSCRIBERS_HAND_SCROLL,
-    WHOLE_WORD_SCROLL, WARDEN_ACT_SCROLL,
+    WHOLE_WORD_SCROLL, REWRITING_WORD_SCROLL,
     pick_relic_scroll as _pick_relic_scroll,
 )
 
@@ -229,17 +229,21 @@ Position within the word ceased to matter.
   The boundary is the rune, not where you stand.
 """
 
-_SCROLL_TEXT_WARDENS_ACT = """\
-The Warden's Act
-================
-The Sight became second nature. These remain.
+_SCROLL_TEXT_REWRITING_WORD = """\
+The Rewriting Word
+==================
+Every word taken clean. Now take them all at once.
 
-  gv             ──  reselect the last visual span
-  o              ──  in Visual: swap to the other end
-  <C-v>I…<Esc>   ──  block insert — write down every row
+  :s     ──  change a word where it stands
+  :%s    ──  every line, every hit at once
+  :g     ──  strike each line that matches
+  &      ──  do the same once more, unbidden
 
-  See. Select. Strike.
-  The eye and the hand are one.
+  q@     ──  record once, replay a hundredfold
+  "a     ──  a register called by its name
+
+  One breath, and the whole page turns true.
+  The hand need not repeat itself.
 """
 
 def _chest_loot(kind: str) -> str:
@@ -571,7 +575,7 @@ _STD_SCROLLS = {
     'd_op':      OPERATOR_CODEX_SCROLL,
     'writers':   INSCRIBERS_HAND_SCROLL,
     'text_obj':  WHOLE_WORD_SCROLL,
-    'visual_op': WARDEN_ACT_SCROLL,
+    'subst': REWRITING_WORD_SCROLL,
 }
 
 
@@ -599,7 +603,7 @@ _SCROLL_DROPS = {
     'warden_pathfinder':    ('d_op',      "The Operator's Codex",   _SCROLL_TEXT_OPERATOR_CODEX),
     'warden_manifold':      ('writers',   "The Inscriber's Hand",   _SCROLL_TEXT_INSCRIBERS_HAND),
     'warden_scrivener':     ('text_obj',  'The Whole Word',         _SCROLL_TEXT_WHOLE_WORD),
-    'grandmasters_sanctum': ('visual_op', "The Warden's Act",       _SCROLL_TEXT_WARDENS_ACT),
+    'grandmasters_sanctum': ('subst',     'The Rewriting Word',      _SCROLL_TEXT_REWRITING_WORD),
 }
 
 

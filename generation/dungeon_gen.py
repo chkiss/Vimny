@@ -4880,7 +4880,9 @@ _HE_THROAT = 7
 _HE_GATE   = 8
 _HE_BOLTS  = {2: 23, 3: 24, 4: 25, 5: 26, 6: 27}
 _HE_EXIT   = (8, 28)                  # the FINAL SEAL, east of every bolt
-_HE_PAR    = 14                       # j qa ^ w daw w x j q 4@a G $
+_HE_PAR    = 13                       # qa j ^ w daw w x q 4@a G $ — the j RIDES
+                                      # INSIDE the macro (record the row-advance,
+                                      # not a separate leading j; playtest 2026-07-17)
 _HE_BUDGET = 45                       # GENEROUS hand-set: the straight manual
                                       # mend (43 — the dot can't ride at all,
                                       # x is always the LAST change) wins 1★
@@ -4961,7 +4963,7 @@ def build_dungeon_hall_of_echoes(seed: int) -> Dungeon:
     apply_stone_fog(room)
     room.par    = _HE_PAR
     room.budget = _HE_BUDGET
-    room.answer = 'j qa ^ w daw w x j q 4@a G $'
+    room.answer = 'qa j ^ w daw w x q 4@a G $'
 
     dungeon = Dungeon(name='The Hall of Echoes', seed=seed)
     dungeon.rooms        = [room]

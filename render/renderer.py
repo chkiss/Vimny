@@ -317,7 +317,8 @@ def render_all(term: Terminal, dungeon: Dungeon, player: Player,
     budget_s = C.hint_fg() + f' Budget:{budget.total:2d}' + rst
     par_s    = C.hint_fg() + f' Par:{room.par or "-"}' + rst
 
-    dname = dungeon.name[:24]
+    dname = dungeon.name[:30]      # 30 fits the longest names (Brace & Square
+                                   # Enclosure = 28, Grandmaster's Sanctum = 25)
     status_plain = f'  {"♥"*full_h}{"♡"*half_h}{"░"*empty_h}  {dname}  {ml}  Keys:{spent:2d} Budget:{budget.total:2d}  Par:{room.par or "-"}'
     padding = max(0, iw - len(status_plain))
     status_line = (bfg + S.BOX_V + rst +

@@ -463,20 +463,28 @@ SEALED_DEPARTURE_SCROLL = {
     ],
 }
 
-# Re-purposed 2026-07-12: v{m}d/y/c moved to the Sight Sanctum's own lesson
-# (token visual_op is taught there), so the Grandmaster's drop now teaches the
-# visual FLOURISHES no level drills — the selection's finer handles.
-WARDEN_ACT_SCROLL = {
-    'title': "◈   The Warden's Act   ◈",
+# The Grandmaster caps the text-object act — every word taken clean. His drop
+# smudge-previews the NEXT act (the ex-command / automation tier): the
+# substitute family at the Spellwright's Forge (:s :%s :g & — token 'subst'),
+# then macros and named registers at the Hall of Echoes (q@ 'q', "a
+# 'reg_named'). Reveal-the-validated, smudge-the-next: the lines sleep under
+# the dip until each is learned. (Re-purposed 2026-07-17 from the old visual-
+# flourish stopgap, which taught nothing new past the Sight Sanctum.)
+REWRITING_WORD_SCROLL = {
+    'title': "◈   The Rewriting Word   ◈",
     'lines': [
-        ('dim',    '  The Sight became second nature. These remain.'),
+        ('dim',    '  Every word taken clean. Now take them all at once.'),
         ('blank',),
-        ('cmd',    'gv',       'reselect the last visual span'),
-        ('cmd',    'o',        'in Visual: swap ends'),
-        ('cmd',    '<C-v>I…<Esc>', 'block insert, every row at once'),
+        ('smudge', ':s',  'change a w', 'ord where it stands',    'subst'),
+        ('smudge', ':%s', 'every li',   'ne, every hit at once',  'subst'),
+        ('smudge', ':g',  'strike ea',  'ch line that matches',   'subst'),
+        ('smudge', '&',   'do the sam', 'e once more, unbidden',  'subst'),
         ('blank',),
-        ('amber',  '  See. Select. Strike.'),
-        ('dim',    '  The eye and the hand are one.'),
+        ('smudge', 'q@',  'record on',  'ce, replay a hundredfold', 'q'),
+        ('smudge', '"a',  'a register', ' called by its name',    'reg_named'),
+        ('blank',),
+        ('amber',  '  One breath, and the whole page turns true.'),
+        ('dim',    '  The hand need not repeat itself.'),
     ],
 }
 
@@ -585,12 +593,12 @@ SCROLL_CATALOG = [
         'content':    WHOLE_WORD_SCROLL,
     },
     {
-        'id':         'visual_op',
-        'title':      "The Warden's Act",
+        'id':         'subst',
+        'title':      'The Rewriting Word',
         'dropped_by': "The Grandmaster's Sanctum",
         'level_slug': 'grandmasters_sanctum',
         'level_name': "The Grandmaster's Sanctum",
-        'content':    WARDEN_ACT_SCROLL,
+        'content':    REWRITING_WORD_SCROLL,
     },
 
     # ── Relic scrolls — found, not act-gated. Each teaches a budget-safe
