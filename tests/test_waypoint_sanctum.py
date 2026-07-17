@@ -35,7 +35,8 @@ from generation.dungeon_gen import (
     build_dungeon_waypoint_sanctum as _build,
     _WP_PAR, _WP_ANSWER, _WP_KEYWORD, _WP_SCROLL, _WP_SPAWN,
     _WP_LOCK, _WP_EXIT, _WP_KEY, _WP_KEY_WORD_POS, _WP_DECOY_POS, _WP_CROW,
-    _WP_DANGER_ROWS,
+    _WP_DANGER_ROWS, _WP_WORD2, _WP_W2_POCKET1, _WP_W2_POCKET2,
+    _WP_W2_DECOYS, _WP_PKT1_SPAN, _WP_PKT2_SPAN,
 )
 from engine.world import CellType
 from engine.player import Player
@@ -92,6 +93,16 @@ def _simulate(answer, room):
             pat, base = last
             p.row, p.col = find_next(room, p, pat, (not base) if tok == 'N' else base)
             spent += 1
+        elif tok in ('*', '#'):                                   # word under cursor
+            ru = room.char_run_at(p.row, p.col)
+            assert ru is not None, f'{tok}: no word under cursor'
+            pat = ''.join(ru.symbols)
+            fwd = tok == '*'
+            last = (pat, fwd)
+            dest = find_next(room, p, pat, fwd)
+            assert dest is not None, f'{tok}: no match for {pat}'
+            p.row, p.col = dest
+            spent += 1
         elif tok == 'x':
             ent = room.entity_at(p.row, p.col)
             if ent is not None and ent.kind == 'chest_scroll':
@@ -113,6 +124,12 @@ def _simulate(answer, room):
             n = int(tok[:i]) if i else 1
             apply_motion(p, tok[i:], n, room, count_given=(i > 0))
             spent += (len(tok[:i]) + 1) if i else 1
+        # The waking stone (the main-loop tick, mimicked): landing inside
+        # pocket 1 lifts plugh's scripted fog.
+        pf = getattr(room, '_wp_plugh_fog', set())
+        if (pf and room.fog_cells & pf and p.row == _WP_W2_POCKET1[0]
+                and _WP_PKT1_SPAN[0] <= p.col <= _WP_PKT1_SPAN[1]):
+            room.fog_cells -= pf
     return (p.row, p.col), spent, (p.row, p.col) == _WP_EXIT, got_scroll
 
 
@@ -121,8 +138,8 @@ def _simulate(answer, room):
 def test_dimensions_and_budget(seed):
     room = _room(seed)
     assert (room.rows, room.cols) == (19, 46)
-    assert room.par == _WP_PAR == 15
-    assert room.budget == 21                       # ceil(15 * 1.4)
+    assert room.par == _WP_PAR == 17
+    assert room.budget == 24                       # ceil(17 * 1.4)
 
 
 @pytest.mark.parametrize('seed', SEEDS)
@@ -200,24 +217,39 @@ def test_backward_search_is_the_direct_key_fetch(seed):
 
 
 @pytest.mark.parametrize('seed', SEEDS)
-def test_key_is_sealed_in_a_search_only_pocket(seed):
-    """The gold key + its rune sit in a walled pocket: the search jumps land ON
-    them (cells stay corridor), but gg/G + a count-walk can't step in — the ring
-    of walls forces the ?xyzzy up-leg, mirroring how the moats force the mark home."""
+def test_both_pockets_are_search_only(seed):
+    """Both magic-word pockets: interiors stay corridor (search jumps land),
+    ringed by misted water (no foot path in, no $ / f scan across, contents
+    VISIBLE per the stone-fog law). Pocket 1 holds xyzzy + the waking plugh;
+    pocket 2 (strictly WEST — behind, for #) holds plugh's twin + the key."""
     room = _room(seed)
-    kr, kc = _WP_KEY
-    end = _WP_KEY_WORD_POS[1] + len(_WP_KEYWORD)              # right wall col
-    # the key + rune cells remain corridor so a search-jump can land on them
-    assert room.cells[kr][kc] == CellType.CORRIDOR
-    for i in range(len(_WP_KEYWORD)):
-        assert room.cells[_WP_KEY_WORD_POS[0]][_WP_KEY_WORD_POS[1] + i] == CellType.CORRIDOR
-    # the ring is misted water: over the ceiling (row 1) and both flanks
-    # (row 2) — no foot path enters, no $ / f scan crosses the mist, and
-    # the key + rune stay VISIBLE across the water (the stone-fog law).
-    for rc in ([(2, kc - 1), (2, end)]
-               + [(1, c) for c in range(kc - 1, end + 1)]):
-        assert room.cells[rc[0]][rc[1]] == CellType.WATER, rc
-        assert rc in room.fog_cells, rc
+    for span in (_WP_PKT1_SPAN, _WP_PKT2_SPAN):
+        lo, hi = span
+        for c in range(lo, hi + 1):
+            assert room.cells[2][c] == CellType.CORRIDOR, (2, c)
+        for rc in ([(2, lo - 1), (2, hi + 1)]
+                   + [(1, c) for c in range(lo - 1, hi + 2)]):
+            assert room.cells[rc[0]][rc[1]] == CellType.WATER, rc
+            assert rc in room.fog_cells, rc
+    assert room.cells[_WP_KEY[0]][_WP_KEY[1]] == CellType.CORRIDOR
+    assert _WP_PKT2_SPAN[1] < _WP_PKT1_SPAN[0]     # pocket 2 is BEHIND
+
+
+@pytest.mark.parametrize('seed', SEEDS)
+def test_plugh_sleeps_until_the_pocket_is_entered(seed):
+    """The waking stone: pocket 1's plugh starts under scripted fog, so
+    ?plugh from the spawn finds ONLY unfogged matches — pocket 2's twin is
+    visible, but the fresh route to it needs the word under the cursor.
+    After the ? leg lands in pocket 1, # is the one-key fetch."""
+    room = _room(seed)
+    fogged = {(_WP_W2_POCKET1[0], _WP_W2_POCKET1[1] + i)
+              for i in range(len(_WP_WORD2))}
+    assert fogged <= room.fog_cells
+    assert fogged == room._wp_plugh_fog
+    assert not (fogged & room.mist_cells)          # liftable — NOT mist
+    # every plugh stands where designed, nowhere else
+    assert _positions(room, _WP_WORD2) == sorted(
+        [_WP_W2_POCKET1, _WP_W2_POCKET2] + _WP_W2_DECOYS)
 
 
 @pytest.mark.parametrize('seed', SEEDS)
@@ -254,8 +286,20 @@ def test_answer_solves_at_par_via_the_forced_search():
     pos, spent, reached, got_scroll = _simulate(_WP_ANSWER, room)
     assert reached, f'answer ended at {pos}, not the exit {_WP_EXIT}'
     assert not got_scroll, 'the par route is the lean forced-search line, no scroll detour'
-    assert spent == _WP_PAR == 15
+    assert spent == _WP_PAR == 17
     assert spent <= room.budget
+
+
+def test_hash_is_forced_by_par():
+    """The #-less rival from the plugh stone: * hits a forward decoy and
+    N N walks back through the stone to the twin — 3 keys where # pays 1.
+    It wins, at 1★ (par+2)."""
+    room = _room(42)
+    rival = _WP_ANSWER.replace(' # ', ' * N N ', 1)
+    pos, spent, reached, _s = _simulate(rival, room)
+    assert reached
+    assert spent == _WP_PAR + 2
+    assert spent <= room.budget                    # wins — but one star
 
 
 def test_taking_the_scroll_is_an_off_par_bonus():
@@ -266,8 +310,42 @@ def test_taking_the_scroll_is_an_off_par_bonus():
     take = _WP_ANSWER.replace("ma ", "ma 'a x ", 1)   # insert the scroll detour
     pos, spent, reached, got_scroll = _simulate(take, room)
     assert reached and got_scroll
-    assert spent == _WP_PAR + 3 == 18
+    assert spent == _WP_PAR + 3 == 20
     assert spent > _WP_PAR
+
+
+def test_driven_canonical_wins_at_par(monkeypatch):
+    """The REAL main loop end to end: the ? leg, the tick's plugh reveal,
+    the # fetch, the mark home. (The simulator mimics the tick; this one
+    proves it.)"""
+    import main
+    from blessed import Terminal
+    from blessed.keyboard import Keystroke
+    import render.colors as C
+    import render.symbols as S
+    C.init(Terminal())
+    S.init(Terminal())
+    d = _build(42)
+    keys = [Keystroke(ch) for ch in 'ma?xyzzy\rw#hx`a$pl:wq\r']
+    monkeypatch.setattr(main, 'render_all', lambda *a, **k: None)
+    monkeypatch.setattr(main.time, 'sleep', lambda *a, **k: None)
+    for anim in ('_fireworks_animation', '_win_animation', '_starfield_victory',
+                 '_heart_container_animation', '_unlock_animation',
+                 '_void_fall_animation', '_drown_animation'):
+        monkeypatch.setattr(main, anim, lambda *a, **k: None)
+    monkeypatch.setattr(Terminal, 'height', property(lambda self: 41))
+    box = {}
+    orig = main._calc_stars
+    monkeypatch.setattr(main, '_calc_stars',
+                        lambda won, budget, room, player, level='':
+                            (box.__setitem__('spent', budget.spent),
+                             orig(won, budget, room, player, level))[1])
+    term = Terminal()
+    it = iter(keys)
+    monkeypatch.setattr(term, 'inkey', lambda *a, **k: next(it, Keystroke('')))
+    result = main.run_dungeon(term, 'waypoint_sanctum', {}, player_name='Scribe',
+                              _dungeon=d)
+    assert result['won'] and box['spent'] == _WP_PAR
 
 
 # ── :set number gutter (the scroll's payoff) + scroll-drop wiring ────────────

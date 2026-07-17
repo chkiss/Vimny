@@ -5781,13 +5781,26 @@ _WP_LOCK   = (5, 43)               # exit lock (gold)
 _WP_EXIT   = (5, 44)
 _WP_KEYWORD      = 'xyzzy'          # the magic word (Colossal Cave Adventure, 1977);
                                    # a non-word, so it can never collide with vocab
-_WP_KEY_WORD_POS = (2, 30)         # exit key's word — thin TOP danger band (backward)
-_WP_KEY          = (2, 29)         # gold floor_key, just left of the word
+_WP_KEY_WORD_POS = (2, 30)         # the FIRST magic word — thin TOP danger band (backward)
 _WP_DECOY_POS    = [(11, 12), (13, 24), (15, 34)]  # forward decoys (open danger floor)
+# The SECOND magic word (Colossal Cave's other teleporter) — the # lesson
+# (2026-07-17): the ? leg lands you in the xyzzy pocket, where plugh wakes
+# from a SCRIPTED fog (fogged text is unsearchable, so ?plugh from spawn
+# finds nothing — the fresh-word law); its backward twin sits in a second
+# misted pocket holding the gold key, its forward decoys price out * (a
+# * N N walk pays 3 where # pays 1), and the xyzzy register keeps n
+# useless. Standing on plugh, # is the one-key way to the key.
+_WP_WORD2        = 'plugh'
+_WP_W2_POCKET1   = (2, 36)         # the waking stone, east of xyzzy in pocket 1
+_WP_W2_POCKET2   = (2, 7)          # its backward twin, beside the gold key
+_WP_KEY          = (2, 6)          # gold floor_key, just left of the twin
+_WP_W2_DECOYS    = [(11, 30), (13, 6), (15, 16)]   # forward decoys for plugh
+_WP_PKT1_SPAN    = (29, 40)        # pocket-1 interior cols (xyzzy + gap + plugh)
+_WP_PKT2_SPAN    = (6, 12)         # pocket-2 interior cols (key + plugh twin)
 _WP_DANGER_ROWS  = (1, 2, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17)
 _WP_VAULT_COLS   = (6, 10, 14, 18, 22, 26, 30, 34, 38, 42)  # vaults lining the sanctum underside
-_WP_PAR    = 15
-_WP_ANSWER = "ma ?xyzzy⏎ h x `a $ p l"
+_WP_PAR    = 17
+_WP_ANSWER = "ma ?xyzzy⏎ w # h x `a $ p l"
 
 
 def build_dungeon_waypoint_sanctum(seed: int) -> 'Dungeon':
@@ -5836,12 +5849,20 @@ def build_dungeon_waypoint_sanctum(seed: int) -> 'Dungeon':
         cells[r][c] = CellType.WATER
         mist.add((r, c))
 
-    _pkt_lo = _WP_KEY[1] - 1                                  # left bank (col 28)
-    _pkt_hi = _WP_KEY_WORD_POS[1] + len(_WP_KEYWORD)          # right bank (col 35)
+    _pkt_lo = _WP_PKT1_SPAN[0] - 1                            # left bank (col 28)
+    _pkt_hi = _WP_PKT1_SPAN[1] + 1                            # right bank (col 41)
     for c in range(_pkt_lo, _pkt_hi + 1):
         moat(1, c)                                           # water over the pocket
     moat(2, _pkt_lo)                                         # left bank
     moat(2, _pkt_hi)                                         # right bank
+    # Pocket 2 — the # pocket: the gold key + plugh's backward twin, ringed
+    # the same way (misted water: visible per the stone-fog law, searchable,
+    # foot-proof). It sits WEST of pocket 1 so the twin is strictly behind.
+    _p2_lo, _p2_hi = _WP_PKT2_SPAN[0] - 1, _WP_PKT2_SPAN[1] + 1
+    for c in range(_p2_lo, _p2_hi + 1):
+        moat(1, c)
+    moat(2, _p2_lo)
+    moat(2, _p2_hi)
     # SANCTUM (rows 4-6), sealed above by the row-3 wall and below by the row-7 wall.
     # Row 5 is the mark row: a one-cell scroll nook at col 1 behind a 'blue' lock at
     # col 2, then the wordless corridor, the gold exit lock (43) + exit (44).  Rows 4
@@ -5895,12 +5916,19 @@ def build_dungeon_waypoint_sanctum(seed: int) -> 'Dungeon':
     composite.seed = seed
     composite.fog_cells  = set(mist)              # mist on every converted pool
     composite.mist_cells = set(mist)              # …permanent: reveals skip it
+    # (the plugh fog is added below, once the runs exist — NOT mist: the
+    # tick lifts it, and mist_cells would make the reveal skip it)
 
-    # Reserved cells (no prose decor / no goblins): key, key word, decoys, vaults.
+    # Reserved cells (no prose decor / no goblins): key, both magic words +
+    # their decoys, the two pocket interiors, vaults.
     reserved: set = {_WP_KEY} | vault_cells
     reserved |= {(_WP_KEY_WORD_POS[0], _WP_KEY_WORD_POS[1] + i) for i in range(len(_WP_KEYWORD))}
     for (dr, dc) in _WP_DECOY_POS:
         reserved |= {(dr, dc + i) for i in range(len(_WP_KEYWORD))}
+    for (pr, pc) in (_WP_W2_POCKET1, _WP_W2_POCKET2, *_WP_W2_DECOYS):
+        reserved |= {(pr, pc + i) for i in range(len(_WP_WORD2))}
+    reserved |= {(2, c) for c in range(_WP_PKT1_SPAN[0], _WP_PKT1_SPAN[1] + 1)}
+    reserved |= {(2, c) for c in range(_WP_PKT2_SPAN[0], _WP_PKT2_SPAN[1] + 1)}
     # Goblins crawl every danger room (deterministic stride, ~1 in 7 floor cells).
     goblins = [(r, c) for r in _WP_DANGER_ROWS for c in range(1, C - 1)
                if cells[r][c] == CellType.CORRIDOR and (r, c) not in reserved
@@ -5912,6 +5940,13 @@ def build_dungeon_waypoint_sanctum(seed: int) -> 'Dungeon':
                          symbols=tuple(_WP_KEYWORD), kind='ember')]
     for (dr, dc) in _WP_DECOY_POS:
         char_runs.append(CharRun(row=dr, col=dc, symbols=tuple(_WP_KEYWORD), kind='ember'))
+    for (dr, dc) in (_WP_W2_POCKET1, _WP_W2_POCKET2, *_WP_W2_DECOYS):
+        char_runs.append(CharRun(row=dr, col=dc, symbols=tuple(_WP_WORD2), kind='ember'))
+    # The waking stone sleeps under SCRIPTED fog (the Wet Ink pattern): a
+    # fogged word is unsearchable, so ?plugh from the spawn finds nothing —
+    # the level tick lifts it the moment the ? leg lands in pocket 1.
+    _plugh_fog = {(_WP_W2_POCKET1[0], _WP_W2_POCKET1[1] + i)
+                  for i in range(len(_WP_WORD2))}
 
     # Prose fill: vocab over the danger rooms (seed-varied, never containing the
     # key word, never on a reserved cell — so the only 'cipher' matches are the
@@ -5944,6 +5979,8 @@ def build_dungeon_waypoint_sanctum(seed: int) -> 'Dungeon':
                 c += span + 1
 
     composite.char_runs = char_runs
+    composite.fog_cells |= _plugh_fog
+    composite._wp_plugh_fog = _plugh_fog
     composite.spawn_pos = _WP_SPAWN
     composite.exit_pos  = _WP_EXIT
     entities += [

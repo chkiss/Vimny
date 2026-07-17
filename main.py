@@ -3126,6 +3126,15 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
         if level == 'paragraph_enclosure':
             for _m in _paragraph_enclosure_tick(room, player):
                 _push(_m)
+        if level == 'waypoint_sanctum':
+            # The waking stone: plugh's scripted fog lifts when the ? leg
+            # lands the player inside pocket 1 (fogged text is unsearchable,
+            # so ?plugh from the spawn finds nothing until then).
+            _pf = getattr(room, '_wp_plugh_fog', None)
+            if (_pf and room.fog_cells & _pf and player.row == 2
+                    and _dg._WP_PKT1_SPAN[0] <= player.col <= _dg._WP_PKT1_SPAN[1]):
+                room.fog_cells -= _pf
+                _push('In the pocket\'s shadow, a second word wakes.')
         if level == 'wet_ink':
             # The alcove's scripted fog lifts when the bend is walked.
             _af = getattr(room, '_wi_alcove_fog', None)
@@ -3939,6 +3948,11 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
                             if not from_visual:
                                 undo_stack.append(pre + (('s', _scost),))
                                 redo_stack.clear()
+                            # A search LANDING fires the gate ticks THIS turn
+                            # (the insert-Esc pattern): the Waypoint's plugh
+                            # reveal must wake on the ? that lands you in the
+                            # pocket, not one keystroke later.
+                            _content_ticks()
                     else:
                         _push(f'Pattern not found: {pattern}')
             elif key.name == 'KEY_BACKSPACE' or str(key) == '\x7f':
