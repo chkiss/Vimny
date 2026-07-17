@@ -8034,43 +8034,58 @@ def build_dungeon_archivists_library(seed: int) -> Dungeon:
 # When no line bears 'old' or 'curse', the seal at (action row, divider) dissolves
 # and the player walks through to the exit. x-erasing each glyph by hand blows the
 # budget — :s / :g are the efficient way (the lesson).
-_FORGE_ROWS, _FORGE_COLS = 20, 54
-_FORGE_DIV   = 42                       # full-height divider wall; sanctum to its right
+_FORGE_ROWS, _FORGE_COLS = 20, 58
+_FORGE_DIV   = 46                       # full-height divider wall; sanctum to its right
+                                        # (widened 2026-07-17: the forge-song's
+                                        # longest line runs 41 chars, to col 42)
 _FORGE_DOOR  = 6                        # the blank corridor row: spawn, seal door, exit
 # Three chambers, each forcing a different member of the :s / :g family more than once.
 # Vocabulary is rigorously separated so one chamber's global rite never reaches another:
 # no word outside Chamber A contains the substring 'old' (no cold/gold/holds/bond…), only
 # Chamber B carries 'pale'/'pure', only Chamber C carries 'cursed'.
 #
-# The floor incantations were rewritten 2026-07-17 (writing-agent pass) so the
-# MEANING alone tells the apprentice what to mend and what to keep — the wizard's
-# rule: "pale moon remains pale; a pale heart is plainly a pure heart." Each
-# chamber's images are self-labelling: things a forge RENEWS (flame, dawn, sparks)
-# read wrong as 'old'; a heart and quenching water plainly want to be 'pure' while
-# the moon is rightly pale; corruption (rune rots, nail splits, rust eats) is struck
-# while the sacred fixtures "stand" and "ring" and are kept.
+# The floor incantations were rewritten 2026-07-17 (writing-agent pass, user
+# pick "the forge-song"): the SURVIVING lines — the three A wards mended to
+# 'new', the two B verses mended to 'pure', B's kept 'pale' line, and C's two
+# sacred keepers — read TOP TO BOTTOM as one coherent poem (a smith waking the
+# forge and blessing the blade). The corruptions still self-label: a forge
+# RENEWS (iron, sparks, songs) so 'old' reads wrong; a heart and one's work
+# plainly want 'pure' while the moon is rightly pale; the 'cursed' lines are
+# struck while the 'sacred' ones are kept. Line lengths reach 41 (Chamber A),
+# which is why _FORGE_DIV was widened to 46.
+#
+# THE FINAL POEM (post-edit), in buffer order:
+#   new iron, new fire, i wake the forge        (A1)
+#   new sparks for the new blade i shape         (A2)
+#   new songs rise where the new hammer falls    (A3)
+#   shaped by a heart that beats pure            (B1)
+#   under a pale and patient moon                (B2, kept)
+#   my work lies pure beneath its light          (B3)
+#   sacred embers guard the coal                 (C2, kept)
+#   this blade is sacred, keep it well           (C4, kept)
 #
 # Chamber A — Ember Wards (rows 2-4): 'old' repeats WITHIN each line, so :s/old/new/
 # alone leaves remnants — only :%s/old/new/g mends a whole ward.  Drills the /g flag.
-_FORGE_A_WARDS   = [(2, 'the old flame lights the old forge'),
-                    (3, 'the old dawn breaks on the old day'),
-                    (4, 'old sparks kindle old fires here')]
+_FORGE_A_WARDS   = [(2, 'old iron, old fire, i wake the forge'),
+                    (3, 'old sparks for the old blade i shape'),
+                    (4, 'old songs rise where the old hammer falls')]
 # Chamber B — Selfsame Verses (rows 8-10): 'pale'→'pure', but the MIDDLE line's 'pale'
 # is TRUE (verdant) and must remain.  A whole-buffer :%s/pale/pure/g wrecks it; the two
 # corrupt (ember) lines straddle the protected one so no single range covers just them —
 # :s one, jj past the true line, & the other.  Drills surgical :s + the & repeat.
-_FORGE_B_CORRUPT = [(8, 'the smith works with a pale heart'), (10, 'pale water fills the quenching well')]
-_FORGE_B_KEEP    = (9, 'pale moon stays pale, as it must')
+_FORGE_B_CORRUPT = [(8, 'shaped by a heart that beats pale'),
+                    (10, 'my work lies pale beneath its light')]
+_FORGE_B_KEEP    = (9, 'under a pale and patient moon')
 # Chamber C — Cursed Litany (rows 14-18): :g/cursed/d sweeps every cursed (ember) line at
 # once; the sacred (verdant) lines between them must remain (so a blanket delete fails).
 # Drills :g/pat/d and its selective, all-at-once global reach.
 # (Rows start at 14, NOT 13: :g/…/d REMOVES rows and destroys entities on them,
 # and the sanctum's scroll chest sits on row 13 — the litany begins below it.)
-_FORGE_C_CURSED  = [(14, 'a cursed rune rots on the anvil'),
-                    (16, 'the cursed nail splits every blade'),
-                    (18, 'cursed rust eats the iron whole')]
-_FORGE_C_KEEP    = [(15, 'the sacred fire stands, let it stand'),
-                    (17, 'a sacred hymn rings true, let it ring')]
+_FORGE_C_CURSED  = [(14, 'cursed sparks die in the ash'),
+                    (16, 'no cursed thing survives this heat'),
+                    (18, 'cursed iron cracks and is thrown out')]
+_FORGE_C_KEEP    = [(15, 'sacred embers guard the coal'),
+                    (17, 'this blade is sacred, keep it well')]
 _FORGE_CHEST     = (13, _FORGE_COLS - 2)   # sanctum scroll chest (random relic —
                                            # the forge names no scroll drop)
 
