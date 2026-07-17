@@ -339,3 +339,11 @@
 | @{a}  | @         | play macro   |
 | @@    |           | repeat macro |
 | "{a}  | reg_named | named reg    |
+
+## stair_rail — line steps
+
+| keys | token     | desc            |
+|------|-----------|-----------------|
+| +    | line_step | down, first word |
+| -    | line_step | up, first word  |
+| {n}_ | line_step | to line n below |

@@ -16,17 +16,12 @@ the tight-budget Overwrite Halls stretch is long past).
 
 ---
 
-## The Stair Rail (`stair_rail`) — `+ - _` and NORMAL-Enter
-
-- **Engine: DONE** (2026-07-14). `+`/`-` land on the target row's first
-  non-blank; `_` is count-is-target (count−1 down); NORMAL Enter ≡ `+`.
-  All gated on the `line_step` token, currently taught nowhere.
-- A full level of its own (user decision — NOT a `.1`).
-- Concept: staircase bays where every plain `j`/`k` strands the cursor on
-  blank floor mid-descent and `+`/`-` land the word; a `_` chamber where the
-  count IS the destination. Forcing: `j ^` pairs (2 keys) vs `+` (1) on every
-  step — par takes the rail, the `j^` walk wins at 1★.
-- Teaches: `['line_step']`.
+> ✅ The Stair Rail SHIPPED as display 41 (built to the sketch: five
+> east-drifting steps of fused ◆words on the exact-text chassis, each +
+> landing what j strands beside; the 8_ counted drop to a gate that G
+> undershoots into a chest-bearing undercroft; par 13, STANDARD ×1.4
+> budget, the j^-walk (17) wins 1★; warden_eternal renumbered 41.1
+> hanging off stair_rail — see `build_dungeon_stair_rail` + its tests).
 
 ## The G-Sanctum (`g_sanctum`) — the g-family
 

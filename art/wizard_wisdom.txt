@@ -596,6 +596,17 @@
       ]
     },
     {
+      "introduces_slug": "stair_rail",
+      "name": "+ - _",
+      "line_count": 4,
+      "quote": [
+        "   j falls where it falls; + finds the step.    ",
+        "      - climbs the same way, word to word.      ",
+        "    And _ counts the whole descent at once.     ",
+        "   Take the rail; the stairs were cut for it.   "
+      ]
+    },
+    {
       "introduces_slug": "warden_eternal",
       "name": "warden eternal",
       "line_count": 4,

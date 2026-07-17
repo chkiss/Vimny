@@ -384,6 +384,12 @@ POEMS: list[tuple[str | None, str, list[str]]] = [
         '"ay fills a jar; "ap pours it out.',
         'One motion, stored to echo down the halls.',
     ]),
+    ('stair_rail', '+ - _', [                  # The Stair Rail — + - _
+        'j falls where it falls; + finds the step.',
+        '- climbs the same way, word to word.',
+        'And _ counts the whole descent at once.',
+        'Take the rail; the stairs were cut for it.',
+    ]),
     ('warden_eternal', 'warden eternal', [     # The Warden Eternal (final boss)
         'The last Warden is every Warden.',
         'No key remains for me to give—',

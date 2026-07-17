@@ -93,7 +93,8 @@ Curriculum order is the order of `LEVELS`. Blueprints: `blueprints/act_*.md`.
 | 38.1 | `grandmasters_sanctum` | The Grandmaster's Sanctum | — | boss |
 | 39 | `spellwrights_forge` | The Spellwright's Forge | `:s///  :g  &` |  |
 | 40 | `hall_of_echoes` | The Hall of Echoes | `q @ "` |  |
-| 40.1 | `warden_eternal` | The Warden Eternal | — | boss |
+| 41 | `stair_rail` | The Stair Rail | `+ - _` |  |
+| 41.1 | `warden_eternal` | The Warden Eternal | — | boss |
 | 99 | `dummy` | Dummy Dungeon | `d x s y p yy P` |  |
 <!-- END GENERATED CURRICULUM TABLE -->
 
