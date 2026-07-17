@@ -137,7 +137,7 @@ def test_mark_set_and_jump_back(monkeypatch):
     start = default_cursor(_lines())
     result, player = _drive(_K("maG'a"), monkeypatch)
     assert result['cursor'] == start
-    assert player.ow_marks == {'a': start}
+    assert player.ow_marks == {'a': (start, 0)}
 
 
 def test_quote_quote_returns_to_jump_origin(monkeypatch):
@@ -168,6 +168,126 @@ def test_search_feeds_the_jump_list(monkeypatch):
     result, _p = _drive(_K('/goblin_gauntlet\r') + [Keystroke('\x0f')],
                         monkeypatch)
     assert result['cursor'] == start
+
+
+# ── column motions (the netrw buffer gained a column cursor) ─────────────────
+
+ALL_COLS = ALL_TOKENS + ['w', 'b', 'e', 'W', 'B', 'E', 'f', 'F', 't', 'T',
+                         ';', ',', '*', 'g_family']
+
+
+def _drive_col(keys, monkeypatch, tokens=ALL_COLS):
+    """Like _drive, but captures the effective column at each render."""
+    cols = []
+    orig = main.run_overworld
+    result, player = None, None
+
+    def _stub_render(*a, **k):
+        cols.append(k.get('col', 0))
+        return (k.get('scroll_offset', 0), 0, 0)
+
+    keys = list(keys) + _K(':q\r')
+    monkeypatch.setattr(main, 'render_overworld', _stub_render)
+    monkeypatch.setattr(main, '_known_from_progress', lambda p: list(tokens))
+    monkeypatch.setattr(Terminal, 'height', property(lambda self: 41))
+    term = Terminal()
+    it = iter(keys)
+    monkeypatch.setattr(term, 'inkey', lambda *a, **k: next(it, Keystroke('')))
+    player = Player(name='Scribe', row=0, col=0)
+    result = main.run_overworld(term, player, {})
+    return result, cols
+
+
+def test_l_and_h_move_the_column(monkeypatch):
+    # '../' is 3 wide: lll clamps at col 2, h steps back to 1.
+    _r, cols = _drive_col(_K('lllh'), monkeypatch)
+    assert max(cols) == 2 and cols[-1] == 1
+
+
+def test_dollar_and_zero_and_caret(monkeypatch):
+    # cursor starts on '../' (len 3): $ → col 2; 0 → col 0.
+    _r, cols = _drive_col(_K('$'), monkeypatch)
+    assert cols[-2] == 2
+    _r, cols = _drive_col(_K('$0'), monkeypatch)
+    assert cols[-2] == 0
+
+
+def test_curswant_survives_vertical_moves(monkeypatch):
+    # $ on '../' then j onto './' (len 2 → col 1), then onto a level label
+    # (long → snaps to its end): Vim's sticky column.
+    _r, cols = _drive_col(_K('$j'), monkeypatch)
+    assert cols[-2] == 1
+    lines = _lines()
+    lvl = next(i for i, ln in enumerate(lines) if ln['type'] == 'level')
+    _r, cols = _drive_col(_K('$' + 'j' * (lvl - default_cursor(lines))),
+                          monkeypatch)
+    assert cols[-2] == len(line_search_text(lines[lvl])) - 1
+
+
+def test_w_walks_the_label_words(monkeypatch):
+    # On a level label (dungeon_NN_name): '_'-joined = ONE Vim word, so w
+    # from col 0 stays put at the line's last word start… use f to check
+    # instead: f5 finds the '5' in 'dungeon_05'.
+    lines = _lines()
+    lvl = _line_of('goblin_gauntlet')
+    label = line_search_text(lines[lvl])
+    _r, cols = _drive_col(_K('j' * (lvl - default_cursor(lines)) + 'f5'),
+                          monkeypatch)
+    assert cols[-2] == label.index('5')
+
+
+def test_semicolon_repeats_the_find(monkeypatch):
+    lines = _lines()
+    lvl = _line_of('goblin_gauntlet')       # dungeon_05_the_goblin_gauntlet
+    label = line_search_text(lines[lvl])
+    _r, cols = _drive_col(_K('j' * (lvl - default_cursor(lines)) + 'fg;'),
+                          monkeypatch)
+    assert cols[-2] == label.index('g', label.index('g') + 1)
+
+
+def test_star_whole_word_search(monkeypatch):
+    # * on './' … no word; on a level label the whole '_'-joined key is one
+    # word appearing once — * wraps back to the same spot with the message.
+    lines = _lines()
+    lvl = _line_of('goblin_gauntlet')
+    result, player = _drive(_K('j' * (lvl - default_cursor(lines)) + '*'),
+                            monkeypatch, tokens=ALL_COLS)
+    assert result['cursor'] == lvl
+    assert any('continuing at TOP' in e for e in player.errlog)
+
+
+def test_search_lands_on_the_match_column(monkeypatch):
+    lines = _lines()
+    lvl = _line_of('goblin_gauntlet')
+    label = line_search_text(lines[lvl])
+    _r, cols = _drive_col(_K('/gauntlet\r'), monkeypatch)
+    assert cols[-2] == label.index('gauntlet')
+
+
+def test_zz_zt_zb_move_the_view_not_the_cursor(monkeypatch):
+    offs = []
+
+    def _stub_render(*a, **k):
+        offs.append(k.get('scroll_offset', 0))
+        return (k.get('scroll_offset', 0), 0, 0)
+
+    monkeypatch.setattr(main, 'render_overworld', _stub_render)
+    monkeypatch.setattr(main, '_known_from_progress', lambda p: ['G'])
+    monkeypatch.setattr(Terminal, 'height', property(lambda self: 12))
+    term = Terminal()
+    keys = _K('Gztzbzz:q\r')
+    it = iter(keys)
+    monkeypatch.setattr(term, 'inkey', lambda *a, **k: next(it, Keystroke('')))
+    player = Player(name='Scribe', row=0, col=0)
+    result = main.run_overworld(term, player, {})
+    n, avail = len(_lines()), 12 - 5
+    last = n - 1
+    max_off = max(0, n - avail)
+    # after G: zt wants cursor at top (clamped), zb at bottom, zz centred
+    assert offs[-4] == min(last, max_off)              # zt
+    assert offs[-3] == max(0, min(last - avail + 1, max_off))   # zb
+    assert offs[-2] == max(0, min(last - avail // 2, max_off))  # zz
+    assert result['cursor'] == last                    # the cursor never moved
 
 
 # ── the single-source label law ──────────────────────────────────────────────

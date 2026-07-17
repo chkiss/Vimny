@@ -81,6 +81,14 @@ def line_search_text(ln: dict) -> str:
     return ''
 
 
+def line_label_offset(ln: dict) -> int:
+    """Screen column where a line's searchable label begins (companion to
+    line_search_text — same single-source law): custom layouts draw a
+    2-space + tree-glyph indent before the name; everything else starts
+    flush after the gutter."""
+    return 4 if ln['type'] == 'custom' else 0
+
+
 def default_cursor(lines: list) -> int:
     """The line the cursor rests on when the overworld opens: the first ``../``."""
     for i, ln in enumerate(lines):
@@ -105,7 +113,7 @@ def render_overworld(term: Terminal, player: Player, progress: dict,
                      cursor: int, lines: list, *,
                      cmd_line: str | None = None, number_mode: str = 'number',
                      deleting: bool = False, renaming: str | None = None,
-                     scroll_offset: int = 0) -> tuple[int, int, int]:
+                     scroll_offset: int = 0, col: int = 0) -> tuple[int, int, int]:
     """Render the overworld; returns (scroll_offset, cursor_y, cursor_x) so the
     caller can place the live cursor. ``number_mode`` ∈ {'number','relativenumber','none'}."""
     iw  = _iw(term)
@@ -259,7 +267,7 @@ def render_overworld(term: Terminal, player: Player, progress: dict,
                 bfg + S.BOX_V + rst)
 
     cur_y = 3 + (cursor - scroll_offset)        # default: the live cursor sits on its line
-    cur_x = 1 + GW
+    cur_x = 1 + GW + line_label_offset(lines[cursor]) + max(0, col)
     sl_y  = 3 + avail
     if deleting:
         out.append(_bar(C.error_bg() + C.error_fg(),

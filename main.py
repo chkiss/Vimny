@@ -35,7 +35,9 @@ from engine.player import Player
 from engine.modes import Mode
 from engine.budget import Budget
 from engine.vim_parser import parse, parse_visual_textobj
-from engine.command_guard import action_allowed as _action_allowed, guard_message as _guard_message
+from engine.command_guard import (action_allowed as _action_allowed,
+                                  guard_message as _guard_message,
+                                  _MOTION_GUARD as _MOTION_GUARD_TABLE)
 from engine.world import Entity, CellType, CharRun, Dungeon, clone_entity
 from engine.motion import (apply_motion, _apply_esc, _reveal_from,
                            _first_non_blank_col, auto_fog_tick as _auto_fog_tick)
@@ -6230,6 +6232,84 @@ def _ow_section(lines: list, cursor: int, direction: int) -> int:
     return after[0] if after else len(lines) - 1
 
 
+# ── Overworld string motions ──────────────────────────────────────────────────
+# Vim word/find motions over a plain label string (the netrw buffer has no
+# Room, so these mirror engine/motion's class rules on text: word chars are
+# [A-Za-z0-9_], punctuation is its own class, WORD is whitespace-bounded).
+
+def _owm_class(ch: str) -> int:
+    if ch.isspace():
+        return 0
+    return 1 if (ch.isalnum() or ch == '_') else 2
+
+
+def _owm_w(text: str, c: int, big: bool) -> int:
+    n = len(text)
+    if c >= n - 1:
+        return c
+    k = _owm_class(text[c]) if not big else (0 if text[c].isspace() else 1)
+    i = c
+    while i < n and ((0 if text[i].isspace() else 1) if big else _owm_class(text[i])) == k and k != 0:
+        i += 1
+    while i < n and text[i].isspace():
+        i += 1
+    return i if i < n else c
+
+
+def _owm_b(text: str, c: int, big: bool) -> int:
+    i = c - 1
+    while i >= 0 and text[i].isspace():
+        i -= 1
+    if i < 0:
+        return c
+    k = (1 if not text[i].isspace() else 0) if big else _owm_class(text[i])
+    while i - 1 >= 0 and ((0 if text[i-1].isspace() else 1) if big else _owm_class(text[i-1])) == k:
+        i -= 1
+    return i
+
+
+def _owm_e(text: str, c: int, big: bool) -> int:
+    n = len(text)
+    i = c + 1
+    while i < n and text[i].isspace():
+        i += 1
+    if i >= n:
+        return c
+    k = (1 if not text[i].isspace() else 0) if big else _owm_class(text[i])
+    while i + 1 < n and ((0 if text[i+1].isspace() else 1) if big else _owm_class(text[i+1])) == k:
+        i += 1
+    return i
+
+
+def _owm_find(text: str, c: int, ch: str, fwd: bool, till: bool) -> int | None:
+    if fwd:
+        i = text.find(ch, c + 1 + (1 if till else 0))
+        if i < 0:
+            return None
+        return i - (1 if till else 0)
+    i = text.rfind(ch, 0, c - (1 if till else 0))
+    if i < 0:
+        return None
+    return i + (1 if till else 0)
+
+
+def _owm_word_at(text: str, c: int) -> str | None:
+    """The word under (or after, Vim-true) the cursor — for * / g*."""
+    n = len(text)
+    i = c
+    while i < n and _owm_class(text[i]) != 1:
+        i += 1
+    if i >= n:
+        return None
+    lo = i
+    while lo - 1 >= 0 and _owm_class(text[lo - 1]) == 1:
+        lo -= 1
+    hi = i
+    while hi + 1 < n and _owm_class(text[hi + 1]) == 1:
+        hi += 1
+    return text[lo:hi + 1]
+
+
 def run_overworld(term: Terminal, player: Player, progress: dict,
                   initial_cursor: int | None = None) -> dict:
     """The netrw overworld (~/.vimny/world/) as a real netrw buffer.
@@ -6269,10 +6349,27 @@ def run_overworld(term: Terminal, player: Player, progress: dict,
     pending_delete = False
     pending_g      = False
     pending_mark   = ''          # 'm' | "'" | '`' awaiting its register letter
+    pending_z      = False       # z awaiting z/t/b (view scroll)
+    pending_find   = ''          # 'f'|'F'|'t'|'T' awaiting its target char
     searching      = None        # None, or {'pfx': '/'|'?', 'buf': str}
     count_buf      = ''
     scroll_offset  = 0
     avail          = max(1, term.height - 5)
+    # The COLUMN cursor (Vim's curswant model): want_col is the sticky
+    # desired column; the effective column on any line is min(want, len-1)
+    # over that line's label. $ wants line-end forever (want = huge).
+    want_col   = 0
+    ow_last_f  = None            # (cmd, char) for ; and ,
+
+    def _label(i=None):
+        return line_search_text(lines[cursor if i is None else i])
+
+    def _eff(i=None):
+        return min(want_col, max(0, len(_label(i)) - 1))
+
+    def _mgate(mkey, label):
+        tok = _MOTION_GUARD_TABLE.get(mkey)
+        return tok is None or _gate(tok, label)
     # Buffer-local marks + the jump list, netrw-style: session-scoped on the
     # player (the overworld is one buffer; re-entering it keeps your marks).
     if not hasattr(player, 'ow_marks'):
@@ -6293,34 +6390,56 @@ def run_overworld(term: Terminal, player: Player, progress: dict,
         jump_idx = len(jump_list)
         cursor = target
 
-    def _search_from(pattern, fwd, start):
-        """First matching line from `start` (exclusive), wrapscan — Vim's
-        wrapping search over the buffer's VISIBLE text (line_search_text is
-        the renderer's single source). Returns (index|None, wrapped)."""
+    def _match_cols(pattern, text):
+        """Sorted match-start columns of `pattern` in `text` (vimregex, with
+        literal-substring fallback for untranslatable patterns)."""
         pat = _vre_compile(pattern)
-        order = (list(range(start + 1, len(lines))) + list(range(0, start + 1))
-                 if fwd else
-                 list(range(start - 1, -1, -1)) + list(range(len(lines) - 1, start - 1, -1)))
-        for i in order:
-            text = line_search_text(lines[i])
-            if pat is not None:
-                if pat.first_in(text) is not None:
-                    return i, (i <= start if fwd else i >= start)
-            elif pattern in text:                     # untranslatable → literal
-                return i, (i <= start if fwd else i >= start)
+        if pat is not None:
+            return sorted({s for s, _e in pat.finditer(text)})
+        cols, k = [], text.find(pattern)
+        while k >= 0:
+            cols.append(k)
+            k = text.find(pattern, k + 1)
+        return cols
+
+    def _search_from(pattern, fwd, start, start_col):
+        """First match strictly after/before (start, start_col), wrapscan —
+        Vim's wrapping search over the buffer's VISIBLE text, column-exact.
+        Returns ((line, col)|None, wrapped)."""
+        n = len(lines)
+        here = _match_cols(pattern, line_search_text(lines[start]))
+        if fwd:
+            after = [c for c in here if c > start_col]
+            if after:
+                return (start, after[0]), False
+            for step in range(1, n + 1):
+                i = (start + step) % n
+                cols = _match_cols(pattern, line_search_text(lines[i]))
+                if cols:
+                    return (i, cols[0]), (i <= start)
+            return None, False
+        before = [c for c in here if c < start_col]
+        if before:
+            return (start, before[-1]), False
+        for step in range(1, n + 1):
+            i = (start - step) % n
+            cols = _match_cols(pattern, line_search_text(lines[i]))
+            if cols:
+                return (i, cols[-1]), (i >= start)
         return None, False
 
     def _run_search(pattern, fwd):
-        nonlocal cursor
+        nonlocal want_col
         if not pattern:
             player.error = 'E35: No previous regular expression'
             return
         player.last_search = (pattern, fwd)
-        hit, wrapped = _search_from(pattern, fwd, cursor)
+        hit, wrapped = _search_from(pattern, fwd, cursor, _eff())
         if hit is None:
             player.error = f'E486: Pattern not found: {pattern}'
         else:
-            _jump_to(hit)
+            _jump_to(hit[0])
+            want_col = hit[1]                 # the cursor lands ON the match
             if wrapped:
                 player.error = ('search hit BOTTOM, continuing at TOP'
                                 if fwd else 'search hit TOP, continuing at BOTTOM')
@@ -6338,7 +6457,7 @@ def run_overworld(term: Terminal, player: Player, progress: dict,
             cmd_line=((searching['pfx'] + searching['buf']) if searching
                       else cmdline.line if cmdline.active else None),
             number_mode=number_mode, deleting=pending_delete,
-            renaming=renaming, scroll_offset=scroll_offset)
+            renaming=renaming, scroll_offset=scroll_offset, col=_eff())
         print(term.move_yx(cy, cx) + (term.cvvis or term.cnorm), end='', flush=True)  # blinking cursor
 
     def _done(result):
@@ -6446,7 +6565,50 @@ def run_overworld(term: Terminal, player: Player, progress: dict,
                 count_buf = ''
                 _render()
                 continue
-            # not 'gg' → fall through
+            if raw in ('*', '#'):                      # g* / g# — substring search
+                if _gate('g_family', 'the g-family'):
+                    word = _owm_word_at(_label(), _eff())
+                    if word is None:
+                        player.error = 'E348: No string under cursor'
+                    else:
+                        _run_search('\\V' + word, raw == '*')
+                count_buf = ''
+                _render()
+                continue
+            if raw == '_':                             # g_ — last non-blank
+                if _gate('g_family', 'the g-family'):
+                    want_col = max(0, len(_label().rstrip()) - 1)
+                count_buf = ''
+                _render()
+                continue
+            # not a g-sequence → fall through
+
+        # z{z,t,b} — view scrolling (free, like Ctrl-d/u/f/b: view-only)
+        if pending_z:
+            pending_z = False
+            max_off = max(0, len(lines) - avail)
+            if raw == 'z':
+                scroll_offset = max(0, min(cursor - avail // 2, max_off))
+            elif raw == 't':
+                scroll_offset = max(0, min(cursor, max_off))
+            elif raw == 'b':
+                scroll_offset = max(0, min(cursor - avail + 1, max_off))
+            count_buf = ''
+            _render()
+            continue
+
+        # f/F/t/T — awaiting the target character
+        if pending_find:
+            pf, pending_find = pending_find, ''
+            if not key.is_sequence and len(raw) == 1 and raw.isprintable():
+                fwd, till = pf in 'ft', pf in 'tT'
+                hit = _owm_find(_label(), _eff(), raw, fwd, till)
+                ow_last_f = (pf, raw)
+                if hit is not None:
+                    want_col = hit
+            count_buf = ''
+            _render()
+            continue
 
         # count prefix ('0' alone is not a count)
         if raw.isdigit() and (raw != '0' or count_buf):
@@ -6462,13 +6624,19 @@ def run_overworld(term: Terminal, player: Player, progress: dict,
             pm, pending_mark = pending_mark, ''
             if pm == 'm':
                 if raw.isalpha() and raw.islower():
-                    player.ow_marks[raw] = cursor
+                    player.ow_marks[raw] = (cursor, _eff())
             elif raw in ("'", '`') and pm in ("'", '`'):
                 if last_jump is not None:              # '' — back where you jumped from
                     _jump_to(last_jump)
             elif raw.isalpha() and raw.islower():
                 if raw in player.ow_marks:
-                    _jump_to(min(player.ow_marks[raw], last))
+                    mr, mc = player.ow_marks[raw]
+                    _jump_to(min(mr, last))
+                    if pm == '`':                      # ` — exact column; ' — first non-blank
+                        want_col = mc
+                    else:
+                        t = _label()
+                        want_col = len(t) - len(t.lstrip()) if t.strip() else 0
                 else:
                     player.error = f'E20: Mark not set: {raw}'
             _render()
@@ -6486,6 +6654,47 @@ def run_overworld(term: Terminal, player: Player, progress: dict,
                 else:
                     pat, base_fwd = player.last_search
                     _run_search(pat, base_fwd if raw == 'n' else not base_fwd)
+        elif raw == 'h':
+            if n <= 1 or _gate('count', 'counts'):
+                want_col = max(0, _eff() - n)
+        elif raw == 'l':
+            if n <= 1 or _gate('count', 'counts'):
+                want_col = min(max(0, len(_label()) - 1), _eff() + n)
+        elif raw == '0' and not n_given:
+            want_col = 0
+        elif raw == '^':
+            t = _label()
+            want_col = len(t) - len(t.lstrip()) if t.strip() else 0
+        elif raw == '$':
+            want_col = 10 ** 9                         # curswant: line-end, forever
+        elif raw in 'wbeWBE':
+            if _mgate(raw, raw):
+                fn = {'w': _owm_w, 'b': _owm_b, 'e': _owm_e,
+                      'W': _owm_w, 'B': _owm_b, 'E': _owm_e}[raw]
+                c = _eff()
+                for _ in range(n):
+                    c = fn(_label(), c, raw.isupper())
+                want_col = c
+        elif raw in 'fFtT':
+            if _mgate(raw, raw):
+                pending_find = raw
+        elif raw in (';', ','):
+            if _mgate(raw, raw) and ow_last_f:
+                pf, ch = ow_last_f
+                if raw == ',':
+                    pf = {'f': 'F', 'F': 'f', 't': 'T', 'T': 't'}[pf]
+                hit = _owm_find(_label(), _eff(), ch, pf in 'ft', pf in 'tT')
+                if hit is not None:
+                    want_col = hit
+        elif raw in ('*', '#'):
+            if _gate('*', '* (search word)'):
+                word = _owm_word_at(_label(), _eff())
+                if word is None:
+                    player.error = 'E348: No string under cursor'
+                else:                                  # Vim-true whole word
+                    _run_search('\\<' + word + '\\>', raw == '*')
+        elif raw == 'z':
+            pending_z = True
         elif raw in ("m'`") and raw:
             if _gate('mark', 'marks'):
                 pending_mark = raw
