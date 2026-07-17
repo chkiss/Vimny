@@ -62,7 +62,7 @@ LEVELS = [
     {'display': '12',   'slug': 'runic_archives',        'name': 'The Runic Archives',         'commands': '} {', 'teaches': ['{', '}']},
     {'display': '13',   'slug': 'sentence_corridor',     'name': 'The Sentence Corridor',      'commands': ') (', 'teaches': ['(', ')']},
     {'display': '13.1', 'slug': 'warden_surveyor',       'name': 'The Warden Surveyor',        'type': 'boss', 'after': 'sentence_corridor', 'teaches': []},
-    {'display': '14',   'slug': 'seekers_labyrinth',     'name': "The Seekers' Labyrinth",     'commands': '/ ? n N *', 'teaches': ['/', '*']},
+    {'display': '14',   'slug': 'seekers_labyrinth',     'name': "The Seekers' Labyrinth",     'commands': '/ ? n N * #', 'teaches': ['/', '*']},
     {'display': '14.1', 'slug': 'binders_reliquary',     'name': "The Binder's Reliquary",     'commands': ':h za :q', 'type': 'reliquary', 'after': 'seekers_labyrinth', 'teaches': ['help']},
     {'display': '15',   'slug': 'waypoint_sanctum',      'name': 'The Waypoint Sanctum',       'commands': "m ' `", 'teaches': ['mark']},
     {'display': '16',   'slug': 'archivists_library',    'name': "The Archivist's Library",    'commands': ':set wrap  :e!  :w {file}', 'teaches': ['setwrap', 'reload', 'writeas']},

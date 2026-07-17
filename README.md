@@ -83,7 +83,7 @@ The curriculum is defined in `content/levels.py` (canonical) and mirrored in `LE
 | 12 | The Runic Archives | `} {` | Playable |
 | 13 | The Sentence Corridor | `) (` | Playable |
 | 13.1 | The Warden Surveyor | (boss) | Playable |
-| 14 | The Seekers' Labyrinth | `/ ? n N *` | Playable |
+| 14 | The Seekers' Labyrinth | `/ ? n N * #` | Playable |
 | 14.1 | The Binder's Reliquary | `:h za :q` | Playable |
 | 15 | The Waypoint Sanctum | `` m ' ` `` | Playable |
 | 16 | The Archivist's Library | `:set wrap  :e!  :w {file}` | Playable |
@@ -182,6 +182,7 @@ The full command reference (also the hint-bar source) is `render/vim_commands.md
 | `n` | next match |
 | `N` | prev match |
 | `*` | search word |
+| `#` | search word back |
 | `m{a}` | set mark |
 | `` `{a} `` | to mark |
 | `'{a}` | to mark ↑ |

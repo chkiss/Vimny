@@ -154,6 +154,7 @@
 | n       |       | next match  |
 | N       |       | prev match  |
 | *       |       | search word |
+| #       |       | search word back |
 
 ## waypoint_sanctum — marks
 
