@@ -3144,8 +3144,14 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
         if level == 'grandmasters_sanctum' and dungeon.current_room == 0:
             for _m in _grandmasters_gallery_tick(room, player):
                 _push(_m)
+            # The descent needs the SEAL OPEN, not just the position: a
+            # jump (G on the collapsed gate row) can park the player past
+            # a barred seal — standing beyond stone is lawful, passing
+            # through it is not.
             if (player.row == room.exit_pos[0]
                     and player.col >= room.exit_pos[1]
+                    and room.cells[room.exit_pos[0]][room.exit_pos[1] - 1]
+                        != CellType.WALL
                     and len(dungeon.rooms) > 1):
                 dungeon.current_room = 1                 # through the gate
                 room = dungeon.room

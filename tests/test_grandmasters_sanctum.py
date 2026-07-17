@@ -27,7 +27,7 @@ import main
 from engine.world import CellType
 from generation.dungeon_gen import (
     build_dungeon_grandmasters_sanctum,
-    _GMS_ROWS0, _GMS_COLS0, _GMS_SPINE, _GMS_BAYS, _GMS_PARA, _GMS_GATE,
+    _GMS_ROWS0, _GMS_COLS0, _GMS_SPINE, _GMS_BAYS, _GMS_PARA, _GMS_GATE, _GMS_TEXT0,
     _GMS_BOLTS, _GMS_SEAL, _GMS_TRANSIT, _GMS_WATCH, _GMS_BUDGET,
     _GMS_A_ROWS, _GMS_A_COLS, _GMS_A_SPAWN, _GMS_A_BOSS, _GMS_A_EXIT,
 )
@@ -64,10 +64,10 @@ def _canon_keys(room):
             + _K('2jdit')
             + _K('2jci{') + _K(w['b_cure']) + [ESC]
             + _K('2jdap')
-            # G parks on the gate row's first non-blank — which is the
-            # Grandmaster himself, past the opened seal: one key walks you
-            # through the gate and into the arena.
-            + _K('G')
+            # The dap's linewise park leaves the cursor at the head of the
+            # collapsed gate row; $ rides the opened gate east past the
+            # transit cell — the natural stroke from the bottom of the hall.
+            + _K('$')
             + _K('17l') + _K('xxxxx')         # the arena: stand on him, five strikes
             + _K('x')                         # the key drops underfoot — x it into the register
             + _K('8l') + _K('p')              # to the door; the pasted key unlocks
@@ -209,6 +209,19 @@ def test_legion_bolt_needs_the_goblins_down(monkeypatch):
     assert gallery.cells[_GMS_GATE][_GMS_SEAL] == CellType.WALL
 
 
+@pytest.mark.parametrize("seed", SEEDS)
+def test_dit_park_lands_inside_the_braces(seed):
+    # The chained landing: dit parks at the tag's inner start, and 2j must
+    # carry that column INSIDE the brace pair — ci{ has no forward seek
+    # (Vim-faithful), so a park east of the } would leave the op dead.
+    room = _gallery(seed)
+    w = room._gms_words
+    park = _GMS_TEXT0 + len(w['t_l']) + 1 + 1 + len(w['t_name']) + 1
+    open_col = _GMS_TEXT0 + len(w['b_n']) + 1
+    close_col = open_col + 1 + len(w['b_rot'])
+    assert open_col < park < close_col
+
+
 # ── audits ────────────────────────────────────────────────────────────────────
 
 def test_dG_is_parried_at_the_gate(monkeypatch):
@@ -220,6 +233,16 @@ def test_dG_is_parried_at_the_gate(monkeypatch):
     for dc in _GMS_BOLTS[:6]:                 # the legion bolt MAY open (dG
         assert gallery.cells[gr][dc] == CellType.WALL   # does kill the goblins)
     assert gallery.cells[gr][_GMS_SEAL] == CellType.WALL          # seal shut
+
+
+def test_dap_G_cannot_skip_the_gallery(monkeypatch):
+    # The collapse cheese: dap the legion bay from a j-chain, then G — the
+    # pulled-up Grandmaster is a lawful G park, but the seal is still
+    # stone, so standing beyond it must NOT descend to the arena.
+    d, gallery, _arena = _rooms(0)
+    result = _drive(d, _K('14jdapG'), monkeypatch, finish=':wq\r')
+    assert not result['won']
+    assert d.current_room == 0
 
 
 @pytest.mark.parametrize("seed", SEEDS)

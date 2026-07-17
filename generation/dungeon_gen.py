@@ -4681,7 +4681,11 @@ def _gms_draw_words(rng) -> dict:
             'k_d': draw(3), 'k_e': draw(3), 'k_rt': draw(3), 'k_g': draw(3),
             's_a': draw(3), 's_rot': draw(4), 's_cure': draw(4), 's_b': draw(3),
             't_l': draw(3), 't_name': draw(3), 't_rt': draw(3), 't_m': draw(3),
-            'b_n': draw(3), 'b_rot': draw(3), 'b_cure': draw(3),
+            # b_rot is len 5 so the brace pair spans the column where the
+            # tag bay's dit parks the cursor (col 33) — ci{ has no forward
+            # seek (Vim-faithful), so the chained landing must fall INSIDE
+            # the braces, not east of them.
+            'b_n': draw(3), 'b_rot': draw(5), 'b_cure': draw(3),
             'b_keep': draw(3), 'b_o': draw(3),
             'p_rows': ((draw(3), draw(4)), (draw(4), draw(3))),
         }
@@ -4828,11 +4832,13 @@ def build_dungeon_grandmasters_sanctum(seed: int) -> Dungeon:
     arena.answer = ''
 
     # The driven canonical (see tests): the ops chain bay to bay straight
-    # down; G parks on the gate row's first non-blank — the Grandmaster
-    # himself, past the opened seal — and walks you through the gate.
+    # down; the dap's linewise park leaves the cursor at the head of the
+    # gate row, and $ rides the opened gate east past the transit cell —
+    # the natural stroke from the bottom of the hall (G also works, but
+    # the player is already on the last line).
     gallery.answer = (f"2j w w diw 2j ci\" {words['q_cure']} 2j da[ "
                       f"2j cis {words['s_cure']}. 2j dit 2j ci{{ {words['b_cure']} "
-                      f"2j dap G")
+                      f"2j dap $")
     arena.answer = '17l x x x x x x 8l p l'   # five strikes, the key, the door
 
     dungeon = Dungeon(name="The Grandmaster's Sanctum", seed=seed)
