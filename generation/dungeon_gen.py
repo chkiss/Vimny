@@ -5942,10 +5942,16 @@ def build_dungeon_waypoint_sanctum(seed: int) -> 'Dungeon':
         char_runs.append(CharRun(row=dr, col=dc, symbols=tuple(_WP_KEYWORD), kind='ember'))
     for (dr, dc) in (_WP_W2_POCKET1, _WP_W2_POCKET2, *_WP_W2_DECOYS):
         char_runs.append(CharRun(row=dr, col=dc, symbols=tuple(_WP_WORD2), kind='ember'))
-    # The waking stone sleeps under SCRIPTED fog (the Wet Ink pattern): a
-    # fogged word is unsearchable, so ?plugh from the spawn finds nothing —
-    # the level tick lifts it the moment the ? leg lands in pocket 1.
-    _plugh_fog = {(_WP_W2_POCKET1[0], _WP_W2_POCKET1[1] + i)
+    # BOTH sanctum plughs sleep under SCRIPTED fog (the Wet Ink pattern):
+    # a fogged word is unsearchable — by EVERY search uniformly, # included
+    # — so ?plugh from the spawn finds nothing (with only the stone fogged,
+    # the visible pocket-2 twin was a 15-key skip straight to the key —
+    # caught 2026-07-17). The level tick wakes the pair the moment the ?
+    # leg lands in pocket 1; # then reaches the freshly-lit twin. The
+    # forward DECOYS stay unfogged: they are the *-pricing, and a backward
+    # search from the spawn never sees them.
+    _plugh_fog = {(r, c + i)
+                  for (r, c) in (_WP_W2_POCKET1, _WP_W2_POCKET2)
                   for i in range(len(_WP_WORD2))}
 
     # Prose fill: vocab over the danger rooms (seed-varied, never containing the

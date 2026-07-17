@@ -237,12 +237,13 @@ def test_both_pockets_are_search_only(seed):
 
 @pytest.mark.parametrize('seed', SEEDS)
 def test_plugh_sleeps_until_the_pocket_is_entered(seed):
-    """The waking stone: pocket 1's plugh starts under scripted fog, so
-    ?plugh from the spawn finds ONLY unfogged matches — pocket 2's twin is
-    visible, but the fresh route to it needs the word under the cursor.
-    After the ? leg lands in pocket 1, # is the one-key fetch."""
+    """BOTH sanctum plughs start under scripted fog — fog blocks EVERY
+    search uniformly (# included), so ?plugh from the spawn finds nothing
+    at all: the fogged pair is skipped, and the unfogged decoys all lie
+    FORWARD, out of a backward search's reach. (With only the stone
+    fogged, the visible twin was a 15-key skip straight to the key.)"""
     room = _room(seed)
-    fogged = {(_WP_W2_POCKET1[0], _WP_W2_POCKET1[1] + i)
+    fogged = {(r, c + i) for (r, c) in (_WP_W2_POCKET1, _WP_W2_POCKET2)
               for i in range(len(_WP_WORD2))}
     assert fogged <= room.fog_cells
     assert fogged == room._wp_plugh_fog
@@ -250,6 +251,16 @@ def test_plugh_sleeps_until_the_pocket_is_entered(seed):
     # every plugh stands where designed, nowhere else
     assert _positions(room, _WP_WORD2) == sorted(
         [_WP_W2_POCKET1, _WP_W2_POCKET2] + _WP_W2_DECOYS)
+    # the spawn cheese, pinned dead: a backward plugh search skips the
+    # fogged pair and WRAPS (Vim-true) onto a forward decoy in the goblin
+    # room — never a pocket. Decoy-hopping can't reach the pair either.
+    p = Player(row=_WP_SPAWN[0], col=_WP_SPAWN[1])
+    hit = find_next(room, p, _WP_WORD2, False)
+    assert hit in _WP_W2_DECOYS
+    for _ in range(6):                             # walk the whole visible chain
+        p.row, p.col = hit
+        hit = find_next(room, p, _WP_WORD2, False)
+        assert hit in _WP_W2_DECOYS                # the pockets never surface
 
 
 @pytest.mark.parametrize('seed', SEEDS)
