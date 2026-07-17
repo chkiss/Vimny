@@ -54,7 +54,7 @@ def _canon_keys(room):
     return (_K('jdi"j.') + _K('2jci"') + _K(ca) + [ESC]
             + _K('jci"') + _K(cb) + [ESC]
             + _K("2jdi'j.") + _K('2jda"jda\'')
-            + _K('2j2f"di"') + _K('G$'))
+            + _K('2jwdi"') + _K('G$'))
 
 
 # The leanest old-only rival: every row pays its walk-in (f" / h / l) before
@@ -115,7 +115,7 @@ def test_par_answer_budget(seed):
     ca, cb = room._qe_words['cures']
     assert room.answer == (f'j di" j . 2j ci" {ca} j ci" {cb} '
                            f"2j di' j . 2j da\" j da' "
-                           f'2j 2f" di" G $')
+                           f'2j w di" G $')
 
 
 @pytest.mark.parametrize("seed", SEEDS)

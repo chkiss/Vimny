@@ -47,14 +47,15 @@ def _K(s):
 
 
 # The canonical tape (== room.answer with Esc placed): 5w to a mid-sentence
-# landing, then dis/das/cis dot-chained down the aligned columns; C5 razes
-# the first two sentences with das + dot and keeps the last.
+# landing, then dis/das/cis dot-chained down the aligned columns; C5 falls
+# entirely to TWO DOTS riding C4's das (the player-found golf) and keeps
+# the last sentence.
 def _canon_keys(room):
     ca, cb = room._se_words['cures']
     return (_K('j5wdisj.') + _K('2jdasj.')
             + _K('2jcis') + _K(ca + '.') + [ESC]
             + _K('jcis') + _K(cb + '.') + [ESC]
-            + _K('2jdas') + _K('2jdas.') + _K('G$'))
+            + _K('2jdas') + _K('2j..') + _K('G$'))
 
 
 # The leanest old-only rival: count-x from each sentence's exact start —
@@ -114,7 +115,7 @@ def test_par_answer_budget(seed):
     assert room.budget == math.ceil(_SE_PAR * 1.4)
     ca, cb = room._se_words['cures']
     assert room.answer == (f'j 5w dis j . 2j das j . 2j cis {ca}. j cis {cb}. '
-                           f'2j das 2j das . G $')
+                           f'2j das 2j . . G $')
 
 
 @pytest.mark.parametrize("seed", SEEDS)

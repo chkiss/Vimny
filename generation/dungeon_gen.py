@@ -4012,14 +4012,15 @@ def build_dungeon_brace_square_enclosure(seed: int) -> Dungeon:
 #                   SINGLE gap 'w1 w2' — where da( left the double-gap scar.
 #   C5 (row 15)     THE SEEK'S LIMIT: 'w1 "" "jjj" w2' — the forward seek
 #                   takes the FIRST pair, which is already empty (di" from
-#                   the spine is a no-op), so the player must aim: 2f" onto
-#                   the second pair's opening mark, then di".
+#                   the landing is a no-op), so the player must aim: one w
+#                   hops the empty pair onto the second's opening mark
+#                   (player-found golf 2026-07-20; 2f" pays a key more).
 #
-# Forcing audit (why par 47 needs the objects): the objects fire from the
-# spine while every old tool must first walk in (f"/w cost 2-3 keys before a
+# Forcing audit (why par 45 needs the objects): the objects fire from the
+# spine while every old tool must first walk in (f"/w cost 1-3 keys before a
 # {n}x or dt" even starts); % does not speak quotes; D/cc raze the kept
-# words. C5's f-navigation route ties the object route (6 = 6) — a tie,
-# never a win.
+# words. C5's w l 3x route ties the object route (4 = 4) — a tie, never a
+# win.
 _QE_ROWS, _QE_COLS = 19, 44
 _QE_SPINE   = 20                     # every row's first standable
 _QE_BAY_W   = 21                     # bay floor cols 21..42; east wall 43
@@ -4042,7 +4043,7 @@ _QE_EXIT    = (17, 26)               # the FINAL SEAL, east of every bolt
 _QE_SHAPE = ((3, 3, '"'), (4, 4, '"'), (6, 5, '"'), (7, 4, '"'),
              (9, 4, "'"), (10, 3, "'"), (12, 5, '"'), (13, 4, "'"),
              (15, 3, '"'))
-_QE_PAR = 47            # hand-tallied along the driven tape (spine strikes)
+_QE_PAR = 45            # hand-tallied along the driven tape (spine strikes)
 
 
 def _qe_draw_words(rng) -> dict:
@@ -4135,7 +4136,7 @@ def build_dungeon_quote_enclosure(seed: int) -> Dungeon:
     room.budget = math.ceil(_QE_PAR * 1.4)  # STANDARD: the walk-in route wins at 1★
     room.answer = (f'j di" j . 2j ci" {ca} j ci" {cb} '
                    f"2j di' j . 2j da\" j da' "
-                   f'2j 2f" di" G $')
+                   f'2j w di" G $')
 
     dungeon = Dungeon(name='The Quote Enclosure', seed=seed)
     dungeon.rooms        = [room]
@@ -4355,7 +4356,9 @@ _SE_THROAT  = 15
 _SE_GATE    = 16
 _SE_BOLTS   = {'c1': 23, 'c2': 24, 'c3': 25, 'c4': 26, 'c5': 27}
 _SE_EXIT    = (16, 28)               # the FINAL SEAL, east of every bolt
-_SE_PAR = 45            # hand-tallied along the driven tape (mid landings)
+_SE_PAR = 43            # hand-tallied along the driven tape (mid landings;
+                        # C5 falls to TWO DOTS riding C4's das — player-found
+                        # golf 2026-07-20: re-striking das there paid 2 over)
 
 
 def _se_draw_words(rng) -> dict:
@@ -4469,7 +4472,7 @@ def build_dungeon_sentence_enclosure(seed: int) -> Dungeon:
     room.par    = _SE_PAR
     room.budget = math.ceil(_SE_PAR * 1.4)  # STANDARD: the edge-hunting route wins at 1★
     room.answer = (f'j 5w dis j . 2j das j . 2j cis {ca}. j cis {cb}. '
-                   f'2j das 2j das . G $')
+                   f'2j das 2j . . G $')
 
     dungeon = Dungeon(name='The Sentence Enclosure', seed=seed)
     dungeon.rooms        = [room]
