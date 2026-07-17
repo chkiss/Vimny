@@ -80,11 +80,16 @@ def test_bw_structure(seed):
                  and ru.col == _BW_STAND[1])
     assert ''.join(stand.symbols) == w
     for i, r in enumerate(_BW_BAYS):
+        # the buried word is INTACT (so g* finds it); the corruption is the
+        # last letter of pre, one cell before it.
         run = next(ru for ru in room.char_runs
-                   if ru.row == r and '◆' in ru.symbols)
+                   if ru.row == r and ru.kind == 'ember')
         text = ''.join(run.symbols)
         pre, post, _f = room._bw_words['bays'][i]
-        assert text == pre + '◆' + w + post   # buried, fused at the seam
+        pre_c = room._bw_words['pre_corrupts'][i]
+        assert text == pre_c + w + post        # buried word intact, pre corrupt
+        assert pre_c != pre and pre_c[:-1] == pre[:-1]   # only pre's last letter
+        assert w in text                        # g* will find it
     # the buried word never stands alone below the ledge (whole-word *
     # would find nothing)
     for r in _BW_BAYS:
@@ -94,17 +99,38 @@ def test_bw_structure(seed):
 
 
 @pytest.mark.parametrize("seed", SEEDS)
+def test_bw_plaque_shows_the_true_run(seed):
+    room = cached_room('build_dungeon_buried_word', seed)
+    w = room._bw_words['word']
+    for i, r in enumerate(_BW_BAYS):
+        pre, post, _f = room._bw_words['bays'][i]
+        plq = next(ru for ru in room.char_runs
+                   if ru.row == r and ru.col == 2)     # _BW_PLQ_COL
+        assert ''.join(plq.symbols) == pre + w + post  # matches the door target
+        target, _ = room._wla_doors[i]
+        assert target == pre + w + post
+
+
+def _bw_canon(room):
+    f = room._bw_words['fixes']
+    return f'g*hr{f[0]}lnhr{f[1]}lnhr{f[2]}G$'
+
+
+@pytest.mark.parametrize("seed", SEEDS)
 def test_bw_canonical_wins_at_par(seed, monkeypatch):
     d = build_dungeon_buried_word(seed)
-    won, spent = _spent(d, 'buried_word', _K('g*hxnhxnhxG$'), monkeypatch)
+    won, spent = _spent(d, 'buried_word', _K(_bw_canon(d.rooms[0])), monkeypatch)
     assert won and spent == _BW_PAR
 
 
 @pytest.mark.parametrize("seed", SEEDS)
 def test_bw_typed_search_rival_wins_at_one_star(seed, monkeypatch):
     d = build_dungeon_buried_word(seed)
+    f = d.rooms[0]._bw_words['fixes']
     w = d.rooms[0]._bw_words['word']
-    keys = _K('/' + w + '\rhxnhxnhxG$')
+    # /word finds the same buried copies (literal), but the typed search
+    # costs word-length+1 up front where g* is two flat — the same r mends.
+    keys = _K(f'/{w}\rhr{f[0]}lnhr{f[1]}lnhr{f[2]}G$')
     won, spent = _spent(d, 'buried_word', keys, monkeypatch)
     assert won and _BW_PAR < spent <= d.rooms[0].budget
 

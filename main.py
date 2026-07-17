@@ -3212,8 +3212,8 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
             for _m in _inscription_halls_tick(room, player):
                 _push(_m)
         if level in ('whole_line_annex', 'change_extension', 'overwrite_halls',
-                     'case_chambers', 'joiners_gate'):
-            for _m in _whole_line_annex_tick(room, player):
+                     'case_chambers', 'joiners_gate', 'g_sanctum', 'buried_word'):
+            for _m in _whole_line_annex_tick(room, player):   # substring doors
                 _push(_m)
         if level == 'alignment_halls':
             for _m in _alignment_halls_tick(room, player):
@@ -3224,8 +3224,7 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
         if level in ('sight_sanctum', 'selection_halls', 'word_enclosure',
                      'bracket_enclosure', 'brace_square_enclosure',
                      'quote_enclosure', 'tag_enclosure', 'sentence_enclosure',
-                     'hall_of_echoes', 'stair_rail', 'g_sanctum',
-                     'buried_word', 'wet_ink'):
+                     'hall_of_echoes', 'stair_rail', 'wet_ink'):
             for _m in _sight_sanctum_tick(room, player):   # the shared exact-text tick
                 _push(_m)
         if level == 'paragraph_enclosure':

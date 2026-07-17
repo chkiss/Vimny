@@ -5110,7 +5110,7 @@ def build_dungeon_stair_rail(seed: int) -> Dungeon:
     return dungeon
 
 
-# ── The G-Sanctum (42: the g-family — g_ forced; g* g# gi gp gP granted) ─────
+# ── The G-Sanctum (41: the g-family — g_ forced; g* g# gi gp gP granted) ─────
 #
 # Three long verse rows, each running east into WATER: $ overshoots the
 # text onto the flood (the $-drown trap, the Inscription Halls' law) while
@@ -5118,10 +5118,17 @@ def build_dungeon_stair_rail(seed: int) -> Dungeon:
 # scan sails past it. The rows are 10–12 words long, so a counted
 # word-end walk pays two digits ({n}e = 3 keys) where g_ pays 2, and the
 # rows are UNEQUAL so no count is reusable blind. + (taught one level
-# back) chains row to row; the x/dot mends the ◆. The rest of the family
-# (g* g# gi gp gP) rides the same g_family token as taught conveniences —
-# their honest par-forcing collapses to ties (see the build log), and the
-# wing's charter is granting budget-safe conveniences late.
+# back) chains row to row.
+#
+# The last GLYPH is a CORRUPTION: the tail word's final letter is wrong.
+# g_ lands on it and r{letter} mends it — the west plaque shows the tail's
+# TRUE spelling (a single short word, so the plaque genuinely matches the
+# one word you repair; the rest of the verse is navigation filler). The
+# door reads that tail word as a substring, so the plaque and the goal are
+# the same thing. (Redesigned 2026-07-17 from the old whole-verse exact
+# door, whose one-word plaque could never match the long line.) The rest
+# of the family (g* g# gi gp gP) rides the same g_family token as taught
+# conveniences — their honest par-forcing collapses to ties (see the log).
 _GS_ROWS, _GS_COLS = 8, 78
 _GS_SPINE  = 22
 _GS_PLQ_COL = 2
@@ -5133,21 +5140,38 @@ _GS_THROAT = 5
 _GS_GATE   = 6
 _GS_BOLTS  = {2: 68, 3: 69, 4: 70}
 _GS_EXIT   = (6, 71)                  # the FINAL SEAL, east of every bolt
-_GS_PAR    = 14                       # j g_ x + g_ . + g_ . G $
+_GS_PAR    = 17                       # j g_ r{f} + g_ r{f} + g_ r{f} G $
 
 
 def _gs_draw_words(rng) -> dict:
-    """Three verses of len-3 words; the three TAIL words distinct (their
-    mended rows are the door targets)."""
+    """Three verses of len-3 words. Each TAIL word's last letter is corrupted
+    to a wrong letter (g_ lands there, r{fix} mends it); the true tails are
+    globally unique so the door's substring read is unambiguous."""
     _load_vocab_tables()
     pool = [w for w in _VOCAB_PLAIN_BY_LEN.get(3, ())
             if w.isalpha() and w == w.lower()]
-    for _ in range(80):
+    poolset = set(pool)
+    alph = 'abcdefghijklmnopqrstuvwxyz'
+    for _ in range(200):
         rows = [tuple(rng.choice(pool) for _ in range(n)) for n in _GS_NWORDS]
         tails = [r[-1] for r in rows]
-        if len(set(tails)) == 3:
-            return {'rows': rows, 'tails': tails}
-    raise ValueError('g_sanctum: no distinct draw after 80 tries')
+        allwords = [w for r in rows for w in r]
+        if len(set(tails)) != 3:
+            continue
+        if any(allwords.count(t) != 1 for t in tails):        # tails unique in the buffer
+            continue
+        corrupts, fixes, ok = [], [], True
+        for t in tails:
+            wrong = rng.choice([c for c in alph if c != t[-1]])
+            corr = t[:-1] + wrong
+            if corr in poolset or corr in allwords:           # corruption ≠ any real word
+                ok = False
+                break
+            corrupts.append(corr)
+            fixes.append(t[-1])                                # the letter r must type
+        if ok:
+            return {'rows': rows, 'tails': tails, 'corrupts': corrupts, 'fixes': fixes}
+    raise ValueError('g_sanctum: no clean draw after 200 tries')
 
 
 def build_dungeon_g_sanctum(seed: int) -> Dungeon:
@@ -5180,15 +5204,18 @@ def build_dungeon_g_sanctum(seed: int) -> Dungeon:
         verse = words['rows'][i]
         col = _GS_TEXT0
         for k, part in enumerate(verse):
-            text = part + ('◆' if k == len(verse) - 1 else '')
+            # the last word wears its CORRUPT spelling (last letter wrong);
+            # g_ lands on that letter and r{fix} mends it.
+            text = words['corrupts'][i] if k == len(verse) - 1 else part
             room.char_runs.append(CharRun(r, col, tuple(text), 'ancient'))
             col += len(part) + 1
-        # West plaque: the maker's mark — the TAIL word as it must read
-        # (full targets run ~45 chars, past any plaque's width).
+        # West plaque: the tail word's TRUE spelling — a single short word
+        # that genuinely matches the one word you repair.
         room.char_runs.append(CharRun(r, _GS_PLQ_COL, tuple(words['tails'][i]),
                                       'verdant'))
-        doors.append((( ' '.join(verse),), _GS_BOLTS[r]))
-    room._ss_doors = tuple(doors)                        # the shared exact-text tick
+        # substring door: opens when the true tail reads on the floor.
+        doors.append((words['tails'][i], (_GS_GATE, _GS_BOLTS[r])))
+    room._wla_doors = tuple(doors)                       # the substring tick
     room._gs_words = words
 
     room.entities.append(Entity(kind='exit', row=_GS_EXIT[0], col=_GS_EXIT[1],
@@ -5200,7 +5227,8 @@ def build_dungeon_g_sanctum(seed: int) -> Dungeon:
     apply_stone_fog(room)
     room.par    = _GS_PAR
     room.budget = math.ceil(_GS_PAR * 1.4)  # STANDARD: the counted-e walk wins at 1★
-    room.answer = 'j g_ x + g_ . + g_ . G $'
+    f = words['fixes']
+    room.answer = f'j g_ r{f[0]} + g_ r{f[1]} + g_ r{f[2]} G $'
 
     dungeon = Dungeon(name='The G-Sanctum', seed=seed)
     dungeon.rooms        = [room]
@@ -5208,15 +5236,18 @@ def build_dungeon_g_sanctum(seed: int) -> Dungeon:
     return dungeon
 
 
-# ── The Buried Word (43, bonus: g* and the n-chain) ──────────────────────────
+# ── The Buried Word (42, bonus: g* and the n-chain) ──────────────────────────
 #
 # One standing word — the player spawns ON it — and three echoes of it
-# BURIED inside longer runs down the hall ({pre}◆{word}{post}), each with
-# a fused ◆ at the seam. * (whole-word) finds nothing: no echo stands
-# alone. g* takes the word literally and walks the chain; n carries on.
-# The mend is h x at each landing (the match begins one past the ◆).
-# Bonus-wing framing: the /typed-search rival costs a few keys more (the
-# word is four letters), and that margin is the whole game — no S1 here.
+# BURIED inside longer runs down the hall ({pre}{word}{post}). * (whole-
+# word) finds nothing: no echo stands alone. g* takes the word literally
+# and walks the chain; n carries on. At each landing the letter just BEFORE
+# the buried word is corrupt (pre's last letter is wrong) — h steps onto it
+# and r{fix} mends it; the west plaque shows the run's TRUE spelling (which
+# the substring door reads, so the plaque and the goal are the same). The
+# /typed-search rival costs a few keys more — that margin is the whole game.
+# (Redesigned 2026-07-17 from the ◆-seam / whole-row door, whose plaque
+# dropped the filler and never matched the line.)
 _BW_ROWS, _BW_COLS = 8, 54
 _BW_SPINE   = 22
 _BW_PLQ_COL = 2
@@ -5227,18 +5258,23 @@ _BW_THROAT  = 5
 _BW_GATE    = 6
 _BW_BOLTS   = {2: 23, 3: 24, 4: 25}
 _BW_EXIT    = (6, 26)                 # the FINAL SEAL, east of every bolt
-_BW_PAR     = 12                      # g* h x n h x n h x G $
+_BW_PAR     = 17                      # g* h r{f} l n h r{f} l n h r{f} G $
 
 
 def _bw_draw_words(rng) -> dict:
-    """The buried word (len 4) + per-bay pre/post/filler (len 3, distinct)."""
+    """The buried word (len 4) + per-bay pre/post/filler (len 3, distinct).
+    Each bay's PRE has its last letter corrupted (the cell just before the
+    buried word) — g* lands on the word, h steps onto the corruption, r
+    mends it."""
     _load_vocab_tables()
 
     def pool(length):
         return [w for w in _VOCAB_PLAIN_BY_LEN.get(length, ())
                 if w.isalpha() and w == w.lower()]
 
-    for _ in range(80):
+    alph = 'abcdefghijklmnopqrstuvwxyz'
+    poolset3 = set(pool(3))
+    for _ in range(200):
         picks: list = []
 
         def draw(length):
@@ -5248,9 +5284,22 @@ def _bw_draw_words(rng) -> dict:
 
         d = {'word': draw(4),
              'bays': tuple((draw(3), draw(3), draw(3)) for _ in range(3))}
-        if len(set(picks)) == len(picks):
+        if len(set(picks)) != len(picks):
+            continue
+        corrupts, fixes, ok = [], [], True
+        for pre, _post, _filler in d['bays']:
+            wrong = rng.choice([c for c in alph if c != pre[-1]])
+            corr = pre[:-1] + wrong
+            if corr in poolset3 or corr in picks:      # corruption ≠ a real word
+                ok = False
+                break
+            corrupts.append(corr)
+            fixes.append(pre[-1])
+        if ok:
+            d['pre_corrupts'] = corrupts               # pre with the wrong last letter
+            d['fixes'] = fixes                          # the letter r must type
             return d
-    raise ValueError('buried_word: no distinct draw after 80 tries')
+    raise ValueError('buried_word: no clean draw after 200 tries')
 
 
 def build_dungeon_buried_word(seed: int) -> Dungeon:
@@ -5283,17 +5332,18 @@ def build_dungeon_buried_word(seed: int) -> Dungeon:
     doors = []
     for i, r in enumerate(_BW_BAYS):
         pre, post, filler = words['bays'][i]
-        # `{filler} {pre}◆{word}{post}` — the echo buried mid-run, the
-        # fused seam one cell before the match.
+        pre_c = words['pre_corrupts'][i]
+        # `{filler} {pre_corrupt}{word}{post}` — the echo buried mid-run, the
+        # corrupt letter one cell before the (intact) buried word.
         room.char_runs.append(CharRun(r, _BW_TEXT0, tuple(filler), 'ancient'))
         run_col = _BW_TEXT0 + len(filler) + 1
         room.char_runs.append(CharRun(r, run_col,
-                                      tuple(pre + '◆' + w + post), 'ember'))
-        target = f'{filler} {pre}{w}{post}'
+                                      tuple(pre_c + w + post), 'ember'))
+        # west plaque: the run's TRUE spelling — what the substring door reads.
         room.char_runs.append(CharRun(r, _BW_PLQ_COL,
                                       tuple(pre + w + post), 'verdant'))
-        doors.append(((target,), _BW_BOLTS[r]))
-    room._ss_doors = tuple(doors)                        # the shared exact-text tick
+        doors.append((f'{pre}{w}{post}', (_BW_GATE, _BW_BOLTS[r])))
+    room._wla_doors = tuple(doors)                       # the substring tick
     room._bw_words = words
 
     room.entities.append(Entity(kind='exit', row=_BW_EXIT[0], col=_BW_EXIT[1],
@@ -5305,7 +5355,11 @@ def build_dungeon_buried_word(seed: int) -> Dungeon:
     apply_stone_fog(room)
     room.par    = _BW_PAR
     room.budget = math.ceil(_BW_PAR * 1.4)
-    room.answer = 'g* h x n h x n h x G $'
+    # r mends in place (no shift), so l steps back onto the word before n —
+    # else n re-finds THIS row's word (which now sits one cell ahead of the
+    # cursor). The old ◆-x route shifted the word onto the cursor for free.
+    f = words['fixes']
+    room.answer = f'g* h r{f[0]} l n h r{f[1]} l n h r{f[2]} G $'
 
     dungeon = Dungeon(name='The Buried Word', seed=seed)
     dungeon.rooms        = [room]

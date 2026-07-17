@@ -30,7 +30,7 @@ from engine.world import CellType
 from generation.dungeon_gen import (
     build_dungeon_g_sanctum,
     _GS_ROWS, _GS_COLS, _GS_SPINE, _GS_BAYS, _GS_NWORDS, _GS_POOL,
-    _GS_GATE, _GS_BOLTS, _GS_EXIT, _GS_PAR,
+    _GS_GATE, _GS_BOLTS, _GS_EXIT, _GS_PAR, _GS_PLQ_COL,
 )
 from tests import SEEDS, cached_room
 
@@ -43,15 +43,22 @@ def _K(s):
     return [Keystroke(ch) for ch in s]
 
 
-# The canonical tape (== room.answer): g_ from the spine lands the fused ◆
-# at each verse's end; x (then the dot) mends it; + chains the bays.
-CANON = 'jg_x+g_.+g_.G$'
+# The canonical tape (== room.answer): g_ from the spine lands the last
+# glyph — the tail word's CORRUPT final letter — and r{fix} mends it;
+# + chains the bays. (Per seed: the fix letters are the true spellings.)
+def _canon(room):
+    f = room._gs_words['fixes']
+    return f'jg_r{f[0]}+g_r{f[1]}+g_r{f[2]}G$'
 
-# The counted-e rival: every verse is 10+ words, so the walk to the end
-# pays two count digits per row where g_ pays two keys flat — and the ◆ is
-# its own punctuation word-end, so the count is words+1; the rows are
-# unequal, so no count transfers blind. Wins, at 1★ (17 ≤ 20 > 14).
-RIVAL = 'j11ex+13e.+12e.G$'
+
+# The counted-e rival: every verse is 10+ words, so the walk to the last
+# word's end pays two count digits per row where g_ pays two keys flat; the
+# rows are unequal, so no count transfers blind. Same r{fix} mend. Wins, at
+# 1★ ({n}e is one key dearer than g_ on each of three rows: par+3).
+def _rival(room):
+    f = room._gs_words['fixes']
+    n = _GS_NWORDS
+    return f'j{n[0]}er{f[0]}+{n[1]}er{f[1]}+{n[2]}er{f[2]}G$'
 
 
 def _drive(dungeon, keys, monkeypatch, finish=':wq\r', name='Scribe'):
@@ -98,20 +105,37 @@ def test_par_answer_budget(seed):
     room = _room(seed)
     assert room.par == _GS_PAR
     assert room.budget == math.ceil(_GS_PAR * 1.4)
-    assert room.answer == 'j g_ x + g_ . + g_ . G $'
+    f = room._gs_words['fixes']
+    assert room.answer == f'j g_ r{f[0]} + g_ r{f[1]} + g_ r{f[2]} G $'
 
 
 @pytest.mark.parametrize("seed", SEEDS)
-def test_verses_end_in_a_fused_glyph_before_the_flood(seed):
+def test_verses_end_in_a_corrupt_tail_before_the_flood(seed):
     room = _room(seed)
+    w = room._gs_words
     for i, r in enumerate(_GS_BAYS):
         runs = sorted((ru for ru in room.char_runs
                        if ru.row == r and _GS_SPINE < ru.col < _GS_POOL[0]),
                       key=lambda ru: ru.col)
         assert len(runs) == _GS_NWORDS[i]
-        assert runs[-1].symbols[-1] == '◆'
+        tail = ''.join(runs[-1].symbols)
+        assert tail == w['corrupts'][i]                 # the corrupt spelling laid
+        assert tail != w['tails'][i]                    # ≠ the true word (plaque)
+        assert tail[:-1] == w['tails'][i][:-1]          # only the last letter is wrong
         for c in _GS_POOL:                    # the drowning pool past the verse
             assert room.cells[r][c] == CellType.WATER
+
+
+@pytest.mark.parametrize("seed", SEEDS)
+def test_plaque_shows_the_true_tail(seed):
+    room = _room(seed)
+    w = room._gs_words
+    for i, r in enumerate(_GS_BAYS):
+        plq = next(ru for ru in room.char_runs
+                   if ru.row == r and ru.col == _GS_PLQ_COL)
+        assert ''.join(plq.symbols) == w['tails'][i]    # the plaque IS the repair goal
+        assert w['tails'][i] not in ''.join(
+            main._wla_floor_text(room, r))               # not yet true on the floor
 
 
 @pytest.mark.parametrize("seed", SEEDS)
@@ -132,14 +156,14 @@ def test_exit_and_bolts_start_sealed(seed):
 
 @pytest.mark.parametrize("seed", SEEDS)
 def test_canonical_g_run_wins_at_par(seed, monkeypatch):
-    won, spent = _drive_spent(_K(CANON), monkeypatch, seed)
+    won, spent = _drive_spent(_K(_canon(_room(seed))), monkeypatch, seed)
     assert won and spent == _GS_PAR
 
 
 @pytest.mark.parametrize("seed", SEEDS)
 def test_counted_e_rival_wins_at_one_star(seed, monkeypatch):
     room = _room(seed)
-    won, spent = _drive_spent(_K(RIVAL), monkeypatch, seed)
+    won, spent = _drive_spent(_K(_rival(room)), monkeypatch, seed)
     assert won and _GS_PAR < spent <= room.budget
 
 
@@ -166,7 +190,7 @@ def test_g_underscore_lands_the_last_glyph(monkeypatch):
     assert r == _GS_BAYS[0]
     run = max((ru for ru in room.char_runs
                if ru.row == r and ru.kind == 'ancient'), key=lambda ru: ru.col)
-    assert c == run.col + len(run.symbols) - 1      # the ◆, not the brink
+    assert c == run.col + len(run.symbols) - 1      # the corrupt letter, not the brink
 
 
 def test_undo_rebars_an_open_bolt(monkeypatch):
