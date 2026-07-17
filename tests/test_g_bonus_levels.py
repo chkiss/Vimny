@@ -80,16 +80,19 @@ def test_bw_structure(seed):
                  and ru.col == _BW_STAND[1])
     assert ''.join(stand.symbols) == w
     for i, r in enumerate(_BW_BAYS):
-        # the buried word is INTACT (so g* finds it); the corruption is the
-        # last letter of pre, one cell before it.
+        # a REAL word buries the target; ONE letter (the cell before it) is
+        # corrupt, but the target itself is intact so g* finds it.
         run = next(ru for ru in room.char_runs
                    if ru.row == r and ru.kind == 'ember')
         text = ''.join(run.symbols)
-        pre, post, _f = room._bw_words['bays'][i]
-        pre_c = room._bw_words['pre_corrupts'][i]
-        assert text == pre_c + w + post        # buried word intact, pre corrupt
-        assert pre_c != pre and pre_c[:-1] == pre[:-1]   # only pre's last letter
-        assert w in text                        # g* will find it
+        host = room._bw_words['hosts'][i]
+        corr = room._bw_words['corrupts'][i]
+        assert text == corr and corr != host        # the corrupt spelling laid
+        assert len(corr) == len(host)               # one substituted letter
+        assert sum(a != b for a, b in zip(corr, host)) == 1
+        assert text.count(w) == 1 and w in text     # g* will find it (once)
+        idx = host.index(w)
+        assert corr[idx:] == host[idx:] and corr[idx - 1] != host[idx - 1]  # before it
     # the buried word never stands alone below the ledge (whole-word *
     # would find nothing)
     for r in _BW_BAYS:
@@ -99,16 +102,26 @@ def test_bw_structure(seed):
 
 
 @pytest.mark.parametrize("seed", SEEDS)
-def test_bw_plaque_shows_the_true_run(seed):
+def test_bw_hosts_are_real_words(seed):
+    import generation.dungeon_gen as dg
+    dg._load_vocab_tables()
+    real = set(x for L in range(4, 8)
+               for x in dg._VOCAB_PLAIN_BY_LEN.get(L, ()))
     room = cached_room('build_dungeon_buried_word', seed)
-    w = room._bw_words['word']
+    for host in room._bw_words['hosts']:
+        assert host in real                          # actual words, not nonsense
+
+
+@pytest.mark.parametrize("seed", SEEDS)
+def test_bw_plaque_shows_the_true_host(seed):
+    room = cached_room('build_dungeon_buried_word', seed)
     for i, r in enumerate(_BW_BAYS):
-        pre, post, _f = room._bw_words['bays'][i]
+        host = room._bw_words['hosts'][i]
         plq = next(ru for ru in room.char_runs
                    if ru.row == r and ru.col == 2)     # _BW_PLQ_COL
-        assert ''.join(plq.symbols) == pre + w + post  # matches the door target
+        assert ''.join(plq.symbols) == host           # matches the door target
         target, _ = room._wla_doors[i]
-        assert target == pre + w + post
+        assert target == host
 
 
 def _bw_canon(room):

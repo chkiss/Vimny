@@ -5238,16 +5238,17 @@ def build_dungeon_g_sanctum(seed: int) -> Dungeon:
 
 # ── The Buried Word (42, bonus: g* and the n-chain) ──────────────────────────
 #
-# One standing word — the player spawns ON it — and three echoes of it
-# BURIED inside longer runs down the hall ({pre}{word}{post}). * (whole-
-# word) finds nothing: no echo stands alone. g* takes the word literally
-# and walks the chain; n carries on. At each landing the letter just BEFORE
-# the buried word is corrupt (pre's last letter is wrong) — h steps onto it
-# and r{fix} mends it; the west plaque shows the run's TRUE spelling (which
-# the substring door reads, so the plaque and the goal are the same). The
+# One standing word — the player spawns ON it (e.g. `set`) — and three
+# echoes of it BURIED inside REAL longer words down the hall (`reset`,
+# `onset`, `upset`). * (whole-word) finds nothing: the word never stands
+# alone below the ledge. g* takes it literally and walks the chain; n
+# carries on. Each real word has ONE corrupt letter — the cell just before
+# the buried word — so g* still finds it; h steps onto the corruption and
+# r{fix} mends it. The west plaque shows the word's TRUE spelling (which the
+# substring door reads, so the plaque and the goal are the same). The
 # /typed-search rival costs a few keys more — that margin is the whole game.
-# (Redesigned 2026-07-17 from the ◆-seam / whole-row door, whose plaque
-# dropped the filler and never matched the line.)
+# (Redesigned 2026-07-17: real words that CONTAIN the target — the true g*
+# use case — in place of the old nonsense {pre}{word}{post} concatenations.)
 _BW_ROWS, _BW_COLS = 8, 54
 _BW_SPINE   = 22
 _BW_PLQ_COL = 2
@@ -5262,44 +5263,42 @@ _BW_PAR     = 17                      # g* h r{f} l n h r{f} l n h r{f} G $
 
 
 def _bw_draw_words(rng) -> dict:
-    """The buried word (len 4) + per-bay pre/post/filler (len 3, distinct).
-    Each bay's PRE has its last letter corrupted (the cell just before the
-    buried word) — g* lands on the word, h steps onto the corruption, r
-    mends it."""
+    """A short target word (len 3) and three REAL longer words that contain
+    it (buried, with a non-empty prefix). Each host word gets ONE corrupt
+    letter — the cell just before the buried word — so g* still finds the
+    target; h steps onto the corruption, r{fix} mends it."""
     _load_vocab_tables()
 
     def pool(length):
         return [w for w in _VOCAB_PLAIN_BY_LEN.get(length, ())
                 if w.isalpha() and w == w.lower()]
 
+    allwords = set(w for L in range(4, 8) for w in pool(L))
+    hosts_by_len = [w for L in range(4, 8) for w in pool(L)]
+    targets = [w for w in pool(3)]
     alph = 'abcdefghijklmnopqrstuvwxyz'
-    poolset3 = set(pool(3))
-    for _ in range(200):
-        picks: list = []
-
-        def draw(length):
-            w = rng.choice(pool(length))
-            picks.append(w)
-            return w
-
-        d = {'word': draw(4),
-             'bays': tuple((draw(3), draw(3), draw(3)) for _ in range(3))}
-        if len(set(picks)) != len(picks):
+    for _ in range(400):
+        t = rng.choice(targets)
+        # real words that BURY the target once, past position 0 (a prefix to corrupt)
+        hosts = [w for w in hosts_by_len
+                 if w != t and w.count(t) == 1 and w.index(t) >= 1]
+        if len(hosts) < 3:
             continue
+        picks = rng.sample(hosts, 3)
         corrupts, fixes, ok = [], [], True
-        for pre, _post, _filler in d['bays']:
-            wrong = rng.choice([c for c in alph if c != pre[-1]])
-            corr = pre[:-1] + wrong
-            if corr in poolset3 or corr in picks:      # corruption ≠ a real word
-                ok = False
-                break
+        for word in picks:
+            idx = word.index(t)                        # corrupt the cell before it
+            correct = word[idx - 1]
+            wrong = rng.choice([c for c in alph if c != correct])
+            corr = word[:idx - 1] + wrong + word[idx:]
+            if corr in allwords or corr.count(t) != 1:
+                ok = False                             # corruption ≠ real word;
+                break                                  # target still buried once
             corrupts.append(corr)
-            fixes.append(pre[-1])
+            fixes.append(correct)
         if ok:
-            d['pre_corrupts'] = corrupts               # pre with the wrong last letter
-            d['fixes'] = fixes                          # the letter r must type
-            return d
-    raise ValueError('buried_word: no clean draw after 200 tries')
+            return {'word': t, 'hosts': picks, 'corrupts': corrupts, 'fixes': fixes}
+    raise ValueError('buried_word: no clean draw after 400 tries')
 
 
 def build_dungeon_buried_word(seed: int) -> Dungeon:
@@ -5331,18 +5330,12 @@ def build_dungeon_buried_word(seed: int) -> Dungeon:
     room.char_runs.append(CharRun(*_BW_STAND, tuple(w), 'verdant'))
     doors = []
     for i, r in enumerate(_BW_BAYS):
-        pre, post, filler = words['bays'][i]
-        pre_c = words['pre_corrupts'][i]
-        # `{filler} {pre_corrupt}{word}{post}` — the echo buried mid-run, the
-        # corrupt letter one cell before the (intact) buried word.
-        room.char_runs.append(CharRun(r, _BW_TEXT0, tuple(filler), 'ancient'))
-        run_col = _BW_TEXT0 + len(filler) + 1
-        room.char_runs.append(CharRun(r, run_col,
-                                      tuple(pre_c + w + post), 'ember'))
-        # west plaque: the run's TRUE spelling — what the substring door reads.
-        room.char_runs.append(CharRun(r, _BW_PLQ_COL,
-                                      tuple(pre + w + post), 'verdant'))
-        doors.append((f'{pre}{w}{post}', (_BW_GATE, _BW_BOLTS[r])))
+        host = words['hosts'][i]                         # the true real word
+        corr = words['corrupts'][i]                      # …with one wrong letter
+        room.char_runs.append(CharRun(r, _BW_TEXT0, tuple(corr), 'ember'))
+        # west plaque: the host word's TRUE spelling — what the door reads.
+        room.char_runs.append(CharRun(r, _BW_PLQ_COL, tuple(host), 'verdant'))
+        doors.append((host, (_BW_GATE, _BW_BOLTS[r])))
     room._wla_doors = tuple(doors)                       # the substring tick
     room._bw_words = words
 
