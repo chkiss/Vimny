@@ -55,15 +55,16 @@
 
 ---
 
-> ✅ The Paragraph Enclosure SHIPPED 2026-07-25 as display 38 (the actual
-> build diverged from the old section: two ELEVEN-row goblin cantos so a
-> counted line-cut pays its second digit where dip/dap do not; the
-> Warden's Measure seal (exact final row count + no goblin standing)
-> prices which blank rows survive — over-deletion (d}, dG, :g/./d)
-> breaks the measure instead of being parried; the watch-gap's goblins
-> stand on a textless blank row (dap-forced, :g-immune), west-walled so
-> V}d can't tie par from the aisle; par 9 —
-> see `build_dungeon_paragraph_enclosure` + its tests).
+> ✅ The Paragraph Enclosure SHIPPED as display 38, then REDESIGNED after
+> playtest (the Warden's SIGIL replaced the row-count measure): two tall
+> UNEQUAL goblin cantos (11 vs 12 rows — counted cuts pay a second digit,
+> no dot pair spans both), and six brazier flames (▲ entities — rows stay
+> blank) on the three must-survive rows, which stack into ▲/▲▲/▲▲▲ when
+> exactly the right paragraphs fall. The seal opens on the assembled
+> sigil + no goblin standing; wrong cuts SUCCEED and visibly extinguish
+> flames (undo relights). The watch-gap's goblins stand on a textless
+> blank row (dap-forced, :g-immune), west-walled so V}d can't tie par;
+> par 9 — see `build_dungeon_paragraph_enclosure` + its tests.
 
 ---
 
