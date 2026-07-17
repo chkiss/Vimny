@@ -4480,6 +4480,119 @@ def build_dungeon_sentence_enclosure(seed: int) -> Dungeon:
     return dungeon
 
 
+# ── The Paragraph Enclosure (ip ap) ───────────────────────────────────────────
+#
+# Two cantos of the goblin legion stand in ranked verse — ELEVEN rows each,
+# tall enough that a counted line-cut (d10j / d11j) pays its second digit
+# where dip/dap do not. The gate keeps the Warden's Measure: it parts only
+# when no sentinel stands AND the dungeon has closed to exactly
+# _PE_FINAL_ROWS lines. That single global invariant prices every route:
+#   • the blank rest below the first canto must SURVIVE — dip spares it;
+#     d} / V}d / dap eat it, and the measure breaks;
+#   • the watch-gap below the second canto AND its echo row must FALL —
+#     dap's trailing block is the whole consecutive blank run (both rows);
+#     V}d grabs one blank short, d12j pays its digits;
+#   • over-deletion (dG, d}, :g/./d) is never parried — it just breaks the
+#     measure, and undo restores it. The watch-gap's goblins stand on a
+#     TEXTLESS row, so no :g pattern can ever reach them.
+# Blank rows must hold NO char runs anywhere (a wall-embedded glyph would
+# make the row non-blank and weld the cantos into one paragraph); the gate
+# row's floor plaque is what stops dap's blank-run extension at the gate.
+_PE_ROWS, _PE_COLS = 29, 30
+_PE_SPAWN  = (1, 1)
+_PE_P1     = (2, 12)        # first canto: 11 content rows
+_PE_B1     = 13             # the warden's rest — must survive (dip, not dap)
+_PE_P2     = (14, 24)       # second canto: 11 content rows
+_PE_GUARD  = 25             # the watch-gap: goblins on a textless (blank) row
+_PE_B2     = 26             # its echo — dap's trailing blank block is BOTH rows
+_PE_GATE   = 27
+_PE_EXIT   = (27, 27)       # the sealed exit cell itself (plain stone until open)
+_PE_TEXT0  = 3
+_PE_GOB_COLS   = (17, 27)   # canto sentinels stand east, clear of the west aisle
+_PE_GUARD_COLS = (8, 13, 18, 23)
+_PE_FINAL_ROWS = 5          # wall · spawn row · the rest · gate · wall
+_PE_PAR    = 9              # j dip j dap $ — best old-only (d11j j d11j $) pays 10
+
+
+def _pe_draw_words(rng) -> dict:
+    """Two short vocab words per canto row (the legion's verses)."""
+    _load_vocab_tables()
+
+    def pool(length):
+        return [w for w in _VOCAB_PLAIN_BY_LEN.get(length, ())
+                if w.isalpha() and w == w.lower()]
+
+    rows = {}
+    for lo, hi in (_PE_P1, _PE_P2):
+        for r in range(lo, hi + 1):
+            rows[r] = (rng.choice(pool(rng.choice((3, 4, 5)))),
+                       rng.choice(pool(rng.choice((3, 4, 5)))))
+    return rows
+
+
+def build_dungeon_paragraph_enclosure(seed: int) -> Dungeon:
+    """The Paragraph Enclosure (slug `paragraph_enclosure`): ip ap — the
+    blank-row-bounded block under your hand, from anywhere inside it."""
+    rng = random.Random(seed)
+    words = _pe_draw_words(rng)
+
+    R, C = _PE_ROWS, _PE_COLS
+    cells = [[CellType.WALL] * C for _ in range(R)]
+    for r in range(1, _PE_GATE):                         # the hall: full-width
+        for c in range(1, C - 2):
+            cells[r][c] = CellType.FLOOR
+    # The watch-gap's west end is walled: `}` from the west aisle refuses a
+    # walled column (it never skips ahead), so V}d from the second canto's
+    # top row cannot grab exactly canto+gap for 3 keys and tie par — the
+    # visual route must first pay its way east onto the verse.
+    for c in range(1, _PE_GUARD_COLS[0] - 2):
+        cells[_PE_GUARD][c] = CellType.WALL
+    for c in range(1, _PE_EXIT[1]):                      # gate row: aisle to the seal
+        cells[_PE_GATE][c] = CellType.FLOOR
+    # _PE_EXIT itself stays WALL — the seal; plain stone until the measure holds.
+
+    room = Room(room_type=RoomType.ENTRY, rows=R, cols=C)
+    room.cells = cells
+    room.seed  = seed
+
+    for r, (a, b) in words.items():                      # the cantos' verses
+        room.char_runs.append(CharRun(r, _PE_TEXT0, tuple(a), 'ancient'))
+        room.char_runs.append(CharRun(r, _PE_TEXT0 + len(a) + 1, tuple(b), 'ancient'))
+    # The gate plaque (floor runes): names the measure, and — being char runs —
+    # keeps the gate row non-blank so dap's blank-run extension stops here.
+    col = _PE_TEXT0
+    for part in ('measure', 'is', 'five', 'lines'):
+        room.char_runs.append(CharRun(_PE_GATE, col, tuple(part), 'verdant'))
+        col += len(part) + 1
+    room._pe_words = words
+
+    room.entities.append(Entity(kind='exit', row=_PE_EXIT[0], col=_PE_EXIT[1],
+                                edit_immune=True))
+    for lo, hi in (_PE_P1, _PE_P2):                      # one sentinel per verse row
+        for r in range(lo, hi + 1):
+            room.entities.append(Entity(kind='goblin', row=r,
+                                        col=rng.randint(*_PE_GOB_COLS),
+                                        hp=1, max_hp=1, ai=''))
+    for gc in _PE_GUARD_COLS:                            # the watch-gap: no runes
+        room.entities.append(Entity(kind='goblin', row=_PE_GUARD, col=gc,
+                                    hp=1, max_hp=1, ai=''))
+
+    room.spawn_pos      = _PE_SPAWN
+    room.exit_pos       = _PE_EXIT
+    room._pe_final_rows = _PE_FINAL_ROWS
+
+    room.rebuild_indexes()
+    apply_stone_fog(room)                 # the sealed exit pocket sleeps under fog
+    room.par    = _PE_PAR
+    room.budget = math.ceil(_PE_PAR * 1.4)  # STANDARD: the counted-cut route wins at 1★
+    room.answer = 'j dip j dap $'
+
+    dungeon = Dungeon(name='The Paragraph Enclosure', seed=seed)
+    dungeon.rooms        = [room]
+    dungeon.current_room = 0
+    return dungeon
+
+
 # ── The Binder's Reliquary (:h — the Codex) ─────────────────────────────────
 #
 # A second reliquary (display 14.1, after the Seekers' Labyrinth), on the

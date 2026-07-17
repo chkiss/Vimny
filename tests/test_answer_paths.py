@@ -70,6 +70,8 @@ def _token_ks_cost(token: str) -> int:
     m = _CNT_RE.match(token)
     if m:
         return len(m.group(1)) + 1
+    if len(token) == 3 and token[0] in 'dyc' and token[1] in 'ia':
+        return 3      # operator + text object ('dip', 'das', 'yi('): three keys
     if len(token) >= 2 and token[0] in 'ia' and token[1:].isalpha():
         # insert tokens ('ica', 'agate'): the entry key + each typed char
         # spend 1; Esc spends NOTHING (main's INSERT loop only charges

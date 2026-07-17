@@ -1555,6 +1555,28 @@ def _sight_sanctum_tick(room, player) -> list:
     return msgs
 
 
+def _paragraph_enclosure_tick(room, player) -> list:
+    """The Warden's Measure — the Paragraph Enclosure's seal. The exit cell
+    parts only while no sentinel of the legion stands AND the buffer has
+    closed to exactly its blessed measure (room._pe_final_rows lines). One
+    global invariant, no parrying: over-deletion (d}, dG, :g/./d) simply
+    breaks the measure, and undo restores it. STATELESS + undo-aware (the
+    seal re-walls), the hardened-chassis pattern. exit_pos is read live —
+    row collapses shift it with the rest of the world."""
+    msgs = []
+    legion = any(e.alive for e in room._entity_by_kind.get('goblin', []))
+    all_true = (not legion) and room.rows == getattr(room, '_pe_final_rows', -1)
+    er, ec = room.exit_pos
+    seal_open = room.cells[er][ec] != CellType.WALL
+    if all_true and not seal_open:
+        room.cells[er][ec] = CellType.FLOOR
+        msgs.append('The legion is fallen and the hall closes to the measure — '
+                    'the seal parts!')
+    elif not all_true and seal_open and (player.row, player.col) != (er, ec):
+        room.cells[er][ec] = CellType.WALL         # undone — the seal returns
+    return msgs
+
+
 def _indentation_sanctum_tick(room, player) -> list:
     """The Indentation Sanctum bolts. Gallery bolts are the Alignment rule (a
     noun seated at the plumb register, exact col, any floor row). The RITE
@@ -2317,6 +2339,7 @@ _LEVEL_INTROS = {
     'sentence_enclosure': ('The Sentence Enclosure — the inscriptions here run in full verses, and the rot takes a whole verse at a time. The old lectors never hunted for a verse\'s edges: anywhere within it, the word sufficed.', 70),
     'tag_enclosure': ('The Tag Enclosure — every reliquary here is sealed in a named case, and some cases sit within cases. The old keepers never pried at the seams: they spoke the name, and the innermost case answered.', 70),
     'quote_enclosure': ('The Quote Enclosure — a gallery of quoted settings, every one holding a rotten word between its marks. The old scribes never stepped up to the shelves: they read the marks from the aisle, and struck from there.', 70),
+    'paragraph_enclosure': ('The Paragraph Enclosure — the goblin legion stands mustered in two long cantos, rank upon rank. The gate at the hall\'s end keeps the Warden\'s Measure, and it is carved there in stone for any who read so far.', 70),
     'binders_reliquary': ('The Binder\'s Reliquary — still water splits the vault, too wide to step and too deep to wade. On the far shore a single word is legible, and beyond it, the binder\'s last work.', 70),
     'warden_scrivener':    ('The Warden Scrivener — he has copied these halls for an age and finished nothing. The great page waits, passage by passage, for a truer hand.', 70),
     'warden_manifold':     ('The Warden Manifold — he stamps himself into the world. Light the four braziers; the gate will draw and the fog will part.', 70),
@@ -3025,6 +3048,9 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
                      'bracket_enclosure', 'brace_square_enclosure',
                      'quote_enclosure', 'tag_enclosure', 'sentence_enclosure'):
             for _m in _sight_sanctum_tick(room, player):   # the shared exact-text tick
+                _push(_m)
+        if level == 'paragraph_enclosure':
+            for _m in _paragraph_enclosure_tick(room, player):
                 _push(_m)
         if level == 'sculpting_chambers':
             for _m in _sculpting_chambers_tick(room, player):
