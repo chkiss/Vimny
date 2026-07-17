@@ -5015,31 +5015,43 @@ def build_dungeon_hall_of_echoes(seed: int) -> Dungeon:
     return dungeon
 
 
-# ── The Stair Rail (41: + - _ and NORMAL-Enter) ──────────────────────────────
+# ── The Stair Rail (40: + - _ and NORMAL-Enter) ──────────────────────────────
 #
-# A staircase of five steps drifting EAST: each step row carries one fused
-# word (◆word — strike the ◆, the exact-text bolt reads the word true), and
-# each word sits four columns east of the one above. A plain j from any
-# mended word lands on bare floor WEST of the next word: the j-walker pays
-# j + ^ (2) per step where + pays 1 — the rail. Below the last step a deep
-# empty shaft: the gate row is EIGHT lines down but NOT the last line (a
-# bare undercroft with an unassigned reward chest lies beneath it), so G
-# undershoots the gate and 8_ — count-is-target — is the one-stroke
-# descent. Forcing by PAR with the STANDARD budget: the j^-walk (17) wins
-# at 1★ over par 13.
-_SR_ROWS, _SR_COLS = 17, 54
-_SR_SPINE   = 22
+# A VALLEY of five steps, the player spawning on the MIDDLE one. Each step
+# row carries one fused word (◆word — strike the ◆, the exact-text bolt
+# reads the word true) at its own column, with blank floor to its west; the
+# columns ZIGZAG, so a plain j/k from one mended word lands on bare floor
+# beside the next — the j/k-walker pays a trailing ^ where +/- land on the
+# word in one reach. The two steps ABOVE the spawn force `-` (up to the
+# first non-blank), the two BELOW force `+`; neither can be skipped, since
+# every step is its own bolt. Below the valley a shaft drops to the gate,
+# whose EXIT sits at the gate row's own first-non-blank with a bare
+# undercroft beneath it (G undershoots), so the descent is {n}_ landing
+# straight onto the seal — a plain {n}j lands beside it and still owes a ^.
+#
+# Redesigned 2026-07-17: the old level was a pure descent — `-` went unused
+# and the final `8_` tied a plain `7j` (a trailing `$` made the landing
+# column moot). NOTE: `_` cannot be UNIQUELY forced — `{n}_` is exactly
+# `{n-1}+`, and `_` alone is `^` — so the drop's `{n}_` merely TIES `{n-1}+`
+# while beating `j`/`G`; the level teaches `_` as a first-class descent, not
+# as the sole key. What IS strictly forced here is `-` (and `+`).
+_SR_ROWS, _SR_COLS = 26, 54
 _SR_PLQ_COL = 2
-_SR_STEPS   = (2, 3, 4, 5, 6)         # step k's word at col 24 + 4k
-_SR_TEXT0   = 24
-_SR_STEP_DX = 4
-_SR_SHAFT   = (7, 12)                 # bare rows — the long drop
-_SR_GATE    = 13
-_SR_BOLTS   = {2: 41, 3: 42, 4: 43, 5: 44, 6: 45}
-_SR_EXIT    = (13, 46)                # the FINAL SEAL, east of every bolt
-_SR_CELLAR  = (14, 15)                # the undercroft: G's landing, a chest
-_SR_CHEST   = (15, 35)                # unassigned → the relic scroll pool
-_SR_PAR     = 13                      # j x + x + x + x + x 8_ $
+_SR_WEST    = 22                      # blank floor's west edge (so ^/-/+/_ have work)
+_SR_EAST    = 46
+# The valley sits LOW so every step's absolute line number is TWO digits: a
+# relative {n}+ / {n}- (1-digit count) beats the absolute {nn}G that would
+# otherwise tie it (both land on the first non-blank). Relative distances
+# stay one digit — that gap is the whole forcing.
+_SR_STEP_ROWS = (12, 14, 16, 18, 20)  # S1..S5; the player spawns on S3 (the middle)
+_SR_STEP_COLS = (24, 32, 26, 34, 26)  # zigzag — vertical neighbours never align
+_SR_SPAWN_IDX = 2                     # index into the two tuples above (row 16)
+_SR_GATE    = 24
+_SR_EXIT    = (24, _SR_WEST)          # the FINAL SEAL, AT the gate row's first-non-blank
+_SR_BOLT_COLS = (24, 25, 26, 27, 28)  # per-word bolts, east of the exit
+_SR_UNDERCROFT = 25                   # bare row — G undershoots the gate to here
+_SR_CHEST   = (25, 34)                # unassigned → the relic scroll pool
+_SR_PAR     = 15                      # x 2- x 2- x 6+ x 2+ x 5_
 
 
 def _sr_draw_words(rng) -> tuple:
@@ -5055,54 +5067,46 @@ def _sr_draw_words(rng) -> tuple:
 
 
 def build_dungeon_stair_rail(seed: int) -> Dungeon:
-    """The Stair Rail (slug `stair_rail`): + - _ — the descent that lands
+    """The Stair Rail (slug `stair_rail`): + - _ — climb and drop, landing
     on the word, not beside it."""
     rng = random.Random(seed)
     words = _sr_draw_words(rng)
 
     R, C = _SR_ROWS, _SR_COLS
     cells = [[CellType.WALL] * C for _ in range(R)]
-    cells[1][_SR_TEXT0] = CellType.FLOOR                 # the landing at the top
-    for r in _SR_STEPS + tuple(range(_SR_SHAFT[0], _SR_SHAFT[1] + 1)):
-        for c in range(_SR_SPINE, 49):
+    # the whole shaft is contiguous floor (rows 2..17) so -/+ can traverse
+    # the blank rows between steps; the steps' words sit on rows 2,4,6,8,10.
+    for r in range(_SR_STEP_ROWS[0], _SR_UNDERCROFT + 1):
+        for c in range(_SR_WEST, _SR_EAST):
             cells[r][c] = CellType.FLOOR
-    for c in range(_SR_SPINE, _SR_EXIT[1]):              # gate row + bolts
-        cells[_SR_GATE][c] = CellType.FLOOR
-    for dc in _SR_BOLTS.values():
+    for dc in _SR_BOLT_COLS:                               # the per-word bolts
         cells[_SR_GATE][dc] = CellType.WALL
-    for r in _SR_CELLAR:                                 # the undercroft
-        for c in range(_SR_SPINE, 49):
-            cells[r][c] = CellType.FLOOR
-    # _SR_EXIT itself stays WALL — the final seal (chassis-standard).
+    cells[_SR_EXIT[0]][_SR_EXIT[1]] = CellType.WALL        # the FINAL SEAL (the fnb)
 
     room = Room(room_type=RoomType.ENTRY, rows=R, cols=C)
     room.cells = cells
     room.seed  = seed
 
     doors = []
-    for k, r in enumerate(_SR_STEPS):
-        col = _SR_TEXT0 + k * _SR_STEP_DX
+    for k, r in enumerate(_SR_STEP_ROWS):
+        col = _SR_STEP_COLS[k]
         room.char_runs.append(CharRun(r, col, tuple('◆' + words[k]), 'ember'))
         room.char_runs.append(CharRun(r, _SR_PLQ_COL, tuple(words[k]), 'verdant'))
-        doors.append(((words[k],), _SR_BOLTS[r]))
+        doors.append(((words[k],), _SR_BOLT_COLS[k]))
     room._ss_doors = tuple(doors)                        # the shared exact-text tick
     room._sr_words = words
-    col = _SR_SPINE + 1                                  # gate plaque (floor): the
-    for part in ('the', 'rail', 'ends'):                 # fnb that 8_ lands on
-        room.char_runs.append(CharRun(_SR_GATE, col, tuple(part), 'verdant'))
-        col += len(part) + 1
 
     room.entities.append(Entity(kind='exit', row=_SR_EXIT[0], col=_SR_EXIT[1],
                                 edit_immune=True))
     room.entities.append(Entity(kind='chest', row=_SR_CHEST[0], col=_SR_CHEST[1]))
-    room.spawn_pos = (1, _SR_TEXT0)
+    room.spawn_pos = (_SR_STEP_ROWS[_SR_SPAWN_IDX], _SR_STEP_COLS[_SR_SPAWN_IDX])
     room.exit_pos  = _SR_EXIT
 
     room.rebuild_indexes()
     apply_stone_fog(room)
     room.par    = _SR_PAR
-    room.budget = math.ceil(_SR_PAR * 1.4)  # STANDARD: the j^-walk (17) wins at 1★
-    room.answer = 'j x + x + x + x + x 8_ $'
+    room.budget = math.ceil(_SR_PAR * 1.4)  # STANDARD: the k^/j^-walk wins at 1★
+    room.answer = 'x 2- x 2- x 6+ x 2+ x 5_'
 
     dungeon = Dungeon(name='The Stair Rail', seed=seed)
     dungeon.rooms        = [room]

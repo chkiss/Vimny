@@ -16,9 +16,12 @@
 #
 # SPDX-License-Identifier: GPL-3.0-or-later
 
-"""The Stair Rail (+ - _): an east-drifting staircase where j strands the
-cursor beside each word and + lands it; a long counted drop (8_) to a gate
-that G undershoots (the undercroft below is the last line)."""
+"""The Stair Rail (+ - _): a VALLEY of five steps (spawn on the middle one)
+whose columns zigzag, so j/k strand the cursor beside each word while +/-
+land it. The valley sits LOW, so a relative {n}+/{n}- (1-digit) beats the
+absolute {nn}G (2-digit) that would otherwise tie it. A counted {n}_ drop
+lands straight on the exit at the gate row's own first non-blank; G
+undershoots to the undercroft below."""
 import math
 
 import pytest
@@ -29,8 +32,8 @@ import main
 from engine.world import CellType
 from generation.dungeon_gen import (
     build_dungeon_stair_rail,
-    _SR_ROWS, _SR_COLS, _SR_STEPS, _SR_TEXT0, _SR_STEP_DX, _SR_GATE,
-    _SR_BOLTS, _SR_EXIT, _SR_CELLAR, _SR_CHEST, _SR_PAR,
+    _SR_ROWS, _SR_COLS, _SR_STEP_ROWS, _SR_STEP_COLS, _SR_SPAWN_IDX, _SR_GATE,
+    _SR_BOLT_COLS, _SR_EXIT, _SR_UNDERCROFT, _SR_CHEST, _SR_PAR,
 )
 from tests import SEEDS, cached_room
 
@@ -43,14 +46,17 @@ def _K(s):
     return [Keystroke(ch) for ch in s]
 
 
-# The canonical tape (== room.answer): x the first fused glyph, then ride
-# the rail — each + lands on the next step's word in one key — and take
-# the whole drop with a single counted _.
-CANON = 'jx' + '+x' * 4 + '8_$'
+_SPAWN = (_SR_STEP_ROWS[_SR_SPAWN_IDX], _SR_STEP_COLS[_SR_SPAWN_IDX])
 
-# The j-walker: every step pays j + ^ where the rail pays +, and the drop
-# is walked with a counted j plus the caret. Wins, at 1★ (17 ≤ 19 > 13).
-RIVAL = 'jx' + 'j^x' * 4 + '7j^$'
+# The canonical tape (== room.answer): x the middle step, climb with - to the
+# two steps above, descend with + to the two below, then a single counted _
+# drops straight onto the exit at the gate's first non-blank.
+CANON = 'x2-x2-x6+x2+x5_'
+
+# The k/j-walker: every step pays k/j + ^ where the rail pays -/+, and the
+# drop is walked with a counted j plus the caret. (The {nn}G route ties this
+# — both are one key dearer per step than the relative rail.) Wins, at 1★.
+RIVAL = 'x2k^x2k^x6j^x2j^x4j^'
 
 
 def _drive(dungeon, keys, monkeypatch, finish=':wq\r', name='Scribe'):
@@ -86,7 +92,7 @@ def _drive_spent(keys, monkeypatch, seed=0):
 def test_layout_and_identity(seed):
     room = _room(seed)
     assert (room.rows, room.cols) == (_SR_ROWS, _SR_COLS)
-    assert room.spawn_pos == (1, _SR_TEXT0)
+    assert room.spawn_pos == _SPAWN          # on the MIDDLE step
     assert room.exit_pos == _SR_EXIT
     exit_ent = next(e for e in room.entities if e.kind == 'exit')
     assert (exit_ent.row, exit_ent.col) == _SR_EXIT and exit_ent.edit_immune
@@ -97,29 +103,34 @@ def test_par_answer_budget(seed):
     room = _room(seed)
     assert room.par == _SR_PAR
     assert room.budget == math.ceil(_SR_PAR * 1.4)
-    assert room.answer == 'j x + x + x + x + x 8_ $'
+    assert room.answer == 'x 2- x 2- x 6+ x 2+ x 5_'
 
 
 @pytest.mark.parametrize("seed", SEEDS)
-def test_stair_drifts_east(seed):
-    # Each step's word sits STEP_DX east of the one above — the geometry
-    # that makes j strand the cursor on bare floor beside every landing.
+def test_steps_zigzag_at_two_digit_rows(seed):
+    # Each step's word sits at its own zigzag column (so j/k strand the
+    # cursor on bare floor beside a landing), and every step's line number
+    # is TWO digits (so {nn}G can't undercut the 1-digit relative rail).
     room = _room(seed)
-    for k, r in enumerate(_SR_STEPS):
+    for k, r in enumerate(_SR_STEP_ROWS):
         run = next(ru for ru in room.char_runs
-                   if ru.row == r and ru.col >= _SR_TEXT0)
-        assert run.col == _SR_TEXT0 + k * _SR_STEP_DX
+                   if ru.row == r and ru.col >= _SR_STEP_COLS[k])
+        assert run.col == _SR_STEP_COLS[k]
         assert run.symbols[0] == '◆'
+        assert r >= 10                       # two-digit line number
+    # neighbouring steps never share a column — the zigzag
+    for a, b in zip(_SR_STEP_COLS, _SR_STEP_COLS[1:]):
+        assert a != b
 
 
 @pytest.mark.parametrize("seed", SEEDS)
 def test_undercroft_is_below_the_gate(seed):
-    # The last standable line is the cellar, not the gate — G undershoots;
-    # only a counted _ (or the j-walk) lands the gate row.
+    # The last standable line is the undercroft, not the gate — G undershoots;
+    # only a counted _ (or the k/j-walk) lands the gate row.
     room = _room(seed)
     standable = [r for r in range(room.rows)
                  if any(room.is_passable(r, c) for c in range(room.cols))]
-    assert standable[-1] == _SR_CELLAR[-1] > _SR_GATE
+    assert standable[-1] == _SR_UNDERCROFT > _SR_GATE
     chest = next(e for e in room.entities if e.kind == 'chest')
     assert (chest.row, chest.col) == _SR_CHEST
 
@@ -127,9 +138,11 @@ def test_undercroft_is_below_the_gate(seed):
 @pytest.mark.parametrize("seed", SEEDS)
 def test_exit_and_bolts_start_sealed(seed):
     room = _room(seed)
-    for dc in _SR_BOLTS.values():
+    for dc in _SR_BOLT_COLS:
         assert room.cells[_SR_GATE][dc] == CellType.WALL
     assert room.cells[_SR_EXIT[0]][_SR_EXIT[1]] == CellType.WALL
+    # the exit sits AT the gate row's first non-blank (west of the bolts)
+    assert _SR_EXIT[1] < min(_SR_BOLT_COLS)
 
 
 # ── playthroughs ─────────────────────────────────────────────────────────────
@@ -159,14 +172,14 @@ def test_G_undershoots_into_the_undercroft(monkeypatch):
     monkeypatch.setattr(main, '_calc_stars', spy)
     result = _drive(dungeon, _K('G'), monkeypatch, finish=':wq\r')
     assert not result['won']
-    assert seen['pos'][0] in _SR_CELLAR       # the decoy landing
+    assert seen['pos'][0] == _SR_UNDERCROFT   # the decoy landing
 
 
 def test_undo_rebars_an_open_bolt(monkeypatch):
     dungeon = build_dungeon_stair_rail(0)
     room = dungeon.rooms[0]
-    _drive(dungeon, _K('jxu'), monkeypatch, finish=':q!\r')
-    assert room.cells[_SR_GATE][_SR_BOLTS[2]] == CellType.WALL
+    _drive(dungeon, _K('xu'), monkeypatch, finish=':q!\r')   # spawn is ON S3
+    assert room.cells[_SR_GATE][_SR_BOLT_COLS[_SR_SPAWN_IDX]] == CellType.WALL
 
 
 # ── teleport audit ───────────────────────────────────────────────────────────
@@ -181,9 +194,10 @@ def test_no_jump_lands_on_the_sealed_exit(monkeypatch):
         return orig(won, budget, room_, player, level)
 
     monkeypatch.setattr(main, '_calc_stars', spy)
-    result = _drive(dungeon, _K('13G$'), monkeypatch, finish=':wq\r')
+    # jump straight to the gate row and try to reach the exit while sealed
+    result = _drive(dungeon, _K(f'{_SR_GATE}G0'), monkeypatch, finish=':wq\r')
     assert not result['won']
-    assert seen['pos'][1] < _SR_EXIT[1], seen
+    assert seen['pos'] != _SR_EXIT, seen      # the sealed exit is never a landing
 
 
 @pytest.mark.parametrize("seed", SEEDS)
