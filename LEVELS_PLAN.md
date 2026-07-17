@@ -92,11 +92,11 @@ Curriculum order is the order of `LEVELS`. Blueprints: `blueprints/act_*.md`.
 | 38 | `paragraph_enclosure` | The Paragraph Enclosure | `ip ap` |  |
 | 38.1 | `grandmasters_sanctum` | The Grandmaster's Sanctum | — | boss |
 | 39 | `spellwrights_forge` | The Spellwright's Forge | `:s///  :g  &` |  |
-| 40 | `hall_of_echoes` | The Hall of Echoes | `q @ "` |  |
-| 41 | `stair_rail` | The Stair Rail | `+ - _` |  |
-| 42 | `g_sanctum` | The G-Sanctum | `g_ g* gi gp` |  |
-| 43 | `buried_word` | The Buried Word | `g* n` |  |
-| 44 | `wet_ink` | The Wet Ink | `gi` |  |
+| 40 | `stair_rail` | The Stair Rail | `+ - _` |  |
+| 41 | `g_sanctum` | The G-Sanctum | `g_ g* gi gp` |  |
+| 42 | `buried_word` | The Buried Word | `g* n` |  |
+| 43 | `wet_ink` | The Wet Ink | `gi` |  |
+| 44 | `hall_of_echoes` | The Hall of Echoes | `q @ "` |  |
 | 45 | `gauntlet` | The Gauntlet | `everything` |  |
 | 45.1 | `warden_eternal` | The Warden Eternal | — | boss |
 | 99 | `dummy` | Dummy Dungeon | `d x s y p yy P` |  |

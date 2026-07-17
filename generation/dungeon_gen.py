@@ -1713,7 +1713,7 @@ def build_dungeon_goblin_gauntlet(seed: int) -> Dungeon:
     composite.spawn_pos    = (1, 1)
     composite.exit_pos = (18, 56)
 
-    entities: list = [Entity(kind='entry_marker', row=1, col=1)]
+    entities: list = []                       # (no entry_marker — spawn_pos suffices)
     runes:    list = []
     corr_data      = []
 
@@ -7965,7 +7965,6 @@ def build_dungeon_archivists_library(seed: int) -> Dungeon:
     # The Archivist paces the hall (ai='wander' → oscillates in _enemy_tick); he starts
     # off the first screen, and ':set wrap' folds the line in so the player sees him move.
     room.entities = [
-        Entity(kind='entry_marker', row=0, col=0),
         Entity(kind='archivist',    row=0, col=1, ai='wander', ai_speed=1, move_dir=1,
                hp=100, max_hp=100),   # tanky, but his 10-damage strike is what stops you
     ]
@@ -8078,7 +8077,6 @@ def build_dungeon_spellwrights_forge(seed: int) -> Dungeon:
         _forge_text(room, r, 2, txt, 'verdant')
 
     room.entities = [
-        Entity(kind='entry_marker', row=_FORGE_DOOR, col=1),
         Entity(kind='exit',         row=_FORGE_DOOR, col=COLS - 2),
         # The sanctum's reward: an unassigned chest → a random relic scroll.
         # Row 13 — ABOVE every cursed row, so :g/cursed/d never collapses it.

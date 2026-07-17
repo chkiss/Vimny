@@ -80,7 +80,8 @@ def test_builder_structure():
     assert r._forge_seal == (dg._FORGE_DOOR, dg._FORGE_DIV)
     assert not _seal_open(r)                          # sealed shut at the start
     kinds = {e.kind for e in r.entities}
-    assert 'exit' in kinds and 'entry_marker' in kinds
+    assert 'exit' in kinds
+    assert 'entry_marker' not in kinds                # cut 2026-07-17 (the flash)
     txts = _texts(r)
     # Chamber A — three ember wards, each repeating the rot WITHIN the line (forces /g).
     assert sum('old' in t for t in txts) == 3
