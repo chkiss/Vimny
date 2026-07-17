@@ -470,7 +470,11 @@ def apply_motion(player, motion, count, room, target=None, count_given: bool = T
             if best is not None:
                 player.col = best
                 moved = True
-        elif motion == '^':
+        elif motion in ('^', 'g_'):
+            # ^ — first non-blank of the segment; g_ — LAST non-blank (the
+            # mirror). Both segment-bounded and caret-stop based, so g_
+            # lands on the final glyph where $ would land on the final
+            # PASSABLE cell (bare floor, a void brink, a drowning pool).
             row = player.row
             left = player.col
             for c in range(player.col - 1, -1, -1):
@@ -482,11 +486,18 @@ def apply_motion(player, motion, count, room, target=None, count_given: bool = T
                 if not _cross_water(room, row, c):
                     break
                 right = c
-            target = left
-            for c in range(left, right + 1):
-                if _caret_stop(room, row, c):     # a character or a notable entity (key/foe/loot)
-                    target = c
-                    break
+            if motion == '^':
+                target = left
+                for c in range(left, right + 1):
+                    if _caret_stop(room, row, c):     # a character or a notable entity
+                        target = c
+                        break
+            else:
+                target = right
+                for c in range(right, left - 1, -1):
+                    if _caret_stop(room, row, c):
+                        target = c
+                        break
             if target != player.col:
                 player.col = target
                 moved = True

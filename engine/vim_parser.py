@@ -180,6 +180,16 @@ def parse(buf: str, mode: Mode) -> tuple[dict | None, str]:
             return _cg({'type': 'join', 'gap': False, 'count': count_n}, count), buf[i+2:]
         if g2 == '&':                              # g& — repeat last :s over the whole file, with flags
             return {'type': 'sub_repeat', 'whole_file': True, 'keep_flags': True}, buf[i+2:]
+        if g2 == '_':                              # g_ — last non-blank of the line
+            return {'type': 'motion', 'motion': 'g_', 'count': count_n}, buf[i+2:]
+        if g2 in '*#':                             # g* / g# — search word, NO boundaries
+            return _cg({'type': 'search_word', 'forward': g2 == '*',
+                        'literal': True, 'count': count_n}, count), buf[i+2:]
+        if g2 == 'i':                              # gi — INSERT at the last insert spot
+            return {'type': 'goto_insert'}, buf[i+2:]
+        if g2 in 'pP':                             # gp / gP — paste, cursor AFTER it
+            return _cg({'type': 'paste', 'before': g2 == 'P', 'after_cursor': True,
+                        'count': count_n}, count), buf[i+2:]
         return {'type': 'unknown'}, buf[i+2:]
 
     # f/F/t/T — need one more char

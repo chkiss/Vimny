@@ -3962,6 +3962,10 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
                                           'typed': insert_typed}
                 insert_typed = ''
                 player.mode = Mode.NORMAL
+                # gi's anchor: where INSERT was last left, recorded BEFORE
+                # the Esc retreat (Vim-true — gi resumes at the ink, not a
+                # column shy of it).
+                player.last_insert = (player.row, player.col)
                 # Vim retreats one column on leaving INSERT. Also the safety
                 # net for water-writing: `a` at a bank hovers the cursor on
                 # the flood; the retreat steps back onto written ground.
@@ -4683,6 +4687,23 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
                         message = 'Dungeon cleared!  Type :wq to return to the overworld.'
                     msg_ttl = 200
 
+        elif action['type'] == 'goto_insert':
+            # gi — return to where INSERT was last left, and resume there.
+            if not edit_mode and not _action_allowed(action, player.known_commands) and _blocked(action):
+                continue
+            li = getattr(player, 'last_insert', None)
+            if li is None or li[0] >= room.rows or not room.is_passable(*li):
+                _push('No previous insertion.')
+            else:
+                undo_stack.append(_snapshot(room, player, budget, ans=cmd_start_ans))
+                redo_stack.clear()
+                player.row, player.col = li
+                begin_insert(room, player, 'i', 1)
+                player.mode = Mode.INSERT
+                insert_typed = ''
+                budget.spend(2)                      # 'g' + 'i'
+                player.last_change = action
+
         elif action['type'] == 'enter_mode':
             m = action['mode']
             if m == 'command':
@@ -4845,9 +4866,15 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
                     pattern, fwd = None, True
                 else:
                     fwd = action.get('forward', True)
-                    # * / # search the word literally (not as a regex) — \V makes
-                    # every char of the word a literal in the matcher.
-                    pattern = '\\V' + word
+                    if action.get('literal') or not word.isalnum():
+                        # g* / g# — the word literally, NO boundaries: the
+                        # substring form (\V = every char literal). Also the
+                        # form for punctuation 'words', which have no
+                        # boundary to speak of.
+                        pattern = '\\V' + word
+                    else:
+                        # * / # — Vim-true whole-word search: \<word\>.
+                        pattern = '\\<' + word + '\\>'
                     player.last_search = (pattern, fwd)
             else:                                  # n / N
                 if not player.last_search:
@@ -5304,7 +5331,13 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
                 undo_stack.append(_snapshot(room, player, budget, ans=cmd_start_ans))
                 redo_stack.clear()
                 if op_paste(room, player, clip, before, count):
-                    budget.spend(_keystroke_cost(count, 'p', action.get('count_given', False)))
+                    if action.get('after_cursor') and player.col + 1 < room.cols \
+                            and room.is_passable(player.row, player.col + 1):
+                        # gp / gP: the cursor rests one cell PAST the pasted
+                        # text — the stamp-run idiom (paste on, never step).
+                        player.col += 1
+                    budget.spend(_keystroke_cost(count, 'p', action.get('count_given', False))
+                                 + (1 if action.get('after_cursor') else 0))
                     spawned = next((ed['tmpl']['kind'] for ed in clip_entities), None)
                     _push(_PASTE_SPAWN_MSG[spawned] if spawned in _PASTE_SPAWN_MSG else 'Pasted.')
                 else:

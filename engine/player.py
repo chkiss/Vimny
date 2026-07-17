@@ -37,6 +37,7 @@ class Player:
     jump_idx: int = 0                              # cursor index into jump_list
 
     last_f: tuple | None = None   # (motion, target) of most recent f/F/t/T; set by apply_motion
+    last_insert: tuple | None = None  # (row, col) where INSERT was last left — gi's anchor
     last_change: dict | None = None  # last action that mutated the room; re-played by .
     insert_extend: bool = False   # True during an A-initiated INSERT: typing builds new floor (ledge) into the void
     visual_anchor: tuple | None = None       # (row, col) where v/V/Ctrl-v was pressed

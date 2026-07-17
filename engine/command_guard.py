@@ -42,6 +42,7 @@ _MOTION_GUARD: dict[str, str] = {
     # lesson token, deliberately untaught until the post-Act-VI slot
     # (cheap fnb-landing steps golf several existing pars if freed early)
     '+': 'line_step', '-': 'line_step', '_': 'line_step',
+    'g_': 'g_family',                 # the G-Sanctum's family (g_ g* g# gi gp gP)
 }
 
 
@@ -112,6 +113,8 @@ def action_allowed(action: dict, known: list | set, edit_mode: bool = False) -> 
         return guard_key is None or guard_key in known_set
 
     if t == 'paste' and not edit_mode:
+        if action.get('after_cursor'):
+            return 'g_family' in known_set   # gp / gP — the G-Sanctum
         if action.get('before'):
             return 'P' in known_set   # P — taught at The Beacon Tiers
         return 'p' in known_set       # p — taught at The Goblin Gauntlet
@@ -138,8 +141,12 @@ def action_allowed(action: dict, known: list | set, edit_mode: bool = False) -> 
 
     if t == 'search_repeat':                      # n / N
         return '/' in known_set
-    if t == 'search_word':                        # * / #
+    if t == 'search_word':                        # * / # (g* / g# = the literal form)
+        if action.get('literal'):
+            return 'g_family' in known_set
         return '*' in known_set
+    if t == 'goto_insert':                        # gi — INSERT at the last spot
+        return 'g_family' in known_set
     if t == 'macro_record':                       # q{reg}
         return 'q' in known_set
     if t == 'macro_play':                         # @{reg} / @@
@@ -209,8 +216,12 @@ def guard_message(action: dict, known: list | set = ()) -> str:
         return "You haven't learned r yet."
     if t == 'join':
         return "You haven't learned J (join) yet."
+    if t == 'search_word' and action.get('literal'):
+        return "You haven't learned the g-family yet."
     if t in ('search_repeat', 'search_word'):
         return "You haven't learned search yet."
+    if t == 'goto_insert':
+        return "You haven't learned the g-family yet."
     if t == 'macro_record':
         return "You haven't learned q (macros) yet."
     if t == 'macro_play':
