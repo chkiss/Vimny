@@ -235,23 +235,15 @@ def test_dG_is_parried_at_the_gate(monkeypatch):
     assert gallery.cells[gr][_GMS_SEAL] == CellType.WALL          # seal shut
 
 
-def test_grandmaster_paints_his_own_glyph():
-    from engine.world import entity_letter
-    _d, gallery, arena = _rooms(0)
-    for room in (gallery, arena):
-        gm = next(e for e in room.entities
-                  if e.kind == 'warden' and e.tag == 'grandmaster')
-        assert entity_letter(gm) == 'G'
-
-
 @pytest.mark.parametrize("seed", SEEDS)
 def test_arena_search_finds_the_grandmaster(seed):
+    # The Warden is always W — Scrivener, Pathfinder, Grandmaster alike.
     from engine.search import find_next
     from engine.player import Player
     d, _gallery, arena = _rooms(seed)
     p = Player()
     p.row, p.col = arena.spawn_pos
-    assert find_next(arena, p, 'G', True) == _GMS_A_BOSS
+    assert find_next(arena, p, 'W', True) == _GMS_A_BOSS
 
 
 def test_G_parks_on_the_threshold_not_past_the_seal(monkeypatch):

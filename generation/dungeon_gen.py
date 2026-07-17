@@ -4832,7 +4832,7 @@ def build_dungeon_grandmasters_sanctum(seed: int) -> Dungeon:
         Entity(kind='heart_container', row=_GMS_A_HEART[0], col=_GMS_A_HEART[1]),
         Entity(kind='chest_scroll', row=_GMS_A_CHEST[0], col=_GMS_A_CHEST[1]),
     ]
-    arena.search_glyph_entities = True   # /G finds the Grandmaster — the
+    arena.search_glyph_entities = True   # /W finds the Grandmaster — the
     arena.rebuild_indexes()              # Pathfinder/Manifold search parity
     _fog_unreachable(arena, *_GMS_A_SPAWN)
     arena.par    = None

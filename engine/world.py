@@ -113,8 +113,6 @@ def entity_letter(ent) -> Optional[str]:
     letter-kinds draw, so changing a glyph here updates every command at once."""
     if ent.kind == 'goblin':
         return 'W' if ent.tag == 'echo' else 'g'   # echo goblins are the Hunt's impostor Ws
-    if ent.kind == 'warden' and ent.tag == 'grandmaster':
-        return 'G'                                 # the Grandmaster is no stock warden
     return _ENTITY_LETTER.get(ent.kind)
 
 
