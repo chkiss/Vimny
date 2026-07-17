@@ -4787,6 +4787,13 @@ def build_dungeon_grandmasters_sanctum(seed: int) -> Dungeon:
             CharRun(_GMS_GATE, col, tuple(part), 'verdant'))
         col += len(part) + 1
 
+    # The threshold stone: a single ◆ on the spine cell of the gate row.
+    # Fixed text, load-bearing — its EXISTENCE is the mechanism: it is the
+    # gate row's first non-blank, so G (and any linewise park) lands at the
+    # head of the row, west of the bolts; only $ (or walking) rides the
+    # opened gate east past the transit cell.
+    gallery.char_runs.append(CharRun(_GMS_GATE, _GMS_SPINE, ('◆',), 'ancient'))
+
     # The Grandmaster watches from the gate pocket. edit_immune: he anchors
     # the gate row against dG, and he is not to be killed through a wall.
     gallery.entities.append(Entity(kind='warden', row=_GMS_WATCH[0],
@@ -4825,7 +4832,8 @@ def build_dungeon_grandmasters_sanctum(seed: int) -> Dungeon:
         Entity(kind='heart_container', row=_GMS_A_HEART[0], col=_GMS_A_HEART[1]),
         Entity(kind='chest_scroll', row=_GMS_A_CHEST[0], col=_GMS_A_CHEST[1]),
     ]
-    arena.rebuild_indexes()
+    arena.search_glyph_entities = True   # /G finds the Grandmaster — the
+    arena.rebuild_indexes()              # Pathfinder/Manifold search parity
     _fog_unreachable(arena, *_GMS_A_SPAWN)
     arena.par    = None
     arena.budget = _GMS_BUDGET

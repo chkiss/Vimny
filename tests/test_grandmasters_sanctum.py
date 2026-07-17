@@ -235,6 +235,35 @@ def test_dG_is_parried_at_the_gate(monkeypatch):
     assert gallery.cells[gr][_GMS_SEAL] == CellType.WALL          # seal shut
 
 
+def test_grandmaster_paints_his_own_glyph():
+    from engine.world import entity_letter
+    _d, gallery, arena = _rooms(0)
+    for room in (gallery, arena):
+        gm = next(e for e in room.entities
+                  if e.kind == 'warden' and e.tag == 'grandmaster')
+        assert entity_letter(gm) == 'G'
+
+
+@pytest.mark.parametrize("seed", SEEDS)
+def test_arena_search_finds_the_grandmaster(seed):
+    from engine.search import find_next
+    from engine.player import Player
+    d, _gallery, arena = _rooms(seed)
+    p = Player()
+    p.row, p.col = arena.spawn_pos
+    assert find_next(arena, p, 'G', True) == _GMS_A_BOSS
+
+
+def test_G_parks_on_the_threshold_not_past_the_seal(monkeypatch):
+    # Only $ rides through the opened gate: G's first-non-blank is the
+    # threshold ◆ at the head of the gate row, west of the bolts.
+    d, gallery, _arena = _rooms(0)
+    keys = _canon_keys(gallery)
+    keys = keys[:-len(_K('$17lxxxxxx8lpl'))] + _K('G')   # swap the finale $ for G
+    _drive(d, keys, monkeypatch, finish=':q!\r')
+    assert d.current_room == 0
+
+
 def test_dap_G_cannot_skip_the_gallery(monkeypatch):
     # The collapse cheese: dap the legion bay from a j-chain, then G — the
     # pulled-up Grandmaster is a lawful G park, but the seal is still
