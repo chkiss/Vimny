@@ -10994,3 +10994,333 @@ def build_dungeon_warden_scrivener(seed: int) -> Dungeon:
     dungeon.rooms        = [room]
     dungeon.current_room = 0
     return dungeon
+
+
+# ── The Gauntlet (45: the everything-exam maze) ──────────────────────────────
+#
+# One continuous maze — every act folded into a single buffer, sixteen doors,
+# one FINAL SEAL. Nothing is new; everything is asked at once. teaches: [] —
+# an exam introduces nothing. Full design: blueprints/gauntlet.md (delete on
+# review). Par is HAND-TALLIED along the canonical tape and pinned by the
+# driven 2★ test; every door has a per-leg rival audit in its tests.
+#
+# THE ONE-MAZE LAWS (why the layout is what it is):
+#  • Vertical reflow is buffer-global: the row-creating legs (Y-linewise-p,
+#    O, o) live in the BOTTOM band; only sacrificial blanks and the gate lie
+#    beneath them, and the tick derives its gate row from exit_pos each tick
+#    (rides _shift_rows — the Joiner's Gate hardening).
+#  • Buffer-wide motions span the whole maze: every drawn word is globally
+#    unique AND no search word (S1/T1/U1/W7) is a substring of any other
+#    floor token (the distinct-draw loop enforces both).
+#  • State is sequenced by the route, not by seals: /-before-n (register),
+#    stamp-before-dot (gU then .), yank-AFTER-every-delete (the # trip to
+#    the W7 word happens once d/D/C/S are done, so nothing clobbers it).
+#
+# THE SEALED POCKETS (the search band's forcing): P1 and P2 are floor islands
+# with NO walking access at all — the only way in or out is a search jump
+# (Vim-true: a text jump crosses any stone). The motion rival is infinite;
+# / n * # are forced absolutely, not by key-count.
+#
+# DOOR LEDGER — 18 doors, canonical key(s) · rival that loses:
+#   r1  e-door     k 3e x       spawn is the row BELOW (k opens the exam);
+#                               16l x (4) / fλ;;;x (6)              [sub]
+#   r2  b/w-door   j 2b x w x   12h x (4) / F;x (4) / fλ x (3>2)    [sub]
+#   r3  %-door     j % l x      11l x (4) / f;;x (5) / $ gE gE (4)  [sub]
+#   r4  )-door     j ) x        fX x (3) / 3l x (3)                 [sub]
+#   —   }          }            3j (2); the TWO S1 decoys on the block row
+#                               make a pre-} search eat n n (+2)
+#   P1  r-door     /S1 2e rC    motions: IMPOSSIBLE (sealed island); s ties
+#                               r — the Vim-intrinsic tie, accepted
+#   P2  ~-door     n w ~~       fU ~~ (4) — w beats f by 1; R-retype (3>2)
+#   P3  gU·. ×3    * 3b gUe w . w .    count-~ per door loses 10 vs 9 ONLY
+#                               because THREE doors of distinct lengths let
+#                               the dot amortize; veU-family ≥ +2
+#   —   cit-door   M cit{cure}  M (mid passable row) lands ON the '<' at the
+#                               row head; the lazy j parks ~34 cols east of
+#                               the tag where cit resolves nothing
+#   —   d-door     j ^ dw       11x (3) / count-x pays the run length [row]
+#   —   D-door     j w D        d$ (+1) / dw dw (+2)                  [row]
+#   —   C-door     j C{cure}    c$ (+1) / D a (+1) — D parks the cursor on
+#                               the first wrong word (text laid at col 23)
+#   —   S-door     j S{word}    ^C (+1) / cc (+1) — park is mid-row
+#   —   y-door     j b # w yiw N (w e l p)×2   typing W7 in both settings
+#                  (+4); the r20 nook U1 decoy makes a wrapping * lose to #
+#                  by 1; N (not n) rides home — after # the register runs
+#                  backward, so n would sink deeper                  [sub]
+#   —   Y-door     j Y p        yy p (+1); retype-with-spaces ≫      [dup]
+#   —   O/o doors  j O{w}  2j o{w}   i on the sacrificial blank (+1 travel);
+#                  the created lines DON'T exist — o/O are the only authors
+#   —   finale     G $ h        the ◆ east of the exit catches $; h steps
+#                               back onto the frame — nothing is cheaper
+_GNT_ROWS, _GNT_COLS = 24, 74
+_GNT_SPINE = 20                     # the descent rail — every row's first standable
+_GNT_TX    = 22                     # text column 0 for most rows
+_GNT_PLQ_COL = 1                    # west-wall plaques (cols 1..18)
+# M is the middle PASSABLE row (blank floor counts): rows 1..22 → M lands 12,
+# so the cit door sits at row 12 and the whole ladder is built around that.
+_GNT_R_E, _GNT_R_BW, _GNT_R_PCT, _GNT_R_SEN = 1, 2, 3, 4   # spawn is R_BW; k → R_E
+_GNT_R_BLK, _GNT_R_BLANK = 5, 6
+_GNT_R_P1, _GNT_R_P2, _GNT_R_P3 = 7, 9, 11        # 8/10 are spine-only wall rows
+_GNT_R_CIT, _GNT_R_D, _GNT_R_DD = 12, 13, 14
+_GNT_R_C, _GNT_R_S, _GNT_R_Y1, _GNT_R_YL = 15, 16, 17, 18
+_GNT_R_ST1, _GNT_R_ST2 = 19, 20                   # the stanza (packed; O above, o below)
+_GNT_R_NOOK = 21                                  # wall course west + the U1 decoy nook
+_GNT_R_GATE = 22
+_GNT_P1_COLS = (52, 69)             # sealed floor island (search-only)
+_GNT_P2_COLS = (30, 46)             # sealed floor island (search-only)
+_GNT_NOOK_COLS = (64, 71)           # sealed decoy nook (a search LANDING, not a walk)
+_GNT_BOLT0 = 23                     # 18 bolts, cols 23..40
+_GNT_EXIT  = (_GNT_R_GATE, 42)      # the FINAL SEAL — stone until every proof holds
+_GNT_CATCH = 43                     # ◆ east of the exit: $ lands here, h steps back
+_GNT_PAR    = 103                   # the canonical tape spends EXACTLY this (probed:
+                                    # par 102 drops the driven run to 1★)
+_GNT_BUDGET = 140                   # hand-set generous: ~10 insert doors invite typos
+
+
+def _gnt_draw_words(rng) -> dict:
+    """The Gauntlet's vocabulary. Globally distinct, pairwise non-substring
+    (a search word inside another token would corrupt the / n * # chains),
+    with the initial-sharing groups the f/F decoys need."""
+    _load_vocab_tables()
+
+    def pool(length, initial=None):
+        ws = [w for w in _VOCAB_PLAIN_BY_LEN.get(length, ())
+              if w.isalpha() and w == w.lower()]
+        if initial:
+            ws = [w for w in ws if w[0] == initial]
+        return ws
+
+    for _ in range(200):
+        picks: list = []
+
+        def draw(length, initial=None):
+            ws = [w for w in pool(length, initial) if w not in picks]
+            if not ws:
+                raise IndexError
+            w = rng.choice(ws)
+            picks.append(w)
+            return w
+
+        try:
+            lam1 = rng.choice('bcdfgmprst')
+            lam2 = rng.choice([c for c in 'bcdfgmprst' if c != lam1])
+            lam3 = rng.choice([c for c in 'bcdfgmprst' if c not in (lam1, lam2)])
+            lam4 = rng.choice([c for c in 'bcdfgmprst' if c not in (lam1, lam2, lam3)])
+            d = {
+                't1': draw(5, lam1), 't2': draw(5, lam1), 't3': draw(4, lam1),
+                't4': draw(4), 'lam1': lam1,
+                'v1': draw(4), 'v2': draw(4, lam2), 'v3': draw(4, lam2),
+                'v4': draw(4), 'lam2': lam2,
+                'u1': draw(4), 'u2': draw(4), 'u3': draw(4, lam3),
+                'u4': draw(4, lam3), 'u5': draw(4), 'u6': draw(4), 'lam3': lam3,
+                'a1': draw(4, lam4), 'a2': draw(4), 'a3': draw(5, lam4),
+                'a4': draw(5), 'a5': draw(4), 'a6': draw(4), 'lam4': lam4,
+                'w7': draw(7), 's1': draw(3), 't1s': draw(3), 'u1s': draw(3),
+                'p1': draw(5), 'p2': draw(6),
+                'rcure': draw(6), 'cw': draw(6),
+                'g1': draw(5), 'g2': draw(7), 'g3': draw(4),
+                'tn': draw(3), 'ti': draw(6), 'tc': draw(4),
+                'dword': draw(5), 'd2': draw(4), 'd3': draw(4),
+                'dhead': draw(5), 'dt1': draw(4), 'dt2': draw(4),
+                'chead': draw(4), 'cw1': draw(4), 'cw2': draw(4), 'ccure': draw(4),
+                'sw1': draw(4), 'sw2': draw(5), 'sword': draw(4),
+                'ypre': draw(4), 'ymid': draw(3), 'ypost': draw(4),
+                'yl1': draw(4), 'yl2': draw(4), 'yl3': draw(4),
+                'sa1': draw(4), 'sa2': draw(4), 'sb1': draw(4), 'sb2': draw(4),
+                'ow1': draw(4), 'ow2': draw(4),
+            }
+        except IndexError:
+            continue
+        # the r-door's wrong letter: distinct from everything near its seek
+        wletters = [c for c in 'kqjzxv'
+                    if c not in d['s1'] + d['rcure'] and c != lam1]
+        if not wletters:
+            continue
+        d['wl'] = rng.choice(wletters)
+        # global no-substring: a search word inside any other floor token
+        # (including the rot forms actually laid) breaks the / n * # chains.
+        rots = [d['t3'][:4] + lam1, lam2 + d['v2'], lam2 + d['v3'],
+                d['rcure'][:5] + d['wl'],
+                d['cw'][:2].upper() + d['cw'][2:]]
+        tokens = [w for k, w in d.items() if k not in
+                  ('lam1', 'lam2', 'lam3', 'lam4', 'wl')] + rots
+        # No-substring where it GATES: the search words (chain corruption)
+        # and every single-word sub-door target (a nested copy would pre-open
+        # its door). Multi-word targets are context-protected by their
+        # spaces; row-kind doors compare exact.
+        critical = [d[k] for k in ('s1', 't1s', 'u1s', 'w7', 'rcure', 'cw',
+                                   'g1', 'g2', 'g3', 'sword', 'ow1', 'ow2')]
+        ok = len(set(tokens)) == len(tokens)
+        if ok:
+            for a in critical:
+                for b in tokens:
+                    if a != b and a in b:
+                        ok = False
+                        break
+                if not ok:
+                    break
+        if ok:
+            return d
+    raise ValueError('gauntlet: no clean draw after 200 tries')
+
+
+def build_dungeon_gauntlet(seed: int) -> Dungeon:
+    """The Gauntlet (slug `gauntlet`): the everything-exam. One maze, sixteen
+    doors, one seal — every act's verbs asked in a single descent. See the
+    section header for the door ledger and the one-maze laws."""
+    rng = random.Random(seed ^ 0x6AC7)
+    w = _gnt_draw_words(rng)
+    R, C, SP, TX = _GNT_ROWS, _GNT_COLS, _GNT_SPINE, _GNT_TX
+    cells = [[CellType.WALL] * C for _ in range(R)]
+
+    def floor(r, c0, c1):
+        for c in range(c0, c1 + 1):
+            cells[r][c] = CellType.FLOOR
+
+    # the open descent: galleries + block (rows 1-5), the blank, the sealed
+    # pockets, then the lower band — the spine (col 20) threads EVERY row.
+    for r in (_GNT_R_E, _GNT_R_BW, _GNT_R_PCT, _GNT_R_SEN, _GNT_R_BLK):
+        floor(r, SP, 58)
+    floor(_GNT_R_BLANK, SP, 48)                     # } lands here; wall guards P1
+    floor(_GNT_R_P1, *_GNT_P1_COLS)                 # sealed island 1
+    floor(_GNT_R_P2, *_GNT_P2_COLS)                 # sealed island 2
+    for r in (_GNT_R_P1, _GNT_R_P1 + 1, _GNT_R_P2, _GNT_R_P2 + 1):
+        cells[r][SP] = CellType.FLOOR               # the spine passes the pockets
+    floor(_GNT_R_P3, SP, 72)
+    floor(_GNT_R_CIT, SP, 72)          # wide: the lazy j-park (col ~64) drops
+    for r in (_GNT_R_D, _GNT_R_DD, _GNT_R_C, _GNT_R_S,        # in far EAST of
+              _GNT_R_Y1, _GNT_R_YL, _GNT_R_ST1, _GNT_R_ST2):  # the tag (at 30)
+        floor(r, SP, 58)
+    # The nook row: WALL to the west — a writable blank row here would let
+    # `j i{word}` tie the o-door (the i-cheese); the nearest blank is r6,
+    # three travel keys away. The east nook holds the U1 decoy (a search
+    # LANDING — sealed, escaped the way you came in). The gate is therefore
+    # reachable ONLY by jump (G/L over the wall row) — the finale forces G.
+    floor(_GNT_R_NOOK, *_GNT_NOOK_COLS)
+    floor(_GNT_R_GATE, SP, _GNT_CATCH)
+    for i in range(18):                             # the eighteen bolts
+        cells[_GNT_R_GATE][_GNT_BOLT0 + i] = CellType.WALL
+    cells[_GNT_EXIT[0]][_GNT_EXIT[1]] = CellType.WALL   # the FINAL SEAL
+
+    room = Room(room_type=RoomType.ENTRY, rows=R, cols=C)
+    room.cells = cells
+    room.seed  = seed
+
+    def lay(r, c, text, kind='ancient'):
+        col = c
+        for part in text.split(' '):
+            if part:
+                room.char_runs.append(CharRun(r, col, tuple(part), kind))
+            col += len(part) + 1
+
+    doors = []                     # (kind, target, bolt_col) — see _gauntlet_tick
+
+    def door(kind, target):
+        doors.append((kind, target, _GNT_BOLT0 + len(doors)))
+
+    # r1 · e-door: t3 wears an extra letter (the shared initial) at its tail.
+    lay(_GNT_R_E, TX, f"{w['t1']} {w['t2']} {w['t3'][:4]}{w['lam1']} {w['t4']}")
+    door('sub', f"{w['t1']} {w['t2']} {w['t3']} {w['t4']}")
+    # r2 · b/w-door: two intruder initials, one behind and one ahead.
+    lay(_GNT_R_BW, TX, f"{w['v1']} {w['lam2']}{w['v2']} {w['lam2']}{w['v3']} {w['v4']}")
+    door('sub', f"{w['v1']} {w['v2']} {w['v3']} {w['v4']}")
+    # r3 · %-door: the intruder hides fused to the closing bracket.
+    lay(_GNT_R_PCT, TX, f"{w['u1']} {w['u2']} ({w['u3']} {w['u4']}){w['lam3']} "
+                        f"{w['u5']} {w['u6']}")
+    door('sub', f"({w['u3']} {w['u4']}) {w['u5']}")
+    # r4 · )-door: the third sentence begins with a letter that is not its own.
+    lay(_GNT_R_SEN, TX, f"{w['a1']} {w['a2']}. {w['a3']} {w['a4']}. "
+                        f"{w['lam4']}{w['a5']} {w['a6']}.")
+    # target reaches back over the second sentence's period: the intruder is
+    # a PREFIX, so a two-token target would already read true around it.
+    door('sub', f"{w['a4']}. {w['a5']} {w['a6']}.")
+    # r5 · the block: U1 (the # twin) with W7 (the yank word) beside it, the
+    # TWO S1 decoys that make } worth its key (a pre-} search eats n n), and
+    # the T1 decoy that sits BEHIND P2 so a # there lands wrong.
+    lay(_GNT_R_BLK, TX, f"{w['u1s']} {w['w7']} {w['s1']} {w['t1s']} {w['s1']}")
+    # P1 · r-door (sealed): the cure's last letter went wrong.
+    lay(_GNT_R_P1, _GNT_P1_COLS[0], f"{w['s1']} {w['rcure'][:5]}{w['wl']}")
+    door('sub', w['rcure'])
+    # P2 · ~-door (sealed): the first two letters stand in the wrong case.
+    lay(_GNT_R_P2, _GNT_P2_COLS[0],
+        f"{w['s1']} {w['cw'][:2].upper()}{w['cw'][2:]} {w['t1s']}")
+    door('sub', w['cw'])
+    # P3 · the gU gallery: three lowered names of three lengths — the dot
+    # amortizes gUe past count-~ only because there are THREE.
+    lay(_GNT_R_P3, 50, f"{w['g1']} {w['g2']} {w['g3']} {w['t1s']}")
+    for g in ('g1', 'g2', 'g3'):
+        door('sub', w[g].upper())
+    # r13 · cit-door: the named case holds the wrong fitting.
+    # tag at 30 = the row's FIRST NON-BLANK, so M (middle passable row = 11)
+    # lands ON the '<' and cit fires — while the lazy 2j from P3's park drops
+    # at col ~64, far east of the tag, where cit resolves nothing (no forward
+    # seek — the GMS brace lesson) and the recovery costs more than M saved.
+    lay(_GNT_R_CIT, 30, f"<{w['tn']}>{w['ti']}</{w['tn']}>")
+    door('sub', f"<{w['tn']}>{w['tc']}</{w['tn']}>")
+    # r14 · d-door (M's landing): eleven dead marks squat before the verse.
+    lay(_GNT_R_D, TX, f"{'◆' * 11} {w['dword']} {w['d2']} {w['d3']}")
+    door('row', f"{w['dword']} {w['d2']} {w['d3']}")
+    # r15 · D-door: the head is true; everything after it is rot.
+    lay(_GNT_R_DD, TX, f"{w['dhead']} {w['dt1']} {w['dt2']}")
+    door('row', w['dhead'])
+    # r14 · C-door: the tail is wrong from the second word on. Text starts at
+    # col 23 so the D-door's park (col 28) drops exactly onto the first wrong
+    # word — C from there keeps the head and its space.
+    lay(_GNT_R_C, TX + 1, f"{w['chead']} {w['cw1']} {w['cw2']}")
+    door('sub', f"{w['chead']} {w['ccure']}")
+    # r17 · S-door: wrong on both sides of where the cursor arrives.
+    lay(_GNT_R_S, TX, f"{w['sw1']} {w['sw2']}")
+    door('sub', w['sword'])
+    # r18 · y-door: two empty settings; the W7 word fills both (the # trip).
+    lay(_GNT_R_Y1, TX, f"{w['u1s']} {w['ypre']}  {w['ymid']}  {w['ypost']}")
+    door('sub', f"{w['ypre']} {w['w7']} {w['ymid']} {w['w7']} {w['ypost']}")
+    # r19 · Y-door: the line must stand TWICE (Y p — the dup door).
+    _yline = f"{w['yl1']} {w['yl2']} {w['yl3']}"
+    lay(_GNT_R_YL, TX, _yline)
+    door('dup', _yline)
+    # r20/r21 · the stanza — packed; the verse lines DON'T EXIST until O and
+    # o author them.
+    lay(_GNT_R_ST1, TX, f"{w['sa1']} {w['sa2']}")
+    lay(_GNT_R_ST2, TX, f"{w['sb1']} {w['sb2']}")
+    door('sub', w['ow1'])
+    door('sub', w['ow2'])
+    # r22 · the nook: the U1 forward decoy (a wrapping * lands here and
+    # loses to # by one). r23 · the gate: threshold ◆ (G parks west of the
+    # bolts — the GMS lesson) and the catch ◆ east of the seal ($ lands
+    # there; h steps back onto the frame).
+    lay(_GNT_R_NOOK, _GNT_NOOK_COLS[0] + 2, w['u1s'])
+    room.char_runs.append(CharRun(_GNT_R_GATE, SP + 1, ('◆',), 'ancient'))
+    room.char_runs.append(CharRun(_GNT_R_GATE, _GNT_CATCH, ('◆',), 'ancient'))
+
+    # West-wall plaques: the cure words, one per door row (flavor + help;
+    # substring doors read the FLOOR only).
+    for pr, ptext in ((_GNT_R_E, w['t3']), (_GNT_R_BW, f"{w['v2']} {w['v3']}"),
+                      (_GNT_R_PCT, f"{w['u3']} {w['u4']}"), (_GNT_R_SEN, w['a5']),
+                      (_GNT_R_P3, 'raise three'), (_GNT_R_CIT, w['tc']),
+                      (_GNT_R_D, w['dword']), (_GNT_R_DD, w['dhead']),
+                      (_GNT_R_C, w['ccure']), (_GNT_R_S, w['sword']),
+                      (_GNT_R_Y1, w['w7']), (_GNT_R_YL, 'twice the line'),
+                      (_GNT_R_ST1, w['ow1']), (_GNT_R_ST2, w['ow2'])):
+        lay(pr, _GNT_PLQ_COL, ptext, 'verdant')
+
+    room._gnt_doors = tuple(doors)
+    room.entities.append(Entity(kind='exit', row=_GNT_EXIT[0], col=_GNT_EXIT[1],
+                                edit_immune=True))
+    room.spawn_pos = (_GNT_R_BW, SP)               # k opens the exam (row above)
+    room.exit_pos  = _GNT_EXIT
+
+    room.rebuild_indexes()
+    room.par    = _GNT_PAR
+    room.budget = _GNT_BUDGET
+    # The canonical tape (karaoke): every typed token is a single drawn word.
+    room.answer = (
+        f"k 3e x j 2b x w x j % l x j ) x }} "
+        f"/{w['s1']}⏎ 2e r{w['rcure'][5]} n w ~ ~ w * 3b gUe w . w . "
+        f"M cit{w['tc']} j ^ dw j w D j C{w['ccure']} j S{w['sword']} "
+        f"j b # w yiw N w e l p w e l p j Y p "
+        f"j O{w['ow1']} 2j o{w['ow2']} G $ h")
+
+    dungeon = Dungeon(name='The Gauntlet', seed=seed)
+    dungeon.rooms        = [room]
+    dungeon.current_room = 0
+    return dungeon

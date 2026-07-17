@@ -408,6 +408,12 @@ POEMS: list[tuple[str | None, str, list[str]]] = [
         'gi sets your pen where the ink is wet,',
         'already writing, mid-thought, mid-line.',
     ]),
+    ('gauntlet', 'everything', [               # The Gauntlet — the everything-exam
+        'Every hall you walked, I folded into one.',
+        'Two chambers have no doors: search is the key.',
+        'Two verses are unwritten: open the line.',
+        'Walk it once, clean, and the last seal parts.',
+    ]),
     ('warden_eternal', 'warden eternal', [     # The Warden Eternal (final boss)
         'The last Warden is every Warden.',
         'No key remains for me to give—',

@@ -155,6 +155,7 @@ _ANSWER_NOT_TOKENISED = {
     'build_dungeon_tag_enclosure',     # dit/cit+cure tape with typed text; tests/test_tag_enclosure.py
     'build_dungeon_sentence_enclosure',  # dis/cis+cure tape with typed text; tests/test_sentence_enclosure.py
     'build_dungeon_wet_ink',           # i/gi tape with typed halves; tests/test_g_bonus_levels.py
+    'build_dungeon_gauntlet',          # the everything-exam tape (typed cures, /⏎, dots); tests/test_gauntlet.py
 }
 
 # Levels with a documented NON-1.4 budget. The Change Annex / Extension use a
@@ -167,6 +168,7 @@ _NONSTANDARD_BUDGET = {
     'build_dungeon_indentation_sanctum',  # GENEROUS hand-set: the manual-mason route wins 1★
     'build_dungeon_selection_halls',   # GENEROUS hand-set 110: the void-push forces visual p
     'build_dungeon_hall_of_echoes',    # GENEROUS hand-set 45: straight manual (43) wins 1★
+    'build_dungeon_gauntlet',          # GENEROUS hand-set 140: ~10 insert doors invite typos
 }
 
 from tests import SEEDS as _UNIVERSAL_SEEDS
@@ -272,6 +274,7 @@ _REPLAY_OWN_TEST = {
     'build_dungeon_tag_enclosure': 'test_tag_enclosure.py::test_canonical_run_wins_at_par',
     'build_dungeon_sentence_enclosure': 'test_sentence_enclosure.py::test_canonical_run_wins_at_par',
     'build_dungeon_wet_ink': 'test_g_bonus_levels.py::test_wi_canonical_wins_at_par',
+    'build_dungeon_gauntlet': 'test_gauntlet.py::test_canonical_run_wins_at_par',
 }
 
 

@@ -36,6 +36,9 @@ _SCRIPTED_FOG = {
     'build_dungeon_warden_manifold',     # ward-machine fog, re-laid per round
     'build_dungeon_warden_scrivener',    # hall/pocket fog lifted per beat
     'build_dungeon_dummy',               # admin sandbox
+    'build_dungeon_gauntlet',            # sealed search-islands stay VISIBLE by
+                                         # design: search is their only door,
+                                         # and fogged cells are unsearchable
 }
 
 # (The one-time jump-entry exemption list emptied 2026-07-19: waypoint and

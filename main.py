@@ -1642,6 +1642,49 @@ def _grandmasters_gallery_tick(room, player) -> list:
     return msgs
 
 
+def _gauntlet_tick(room, player) -> list:
+    """The Gauntlet's sixteen bolts + FINAL SEAL — the Annex chassis widened
+    to three door kinds (room._gnt_doors = (kind, target, bolt_col)):
+      'sub' — target reads as a substring of some floor row (the Annex rule);
+      'row' — some floor row, stripped, IS the target exactly (deletion
+              doors: their post-fix text is a prefix of the pre-fix text, so
+              substring matching would open them unfixed);
+      'dup' — the target line stands on TWO floor rows (the Y p door: its
+              source row alone must not count).
+    Stateless, two-sided, row-agnostic; gate row derived from exit_pos each
+    tick (rides _shift_rows — o/O/linewise-p all insert real rows here)."""
+    msgs = []
+    floor_rows = [_wla_floor_text(room, r) for r in range(room.rows)]
+    stripped = [t.strip() for t in floor_rows]
+
+    def held(kind, target):
+        if kind == 'sub':
+            return any(target in t for t in floor_rows)
+        if kind == 'row':
+            return target in stripped
+        return sum(1 for t in stripped if t == target) >= 2      # 'dup'
+
+    gr = room.exit_pos[0]
+    all_true = True
+    for kind, target, dc in getattr(room, '_gnt_doors', ()):
+        ok = held(kind, target)
+        is_open = room.cells[gr][dc] != CellType.WALL
+        if ok and not is_open:
+            room.cells[gr][dc] = CellType.FLOOR
+            msgs.append('A proof holds — a bolt grinds back!')
+        elif not ok and is_open and (player.row, player.col) != (gr, dc):
+            room.cells[gr][dc] = CellType.WALL       # undone — the bolt re-bars
+        all_true = all_true and ok
+    er, ec = room.exit_pos
+    seal_open = room.cells[er][ec] != CellType.WALL
+    if all_true and not seal_open:
+        room.cells[er][ec] = CellType.FLOOR
+        msgs.append('Sixteen proofs stand together — the last seal parts!')
+    elif not all_true and seal_open and (player.row, player.col) != (er, ec):
+        room.cells[er][ec] = CellType.WALL           # undone — the seal returns
+    return msgs
+
+
 def _indentation_sanctum_tick(room, player) -> list:
     """The Indentation Sanctum bolts. Gallery bolts are the Alignment rule (a
     noun seated at the plumb register, exact col, any floor row). The RITE
@@ -2411,6 +2454,7 @@ _LEVEL_INTROS = {
     'stair_rail': ('The Stair Rail — a broken stair winds down the shaft, each step\'s word set a little east of the last, and below the steps the floor falls a long way. The masons who cut these stairs never missed a landing.', 70),
     'hall_of_echoes': ('The Hall of Echoes — one blighted verse, copied five times down the hall, and every copy blighted the same way. The hall listens.', 70),
     'grandmasters_sanctum': ('The Grandmaster\'s Sanctum — a long gallery of seven proofs, and the master himself beyond the last stone, listening to every stroke. Nothing here is new; everything here is asked properly.', 70),
+    'gauntlet': ('The Gauntlet — every hall you have walked, folded into one long descent. Two of its chambers have no doors at all, and two of its verses have not been written yet. Sixteen bolts, one seal. Nothing here is new. Everything here is final.', 70),
     'binders_reliquary': ('The Binder\'s Reliquary — still water splits the vault, too wide to step and too deep to wade. On the far shore a single word is legible, and beyond it, the binder\'s last work.', 70),
     'warden_scrivener':    ('The Warden Scrivener — he has copied these halls for an age and finished nothing. The great page waits, passage by passage, for a truer hand.', 70),
     'warden_manifold':     ('The Warden Manifold — he stamps himself into the world. Light the four braziers; the gate will draw and the fog will part.', 70),
@@ -3141,6 +3185,9 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
             if _af and player.row >= 3 and room.fog_cells & _af:
                 room.fog_cells -= _af
                 _push('The dark gives back the rest of the inscription.')
+        if level == 'gauntlet':
+            for _m in _gauntlet_tick(room, player):
+                _push(_m)
         if level == 'grandmasters_sanctum' and dungeon.current_room == 0:
             for _m in _grandmasters_gallery_tick(room, player):
                 _push(_m)

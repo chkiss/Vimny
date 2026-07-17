@@ -106,7 +106,8 @@ LEVELS = [
     {'display': '42',   'slug': 'g_sanctum',             'name': 'The G-Sanctum',              'commands': 'g_ g* gi gp', 'teaches': ['g_family']},
     {'display': '43',   'slug': 'buried_word',           'name': 'The Buried Word',            'commands': 'g* n', 'teaches': []},
     {'display': '44',   'slug': 'wet_ink',               'name': 'The Wet Ink',                'commands': 'gi', 'teaches': []},
-    {'display': '44.1', 'slug': 'warden_eternal',        'name': 'The Warden Eternal',         'type': 'boss', 'after': 'wet_ink', 'teaches': []},
+    {'display': '45',   'slug': 'gauntlet',              'name': 'The Gauntlet',               'commands': 'everything', 'teaches': []},
+    {'display': '45.1', 'slug': 'warden_eternal',        'name': 'The Warden Eternal',         'type': 'boss', 'after': 'gauntlet', 'teaches': []},
     {'display': '99',   'slug': 'dummy',                 'name': 'Dummy Dungeon',              'commands': 'd x s y p yy P', 'admin_only': True, 'teaches': []},
 ]
 

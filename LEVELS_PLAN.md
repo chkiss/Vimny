@@ -97,7 +97,8 @@ Curriculum order is the order of `LEVELS`. Blueprints: `blueprints/act_*.md`.
 | 42 | `g_sanctum` | The G-Sanctum | `g_ g* gi gp` |  |
 | 43 | `buried_word` | The Buried Word | `g* n` |  |
 | 44 | `wet_ink` | The Wet Ink | `gi` |  |
-| 44.1 | `warden_eternal` | The Warden Eternal | — | boss |
+| 45 | `gauntlet` | The Gauntlet | `everything` |  |
+| 45.1 | `warden_eternal` | The Warden Eternal | — | boss |
 | 99 | `dummy` | Dummy Dungeon | `d x s y p yy P` |  |
 <!-- END GENERATED CURRICULUM TABLE -->
 

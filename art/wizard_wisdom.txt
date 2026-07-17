@@ -640,6 +640,17 @@
       ]
     },
     {
+      "introduces_slug": "gauntlet",
+      "name": "everything",
+      "line_count": 4,
+      "quote": [
+        "   Every hall you walked, I folded into one.    ",
+        " Two chambers have no doors: search is the key. ",
+        "    Two verses are unwritten: open the line.    ",
+        " Walk it once, clean, and the last seal parts.  "
+      ]
+    },
+    {
       "introduces_slug": "warden_eternal",
       "name": "warden eternal",
       "line_count": 4,

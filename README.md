@@ -119,7 +119,8 @@ The curriculum is defined in `content/levels.py` (canonical) and mirrored in `LE
 | 42 | The G-Sanctum | `g_ g* gi gp` | Playable |
 | 43 | The Buried Word | `g* n` | Playable |
 | 44 | The Wet Ink | `gi` | Playable |
-| 44.1 | The Warden Eternal | (boss) | Planned |
+| 45 | The Gauntlet | `everything` | Playable |
+| 45.1 | The Warden Eternal | (boss) | Planned |
 <!-- END GENERATED LEVELS TABLE -->
 
 ## Commands
