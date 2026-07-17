@@ -347,3 +347,13 @@
 | +    | line_step | down, first word |
 | -    | line_step | up, first word  |
 | {n}_ | line_step | to line n below |
+
+## g_sanctum — the g-family
+
+| keys | token    | desc              |
+|------|----------|-------------------|
+| g_   | g_family | last non-blank    |
+| g*   | g_family | search substring  |
+| g#   | g_family | substring back    |
+| gi   | g_family | resume inserting  |
+| gp   | g_family | paste, cursor after |

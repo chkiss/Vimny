@@ -23,18 +23,16 @@ the tight-budget Overwrite Halls stretch is long past).
 > budget, the j^-walk (17) wins 1★; warden_eternal renumbered 41.1
 > hanging off stair_rail — see `build_dungeon_stair_rail` + its tests).
 
-## The G-Sanctum (`g_sanctum`) — the g-family
-
-- `g_` (last non-blank), `gp`/`gP` (paste, cursor AFTER the pasted text —
-  the repeated-paste idiom), `g*`/`g#` (word-under-cursor search without
-  word boundaries), `gi` (INSERT at the last insert spot). Recap plaques:
-  `ge`/`gE`/`gv`/`gj`/`gk`.
-- **Engine: NOT built** — g_, gp/gP, g*/g#, gi all need motion/paste/search
-  work. One gate token `g_family`.
-- Forcing sketches: a `g*` gallery where the target word is a SUBSTRING of
-  its echoes (`*` finds nothing — whole-word — while `g*` walks the chain);
-  a `gp` stamp-run (paste-advance-paste beats `p l l …`); `gi` returning to
-  an interrupted inscription after a forced detour.
+> ✅ The G-Sanctum SHIPPED as display 42 (engine built: g_ mirror of ^,
+> g*/g# literal search with * itself gaining Vim-true \\<boundaries\\>
+> (labyrinth suite audited green), gi via player.last_insert, gp/gP
+> after-cursor paste — one g_family token. The LEVEL forces g_ only:
+> three water-tailed 10/12/11-word verses where $ drowns and counted
+> e-walks pay two digits; g*/gi/gp are granted conveniences — their
+> honest par-forcing collapses to ties (g* vs {n}w, gp vs p+l), per the
+> wing's grant-late charter; JUDGMENT CALL flagged for review. par 14,
+> STANDARD budget; warden_eternal renumbered 42.1 —
+> see `build_dungeon_g_sanctum` + its tests).
 
 ## The Cartographer's Table (`cartographers_table`) — `zf` folds
 

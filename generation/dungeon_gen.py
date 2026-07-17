@@ -5048,6 +5048,104 @@ def build_dungeon_stair_rail(seed: int) -> Dungeon:
     return dungeon
 
 
+# ── The G-Sanctum (42: the g-family — g_ forced; g* g# gi gp gP granted) ─────
+#
+# Three long verse rows, each running east into WATER: $ overshoots the
+# text onto the flood (the $-drown trap, the Inscription Halls' law) while
+# g_ lands the last GLYPH — water carries no characters, so the caret-stop
+# scan sails past it. The rows are 10–12 words long, so a counted
+# word-end walk pays two digits ({n}e = 3 keys) where g_ pays 2, and the
+# rows are UNEQUAL so no count is reusable blind. + (taught one level
+# back) chains row to row; the x/dot mends the ◆. The rest of the family
+# (g* g# gi gp gP) rides the same g_family token as taught conveniences —
+# their honest par-forcing collapses to ties (see the build log), and the
+# wing's charter is granting budget-safe conveniences late.
+_GS_ROWS, _GS_COLS = 8, 78
+_GS_SPINE  = 22
+_GS_PLQ_COL = 2
+_GS_BAYS   = (2, 3, 4)                # adjacent — + chains them
+_GS_NWORDS = (10, 12, 11)             # unequal, all two-digit e-counts
+_GS_TEXT0  = 24
+_GS_POOL   = (72, 73)                 # the flood: $ lands here and drowns
+_GS_THROAT = 5
+_GS_GATE   = 6
+_GS_BOLTS  = {2: 68, 3: 69, 4: 70}
+_GS_EXIT   = (6, 71)                  # the FINAL SEAL, east of every bolt
+_GS_PAR    = 14                       # j g_ x + g_ . + g_ . G $
+
+
+def _gs_draw_words(rng) -> dict:
+    """Three verses of len-3 words; the three TAIL words distinct (their
+    mended rows are the door targets)."""
+    _load_vocab_tables()
+    pool = [w for w in _VOCAB_PLAIN_BY_LEN.get(3, ())
+            if w.isalpha() and w == w.lower()]
+    for _ in range(80):
+        rows = [tuple(rng.choice(pool) for _ in range(n)) for n in _GS_NWORDS]
+        tails = [r[-1] for r in rows]
+        if len(set(tails)) == 3:
+            return {'rows': rows, 'tails': tails}
+    raise ValueError('g_sanctum: no distinct draw after 80 tries')
+
+
+def build_dungeon_g_sanctum(seed: int) -> Dungeon:
+    """The G-Sanctum (slug `g_sanctum`): the g-family — the last glyph,
+    named in one reach."""
+    rng = random.Random(seed)
+    words = _gs_draw_words(rng)
+
+    R, C = _GS_ROWS, _GS_COLS
+    cells = [[CellType.WALL] * C for _ in range(R)]
+    for r in range(1, _GS_GATE + 1):                     # the spine
+        cells[r][_GS_SPINE] = CellType.FLOOR
+    for r in _GS_BAYS:                                   # the verse rows
+        for c in range(_GS_SPINE, _GS_POOL[1] + 1):
+            cells[r][c] = CellType.FLOOR
+        for c in _GS_POOL:                               # the flood at the brink
+            cells[r][c] = CellType.WATER
+    for c in range(_GS_SPINE, _GS_EXIT[1]):              # gate row + bolts
+        cells[_GS_GATE][c] = CellType.FLOOR
+    for dc in _GS_BOLTS.values():
+        cells[_GS_GATE][dc] = CellType.WALL
+    # _GS_EXIT itself stays WALL — the final seal (chassis-standard).
+
+    room = Room(room_type=RoomType.ENTRY, rows=R, cols=C)
+    room.cells = cells
+    room.seed  = seed
+
+    doors = []
+    for i, r in enumerate(_GS_BAYS):
+        verse = words['rows'][i]
+        col = _GS_TEXT0
+        for k, part in enumerate(verse):
+            text = part + ('◆' if k == len(verse) - 1 else '')
+            room.char_runs.append(CharRun(r, col, tuple(text), 'ancient'))
+            col += len(part) + 1
+        # West plaque: the maker's mark — the TAIL word as it must read
+        # (full targets run ~45 chars, past any plaque's width).
+        room.char_runs.append(CharRun(r, _GS_PLQ_COL, tuple(words['tails'][i]),
+                                      'verdant'))
+        doors.append((( ' '.join(verse),), _GS_BOLTS[r]))
+    room._ss_doors = tuple(doors)                        # the shared exact-text tick
+    room._gs_words = words
+
+    room.entities.append(Entity(kind='exit', row=_GS_EXIT[0], col=_GS_EXIT[1],
+                                edit_immune=True))
+    room.spawn_pos = (1, _GS_SPINE)
+    room.exit_pos  = _GS_EXIT
+
+    room.rebuild_indexes()
+    apply_stone_fog(room)
+    room.par    = _GS_PAR
+    room.budget = math.ceil(_GS_PAR * 1.4)  # STANDARD: the counted-e walk wins at 1★
+    room.answer = 'j g_ x + g_ . + g_ . G $'
+
+    dungeon = Dungeon(name='The G-Sanctum', seed=seed)
+    dungeon.rooms        = [room]
+    dungeon.current_room = 0
+    return dungeon
+
+
 # ── The Binder's Reliquary (:h — the Codex) ─────────────────────────────────
 #
 # A second reliquary (display 14.1, after the Seekers' Labyrinth), on the

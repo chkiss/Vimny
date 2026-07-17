@@ -390,6 +390,12 @@ POEMS: list[tuple[str | None, str, list[str]]] = [
         'And _ counts the whole descent at once.',
         'Take the rail; the stairs were cut for it.',
     ]),
+    ('g_sanctum', 'g_ g* gi gp', [             # The G-Sanctum — the g-family
+        'g_ finds the last glyph, never the fall.',
+        'g* hunts a word hidden inside words.',
+        'gi returns your pen to the wet ink.',
+        'gp stamps, and stands ready to stamp again.',
+    ]),
     ('warden_eternal', 'warden eternal', [     # The Warden Eternal (final boss)
         'The last Warden is every Warden.',
         'No key remains for me to give—',

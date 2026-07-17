@@ -607,6 +607,17 @@
       ]
     },
     {
+      "introduces_slug": "g_sanctum",
+      "name": "g_ g* gi gp",
+      "line_count": 4,
+      "quote": [
+        "    g_ finds the last glyph, never the fall.    ",
+        "      g* hunts a word hidden inside words.      ",
+        "      gi returns your pen to the wet ink.       ",
+        "  gp stamps, and stands ready to stamp again.   "
+      ]
+    },
+    {
       "introduces_slug": "warden_eternal",
       "name": "warden eternal",
       "line_count": 4,

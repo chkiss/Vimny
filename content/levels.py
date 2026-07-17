@@ -103,7 +103,8 @@ LEVELS = [
     {'display': '39',   'slug': 'spellwrights_forge',    'name': "The Spellwright's Forge",    'commands': ':s///  :g  &', 'teaches': ['subst']},
     {'display': '40',   'slug': 'hall_of_echoes',        'name': 'The Hall of Echoes',         'commands': 'q @ "', 'teaches': ['q', '@', 'reg_named']},
     {'display': '41',   'slug': 'stair_rail',            'name': 'The Stair Rail',             'commands': '+ - _', 'teaches': ['line_step']},
-    {'display': '41.1', 'slug': 'warden_eternal',        'name': 'The Warden Eternal',         'type': 'boss', 'after': 'stair_rail', 'teaches': []},
+    {'display': '42',   'slug': 'g_sanctum',             'name': 'The G-Sanctum',              'commands': 'g_ g* gi gp', 'teaches': ['g_family']},
+    {'display': '42.1', 'slug': 'warden_eternal',        'name': 'The Warden Eternal',         'type': 'boss', 'after': 'g_sanctum', 'teaches': []},
     {'display': '99',   'slug': 'dummy',                 'name': 'Dummy Dungeon',              'commands': 'd x s y p yy P', 'admin_only': True, 'teaches': []},
 ]
 

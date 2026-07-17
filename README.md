@@ -116,7 +116,8 @@ The curriculum is defined in `content/levels.py` (canonical) and mirrored in `LE
 | 39 | The Spellwright's Forge | `:s///  :g  &` | Playable |
 | 40 | The Hall of Echoes | `q @ "` | Playable |
 | 41 | The Stair Rail | `+ - _` | Playable |
-| 41.1 | The Warden Eternal | (boss) | Planned |
+| 42 | The G-Sanctum | `g_ g* gi gp` | Playable |
+| 42.1 | The Warden Eternal | (boss) | Planned |
 <!-- END GENERATED LEVELS TABLE -->
 
 ## Commands
@@ -246,6 +247,11 @@ The full command reference (also the hint-bar source) is `render/vim_commands.md
 | `"{a}` | named reg |
 | `+` | down, first word |
 | `{n}_` | to line n below |
+| `g_` | last non-blank |
+| `g*` | search substring |
+| `g#` | substring back |
+| `gi` | resume inserting |
+| `gp` | paste, cursor after |
 <!-- END GENERATED COMMANDS TABLE -->
 
 </details>
