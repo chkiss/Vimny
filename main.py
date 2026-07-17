@@ -26,7 +26,9 @@ import render.colors as C
 from render.renderer import render_all
 import render.symbols as S
 from render.utils import inner_w as _iw
-from render.overworld import render_overworld, build_lines, default_cursor
+from render.overworld import (render_overworld, build_lines, default_cursor,
+                              line_search_text)
+from engine.vimregex import compile_vim as _vre_compile
 from render.title import render_title, render_save_select, select_quote, select_quote_by_name, select_next_lesson_quote, MENU_ITEMS as _TITLE_MENU, NAME_MAX as _NAME_MAX
 from render.wizard_blessing import run_wizard_blessing
 from engine.player import Player
@@ -6266,9 +6268,62 @@ def run_overworld(term: Terminal, player: Player, progress: dict,
     renaming       = None        # None, or the in-progress new-name buffer
     pending_delete = False
     pending_g      = False
+    pending_mark   = ''          # 'm' | "'" | '`' awaiting its register letter
+    searching      = None        # None, or {'pfx': '/'|'?', 'buf': str}
     count_buf      = ''
     scroll_offset  = 0
     avail          = max(1, term.height - 5)
+    # Buffer-local marks + the jump list, netrw-style: session-scoped on the
+    # player (the overworld is one buffer; re-entering it keeps your marks).
+    if not hasattr(player, 'ow_marks'):
+        player.ow_marks = {}
+    jump_list: list = []         # cursor lines, Ctrl-o back / Ctrl-i (Tab) fwd
+    jump_idx  = 0
+    last_jump = None             # `''` — where the last jump left from
+
+    def _jump_to(target):
+        """A JUMP motion (G / { } / search / mark / :{n}): remember where we
+        left from, exactly like Vim's jump list + '' mark."""
+        nonlocal cursor, jump_idx, last_jump
+        if target == cursor:
+            return
+        last_jump = cursor
+        del jump_list[jump_idx:]
+        jump_list.append(cursor)
+        jump_idx = len(jump_list)
+        cursor = target
+
+    def _search_from(pattern, fwd, start):
+        """First matching line from `start` (exclusive), wrapscan — Vim's
+        wrapping search over the buffer's VISIBLE text (line_search_text is
+        the renderer's single source). Returns (index|None, wrapped)."""
+        pat = _vre_compile(pattern)
+        order = (list(range(start + 1, len(lines))) + list(range(0, start + 1))
+                 if fwd else
+                 list(range(start - 1, -1, -1)) + list(range(len(lines) - 1, start - 1, -1)))
+        for i in order:
+            text = line_search_text(lines[i])
+            if pat is not None:
+                if pat.first_in(text) is not None:
+                    return i, (i <= start if fwd else i >= start)
+            elif pattern in text:                     # untranslatable → literal
+                return i, (i <= start if fwd else i >= start)
+        return None, False
+
+    def _run_search(pattern, fwd):
+        nonlocal cursor
+        if not pattern:
+            player.error = 'E35: No previous regular expression'
+            return
+        player.last_search = (pattern, fwd)
+        hit, wrapped = _search_from(pattern, fwd, cursor)
+        if hit is None:
+            player.error = f'E486: Pattern not found: {pattern}'
+        else:
+            _jump_to(hit)
+            if wrapped:
+                player.error = ('search hit BOTTOM, continuing at TOP'
+                                if fwd else 'search hit TOP, continuing at BOTTOM')
 
     def _rebuild():
         nonlocal customs, lines, cursor
@@ -6280,7 +6335,8 @@ def run_overworld(term: Terminal, player: Player, progress: dict,
         nonlocal scroll_offset
         scroll_offset, cy, cx = render_overworld(
             term, player, progress, cursor, lines,
-            cmd_line=cmdline.line if cmdline.active else None,
+            cmd_line=((searching['pfx'] + searching['buf']) if searching
+                      else cmdline.line if cmdline.active else None),
             number_mode=number_mode, deleting=pending_delete,
             renaming=renaming, scroll_offset=scroll_offset)
         print(term.move_yx(cy, cx) + (term.cvvis or term.cnorm), end='', flush=True)  # blinking cursor
@@ -6313,10 +6369,34 @@ def run_overworld(term: Terminal, player: Player, progress: dict,
             _render()
             continue
 
+        # ── Search input (/ and ? — the netrw buffer is a real buffer) ────────
+        if searching is not None:
+            if key.name == 'KEY_ESCAPE':
+                searching = None
+            elif key.name == 'KEY_ENTER' or str(key) in ('\n', '\r'):
+                pat = searching['buf'] or (player.last_search or ('', True))[0]
+                fwd = searching['pfx'] == '/'
+                searching = None
+                _run_search(pat, fwd)
+            elif key.name == 'KEY_BACKSPACE' or str(key) == '\x7f':
+                if searching['buf']:
+                    searching['buf'] = searching['buf'][:-1]
+                else:
+                    searching = None                   # BS past the prompt closes it
+            elif not key.is_sequence and len(str(key)) == 1 and str(key).isprintable():
+                searching['buf'] += str(key)
+            _render()
+            continue
+
         # ── Command mode ──────────────────────────────────────────────────────
         if cmdline.active:
             cmd = cmdline.feed(key)
             if cmd:
+                if cmd.isdigit():                      # :{n} — the line address
+                    if _gate('line_addr', ':{n}'):
+                        _jump_to(max(0, min(int(cmd) - 1, len(lines) - 1)))
+                    _render()
+                    continue
                 if cmd in ('q', 'q!', 'wq'):
                     if cmd == 'wq':
                         SM.save_progress(progress, player.name)
@@ -6362,7 +6442,7 @@ def run_overworld(term: Terminal, player: Player, progress: dict,
         if pending_g:
             pending_g = False
             if raw == 'g':
-                cursor    = 0
+                _jump_to(0)
                 count_buf = ''
                 _render()
                 continue
@@ -6377,8 +6457,50 @@ def run_overworld(term: Terminal, player: Player, progress: dict,
         n = int(count_buf) if count_buf else 1
         count_buf = ''
 
+        # m{a} / '{a} / `{a} — buffer-local marks ('' jumps back)
+        if pending_mark:
+            pm, pending_mark = pending_mark, ''
+            if pm == 'm':
+                if raw.isalpha() and raw.islower():
+                    player.ow_marks[raw] = cursor
+            elif raw in ("'", '`') and pm in ("'", '`'):
+                if last_jump is not None:              # '' — back where you jumped from
+                    _jump_to(last_jump)
+            elif raw.isalpha() and raw.islower():
+                if raw in player.ow_marks:
+                    _jump_to(min(player.ow_marks[raw], last))
+                else:
+                    player.error = f'E20: Mark not set: {raw}'
+            _render()
+            continue
+
         if raw == ':':
             cmdline.open()
+        elif raw in ('/', '?'):
+            if _gate('/', 'search'):
+                searching = {'pfx': raw, 'buf': ''}
+        elif raw in ('n', 'N'):
+            if _gate('/', 'search'):
+                if not player.last_search:
+                    player.error = 'E35: No previous regular expression'
+                else:
+                    pat, base_fwd = player.last_search
+                    _run_search(pat, base_fwd if raw == 'n' else not base_fwd)
+        elif raw in ("m'`") and raw:
+            if _gate('mark', 'marks'):
+                pending_mark = raw
+        elif raw == '\x0f':                            # Ctrl-o — jump back
+            if _gate('jump', 'the jump list'):
+                if jump_idx > 0:
+                    if jump_idx == len(jump_list):     # entering history: save here
+                        jump_list.append(cursor)
+                    jump_idx -= 1
+                    cursor = min(jump_list[jump_idx], last)
+        elif raw == '\t':                              # Ctrl-i (Tab) — jump forward
+            if _gate('jump', 'the jump list'):
+                if jump_idx + 1 < len(jump_list):
+                    jump_idx += 1
+                    cursor = min(jump_list[jump_idx], last)
         elif raw == '-':
             return _done({'action': 'parent_view', 'cursor': cursor})
         elif raw == 'j':
@@ -6391,7 +6513,7 @@ def run_overworld(term: Terminal, player: Player, progress: dict,
             pending_g = True
         elif raw == 'G':                               # {n}G → line n; bare G → last line
             if (n <= 1 or _gate('count', 'counts')) and _gate('G', 'G'):
-                cursor = max(0, min(n - 1, last)) if n_given else last
+                _jump_to(max(0, min(n - 1, last)) if n_given else last)
         elif raw == 'H':
             if _gate('H', 'H'):
                 cursor = min(scroll_offset, last)
@@ -6404,10 +6526,10 @@ def run_overworld(term: Terminal, player: Player, progress: dict,
                 cursor = min(scroll_offset + avail - 1, last)
         elif raw == '{':
             if _gate('{', '{'):
-                cursor = _ow_section(lines, cursor, -1)
+                _jump_to(_ow_section(lines, cursor, -1))
         elif raw == '}':
             if _gate('}', '}'):
-                cursor = _ow_section(lines, cursor, +1)
+                _jump_to(_ow_section(lines, cursor, +1))
         elif raw == '\x04':                            # Ctrl-d — half page down
             cursor = min(cursor + avail // 2, last)
         elif raw == '\x15':                            # Ctrl-u — half page up

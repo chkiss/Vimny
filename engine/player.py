@@ -32,6 +32,7 @@ class Player:
     registers: dict = field(default_factory=dict)  # vim registers: '"' unnamed, 'a'-'z', '0', etc.
     edit_clip: list = field(default_factory=list)  # admin map-editor clipboard (characters/entities/cells)
     marks: dict = field(default_factory=dict)   # 'a'-'z' -> (row, col)
+    ow_marks: dict = field(default_factory=dict)  # overworld buffer-local marks: 'a'-'z' -> line
     macros: dict = field(default_factory=dict)  # 'a'-'z' -> recorded keystroke string
     jump_list: list = field(default_factory=list)  # (row, col) positions for Ctrl-o/Ctrl-i
     jump_idx: int = 0                              # cursor index into jump_list

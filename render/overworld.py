@@ -47,6 +47,40 @@ def build_lines(levels: list, custom_layouts: list) -> list:
     return lines
 
 
+def line_search_text(ln: dict) -> str:
+    """The text `/` searches for a buffer line.
+
+    LAW (single source of truth, 2026-07-17): search must match what the
+    renderer DRAWS — the label text, gutter excluded. Level and custom
+    lines share their exact source strings with `_content` (key_for_slug /
+    layout_name); comment lines use the width-INDEPENDENT core of their
+    rendered text (the divider width and version tag vary with the
+    terminal, and search must not depend on window size). If `_content`
+    ever decorates a label, decorate it here too — a silent desync makes
+    `/` lie about the screen.
+    """
+    t = ln['type']
+    if t == 'level':
+        return key_for_slug(ln['level']['slug'])
+    if t == 'custom':
+        return ln['layout'].get('layout_name', '?')
+    if t == 'parent':
+        return '../'
+    if t == 'self':
+        return './'
+    if t == 'subhdr':
+        return ln.get('label', 'custom/')
+    if t == 'comment':
+        return {
+            'div':   '" ' + '=' * 20,
+            'title': '" Netrw Directory Listing',
+            'path':  '"   ~/.vimny/world/',
+            'sort':  '"   Sorted by      discovery order',
+            'help':  '"   Quick Help:',
+        }.get(ln.get('tag', ''), '"')
+    return ''
+
+
 def default_cursor(lines: list) -> int:
     """The line the cursor rests on when the overworld opens: the first ``../``."""
     for i, ln in enumerate(lines):
