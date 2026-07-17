@@ -4489,9 +4489,11 @@ def build_dungeon_sentence_enclosure(seed: int) -> Dungeon:
 # the three rows that must SURVIVE (the spawn row, the rest between the
 # cantos, the gate row), placed so that when — and only when — exactly the
 # right paragraphs fall, the survivors stack into the sigil:
-#         ▲          spawn row       (c)
-#        ▲ ▲         the rest        (c−1, c+1)
-#       ▲ ▲ ▲        gate row        (c−2, c, c+2)
+#         🜂          spawn row       (c)
+#        🜂 🜂         the rest        (c−1, c+1)
+#       🜂 🜂 🜂        gate row        (c−2, c, c+2)
+# (each flame is the Beacon Tiers' 🜂 with its flicker — established
+# vocabulary only; entity-borne so its row stays BLANK)
 # The seal parts when the sigil stands assembled and no goblin lives. The
 # win condition is VISIBLE: a cut through the wrong row extinguishes its
 # flames (remove_row kills entities), the hole in the sigil says exactly
