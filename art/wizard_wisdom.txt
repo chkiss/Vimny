@@ -618,6 +618,28 @@
       ]
     },
     {
+      "introduces_slug": "buried_word",
+      "name": "g* n",
+      "line_count": 4,
+      "quote": [
+        "      A word may hide inside another word.      ",
+        "    * asks for it whole, and hears nothing;     ",
+        "   g* asks for the letters, and they answer.    ",
+        "       Then n, and n — the chain unwinds.       "
+      ]
+    },
+    {
+      "introduces_slug": "wet_ink",
+      "name": "gi",
+      "line_count": 4,
+      "quote": [
+        "  Called away mid-word? Let it dry unfinished.  ",
+        "    When you return, do not hunt the margin—    ",
+        "     gi sets your pen where the ink is wet,     ",
+        "    already writing, mid-thought, mid-line.     "
+      ]
+    },
+    {
       "introduces_slug": "warden_eternal",
       "name": "warden eternal",
       "line_count": 4,

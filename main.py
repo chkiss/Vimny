@@ -2401,6 +2401,8 @@ _LEVEL_INTROS = {
     'tag_enclosure': ('The Tag Enclosure — every reliquary here is sealed in a named case, and some cases sit within cases. The names are carved plain on every seam; the keepers trusted them entirely.', 70),
     'quote_enclosure': ('The Quote Enclosure — a gallery of quoted settings, every one holding a rotten word between its marks. The aisle runs the gallery\'s whole length, and the shelves keep their distance from it.', 70),
     'paragraph_enclosure': ('The Paragraph Enclosure — the goblin legion stands mustered in two long cantos, rank upon rank, and six flames burn scattered down the hall among them. The gate keeps the Warden\'s Sigil: sign and seal are one.', 70),
+    'buried_word': ('The Buried Word — one word stands alone at the hall\'s mouth, and nowhere else does it stand: down the hall it only hides, seamed into longer names. The seams are fused shut.', 70),
+    'wet_ink': ('The Wet Ink — a writing ledge, a plaque with half an inscription, and a corridor that bends away into the dark. The scribes here were often called away mid-word.', 70),
     'g_sanctum': ('The G-Sanctum — three long verses run east toward a crumbling brink, and each ends in a fused glyph hard against the fall. The keepers of this place went to the end of the line many times a day, and never once over it.', 70),
     'stair_rail': ('The Stair Rail — a broken stair winds down the shaft, each step\'s word set a little east of the last, and below the steps the floor falls a long way. The masons who cut these stairs never missed a landing.', 70),
     'hall_of_echoes': ('The Hall of Echoes — one blighted verse, copied five times down the hall, and every copy blighted the same way. The hall listens.', 70),
@@ -3113,12 +3115,19 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
         if level in ('sight_sanctum', 'selection_halls', 'word_enclosure',
                      'bracket_enclosure', 'brace_square_enclosure',
                      'quote_enclosure', 'tag_enclosure', 'sentence_enclosure',
-                     'hall_of_echoes', 'stair_rail', 'g_sanctum'):
+                     'hall_of_echoes', 'stair_rail', 'g_sanctum',
+                     'buried_word', 'wet_ink'):
             for _m in _sight_sanctum_tick(room, player):   # the shared exact-text tick
                 _push(_m)
         if level == 'paragraph_enclosure':
             for _m in _paragraph_enclosure_tick(room, player):
                 _push(_m)
+        if level == 'wet_ink':
+            # The alcove's scripted fog lifts when the bend is walked.
+            _af = getattr(room, '_wi_alcove_fog', None)
+            if _af and player.row >= 3 and room.fog_cells & _af:
+                room.fog_cells -= _af
+                _push('The dark gives back the rest of the inscription.')
         if level == 'grandmasters_sanctum' and dungeon.current_room == 0:
             for _m in _grandmasters_gallery_tick(room, player):
                 _push(_m)
@@ -4903,7 +4912,10 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
                     # re-cost (after the search was undone) re-pays the full search cost.
                     _scg = action.get('count_given', False)
                     if action['type'] == 'search_word':
-                        cost, player.pending_recost_s, smark = _keystroke_cost(count, '', _scg), 0, True
+                        # g* / g# are two physical keys; * / # are one.
+                        cost = (_keystroke_cost(count, '', _scg)
+                                + (1 if action.get('literal') else 0))
+                        player.pending_recost_s, smark = 0, True
                     elif player.pending_recost_s:
                         cost, player.pending_recost_s, smark = player.pending_recost_s, 0, True
                     else:

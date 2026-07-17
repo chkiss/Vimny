@@ -396,6 +396,18 @@ POEMS: list[tuple[str | None, str, list[str]]] = [
         'gi returns your pen to the wet ink.',
         'gp stamps, and stands ready to stamp again.',
     ]),
+    ('buried_word', 'g* n', [                  # The Buried Word — g* n (bonus)
+        'A word may hide inside another word.',
+        '* asks for it whole, and hears nothing;',
+        'g* asks for the letters, and they answer.',
+        'Then n, and n — the chain unwinds.',
+    ]),
+    ('wet_ink', 'gi', [                        # The Wet Ink — gi (bonus)
+        'Called away mid-word? Let it dry unfinished.',
+        'When you return, do not hunt the margin—',
+        'gi sets your pen where the ink is wet,',
+        'already writing, mid-thought, mid-line.',
+    ]),
     ('warden_eternal', 'warden eternal', [     # The Warden Eternal (final boss)
         'The last Warden is every Warden.',
         'No key remains for me to give—',

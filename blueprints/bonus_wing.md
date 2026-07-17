@@ -34,6 +34,17 @@ the tight-budget Overwrite Halls stretch is long past).
 > STANDARD budget; warden_eternal renumbered 42.1 —
 > see `build_dungeon_g_sanctum` + its tests).
 
+> ✅ BONUS LEVELS 43/44 SHIPPED (user-directed 2026-07-17, ties-fine
+> framing): The Buried Word (43, g*/n — the standing word's echoes buried
+> in longer runs, * whole-word finds nothing, g* walks the chain; par 12)
+> and The Wet Ink (44, gi — half the inscription on the ledge plaque,
+> half in a SCRIPTED-fog alcove around the bend — vision is a flood, so
+> bends hide nothing without scripting; gi returns the pen; par 16).
+> ❌ The Stamp Run (gp) was designed and CUT: the engine gives gp no
+> niche (paste self-chains at line end; the Beacon fill is insert-plus-
+> tumble; p+l ties gp everywhere) — gp stays a granted convenience.
+> warden_eternal renumbered 44.1 after wet_ink.
+
 ## The Cartographer's Table (`cartographers_table`) — `zf` folds
 
 - The Codex (14.1, SHIPPED 2026-07-16) already teaches za/zR/zM on the

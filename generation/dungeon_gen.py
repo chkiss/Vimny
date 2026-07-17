@@ -5146,6 +5146,209 @@ def build_dungeon_g_sanctum(seed: int) -> Dungeon:
     return dungeon
 
 
+# ── The Buried Word (43, bonus: g* and the n-chain) ──────────────────────────
+#
+# One standing word — the player spawns ON it — and three echoes of it
+# BURIED inside longer runs down the hall ({pre}◆{word}{post}), each with
+# a fused ◆ at the seam. * (whole-word) finds nothing: no echo stands
+# alone. g* takes the word literally and walks the chain; n carries on.
+# The mend is h x at each landing (the match begins one past the ◆).
+# Bonus-wing framing: the /typed-search rival costs a few keys more (the
+# word is four letters), and that margin is the whole game — no S1 here.
+_BW_ROWS, _BW_COLS = 8, 54
+_BW_SPINE   = 22
+_BW_PLQ_COL = 2
+_BW_STAND   = (1, 24)                 # the standing word — spawn is ON it
+_BW_BAYS    = (2, 3, 4)
+_BW_TEXT0   = 24
+_BW_THROAT  = 5
+_BW_GATE    = 6
+_BW_BOLTS   = {2: 23, 3: 24, 4: 25}
+_BW_EXIT    = (6, 26)                 # the FINAL SEAL, east of every bolt
+_BW_PAR     = 12                      # g* h x n h x n h x G $
+
+
+def _bw_draw_words(rng) -> dict:
+    """The buried word (len 4) + per-bay pre/post/filler (len 3, distinct)."""
+    _load_vocab_tables()
+
+    def pool(length):
+        return [w for w in _VOCAB_PLAIN_BY_LEN.get(length, ())
+                if w.isalpha() and w == w.lower()]
+
+    for _ in range(80):
+        picks: list = []
+
+        def draw(length):
+            w = rng.choice(pool(length))
+            picks.append(w)
+            return w
+
+        d = {'word': draw(4),
+             'bays': tuple((draw(3), draw(3), draw(3)) for _ in range(3))}
+        if len(set(picks)) == len(picks):
+            return d
+    raise ValueError('buried_word: no distinct draw after 80 tries')
+
+
+def build_dungeon_buried_word(seed: int) -> Dungeon:
+    """The Buried Word (slug `buried_word`, bonus): g* — the word hunted
+    inside other words."""
+    rng = random.Random(seed)
+    words = _bw_draw_words(rng)
+    w = words['word']
+
+    R, C = _BW_ROWS, _BW_COLS
+    cells = [[CellType.WALL] * C for _ in range(R)]
+    for r in range(1, _BW_GATE + 1):                     # the spine
+        cells[r][_BW_SPINE] = CellType.FLOOR
+    for c in range(_BW_SPINE, 32):                       # the standing ledge
+        cells[1][c] = CellType.FLOOR
+    for r in _BW_BAYS:                                   # the echo rows
+        for c in range(_BW_SPINE, 52):
+            cells[r][c] = CellType.FLOOR
+    for c in range(_BW_SPINE, _BW_EXIT[1]):              # gate row + bolts
+        cells[_BW_GATE][c] = CellType.FLOOR
+    for dc in _BW_BOLTS.values():
+        cells[_BW_GATE][dc] = CellType.WALL
+    # _BW_EXIT itself stays WALL — the final seal (chassis-standard).
+
+    room = Room(room_type=RoomType.ENTRY, rows=R, cols=C)
+    room.cells = cells
+    room.seed  = seed
+
+    room.char_runs.append(CharRun(*_BW_STAND, tuple(w), 'verdant'))
+    doors = []
+    for i, r in enumerate(_BW_BAYS):
+        pre, post, filler = words['bays'][i]
+        # `{filler} {pre}◆{word}{post}` — the echo buried mid-run, the
+        # fused seam one cell before the match.
+        room.char_runs.append(CharRun(r, _BW_TEXT0, tuple(filler), 'ancient'))
+        run_col = _BW_TEXT0 + len(filler) + 1
+        room.char_runs.append(CharRun(r, run_col,
+                                      tuple(pre + '◆' + w + post), 'ember'))
+        target = f'{filler} {pre}{w}{post}'
+        room.char_runs.append(CharRun(r, _BW_PLQ_COL,
+                                      tuple(pre + w + post), 'verdant'))
+        doors.append(((target,), _BW_BOLTS[r]))
+    room._ss_doors = tuple(doors)                        # the shared exact-text tick
+    room._bw_words = words
+
+    room.entities.append(Entity(kind='exit', row=_BW_EXIT[0], col=_BW_EXIT[1],
+                                edit_immune=True))
+    room.spawn_pos = _BW_STAND
+    room.exit_pos  = _BW_EXIT
+
+    room.rebuild_indexes()
+    apply_stone_fog(room)
+    room.par    = _BW_PAR
+    room.budget = math.ceil(_BW_PAR * 1.4)
+    room.answer = 'g* h x n h x n h x G $'
+
+    dungeon = Dungeon(name='The Buried Word', seed=seed)
+    dungeon.rooms        = [room]
+    dungeon.current_room = 0
+    return dungeon
+
+
+# ── The Wet Ink (44, bonus: gi) ──────────────────────────────────────────────
+#
+# One writing ledge and a plaque bearing only HALF the inscription. The
+# second half is carved in an alcove around a bend — stone-hidden, so it
+# starts fogged and must be walked to. Write the first half, go read the
+# rest, and gi returns the pen to the wet ink (the exact cell INSERT was
+# left at, before the Esc retreat) with insert re-entered — two keys where
+# the walk back pays four. The halves are fused (no typed space — the
+# karaoke law); the door reads the whole word.
+_WI_ROWS, _WI_COLS = 8, 54
+_WI_SPINE  = 22
+_WI_PLQ_COL = 2
+_WI_LEDGE  = 2                        # the writing row
+_WI_INK0   = 24                       # where the inscription begins
+_WI_BEND   = 40                       # the corridor's turn, down to the alcove
+_WI_ALCOVE = 4                        # the alcove row (plaque2 in its south wall)
+_WI_GATE   = 6
+_WI_BOLT   = 23
+_WI_EXIT   = (6, 24)
+_WI_PAR    = 16                       # i{w1} $ 2j gi{w2} G $ (driven tally, pinned)
+
+
+def _wi_draw_words(rng) -> tuple:
+    """The two halves of the inscription (len 4 + len 4, distinct)."""
+    _load_vocab_tables()
+    pool = [w for w in _VOCAB_PLAIN_BY_LEN.get(4, ())
+            if w.isalpha() and w == w.lower()]
+    for _ in range(80):
+        w1, w2 = rng.choice(pool), rng.choice(pool)
+        if w1 != w2:
+            return w1, w2
+    raise ValueError('wet_ink: no distinct draw after 80 tries')
+
+
+def build_dungeon_wet_ink(seed: int) -> Dungeon:
+    """The Wet Ink (slug `wet_ink`, bonus): gi — the pen returns to where
+    it left the page."""
+    rng = random.Random(seed)
+    w1, w2 = _wi_draw_words(rng)
+
+    R, C = _WI_ROWS, _WI_COLS
+    cells = [[CellType.WALL] * C for _ in range(R)]
+    for c in range(_WI_SPINE, _WI_BEND + 1):             # the writing corridor
+        cells[_WI_LEDGE][c] = CellType.FLOOR
+    for r in range(_WI_LEDGE, _WI_ALCOVE + 1):           # the bend, downward
+        cells[r][_WI_BEND] = CellType.FLOOR
+    for c in range(_WI_BEND, _WI_BEND + 6):              # the alcove
+        cells[_WI_ALCOVE][c] = CellType.FLOOR
+    for r in range(_WI_LEDGE, _WI_GATE + 1):             # the spine to the gate
+        cells[r][_WI_SPINE] = CellType.FLOOR
+    for c in range(_WI_SPINE, _WI_EXIT[1]):              # gate row + the bolt
+        cells[_WI_GATE][c] = CellType.FLOOR
+    cells[_WI_GATE][_WI_BOLT] = CellType.WALL
+    # _WI_EXIT itself stays WALL — the final seal.
+
+    room = Room(room_type=RoomType.ENTRY, rows=R, cols=C)
+    room.cells = cells
+    room.seed  = seed
+
+    # Plaque 1 (west wall of the ledge): the FIRST half only.
+    room.char_runs.append(CharRun(_WI_LEDGE, _WI_PLQ_COL, tuple(w1), 'verdant'))
+    # Plaque 2 (the alcove's south wall): the SECOND half — stone-hidden
+    # until the bend is walked.
+    room.char_runs.append(CharRun(_WI_ALCOVE + 1, _WI_BEND + 2, tuple(w2),
+                                  'verdant'))
+    room._ss_doors = (((w1 + w2,), _WI_BOLT),)           # the fused inscription
+    room._wi_words = (w1, w2)
+
+    room.entities.append(Entity(kind='exit', row=_WI_EXIT[0], col=_WI_EXIT[1],
+                                edit_immune=True))
+    room.spawn_pos = (_WI_LEDGE, _WI_INK0)
+    room.exit_pos  = _WI_EXIT
+
+    room.rebuild_indexes()
+    # SCRIPTED fog (the Manifold pattern, NOT apply_stone_fog): vision is
+    # a stone-bounded FLOOD, so a mere bend hides nothing — the alcove and
+    # its plaque are fogged by hand and revealed by the level tick when
+    # the player walks the bend. The fog-audit exempts scripted-fog rooms.
+    room.fog_cells = {(r, c)
+                      for r in (_WI_ALCOVE, _WI_ALCOVE + 1)
+                      for c in range(_WI_BEND - 1, _WI_BEND + 6)}
+    room._wi_alcove_fog = set(room.fog_cells)
+    room.par    = _WI_PAR
+    room.budget = math.ceil(_WI_PAR * 1.4)
+    room.answer = f'i{w1} $ 2j gi{w2} G $'
+
+    dungeon = Dungeon(name='The Wet Ink', seed=seed)
+    dungeon.rooms        = [room]
+    dungeon.current_room = 0
+    return dungeon
+
+
+# (The Stamp Run — a gp level — was designed and CUT 2026-07-17: the
+# engine gives gp no niche. Ordinary paste self-chains at line end, the
+# Beacon flame-fill is insert-plus-tumble, and p+l ties gp everywhere
+# else. Recorded in the build log; gp remains a granted convenience.)
+
+
 # ── The Binder's Reliquary (:h — the Codex) ─────────────────────────────────
 #
 # A second reliquary (display 14.1, after the Seekers' Labyrinth), on the

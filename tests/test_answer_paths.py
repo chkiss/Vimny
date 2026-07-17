@@ -40,7 +40,7 @@ _COUNT_RE = re.compile(r'^\d+[hjkl]$')   # e.g. '44l', '3j', '2h'
 #   count=1 → 1 ks; count=N → len(str(N))+1 ks.
 #   ge/gE add +1 base: 2 ks for n=1, len(str(n))+2 for n>1.
 
-_GE_RE  = re.compile(r'^(\d*)g[eEg_]$')  # 'ge', 'gE', 'gg', 'g_', '2gE', '10ge', …
+_GE_RE  = re.compile(r'^(\d*)g[eEg_*#]$')  # 'ge', 'gg', 'g_', 'g*', 'g#', '2gE', …
 _FT_RE  = re.compile(r'^(\d*)[fFtTr].$')  # 'fr', 'Fw', 't!', '2fr' — and r{c}: 'ra', '2rs'
 _CNT_RE = re.compile(r'^(\d+).')        # '4e', '18h', '2j', …
 _MACRO_RE = re.compile(r'q[a-z]?|\d*@[a-z@]')   # 'qa', 'q', '4@a', '@@'
@@ -154,6 +154,7 @@ _ANSWER_NOT_TOKENISED = {
     'build_dungeon_quote_enclosure',   # di"/ci"+cure tape with typed text; tests/test_quote_enclosure.py
     'build_dungeon_tag_enclosure',     # dit/cit+cure tape with typed text; tests/test_tag_enclosure.py
     'build_dungeon_sentence_enclosure',  # dis/cis+cure tape with typed text; tests/test_sentence_enclosure.py
+    'build_dungeon_wet_ink',           # i/gi tape with typed halves; tests/test_g_bonus_levels.py
 }
 
 # Levels with a documented NON-1.4 budget. The Change Annex / Extension use a
@@ -270,6 +271,7 @@ _REPLAY_OWN_TEST = {
     'build_dungeon_quote_enclosure': 'test_quote_enclosure.py::test_canonical_run_wins_at_par',
     'build_dungeon_tag_enclosure': 'test_tag_enclosure.py::test_canonical_run_wins_at_par',
     'build_dungeon_sentence_enclosure': 'test_sentence_enclosure.py::test_canonical_run_wins_at_par',
+    'build_dungeon_wet_ink': 'test_g_bonus_levels.py::test_wi_canonical_wins_at_par',
 }
 
 

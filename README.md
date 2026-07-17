@@ -117,7 +117,9 @@ The curriculum is defined in `content/levels.py` (canonical) and mirrored in `LE
 | 40 | The Hall of Echoes | `q @ "` | Playable |
 | 41 | The Stair Rail | `+ - _` | Playable |
 | 42 | The G-Sanctum | `g_ g* gi gp` | Playable |
-| 42.1 | The Warden Eternal | (boss) | Planned |
+| 43 | The Buried Word | `g* n` | Playable |
+| 44 | The Wet Ink | `gi` | Playable |
+| 44.1 | The Warden Eternal | (boss) | Planned |
 <!-- END GENERATED LEVELS TABLE -->
 
 ## Commands
