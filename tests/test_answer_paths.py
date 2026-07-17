@@ -43,6 +43,7 @@ _COUNT_RE = re.compile(r'^\d+[hjkl]$')   # e.g. '44l', '3j', '2h'
 _GE_RE  = re.compile(r'^(\d*)g[eEg]$')  # 'ge', 'gE', 'gg', '2gE', '10ge', …
 _FT_RE  = re.compile(r'^(\d*)[fFtTr].$')  # 'fr', 'Fw', 't!', '2fr' — and r{c}: 'ra', '2rs'
 _CNT_RE = re.compile(r'^(\d+).')        # '4e', '18h', '2j', …
+_MACRO_RE = re.compile(r'q[a-z]?|\d*@[a-z@]')   # 'qa', 'q', '4@a', '@@'
 
 
 def _token_ks_cost(token: str) -> int:
@@ -67,6 +68,12 @@ def _token_ks_cost(token: str) -> int:
     if m:
         n_str = m.group(1)
         return 2 if not n_str else len(n_str) + 2
+    if _MACRO_RE.fullmatch(token):
+        # 'qa'/'q' cost 0 (the engine charges no keystrokes for the record
+        # bookends — recording pays via the keys it captures live);
+        # '{n}@a' charges 2 + its count digits (main's macro_play), which
+        # equals the token's length. Must precede the generic count rule.
+        return 0 if token[0] == 'q' else len(token)
     m = _CNT_RE.match(token)
     if m:
         return len(m.group(1)) + 1
@@ -158,6 +165,7 @@ _NONSTANDARD_BUDGET = {
     'build_dungeon_overwrite_halls',   # TIGHT: par + _OH_SAVING − 1 bars the all-S route
     'build_dungeon_indentation_sanctum',  # GENEROUS hand-set: the manual-mason route wins 1★
     'build_dungeon_selection_halls',   # GENEROUS hand-set 110: the void-push forces visual p
+    'build_dungeon_hall_of_echoes',    # GENEROUS hand-set 45: straight manual (43) wins 1★
 }
 
 from tests import SEEDS as _UNIVERSAL_SEEDS

@@ -2399,6 +2399,7 @@ _LEVEL_INTROS = {
     'tag_enclosure': ('The Tag Enclosure — every reliquary here is sealed in a named case, and some cases sit within cases. The names are carved plain on every seam; the keepers trusted them entirely.', 70),
     'quote_enclosure': ('The Quote Enclosure — a gallery of quoted settings, every one holding a rotten word between its marks. The aisle runs the gallery\'s whole length, and the shelves keep their distance from it.', 70),
     'paragraph_enclosure': ('The Paragraph Enclosure — the goblin legion stands mustered in two long cantos, rank upon rank, and six flames burn scattered down the hall among them. The gate keeps the Warden\'s Sigil: sign and seal are one.', 70),
+    'hall_of_echoes': ('The Hall of Echoes — one blighted verse, copied five times down the hall, and every copy blighted the same way. The hall listens.', 70),
     'grandmasters_sanctum': ('The Grandmaster\'s Sanctum — a long gallery of seven proofs, and the master himself beyond the last stone, listening to every stroke. Nothing here is new; everything here is asked properly.', 70),
     'binders_reliquary': ('The Binder\'s Reliquary — still water splits the vault, too wide to step and too deep to wade. On the far shore a single word is legible, and beyond it, the binder\'s last work.', 70),
     'warden_scrivener':    ('The Warden Scrivener — he has copied these halls for an age and finished nothing. The great page waits, passage by passage, for a truer hand.', 70),
@@ -3107,7 +3108,8 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
                 _push(_m)
         if level in ('sight_sanctum', 'selection_halls', 'word_enclosure',
                      'bracket_enclosure', 'brace_square_enclosure',
-                     'quote_enclosure', 'tag_enclosure', 'sentence_enclosure'):
+                     'quote_enclosure', 'tag_enclosure', 'sentence_enclosure',
+                     'hall_of_echoes'):
             for _m in _sight_sanctum_tick(room, player):   # the shared exact-text tick
                 _push(_m)
         if level == 'paragraph_enclosure':

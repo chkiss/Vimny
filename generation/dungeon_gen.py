@@ -4839,6 +4839,120 @@ def build_dungeon_grandmasters_sanctum(seed: int) -> Dungeon:
     return dungeon
 
 
+# ── The Hall of Echoes (40: q @ " — macros + named registers) ────────────────
+#
+# Five ECHO ROWS — the same blighted verse copied down the hall, each row
+# needing the SAME two-part mend (daw the junk word, x the fused ◆ off the
+# last word) but bearing a DISTINCT last word, so each of the five
+# exact-text bolts answers only its own row (identical targets would let
+# one mended row open every bolt — the row-agnostic matching law). Two
+# different edits per row means the dot can only carry HALF the work; the
+# macro carries all of it: record the first mend (qa ^ w daw w x j q),
+# then 4@a replays it down the hall. Replayed keys are budget-free
+# (Budget.frozen — the engine's macro pricing), so par is the RECORDING
+# plus three keys of replay. The dot-assisted manual mend wins at 1★
+# under the hand-set budget; the :s routes (subst is already taught at
+# 39) cannot name the untypable ◆ except by char-class and land ~31 —
+# also 1★. The ^ at the macro's head is what makes it position-
+# independent (j exits each row mid-text; ^ renormalises).
+_HE_ROWS, _HE_COLS = 10, 54
+_HE_SPINE  = 22
+_HE_PLQ_COL = 2
+_HE_TEXT0  = 24
+_HE_ECHOES = (2, 3, 4, 5, 6)          # the five copies of the verse
+_HE_THROAT = 7
+_HE_GATE   = 8
+_HE_BOLTS  = {2: 23, 3: 24, 4: 25, 5: 26, 6: 27}
+_HE_EXIT   = (8, 28)                  # the FINAL SEAL, east of every bolt
+_HE_PAR    = 14                       # j qa ^ w daw w x j q 4@a G $
+_HE_BUDGET = 45                       # GENEROUS hand-set: the straight manual
+                                      # mend (43 — the dot can't ride at all,
+                                      # x is always the LAST change) wins 1★
+
+
+def _he_draw_words(rng) -> dict:
+    """One verse, five tails: a + junk + b shared, c1..c5 distinct."""
+    _load_vocab_tables()
+
+    def pool(length):
+        return [w for w in _VOCAB_PLAIN_BY_LEN.get(length, ())
+                if w.isalpha() and w == w.lower()]
+
+    for _ in range(80):
+        picks: list = []
+
+        def draw(length):
+            w = rng.choice(pool(length))
+            picks.append(w)
+            return w
+
+        d = {'a': draw(3), 'junk': draw(4), 'b': draw(3),
+             'tails': tuple(draw(3) for _ in range(5))}
+        if len(set(picks)) == len(picks):
+            return d
+    raise ValueError('hall_of_echoes: no distinct draw after 80 tries')
+
+
+def build_dungeon_hall_of_echoes(seed: int) -> Dungeon:
+    """The Hall of Echoes (slug `hall_of_echoes`): q @ " — record the mend
+    once, and let the echo do the rest."""
+    rng = random.Random(seed)
+    words = _he_draw_words(rng)
+
+    R, C = _HE_ROWS, _HE_COLS
+    cells = [[CellType.WALL] * C for _ in range(R)]
+    for r in range(1, _HE_GATE + 1):                     # the spine
+        cells[r][_HE_SPINE] = CellType.FLOOR
+    for r in _HE_ECHOES:                                 # the echo rows
+        for c in range(_HE_SPINE, 52):
+            cells[r][c] = CellType.FLOOR
+    for dc in _HE_BOLTS.values():                        # gate row + bolts
+        cells[_HE_GATE][dc] = CellType.WALL
+    for c in range(_HE_SPINE, _HE_EXIT[1]):
+        if c not in _HE_BOLTS.values():
+            cells[_HE_GATE][c] = CellType.FLOOR
+    # _HE_EXIT itself stays WALL — the final seal (chassis-standard).
+
+    room = Room(room_type=RoomType.ENTRY, rows=R, cols=C)
+    room.cells = cells
+    room.seed  = seed
+
+    doors = []
+    for i, r in enumerate(_HE_ECHOES):
+        tail = words['tails'][i]
+        # The verse: `aaa jjjj bbb ◆tail` — daw pulls the junk out whole,
+        # x strikes the fused glyph, and the row reads `aaa bbb tail`.
+        col = _HE_TEXT0
+        for part, kind in ((words['a'], 'ancient'), (words['junk'], 'ancient'),
+                           (words['b'], 'ancient'), ('◆' + tail, 'ember')):
+            room.char_runs.append(CharRun(r, col, tuple(part), kind))
+            col += len(part) + 1
+        target = f"{words['a']} {words['b']} {tail}"
+        col = _HE_PLQ_COL                                # west plaque = the target
+        for part in target.split(' '):
+            room.char_runs.append(CharRun(r, col, tuple(part), 'verdant'))
+            col += len(part) + 1
+        doors.append(((target,), _HE_BOLTS[r]))
+    room._ss_doors = tuple(doors)                        # the shared exact-text tick
+    room._he_words = words
+
+    room.entities.append(Entity(kind='exit', row=_HE_EXIT[0], col=_HE_EXIT[1],
+                                edit_immune=True))
+    room.spawn_pos = (1, _HE_SPINE)
+    room.exit_pos  = _HE_EXIT
+
+    room.rebuild_indexes()
+    apply_stone_fog(room)
+    room.par    = _HE_PAR
+    room.budget = _HE_BUDGET
+    room.answer = 'j qa ^ w daw w x j q 4@a G $'
+
+    dungeon = Dungeon(name='The Hall of Echoes', seed=seed)
+    dungeon.rooms        = [room]
+    dungeon.current_room = 0
+    return dungeon
+
+
 # ── The Binder's Reliquary (:h — the Codex) ─────────────────────────────────
 #
 # A second reliquary (display 14.1, after the Seekers' Labyrinth), on the
