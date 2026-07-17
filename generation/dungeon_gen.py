@@ -4482,36 +4482,53 @@ def build_dungeon_sentence_enclosure(seed: int) -> Dungeon:
 
 # ── The Paragraph Enclosure (ip ap) ───────────────────────────────────────────
 #
-# Two cantos of the goblin legion stand in ranked verse — ELEVEN rows each,
-# tall enough that a counted line-cut (d10j / d11j) pays its second digit
-# where dip/dap do not. The gate keeps the Warden's Measure: it parts only
-# when no sentinel stands AND the dungeon has closed to exactly
-# _PE_FINAL_ROWS lines. That single global invariant prices every route:
-#   • the blank rest below the first canto must SURVIVE — dip spares it;
-#     d} / V}d / dap eat it, and the measure breaks;
+# Two cantos of the goblin legion stand in ranked verse — 11 and 12 rows,
+# tall enough that a counted line-cut (11dd / 14dd) pays its second digit
+# where dip/dap do not, and UNEQUAL so no dot can repeat one canto's cut on
+# the other. The gate keeps the WARDEN'S SIGIL: six braziers scattered on
+# the three rows that must SURVIVE (the spawn row, the rest between the
+# cantos, the gate row), placed so that when — and only when — exactly the
+# right paragraphs fall, the survivors stack into the sigil:
+#         ▲          spawn row       (c)
+#        ▲ ▲         the rest        (c−1, c+1)
+#       ▲ ▲ ▲        gate row        (c−2, c, c+2)
+# The seal parts when the sigil stands assembled and no goblin lives. The
+# win condition is VISIBLE: a cut through the wrong row extinguishes its
+# flames (remove_row kills entities), the hole in the sigil says exactly
+# what went wrong, and undo relights them. No un-Vim parrying anywhere —
+# 25dd/d}/dG all WORK; they just wreck the sigil:
+#   • the rest below the first canto must SURVIVE — its brazier pair is
+#     the visible reason; dip spares it, dap/d}/any spanning cut kills it;
+#   • the spawn row must SURVIVE (its lone flame) — no counted cut may
+#     start there, so the first cut is taken from INSIDE the canto;
 #   • the watch-gap below the second canto AND its echo row must FALL —
 #     dap's trailing block is the whole consecutive blank run (both rows);
-#     V}d grabs one blank short, d12j pays its digits;
-#   • over-deletion (dG, d}, :g/./d) is never parried — it just breaks the
-#     measure, and undo restores it. The watch-gap's goblins stand on a
-#     TEXTLESS row, so no :g pattern can ever reach them.
+#     V}d grabs one blank short, counted cuts pay their digits;
+#   • the watch-gap's goblins stand on a TEXTLESS row, so no :g pattern
+#     can ever reach them.
 # Blank rows must hold NO char runs anywhere (a wall-embedded glyph would
-# make the row non-blank and weld the cantos into one paragraph); the gate
-# row's floor plaque is what stops dap's blank-run extension at the gate.
-_PE_ROWS, _PE_COLS = 29, 30
+# make the row non-blank and weld the cantos into one paragraph) — the
+# braziers are ENTITIES, which leave their rows blank. The gate row's
+# floor plaque is what stops dap's blank-run extension at the gate.
+_PE_ROWS, _PE_COLS = 30, 30
 _PE_SPAWN  = (1, 1)
 _PE_P1     = (2, 12)        # first canto: 11 content rows
 _PE_B1     = 13             # the warden's rest — must survive (dip, not dap)
-_PE_P2     = (14, 24)       # second canto: 11 content rows
-_PE_GUARD  = 25             # the watch-gap: goblins on a textless (blank) row
-_PE_B2     = 26             # its echo — dap's trailing blank block is BOTH rows
-_PE_GATE   = 27
-_PE_EXIT   = (27, 27)       # the sealed exit cell itself (plain stone until open)
+_PE_P2     = (14, 25)       # second canto: 12 content rows (≠ P1 — no dot pair)
+_PE_GUARD  = 26             # the watch-gap: goblins on a textless (blank) row
+_PE_B2     = 27             # its echo — dap's trailing blank block is BOTH rows
+_PE_GATE   = 28
+_PE_EXIT   = (28, 27)       # the sealed exit cell itself (plain stone until open)
 _PE_TEXT0  = 3
 _PE_GOB_COLS   = (17, 27)   # canto sentinels stand east, clear of the west aisle
 _PE_GUARD_COLS = (8, 13, 18, 23)
-_PE_FINAL_ROWS = 5          # wall · spawn row · the rest · gate · wall
-_PE_PAR    = 9              # j dip j dap $ — best old-only (d11j j d11j $) pays 10
+_PE_SIGIL_COL  = 22         # the sigil's centre column (east, clear of the plaque)
+_PE_SIGIL      = ((0, 0), (1, -1), (1, 1), (2, -2), (2, 0), (2, 2))
+# Initial (row, col) of each flame: lone on the spawn row, pair on the rest,
+# trio on the gate row — the sigil's shape, stretched across the hall until
+# the deletions pull the three rows together.
+_PE_BRAZIERS   = ((1, 22), (13, 21), (13, 23), (28, 20), (28, 22), (28, 24))
+_PE_PAR    = 9              # j dip j dap $ — best old-only (j 11dd j 14dd $) pays 11
 
 
 def _pe_draw_words(rng) -> dict:
@@ -4561,13 +4578,19 @@ def build_dungeon_paragraph_enclosure(seed: int) -> Dungeon:
     # The gate plaque (floor runes): names the measure, and — being char runs —
     # keeps the gate row non-blank so dap's blank-run extension stops here.
     col = _PE_TEXT0
-    for part in ('measure', 'is', 'five', 'lines'):
+    for part in ('sign', 'and', 'seal'):
         room.char_runs.append(CharRun(_PE_GATE, col, tuple(part), 'verdant'))
         col += len(part) + 1
     room._pe_words = words
 
     room.entities.append(Entity(kind='exit', row=_PE_EXIT[0], col=_PE_EXIT[1],
                                 edit_immune=True))
+    # The sigil's flames — NOT edit_immune: a cut through a flame's row
+    # succeeds and extinguishes it (the hole in the sigil shows the player
+    # exactly which row should have survived); undo relights it.
+    for br, bc in _PE_BRAZIERS:
+        room.entities.append(Entity(kind='brazier', row=br, col=bc,
+                                    hp=1, max_hp=1, ai=''))
     for lo, hi in (_PE_P1, _PE_P2):                      # one sentinel per verse row
         for r in range(lo, hi + 1):
             room.entities.append(Entity(kind='goblin', row=r,
@@ -4577,9 +4600,8 @@ def build_dungeon_paragraph_enclosure(seed: int) -> Dungeon:
         room.entities.append(Entity(kind='goblin', row=_PE_GUARD, col=gc,
                                     hp=1, max_hp=1, ai=''))
 
-    room.spawn_pos      = _PE_SPAWN
-    room.exit_pos       = _PE_EXIT
-    room._pe_final_rows = _PE_FINAL_ROWS
+    room.spawn_pos = _PE_SPAWN
+    room.exit_pos  = _PE_EXIT
 
     room.rebuild_indexes()
     apply_stone_fog(room)                 # the sealed exit pocket sleeps under fog

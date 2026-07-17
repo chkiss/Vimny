@@ -210,6 +210,8 @@ def _ent_cell_str(ent, room, r: int, c: int, mode, floor_bg: str) -> str:
         return floor_bg + C.boss_fg() + entity_letter(ent) + rst
     if ent.kind == 'shield':
         return floor_bg + C.boss_fg() + S.SHIELD + rst
+    if ent.kind == 'brazier':                         # a standing flame (the Sigil)
+        return floor_bg + C.rune_ember() + '▲' + rst
     if ent.kind == 'heart_container':
         return floor_bg + C.heart_full() + '♥' + rst
     if ent.kind == 'floor_key':

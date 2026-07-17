@@ -16,9 +16,10 @@
 #
 # SPDX-License-Identifier: GPL-3.0-or-later
 
-"""The Paragraph Enclosure (ip ap): eleven-row cantos so a counted line-cut
-pays its second digit, and the Warden's Measure (exact final row count + no
-goblin standing) prices which blank rows survive and which fall."""
+"""The Paragraph Enclosure (ip ap): tall unequal cantos so counted line-cuts
+pay their digits, and the Warden's Sigil — six brazier flames on the three
+rows that must survive, stacking into ▲ / ▲ ▲ / ▲ ▲ ▲ when exactly the right
+paragraphs fall. The win condition is visible: wrong cuts extinguish flames."""
 import math
 
 import pytest
@@ -31,7 +32,7 @@ from engine.text_object import resolve_text_object
 from generation.dungeon_gen import (
     build_dungeon_paragraph_enclosure,
     _PE_ROWS, _PE_COLS, _PE_SPAWN, _PE_P1, _PE_B1, _PE_P2, _PE_GUARD,
-    _PE_B2, _PE_GATE, _PE_EXIT, _PE_FINAL_ROWS, _PE_PAR,
+    _PE_B2, _PE_GATE, _PE_EXIT, _PE_PAR, _PE_SIGIL, _PE_BRAZIERS,
 )
 from tests import SEEDS, cached_room
 
@@ -44,20 +45,33 @@ def _K(s):
     return [Keystroke(ch) for ch in s]
 
 
-# The canonical tape (== room.answer): dip spares the warden's rest below the
-# first canto; dap takes the second canto WITH its whole trailing blank block
-# (the watch-gap and its echo).
+def _flames(room):
+    return [(e.row, e.col) for e in room.entities
+            if e.kind == 'brazier' and e.alive]
+
+
+def _sigil_stands(room):
+    fl = _flames(room)
+    if len(fl) != 6:
+        return False
+    r0, c0 = min(fl)
+    return set(fl) == {(r0 + dr, c0 + dc) for dr, dc in _PE_SIGIL}
+
+
+# The canonical tape (== room.answer): dip spares the rest below the first
+# canto (its flame pair survives); dap takes the second canto WITH its whole
+# trailing blank block (the watch-gap and its echo), pulling the gate row's
+# flame trio up under the pair — the sigil stands.
 CANON = 'jdipjdap$'
 
-# The leanest old-only rival: counted line-cuts. d11j from the spawn row eats
-# spawn row + first canto (the warden's rest survives in the spawn row's
-# stead — the measure counts lines, not names); then the second cut must
-# span canto + watch-gap, and the gap's west end is walled — the j-motion
-# stops short from the aisle, so the rival pays 5l east onto the verse
-# before d11j. 29 − 12 − 12 = 5: the measure holds, every goblin is fallen.
-# The cut parks on the surviving echo row, one line shy of the gate — a
-# final j before $. Wins, at 1★ (13 = budget > par 9).
-RIVAL = 'd11jj5ld11jj$'
+# The leanest old-only rival: two counted line-cuts around the flames. No
+# cut may start on the SPAWN row (its lone flame is the sigil's crown), so
+# the rival enters the canto first: 11dd takes exactly the first canto,
+# 14dd from the second canto's top row takes canto + watch-gap + echo (dd is
+# row-based, so the gap's walled west end doesn't stop it the way it stops
+# a d{n}j motion). The cantos are UNEQUAL (11 vs 12 rows), so no dot can
+# repeat the first cut on the second. Wins, at 1★ (11 > par 9).
+RIVAL = 'j11ddj14dd$'
 
 
 def _drive(dungeon, keys, monkeypatch, finish=':wq\r', name='Scribe'):
@@ -105,7 +119,6 @@ def test_par_answer_budget(seed):
     assert room.par == _PE_PAR
     assert room.budget == math.ceil(_PE_PAR * 1.4)
     assert room.answer == 'j dip j dap $'
-    assert room._pe_final_rows == _PE_FINAL_ROWS
 
 
 @pytest.mark.parametrize("seed", SEEDS)
@@ -117,7 +130,8 @@ def test_exit_starts_sealed(seed):
 @pytest.mark.parametrize("seed", SEEDS)
 def test_blank_rows_are_truly_blank(seed):
     # A single stray char run (even one embedded in a wall) on a boundary row
-    # would weld the two cantos into ONE paragraph.
+    # would weld the two cantos into ONE paragraph. The sigil's flames are
+    # ENTITIES precisely so their rows stay blank.
     room = _room(seed)
     text_rows = {ru.row for ru in room.char_runs}
     for r in (_PE_SPAWN[0], _PE_B1, _PE_GUARD, _PE_B2):
@@ -126,6 +140,18 @@ def test_blank_rows_are_truly_blank(seed):
         for r in range(lo, hi + 1):
             assert r in text_rows, f"canto row {r} must carry a verse"
     assert _PE_GATE in text_rows          # the plaque stops dap's blank run
+
+
+@pytest.mark.parametrize("seed", SEEDS)
+def test_the_sigil_flames_ride_the_surviving_rows(seed):
+    room = _room(seed)
+    assert sorted(_flames(room)) == sorted(_PE_BRAZIERS)
+    rows = {r for r, _ in _PE_BRAZIERS}
+    assert rows == {_PE_SPAWN[0], _PE_B1, _PE_GATE}
+    for e in room.entities:
+        if e.kind == 'brazier':
+            assert not e.edit_immune      # a wrong cut SUCCEEDS and snuffs it
+    assert not _sigil_stands(room)        # scattered at first — rows apart
 
 
 @pytest.mark.parametrize("seed", SEEDS)
@@ -163,9 +189,17 @@ def test_paragraph_objects_resolve_to_the_cantos(seed):
 # ── playthroughs ─────────────────────────────────────────────────────────────
 
 @pytest.mark.parametrize("seed", SEEDS)
-def test_canonical_run_wins_at_par(seed, monkeypatch):
-    won, spent = _drive_spent(_K(CANON), monkeypatch, seed)
-    assert won and spent == _PE_PAR
+def test_canonical_run_wins_at_par_and_raises_the_sigil(seed, monkeypatch):
+    dungeon = build_dungeon_paragraph_enclosure(seed)
+    box = {}
+    orig = main._calc_stars
+    monkeypatch.setattr(main, '_calc_stars',
+                        lambda won, budget, room, player, level='':
+                            (box.__setitem__('spent', budget.spent),
+                             orig(won, budget, room, player, level))[1])
+    result = _drive(dungeon, _K(CANON), monkeypatch)
+    assert result['won'] and box['spent'] == _PE_PAR
+    assert _sigil_stands(dungeon.rooms[0])
 
 
 @pytest.mark.parametrize("seed", SEEDS)
@@ -175,16 +209,48 @@ def test_counted_cut_rival_wins_at_one_star(seed, monkeypatch):
     assert won and _PE_PAR < spent <= room.budget
 
 
-def test_overeating_the_rest_breaks_the_measure(monkeypatch):
-    # d} from the first canto eats the warden's rest along with the canto —
-    # the measure is broken and the seal never parts, even with the second
-    # canto swept correctly.
+def test_one_cut_through_both_cantos_snuffs_the_pair(monkeypatch):
+    # The 25dd question (playtest 2026-07-17): a single counted cut spanning
+    # canto–rest–canto fells every goblin — and visibly extinguishes the
+    # rest's flame pair, so the sigil (and the seal) can never stand.
+    dungeon = build_dungeon_paragraph_enclosure(0)
+    result = _drive(dungeon, _K('j25dd$'), monkeypatch)
+    assert not result['won']
+    room = dungeon.rooms[0]
+    assert not any(e.alive for e in room.entities if e.kind == 'goblin')
+    assert len(_flames(room)) == 4                        # the pair is dark
+    assert not _sigil_stands(room)
+
+
+def test_a_cut_from_the_spawn_row_snuffs_the_crown(monkeypatch):
+    # 12dd from the spawn row would tie the rival by letting the spawn row
+    # substitute for the rest — the crown flame on the spawn row forbids it.
+    dungeon = build_dungeon_paragraph_enclosure(0)
+    result = _drive(dungeon, _K('12ddj14ddj$'), monkeypatch)
+    assert not result['won']
+    assert len(_flames(dungeon.rooms[0])) == 5            # the crown is dark
+
+
+def test_no_dot_pair_spans_both_cantos(monkeypatch):
+    # 11dd then `.` (the equal-size dot cheese): the cantos are 11 vs 12
+    # rows, so the repeated cut falls one row short of the watch-gap.
+    dungeon = build_dungeon_paragraph_enclosure(0)
+    result = _drive(dungeon, _K('j11ddj.jjj$'), monkeypatch)
+    assert not result['won']
+    assert any(e.alive for e in dungeon.rooms[0].entities if e.kind == 'goblin')
+
+
+def test_overeating_the_rest_breaks_the_sigil(monkeypatch):
+    # d} from the first canto eats the rest along with the canto — its
+    # flame pair dies with the row, and the seal never parts, even with the
+    # second canto swept correctly.
     dungeon = build_dungeon_paragraph_enclosure(0)
     result = _drive(dungeon, _K('jd}jdap$'), monkeypatch)
     assert not result['won']
     room = dungeon.rooms[0]
     er, ec = room.exit_pos
     assert room.cells[er][ec] == CellType.WALL
+    assert len(_flames(room)) == 4
 
 
 def test_dip_on_the_second_canto_leaves_the_watch(monkeypatch):
@@ -198,18 +264,18 @@ def test_dip_on_the_second_canto_leaves_the_watch(monkeypatch):
 
 def test_dG_over_deletion_is_not_a_route(monkeypatch):
     # dG from inside the first canto rips everything down to the anchored
-    # gate row: goblins all die, but the measure is broken → sealed.
+    # gate row: goblins all die, but the flames die with their rows.
     dungeon = build_dungeon_paragraph_enclosure(0)
     result = _drive(dungeon, _K('jdG$'), monkeypatch)
     assert not result['won']
 
 
-def test_undo_restores_the_measure_and_reseals(monkeypatch):
+def test_undo_relights_the_flames_and_reseals(monkeypatch):
     dungeon = build_dungeon_paragraph_enclosure(0)
     room = dungeon.rooms[0]
-    _drive(dungeon, _K('jdipjdapu'), monkeypatch, finish=':q!\r')
-    # undo rebuilt the second canto: rows back over the measure, seal shut
-    assert room.rows != _PE_FINAL_ROWS
+    _drive(dungeon, _K('jdipjd}u'), monkeypatch, finish=':q!\r')
+    # d} ate the second canto plus the watch-gap AND beyond; undo rebuilt it
+    assert len(_flames(room)) == 6
     er, ec = room.exit_pos
     assert room.cells[er][ec] == CellType.WALL
     assert any(e.alive for e in room.entities if e.kind == 'goblin')
@@ -245,7 +311,7 @@ def test_no_jump_lands_on_the_sealed_exit(monkeypatch):
 
 
 @pytest.mark.parametrize("seed", SEEDS)
-def test_exit_unreachable_until_the_measure(seed):
+def test_exit_unreachable_until_the_sigil(seed):
     from collections import deque
     room = _room(seed)
     seen, dq = {room.spawn_pos}, deque([room.spawn_pos])

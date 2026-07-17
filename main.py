@@ -1556,22 +1556,34 @@ def _sight_sanctum_tick(room, player) -> list:
 
 
 def _paragraph_enclosure_tick(room, player) -> list:
-    """The Warden's Measure — the Paragraph Enclosure's seal. The exit cell
-    parts only while no sentinel of the legion stands AND the buffer has
-    closed to exactly its blessed measure (room._pe_final_rows lines). One
-    global invariant, no parrying: over-deletion (d}, dG, :g/./d) simply
-    breaks the measure, and undo restores it. STATELESS + undo-aware (the
-    seal re-walls), the hardened-chassis pattern. exit_pos is read live —
-    row collapses shift it with the rest of the world."""
+    """The Warden's Sigil — the Paragraph Enclosure's seal. Six brazier
+    flames ride the three rows that must survive (spawn row · the rest
+    between the cantos · the gate row); when exactly the right paragraphs
+    fall, the survivors stack into the sigil (▲ / ▲ ▲ / ▲ ▲ ▲) and the
+    seal parts, provided no goblin still stands. The win condition is
+    VISIBLE: a cut through a wrong row extinguishes its flames — the cut
+    itself succeeds (no un-Vim parrying), the hole in the sigil shows what
+    went wrong, and undo relights it. STATELESS + undo-aware (the seal
+    re-walls), the hardened-chassis pattern; entity rows shift with the
+    collapses, so the check is pure geometry on live positions."""
     msgs = []
     legion = any(e.alive for e in room._entity_by_kind.get('goblin', []))
-    all_true = (not legion) and room.rows == getattr(room, '_pe_final_rows', -1)
+    flames = [e for e in room._entity_by_kind.get('brazier', []) if e.alive]
+    sigil = False
+    if len(flames) == 6:
+        tops = [e for e in flames if e.row == min(f.row for f in flames)]
+        if len(tops) == 1:
+            r0, c0 = tops[0].row, tops[0].col
+            from generation.dungeon_gen import _PE_SIGIL
+            sigil = ({(e.row, e.col) for e in flames}
+                     == {(r0 + dr, c0 + dc) for dr, dc in _PE_SIGIL})
+    all_true = sigil and not legion
     er, ec = room.exit_pos
     seal_open = room.cells[er][ec] != CellType.WALL
     if all_true and not seal_open:
         room.cells[er][ec] = CellType.FLOOR
-        msgs.append('The legion is fallen and the hall closes to the measure — '
-                    'the seal parts!')
+        msgs.append('The legion is fallen and the six flames stand as one '
+                    'sign — the seal parts!')
     elif not all_true and seal_open and (player.row, player.col) != (er, ec):
         room.cells[er][ec] = CellType.WALL         # undone — the seal returns
     return msgs
@@ -2339,7 +2351,7 @@ _LEVEL_INTROS = {
     'sentence_enclosure': ('The Sentence Enclosure — the inscriptions here run in full verses, and the rot takes a whole verse at a time. The plaques remember how every line should read when the reading is done.', 70),
     'tag_enclosure': ('The Tag Enclosure — every reliquary here is sealed in a named case, and some cases sit within cases. The names are carved plain on every seam; the keepers trusted them entirely.', 70),
     'quote_enclosure': ('The Quote Enclosure — a gallery of quoted settings, every one holding a rotten word between its marks. The aisle runs the gallery\'s whole length, and the shelves keep their distance from it.', 70),
-    'paragraph_enclosure': ('The Paragraph Enclosure — the goblin legion stands mustered in two long cantos, rank upon rank. The gate at the hall\'s end keeps the Warden\'s Measure, and it is carved there in stone for any who read so far.', 70),
+    'paragraph_enclosure': ('The Paragraph Enclosure — the goblin legion stands mustered in two long cantos, rank upon rank, and six flames burn scattered down the hall among them. The gate keeps the Warden\'s Sigil: sign and seal are one.', 70),
     'binders_reliquary': ('The Binder\'s Reliquary — still water splits the vault, too wide to step and too deep to wade. On the far shore a single word is legible, and beyond it, the binder\'s last work.', 70),
     'warden_scrivener':    ('The Warden Scrivener — he has copied these halls for an age and finished nothing. The great page waits, passage by passage, for a truer hand.', 70),
     'warden_manifold':     ('The Warden Manifold — he stamps himself into the world. Light the four braziers; the gate will draw and the fog will part.', 70),
