@@ -4617,6 +4617,228 @@ def build_dungeon_paragraph_enclosure(seed: int) -> Dungeon:
     return dungeon
 
 
+# ── The Grandmaster's Sanctum (38.1, act boss) ────────────────────────────────
+#
+# Two rooms. Room 0 — the PROVING GALLERY: seven bays on the exact-text
+# chassis, each a condensed reprise of its level's signature discovery, ops
+# STAGGERED d/c/d/c/d/c/d so no dot rides between bays. Six text doors +
+# the legion bolt (the paragraph bay's goblins must fall). The Grandmaster
+# stands in the gate pocket (edit_immune — he also anchors the gate row
+# against dG) and voices one line of cold appraisal per bolt; the pocket is
+# stone-hidden until the seal parts (fog law), so his presence in the
+# gallery is his VOICE — he is seen when the stone opens. Stepping through
+# the gate swaps to room 1. Room 1 — the ARENA: the Warden's Keep pattern
+# (warden hp5 → key drop → locked door → exit + chest with The Warden's
+# Act). Boss conventions: par None, hand-set budget, no exit entity in the
+# gallery (winning is stepping on the ARENA's exit).
+#
+# Bay door targets are computed FROM layout math (charwise deletes leave
+# literal gaps on non-ledge rows — a diw hole is rot+2 spaces wide), so the
+# plaque, the door, and the operator can never drift apart.
+_GMS_ROWS0, _GMS_COLS0 = 21, 54
+_GMS_SPINE   = 22
+_GMS_PLQ_COL = 2                       # west-wall plaques (park-safe, uncuttable)
+_GMS_TEXT0   = 24
+_GMS_BAYS    = (3, 5, 7, 9, 11, 13)   # word · quote · bracket · sentence · tag · brace
+_GMS_PARA    = (15, 16)               # the legion bay: a 2-row canto, goblins standing
+_GMS_TAIL    = 17                      # its trailing blank …
+_GMS_THROAT  = 18                      # … and the spine-only throat (also blank)
+_GMS_GATE    = 19
+_GMS_BOLTS   = (23, 24, 25, 26, 27, 28, 29)
+_GMS_SEAL    = 30                      # stone until every proof is made
+_GMS_TRANSIT = (19, 31)                # exit_pos: stepping here (or past) descends
+_GMS_WATCH   = (19, 32)                # where the Grandmaster stands
+_GMS_BUDGET  = 160                     # hand-set, generous (gallery + arena melee)
+
+_GMS_A_ROWS, _GMS_A_COLS = 9, 34       # room 1 — the arena
+_GMS_A_SPAWN = (4, 1)
+_GMS_A_BOSS  = (4, 18)
+_GMS_A_TRWALL = 27                     # treasure wall; the locked door sits in it
+_GMS_A_EXIT  = (4, 28)
+_GMS_A_HEART = (3, 30)
+_GMS_A_CHEST = (5, 30)
+
+
+def _gms_draw_words(rng) -> dict:
+    """The gallery's vocabulary — all distinct so no door cross-matches."""
+    _load_vocab_tables()
+
+    def pool(length):
+        return [w for w in _VOCAB_PLAIN_BY_LEN.get(length, ())
+                if w.isalpha() and w == w.lower()]
+
+    for _ in range(80):
+        picks: list = []
+
+        def draw(length):
+            w = rng.choice(pool(length))
+            picks.append(w)
+            return w
+
+        d = {
+            'w_a': draw(3), 'w_rot': draw(4), 'w_b': draw(3),
+            'q_c': draw(3), 'q_rot': draw(4), 'q_cure': draw(4),
+            'k_d': draw(3), 'k_e': draw(3), 'k_rt': draw(3), 'k_g': draw(3),
+            's_a': draw(3), 's_rot': draw(4), 's_cure': draw(4), 's_b': draw(3),
+            't_l': draw(3), 't_rt': draw(3), 't_m': draw(3),
+            'b_n': draw(3), 'b_rot': draw(3), 'b_cure': draw(3),
+            'b_keep': draw(3), 'b_o': draw(3),
+            'p_rows': ((draw(3), draw(4)), (draw(4), draw(3))),
+        }
+        flat = [w for w in picks]
+        if len(set(flat)) == len(flat):
+            return d
+    raise ValueError('grandmasters_sanctum: no distinct draw after 80 tries')
+
+
+def _gms_bay_specs(w) -> list:
+    """(row_text, door_target) per bay, in bay order. Targets are computed
+    from the SAME strings the rows are laid from. These bay rows are
+    LEDGES: a charwise delete PULLS the tail left (close_gap), so a diw
+    hole reads as the two ORIGINAL separator spaces (vs daw's one — the
+    discrimination survives the pull), and da[/dit close up entirely."""
+    return [
+        # 1 · WORD (diw): the rot mid-row; the pull leaves the two
+        # original gaps — daw eats one of them, and the door reads false.
+        (f"{w['w_a']} {w['w_rot']} {w['w_b']}",
+         f"{w['w_a']}  {w['w_b']}"),
+        # 2 · QUOTE (ci"): an EMPTY pair first on the line — the forward
+        # seek must carry past it; the cure is typed into the second pair.
+        (f"\"\" {w['q_c']} \"{w['q_rot']}\"",
+         f"\"\" {w['q_c']} \"{w['q_cure']}\""),
+        # 3 · BRACKET (da[): the fitting torn whole from inside its
+        # setting; the setting closes around the wound.
+        (f"{w['k_d']} ({w['k_e']}[{w['k_rt']}]{w['k_g']})",
+         f"{w['k_d']} ({w['k_e']}{w['k_g']})"),
+        # 4 · SENTENCE (cis): the middle verse cut mid-breath and retyped.
+        (f"{w['s_a']}. {w['s_rot']}. {w['s_b']}.",
+         f"{w['s_a']}. {w['s_cure']}. {w['s_b']}."),
+        # 5 · TAG (dit): empty the named case, keep the case (dat tears it).
+        (f"{w['t_l']} <b>{w['t_rt']}</b> {w['t_m']}",
+         f"{w['t_l']} <b></b> {w['t_m']}"),
+        # 6 · BRACE (ci{): read the metal — the cure goes in the brace,
+        # the bracketed casket beside it must stand untouched.
+        (f"{w['b_n']} {{{w['b_rot']}}} [{w['b_keep']}] {w['b_o']}",
+         f"{w['b_n']} {{{w['b_cure']}}} [{w['b_keep']}] {w['b_o']}"),
+    ]
+
+
+def build_dungeon_grandmasters_sanctum(seed: int) -> Dungeon:
+    """The Grandmaster's Sanctum (slug `grandmasters_sanctum`): the act
+    boss — every text object, asked properly, then the man himself."""
+    rng = random.Random(seed)
+    words = _gms_draw_words(rng)
+    specs = _gms_bay_specs(words)
+
+    # ── Room 0: the proving gallery ─────────────────────────────────────────
+    R, C = _GMS_ROWS0, _GMS_COLS0
+    cells = [[CellType.WALL] * C for _ in range(R)]
+    for r in range(1, _GMS_GATE + 1):                    # the spine
+        cells[r][_GMS_SPINE] = CellType.FLOOR
+    # Bays AND their separator rows are full-width floor (the ops chain
+    # bay-to-bay straight down, SE's shaft trick generalised); only the
+    # THROAT is spine-only, so no east column can drop past the bolts.
+    for r in range(2, _GMS_THROAT):
+        for c in range(_GMS_SPINE, 52):
+            cells[r][c] = CellType.FLOOR
+    for c in range(_GMS_SPINE, _GMS_WATCH[1] + 1):       # gate row + pocket
+        cells[_GMS_GATE][c] = CellType.FLOOR
+    for dc in _GMS_BOLTS:                                # the seven bolts
+        cells[_GMS_GATE][dc] = CellType.WALL
+    cells[_GMS_GATE][_GMS_SEAL] = CellType.WALL          # the final seal
+
+    gallery = Room(room_type=RoomType.ENTRY, rows=R, cols=C)
+    gallery.cells = cells
+    gallery.seed  = seed
+
+    doors = []
+    for bay_i, (text, target) in enumerate(specs):
+        row = _GMS_BAYS[bay_i]
+        col = _GMS_TEXT0                                 # the floor text
+        for part in text.split(' '):
+            if part:
+                gallery.char_runs.append(CharRun(row, col, tuple(part), 'ancient'))
+            col += len(part) + 1
+        col = _GMS_PLQ_COL                               # the west plaque = the target
+        for part in target.split(' '):
+            if part:
+                gallery.char_runs.append(CharRun(row, col, tuple(part), 'verdant'))
+            col += len(part) + 1
+        doors.append((target, _GMS_BOLTS[bay_i]))
+    doors.append((None, _GMS_BOLTS[6]))                  # the legion bolt (goblins)
+    gallery._gms_doors = tuple(doors)
+
+    for pr_i, r in enumerate(_GMS_PARA):                 # the legion bay's canto
+        a, b = words['p_rows'][pr_i]
+        gallery.char_runs.append(CharRun(r, _GMS_TEXT0, tuple(a), 'ancient'))
+        gallery.char_runs.append(CharRun(r, _GMS_TEXT0 + len(a) + 1, tuple(b), 'ancient'))
+        for gc in (40, 46):
+            gallery.entities.append(Entity(kind='goblin', row=r, col=gc,
+                                           hp=1, max_hp=1, ai=''))
+    col = _GMS_PLQ_COL                                   # gate-row plaque: keeps the
+    for part in ('the', 'last', 'gate'):                 # gate row non-blank (stops
+        gallery.char_runs.append(                        # dap's blank-run extension)
+            CharRun(_GMS_GATE, col, tuple(part), 'verdant'))
+        col += len(part) + 1
+
+    # The Grandmaster watches from the gate pocket. edit_immune: he anchors
+    # the gate row against dG, and he is not to be killed through a wall.
+    gallery.entities.append(Entity(kind='warden', row=_GMS_WATCH[0],
+                                   col=_GMS_WATCH[1], hp=5, max_hp=5,
+                                   ai='', tag='grandmaster', edit_immune=True))
+
+    gallery.spawn_pos = (1, _GMS_SPINE)
+    gallery.exit_pos  = _GMS_TRANSIT          # NO exit entity: stepping here descends
+    gallery._gms_words = words
+    gallery.rebuild_indexes()
+    apply_stone_fog(gallery)
+    gallery.par    = None
+    gallery.budget = _GMS_BUDGET
+    gallery.answer = ''                        # set below once words are drawn
+
+    # ── Room 1: the arena ───────────────────────────────────────────────────
+    AR, AC = _GMS_A_ROWS, _GMS_A_COLS
+    acells = [[CellType.WALL] * AC for _ in range(AR)]
+    for r in range(1, AR - 1):
+        for c in range(1, AC - 2):
+            acells[r][c] = CellType.FLOOR
+    for r in range(1, AR - 1):                           # the treasure wall
+        if r != _GMS_A_EXIT[0]:
+            acells[r][_GMS_A_TRWALL] = CellType.WALL
+
+    arena = Room(room_type=RoomType.BOSS, rows=AR, cols=AC)
+    arena.cells     = acells
+    arena.seed      = seed
+    arena.spawn_pos = _GMS_A_SPAWN
+    arena.exit_pos  = _GMS_A_EXIT
+    arena.entities  = [
+        Entity(kind='warden', row=_GMS_A_BOSS[0], col=_GMS_A_BOSS[1],
+               hp=5, max_hp=5, ai='', tag='grandmaster'),
+        Entity(kind='locked_door', row=_GMS_A_EXIT[0], col=_GMS_A_TRWALL),
+        Entity(kind='exit', row=_GMS_A_EXIT[0], col=_GMS_A_EXIT[1]),
+        Entity(kind='heart_container', row=_GMS_A_HEART[0], col=_GMS_A_HEART[1]),
+        Entity(kind='chest_scroll', row=_GMS_A_CHEST[0], col=_GMS_A_CHEST[1]),
+    ]
+    arena.rebuild_indexes()
+    _fog_unreachable(arena, *_GMS_A_SPAWN)
+    arena.par    = None
+    arena.budget = _GMS_BUDGET
+    arena.answer = ''
+
+    # The driven canonical (see tests): the ops chain bay to bay straight
+    # down; G parks on the gate row's first non-blank — the Grandmaster
+    # himself, past the opened seal — and walks you through the gate.
+    gallery.answer = (f"2j w w diw 2j ci\" {words['q_cure']} 2j da[ "
+                      f"2j cis {words['s_cure']}. 2j dit 2j ci{{ {words['b_cure']} "
+                      f"2j dap G")
+    arena.answer = '17l x x x x x x 8l p l'   # five strikes, the key, the door
+
+    dungeon = Dungeon(name="The Grandmaster's Sanctum", seed=seed)
+    dungeon.rooms        = [gallery, arena]
+    dungeon.current_room = 0
+    return dungeon
+
+
 # ── The Binder's Reliquary (:h — the Codex) ─────────────────────────────────
 #
 # A second reliquary (display 14.1, after the Seekers' Labyrinth), on the

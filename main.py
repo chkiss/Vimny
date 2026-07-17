@@ -1589,6 +1589,53 @@ def _paragraph_enclosure_tick(room, player) -> list:
     return msgs
 
 
+_GMS_APPRAISALS = (
+    "'The word, taken clean.' A bolt draws back.",
+    "'You carried past the empty marks without a stroke.' A bolt draws back.",
+    "'The fitting, torn whole from its setting.' A bolt draws back.",
+    "'A verse cut mid-breath, and made true.' A bolt draws back.",
+    "'You asked the case its name, and kept the case.' A bolt draws back.",
+    "'You read the metal, not the shape.' A bolt draws back.",
+    "'And the legion, put away entire.' The last bolt draws back.",
+)
+
+
+def _grandmasters_gallery_tick(room, player) -> list:
+    """The Grandmaster's proving gallery — seven bolts on the exact-text
+    chassis: six text doors (targets on the west plaques) + the legion bolt
+    (the paragraph bay's goblins must fall). The Grandmaster voices one
+    line of cold appraisal per bolt that opens. Stateless, two-sided,
+    row-agnostic; the gate row derives from exit_pos so the paragraph
+    bay's collapse cannot strand the bolts. The final seal is stone until
+    every proof is made."""
+    msgs = []
+    texts = {_wla_floor_text(room, r).strip() for r in range(room.rows)}
+    gr = room.exit_pos[0]
+    all_true = True
+    for i, (target, dc) in enumerate(getattr(room, '_gms_doors', ())):
+        if target is None:                       # the legion bolt
+            held = not any(e.alive
+                           for e in room._entity_by_kind.get('goblin', []))
+        else:
+            held = target in texts
+        is_open = room.cells[gr][dc] != CellType.WALL
+        if held and not is_open:
+            room.cells[gr][dc] = CellType.FLOOR
+            msgs.append(_GMS_APPRAISALS[i])
+        elif not held and is_open and (player.row, player.col) != (gr, dc):
+            room.cells[gr][dc] = CellType.WALL   # undone — the bolt re-bars
+        all_true = all_true and held
+    sc = room.exit_pos[1] - 1
+    seal_open = room.cells[gr][sc] != CellType.WALL
+    if all_true and not seal_open:
+        room.cells[gr][sc] = CellType.FLOOR
+        msgs.append('The stone parts — and the Grandmaster regards you. '
+                    '"Then come. The floor will speak for you."')
+    elif not all_true and seal_open and (player.row, player.col) != (gr, sc):
+        room.cells[gr][sc] = CellType.WALL       # undone — the seal returns
+    return msgs
+
+
 def _indentation_sanctum_tick(room, player) -> list:
     """The Indentation Sanctum bolts. Gallery bolts are the Alignment rule (a
     noun seated at the plumb register, exact col, any floor row). The RITE
@@ -2352,6 +2399,7 @@ _LEVEL_INTROS = {
     'tag_enclosure': ('The Tag Enclosure — every reliquary here is sealed in a named case, and some cases sit within cases. The names are carved plain on every seam; the keepers trusted them entirely.', 70),
     'quote_enclosure': ('The Quote Enclosure — a gallery of quoted settings, every one holding a rotten word between its marks. The aisle runs the gallery\'s whole length, and the shelves keep their distance from it.', 70),
     'paragraph_enclosure': ('The Paragraph Enclosure — the goblin legion stands mustered in two long cantos, rank upon rank, and six flames burn scattered down the hall among them. The gate keeps the Warden\'s Sigil: sign and seal are one.', 70),
+    'grandmasters_sanctum': ('The Grandmaster\'s Sanctum — a long gallery of seven proofs, and the master himself beyond the last stone, listening to every stroke. Nothing here is new; everything here is asked properly.', 70),
     'binders_reliquary': ('The Binder\'s Reliquary — still water splits the vault, too wide to step and too deep to wade. On the far shore a single word is legible, and beyond it, the binder\'s last work.', 70),
     'warden_scrivener':    ('The Warden Scrivener — he has copied these halls for an age and finished nothing. The great page waits, passage by passage, for a truer hand.', 70),
     'warden_manifold':     ('The Warden Manifold — he stamps himself into the world. Light the four braziers; the gate will draw and the fog will part.', 70),
@@ -2684,7 +2732,7 @@ def _enemy_tick(room, player) -> list:
         dist = _manhattan(player.row, player.col, ent.row, ent.col)
         if ent.kind == 'warden' \
                 and ent.tag not in ('surveyor', 'verse', 'manifold', 'stamp',
-                                    'scrivener') \
+                                    'scrivener', 'grandmaster') \
                 and dist <= _ALERT_RADIUS:
             has_goblins = any(
                 e.alive and e.summoner_uid == ent.uid
@@ -3024,6 +3072,7 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
             msg_pool.append(text)
 
     def _content_ticks() -> None:
+        nonlocal room                 # the Sanctum's gate swaps the live room
         """Run the buffer-content gate ticks (the plaque / votive / word gates that
         open the instant their text READS TRUE) and surface their messages. Called
         both in the per-turn dispatch AND on leaving INSERT/REPLACE (Esc), so an
@@ -3064,6 +3113,19 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
         if level == 'paragraph_enclosure':
             for _m in _paragraph_enclosure_tick(room, player):
                 _push(_m)
+        if level == 'grandmasters_sanctum' and dungeon.current_room == 0:
+            for _m in _grandmasters_gallery_tick(room, player):
+                _push(_m)
+            if (player.row == room.exit_pos[0]
+                    and player.col >= room.exit_pos[1]
+                    and len(dungeon.rooms) > 1):
+                dungeon.current_room = 1                 # through the gate
+                room = dungeon.room
+                player.row, player.col = room.spawn_pos
+                undo_stack.clear()                       # gallery snapshots stay behind
+                redo_stack.clear()
+                _push('The Grandmaster withdraws before you into the arena. '
+                      'His shadow does not hurry.')
         if level == 'sculpting_chambers':
             for _m in _sculpting_chambers_tick(room, player):
                 _push(_m)
@@ -4997,10 +5059,12 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
                     # (wired separately); it never leaps-and-summons like the Keep.
                     # The Manifold re-manifests via its own ward machine — the
                     # tick moves him to the next podium, never a random leap.
+                    # The Grandmaster does not flinch: he stands his ground
+                    # and trades blows — a deterministic duel, no leap.
                     if cur.kind == 'warden' and cur.hp > 0 \
                             and cur.tag not in ('surveyor', 'verse',
                                                 'manifold', 'stamp',
-                                                'scrivener'):
+                                                'scrivener', 'grandmaster'):
                         move_msg = _do_warden_move(room, cur, player)
                         if move_msg:
                             _push(move_msg)

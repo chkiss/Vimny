@@ -68,6 +68,21 @@
 
 ---
 
+> ✅ The Grandmaster's Sanctum SHIPPED as display 38.1 (built to the
+> prepped section below: two rooms — the proving gallery's seven
+> staggered-op bays on the exact-text chassis with computed pulled-gap
+> targets + the legion bolt, the Grandmaster's appraisal per bolt, G's
+> first-non-blank parking the player through the opened gate; then the
+> arena duel — leap-exempt 'grandmaster' warden, stand-and-trade, key →
+> locked door → exit + The Warden's Act chest. par None, budget 160.
+> DEVIATION from the pinned decision, for morning review: the gate
+> pocket is stone-hidden, so the Grandmaster is HEARD during the bays
+> and SEEN when the seal parts — bolts are stone, and stone blocks
+> sight (the fog law); a from-the-start sightline would have needed a
+> bolt-bypassing corridor. See `build_dungeon_grandmasters_sanctum` +
+> tests/test_grandmasters_sanctum.py. THIS FILE'S ACT IS COMPLETE —
+> delete the file once reviewed.)
+
 ## Level 38.1 — The Grandmaster's Sanctum (act boss) — PREPPED 2026-07-25
 
 **Slug** `grandmasters_sanctum` · display **38.1** · `type: 'boss'`,
