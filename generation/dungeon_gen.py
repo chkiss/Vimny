@@ -4680,7 +4680,7 @@ def _gms_draw_words(rng) -> dict:
             'q_c': draw(3), 'q_rot': draw(4), 'q_cure': draw(4),
             'k_d': draw(3), 'k_e': draw(3), 'k_rt': draw(3), 'k_g': draw(3),
             's_a': draw(3), 's_rot': draw(4), 's_cure': draw(4), 's_b': draw(3),
-            't_l': draw(3), 't_rt': draw(3), 't_m': draw(3),
+            't_l': draw(3), 't_name': draw(3), 't_rt': draw(3), 't_m': draw(3),
             'b_n': draw(3), 'b_rot': draw(3), 'b_cure': draw(3),
             'b_keep': draw(3), 'b_o': draw(3),
             'p_rows': ((draw(3), draw(4)), (draw(4), draw(3))),
@@ -4713,9 +4713,11 @@ def _gms_bay_specs(w) -> list:
         # 4 · SENTENCE (cis): the middle verse cut mid-breath and retyped.
         (f"{w['s_a']}. {w['s_rot']}. {w['s_b']}.",
          f"{w['s_a']}. {w['s_cure']}. {w['s_b']}."),
-        # 5 · TAG (dit): empty the named case, keep the case (dat tears it).
-        (f"{w['t_l']} <b>{w['t_rt']}</b> {w['t_m']}",
-         f"{w['t_l']} <b></b> {w['t_m']}"),
+        # 5 · TAG (dit): empty the named case, keep the case (dat tears
+        # it). The name is DRAWN per seed — the Tag Enclosure's precedent
+        # (a fixed <b> was a hard-coding regression, caught 2026-07-17).
+        (f"{w['t_l']} <{w['t_name']}>{w['t_rt']}</{w['t_name']}> {w['t_m']}",
+         f"{w['t_l']} <{w['t_name']}></{w['t_name']}> {w['t_m']}"),
         # 6 · BRACE (ci{): read the metal — the cure goes in the brace,
         # the bracketed casket beside it must stand untouched.
         (f"{w['b_n']} {{{w['b_rot']}}} [{w['b_keep']}] {w['b_o']}",
