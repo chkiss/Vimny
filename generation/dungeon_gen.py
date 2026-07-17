@@ -4315,6 +4315,168 @@ def build_dungeon_tag_enclosure(seed: int) -> Dungeon:
     return dungeon
 
 
+# ── The Sentence Enclosure (is as) ──────────────────────────────────────────
+#
+# Sentences are delimited by their own PUNCTUATION — every glyph on a row
+# belongs to one — so is/as forgive position INSIDE the sentence while the
+# old tools (d) d( df. d$) demand its exact edges. Every strike here lands
+# MID-sentence (the chained geometry guarantees it), which is precisely
+# where the objects win. Five chambers on the exact-text chassis:
+#   C1 (rows 3-4)   dis the rotten middle ×2 (dot)  → 's1.  s3.' — inner
+#                   trims no whitespace, so the DOUBLE gap remains
+#   C2 (rows 6-7)   das the middle ×2 (dot)         → 's1. s3.' — around
+#                   spans the trailing space: the SINGLE gap (the pair
+#                   lesson, sentence flavour — and the doors discriminate:
+#                   a d) golf produces the WRONG gap for C1)
+#   C3 (rows 9-10)  cis cures (typed word + its period, single tokens)
+#   C4 (row 12)     das the LAST sentence: nothing trails, so the object
+#                   eats the LEADING whitespace (Vim-true, engine'd today)
+#   C5 (row 14)     das + dot ACROSS sentences: raze the first two, keep
+#                   the last — the dot rides the collapsing row
+#
+# Forcing audit (why par 45 needs the objects): every landing is
+# mid-sentence, where d)/d(/d$ delete PARTIAL sentences and df. leaves the
+# head; whole-sentence spans cost the old tools their positioning (F./^/hh)
+# on every row; the C1-vs-C2 gap discrimination text-forces is-vs-as; '.'
+# repeats are 1 key and cannot be undercut.
+_SE_ROWS, _SE_COLS = 18, 54
+_SE_SPINE   = 22                     # every row's first standable
+_SE_BAY_W   = 23                     # bay floor cols 23..51; east wall 52
+_SE_BAY_E   = 51
+_SE_PLQ_COL = 2                      # full true readings (≤19 chars)
+_SE_TEXT0   = 24
+_SE_C1_ROWS = (3, 4)
+_SE_C2_ROWS = (6, 7)
+_SE_C3_ROWS = (9, 10)
+_SE_C4_ROWS = (12,)
+_SE_C5_ROWS = (14,)
+_SE_SHAFT_SEPS = ((5, 33), (8, 31), (11, 33), (13, 29))
+_SE_THROAT  = 15
+_SE_GATE    = 16
+_SE_BOLTS   = {'c1': 23, 'c2': 24, 'c3': 25, 'c4': 26, 'c5': 27}
+_SE_EXIT    = (16, 28)               # the FINAL SEAL, east of every bolt
+_SE_PAR = 45            # hand-tallied along the driven tape (mid landings)
+
+
+def _se_draw_words(rng) -> dict:
+    """Draw the enclosure vocabulary. Per-chamber row SHAPES stagger the
+    first sentence's length so the chained landing column always falls
+    MID-target-sentence: C1/C5 rows open with a two-word sentence, C2 with
+    a lone len-5 word, C3/C4 with a lone len-4 word. Cures len 3."""
+    _load_vocab_tables()
+
+    def pool(length):
+        return [w for w in _VOCAB_PLAIN_BY_LEN.get(length, ())
+                if w.isalpha() and w == w.lower()]
+
+    for _ in range(80):
+        picks: list = []
+
+        def draw(length):
+            w = rng.choice(pool(length))
+            picks.append(w)
+            return w
+
+        rows = {}
+        for r in _SE_C1_ROWS + _SE_C5_ROWS:      # 3× two len-3 words
+            rows[r] = ([draw(3), draw(3)], [draw(3), draw(3)],
+                       [draw(3), draw(3)])
+        for r in _SE_C2_ROWS:                    # len-5 lone + 2× pairs
+            rows[r] = ([draw(5)], [draw(3), draw(3)], [draw(3), draw(3)])
+        for r in _SE_C3_ROWS:                    # len-4 lone + 2× pairs
+            rows[r] = ([draw(4)], [draw(3), draw(3)], [draw(3), draw(3)])
+        for r in _SE_C4_ROWS:                    # len-4 lone + one pair
+            rows[r] = ([draw(4)], [draw(3), draw(3)])
+        cures = [draw(3), draw(3)]
+        if len(set(picks)) == len(picks):
+            return {'rows': rows, 'cures': cures}
+    raise ValueError('sentence_enclosure: no distinct draw after 80 tries')
+
+
+def _se_sentence(words) -> str:
+    return ' '.join(words) + '.'
+
+
+def build_dungeon_sentence_enclosure(seed: int) -> Dungeon:
+    """The Sentence Enclosure (slug `sentence_enclosure`): is as — the
+    sentence under your hand, from anywhere inside it."""
+    rng = random.Random(seed)
+    words = _se_draw_words(rng)
+    ca, cb = words['cures']
+
+    runs, plaques = [], []
+    tgt = {}
+    for r, sents in words['rows'].items():
+        text = ' '.join(_se_sentence(s) for s in sents)
+        # Space-free runs with bare-floor gaps (the space-glyph law: a
+        # literal space glyph is a punctuation 'word' and breaks w / the
+        # sentence scanner) — the floor scan reconstructs the spacing.
+        col = _SE_TEXT0
+        for part in text.split(' '):
+            if part:
+                runs.append((r, col, part))
+            col += len(part) + 1
+        s_texts = [_se_sentence(s) for s in sents]
+        if r in _SE_C1_ROWS:                     # dis middle: DOUBLE gap
+            tgt[r] = f'{s_texts[0]}  {s_texts[2]}'
+        elif r in _SE_C2_ROWS:                   # das middle: SINGLE gap
+            tgt[r] = f'{s_texts[0]} {s_texts[2]}'
+        elif r in _SE_C3_ROWS:                   # cis middle: the cure
+            cure = ca if r == _SE_C3_ROWS[0] else cb
+            tgt[r] = f'{s_texts[0]} {cure}. {s_texts[2]}'
+        elif r in _SE_C4_ROWS:                   # das last: only s1 stands
+            tgt[r] = s_texts[0]
+        else:                                    # C5: only the LAST stands
+            tgt[r] = s_texts[2]
+        plaques.append((r, tgt[r]))
+    doors = ((tuple(tgt[r] for r in _SE_C1_ROWS), _SE_BOLTS['c1']),
+             (tuple(tgt[r] for r in _SE_C2_ROWS), _SE_BOLTS['c2']),
+             (tuple(tgt[r] for r in _SE_C3_ROWS), _SE_BOLTS['c3']),
+             ((tgt[_SE_C4_ROWS[0]],), _SE_BOLTS['c4']),
+             ((tgt[_SE_C5_ROWS[0]],), _SE_BOLTS['c5']))
+
+    R, C = _SE_ROWS, _SE_COLS
+    cells = [[CellType.WALL] * C for _ in range(R)]
+    for r in range(2, _SE_GATE + 1):                     # the spine
+        cells[r][_SE_SPINE] = CellType.FLOOR
+    for r in words['rows']:                              # the bays
+        for c in range(_SE_BAY_W, _SE_BAY_E + 1):
+            cells[r][c] = CellType.FLOOR
+    for r, c in _SE_SHAFT_SEPS:                          # the light shafts —
+        cells[r][c] = CellType.FLOOR                     # NOT the throat row
+
+    room = Room(room_type=RoomType.ENTRY, rows=R, cols=C)
+    room.cells = cells
+    room.seed  = seed
+
+    for pr, ptext in plaques:                            # full true readings
+        col = _SE_PLQ_COL
+        for part in ptext.split(' '):
+            if part:
+                room.char_runs.append(CharRun(pr, col, tuple(part), 'verdant'))
+            col += len(part) + 1
+    for rr, cc, text in runs:
+        room.char_runs.append(CharRun(rr, cc, tuple(text), 'ancient'))
+    room._ss_doors = doors                               # the shared exact-text tick
+    room._se_words = words
+
+    room.entities.append(Entity(kind='exit', row=_SE_EXIT[0], col=_SE_EXIT[1],
+                                edit_immune=True))
+    room.spawn_pos = (2, _SE_SPINE)
+    room.exit_pos  = _SE_EXIT
+
+    room.rebuild_indexes()
+    room.par    = _SE_PAR
+    room.budget = math.ceil(_SE_PAR * 1.4)  # STANDARD: the edge-hunting route wins at 1★
+    room.answer = (f'j 5w dis j . 2j das j . 2j cis {ca}. j cis {cb}. '
+                   f'2j das 2j das . G $')
+
+    dungeon = Dungeon(name='The Sentence Enclosure', seed=seed)
+    dungeon.rooms        = [room]
+    dungeon.current_room = 0
+    return dungeon
+
+
 # ── The Binder's Reliquary (:h — the Codex) ─────────────────────────────────
 #
 # A second reliquary (display 14.1, after the Seekers' Labyrinth), on the

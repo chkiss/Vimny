@@ -110,7 +110,7 @@ The curriculum is defined in `content/levels.py` (canonical) and mirrored in `LE
 | 34 | The Brace & Square Enclosure | `i[ a[ i{ a{` | Playable |
 | 35 | The Quote Enclosure | `i" a" i' a'` | Playable |
 | 36 | The Tag Enclosure | `it at` | Playable |
-| 37 | The Sentence Enclosure | `is as` | Planned |
+| 37 | The Sentence Enclosure | `is as` | Playable |
 | 38 | The Paragraph Enclosure | `ip ap` | Planned |
 | 38.1 | The Grandmaster's Sanctum | (boss) | Planned |
 | 39 | The Spellwright's Forge | `:s///  :g  &` | Playable |

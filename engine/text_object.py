@@ -374,6 +374,13 @@ def _resolve_sentence(room, r, c, around):
         e = nxt - 1
     else:
         e = max((ru.col + len(ru.symbols) - 1 for ru in room._char_runs_by_row.get(r, [])), default=hi)
+        if around:
+            # Vim-true as on the LAST sentence: nothing trails, so the
+            # object eats the LEADING whitespace instead (the a-quote rule,
+            # sentence flavour) — das leaves no straggling gap at line end.
+            while (s > lo and room.char_run_at(r, s - 1) is None
+                   and room.is_passable(r, s - 1)):
+                s -= 1
     if not around:                                  # trim trailing blanks for inner
         while e > s and room.char_run_at(r, e) is None:
             e -= 1

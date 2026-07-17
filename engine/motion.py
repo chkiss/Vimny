@@ -381,6 +381,13 @@ def _sentence_starts(room, row: int) -> list:
         ru = room.char_run_at(row, c)
         if ru is None or ru.kind == 'void':
             continue
+        # NOTE: wall-embedded glyphs DO seed sentence starts here — a
+        # deliberate exception to the glyphs-in-stone law: the Inscription
+        # Halls' ( ) route counts its wall-carved word bridges, and the
+        # is_passable landing filter already keeps sealed starts unreachable.
+        # (A west-wall plaque ahead of a row's text merely adds starts left
+        # of the floor text; sentence objects pick the nearest start ≤ the
+        # cursor, so floor resolution is unaffected.)
         if pending:
             starts.append(c)
             pending = False
