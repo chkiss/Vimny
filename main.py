@@ -2516,7 +2516,7 @@ _LEVEL_INTROS = {
     'paragraph_enclosure': ('The Paragraph Enclosure — the goblin legion stands mustered in two long cantos, rank upon rank, and six flames burn scattered down the hall among them. The gate keeps the Warden\'s Sigil: sign and seal are one.', 70),
     'buried_word': ('The Buried Word — one word stands alone at the hall\'s mouth, and nowhere else does it stand: down the hall it only hides, seamed into longer names. The seams are fused shut.', 70),
     'wet_ink': ('The Wet Ink — a writing ledge, a plaque with half an inscription, and a corridor that bends away into the dark. The scribes here were often called away mid-word.', 70),
-    'g_sanctum': ('The G-Sanctum — three long verses run east toward a crumbling brink, and each ends in a fused glyph hard against the fall. The keepers of this place went to the end of the line many times a day, and never once over it.', 70),
+    'g_sanctum': ('The Last Reach — three long verses run east toward a crumbling brink, and each ends in a fused glyph hard against the fall. The keepers of this place went to the end of the line many times a day, and never once over it.', 70),
     'stair_rail': ('The Stair Rail — a broken stair winds down the shaft, each step\'s word set a little east of the last, and below the steps the floor falls a long way. The masons who cut these stairs never missed a landing.', 70),
     'hall_of_echoes': ('The Hall of Echoes — one blighted verse, copied five times down the hall, and every copy blighted the same way. The hall listens.', 70),
     'grandmasters_sanctum': ('The Grandmaster\'s Sanctum — a long gallery of seven proofs, and the master himself beyond the last stone, listening to every stroke. Nothing here is new; everything here is asked properly.', 70),

@@ -5114,7 +5114,7 @@ def build_dungeon_stair_rail(seed: int) -> Dungeon:
     return dungeon
 
 
-# ── The G-Sanctum (41: the g-family — g_ forced; g* g# gi gp gP granted) ─────
+# ── The Last Reach (41: the g-family — g_ forced; g* g# gi gp gP granted) ────
 #
 # Three long verse rows, each running east into WATER: $ overshoots the
 # text onto the flood (the $-drown trap, the Inscription Halls' law) while
@@ -5179,7 +5179,7 @@ def _gs_draw_words(rng) -> dict:
 
 
 def build_dungeon_g_sanctum(seed: int) -> Dungeon:
-    """The G-Sanctum (slug `g_sanctum`): the g-family — the last glyph,
+    """The Last Reach (slug `g_sanctum`): the g-family — the last glyph,
     named in one reach."""
     rng = random.Random(seed)
     words = _gs_draw_words(rng)
@@ -5234,7 +5234,7 @@ def build_dungeon_g_sanctum(seed: int) -> Dungeon:
     f = words['fixes']
     room.answer = f'j g_ r{f[0]} + g_ r{f[1]} + g_ r{f[2]} G $'
 
-    dungeon = Dungeon(name='The G-Sanctum', seed=seed)
+    dungeon = Dungeon(name='The Last Reach', seed=seed)
     dungeon.rooms        = [room]
     dungeon.current_room = 0
     return dungeon

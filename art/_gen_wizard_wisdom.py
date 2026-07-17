@@ -390,7 +390,7 @@ POEMS: list[tuple[str | None, str, list[str]]] = [
         'And _ counts the whole descent at once.',
         'Take the rail; the stairs were cut for it.',
     ]),
-    ('g_sanctum', 'g_ g* gi gp', [             # The G-Sanctum — the g-family
+    ('g_sanctum', 'g_ g* gi gp', [             # The Last Reach — the g-family
         'g_ finds the last glyph, never the fall.',
         'g* hunts a word hidden inside words.',
         'gi returns your pen to the wet ink.',

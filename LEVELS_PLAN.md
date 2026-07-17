@@ -93,7 +93,7 @@ Curriculum order is the order of `LEVELS`. Blueprints: `blueprints/act_*.md`.
 | 38.1 | `grandmasters_sanctum` | The Grandmaster's Sanctum | — | boss |
 | 39 | `spellwrights_forge` | The Spellwright's Forge | `:s///  :g  &` |  |
 | 40 | `stair_rail` | The Stair Rail | `+ - _` |  |
-| 41 | `g_sanctum` | The G-Sanctum | `g_ g* gi gp` |  |
+| 41 | `g_sanctum` | The Last Reach | `g_ g* gi gp` |  |
 | 42 | `buried_word` | The Buried Word | `g* n` |  |
 | 43 | `wet_ink` | The Wet Ink | `gi` |  |
 | 44 | `hall_of_echoes` | The Hall of Echoes | `q @ "` |  |

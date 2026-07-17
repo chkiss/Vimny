@@ -115,7 +115,7 @@ The curriculum is defined in `content/levels.py` (canonical) and mirrored in `LE
 | 38.1 | The Grandmaster's Sanctum | (boss) | Playable |
 | 39 | The Spellwright's Forge | `:s///  :g  &` | Playable |
 | 40 | The Stair Rail | `+ - _` | Playable |
-| 41 | The G-Sanctum | `g_ g* gi gp` | Playable |
+| 41 | The Last Reach | `g_ g* gi gp` | Playable |
 | 42 | The Buried Word | `g* n` | Playable |
 | 43 | The Wet Ink | `gi` | Playable |
 | 44 | The Hall of Echoes | `q @ "` | Playable |

@@ -102,7 +102,7 @@ LEVELS = [
     {'display': '38.1', 'slug': 'grandmasters_sanctum',  'name': "The Grandmaster's Sanctum",  'type': 'boss', 'after': 'paragraph_enclosure', 'teaches': []},
     {'display': '39',   'slug': 'spellwrights_forge',    'name': "The Spellwright's Forge",    'commands': ':s///  :g  &', 'teaches': ['subst']},
     {'display': '40',   'slug': 'stair_rail',            'name': 'The Stair Rail',             'commands': '+ - _', 'teaches': ['line_step']},
-    {'display': '41',   'slug': 'g_sanctum',             'name': 'The G-Sanctum',              'commands': 'g_ g* gi gp', 'teaches': ['g_family']},
+    {'display': '41',   'slug': 'g_sanctum',             'name': 'The Last Reach',             'commands': 'g_ g* gi gp', 'teaches': ['g_family']},
     {'display': '42',   'slug': 'buried_word',           'name': 'The Buried Word',            'commands': 'g* n', 'teaches': []},
     {'display': '43',   'slug': 'wet_ink',               'name': 'The Wet Ink',                'commands': 'gi', 'teaches': []},
     # Macros cheese almost everything, so they are taught VERY LATE — after the
