@@ -6681,7 +6681,7 @@ def run_overworld(term: Terminal, player: Player, progress: dict,
             want_col = len(t) - len(t.lstrip()) if t.strip() else 0
         elif raw == '$':
             want_col = 10 ** 9                         # curswant: line-end, forever
-        elif raw in 'wbeWBE':
+        elif raw and raw in 'wbeWBE':
             if _mgate(raw, raw):
                 fn = {'w': _owm_w, 'b': _owm_b, 'e': _owm_e,
                       'W': _owm_w, 'B': _owm_b, 'E': _owm_e}[raw]
@@ -6689,7 +6689,7 @@ def run_overworld(term: Terminal, player: Player, progress: dict,
                 for _ in range(n):
                     c = fn(_label(), c, raw.isupper())
                 want_col = c
-        elif raw in 'fFtT':
+        elif raw and raw in 'fFtT':
             if _mgate(raw, raw):
                 pending_find = raw
         elif raw in (';', ','):

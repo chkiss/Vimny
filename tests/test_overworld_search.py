@@ -290,6 +290,15 @@ def test_zz_zt_zb_move_the_view_not_the_cursor(monkeypatch):
     assert result['cursor'] == last                    # the cursor never moved
 
 
+def test_sequence_keys_do_not_crash(monkeypatch):
+    # An arrow key reaches the loop with raw == '' — and '' is a substring
+    # of every string, so unguarded `raw in 'wbeWBE'` matched and crashed
+    # (the documented raw-in-'vV' regression class, reintroduced 2026-07-17).
+    keys = [Keystroke('\x1b[A', name='KEY_UP'), Keystroke('\x1b[B', name='KEY_DOWN')]
+    result, _p = _drive(keys, monkeypatch)
+    assert result['action'] == 'quit'
+
+
 # ── the single-source label law ──────────────────────────────────────────────
 
 def test_search_text_matches_the_level_labels():
