@@ -68,11 +68,16 @@ def _canon_keys(room):
             # collapsed gate row; $ rides the opened gate east past the
             # transit cell — the natural stroke from the bottom of the hall.
             + _K('$')
-            + _K('17l') + _K('xxxxx')         # the arena: stand on him, five strikes
-            + _K('x')                         # the key drops underfoot — x it into the register
-            + _K('8l') + _K('p')              # to the door; the pasted key unlocks
-            + _K('l'))                        # it and carries you into the frame —
-                                              # one step onto the exit
+            # The Unmaking: shear each of his six strands with its object —
+            # jump to the strand's row, f onto the structure, delete inside.
+            # The sixth stroke unmakes him and the seal opens; 7G $ rides east.
+            + _K('2Gfodiw')
+            + _K('4Gf"di"')
+            + _K('6Gf(di(')
+            + _K('8Gf{di{')
+            + _K('10Gf<dit')
+            + _K('12Gfcdis')
+            + _K('7G$'))
 
 
 def _drive(dungeon, keys, monkeypatch, finish=':wq\r', name='Scribe'):
@@ -170,6 +175,69 @@ def test_canonical_run_clears_both_rooms(seed, monkeypatch):
     assert not gm.alive
 
 
+# ── the arena: The Unmaking ─────────────────────────────────────────────────
+
+def _drive_arena(d, keys, monkeypatch, finish=':q!\r'):
+    d.current_room = 1                       # start in the arena in isolation
+    return _drive(d, keys, monkeypatch, finish=finish)
+
+
+@pytest.mark.parametrize("seed", SEEDS)
+def test_arena_six_strands_on_distinct_rows(seed):
+    _d, _g, arena = _rooms(seed)
+    lec = arena._gm_lecterns
+    assert len(lec) == 6
+    assert len({l['row'] for l in lec}) == 6          # no shared rows (no pull-shift)
+    assert {l['obj'] for l in lec} == {'iw', 'i"', 'i(', 'i{', 'it', 'is'}
+    gm = next(e for e in arena.entities if e.tag == 'grandmaster')
+    assert gm.edit_immune and gm.hp == gm.max_hp == 6
+
+
+def test_x_cannot_strike_the_grandmaster(monkeypatch):
+    # He is edit_immune: walking onto him is barred and x never lands — the
+    # only recourse is the text. Standing where he opens and mashing x leaves
+    # his health full.
+    d, _g, arena = _rooms(0)
+    _drive_arena(d, _K('xxxxxxxx'), monkeypatch)
+    gm = next(e for e in arena.entities if e.tag == 'grandmaster')
+    assert gm.alive and gm.hp == 6
+
+
+def test_one_shear_drains_one_hp(monkeypatch):
+    d, _g, arena = _rooms(0)
+    _drive_arena(d, _K('2Gfodiw'), monkeypatch)       # shear the word strand
+    gm = next(e for e in arena.entities if e.tag == 'grandmaster')
+    assert gm.alive and gm.hp == 5                     # 6 − 1 strand
+
+
+def test_dd_does_not_shear_a_strand(monkeypatch):
+    # A whole-line dd wipes the structure marker too, so it does NOT count —
+    # the object (inner-delete, marker kept) is what shears.
+    d, _g, arena = _rooms(0)
+    _drive_arena(d, _K('2Gdd'), monkeypatch)
+    gm = next(e for e in arena.entities if e.tag == 'grandmaster')
+    assert gm.alive and gm.hp == 6
+
+
+def test_shearing_recoils_the_grandmaster(monkeypatch):
+    d, _g, arena = _rooms(0)
+    start = _GMS_A_BOSS
+    _drive_arena(d, _K('2Gfodiw'), monkeypatch)
+    gm = next(e for e in arena.entities if e.tag == 'grandmaster')
+    assert (gm.row, gm.col) != start                  # he leapt to a standing strand
+
+
+@pytest.mark.parametrize("seed", SEEDS)
+def test_the_unmaking_opens_the_seal(seed, monkeypatch):
+    d, _g, arena = _rooms(seed)
+    keys = _K('2Gfodiw4Gf"di"6Gf(di(8Gf{di{10Gf<dit12Gfcdis')
+    result = _drive_arena(d, keys + _K('7G$'), monkeypatch, finish=':wq\r')
+    gm = next(e for e in arena.entities if e.tag == 'grandmaster')
+    assert not gm.alive                                # all six strands sheared
+    assert arena.cells[_GMS_A_EXIT[0]][arena._gm_seal_col] == CellType.FLOOR
+    assert result['won']
+
+
 def test_gallery_wq_cannot_win(monkeypatch):
     d, gallery, _arena = _rooms(0)
     result = _drive(d, _K('G'), monkeypatch, finish=':wq\r')
@@ -250,8 +318,13 @@ def test_G_parks_on_the_threshold_not_past_the_seal(monkeypatch):
     # Only $ rides through the opened gate: G's first-non-blank is the
     # threshold ◆ at the head of the gate row, west of the bolts.
     d, gallery, _arena = _rooms(0)
-    keys = _canon_keys(gallery)
-    keys = keys[:-len(_K('$17lxxxxxx8lpl'))] + _K('G')   # swap the finale $ for G
+    w = gallery._gms_words
+    # the gallery solve, but the finale $ (which rides the gate) swapped for G
+    # (which parks on the threshold ◆, west of the bolts — no descent).
+    keys = (_K('2jwwdiw') + _K('2jci"') + _K(w['q_cure']) + [ESC]
+            + _K('2jda[') + _K('2jcis') + _K(w['s_cure'] + '.') + [ESC]
+            + _K('2jdit') + _K('2jci{') + _K(w['b_cure']) + [ESC]
+            + _K('2jdap') + _K('G'))
     _drive(d, keys, monkeypatch, finish=':q!\r')
     assert d.current_room == 0
 

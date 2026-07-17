@@ -1646,6 +1646,63 @@ def _grandmasters_gallery_tick(room, player) -> list:
     return msgs
 
 
+def _grandmasters_arena_tick(room, player) -> list:
+    """The Unmaking (arena, room 1): the Grandmaster is the master of the
+    written word — edit_immune, unkillable by blade. He is woven from six
+    strands, each a text object on a lectern (room._gm_lecterns). Shearing a
+    strand with its object (di" di( di{ dit dis diw) empties its inner content
+    while the structure survives — that costs him a strand (−1 HP) and he
+    RECOILS to the farthest strand still standing; get within 2 cells and he
+    flees the same way. Six strokes and the last strand parts: he is unmade
+    and the sanctum seal opens. Stateless (HP derives from the floor each
+    tick, so undo restores a strand and his health together)."""
+    msgs = []
+    lecterns = getattr(room, '_gm_lecterns', None)
+    if not lecterns:
+        return msgs
+    blob = ' '.join(_wla_floor_text(room, r) for r in range(room.rows))
+
+    def sheared(lc):                         # inner gone, the structure kept —
+        return lc['gone'] not in blob and lc['keep'] in blob   # a dd wipes both
+    count = sum(sheared(lc) for lc in lecterns)
+    gm = next((e for e in room.entities
+               if e.kind == 'warden' and e.tag == 'grandmaster' and e.alive), None)
+    if gm is None:
+        return msgs
+    gm.max_hp = len(lecterns)
+    gm.hp     = max(1, len(lecterns) - count)     # 1 while a strand stands
+
+    prev = getattr(room, '_gm_last_shear', 0)
+    crowded = max(abs(gm.row - player.row), abs(gm.col - player.col)) <= 2
+    if count < len(lecterns) and (count > prev or crowded):
+        far, best = None, -1
+        for lc in lecterns:                       # leap to the standing strand
+            if sheared(lc):                        # farthest from the player
+                continue
+            g = lc['guard']
+            if g in ((gm.row, gm.col), (player.row, player.col)):
+                continue
+            if room.cells[g[0]][g[1]] == CellType.WALL:
+                continue
+            d = abs(g[0] - player.row) + abs(g[1] - player.col)
+            if d > best:
+                best, far = d, g
+        if far is not None:
+            room.move_entity(gm, far[0], far[1])
+            if count > prev:
+                msgs.append('A strand parts — the Grandmaster recoils.')
+    room._gm_last_shear = count
+
+    if count >= len(lecterns):                     # the unmaking
+        room.kill_entity(gm)
+        sc = getattr(room, '_gm_seal_col', None)
+        if sc is not None:
+            room.cells[room.exit_pos[0]][sc] = CellType.FLOOR
+        msgs.append('The last strand parts. The Grandmaster is unmade — '
+                    'the sanctum opens.')
+    return msgs
+
+
 def _gauntlet_tick(room, player) -> list:
     """The Gauntlet's sixteen bolts + FINAL SEAL — the Annex chassis widened
     to three door kinds (room._gnt_doors = (kind, target, bolt_col)):
@@ -3211,6 +3268,9 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
                 redo_stack.clear()
                 _push('The Grandmaster withdraws before you into the arena. '
                       'His shadow does not hurry.')
+        if level == 'grandmasters_sanctum' and dungeon.current_room == 1:
+            for _m in _grandmasters_arena_tick(room, player):
+                _push(_m)
         if level == 'sculpting_chambers':
             for _m in _sculpting_chambers_tick(room, player):
                 _push(_m)

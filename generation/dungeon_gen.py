@@ -4650,13 +4650,39 @@ _GMS_TRANSIT = (19, 31)                # exit_pos: stepping here (or past) desce
 _GMS_WATCH   = (19, 32)                # where the Grandmaster stands
 _GMS_BUDGET  = 160                     # hand-set, generous (gallery + arena melee)
 
-_GMS_A_ROWS, _GMS_A_COLS = 9, 34       # room 1 — the arena
-_GMS_A_SPAWN = (4, 1)
-_GMS_A_BOSS  = (4, 18)
-_GMS_A_TRWALL = 27                     # treasure wall; the locked door sits in it
-_GMS_A_EXIT  = (4, 28)
-_GMS_A_HEART = (3, 30)
-_GMS_A_CHEST = (5, 30)
+# ── Room 1: The Unmaking (the arena) ─────────────────────────────────────────
+# The Grandmaster is the master of the written WORD — so he cannot be struck
+# (edit_immune); he can only be UNWRITTEN. He is woven from six strands, each a
+# different text object inscribed on a lectern. When the player closes within 2
+# cells he FLEES to the nearest strand still standing; the only recourse is to
+# shear a lectern with its matching object (diw · di" · di( · di{ · dit · dis),
+# which costs him a strand (−1 HP) and drives him on. Six strokes and the last
+# strand parts — he is unmade and the sanctum opens. (The lectern texts are
+# fixed and load-bearing: each is the exact structure its object targets, and
+# the shear reads the exact remnant that object leaves — a whole-line dd wipes
+# the structure too and does NOT count. All six are CHARWISE inner-deletes, so
+# no strand collapses a row mid-chase — the flight geometry stays put.)
+_GMS_A_ROWS, _GMS_A_COLS = 15, 54
+_GMS_A_SPAWN = (7, 2)
+_GMS_A_BOSS  = (7, 20)                  # he opens in the middle of the hall
+_GMS_A_SEAL_COL = 48                    # the sanctum seal wall (opens at 0 HP)
+_GMS_A_EXIT  = (7, 52)
+_GMS_A_HEART = (5, 51)
+_GMS_A_CHEST = (9, 51)
+# Each strand on its OWN row (a charwise delete pulls its row's tail left, so
+# sharing a row would shift a neighbour's columns mid-fight). Fields: row,
+# structure-start col, before-text, object, cursor col (where the delete is
+# made), 'gone' (inner content the object removes) and 'keep' (a structure
+# marker that SURVIVES the object but a whole-line dd would wipe — so only the
+# inner-delete counts). They alternate left/right down the hall: a real chase.
+_GMS_A_LECTERNS = [
+    (2,  6,  'bind oath free',           'iw', 11, 'oath', 'bind'),
+    (4,  30, 'cry "vow" now',            'i"', 35, 'vow',  'cry'),
+    (6,  8,  'hold (bond) tight',        'i(', 14, 'bond', 'hold'),
+    (8,  32, 'keep {ward} shut',         'i{', 38, 'ward', 'keep'),
+    (10, 6,  '<rite>mark</rite> gone',   'it', 12, 'mark', 'rite'),
+    (12, 28, 'one. cut this. two.',      'is', 33, 'cut',  'one'),
+]
 
 
 def _gms_draw_words(rng) -> dict:
@@ -4809,32 +4835,46 @@ def build_dungeon_grandmasters_sanctum(seed: int) -> Dungeon:
     gallery.budget = _GMS_BUDGET
     gallery.answer = ''                        # set below once words are drawn
 
-    # ── Room 1: the arena ───────────────────────────────────────────────────
+    # ── Room 1: The Unmaking (the arena) ─────────────────────────────────────
     AR, AC = _GMS_A_ROWS, _GMS_A_COLS
     acells = [[CellType.WALL] * AC for _ in range(AR)]
     for r in range(1, AR - 1):
-        for c in range(1, AC - 2):
+        for c in range(1, _GMS_A_SEAL_COL):              # the open hall
             acells[r][c] = CellType.FLOOR
-    for r in range(1, AR - 1):                           # the treasure wall
-        if r != _GMS_A_EXIT[0]:
-            acells[r][_GMS_A_TRWALL] = CellType.WALL
+    for r in range(1, AR - 1):                           # the sanctum pocket,
+        for c in range(_GMS_A_SEAL_COL + 1, AC - 1):     # walled off by the seal
+            acells[r][c] = CellType.FLOOR
+    # the seal column is WALL top to bottom (opens at 0 HP); punch the throat
+    # so the pocket is a real room behind it, reachable only when he is unmade.
 
     arena = Room(room_type=RoomType.BOSS, rows=AR, cols=AC)
     arena.cells     = acells
     arena.seed      = seed
     arena.spawn_pos = _GMS_A_SPAWN
     arena.exit_pos  = _GMS_A_EXIT
+
+    lecterns = []
+    for r, c, text, obj, cur, gone, keep in _GMS_A_LECTERNS:
+        _forge_text(arena, r, c, text, 'ember')          # ember = corrupt/bound
+        # the guard cell: two east of the strand's tail, so the Grandmaster
+        # recoils AWAY from the player's approach without ever sitting on the
+        # text he protects (the player must reach the structure to shear it).
+        lecterns.append({'row': r, 'col': c, 'obj': obj, 'cursor': (r, cur),
+                         'gone': gone, 'keep': keep,
+                         'guard': (r, min(_GMS_A_SEAL_COL - 1, c + len(text) + 1))})
+    arena._gm_lecterns = lecterns
+    arena._gm_seal_col = _GMS_A_SEAL_COL
+    arena._gm_last_shear = 0
+
     arena.entities  = [
         Entity(kind='warden', row=_GMS_A_BOSS[0], col=_GMS_A_BOSS[1],
-               hp=5, max_hp=5, ai='', tag='grandmaster'),
-        Entity(kind='locked_door', row=_GMS_A_EXIT[0], col=_GMS_A_TRWALL),
+               hp=6, max_hp=6, ai='', tag='grandmaster', edit_immune=True),
         Entity(kind='exit', row=_GMS_A_EXIT[0], col=_GMS_A_EXIT[1]),
         Entity(kind='heart_container', row=_GMS_A_HEART[0], col=_GMS_A_HEART[1]),
         Entity(kind='chest_scroll', row=_GMS_A_CHEST[0], col=_GMS_A_CHEST[1]),
     ]
     arena.search_glyph_entities = True   # /W finds the Grandmaster — the
     arena.rebuild_indexes()              # Pathfinder/Manifold search parity
-    _fog_unreachable(arena, *_GMS_A_SPAWN)
     arena.par    = None
     arena.budget = _GMS_BUDGET
     arena.answer = ''
@@ -4847,7 +4887,11 @@ def build_dungeon_grandmasters_sanctum(seed: int) -> Dungeon:
     gallery.answer = (f"2j w w diw 2j ci\" {words['q_cure']} 2j da[ "
                       f"2j cis {words['s_cure']}. 2j dit 2j ci{{ {words['b_cure']} "
                       f"2j dap $")
-    arena.answer = '17l x x x x x x 8l p l'   # five strikes, the key, the door
+    # The Unmaking: land in each strand (jump to its row, f onto the structure)
+    # and shear it with its object; the sixth stroke unmakes him and the seal
+    # opens — 7G $ rides east through it to the exit.
+    arena.answer = ('2G fo diw 4G f" di" 6G f( di( 8G f{ di{ '
+                    '10G f< dit 12G fc dis 7G $')
 
     dungeon = Dungeon(name="The Grandmaster's Sanctum", seed=seed)
     dungeon.rooms        = [gallery, arena]
