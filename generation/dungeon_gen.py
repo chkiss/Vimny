@@ -4664,11 +4664,13 @@ _GMS_BUDGET  = 160                     # hand-set, generous (gallery + arena mel
 # no strand collapses a row mid-chase — the flight geometry stays put.)
 _GMS_A_ROWS, _GMS_A_COLS = 15, 54
 _GMS_A_SPAWN = (7, 2)
-_GMS_A_BOSS  = (7, 20)                  # he opens in the middle of the hall
+_GMS_A_BOSS  = (2, 11)                  # he opens INSIDE the first strand ('oath'),
+                                        # a valid deletion target — see _GMS_A_LECTERNS[0]
 _GMS_A_SEAL_COL = 48                    # the sanctum seal wall (opens at 0 HP)
 _GMS_A_EXIT  = (7, 52)
 _GMS_A_HEART = (5, 51)
 _GMS_A_CHEST = (9, 51)
+_GMS_A_BUDGET = 300                     # boss convention: no par, very relaxed
 # Each strand on its OWN row (a charwise delete pulls its row's tail left, so
 # sharing a row would shift a neighbour's columns mid-fight). Fields: row,
 # structure-start col, before-text, object, cursor col (where the delete is
@@ -4876,8 +4878,8 @@ def build_dungeon_grandmasters_sanctum(seed: int) -> Dungeon:
     arena.search_glyph_entities = True   # /W finds the Grandmaster — the
     arena.rebuild_indexes()              # Pathfinder/Manifold search parity
     arena.par    = None
-    arena.budget = _GMS_BUDGET
-    arena.answer = ''
+    arena.budget = _GMS_A_BUDGET         # very large — the chase is unsequenced
+    arena.answer = ''                     # no karaoke: the fight has no fixed route
 
     # The driven canonical (see tests): the ops chain bay to bay straight
     # down; the dap's linewise park leaves the cursor at the head of the
@@ -4887,11 +4889,9 @@ def build_dungeon_grandmasters_sanctum(seed: int) -> Dungeon:
     gallery.answer = (f"2j w w diw 2j ci\" {words['q_cure']} 2j da[ "
                       f"2j cis {words['s_cure']}. 2j dit 2j ci{{ {words['b_cure']} "
                       f"2j dap $")
-    # The Unmaking: land in each strand (jump to its row, f onto the structure)
-    # and shear it with its object; the sixth stroke unmakes him and the seal
-    # opens — 7G $ rides east through it to the exit.
-    arena.answer = ('2G fo diw 4G f" di" 6G f( di( 8G f{ di{ '
-                    '10G f< dit 12G fc dis 7G $')
+    # The arena (The Unmaking) has NO karaoke — shear the six strands in any
+    # order; the Grandmaster starts inside one and slips to another whenever
+    # you close on him. The seal opens when the last strand parts.
 
     dungeon = Dungeon(name="The Grandmaster's Sanctum", seed=seed)
     dungeon.rooms        = [gallery, arena]

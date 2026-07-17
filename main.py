@@ -1649,13 +1649,15 @@ def _grandmasters_gallery_tick(room, player) -> list:
 def _grandmasters_arena_tick(room, player) -> list:
     """The Unmaking (arena, room 1): the Grandmaster is the master of the
     written word — edit_immune, unkillable by blade. He is woven from six
-    strands, each a text object on a lectern (room._gm_lecterns). Shearing a
-    strand with its object (di" di( di{ dit dis diw) empties its inner content
-    while the structure survives — that costs him a strand (−1 HP) and he
-    RECOILS to the farthest strand still standing; get within 2 cells and he
-    flees the same way. Six strokes and the last strand parts: he is unmade
-    and the sanctum seal opens. Stateless (HP derives from the floor each
-    tick, so undo restores a strand and his health together)."""
+    strands, each a text object on a lectern (room._gm_lecterns), and he
+    STARTS inside one. Shear a strand with its object (di" di( di{ dit dis
+    diw) — in ANY order — and it empties while the structure survives (a
+    whole-line dd wipes the marker too and does NOT count). Whenever you
+    close on him (within 2 cells) or land on his cell — a / search onto his
+    W, say — he SLIPS into another strand still standing (the farthest from
+    you). Empty all six and the last strand parts: he is unmade and the
+    sanctum seal opens. Stateless (HP derives from the floor each tick, so
+    undo restores a strand and his health together); no fixed route."""
     msgs = []
     lecterns = getattr(room, '_gm_lecterns', None)
     if not lecterns:
@@ -1672,14 +1674,17 @@ def _grandmasters_arena_tick(room, player) -> list:
     gm.max_hp = len(lecterns)
     gm.hp     = max(1, len(lecterns) - count)     # 1 while a strand stands
 
-    prev = getattr(room, '_gm_last_shear', 0)
+    # He slips away when you crowd him (approach or land on his cell), or if
+    # the strand he sits in was somehow emptied — always INTO another strand.
     crowded = max(abs(gm.row - player.row), abs(gm.col - player.col)) <= 2
-    if count < len(lecterns) and (count > prev or crowded):
+    on_dead = any(sheared(lc) and lc['cursor'] == (gm.row, gm.col)
+                  for lc in lecterns)
+    if count < len(lecterns) and (crowded or on_dead):
         far, best = None, -1
-        for lc in lecterns:                       # leap to the standing strand
+        for lc in lecterns:                       # slip to the standing strand
             if sheared(lc):                        # farthest from the player
                 continue
-            g = lc['guard']
+            g = lc['cursor']                       # a cell INSIDE the structure
             if g in ((gm.row, gm.col), (player.row, player.col)):
                 continue
             if room.cells[g[0]][g[1]] == CellType.WALL:
@@ -1689,8 +1694,8 @@ def _grandmasters_arena_tick(room, player) -> list:
                 best, far = d, g
         if far is not None:
             room.move_entity(gm, far[0], far[1])
-            if count > prev:
-                msgs.append('A strand parts — the Grandmaster recoils.')
+            if crowded:
+                msgs.append('You reach for him — and he slips into another strand.')
     room._gm_last_shear = count
 
     if count >= len(lecterns):                     # the unmaking

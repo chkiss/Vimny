@@ -68,15 +68,18 @@ def _canon_keys(room):
             # collapsed gate row; $ rides the opened gate east past the
             # transit cell — the natural stroke from the bottom of the hall.
             + _K('$')
-            # The Unmaking: shear each of his six strands with its object —
-            # jump to the strand's row, f onto the structure, delete inside.
-            # The sixth stroke unmakes him and the seal opens; 7G $ rides east.
-            + _K('2Gfodiw')
+            # The Unmaking: shear his six strands in ANY order (no karaoke) —
+            # jump to a strand's row, f onto the structure, delete inside. He
+            # STARTS inside the word strand and slips away when you close on
+            # him, so that strand is taken LAST (2G ee diw, from its far end,
+            # where he can no longer flee). The sixth stroke unmakes him and
+            # opens the seal; 7G $ rides east to the exit.
             + _K('4Gf"di"')
             + _K('6Gf(di(')
             + _K('8Gf{di{')
             + _K('10Gf<dit')
             + _K('12Gfcdis')
+            + _K('2Geediw')
             + _K('7G$'))
 
 
@@ -193,10 +196,23 @@ def test_arena_six_strands_on_distinct_rows(seed):
     assert gm.edit_immune and gm.hp == gm.max_hp == 6
 
 
+def test_grandmaster_starts_inside_a_strand(monkeypatch):
+    # He opens IN a deletion target (the word strand's cursor cell), not on
+    # bare floor — a place to be deleted.
+    _d, _g, arena = _rooms(0)
+    gm = next(e for e in arena.entities if e.tag == 'grandmaster')
+    assert (gm.row, gm.col) == _GMS_A_BOSS
+    assert any((gm.row, gm.col) == l['cursor'] for l in arena._gm_lecterns)
+
+
+def test_arena_has_no_karaoke_and_a_boss_budget(seed=0):
+    _d, _g, arena = _rooms(0)
+    assert arena.answer == ''                          # no fixed route
+    assert arena.par is None and arena.budget >= 220    # boss convention
+
+
 def test_x_cannot_strike_the_grandmaster(monkeypatch):
-    # He is edit_immune: walking onto him is barred and x never lands — the
-    # only recourse is the text. Standing where he opens and mashing x leaves
-    # his health full.
+    # He is edit_immune: x never lands — the only recourse is the text.
     d, _g, arena = _rooms(0)
     _drive_arena(d, _K('xxxxxxxx'), monkeypatch)
     gm = next(e for e in arena.entities if e.tag == 'grandmaster')
@@ -205,7 +221,7 @@ def test_x_cannot_strike_the_grandmaster(monkeypatch):
 
 def test_one_shear_drains_one_hp(monkeypatch):
     d, _g, arena = _rooms(0)
-    _drive_arena(d, _K('2Gfodiw'), monkeypatch)       # shear the word strand
+    _drive_arena(d, _K('4Gf"di"'), monkeypatch)       # shear the quote strand
     gm = next(e for e in arena.entities if e.tag == 'grandmaster')
     assert gm.alive and gm.hp == 5                     # 6 − 1 strand
 
@@ -214,23 +230,36 @@ def test_dd_does_not_shear_a_strand(monkeypatch):
     # A whole-line dd wipes the structure marker too, so it does NOT count —
     # the object (inner-delete, marker kept) is what shears.
     d, _g, arena = _rooms(0)
-    _drive_arena(d, _K('2Gdd'), monkeypatch)
+    _drive_arena(d, _K('4Gdd'), monkeypatch)          # dd the quote row
     gm = next(e for e in arena.entities if e.tag == 'grandmaster')
     assert gm.alive and gm.hp == 6
 
 
-def test_shearing_recoils_the_grandmaster(monkeypatch):
+def test_approaching_makes_him_slip_to_another_strand(monkeypatch):
+    # Close within 2 cells of where he opens and he slips into another strand.
     d, _g, arena = _rooms(0)
     start = _GMS_A_BOSS
-    _drive_arena(d, _K('2Gfodiw'), monkeypatch)
+    _drive_arena(d, _K('2G' + 'l' * 8), monkeypatch)   # walk along his row toward him
     gm = next(e for e in arena.entities if e.tag == 'grandmaster')
-    assert (gm.row, gm.col) != start                  # he leapt to a standing strand
+    assert (gm.row, gm.col) != start
+    assert any((gm.row, gm.col) == l['cursor'] for l in arena._gm_lecterns)  # into a target
+
+
+def test_search_landing_makes_him_slip(monkeypatch):
+    # A / search onto his W lands the cursor on him — he slips away.
+    d, _g, arena = _rooms(0)
+    start = _GMS_A_BOSS
+    _drive_arena(d, _K('/W\r'), monkeypatch)
+    gm = next(e for e in arena.entities if e.tag == 'grandmaster')
+    assert (gm.row, gm.col) != start
 
 
 @pytest.mark.parametrize("seed", SEEDS)
 def test_the_unmaking_opens_the_seal(seed, monkeypatch):
     d, _g, arena = _rooms(seed)
-    keys = _K('2Gfodiw4Gf"di"6Gf(di(8Gf{di{10Gf<dit12Gfcdis')
+    # take his starting strand (the word) LAST — 2G ee diw from its far end,
+    # where he can no longer slip.
+    keys = _K('4Gf"di"6Gf(di(8Gf{di{10Gf<dit12Gfcdis2Geediw')
     result = _drive_arena(d, keys + _K('7G$'), monkeypatch, finish=':wq\r')
     gm = next(e for e in arena.entities if e.tag == 'grandmaster')
     assert not gm.alive                                # all six strands sheared
