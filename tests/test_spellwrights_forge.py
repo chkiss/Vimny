@@ -189,7 +189,27 @@ def test_chamber_C_strikes_the_cursed_and_keeps_the_sacred():
          dungeon=d)
     blob = ' || '.join(_texts(d.room))
     assert 'cursed' not in blob
-    assert 'a sacred vow' in blob and 'a sacred bond' in blob
+    for _r, keep in dg._FORGE_C_KEEP:              # the sacred keepers survive
+        assert keep in blob
+
+
+def test_sanctum_scroll_chest_present_and_survives_the_sweep():
+    # The reward that balances the empty sanctum: an unassigned chest (→ a
+    # random relic scroll) at row 13, last column — ABOVE every cursed row,
+    # so :g/cursed/d never collapses it out of the buffer.
+    from engine.world import CellType
+    d = dg.build_dungeon_spellwrights_forge(1)
+    room = d.room
+    chest = [e for e in room.entities if e.kind == 'chest_scroll']
+    assert len(chest) == 1
+    assert (chest[0].row, chest[0].col) == dg._FORGE_CHEST == (13, dg._FORGE_COLS - 2)
+    assert chest[0].scroll_id in (None, '')          # unassigned → random relic
+    assert dg._FORGE_CHEST[0] < min(r for r, _ in dg._FORGE_C_CURSED)
+    _run('spellwrights_forge', list(':g/cursed/d') + ['\r'] + list(':q!') + ['\r'],
+         dungeon=d)
+    still = [e for e in room.entities if e.kind == 'chest_scroll']
+    assert len(still) == 1                            # the sweep spared it
+    assert room.cells[dg._FORGE_CHEST[0]][dg._FORGE_CHEST[1]] == CellType.FLOOR
 
 
 def test_snip_mangle_cannot_open_the_seal():
