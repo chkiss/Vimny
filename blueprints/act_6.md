@@ -150,13 +150,19 @@ chest (`chest_scroll` → the wired drop) and the way out.
   tier and smudges the visual-op lines until learned (`_smudge_gate_met` —
   already authored; verify against the final known-set only).
 
-### Open decisions (ask before building)
+### Decisions (RESOLVED with user 2026-07-25)
 
-1. One hall vs two rooms (bays + arena)?
-2. Embrace the dot-carry across same-op bays as the mastery lesson, or
-   stagger operators so every bay is typed in full?
-3. Does the Grandmaster pressure the player DURING the bays (Scrivener-style
-   timed windows) or only in the finale arena?
+1. **Two rooms** — room 1 = the proving gallery (antechamber + seven bays +
+   gate + final seal), room 2 = the arena (Grandmaster, chest, exit).
+   Pathfinder precedent; keeps each room under the ~30-row ceiling.
+2. **Stagger operators** — no dot-carry shortcuts; every bay is typed in
+   full. "This is the final drill." Adjacent bays must not share an op
+   (probe the dot empirically anyway before pinning any tape).
+3. **Finale-only combat, presence throughout** — the Grandmaster acts only
+   in the arena (keeps the gallery deterministic; Scrivener already owns
+   during-puzzle pressure). In the gallery he stands visible beyond the
+   final seal from the start and speaks one line of cold appraisal per
+   bolt that opens — flavor, no mechanics.
 
 ---
 
