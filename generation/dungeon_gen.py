@@ -11340,6 +11340,7 @@ def build_dungeon_gauntlet(seed: int) -> Dungeon:
     # (galleries rows 3-6), the blank, the pocket channels, then the lower
     # band — the spine (col 24) threads rows 3..gate.
     floor(_GNT_R_BLK, TX, 62)                       # the shelf: search-only
+    floor(_GNT_R_BLK, SP, SP)                       # …its ◆ threshold cell
     for r in (_GNT_R_E, _GNT_R_BW, _GNT_R_PCT, _GNT_R_SEN):
         floor(r, SP, 62)
     floor(_GNT_R_BLANK, SP, SP)                     # the spine steps through —
@@ -11349,8 +11350,11 @@ def build_dungeon_gauntlet(seed: int) -> Dungeon:
                                                     # the walk-in from above
     floor(_GNT_R_P1, *_GNT_P1_COLS)                 # island 1
     floor(_GNT_R_P2, *_GNT_P2_COLS)                 # island 2
-    for r in (_GNT_R_P1, _GNT_R_P1 + 1, _GNT_R_P2, _GNT_R_P2 + 1):
-        cells[r][SP] = CellType.FLOOR               # the spine passes the pockets
+    for r in (_GNT_R_P1, _GNT_R_P2):
+        cells[r][SP] = CellType.FLOOR               # the ◆ threshold cells
+    # (the between-pocket rows hold NO stepping cell: a spine cell there
+    # let + + hop island → island → gallery, riding each row's fnb — the
+    # user-found cheese; the courses are pure water now)
     # The lower band's floor starts at TX, not the spine: S / o / O drop
     # their typed lines at the SEGMENT START, so the segment must start
     # where the text stands — the left-align law (every playable line
@@ -11358,6 +11362,9 @@ def build_dungeon_gauntlet(seed: int) -> Dungeon:
     for r in (_GNT_R_P3, _GNT_R_CIT, _GNT_R_D, _GNT_R_DD, _GNT_R_C,
               _GNT_R_S, _GNT_R_Y1, _GNT_R_YL):
         floor(r, TX, 62)
+    floor(_GNT_R_P3, SP, SP)           # the gU gallery's ◆ threshold cell:
+                                       # without it, {12}G ferries straight
+                                       # onto g1 and undercuts w * 3b
     # The nook row: no standable floor west of the nook — a writable blank
     # row here would let `j i{word}` tie the o-door (the i-cheese); the
     # nearest blank is r6, three travel keys away. The east nook holds the
@@ -11379,6 +11386,8 @@ def build_dungeon_gauntlet(seed: int) -> Dungeon:
             mist.add((r, c))
 
     moat(_GNT_R_WTR, SP, 62)                        # the shelf's water band
+    moat(_GNT_R_BLK, SP + 1, SP + 1)                # the shelf threshold's gap
+    moat(_GNT_R_P3, SP + 1, SP + 1)                 # the gallery threshold's gap
     moat(_GNT_R_BLANK, SP + 1, 62)                  # the pocket moat (ceiling)
     moat(_GNT_R_P1, SP + 1, _GNT_P1_COLS[0] - 1)    # west channel to island 1
     moat(_GNT_R_P1, _GNT_P1_COLS[1] + 1, 76)        # …and its east water
@@ -11388,8 +11397,8 @@ def build_dungeon_gauntlet(seed: int) -> Dungeon:
     # spine's stepping cells — and the lower one is the SIGHT-line into
     # the lower band (its floor heads at TX with no spine entry): vision
     # floods through water, feet do not.
-    moat(_GNT_R_P1 + 1, SP + 1, 76)
-    moat(_GNT_R_P2 + 1, SP + 1, 76)
+    moat(_GNT_R_P1 + 1, SP, 76)
+    moat(_GNT_R_P2 + 1, SP, 76)
     moat(_GNT_R_NOOK, SP + 1, _GNT_NOOK_COLS[0] - 1)   # the nook's channel
     for i in range(18):                             # the eighteen bolts
         cells[_GNT_R_GATE][_GNT_BOLT0 + i] = CellType.WALL
@@ -11422,13 +11431,15 @@ def build_dungeon_gauntlet(seed: int) -> Dungeon:
     lay(_GNT_R_PCT, TX, f"{w['u1']} ({w['u3']} {w['u4']}){w['lam3']} {w['u5']}")
     door('sub', f"({w['u3']} {w['u4']}) {w['u5']}")
     # r4 · (-door: the second sentence begins with a letter that is not its
-    # own, and the row ends exactly under the cursor's descent — ( reaches
-    # BACK to the sentence's start (the intruder), where b b overpays.
-    lay(_GNT_R_SEN, TX, f"{w['a1']} {w['a2']}. "
-                        f"{w['lam4']}{w['a3']} {w['a4']}.")
+    # own. The FIRST sentence is a single word, so the intruded sentence
+    # runs long and the descent lands a full word east of the intruder —
+    # ( reaches its start in one stroke where b b overpays (a shorter
+    # second sentence let ONE b tie the paren — the round-5 audit).
+    lay(_GNT_R_SEN, TX, f"{w['a1']}. "
+                        f"{w['lam4']}{w['a3']} {w['a4']} {w['a2']}.")
     # target reaches back over the first sentence's period: the intruder is
     # a PREFIX, so a shorter target would already read true around it.
-    door('sub', f"{w['a2']}. {w['a3']} {w['a4']}.")
+    door('sub', f"{w['a1']}. {w['a3']} {w['a4']} {w['a2']}.")
     # r1 · the search shelf: U1 (the # twin) with the yank word beside it,
     # and the T1 decoy that sits BEHIND P2 so a # there lands wrong. The
     # shelf hangs over the water band — search is its only door, so the
@@ -11496,11 +11507,13 @@ def build_dungeon_gauntlet(seed: int) -> Dungeon:
     lay(_GNT_R_NOOK, _GNT_NOOK_COLS[0] + 2, w['u1s'])
     room.char_runs.append(CharRun(_GNT_R_GATE, SP + 1, ('◆',), 'ancient'))
     room.char_runs.append(CharRun(_GNT_R_GATE, _GNT_CATCH, ('◆',), 'ancient'))
-    # Threshold ◆ on the pocket rows' spine cells: {n}G / + / - land on a
-    # row's FIRST NON-BLANK, which would otherwise be the island text — a
-    # two-key ferry past the search-only law. The ◆ makes the spine the
-    # landing (the gate-row lesson applied upstream).
-    for pr in (_GNT_R_P1, _GNT_R_P2):
+    # Threshold ◆ on every search-band row's spine cell (the shelf, both
+    # pockets, the gU gallery): {n}G / H / gg / + / - land on a row's
+    # FIRST NON-BLANK, which would otherwise be the row's text — a
+    # two-key ferry past the search-only law. The ◆ catches the jump on
+    # a one-cell ledge with water east (w stops at the bank); search
+    # remains the only useful door.
+    for pr in (_GNT_R_BLK, _GNT_R_P1, _GNT_R_P2, _GNT_R_P3):
         room.char_runs.append(CharRun(pr, SP, ('◆',), 'ancient'))
 
     # West-wall plaques: each door's FULL true reading on its own row (the
@@ -11518,7 +11531,7 @@ def build_dungeon_gauntlet(seed: int) -> Dungeon:
                       (_GNT_R_E, f"{w['t1']} {w['t2']} {w['t3']} {w['t4']}"),
                       (_GNT_R_BW, f"{w['v1']} {w['v2']} {w['v3']} {w['v4']}"),
                       (_GNT_R_PCT, f"{w['u1']} ({w['u3']} {w['u4']}) {w['u5']}"),
-                      (_GNT_R_SEN, f"{w['a1']} {w['a2']}. {w['a3']} {w['a4']}."),
+                      (_GNT_R_SEN, f"{w['a1']}. {w['a3']} {w['a4']} {w['a2']}."),
                       (_GNT_R_P1, f"{w['s1']} {w['rcure']}"),
                       (_GNT_R_P2, f"{w['s1']} {w['cw']} {w['t1s']}"),
                       (_GNT_R_P3, f"{w['g1'].upper()} {w['g2'].upper()} "

@@ -161,7 +161,10 @@ def test_pockets_and_gate_are_walk_proof(seed):
     assert not any((_GNT_R_NOOK, c) in seen
                    for c in range(_GNT_NOOK_COLS[0], _GNT_NOOK_COLS[1] + 1))
     assert not any(r == _GNT_R_GATE for (r, c) in seen)
-    assert not any(r == _GNT_R_BLK for (r, c) in seen)   # the search shelf
+    # the search shelf and the gU gallery: their ◆ threshold cells may be
+    # walked/jumped to, but never their text
+    assert not any(r == _GNT_R_BLK and c >= 26 for (r, c) in seen)
+    assert not any(r == _GNT_R_P3 and c >= 26 for (r, c) in seen)
 
 
 @pytest.mark.parametrize("seed", SEEDS)
@@ -187,7 +190,7 @@ def test_search_words_are_clean(seed):
     room = _room(seed)
     text = '\n'.join(main._wla_floor_text(room, r) for r in range(room.rows))
     blk = main._wla_floor_text(room, _GNT_R_BLK).split()
-    u1, ywd, t1 = blk[0], blk[1], blk[2]
+    u1, ywd, t1 = blk[1], blk[2], blk[3]          # after the threshold ◆
     s1 = main._wla_floor_text(room, _GNT_R_P1).split()[1]   # after the spine ◆
     assert len(re.findall(r'\b%s\b' % s1, text)) == 2
     assert len(re.findall(r'\b%s\b' % t1, text)) == 3
@@ -233,9 +236,14 @@ def test_islands_are_search_only(seed):
         p.row, p.col = _GNT_R_P1, _GNT_SPINE
         apply_motion(p, motion, 1, room)
         assert not (p.row == _GNT_R_P1 and p.col in isl1), motion
-    # the fnb of both pocket rows is the spine ◆, not the island text
-    for r in (_GNT_R_P1, _GNT_R_P2):
+    # the fnb of every search-band row is its spine ◆, not the text —
+    # and from the ◆, word motions die at the one-cell water gap
+    for r in (_GNT_R_BLK, _GNT_R_P1, _GNT_R_P2, _GNT_R_P3):
         assert _first_non_blank_col(room, r) == _GNT_SPINE
+        p = Player()
+        p.row, p.col = r, _GNT_SPINE
+        apply_motion(p, 'w', 1, room)
+        assert (p.row, p.col) == (r, _GNT_SPINE), r
     # …while the search still crosses the water onto the island
     s1 = main._wla_floor_text(room, _GNT_R_P1).split()[1]
     p = Player()
@@ -401,6 +409,41 @@ def test_longhand_fill_costs_a_star(monkeypatch):
     a = _swap(d.rooms[0].answer, 'qb e l p q w @b', 'e l p w e l p')
     result = _drive(d, _tape_keys(a), monkeypatch)
     assert result['won'] and result['stars'] == 1
+
+
+def _cheese_probes(room):
+    """Alternative tapes for every generic-motion shortcut the terrain must
+    price out or dead-end. Each replaces one canonical leg; a probe passes
+    the audit if it either fails to win or spends MORE than par."""
+    s1 = main._wla_floor_text(room, _GNT_R_P1).split()[1]
+    lam = main._wla_floor_text(room, _GNT_R_SEN).split()[1][0]   # the intruder
+    return [
+        ('plus-plus ferry to the gallery', 'w * 3b', '+ +'),
+        ('counted-G ferry to the gallery', 'w * 3b', '12G 3b'),
+        ('counted-G ferry to pocket 1', f'/{s1}⏎', '8G'),
+        ('gg ferry to the shelf', f'/{s1}⏎', 'gg'),
+        ('counted-G ferry to pocket 2', 'n', '10G'),
+        ('H ferry replacing the hash trip', 'j b # w yiw N', 'H w yiw 18G'),
+        ('gg ferry replacing the hash trip', 'j b # w yiw N', 'gg w yiw 18G'),
+        ('b-walk replacing the paren', '( x', 'b b x'),
+        ('find replacing the paren', '( x', f'F{lam} x'),
+    ]
+
+
+@pytest.mark.parametrize("idx", range(9))
+def test_cheese_probe_never_beats_par(idx, monkeypatch):
+    d = _fresh(0)
+    room = d.rooms[0]
+    name, old, new = _cheese_probes(room)[idx]
+    a = _swap(room.answer, old, new)
+    box = {}
+    orig = main._calc_stars
+    monkeypatch.setattr(main, '_calc_stars',
+                        lambda won, budget, room_, player, level='':
+                            (box.__setitem__('spent', budget.spent),
+                             orig(won, budget, room_, player, level))[1])
+    result = _drive(d, _tape_keys(a), monkeypatch)
+    assert (not result['won']) or box.get('spent', 0) > _GNT_PAR, name
 
 
 def test_jump_cannot_pass_the_sealed_gate(monkeypatch):
