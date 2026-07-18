@@ -243,15 +243,27 @@ def test_clobbering_delete_loses_the_key(monkeypatch):
     assert not result['won']
 
 
-def test_stashed_key_is_swept_by_the_mist(monkeypatch):
-    # Pasting the key onto the floor to shield it from the culls: the mist
-    # takes the loose key, and the register copy dies to the plain :2d.
+def test_stashing_the_key_loses_it(monkeypatch):
+    # KEYS ARE SLIPPERY (global paste law): pasting the key anywhere but onto
+    # a locked door loses it outright — no floor copy lands, the hand
+    # empties — so the stash never shields a plain cull.
     d = _fresh(0)
-    a = d.rooms[0].answer
-    a = a.replace('$ p :2d␣_⏎', '$ p p :2d⏎')     # drop a copy, cull plainly
+    r = d.rooms[0]
+    a = r.answer
+    a = a.replace('$ p :2d␣_⏎', '$ p p :2d⏎')     # try to drop a copy
     a = a.replace(':5,9d␣_⏎', ':5,9d⏎')
     result = _drive(d, _tape_keys(a), monkeypatch)
     assert not result['won']
+    assert not any(e.kind == 'floor_key' and e.alive for e in r.entities)
+
+
+def test_undo_dropped_key_persists_on_the_floor(monkeypatch):
+    # The undo precision-tax (a WORLD drop, not a paste) still leaves the key
+    # on the floor to be re-fetched — the paste law never touches it.
+    d = _fresh(0)
+    r = d.rooms[0]
+    _drive(d, _K('2lx$plu'), monkeypatch, finish=':q!\r')   # step, then undo: slip
+    assert any(e.kind == 'floor_key' and e.alive for e in r.entities)
 
 
 def test_global_delete_also_clobbers(monkeypatch):

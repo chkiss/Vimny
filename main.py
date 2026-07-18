@@ -3489,12 +3489,13 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
 
     def _ledger_check():
         """The Culling Ledger (v3). Each tick, statelessly:
-        1. sweep any floor key into the mist (no stashing the key past a cull);
-        2. once door ONE is open, part the mist — the dark ledger becomes
+        1. once door ONE is open, part the mist — the dark ledger becomes
            misted (readable, still unwalkable; the unseen-line law lifts);
-        3. once the ledger reads EXACTLY its true lines, in order, the cold
+        2. once the ledger reads EXACTLY its true lines, in order, the cold
            corridor brazier catches the verdant lines' fire and its light
            unveils the exit pocket (door TWO still wants the key).
+        (Key stashing is dead GLOBALLY: a key pasted anywhere but onto a
+        locked door is lost — see the keys-are-slippery paste law.)
         Blank residue rows are ignored — the :s-blanking longhand stays a
         lawful 1★ route; forcing is by PAR."""
         keeps = getattr(room, '_ledger_keeps', None)
@@ -3513,10 +3514,6 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
                     if player.row >= r:
                         player.row = exit_row
                     _push('The void swallows the false ledge!')
-        for e in [e for e in room.entities
-                  if e.kind == 'floor_key' and e.alive]:
-            room.remove_entity(e)
-            _push('The mist takes the key your hand let go!')
         _chasm_remist()                 # a :t/:m'd row must never become footing
         cor = _subst._last_standable_row(room)     # the corridor rides up
         door1_shut = any(e.kind == 'locked_door' and e.alive
@@ -5785,6 +5782,18 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
                 # A FREE no-op — nothing paid, nothing snapshotted.
                 _push(getattr(room, '_flame_block_msg',
                               'There is no fuel to hold that flame.'))
+            elif clip and any(ed['tmpl'].get('kind') == 'floor_key'
+                              for ed in clip_entities):
+                # KEYS ARE SLIPPERY (global law, 2026-07-19): loosed anywhere
+                # but onto a locked door, the key is gone — no pasted copy
+                # lands AND the hand empties. (p never consumes a register, so
+                # a floor paste would MINT a duplicate no cut could touch —
+                # the register-stash exploit.) Undo far enough to re-loot.
+                undo_stack.append(_snapshot(room, player, budget, ans=cmd_start_ans))
+                redo_stack.clear()
+                player.registers['"'] = None
+                budget.spend(_keystroke_cost(count, 'p', action.get('count_given', False)))
+                _push('You lost the key!')
             elif clip and any(rw.get('char_runs') or rw.get('entities') for rw in clip['rows']):
                 # One register for everything cut/yanked: lay characters back down and
                 # respawn cut creatures. count fans out copies (3p = 3 in a row).
