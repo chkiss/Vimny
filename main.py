@@ -905,9 +905,10 @@ def _fireworks_animation(term, iw, dungeon, player):
                     print(term.move_yx(rr, cc) + bg_at(rr, cc) + color + sc + term.normal,
                           end='', flush=True)
         _banner(frame)
-        time.sleep(0.1)
+        if term.inkey(timeout=0.1):    # any key skips (the key is absorbed here)
+            return
     _banner(19)             # settle on a final frame and hold ~1s so the motto can
-    time.sleep(1.1)         # be read (this fires after every par-perfect finish)
+    term.inkey(timeout=1.1)  # be read — or skipped (fires after every par-perfect finish)
 
 
 def _starfield_victory(term, iw, dungeon, player):
@@ -3587,9 +3588,15 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
         if have != want:
             for ru in stale:
                 room.remove_char_run(ru)
+            moved = []
             for (r, col, wd) in sorted(want):
                 room.add_char_run(CharRun(r, col, tuple(wd), 'verdant'))
+                moved += [(r, col + i) for i in range(len(wd))]
             room.rebuild_indexes()
+            # THE PLAQUE-RESTORE LAW: an edit may drag or dent a plaque, but
+            # the wall remembers — it re-rights itself with the glitter (the
+            # sculpting mechanic), canonical edit or not.
+            room._sc_twinkle = moved
         if getattr(room, '_shr_seal_col', None) is None:
             return
         gal = _subst._last_standable_row(room)
@@ -3908,6 +3915,11 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
             _ledger_check()                      # open the seal once the ledger reads true
         elif level == 'shelving_room':
             _shelving_tick()                     # re-mist, re-right plaques, seal check
+            _tw = getattr(room, '_sc_twinkle', None)
+            if _tw:                              # the plaque re-rights: glitter
+                _sc_twinkle_animation(term, room, player, _tw, _iw(term),
+                                      term.height - 8)
+                room._sc_twinkle = []
         elif level == 'refrain_vault':
             _refrain_tick()                      # re-mist the chasm, seal check
         # Macro playback: drain queued keystrokes before reading the terminal.

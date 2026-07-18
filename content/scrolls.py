@@ -713,7 +713,7 @@ SCROLL_CATALOG = [
     {
         'id':         'readers_key',
         'title':      'The Codex Key',
-        'dropped_by': "The Binder's lectern",
+        'dropped_by': "The Binder's Lectern",
         'level_slug': 'binders_reliquary',
         'level_name': "The Binder's Reliquary",
         'content':    READERS_KEY_SCROLL,

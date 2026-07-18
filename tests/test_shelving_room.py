@@ -68,7 +68,8 @@ def _drive(dungeon, keys, monkeypatch, finish=':wq\r', player_name='Scribe'):
     monkeypatch.setattr(main.time, 'sleep', lambda *a, **k: None)
     for anim in ('_fireworks_animation', '_win_animation', '_starfield_victory',
                  '_heart_container_animation', '_unlock_animation',
-                 '_void_fall_animation', '_drown_animation'):
+                 '_void_fall_animation', '_drown_animation',
+                 '_sc_twinkle_animation'):
         monkeypatch.setattr(main, anim, lambda *a, **k: None)
     monkeypatch.setattr(Terminal, 'height', property(lambda self: 45))
     term = Terminal()

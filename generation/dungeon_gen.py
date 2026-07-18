@@ -8309,7 +8309,7 @@ def build_dungeon_refrain_vault(seed: int) -> Dungeon:
 
     room.par    = _RV_PAR
     room.budget = _RV_BUDGET
-    room.answer = (f':s/{b}/{c}/g⏎ :5&&⏎ j & 2j & j & '
+    room.answer = (f':set␣nu⏎ :s/{b}/{c}/g⏎ :5&&⏎ j & 2j & j & '
                    f':1,2j⏎ :1y⏎ p 3j $')
 
     room.rebuild_indexes()
@@ -11877,7 +11877,7 @@ def build_dungeon_culling_ledger(seed: int) -> Dungeon:
 
     room.par    = _CL_PAR
     room.budget = _CL_BUDGET
-    room.answer = (f'2l x $ p :2d␣_⏎ :5,9d␣_⏎ '
+    room.answer = (f':set␣nu⏎ 2l x $ p :2d␣_⏎ :5,9d␣_⏎ '
                    f':6,13v/{s4}/d␣_⏎ $ p 4l')
 
     room.rebuild_indexes()
@@ -11942,16 +11942,16 @@ def build_dungeon_shelving_room(seed: int) -> Dungeon:
     for c in range(_SHR_TX, _SHR_BAND[1] + 1):     # the water course (sight-line;
         cells[_SHR_WTR][c] = CellType.WATER        # cols west stay WALL so the
         mist.add((_SHR_WTR, c))                    # 8th plaque line sits in stone)
-    for c in range(2, _SHR_SEAL_COL):
-        cells[_SHR_GAL][c] = CellType.FLOOR        # the reading gallery
-    for c in range(_SHR_SEAL_COL + 1, _SHR_EXIT_COL + 1):
-        cells[_SHR_GAL][c] = CellType.FLOOR        # the sealed exit pocket
+    for c in range(_SHR_TX - 1, _SHR_SEAL_COL):
+        cells[_SHR_GAL][c] = CellType.FLOOR        # the reading gallery (west of
+    for c in range(_SHR_SEAL_COL + 1, _SHR_EXIT_COL + 1):    # the band is stone —
+        cells[_SHR_GAL][c] = CellType.FLOOR        # nothing to walk there)
     # (_SHR_GAL, _SHR_SEAL_COL) stays WALL until _shelving_tick opens it.
 
     room = Room(room_type=RoomType.ENTRY, rows=R, cols=C)
     room.cells     = cells
     room.seed      = seed
-    room.spawn_pos = (_SHR_GAL, 2)
+    room.spawn_pos = (_SHR_GAL, _SHR_TX - 1)       # under the shelf's west edge
     room.exit_pos  = (_SHR_GAL, _SHR_EXIT_COL)
     room.char_runs = []
 
@@ -11976,7 +11976,7 @@ def build_dungeon_shelving_room(seed: int) -> Dungeon:
 
     room.par    = _SHR_PAR
     room.budget = _SHR_BUDGET
-    room.answer = ':2m4⏎ :5t7⏎ :3<⏎ :6>⏎ $'
+    room.answer = ':set␣nu⏎ :2m4⏎ :5t7⏎ :3<⏎ :6>⏎ $'
 
     room.rebuild_indexes()
     pocket = {(_SHR_GAL, c) for c in range(_SHR_SEAL_COL + 1, _SHR_EXIT_COL + 1)}
