@@ -100,9 +100,55 @@ CHALLENGE C7 resolved by precedent: every scripted level works this way).
 `_drive` harness, cheese probes, rivals, admin karaoke sync). Delete this
 file when the boss ships.
 
-### Open question (pre-implementation)
+---
 
-Whether to teach further `:{range}` ex commands (`:d`, `:m`, `:t`, `:y`,
-`:>`, `:j`) in a new level BEFORE the boss — under assessment; if such a
-level ships, Phase 1/3 may add a beat that uses it (e.g. `:m` a bridge line
-into place).
+## The Ex-Range mini-act — three levels BEFORE the boss (decided 2026-07-18)
+
+Slots between the Spellwright's Forge (39) and the Stair Rail (40); displays
+are cosmetic, renumber 40–45.1 and rerun `content/_gen_curriculum_table.py`.
+Closes the teaching gaps for `:v` and `&`/`:&&`/`g&` (implemented since
+2026-06-03, never exercised by a lesson) and gives the boss's ranged-`:s`
+finale five levels of reinforcement.
+
+**Budget/cheese fact underpinning all three:** command-line input charges
+`len(cmd) + 1` (every typed char + Enter, main.py), so ex forms carry ~4+
+keys of overhead and only beat normal-mode ops when ONE command treats MANY
+rows. Forcing is by PAR via that multi-row win (plus terrain where the rows
+are unreachable); single-row ex routes lose on cost naturally.
+
+### Level A — deletion at a distance (`ex_range` token)
+- Teaches `:{range}d`, `:g/pat/d`, `:v/pat/d` (the star turn: keep only the
+  true lines). `:g` subcommand `d` already runs in `run_global`; only the
+  bare `:{range}d` branch is new engine work.
+- Chassis: a ledger of verses, most corrupted, behind terrain the player
+  cannot walk (misted water / lethal rows) — lines must be culled from afar.
+
+### Level B — the movers (`:{range}m{addr}`, `:{range}t{addr}`, `:>` `:<`)
+- Reshelve verses across an uncrossable gap; `:t` duplicates at a distance,
+  `:m` reorders. Then `:{range}>` / `:{range}<` (wraps `apply_indent`) fixes
+  the indent of the landed lines — the ranged sibling of L29's `>>`/`<<`.
+- Debuts the lethal-landing fire-row tech that boss Phase 1 reuses
+  (de-risks the boss build).
+
+### Level C — repeats and remote yank (`&`, `:&&`, `g&`, `:{range}y [reg]`, `:{range}j`)
+- The repeat-substitute family finally taught; `:{range}y` feeds a named
+  register for a linewise paste (rhymes with the Hall of Echoes register
+  lesson soon after); `:{range}j` (wraps `op_join`) as the ranged sibling of
+  L27's `J`.
+
+**Engine work:** thin `run_ex` branches for `d`, `y`, `m`, `t`, `>`, `<`,
+`j` over existing primitives (`remove_row`, register clips,
+`_insert_blank_row` + relay, `apply_indent`, `op_join`). `&`/`:v` need
+nothing. Deferred: `:{range}normal` (old CHALLENGE C8 territory), `:sort`.
+
+**Gauntlet obligation:** these tokens enter the Gauntlet's `known_commands`,
+so add ex-route cheese probes to `test_gauntlet.py` when they ship — `:{n}d`,
+`:g//d`, `:{n}y p`, and especially `:t`/`:m` ferries of plaque-matching rows
+(remote duplication is the only genuinely novel vector; assert none beats
+the taped route on any door). Verdict from the 2026-07-18 audit: no current
+leak — ex overhead loses on single-row beats, `:y` is linewise where the
+Gauntlet forces charwise yanks, and doors are presence-matches so mass
+deletion opens nothing.
+
+**Boss tie-in:** once B ships, Phase 1/3 may add a beat that uses it (e.g.
+`:m` a bridge line into place).
