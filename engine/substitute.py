@@ -589,6 +589,144 @@ def run_global(room, player, lo, hi, rest, *, confirm=None,
     return f'E492: Not an editor command: {subcmd}', 0, 0
 
 
+# ── the ex-range family: :[range]d y m t > < j ───────────────────────────────
+_PARRY_MSG = "The Warden's shield defended him from your cut!"
+
+
+def _parse_ex_range(rest: str, room, player):
+    """Parse the command tail of an ex-range command (everything after the
+    range). Returns a spec dict or None if `rest` is not one of ours. Strict:
+    trailing junk → None, so unknown colon commands fall through untouched."""
+    for name, cmd in (('delete', 'd'), ('yank', 'y'), ('move', 'm'),
+                      ('copy', 't'), ('co', 't'), ('mo', 'm'),
+                      ('join', 'j'), ('t', 't'), ('m', 'm'),
+                      ('d', 'd'), ('y', 'y'), ('j', 'j')):
+        if not rest.startswith(name):
+            continue
+        tail = rest[len(name):]
+        if cmd in 'dy':                        # :[range]d [reg] / :[range]y [reg]
+            tail = tail.strip()
+            if tail == '':
+                return {'cmd': cmd, 'reg': None}
+            if len(tail) == 1 and (tail.isalpha() or tail == '"'):
+                return {'cmd': cmd, 'reg': tail}
+            return None
+        if cmd in 'mt':                        # :[range]m{addr} / :[range]t{addr}
+            tail = tail.lstrip()
+            dest, i = _read_addr(tail, 0, room, player)
+            if dest is None or tail[i:].strip():
+                return None                    # E14-territory: bad/absent address
+            return {'cmd': cmd, 'dest': dest}
+        if cmd == 'j':                         # :[range]j[!]
+            bang = tail.startswith('!')
+            if tail[1 if bang else 0:].strip():
+                return None
+            return {'cmd': 'j', 'bang': bang}
+    if rest and rest[0] in '><' and set(rest) == {rest[0]}:
+        return {'cmd': rest[0], 'depth': len(rest)}   # :[range]> / :[range]>> …
+    return None
+
+
+def looks_like_ex_range(cmd: str, room, player) -> bool:
+    """True if cmd (after a leading range) is a d/y/m/t/>/</j ex command."""
+    try:
+        _lo, _hi, rest = split_range(cmd, room, player)
+    except Exception:                          # noqa: BLE001
+        return False
+    return bool(rest) and _parse_ex_range(rest, room, player) is not None
+
+
+def _rows_parried(room, lo: int, hi: int) -> bool:
+    """A structural row removal is refused when any row in the span carries an
+    edit-immune entity (the boss-parry rule, same as remove_row's guard)."""
+    return any(e.edit_immune and lo <= e.row <= hi for e in room.entities)
+
+
+def _paste_rows_below(room, player, clip, dest: int) -> int:
+    """Insert a linewise clip's rows just below 0-based row `dest` (dest -1 =
+    above the first line). Cursor → LAST inserted line (Vim). Returns nrows."""
+    from engine.operator import op_paste
+    nrows = len(clip['rows'])
+    if dest < 0:
+        player.row = 0
+        op_paste(room, player, clip, before=True)
+    else:
+        player.row = min(dest, room.rows - 1)
+        op_paste(room, player, clip, before=False)
+    player.row = min(player.row + nrows - 1, room.rows - 1)
+    return nrows
+
+
+def run_ex_range(room, player, lo, hi, spec):
+    """Execute a parsed ex-range spec. Returns (message, n_lines_touched)."""
+    from engine.operator import (op_yank, op_delete, op_join, apply_indent,
+                                 INDENT_WIDTH)
+    from engine.registers import write_register
+    from engine.text_object import TextObject, TextObjectType
+    c = spec['cmd']
+    n = hi - lo + 1
+    tobj = TextObject(lo, 0, hi, 0, TextObjectType.LINEWISE)
+
+    if c == 'y':
+        clip = op_yank(room, player, tobj)
+        write_register(player, spec['reg'], clip)
+        return (f'{n} lines yanked' if n > 1 else None), n
+
+    if c == 'd':
+        if _rows_parried(room, lo, hi):
+            return _PARRY_MSG, 0
+        pre = room.rows
+        clip = op_delete(room, player, tobj, collapse=True)
+        write_register(player, spec['reg'], clip, is_delete=True)
+        gone = pre - room.rows
+        return (f'{gone} fewer lines' if gone > 1 else None), gone
+
+    if c == 'm':
+        dest = min(spec['dest'], room.rows - 1)
+        if lo <= dest <= hi:
+            return 'E134: Cannot move a range of lines into itself', 0
+        if _rows_parried(room, lo, hi):
+            return _PARRY_MSG, 0
+        clip = op_yank(room, player, tobj)     # registers untouched (:m is not a cut)
+        pre = room.rows
+        op_delete(room, player, tobj, collapse=True)
+        if pre - room.rows != n:               # a row refused to collapse — bail
+            return 'E21: Cannot make changes here', 0
+        if dest > hi:
+            dest -= n
+        _paste_rows_below(room, player, clip, dest)
+        return (f'{n} lines moved' if n > 1 else None), n
+
+    if c == 't':
+        dest = min(spec['dest'], room.rows - 1)
+        clip = op_yank(room, player, tobj)     # registers untouched
+        _paste_rows_below(room, player, clip, dest)
+        return (f'{n} more lines' if n > 1 else None), n
+
+    if c in '><':
+        amount = (INDENT_WIDTH * spec['depth']) * (1 if c == '>' else -1)
+        moved = 0
+        for row in range(lo, hi + 1):
+            if apply_indent(room, row, amount):
+                moved += 1
+        if not moved:
+            return None, 0
+        times = spec['depth']
+        return (f"{moved} line{'s' if moved > 1 else ''} {c}ed "
+                f"{times} time{'s' if times > 1 else ''}"), moved
+
+    if c == 'j':
+        if _rows_parried(room, lo + 1, hi if hi > lo else lo + 1):
+            return _PARRY_MSG, 0
+        count = (n if hi > lo else 2)          # bare :j joins with the next line
+        player.row, player.col = lo, max(player.col, 0)
+        if not op_join(room, player, gap=not spec['bang'], count=count):
+            return None, 0
+        return None, count - 1
+
+    return None, 0
+
+
 # ── public entry ─────────────────────────────────────────────────────────────
 def looks_like_sg(cmd: str, room, player) -> bool:
     """True if cmd (after a leading range) is a substitute or global command."""
@@ -625,6 +763,10 @@ def run_ex(cmd, room, player, *, confirm=None, insert_row=None, delete_row=None)
                                  confirm=confirm, insert_row=insert_row,
                                  delete_row=delete_row)
         return True, msg, ns, nl
+    spec = _parse_ex_range(rest, room, player)
+    if spec is not None:
+        msg, nl = run_ex_range(room, player, lo, hi, spec)
+        return True, msg, 0, nl
     return False, None, 0, 0
 
 

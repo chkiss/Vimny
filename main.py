@@ -4101,8 +4101,11 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
                                                cmd_start_ans[0], cmd_start_ans[1]))
                             redo_stack.clear()
 
-                elif _subst.looks_like_sg(cmd, room, player):
-                    if 'subst' not in player.known_commands and player_name != 'admin':
+                elif (_subst.looks_like_sg(cmd, room, player)
+                      or _subst.looks_like_ex_range(cmd, room, player)):
+                    _ex_tok = ('subst' if _subst.looks_like_sg(cmd, room, player)
+                               else 'ex_range')
+                    if _ex_tok not in player.known_commands and player_name != 'admin':
                         player.error = 'E492: Not an editor command: ' + cmd
                     else:
                         _pre = _snapshot(room, player, budget, ans=cmd_start_ans)
@@ -4115,6 +4118,7 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
                             if not edit_mode:
                                 budget.spend(len(cmd) + 1)
                             room.rebuild_indexes()
+                            _animate_reflow_falls()      # :> can shove glyphs off the brink
                             if _sg_msg:
                                 _push(_sg_msg)
                         elif _sg_msg and _sg_msg.startswith('E'):
