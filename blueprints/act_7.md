@@ -116,12 +116,19 @@ keys of overhead and only beat normal-mode ops when ONE command treats MANY
 rows. Forcing is by PAR via that multi-row win (plus terrain where the rows
 are unreachable); single-row ex routes lose on cost naturally.
 
-### Level A — deletion at a distance (`ex_range` token)
-- Teaches `:{range}d`, `:g/pat/d`, `:v/pat/d` (the star turn: keep only the
-  true lines). `:g` subcommand `d` already runs in `run_global`; only the
-  bare `:{range}d` branch is new engine work.
-- Chassis: a ledger of verses, most corrupted, behind terrain the player
-  cannot walk (misted water / lethal rows) — lines must be culled from afar.
+### Level A — SHIPPED 2026-07-18 as The Culling Ledger (display 40)
+- As built: teaches `ex_range` via `:{n}d`, `:{a},{b}d`, `:{range}v//d` (the
+  star turn — keep only the lines bearing the sacred word). Ledger text on
+  MISTED FLOOR (fog ∩ mist: the renderer's carved-through-mist branch shows
+  it in full colour; fog bars feet, search-landings, cuts); no cell on a
+  ledger row is passable, so jump ferries simply fail. Par 22 (:2d +
+  :5,9d + :6,13v//d + $), budget hand-set 60; :g//d, :{n}d singles, and the
+  :s-blanking longhand all win at 1★. Engine laws established: ex addresses
+  follow the NUMBER GUTTER (line 1 = first_standable_row, as {n}G lands);
+  THE AVATAR HAS FEET — :d/:m/:t/:g//d/:s never park the player on
+  unwalkable ground (a ranged edit is not a ferry); mist_cells ride row
+  inserts/collapses like fog. See build_dungeon_culling_ledger +
+  tests/test_culling_ledger.py (+ ex probes in test_gauntlet.py).
 
 ### Level B — the movers (`:{range}m{addr}`, `:{range}t{addr}`, `:>` `:<`)
 - Reshelve verses across an uncrossable gap; `:t` duplicates at a distance,

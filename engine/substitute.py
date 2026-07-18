@@ -222,14 +222,25 @@ def _sub_line(text: str, kinds: list, default_kind: str, vp, rep: str,
 
 
 # ── addresses & ranges ───────────────────────────────────────────────────────
+def _last_standable_row(room) -> int:
+    """Grid row of the LAST buffer line — mirrors Room.first_standable_row()."""
+    for r in range(room.rows - 1, -1, -1):
+        if any(room.cells[r][c] in (CellType.FLOOR, CellType.CORRIDOR)
+               for c in range(room.cols)):
+            return r
+    return room.rows - 1
+
+
 def _read_addr(s: str, i: int, room, player):
-    """Parse one address at s[i:] → (row|None, new_i). None = absent address."""
+    """Parse one address at s[i:] → (row|None, new_i). None = absent address.
+    Line numbers follow the gutter: line 1 = first_standable_row() (borders are
+    not lines), exactly as {n}G lands — so :3d strikes the row `:set nu` calls 3."""
     n = len(s)
     base = None
     if i < n and s[i] == '.':
         base = player.row; i += 1
     elif i < n and s[i] == '$':
-        base = room.rows - 1; i += 1
+        base = _last_standable_row(room); i += 1
     elif i < n and s[i] == "'" and i + 1 < n:
         mk = s[i + 1]; i += 2
         if mk == '<' and player.last_visual_anchor is not None:
@@ -244,7 +255,7 @@ def _read_addr(s: str, i: int, room, player):
         j = i
         while j < n and s[j].isdigit():
             j += 1
-        base = int(s[i:j]) - 1                  # 1-based line → 0-based row
+        base = room.first_standable_row() + int(s[i:j]) - 1   # gutter line → row
         i = j
     # offsets:  +N / -N (repeatable)
     while i < n and s[i] in '+-':
@@ -441,8 +452,10 @@ def substitute(room, player, lo, hi, spec, *, confirm=None,
     player.last_sub = (pat, rep, ''.join(sorted(flags & set('gcInie'))))
     player.last_search = (pat, True)            # :s sets the last search pattern too
     if last_changed is not None and not count_only:
-        player.row = last_changed
-        player.col = _first_glyph_col(room, last_changed)
+        c = _first_glyph_col(room, last_changed)
+        if room.is_passable(last_changed, c):    # the avatar has feet: a ranged
+            player.row = last_changed            # :s onto unwalkable ground (a
+            player.col = c                       # misted ledger) never ferries it
 
     if count_only:
         return f'{n_subs} matches on {n_lines} lines', n_subs, n_lines
@@ -563,13 +576,15 @@ def run_global(room, player, lo, hi, rest, *, confirm=None,
     if subcmd in ('d', 'delete'):
         n = 0
         for row in sorted(marked, reverse=True):    # delete bottom-up
-            if delete_row is not None and delete_row(row):
-                n += 1
-            elif delete_row is None:
+            done = (delete_row(row) if delete_row is not None else None)
+            if done is None:
                 from engine.reflow import remove_row
-                if remove_row(room, row, player):
-                    n += 1
-        player.row = min(player.row, room.rows - 1)
+                done = remove_row(room, row, player)
+            if done:
+                n += 1
+                if row < player.row:                # the avatar rides its row up
+                    player.row -= 1
+        player.row = max(0, min(player.row, room.rows - 1))
         return f'{n} fewer lines', 0, n
 
     if subcmd[:1] == 's':
@@ -644,23 +659,47 @@ def _rows_parried(room, lo: int, hi: int) -> bool:
 
 def _paste_rows_below(room, player, clip, dest: int) -> int:
     """Insert a linewise clip's rows just below 0-based row `dest` (dest -1 =
-    above the first line). Cursor → LAST inserted line (Vim). Returns nrows."""
+    above the first line). Returns nrows.
+
+    THE PLAYER STAYS PUT (same content row). Real Vim parks the cursor on the
+    moved/copied text, but here the cursor is an avatar with feet: letting :t/:m
+    carry it would be a free ferry onto any island in the game. Precedent:
+    run_global's :g//d already keeps the player in place."""
     from engine.operator import op_paste
     nrows = len(clip['rows'])
+    save_r, save_c = player.row, player.col
     if dest < 0:
-        player.row = 0
+        player.row, base = 0, 0
         op_paste(room, player, clip, before=True)
     else:
         player.row = min(dest, room.rows - 1)
+        base = player.row + 1
         op_paste(room, player, clip, before=False)
-    player.row = min(player.row + nrows - 1, room.rows - 1)
+    if base <= save_r:                                # rows landed above the player
+        save_r += nrows
+    player.row = min(save_r, room.rows - 1)
+    player.col = save_c
     return nrows
+
+
+def _remove_rows(room, player, lo: int, hi: int) -> int:
+    """Collapse rows hi..lo (bottom-up, skipping refusals), keeping the PLAYER
+    on the same content row (see _paste_rows_below on why the avatar stays put).
+    Returns how many rows actually collapsed."""
+    from engine.reflow import remove_row
+    gone = 0
+    for row in range(hi, lo - 1, -1):
+        if remove_row(room, row, player):
+            gone += 1
+            if row < player.row:
+                player.row -= 1
+    player.row = max(0, min(player.row, room.rows - 1))
+    return gone
 
 
 def run_ex_range(room, player, lo, hi, spec):
     """Execute a parsed ex-range spec. Returns (message, n_lines_touched)."""
-    from engine.operator import (op_yank, op_delete, op_join, apply_indent,
-                                 INDENT_WIDTH)
+    from engine.operator import op_yank, op_join, apply_indent, INDENT_WIDTH
     from engine.registers import write_register
     from engine.text_object import TextObject, TextObjectType
     c = spec['cmd']
@@ -675,10 +714,11 @@ def run_ex_range(room, player, lo, hi, spec):
     if c == 'd':
         if _rows_parried(room, lo, hi):
             return _PARRY_MSG, 0
-        pre = room.rows
-        clip = op_delete(room, player, tobj, collapse=True)
+        clip = op_yank(room, player, tobj)     # capture before the collapse
+        gone = _remove_rows(room, player, lo, hi)
+        if not gone:
+            return None, 0
         write_register(player, spec['reg'], clip, is_delete=True)
-        gone = pre - room.rows
         return (f'{gone} fewer lines' if gone > 1 else None), gone
 
     if c == 'm':
@@ -688,10 +728,8 @@ def run_ex_range(room, player, lo, hi, spec):
         if _rows_parried(room, lo, hi):
             return _PARRY_MSG, 0
         clip = op_yank(room, player, tobj)     # registers untouched (:m is not a cut)
-        pre = room.rows
-        op_delete(room, player, tobj, collapse=True)
-        if pre - room.rows != n:               # a row refused to collapse — bail
-            return 'E21: Cannot make changes here', 0
+        if _remove_rows(room, player, lo, hi) != n:
+            return 'E21: Cannot make changes here', 0   # a row refused to collapse
         if dest > hi:
             dest -= n
         _paste_rows_below(room, player, clip, dest)

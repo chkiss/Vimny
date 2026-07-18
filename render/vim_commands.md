@@ -332,6 +332,14 @@
 | :g/pat/d    |       | global delete   |
 | &           |       | repeat last :s  |
 
+## culling_ledger — ex-range commands
+
+| keys       | token    | desc          |
+|------------|----------|---------------|
+| :{n}d      | ex_range | delete line n |
+| :{a},{b}d  |          | delete range  |
+| :{r}v//d   |          | keep matching |
+
 ## hall_of_echoes — macros + named registers
 
 | keys  | token     | desc         |

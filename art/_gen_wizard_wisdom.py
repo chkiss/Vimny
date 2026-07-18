@@ -378,6 +378,12 @@ POEMS: list[tuple[str | None, str, list[str]]] = [
         ':g/pat/d strikes every line bearing the curse.',
         'Name what is, then what shall be.',
     ]),
+    ('culling_ledger', ':{range}d', [          # The Culling Ledger — ex ranges
+        'A range names lines you will never touch.',
+        ':3d culls one; :6,10d culls the block.',
+        ':v//d keeps only what bears the word.',
+        'The long arm of the colon needs no feet.',
+    ]),
     ('hall_of_echoes', 'q @ "', [              # The Hall of Echoes — q @ "
         'qa captures your rhythm; q stills it.',
         '@a plays it back like a looped tape.',

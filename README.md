@@ -114,13 +114,14 @@ The curriculum is defined in `content/levels.py` (canonical) and mirrored in `LE
 | 38 | The Paragraph Enclosure | `ip ap` | Playable |
 | 38.1 | The Grandmaster's Sanctum | (boss) | Playable |
 | 39 | The Spellwright's Forge | `:s///  :g  &` | Playable |
-| 40 | The Stair Rail | `+ - _` | Playable |
-| 41 | The Last Reach | `g_ g* gi gp` | Playable |
-| 42 | The Buried Word | `g* n` | Playable |
-| 43 | The Wet Ink | `gi` | Playable |
-| 44 | The Hall of Echoes | `q @ "` | Playable |
-| 45 | The Gauntlet | — | Playable |
-| 45.1 | The Warden Eternal | (boss) | Planned |
+| 40 | The Culling Ledger | `:d :a,bd :v//d` | Playable |
+| 41 | The Stair Rail | `+ - _` | Playable |
+| 42 | The Last Reach | `g_ g* gi gp` | Playable |
+| 43 | The Buried Word | `g* n` | Playable |
+| 44 | The Wet Ink | `gi` | Playable |
+| 45 | The Hall of Echoes | `q @ "` | Playable |
+| 46 | The Gauntlet | — | Playable |
+| 46.1 | The Warden Eternal | (boss) | Planned |
 <!-- END GENERATED LEVELS TABLE -->
 
 ## Commands

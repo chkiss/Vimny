@@ -132,7 +132,7 @@ def test_move_to_top_with_addr_zero():
     handled, _msg, _ns, nl = S.run_ex('3m0', r, p)
     assert handled and nl == 1
     assert _all(r) == ['cc', 'aa', 'bb']
-    assert p.row == 0                              # cursor on the last moved line
+    assert p.row == 1                              # the avatar stays on ITS line ('aa')
 
 
 def test_move_to_bottom_adjusts_for_removed_rows():
@@ -140,7 +140,7 @@ def test_move_to_bottom_adjusts_for_removed_rows():
     p = _player()
     S.run_ex('1m$', r, p)
     assert _all(r) == ['bb', 'cc', 'dd', 'aa']
-    assert p.row == 3
+    assert p.row == 0                              # the avatar never rides the move
 
 
 def test_move_range_down_and_cursor_lands_last():
@@ -149,7 +149,7 @@ def test_move_range_down_and_cursor_lands_last():
     handled, msg, _ns, _nl = S.run_ex('1,2m$', r, p)
     assert handled and msg == '2 lines moved'
     assert _all(r) == ['cc', 'dd', 'aa', 'bb']
-    assert p.row == 3
+    assert p.row == 0
 
 
 def test_move_into_itself_is_an_error():

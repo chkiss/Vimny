@@ -11587,3 +11587,140 @@ def build_dungeon_gauntlet(seed: int) -> Dungeon:
     dungeon.rooms        = [room]
     dungeon.current_room = 0
     return dungeon
+
+
+# ── The Culling Ledger (display 40) — the ex-range family's first lesson ─────
+# A stone ledger carved into the far face of a chasm: the player walks a
+# reading gallery at the bottom and can NEVER stand on a ledger row — the
+# text sits on MISTED floor (fog_cells ∩ mist_cells: readable in full colour
+# through the renderer's carved-through-mist branch, but fog bars feet,
+# match-landings, and cuts). Not one cell on a ledger row is passable, so
+# every jump ferry ({n}G / G / H / M) simply FAILS — nothing to land on —
+# and the ○ marker at each row's west lip is scenery: the chasm's warning.
+# The ONLY hands long enough are the ranged ex commands: :{n}d, :{a},{b}d,
+# and :{range}v//d. (Each row keeps ≥1 FLOOR cell so remove_row consents.)
+# Blighted lines render EMBER, true lines VERDANT (the forge's colour law);
+# the seal opens when the ledger reads EXACTLY its true lines, in order
+# (blank residue rows are ignored — the :s-blanking longhand stays a lawful
+# 1★ route; forcing is by PAR).
+_CL_ROWS, _CL_COLS = 23, 56
+_CL_CATCH = 2                        # the void-rune landing catch (only floor cell)
+_CL_TX    = 5                        # carved text head col
+_CL_GAL   = 21                       # the reading gallery (player walk)
+_CL_SEP   = 20                       # all-wall course between gallery and ledger
+_CL_SEAL  = (_CL_GAL, 50)            # the seal cell (WALL until the ledger reads true)
+_CL_EXIT  = (_CL_GAL, 54)
+_CL_CHEST = (_CL_GAL, 52)
+# Ledger rows (0-based; row 0 is border so GUTTER LINE N = ROW N — the ex
+# address mapping follows the gutter). Stanza I 1-3 (blight 2) · gap 4 ·
+# stanza II 5-10 (keep 5, blights 6-10 contiguous — the :{a},{b}d block) ·
+# gap 11 · stanza III 12-19 interleaved (junk 12,14,16,17,19; sacred
+# 13,15,18 — five scattered junk rows make :v//d beat five :{n}d singles
+# by PAR: the best singles route, deleted bottom-up, spends 18 vs 13).
+_CL_KEEP_ROWS   = (1, 3, 5)
+_CL_BLIGHT_I    = 2
+_CL_BLIGHT_II   = (6, 7, 8, 9, 10)
+_CL_JUNK_III    = (12, 14, 16, 17, 19)
+_CL_SACRED_III  = (13, 15, 18)
+_CL_GAPS        = (4, 11)
+_CL_PAR    = 22                      # :2d(3) + :5,9d(5) + :6,13v/{s4}/d(13) + $(1)
+_CL_BUDGET = 60                      # generous: the :s-blanking longhand (~45) wins 1★
+
+
+def _cl_draw_words(rng):
+    """(s4, b5, pool): the sacred word (len 4), the blight word (len 5), and a
+    pool of distinct filler words containing neither as a substring."""
+    _load_vocab_tables()
+    p4, p5 = _VOCAB_PLAIN_BY_LEN[4], _VOCAB_PLAIN_BY_LEN[5]
+    for _ in range(200):
+        s4, b5 = rng.choice(p4), rng.choice(p5)
+        pool = [w for w in p4 + p5
+                if s4 not in w and b5 not in w and w not in (s4, b5)]
+        if len(pool) >= 43:                    # 9 keep + 3 + 10 blight + 6 + 15
+            return s4, b5, rng.sample(pool, 43)
+    raise RuntimeError('culling ledger: vocab too thin')
+
+
+def build_dungeon_culling_ledger(seed: int) -> Dungeon:
+    dungeon = Dungeon(name='The Culling Ledger', seed=seed)
+    rng = random.Random(seed ^ 0x2C11)
+    s4, b5, pool = _cl_draw_words(rng)
+    R, C, TX = _CL_ROWS, _CL_COLS, _CL_TX
+
+    cells = [[CellType.WALL] * C for _ in range(R)]
+    for r in list(_CL_KEEP_ROWS) + [_CL_BLIGHT_I] + list(_CL_BLIGHT_II) \
+             + list(_CL_JUNK_III) + list(_CL_SACRED_III) + list(_CL_GAPS):
+        cells[r][_CL_CATCH] = CellType.FLOOR       # the ○ marker's floor cell
+    for c in range(2, 50):
+        cells[_CL_GAL][c] = CellType.FLOOR         # the reading gallery
+    for c in range(51, 55):
+        cells[_CL_GAL][c] = CellType.FLOOR         # the sealed exit pocket
+    # _CL_SEAL stays WALL until main._ledger_check opens it.
+
+    room = Room(room_type=RoomType.ENTRY, rows=R, cols=C)
+    room.cells     = cells
+    room.seed      = seed
+    room.spawn_pos = (_CL_GAL, 2)
+    room.exit_pos  = _CL_EXIT
+    room.char_runs = []
+
+    mist: set = set()
+
+    def carve(r, text, kind):
+        """Lay a ledger line: the ○ marker, then the words — all on misted
+        floor (readable through the mist, standable by no one: with not one
+        passable cell on a ledger row, every jump ferry simply fails)."""
+        room.char_runs.append(CharRun(r, _CL_CATCH, ('○',), 'void'))
+        mist.add((r, _CL_CATCH))
+        col = TX
+        for wd in text.split(' '):
+            room.char_runs.append(CharRun(r, col, tuple(wd), kind))
+            for c in range(col, col + len(wd)):
+                cells[r][c] = CellType.FLOOR
+                mist.add((r, c))
+            col += len(wd) + 1
+
+    take = iter(pool)
+    keeps = []
+    for r in _CL_KEEP_ROWS:                        # stanza I/II true lines
+        t = f'{next(take)} {next(take)} {next(take)}'
+        keeps.append(t); carve(r, t, 'verdant')
+    carve(_CL_BLIGHT_I, f'{next(take)} {next(take)} {next(take)}', 'ember')
+    for i, r in enumerate(_CL_BLIGHT_II):          # the contiguous blight block
+        w1, w2 = next(take), next(take)
+        t = (f'{b5} {w1} {w2}', f'{w1} {b5} {w2}', f'{w1} {w2} {b5}')[i % 3]
+        carve(r, t, 'ember')
+    for r in _CL_GAPS:                             # stanza gaps: marker only
+        room.char_runs.append(CharRun(r, _CL_CATCH, ('○',), 'void'))
+        mist.add((r, _CL_CATCH))
+    third = {}
+    for r in _CL_SACRED_III:                       # sacred lines lead with s4
+        t = f'{s4} {next(take)} {next(take)}'
+        third[r] = ('verdant', t)
+    for r in _CL_JUNK_III:
+        third[r] = ('ember', f'{next(take)} {next(take)} {next(take)}')
+    for r in sorted(third):                        # carve in row order…
+        kind, t = third[r]
+        carve(r, t, kind)
+        if kind == 'verdant':
+            keeps.append(t)                        # …so keeps stays ledger-ordered
+
+    room.entities = [
+        Entity(kind='exit',         row=_CL_EXIT[0],  col=_CL_EXIT[1]),
+        Entity(kind='chest_scroll', row=_CL_CHEST[0], col=_CL_CHEST[1]),
+    ]
+    room._ledger_seal  = _CL_SEAL
+    room._ledger_keeps = tuple(keeps)              # the true lines, in order
+    room._ledger_blight = b5
+
+    room.par    = _CL_PAR
+    room.budget = _CL_BUDGET
+    room.answer = f':2d⏎ :5,9d⏎ :6,13v/{s4}/d⏎ $'
+
+    room.rebuild_indexes()
+    pocket = {(_CL_GAL, c) for c in range(51, 55)}  # the sealed exit pocket
+    room.fog_cells  = set(mist) | pocket            # fog bars feet + landings…
+    room.mist_cells = set(mist)                     # …mist keeps the text readable
+    dungeon.rooms        = [room]
+    dungeon.current_room = 0
+    return dungeon

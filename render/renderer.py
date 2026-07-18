@@ -452,7 +452,13 @@ def render_all(term: Terminal, dungeon: Dungeon, player: Player,
                 # Mist ON water reads as hazy water, not stone — the channel
                 # stays visibly a channel (scans still stop at the fog).
                 return C.water_bg() + C.hint_fg() + '~' + C.normal_fg()
-            return wall_bg + ' ' + C.normal_fg()
+            if ((room_r, room_c) not in room.mist_cells
+                    or room.char_run_at(room_r, room_c) is None):
+                return wall_bg + ' ' + C.normal_fg()
+            # MISTED FLOOR carrying a glyph: text across a chasm — readable in
+            # full colour but never standable, searchable, or cuttable (the fog
+            # bars feet and match-landings; only ranged ex commands reach it).
+            # Fall through to the ordinary char-run rendering.
 
         # Entity?
         ent = room.entity_at(room_r, room_c)

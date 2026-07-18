@@ -2638,6 +2638,9 @@ _LEVEL_INTROS = {
     'spellwrights_forge':  ('The Spellwright\'s Forge — the old wards have rotted and cursed lines '
                             'fester among the true. Mend what is corrupt, strike what is cursed, and '
                             'spare what already rings true.', 70),
+    'culling_ledger':      ('The Culling Ledger — a stone ledger carved into the far face of a '
+                            'chasm no foot can cross. The false lines fester among the true; from '
+                            'the reading gallery, only a command can reach them.', 70),
     'dummy':               ('Sandbox — all mechanics active. Type :edit to enter editor mode.', 60),
     'archivists_library':  ("The Archivist's Library — the whole catalogue has spilled "
                             'into a single endless line.', 80),
@@ -3478,6 +3481,33 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
         room._forge_seal = None
         _push('The wards dissolve — the spellwork rings true. The way opens!')
 
+    def _ledger_check():
+        """The Culling Ledger: open the seal once the carved ledger reads EXACTLY
+        its true lines, in order. Blank residue rows (an :s-blanked line, a stanza
+        gap, the bare gallery) are ignored — the subst-only longhand stays a lawful
+        1★ route; demanding the exact ordered texts (not the mere absence of the
+        blight) forbids every snip mangle."""
+        seal = getattr(room, '_ledger_seal', None)
+        keeps = getattr(room, '_ledger_keeps', None)
+        if seal is None or keeps is None:
+            return
+        texts = []
+        for r in range(room.rows):
+            t = _subst.line_text(room, r)[0].replace('○', '').strip()
+            if t:
+                texts.append(t)
+        if texts != list(keeps):
+            return
+        # The gallery rides up as rows collapse — find the seal on the LIVE
+        # bottom line (its stored row is from the unculled ledger).
+        sr, sc = _subst._last_standable_row(room), seal[1]
+        if room.cells[sr][sc] == CellType.WALL:
+            room.cells[sr][sc] = CellType.FLOOR
+        room.fog_cells = {(fr, fc) for (fr, fc) in room.fog_cells
+                          if not (fr == sr and fc > sc)}   # unveil the pocket
+        room._ledger_seal = None
+        _push('The false lines are culled — the ledger reads true. The way opens!')
+
     def _advance_answer(ch: str):
         """Admin karaoke: advance the answer tape by one typed key (Enter passed as the
         glyph '⏎', matching the tape's own Enter marker).  Spaces in the tape are visual
@@ -3725,6 +3755,8 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
 
     if level == 'archivists_library':
         _lib_relayout()                          # fit the page frame to the real viewport
+    if level == 'culling_ledger':
+        player.number_mode = 'number'            # the ledger numbers its own lines
 
     _render(message)
 
@@ -3733,6 +3765,8 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
             _lib_sync()                          # re-tighten the frame on terminal resize
         elif level == 'spellwrights_forge':
             _forge_check()                       # open the sanctum seal once the rites are true
+        elif level == 'culling_ledger':
+            _ledger_check()                      # open the seal once the ledger reads true
         # Macro playback: drain queued keystrokes before reading the terminal.
         if macro_pending:
             macro_run_keys += 1

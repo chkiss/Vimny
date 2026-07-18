@@ -585,6 +585,17 @@
       ]
     },
     {
+      "introduces_slug": "culling_ledger",
+      "name": ":{range}d",
+      "line_count": 4,
+      "quote": [
+        "   A range names lines you will never touch.    ",
+        "     :3d culls one; :6,10d culls the block.     ",
+        "     :v//d keeps only what bears the word.      ",
+        "    The long arm of the colon needs no feet.    "
+      ]
+    },
+    {
       "introduces_slug": "hall_of_echoes",
       "name": "q @ \"",
       "line_count": 4,

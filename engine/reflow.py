@@ -306,6 +306,9 @@ def _shift_rows(room, player, moves, delta: int) -> None:
     if room.spawn_pos and moves(room.spawn_pos[0]):
         room.spawn_pos = (room.spawn_pos[0] + delta, room.spawn_pos[1])
     room.fog_cells = {((r + delta) if moves(r) else r, c) for (r, c) in room.fog_cells}
+    if room.mist_cells:                       # permanent mist rides its rows too
+        room.mist_cells = {((r + delta) if moves(r) else r, c)
+                          for (r, c) in room.mist_cells}
     if player is not None:
         for nm, (r, c) in list(player.marks.items()):
             if moves(r):
@@ -388,6 +391,7 @@ def remove_row(room, at_row: int, player=None) -> bool:
             room.remove_entity(e)
             room._on_entity_destroyed(e)
     room.fog_cells = {(r, c) for (r, c) in room.fog_cells if r != at_row}
+    room.mist_cells = {(r, c) for (r, c) in room.mist_cells if r != at_row}
     _shift_rows(room, player, lambda r: r > at_row, -1)
     room.rebuild_indexes()
     return True

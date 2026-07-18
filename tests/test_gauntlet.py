@@ -427,10 +427,17 @@ def _cheese_probes(room):
         ('gg ferry replacing the hash trip', 'j b # w yiw N', 'gg w yiw 18G'),
         ('b-walk replacing the paren', '( x', 'b b x'),
         ('find replacing the paren', '( x', f'F{lam} x'),
+        # The ex-range family (taught at 40, so it enters the exam's kit):
+        # remote row ops carry ≥4 keys of colon overhead, so they must never
+        # undercut the on-site verbs — :t. is the sharpest (a remote self-dup
+        # exactly reproducing Y p for one key more).
+        ('ex self-copy replacing Y p', 'Y p', ':t.⏎'),
+        ('ex linewise yank replacing the hash trip', 'j b # w yiw N',
+         'j :1y⏎ p'),
     ]
 
 
-@pytest.mark.parametrize("idx", range(9))
+@pytest.mark.parametrize("idx", range(11))
 def test_cheese_probe_never_beats_par(idx, monkeypatch):
     d = _fresh(0)
     room = d.rooms[0]
@@ -471,11 +478,11 @@ def test_first_door_opens_and_undo_rebars(monkeypatch):
 def test_curriculum_entry():
     from content.levels import _BY_SLUG, known_commands
     lv = _BY_SLUG['gauntlet']
-    assert lv['display'] == '45'
+    assert lv['display'] == '46'
     assert lv['teaches'] == []                     # an exam introduces nothing
     # everything the exam asks is already taught by this point
     known = set(known_commands('gauntlet'))
     for tok in ('w', 'b', 'e', 'p', 'y', 'Y', 'd', 'D', 'C', 'S', 'r',
                 'it', '%', '/', '*', 'dot', '~', 'gU', 'insert',
-                '(', 'q', 'line_step', '<'):
+                '(', 'q', 'line_step', '<', 'ex_range'):
         assert tok in known, tok
