@@ -5375,45 +5375,52 @@ def build_dungeon_buried_word(seed: int) -> Dungeon:
 # karaoke law); the door reads the whole word.
 _WI_ROWS, _WI_COLS = 8, 54
 _WI_SPINE  = 22
-_WI_PLQ_COL = 2
+_WI_PLQ_COL = 2                       # the inscription's west edge (wall plaque)
 _WI_LEDGE  = 2                        # the writing row
-_WI_INK0   = 24                       # where the inscription begins
-_WI_BEND   = 40                       # the corridor's turn, down to the alcove
-_WI_ALCOVE = 4                        # the alcove row (plaque2 in its south wall)
+_WI_INK0   = 24                       # where the writing begins
+_WI_BRZ_ROW = 4                       # the brazier gallery, beneath the plaque
+_WI_SOURCE  = (_WI_BRZ_ROW, 4)        # the one flame that never dies
+_WI_BRAZIERS = ((_WI_BRZ_ROW, 7), (_WI_BRZ_ROW, 11), (_WI_BRZ_ROW, 15))
 _WI_GATE   = 6
 _WI_BOLT   = 23
 _WI_EXIT   = (6, 24)
-_WI_PAR    = 16                       # i{w1} $ 2j gi{w2} G $ (driven tally, pinned)
+_WI_PAR    = 43                       # i{w1} 2+ yl 2l p gi{w2} 2+ 6l p
+                                      # gi{w3} 2+ 10l p gi{w4} G $ (pinned)
 
 
 def _wi_draw_words(rng) -> tuple:
-    """The two halves of the inscription (len 4 + len 4, distinct)."""
+    """The four quarters of the inscription (len 4 each, all distinct)."""
     _load_vocab_tables()
     pool = [w for w in _VOCAB_PLAIN_BY_LEN.get(4, ())
             if w.isalpha() and w == w.lower()]
     for _ in range(80):
-        w1, w2 = rng.choice(pool), rng.choice(pool)
-        if w1 != w2:
-            return w1, w2
+        ws = tuple(rng.choice(pool) for _ in range(4))
+        if len(set(ws)) == 4:
+            return ws
     raise ValueError('wet_ink: no distinct draw after 80 tries')
 
 
 def build_dungeon_wet_ink(seed: int) -> Dungeon:
     """The Wet Ink (slug `wet_ink`, bonus): gi — the pen returns to where
-    it left the page."""
+    it left the page. One 16-glyph inscription in the ledge's west wall;
+    only the first quarter shows. Beneath it, a gallery of cold braziers
+    and one standing flame: carry fire (yl … p) to a brazier and its
+    firelight reveals the next quarter — but a brazier only takes the
+    flame once the quarter BEFORE it is written on the ledge (the fuel
+    gate, _wet_ink_tick), so the scribe must leave the page and return
+    to it, three times over."""
     rng = random.Random(seed)
-    w1, w2 = _wi_draw_words(rng)
+    ws = _wi_draw_words(rng)
+    full = ''.join(ws)
 
     R, C = _WI_ROWS, _WI_COLS
     cells = [[CellType.WALL] * C for _ in range(R)]
-    for c in range(_WI_SPINE, _WI_BEND + 1):             # the writing corridor
+    for c in range(_WI_SPINE, 47):                       # the writing ledge
         cells[_WI_LEDGE][c] = CellType.FLOOR
-    for r in range(_WI_LEDGE, _WI_ALCOVE + 1):           # the bend, downward
-        cells[r][_WI_BEND] = CellType.FLOOR
-    for c in range(_WI_BEND, _WI_BEND + 6):              # the alcove
-        cells[_WI_ALCOVE][c] = CellType.FLOOR
-    for r in range(_WI_LEDGE, _WI_GATE + 1):             # the spine to the gate
+    for r in range(_WI_LEDGE, _WI_GATE + 1):             # the spine, down
         cells[r][_WI_SPINE] = CellType.FLOOR
+    for c in range(_WI_SOURCE[1], _WI_SPINE):            # the brazier gallery
+        cells[_WI_BRZ_ROW][c] = CellType.FLOOR
     for c in range(_WI_SPINE, _WI_EXIT[1]):              # gate row + the bolt
         cells[_WI_GATE][c] = CellType.FLOOR
     cells[_WI_GATE][_WI_BOLT] = CellType.WALL
@@ -5423,14 +5430,21 @@ def build_dungeon_wet_ink(seed: int) -> Dungeon:
     room.cells = cells
     room.seed  = seed
 
-    # Plaque 1 (west wall of the ledge): the FIRST half only.
-    room.char_runs.append(CharRun(_WI_LEDGE, _WI_PLQ_COL, tuple(w1), 'verdant'))
-    # Plaque 2 (the alcove's south wall): the SECOND half — stone-hidden
-    # until the bend is walked.
-    room.char_runs.append(CharRun(_WI_ALCOVE + 1, _WI_BEND + 2, tuple(w2),
+    # The plaque (west wall of the ledge): the WHOLE inscription, laid at
+    # build; quarters 2-4 are fogged and revealed by firelight.
+    room.char_runs.append(CharRun(_WI_LEDGE, _WI_PLQ_COL, tuple(full),
                                   'verdant'))
-    room._ss_doors = (((w1 + w2,), _WI_BOLT),)           # the fused inscription
-    room._wi_words = (w1, w2)
+    # The source flame, and embers on every cold brazier.
+    room.char_runs.append(CharRun(*_WI_SOURCE, (_QM_FLAME,), 'flame'))
+    for (br, bc) in _WI_BRAZIERS:
+        room.char_runs.append(CharRun(br, bc, (_QM_EMBERS,), 'pedestal'))
+    room._ss_doors = (((full,), _WI_BOLT),)              # the full inscription
+    room._wi_words = ws
+    # The fuel gate starts source-only; _wet_ink_tick widens it as the
+    # quarters are written (read by _flame_paste_blocked).
+    room._qm_chain = (_WI_SOURCE,)
+    room._flame_block_msg = ('The flame gutters out — only a brazier whose '
+                             'quarter is written will hold it.')
 
     room.entities.append(Entity(kind='exit', row=_WI_EXIT[0], col=_WI_EXIT[1],
                                 edit_immune=True))
@@ -5438,17 +5452,16 @@ def build_dungeon_wet_ink(seed: int) -> Dungeon:
     room.exit_pos  = _WI_EXIT
 
     room.rebuild_indexes()
-    # SCRIPTED fog (the Manifold pattern, NOT apply_stone_fog): vision is
-    # a stone-bounded FLOOD, so a mere bend hides nothing — the alcove and
-    # its plaque are fogged by hand and revealed by the level tick when
-    # the player walks the bend. The fog-audit exempts scripted-fog rooms.
-    room.fog_cells = {(r, c)
-                      for r in (_WI_ALCOVE, _WI_ALCOVE + 1)
-                      for c in range(_WI_BEND - 1, _WI_BEND + 6)}
-    room._wi_alcove_fog = set(room.fog_cells)
+    # SCRIPTED fog on the plaque's WALL cells (the fog-audit only polices
+    # stone-hidden FLOOR): quarter k+1 is dark until brazier k burns.
+    room._wi_seg_fog = tuple(
+        frozenset((_WI_LEDGE, _WI_PLQ_COL + 4 * k + i) for i in range(4))
+        for k in (1, 2, 3))
+    room.fog_cells = set().union(*room._wi_seg_fog)
     room.par    = _WI_PAR
     room.budget = math.ceil(_WI_PAR * 1.4)
-    room.answer = f'i{w1} $ 2j gi{w2} G $'
+    room.answer = (f'i{ws[0]} 2+ yl 2l p gi{ws[1]} 2+ 6l p '
+                   f'gi{ws[2]} 2+ 10l p gi{ws[3]} G $')
 
     dungeon = Dungeon(name='The Wet Ink', seed=seed)
     dungeon.rooms        = [room]

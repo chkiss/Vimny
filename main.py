@@ -2474,6 +2474,56 @@ def _quartermaster_tick(room, player) -> list:
     return list(dict.fromkeys(msgs))
 
 
+def _wet_ink_tick(room, player) -> list:
+    """The Wet Ink braziers — the inscription reveals by FIRELIGHT.
+    STATELESS (the vault-tick principle): recomputed from the text each
+    turn. Three laws:
+      the fuel gate — a cold brazier joins the paste-allowed set
+        (room._qm_chain, read by _flame_paste_blocked) only once the
+        quarters BEFORE its own read true on the ledge, so the scribe
+        must write, walk, light, and gi back — no lighting ahead;
+      embers       — every unlit brazier shows … (kind='pedestal'),
+        laid/swept here so lighting reads as embers → flame;
+      firelight    — brazier k burning lifts the fog on plaque quarter
+        k+1, one-way (what the fire has shown cannot be unseen)."""
+    msgs = []
+    words = getattr(room, '_wi_words', None)
+    seg_fog = getattr(room, '_wi_seg_fog', None)
+    if not words or not seg_fog:
+        return msgs
+    braziers = _dg._WI_BRAZIERS
+
+    def lit(r, c):
+        ru = room.char_run_at(r, c)
+        return ru is not None and ru.symbols[c - ru.col] == _dg._QM_FLAME
+
+    ledge = _wla_floor_text(room, _dg._WI_LEDGE).strip()
+
+    # The fuel gate: the source always holds; brazier k opens with its prefix.
+    allowed = [_dg._WI_SOURCE]
+    for k, rc in enumerate(braziers, start=1):
+        if lit(*rc) or ledge.startswith(''.join(words[:k])):
+            allowed.append(rc)
+    room._qm_chain = tuple(allowed)
+
+    # Embers: lay at every unlit brazier, sweep strays.
+    unlit = {rc for rc in braziers if not lit(*rc)}
+    for ru in [ru for ru in room.char_runs if ru.kind == 'pedestal']:
+        if (ru.row, ru.col) not in unlit:
+            room.remove_char_run(ru)
+    for (r, c) in unlit:
+        if room.is_passable(r, c) and room.char_run_at(r, c) is None:
+            room.add_char_run(CharRun(r, c, (_dg._QM_EMBERS,), 'pedestal'))
+
+    # Firelight: brazier k reveals quarter k+1.
+    for k, rc in enumerate(braziers, start=1):
+        if lit(*rc) and room.fog_cells & seg_fog[k - 1]:
+            room.fog_cells -= seg_fog[k - 1]
+            msgs.append('The firelight spills up the stone — more of the '
+                        'inscription wakes.')
+    return msgs
+
+
 def _spawn_goblin(room, row, col, summoner_uid: int = 0) -> Entity | None:
     for c in (col, col - 1, col + 1):
         if 0 <= c < room.cols and room.is_passable(row, c) and not room.entity_at(row, c):
@@ -2515,7 +2565,7 @@ _LEVEL_INTROS = {
     'quote_enclosure': ('The Quote Enclosure — a gallery of quoted settings, every one holding a rotten word between its marks. The aisle runs the gallery\'s whole length, and the shelves keep their distance from it.', 70),
     'paragraph_enclosure': ('The Paragraph Enclosure — the goblin legion stands mustered in two long cantos, rank upon rank, and six flames burn scattered down the hall among them. The gate keeps the Warden\'s Sigil: sign and seal are one.', 70),
     'buried_word': ('The Buried Word — one word stands alone at the hall\'s mouth, and nowhere else does it stand: down the hall it only hides, seamed into longer names. The seams are fused shut.', 70),
-    'wet_ink': ('The Wet Ink — a writing ledge, a plaque with half an inscription, and a corridor that bends away into the dark. The scribes here were often called away mid-word.', 70),
+    'wet_ink': ('The Wet Ink — a writing ledge, one long inscription mostly lost in the dark, and a gallery of cold braziers beneath it. The scribes here wrote by firelight, and the fire answers only words already written.', 70),
     'g_sanctum': ('The Last Reach — three long verses run east toward a crumbling brink, and each ends in a fused glyph hard against the fall. The keepers of this place went to the end of the line many times a day, and never once over it.', 70),
     'stair_rail': ('The Stair Rail — a broken stair winds down the shaft, each step\'s word set a little east of the last, and below the steps the floor falls a long way. The masons who cut these stairs never missed a landing.', 70),
     'hall_of_echoes': ('The Hall of Echoes — one blighted verse, copied five times down the hall, and every copy blighted the same way. The hall listens.', 70),
@@ -3245,11 +3295,8 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
                 room.fog_cells -= _pf
                 _push('In the pocket\'s shadow, a second word wakes.')
         if level == 'wet_ink':
-            # The alcove's scripted fog lifts when the bend is walked.
-            _af = getattr(room, '_wi_alcove_fog', None)
-            if _af and player.row >= 3 and room.fog_cells & _af:
-                room.fog_cells -= _af
-                _push('The dark gives back the rest of the inscription.')
+            for _m in _wet_ink_tick(room, player):    # braziers, fuel gate, fog
+                _push(_m)
         if level == 'gauntlet':
             for _m in _gauntlet_tick(room, player):
                 _push(_m)
@@ -5478,7 +5525,8 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
             elif _flame_paste_blocked(room, player, clip, before, count):
                 # The Beacon Tiers' fuel rule: flames lie only in braziers.
                 # A FREE no-op — nothing paid, nothing snapshotted.
-                _push('There is no fuel to hold that flame.')
+                _push(getattr(room, '_flame_block_msg',
+                              'There is no fuel to hold that flame.'))
             elif clip and any(rw.get('char_runs') or rw.get('entities') for rw in clip['rows']):
                 # One register for everything cut/yanked: lay characters back down and
                 # respawn cut creatures. count fans out copies (3p = 3 in a row).
