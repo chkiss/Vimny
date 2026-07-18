@@ -11728,18 +11728,36 @@ def build_dungeon_gauntlet(seed: int) -> Dungeon:
 # and the ○ marker at each row's west lip is scenery: the chasm's warning.
 # The ONLY hands long enough are the ranged ex commands: :{n}d, :{a},{b}d,
 # and :{range}v//d. (Each row keeps ≥1 FLOOR cell so remove_row consents.)
-# Blighted lines render EMBER, true lines VERDANT (the forge's colour law);
-# the seal opens when the ledger reads EXACTLY its true lines, in order
-# (blank residue rows are ignored — the :s-blanking longhand stays a lawful
-# 1★ route; forcing is by PAR).
-_CL_ROWS, _CL_COLS = 23, 56
-_CL_CATCH = 2                        # the void-rune landing catch (only floor cell)
+# Blighted lines render EMBER, true lines VERDANT (the forge's colour law).
+#
+# v3 (2026-07-19, the register lesson): the corridor holds a KEY CHEST, a
+# LOCKED DOOR mid-way, and a second locked door before the exit. The key
+# lives in the unnamed register (engine law), a :d clobbers it, and there
+# is only one key — so every register-writing cull must go to the black
+# hole (:d _, :v//d _; :g//d is Vim-faithfully register-writing too). The
+# ledger starts DARK (fog without mist): the UNSEEN-LINE LAW bars culling
+# it blind, so the key must be fetched and door one opened FIRST, which
+# parts the mist (adds mist to the fogged ledger — readable, still
+# unwalkable). Verdant lines each carry a lit brazier at col 30; a cold
+# one waits on the corridor: when the ledger reads true, the corridor
+# brazier catches their fire and its light unveils the exit pocket (the
+# second locked door still wants the key — mind what you cut). A key
+# pasted onto the floor is swept away by the mist (no stashing it past
+# the culls). Blank residue rows are ignored by the check — the
+# :s-blanking longhand stays a lawful 1★ route; forcing is by PAR.
+_CL_ROWS, _CL_COLS = 24, 56
+_CL_CATCH = 2                        # the ○ marker col on every ledger row
 _CL_TX    = 5                        # carved text head col
-_CL_GAL   = 21                       # the reading gallery (player walk)
-_CL_SEP   = 20                       # all-wall course between gallery and ledger
-_CL_SEAL  = (_CL_GAL, 50)            # the seal cell (WALL until the ledger reads true)
-_CL_EXIT  = (_CL_GAL, 54)
-_CL_CHEST = (_CL_GAL, 52)
+_CL_SEP   = 20                       # misted-water course above the wall
+_CL_WALL  = 21                       # stone course — solid but for the gap
+_CL_GAP   = (21, 12)                 # the one gap column (east of door one)
+_CL_COR   = 22                       # the corridor (player walk)
+_CL_KEYCH = (_CL_COR, 4)             # the key chest
+_CL_DOOR1 = (_CL_COR, 10)            # the first locked door
+_CL_BRZ_COL = 30                     # braziers: lit on verdant rows, cold here
+_CL_DOOR2 = (_CL_COR, 50)            # the last locked door, before the exit
+_CL_EXIT  = (_CL_COR, 54)
+_CL_CHEST = (_CL_COR, 52)
 # Ledger rows (0-based; row 0 is border so GUTTER LINE N = ROW N — the ex
 # address mapping follows the gutter). Stanza I 1-3 (blight 2) · gap 4 ·
 # stanza II 5-10 (keep 5, blights 6-10 contiguous — the :{a},{b}d block) ·
@@ -11752,8 +11770,9 @@ _CL_BLIGHT_II   = (6, 7, 8, 9, 10)
 _CL_JUNK_III    = (12, 14, 16, 17, 19)
 _CL_SACRED_III  = (13, 15, 18)
 _CL_GAPS        = (4, 11)
-_CL_PAR    = 22                      # :2d(3) + :5,9d(5) + :6,13v/{s4}/d(13) + $(1)
-_CL_BUDGET = 60                      # generous: the :s-blanking longhand (~45) wins 1★
+_CL_PAR    = 36    # 2l(2) x(1) $(1) p(1)  :2d␣_(5) :5,9d␣_(7)
+                   # :6,13v/{s4}/d␣_(15)  $(1) p(1) 4l(2)
+_CL_BUDGET = 60                      # generous: the :s-blanking longhand wins 1★
 
 
 def _cl_draw_words(rng):
@@ -11777,44 +11796,48 @@ def build_dungeon_culling_ledger(seed: int) -> Dungeon:
     R, C, TX = _CL_ROWS, _CL_COLS, _CL_TX
 
     cells = [[CellType.WALL] * C for _ in range(R)]
-    mist: set = set()
+    mist: set = set()                              # visible-through-haze from turn 0
+    fog:  set = set()                              # DARK until door one opens
     for r in list(_CL_KEEP_ROWS) + [_CL_BLIGHT_I] + list(_CL_BLIGHT_II) \
              + list(_CL_JUNK_III) + list(_CL_SACRED_III):
         cells[r][_CL_CATCH] = CellType.FLOOR       # the ○ marker's floor cell
-    # THE STONE LAW needs open SIGHT, not a render cheat: misted-water bands
-    # at the stanza gaps and above the gallery conduct the vision flood from
-    # the spawn up through every stanza (walls would hide the ledger from
-    # the spawn while the mist render showed it anyway — an audit exception).
+    # Misted-water bands at the stanza gaps and above the stone course: they
+    # conduct the vision flood between stanzas AND stop the natural walk-
+    # reveal (light halts at mist), so the dark ledger cannot leak open.
     for r in list(_CL_GAPS) + [_CL_SEP]:
         for c in range(2, 54):
             cells[r][c] = CellType.WATER
             mist.add((r, c))
+    cells[_CL_GAP[0]][_CL_GAP[1]] = CellType.FLOOR   # the one gap in the stone
     for c in range(2, 50):
-        cells[_CL_GAL][c] = CellType.FLOOR         # the reading gallery
+        cells[_CL_COR][c] = CellType.FLOOR         # the corridor
     for c in range(51, 55):
-        cells[_CL_GAL][c] = CellType.FLOOR         # the sealed exit pocket
-    # _CL_SEAL stays WALL until main._ledger_check opens it.
+        cells[_CL_COR][c] = CellType.FLOOR         # the dark exit pocket
 
     room = Room(room_type=RoomType.ENTRY, rows=R, cols=C)
     room.cells     = cells
     room.seed      = seed
-    room.spawn_pos = (_CL_GAL, 2)
+    room.spawn_pos = (_CL_COR, 2)
     room.exit_pos  = _CL_EXIT
     room.char_runs = []
 
     def carve(r, text, kind):
-        """Lay a ledger line: the ○ marker, then the words — all on misted
-        floor (readable through the mist, standable by no one: with not one
-        passable cell on a ledger row, every jump ferry simply fails)."""
+        """Lay a ledger line: the ○ marker, then the words — floor cells that
+        start DARK (fog only; _ledger_check adds the mist when door one
+        opens). Standable by no one either way: every jump ferry fails."""
         room.char_runs.append(CharRun(r, _CL_CATCH, ('○',), 'void'))
-        mist.add((r, _CL_CATCH))
+        fog.add((r, _CL_CATCH))
         col = TX
         for wd in text.split(' '):
             room.char_runs.append(CharRun(r, col, tuple(wd), kind))
             for c in range(col, col + len(wd)):
                 cells[r][c] = CellType.FLOOR
-                mist.add((r, c))
+                fog.add((r, c))
             col += len(wd) + 1
+        if kind == 'verdant':                      # a lit brazier keeps the line
+            room.char_runs.append(CharRun(r, _CL_BRZ_COL, (_QM_FLAME,), 'flame'))
+            cells[r][_CL_BRZ_COL] = CellType.FLOOR
+            fog.add((r, _CL_BRZ_COL))
 
     take = iter(pool)
     keeps = []
@@ -11838,22 +11861,29 @@ def build_dungeon_culling_ledger(seed: int) -> Dungeon:
         if kind == 'verdant':
             keeps.append(t)                        # …so keeps stays ledger-ordered
 
+    # The cold brazier on the corridor — the finale lights it.
+    room.char_runs.append(CharRun(_CL_COR, _CL_BRZ_COL, (_QM_EMBERS,), 'pedestal'))
+
     room.entities = [
-        Entity(kind='exit',         row=_CL_EXIT[0],  col=_CL_EXIT[1]),
+        Entity(kind='exit',        row=_CL_EXIT[0],  col=_CL_EXIT[1]),
         Entity(kind='chest_scroll', row=_CL_CHEST[0], col=_CL_CHEST[1]),
+        Entity(kind='chest_key',   row=_CL_KEYCH[0], col=_CL_KEYCH[1]),
+        Entity(kind='locked_door', row=_CL_DOOR1[0], col=_CL_DOOR1[1]),
+        Entity(kind='locked_door', row=_CL_DOOR2[0], col=_CL_DOOR2[1]),
     ]
-    room._ledger_seal  = _CL_SEAL
     room._ledger_keeps = tuple(keeps)              # the true lines, in order
     room._ledger_blight = b5
+    room._ledger_lit = False                       # the corridor brazier, cold
 
     room.par    = _CL_PAR
     room.budget = _CL_BUDGET
-    room.answer = f':2d⏎ :5,9d⏎ :6,13v/{s4}/d⏎ $'
+    room.answer = (f'2l x $ p :2d␣_⏎ :5,9d␣_⏎ '
+                   f':6,13v/{s4}/d␣_⏎ $ p 4l')
 
     room.rebuild_indexes()
-    pocket = {(_CL_GAL, c) for c in range(51, 55)}  # the sealed exit pocket
-    room.fog_cells  = set(mist) | pocket            # fog bars feet + landings…
-    room.mist_cells = set(mist)                     # …mist keeps the text readable
+    pocket = {(_CL_COR, c) for c in range(51, 55)}  # the dark exit pocket
+    room.fog_cells  = fog | set(mist) | pocket      # fog bars feet + landings…
+    room.mist_cells = set(mist)                     # …only the water shows, hazy
     dungeon.rooms        = [room]
     dungeon.current_room = 0
     return dungeon

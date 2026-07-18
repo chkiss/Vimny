@@ -16,14 +16,15 @@
 #
 # SPDX-License-Identifier: GPL-3.0-or-later
 
-"""The Culling Ledger (40) — the ex-range family's first lesson.
+"""The Culling Ledger (40) — the ex-range family's first lesson, v3.
 
-A stone ledger across a chasm: text on misted floor (readable, never
-standable/searchable/cuttable), one void catch per row punishing every jump
-ferry, a reading gallery below. Canonical: :2d + :5,9d + :6,13v/{s4}/d + $,
-par 22. Forcing is by PAR: :g//d, per-line singles, and the :s-blanking
-longhand all win at 1★.
-"""
+A dark ledger across a chasm, a key chest, and two locked doors. The key
+lives in the unnamed register, every register-writing cull clobbers it, and
+there is only one key — the black hole (:d _) is the lesson. The unseen-line
+law bars culling the still-dark ledger, so door one must open first (which
+parts the mist); when the ledger reads true, the corridor brazier catches
+the verdant lines' fire and its light unveils the exit pocket. Canonical
+`2l x $ p :2d _ :5,9d _ :6,13v/{s4}/d _ $ p 4l`, par 36."""
 from collections import deque
 
 import pytest
@@ -35,8 +36,9 @@ from engine.world import CellType
 from engine import substitute as S
 from generation.dungeon_gen import (
     build_dungeon_culling_ledger,
-    _CL_ROWS, _CL_COLS, _CL_CATCH, _CL_TX, _CL_GAL, _CL_SEP, _CL_SEAL,
-    _CL_EXIT, _CL_KEEP_ROWS, _CL_BLIGHT_I, _CL_BLIGHT_II, _CL_JUNK_III,
+    _CL_ROWS, _CL_COLS, _CL_CATCH, _CL_TX, _CL_SEP, _CL_WALL, _CL_GAP,
+    _CL_COR, _CL_KEYCH, _CL_DOOR1, _CL_DOOR2, _CL_BRZ_COL, _CL_EXIT,
+    _CL_KEEP_ROWS, _CL_BLIGHT_I, _CL_BLIGHT_II, _CL_JUNK_III,
     _CL_SACRED_III, _CL_GAPS, _CL_PAR, _CL_BUDGET,
 )
 from content.levels import LEVELS, known_commands
@@ -54,7 +56,15 @@ def _fresh(seed=0):
 
 
 def _K(s):
-    return [ENTER if ch == '⏎' else Keystroke(ch) for ch in s]
+    out = []
+    for ch in s:
+        if ch == '⏎':
+            out.append(ENTER)
+        elif ch == '␣':
+            out.append(Keystroke(' '))
+        else:
+            out.append(Keystroke(ch))
+    return out
 
 
 def _tape_keys(answer):
@@ -72,6 +82,9 @@ def _drive(dungeon, keys, monkeypatch, finish=':wq\r', player_name='Scribe'):
                  '_heart_container_animation', '_unlock_animation',
                  '_void_fall_animation', '_drown_animation'):
         monkeypatch.setattr(main, anim, lambda *a, **k: None)
+    # chest pickups pop scroll overlays that would eat tape keys
+    monkeypatch.setattr(main, '_show_catalog_scroll', lambda *a, **k: None)
+    monkeypatch.setattr(main, '_show_scroll_by_id', lambda *a, **k: None)
     monkeypatch.setattr(Terminal, 'height', property(lambda self: 45))
     term = Terminal()
     it = iter(keys)
@@ -84,69 +97,63 @@ _CONTENT_ROWS = (list(_CL_KEEP_ROWS) + [_CL_BLIGHT_I] + list(_CL_BLIGHT_II)
                  + list(_CL_JUNK_III) + list(_CL_SACRED_III))
 
 
+def _strip(t):
+    for junk in ('○', '🜂', '…'):
+        t = t.replace(junk, '')
+    return t.strip()
+
+
 # ── structure ─────────────────────────────────────────────────────────────────
 
 @pytest.mark.parametrize("seed", SEEDS)
-def test_dimensions_and_seal(seed):
+def test_dimensions_doors_and_braziers(seed):
     r = _room(seed)
     assert (r.rows, r.cols) == (_CL_ROWS, _CL_COLS)
-    assert r.cells[_CL_SEAL[0]][_CL_SEAL[1]] == CellType.WALL
+    kinds = {(e.row, e.col): e.kind for e in r.entities}
+    assert kinds[_CL_KEYCH] == 'chest_key'
+    assert kinds[_CL_DOOR1] == 'locked_door' and kinds[_CL_DOOR2] == 'locked_door'
     assert r.exit_pos == _CL_EXIT
     assert r.par == _CL_PAR and r.budget == _CL_BUDGET
+    # the stone course is solid but for the one gap, east of door one
+    for c in range(1, r.cols - 1):
+        want = CellType.FLOOR if (_CL_WALL, c) == _CL_GAP else CellType.WALL
+        assert r.cells[_CL_WALL][c] == want
+    assert _CL_GAP[1] > _CL_DOOR1[1]
+    # lit braziers on every verdant line, a cold one on the corridor
+    for row in list(_CL_KEEP_ROWS) + list(_CL_SACRED_III):
+        ru = r.char_run_at(row, _CL_BRZ_COL)
+        assert ru is not None and ru.kind == 'flame'
+    ped = r.char_run_at(_CL_COR, _CL_BRZ_COL)
+    assert ped is not None and ped.kind == 'pedestal'
 
 
 @pytest.mark.parametrize("seed", SEEDS)
-def test_ledger_rows_read_and_keeps_are_ordered(seed):
+def test_ledger_starts_dark_and_keeps_are_ordered(seed):
     r = _room(seed)
     keeps = r._ledger_keeps
     assert len(keeps) == 6
     rows_true = list(_CL_KEEP_ROWS) + list(_CL_SACRED_III)
     for row, k in zip(rows_true, keeps):
-        assert S.line_text(r, row)[0].replace('○', '').strip() == k
+        assert _strip(S.line_text(r, row)[0]) == k
+    for row in _CONTENT_ROWS:
+        for ru in r._char_runs_by_row.get(row, []):
+            for i in range(len(ru.symbols)):
+                cell = (row, ru.col + i)
+                assert cell in r.fog_cells
+                assert cell not in r.mist_cells    # DARK until door one opens
+                assert not r.is_passable(*cell)
     s4 = r.answer.split('/')[1]
-    for row in _CL_SACRED_III:                      # sacred lines lead with s4
-        assert S.line_text(r, row)[0].replace('○', '').strip().startswith(s4)
     b5 = r._ledger_blight
-    for row in _CL_BLIGHT_II:                       # the blight word marks the block
+    for row in _CL_SACRED_III:
+        assert _strip(S.line_text(r, row)[0]).startswith(s4)
+    for row in _CL_BLIGHT_II:
         assert b5 in S.line_text(r, row)[0]
-    for row in rows_true + list(_CL_JUNK_III) + [_CL_BLIGHT_I]:
-        if row not in _CL_BLIGHT_II:
-            assert b5 not in S.line_text(r, row)[0]
-    for row in _CL_JUNK_III:                        # :v must not spare the junk
+    for row in _CL_JUNK_III:
         assert s4 not in S.line_text(r, row)[0]
 
 
 @pytest.mark.parametrize("seed", SEEDS)
-def test_ledger_text_is_misted_and_impassable(seed):
-    r = _room(seed)
-    for row in _CONTENT_ROWS:
-        for ru in r._char_runs_by_row.get(row, []):
-            if ru.kind == 'void':
-                continue
-            for i in range(len(ru.symbols)):
-                cell = (row, ru.col + i)
-                assert cell in r.fog_cells and cell in r.mist_cells
-                assert not r.is_passable(*cell)
-
-
-@pytest.mark.parametrize("seed", SEEDS)
-def test_ledger_is_seen_by_lawful_sightline(seed):
-    # The stone law without exception: the misted-water bands (gaps 4/11 and
-    # the course above the gallery) conduct the vision flood from the spawn
-    # to every carved cell — the mist render shows nothing stone hides.
-    from engine.motion import _vision_flood
-    r = _room(seed)
-    visible = _vision_flood(r, *r.spawn_pos)
-    for row in _CONTENT_ROWS:
-        for ru in r._char_runs_by_row.get(row, []):
-            for i in range(len(ru.symbols)):
-                assert (row, ru.col + i) in visible
-
-
-@pytest.mark.parametrize("seed", SEEDS)
 def test_no_jump_can_land_on_a_ledger_row(seed):
-    # Not one passable cell on any ledger row: {n}G / G / H / M have nothing
-    # to land on — no ferry, and dd can never be aimed at the ledger.
     from engine.motion import apply_motion
     from engine.player import Player
     r = _room(seed)
@@ -156,13 +163,12 @@ def test_no_jump_can_land_on_a_ledger_row(seed):
     p.row, p.col = r.spawn_pos
     for count in (2, 5, 9, 13):
         apply_motion(p, 'G', count, r, None, count_given=True)
-        assert (p.row, p.col) == r.spawn_pos       # the jump found no footing
+        assert p.row > _CL_SEP          # at worst the gap perch — never the ledger
+        p.row, p.col = r.spawn_pos
 
 
 @pytest.mark.parametrize("seed", SEEDS)
-def test_gallery_cannot_walk_the_ledger(seed):
-    # BFS from spawn: nothing above the separator course is reachable, and
-    # the sealed exit pocket stays out until the seal opens.
+def test_walk_stops_at_door_one(seed):
     r = _room(seed)
     seen = {r.spawn_pos}
     q = deque(seen)
@@ -173,9 +179,22 @@ def test_gallery_cannot_walk_the_ledger(seed):
             if nxt not in seen and r.is_passable(*nxt):
                 seen.add(nxt)
                 q.append(nxt)
-    assert all(row == _CL_GAL for row, _ in seen)
-    assert _CL_EXIT not in seen
-    assert max(c for _, c in seen) < _CL_SEAL[1]
+    assert max(c for _, c in seen) < _CL_DOOR1[1]
+    assert all(row == _CL_COR for row, _ in seen)
+
+
+# ── the unseen-line law ───────────────────────────────────────────────────────
+
+def test_blind_cull_is_refused():
+    # The ledger is dark: ranged deletes are refused until the mist parts.
+    d = _fresh(0)
+    r = d.rooms[0]
+    from engine.player import Player
+    p = Player(name='t')
+    p.row, p.col = r.spawn_pos
+    handled, msg, _ns, nl = S.run_ex('2d', r, p)
+    assert handled and nl == 0 and 'dark' in msg
+    assert r.rows == _CL_ROWS
 
 
 # ── the driven canonical ──────────────────────────────────────────────────────
@@ -204,51 +223,72 @@ def test_admin_karaoke_stays_in_sync(seed, monkeypatch):
     assert room.answer_pos == len(room.answer.replace(' ', ''))
 
 
-# ── rivals: every old road wins, one star short ───────────────────────────────
+def test_finale_lights_the_brazier(monkeypatch):
+    d = _fresh(0)
+    result = _drive(d, _tape_keys(d.rooms[0].answer), monkeypatch)
+    assert result['won']
+    r = d.rooms[0]
+    cor = S._last_standable_row(r)
+    ru = r.char_run_at(cor, _CL_BRZ_COL)
+    assert ru is not None and ru.kind == 'flame'   # the cold brazier caught fire
 
-def _rival(monkeypatch, cmds, seed=0):
-    d = _fresh(seed)
-    keys = []
-    for c in cmds:
-        keys += _K(c)
-    return _drive(d, keys, monkeypatch), d.rooms[0]
 
+# ── the register lesson: skip the black hole and the key is ash ───────────────
+
+def test_clobbering_delete_loses_the_key(monkeypatch):
+    # :2d without _ overwrites the held key — door two never opens.
+    d = _fresh(0)
+    a = d.rooms[0].answer.replace(':2d␣_⏎', ':2d⏎')
+    result = _drive(d, _tape_keys(a), monkeypatch)
+    assert not result['won']
+
+
+def test_stashed_key_is_swept_by_the_mist(monkeypatch):
+    # Pasting the key onto the floor to shield it from the culls: the mist
+    # takes the loose key, and the register copy dies to the plain :2d.
+    d = _fresh(0)
+    a = d.rooms[0].answer
+    a = a.replace('$ p :2d␣_⏎', '$ p p :2d⏎')     # drop a copy, cull plainly
+    a = a.replace(':5,9d␣_⏎', ':5,9d⏎')
+    result = _drive(d, _tape_keys(a), monkeypatch)
+    assert not result['won']
+
+
+def test_global_delete_also_clobbers(monkeypatch):
+    # :v//d without _ is register-writing too (Vim-faithful) — key lost.
+    d = _fresh(0)
+    a = d.rooms[0].answer.replace('/d␣_⏎', '/d⏎')
+    result = _drive(d, _tape_keys(a), monkeypatch)
+    assert not result['won']
+
+
+# ── rivals ────────────────────────────────────────────────────────────────────
 
 def test_global_delete_rival_loses_a_star(monkeypatch):
-    # :g/{b5}/d (taught at the forge) clears the block for 10 where :5,9d
-    # pays 5 — the whole run lands at 27 > par 22.
+    # :g/{b5}/d _ clears the block for 12 where :5,9d _ pays 7.
     d = _fresh(0)
     b5 = d.rooms[0]._ledger_blight
-    s4 = d.rooms[0].answer.split('/')[1]
-    keys = _K(f':2d⏎:g/{b5}/d⏎:6,13v/{s4}/d⏎$')
-    result = _drive(d, keys, monkeypatch)
-    assert result['won'] and result['stars'] == 1
-
-
-def test_singles_rival_loses_a_star(monkeypatch):
-    # Culling stanza III one :{n}d at a time (bottom-up, the cheapest manual
-    # order: 13, 11, 10, 8, 6) spends 18 where :v spends 13 → 27 > par.
-    d = _fresh(0)
-    keys = _K(':2d⏎:5,9d⏎:13d⏎:11d⏎:10d⏎:8d⏎:6d⏎$')
-    result = _drive(d, keys, monkeypatch)
+    a = d.rooms[0].answer.replace(':5,9d␣_⏎', f':g/{b5}/d␣_⏎')
+    result = _drive(d, _tape_keys(a), monkeypatch)
     assert result['won'] and result['stars'] == 1
 
 
 def test_subst_blanking_longhand_wins_one_star(monkeypatch):
-    # The pre-ex_range road: blank every false line with :s (residue rows are
-    # ignored by the seal check) — lawful, far over par, inside budget 60.
-    # No rows collapse, so the addresses stay at their carved positions.
+    # The register-safe longhand: blank the false lines with :s (no clobber,
+    # no _ needed) — lawful, far over par, inside budget 60. The blind rows
+    # still need door one first (the unseen law covers only the ex-range
+    # family, but the :v pattern needs the revealed sacred word anyway).
     d = _fresh(0)
     s4 = d.rooms[0].answer.split('/')[1]
-    keys = _K(f':2s/.*//⏎:6,10s/.*//⏎:12,19v/{s4}/s%.*%%⏎$')
+    keys = _K(f'2lx$p:2s/.*//⏎:6,10s/.*//⏎:12,19v/{s4}/s%.*%%⏎$p4l')
     result = _drive(d, keys, monkeypatch)
     assert result['won'] and result['stars'] == 1
 
 
-def test_scorched_earth_never_opens_the_seal(monkeypatch):
-    # :%d culls the true lines with the false — the seal must stay shut.
+def test_scorched_earth_never_opens_the_way(monkeypatch):
     d = _fresh(0)
-    result = _drive(d, _K(':%d⏎$'), monkeypatch)
+    keys = _K('2lx$p:%d␣_⏎$')
+    result = _drive(d, keys, monkeypatch)
     assert not result['won']
 
 

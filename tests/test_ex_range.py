@@ -239,6 +239,47 @@ def test_join_bang_leaves_no_seam_space():
     assert _all(r) == ['aabb']
 
 
+# ── the black hole, the Vim-faithful :g//d register, the unseen-line law ─────
+def test_black_hole_delete_spares_the_register():
+    r = _room(['aa', 'bb'])
+    p = _player()
+    p.registers['"'] = {'linewise': False, 'rows': [{'width': 1, 'char_runs': []}]}
+    held = p.registers['"']
+    handled, _msg, _ns, nl = S.run_ex('d _', r, p)
+    assert handled and nl == 1
+    assert p.registers['"'] is held                # "_ discarded the cut
+
+
+def test_global_delete_fills_the_register():
+    r = _room(['xa', 'bb', 'xc'])
+    p = _player()
+    S.run_ex('g/x/d', r, p)
+    clip = p.registers['"']
+    assert clip['linewise'] and len(clip['rows']) == 2
+
+
+def test_global_delete_black_hole():
+    r = _room(['xa', 'bb'])
+    p = _player()
+    p.registers['"'] = {'linewise': False, 'rows': [{'width': 1, 'char_runs': []}]}
+    held = p.registers['"']
+    S.run_ex('g/x/d _', r, p)
+    assert p.registers['"'] is held
+
+
+def test_unseen_rows_refuse_ranged_commands():
+    # Fogged-unmisted glyphs = unread text: d/y/m/t/j/>/< all refuse.
+    r = _room(['aa', 'bb', 'cc'])
+    p = _player(row=2)
+    r.fog_cells = {(0, 0), (0, 1)}                 # line 1 goes dark
+    for cmd in ('1d', '1y', '1m3', '1t3', '1,2j', '1>'):
+        handled, msg, _ns, nl = S.run_ex(cmd, r, p)
+        assert handled and nl == 0 and 'dark' in msg, cmd
+    r.mist_cells = {(0, 0), (0, 1)}                # mist parts: seen through haze
+    handled, _msg, _ns, nl = S.run_ex('1y', r, p)
+    assert handled and nl == 1
+
+
 # ── boss safety: edit-immune rows parry structural removal ───────────────────
 def _with_warden(r, row):
     w = Entity(kind='warden', row=row, col=1, max_hp=5)

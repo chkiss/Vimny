@@ -114,7 +114,7 @@ The curriculum is defined in `content/levels.py` (canonical) and mirrored in `LE
 | 38 | The Paragraph Enclosure | `ip ap` | Playable |
 | 38.1 | The Grandmaster's Sanctum | (boss) | Playable |
 | 39 | The Spellwright's Forge | `:s///  :g  &` | Playable |
-| 40 | The Culling Ledger | `:d :a,bd :v//d` | Playable |
+| 40 | The Culling Ledger | `:d _ :a,bd :v//d` | Playable |
 | 41 | The Shelving Room | `:m :t :> :<` | Playable |
 | 42 | The Refrain Vault | `& :&& :j :y` | Playable |
 | 43 | The Stair Rail | `+ - _` | Playable |
@@ -251,6 +251,7 @@ The full command reference (also the hint-bar source) is `render/vim_commands.md
 | `:{n}d` | delete line n |
 | `:{a},{b}d` | delete range |
 | `:{r}v//d` | keep matching |
+| `:d _` | cut, keep reg |
 | `q{a}` | record macro |
 | `@{a}` | play macro |
 | `@@` | repeat macro |

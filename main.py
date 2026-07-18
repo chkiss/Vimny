@@ -3488,43 +3488,77 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
         _push('The wards dissolve — the spellwork rings true. The way opens!')
 
     def _ledger_check():
-        """The Culling Ledger: open the seal once the carved ledger reads EXACTLY
-        its true lines, in order. Blank residue rows (an :s-blanked line, a stanza
-        gap, the bare gallery) are ignored — the subst-only longhand stays a lawful
-        1★ route; demanding the exact ordered texts (not the mere absence of the
-        blight) forbids every snip mangle."""
-        seal = getattr(room, '_ledger_seal', None)
+        """The Culling Ledger (v3). Each tick, statelessly:
+        1. sweep any floor key into the mist (no stashing the key past a cull);
+        2. once door ONE is open, part the mist — the dark ledger becomes
+           misted (readable, still unwalkable; the unseen-line law lifts);
+        3. once the ledger reads EXACTLY its true lines, in order, the cold
+           corridor brazier catches the verdant lines' fire and its light
+           unveils the exit pocket (door TWO still wants the key).
+        Blank residue rows are ignored — the :s-blanking longhand stays a
+        lawful 1★ route; forcing is by PAR."""
         keeps = getattr(room, '_ledger_keeps', None)
         if keeps is None:
             return
+        # No ledge below the corridor: a linewise paste there clones the
+        # corridor WITHOUT its doors — a bridge around door two. The void
+        # swallows it (stateless; the paster snaps back to the corridor).
+        if room.exit_pos is None:
+            return                      # the corridor itself was culled — undo it
+        exit_row = room.exit_pos[0]
+        for r in range(room.rows - 2, exit_row, -1):
+            if any(room.cells[r][c] == CellType.FLOOR for c in range(room.cols)):
+                from engine.reflow import remove_row as _rm_row
+                if _rm_row(room, r, player):
+                    if player.row >= r:
+                        player.row = exit_row
+                    _push('The void swallows the false ledge!')
+        for e in [e for e in room.entities
+                  if e.kind == 'floor_key' and e.alive]:
+            room.remove_entity(e)
+            _push('The mist takes the key your hand let go!')
         _chasm_remist()                 # a :t/:m'd row must never become footing
-        if seal is None:
-            return
+        cor = _subst._last_standable_row(room)     # the corridor rides up
+        door1_shut = any(e.kind == 'locked_door' and e.alive
+                         and e.col < _dg._CL_BRZ_COL
+                         for e in room.entities)
+        if not door1_shut:
+            dark = {(fr, fc) for (fr, fc) in room.fog_cells
+                    if fr < cor - 1 and (fr, fc) not in room.mist_cells
+                    and room.cells[fr][fc] == CellType.FLOOR}
+            if dark:
+                room.mist_cells |= dark            # the mist parts: text readable
+                _push('Beyond the door, the dark thins — the ledger stands '
+                      'in the mist.')
+        if getattr(room, '_ledger_lit', None) is not False:
+            return                                 # already lit (or not this level)
         texts = []
         for r in range(room.rows):
-            t = _subst.line_text(room, r)[0].replace('○', '').strip()
-            if t:
-                texts.append(t)
+            t = _subst.line_text(room, r)[0]
+            for junk in ('○', _dg._QM_FLAME, _dg._QM_EMBERS):
+                t = t.replace(junk, '')
+            if t.strip():
+                texts.append(t.strip())
         if texts != list(keeps):
             return
-        # The gallery rides up as rows collapse — find the seal on the LIVE
-        # bottom line (its stored row is from the unculled ledger).
-        sr, sc = _subst._last_standable_row(room), seal[1]
-        if room.cells[sr][sc] == CellType.WALL:
-            room.cells[sr][sc] = CellType.FLOOR
+        room._ledger_lit = True
+        for ru in list(room._char_runs_by_row.get(cor, [])):
+            if ru.kind == 'pedestal':              # the cold brazier catches fire
+                room.remove_char_run(ru)
+        room.add_char_run(CharRun(cor, _dg._CL_BRZ_COL, (_dg._QM_FLAME,), 'flame'))
         room.fog_cells = {(fr, fc) for (fr, fc) in room.fog_cells
-                          if not (fr == sr and fc > sc)}   # unveil the pocket
-        room._ledger_seal = None
-        _push('The false lines are culled — the ledger reads true. The way opens!')
+                          if fr != cor}            # firelight unveils the pocket
+        room.rebuild_indexes()
+        _push('The braziers answer as one — firelight finds the way out!')
 
     def _chasm_remist():
         """The chasm law, stateless: any BARE floor above the gallery (a row a
         :t/:m just shelved arrives unfogged) is re-mist ed each turn — the far
         bank never becomes footing."""
         gal = _subst._last_standable_row(room)
-        for r in range(1, gal):
-            if any(room.cells[r][c] in (CellType.FLOOR, CellType.CORRIDOR)
-                   for c in range(room.cols)):
+        for r in range(1, gal - 1):     # gal-1 = the wall/water course (its gap
+            if any(room.cells[r][c] in (CellType.FLOOR, CellType.CORRIDOR)  # perch
+                   for c in range(room.cols)):      # stays lawful footing)
                 for c in range(room.cols):
                     if (room.cells[r][c] == CellType.FLOOR
                             and (r, c) not in room.fog_cells):

@@ -339,6 +339,7 @@
 | :{n}d      | ex_range | delete line n |
 | :{a},{b}d  |          | delete range  |
 | :{r}v//d   |          | keep matching |
+| :d _       |          | cut, keep reg |
 
 ## hall_of_echoes — macros + named registers
 

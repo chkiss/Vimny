@@ -380,9 +380,9 @@ POEMS: list[tuple[str | None, str, list[str]]] = [
     ]),
     ('culling_ledger', ':{range}d', [          # The Culling Ledger — ex ranges
         'A range names lines you will never touch.',
-        ':3d culls one; :6,10d culls the block.',
+        ':2d culls one; :5,9d culls the block.',
         ':v//d keeps only what bears the word.',
-        'The long arm of the colon needs no feet.',
+        'd _ culls to the void; your hand keeps its key.',
     ]),
     ('shelving_room', ':m :t :> :<', [         # The Shelving Room — the movers
         ':m carries a line to a shelf it never walked.',

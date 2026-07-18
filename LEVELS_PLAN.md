@@ -92,7 +92,7 @@ Curriculum order is the order of `LEVELS`. Blueprints: `blueprints/act_*.md`.
 | 38 | `paragraph_enclosure` | The Paragraph Enclosure | `ip ap` |  |
 | 38.1 | `grandmasters_sanctum` | The Grandmaster's Sanctum | — | boss |
 | 39 | `spellwrights_forge` | The Spellwright's Forge | `:s///  :g  &` |  |
-| 40 | `culling_ledger` | The Culling Ledger | `:d :a,bd :v//d` |  |
+| 40 | `culling_ledger` | The Culling Ledger | `:d _ :a,bd :v//d` |  |
 | 41 | `shelving_room` | The Shelving Room | `:m :t :> :<` |  |
 | 42 | `refrain_vault` | The Refrain Vault | `& :&& :j :y` |  |
 | 43 | `stair_rail` | The Stair Rail | `+ - _` |  |

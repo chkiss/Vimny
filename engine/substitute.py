@@ -43,10 +43,13 @@ Supported, matching Vim:
   :g/:v       :g/pat/cmd  :g!/pat/cmd  :v/pat/cmd   over d, s///, and p(no-op)
 """
 from __future__ import annotations
+import re
+
 from engine.world import CellType, CharRun
 from engine.vimregex import compile_sub
 
 _WALLS = (CellType.WALL, CellType.WOOD_WALL)
+_G_DEL_RE = re.compile(r'(?:d|delete)(?:\s+([a-zA-Z"_]))?$')   # :g//d [reg]
 
 
 # ── line text ↔ row ──────────────────────────────────────────────────────────
@@ -573,7 +576,15 @@ def run_global(room, player, lo, hi, rest, *, confirm=None,
     if subcmd in ('', 'p', 'print', 'nu', 'number'):
         return f'{len(marked)} lines matched', 0, len(marked)
 
-    if subcmd in ('d', 'delete'):
+    _dm = _G_DEL_RE.match(subcmd)
+    if _dm:
+        from engine.registers import write_register
+        reg = _dm.group(1)
+        # Vim-faithful: :g//d fills the register like any delete ("_ discards).
+        clip = {'linewise': True,
+                'rows': [r_ for row in sorted(marked)
+                         for r_ in _yank_rows_clip(room, row, row)['rows']]}
+        write_register(player, reg, clip, is_delete=True)
         n = 0
         for row in sorted(marked, reverse=True):    # delete bottom-up
             done = (delete_row(row) if delete_row is not None else None)
@@ -623,8 +634,8 @@ def _parse_ex_range(rest: str, room, player):
             tail = tail.strip()
             if tail == '':
                 return {'cmd': cmd, 'reg': None}
-            if len(tail) == 1 and (tail.isalpha() or tail == '"'):
-                return {'cmd': cmd, 'reg': tail}
+            if len(tail) == 1 and (tail.isalpha() or tail in '"_'):
+                return {'cmd': cmd, 'reg': tail}   # "_ = the black hole
             return None
         if cmd in 'mt':                        # :[range]m{addr} / :[range]t{addr}
             tail = tail.lstrip()
@@ -649,6 +660,23 @@ def looks_like_ex_range(cmd: str, room, player) -> bool:
     except Exception:                          # noqa: BLE001
         return False
     return bool(rest) and _parse_ex_range(rest, room, player) is not None
+
+
+_UNSEEN_MSG = 'The dark still holds those lines — bring light before you judge.'
+
+
+def _rows_unseen(room, lo: int, hi: int) -> bool:
+    """The UNSEEN-LINE LAW: a ranged command may not act on a row whose glyphs
+    the fog hides UN-misted (misted text is seen-through-haze and fair game;
+    plain-fogged text is unread, and you cannot judge what you cannot read).
+    This bars blind culling of a still-dark ledger."""
+    for r in range(lo, hi + 1):
+        for ru in room._char_runs_by_row.get(r, []):
+            for i in range(len(ru.symbols)):
+                cell = (r, ru.col + i)
+                if cell in room.fog_cells and cell not in room.mist_cells:
+                    return True
+    return False
 
 
 def _rows_parried(room, lo: int, hi: int) -> bool:
@@ -799,10 +827,10 @@ def run_ex_range(room, player, lo, hi, spec):
     """Execute a parsed ex-range spec. Returns (message, n_lines_touched)."""
     from engine.operator import INDENT_WIDTH
     from engine.registers import write_register
-    from engine.text_object import TextObject, TextObjectType
     c = spec['cmd']
     n = hi - lo + 1
-    tobj = TextObject(lo, 0, hi, 0, TextObjectType.LINEWISE)
+    if _rows_unseen(room, lo, hi):
+        return _UNSEEN_MSG, 0
 
     if c == 'y':
         clip = _yank_rows_clip(room, lo, hi)

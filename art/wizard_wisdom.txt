@@ -590,9 +590,9 @@
       "line_count": 4,
       "quote": [
         "   A range names lines you will never touch.    ",
-        "     :3d culls one; :6,10d culls the block.     ",
+        "     :2d culls one; :5,9d culls the block.      ",
         "     :v//d keeps only what bears the word.      ",
-        "    The long arm of the colon needs no feet.    "
+        "d _ culls to the void; your hand keeps its key. "
       ]
     },
     {
