@@ -6642,8 +6642,9 @@ def run_overworld(term: Terminal, player: Player, progress: dict,
         nonlocal scroll_offset
         scroll_offset, cy, cx = render_overworld(
             term, player, progress, cursor, lines,
-            cmd_line=((searching['pfx'] + searching['buf']) if searching
+            cmd_line=(searching['buf'] if searching
                       else cmdline.line if cmdline.active else None),
+            cmd_prefix=(searching['pfx'] if searching else ':'),
             number_mode=number_mode, deleting=pending_delete,
             renaming=renaming, scroll_offset=scroll_offset, col=_eff())
         print(term.move_yx(cy, cx) + (term.cvvis or term.cnorm), end='', flush=True)  # blinking cursor

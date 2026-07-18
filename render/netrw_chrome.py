@@ -90,11 +90,13 @@ def header_fns(iw, bfg, rst, dfc):
     return _hdr, _div
 
 
-def bottom_statusline(iw, bfg, rst, label, cursor_row, total, cmd_line):
-    """Bottom bar: the ':cmd' command line when `cmd_line` is set, else
-    '-- LABEL --' on the left and 'cursor/total' on the right."""
+def bottom_statusline(iw, bfg, rst, label, cursor_row, total, cmd_line,
+                      cmd_prefix=':'):
+    """Bottom bar: the command line when `cmd_line` is set — prompted with
+    `cmd_prefix` (':' for commands, '/' or '?' for a search, Vim-true) —
+    else '-- LABEL --' on the left and 'cursor/total' on the right."""
     if cmd_line is not None:
-        cmd_text = ':' + cmd_line
+        cmd_text = cmd_prefix + cmd_line
         return (bfg + S.BOX_V + rst +
                 C.mode_command() + cmd_text +
                 rst + ' ' * max(0, iw - len(cmd_text)) +

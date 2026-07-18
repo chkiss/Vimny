@@ -111,7 +111,8 @@ def _scroll_offset(cursor: int, scroll_offset: int, avail: int, n_lines: int) ->
 
 def render_overworld(term: Terminal, player: Player, progress: dict,
                      cursor: int, lines: list, *,
-                     cmd_line: str | None = None, number_mode: str = 'number',
+                     cmd_line: str | None = None, cmd_prefix: str = ':',
+                     number_mode: str = 'number',
                      deleting: bool = False, renaming: str | None = None,
                      scroll_offset: int = 0, col: int = 0) -> tuple[int, int, int]:
     """Render the overworld; returns (scroll_offset, cursor_y, cursor_x) so the
@@ -279,8 +280,12 @@ def render_overworld(term: Terminal, player: Player, progress: dict,
     elif player.error:
         out.append(_bar(C.error_bg() + C.error_fg(), player.error))
     elif cmd_line is not None:
-        out.append(NC.bottom_statusline(iw, bfg, rst, ow_label, cursor, len(lines), cmd_line))
-        cur_y, cur_x = sl_y, 1 + len(':' + cmd_line)
+        # cmd_prefix is ':' for commands, '/' or '?' for a search — Vim
+        # never shows ':' before a search prompt.
+        out.append(NC.bottom_statusline(iw, bfg, rst, ow_label, cursor,
+                                        len(lines), cmd_line,
+                                        cmd_prefix=cmd_prefix))
+        cur_y, cur_x = sl_y, 1 + len(cmd_prefix + cmd_line)
     else:
         out.append(NC.bottom_statusline(iw, bfg, rst, ow_label, cursor, len(lines), None))
 
