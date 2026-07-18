@@ -36,7 +36,7 @@ from generation.dungeon_gen import (
     _GNT_ROWS, _GNT_COLS, _GNT_SPINE, _GNT_R_E, _GNT_R_BW, _GNT_R_PCT,
     _GNT_R_BLK,
     _GNT_R_BLANK, _GNT_R_P1, _GNT_R_P2, _GNT_R_P3, _GNT_R_CIT, _GNT_R_D,
-    _GNT_R_SEN, _GNT_R_YL,
+    _GNT_R_SEN, _GNT_R_Y1, _GNT_R_YL,
     _GNT_R_NOOK, _GNT_R_GATE, _GNT_P1_COLS, _GNT_P2_COLS, _GNT_NOOK_COLS,
     _GNT_BOLT0, _GNT_EXIT, _GNT_CATCH, _GNT_PAR, _GNT_BUDGET,
 )
@@ -157,38 +157,39 @@ def test_pockets_and_gate_are_walk_proof(seed):
     assert not any((_GNT_R_NOOK, c) in seen
                    for c in range(_GNT_NOOK_COLS[0], _GNT_NOOK_COLS[1] + 1))
     assert not any(r == _GNT_R_GATE for (r, c) in seen)
+    assert not any(r == _GNT_R_BLK for (r, c) in seen)   # the search shelf
 
 
 @pytest.mark.parametrize("seed", SEEDS)
-def test_M_lands_on_the_cit_row(seed):
-    # M targets the middle PASSABLE row — the ladder is built so that is the
-    # cit row, and its landing column is the tag's '<' (first non-blank).
+def test_plus_lands_on_the_cit_tag(seed):
+    # + steps from the gU gallery down onto the cit row's first non-blank —
+    # the tag's '<' — wherever the gallery left the cursor.
     from engine.motion import apply_motion, _first_non_blank_col
     from engine.player import Player
     room = _room(seed)
     p = Player()
     p.row, p.col = _GNT_R_P3, 68
-    apply_motion(p, 'M', 1, room)
+    apply_motion(p, '+', 1, room)
     assert p.row == _GNT_R_CIT
     assert p.col == _first_non_blank_col(room, _GNT_R_CIT) == 34
 
 
 @pytest.mark.parametrize("seed", SEEDS)
 def test_search_words_are_clean(seed):
-    # The chain words appear EXACTLY where designed: S1 ×4 (two block
-    # decoys + both pockets), T1 ×3 (block decoy, P2, P3), U1 ×3 (block,
-    # y-door, nook) — and never nested inside another token.
+    # The chain words appear EXACTLY where designed: S1 ×2 (both pockets),
+    # T1 ×3 (shelf decoy, P2, P3), U1 ×3 (shelf, y-door, nook), the yank
+    # word ×1 (the shelf) — and never nested inside another token.
     import re
     room = _room(seed)
     text = '\n'.join(main._wla_floor_text(room, r) for r in range(room.rows))
     blk = main._wla_floor_text(room, _GNT_R_BLK).split()
-    u1, w7, s1, t1 = blk[0], blk[1], blk[2], blk[3]
-    assert blk[4] == s1                                   # the second decoy
-    assert len(re.findall(r'\b%s\b' % s1, text)) == 4
+    u1, ywd, t1 = blk[0], blk[1], blk[2]
+    s1 = main._wla_floor_text(room, _GNT_R_P1).split()[1]   # after the spine ◆
+    assert len(re.findall(r'\b%s\b' % s1, text)) == 2
     assert len(re.findall(r'\b%s\b' % t1, text)) == 3
     assert len(re.findall(r'\b%s\b' % u1, text)) == 3
-    assert len(re.findall(r'\b%s\b' % w7, text)) == 1
-    for sw in (s1, t1, u1, w7):                           # never nested
+    assert len(re.findall(r'\b%s\b' % ywd, text)) == 1
+    for sw in (s1, t1, u1, ywd):                          # never nested
         assert not re.search(r'\w%s|%s\w' % (sw, sw), text)
 
 
@@ -203,6 +204,10 @@ def test_channels_are_misted_water(seed):
         for c in range(_GNT_SPINE + 1, lo):
             assert room.cells[r][c] == CellType.WATER
             assert (r, c) in room.fog_cells and (r, c) in room.mist_cells
+    from generation.dungeon_gen import _GNT_R_WTR
+    for c in range(_GNT_SPINE, 63):                      # the shelf's band
+        assert room.cells[_GNT_R_WTR][c] == CellType.WATER
+        assert (_GNT_R_WTR, c) in room.mist_cells
     for c in range(_GNT_P1_COLS[0], _GNT_P1_COLS[1] + 1):
         assert (_GNT_R_P1, c) not in room.fog_cells
     for c in range(_GNT_P2_COLS[0], _GNT_P2_COLS[1] + 1):
@@ -228,7 +233,7 @@ def test_islands_are_search_only(seed):
     for r in (_GNT_R_P1, _GNT_R_P2):
         assert _first_non_blank_col(room, r) == _GNT_SPINE
     # …while the search still crosses the water onto the island
-    s1 = main._wla_floor_text(room, _GNT_R_BLK).split()[2]
+    s1 = main._wla_floor_text(room, _GNT_R_P1).split()[1]
     p = Player()
     p.row, p.col = room.spawn_pos
     hit = find_next(room, p, s1, True)
@@ -248,18 +253,18 @@ def test_plaques_read_the_full_targets(seed):
                         and ru.col < _GNT_SPINE)
 
     targets = [t for _k, t, _dc in room._gnt_doors]
-    # doors 0-2 (galleries), 4-5 (pocket cures), 9 (cit), 10-11 (row doors),
-    # 12 (C), 13 (S) read VERBATIM on their rows; the sentence row's plaque
-    # is its whole corrected line (its target is the tail); P3 reads its
-    # three raised names as one plaque.
+    # every plaque is its row's WHOLE finished line, navigation words
+    # included: door targets read verbatim on (or as the tail of) their
+    # row's plaque.
     for r, t in ((_GNT_R_E, targets[0]), (_GNT_R_BW, targets[1]),
-                 (_GNT_R_PCT, targets[2]), (_GNT_R_P1, targets[4]),
-                 (_GNT_R_P2, targets[5]), (_GNT_R_CIT, targets[9]),
-                 (_GNT_R_D, targets[10]),
-                 (_GNT_R_P3, ' '.join(targets[6:9]))):
+                 (_GNT_R_CIT, targets[9]), (_GNT_R_D, targets[10]),
+                 (_GNT_R_Y1, targets[14])):
         assert plaque(r) == t, (r, t)
-    # the sentence plaque ends with its target and IS the corrected line
-    assert plaque(_GNT_R_SEN).endswith(targets[3])
+    assert plaque(_GNT_R_PCT).endswith(targets[2])       # u1 + the span
+    assert plaque(_GNT_R_SEN).endswith(targets[3])       # the corrected line
+    assert plaque(_GNT_R_P1).endswith(targets[4])        # s1 + the cure
+    assert targets[5] in plaque(_GNT_R_P2)               # s1 + cure + t1s
+    assert plaque(_GNT_R_P3).startswith(' '.join(targets[6:9]))  # + t1s
     # the goal column at build: the yanked line TWICE, then the two verses
     yline, ow1, ow2 = room._gnt_band
     assert plaque(_GNT_R_YL) == yline
@@ -325,10 +330,10 @@ def test_budget_is_hand_set(monkeypatch):
 
 # ── rival tapes: each loses a star or fails its door ──────────────────────────
 
-def test_skipping_M_costs_a_star(monkeypatch):
-    # j lands ~34 cols east of the tag; ^ recovers to the '<' — one key more.
+def test_skipping_plus_costs_a_star(monkeypatch):
+    # j lands far east of the tag; ^ recovers to the '<' — one key more.
     d = _fresh(0)
-    a = _swap(d.rooms[0].answer, 'M', 'j ^')
+    a = _swap(d.rooms[0].answer, '+', 'j ^')
     result = _drive(d, _tape_keys(a), monkeypatch)
     assert result['won'] and result['stars'] == 1
 
@@ -344,13 +349,11 @@ def test_skipping_hash_with_star_costs_a_star(monkeypatch):
     assert result['won'] and result['stars'] == 1
 
 
-def test_skipping_brace_costs_a_star(monkeypatch):
-    # Searching from the sentence row eats both block decoys (n n) — the }
-    # that skips past them is exactly one key cheaper.
+def test_counted_walk_back_costs_a_star(monkeypatch):
+    # r2 without the second b: a counted h-walk back to the first intruder
+    # pays a digit — one key, one star.
     d = _fresh(0)
-    room = d.rooms[0]
-    s1 = main._wla_floor_text(room, _GNT_R_BLK).split()[2]
-    a = _swap(room.answer, f'}} /{s1}⏎', f'/{s1}⏎ n n')
+    a = _swap(d.rooms[0].answer, 'b x b x', 'b x 6h x')
     result = _drive(d, _tape_keys(a), monkeypatch)
     assert result['won'] and result['stars'] == 1
 
@@ -374,15 +377,6 @@ def test_s_ties_r_documented(monkeypatch):
     assert result['won'] and result['stars'] == 2
 
 
-def test_counted_b_and_w_costs_a_star(monkeypatch):
-    # r2 the long way: 2b x w x pays a digit where b x b x (back-to-front)
-    # doesn't — one key, one star.
-    d = _fresh(0)
-    a = _swap(d.rooms[0].answer, 'b x b x', '2b x w x')
-    result = _drive(d, _tape_keys(a), monkeypatch)
-    assert result['won'] and result['stars'] == 1
-
-
 def test_dot_gallery_costs_a_star(monkeypatch):
     # P3 the old way: gUe w . w . opens all three doors but pays 3 more
     # than the single counted stroke gU3e.
@@ -395,9 +389,9 @@ def test_dot_gallery_costs_a_star(monkeypatch):
 def test_longhand_fill_costs_a_star(monkeypatch):
     # The q@ re-audit (macros now precede the exam): the y-door fill is the
     # exam's macro leg — recording is free and @b replays for 2, so the
-    # untaped longhand (w e l p ×2 = 8 vs 6) loses exactly the star.
+    # untaped longhand (e l p w e l p = 7 vs 6) loses exactly the star.
     d = _fresh(0)
-    a = _swap(d.rooms[0].answer, 'qb w e l p q @b', 'w e l p w e l p')
+    a = _swap(d.rooms[0].answer, 'qb e l p q w @b', 'e l p w e l p')
     result = _drive(d, _tape_keys(a), monkeypatch)
     assert result['won'] and result['stars'] == 1
 
@@ -432,6 +426,6 @@ def test_curriculum_entry():
     # everything the exam asks is already taught by this point
     known = set(known_commands('gauntlet'))
     for tok in ('w', 'b', 'e', 'p', 'y', 'Y', 'd', 'D', 'C', 'S', 'r',
-                'it', '%', '/', '*', 'dot', '~', 'gU', 'insert', '{', '}',
-                '(', ')', 'q'):
+                'it', '%', '/', '*', 'dot', '~', 'gU', 'insert',
+                '(', 'q', 'line_step'):
         assert tok in known, tok

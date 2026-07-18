@@ -418,7 +418,7 @@ POEMS: list[tuple[str | None, str, list[str]]] = [
         'The last Warden is every Warden.',
         'No key remains for me to give—',
         'the buffer is yours now, end to end.',
-        'Go gently, traveler. The light holds.',
+        'Go gently, traveler.',
     ]),
 ]
 
