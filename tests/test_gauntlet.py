@@ -126,6 +126,10 @@ def test_no_target_is_already_true(seed):
             assert not any(target in t for t in floor_rows), target
         elif kind == 'row':
             assert target not in stripped, target
+        elif kind == 'col':
+            assert not any(t.strip() == target
+                           and len(t) - len(t.lstrip()) == 26
+                           for t in floor_rows), target
         else:
             assert sum(1 for t in stripped if t == target) < 2, target
 
@@ -171,7 +175,7 @@ def test_plus_lands_on_the_cit_tag(seed):
     p.row, p.col = _GNT_R_P3, 45
     apply_motion(p, '+', 1, room)
     assert p.row == _GNT_R_CIT
-    assert p.col == _first_non_blank_col(room, _GNT_R_CIT) == 26
+    assert p.col == _first_non_blank_col(room, _GNT_R_CIT) == 28
 
 
 @pytest.mark.parametrize("seed", SEEDS)
@@ -265,12 +269,14 @@ def test_plaques_read_the_full_targets(seed):
     assert plaque(_GNT_R_P1).endswith(targets[4])        # s1 + the cure
     assert targets[5] in plaque(_GNT_R_P2)               # s1 + cure + t1s
     assert plaque(_GNT_R_P3).startswith(' '.join(targets[6:9]))  # + t1s
-    # the goal column at build: the yanked line TWICE, then the two verses
-    yline, ow1, ow2 = room._gnt_band
+    # the goal column at build: the yanked line TWICE, the two verses,
+    # then the nook decoy at the row where the nook will come to rest
+    yline, ow1, ow2, nkw = room._gnt_band
     assert plaque(_GNT_R_YL) == yline
     assert plaque(_GNT_R_YL + 1) == yline
     assert plaque(_GNT_R_YL + 2) == ow1
-    assert plaque(_GNT_R_YL + 5) == ow2
+    assert plaque(_GNT_R_YL + 3) == ow2
+    assert plaque(_GNT_R_YL + 4) == nkw
 
 
 @pytest.mark.parametrize("seed", SEEDS)
@@ -280,8 +286,8 @@ def test_goal_column_holds_after_the_canonical(seed, monkeypatch):
     d = _fresh(seed)
     room = d.rooms[0]
     _drive(d, _tape_keys(room.answer), monkeypatch, finish=':q!\r')
-    yline, ow1, ow2 = room._gnt_band
-    for dr, t in ((0, yline), (1, yline), (2, ow1), (5, ow2)):
+    yline, ow1, ow2, nkw = room._gnt_band
+    for dr, t in ((0, yline), (1, yline), (2, ow1), (3, ow2)):
         r = _GNT_R_YL + dr
         assert main._wla_floor_text(room, r).strip() == t, (r, t)
         prunning = ' '.join(''.join(ru.symbols)
@@ -330,14 +336,13 @@ def test_budget_is_hand_set(monkeypatch):
 
 # ── rival tapes: each loses a star or fails its door ──────────────────────────
 
-def test_j_ties_plus_documented(monkeypatch):
-    # Since the left-align law heads every line at TX, the gU gallery parks
-    # its cursor exactly above the tag — j ties + (the tape keeps + as the
-    # showcase). This pin documents the tie, like s/r.
+def test_skipping_plus_costs_a_star(monkeypatch):
+    # The cit row stands one shift east, so j parks on blank floor at TX
+    # where cit resolves nothing; ^ recovers to the '<' — one key more.
     d = _fresh(0)
-    a = _swap(d.rooms[0].answer, '+', 'j')
+    a = _swap(d.rooms[0].answer, '+', 'j ^')
     result = _drive(d, _tape_keys(a), monkeypatch)
-    assert result['won'] and result['stars'] == 2
+    assert result['won'] and result['stars'] == 1
 
 
 def test_skipping_hash_with_star_costs_a_star(monkeypatch):
@@ -429,5 +434,5 @@ def test_curriculum_entry():
     known = set(known_commands('gauntlet'))
     for tok in ('w', 'b', 'e', 'p', 'y', 'Y', 'd', 'D', 'C', 'S', 'r',
                 'it', '%', '/', '*', 'dot', '~', 'gU', 'insert',
-                '(', 'q', 'line_step'):
+                '(', 'q', 'line_step', '<'):
         assert tok in known, tok

@@ -1716,7 +1716,11 @@ def _gauntlet_tick(room, player) -> list:
               doors: their post-fix text is a prefix of the pre-fix text, so
               substring matching would open them unfixed);
       'dup' — the target line stands on TWO floor rows (the Y p door: its
-              source row alone must not count).
+              source row alone must not count);
+      'col' — the target IS some floor row's stripped text AND that row
+              heads exactly at TX (the left-align law made diegetic: the
+              cit door needs its << home; a verse authored off-column
+              reads false).
     Stateless, two-sided, row-agnostic; gate row derived from exit_pos each
     tick (rides _shift_rows — o/O/linewise-p all insert real rows here)."""
     msgs = []
@@ -1728,6 +1732,10 @@ def _gauntlet_tick(room, player) -> list:
             return any(target in t for t in floor_rows)
         if kind == 'row':
             return target in stripped
+        if kind == 'col':
+            return any(t.strip() == target
+                       and len(t) - len(t.lstrip()) == _dg._GNT_TX
+                       for t in floor_rows)
         return sum(1 for t in stripped if t == target) >= 2      # 'dup'
 
     gr = room.exit_pos[0]
@@ -1757,12 +1765,13 @@ def _gauntlet_tick(room, player) -> list:
     # with its twinkle (room._sc_twinkle is read by the render loop).
     band = getattr(room, '_gnt_band', None)
     if band:
-        yline, ow1, ow2 = band
+        yline, ow1, ow2, nkw = band
         anchor = next((r for r, t in enumerate(stripped) if t == yline), None)
         if anchor is not None:
             spine = _dg._GNT_SPINE
             want: dict = {}
-            for dr, t in ((0, yline), (1, yline), (2, ow1), (5, ow2)):
+            for dr, t in ((0, yline), (1, yline), (2, ow1), (3, ow2),
+                          (4, nkw)):
                 if anchor + dr < room.rows:
                     want.setdefault(t, []).append(anchor + dr)
             have: dict = {}
@@ -1774,7 +1783,7 @@ def _gauntlet_tick(room, player) -> list:
                 if not runs:
                     continue
                 text = ' '.join(''.join(ru.symbols) for ru in runs)
-                if text in (yline, ow1, ow2):
+                if text in (yline, ow1, ow2, nkw):
                     have.setdefault(text, []).append(r)
                     runs_at[r] = runs
             if have != want:
