@@ -157,6 +157,8 @@ _ANSWER_NOT_TOKENISED = {
     'build_dungeon_wet_ink',           # i/gi tape with typed halves; tests/test_g_bonus_levels.py
     'build_dungeon_gauntlet',          # the everything-exam tape (typed cures, /⏎, dots); tests/test_gauntlet.py
     'build_dungeon_culling_ledger',    # ex-command tape (:2d⏎ …); tests/test_culling_ledger.py
+    'build_dungeon_shelving_room',     # ex-command tape (:2m4⏎ …); tests/test_shelving_room.py
+    'build_dungeon_refrain_vault',     # :s/&/:y/p tape; tests/test_refrain_vault.py
 }
 
 # Levels with a documented NON-1.4 budget. The Change Annex / Extension use a
@@ -171,6 +173,8 @@ _NONSTANDARD_BUDGET = {
     'build_dungeon_hall_of_echoes',    # GENEROUS hand-set 45: straight manual (43) wins 1★
     'build_dungeon_gauntlet',          # GENEROUS hand-set 140: ~10 insert doors invite typos
     'build_dungeon_culling_ledger',    # GENEROUS hand-set 60: the :s-blanking longhand (~39) wins 1★
+    'build_dungeon_shelving_room',     # GENEROUS hand-set 40: the :t+:d / :s^ longhands win 1★
+    'build_dungeon_refrain_vault',     # GENEROUS hand-set 60: the ranged-:s mix (~39) wins 1★
 }
 
 from tests import SEEDS as _UNIVERSAL_SEEDS

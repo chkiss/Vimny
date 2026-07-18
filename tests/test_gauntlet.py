@@ -478,7 +478,7 @@ def test_first_door_opens_and_undo_rebars(monkeypatch):
 def test_curriculum_entry():
     from content.levels import _BY_SLUG, known_commands
     lv = _BY_SLUG['gauntlet']
-    assert lv['display'] == '46'
+    assert lv['display'] == '48'
     assert lv['teaches'] == []                     # an exam introduces nothing
     # everything the exam asks is already taught by this point
     known = set(known_commands('gauntlet'))

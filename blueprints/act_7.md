@@ -130,23 +130,33 @@ are unreachable); single-row ex routes lose on cost naturally.
   inserts/collapses like fog. See build_dungeon_culling_ledger +
   tests/test_culling_ledger.py (+ ex probes in test_gauntlet.py).
 
-### Level B — the movers (`:{range}m{addr}`, `:{range}t{addr}`, `:>` `:<`)
-- Reshelve verses across an uncrossable gap; `:t` duplicates at a distance,
-  `:m` reorders. Then `:{range}>` / `:{range}<` (wraps `apply_indent`) fixes
-  the indent of the landed lines — the ranged sibling of L29's `>>`/`<<`.
-- Debuts the lethal-landing fire-row tech that boss Phase 1 reuses
-  (de-risks the boss build).
+### Level B — SHIPPED 2026-07-18 as The Shelving Room (display 41)
+- As built: the ledger's misted-chasm chassis; the true stanza carved as a
+  WEST-WALL plaque column row-for-row beside the shelf. Canonical
+  `:2m4 :5t7 :3< :6> $`, par 15, budget hand-set 40. :m/:t are STRUCTURAL
+  ROW SURGERY (`_snapshot_rows`/`_lay_rows_below` — cells, glyphs, fog AND
+  mist ride along; a reflow capture reads a fogged row as empty), :>/:< are
+  glyph-wise (`_indent_rows`; wall-carved plaques never move). main's
+  `_shelving_tick` re-mists any bare shelf floor (stateless chasm law) and
+  re-rights the plaque column after row inserts drag it.
 
-### Level C — repeats and remote yank (`&`, `:&&`, `g&`, `:{range}y [reg]`, `:{range}j`)
-- The repeat-substitute family finally taught; `:{range}y` feeds a named
-  register for a linewise paste (rhymes with the Hall of Echoes register
-  lesson soon after); `:{range}j` (wraps `op_join`) as the ranged sibling of
-  L27's `J`.
+### Level C — SHIPPED 2026-07-18 as The Refrain Vault (display 42)
+- As built: a WALKABLE scriptorium + a two-line colophon chasm. One full
+  `:s/{b}/{c}/g` at the B2 spawn desk, ranged `:5&&` (the park ferries the
+  scribe to the chain top — a plain `&` RESETS the remembered flags,
+  Vim-faithful, so the ranged repeat must fire while /g is fresh), then
+  `j& 2j& j&` down the singles; `:1,2j` mends the colophon (textual
+  `_join_rows` — fog-agnostic, avatar stays put), `:1y` + `p` lay it on the
+  floor. THREE protected verdant lines carrying the blight bar :% / :g / g&
+  outright and their SCATTERING bars any contiguous ranged :s (best mix 39
+  vs par 37). A :t/:m'd chasm slab arrives still misted — off the floor, it
+  never satisfies the colophon door; only the yank serves. Par 37, budget
+  hand-set 60.
 
-**Engine work:** thin `run_ex` branches for `d`, `y`, `m`, `t`, `>`, `<`,
-`j` over existing primitives (`remove_row`, register clips,
-`_insert_blank_row` + relay, `apply_indent`, `op_join`). `&`/`:v` need
-nothing. Deferred: `:{range}normal` (old CHALLENGE C8 territory), `:sort`.
+**Engine work (shipped):** `run_ex_range` (strict parser) + fog-aware forms:
+`_yank_rows_clip` (glyph-wise :y/:d clips), `_snapshot_rows`/`_lay_rows_below`
+(:m/:t), `_indent_rows` (:>/:<), `_join_rows` (:j). `&`/`:v` needed nothing.
+Deferred: `:{range}normal` (old CHALLENGE C8 territory), `:sort`.
 
 **Gauntlet obligation:** these tokens enter the Gauntlet's `known_commands`,
 so add ex-route cheese probes to `test_gauntlet.py` when they ship — `:{n}d`,

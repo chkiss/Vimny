@@ -115,13 +115,15 @@ The curriculum is defined in `content/levels.py` (canonical) and mirrored in `LE
 | 38.1 | The Grandmaster's Sanctum | (boss) | Playable |
 | 39 | The Spellwright's Forge | `:s///  :g  &` | Playable |
 | 40 | The Culling Ledger | `:d :a,bd :v//d` | Playable |
-| 41 | The Stair Rail | `+ - _` | Playable |
-| 42 | The Last Reach | `g_ g* gi gp` | Playable |
-| 43 | The Buried Word | `g* n` | Playable |
-| 44 | The Wet Ink | `gi` | Playable |
-| 45 | The Hall of Echoes | `q @ "` | Playable |
-| 46 | The Gauntlet | — | Playable |
-| 46.1 | The Warden Eternal | (boss) | Planned |
+| 41 | The Shelving Room | `:m :t :> :<` | Playable |
+| 42 | The Refrain Vault | `& :&& :j :y` | Playable |
+| 43 | The Stair Rail | `+ - _` | Playable |
+| 44 | The Last Reach | `g_ g* gi gp` | Playable |
+| 45 | The Buried Word | `g* n` | Playable |
+| 46 | The Wet Ink | `gi` | Playable |
+| 47 | The Hall of Echoes | `q @ "` | Playable |
+| 48 | The Gauntlet | — | Playable |
+| 48.1 | The Warden Eternal | (boss) | Planned |
 <!-- END GENERATED LEVELS TABLE -->
 
 ## Commands
@@ -246,6 +248,9 @@ The full command reference (also the hint-bar source) is `render/vim_commands.md
 | `:%s//g` | substitute all |
 | `:g/pat/d` | global delete |
 | `&` | repeat last :s |
+| `:{n}d` | delete line n |
+| `:{a},{b}d` | delete range |
+| `:{r}v//d` | keep matching |
 | `q{a}` | record macro |
 | `@{a}` | play macro |
 | `@@` | repeat macro |

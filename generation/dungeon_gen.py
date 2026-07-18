@@ -8193,6 +8193,135 @@ def build_dungeon_spellwrights_forge(seed: int) -> Dungeon:
     return dungeon
 
 
+# ── The Refrain Vault (display 42) — repeats + remote yank: & :&& :j :y ──────
+# A walkable scriptorium under a small chasm. Rows of verses carry one blight
+# word; the first mend is spoken in full (:s/{b}/{c}/g on the triple-blighted
+# desk you wake at), then & repeats it line by line and :&& (flags kept)
+# clears the second triple. THREE protected verdant lines carrying the SAME
+# blight word stand scattered BETWEEN the blighted rows: :%s / g& / :g//s all
+# mend them too (door fails), and no contiguous :{a},{b}s can cover every
+# blight while missing every protected line — the repeat family wins by PAR.
+# Above the water course, the vault's colophon lies broken across two misted
+# chasm lines: :1,2j mends it, :1y carries it, p lays it in the hall (a
+# :t/:m ferry of the chasm line arrives still misted — impassable stone that
+# can never satisfy the door's on-the-floor demand; only the yank serves).
+_RV_ROWS, _RV_COLS = 14, 60
+_RV_CTX  = 8                          # chasm band head col
+_RV_BAND = (8, 41)                    # misted colophon band, rows 1-2
+_RV_WTR  = 3                          # the water course (sight-line)
+_RV_TX   = 4                          # workroom text head col
+_RV_WORK = (4, 12)                    # walkable verse rows
+_RV_PROTECTED = (4, 7, 10)            # verdant, blight word KEPT
+_RV_MULTI     = (5, 11)               # triple-blight rows (B1 = spawn, B2)
+_RV_SINGLE    = (6, 8, 9)             # one blight each — the & chain
+_RV_FILLER    = 12                    # a clean closing verse (the seal row)
+_RV_SEAL_COL  = 49
+_RV_CHEST_COL = 53
+_RV_EXIT_COL  = 57
+# A plain & resets the remembered flags (Vim-faithful), so the OTHER triple
+# is mended by RANGED :5&& while the /g is still fresh — before the & chain.
+# The spawn desk is B2 (row 11): the :5&& park carries the scribe to the top
+# of the chain, and the singles fall to plain & on the way back down.
+_RV_PAR    = 37    # :s/{b}/{c}/g(14) :5&&(4) j&(2) 2j&(3) j&(2)
+                   # :1,2j(5) :1y(3) p(1) 3j(2) $(1)
+_RV_BUDGET = 60                       # generous: the longhand roads win 1★
+
+
+def _rv_draw_words(rng):
+    """(b, c, pool): blight, cure, and 23 fillers free of both as substrings."""
+    _load_vocab_tables()
+    p4 = _VOCAB_PLAIN_BY_LEN[4]
+    for _ in range(200):
+        b, c = rng.sample(p4, 2)
+        pool = [w for w in p4 + _VOCAB_PLAIN_BY_LEN[5]
+                if b not in w and c not in w and w not in (b, c)]
+        if len(pool) >= 24:                    # 5 colophon + 6 + 4 + 6 + 3 filler
+            return b, c, rng.sample(pool, 24)
+    raise RuntimeError('refrain vault: vocab too thin')
+
+
+def build_dungeon_refrain_vault(seed: int) -> Dungeon:
+    dungeon = Dungeon(name='The Refrain Vault', seed=seed)
+    rng = random.Random(seed ^ 0x8EF8)
+    b, c, pool = _rv_draw_words(rng)
+    R, C = _RV_ROWS, _RV_COLS
+
+    cells = [[CellType.WALL] * C for _ in range(R)]
+    mist: set = set()
+    for r in (1, 2):                               # the colophon chasm
+        for col in range(*_RV_BAND):
+            cells[r][col] = CellType.FLOOR
+            mist.add((r, col))
+    for col in range(_RV_CTX, C - 3):              # the water course (sight)
+        cells[_RV_WTR][col] = CellType.WATER
+        mist.add((_RV_WTR, col))
+    for r in range(*_RV_WORK):
+        for col in range(2, _RV_SEAL_COL):
+            cells[r][col] = CellType.FLOOR         # the workroom
+    for col in range(2, _RV_SEAL_COL):
+        cells[_RV_FILLER][col] = CellType.FLOOR    # the seal row
+    for col in range(_RV_SEAL_COL + 1, _RV_EXIT_COL + 1):
+        cells[_RV_FILLER][col] = CellType.FLOOR    # the sealed exit pocket
+    # (_RV_FILLER, _RV_SEAL_COL) stays WALL until _refrain_tick opens it.
+
+    room = Room(room_type=RoomType.ENTRY, rows=R, cols=C)
+    room.cells     = cells
+    room.seed      = seed
+    room.spawn_pos = (_RV_MULTI[1], 2)             # the B2 desk (row 11)
+    room.exit_pos  = (_RV_FILLER, _RV_EXIT_COL)
+    room.char_runs = []
+
+    def lay(r, col, text, kind):
+        for wd in text.split(' '):
+            room.char_runs.append(CharRun(r, col, tuple(wd), kind))
+            col += len(wd) + 1
+
+    take = iter(pool)
+    half1 = f'{next(take)} {next(take)} {next(take)}'
+    half2 = f'{next(take)} {next(take)}'
+    lay(1, _RV_CTX, half1, 'ancient')
+    lay(2, _RV_CTX, half2, 'ancient')
+    colophon = f'{half1} {half2}'
+
+    protected, mended = [], []
+    for r in _RV_PROTECTED:
+        t = f'{next(take)} {b} {next(take)}'
+        protected.append(t); lay(r, _RV_TX, t, 'verdant')
+    for r in _RV_MULTI:
+        w1, w2 = next(take), next(take)
+        lay(r, _RV_TX, f'{b} {w1} {b} {w2} {b}', 'ember')
+        mended.append(f'{c} {w1} {c} {w2} {c}')
+    for r in _RV_SINGLE:
+        w1, w2 = next(take), next(take)
+        lay(r, _RV_TX, f'{w1} {b} {w2}', 'ember')
+        mended.append(f'{w1} {c} {w2}')
+    lay(_RV_FILLER, _RV_TX, f'{next(take)} {next(take)} {next(take)}', 'ancient')
+
+    room.entities = [
+        Entity(kind='exit',         row=_RV_FILLER, col=_RV_EXIT_COL),
+        Entity(kind='chest_scroll', row=_RV_FILLER, col=_RV_CHEST_COL),
+    ]
+    room._rv_blight    = b
+    room._rv_protected = tuple(protected)
+    room._rv_mended    = tuple(mended)
+    room._rv_colophon  = colophon
+    room._rv_seal_col  = _RV_SEAL_COL
+
+    room.par    = _RV_PAR
+    room.budget = _RV_BUDGET
+    room.answer = (f':s/{b}/{c}/g⏎ :5&&⏎ j & 2j & j & '
+                   f':1,2j⏎ :1y⏎ p 3j $')
+
+    room.rebuild_indexes()
+    pocket = {(_RV_FILLER, col)
+              for col in range(_RV_SEAL_COL + 1, _RV_EXIT_COL + 1)}
+    room.fog_cells  = set(mist) | pocket
+    room.mist_cells = set(mist)
+    dungeon.rooms        = [room]
+    dungeon.current_room = 0
+    return dungeon
+
+
 # ── The Warden Pathfinder (Act III boss) ─────────────────────────────────────
 # Two rooms: the Arena (room 0) and the Wardenverse (room 1, a single-line wrap
 # buffer). Act 1 plays out in the Arena; when the Warden's shields fall he flees
@@ -11725,6 +11854,104 @@ def build_dungeon_culling_ledger(seed: int) -> Dungeon:
     pocket = {(_CL_GAL, c) for c in range(51, 55)}  # the sealed exit pocket
     room.fog_cells  = set(mist) | pocket            # fog bars feet + landings…
     room.mist_cells = set(mist)                     # …mist keeps the text readable
+    dungeon.rooms        = [room]
+    dungeon.current_room = 0
+    return dungeon
+
+
+# ── The Shelving Room (display 41) — the movers: :m :t :> :< ─────────────────
+# The Culling Ledger's chasm chassis, second lesson: verses were shelved
+# BLIND across the gap — one out of order, the closing refrain never shelved
+# at all, two landed at the wrong depth. The true stanza is carved in the
+# WEST WALL (a plaque column, row for row beside the shelf); the seal opens
+# when the shelf reads the plaque exactly, indent included. No cell on a
+# shelf row is passable (misted floor band), so the only movers are the
+# ranged ex commands: :m reorders, :t shelves the missing copy, :> :< set
+# the depth. A fresh :t/:m row is born unfogged — main's _shelving_tick
+# re-mists ANY bare shelf floor each turn (the chasm law is stateless) and
+# re-rights the plaque column after row inserts drag it.
+_SHR_ROWS, _SHR_COLS = 11, 72
+_SHR_PLQ  = 3                        # plaque head col (wall glyphs, + indent)
+_SHR_TX   = 30                       # shelf floor band head col
+_SHR_BAND = (30, 66)                 # the misted floor band on every shelf row
+_SHR_WTR  = 8                        # the water course (sight-line + line 8's home)
+_SHR_GAL  = 9                        # the reading gallery
+_SHR_SEAL_COL  = 61
+_SHR_CHEST_COL = 66
+_SHR_EXIT_COL  = 70
+# Target stanza: 8 lines, refrain (line 5's text) closing at line 8.
+_SHR_INDENTS = (0, 2, 2, 0, 0, 2, 2, 0)
+# Initial shelf rows 1..7: (target_index, indent) — T4 shelved second, T3 a
+# step too deep, T6 flush that should stand deep, the refrain copy missing.
+_SHR_INIT = ((0, 0), (3, 0), (1, 2), (2, 4), (4, 0), (5, 0), (6, 2))
+_SHR_PAR    = 15                     # :2m4(4) + :5t7(4) + :3<(3) + :6>(3) + $(1)
+_SHR_BUDGET = 40                     # generous: the movers invite exploration
+
+
+def _shr_draw_words(rng):
+    _load_vocab_tables()
+    _CL_ = _VOCAB_PLAIN_BY_LEN
+    pool = rng.sample(_CL_[4] + _CL_[5], 21)
+    return [' '.join(pool[i * 3:i * 3 + 3]) for i in range(7)]
+
+
+def build_dungeon_shelving_room(seed: int) -> Dungeon:
+    dungeon = Dungeon(name='The Shelving Room', seed=seed)
+    rng = random.Random(seed ^ 0x54E1)
+    lines = _shr_draw_words(rng)                   # T1..T7; refrain = T5
+    R, C = _SHR_ROWS, _SHR_COLS
+    targets = [(' ' * _SHR_INDENTS[i]) + lines[i if i < 7 else 4]
+               for i in range(8)]
+
+    cells = [[CellType.WALL] * C for _ in range(R)]
+    mist: set = set()
+    for r in range(1, 8):                          # the shelf band
+        for c in range(*_SHR_BAND):
+            cells[r][c] = CellType.FLOOR
+            mist.add((r, c))
+    for c in range(_SHR_TX, _SHR_BAND[1] + 1):     # the water course (sight-line;
+        cells[_SHR_WTR][c] = CellType.WATER        # cols west stay WALL so the
+        mist.add((_SHR_WTR, c))                    # 8th plaque line sits in stone)
+    for c in range(2, _SHR_SEAL_COL):
+        cells[_SHR_GAL][c] = CellType.FLOOR        # the reading gallery
+    for c in range(_SHR_SEAL_COL + 1, _SHR_EXIT_COL + 1):
+        cells[_SHR_GAL][c] = CellType.FLOOR        # the sealed exit pocket
+    # (_SHR_GAL, _SHR_SEAL_COL) stays WALL until _shelving_tick opens it.
+
+    room = Room(room_type=RoomType.ENTRY, rows=R, cols=C)
+    room.cells     = cells
+    room.seed      = seed
+    room.spawn_pos = (_SHR_GAL, 2)
+    room.exit_pos  = (_SHR_GAL, _SHR_EXIT_COL)
+    room.char_runs = []
+
+    def lay(r, col, text, kind):
+        for wd in text.split(' '):
+            room.char_runs.append(CharRun(r, col, tuple(wd), kind))
+            col += len(wd) + 1
+
+    for i, t in enumerate(targets):                # the plaque column (rows 1..8)
+        lay(i + 1, _SHR_PLQ + _SHR_INDENTS[i], t.strip(), 'verdant')
+    for r, (ti, ind) in enumerate(_SHR_INIT, start=1):   # the misshelved stanza
+        lay(r, _SHR_TX + ind, lines[ti], 'ancient')
+
+    room.entities = [
+        Entity(kind='exit',         row=_SHR_GAL, col=_SHR_EXIT_COL),
+        Entity(kind='chest_scroll', row=_SHR_GAL, col=_SHR_CHEST_COL),
+    ]
+    room._shr_targets = tuple(targets)
+    room._shr_plaque  = tuple((_SHR_INDENTS[i], targets[i].strip())
+                              for i in range(8))
+    room._shr_seal_col = _SHR_SEAL_COL
+
+    room.par    = _SHR_PAR
+    room.budget = _SHR_BUDGET
+    room.answer = ':2m4⏎ :5t7⏎ :3<⏎ :6>⏎ $'
+
+    room.rebuild_indexes()
+    pocket = {(_SHR_GAL, c) for c in range(_SHR_SEAL_COL + 1, _SHR_EXIT_COL + 1)}
+    room.fog_cells  = set(mist) | pocket
+    room.mist_cells = set(mist)
     dungeon.rooms        = [room]
     dungeon.current_room = 0
     return dungeon

@@ -384,6 +384,18 @@ POEMS: list[tuple[str | None, str, list[str]]] = [
         ':v//d keeps only what bears the word.',
         'The long arm of the colon needs no feet.',
     ]),
+    ('shelving_room', ':m :t :> :<', [         # The Shelving Room — the movers
+        ':m carries a line to a shelf it never walked.',
+        ':t leaves the original standing.',
+        ':> and :< set how deep it sits.',
+        'Order is an edit like any other.',
+    ]),
+    ('refrain_vault', '& :&& :j :y', [         # The Refrain Vault — repeats + remote yank
+        'One spell, spoken once: & says it again.',
+        ':&& keeps the flags; g& shouts it everywhere.',
+        ':j mends a line broken across the gap;',
+        ':y carries its words home to your register.',
+    ]),
     ('hall_of_echoes', 'q @ "', [              # The Hall of Echoes — q @ "
         'qa captures your rhythm; q stills it.',
         '@a plays it back like a looped tape.',

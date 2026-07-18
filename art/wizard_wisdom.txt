@@ -596,6 +596,28 @@
       ]
     },
     {
+      "introduces_slug": "shelving_room",
+      "name": ":m :t :> :<",
+      "line_count": 4,
+      "quote": [
+        " :m carries a line to a shelf it never walked.  ",
+        "        :t leaves the original standing.        ",
+        "        :> and :< set how deep it sits.         ",
+        "        Order is an edit like any other.        "
+      ]
+    },
+    {
+      "introduces_slug": "refrain_vault",
+      "name": "& :&& :j :y",
+      "line_count": 4,
+      "quote": [
+        "    One spell, spoken once: & says it again.    ",
+        " :&& keeps the flags; g& shouts it everywhere.  ",
+        "     :j mends a line broken across the gap;     ",
+        "  :y carries its words home to your register.   "
+      ]
+    },
+    {
       "introduces_slug": "hall_of_echoes",
       "name": "q @ \"",
       "line_count": 4,

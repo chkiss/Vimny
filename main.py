@@ -1088,6 +1088,7 @@ def _base_snapshot(room, player, budget, row, col, spent, ap, ad) -> dict:
         'exit_pos': room.exit_pos,
         'spawn_pos': room.spawn_pos,
         'fog_cells': set(room.fog_cells),
+        'mist_cells': set(room.mist_cells),
         'answer_pos':      ap,
         'answer_diverged': ad,
     }
@@ -1125,6 +1126,8 @@ def _pop_history_step(src: list, dst: list, room, player, budget, is_redo: bool 
             room.exit_pos = item['exit_pos']
             room.spawn_pos = item['spawn_pos']
         room.fog_cells = item['fog_cells']
+        if 'mist_cells' in item:
+            room.mist_cells = item['mist_cells']
         if 'wm_state' in item:                   # the Manifold's boss ward state
             for k in _WM_UNDO_ATTRS:
                 if k in item['wm_state']:
@@ -2640,6 +2643,10 @@ _LEVEL_INTROS = {
                             'spare what already rings true.', 70),
     'culling_ledger':      ('The Culling Ledger — false lines fester in a ledger no foot can '
                             'reach. Set the numbers before you judge.', 60),
+    'shelving_room':       ('The Shelving Room — the verses were shelved blind, across the gap. '
+                            'The wall remembers their order.', 60),
+    'refrain_vault':       ('The Refrain Vault — one blight, many verses, three wards that must '
+                            'keep theirs. And the colophon lies broken past the water.', 60),
     'dummy':               ('Sandbox — all mechanics active. Type :edit to enter editor mode.', 60),
     'archivists_library':  ("The Archivist's Library — the whole catalogue has spilled "
                             'into a single endless line.', 80),
@@ -3488,7 +3495,10 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
         blight) forbids every snip mangle."""
         seal = getattr(room, '_ledger_seal', None)
         keeps = getattr(room, '_ledger_keeps', None)
-        if seal is None or keeps is None:
+        if keeps is None:
+            return
+        _chasm_remist()                 # a :t/:m'd row must never become footing
+        if seal is None:
             return
         texts = []
         for r in range(room.rows):
@@ -3506,6 +3516,108 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
                           if not (fr == sr and fc > sc)}   # unveil the pocket
         room._ledger_seal = None
         _push('The false lines are culled — the ledger reads true. The way opens!')
+
+    def _chasm_remist():
+        """The chasm law, stateless: any BARE floor above the gallery (a row a
+        :t/:m just shelved arrives unfogged) is re-mist ed each turn — the far
+        bank never becomes footing."""
+        gal = _subst._last_standable_row(room)
+        for r in range(1, gal):
+            if any(room.cells[r][c] in (CellType.FLOOR, CellType.CORRIDOR)
+                   for c in range(room.cols)):
+                for c in range(room.cols):
+                    if (room.cells[r][c] == CellType.FLOOR
+                            and (r, c) not in room.fog_cells):
+                        room.fog_cells.add((r, c))
+                        room.mist_cells.add((r, c))
+
+    def _shelving_tick():
+        """The Shelving Room: re-mist fresh shelf rows, re-right the plaque
+        column (row inserts drag it), and open the seal once the shelf reads
+        the plaque exactly — indent included, blank rows ignored."""
+        targets = getattr(room, '_shr_targets', None)
+        if targets is None:
+            return
+        _chasm_remist()
+        # Re-right the plaque column: verdant runs west of the shelf band
+        # belong at rows 1..8, whatever the buffer has done underneath them.
+        plq = room._shr_plaque
+        stale = [ru for ru in room.char_runs
+                 if ru.kind == 'verdant' and ru.col < _dg._SHR_TX]
+        want = set()
+        for i, (ind, text) in enumerate(plq):
+            if i + 1 >= room.rows - 1:           # the buffer has been gutted —
+                break                            # don't carve past its floor
+            col = _dg._SHR_PLQ + ind
+            for wd in text.split(' '):
+                want.add((i + 1, col, wd))
+                col += len(wd) + 1
+        have = {(ru.row, ru.col, ''.join(ru.symbols)) for ru in stale}
+        if have != want:
+            for ru in stale:
+                room.remove_char_run(ru)
+            for (r, col, wd) in sorted(want):
+                room.add_char_run(CharRun(r, col, tuple(wd), 'verdant'))
+            room.rebuild_indexes()
+        if getattr(room, '_shr_seal_col', None) is None:
+            return
+        gal = _subst._last_standable_row(room)
+        texts = []
+        for r in range(1, gal - 1):
+            t = _subst.line_text(room, r)[0].rstrip()
+            if t:
+                texts.append(t)
+        if texts != list(targets):
+            return
+        sc = room._shr_seal_col
+        if room.cells[gal][sc] == CellType.WALL:
+            room.cells[gal][sc] = CellType.FLOOR
+        room.fog_cells = {(fr, fc) for (fr, fc) in room.fog_cells
+                          if not (fr == gal and fc > sc)}   # unveil the pocket
+        room._shr_seal_col = None
+        _push('The stanza stands as the wall remembers it. The way opens!')
+
+    def _refrain_tick():
+        """The Refrain Vault: re-mist the colophon chasm, then open the seal
+        once every blight is mended (the three protected lines KEEP theirs —
+        exactly three lines may bear the blight word), and the joined colophon
+        stands on walkable floor (a :t/:m'd chasm slab arrives misted and
+        cannot serve)."""
+        mended = getattr(room, '_rv_mended', None)
+        if mended is None:
+            return
+        wtr = next((r for r in range(room.rows)
+                    if any(room.cells[r][cc] == CellType.WATER
+                           for cc in range(room.cols))), None)
+        if wtr:
+            for r in range(1, wtr):
+                for cc in range(room.cols):
+                    if (room.cells[r][cc] == CellType.FLOOR
+                            and (r, cc) not in room.fog_cells):
+                        room.fog_cells.add((r, cc))
+                        room.mist_cells.add((r, cc))
+        if getattr(room, '_rv_seal_col', None) is None:
+            return
+        texts = [_subst.line_text(room, r)[0] for r in range(room.rows)]
+        blight = room._rv_blight
+        if sum(1 for t in texts if blight in t) != len(room._rv_protected):
+            return                              # a blight survives, or a ward fell
+        if not all(any(p in t for t in texts) for p in room._rv_protected):
+            return
+        if not all(any(m in t for t in texts) for m in mended):
+            return
+        colo = room._rv_colophon
+        if not any(colo in texts[r]
+                   and any(room.is_passable(r, cc) for cc in range(room.cols))
+                   for r in range(room.rows)):
+            return                              # spoken, but not on the floor
+        sr, sc = room.exit_pos[0], room._rv_seal_col
+        if room.cells[sr][sc] == CellType.WALL:
+            room.cells[sr][sc] = CellType.FLOOR
+        room.fog_cells = {(fr, fc) for (fr, fc) in room.fog_cells
+                          if not (fr == sr and fc > sc)}   # unveil the pocket
+        room._rv_seal_col = None
+        _push('The refrain rings whole through the vault. The way opens!')
 
     def _advance_answer(ch: str):
         """Admin karaoke: advance the answer tape by one typed key (Enter passed as the
@@ -3763,6 +3875,10 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
             _forge_check()                       # open the sanctum seal once the rites are true
         elif level == 'culling_ledger':
             _ledger_check()                      # open the seal once the ledger reads true
+        elif level == 'shelving_room':
+            _shelving_tick()                     # re-mist, re-right plaques, seal check
+        elif level == 'refrain_vault':
+            _refrain_tick()                      # re-mist the chasm, seal check
         # Macro playback: drain queued keystrokes before reading the terminal.
         if macro_pending:
             macro_run_keys += 1

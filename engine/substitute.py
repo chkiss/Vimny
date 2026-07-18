@@ -657,29 +657,127 @@ def _rows_parried(room, lo: int, hi: int) -> bool:
     return any(e.edit_immune and lo <= e.row <= hi for e in room.entities)
 
 
-def _paste_rows_below(room, player, clip, dest: int) -> int:
-    """Insert a linewise clip's rows just below 0-based row `dest` (dest -1 =
+def _snapshot_rows(room, lo: int, hi: int) -> list:
+    """Full structural copies of rows lo..hi: cells, glyphs, fog/mist columns.
+    :m/:t are ROW SURGERY, not a reflow paste — a fogged (misted-chasm) line
+    moves with its terrain and its mist, so it arrives exactly as it stood
+    (a reflow capture would read a fogged row as empty: line_extent is
+    passability-based by design)."""
+    snap = []
+    for r in range(lo, hi + 1):
+        snap.append((
+            [room.cells[r][c] for c in range(room.cols)],
+            [(ru.col, tuple(ru.symbols), ru.kind)
+             for ru in room._char_runs_by_row.get(r, [])],
+            {c for (fr, c) in room.fog_cells if fr == r},
+            {c for (fr, c) in room.mist_cells if fr == r},
+        ))
+    return snap
+
+
+def _lay_rows_below(room, player, snap: list, dest: int) -> int:
+    """Insert structural row copies just below 0-based row `dest` (dest -1 =
     above the first line). Returns nrows.
 
     THE PLAYER STAYS PUT (same content row). Real Vim parks the cursor on the
     moved/copied text, but here the cursor is an avatar with feet: letting :t/:m
     carry it would be a free ferry onto any island in the game. Precedent:
     run_global's :g//d already keeps the player in place."""
-    from engine.operator import op_paste
-    nrows = len(clip['rows'])
-    save_r, save_c = player.row, player.col
-    if dest < 0:
-        player.row, base = 0, 0
-        op_paste(room, player, clip, before=True)
-    else:
-        player.row = min(dest, room.rows - 1)
-        base = player.row + 1
-        op_paste(room, player, clip, before=False)
-    if base <= save_r:                                # rows landed above the player
-        save_r += nrows
-    player.row = min(save_r, room.rows - 1)
-    player.col = save_c
-    return nrows
+    from engine.reflow import _shift_rows
+    from engine.world import CellType as _CT, CharRun as _CR
+    n = len(snap)
+    at = max(0, dest + 1)
+    for _ in range(n):
+        room.cells.insert(at, [_CT.WALL] * room.cols)
+    room.rows += n
+    _shift_rows(room, player, lambda r: r >= at, +n)
+    if at <= player.row:
+        player.row = min(player.row + n, room.rows - 1)
+    for k, (cells_row, runs, fogc, mistc) in enumerate(snap):
+        room.cells[at + k] = list(cells_row)
+        for (col, syms, kind) in runs:
+            room.char_runs.append(_CR(at + k, col, syms, kind))
+        room.fog_cells  |= {(at + k, c) for c in fogc}
+        room.mist_cells |= {(at + k, c) for c in mistc}
+    room.rebuild_indexes()
+    return n
+
+
+def _yank_rows_clip(room, lo: int, hi: int) -> dict:
+    """A linewise register clip built GLYPH-WISE from rows lo..hi (dcol
+    relative to each row's writable start), so :y reaches fogged (chasm) rows
+    that a reflow capture would read as empty."""
+    rows = []
+    for r in range(lo, hi + 1):
+        b_lo, b_hi = _bounds(room, r)
+        runs = sorted(({'dcol': ru.col - b_lo, 'symbols': tuple(ru.symbols),
+                        'kind': ru.kind}
+                       for ru in room._char_runs_by_row.get(r, [])
+                       if b_lo <= ru.col < b_hi), key=lambda d: d['dcol'])
+        width = max((d['dcol'] + len(d['symbols']) for d in runs), default=0)
+        rows.append({'width': width, 'char_runs': runs})
+    return {'linewise': True, 'rows': rows}
+
+
+def _join_rows(room, player, lo: int, hi: int, gap: bool = True) -> int:
+    """The : form of J: join lines lo..hi TEXTUALLY (fog-agnostic — the
+    normal-mode op_join pulls only passable glyphs and parks the cursor,
+    neither of which a ranged join across a chasm may do; the avatar stays
+    put via _remove_rows). Returns the number of joins performed."""
+    if hi <= lo:
+        return 0
+    text0, l0, h0, kinds0 = _read_line(room, lo)
+    base = text0.rstrip()
+    text, kinds = base, list(kinds0)[:len(base)]
+    for r in range(lo + 1, hi + 1):
+        t, _l, _h, k = _read_line(room, r)
+        ts = t.strip()
+        if not ts:
+            continue
+        lead = len(t) - len(t.lstrip())
+        if gap and text:
+            text += ' '
+            kinds.append(None)
+        text += ts
+        kinds += list(k)[lead:lead + len(ts)]
+    gone = _remove_rows(room, player, lo + 1, hi)
+    if not gone:
+        return 0
+    set_line_text(room, lo, text, l0, h0, kinds, line_kind(room, lo))
+    room.rebuild_indexes()
+    return gone
+
+
+def _indent_rows(room, lo: int, hi: int, amount: int) -> int:
+    """Shift each row's in-bounds glyphs by `amount` columns (the : form of
+    >>/<<). Glyph-wise, so it reaches fogged (chasm) rows that the reflow
+    apply_indent cannot (its line_extent is passability-based); dedent clamps
+    at the row's writable start, indent drops glyphs pushed past its end.
+    Glyphs WEST of the writable span (wall-carved plaques) never move.
+    Returns how many rows changed."""
+    moved = 0
+    for row in range(lo, hi + 1):
+        b_lo, b_hi = _bounds(room, row)
+        tgt = [ru for ru in room._char_runs_by_row.get(row, [])
+               if b_lo <= ru.col < b_hi]
+        if not tgt:
+            continue
+        amt = amount
+        if amt < 0:
+            amt = -min(-amt, min(ru.col for ru in tgt) - b_lo)
+        if amt == 0:
+            continue
+        for ru in tgt:
+            room.remove_char_run(ru)
+        for (col, syms, kind) in [(ru.col, tuple(ru.symbols), ru.kind)
+                                  for ru in tgt]:
+            new = col + amt
+            keep = syms[:max(0, b_hi - new)]      # past the brink: dropped
+            if keep:
+                room.add_char_run(CharRun(row, new, keep, kind))
+        moved += 1
+    room.rebuild_indexes()
+    return moved
 
 
 def _remove_rows(room, player, lo: int, hi: int) -> int:
@@ -699,7 +797,7 @@ def _remove_rows(room, player, lo: int, hi: int) -> int:
 
 def run_ex_range(room, player, lo, hi, spec):
     """Execute a parsed ex-range spec. Returns (message, n_lines_touched)."""
-    from engine.operator import op_yank, op_join, apply_indent, INDENT_WIDTH
+    from engine.operator import INDENT_WIDTH
     from engine.registers import write_register
     from engine.text_object import TextObject, TextObjectType
     c = spec['cmd']
@@ -707,14 +805,14 @@ def run_ex_range(room, player, lo, hi, spec):
     tobj = TextObject(lo, 0, hi, 0, TextObjectType.LINEWISE)
 
     if c == 'y':
-        clip = op_yank(room, player, tobj)
+        clip = _yank_rows_clip(room, lo, hi)
         write_register(player, spec['reg'], clip)
         return (f'{n} lines yanked' if n > 1 else None), n
 
     if c == 'd':
         if _rows_parried(room, lo, hi):
             return _PARRY_MSG, 0
-        clip = op_yank(room, player, tobj)     # capture before the collapse
+        clip = _yank_rows_clip(room, lo, hi)   # capture before the collapse
         gone = _remove_rows(room, player, lo, hi)
         if not gone:
             return None, 0
@@ -727,26 +825,23 @@ def run_ex_range(room, player, lo, hi, spec):
             return 'E134: Cannot move a range of lines into itself', 0
         if _rows_parried(room, lo, hi):
             return _PARRY_MSG, 0
-        clip = op_yank(room, player, tobj)     # registers untouched (:m is not a cut)
+        snap = _snapshot_rows(room, lo, hi)    # registers untouched (:m is not a cut)
         if _remove_rows(room, player, lo, hi) != n:
             return 'E21: Cannot make changes here', 0   # a row refused to collapse
         if dest > hi:
             dest -= n
-        _paste_rows_below(room, player, clip, dest)
+        _lay_rows_below(room, player, snap, dest)
         return (f'{n} lines moved' if n > 1 else None), n
 
     if c == 't':
         dest = min(spec['dest'], room.rows - 1)
-        clip = op_yank(room, player, tobj)     # registers untouched
-        _paste_rows_below(room, player, clip, dest)
+        snap = _snapshot_rows(room, lo, hi)    # registers untouched
+        _lay_rows_below(room, player, snap, dest)
         return (f'{n} more lines' if n > 1 else None), n
 
     if c in '><':
         amount = (INDENT_WIDTH * spec['depth']) * (1 if c == '>' else -1)
-        moved = 0
-        for row in range(lo, hi + 1):
-            if apply_indent(room, row, amount):
-                moved += 1
+        moved = _indent_rows(room, lo, hi, amount)
         if not moved:
             return None, 0
         times = spec['depth']
@@ -754,13 +849,12 @@ def run_ex_range(room, player, lo, hi, spec):
                 f"{times} time{'s' if times > 1 else ''}"), moved
 
     if c == 'j':
-        if _rows_parried(room, lo + 1, hi if hi > lo else lo + 1):
+        if hi == lo:                           # bare :j joins with the next line
+            hi = min(lo + 1, room.rows - 1)
+        if _rows_parried(room, lo, hi):
             return _PARRY_MSG, 0
-        count = (n if hi > lo else 2)          # bare :j joins with the next line
-        player.row, player.col = lo, max(player.col, 0)
-        if not op_join(room, player, gap=not spec['bang'], count=count):
-            return None, 0
-        return None, count - 1
+        gone = _join_rows(room, player, lo, hi, gap=not spec['bang'])
+        return None, gone
 
     return None, 0
 

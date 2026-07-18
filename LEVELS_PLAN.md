@@ -93,13 +93,15 @@ Curriculum order is the order of `LEVELS`. Blueprints: `blueprints/act_*.md`.
 | 38.1 | `grandmasters_sanctum` | The Grandmaster's Sanctum | — | boss |
 | 39 | `spellwrights_forge` | The Spellwright's Forge | `:s///  :g  &` |  |
 | 40 | `culling_ledger` | The Culling Ledger | `:d :a,bd :v//d` |  |
-| 41 | `stair_rail` | The Stair Rail | `+ - _` |  |
-| 42 | `g_sanctum` | The Last Reach | `g_ g* gi gp` |  |
-| 43 | `buried_word` | The Buried Word | `g* n` |  |
-| 44 | `wet_ink` | The Wet Ink | `gi` |  |
-| 45 | `hall_of_echoes` | The Hall of Echoes | `q @ "` |  |
-| 46 | `gauntlet` | The Gauntlet | — |  |
-| 46.1 | `warden_eternal` | The Warden Eternal | — | boss |
+| 41 | `shelving_room` | The Shelving Room | `:m :t :> :<` |  |
+| 42 | `refrain_vault` | The Refrain Vault | `& :&& :j :y` |  |
+| 43 | `stair_rail` | The Stair Rail | `+ - _` |  |
+| 44 | `g_sanctum` | The Last Reach | `g_ g* gi gp` |  |
+| 45 | `buried_word` | The Buried Word | `g* n` |  |
+| 46 | `wet_ink` | The Wet Ink | `gi` |  |
+| 47 | `hall_of_echoes` | The Hall of Echoes | `q @ "` |  |
+| 48 | `gauntlet` | The Gauntlet | — |  |
+| 48.1 | `warden_eternal` | The Warden Eternal | — | boss |
 | 99 | `dummy` | Dummy Dungeon | `d x s y p yy P` |  |
 <!-- END GENERATED CURRICULUM TABLE -->
 
