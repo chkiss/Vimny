@@ -11648,9 +11648,18 @@ def build_dungeon_culling_ledger(seed: int) -> Dungeon:
     R, C, TX = _CL_ROWS, _CL_COLS, _CL_TX
 
     cells = [[CellType.WALL] * C for _ in range(R)]
+    mist: set = set()
     for r in list(_CL_KEEP_ROWS) + [_CL_BLIGHT_I] + list(_CL_BLIGHT_II) \
-             + list(_CL_JUNK_III) + list(_CL_SACRED_III) + list(_CL_GAPS):
+             + list(_CL_JUNK_III) + list(_CL_SACRED_III):
         cells[r][_CL_CATCH] = CellType.FLOOR       # the ○ marker's floor cell
+    # THE STONE LAW needs open SIGHT, not a render cheat: misted-water bands
+    # at the stanza gaps and above the gallery conduct the vision flood from
+    # the spawn up through every stanza (walls would hide the ledger from
+    # the spawn while the mist render showed it anyway — an audit exception).
+    for r in list(_CL_GAPS) + [_CL_SEP]:
+        for c in range(2, 54):
+            cells[r][c] = CellType.WATER
+            mist.add((r, c))
     for c in range(2, 50):
         cells[_CL_GAL][c] = CellType.FLOOR         # the reading gallery
     for c in range(51, 55):
@@ -11663,8 +11672,6 @@ def build_dungeon_culling_ledger(seed: int) -> Dungeon:
     room.spawn_pos = (_CL_GAL, 2)
     room.exit_pos  = _CL_EXIT
     room.char_runs = []
-
-    mist: set = set()
 
     def carve(r, text, kind):
         """Lay a ledger line: the ○ marker, then the words — all on misted
@@ -11690,9 +11697,6 @@ def build_dungeon_culling_ledger(seed: int) -> Dungeon:
         w1, w2 = next(take), next(take)
         t = (f'{b5} {w1} {w2}', f'{w1} {b5} {w2}', f'{w1} {w2} {b5}')[i % 3]
         carve(r, t, 'ember')
-    for r in _CL_GAPS:                             # stanza gaps: marker only
-        room.char_runs.append(CharRun(r, _CL_CATCH, ('○',), 'void'))
-        mist.add((r, _CL_CATCH))
     third = {}
     for r in _CL_SACRED_III:                       # sacred lines lead with s4
         t = f'{s4} {next(take)} {next(take)}'

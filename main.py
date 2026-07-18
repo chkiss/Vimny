@@ -2638,9 +2638,8 @@ _LEVEL_INTROS = {
     'spellwrights_forge':  ('The Spellwright\'s Forge — the old wards have rotted and cursed lines '
                             'fester among the true. Mend what is corrupt, strike what is cursed, and '
                             'spare what already rings true.', 70),
-    'culling_ledger':      ('The Culling Ledger — a stone ledger carved into the far face of a '
-                            'chasm no foot can cross. The false lines fester among the true; from '
-                            'the reading gallery, only a command can reach them.', 70),
+    'culling_ledger':      ('The Culling Ledger — false lines fester in a ledger no foot can '
+                            'reach. Set the numbers before you judge.', 60),
     'dummy':               ('Sandbox — all mechanics active. Type :edit to enter editor mode.', 60),
     'archivists_library':  ("The Archivist's Library — the whole catalogue has spilled "
                             'into a single endless line.', 80),
@@ -3755,9 +3754,6 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
 
     if level == 'archivists_library':
         _lib_relayout()                          # fit the page frame to the real viewport
-    if level == 'culling_ledger':
-        player.number_mode = 'number'            # the ledger numbers its own lines
-
     _render(message)
 
     while True:

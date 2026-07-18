@@ -130,6 +130,20 @@ def test_ledger_text_is_misted_and_impassable(seed):
 
 
 @pytest.mark.parametrize("seed", SEEDS)
+def test_ledger_is_seen_by_lawful_sightline(seed):
+    # The stone law without exception: the misted-water bands (gaps 4/11 and
+    # the course above the gallery) conduct the vision flood from the spawn
+    # to every carved cell — the mist render shows nothing stone hides.
+    from engine.motion import _vision_flood
+    r = _room(seed)
+    visible = _vision_flood(r, *r.spawn_pos)
+    for row in _CONTENT_ROWS:
+        for ru in r._char_runs_by_row.get(row, []):
+            for i in range(len(ru.symbols)):
+                assert (row, ru.col + i) in visible
+
+
+@pytest.mark.parametrize("seed", SEEDS)
 def test_no_jump_can_land_on_a_ledger_row(seed):
     # Not one passable cell on any ledger row: {n}G / G / H / M have nothing
     # to land on — no ferry, and dd can never be aimed at the ledger.
