@@ -109,7 +109,7 @@ LEVELS = [
     # g-levels, just before the exam (2026-07-17). The Gauntlet then plays WITH
     # q@ available (audited: its legs are distinct, no macro beats par).
     {'display': '44',   'slug': 'hall_of_echoes',        'name': 'The Hall of Echoes',         'commands': 'q @ "', 'teaches': ['q', '@', 'reg_named']},
-    {'display': '45',   'slug': 'gauntlet',              'name': 'The Gauntlet',               'commands': 'everything', 'teaches': []},
+    {'display': '45',   'slug': 'gauntlet',              'name': 'The Gauntlet',               'commands': '', 'teaches': []},
     {'display': '45.1', 'slug': 'warden_eternal',        'name': 'The Warden Eternal',         'type': 'boss', 'after': 'gauntlet', 'teaches': []},
     {'display': '99',   'slug': 'dummy',                 'name': 'Dummy Dungeon',              'commands': 'd x s y p yy P', 'admin_only': True, 'teaches': []},
 ]

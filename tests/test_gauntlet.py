@@ -168,10 +168,10 @@ def test_plus_lands_on_the_cit_tag(seed):
     from engine.player import Player
     room = _room(seed)
     p = Player()
-    p.row, p.col = _GNT_R_P3, 68
+    p.row, p.col = _GNT_R_P3, 45
     apply_motion(p, '+', 1, room)
     assert p.row == _GNT_R_CIT
-    assert p.col == _first_non_blank_col(room, _GNT_R_CIT) == 34
+    assert p.col == _first_non_blank_col(room, _GNT_R_CIT) == 26
 
 
 @pytest.mark.parametrize("seed", SEEDS)
@@ -330,12 +330,14 @@ def test_budget_is_hand_set(monkeypatch):
 
 # ── rival tapes: each loses a star or fails its door ──────────────────────────
 
-def test_skipping_plus_costs_a_star(monkeypatch):
-    # j lands far east of the tag; ^ recovers to the '<' — one key more.
+def test_j_ties_plus_documented(monkeypatch):
+    # Since the left-align law heads every line at TX, the gU gallery parks
+    # its cursor exactly above the tag — j ties + (the tape keeps + as the
+    # showcase). This pin documents the tie, like s/r.
     d = _fresh(0)
-    a = _swap(d.rooms[0].answer, '+', 'j ^')
+    a = _swap(d.rooms[0].answer, '+', 'j')
     result = _drive(d, _tape_keys(a), monkeypatch)
-    assert result['won'] and result['stars'] == 1
+    assert result['won'] and result['stars'] == 2
 
 
 def test_skipping_hash_with_star_costs_a_star(monkeypatch):

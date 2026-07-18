@@ -11224,8 +11224,9 @@ _GNT_R_ST1, _GNT_R_ST2 = 20, 21                   # rune courses (packed; O abov
                                                   # below) — NOT manuscript, hence ◆
 _GNT_R_NOOK = 22                                  # water course west + the decoy nook
 _GNT_R_GATE = 23
-_GNT_P1_COLS = (56, 73)             # floor island in misted water (search-only)
-_GNT_P2_COLS = (34, 50)             # floor island in misted water (search-only)
+_GNT_P1_COLS = (26, 35)             # floor island in misted water (search-only;
+_GNT_P2_COLS = (26, 39)             # text at TX — the left-align law — with a
+                                    # one-cell misted gap east of the spine ◆)
 _GNT_NOOK_COLS = (68, 75)           # decoy nook in misted water (a search LANDING)
 _GNT_BOLT0 = 27                     # 18 bolts, cols 27..44
 _GNT_EXIT  = (_GNT_R_GATE, 46)      # the FINAL SEAL — stone until every proof holds
@@ -11279,7 +11280,7 @@ def _gnt_draw_words(rng) -> dict:
                 'tn': draw(3), 'ti': draw(6), 'tc': draw(4),
                 'dword': draw(5), 'd2': draw(4), 'd3': draw(4),
                 'dhead': draw(5), 'dt1': draw(4), 'dt2': draw(4),
-                'chead': draw(4), 'cw1': draw(4), 'cw2': draw(4), 'ccure': draw(4),
+                'chead': draw(5), 'cw1': draw(4), 'cw2': draw(4), 'ccure': draw(4),
                 'sw1': draw(4), 'sw2': draw(5), 'sword': draw(4),
                 'ymid': draw(3),
                 'yl1': draw(4), 'yl2': draw(4), 'yl3': draw(4),
@@ -11340,16 +11341,22 @@ def build_dungeon_gauntlet(seed: int) -> Dungeon:
     floor(_GNT_R_BLK, TX, 62)                       # the shelf: search-only
     for r in (_GNT_R_E, _GNT_R_BW, _GNT_R_PCT, _GNT_R_SEN):
         floor(r, SP, 62)
-    floor(_GNT_R_BLANK, SP, 52)                     # breathing room
+    floor(_GNT_R_BLANK, SP, SP)                     # the spine steps through —
+                                                    # the rest is moat (below):
+                                                    # the islands now head at TX,
+                                                    # so their CEILING must bar
+                                                    # the walk-in from above
     floor(_GNT_R_P1, *_GNT_P1_COLS)                 # island 1
     floor(_GNT_R_P2, *_GNT_P2_COLS)                 # island 2
     for r in (_GNT_R_P1, _GNT_R_P1 + 1, _GNT_R_P2, _GNT_R_P2 + 1):
         cells[r][SP] = CellType.FLOOR               # the spine passes the pockets
-    floor(_GNT_R_P3, SP, 76)
-    floor(_GNT_R_CIT, SP, 76)          # wide: the lazy j-park (col ~68) drops
-    for r in (_GNT_R_D, _GNT_R_DD, _GNT_R_C, _GNT_R_S,        # in far EAST of
-              _GNT_R_Y1, _GNT_R_YL, _GNT_R_ST1, _GNT_R_ST2):  # the tag (at 34)
-        floor(r, SP, 62)
+    # The lower band's floor starts at TX, not the spine: S / o / O drop
+    # their typed lines at the SEGMENT START, so the segment must start
+    # where the text stands — the left-align law (every playable line
+    # heads at TX, mirroring the plaque column line for line).
+    for r in (_GNT_R_P3, _GNT_R_CIT, _GNT_R_D, _GNT_R_DD, _GNT_R_C,
+              _GNT_R_S, _GNT_R_Y1, _GNT_R_YL, _GNT_R_ST1, _GNT_R_ST2):
+        floor(r, TX, 62)
     # The nook row: no standable floor west of the nook — a writable blank
     # row here would let `j i{word}` tie the o-door (the i-cheese); the
     # nearest blank is r6, three travel keys away. The east nook holds the
@@ -11371,10 +11378,15 @@ def build_dungeon_gauntlet(seed: int) -> Dungeon:
             mist.add((r, c))
 
     moat(_GNT_R_WTR, SP, 62)                        # the shelf's water band
+    moat(_GNT_R_BLANK, SP + 1, 62)                  # the pocket moat (ceiling)
     moat(_GNT_R_P1, SP + 1, _GNT_P1_COLS[0] - 1)    # west channel to island 1
     moat(_GNT_R_P1, _GNT_P1_COLS[1] + 1, 76)        # …and its east water
     moat(_GNT_R_P2, SP + 1, _GNT_P2_COLS[0] - 1)    # west channel to island 2
     moat(_GNT_R_P2, _GNT_P2_COLS[1] + 1, 76)        # …and its east water
+    # …which spills one row south: the lower band heads at TX now (no
+    # spine entry), so this is the SIGHT-line into it — vision floods
+    # through water, feet do not.
+    moat(_GNT_R_P2 + 1, _GNT_P2_COLS[1] + 1, 76)
     moat(_GNT_R_NOOK, SP + 1, _GNT_NOOK_COLS[0] - 1)   # the nook's channel
     for i in range(18):                             # the eighteen bolts
         cells[_GNT_R_GATE][_GNT_BOLT0 + i] = CellType.WALL
@@ -11428,15 +11440,14 @@ def build_dungeon_gauntlet(seed: int) -> Dungeon:
     door('sub', w['cw'])
     # P3 · the gU gallery: three lowered names of three lengths — the dot
     # amortizes gUe past count-~ only because there are THREE.
-    lay(_GNT_R_P3, 54, f"{w['g1']} {w['g2']} {w['g3']} {w['t1s']}")
+    lay(_GNT_R_P3, TX, f"{w['g1']} {w['g2']} {w['g3']} {w['t1s']}")
     for g in ('g1', 'g2', 'g3'):
         door('sub', w[g].upper())
-    # r13 · cit-door: the named case holds the wrong fitting.
-    # tag at 34 = the row's FIRST NON-BLANK, so + from the gU gallery lands
-    # ON the '<' and cit fires — while the lazy j from P3's park drops at
-    # col ~68, far east of the tag, where cit resolves nothing (no forward
-    # seek — the GMS brace lesson) and the ^ recovery costs one more.
-    lay(_GNT_R_CIT, 34, f"<{w['tn']}>{w['ti']}</{w['tn']}>")
+    # r13 · cit-door: the named case holds the wrong fitting. The tag heads
+    # the row at TX (the left-align law), so + from the gU gallery lands ON
+    # the '<' — j now TIES it (the gallery also parks its cursor at TX);
+    # the tape keeps + as the showcase.
+    lay(_GNT_R_CIT, TX, f"<{w['tn']}>{w['ti']}</{w['tn']}>")
     door('sub', f"<{w['tn']}>{w['tc']}</{w['tn']}>")
     # r14 · d-door (M's landing): eleven dead marks squat before the verse.
     lay(_GNT_R_D, TX, f"{'◆' * 11} {w['dword']} {w['d2']} {w['d3']}")
@@ -11444,10 +11455,11 @@ def build_dungeon_gauntlet(seed: int) -> Dungeon:
     # r15 · D-door: the head is true; everything after it is rot.
     lay(_GNT_R_DD, TX, f"{w['dhead']} {w['dt1']} {w['dt2']}")
     door('row', w['dhead'])
-    # r14 · C-door: the tail is wrong from the second word on. Text starts at
-    # col 23 so the D-door's park (col 28) drops exactly onto the first wrong
-    # word — C from there keeps the head and its space.
-    lay(_GNT_R_C, TX + 1, f"{w['chead']} {w['cw1']} {w['cw2']}")
+    # r14 · C-door: the tail is wrong from the second word on. chead is a
+    # FIVE-letter word so the row heads at TX (the left-align law) while
+    # the D-door's park (dhead is five too) still drops exactly onto the
+    # first wrong word — C from there keeps the head and its space.
+    lay(_GNT_R_C, TX, f"{w['chead']} {w['cw1']} {w['cw2']}")
     door('sub', f"{w['chead']} {w['ccure']}")
     # r17 · S-door: wrong on both sides of where the cursor arrives.
     lay(_GNT_R_S, TX, f"{w['sw1']} {w['sw2']}")
@@ -11497,9 +11509,11 @@ def build_dungeon_gauntlet(seed: int) -> Dungeon:
     # shows the line that must stand twice.
     # Every plaque is its row's WHOLE finished line — navigation words
     # (s1 / t1s / u1s / the yank word) included, since they survive the
-    # solve. Rows with no plaque (the rune courses, the shelf, the nook)
-    # are scaffolding, not manuscript.
-    for pr, ptext in ((_GNT_R_E, f"{w['t1']} {w['t2']} {w['t3']} {w['t4']}"),
+    # solve; the shelf and the nook keep their text too, so they read on
+    # the wall. Only the rune courses carry no plaque.
+    for pr, ptext in ((_GNT_R_BLK, f"{w['u1s']} {w['ywd']} {w['t1s']}"),
+                      (_GNT_R_NOOK, w['u1s']),
+                      (_GNT_R_E, f"{w['t1']} {w['t2']} {w['t3']} {w['t4']}"),
                       (_GNT_R_BW, f"{w['v1']} {w['v2']} {w['v3']} {w['v4']}"),
                       (_GNT_R_PCT, f"{w['u1']} ({w['u3']} {w['u4']}) {w['u5']}"),
                       (_GNT_R_SEN, f"{w['a1']} {w['a2']}. {w['a3']} {w['a4']}."),
