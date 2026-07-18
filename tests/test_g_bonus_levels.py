@@ -167,30 +167,34 @@ def test_bw_star_finds_nothing(monkeypatch):
 # ── The Wet Ink (gi) ─────────────────────────────────────────────────────────
 
 def _wi_canon_keys(ws):
-    """The canonical tape: write a quarter, carry fire, gi back — ×3."""
-    return (_K('i') + _K(ws[0]) + [ESC] + _K('2+yl2lp')
-            + _K('gi') + _K(ws[1]) + [ESC] + _K('2+6lp')
-            + _K('gi') + _K(ws[2]) + [ESC] + _K('2+10lp')
-            + _K('gi') + _K(ws[3]) + [ESC] + _K('G$'))
+    """The canonical tape: write a quarter, carry fire (w hops the ember
+    words, P lights in place), gi back — ×3. Typed spaces join the quarters
+    (the tape marks them ␣)."""
+    return (_K('i') + _K(ws[0]) + [ESC] + _K('2+ylwP')
+            + _K('gi ') + _K(ws[1]) + [ESC] + _K('2+2wP')
+            + _K('gi ') + _K(ws[2]) + [ESC] + _K('2+3wP')
+            + _K('gi ') + _K(ws[3]) + [ESC] + _K('G$'))
 
 
 @pytest.mark.parametrize("seed", SEEDS)
 def test_wi_structure(seed):
     room = cached_room('build_dungeon_wet_ink', seed)
     ws = room._wi_words
-    full = ''.join(ws)
+    full = ' '.join(ws)
     assert len(ws) == 4 and len(set(ws)) == 4
     assert room._ss_doors[0][0] == (full,)
-    # the whole inscription is laid at build, in the west WALL
-    plq = next(ru for ru in room.char_runs
-               if ru.row == _WI_LEDGE and ru.col == _WI_PLQ_COL)
-    assert ''.join(plq.symbols) == full
+    # the whole inscription is laid at build, in the west WALL, one run
+    # per quarter with a gap column for the space
+    for k, w in enumerate(ws):
+        plq = next(ru for ru in room.char_runs
+                   if ru.row == _WI_LEDGE and ru.col == _WI_PLQ_COL + 5 * k)
+        assert ''.join(plq.symbols) == w
     # quarter 1 clear, quarters 2-4 fogged (the firelight law)
     for i in range(4):
         assert (_WI_LEDGE, _WI_PLQ_COL + i) not in room.fog_cells
     for k in (1, 2, 3):
         for i in range(4):
-            assert (_WI_LEDGE, _WI_PLQ_COL + 4 * k + i) in room.fog_cells
+            assert (_WI_LEDGE, _WI_PLQ_COL + 5 * k + i) in room.fog_cells
     # one standing flame, embers on every cold brazier
     src = room.char_run_at(*_WI_SOURCE)
     assert src is not None and src.symbols == (_QM_FLAME,)
@@ -214,10 +218,10 @@ def test_wi_walk_back_rival_wins(seed, monkeypatch):
     # No gi: climb back (2-) and append at the seam (g_a) — costs more per rep.
     d = build_dungeon_wet_ink(seed)
     ws = d.rooms[0]._wi_words
-    keys = (_K('i') + _K(ws[0]) + [ESC] + _K('2+yl2lp')
-            + _K('2-g_a') + _K(ws[1]) + [ESC] + _K('2+6lp')
-            + _K('2-g_a') + _K(ws[2]) + [ESC] + _K('2+10lp')
-            + _K('2-g_a') + _K(ws[3]) + [ESC] + _K('G$'))
+    keys = (_K('i') + _K(ws[0]) + [ESC] + _K('2+ylwP')
+            + _K('2-g_a ') + _K(ws[1]) + [ESC] + _K('2+2wP')
+            + _K('2-g_a ') + _K(ws[2]) + [ESC] + _K('2+3wP')
+            + _K('2-g_a ') + _K(ws[3]) + [ESC] + _K('G$'))
     won, spent = _spent(d, 'wet_ink', keys, monkeypatch)
     assert won and _WI_PAR < spent <= d.rooms[0].budget
 
@@ -228,7 +232,7 @@ def test_wi_cold_brazier_refuses_ahead_of_the_ink(seed, monkeypatch):
     # no-op — the brazier stays embers and quarter 3 stays dark.
     d = build_dungeon_wet_ink(seed)
     ws = d.rooms[0]._wi_words
-    keys = _K('i') + _K(ws[0]) + [ESC] + _K('2+yl6lp')
+    keys = _K('i') + _K(ws[0]) + [ESC] + _K('2+yl2wP')
     _drive(d, 'wet_ink', keys, monkeypatch, finish=':q!\r')
     room = d.rooms[0]
     b2 = room.char_run_at(*_WI_BRAZIERS[1])
@@ -241,7 +245,7 @@ def test_wi_firelight_reveals_one_quarter(seed, monkeypatch):
     # Light brazier 1 legitimately: quarter 2 wakes, quarters 3-4 stay dark.
     d = build_dungeon_wet_ink(seed)
     ws = d.rooms[0]._wi_words
-    keys = _K('i') + _K(ws[0]) + [ESC] + _K('2+yl2lp')
+    keys = _K('i') + _K(ws[0]) + [ESC] + _K('2+ylwP')
     _drive(d, 'wet_ink', keys, monkeypatch, finish=':q!\r')
     room = d.rooms[0]
     b1 = room.char_run_at(*_WI_BRAZIERS[0])

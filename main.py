@@ -2502,7 +2502,7 @@ def _wet_ink_tick(room, player) -> list:
     # The fuel gate: the source always holds; brazier k opens with its prefix.
     allowed = [_dg._WI_SOURCE]
     for k, rc in enumerate(braziers, start=1):
-        if lit(*rc) or ledge.startswith(''.join(words[:k])):
+        if lit(*rc) or ledge.startswith(' '.join(words[:k])):
             allowed.append(rc)
     room._qm_chain = tuple(allowed)
 
@@ -3422,6 +3422,8 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
         INSERT-mode advance.  Caller guarantees admin + a live tape."""
         if room.answer_diverged:
             return
+        if ch == ' ':
+            ch = '␣'                      # a TYPED space: the tape marks it ␣
         _ap = room.answer.replace(' ', '')
         if room.answer_pos < len(_ap):
             if ch == _ap[room.answer_pos]:
@@ -4276,8 +4278,11 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
                         if (player_name == 'admin' and room.answer
                                 and not room.answer_diverged):
                             _ap = room.answer.replace(' ', '')
+                            # a TYPED space is marked ␣ in the tape (plain
+                            # spaces are separators, stripped above)
+                            _ck = '␣' if ch == ' ' else ch
                             if room.answer_pos < len(_ap):
-                                if ch == _ap[room.answer_pos]:
+                                if _ck == _ap[room.answer_pos]:
                                     room.answer_pos += 1
                                 else:
                                     room.answer_diverged = True

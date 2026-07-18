@@ -5380,12 +5380,12 @@ _WI_LEDGE  = 2                        # the writing row
 _WI_INK0   = 24                       # where the writing begins
 _WI_BRZ_ROW = 4                       # the brazier gallery, beneath the plaque
 _WI_SOURCE  = (_WI_BRZ_ROW, 4)        # the one flame that never dies
-_WI_BRAZIERS = ((_WI_BRZ_ROW, 7), (_WI_BRZ_ROW, 11), (_WI_BRZ_ROW, 15))
+_WI_BRAZIERS = ((_WI_BRZ_ROW, 8), (_WI_BRZ_ROW, 13), (_WI_BRZ_ROW, 18))
 _WI_GATE   = 6
 _WI_BOLT   = 23
 _WI_EXIT   = (6, 24)
-_WI_PAR    = 43                       # i{w1} 2+ yl 2l p gi{w2} 2+ 6l p
-                                      # gi{w3} 2+ 10l p gi{w4} G $ (pinned)
+_WI_PAR    = 44                       # i{w1} 2+ yl w P gi␣{w2} 2+ 2w P
+                                      # gi␣{w3} 2+ 3w P gi␣{w4} G $ (pinned)
 
 
 def _wi_draw_words(rng) -> tuple:
@@ -5411,7 +5411,7 @@ def build_dungeon_wet_ink(seed: int) -> Dungeon:
     to it, three times over."""
     rng = random.Random(seed)
     ws = _wi_draw_words(rng)
-    full = ''.join(ws)
+    full = ' '.join(ws)
 
     R, C = _WI_ROWS, _WI_COLS
     cells = [[CellType.WALL] * C for _ in range(R)]
@@ -5431,9 +5431,11 @@ def build_dungeon_wet_ink(seed: int) -> Dungeon:
     room.seed  = seed
 
     # The plaque (west wall of the ledge): the WHOLE inscription, laid at
-    # build; quarters 2-4 are fogged and revealed by firelight.
-    room.char_runs.append(CharRun(_WI_LEDGE, _WI_PLQ_COL, tuple(full),
-                                  'verdant'))
+    # build as one run per quarter (a wall-gap column between them reads
+    # as the space); quarters 2-4 are fogged and revealed by firelight.
+    for k, w in enumerate(ws):
+        room.char_runs.append(CharRun(_WI_LEDGE, _WI_PLQ_COL + 5 * k,
+                                      tuple(w), 'verdant'))
     # The source flame, and embers on every cold brazier.
     room.char_runs.append(CharRun(*_WI_SOURCE, (_QM_FLAME,), 'flame'))
     for (br, bc) in _WI_BRAZIERS:
@@ -5453,15 +5455,16 @@ def build_dungeon_wet_ink(seed: int) -> Dungeon:
 
     room.rebuild_indexes()
     # SCRIPTED fog on the plaque's WALL cells (the fog-audit only polices
-    # stone-hidden FLOOR): quarter k+1 is dark until brazier k burns.
+    # stone-hidden FLOOR): quarter k+1 (and the gap before it) is dark
+    # until brazier k burns.
     room._wi_seg_fog = tuple(
-        frozenset((_WI_LEDGE, _WI_PLQ_COL + 4 * k + i) for i in range(4))
+        frozenset((_WI_LEDGE, _WI_PLQ_COL + 5 * k - 1 + i) for i in range(5))
         for k in (1, 2, 3))
     room.fog_cells = set().union(*room._wi_seg_fog)
     room.par    = _WI_PAR
     room.budget = math.ceil(_WI_PAR * 1.4)
-    room.answer = (f'i{ws[0]} 2+ yl 2l p gi{ws[1]} 2+ 6l p '
-                   f'gi{ws[2]} 2+ 10l p gi{ws[3]} G $')
+    room.answer = (f'i{ws[0]} 2+ yl w P gi␣{ws[1]} 2+ 2w P '
+                   f'gi␣{ws[2]} 2+ 3w P gi␣{ws[3]} G $')
 
     dungeon = Dungeon(name='The Wet Ink', seed=seed)
     dungeon.rooms        = [room]
