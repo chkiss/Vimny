@@ -11465,11 +11465,13 @@ def build_dungeon_gauntlet(seed: int) -> Dungeon:
     lay(_GNT_R_YL, TX, _yline)
     door('dup', _yline)
     # r20/r21 · the rune courses — packed; the verse lines DON'T EXIST
-    # until O and o author them. The courses are ◆-runes, not words: they
-    # are scaffolding, not manuscript, and carry no plaque (the wall-is-
-    # the-goal law's negative space).
-    room.char_runs.append(CharRun(_GNT_R_ST1, TX, ('◆',) * 7, 'ancient'))
-    room.char_runs.append(CharRun(_GNT_R_ST2, TX, ('◆',) * 5, 'ancient'))
+    # until O and o author them. The courses are soft runes (· ∘ ⊙), not
+    # words: scaffolding, not manuscript, and no plaque (the wall-is-the-
+    # goal law's negative space). NOT ◆ — the ◆ glyph is what the d-door
+    # asks the player to DELETE (and what thresholds catch jumps with);
+    # these runes mean 'leave me be'.
+    room.char_runs.append(CharRun(_GNT_R_ST1, TX, tuple('·∘⊙∘·∘⊙'), 'ancient'))
+    room.char_runs.append(CharRun(_GNT_R_ST2, TX, tuple('∘·⊙·∘'), 'ancient'))
     door('sub', w['ow1'])
     door('sub', w['ow2'])
     # r22 · the nook: the U1 forward decoy (a wrapping * lands here and
