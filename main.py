@@ -1748,6 +1748,57 @@ def _gauntlet_tick(room, player) -> list:
         msgs.append('Sixteen proofs stand together — the last seal parts!')
     elif not all_true and seal_open and (player.row, player.col) != (er, ec):
         room.cells[er][ec] = CellType.WALL           # undone — the seal returns
+
+    # ── the goal column (the Y/O/o band) ─────────────────────────────────
+    # The west wall paints the FINISHED manuscript relative to the yanked
+    # line: that line TWICE, the O verse two below its head, the o verse
+    # five below. Row inserts (Y-p / O / o) shift the wall plaques with the
+    # world; this re-rights them to the goal rows — the sculpting re-align,
+    # with its twinkle (room._sc_twinkle is read by the render loop).
+    band = getattr(room, '_gnt_band', None)
+    if band:
+        yline, ow1, ow2 = band
+        anchor = next((r for r, t in enumerate(stripped) if t == yline), None)
+        if anchor is not None:
+            spine = _dg._GNT_SPINE
+            want: dict = {}
+            for dr, t in ((0, yline), (1, yline), (2, ow1), (5, ow2)):
+                if anchor + dr < room.rows:
+                    want.setdefault(t, []).append(anchor + dr)
+            have: dict = {}
+            runs_at: dict = {}
+            for r in range(room.rows):
+                runs = sorted((ru for ru in room._char_runs_by_row.get(r, [])
+                               if ru.kind == 'verdant' and ru.col < spine),
+                              key=lambda ru: ru.col)
+                if not runs:
+                    continue
+                text = ' '.join(''.join(ru.symbols) for ru in runs)
+                if text in (yline, ow1, ow2):
+                    have.setdefault(text, []).append(r)
+                    runs_at[r] = runs
+            if have != want:
+                moved = []
+                for t, rows_w in want.items():
+                    rows_h = have.get(t, [])
+                    for i, nr in enumerate(rows_w):
+                        old = rows_h[i] if i < len(rows_h) else nr
+                        if old != nr:
+                            moved.append((old, nr, _dg._GNT_PLQ_COL, tuple(t)))
+                for rows_h in have.values():
+                    for r in rows_h:
+                        for ru in runs_at.get(r, ()):
+                            room.remove_char_run(ru)
+                for t, rows_w in want.items():
+                    for nr in rows_w:
+                        c = _dg._GNT_PLQ_COL
+                        for part in t.split(' '):
+                            if part:
+                                room.add_char_run(CharRun(nr, c, tuple(part),
+                                                          'verdant'))
+                            c += len(part) + 1
+                if moved:
+                    room._sc_twinkle = moved
     return msgs
 
 
@@ -3300,6 +3351,10 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
         if level == 'gauntlet':
             for _m in _gauntlet_tick(room, player):
                 _push(_m)
+            _tw = getattr(room, '_sc_twinkle', None)
+            if _tw:                       # the goal column re-rights: glitter
+                _sc_twinkle_animation(term, room, player, _tw, _iw(term), term.height - 8)
+                room._sc_twinkle = []
         if level == 'grandmasters_sanctum' and dungeon.current_room == 0:
             for _m in _grandmasters_gallery_tick(room, player):
                 _push(_m)
@@ -3694,6 +3749,8 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
                 player.macros[recording_reg] = macro_buf
                 recording_reg = None
                 macro_buf = ''
+                if player_name == 'admin' and room.answer:
+                    _advance_answer('q')    # the stop-q is a tape token too
                 _render(message)
                 continue
             rc = _record_char(key)
@@ -3740,7 +3797,10 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
             continue
 
         # ── Admin answer tracking ─────────────────────────────────────────────
-        if (player_name == 'admin' and room.answer
+        # from_macro keys are skipped: the tape shows '@b', not the replayed
+        # keystrokes — matching them against the tape after the '@b' token
+        # falsely diverged every tape with a macro leg.
+        if (player_name == 'admin' and room.answer and not from_macro
                 and not key.is_sequence and str(key) != ':'
                 and player.mode in (Mode.NORMAL, Mode.VISUAL,
                                     Mode.VISUAL_LINE, Mode.VISUAL_BLOCK)):

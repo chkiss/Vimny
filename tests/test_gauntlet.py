@@ -36,6 +36,7 @@ from generation.dungeon_gen import (
     _GNT_ROWS, _GNT_COLS, _GNT_SPINE, _GNT_R_E, _GNT_R_BW, _GNT_R_PCT,
     _GNT_R_BLK,
     _GNT_R_BLANK, _GNT_R_P1, _GNT_R_P2, _GNT_R_P3, _GNT_R_CIT, _GNT_R_D,
+    _GNT_R_SEN, _GNT_R_YL,
     _GNT_R_NOOK, _GNT_R_GATE, _GNT_P1_COLS, _GNT_P2_COLS, _GNT_NOOK_COLS,
     _GNT_BOLT0, _GNT_EXIT, _GNT_CATCH, _GNT_PAR, _GNT_BUDGET,
 )
@@ -71,19 +72,20 @@ def _tape_keys(answer):
     return keys
 
 
-def _drive(dungeon, keys, monkeypatch, finish=':wq\r'):
+def _drive(dungeon, keys, monkeypatch, finish=':wq\r', player_name='Scribe'):
     keys = list(keys) + _K(finish)
     monkeypatch.setattr(main, 'render_all', lambda *a, **k: None)
     monkeypatch.setattr(main.time, 'sleep', lambda *a, **k: None)
     for anim in ('_fireworks_animation', '_win_animation', '_starfield_victory',
                  '_heart_container_animation', '_unlock_animation',
-                 '_void_fall_animation', '_drown_animation'):
+                 '_void_fall_animation', '_drown_animation',
+                 '_sc_twinkle_animation'):
         monkeypatch.setattr(main, anim, lambda *a, **k: None)
     monkeypatch.setattr(Terminal, 'height', property(lambda self: 45))
     term = Terminal()
     it = iter(keys)
     monkeypatch.setattr(term, 'inkey', lambda *a, **k: next(it, Keystroke('')))
-    return main.run_dungeon(term, 'gauntlet', {}, player_name='Scribe',
+    return main.run_dungeon(term, 'gauntlet', {}, player_name=player_name,
                             _dungeon=dungeon)
 
 
@@ -246,15 +248,54 @@ def test_plaques_read_the_full_targets(seed):
                         and ru.col < _GNT_SPINE)
 
     targets = [t for _k, t, _dc in room._gnt_doors]
-    # doors 0-3 (galleries), 4-5 (pocket cures), 9 (cit), 10-11 (row doors),
-    # 12 (C), 13 (S) read VERBATIM on their rows; P3 reads its three raised
-    # names as one plaque; the O/o doors (16-17) read their created lines.
+    # doors 0-2 (galleries), 4-5 (pocket cures), 9 (cit), 10-11 (row doors),
+    # 12 (C), 13 (S) read VERBATIM on their rows; the sentence row's plaque
+    # is its whole corrected line (its target is the tail); P3 reads its
+    # three raised names as one plaque.
     for r, t in ((_GNT_R_E, targets[0]), (_GNT_R_BW, targets[1]),
                  (_GNT_R_PCT, targets[2]), (_GNT_R_P1, targets[4]),
                  (_GNT_R_P2, targets[5]), (_GNT_R_CIT, targets[9]),
                  (_GNT_R_D, targets[10]),
                  (_GNT_R_P3, ' '.join(targets[6:9]))):
         assert plaque(r) == t, (r, t)
+    # the sentence plaque ends with its target and IS the corrected line
+    assert plaque(_GNT_R_SEN).endswith(targets[3])
+    # the goal column at build: the yanked line TWICE, then the two verses
+    yline, ow1, ow2 = room._gnt_band
+    assert plaque(_GNT_R_YL) == yline
+    assert plaque(_GNT_R_YL + 1) == yline
+    assert plaque(_GNT_R_YL + 2) == ow1
+    assert plaque(_GNT_R_YL + 5) == ow2
+
+
+@pytest.mark.parametrize("seed", SEEDS)
+def test_goal_column_holds_after_the_canonical(seed, monkeypatch):
+    # After the full solve the floor has grown to MEET the goal column:
+    # every band plaque row's floor text equals its plaque.
+    d = _fresh(seed)
+    room = d.rooms[0]
+    _drive(d, _tape_keys(room.answer), monkeypatch, finish=':q!\r')
+    yline, ow1, ow2 = room._gnt_band
+    for dr, t in ((0, yline), (1, yline), (2, ow1), (5, ow2)):
+        r = _GNT_R_YL + dr
+        assert main._wla_floor_text(room, r).strip() == t, (r, t)
+        prunning = ' '.join(''.join(ru.symbols)
+                            for ru in room._char_runs_by_row.get(r, [])
+                            if ru.kind == 'verdant' and ru.col < _GNT_SPINE)
+        assert prunning == t                        # plaque re-righted beside it
+
+
+@pytest.mark.parametrize("seed", SEEDS)
+def test_admin_karaoke_stays_in_sync(seed, monkeypatch):
+    # An admin following the tape verbatim consumes it fully with no
+    # divergence — the macro replay and the stop-q are tracker-safe.
+    d = _fresh(seed)
+    room = d.rooms[0]
+    result = _drive(d, _tape_keys(room.answer), monkeypatch,
+                    player_name='admin')
+    assert result['won']
+    assert not room.answer_diverged
+    assert room.answer_pos == len(room.answer.replace(' ', ''))
 
 
 # ── the driven canonical ──────────────────────────────────────────────────────
@@ -331,6 +372,24 @@ def test_s_ties_r_documented(monkeypatch):
             keys.append(ESC)                        # s enters insert; Esc is free
     result = _drive(d, keys, monkeypatch)
     assert result['won'] and result['stars'] == 2
+
+
+def test_counted_b_and_w_costs_a_star(monkeypatch):
+    # r2 the long way: 2b x w x pays a digit where b x b x (back-to-front)
+    # doesn't — one key, one star.
+    d = _fresh(0)
+    a = _swap(d.rooms[0].answer, 'b x b x', '2b x w x')
+    result = _drive(d, _tape_keys(a), monkeypatch)
+    assert result['won'] and result['stars'] == 1
+
+
+def test_dot_gallery_costs_a_star(monkeypatch):
+    # P3 the old way: gUe w . w . opens all three doors but pays 3 more
+    # than the single counted stroke gU3e.
+    d = _fresh(0)
+    a = _swap(d.rooms[0].answer, 'gU3e', 'gUe w . w .')
+    result = _drive(d, _tape_keys(a), monkeypatch)
+    assert result['won'] and result['stars'] == 1
 
 
 def test_longhand_fill_costs_a_star(monkeypatch):

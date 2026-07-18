@@ -11171,17 +11171,21 @@ def build_dungeon_warden_scrivener(seed: int) -> Dungeon:
 # DOOR LEDGER — 18 doors, canonical key(s) · rival that loses:
 #   r1  e-door     k 3e x       spawn is the row BELOW (k opens the exam);
 #                               16l x (4) / fλ;;;x (6)              [sub]
-#   r2  b/w-door   j 2b x w x   12h x (4) / F;x (4) / fλ x (3>2)    [sub]
+#   r2  b/w-door   j b x b x    the descent lands past BOTH intruders, so
+#                               two bare b's take them back-to-front;
+#                               2b x w x (+1) / F;x / fλ x           [sub]
 #   r3  %-door     j % l x      11l x (4) / f;;x (5) / $ gE gE (4)  [sub]
-#   r4  )-door     j ) x        fX x (3) / 3l x (3)                 [sub]
+#   r4  (-door     j ( x        the descent lands on the row's final '.';
+#                               ( reaches back to the intruded sentence's
+#                               start — b b x (+1) / Fλ x (+1)       [sub]
 #   —   }          }            3j (2); the TWO S1 decoys on the block row
 #                               make a pre-} search eat n n (+2)
 #   P1  r-door     /S1 2e rC    motions: IMPOSSIBLE (sealed island); s ties
 #                               r — the Vim-intrinsic tie, accepted
 #   P2  ~-door     n w ~~       fU ~~ (4) — w beats f by 1; R-retype (3>2)
-#   P3  gU·. ×3    * 3b gUe w . w .    count-~ per door loses 10 vs 9 ONLY
-#                               because THREE doors of distinct lengths let
-#                               the dot amortize; veU-family ≥ +2
+#   P3  gU·3e ×3   * 3b gU3e    ONE operator stroke raises all three names
+#                               (the count rides the motion, Vim-true);
+#                               gUe w . w . (+3), count-~ per door worse
 #   —   cit-door   M cit{cure}  M (mid passable row) lands ON the '<' at the
 #                               row head; the lazy j parks ~34 cols east of
 #                               the tag where cit resolves nothing
@@ -11223,8 +11227,8 @@ _GNT_NOOK_COLS = (68, 75)           # decoy nook in misted water (a search LANDI
 _GNT_BOLT0 = 27                     # 18 bolts, cols 27..44
 _GNT_EXIT  = (_GNT_R_GATE, 46)      # the FINAL SEAL — stone until every proof holds
 _GNT_CATCH = 47                     # ◆ east of the exit: $ lands here, h steps back
-_GNT_PAR    = 101                   # the canonical tape spends EXACTLY this (probed:
-                                    # par 100 drops the driven run to 1★)
+_GNT_PAR    = 97                    # the canonical tape spends EXACTLY this (probed:
+                                    # par 96 drops the driven run to 1★)
 _GNT_BUDGET = 140                   # hand-set generous: ~10 insert doors invite typos
 
 
@@ -11264,8 +11268,8 @@ def _gnt_draw_words(rng) -> dict:
                 'v4': draw(4), 'lam2': lam2,
                 'u1': draw(4), 'u2': draw(4), 'u3': draw(4, lam3),
                 'u4': draw(4, lam3), 'u5': draw(4), 'u6': draw(4), 'lam3': lam3,
-                'a1': draw(4, lam4), 'a2': draw(4), 'a3': draw(5, lam4),
-                'a4': draw(5), 'a5': draw(4), 'a6': draw(4), 'lam4': lam4,
+                'a1': draw(4, lam4), 'a2': draw(4), 'a3': draw(4, lam4),
+                'a4': draw(4), 'lam4': lam4,
                 'w7': draw(7), 's1': draw(3), 't1s': draw(3), 'u1s': draw(3),
                 'p1': draw(5), 'p2': draw(6),
                 'rcure': draw(6), 'cw': draw(6),
@@ -11291,6 +11295,7 @@ def _gnt_draw_words(rng) -> dict:
         # global no-substring: a search word inside any other floor token
         # (including the rot forms actually laid) breaks the / n * # chains.
         rots = [d['t3'][:4] + lam1, lam2 + d['v2'], lam2 + d['v3'],
+                lam4 + d['a3'],
                 d['rcure'][:5] + d['wl'],
                 d['cw'][:2].upper() + d['cw'][2:]]
         tokens = [w for k, w in d.items() if k not in
@@ -11397,12 +11402,14 @@ def build_dungeon_gauntlet(seed: int) -> Dungeon:
     lay(_GNT_R_PCT, TX, f"{w['u1']} {w['u2']} ({w['u3']} {w['u4']}){w['lam3']} "
                         f"{w['u5']} {w['u6']}")
     door('sub', f"({w['u3']} {w['u4']}) {w['u5']}")
-    # r4 · )-door: the third sentence begins with a letter that is not its own.
-    lay(_GNT_R_SEN, TX, f"{w['a1']} {w['a2']}. {w['a3']} {w['a4']}. "
-                        f"{w['lam4']}{w['a5']} {w['a6']}.")
-    # target reaches back over the second sentence's period: the intruder is
-    # a PREFIX, so a two-token target would already read true around it.
-    door('sub', f"{w['a4']}. {w['a5']} {w['a6']}.")
+    # r4 · (-door: the second sentence begins with a letter that is not its
+    # own, and the row ends exactly under the cursor's descent — ( reaches
+    # BACK to the sentence's start (the intruder), where b b overpays.
+    lay(_GNT_R_SEN, TX, f"{w['a1']} {w['a2']}. "
+                        f"{w['lam4']}{w['a3']} {w['a4']}.")
+    # target reaches back over the first sentence's period: the intruder is
+    # a PREFIX, so a shorter target would already read true around it.
+    door('sub', f"{w['a2']}. {w['a3']} {w['a4']}.")
     # r5 · the block: U1 (the # twin) with W7 (the yank word) beside it, the
     # TWO S1 decoys that make } worth its key (a pre-} search eats n n), and
     # the T1 decoy that sits BEHIND P2 so a # there lands wrong.
@@ -11477,7 +11484,7 @@ def build_dungeon_gauntlet(seed: int) -> Dungeon:
     for pr, ptext in ((_GNT_R_E, f"{w['t1']} {w['t2']} {w['t3']} {w['t4']}"),
                       (_GNT_R_BW, f"{w['v1']} {w['v2']} {w['v3']} {w['v4']}"),
                       (_GNT_R_PCT, f"({w['u3']} {w['u4']}) {w['u5']}"),
-                      (_GNT_R_SEN, f"{w['a4']}. {w['a5']} {w['a6']}."),
+                      (_GNT_R_SEN, f"{w['a1']} {w['a2']}. {w['a3']} {w['a4']}."),
                       (_GNT_R_P1, w['rcure']), (_GNT_R_P2, w['cw']),
                       (_GNT_R_P3, f"{w['g1'].upper()} {w['g2'].upper()} "
                                   f"{w['g3'].upper()}"),
@@ -11486,9 +11493,17 @@ def build_dungeon_gauntlet(seed: int) -> Dungeon:
                       (_GNT_R_DD, w['dhead']),
                       (_GNT_R_C, f"{w['chead']} {w['ccure']}"),
                       (_GNT_R_S, w['sword']),
-                      (_GNT_R_Y1, f"{w['w7']} {w['w7']}"),
-                      (_GNT_R_YL, f"{w['yl1']} {w['yl2']} {w['yl3']}"),
-                      (_GNT_R_ST1, w['ow1']), (_GNT_R_ST2, w['ow2'])):
+                      (_GNT_R_Y1, f"{w['w7']} {w['w7']}")):
+        lay(pr, _GNT_PLQ_COL, ptext, 'verdant')
+    # The GOAL COLUMN (the Y/O/o band): the west wall shows the FINISHED
+    # manuscript — the yanked line TWICE (the dup door's instruction), then
+    # the two authored verses at the rows where they will be born. Row
+    # inserts drag these plaques out of true; _gauntlet_tick re-rights them
+    # (the sculpting re-align, with its twinkle) so the wall always paints
+    # the goal and the player edits the floor until the two columns agree.
+    room._gnt_band = (_yline, w['ow1'], w['ow2'])
+    for pr, ptext in ((_GNT_R_YL, _yline), (_GNT_R_YL + 1, _yline),
+                      (_GNT_R_YL + 2, w['ow1']), (_GNT_R_YL + 5, w['ow2'])):
         lay(pr, _GNT_PLQ_COL, ptext, 'verdant')
 
     room._gnt_doors = tuple(doors)
@@ -11504,8 +11519,8 @@ def build_dungeon_gauntlet(seed: int) -> Dungeon:
     room.budget = _GNT_BUDGET
     # The canonical tape (karaoke): every typed token is a single drawn word.
     room.answer = (
-        f"k 3e x j 2b x w x j % l x j ) x }} "
-        f"/{w['s1']}⏎ 2e r{w['rcure'][5]} n w ~ ~ w * 3b gUe w . w . "
+        f"k 3e x j b x b x j % l x j ( x }} "
+        f"/{w['s1']}⏎ 2e r{w['rcure'][5]} n w ~ ~ w * 3b gU3e "
         f"M cit{w['tc']} j ^ dw j w D j C{w['ccure']} j S{w['sword']} "
         f"j b # w yiw N qb w e l p q @b j Y p "
         f"j O{w['ow1']} 2j o{w['ow2']} G $ h")
