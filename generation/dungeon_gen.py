@@ -11208,7 +11208,7 @@ def build_dungeon_warden_scrivener(seed: int) -> Dungeon:
 #                  same edit read from the other bank; the exam keeps o)
 #   —   finale     G $ h        the ◆ east of the exit catches $; h steps
 #                               back onto the frame — nothing is cheaper
-_GNT_ROWS, _GNT_COLS = 25, 78
+_GNT_ROWS, _GNT_COLS = 27, 78
 _GNT_SPINE = 24                     # the descent rail — every row's first standable
 _GNT_TX    = 26                     # text column 0 for most rows
 _GNT_PLQ_COL = 1                    # west-wall plaques (cols 1..22 — wide enough
@@ -11223,12 +11223,15 @@ _GNT_R_BLANK = 7
 _GNT_R_P1, _GNT_R_P2, _GNT_R_P3 = 8, 10, 12       # 9/11 are spine-only wall rows
 _GNT_R_CIT, _GNT_R_D, _GNT_R_DD = 13, 14, 15      # + steps P3 → cit (fnb = the tag)
 _GNT_R_C, _GNT_R_S, _GNT_R_Y1, _GNT_R_YL = 16, 17, 18, 19
-_GNT_R_NOOK = 20                                  # water course west + the decoy nook
-_GNT_R_GATE = 21
+_GNT_R_NOOK = 21                                  # the decoy's SOUTHERN ISLAND —
+                                                  # water rows 20/22 flank it, so
+                                                  # its text heads at TX (the
+                                                  # left-align law) with no walk-in
+_GNT_R_GATE = 23
 _GNT_P1_COLS = (26, 35)             # floor island in misted water (search-only;
 _GNT_P2_COLS = (26, 39)             # text at TX — the left-align law — with a
                                     # one-cell misted gap east of the spine ◆)
-_GNT_NOOK_COLS = (68, 75)           # decoy nook in misted water (a search LANDING)
+_GNT_NOOK_COLS = (26, 28)           # decoy nook island (a search LANDING)
 _GNT_BOLT0 = 27                     # 18 bolts, cols 27..44
 _GNT_EXIT  = (_GNT_R_GATE, 46)      # the FINAL SEAL — stone until every proof holds
 _GNT_CATCH = 47                     # ◆ east of the exit: $ lands here, h steps back
@@ -11365,11 +11368,11 @@ def build_dungeon_gauntlet(seed: int) -> Dungeon:
     floor(_GNT_R_P3, SP, SP)           # the gU gallery's ◆ threshold cell:
                                        # without it, {12}G ferries straight
                                        # onto g1 and undercuts w * 3b
-    # The nook row: no standable floor west of the nook — a writable blank
-    # row here would let `j i{word}` tie the o-door (the i-cheese); the
-    # nearest blank is r6, three travel keys away. The east nook holds the
-    # U1 decoy (a search LANDING — escaped the way you came in). The gate
-    # is therefore reachable ONLY by jump (G/L) — the finale forces G.
+    # The nook: a SOUTHERN ISLAND for the U1 decoy (a search LANDING —
+    # escaped the way you came in), its text at TX per the left-align
+    # law. Full water rows flank it above and below, so nothing walks in
+    # from the yline row or on to the gate — the gate stays reachable
+    # ONLY by jump (G/L), and the finale forces G.
     floor(_GNT_R_NOOK, *_GNT_NOOK_COLS)
     floor(_GNT_R_GATE, SP, _GNT_CATCH)
     # THE WATERWORKS (stone-fog law, the waypoint pattern): the pockets and
@@ -11399,7 +11402,10 @@ def build_dungeon_gauntlet(seed: int) -> Dungeon:
     # floods through water, feet do not.
     moat(_GNT_R_P1 + 1, SP, 76)
     moat(_GNT_R_P2 + 1, SP, 76)
-    moat(_GNT_R_NOOK, SP + 1, _GNT_NOOK_COLS[0] - 1)   # the nook's channel
+    moat(_GNT_R_NOOK - 1, SP, 62)                   # the island's north water
+    moat(_GNT_R_NOOK, SP, _GNT_NOOK_COLS[0] - 1)    # …its west channel
+    moat(_GNT_R_NOOK, _GNT_NOOK_COLS[1] + 1, 62)    # …its east water
+    moat(_GNT_R_NOOK + 1, SP, 62)                   # …and its south water
     for i in range(18):                             # the eighteen bolts
         cells[_GNT_R_GATE][_GNT_BOLT0 + i] = CellType.WALL
     cells[_GNT_EXIT[0]][_GNT_EXIT[1]] = CellType.WALL   # the FINAL SEAL
@@ -11500,11 +11506,11 @@ def build_dungeon_gauntlet(seed: int) -> Dungeon:
     # off-TX reads false.
     door('col', w['ow1'])
     door('col', w['ow2'])
-    # r22 · the nook: the U1 forward decoy (a wrapping * lands here and
+    # the nook island: the U1 forward decoy (a wrapping * lands here and
     # loses to # by one). r23 · the gate: threshold ◆ (G parks west of the
     # bolts — the GMS lesson) and the catch ◆ east of the seal ($ lands
     # there; h steps back onto the frame).
-    lay(_GNT_R_NOOK, _GNT_NOOK_COLS[0] + 2, w['u1s'])
+    lay(_GNT_R_NOOK, _GNT_NOOK_COLS[0], w['u1s'])
     room.char_runs.append(CharRun(_GNT_R_GATE, SP + 1, ('◆',), 'ancient'))
     room.char_runs.append(CharRun(_GNT_R_GATE, _GNT_CATCH, ('◆',), 'ancient'))
     # Threshold ◆ on every search-band row's spine cell (the shelf, both
@@ -11548,14 +11554,14 @@ def build_dungeon_gauntlet(seed: int) -> Dungeon:
     # manuscript — the yanked line TWICE (the dup door's instruction), the
     # two authored verses at the rows where they will be born, and the
     # nook's decoy word at the row where the nook will COME TO REST (the
-    # inserts push it down to anchor+4). Row inserts drag these plaques
+    # inserts push its island down to anchor+5). Row inserts drag these plaques
     # out of true; _gauntlet_tick re-rights them to the yline-anchored
     # goal rows (the sculpting re-align, with its twinkle) so the wall
     # always paints the goal and the player edits until the columns agree.
     room._gnt_band = (_yline, w['ow1'], w['ow2'], w['u1s'])
     for pr, ptext in ((_GNT_R_YL, _yline), (_GNT_R_YL + 1, _yline),
                       (_GNT_R_YL + 2, w['ow1']), (_GNT_R_YL + 3, w['ow2']),
-                      (_GNT_R_YL + 4, w['u1s'])):
+                      (_GNT_R_YL + 5, w['u1s'])):
         lay(pr, _GNT_PLQ_COL, ptext, 'verdant')
 
     room._gnt_doors = tuple(doors)

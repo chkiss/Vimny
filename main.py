@@ -1771,7 +1771,7 @@ def _gauntlet_tick(room, player) -> list:
             spine = _dg._GNT_SPINE
             want: dict = {}
             for dr, t in ((0, yline), (1, yline), (2, ow1), (3, ow2),
-                          (4, nkw)):
+                          (5, nkw)):
                 if anchor + dr < room.rows:
                     want.setdefault(t, []).append(anchor + dr)
             have: dict = {}

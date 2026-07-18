@@ -284,7 +284,7 @@ def test_plaques_read_the_full_targets(seed):
     assert plaque(_GNT_R_YL + 1) == yline
     assert plaque(_GNT_R_YL + 2) == ow1
     assert plaque(_GNT_R_YL + 3) == ow2
-    assert plaque(_GNT_R_YL + 4) == nkw
+    assert plaque(_GNT_R_YL + 5) == nkw
 
 
 @pytest.mark.parametrize("seed", SEEDS)
