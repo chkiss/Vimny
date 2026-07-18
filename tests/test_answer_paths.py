@@ -312,7 +312,8 @@ def _drive_to_win(builder, seed):
     dungeon = builder(seed)
     slug = builder.__name__[len('build_dungeon_'):]
     tape = dungeon.rooms[0].answer.replace(' ', '')          # spaces are visual separators
-    keys = [Keystroke('\r' if c == '⏎' else c) for c in tape]
+    keys = [Keystroke('\r' if c == '⏎' else ' ' if c == '␣' else c)
+            for c in tape]                                   # ␣ = a TYPED space
     keys += [Keystroke(c) for c in ':wq\r']                  # :wq returns the real win/stars
     term = Terminal(force_styling=False)
     import render.colors as _colors

@@ -3588,14 +3588,21 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
         if have != want:
             for ru in stale:
                 room.remove_char_run(ru)
-            moved = []
+            placed: dict = {}
             for (r, col, wd) in sorted(want):
                 room.add_char_run(CharRun(r, col, tuple(wd), 'verdant'))
-                moved += [(r, col + i) for i in range(len(wd))]
+                placed.setdefault((col, wd), []).append(r)
             room.rebuild_indexes()
             # THE PLAQUE-RESTORE LAW: an edit may drag or dent a plaque, but
-            # the wall remembers — it re-rights itself with the glitter (the
-            # sculpting mechanic), canonical edit or not.
+            # the wall remembers — it re-rights itself under the sculpting
+            # glitter, canonical edit or not.
+            moved = []
+            for ru in stale:
+                wd = ''.join(ru.symbols)
+                rs = placed.get((ru.col, wd))
+                new_r = rs.pop(0) if rs else ru.row
+                if new_r != ru.row:
+                    moved.append((ru.row, new_r, ru.col, wd))
             room._sc_twinkle = moved
         if getattr(room, '_shr_seal_col', None) is None:
             return

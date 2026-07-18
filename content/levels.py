@@ -101,7 +101,9 @@ LEVELS = [
     {'display': '38',   'slug': 'paragraph_enclosure',   'name': 'The Paragraph Enclosure',    'commands': 'ip ap', 'teaches': ['ip', 'ap']},
     {'display': '38.1', 'slug': 'grandmasters_sanctum',  'name': "The Grandmaster's Sanctum",  'type': 'boss', 'after': 'paragraph_enclosure', 'teaches': []},
     {'display': '39',   'slug': 'spellwrights_forge',    'name': "The Spellwright's Forge",    'commands': ':s///  :g  &', 'teaches': ['subst']},
-    {'display': '40',   'slug': 'culling_ledger',        'name': 'The Culling Ledger',         'commands': ':d _ :a,bd :v//d', 'teaches': ['ex_range']},
+    # teaches 'setnum' too: the ledger's addresses NEED the number gutter, and
+    # the Waypoint nook chest that normally grants :set nu is optional loot.
+    {'display': '40',   'slug': 'culling_ledger',        'name': 'The Culling Ledger',         'commands': ':d _ :a,bd :v//d', 'teaches': ['ex_range', 'setnum']},
     {'display': '41',   'slug': 'shelving_room',         'name': 'The Shelving Room',          'commands': ':m :t :> :<', 'teaches': []},
     {'display': '42',   'slug': 'refrain_vault',         'name': 'The Refrain Vault',          'commands': '& :&& :j :y', 'teaches': []},
     {'display': '43',   'slug': 'stair_rail',            'name': 'The Stair Rail',             'commands': '+ - _', 'teaches': ['line_step']},

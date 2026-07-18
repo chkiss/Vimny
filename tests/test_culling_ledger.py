@@ -308,7 +308,8 @@ def test_scorched_earth_never_opens_the_way(monkeypatch):
 
 def test_curriculum_entry():
     lv = next(l for l in LEVELS if l['slug'] == 'culling_ledger')
-    assert lv['teaches'] == ['ex_range']
+    assert lv['teaches'] == ['ex_range', 'setnum']
     known = known_commands('culling_ledger')
     assert 'ex_range' in known and 'subst' in known
+    assert 'setnum' in known                       # :set nu is guaranteed here
     assert 'q' not in known                        # macros come later
