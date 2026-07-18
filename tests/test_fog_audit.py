@@ -36,10 +36,9 @@ _SCRIPTED_FOG = {
     'build_dungeon_warden_manifold',     # ward-machine fog, re-laid per round
     'build_dungeon_warden_scrivener',    # hall/pocket fog lifted per beat
     'build_dungeon_dummy',               # admin sandbox
-    'build_dungeon_gauntlet',            # sealed search-islands stay VISIBLE by
-                                         # design: search is their only door,
-                                         # and fogged cells are unsearchable
 }
+# (gauntlet removed 2026-07-18: its search-islands sit in misted water now —
+# visible per the stone law, foot- and scan-proof, search still their door.)
 
 # (The one-time jump-entry exemption list emptied 2026-07-19: waypoint and
 # sentence_corridor via the waterworks; operators_vault via natural fog +

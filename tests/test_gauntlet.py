@@ -33,7 +33,8 @@ import main
 from engine.world import CellType
 from generation.dungeon_gen import (
     build_dungeon_gauntlet,
-    _GNT_ROWS, _GNT_COLS, _GNT_SPINE, _GNT_R_E, _GNT_R_BW, _GNT_R_BLK,
+    _GNT_ROWS, _GNT_COLS, _GNT_SPINE, _GNT_R_E, _GNT_R_BW, _GNT_R_PCT,
+    _GNT_R_BLK,
     _GNT_R_BLANK, _GNT_R_P1, _GNT_R_P2, _GNT_R_P3, _GNT_R_CIT, _GNT_R_D,
     _GNT_R_NOOK, _GNT_R_GATE, _GNT_P1_COLS, _GNT_P2_COLS, _GNT_NOOK_COLS,
     _GNT_BOLT0, _GNT_EXIT, _GNT_CATCH, _GNT_PAR, _GNT_BUDGET,
@@ -164,10 +165,10 @@ def test_M_lands_on_the_cit_row(seed):
     from engine.player import Player
     room = _room(seed)
     p = Player()
-    p.row, p.col = _GNT_R_P3, 64
+    p.row, p.col = _GNT_R_P3, 68
     apply_motion(p, 'M', 1, room)
     assert p.row == _GNT_R_CIT
-    assert p.col == _first_non_blank_col(room, _GNT_R_CIT) == 30
+    assert p.col == _first_non_blank_col(room, _GNT_R_CIT) == 34
 
 
 @pytest.mark.parametrize("seed", SEEDS)
@@ -187,6 +188,73 @@ def test_search_words_are_clean(seed):
     assert len(re.findall(r'\b%s\b' % w7, text)) == 1
     for sw in (s1, t1, u1, w7):                           # never nested
         assert not re.search(r'\w%s|%s\w' % (sw, sw), text)
+
+
+@pytest.mark.parametrize("seed", SEEDS)
+def test_channels_are_misted_water(seed):
+    # The waterworks: every pocket channel is WATER under permanent mist —
+    # visible (the vision flood crosses water), foot-proof, scan-proof.
+    # The islands themselves stay clear: visible and searchable.
+    room = _room(seed)
+    for r, lo in ((_GNT_R_P1, _GNT_P1_COLS[0]), (_GNT_R_P2, _GNT_P2_COLS[0]),
+                  (_GNT_R_NOOK, _GNT_NOOK_COLS[0])):
+        for c in range(_GNT_SPINE + 1, lo):
+            assert room.cells[r][c] == CellType.WATER
+            assert (r, c) in room.fog_cells and (r, c) in room.mist_cells
+    for c in range(_GNT_P1_COLS[0], _GNT_P1_COLS[1] + 1):
+        assert (_GNT_R_P1, c) not in room.fog_cells
+    for c in range(_GNT_P2_COLS[0], _GNT_P2_COLS[1] + 1):
+        assert (_GNT_R_P2, c) not in room.fog_cells
+
+
+@pytest.mark.parametrize("seed", SEEDS)
+def test_islands_are_search_only(seed):
+    # Water bars feet (the BFS test), the mist bars the line scans, and the
+    # spine ◆ catches every fnb jump ({n}G / + / -) — only a search lands
+    # on an island; the search itself remains a lawful landing.
+    from engine.motion import apply_motion, _first_non_blank_col
+    from engine.player import Player
+    from engine.search import find_next
+    room = _room(seed)
+    isl1 = set(range(_GNT_P1_COLS[0], _GNT_P1_COLS[1] + 1))
+    for motion in ('$', 'w', 'e', 'W', 'E'):
+        p = Player()
+        p.row, p.col = _GNT_R_P1, _GNT_SPINE
+        apply_motion(p, motion, 1, room)
+        assert not (p.row == _GNT_R_P1 and p.col in isl1), motion
+    # the fnb of both pocket rows is the spine ◆, not the island text
+    for r in (_GNT_R_P1, _GNT_R_P2):
+        assert _first_non_blank_col(room, r) == _GNT_SPINE
+    # …while the search still crosses the water onto the island
+    s1 = main._wla_floor_text(room, _GNT_R_BLK).split()[2]
+    p = Player()
+    p.row, p.col = room.spawn_pos
+    hit = find_next(room, p, s1, True)
+    assert hit is not None and hit[0] in (_GNT_R_BLK, _GNT_R_P1, _GNT_R_P2)
+
+
+@pytest.mark.parametrize("seed", SEEDS)
+def test_plaques_read_the_full_targets(seed):
+    # The playtest law: every door row's west-wall plaque carries the door's
+    # FULL true reading (the y/Y doors show their fill word twice / the
+    # doubled line). Wall runs never join the floor scans or a search.
+    room = _room(seed)
+
+    def plaque(r):
+        return ' '.join(''.join(ru.symbols) for ru in room.char_runs
+                        if ru.row == r and ru.kind == 'verdant'
+                        and ru.col < _GNT_SPINE)
+
+    targets = [t for _k, t, _dc in room._gnt_doors]
+    # doors 0-3 (galleries), 4-5 (pocket cures), 9 (cit), 10-11 (row doors),
+    # 12 (C), 13 (S) read VERBATIM on their rows; P3 reads its three raised
+    # names as one plaque; the O/o doors (16-17) read their created lines.
+    for r, t in ((_GNT_R_E, targets[0]), (_GNT_R_BW, targets[1]),
+                 (_GNT_R_PCT, targets[2]), (_GNT_R_P1, targets[4]),
+                 (_GNT_R_P2, targets[5]), (_GNT_R_CIT, targets[9]),
+                 (_GNT_R_D, targets[10]),
+                 (_GNT_R_P3, ' '.join(targets[6:9]))):
+        assert plaque(r) == t, (r, t)
 
 
 # ── the driven canonical ──────────────────────────────────────────────────────
@@ -265,6 +333,16 @@ def test_s_ties_r_documented(monkeypatch):
     assert result['won'] and result['stars'] == 2
 
 
+def test_longhand_fill_costs_a_star(monkeypatch):
+    # The q@ re-audit (macros now precede the exam): the y-door fill is the
+    # exam's macro leg — recording is free and @b replays for 2, so the
+    # untaped longhand (w e l p ×2 = 8 vs 6) loses exactly the star.
+    d = _fresh(0)
+    a = _swap(d.rooms[0].answer, 'qb w e l p q @b', 'w e l p w e l p')
+    result = _drive(d, _tape_keys(a), monkeypatch)
+    assert result['won'] and result['stars'] == 1
+
+
 def test_jump_cannot_pass_the_sealed_gate(monkeypatch):
     # G lands the threshold ◆; $ stops at the first barred bolt; the seal
     # never opens for position alone.
@@ -296,5 +374,5 @@ def test_curriculum_entry():
     known = set(known_commands('gauntlet'))
     for tok in ('w', 'b', 'e', 'p', 'y', 'Y', 'd', 'D', 'C', 'S', 'r',
                 'it', '%', '/', '*', 'dot', '~', 'gU', 'insert', '{', '}',
-                '(', ')'):
+                '(', ')', 'q'):
         assert tok in known, tok
