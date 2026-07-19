@@ -71,15 +71,15 @@ def _canon_keys(room):
             # The Unmaking: shear his six strands in ANY order (no karaoke) —
             # jump to a strand's row, f onto the structure, delete inside. He
             # STARTS inside the word strand and slips away when you close on
-            # him, so that strand is taken LAST (2G ee diw, from its far end,
-            # where he can no longer flee). The sixth stroke unmakes him and
-            # opens the seal; 7G $ rides east to the exit.
+            # him, so that strand is taken LAST (2G e diw — e stops on
+            # 'stitch', where he can no longer flee). The sixth stroke
+            # unmakes him and opens the seal; 7G $ rides east to the exit.
             + _K('4Gf"di"')
             + _K('6Gf(di(')
             + _K('8Gf{di{')
             + _K('10Gf<dit')
-            + _K('12Gfcdis')
-            + _K('2Geediw')
+            + _K('12Gfvdis')
+            + _K('2Gediw')
             + _K('7G$'))
 
 
@@ -257,9 +257,9 @@ def test_search_landing_makes_him_slip(monkeypatch):
 @pytest.mark.parametrize("seed", SEEDS)
 def test_the_unmaking_opens_the_seal(seed, monkeypatch):
     d, _g, arena = _rooms(seed)
-    # take his starting strand (the word) LAST — 2G ee diw from its far end,
+    # take his starting strand (the word) LAST — 2G e diw — e stops on 'stitch',
     # where he can no longer slip.
-    keys = _K('4Gf"di"6Gf(di(8Gf{di{10Gf<dit12Gfcdis2Geediw')
+    keys = _K('4Gf"di"6Gf(di(8Gf{di{10Gf<dit12Gfvdis2Gediw')
     result = _drive_arena(d, keys + _K('7G$'), monkeypatch, finish=':wq\r')
     gm = next(e for e in arena.entities if e.tag == 'grandmaster')
     assert not gm.alive                                # all six strands sheared

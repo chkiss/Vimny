@@ -4664,7 +4664,7 @@ _GMS_BUDGET  = 160                     # hand-set, generous (gallery + arena mel
 # no strand collapses a row mid-chase — the flight geometry stays put.)
 _GMS_A_ROWS, _GMS_A_COLS = 15, 54
 _GMS_A_SPAWN = (7, 2)
-_GMS_A_BOSS  = (2, 11)                  # he opens INSIDE the first strand ('oath'),
+_GMS_A_BOSS  = (2, 8)                   # he opens INSIDE the first strand ('stitch'),
                                         # a valid deletion target — see _GMS_A_LECTERNS[0]
 _GMS_A_SEAL_COL = 48                    # the sanctum seal wall (opens at 0 HP)
 _GMS_A_EXIT  = (7, 52)
@@ -4677,13 +4677,18 @@ _GMS_A_BUDGET = 300                     # boss convention: no par, very relaxed
 # made), 'gone' (inner content the object removes) and 'keep' (a structure
 # marker that SURVIVES the object but a whole-line dd would wipe — so only the
 # inner-delete counts). They alternate left/right down the hall: a real chase.
+# The six strands are FAMOUS FRAGMENTS (sense, not decree — each is a known
+# phrase whose heart the player unweaves): a proverb's stitch, the cry of
+# wolf, X marking the spot, the silver lining, Caesar twice over. The shear
+# keys stay text-independent (f finds the DELIMITER — " ( { < — and the iw
+# strand's target is the second word, as before).
 _GMS_A_LECTERNS = [
-    (2,  6,  'bind oath free',           'iw', 11, 'oath', 'bind'),
-    (4,  30, 'cry "vow" now',            'i"', 35, 'vow',  'cry'),
-    (6,  8,  'hold (bond) tight',        'i(', 14, 'bond', 'hold'),
-    (8,  32, 'keep {ward} shut',         'i{', 38, 'ward', 'keep'),
-    (10, 6,  '<rite>mark</rite> gone',   'it', 12, 'mark', 'rite'),
-    (12, 28, 'one. cut this. two.',      'is', 33, 'cut',  'one'),
+    (2,  6,  'a stitch in time',         'iw', 8,  'stitch', 'time'),
+    (4,  30, 'cry "wolf" again',         'i"', 35, 'wolf',   'cry'),
+    (6,  8,  '(x) marks the spot',       'i(', 9,  'x',      'spot'),
+    (8,  30, 'a {silver} lining',        'i{', 33, 'silver', 'lining'),
+    (10, 6,  '<q>et tu</q> brute',       'it', 9,  'et tu',  'brute'),
+    (12, 28, 'veni. vidi. vici.',        'is', 34, 'vidi',   'veni'),
 ]
 
 
