@@ -143,16 +143,24 @@ def test_lesson_block_is_open_floor(seed):
 
 
 @pytest.mark.parametrize("seed", SEEDS)
-def test_plaque_is_in_the_west_wall(seed):
-    """The plaque sits WEST of the spine, in WALL cells (uncuttable, off the
-    floor scans)."""
+def test_saying_prefixes_are_carved_in_the_west_stone(seed):
+    """Sense, not decree: every door's saying prefix is carved in WALL cells
+    (uncuttable, off the floor scans), right-aligned to end two cols shy of
+    the spine — the saying reads straight across the stone into the floor."""
     room = _room(seed)
-    for r in _CE_LESSON_ROWS:
-        plq = room.char_run_at(r, _CE_PLQ_COL)
-        assert plq is not None and plq.kind == 'verdant'
-        assert _CE_PLQ_COL < _CE_COL_S, "plaque is west of the spine"
-        for k in range(len(plq.symbols)):
-            assert room.cells[r][_CE_PLQ_COL + k] == CellType.WALL
+    for L in room._ce_lessons:
+        r = L['row']
+        stones = [ru for ru in room.char_runs
+                  if ru.row == r and ru.kind == 'verdant']
+        assert stones, r
+        for ru in stones:
+            for k in range(len(ru.symbols)):
+                assert room.cells[r][ru.col + k] == CellType.WALL
+        east = max(ru.col + len(ru.symbols) - 1 for ru in stones)
+        assert east == _CE_COL_S - 2
+        text = ' '.join(''.join(ru.symbols)
+                        for ru in sorted(stones, key=lambda u: u.col))
+        assert text == L['prefix']
 
 
 @pytest.mark.parametrize("seed", SEEDS)
@@ -190,54 +198,52 @@ def test_lesson_mix(seed):
             assert i > 0 and kinds[i - 1] == 'sline', f"C door {i} must follow an S door"
 
 
-@pytest.mark.parametrize("seed", SEEDS)
-def test_label_target_shapes(seed):
-    """sline: a single 6-letter word (no space). ceol: prefix kept, a two-word
-    wrong tail collapses to ONE right word. word: one word off, context kept.
-    wordW: a ★-spanning WORD → a plain word, context kept. rune: a fused ◆ → two
-    letters. bracket: a (bracketed) head on a kept stem → a plain head. No typed
-    value holds a space."""
-    for L in _ce_pick(random.Random(seed)):
+def test_label_target_shapes():
+    """sline: one dissimilar wrong word, cure EXACTLY 6 letters (the S→C
+    alignment law). ceol: kept 4-letter floor word + a two-word junk tail
+    collapsing to the famous word. word: one word off, tail kept. wordW: a
+    ★-scarred famous word, context kept. rune: a fused ◆ head → two letters.
+    bracket: a wrong (bracketed) head on the famous stem. No typed value
+    holds a space (fixed texts — checked once)."""
+    for L in _ce_pick(random.Random(0)):
         assert ' ' not in L['typed'], "no typed value may contain a space"
         if L['kind'] == 'sline':
             assert ' ' not in L['label'] and ' ' not in L['target']
             assert L['typed'] == L['target'] and L['label'] != L['target']
-            assert len(L['typed']) == 6
+            assert len(L['typed']) == 6, "the alignment law: S cures are 6"
         elif L['kind'] == 'ceol':
             lw, tw = L['label'].split(), L['target'].split()
             assert len(lw) == 3 and len(tw) == 2          # 'pre badA badB' → 'pre right'
-            assert lw[0] == tw[0], "prefix kept"
-            assert L['typed'] == tw[1] and len(L['typed']) == 4
+            assert lw[0] == tw[0] and len(lw[0]) == 4, \
+                "prefix kept, 4 letters (the alignment law)"
+            assert L['typed'] == tw[1]
             assert tw[1] not in (lw[1], lw[2]), "the tail is genuinely wrong"
         elif L['kind'] == 'word':
             lw, tw = L['label'].split(), L['target'].split()
-            assert lw[1] == tw[1] and lw[0] != tw[0]      # context kept
-            assert L['typed'] == tw[0] and len(L['typed']) == 4
+            assert lw[1:] == tw[1:] and lw[0] != tw[0]    # tail kept
+            assert L['typed'] == tw[0]
         elif L['kind'] == 'wordW':
             lw, tw = L['label'].split(), L['target'].split()
             assert _CE_SYMBOL in lw[0], "the head WORD spans the ★ (ce stops; cE crosses)"
-            assert lw[1] == tw[1], "context kept"
-            assert L['typed'] == tw[0] and len(L['typed']) == 4
+            assert lw[1:] == tw[1:], "context kept"
+            assert L['typed'] == tw[0]
             assert _CE_SYMBOL not in tw[0], "the target head is plain"
         elif L['kind'] == 'bracket':
-            lw, tw = L['label'].split(), L['target'].split()
+            lw = L['label'].split()
             assert lw[0].startswith('(') and ')' in lw[0], "a bracketed head"
-            assert lw[1] == tw[1], "context kept"
-            stem = lw[0].split(')', 1)[1]                  # '(co)il' → 'il'
-            assert tw[0] == L['typed'] + stem, "c% swaps only the bracket span"
+            stem = lw[0].split(')', 1)[1]                  # '(al)gether' → 'gether'
+            assert L['target'] == L['typed'] + stem, "c% swaps only the bracket span"
             assert len(L['typed']) == 2
         else:
             assert L['label'].startswith(_CE_PLACEHOLDER)
-            tw = L['target'].split()
-            assert L['typed'] == tw[0][:2] and len(L['typed']) == 2
-            assert L['label'].split()[1] == tw[1]         # context kept
+            assert L['typed'] == L['target'][:2] and len(L['typed']) == 2
+            assert L['target'][2:] == L['label'][1:], "the fused head hides 2 letters"
 
 
-@pytest.mark.parametrize("seed", SEEDS)
-def test_doors_independent(seed):
-    """Distinct words guarantee it: no target is a substring of another target
-    or of any label, so each change opens exactly its own bolt."""
-    lessons = _ce_pick(random.Random(seed))
+def test_doors_independent():
+    """No target is a substring of another target or of any label, so each
+    change opens exactly its own bolt (fixed texts — checked once)."""
+    lessons = _ce_pick(random.Random(0))
     targets = [L['target'] for L in lessons]
     labels = [L['label'] for L in lessons]
     for i, t in enumerate(targets):
@@ -249,20 +255,15 @@ def test_doors_independent(seed):
 
 
 def test_s_doors_resist_cheap_old_tool_edits():
-    """The S/C-forcing margin is a single key (budget = par + SAVING - 1), so an
-    S door whose wrong/right words are SIMILAR could be rewritten more cheaply
-    than `cc`/`S` with an already-known tool (a `r`, a count-`s`, or a shared
-    prefix/suffix change). That alone clears the door for under a key and—since
-    the margin is exactly one—lets a player beat the hall WITHOUT ever pressing S
-    or C (replay-confirmed on the old generator, e.g. seed 1349's `strobe`→`strong`
-    via `4l2sng`). `_draw_whole_line_pair` forbids it: each S-door pair differs in
-    the first AND last char and in >= 4 positions, so the cheapest old-tool rewrite
-    is `{6}s` = `cc`'s cost, never less. Scanned WIDE (not just the 5 SEEDS)."""
-    for seed in range(1000):
-        for L in _ce_pick(random.Random(seed)):
-            if L['kind'] == 'sline':
-                assert _whole_line_dissimilar(L['label'], L['target']), \
-                    (seed, L['label'], L['target'])
+    """The S/C-forcing margin is a single key (budget = par + SAVING − 1), so
+    an S door whose wrong/right words were SIMILAR could fall to r/count-s for
+    under the shorthand. The fixed pairs differ in the first AND last char and
+    in >= 4 positions, so the cheapest old-tool rewrite is `{6}s` = `cc`'s
+    cost, never less."""
+    for L in _ce_pick(random.Random(0)):
+        if L['kind'] == 'sline':
+            assert _whole_line_dissimilar(L['label'], L['target']), \
+                (L['label'], L['target'])
 
 
 @pytest.mark.parametrize("seed", SEEDS)
@@ -347,17 +348,17 @@ def test_c_door_keeps_the_prefix(seed, monkeypatch):
 
 
 @pytest.mark.parametrize("seed", SEEDS)
-def test_plaques_survive_every_change(seed, monkeypatch):
-    """The west-wall plaque is untouched by the floor edits: after the whole
-    route (every kind of edit) each plaque still reads its original target."""
+def test_stone_prefixes_survive_every_change(seed, monkeypatch):
+    """The carved saying prefixes are untouched by the floor edits: after the
+    whole route (every kind of edit) each still reads across the stone."""
     dungeon = build_dungeon_change_extension(seed)
     room = dungeon.rooms[0]
-    want = {r: room.char_run_at(r, _CE_PLQ_COL).symbols for r in _CE_LESSON_ROWS}
+    def stones():
+        return sorted((ru.row, ru.col, ru.symbols)
+                      for ru in room.char_runs if ru.kind == 'verdant')
+    want = stones()
     _drive(dungeon, _change_keys(room._ce_lessons), monkeypatch)
-    for r in _CE_LESSON_ROWS:
-        plq = room.char_run_at(r, _CE_PLQ_COL)
-        assert plq is not None and plq.symbols == want[r], \
-            f"plaque on row {r} was disturbed by an edit"
+    assert stones() == want, "a carved prefix was disturbed by an edit"
 
 
 @pytest.mark.parametrize("seed", SEEDS)
