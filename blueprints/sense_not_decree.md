@@ -38,15 +38,18 @@ plunder-tally (11/12 gift lines). 37's C3 = veni/vidi/vici +
 live/laugh/love (fixed, cures typed by heart; the vidi strand returns at
 the Grandmaster — deliberate callback).
 
-**REMAINING (next session): the change levels 22 (c/s) · 23 (S/C) · 25
-(R).** Blocker solved on paper, build pending: their length-progression
-forcing needs typed cures of len 10/12/14, which no proverb word supplies —
-use FAMOUS HYPHENATED EXPRESSIONS as the long cE doors (well-to-do /
-up-to-date 10 · hand-in-hand / never-ending 12 · merry-go-round /
-happy-go-lucky / helter-skelter / lost-and-found 14; misspelled on the
-floor, retyped by heart), and whole-proverb rows (anchor law) for the
-short word doors. Each is a full re-derivation: volume forcing, budget =
-par + SAVING − 1, dissimilarity laws superseded by fixed misquotes.
+**Change levels SHIPPED 2026-07-19 (second pass)**: 22 Change Annex (fixed
+door table `_WLA_DOORS`; carved saying prefixes in the west stone replace
+the decree plaques; the long cE doors are SCRAMBLED FAMOUS COMPOUNDS —
+to-do-well / ending-never road / round-go-merry ride, each with a kept
+tail word barring the ce+retype substring false-open; rune doors = saves
+◆ne → ni, makes ◆rfect → pe; par 106→101), 23 Change Extension (`_CE_DOORS`
+— the S→C alignment law holds because every S cure is exactly 6 letters:
+policy/golden/grease; ceol = kept 4-letter floor word + junk tail → C
+news/tell/words; ★-scars ir★n / co★ks; ◆ep→deep, ◆ord→sword; (al)gether →
+c% to; par computed 86), 25 Overwrite Halls (`_OH_LESSONS` — floor
+last-words rotted: believing/waste/earned/twice/silver; the corrupt
+positions preserve the F-anchored landing chain, par 30 intact).
 
 ## 7. Grandmaster's Sanctum strands — SHIPPED 2026-07-19 (see header).
 Explore later: gallery-bay targets (the proving gallery) joining the
