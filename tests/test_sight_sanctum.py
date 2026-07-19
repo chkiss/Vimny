@@ -33,8 +33,8 @@ from engine.search import _match_positions
 from content.levels import known_commands
 from generation.dungeon_gen import (
     build_dungeon_sight_sanctum,
-    _SS_ROWS, _SS_COLS, _SS_SPINE, _SS_BAY_W, _SS_BAY_E,
-    _SS_PLQ_COL, _SS_GATE, _SS_BOLT0, _SS_EXIT, _SS_PAR, _ss_answer,
+    _SS_ROWS, _SS_COLS, _SS_SPINE, _SS_BAY_W, _SS_BAY_E, _SS_SPAWN,
+    _SS_GATE, _SS_BOLT0, _SS_EXIT, _SS_PAR, _ss_answer,
 )
 from tests import SEEDS, cached_room
 
@@ -60,23 +60,24 @@ def _letters(room):
 
 
 # The canonical tape (== room.answer with Esc placed): select first, act
-# second — anchor-aligned down the light shaft, so every hop is a plain
-# {n}j. 33 keys, letters drawn per seed.
+# second — the spawn drops onto the first blight, anchor-aligned down the
+# light shaft, so every hop is a plain {n}j. Letters drawn per seed.
 def _canon_keys(room):
     a, b, x = _letters(room)
-    return (_K(f'jelv2jt{a}d') + _K(f'4jv2jt{b}c') + _K('s') + [ESC]
+    return (_K(f'jv2jt{a}d') + _K(f'4jv2jt{b}c') + _K('s') + [ESC]
             + _K('4jvje~') + _K('3jv') + _K(f'/{x}\r') + _K('hd') + _K('G$'))
 
 
 # The leanest old-only rival (cheese-audited): middle blight rows are never
 # cleared — doors check only the target rows — so no dd at all: D for heads,
-# ^dt{ch} for tails, i+s for the typed cure, count-~ for the case words.
+# ^dt{ch} for tails, i+s for the typed cure, count-~ for the flipped spans.
 # Wins — inside the standard budget — but over par: 1 star.
 def _piecewise_rival_keys(room):
     a, b, x = _letters(room)
-    return (_K(f'jelD2j^dt{a}') + _K('el2jD') + _K('is') + [ESC]
-            + _K(f'2j^dt{b}') + _K('el2j5~j^6~') + _K(f'hh2jD2j^dt{x}')
-            + _K('G$'))
+    _g1, f1, f2, _g2 = room._ss_words['case']
+    return (_K(f'jD2j^dt{a}') + _K('4l2jD') + _K('is') + [ESC]
+            + _K(f'2j^dt{b}') + _K(f'4l2j{len(f1)}~j^{len(f2)}~')
+            + _K(f'hh2jD2j^dt{x}') + _K('G$'))
 
 
 def _drive(dungeon, keys, monkeypatch, finish=':wq\r', name='Scribe'):
@@ -112,7 +113,7 @@ def _drive_spent(keys, monkeypatch, seed=0):
 def test_layout_and_identity(seed):
     room = _room(seed)
     assert (room.rows, room.cols) == (_SS_ROWS, _SS_COLS)
-    assert room.spawn_pos == (2, _SS_SPINE)
+    assert room.spawn_pos == _SS_SPAWN
     assert room.exit_pos == _SS_EXIT
     exit_ent = next(e for e in room.entities if e.kind == 'exit')
     assert (exit_ent.row, exit_ent.col) == _SS_EXIT and exit_ent.edit_immune
@@ -164,7 +165,7 @@ def test_bolt_opens_the_instant_the_strike_lands(monkeypatch):
     dungeon = build_dungeon_sight_sanctum(0)
     room = dungeon.rooms[0]
     a, _b, _x = _letters(room)
-    _drive(dungeon, _K(f'jelv2jt{a}d'), monkeypatch, finish=':q!\r')
+    _drive(dungeon, _K(f'jv2jt{a}d'), monkeypatch, finish=':q!\r')
     assert room.cells[_bolt(0)[0]][_bolt(0)[1]] == CellType.FLOOR
 
 
@@ -175,32 +176,22 @@ def test_seal_initial_is_pristine_level_wide(seed):
     search skips — so /{x}⏎ has one landing."""
     room = _room(seed)
     _a, _b, x = _letters(room)
-    s_tail = room._ss_words['seal'][1]
     positions = _match_positions(room, x)
     from generation.dungeon_gen import _SS_TAIL0
     # every floor match lives inside the tail itself (the initial may recur
-    # within its own word — /{x}⏎ still lands on the head), none elsewhere
+    # within its own text — /{x}⏎ still lands on the head), none elsewhere
     assert positions and positions[0] == (16, _SS_TAIL0), (x, positions)
     assert all(r == 16 and c >= _SS_TAIL0 for r, c in positions), (x, positions)
-    # and the wall copy exists but is not a landing
-    assert any(ru.col == _SS_PLQ_COL and ''.join(ru.symbols) == s_tail
-               for ru in room.char_runs), "the plaque carries the true word"
 
 
 @pytest.mark.parametrize("seed", SEEDS)
-def test_case_plaques_carry_the_full_reading(seed):
-    """The plaque IS the row's whole true text — guard words included (a
-    one-word plaque beside a two-word row made no sense; playtest)."""
+def test_case_rows_read_flanks_sound_and_middles_flipped(seed):
+    """The saying's middle segments stand UPPER between lowercase flanks —
+    and the whole reading is the saying, split across the two rows."""
     room = _room(seed)
-    gw, w1, w2, ge = room._ss_words['case']
-    plq = {}
-    for ru in room.char_runs:
-        if not room.is_passable(ru.row, ru.col):
-            plq.setdefault(ru.row, []).append(ru)
-    def reading(row):
-        return ' '.join(''.join(ru.symbols) for ru in sorted(plq[row], key=lambda r: r.col))
-    assert reading(11) == f'{gw} {w1}'
-    assert reading(12) == f'{w2} {ge}'
+    g1, f1, f2, g2 = room._ss_words['case']
+    assert main._wla_floor_text(room, 11).strip() == f'{g1} {f1.upper()}'
+    assert main._wla_floor_text(room, 12).strip() == f'{f2.upper()} {g2}'
 
 
 def test_no_chest_in_the_sanctum():
@@ -315,13 +306,13 @@ def test_half_cleared_chamber_stays_shut(monkeypatch):
     still buried) leaves the bolt barred."""
     dungeon = build_dungeon_sight_sanctum(0)
     room = dungeon.rooms[0]
-    _drive(dungeon, _K('jelD'), monkeypatch, finish=':q!\r')
+    _drive(dungeon, _K('jD'), monkeypatch, finish=':q!\r')
     assert room.cells[_bolt(0)[0]][_bolt(0)[1]] == CellType.WALL
 
 
 def test_linewise_case_toggle_is_a_dead_route(monkeypatch):
-    """The Case chamber's guard words: g~j flips 'dim' and 'ash' too, so the
-    whole-lines toggle reads false — per-row charwise v~ is the only cure."""
+    """The Case chamber's flanks: g~j flips the sound flanking words too, so
+    the whole-lines toggle reads false — per-row charwise v~ is the cure."""
     dungeon = build_dungeon_sight_sanctum(0)
     room = dungeon.rooms[0]
     _drive(dungeon, _K('9jg~j'), monkeypatch, finish=':q!\r')
@@ -335,7 +326,7 @@ def test_visual_case_toggle_spares_the_guard_words(monkeypatch):
     dungeon = build_dungeon_sight_sanctum(0)
     room = dungeon.rooms[0]
     a, b, _x = _letters(room)
-    _drive(dungeon, _K(f'jelv2jt{a}d') + _K(f'4jv2jt{b}c') + _K('s') + [ESC]
+    _drive(dungeon, _K(f'jv2jt{a}d') + _K(f'4jv2jt{b}c') + _K('s') + [ESC]
            + _K('4jvje~'), monkeypatch, finish=':q!\r')
     assert room.cells[_bolt(2)[0]][_bolt(2)[1]] == CellType.FLOOR
 
@@ -345,9 +336,9 @@ def test_spine_detour_nav_costs_more_than_par(monkeypatch):
     instead of the light shaft loses to the tape — par IS the cheapest nav."""
     room = _room(0)
     a, b, x = _letters(room)
-    spine_variant = (_K(f'jelv2jt{a}d') + _K('04jel') + _K(f'v2jt{b}c') + _K('s')
-                     + [ESC] + _K('04jww') + _K('vje~') + _K('03jel')
-                     + _K('v') + _K(f'/{x}\r') + _K('hd') + _K('G$'))
+    spine_variant = (_K(f'jv2jt{a}d') + _K(f'4jv2jt{b}c') + _K('s')
+                     + [ESC] + _K('04j17l') + _K('vje~') + _K('3jv')
+                     + _K(f'/{x}\r') + _K('hd') + _K('G$'))
     won, spent = _drive_spent(spine_variant, monkeypatch)
     assert won and spent > _SS_PAR, (won, spent)
 

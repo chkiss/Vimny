@@ -3121,127 +3121,175 @@ def build_dungeon_word_forge(seed: int) -> Dungeon:
 # Blight rows that must survive in part carry their kept word at the row EDGE
 # (head at line start, tail at line end) — middle rows of a charwise
 # multi-row span are always consumed whole, so nothing kept may live there.
-_SS_ROWS, _SS_COLS = 20, 30
-_SS_SPINE  = 13                     # every row's first standable (the jump audit)
-_SS_BAY_W  = 14                     # bay floor cols 14..28; east wall 29
-_SS_BAY_E  = 28
-_SS_PLQ_COL = 2                     # the full true readings, in the WEST wall
-                                    # band (cols 2..11 — wide enough for the
-                                    # Case chamber's two-word rows)
-_SS_TEXT0  = 15                     # floor words start two east of the spine
-_SS_SHAFT  = 19                     # the sight-line: a one-cell light shaft
-                                    # through each bay separator at the anchor
-                                    # column, so the plain j-hop (4j/3j) rides
-                                    # straight from strike to next anchor (the
+_SS_ROWS, _SS_COLS = 20, 46
+_SS_SPINE  = 2                      # every row's first standable (the jump audit)
+_SS_BAY_W  = 3                      # bay floor cols 3..43; east wall 44
+_SS_BAY_E  = 43
+_SS_TEXT_MIN = 3                    # earliest col a saying may start
+_SS_BLIGHT0 = 15                    # middle/tail rows' blight starts here
+_SS_SHAFT  = 19                     # the sight-line — AND the anchor: every
+                                    # head ends at 18, every head-row blight
+                                    # starts here; a one-cell light shaft
+                                    # through each bay separator at this
+                                    # column rides the plain j-hops (the
                                     # spine stays every row's first standable)
 _SS_SHAFT_ROWS = (6, 10, 13)        # the bay separators it pierces
 _SS_THROAT = 17                     # spine-only row joins the bays to the gate
 _SS_GATE   = 18
-_SS_BOLT0  = 14                     # bolts cols 14..17, one per chamber
-_SS_EXIT   = (18, 18)               # the FINAL SEAL — stone until all read true
-_SS_TAIL0  = 24                     # tail words sit at the row end, after 9 blight
+_SS_BOLT0  = 3                      # bolts cols 3..6, one per chamber
+_SS_EXIT   = (18, 7)                # the FINAL SEAL — stone until all read true
+_SS_TAIL0  = 29                     # tail words sit at the row end (blight 15..28)
+_SS_SPAWN  = (2, 19)                # over the first blight: j drops onto it
 
+# SENSE, NOT DECREE (blueprints/sense_not_decree.md §2): every chamber is a
+# famous saying INTERRUPTED by a rot-span. The Cut/Word/Seal chambers keep
+# the saying's opening words at the head row's edge and its remainder at the
+# tail row's edge — the strike removes exactly the rot, and the saying
+# stands complete, split across two carved lines. The Word chamber's head is
+# the saying missing one final 's' (the typed cure); the Case chamber is a
+# saying whose MIDDLE words are case-mangled between sound flanks. No west
+# plaques: the player knows the readings by heart.
+#
 # The canonical tape (hand-measured, driven — the buffer mutates, so no
-# Dijkstra). The chambers are ANCHOR-ALIGNED at the shaft column: heads are
-# exactly 4 letters, so `e l` lands the anchor and every op leaves the cursor
-# where the next bay's plain j-hop lands on the next anchor — no {n}G / } /
-# H-M-L golf can undercut the tape (the nav-golf audit, driven):
-#   j e l   v 2j t{a} d    — Cut:   9   (cursor → the anchor)
-#   4j      v 2j t{b} c s  — Word:  9   (post-Esc cursor → the anchor)
+# Dijkstra). The chambers are ANCHOR-ALIGNED at the shaft column: the spawn
+# drops onto the first blight, and every op leaves the cursor where the
+# next bay's plain j-hop lands on the next anchor:
+#   j       v 2j t{a} d    — Cut:   7
+#   4j      v 2j t{b} c s  — Word:  9   (post-Esc cursor → the Case anchor)
 #   4j      v j e ~        — Case:  6   (cursor → selection start)
-#   3j      v /{x}⏎ h d    — Seal:  7
+#   3j      v /{x}⏎ h d    — Seal:  7   (the search Enter spends nothing)
 #   G $                    — exit:  2
-_SS_PAR = 33
+_SS_PAR = 31
+
+# Case chamber pool: (west flank, flip 1, flip 2, east flank) — the middle
+# two segments stand case-mangled. Flip 2 is laid at _SS_BLIGHT0 and must
+# END at col 19..21 (len 6-8: the v j landing sits strictly inside it, so
+# `e` stops at ITS end, west of the east flank).
+# (flip 2 is exactly 6 CELLS so the rival's count-~ and its h-walk back to
+# the shaft stay seed-invariant inside the standard budget)
+_SS_CASE_POOL = (
+    ('actions', 'speak', 'louder', 'than words'),
+    ('all that', 'glitters', 'is not', 'gold'),
+)
+# Word chamber pool: (head missing its final s, the rest) — the typed cure
+# is the single 's' that mends the saying.
+_SS_WORD_POOL = (
+    ('many hand', 'make light work'),
+    ('no new', 'is good news'),
+    ('still water', 'run deep'),
+)
 
 
 def _ss_answer(words: dict) -> str:
     a = words['cut'][1][0]        # the Cut tail's initial (t{a})
     b = words['word'][1][0]       # the Word tail's initial (t{b})
     x = words['seal'][1][0]       # the Seal tail's pristine initial (/{x})
-    return f'j e l v 2j t{a} d 4j v 2j t{b} c s 4j v j e ~ 3j v /{x}⏎ h d G $'
+    return f'j v 2j t{a} d 4j v 2j t{b} c s 4j v j e ~ 3j v /{x}⏎ h d G $'
+
+
+def _ss_splits(saying_words, head_cap=16, tail_cap=15):
+    """All (head, tail) splits of a saying that fit the anchored geometry:
+    head right-aligns to end at col 18, tail starts at _SS_TAIL0."""
+    out = []
+    for k in range(1, len(saying_words)):
+        head = ' '.join(saying_words[:k])
+        tail = ' '.join(saying_words[k:])
+        if len(head) <= head_cap and len(tail) <= tail_cap:
+            out.append((head, tail))
+    return out
 
 
 def _ss_draw_words(rng) -> dict:
-    """Draw the chamber vocabulary. Slot LENGTHS are fixed (they pin par and
-    the rival's count-~ costs); the words vary per seed. Constraints:
-      • all words pairwise distinct, and the Word chamber's cure (stem+'s')
-        distinct from everything;
-      • the Seal tail's INITIAL appears in no other drawn word (nor in the
-        typed 's') — the pristine search anchor, /{x}⏎ has one landing."""
-    _load_vocab_tables()
+    """Draw the chambers' sayings. The Case and Word chambers draw from
+    their fixed-split pools; the Cut chamber takes any fitting split of a
+    fresh saying; the Seal draws LAST, filtered so its tail's INITIAL
+    appears in no other laid letter (nor the decoys nor the typed 's') —
+    the pristine search anchor, /{x}⏎ has one landing."""
+    from content import proverbs as _pv
 
-    def pool(length):
-        return [w for w in _VOCAB_PLAIN_BY_LEN.get(length, ())
-                if w.isalpha() and w == w.lower()]
-
-    for _ in range(80):
-        picks: list = []
-
-        def draw(length):
-            w = rng.choice(pool(length))
-            picks.append(w)
-            return w
-
-        a_head, a_tail = draw(4), draw(4)     # Cut: head / tail
-        stem,  b_tail  = draw(4), draw(4)     # Word: stem (+'s') / tail
-        gw, w1 = draw(3), draw(5)             # Case: west guard · flipped word
-        w2, ge = draw(6), draw(3)             # Case: flipped word · east guard
-        s_head = draw(4)                      # Seal: head
-        if len(set(picks + [stem + 's'])) != len(picks) + 1:
-            continue                          # a collision — redraw everything
-        used = set(''.join(picks)) | {'s'}
-        cands = [w for w in pool(4) + pool(5)
-                 if w[0] not in used and w not in picks]
-        if not cands:
+    for _ in range(200):
+        case = rng.choice(_SS_CASE_POOL)
+        word = rng.choice(_SS_WORD_POOL)
+        used_texts = {' '.join(case), f"{word[0]}s {word[1]}"}
+        cut_cands = []
+        for w in _pv.PLAIN:
+            if any(t in ' '.join(w) or ' '.join(w) in t for t in used_texts):
+                continue
+            cut_cands += [(w, s) for s in _ss_splits(w)]
+        if not cut_cands:
             continue
-        s_tail = rng.choice(cands)            # Seal: the pristine-initial tail
-        return {'cut': (a_head, a_tail), 'word': (stem, b_tail),
-                'case': (gw, w1, w2, ge), 'seal': (s_head, s_tail)}
-    raise ValueError('sight_sanctum: no pristine seal word after 80 draws')
+        cut_w, cut = rng.choice(cut_cands)
+        a, b = cut[1][0], word[1][0]           # the t-target initials
+        used = set(''.join(case) + ''.join(word) + ''.join(cut)) | {a, b, 's'}
+        used.discard(' ')
+        seal_cands = []
+        for w in _pv.PLAIN:
+            if w == cut_w or any(' '.join(w) in t or t in ' '.join(w)
+                                 for t in used_texts):
+                continue
+            seal_cands += [s for s in _ss_splits(w)
+                           if s[1][0] not in used and s[1][0] not in s[0]]
+        if not seal_cands:
+            continue
+        seal = rng.choice(seal_cands)
+        targets = [cut[0], cut[1], word[0] + 's', word[1],
+                   f'{case[0]} {case[1]}', f'{case[2]} {case[3]}',
+                   seal[0], seal[1]]
+        if len(set(targets)) != len(targets):
+            continue
+        return {'cut': cut, 'word': word, 'case': case, 'seal': seal}
+    raise ValueError('sight_sanctum: no pristine seal saying after 200 draws')
 
 
 def _ss_chambers(words: dict):
     """The chamber table for this seed: (name, bay rows, floor runs, door
     targets). Blight is '#'; two DECOYS of each t-target's initial sit in the
     rows the t-motion never scans (t is row-local; / is buffer-wide and pays
-    an n per decoy — pricing out the lazy one-char search). Kept words live
-    only at row EDGES: charwise multi-row middles are always consumed whole."""
-    t0, an, tl = _SS_TEXT0, _SS_SHAFT, _SS_TAIL0
+    an n per decoy — pricing out the lazy one-char search). Kept text lives
+    only at row EDGES: charwise multi-row middles are always consumed whole.
+    Multi-word texts are laid one run per word by the builder."""
+    b0, an, tl = _SS_BLIGHT0, _SS_SHAFT, _SS_TAIL0
     a_head, a_tail = words['cut']
-    stem,  b_tail  = words['word']
-    gw, w1, w2, ge = words['case']
+    w_head, w_tail = words['word']
+    g1, f1, f2, g2 = words['case']
     s_head, s_tail = words['seal']
-    a, b = a_tail[0], b_tail[0]
+    a, b = a_tail[0], w_tail[0]
+
+    def head_at(text):
+        return an - 1 - len(text)              # right-aligned, ends col 18
+
     return (
-        # Cut (v 2j t{a} d): head at row start, tail at row end, full middle
+        # Cut (v 2j t{a} d): the saying's opening at the head row's edge,
+        # its remainder at the tail row's end, rot between
         ('cut',  (3, 4, 5),
-         ((3, t0, a_head), (3, an, f'##{a}###{a}###'),
-          (4, t0, f'#####{a}###{a}####'),
-          (5, t0, '#' * 9), (5, tl, a_tail)),
+         ((3, head_at(a_head), a_head), (3, an, f'##{a}###{a}###'),
+          (4, b0, f'#####{a}###{a}####'),
+          (5, b0, '#' * 14), (5, tl, a_tail)),
          (a_head, a_tail)),
-        # Word (v 2j t{b} c s): kept head stem, the cure is TYPED — stem+'s'.
-        # The 4-letter head puts the anchor ON the shaft column, and the
-        # post-Esc cursor lands on the Case anchor
+        # Word (v 2j t{b} c s): the head is the saying missing one 's' —
+        # the cure is TYPED at the anchor and fuses onto the head
+        # the word head ends flush at 18 (no gap): the typed 's' at the
+        # anchor fuses onto it — 'still water'+'s'
         ('word', (7, 8, 9),
-         ((7, t0, stem), (7, an, f'##{b}#####{b}#'),
-          (8, t0, f'######{b}#######'),
-          (9, t0, '#' * 9), (9, tl, b_tail)),
-         (stem + 's', b_tail)),
-        # Case (v j e ~): two flipped words with GUARD words outside the
-        # span — the west guard before the anchor (top row toggles
-        # anchor→line end), the east guard past the cursor (bottom row
-        # toggles line start→cursor). The linewise g~j flips the guards too
-        # and reads false: per-row charwise ~ is forced.
+         ((7, head_at(w_head) + 1, w_head), (7, an, f'##{b}#####{b}#'),
+          (8, b0, f'######{b}#######'),
+          (9, b0, '#' * 14), (9, tl, w_tail)),
+         (w_head + 's', w_tail)),
+        # Case (v j e ~): the saying's middle two segments stand flipped
+        # between sound flanks — the west flank before the anchor (top row
+        # toggles anchor→line end), the east flank past the cursor (bottom
+        # row toggles line start→cursor). The linewise g~j flips the flanks
+        # too and reads false: per-row charwise ~ is forced.
         ('case', (11, 12),
-         ((11, t0, gw), (11, an, w1.upper()),
-          (12, t0, w2.upper()), (12, t0 + 7, ge)),
-         (f'{gw} {w1}', f'{w2} {ge}')),
+         ((11, head_at(g1), g1), (11, an, f1.upper()),
+          (12, b0, f2.upper()), (12, b0 + len(f2) + 1, g2)),
+         (f'{g1} {f1}', f'{f2} {g2}')),
         # Seal (v /{x}⏎ h d): the tail's initial is pristine level-wide —
         # the one named thing; name what you see
         ('seal', (14, 15, 16),
-         ((14, t0, s_head), (14, an, '#' * 10),
-          (15, t0, '#' * 14),
-          (16, t0, '#' * 9), (16, tl, s_tail)),
+         ((14, head_at(s_head), s_head), (14, an, '#' * 10),
+          (15, b0, '#' * 17),
+          (16, b0, '#' * 14), (16, tl, s_tail)),
          (s_head, s_tail)),
     )
 
@@ -3280,25 +3328,24 @@ def build_dungeon_sight_sanctum(seed: int) -> Dungeon:
     doors = []
     for i, (_name, _rows, runs, targets) in enumerate(chambers):
         for rr, cc, text in runs:
-            room.char_runs.append(CharRun(rr, cc, tuple(text), 'ancient'))
-        doors.append((targets, _SS_BOLT0 + i))
-        # the plaque carries the row's FULL true reading (multi-word rows
-        # split into one run per word — a literal space glyph is a
-        # punctuation "word" and would render a floor-looking gap)
-        plaque_rows = (_rows[0], _rows[-1])
-        for pr, ptext in zip(plaque_rows, targets):
-            col = _SS_PLQ_COL
-            for part in ptext.split(' '):
-                room.char_runs.append(CharRun(pr, col, tuple(part), 'verdant'))
+            # one run per word — a literal space glyph is a punctuation
+            # "word" and would break w/e and the strip
+            col = cc
+            for part in text.split(' '):
+                if part:
+                    room.char_runs.append(CharRun(rr, col, tuple(part),
+                                                  'ancient'))
                 col += len(part) + 1
+        doors.append((targets, _SS_BOLT0 + i))
     room._ss_doors = tuple(doors)
     room._ss_words = words
     # no lintel: floating carved words over the spawn read as a locked door
     # (playtest 2026-07-12) — the credo lives in the intro hint instead
 
+    cells[_SS_SPAWN[0]][_SS_SPAWN[1]] = CellType.FLOOR   # the drop-in
     room.entities.append(Entity(kind='exit', row=_SS_EXIT[0], col=_SS_EXIT[1],
                                 edit_immune=True))
-    room.spawn_pos = (2, _SS_SPINE)
+    room.spawn_pos = _SS_SPAWN
     room.exit_pos  = _SS_EXIT
 
     room.rebuild_indexes()

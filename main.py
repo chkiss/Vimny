@@ -2640,7 +2640,7 @@ _LEVEL_INTROS = {
     'alignment_halls':     ('The Alignment Halls — a plumb line falls through the hall, and every word has slid from its station. The plaques remember where each belongs.', 70),
     'indentation_sanctum': ('The Indentation Sanctum — the law presides from the lintel, and the verses below have slid from their stations.', 70),
     'sentence_corridor': ('The Sentence Corridor — two verses parted by still water, and a mist that clings to the pool. The far shore reads clear, but you can\'t reliably jump to the far wall from here.', 70),
-    'sight_sanctum': ('The Sight Sanctum — the rot here spreads in ragged patches no single stroke can span. The keepers of this place had one law: first behold, then strike.', 70),
+    'sight_sanctum': ('The Sight Sanctum — old sayings interrupted mid-breath by rot no single stroke can span. You know how each one should finish. The keepers of this place had one law: first behold, then strike.', 70),
     'selection_halls': ('The Selection Halls — a gallery of corrupt panels: some rotted whole lines at a time, some down a single seam. The restorers here took each span in one grasp.', 70),
     'word_enclosure': ('The Word Enclosure — old sayings hang in these bays, every one spoken wrong. You know how they truly run. The wardens here did not aim their cuts; they named the shape, and the shape was taken whole.', 70),
     'bracket_enclosure': ('The Bracket Enclosure — a jeweller\'s gallery: old sayings carved with a stone in a setting, and every stone has gone bad. You know each saying by heart; no two doors ask alike.', 70),
