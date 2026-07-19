@@ -8194,81 +8194,80 @@ def build_dungeon_spellwrights_forge(seed: int) -> Dungeon:
 
 
 # ── The Refrain Vault (display 42) — repeats + remote yank: & :&& :j :y ──────
-# A walkable scriptorium under a small chasm. Rows of verses carry one blight
-# word; the first mend is spoken in full (:s/{b}/{c}/g on the triple-blighted
-# desk you wake at), then & repeats it line by line and :&& (flags kept)
-# clears the second triple. THREE protected verdant lines carrying the SAME
-# blight word stand scattered BETWEEN the blighted rows: :%s / g& / :g//s all
-# mend them too (door fails), and no contiguous :{a},{b}s can cover every
-# blight while missing every protected line — the repeat family wins by PAR.
-# Above the water course, the vault's colophon lies broken across two misted
-# chasm lines: :1,2j mends it, :1y carries it, p lays it in the hall (a
-# :t/:m ferry of the chasm line arrives still misted — impassable stone that
-# can never satisfy the door's on-the-floor demand; only the yank serves).
-_RV_ROWS, _RV_COLS = 14, 60
+# LONDON BRIDGE IS FALLING DOWN (public domain, known to all, one search
+# away for the rest). The scribe wrote the falling verses WRONG — "falling
+# up" — while the build and key verses keep "up" RIGHTLY ("Build it up…",
+# "Take the key and lock her up…"): a blanket :%s/up/down/g wrecks them
+# self-evidently, and no contiguous range covers both falling verses while
+# sparing the middle. So: one full :s/up/down/g on the double line you wake
+# at, then RANGED :&& over each falling verse while the /g is fresh (a
+# plain & resets the remembered flags, Vim-faithful). Above the water the
+# torn final line lies in the mist — "my fair" / "lady." — :1j mends it,
+# :1y carries it, p lays it where the reprise goes without one (a :t of
+# the chasm line arrives still misted: text off the floor never serves).
+_RV_ROWS, _RV_COLS = 21, 60
 _RV_CTX  = 8                          # chasm band head col
-_RV_BAND = (8, 41)                    # misted colophon band, rows 1-2
+_RV_BAND = (8, 42)                    # misted torn-line band, rows 1-2
 _RV_WTR  = 3                          # the water course (sight-line)
-_RV_TX   = 4                          # workroom text head col
-_RV_WORK = (4, 12)                    # walkable verse rows
-_RV_PROTECTED = (4, 7, 10)            # verdant, blight word KEPT
-_RV_MULTI     = (5, 11)               # triple-blight rows (B1 = spawn, B2)
-_RV_SINGLE    = (6, 8, 9)             # one blight each — the & chain
-_RV_FILLER    = 12                    # a clean closing verse (the seal row)
+_RV_TX   = 4                          # song text head col
+_RV_SONG = (4, 18)                    # the carved song, one line per row
+_RV_CORRUPT = (4, 5, 6, 16, 17, 18)   # the falling verses, written "up"
+_RV_SEAL_ROW  = 19                    # the blank walk below the song
 _RV_SEAL_COL  = 49
 _RV_CHEST_COL = 53
 _RV_EXIT_COL  = 57
-# A plain & resets the remembered flags (Vim-faithful), so the OTHER triple
-# is mended by RANGED :5&& while the /g is still fresh — before the & chain.
-# The spawn desk is B2 (row 11): the :5&& park carries the scribe to the top
-# of the chain, and the singles fall to plain & on the way back down.
-_RV_PAR    = 37    # :s/{b}/{c}/g(14) :5&&(4) j&(2) 2j&(3) j&(2)
-                   # :1,2j(5) :1y(3) p(1) 3j(2) $(1)
-_RV_BUDGET = 60                       # generous: the longhand roads win 1★
-
-
-def _rv_draw_words(rng):
-    """(b, c, pool): blight, cure, and 23 fillers free of both as substrings."""
-    _load_vocab_tables()
-    p4 = _VOCAB_PLAIN_BY_LEN[4]
-    for _ in range(200):
-        b, c = rng.sample(p4, 2)
-        pool = [w for w in p4 + _VOCAB_PLAIN_BY_LEN[5]
-                if b not in w and c not in w and w not in (b, c)]
-        if len(pool) >= 24:                    # 5 colophon + 6 + 4 + 6 + 3 filler
-            return b, c, rng.sample(pool, 24)
-    raise RuntimeError('refrain vault: vocab too thin')
+# The song as it SHOULD read (the seal's demand; the last line is the torn
+# one — nowhere in the workroom until the player lays it down).
+_RV_TRUE = (
+    'London Bridge is falling down,',
+    'falling down, falling down.',
+    'London Bridge is falling down,',
+    'my fair lady.',
+    'Build it up with wood and clay,',
+    'wood and clay, wood and clay.',
+    'Build it up with wood and clay,',
+    'my fair lady.',
+    'Take the key and lock her up,',
+    'lock her up, lock her up.',
+    'Take the key and lock her up,',
+    'my fair lady.',
+    'London Bridge is falling down,',
+    'falling down, falling down.',
+    'London Bridge is falling down,',
+    'my fair lady.',
+)
+_RV_PAR    = 38    # :s/up/down/g(12) :16,18&&(8) :4,6&&(6)
+                   # :1j(3) :1y(3) 12j(3) p(1) j(1) $(1)
+_RV_BUDGET = 60    # generous: the ranged-:s longhand (~46) wins 1★
 
 
 def build_dungeon_refrain_vault(seed: int) -> Dungeon:
     dungeon = Dungeon(name='The Refrain Vault', seed=seed)
-    rng = random.Random(seed ^ 0x8EF8)
-    b, c, pool = _rv_draw_words(rng)
     R, C = _RV_ROWS, _RV_COLS
 
     cells = [[CellType.WALL] * C for _ in range(R)]
     mist: set = set()
-    for r in (1, 2):                               # the colophon chasm
+    for r in (1, 2):                               # the torn-line chasm
         for col in range(*_RV_BAND):
             cells[r][col] = CellType.FLOOR
             mist.add((r, col))
     for col in range(_RV_CTX, C - 3):              # the water course (sight)
         cells[_RV_WTR][col] = CellType.WATER
         mist.add((_RV_WTR, col))
-    for r in range(*_RV_WORK):
+    for r in range(_RV_SONG[0], _RV_SONG[1] + 1):
         for col in range(2, _RV_SEAL_COL):
             cells[r][col] = CellType.FLOOR         # the workroom
     for col in range(2, _RV_SEAL_COL):
-        cells[_RV_FILLER][col] = CellType.FLOOR    # the seal row
+        cells[_RV_SEAL_ROW][col] = CellType.FLOOR  # the seal row
     for col in range(_RV_SEAL_COL + 1, _RV_EXIT_COL + 1):
-        cells[_RV_FILLER][col] = CellType.FLOOR    # the sealed exit pocket
-    # (_RV_FILLER, _RV_SEAL_COL) stays WALL until _refrain_tick opens it.
+        cells[_RV_SEAL_ROW][col] = CellType.FLOOR  # the sealed exit pocket
+    # (_RV_SEAL_ROW, _RV_SEAL_COL) stays WALL until _refrain_tick opens it.
 
     room = Room(room_type=RoomType.ENTRY, rows=R, cols=C)
     room.cells     = cells
     room.seed      = seed
-    room.spawn_pos = (_RV_MULTI[1], 2)             # the B2 desk (row 11)
-    room.exit_pos  = (_RV_FILLER, _RV_EXIT_COL)
+    room.spawn_pos = (5, 2)                        # the double "falling up" line
+    room.exit_pos  = (_RV_SEAL_ROW, _RV_EXIT_COL)
     room.char_runs = []
 
     def lay(r, col, text, kind):
@@ -8276,44 +8275,27 @@ def build_dungeon_refrain_vault(seed: int) -> Dungeon:
             room.char_runs.append(CharRun(r, col, tuple(wd), kind))
             col += len(wd) + 1
 
-    take = iter(pool)
-    half1 = f'{next(take)} {next(take)} {next(take)}'
-    half2 = f'{next(take)} {next(take)}'
-    lay(1, _RV_CTX, half1, 'ancient')
-    lay(2, _RV_CTX, half2, 'ancient')
-    colophon = f'{half1} {half2}'
-
-    protected, mended = [], []
-    for r in _RV_PROTECTED:
-        t = f'{next(take)} {b} {next(take)}'
-        protected.append(t); lay(r, _RV_TX, t, 'verdant')
-    for r in _RV_MULTI:
-        w1, w2 = next(take), next(take)
-        lay(r, _RV_TX, f'{b} {w1} {b} {w2} {b}', 'ember')
-        mended.append(f'{c} {w1} {c} {w2} {c}')
-    for r in _RV_SINGLE:
-        w1, w2 = next(take), next(take)
-        lay(r, _RV_TX, f'{w1} {b} {w2}', 'ember')
-        mended.append(f'{w1} {c} {w2}')
-    lay(_RV_FILLER, _RV_TX, f'{next(take)} {next(take)} {next(take)}', 'ancient')
+    lay(1, _RV_CTX, 'my fair', 'ancient')          # the torn final line
+    lay(2, _RV_CTX, 'lady.', 'ancient')
+    for i, true_line in enumerate(_RV_TRUE[:-1]):  # the carved song, rows 4..18
+        r = _RV_SONG[0] + i
+        writ = true_line.replace('down', 'up') if r in _RV_CORRUPT else true_line
+        lay(r, _RV_TX, writ, 'ember' if r in _RV_CORRUPT else 'verdant')
 
     room.entities = [
-        Entity(kind='exit',         row=_RV_FILLER, col=_RV_EXIT_COL),
-        Entity(kind='chest_scroll', row=_RV_FILLER, col=_RV_CHEST_COL),
+        Entity(kind='exit',         row=_RV_SEAL_ROW, col=_RV_EXIT_COL),
+        Entity(kind='chest_scroll', row=_RV_SEAL_ROW, col=_RV_CHEST_COL),
     ]
-    room._rv_blight    = b
-    room._rv_protected = tuple(protected)
-    room._rv_mended    = tuple(mended)
-    room._rv_colophon  = colophon
-    room._rv_seal_col  = _RV_SEAL_COL
+    room._rv_true     = _RV_TRUE
+    room._rv_seal_col = _RV_SEAL_COL
 
     room.par    = _RV_PAR
     room.budget = _RV_BUDGET
-    room.answer = (f':set␣nu⏎ :s/{b}/{c}/g⏎ :5&&⏎ j & 2j & j & '
-                   f':1,2j⏎ :1y⏎ p 3j $')
+    room.answer = (':set␣nu⏎ :s/up/down/g⏎ :16,18&&⏎ :4,6&&⏎ '
+                   ':1j⏎ :1y⏎ 12j p j $')
 
     room.rebuild_indexes()
-    pocket = {(_RV_FILLER, col)
+    pocket = {(_RV_SEAL_ROW, col)
               for col in range(_RV_SEAL_COL + 1, _RV_EXIT_COL + 1)}
     room.fog_cells  = set(mist) | pocket
     room.mist_cells = set(mist)

@@ -2646,8 +2646,9 @@ _LEVEL_INTROS = {
                             'reach. Set the numbers before you judge.', 60),
     'shelving_room':       ('The Shelving Room — the verses were shelved blind, across the gap. '
                             'The wall remembers their order.', 60),
-    'refrain_vault':       ('The Refrain Vault — one blight, many verses, three wards that must '
-                            'keep theirs. And the colophon lies broken past the water.', 60),
+    'refrain_vault':       ('The Refrain Vault — the old song is carved wrong where it falls, '
+                            'and right where it builds. Its last line lies torn, past the '
+                            'water.', 60),
     'dummy':               ('Sandbox — all mechanics active. Type :edit to enter editor mode.', 60),
     'archivists_library':  ("The Archivist's Library — the whole catalogue has spilled "
                             'into a single endless line.', 80),
@@ -3623,13 +3624,14 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
         _push('The stanza stands as the wall remembers it. The way opens!')
 
     def _refrain_tick():
-        """The Refrain Vault: re-mist the colophon chasm, then open the seal
-        once every blight is mended (the three protected lines KEEP theirs —
-        exactly three lines may bear the blight word), and the joined colophon
-        stands on walkable floor (a :t/:m'd chasm slab arrives misted and
-        cannot serve)."""
-        mended = getattr(room, '_rv_mended', None)
-        if mended is None:
+        """The Refrain Vault (London Bridge): re-mist the torn-line chasm, then
+        open the seal once the song below the water reads EXACTLY as it should
+        — every "falling up" mended to "falling down", the build and key
+        verses untouched ("up" is TRUE there: a blanket :%s wrecks them), and
+        the torn final line laid down on walkable floor (a :t'd chasm slab
+        arrives misted and cannot serve). Blank rows are ignored."""
+        true_song = getattr(room, '_rv_true', None)
+        if true_song is None:
             return
         wtr = next((r for r in range(room.rows)
                     if any(room.cells[r][cc] == CellType.WATER
@@ -3641,28 +3643,25 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
                             and (r, cc) not in room.fog_cells):
                         room.fog_cells.add((r, cc))
                         room.mist_cells.add((r, cc))
-        if getattr(room, '_rv_seal_col', None) is None:
+        if getattr(room, '_rv_seal_col', None) is None or wtr is None:
             return
-        texts = [_subst.line_text(room, r)[0] for r in range(room.rows)]
-        blight = room._rv_blight
-        if sum(1 for t in texts if blight in t) != len(room._rv_protected):
-            return                              # a blight survives, or a ward fell
-        if not all(any(p in t for t in texts) for p in room._rv_protected):
+        sung = []
+        for r in range(wtr + 1, room.rows - 1):
+            t = _subst.line_text(room, r)[0].strip()
+            if t:
+                sung.append((t, any(room.is_passable(r, cc)
+                                    for cc in range(room.cols))))
+        if [t for t, _ in sung] != list(true_song):
             return
-        if not all(any(m in t for t in texts) for m in mended):
-            return
-        colo = room._rv_colophon
-        if not any(colo in texts[r]
-                   and any(room.is_passable(r, cc) for cc in range(room.cols))
-                   for r in range(room.rows)):
-            return                              # spoken, but not on the floor
+        if not all(on_floor for _, on_floor in sung):
+            return                              # sung, but not on the floor
         sr, sc = room.exit_pos[0], room._rv_seal_col
         if room.cells[sr][sc] == CellType.WALL:
             room.cells[sr][sc] = CellType.FLOOR
         room.fog_cells = {(fr, fc) for (fr, fc) in room.fog_cells
                           if not (fr == sr and fc > sc)}   # unveil the pocket
         room._rv_seal_col = None
-        _push('The refrain rings whole through the vault. The way opens!')
+        _push('The song stands whole, verse for verse. The way opens!')
 
     def _advance_answer(ch: str):
         """Admin karaoke: advance the answer tape by one typed key (Enter passed as the

@@ -140,18 +140,18 @@ are unreachable); single-row ex routes lose on cost naturally.
   `_shelving_tick` re-mists any bare shelf floor (stateless chasm law) and
   re-rights the plaque column after row inserts drag it.
 
-### Level C — SHIPPED 2026-07-18 as The Refrain Vault (display 42)
-- As built: a WALKABLE scriptorium + a two-line colophon chasm. One full
-  `:s/{b}/{c}/g` at the B2 spawn desk, ranged `:5&&` (the park ferries the
-  scribe to the chain top — a plain `&` RESETS the remembered flags,
-  Vim-faithful, so the ranged repeat must fire while /g is fresh), then
-  `j& 2j& j&` down the singles; `:1,2j` mends the colophon (textual
-  `_join_rows` — fog-agnostic, avatar stays put), `:1y` + `p` lay it on the
-  floor. THREE protected verdant lines carrying the blight bar :% / :g / g&
-  outright and their SCATTERING bars any contiguous ranged :s (best mix 39
-  vs par 37). A :t/:m'd chasm slab arrives still misted — off the floor, it
-  never satisfies the colophon door; only the yank serves. Par 37, budget
-  hand-set 60.
+### Level C — SHIPPED 2026-07-18, REBUILT 2026-07-19 as London Bridge (display 42)
+- v2 (user-directed: v1's vocab words were arbitrary): the vault sings
+  LONDON BRIDGE IS FALLING DOWN (public domain, fixed text — par constant
+  by construction). The falling verses are carved "falling UP"; the build
+  and key verses keep "up" RIGHTLY, so `:%s/up/down/g` wrecks them
+  self-evidently and no contiguous range spans both falling verses while
+  sparing the middle. Canonical `:s/up/down/g` on the double line (spawn),
+  ranged `:16,18&&` + `:4,6&&` while /g is fresh (a plain & resets the
+  remembered flags), then `:1j` (bare join — user catch, 2 keys under
+  :1,2j) + `:1y` + `p` lays the torn "my fair lady." where the reprise
+  goes without one. A :t'd chasm slab arrives still misted — off the
+  floor, it never completes the song. Par 38, budget hand-set 60.
 
 **Engine work (shipped):** `run_ex_range` (strict parser) + fog-aware forms:
 `_yank_rows_clip` (glyph-wise :y/:d clips), `_snapshot_rows`/`_lay_rows_below`

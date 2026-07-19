@@ -392,9 +392,9 @@ POEMS: list[tuple[str | None, str, list[str]]] = [
     ]),
     ('refrain_vault', '& :&& :j :y', [         # The Refrain Vault — repeats + remote yank
         'One spell, spoken once: & says it again.',
-        ':&& keeps the flags; g& shouts it everywhere.',
-        ':j mends a line broken across the gap;',
-        ':y carries its words home to your register.',
+        ':&& keeps the flags a plain & forgets.',
+        ':1j mends a line torn across the gap;',
+        ':y carries it home to your register.',
     ]),
     ('hall_of_echoes', 'q @ "', [              # The Hall of Echoes — q @ "
         'qa captures your rhythm; q stills it.',
