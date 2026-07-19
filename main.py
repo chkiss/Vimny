@@ -830,7 +830,7 @@ def _victory_cell_bg(term, room, player, iw, game_h):
         if wrap:
             return C.floor_bg()
         room_r = (term_r - 3) + vr_start
-        room_c = (term_c - 1) + vc_start
+        room_c = (term_c - 1) + vc_start - _gutter_w(player)
         if room_r >= room.rows or room_c >= room.cols:
             return C.wall_bg()
         if (room_r, room_c) in room.fog_cells:
@@ -3176,7 +3176,7 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
         vc = max(0, min(player.col - iw_now     // 2, room.cols - iw_now))
         vr, vc = max(0, vr), max(0, vc)
         scr_r = 3 + (expl_r - vr)
-        scr_c = 1 + (expl_c - vc)
+        scr_c = 1 + (expl_c - vc) + _gutter_w(player)
         _render(message)
         _explosion_animation(term, room, expl_r, expl_c, scr_r, scr_c, iw_now, game_h_now)
         for _dr in range(-3, 4):

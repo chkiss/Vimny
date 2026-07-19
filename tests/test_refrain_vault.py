@@ -20,10 +20,10 @@
 
 The falling verses were written "falling up"; the build and key verses keep
 "up" rightly, so :%s/up/down/g wrecks them and no contiguous range spans
-both falling verses while sparing the middle. Canonical: :s/up/down/g on
-the double line, ranged :&& over each falling verse while /g is fresh, then
-:1j + :1y + p to lay the torn "my fair lady." where the reprise goes
-without one. Par 38."""
+both falling verses while sparing the middle. "my fair lady." exists ONLY
+as the torn line across the water: :1j + :1y once, then p at each verse
+end (yank once, lay it four times). Canonical: ranged :13,15s/up/down/g,
+:4,6&& while /g is fresh, join, yank, the paste tour. Par 41."""
 import pytest
 from blessed.keyboard import Keystroke
 from blessed import Terminal
@@ -94,9 +94,12 @@ def test_the_song_stands_written_wrong(seed):
     assert (r.rows, r.cols) == (_RV_ROWS, _RV_COLS)
     assert r.cells[_RV_SEAL_ROW][_RV_SEAL_COL] == CellType.WALL
     assert r.par == _RV_PAR and r.budget == _RV_BUDGET
-    for i, true_line in enumerate(_RV_TRUE[:-1]):
+    carved = [t for t in _RV_TRUE if t != 'my fair lady.']
+    for i, true_line in enumerate(carved):
         row = _RV_SONG[0] + i
-        writ = S.line_text(r, row)[0].strip()
+        full = S.line_text(r, row)[0]
+        assert full == full.lstrip()               # left-aligned, flush at lo
+        writ = full.rstrip()
         if row in _RV_CORRUPT:
             assert writ == true_line.replace('down', 'up')
             kinds = {ru.kind for ru in r._char_runs_by_row[row]}
@@ -104,11 +107,14 @@ def test_the_song_stands_written_wrong(seed):
         else:
             assert writ == true_line
             assert {ru.kind for ru in r._char_runs_by_row[row]} == {'verdant'}
-    # the torn final line waits in the chasm; it appears NOWHERE in the room
+    # the torn refrain waits in the chasm — the ONLY copy anywhere: no
+    # song-side "my fair lady." to yank instead
     assert S.line_text(r, 1)[0].strip() == 'my fair'
     assert S.line_text(r, 2)[0].strip() == 'lady.'
+    for row in range(_RV_SONG[0], r.rows):
+        assert 'lady' not in S.line_text(r, row)[0]
     # "up" is TRUE in the build and key verses (the :%s trap)
-    for row in (8, 10, 12, 13, 14):
+    for row in (7, 9, 10, 11, 12):
         assert 'up' in S.line_text(r, row)[0]
 
 
@@ -154,11 +160,13 @@ def test_admin_karaoke_stays_in_sync(seed, monkeypatch):
 
 # ── rivals: the shortcut roads all lose or wreck the song ─────────────────────
 
+_TOUR = ':1j⏎:1y⏎p3jp3jp3jpj$'                     # join, yank, the paste tour
+
+
 def test_blanket_substitute_wrecks_the_build_verse(monkeypatch):
     # :%s/up/down/g → "Build it down with wood and clay" — the seal stays shut.
     d = _fresh(0)
-    keys = _K(':%s/up/down/g⏎:1j⏎:1y⏎12jpj$')
-    result = _drive(d, keys, monkeypatch)
+    result = _drive(d, _K(':%s/up/down/g⏎' + _TOUR), monkeypatch)
     assert not result['won']
     r = d.rooms[0]
     assert any('Build it down' in S.line_text(r, row)[0]
@@ -167,33 +175,32 @@ def test_blanket_substitute_wrecks_the_build_verse(monkeypatch):
 
 def test_global_mend_wrecks_the_key_verse(monkeypatch):
     d = _fresh(0)
-    keys = _K(':g/up/s//down/g⏎:1j⏎:1y⏎12jpj$')
-    result = _drive(d, keys, monkeypatch)
+    result = _drive(d, _K(':g/up/s//down/g⏎' + _TOUR), monkeypatch)
     assert not result['won']
 
 
 def test_wide_ranged_repeat_wrecks_the_middle(monkeypatch):
-    # :4,18&& sweeps the build and key verses too — no single range serves.
+    # :4,15&& sweeps the build and key verses too — no single range serves.
     d = _fresh(0)
-    keys = _K(':s/up/down/g⏎:4,18&&⏎:1j⏎:1y⏎12jpj$')
-    result = _drive(d, keys, monkeypatch)
+    result = _drive(d, _K(':13,15s/up/down/g⏎:4,15&&⏎' + _TOUR), monkeypatch)
     assert not result['won']
 
 
 def test_ranged_substitute_longhand_wins_one_star(monkeypatch):
-    # Retyping the full :s per falling verse: lawful, 43 > par 38, inside 60.
-    # (The second ranged :s already parks the scribe at the reprise's end.)
+    # The user-probed road: two full ranged :s, no repeat family — lawful,
+    # well over par 41, inside budget 60 (the second :s parks at the reprise,
+    # so the tour needs a 9k walk back to verse one's end first).
     d = _fresh(0)
-    keys = _K(':4,6s/up/down/g⏎:16,18s/up/down/g⏎:1j⏎:1y⏎pj$')
+    keys = _K(':4,6s/up/down/g⏎:13,15s/up/down/g⏎:1j⏎:1y⏎9kp3jp3jp3jpj$')
     result = _drive(d, keys, monkeypatch)
     assert result['won'] and result['stars'] == 1
 
 
 def test_copied_chasm_slab_cannot_serve(monkeypatch):
-    # :t ferries the joined line into the hall still MISTED — text off the
-    # floor never completes the song; only :1y + p lays it down.
+    # :t ferries the joined refrain in still MISTED — text off the floor
+    # never completes the song; only :1y + the p tour lays it down.
     d = _fresh(0)
-    keys = _K(':s/up/down/g⏎:16,18&&⏎:4,6&&⏎:1j⏎:1t17⏎13j$')
+    keys = _K(':13,15s/up/down/g⏎:4,6&&⏎:1j⏎:1t5⏎:1t9⏎:1t13⏎:1t17⏎j$')
     result = _drive(d, keys, monkeypatch)
     assert not result['won']
 

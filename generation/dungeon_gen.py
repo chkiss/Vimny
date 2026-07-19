@@ -8205,40 +8205,45 @@ def build_dungeon_spellwrights_forge(seed: int) -> Dungeon:
 # torn final line lies in the mist — "my fair" / "lady." — :1j mends it,
 # :1y carries it, p lays it where the reprise goes without one (a :t of
 # the chasm line arrives still misted: text off the floor never serves).
-_RV_ROWS, _RV_COLS = 21, 60
+_RV_ROWS, _RV_COLS = 18, 60
 _RV_CTX  = 8                          # chasm band head col
 _RV_BAND = (8, 42)                    # misted torn-line band, rows 1-2
 _RV_WTR  = 3                          # the water course (sight-line)
-_RV_TX   = 4                          # song text head col
-_RV_SONG = (4, 18)                    # the carved song, one line per row
-_RV_CORRUPT = (4, 5, 6, 16, 17, 18)   # the falling verses, written "up"
-_RV_SEAL_ROW  = 19                    # the blank walk below the song
+_RV_TX   = 2                          # song text head col (= the line start:
+                                      # everything left-aligned, so a pasted
+                                      # line lands flush with the verses)
+_RV_SONG = (4, 15)                    # the carved song: 12 lines, NO refrains
+_RV_CORRUPT = (4, 5, 6, 13, 14, 15)   # the falling verses, written "up"
+_RV_SEAL_ROW  = 16                    # the blank walk below the song
 _RV_SEAL_COL  = 49
 _RV_CHEST_COL = 53
 _RV_EXIT_COL  = 57
-# The song as it SHOULD read (the seal's demand; the last line is the torn
-# one — nowhere in the workroom until the player lays it down).
+# The song as it SHOULD read (the seal's demand). "my fair lady." exists
+# ONLY as the torn line across the water — one copy in the whole vault, so
+# every refrain must be pasted from the register (yank once, lay it four
+# times; a song-side copy would let :y skip the chasm entirely).
+_RV_LADY = 'my fair lady.'
 _RV_TRUE = (
     'London Bridge is falling down,',
     'falling down, falling down.',
     'London Bridge is falling down,',
-    'my fair lady.',
+    _RV_LADY,
     'Build it up with wood and clay,',
     'wood and clay, wood and clay.',
     'Build it up with wood and clay,',
-    'my fair lady.',
+    _RV_LADY,
     'Take the key and lock her up,',
     'lock her up, lock her up.',
     'Take the key and lock her up,',
-    'my fair lady.',
+    _RV_LADY,
     'London Bridge is falling down,',
     'falling down, falling down.',
     'London Bridge is falling down,',
-    'my fair lady.',
+    _RV_LADY,
 )
-_RV_PAR    = 38    # :s/up/down/g(12) :16,18&&(8) :4,6&&(6)
-                   # :1j(3) :1y(3) 12j(3) p(1) j(1) $(1)
-_RV_BUDGET = 60    # generous: the ranged-:s longhand (~46) wins 1★
+_RV_PAR    = 41    # :13,15s/up/down/g(17) :4,6&&(6) :1j(3) :1y(3)
+                   # p(1) [3j p](3)×3 j(1) $(1)
+_RV_BUDGET = 60    # generous: the double ranged-:s longhand (~52) wins 1★
 
 
 def build_dungeon_refrain_vault(seed: int) -> Dungeon:
@@ -8275,9 +8280,10 @@ def build_dungeon_refrain_vault(seed: int) -> Dungeon:
             room.char_runs.append(CharRun(r, col, tuple(wd), kind))
             col += len(wd) + 1
 
-    lay(1, _RV_CTX, 'my fair', 'ancient')          # the torn final line
-    lay(2, _RV_CTX, 'lady.', 'ancient')
-    for i, true_line in enumerate(_RV_TRUE[:-1]):  # the carved song, rows 4..18
+    lay(1, _RV_CTX, 'my fair', 'ancient')          # the torn refrain — the ONLY
+    lay(2, _RV_CTX, 'lady.', 'ancient')            # "my fair lady." anywhere
+    carved = [t for t in _RV_TRUE if t != _RV_LADY]
+    for i, true_line in enumerate(carved):         # the carved song, rows 4..15
         r = _RV_SONG[0] + i
         writ = true_line.replace('down', 'up') if r in _RV_CORRUPT else true_line
         lay(r, _RV_TX, writ, 'ember' if r in _RV_CORRUPT else 'verdant')
@@ -8291,8 +8297,8 @@ def build_dungeon_refrain_vault(seed: int) -> Dungeon:
 
     room.par    = _RV_PAR
     room.budget = _RV_BUDGET
-    room.answer = (':set␣nu⏎ :s/up/down/g⏎ :16,18&&⏎ :4,6&&⏎ '
-                   ':1j⏎ :1y⏎ 12j p j $')
+    room.answer = (':set␣nu⏎ :13,15s/up/down/g⏎ :4,6&&⏎ '
+                   ':1j⏎ :1y⏎ p 3j p 3j p 3j p j $')
 
     room.rebuild_indexes()
     pocket = {(_RV_SEAL_ROW, col)
