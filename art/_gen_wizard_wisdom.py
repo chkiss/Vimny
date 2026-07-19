@@ -375,7 +375,7 @@ POEMS: list[tuple[str | None, str, list[str]]] = [
     ('spellwrights_forge', ':s///', [          # The Spellwright's Forge — :s///
         ':s shifts one shape on a line.',
         ':%s reshapes the whole world at once.',
-        ':g/pat/d strikes every line bearing the curse.',
+        ':g/pat/d strikes every line bearing the mark.',
         'Name what is, then what shall be.',
     ]),
     ('culling_ledger', ':{range}d', [          # The Culling Ledger — ex ranges
