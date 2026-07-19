@@ -16,8 +16,8 @@
 #
 # SPDX-License-Identifier: GPL-3.0-or-later
 
-"""The Bracket Enclosure (i( a(): the husk/stone/scar discrimination and the
-gallery's structure/karaoke discipline."""
+"""The Bracket Enclosure (i( a(): proverbs by sense, the husk/gem/scar
+discrimination, and the gallery's structure/karaoke discipline."""
 import math
 
 import pytest
@@ -27,12 +27,13 @@ from blessed import Terminal
 import main
 from engine.world import CellType
 from content.levels import known_commands
+from content import proverbs as pv
 from generation.dungeon_gen import (
     build_dungeon_bracket_enclosure,
     _BE_ROWS, _BE_COLS, _BE_SPINE, _BE_SHAFT_SEPS, _BE_THROAT,
-    _BE_GATE, _BE_BOLT0, _BE_EXIT, _BE_PAR,
+    _BE_GATE, _BE_BOLT0, _BE_EXIT, _BE_PAR, _BE_TEXT_MIN, _BE_BAY_E,
     _BE_C1_ROWS, _BE_C2_ROWS, _BE_C3_ROWS,
-    _BE_C1_SHAPE, _BE_C2_SHAPE, _BE_C3_SHAPE, _BE_TEXT0,
+    _BE_C1_SLOTS, _BE_C2_SLOTS, _BE_C3_SLOTS,
 )
 from tests import SEEDS, cached_room
 
@@ -51,22 +52,28 @@ def _bolt(i):
     return (_BE_GATE, _BE_BOLT0 + i)
 
 
+def _cures(room):
+    return [m[2] for m in room._be_texts['misquotes']]
+
+
 # The canonical tape (== room.answer with Esc placed): the % entry (j %
-# scans to the '(' and lands on its match — user-found nav golf), pry the
-# stones (di( chained by dot), set the new stones (ci( + cure), tear the
-# fittings out (da( with a dot reprise). 33 keys; the cures vary by seed.
+# scans to the '(' and lands on its match — user-found nav golf, and
+# length-independent whatever the proverb's prefix), pry the junk stones
+# (di( chained by dot), recut the miscut gems (ci( + the famous word),
+# tear the fittings out (da( with a dot reprise). 33 keys.
 def _canon_keys(room):
-    ca, cb = room._be_words['cures']
+    ca, cb = _cures(room)
     return (_K('j%di(j.j.') + _K('2jci(') + _K(ca) + [ESC]
             + _K('jci(') + _K(cb) + [ESC] + _K('2jda(j.') + _K('G$'))
 
 
-# The leanest old-only rival (WITH its own best dot usage): dt) needs the
-# stone's start (an h per stagger), ct) pays the h's back from the mid-stone
-# landing, F( dE tears fittings ('(stone)' is one WORD). Wins at 1★.
+# The leanest old-only rival (WITH its own best dot usage), anchor-relative
+# so it is seed-invariant: F( l finds each stone start from the % landing,
+# dt) pries, ct) recuts (h-walks back from the mid-stone landings), F( dE
+# tears fittings ('(junk)' is one WORD). Wins at 1★.
 def _piecewise_rival_keys(room):
-    ca, cb = room._be_words['cures']
-    return (_K('jwwldt)jh.j.') + _K('2jhct)') + _K(ca) + [ESC]
+    ca, cb = _cures(room)
+    return (_K('j%F(ldt)jh.j.') + _K('2jhct)') + _K(ca) + [ESC]
             + _K('jhhct)') + _K(cb) + [ESC] + _K('2jF(dEjh.') + _K('G$'))
 
 
@@ -107,6 +114,13 @@ def _row_text(room, r):
     return out.strip()
 
 
+def _truth(room, r):
+    for rr, words, k, _junk, _f in room._be_texts['intruders']:
+        if rr == r:
+            return pv.text_of(words[:k]), pv.text_of(words[k:])
+    raise KeyError(r)
+
+
 # ── dungeon structure ─────────────────────────────────────────────────────────
 
 @pytest.mark.parametrize("seed", SEEDS)
@@ -124,7 +138,7 @@ def test_par_answer_budget(seed):
     room = _room(seed)
     assert room.par == _BE_PAR
     assert room.budget == math.ceil(_BE_PAR * 1.4)
-    ca, cb = room._be_words['cures']
+    ca, cb = _cures(room)
     assert room.answer == (f'j % di( j . j . 2j ci( {ca} j ci( {cb} '
                            f'2j da( j . G $')
 
@@ -155,28 +169,44 @@ def test_light_shaft_pierces_separators_but_not_the_throat(seed):
 
 
 @pytest.mark.parametrize("seed", SEEDS)
-def test_word_draw_shapes_and_landings(seed):
-    """Fixed slot lengths; row 3's stone is two words; the stagger keeps the
-    di( chain and every hop inside the next stone; all words distinct."""
+def test_proverb_draw_anchors_and_landings(seed):
+    """The '(' sits at its slot exactly; junk lengths fixed; the stagger
+    keeps the di( chain and every hop inside the next stone; the laid text
+    is the saying with its aside; sayings distinct, junk foreign."""
     room = _room(seed)
-    words = room._be_words
-    shapes = _BE_C1_SHAPE + _BE_C2_SHAPE + _BE_C3_SHAPE
-    for i, ((r, w1l, stl, f_s), (w1, stone, w2)) in enumerate(
-            zip(shapes, words['rows'])):
-        assert (len(w1), len(stone), len(w2)) == (w1l, stl, 5)
-        assert f_s == _BE_TEXT0 + w1l + 1
-        if i == 0:
-            assert ' ' in stone, "row 3's stone is TWO WORDS (diw kills half)"
+    texts = room._be_texts
+    slot_by_row = {r: (jl, f) for r, jl, f in (_BE_C1_SLOTS + _BE_C3_SLOTS)}
+    laid = {}
+    for i, (r, words, k, junk, fit) in enumerate(texts['intruders']):
+        jl, f = slot_by_row[r]
+        assert fit == f and len(junk) == jl
+        if r == _BE_C1_ROWS[0]:
+            assert ' ' in junk, "row 3's stone is TWO WORDS (diw kills half)"
+        t0 = fit - (pv.prefix_len(words, k) + 1)
+        assert t0 >= _BE_TEXT_MIN
+        assert fit + jl + 2 + len(' '.join(words[k:])) <= _BE_BAY_E
+        assert _row_text(room, r) == \
+            f"{pv.text_of(words[:k])} ({junk}) {pv.text_of(words[k:])}"
+        laid[r] = (fit + 1, jl)                      # stone start, len
+    for (r, f), (words, idx, cure) in zip(_BE_C2_SLOTS, texts['misquotes']):
+        assert len(cure) == 3 and len(words[idx]) >= 3
+        expect = (f"{pv.text_of(words[:idx])} ({words[idx]})"
+                  + (f" {pv.text_of(words[idx + 1:])}" if words[idx + 1:] else ''))
+        assert _row_text(room, r) == expect
+        laid[r] = (f + 1, len(words[idx]))
     # C1 chain: each after-di( cursor (stone start) is inside the NEXT stone
-    for (ra, _l1, _sl, fa), (rb, _l2, slb, fb) in zip(_BE_C1_SHAPE, _BE_C1_SHAPE[1:]):
-        assert fb + 1 <= fa + 1 < fb + 1 + slb
+    for ra, rb in zip(_BE_C1_ROWS, _BE_C1_ROWS[1:]):
+        (sa, _la), (sb, lb) = laid[ra], laid[rb]
+        assert sb <= sa < sb + lb, "the stagger keeps the dot chain alive"
+    # every hopped-to stone contains its shaft landing column
     shaft = dict(_BE_SHAFT_SEPS)
-    for r, _w1l, stl, f_s in (_BE_C2_SHAPE[:1] + _BE_C3_SHAPE[:1]):
-        assert f_s + 1 <= shaft[6 if r == 7 else 9] < f_s + 1 + stl
-    picks = [w for triple in words['rows']
-             for w in (triple[0], *triple[1].split(' '), triple[2])]
-    picks += words['cures']
-    assert len(set(picks)) == len(picks)
+    for r, land in ((_BE_C2_ROWS[0], shaft[6]), (_BE_C3_ROWS[0], shaft[9])):
+        s, ln = laid[r]
+        assert s <= land < s + ln, f"row {r}: landing {land} outside {s}+{ln}"
+    sayings = [words for _r, words, _k, _j, _f in texts['intruders']]
+    assert len({' '.join(w) for w in sayings}) == len(sayings)
+    for _r, words, _k, junk, _f in texts['intruders']:
+        assert all(p not in words for p in junk.split(' '))
 
 
 def test_curriculum_and_gating():
@@ -227,14 +257,14 @@ def test_di_paren_keeps_the_husk_and_da_paren_leaves_the_scar(monkeypatch):
     """The discrimination, driven both ways on row 3."""
     dungeon = build_dungeon_bracket_enclosure(0)
     room = dungeon.rooms[0]
-    w1, _stone, w2 = room._be_words['rows'][0]
+    pre, suf = _truth(room, _BE_C1_ROWS[0])
     _drive(dungeon, _K('j%di('), monkeypatch, finish=':q!\r')
-    assert _row_text(room, _BE_C1_ROWS[0]) == f'{w1} () {w2}', "the husk stays"
+    assert _row_text(room, _BE_C1_ROWS[0]) == f'{pre} () {suf}', "the husk stays"
 
     dungeon = build_dungeon_bracket_enclosure(0)
     room = dungeon.rooms[0]
     _drive(dungeon, _K('j%da('), monkeypatch, finish=':q!\r')
-    assert _row_text(room, _BE_C1_ROWS[0]) == f'{w1}  {w2}', "the scar"
+    assert _row_text(room, _BE_C1_ROWS[0]) == f'{pre}  {suf}', "the scar"
     assert room.cells[_bolt(0)[0]][_bolt(0)[1]] == CellType.WALL, \
         "the husk door does not accept the scar"
 
@@ -254,7 +284,7 @@ def test_ca_paren_tears_the_setting_and_reads_false(monkeypatch):
     parens (u recovers)."""
     dungeon = build_dungeon_bracket_enclosure(0)
     room = dungeon.rooms[0]
-    ca, _cb = room._be_words['cures']
+    ca, _cb = _cures(room)
     _drive(dungeon, _K('j%di(j.j.2jca(') + _K(ca) + [ESC],
            monkeypatch, finish=':q!\r')
     assert '(' not in _row_text(room, _BE_C2_ROWS[0])
@@ -265,8 +295,8 @@ def test_di_paren_on_the_fitting_rows_reads_false(monkeypatch):
     """di( where da( is needed leaves the husk — the scar door stays shut."""
     dungeon = build_dungeon_bracket_enclosure(0)
     room = dungeon.rooms[0]
-    ca, cb = room._be_words['cures']
-    bad = (_K('jwwldi(j.j.') + _K('2jci(') + _K(ca) + [ESC]
+    ca, cb = _cures(room)
+    bad = (_K('j%di(j.j.') + _K('2jci(') + _K(ca) + [ESC]
            + _K('jci(') + _K(cb) + [ESC] + _K('2jdi(j.'))
     _drive(dungeon, bad, monkeypatch, finish=':q!\r')
     assert room.cells[_bolt(2)[0]][_bolt(2)[1]] == CellType.WALL

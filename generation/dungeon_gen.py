@@ -3528,162 +3528,201 @@ def build_dungeon_selection_halls(seed: int) -> Dungeon:
 
 
 # ── The Word Enclosure (iw aw) ──────────────────────────────────────────────────
-# The first text objects: select by SHAPE, not by landing. Three chambers on
-# the exact-text chassis, discriminated by THE SCAR (probe-verified): deleting
-# a middle word from `w1 rot w2` with diw leaves BOTH separators — `w1  w2`,
-# the double-gap scar — while daw takes the trailing one too: `w1 w2`, the
-# seam healed. The doors read the one-space difference directly.
+# The first text objects: select by SHAPE, not by landing — and SENSE, NOT
+# DECREE (blueprints/sense_not_decree.md §2): every bay holds a famous
+# proverb the player knows by heart. Intruder rows lay a seeded junk word
+# INTO a true saying (the lesson deletes it); misquote rows swap one word
+# for a wrong one (the lesson cures it). No west plaque band — the player's
+# own memory of the proverb is the plaque.
 #
-#   • C1 the diw DRILL (3 rows, doors = double-gap targets): rot words of
-#     DIFFERENT lengths at STAGGERED starts, so the after-diw cursor (the
-#     deletion start) always lands INSIDE the next row's rot — `diw j . j .`
-#     chains at 1 key/row. The piecewise rival (`de` needs the word START
-#     each row) pays an h per stagger; dw/daw heal the seam and read false.
-#   • C2 the ciw CURE (2 rows, different cures — no dot shortcut): the hop
-#     lands two INSIDE the rot (the previous Esc parks the cursor exactly on
-#     the next anchor), so `ce` pays hh first; `caw` fuses the typed cure
-#     into w2 and reads false; count-s is position-relative.
-#   • C3 the daw SEAM (2 rows, doors = single-gap): `dw` from the start
-#     would tie daw, so the arrival is mid-rot again (hh dw = 4 vs daw 3);
-#     diw leaves the scar and reads false; `.` repeats the daw on row two.
-#   • C4 the diW TOKEN (2 rows) · C5 the daW TOKEN (2 rows): MIXED stones
-#     (`rotA-rotB` — one WORD, three w-words). The CLASS lesson: diw/dw/de
-#     kill a subword and read false; the honest rival is the WORD family
-#     (dE/dW from the token START), which TIES ±1 — documented, the g~
-#     precedent. Scar doors for diW, seam doors for daW.
+# PAR INVARIANCE IS COLUMN-ANCHORED, NOT TEXT-ANCHORED: each slot fixes the
+# corrupt word's START COLUMN and (for intruders) its length; the proverb's
+# prefix right-aligns west of the slot (text0 varies per draw, and nothing
+# in either tape counts words or finds letters west of the slot). The scar
+# discrimination is unchanged (probe-verified): diw on the intruder leaves
+# BOTH separators — `prefix  suffix`, the double-gap scar — while daw heals
+# the seam: `prefix suffix`. The doors read the one-space difference.
 #
-# THE DOT GAP (first level priced after the dot-insert replay, 2026-07-13):
-# a text object is ONE change, so it dot-chains down a column; the piecewise
-# fixes need re-positioning every row that dot can't provide. Rivals are
-# driven WITH their own best dot usage and win at 1★ inside the standard 1.4
-# budget. Vocabulary is drawn per seed with FIXED slot lengths.
-_WE_ROWS, _WE_COLS = 21, 40
-_WE_SPINE  = 17                     # every row's first standable
-_WE_BAY_W  = 18                     # bay floor cols 18..38; east wall 39
-_WE_BAY_E  = 38
-_WE_PLQ_COL = 2                     # full true readings (≤14 chars, cols 2..15)
-_WE_TEXT0  = 19                     # w1 starts here on every row
-_WE_SHAFT  = 26                     # the landing column: inside every rot it hops to
+#   • C1 the diw DRILL (3 rows, scar doors): junk lengths 5/4/3 at STAGGERED
+#     starts 32/31/31, so the after-diw cursor always lands INSIDE the next
+#     intruder — `diw j . j .` chains; `de` (rival) pays an h per stagger.
+#   • C2 the ciw CURE (2 rows, misquotes, cures len 3 — different, no dot):
+#     the hop lands slot+2, so `ce` pays hh; `caw` fuses and reads false.
+#   • C3 the daw SEAM (2 rows, seam doors): arrival mid-intruder (hh dw = 4
+#     vs daw 3); diw leaves the scar and reads false; `.` reprises.
+#   • C4 the diW TOKEN · C5 the daW TOKEN (2+2 rows): the intruder is a
+#     HYPHENATED junk token (`abcd-efgh` — one WORD, three w-words). The
+#     CLASS lesson: diw kills a subword; the WORD family (dE/dW from the
+#     token START) TIES ±1 — documented, the g~ precedent.
+#
+# THE DOT GAP is still the forcing story: a text object is ONE change, so
+# it dot-chains down the anchor column; piecewise fixes re-position every
+# row. Rivals driven WITH their own best dot usage win at 1★ (standard 1.4).
+_WE_ROWS, _WE_COLS = 21, 57
+_WE_SPINE  = 2                      # every row's first standable
+_WE_BAY_W  = 3                      # bay floor cols 3..55; east wall 56
+_WE_BAY_E  = 55
+_WE_TEXT_MIN = 3                    # earliest col a proverb may start
 _WE_C1_ROWS = (3, 4, 5)
 _WE_C2_ROWS = (7, 8)
 _WE_C3_ROWS = (10, 11)
-_WE_C4_ROWS = (13, 14)              # diW — mixed tokens
+_WE_C4_ROWS = (13, 14)              # diW — hyphenated intruders
 _WE_C5_ROWS = (16, 17)              # daW
-_WE_SHAFT_SEPS = ((6, 26), (9, 26), (12, 24), (15, 24))   # (row, col)
+_WE_SHAFT_SEPS = ((6, 31), (9, 31), (12, 29), (15, 29))   # (row, col)
 _WE_THROAT = 18
 _WE_GATE   = 19
-_WE_BOLT0  = 18                     # bolts cols 18..22, one per chamber
-_WE_EXIT   = (19, 23)               # the FINAL SEAL
-# (row, w1 len, rot len, rot start): rot start = TEXT0 + w1len + 1; staggered
-# so the diw chain lands inside the next rot, and the C2/C3 hop from the
-# shaft column arrives at rot start + 2 (ce/dw must pay the h's back).
-_WE_C1_SHAPE = ((3, 7, 5, 27), (4, 6, 4, 26), (5, 6, 3, 26))
-_WE_C2_SHAPE = ((7, 4, 4, 24), (8, 4, 4, 24))
-_WE_C3_SHAPE = ((10, 4, 4, 24), (11, 4, 4, 24))
-# mixed-token chambers: (row, w1 len, token len, token start) — the token is
-# rotA-rotB (two len-4 words hyphenated: ONE WORD, three w-words)
-_WE_C4_SHAPE = ((13, 3, 9, 23), (14, 3, 9, 23))
-_WE_C5_SHAPE = ((16, 3, 9, 23), (17, 3, 9, 23))
-_WE_PAR = 49            # hand-tallied along the driven tape (buffer mutates)
+_WE_BOLT0  = 3                      # bolts cols 3..7, one per chamber
+_WE_EXIT   = (19, 8)                # the FINAL SEAL
+_WE_SPAWN  = (2, 32)                # over the first intruder: j drops onto it
+# intruder slots: (row, junk len, start col) — the stagger keeps the chain
+# landing inside the next intruder; misquote slots: (row, start col), the
+# wrong word starts there (len >= 3 so the slot+2 landing stays inside).
+_WE_C1_SLOTS = ((3, 5, 32), (4, 4, 31), (5, 3, 31))
+_WE_C2_SLOTS = ((7, 29), (8, 29))
+_WE_C3_SLOTS = ((10, 4, 29), (11, 4, 29))
+_WE_C4_SLOTS = ((13, 9, 28), (14, 9, 28))
+_WE_C5_SLOTS = ((16, 9, 28), (17, 9, 28))
+_WE_CURE_LEN = 3
+_WE_PAR = 47            # hand-tallied along the driven tape (buffer mutates)
 
 
-def _we_draw_words(rng) -> dict:
-    """Draw the enclosure vocabulary (fixed slot lengths pin par and the
-    rival chains). Seven (w1, rot, w2) triples + two typed cures (len 3),
-    all pairwise distinct."""
+def _we_draw_texts(rng) -> dict:
+    """Draw proverbs + junk intruders for every slot.
+
+    Geometric filters keep par seed-invariant: the corrupt word starts at
+    the slot column, the prefix fits east of the spine, the tail west of
+    the east wall. Proverbs pairwise distinct; junk words distinct, lower
+    alpha, and absent from their own proverb."""
+    from content import proverbs as _pv
     _load_vocab_tables()
 
-    def pool(length):
+    def junk_pool(length):
         return [w for w in _VOCAB_PLAIN_BY_LEN.get(length, ())
                 if w.isalpha() and w == w.lower()]
 
-    shapes = _WE_C1_SHAPE + _WE_C2_SHAPE + _WE_C3_SHAPE
-    for _ in range(80):
-        picks: list = []
+    def fits_intruder(words, k, start, jlen):
+        t0 = start - (_pv.prefix_len(words, k) + 1)
+        last = start + jlen + 1 + len(' '.join(words[k:])) - 1
+        return t0 >= _WE_TEXT_MIN and last <= _WE_BAY_E
 
-        def draw(length):
-            w = rng.choice(pool(length))
-            picks.append(w)
-            return w
+    def fits_misquote(entry, start):
+        words, idx, _cure = entry
+        t0 = start - (_pv.prefix_len(words, idx) + 1)
+        tail = ' '.join(words[idx + 1:])
+        last = start + len(words[idx]) + (1 + len(tail) if tail else 0) - 1
+        return len(words[idx]) >= 3 and t0 >= _WE_TEXT_MIN and last <= _WE_BAY_E
 
-        rows = [(draw(w1l), draw(rotl), draw(5)) for _r, w1l, rotl, _rs in shapes]
-        # mixed tokens for C4/C5: rotA-rotB (token len 9 = 4+1+4)
-        mixed = [(draw(w1l), f'{draw(4)}-{draw(4)}', draw(5))
-                 for _r, w1l, _tl, _ts in (_WE_C4_SHAPE + _WE_C5_SHAPE)]
-        cures = [draw(3), draw(3)]
-        if len(set(picks)) == len(picks):
-            return {'rows': rows, 'mixed': mixed, 'cures': cures}
-    raise ValueError('word_enclosure: no distinct draw after 80 tries')
+    intruder_slots = (_WE_C1_SLOTS + _WE_C3_SLOTS + _WE_C4_SLOTS + _WE_C5_SLOTS)
+    cure_pool = _pv.misquotes_by_cure_len(_WE_CURE_LEN)
+    for _ in range(200):
+        sayings = rng.sample(_pv.PLAIN, len(intruder_slots))
+        junks: list = []
+        rows = []
+        ok = True
+        for (r, jlen, start), words in zip(intruder_slots, sayings):
+            hyphen = jlen == 9
+            if hyphen:
+                a, b = rng.choice(junk_pool(4)), rng.choice(junk_pool(4))
+                junk = f'{a}-{b}'
+                parts = (a, b)
+            else:
+                junk = rng.choice(junk_pool(jlen))
+                parts = (junk,)
+            ks = [k for k in range(1, len(words))
+                  if fits_intruder(words, k, start, jlen)]
+            if not ks or any(p in words for p in parts):
+                ok = False
+                break
+            junks += list(parts)
+            rows.append((r, words, rng.choice(ks), junk, start))
+        if not ok or len(set(junks)) != len(junks):
+            continue
+        mis = rng.sample(cure_pool, len(_WE_C2_SLOTS))
+        if not all(fits_misquote(m, s) for m, (_r, s) in zip(mis, _WE_C2_SLOTS)):
+            continue
+        # a cure door's target is the TRUE proverb — it must not also be an
+        # intruder row's saying, or mending that row opens this bolt free
+        laid = {' '.join(w) for w in sayings}
+        cured = {' '.join(w[:i] + (c,) + w[i + 1:]) for w, i, c in mis}
+        if cured & laid:
+            continue
+        return {'intruders': rows, 'misquotes': mis}
+    raise ValueError('word_enclosure: no fitting draw after 200 tries')
 
 
 def build_dungeon_word_enclosure(seed: int) -> Dungeon:
     """The Word Enclosure (slug `word_enclosure`): iw and aw.
 
-    Select by shape, not by landing: the diw drill (dot-chained down the
-    staggered rots), the ciw cure (caw fuses and reads false), and the daw
-    seam (diw leaves the scar). See the section header for the forcing."""
+    Sense, not decree: every bay is a famous proverb, corrupted one word;
+    the diw drill (dot-chained down the staggered intruders), the ciw cure
+    (the misquote everyone can mend), and the daw seam (diw leaves the
+    scar). See the section header for the forcing."""
+    from content.proverbs import prefix_len, text_of
     rng = random.Random(seed)
-    words = _we_draw_words(rng)
-    shapes = _WE_C1_SHAPE + _WE_C2_SHAPE + _WE_C3_SHAPE
-
-    # per-row runs + each chamber's door targets
-    runs, targets = [], {}
-    for (r, w1l, rotl, rot_s), (w1, rot, w2) in zip(shapes, words['rows']):
-        w2_s = rot_s + rotl + 1
-        runs += [(r, _WE_TEXT0, w1), (r, rot_s, rot), (r, w2_s, w2)]
-        targets[r] = (w1, w2)
-    for (r, _w1l, tokl, tok_s), (w1, tok, w2) in zip(
-            _WE_C4_SHAPE + _WE_C5_SHAPE, words['mixed']):
-        runs += [(r, _WE_TEXT0, w1), (r, tok_s, tok), (r, tok_s + tokl + 1, w2)]
-        targets[r] = (w1, w2)
-    c1 = tuple(f'{targets[r][0]}  {targets[r][1]}' for r in _WE_C1_ROWS)  # the scar
-    c2 = tuple(f'{targets[r][0]} {c} {targets[r][1]}'
-               for r, c in zip(_WE_C2_ROWS, words['cures']))
-    c3 = tuple(f'{targets[r][0]} {targets[r][1]}' for r in _WE_C3_ROWS)  # the seam
-    c4 = tuple(f'{targets[r][0]}  {targets[r][1]}' for r in _WE_C4_ROWS)  # scar
-    c5 = tuple(f'{targets[r][0]} {targets[r][1]}' for r in _WE_C5_ROWS)   # seam
-    chambers = ((_WE_C1_ROWS, c1), (_WE_C2_ROWS, c2), (_WE_C3_ROWS, c3),
-                (_WE_C4_ROWS, c4), (_WE_C5_ROWS, c5))
+    texts = _we_draw_texts(rng)
 
     R, C = _WE_ROWS, _WE_COLS
     cells = [[CellType.WALL] * C for _ in range(R)]
     for r in range(2, _WE_GATE + 1):                     # the spine
         cells[r][_WE_SPINE] = CellType.FLOOR
-    for rows, _t in chambers:                            # the bays
-        for r in rows:
-            for c in range(_WE_BAY_W, _WE_BAY_E + 1):
-                cells[r][c] = CellType.FLOOR
+    all_rows = (_WE_C1_ROWS + _WE_C2_ROWS + _WE_C3_ROWS
+                + _WE_C4_ROWS + _WE_C5_ROWS)
+    for r in all_rows:                                   # the bays
+        for c in range(_WE_BAY_W, _WE_BAY_E + 1):
+            cells[r][c] = CellType.FLOOR
     for r, c in _WE_SHAFT_SEPS:                          # the light shafts —
         cells[r][c] = CellType.FLOOR                     # NOT the throat row
+    cells[_WE_SPAWN[0]][_WE_SPAWN[1]] = CellType.FLOOR   # the drop-in
 
     room = Room(room_type=RoomType.ENTRY, rows=R, cols=C)
     room.cells = cells
     room.seed  = seed
 
-    doors = []
-    for i, (rows, tgt) in enumerate(chambers):
-        doors.append((tgt, _WE_BOLT0 + i))
-        for pr, ptext in zip(rows, tgt):                 # full true readings
-            col = _WE_PLQ_COL
-            for part in ptext.split(' '):
-                if part:
-                    room.char_runs.append(CharRun(pr, col, tuple(part), 'verdant'))
-                col += len(part) + 1
-    for rr, cc, text in runs:
-        room.char_runs.append(CharRun(rr, cc, tuple(text), 'ancient'))
-    room._ss_doors = tuple(doors)                        # the shared exact-text tick
-    room._we_words = words
+    def lay(r, col, words_seq):
+        """One CharRun per word, bare-floor gaps (the space-glyph law)."""
+        for w in words_seq:
+            room.char_runs.append(CharRun(r, col, tuple(w), 'ancient'))
+            col += len(w) + 1
+
+    # intruder rows: prefix right-aligned west of the slot, junk AT it
+    truths = {}                                          # row -> (prefix, suffix)
+    for (r, words, k, junk, start) in texts['intruders']:
+        t0 = start - (prefix_len(words, k) + 1)
+        lay(r, t0, words[:k])
+        lay(r, start, (junk,))
+        lay(r, start + len(junk) + 1, words[k:])
+        truths[r] = (text_of(words[:k]), text_of(words[k:]))
+    # misquote rows: the wrong word sits AT the slot
+    cures = {}
+    for (r, start), (words, idx, cure) in zip(_WE_C2_SLOTS, texts['misquotes']):
+        t0 = start - (prefix_len(words, idx) + 1)
+        lay(r, t0, words[:idx])
+        lay(r, start, (words[idx],))
+        lay(r, start + len(words[idx]) + 1, words[idx + 1:])
+        true = words[:idx] + (cure,) + words[idx + 1:]
+        cures[r] = (cure, text_of(true))
+
+    c1 = tuple(f'{truths[r][0]}  {truths[r][1]}' for r in _WE_C1_ROWS)  # scar
+    c2 = tuple(cures[r][1] for r in _WE_C2_ROWS)
+    c3 = tuple(f'{truths[r][0]} {truths[r][1]}' for r in _WE_C3_ROWS)   # seam
+    c4 = tuple(f'{truths[r][0]}  {truths[r][1]}' for r in _WE_C4_ROWS)  # scar
+    c5 = tuple(f'{truths[r][0]} {truths[r][1]}' for r in _WE_C5_ROWS)   # seam
+    chambers = (c1, c2, c3, c4, c5)
+
+    room._ss_doors = tuple((tgt, _WE_BOLT0 + i)          # the shared exact-text tick
+                           for i, tgt in enumerate(chambers))
+    room._we_texts = texts
 
     room.entities.append(Entity(kind='exit', row=_WE_EXIT[0], col=_WE_EXIT[1],
                                 edit_immune=True))
-    room.spawn_pos = (2, _WE_SPINE)
+    room.spawn_pos = _WE_SPAWN
     room.exit_pos  = _WE_EXIT
 
     room.rebuild_indexes()
     room.par    = _WE_PAR
     room.budget = math.ceil(_WE_PAR * 1.4)   # STANDARD: the piecewise route wins at 1★
-    ca, cb = words['cures']
-    room.answer = (f'j w w diw j . j . 2j ciw {ca} j ciw {cb} '
+    ca, cb = (cures[r][0] for r in _WE_C2_ROWS)
+    room.answer = (f'j diw j . j . 2j ciw {ca} j ciw {cb} '
                    f'2j daw j . 2j diW j . l 2j daW j . G $')
 
     dungeon = Dungeon(name='The Word Enclosure', seed=seed)
@@ -3693,105 +3732,121 @@ def build_dungeon_word_enclosure(seed: int) -> Dungeon:
 
 
 # ── The Bracket Enclosure (i( a() ────────────────────────────────────────────────
-# GEM SETTINGS: the parens are settings, the content is the stone. Three
-# door types on the exact-text chassis, discriminated by what remains
-# (probe-verified):
-#   • C1 the PRIED SETTING (di(, 3 rows): `w1 (rot) w2` → `w1 () w2` — the
-#     empty husk stays and the door reads it. Stones of DIFFERENT lengths at
-#     staggered positions keep the `di( j . j .` chain landing inside the
-#     next stone (a replayed {n}x eats the wrong span — dead); dt)/dT( pay
-#     repositioning; dw/daw heal wrongly. Row 3's stone is TWO WORDS —
-#     diw kills half and reads false (the object-vs-object lesson).
-#   • C2 the NEW STONE (ci( + cure, 2 rows, different cures): → `w1 (cure)
-#     w2`; the hop lands mid-content so ct) leaves the head (wrong text);
-#     ca(+cure tears the setting out and fuses — reads false.
-#   • C3 the TORN FITTING (da(, 2 rows): → `w1  w2` — the double-gap scar
-#     (a( takes no whitespace); di( leaves the husk and reads false. da( is
-#     honestly forced from anywhere inside (F( df) = 5 vs 3); `(stone)` is
-#     ONE WORD, so dE-from-the-( ties only after an F(/h back.
-# Walk-in chamber first, arrival-forced chambers on hops (the chamber-order
-# law); rivals driven WITH their own best dot usage.
-_BE_ROWS, _BE_COLS = 15, 41
-_BE_SPINE  = 17                     # every row's first standable
-_BE_BAY_W  = 18                     # bay floor cols 18..39; east wall 40
-_BE_BAY_E  = 39
-_BE_PLQ_COL = 2                     # full true readings (≤14 chars)
-_BE_TEXT0  = 19                     # w1 starts here on every row
+# GEM SETTINGS, BY SENSE (blueprints/sense_not_decree.md §2): every bay is a
+# famous proverb whose parenthesized aside has gone wrong — a junk stone set
+# into the saying, or the saying's KEY word set as a gem but miscut. No west
+# plaques: the player knows the true reading by heart. Par invariance is
+# COLUMN-ANCHORED (the Word Enclosure law): the '(' sits at a fixed slot
+# column, the proverb's prefix right-aligns west of it. Three door types,
+# discriminated by what remains (probe-verified):
+#   • C1 the PRIED SETTING (di(, 3 rows): `prefix (junk) suffix` →
+#     `prefix () suffix` — the empty husk stays and the door reads it.
+#     Junk of DIFFERENT lengths at staggered slots keeps the `di( j . j .`
+#     chain landing inside the next stone; dt)/dT( pay repositioning;
+#     dw/daw heal wrongly. Row 3's junk is TWO WORDS — diw kills half and
+#     reads false (the object-vs-object lesson).
+#   • C2 the MISCUT GEM (ci( + cure, 2 rows): the saying's famous word sits
+#     bracketed but WRONG — `catches the (snake)` — and the cure is the
+#     word everyone knows: → `prefix (worm) suffix`. The hop lands
+#     mid-content so ct) leaves the head; ca(+cure tears and fuses.
+#   • C3 the TORN FITTING (da(, 2 rows): → `prefix  suffix` — the
+#     double-gap scar (a( takes no whitespace); di( leaves the husk and
+#     reads false; da( honestly forced from anywhere inside.
+# Walk-in chamber first (the j % entry is length-independent: % seeks the
+# first '(' wherever the prefix ends); rivals driven WITH their best dot.
+_BE_ROWS, _BE_COLS = 15, 58
+_BE_SPINE  = 2                      # every row's first standable
+_BE_BAY_W  = 3                      # bay floor cols 3..56; east wall 57
+_BE_BAY_E  = 56
+_BE_TEXT_MIN = 3                    # earliest col a proverb may start
 _BE_C1_ROWS = (3, 4, 5)
 _BE_C2_ROWS = (7, 8)
 _BE_C3_ROWS = (10, 11)
-_BE_SHAFT_SEPS = ((6, 25), (9, 26))  # (row, col) — the hop landing columns
+_BE_SHAFT_SEPS = ((6, 30), (9, 31))  # (row, col) — the hop landing columns
 _BE_THROAT = 12
 _BE_GATE   = 13
-_BE_BOLT0  = 18                     # bolts cols 18..20, one per chamber
-_BE_EXIT   = (13, 21)               # the FINAL SEAL
-# (row, w1 len, stone len, fitting '(' col): stone start = fitting + 1 =
-# TEXT0 + w1len + 2; staggered so the di( chain and every hop land INSIDE
-# the next stone (row 3's stone is 'ab cd' — 3+1+3 = 7, two words).
-_BE_C1_SHAPE = ((3, 5, 7, 25), (4, 4, 5, 24), (5, 4, 4, 24))
-_BE_C2_SHAPE = ((7, 3, 4, 23), (8, 3, 4, 23))
-_BE_C3_SHAPE = ((10, 4, 4, 24), (11, 3, 4, 23))
+_BE_BOLT0  = 3                      # bolts cols 3..5, one per chamber
+_BE_EXIT   = (13, 6)                # the FINAL SEAL
+# intruder slots: (row, junk len, fitting '(' col) — junk starts at '('+1;
+# staggered so the di( chain and every hop land INSIDE the next stone
+# (row 3's junk is 'ab cd' — 3+1+3 = 7, two words). Misquote slots:
+# (row, fitting col); wrong-word len >= 3 keeps the post-cure landing in.
+_BE_C1_SLOTS = ((3, 7, 30), (4, 5, 29), (5, 4, 29))
+_BE_C2_SLOTS = ((7, 28), (8, 28))
+_BE_C3_SLOTS = ((10, 4, 29), (11, 4, 28))
+_BE_CURE_LEN = 3
 _BE_PAR = 33            # hand-tallied along the driven tape (j % entry)
 
 
-def _be_draw_words(rng) -> dict:
-    """Draw the enclosure vocabulary (fixed slot lengths pin par and the
-    rival chains). Row 3's stone is two len-3 words; two typed cures (len 3);
-    all pairwise distinct."""
+def _be_draw_texts(rng) -> dict:
+    """Draw proverbs + junk stones for every slot (the Word Enclosure
+    draw discipline: geometric fits keep par seed-invariant)."""
+    from content import proverbs as _pv
     _load_vocab_tables()
 
-    def pool(length):
+    def junk_pool(length):
         return [w for w in _VOCAB_PLAIN_BY_LEN.get(length, ())
                 if w.isalpha() and w == w.lower()]
 
-    for _ in range(80):
-        picks: list = []
+    def fits_intruder(words, k, fit, jlen):
+        t0 = fit - (_pv.prefix_len(words, k) + 1)
+        last = fit + jlen + 3 + len(' '.join(words[k:])) - 1
+        return t0 >= _BE_TEXT_MIN and last <= _BE_BAY_E
 
-        def draw(length):
-            w = rng.choice(pool(length))
-            picks.append(w)
-            return w
+    def fits_misquote(entry, fit):
+        words, idx, _cure = entry
+        t0 = fit - (_pv.prefix_len(words, idx) + 1)
+        tail = ' '.join(words[idx + 1:])
+        last = fit + len(words[idx]) + 1 + (1 + len(tail) if tail else 0)
+        return len(words[idx]) >= 3 and t0 >= _BE_TEXT_MIN and last <= _BE_BAY_E
 
+    intruder_slots = _BE_C1_SLOTS + _BE_C3_SLOTS
+    cure_pool = _pv.misquotes_by_cure_len(_BE_CURE_LEN)
+    for _ in range(200):
+        sayings = rng.sample(_pv.PLAIN, len(intruder_slots))
+        junks: list = []
         rows = []
-        for i, (_r, w1l, stl, _fs) in enumerate(_BE_C1_SHAPE + _BE_C2_SHAPE
-                                                + _BE_C3_SHAPE):
-            stone = f'{draw(3)} {draw(3)}' if i == 0 else draw(stl)
-            rows.append((draw(w1l), stone, draw(5)))
-        cures = [draw(3), draw(3)]
-        if len(set(picks)) == len(picks):
-            return {'rows': rows, 'cures': cures}
-    raise ValueError('bracket_enclosure: no distinct draw after 80 tries')
+        ok = True
+        for i, ((r, jlen, fit), words) in enumerate(zip(intruder_slots, sayings)):
+            if i == 0:                                   # two words in the setting
+                a, b = rng.choice(junk_pool(3)), rng.choice(junk_pool(3))
+                junk, parts = f'{a} {b}', (a, b)
+            else:
+                junk = rng.choice(junk_pool(jlen))
+                parts = (junk,)
+            ks = [k for k in range(1, len(words))
+                  if fits_intruder(words, k, fit, jlen)]
+            if not ks or any(p in words for p in parts):
+                ok = False
+                break
+            junks += list(parts)
+            rows.append((r, words, rng.choice(ks), junk, fit))
+        if not ok or len(set(junks)) != len(junks):
+            continue
+        mis = rng.sample(cure_pool, len(_BE_C2_SLOTS))
+        if not all(fits_misquote(m, f) for m, (_r, f) in zip(mis, _BE_C2_SLOTS)):
+            continue
+        return {'intruders': rows, 'misquotes': mis}
+    raise ValueError('bracket_enclosure: no fitting draw after 200 tries')
 
 
 def build_dungeon_bracket_enclosure(seed: int) -> Dungeon:
     """The Bracket Enclosure (slug `bracket_enclosure`): i( and a(.
 
-    Gem settings: di( pries the stone and keeps the husk, ci( sets a new
-    stone, da( tears the whole fitting out and leaves the scar. See the
-    section header for the forcing."""
+    Sense, not decree: proverb bays. di( pries the junk stone and keeps the
+    husk, ci( recuts the miscut gem to the word everyone knows, da( tears
+    the whole fitting out. See the section header for the forcing."""
+    from content.proverbs import prefix_len, text_of
     rng = random.Random(seed)
-    words = _be_draw_words(rng)
-    shapes = _BE_C1_SHAPE + _BE_C2_SHAPE + _BE_C3_SHAPE
-
-    runs, targets = [], {}
-    for (r, w1l, stl, f_s), (w1, stone, w2) in zip(shapes, words['rows']):
-        w2_s = f_s + stl + 3                          # past '(stone) '
-        runs += [(r, _BE_TEXT0, w1), (r, f_s, f'({stone})'), (r, w2_s, w2)]
-        targets[r] = (w1, w2)
-    c1 = tuple(f'{targets[r][0]} () {targets[r][1]}' for r in _BE_C1_ROWS)
-    c2 = tuple(f'{targets[r][0]} ({c}) {targets[r][1]}'
-               for r, c in zip(_BE_C2_ROWS, words['cures']))
-    c3 = tuple(f'{targets[r][0]}  {targets[r][1]}' for r in _BE_C3_ROWS)
-    chambers = ((_BE_C1_ROWS, c1), (_BE_C2_ROWS, c2), (_BE_C3_ROWS, c3))
+    texts = _be_draw_texts(rng)
 
     R, C = _BE_ROWS, _BE_COLS
     cells = [[CellType.WALL] * C for _ in range(R)]
     for r in range(2, _BE_GATE + 1):                     # the spine
         cells[r][_BE_SPINE] = CellType.FLOOR
-    for rows, _t in chambers:                            # the bays
-        for r in rows:
-            for c in range(_BE_BAY_W, _BE_BAY_E + 1):
-                cells[r][c] = CellType.FLOOR
+    for r in _BE_C1_ROWS + _BE_C2_ROWS + _BE_C3_ROWS:   # the bays
+        for c in range(_BE_BAY_W, _BE_BAY_E + 1):
+            cells[r][c] = CellType.FLOOR
     for r, c in _BE_SHAFT_SEPS:                          # the light shafts —
         cells[r][c] = CellType.FLOOR                     # NOT the throat row
 
@@ -3799,19 +3854,38 @@ def build_dungeon_bracket_enclosure(seed: int) -> Dungeon:
     room.cells = cells
     room.seed  = seed
 
-    doors = []
-    for i, (rows, tgt) in enumerate(chambers):
-        doors.append((tgt, _BE_BOLT0 + i))
-        for pr, ptext in zip(rows, tgt):                 # full true readings
-            col = _BE_PLQ_COL
-            for part in ptext.split(' '):
-                if part:
-                    room.char_runs.append(CharRun(pr, col, tuple(part), 'verdant'))
-                col += len(part) + 1
-    for rr, cc, text in runs:
-        room.char_runs.append(CharRun(rr, cc, tuple(text), 'ancient'))
-    room._ss_doors = tuple(doors)                        # the shared exact-text tick
-    room._be_words = words
+    def lay(r, col, words_seq):
+        for w in words_seq:
+            room.char_runs.append(CharRun(r, col, tuple(w), 'ancient'))
+            col += len(w) + 1
+
+    truths = {}                                          # row -> (prefix, suffix)
+    for (r, words, k, junk, fit) in texts['intruders']:
+        t0 = fit - (prefix_len(words, k) + 1)
+        lay(r, t0, words[:k])
+        room.char_runs.append(CharRun(r, fit, tuple(f'({junk})'), 'ancient'))
+        lay(r, fit + len(junk) + 3, words[k:])
+        truths[r] = (text_of(words[:k]), text_of(words[k:]))
+    cures = {}
+    for (r, fit), (words, idx, cure) in zip(_BE_C2_SLOTS, texts['misquotes']):
+        t0 = fit - (prefix_len(words, idx) + 1)
+        lay(r, t0, words[:idx])
+        room.char_runs.append(CharRun(r, fit, tuple(f'({words[idx]})'), 'ancient'))
+        tail = words[idx + 1:]
+        if tail:
+            lay(r, fit + len(words[idx]) + 3, tail)
+        true = (f"{text_of(words[:idx])} ({cure})"
+                + (f" {text_of(tail)}" if tail else ''))
+        cures[r] = (cure, true)
+
+    c1 = tuple(f'{truths[r][0]} () {truths[r][1]}' for r in _BE_C1_ROWS)
+    c2 = tuple(cures[r][1] for r in _BE_C2_ROWS)
+    c3 = tuple(f'{truths[r][0]}  {truths[r][1]}' for r in _BE_C3_ROWS)
+    chambers = (c1, c2, c3)
+
+    room._ss_doors = tuple((tgt, _BE_BOLT0 + i)          # the shared exact-text tick
+                           for i, tgt in enumerate(chambers))
+    room._be_texts = texts
 
     room.entities.append(Entity(kind='exit', row=_BE_EXIT[0], col=_BE_EXIT[1],
                                 edit_immune=True))
@@ -3821,10 +3895,10 @@ def build_dungeon_bracket_enclosure(seed: int) -> Dungeon:
     room.rebuild_indexes()
     room.par    = _BE_PAR
     room.budget = math.ceil(_BE_PAR * 1.4)   # STANDARD: the piecewise route wins at 1★
-    ca, cb = words['cures']
+    ca, cb = (cures[r][0] for r in _BE_C2_ROWS)
     # nav golf (user-found in playtest): % from the spine scans to the first
     # '(' and jumps to its MATCH — j % lands ON the ')' and di( resolves
-    # from the delimiter. Two keys under the w-walk.
+    # from the delimiter. Two keys under the w-walk, whatever the prefix.
     room.answer = (f'j % di( j . j . 2j ci( {ca} j ci( {cb} '
                    f'2j da( j . G $')
 

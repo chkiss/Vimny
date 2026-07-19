@@ -16,8 +16,8 @@
 #
 # SPDX-License-Identifier: GPL-3.0-or-later
 
-"""The Word Enclosure (iw aw): the scar discrimination, the dot gap, and the
-gallery's structure/karaoke discipline."""
+"""The Word Enclosure (iw aw): proverbs by sense, the scar discrimination,
+the dot gap, and the gallery's structure/karaoke discipline."""
 import math
 
 import pytest
@@ -27,13 +27,14 @@ from blessed import Terminal
 import main
 from engine.world import CellType
 from content.levels import known_commands
+from content import proverbs as pv
 from generation.dungeon_gen import (
     build_dungeon_word_enclosure,
     _WE_ROWS, _WE_COLS, _WE_SPINE, _WE_SHAFT_SEPS, _WE_THROAT,
-    _WE_GATE, _WE_BOLT0, _WE_EXIT, _WE_PAR,
+    _WE_GATE, _WE_BOLT0, _WE_EXIT, _WE_PAR, _WE_SPAWN, _WE_TEXT_MIN,
     _WE_C1_ROWS, _WE_C2_ROWS, _WE_C3_ROWS, _WE_C4_ROWS, _WE_C5_ROWS,
-    _WE_C1_SHAPE, _WE_C2_SHAPE, _WE_C3_SHAPE, _WE_C4_SHAPE, _WE_C5_SHAPE,
-    _WE_TEXT0,
+    _WE_C1_SLOTS, _WE_C2_SLOTS, _WE_C3_SLOTS, _WE_C4_SLOTS, _WE_C5_SLOTS,
+    _WE_BAY_E,
 )
 from tests import SEEDS, cached_room
 
@@ -52,22 +53,27 @@ def _bolt(i):
     return (_WE_GATE, _WE_BOLT0 + i)
 
 
-# The canonical tape (== room.answer with Esc placed): the diw drill chained
-# by dot, the two ciw cures (different — no dot shortcut), the daw seam with
-# a dot reprise. 34 keys; the cures vary by seed.
+def _cures(room):
+    return [m[2] for m in room._we_texts['misquotes']]
+
+
+# The canonical tape (== room.answer with Esc placed): spawn drops onto the
+# first intruder, the diw drill chains by dot, the two ciw cures mend the
+# misquotes everyone knows, the daw seam with a dot reprise. Cures vary by
+# seed but are all len 3 — par is column-anchored, not text-anchored.
 def _canon_keys(room):
-    ca, cb = room._we_words['cures']
-    return (_K('jwwdiwj.j.') + _K('2jciw') + _K(ca) + [ESC]
+    ca, cb = _cures(room)
+    return (_K('jdiwj.j.') + _K('2jciw') + _K(ca) + [ESC]
             + _K('jciw') + _K(cb) + [ESC] + _K('2jdawj.')
             + _K('2jdiWj.') + _K('l2jdaWj.') + _K('G$'))
 
 
 # The leanest old-only rival (WITH its own best dot usage): de needs each
-# rot's START (an h per stagger), ce/dw pay the hh walk back from the
-# mid-rot landing. Wins at 1★.
+# intruder's START (an h per stagger), ce/dw pay the hh walk back from the
+# mid-word landing. Wins at 1★.
 def _piecewise_rival_keys(room):
-    ca, cb = room._we_words['cures']
-    return (_K('jwwdejh.j.') + _K('2jhhce') + _K(ca) + [ESC]
+    ca, cb = _cures(room)
+    return (_K('jdejh.j.') + _K('2jhhce') + _K(ca) + [ESC]
             + _K('jhhce') + _K(cb) + [ESC] + _K('2jhhdwj.')
             + _K('2jhdEj.') + _K('l2jhdWj.') + _K('G$'))
 
@@ -116,7 +122,7 @@ def _row_text(room, r):
 def test_layout_and_identity(seed):
     room = _room(seed)
     assert (room.rows, room.cols) == (_WE_ROWS, _WE_COLS)
-    assert room.spawn_pos == (2, _WE_SPINE)
+    assert room.spawn_pos == _WE_SPAWN
     assert room.exit_pos == _WE_EXIT
     exit_ent = next(e for e in room.entities if e.kind == 'exit')
     assert (exit_ent.row, exit_ent.col) == _WE_EXIT and exit_ent.edit_immune
@@ -127,8 +133,8 @@ def test_par_answer_budget(seed):
     room = _room(seed)
     assert room.par == _WE_PAR
     assert room.budget == math.ceil(_WE_PAR * 1.4)
-    ca, cb = room._we_words['cures']
-    assert room.answer == (f'j w w diw j . j . 2j ciw {ca} j ciw {cb} '
+    ca, cb = _cures(room)
+    assert room.answer == (f'j diw j . j . 2j ciw {ca} j ciw {cb} '
                            f'2j daw j . 2j diW j . l 2j daW j . G $')
 
 
@@ -158,31 +164,52 @@ def test_light_shaft_pierces_separators_but_not_the_throat(seed):
 
 
 @pytest.mark.parametrize("seed", SEEDS)
-def test_word_draw_shapes_and_landings(seed):
-    """Fixed slot lengths; the rot stagger keeps every dot-chain landing
-    INSIDE the next rot, and the shaft column inside every hopped-to rot."""
+def test_proverb_draw_anchors_and_landings(seed):
+    """The corrupt word occupies its slot exactly (start col + length); the
+    stagger keeps every dot-chain landing INSIDE the next corrupt word; the
+    laid text is the saying itself, fitting the bay."""
     room = _room(seed)
-    words = room._we_words
-    shapes = _WE_C1_SHAPE + _WE_C2_SHAPE + _WE_C3_SHAPE
-    for (r, w1l, rotl, rot_s), (w1, rot, w2) in zip(shapes, words['rows']):
-        assert (len(w1), len(rot), len(w2)) == (w1l, rotl, 5)
-        assert rot_s == _WE_TEXT0 + w1l + 1
-    # C1 chain: each after-diw cursor (rot start) is inside the NEXT rot
-    for (ra, _l1, _rl, sa), (rb, _l2, rlb, sb) in zip(_WE_C1_SHAPE, _WE_C1_SHAPE[1:]):
-        assert sb <= sa < sb + rlb, "the stagger keeps the dot chain alive"
-    # the shafts land inside the C2/C3 rots (ce/dw pay the h's back)
+    texts = room._we_texts
+    slot_by_row = {r: (jl, s) for r, jl, s in
+                   (_WE_C1_SLOTS + _WE_C3_SLOTS + _WE_C4_SLOTS + _WE_C5_SLOTS)}
+    laid = {}
+    for r, words, k, junk, start in texts['intruders']:
+        jl, s = slot_by_row[r]
+        assert start == s and len(junk) == jl
+        assert 1 <= k <= len(words) - 1, "a word stands each side of the junk"
+        t0 = start - (pv.prefix_len(words, k) + 1)
+        assert t0 >= _WE_TEXT_MIN
+        assert start + jl + len(' '.join(words[k:])) <= _WE_BAY_E
+        assert _row_text(room, r) == \
+            f"{pv.text_of(words[:k])} {junk} {pv.text_of(words[k:])}"
+        laid[r] = (start, jl)
+    for (r, s), (words, idx, cure) in zip(_WE_C2_SLOTS, texts['misquotes']):
+        assert len(cure) == 3 and len(words[idx]) >= 3
+        assert _row_text(room, r) == pv.text_of(words)
+        laid[r] = (s, len(words[idx]))
+    # C1 chain: each after-diw cursor (slot start) is inside the NEXT slot
+    for ra, rb in zip(_WE_C1_ROWS, _WE_C1_ROWS[1:]):
+        (sa, _la), (sb, lb) = laid[ra], laid[rb]
+        assert sb <= sa < sb + lb, "the stagger keeps the dot chain alive"
+    # every hopped-to corrupt word contains its shaft landing column
     shaft = dict(_WE_SHAFT_SEPS)
-    for r, _w1l, rotl, rot_s in (_WE_C2_SHAPE + _WE_C3_SHAPE[:1]):
-        assert rot_s < shaft[6] < rot_s + rotl
-    # the mixed tokens: two len-4 words hyphenated (one WORD, three w-words)
-    for (_r, _w1l, tokl, _ts), (w1, tok, w2) in zip(
-            _WE_C4_SHAPE + _WE_C5_SHAPE, words['mixed']):
-        assert len(tok) == tokl == 9 and tok[4] == '-'
-        assert (len(w1), len(w2)) == (3, 5)
-    picks = ([w for triple in words['rows'] for w in triple]
-             + [w for triple in words['mixed'] for w in triple]
-             + words['cures'])
-    assert len(set(picks)) == len(picks)
+    for r, land in ((7, shaft[6]), (10, shaft[9]), (13, shaft[12]),
+                    (16, shaft[15])):
+        s, ln = laid[r]
+        assert s <= land < s + ln, f"row {r}: landing {land} outside {s}+{ln}"
+    # the hyphenated tokens are one WORD, three w-words
+    for r, words, k, junk, start in texts['intruders']:
+        if r in _WE_C4_ROWS + _WE_C5_ROWS:
+            assert len(junk) == 9 and junk[4] == '-'
+    # famous texts pairwise distinct; junk foreign to its own saying
+    sayings = [words for _r, words, _k, _j, _s in texts['intruders']]
+    assert len({' '.join(w) for w in sayings}) == len(sayings)
+    for _r, words, _k, junk, _s in texts['intruders']:
+        assert all(p not in words for p in junk.split('-'))
+    # a cure door's target must not equal any laid saying (cross-open guard)
+    cured = {' '.join(w[:i] + (c,) + w[i + 1:])
+             for w, i, c in texts['misquotes']}
+    assert not (cured & {' '.join(w) for w in sayings})
 
 
 def test_curriculum_and_gating():
@@ -229,42 +256,51 @@ def test_admin_karaoke_tape_tracks_to_the_end(monkeypatch):
 
 # ── the chambers' laws ───────────────────────────────────────────────────────
 
+def _truth(room, r):
+    """(prefix, suffix) of the intruder row's true saying."""
+    for rr, words, k, _junk, _s in room._we_texts['intruders']:
+        if rr == r:
+            return pv.text_of(words[:k]), pv.text_of(words[k:])
+    raise KeyError(r)
+
+
 def test_diw_leaves_the_scar_and_daw_heals_the_seam(monkeypatch):
     """The discrimination, driven: diw on a C1 row leaves the double gap;
     daw there would heal the seam and the door must stay barred."""
     dungeon = build_dungeon_word_enclosure(0)
     room = dungeon.rooms[0]
-    (w1, _rot, w2) = room._we_words['rows'][0]
-    _drive(dungeon, _K('jwwdiw'), monkeypatch, finish=':q!\r')
-    assert _row_text(room, _WE_C1_ROWS[0]) == f'{w1}  {w2}'
+    pre, suf = _truth(room, _WE_C1_ROWS[0])
+    _drive(dungeon, _K('jdiw'), monkeypatch, finish=':q!\r')
+    assert _row_text(room, _WE_C1_ROWS[0]) == f'{pre}  {suf}'
 
     dungeon = build_dungeon_word_enclosure(0)
     room = dungeon.rooms[0]
-    _drive(dungeon, _K('jwwdaw'), monkeypatch, finish=':q!\r')
-    assert _row_text(room, _WE_C1_ROWS[0]) == f'{w1} {w2}', "seam healed"
+    _drive(dungeon, _K('jdaw'), monkeypatch, finish=':q!\r')
+    assert _row_text(room, _WE_C1_ROWS[0]) == f'{pre} {suf}', "seam healed"
     assert room.cells[_bolt(0)[0]][_bolt(0)[1]] == CellType.WALL, \
         "the scar door does not accept the healed seam"
 
 
 def test_dw_heals_the_seam_and_is_dead_for_the_drill(monkeypatch):
-    """dw from the rot's start eats the trailing gap — single gap, scar door
-    stays shut (the reason the piecewise rival must use de)."""
+    """dw from the intruder's start eats the trailing gap — single gap, scar
+    door stays shut (the reason the piecewise rival must use de)."""
     dungeon = build_dungeon_word_enclosure(0)
     room = dungeon.rooms[0]
-    _drive(dungeon, _K('jwwdw'), monkeypatch, finish=':q!\r')
+    _drive(dungeon, _K('jdw'), monkeypatch, finish=':q!\r')
     assert room.cells[_bolt(0)[0]][_bolt(0)[1]] == CellType.WALL
 
 
 def test_caw_fuses_the_cure_and_reads_false(monkeypatch):
-    """caw on a cure row eats the separator — the typed cure fuses into w2
-    and the exact-text door stays barred (u recovers)."""
+    """caw on a misquote row eats a separator — the typed cure fuses into a
+    neighbour and the exact-text door stays barred (u recovers)."""
     dungeon = build_dungeon_word_enclosure(0)
     room = dungeon.rooms[0]
-    ca, _cb = room._we_words['cures']
-    _drive(dungeon, _K('jwwdiwj.j.2jcaw') + _K(ca) + [ESC],
+    ca, _cb = _cures(room)
+    _drive(dungeon, _K('jdiwj.j.2jcaw') + _K(ca) + [ESC],
            monkeypatch, finish=':q!\r')
-    w1, _rot, w2 = room._we_words['rows'][3]
-    assert _row_text(room, _WE_C2_ROWS[0]) == f'{w1} {ca}{w2}', "fused"
+    words, idx, _cure = room._we_texts['misquotes'][0]
+    true = pv.text_of(words[:idx] + (ca,) + words[idx + 1:])
+    assert _row_text(room, _WE_C2_ROWS[0]) != true, "fused — reads false"
     assert room.cells[_bolt(1)[0]][_bolt(1)[1]] == CellType.WALL
 
 
@@ -273,10 +309,8 @@ def test_diw_on_the_seam_rows_reads_false(monkeypatch):
     leaves the scar and the seam door must not open."""
     dungeon = build_dungeon_word_enclosure(0)
     room = dungeon.rooms[0]
-    keys = _canon_keys(room)
-    # swap the first daw for diw: ...2j diw j . — the drill op on seam rows
-    ca, cb = room._we_words['cures']
-    bad = (_K('jwwdiwj.j.') + _K('2jciw') + _K(ca) + [ESC]
+    ca, cb = _cures(room)
+    bad = (_K('jdiwj.j.') + _K('2jciw') + _K(ca) + [ESC]
            + _K('jciw') + _K(cb) + [ESC] + _K('2jdiwj.'))
     _drive(dungeon, bad, monkeypatch, finish=':q!\r')
     assert room.cells[_bolt(2)[0]][_bolt(2)[1]] == CellType.WALL
@@ -287,11 +321,10 @@ def test_diw_on_a_mixed_token_kills_a_subword_and_reads_false(monkeypatch):
     the scar door stays barred; only iW takes the whole WORD."""
     dungeon = build_dungeon_word_enclosure(0)
     room = dungeon.rooms[0]
-    ca, cb = room._we_words['cures']
-    upto_c4 = (_K('jwwdiwj.j.') + _K('2jciw') + _K(ca) + [ESC]
+    ca, cb = _cures(room)
+    upto_c4 = (_K('jdiwj.j.') + _K('2jciw') + _K(ca) + [ESC]
                + _K('jciw') + _K(cb) + [ESC] + _K('2jdawj.') + _K('2j'))
     _drive(dungeon, upto_c4 + _K('diw'), monkeypatch, finish=':q!\r')
-    w1, tok, w2 = room._we_words['mixed'][0]
     assert '-' in _row_text(room, _WE_C4_ROWS[0]), "the hyphen half remains"
     assert room.cells[_bolt(3)[0]][_bolt(3)[1]] == CellType.WALL
 
@@ -301,8 +334,8 @@ def test_dW_heals_the_seam_and_is_dead_for_the_token_scar(monkeypatch):
     double-gap scar (the reason the WORD-family rival must use dE)."""
     dungeon = build_dungeon_word_enclosure(0)
     room = dungeon.rooms[0]
-    ca, cb = room._we_words['cures']
-    upto_c4 = (_K('jwwdiwj.j.') + _K('2jciw') + _K(ca) + [ESC]
+    ca, cb = _cures(room)
+    upto_c4 = (_K('jdiwj.j.') + _K('2jciw') + _K(ca) + [ESC]
                + _K('jciw') + _K(cb) + [ESC] + _K('2jdawj.') + _K('2j'))
     _drive(dungeon, upto_c4 + _K('hdW'), monkeypatch, finish=':q!\r')
     assert room.cells[_bolt(3)[0]][_bolt(3)[1]] == CellType.WALL
@@ -316,7 +349,7 @@ def test_undo_rebars_bolt_and_seal(monkeypatch):
 
     dungeon = build_dungeon_word_enclosure(0)
     room = dungeon.rooms[0]
-    # uu: the walk pushes a snapshot; the second u reaches the dotted daw
+    # uu: the walk pushes a snapshot; the second u reaches the dotted daW
     _drive(dungeon, _canon_keys(room)[:-2] + _K('luu'), monkeypatch, finish=':q!\r')
     assert room.cells[_bolt(4)[0]][_bolt(4)[1]] == CellType.WALL, "re-bars"
     assert room.cells[_WE_EXIT[0]][_WE_EXIT[1]] == CellType.WALL, "re-seals"

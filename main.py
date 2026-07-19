@@ -2642,7 +2642,7 @@ _LEVEL_INTROS = {
     'sentence_corridor': ('The Sentence Corridor — two verses parted by still water, and a mist that clings to the pool. The far shore reads clear, but you can\'t reliably jump to the far wall from here.', 70),
     'sight_sanctum': ('The Sight Sanctum — the rot here spreads in ragged patches no single stroke can span. The keepers of this place had one law: first behold, then strike.', 70),
     'selection_halls': ('The Selection Halls — a gallery of corrupt panels: some rotted whole lines at a time, some down a single seam. The restorers here took each span in one grasp.', 70),
-    'word_enclosure': ('The Word Enclosure — rot has taken root in the middle of the inscriptions. The wardens here did not aim their cuts; they named the shape, and the shape was taken whole.', 70),
+    'word_enclosure': ('The Word Enclosure — old sayings hang in these bays, every one spoken wrong. You know how they truly run. The wardens here did not aim their cuts; they named the shape, and the shape was taken whole.', 70),
     'bracket_enclosure': ('The Bracket Enclosure — a jeweller\'s gallery: every inscription holds a stone in its setting, and every stone has gone bad. The plaques keep each door\'s terms; no two doors ask alike.', 70),
     'brace_square_enclosure': ('The Brace & Square Enclosure — deeper vaults, richer settings: square fittings, braced caskets, and at the heart a casket WITHIN a fitting. The old jewellers read the metal under their hands before they cut.', 70),
     'sentence_enclosure': ('The Sentence Enclosure — the inscriptions here run in full verses, and the rot takes a whole verse at a time. The plaques remember how every line should read when the reading is done.', 70),
