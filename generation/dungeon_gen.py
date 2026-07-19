@@ -5714,20 +5714,23 @@ _WI_BRAZIERS = ((_WI_BRZ_ROW, 8), (_WI_BRZ_ROW, 13), (_WI_BRZ_ROW, 18))
 _WI_GATE   = 6
 _WI_BOLT   = 23
 _WI_EXIT   = (6, 24)
-_WI_PAR    = 44                       # i{w1} 2+ yl w P gi␣{w2} 2+ 2w P
+_WI_PAR    = 42                       # i{w1} 2+ yl w P gi␣{w2} 2+ 2w P
                                       # gi␣{w3} 2+ 3w P gi␣{w4} G $ (pinned)
+
+# SENSE, NOT DECREE (blueprints/sense_not_decree.md §6): the inscription is
+# a four-word saying the player knows whole — writing the first words, they
+# know what the dark plaque quarters must say before the firelight shows
+# them. Both pool entries total 14 letters (words ≤ 4, the plaque pitch),
+# so the typed cost — and par — is pool-invariant.
+_WI_PHRASES = (
+    ('live', 'and', 'let', 'live'),
+    ('easy', 'come', 'easy', 'go'),
+)
 
 
 def _wi_draw_words(rng) -> tuple:
-    """The four quarters of the inscription (len 4 each, all distinct)."""
-    _load_vocab_tables()
-    pool = [w for w in _VOCAB_PLAIN_BY_LEN.get(4, ())
-            if w.isalpha() and w == w.lower()]
-    for _ in range(80):
-        ws = tuple(rng.choice(pool) for _ in range(4))
-        if len(set(ws)) == 4:
-            return ws
-    raise ValueError('wet_ink: no distinct draw after 80 tries')
+    """One saying per seed; the quarters are its words."""
+    return _WI_PHRASES[rng.randrange(len(_WI_PHRASES))]
 
 
 def build_dungeon_wet_ink(seed: int) -> Dungeon:

@@ -181,7 +181,9 @@ def test_wi_structure(seed):
     room = cached_room('build_dungeon_wet_ink', seed)
     ws = room._wi_words
     full = ' '.join(ws)
-    assert len(ws) == 4 and len(set(ws)) == 4
+    from generation.dungeon_gen import _WI_PHRASES
+    assert ws in _WI_PHRASES and len(ws) == 4
+    assert sum(len(w) for w in ws) == 14, "pool-invariant typed cost"
     assert room._ss_doors[0][0] == (full,)
     # the whole inscription is laid at build, in the west WALL, one run
     # per quarter with a gap column for the space
