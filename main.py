@@ -3548,15 +3548,11 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
             # own reveal flood strips too much): everything ABOVE the stone
             # course turns misted (readable, unwalkable); the corridor lights
             # up to the boss door; past it stays dark until the brazier burns.
-            parted = False
             for fr in range(1, cor - 1):
                 for fc in range(room.cols):
                     if room.cells[fr][fc] in (CellType.FLOOR, CellType.WATER):
-                        cell = (fr, fc)
-                        if cell not in room.mist_cells:
-                            parted = True
-                        room.fog_cells.add(cell)
-                        room.mist_cells.add(cell)
+                        room.fog_cells.add((fr, fc))
+                        room.mist_cells.add((fr, fc))
             sd_col = _dg._CL_SEALDOOR[1]
             for fc in range(room.cols):
                 cell = (cor, fc)
@@ -3567,9 +3563,8 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
                                                          CellType.CORRIDOR):
                     room.fog_cells.add(cell)       # the dark holds past the seal
                     room.mist_cells.discard(cell)
-            if parted:
-                _push('Beyond the door, the dark thins — the ledger stands '
-                      'in the mist.')
+            # (No message: the reveal is on screen — narration would only
+            # distract from what the player can already see.)
         if lit is not False:
             return                                 # already lit (or not this level)
         texts = []
