@@ -10585,41 +10585,46 @@ def build_dungeon_sculpting_chambers(seed: int) -> Dungeon:
 # in the WEST wall, a spine-only throat joining the block to the gate row, a row
 # of bolts, and a plain-floor exit east of them (`_whole_line_annex_tick`, keyed
 # on room._wla_doors; R overwrites IN PLACE so the floor scan is shift-free).
-_OH_ROWS, _OH_COLS = 10, 24
-_OH_PLQ_COL = 1                     # the true word, in the WEST wall (cols 1..8)
-_OH_COL_S   = 10                    # the spine — the gate's first standable; the word floor start
+_OH_ROWS, _OH_COLS = 10, 39
+_OH_PLQ_COL = 1                     # (retired name) the west stone band, cols 1..25
+_OH_COL_S   = 27                    # the spine — the gate's first standable; the word floor
+                                    # starts here, the saying's carved PREFIX fills the west wall
 _OH_LBL_COL = _OH_COL_S            # the wrong word sits on the floor here
-_OH_LBL_END = 18                    # word floor reaches here (fits the 8-char stream words)
+_OH_LBL_END = 36                    # word floor reaches here (fits the 9-char stream word)
 _OH_LESSON_ROWS = (2, 3, 4, 5, 6)   # five corridors, descended by j
 _OH_THROAT_ROW  = 7                 # spine-only row: the block joins the gate
 _OH_GATE_ROW    = 8                 # the gate corridor: spine · bolts · exit
-_OH_GATE_COL0   = 11                # first bolt column (one per corridor)
+_OH_GATE_COL0   = 28                # first bolt column (one per corridor)
 _OH_TRIGGERS    = len(_OH_LESSON_ROWS)
 _OH_EXIT = (_OH_GATE_ROW, _OH_GATE_COL0 + _OH_TRIGGERS)   # plain floor, east of the bolts
 _OH_RUN = 'xzq'                     # the 3-cell corruption every stream shares (fx finds it)
 
-# (kind, target, wrong). STREAM: a 3-cell varied run mid-word (fx→R fixes it,
-# S/cc/ce overpay). STITCH: one wrong cell (r's niche). Order interleaves them.
+# SENSE, NOT DECREE (blueprints/sense_not_decree.md §2, the change levels):
+# (kind, stone prefix, target, wrong). Every corridor's floor word FINISHES a
+# saying whose start is carved in the west stone — the cure is the letters
+# everyone knows. STREAM: a 3-cell varied run mid-word (fx→R fixes it, S/cc/ce
+# overpay). STITCH: one wrong cell (r's niche). The corrupt positions keep the
+# tape's landing chain: C2's x sits west of C1's post-R cursor, C3's run west
+# of C2's mend, C4's wrong cell exactly under C3's post-R cursor, C5's run
+# west of C4's mend (all asserted in tests).
 _OH_LESSONS = (
-    ('stream', 'guardian', 'guar' + _OH_RUN + 'n'),   # guar·[dia→xzq]·n
-    ('stitch', 'sentry',   'sentxy'),                  # sent·[r→x]·y
-    ('stream', 'rampart',  'ra' + _OH_RUN + 'rt'),     # ra·[mpa→xzq]·rt
-    ('stitch', 'portal',   'portil'),                  # port·[a→i]·l
-    ('stream', 'bastion',  'ba' + _OH_RUN + 'on'),     # ba·[sti→xzq]·on
+    ('stream', 'seeing is', 'believing', 'beli' + _OH_RUN + 'ng'),
+    ('stitch', 'haste makes', 'waste', 'wastx'),
+    ('stream', 'a penny saved is a penny', 'earned', 'ea' + _OH_RUN + 'd'),
+    ('stitch', 'lightning never strikes', 'twice', 'twica'),
+    ('stream', 'speech is', 'silver', 'si' + _OH_RUN + 'r'),
 )
 # par + the canonical tape, driven end-to-end (no Dijkstra — R overwrites in
 # place, but the fx-R-run route is hand-measured like the Annex). The route is
 # the GOLFED one — `F` (backward-find, NOT `^f`) back to each run, the C4 stitch
 # taken free (the descent lands the cursor on it), and `G$` (NOT `^jj$`) to the
-# door:  fx Rdia · Fx rr · Fx Rmpa · ra · Fx Rsti · G$  = 30 keys.
-# Rivals measured on the SAME seed-invariant geometry with the SAME golfed nav:
-# all-`S` (retype the whole word) = 39, all-`r`-chain = 42. The budget bars the
-# cheapest no-R route (all-S) by one: par + _OH_SAVING(9) − 1 = 38 < 39.
-# (An earlier hand-route used `^f`/`^jj$` and mis-set par to 38 — a nav cheese;
-# see tests/test_overwrite_halls.py::test_no_cheaper_nav_beats_par.)
+# door:  fx Revi · Fx re · Fx Rrne · re · Fx Rlve · G$  = 30 keys.
+# Rivals measured on the SAME fixed geometry with the SAME golfed nav: all-`S`
+# (retype the whole word) and the `r`-chain both overshoot; the budget bars the
+# cheapest no-R route by one (par + _OH_SAVING − 1) — the Annex model.
 _OH_PAR    = 30
-_OH_ANSWER = 'fx Rdia j Fx rr j Fx Rmpa j ra j Fx Rsti G$'
-_OH_SAVING = 9
+_OH_ANSWER = 'fx Revi j Fx re j Fx Rrne j re j Fx Rlve G$'
+_OH_SAVING = 8
 
 
 def build_dungeon_overwrite_halls(seed: int) -> Dungeon:
@@ -10651,12 +10656,18 @@ def build_dungeon_overwrite_halls(seed: int) -> Dungeon:
 
     doors = []
     lessons = []
-    for i, (kind, target, wrong) in enumerate(_OH_LESSONS):
+    for i, (kind, prefix, target, wrong) in enumerate(_OH_LESSONS):
         lrow = _OH_LESSON_ROWS[i]
         lay(lrow, _OH_LBL_COL, wrong, 'ancient')             # the WRONG word, on the floor
-        lay(lrow, _OH_PLQ_COL, target, 'verdant')            # the true word, the WEST-wall plaque
+        # the saying's carved prefix, right-aligned in the west stone (the
+        # sense that replaces the decree plaque)
+        pcol = _OH_COL_S - 1 - len(prefix)
+        for w in prefix.split(' '):
+            lay(lrow, pcol, w, 'verdant')
+            pcol += len(w) + 1
         doors.append((target, (_OH_GATE_ROW, _OH_GATE_COL0 + i)))
-        lessons.append({'kind': kind, 'target': target, 'wrong': wrong, 'row': lrow})
+        lessons.append({'kind': kind, 'prefix': prefix, 'target': target,
+                        'wrong': wrong, 'row': lrow})
     room._wla_doors    = tuple(doors)                        # reuse the Annex tick
     room._oh_lessons   = tuple(lessons)
 

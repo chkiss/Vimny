@@ -59,34 +59,34 @@ def _bolt(i):
 # (backward-find) back to each run, the C4 stitch taken FREE (the descent lands
 # the cursor on it), and `G$` to the door. 30 keys.
 def _canon_keys():
-    return (_K('fx') + _K('R') + _K('dia') + [ESC] + _K('j')
-            + _K('Fx') + _K('rr') + _K('j')
-            + _K('Fx') + _K('R') + _K('mpa') + [ESC] + _K('j')
-            + _K('ra') + _K('j')
-            + _K('Fx') + _K('R') + _K('sti') + [ESC]
+    return (_K('fx') + _K('R') + _K('evi') + [ESC] + _K('j')
+            + _K('Fx') + _K('re') + _K('j')
+            + _K('Fx') + _K('R') + _K('rne') + [ESC] + _K('j')
+            + _K('re') + _K('j')
+            + _K('Fx') + _K('R') + _K('lve') + [ESC]
             + _K('G') + _K('$'))
 
 
-# The OLD hand-route that mis-set par to 38: `^f` back to each run and `^jj$` to
-# the door — every one a wasteful stand-in for `F` / `G$`. It still wins, but
-# spends MORE than par; a golfer would never type it. Kept as a cheese regression.
+# The OLD hand-route shape that once mis-set par: `^f` back to each run and
+# `^jj$` to the door — every one a wasteful stand-in for `F` / `G$`. It still
+# wins, but spends MORE than par. Kept as a cheese regression.
 def _old_nav_keys():
-    return (_K('fx') + _K('R') + _K('dia') + [ESC] + _K('j')
-            + _K('^') + _K('fx') + _K('rr') + _K('j')
-            + _K('^') + _K('fx') + _K('R') + _K('mpa') + [ESC] + _K('j')
-            + _K('^') + _K('fi') + _K('ra') + _K('j')
-            + _K('^') + _K('fx') + _K('R') + _K('sti') + [ESC]
+    return (_K('fx') + _K('R') + _K('evi') + [ESC] + _K('j')
+            + _K('^') + _K('fx') + _K('re') + _K('j')
+            + _K('^') + _K('fx') + _K('R') + _K('rne') + [ESC] + _K('j')
+            + _K('^') + _K('fa') + _K('re') + _K('j')
+            + _K('^') + _K('fx') + _K('R') + _K('lve') + [ESC]
             + _K('^') + _K('j') + _K('j') + _K('$'))
 
 
 def _all_S_keys():
     """The cheapest no-R route: change the whole word on each stream (S), r the
     stitches. Costs par + _OH_SAVING, one past the budget."""
-    return (_K('S') + _K('guardian') + [ESC] + _K('j')
-            + _K('Fx') + _K('rr') + _K('j')
-            + _K('S') + _K('rampart') + [ESC] + _K('j')
-            + _K('Fi') + _K('ra') + _K('j')
-            + _K('S') + _K('bastion') + [ESC]
+    return (_K('S') + _K('believing') + [ESC] + _K('j')
+            + _K('Fx') + _K('re') + _K('j')
+            + _K('S') + _K('earned') + [ESC] + _K('j')
+            + _K('Fa') + _K('re') + _K('j')
+            + _K('S') + _K('silver') + [ESC]
             + _K('G') + _K('$'))
 
 
@@ -137,7 +137,7 @@ def test_streams_carry_a_consecutive_varied_run_stitches_a_single_diff():
     """Each STREAM word differs from its plaque in a CONTIGUOUS run of >= 2 cells
     whose target chars are varied (no two adjacent equal → `.` dies); each STITCH
     differs in exactly ONE cell (r's niche)."""
-    for kind, target, wrong in _OH_LESSONS:
+    for kind, _prefix, target, wrong in _OH_LESSONS:
         assert len(target) == len(wrong)
         diffs = [i for i in range(len(target)) if target[i] != wrong[i]]
         if kind == 'stream':
@@ -151,12 +151,23 @@ def test_streams_carry_a_consecutive_varied_run_stitches_a_single_diff():
 
 
 @pytest.mark.parametrize("seed", SEEDS)
-def test_plaque_true_word_floor_wrong_word(seed):
+def test_stone_prefix_true_saying_floor_wrong_word(seed):
+    """Sense, not decree: the saying's start is carved in the west stone
+    (WALL cells, off the floor scans), right-aligned two cols shy of the
+    spine; the floor holds only the wrong finishing word."""
     room = _room(seed)
-    for i, (kind, target, wrong) in enumerate(_OH_LESSONS):
+    for i, (kind, prefix, target, wrong) in enumerate(_OH_LESSONS):
         r = _OH_LESSON_ROWS[i]
-        plq = room.char_run_at(r, _OH_PLQ_COL)
-        assert plq is not None and ''.join(plq.symbols) == target
+        stones = [ru for ru in room.char_runs
+                  if ru.row == r and ru.kind == 'verdant']
+        assert stones, r
+        for ru in stones:
+            for k in range(len(ru.symbols)):
+                assert room.cells[r][ru.col + k] == CellType.WALL
+        assert max(ru.col + len(ru.symbols) - 1 for ru in stones) == _OH_COL_S - 2
+        text = ' '.join(''.join(ru.symbols)
+                        for ru in sorted(stones, key=lambda u: u.col))
+        assert text == prefix
         floor = main._wla_floor_text(room, r)
         assert wrong in floor and target not in floor, (target, wrong)
 
@@ -165,8 +176,8 @@ def test_plaque_true_word_floor_wrong_word(seed):
 def test_doors_independent(seed):
     """No target reads inside another target or any wrong word, so each bolt
     answers only to its own corridor."""
-    targets = [t for _, t, _ in _OH_LESSONS]
-    wrongs = [w for _, _, w in _OH_LESSONS]
+    targets = [t for _, _, t, _ in _OH_LESSONS]
+    wrongs = [w for _, _, _, w in _OH_LESSONS]
     for i, t in enumerate(targets):
         for j, u in enumerate(targets):
             if i != j:
@@ -250,9 +261,9 @@ def test_dot_cannot_mend_a_varied_run(monkeypatch):
     dungeon = build_dungeon_overwrite_halls(SEEDS[0])
     room = dungeon.rooms[0]
     # r the first run cell, then dot along it (repeats that one char)
-    keys = _K('fx') + _K('rd') + _K('l') + _K('.') + _K('l') + _K('.')
+    keys = _K('fx') + _K('re') + _K('l') + _K('.') + _K('l') + _K('.')
     _drive(dungeon, keys, monkeypatch, finish=':q!\r')
-    assert 'guardian' not in main._wla_floor_text(room, _OH_LESSON_ROWS[0])
+    assert 'believing' not in main._wla_floor_text(room, _OH_LESSON_ROWS[0])
     assert room.cells[_bolt(0)[0]][_bolt(0)[1]] == CellType.WALL, "bolt still shut"
 
 
@@ -283,13 +294,13 @@ def test_undo_rebars_a_bolt(seed, monkeypatch):
     unwrites it and the tick re-bars (stateless, undo-safe)."""
     dungeon = build_dungeon_overwrite_halls(seed)
     room = dungeon.rooms[0]
-    _drive(dungeon, _K('fx') + _K('R') + _K('dia') + [ESC] + _K('l'),
+    _drive(dungeon, _K('fx') + _K('R') + _K('evi') + [ESC] + _K('l'),
            monkeypatch, finish=':q!\r')
     assert room.cells[_bolt(0)[0]][_bolt(0)[1]] == CellType.FLOOR, "opened"
 
     dungeon = build_dungeon_overwrite_halls(seed)
     room = dungeon.rooms[0]
-    _drive(dungeon, _K('fx') + _K('R') + _K('dia') + [ESC] + _K('l') + _K('uu'),
+    _drive(dungeon, _K('fx') + _K('R') + _K('evi') + [ESC] + _K('l') + _K('uu'),
            monkeypatch, finish=':q!\r')
     assert room.cells[_bolt(0)[0]][_bolt(0)[1]] == CellType.WALL, "re-barred"
 
@@ -309,7 +320,7 @@ def test_answer_is_the_real_keystroke_tape(seed, monkeypatch):
     omitted, spaces separators). Driven as admin it advances answer_pos to the
     end without diverging — R-mode chars advance the tape too."""
     room = _room(seed)
-    assert room.answer == 'fx Rdia j Fx rr j Fx Rmpa j ra j Fx Rsti G$'
+    assert room.answer == 'fx Revi j Fx re j Fx Rrne j re j Fx Rlve G$'
     dungeon = build_dungeon_overwrite_halls(seed)
     troom = dungeon.rooms[0]
     _drive(dungeon, _canon_keys(), monkeypatch, finish=':q!\r', name='admin')
