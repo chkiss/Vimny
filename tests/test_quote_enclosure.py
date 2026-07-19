@@ -30,9 +30,11 @@ from engine.world import CellType
 from generation.dungeon_gen import (
     build_dungeon_quote_enclosure,
     _QE_ROWS, _QE_COLS, _QE_SPINE, _QE_SHAFT_SEPS, _QE_THROAT,
-    _QE_GATE, _QE_BOLTS, _QE_EXIT, _QE_PAR, _QE_TEXT0, _QE_SHAPE,
+    _QE_GATE, _QE_BOLTS, _QE_EXIT, _QE_PAR, _QE_ANCHOR, _QE_SHAPE,
+    _QE_TEXT_MIN, _QE_BAY_E,
     _QE_C1_ROWS, _QE_C2_ROWS, _QE_C3_ROWS, _QE_C4_ROWS, _QE_C5_ROWS,
 )
+from content import proverbs as pv
 from tests import SEEDS, cached_room
 
 ESC = Keystroke('\x1b', name='KEY_ESCAPE')
@@ -46,11 +48,15 @@ def _K(s):
     return [Keystroke(ch) for ch in s]
 
 
+def _cures(room):
+    return [m[2] for m in room._qe_texts['misquotes']]
+
+
 # The canonical tape (== room.answer with Esc placed): every strike is
 # thrown from wherever the chained landing sits — the quote objects seek
 # forward, so the tape never walks into a setting except C5's aimed 2f".
 def _canon_keys(room):
-    ca, cb = room._qe_words['cures']
+    ca, cb = _cures(room)
     return (_K('jdi"j.') + _K('2jci"') + _K(ca) + [ESC]
             + _K('jci"') + _K(cb) + [ESC]
             + _K("2jdi'j.") + _K('2jda"jda\'')
@@ -61,7 +67,7 @@ def _canon_keys(room):
 # a count-x or ct" even starts, and the C4 tear-outs count their own cells.
 # Wins, at 1★ (53 > par 47).
 def _piecewise_rival_keys(room):
-    ca, cb = room._qe_words['cures']
+    ca, cb = _cures(room)
     return (_K('jf"l3xj4x') + _K('2jct"') + _K(ca) + [ESC]
             + _K('jhhct"') + _K(cb) + [ESC]
             + _K('2jhh4xj3x') + _K('2jh8xj7x')
@@ -112,7 +118,7 @@ def test_par_answer_budget(seed):
     room = _room(seed)
     assert room.par == _QE_PAR
     assert room.budget == math.ceil(_QE_PAR * 1.4)
-    ca, cb = room._qe_words['cures']
+    ca, cb = _cures(room)
     assert room.answer == (f'j di" j . 2j ci" {ca} j ci" {cb} '
                            f"2j di' j . 2j da\" j da' "
                            f'2j w di" G $')
@@ -154,37 +160,38 @@ def test_no_chest(seed):
                 if e.kind in ('chest', 'chest_key', 'chest_scroll')]
 
 
-# ── plaques & vocabulary ──────────────────────────────────────────────────────
-
-def _plaque_text(room, r):
-    cells = {}
-    for ru in room.char_runs:
-        if ru.row == r and ru.col < _QE_SPINE:
-            for i, s in enumerate(ru.symbols):
-                cells[ru.col + i] = s
-    if not cells:
-        return ''
-    lo, hi = min(cells), max(cells)
-    return ''.join(cells.get(c, ' ') for c in range(lo, hi + 1))
-
+# ── the draw: anchored proverbs ───────────────────────────────────────────────
 
 @pytest.mark.parametrize("seed", SEEDS)
-def test_plaques_carry_the_full_readings(seed):
+def test_proverb_draw_anchors_and_fits(seed):
+    """The opening quote sits at _QE_ANCHOR on every row; junk lengths fixed
+    per slot; sayings distinct; junk foreign to its own saying; misquote
+    cures len 3 for the pinned typed cost."""
     room = _room(seed)
-    for targets, _dc in room._ss_doors:
-        for t in targets:
-            assert any(_plaque_text(room, r) == t for r in range(room.rows)), t
-
-
-@pytest.mark.parametrize("seed", SEEDS)
-def test_vocab_slots_and_distinctness(seed):
-    room = _room(seed)
-    words = room._qe_words
-    picks = [w for row in words['rows'] for w in row] + list(words['cures'])
-    assert len(set(picks)) == len(picks)
-    for (_r, jl, _q), (w1, junk, w2) in zip(_QE_SHAPE, words['rows']):
-        assert len(w1) == 4 and len(junk) == jl and len(w2) == 5
-    assert all(len(c) == 3 for c in words['cures'])
+    texts = room._qe_texts
+    shape_by_row = {r: (jl, q) for r, jl, q in _QE_SHAPE}
+    junks = []
+    for (r, words, k, junk, q) in texts['intruders']:
+        jl, sq = shape_by_row[r]
+        assert (len(junk), q) == (jl, sq)
+        t0 = _QE_ANCHOR - (pv.prefix_len(words, k) + 1)
+        assert t0 >= _QE_TEXT_MIN
+        fitlen = jl + 5 if r in _QE_C5_ROWS else jl + 2
+        assert _QE_ANCHOR + fitlen + len(' '.join(words[k:])) <= _QE_BAY_E
+        assert junk not in words
+        junks.append(junk)
+        # the laid opening quote really is at the anchor
+        ru = next(u for u in room.char_runs
+                  if u.row == r and u.col == _QE_ANCHOR)
+        assert ru.symbols[0] == q
+    assert len(set(junks)) == len(junks)
+    for r, (words, idx, cure) in zip(_QE_C2_ROWS, texts['misquotes']):
+        assert len(cure) == 3 and len(words[idx]) >= 2
+        ru = next(u for u in room.char_runs
+                  if u.row == r and u.col == _QE_ANCHOR)
+        assert ''.join(ru.symbols) == f'"{words[idx]}"'
+    sayings = [w for _r, w, *_ in texts['intruders']]
+    assert len({' '.join(w) for w in sayings}) == len(sayings)
 
 
 @pytest.mark.parametrize("seed", SEEDS)
@@ -199,10 +206,11 @@ def test_targets_are_not_already_true(seed):
 @pytest.mark.parametrize("seed", SEEDS)
 def test_c4_targets_are_the_single_gap(seed):
     # THE WHITESPACE QUIRK: a-quote spans the trailing space, so the tear-out
-    # reads 'w1 w2' with ONE space — where da( left the double-gap scar.
+    # heals to a SINGLE gap — the C4 doors read the PRISTINE saying, no scar
+    # anywhere (where da( left the double gap).
     room = _room(seed)
     for t in room._ss_doors[3][0]:
-        assert '  ' not in t and t.count(' ') == 1
+        assert '  ' not in t
 
 
 # ── playthroughs ─────────────────────────────────────────────────────────────
@@ -228,7 +236,7 @@ def test_blind_dot_off_c2_is_a_costed_noop(monkeypatch):
     # be deliberate.
     dungeon = build_dungeon_quote_enclosure(0)
     room = dungeon.rooms[0]
-    ca, cb = room._qe_words['cures']
+    ca, cb = _cures(room)
     keys = (_K('jdi"j.') + _K('2jci"') + _K(ca) + [ESC]
             + _K('jci"') + _K(cb) + [ESC] + _K('2j.'))
     _drive(dungeon, keys, monkeypatch, finish=':q!\r')
@@ -245,7 +253,8 @@ def test_blind_seek_on_c5_hits_the_empty_first_pair(monkeypatch):
     keys = _K('j') * 13 + _K('di"')          # walk the spine to row 15; strike
     _drive(dungeon, keys, monkeypatch, finish=':q!\r')
     assert main._wla_floor_text(room, 15).strip() != room._ss_doors[4][0][0]
-    assert room._qe_words['rows'][8][1] in main._wla_floor_text(room, 15)
+    junk15 = next(n[3] for n in room._qe_texts['intruders'] if n[0] == 15)
+    assert junk15 in main._wla_floor_text(room, 15)
 
 
 def test_undo_rebars_an_open_bolt(monkeypatch):

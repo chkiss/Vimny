@@ -4159,87 +4159,102 @@ def build_dungeon_brace_square_enclosure(seed: int) -> Dungeon:
 # {n}x or dt" even starts); % does not speak quotes; D/cc raze the kept
 # words. C5's w l 3x route ties the object route (4 = 4) — a tie, never a
 # win.
-_QE_ROWS, _QE_COLS = 19, 44
-_QE_SPINE   = 20                     # every row's first standable
-_QE_BAY_W   = 21                     # bay floor cols 21..42; east wall 43
-_QE_BAY_E   = 42
-_QE_PLQ_COL = 2                      # full true readings (≤17 chars)
-_QE_TEXT0   = 22                     # w1 starts here on every row (len 4)
+_QE_ROWS, _QE_COLS = 19, 58
+_QE_SPINE   = 2                      # every row's first standable
+_QE_BAY_W   = 3                      # bay floor cols 3..55; east wall 56
+_QE_BAY_E   = 55
+_QE_TEXT_MIN = 3                     # earliest col a proverb may start
+_QE_ANCHOR  = 29                     # the opening quote's column, every row
 _QE_C1_ROWS = (3, 4)
 _QE_C2_ROWS = (6, 7)
 _QE_C3_ROWS = (9, 10)
 _QE_C4_ROWS = (12, 13)
 _QE_C5_ROWS = (15,)
-_QE_SHAFT_SEPS = ((5, 28), (8, 30), (11, 28), (14, 27))
+_QE_SHAFT_SEPS = ((5, 30), (8, 32), (11, 30), (14, 29))
 _QE_THROAT  = 16
 _QE_GATE    = 17
-_QE_BOLTS   = {'c1': 21, 'c2': 22, 'c3': 23, 'c4': 24, 'c5': 25}
-_QE_EXIT    = (17, 26)               # the FINAL SEAL, east of every bolt
-# (row, junk len, quote char); w1 is len 4 on every row so the opening
-# quote sits at col 27 throughout — the chained landings stay inside or
-# west of each next pair, which is all the forward seek needs.
-_QE_SHAPE = ((3, 3, '"'), (4, 4, '"'), (6, 5, '"'), (7, 4, '"'),
+_QE_BOLTS   = {'c1': 3, 'c2': 4, 'c3': 5, 'c4': 6, 'c5': 7}
+_QE_EXIT    = (17, 8)                # the FINAL SEAL, east of every bolt
+# (row, junk len, quote char) for the intruder rows — the opening quote
+# sits at _QE_ANCHOR on EVERY row (the proverb's prefix right-aligns west
+# of it), so the chained landings stay inside or west of each next pair,
+# which is all the forward seek needs. C2 rows are misquotes (the famous
+# word quoted but wrong; cures len 3).
+_QE_SHAPE = ((3, 3, '"'), (4, 4, '"'),
              (9, 4, "'"), (10, 3, "'"), (12, 5, '"'), (13, 4, "'"),
              (15, 3, '"'))
+_QE_CURE_LEN = 3
 _QE_PAR = 45            # hand-tallied along the driven tape (spine strikes)
 
 
-def _qe_draw_words(rng) -> dict:
-    """Draw the enclosure vocabulary (fixed slot lengths pin par and the
-    rival chains): nine w1 (len 4), nine junks (per-shape lens), nine w2
-    (len 5), two typed cures (len 3); all pairwise distinct."""
+def _qe_draw_texts(rng) -> dict:
+    """Draw proverbs + quoted junk for every slot (the Word Enclosure draw
+    discipline: geometric fits keep par seed-invariant)."""
+    from content import proverbs as _pv
     _load_vocab_tables()
 
-    def pool(length):
+    def junk_pool(length):
         return [w for w in _VOCAB_PLAIN_BY_LEN.get(length, ())
                 if w.isalpha() and w == w.lower()]
 
-    for _ in range(80):
-        picks: list = []
+    def fits(words, k, fitlen):
+        t0 = _QE_ANCHOR - (_pv.prefix_len(words, k) + 1)
+        last = _QE_ANCHOR + fitlen + 1 + len(' '.join(words[k:])) - 1
+        return t0 >= _QE_TEXT_MIN and last <= _QE_BAY_E
 
-        def draw(length):
-            w = rng.choice(pool(length))
-            picks.append(w)
-            return w
+    def fits_misquote(entry):
+        words, idx, _cure = entry
+        t0 = _QE_ANCHOR - (_pv.prefix_len(words, idx) + 1)
+        tail = ' '.join(words[idx + 1:])
+        last = (_QE_ANCHOR + len(words[idx]) + 1
+                + (1 + len(tail) if tail else 0))
+        return (len(words[idx]) >= 2 and t0 >= _QE_TEXT_MIN
+                and last <= _QE_BAY_E)
 
-        rows = [(draw(4), draw(jl), draw(5)) for (_r, jl, _q) in _QE_SHAPE]
-        cures = [draw(3), draw(3)]
-        if len(set(picks)) == len(picks):
-            return {'rows': rows, 'cures': cures}
-    raise ValueError('quote_enclosure: no distinct draw after 80 tries')
+    cure_pool = _pv.misquotes_by_cure_len(_QE_CURE_LEN)
+    for _ in range(200):
+        sayings = rng.sample(_pv.PLAIN, len(_QE_SHAPE))
+        junks: list = []
+        rows = []
+        ok = True
+        for (r, jlen, q), words in zip(_QE_SHAPE, sayings):
+            junk = rng.choice(junk_pool(jlen))
+            # C5's fitting is '"" "junk"' (jlen+5); others '"junk"' (jlen+2)
+            fitlen = jlen + 5 if r in _QE_C5_ROWS else jlen + 2
+            ks = [k for k in range(1, len(words)) if fits(words, k, fitlen)]
+            if not ks or junk in words:
+                ok = False
+                break
+            junks.append(junk)
+            rows.append((r, words, rng.choice(ks), junk, q))
+        if not ok or len(set(junks)) != len(junks):
+            continue
+        mis = rng.sample(cure_pool, len(_QE_C2_ROWS))
+        if not all(fits_misquote(m) for m in mis):
+            continue
+        # a C4 door's target is the PRISTINE saying — it must not also be
+        # one of the other laid sayings (they never appear whole at build,
+        # but a mended C4 row must not open a sibling's bolt)
+        return {'intruders': rows, 'misquotes': mis}
+    raise ValueError('quote_enclosure: no fitting draw after 200 tries')
 
 
 def build_dungeon_quote_enclosure(seed: int) -> Dungeon:
     """The Quote Enclosure (slug `quote_enclosure`): i" a" i' a' — strike
-    the quoted settings from the spine; the seek does the walking."""
+    the quoted settings from the spine; the seek does the walking.
+    Sense, not decree: proverb bays; the da" rows tear the junk out and
+    the pristine saying itself is the door's reading."""
+    from content.proverbs import prefix_len, text_of
     rng = random.Random(seed)
-    words = _qe_draw_words(rng)
-
-    runs, targets = [], {}
-    for (r, jl, q), (w1, junk, w2) in zip(_QE_SHAPE, words['rows']):
-        if r in _QE_C5_ROWS:                       # 'w1 "" "jjj" w2'
-            fit = f'{q}{q} {q}{junk}{q}'
-        else:                                      # 'w1 "junk" w2'
-            fit = f'{q}{junk}{q}'
-        w2_s = _QE_TEXT0 + 5 + len(fit) + 1
-        runs += [(r, _QE_TEXT0, w1), (r, _QE_TEXT0 + 5, fit), (r, w2_s, w2)]
-        targets[r] = (w1, w2, q)
-    ca, cb = words['cures']
-    c1 = tuple(f'{targets[r][0]} "" {targets[r][1]}' for r in _QE_C1_ROWS)
-    c2 = tuple(f'{targets[r][0]} "{c}" {targets[r][1]}'
-               for r, c in zip(_QE_C2_ROWS, words['cures']))
-    c3 = tuple(f"{targets[r][0]} '' {targets[r][1]}" for r in _QE_C3_ROWS)
-    c4 = tuple(f'{targets[r][0]} {targets[r][1]}' for r in _QE_C4_ROWS)
-    c5 = (f'{targets[15][0]} "" "" {targets[15][1]}',)
-    doors = ((c1, _QE_BOLTS['c1']), (c2, _QE_BOLTS['c2']),
-             (c3, _QE_BOLTS['c3']), (c4, _QE_BOLTS['c4']),
-             (c5, _QE_BOLTS['c5']))
+    texts = _qe_draw_texts(rng)
 
     R, C = _QE_ROWS, _QE_COLS
     cells = [[CellType.WALL] * C for _ in range(R)]
     for r in range(2, _QE_GATE + 1):                     # the spine
         cells[r][_QE_SPINE] = CellType.FLOOR
-    for r, _jl, _q in _QE_SHAPE:                         # the bays
+    lesson_rows = (_QE_C1_ROWS + _QE_C2_ROWS + _QE_C3_ROWS
+                   + _QE_C4_ROWS + _QE_C5_ROWS)
+    for r in lesson_rows:                                # the bays
         for c in range(_QE_BAY_W, _QE_BAY_E + 1):
             cells[r][c] = CellType.FLOOR
     for r, c in _QE_SHAFT_SEPS:                          # the light shafts —
@@ -4249,20 +4264,45 @@ def build_dungeon_quote_enclosure(seed: int) -> Dungeon:
     room.cells = cells
     room.seed  = seed
 
-    # Full true readings, carved row-aligned into the west wall.
-    plaque_rows = (_QE_C1_ROWS + _QE_C2_ROWS + _QE_C3_ROWS
-                   + _QE_C4_ROWS + _QE_C5_ROWS)
-    plaque_texts = list(c1) + list(c2) + list(c3) + list(c4) + list(c5)
-    for pr, ptext in zip(plaque_rows, plaque_texts):
-        col = _QE_PLQ_COL
-        for part in ptext.split(' '):
-            if part:
-                room.char_runs.append(CharRun(pr, col, tuple(part), 'verdant'))
-            col += len(part) + 1
-    for rr, cc, text in runs:
-        room.char_runs.append(CharRun(rr, cc, tuple(text), 'ancient'))
+    def lay(r, col, words_seq):
+        for w in words_seq:
+            room.char_runs.append(CharRun(r, col, tuple(w), 'ancient'))
+            col += len(w) + 1
+
+    truths = {}                                          # row -> (prefix, suffix)
+    for (r, words, k, junk, q) in texts['intruders']:
+        fit = (f'{q}{q} {q}{junk}{q}' if r in _QE_C5_ROWS
+               else f'{q}{junk}{q}')
+        t0 = _QE_ANCHOR - (prefix_len(words, k) + 1)
+        lay(r, t0, words[:k])
+        room.char_runs.append(CharRun(r, _QE_ANCHOR, tuple(fit), 'ancient'))
+        lay(r, _QE_ANCHOR + len(fit) + 1, words[k:])
+        truths[r] = (text_of(words[:k]), text_of(words[k:]))
+    cures = {}
+    for r, (words, idx, cure) in zip(_QE_C2_ROWS, texts['misquotes']):
+        t0 = _QE_ANCHOR - (prefix_len(words, idx) + 1)
+        lay(r, t0, words[:idx])
+        room.char_runs.append(CharRun(r, _QE_ANCHOR,
+                                      tuple(f'"{words[idx]}"'), 'ancient'))
+        tail = words[idx + 1:]
+        if tail:
+            lay(r, _QE_ANCHOR + len(words[idx]) + 3, tail)
+        true = (f'{text_of(words[:idx])} "{cure}"'
+                + (f' {text_of(tail)}' if tail else ''))
+        cures[r] = (cure, true)
+
+    c1 = tuple(f'{truths[r][0]} "" {truths[r][1]}' for r in _QE_C1_ROWS)
+    c2 = tuple(cures[r][1] for r in _QE_C2_ROWS)
+    c3 = tuple(f"{truths[r][0]} '' {truths[r][1]}" for r in _QE_C3_ROWS)
+    c4 = tuple(f'{truths[r][0]} {truths[r][1]}' for r in _QE_C4_ROWS)
+    c5 = tuple(f'{truths[r][0]} "" "" {truths[r][1]}' for r in _QE_C5_ROWS)
+    doors = ((c1, _QE_BOLTS['c1']), (c2, _QE_BOLTS['c2']),
+             (c3, _QE_BOLTS['c3']), (c4, _QE_BOLTS['c4']),
+             (c5, _QE_BOLTS['c5']))
+
     room._ss_doors = doors                               # the shared exact-text tick
-    room._qe_words = words
+    room._qe_texts = texts
+    ca, cb = (cures[r][0] for r in _QE_C2_ROWS)
 
     room.entities.append(Entity(kind='exit', row=_QE_EXIT[0], col=_QE_EXIT[1],
                                 edit_immune=True))
