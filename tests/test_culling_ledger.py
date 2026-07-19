@@ -37,8 +37,8 @@ from engine import substitute as S
 from generation.dungeon_gen import (
     build_dungeon_culling_ledger,
     _CL_ROWS, _CL_COLS, _CL_CATCH, _CL_TX, _CL_SEP, _CL_WALL, _CL_GAP,
-    _CL_COR, _CL_KEYCH, _CL_DOOR1, _CL_DOOR2, _CL_BRZ_COL, _CL_EXIT,
-    _CL_KEEP_ROWS, _CL_BLIGHT_I, _CL_BLIGHT_II, _CL_JUNK_III,
+    _CL_COR, _CL_KEYCH, _CL_DOOR1, _CL_SEALDOOR, _CL_DOOR2, _CL_BRZ_COL,
+    _CL_EXIT, _CL_KEEP_ROWS, _CL_BLIGHT_I, _CL_BLIGHT_II, _CL_JUNK_III,
     _CL_SACRED_III, _CL_GAPS, _CL_PAR, _CL_BUDGET,
 )
 from content.levels import LEVELS, known_commands
@@ -112,6 +112,8 @@ def test_dimensions_doors_and_braziers(seed):
     kinds = {(e.row, e.col): e.kind for e in r.entities}
     assert kinds[_CL_KEYCH] == 'chest_key'
     assert kinds[_CL_DOOR1] == 'locked_door' and kinds[_CL_DOOR2] == 'locked_door'
+    assert kinds[_CL_SEALDOOR] == 'seal_door'      # one cell east of the brazier
+    assert _CL_SEALDOOR[1] == _CL_BRZ_COL + 1
     assert r.exit_pos == _CL_EXIT
     assert r.par == _CL_PAR and r.budget == _CL_BUDGET
     # the stone course is solid but for the one gap, east of door one
@@ -142,6 +144,11 @@ def test_ledger_starts_dark_and_keeps_are_ordered(seed):
                 assert cell in r.fog_cells
                 assert cell not in r.mist_cells    # DARK until door one opens
                 assert not r.is_passable(*cell)
+    for row in list(_CL_GAPS) + [_CL_SEP]:         # the water sleeps dark too
+        for c in range(2, 54):
+            assert (row, c) in r.fog_cells and (row, c) not in r.mist_cells
+    for c in range(_CL_DOOR1[1] + 1, 50):          # and the corridor past door one
+        assert (_CL_COR, c) in r.fog_cells
     s4 = r.answer.split('/')[1]
     b5 = r._ledger_blight
     for row in _CL_SACRED_III:
@@ -195,6 +202,36 @@ def test_blind_cull_is_refused():
     handled, msg, _ns, nl = S.run_ex('2d', r, p)
     assert handled and nl == 0 and 'dark' in msg
     assert r.rows == _CL_ROWS
+
+
+def test_key_chest_gives_only_a_key(monkeypatch):
+    # A chest holds ONE thing: the key chest must never also mint a scroll.
+    d = _fresh(0)
+    called = []
+    monkeypatch.setattr(main, '_pick_relic_scroll',
+                        lambda *a, **k: called.append(1) or None)
+    _drive(d, _K('2lx'), monkeypatch, finish=':q!\r')
+    assert not called
+
+
+def test_door_one_parts_the_mist(monkeypatch):
+    # Opening door one: the ledger and water turn misted (readable, still
+    # unwalkable), the corridor lights up to the boss door, and past it the
+    # dark holds until the brazier burns.
+    d = _fresh(0)
+    r = d.rooms[0]
+    _drive(d, _K('2lx$p'), monkeypatch, finish=':q!\r')
+    for row in _CONTENT_ROWS:
+        for ru in r._char_runs_by_row.get(row, []):
+            if ru.kind == 'void':
+                continue
+            cell = (row, ru.col)
+            assert cell in r.fog_cells and cell in r.mist_cells
+            assert not r.is_passable(*cell)
+    assert (_CL_SEP, 20) in r.mist_cells           # the water shows, hazy
+    assert (_CL_COR, _CL_BRZ_COL) not in r.fog_cells   # the cold brazier, lit
+    assert (_CL_COR, 45) in r.fog_cells            # past the boss door: dark
+    assert any(e.kind == 'seal_door' and e.alive for e in r.entities)
 
 
 # ── the driven canonical ──────────────────────────────────────────────────────
@@ -292,7 +329,7 @@ def test_subst_blanking_longhand_wins_one_star(monkeypatch):
     # family, but the :v pattern needs the revealed sacred word anyway).
     d = _fresh(0)
     s4 = d.rooms[0].answer.split('/')[1]
-    keys = _K(f'2lx$p:2s/.*//⏎:6,10s/.*//⏎:12,19v/{s4}/s%.*%%⏎$p4l')
+    keys = _K(f'2lx$p:2s/.*//⏎:6,10s/.*//⏎:12,19v/{s4}/s%.*%%⏎$p$')
     result = _drive(d, keys, monkeypatch)
     assert result['won'] and result['stars'] == 1
 

@@ -11737,6 +11737,8 @@ _CL_COR   = 22                       # the corridor (player walk)
 _CL_KEYCH = (_CL_COR, 4)             # the key chest
 _CL_DOOR1 = (_CL_COR, 10)            # the first locked door
 _CL_BRZ_COL = 30                     # braziers: lit on verdant rows, cold here
+_CL_SEALDOOR = (_CL_COR, 31)         # the boss door: one cell east of the
+                                     # brazier, dark until its fire answers
 _CL_DOOR2 = (_CL_COR, 50)            # the last locked door, before the exit
 _CL_EXIT  = (_CL_COR, 54)
 _CL_CHEST = (_CL_COR, 52)
@@ -11752,8 +11754,8 @@ _CL_BLIGHT_II   = (6, 7, 8, 9, 10)
 _CL_JUNK_III    = (12, 14, 16, 17, 19)
 _CL_SACRED_III  = (13, 15, 18)
 _CL_GAPS        = (4, 11)
-_CL_PAR    = 36    # 2l(2) x(1) $(1) p(1)  :2d␣_(5) :5,9d␣_(7)
-                   # :6,13v/{s4}/d␣_(15)  $(1) p(1) 4l(2)
+_CL_PAR    = 35    # 2l(2) x(1) $(1) p(1)  :2d␣_(5) :5,9d␣_(7)
+                   # :6,13v/{s4}/d␣_(15)  $(1) p(1) $(1)
 _CL_BUDGET = 60                      # generous: the :s-blanking longhand wins 1★
 
 
@@ -11778,23 +11780,26 @@ def build_dungeon_culling_ledger(seed: int) -> Dungeon:
     R, C, TX = _CL_ROWS, _CL_COLS, _CL_TX
 
     cells = [[CellType.WALL] * C for _ in range(R)]
-    mist: set = set()                              # visible-through-haze from turn 0
     fog:  set = set()                              # DARK until door one opens
     for r in list(_CL_KEEP_ROWS) + [_CL_BLIGHT_I] + list(_CL_BLIGHT_II) \
              + list(_CL_JUNK_III) + list(_CL_SACRED_III):
         cells[r][_CL_CATCH] = CellType.FLOOR       # the ○ marker's floor cell
-    # Misted-water bands at the stanza gaps and above the stone course: they
-    # conduct the vision flood between stanzas AND stop the natural walk-
-    # reveal (light halts at mist), so the dark ledger cannot leak open.
+    # Water bands at the stanza gaps and above the stone course: they conduct
+    # the vision flood between stanzas once revealed. Dark like everything
+    # else until door one opens (_ledger_check runs the whole choreography —
+    # reveals are event-driven, so the darkness holds on its own).
     for r in list(_CL_GAPS) + [_CL_SEP]:
         for c in range(2, 54):
             cells[r][c] = CellType.WATER
-            mist.add((r, c))
+            fog.add((r, c))                        # DARK water until door one
     cells[_CL_GAP[0]][_CL_GAP[1]] = CellType.FLOOR   # the one gap in the stone
     for c in range(2, 50):
-        cells[_CL_COR][c] = CellType.FLOOR         # the corridor
+        cells[_CL_COR][c] = CellType.FLOOR         # the corridor…
+        if c > _CL_DOOR1[1]:
+            fog.add((_CL_COR, c))                  # …dark east of door one
     for c in range(51, 55):
         cells[_CL_COR][c] = CellType.FLOOR         # the dark exit pocket
+    fog.add((_CL_COR, _CL_DOOR2[1]))               # door two sleeps dark too
 
     room = Room(room_type=RoomType.ENTRY, rows=R, cols=C)
     room.cells     = cells
@@ -11851,6 +11856,8 @@ def build_dungeon_culling_ledger(seed: int) -> Dungeon:
         Entity(kind='chest_scroll', row=_CL_CHEST[0], col=_CL_CHEST[1]),
         Entity(kind='chest_key',   row=_CL_KEYCH[0], col=_CL_KEYCH[1]),
         Entity(kind='locked_door', row=_CL_DOOR1[0], col=_CL_DOOR1[1]),
+        # The boss door: one cell east of the cold brazier, dark until lit.
+        Entity(kind='seal_door',   row=_CL_SEALDOOR[0], col=_CL_SEALDOOR[1]),
         Entity(kind='locked_door', row=_CL_DOOR2[0], col=_CL_DOOR2[1]),
     ]
     room._ledger_keeps = tuple(keeps)              # the true lines, in order
@@ -11860,12 +11867,12 @@ def build_dungeon_culling_ledger(seed: int) -> Dungeon:
     room.par    = _CL_PAR
     room.budget = _CL_BUDGET
     room.answer = (f':set␣nu⏎ 2l x $ p :2d␣_⏎ :5,9d␣_⏎ '
-                   f':6,13v/{s4}/d␣_⏎ $ p 4l')
+                   f':6,13v/{s4}/d␣_⏎ $ p $')
 
     room.rebuild_indexes()
     pocket = {(_CL_COR, c) for c in range(51, 55)}  # the dark exit pocket
-    room.fog_cells  = fog | set(mist) | pocket      # fog bars feet + landings…
-    room.mist_cells = set(mist)                     # …only the water shows, hazy
+    room.fog_cells  = fog | pocket                  # EVERYTHING beyond door one
+    room.mist_cells = set()                         # sleeps dark; no mist yet
     dungeon.rooms        = [room]
     dungeon.current_room = 0
     return dungeon

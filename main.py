@@ -614,7 +614,7 @@ def _unlock_animation(term: Terminal, room, player,
     vr_start = max(0, min(player.row - game_h // 2, room.rows - game_h))
     vc_start = max(0, min(player.col - iw    // 2,  room.cols - iw))
     scr_r = door_r - vr_start + 3
-    scr_c = door_c - vc_start + 1
+    scr_c = door_c - vc_start + 1 + _gutter_w(player)
     if not (0 <= scr_r < term.height and 0 <= scr_c < iw):
         return
     key_clr = key_color if key_color is not None else C.key_fg()
@@ -640,8 +640,9 @@ def _sc_twinkle_animation(term, room, player, moved, iw: int, game_h: int) -> No
         sr = rr - vr + 3
         if not (3 <= sr < 3 + game_h):
             return
+        gut = _gutter_w(player)
         for k, ch in enumerate(text):
-            sc = c0 + k - vc + 1
+            sc = c0 + k - vc + 1 + gut
             if 1 <= sc < 1 + iw:
                 print(term.move_yx(sr, sc) + wbg + clr + ch + term.normal, end='', flush=True)
 
@@ -726,6 +727,12 @@ def _void_fall_animation(term, screen_r, screen_c):
         time.sleep(0.12)
 
 
+def _gutter_w(player) -> int:
+    """The :set nu gutter width the renderer prepends — every overlay
+    animation must shift right by the same amount or it draws 4 cells west."""
+    return 0 if getattr(player, 'number_mode', 'none') == 'none' else 4
+
+
 def _void_screen_xy(term, room, player, r, c):
     """Buffer (r, c) → screen (row, col) within the player-centred viewport
     (the same transform the renderer and the normal-mode void fall use)."""
@@ -733,7 +740,7 @@ def _void_screen_xy(term, room, player, r, c):
     game_h   = term.height - 8
     vr_start = max(0, min(player.row - game_h // 2, room.rows - game_h))
     vc_start = max(0, min(player.col - iw  // 2,    room.cols - iw))
-    return r - vr_start + 3, c - vc_start + 1
+    return r - vr_start + 3, c - vc_start + 1 + _gutter_w(player)
 
 
 def _play_void_falls(term, dungeon, room, player):
@@ -3521,15 +3528,35 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
         door1_shut = any(e.kind == 'locked_door' and e.alive
                          and e.col < _dg._CL_BRZ_COL
                          for e in room.entities)
+        lit = getattr(room, '_ledger_lit', None)
         if not door1_shut:
-            dark = {(fr, fc) for (fr, fc) in room.fog_cells
-                    if fr < cor - 1 and (fr, fc) not in room.mist_cells
-                    and room.cells[fr][fc] == CellType.FLOOR}
-            if dark:
-                room.mist_cells |= dark            # the mist parts: text readable
+            # THE MIST PARTS (stateless, re-asserted every tick — the unlock's
+            # own reveal flood strips too much): everything ABOVE the stone
+            # course turns misted (readable, unwalkable); the corridor lights
+            # up to the boss door; past it stays dark until the brazier burns.
+            parted = False
+            for fr in range(1, cor - 1):
+                for fc in range(room.cols):
+                    if room.cells[fr][fc] in (CellType.FLOOR, CellType.WATER):
+                        cell = (fr, fc)
+                        if cell not in room.mist_cells:
+                            parted = True
+                        room.fog_cells.add(cell)
+                        room.mist_cells.add(cell)
+            sd_col = _dg._CL_SEALDOOR[1]
+            for fc in range(room.cols):
+                cell = (cor, fc)
+                if fc < sd_col:
+                    room.fog_cells.discard(cell)   # lit corridor, up to the seal
+                    room.mist_cells.discard(cell)
+                elif not lit and room.cells[cor][fc] in (CellType.FLOOR,
+                                                         CellType.CORRIDOR):
+                    room.fog_cells.add(cell)       # the dark holds past the seal
+                    room.mist_cells.discard(cell)
+            if parted:
                 _push('Beyond the door, the dark thins — the ledger stands '
                       'in the mist.')
-        if getattr(room, '_ledger_lit', None) is not False:
+        if lit is not False:
             return                                 # already lit (or not this level)
         texts = []
         for r in range(room.rows):
@@ -3545,8 +3572,11 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
             if ru.kind == 'pedestal':              # the cold brazier catches fire
                 room.remove_char_run(ru)
         room.add_char_run(CharRun(cor, _dg._CL_BRZ_COL, (_dg._QM_FLAME,), 'flame'))
+        for e in [e for e in room.entities         # the boss door burns open
+                  if e.kind == 'seal_door' and e.alive]:
+            room.remove_entity(e)
         room.fog_cells = {(fr, fc) for (fr, fc) in room.fog_cells
-                          if fr != cor}            # firelight unveils the pocket
+                          if fr != cor}            # firelight unveils the way
         room.rebuild_indexes()
         _push('The braziers answer as one — firelight finds the way out!')
 
@@ -5480,7 +5510,12 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
                         _push('You found a scroll!')
                     interacted = True
                     _drop = _SCROLL_DROPS.get(level)
-                    if _chest_sid:
+                    if item != 'scroll':
+                        # A chest holds ONE thing: only a scroll loot opens
+                        # the scroll machinery — a key chest gives a key,
+                        # a heart chest a heart, full stop.
+                        pass
+                    elif _chest_sid:
                         # This chest names a specific scroll (e.g. the Waypoint
                         # nook → the Numbered Ledger). Grant it and show it via
                         # the standard catalog renderer.
