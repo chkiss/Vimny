@@ -24,10 +24,11 @@ rhyme everyone knows (sense, not decree):
   B — HICKORY DICKORY   : the mouse ran DOWN where the famous line runs UP, but
                           the middle line's 'ran down' is TRUE → surgical :s + &
                           (a whole-buffer :%s would wreck the protected line).
-  C — TEN GREEN BOTTLES : falling bottles amid ones still hanging → :g/falls/d.
+  C — TWINKLE TWINKLE   : its two famous lines amid three lines of nonsense
+                          static — nothing to fix, only strike → :g/krzzt/d.
 
 The sanctum seal dissolves only when every line that must remain reads its exact
-text and no falling bottle survives."""
+text and no line of static survives."""
 import pytest
 from blessed import Terminal
 from blessed.keyboard import Keystroke
@@ -90,30 +91,30 @@ def test_builder_structure():
     assert all(t.count('moo') >= 2 for t in txts if 'moo' in t)
     # Chamber B — two corrupt 'down' verses + one TRUE down line between them.
     assert sum('down' in t for t in txts) == 3
-    # Chamber C — three falling bottles + two still hanging.
-    assert sum('falls' in t for t in txts) == 3
-    assert sum('hanging' in t for t in txts) == 2
+    # Chamber C — three lines of static + the famous 2-liner between them.
+    assert sum('krzzt' in t for t in txts) == 3
+    assert any('twinkle' in t for t in txts) and any('wonder' in t for t in txts)
 
 
 def test_vocabulary_is_chamber_separated():
     # Each chamber's global rite must never reach another's lines: 'moo' lives ONLY in
-    # Chamber A (mouse ≠ moo), 'down'/'up' only in B, 'falls' only in C.  This is what
-    # lets :%s/moo/quack/g be surgical and the rites independent.
+    # Chamber A (mouse ≠ moo), 'down'/'up' only in B, 'krzzt' only in C.  This is
+    # what lets :%s/moo/quack/g be surgical and the rites independent.
     r = dg.build_dungeon_spellwrights_forge(1).room
     A_rows = {rr for rr, _ in dg._FORGE_A_WARDS}
     B_rows = {rr for rr, _ in dg._FORGE_B_CORRUPT} | {dg._FORGE_B_KEEP[0]}
-    C_falls = {rr for rr, _ in dg._FORGE_C_CURSED}
+    C_rows = {rr for rr, _ in dg._FORGE_C_CURSED}
     for row, t in enumerate(_texts(r)):
         if 'moo' in t:                     assert row in A_rows, (row, t)
         if 'down' in t or 'up' in t:       assert row in B_rows, (row, t)
-        if 'falls' in t:                   assert row in C_falls, (row, t)
+        if 'krzzt' in t:                   assert row in C_rows, (row, t)
 
 
 # ── the three rites: each lesson is forced ───────────────────────────────────
 def test_canonical_three_rites_win_two_stars():
     # The full lesson, end to end: :%s/moo/quack/g (Chamber A — the /g flag), then
     # 8G :s/down/up/ + jj & (Chamber B — surgical :s sparing the true line, & to
-    # repeat across the gap), then :g/falls/d (Chamber C), then the walk out.
+    # repeat across the gap), then :g/krzzt/d (Chamber C), then the walk out.
     for seed in (1, 42, 999, 12345, 1048583):
         d = dg.build_dungeon_spellwrights_forge(seed)
         assert d.room.par == dg._SPELLWRIGHTS_PAR
@@ -151,7 +152,7 @@ def test_chamber_A_requires_the_g_flag():
     d = dg.build_dungeon_spellwrights_forge(1)
     keys = (list(':%s/moo/quack') + ['\r']                       # NO /g
             + list('8G') + list(':s/down/up/') + ['\r'] + list('jj&')
-            + list(':g/falls/d') + ['\r']
+            + list(':g/krzzt/d') + ['\r']
             + list(':q!') + ['\r'])
     _run('spellwrights_forge', keys, dungeon=d)
     assert not _seal_open(d.room)
@@ -165,7 +166,7 @@ def test_chamber_B_global_substitute_wrecks_the_protected_line():
     d = dg.build_dungeon_spellwrights_forge(1)
     keys = (list(':%s/moo/quack/g') + ['\r']
             + list(':%s/down/up/g') + ['\r']                     # wrecks the protected line
-            + list(':g/falls/d') + ['\r']
+            + list(':g/krzzt/d') + ['\r']
             + list(':q!') + ['\r'])
     _run('spellwrights_forge', keys, dungeon=d)
     assert not _seal_open(d.room)
@@ -179,28 +180,28 @@ def test_chamber_B_ampersand_is_the_par_route():
     keys = (list(':%s/moo/quack/g') + ['\r']
             + list('8G') + list(':s/down/up/') + ['\r']
             + list('jj') + list(':s/down/up/') + ['\r']          # 2nd full :s, not &
-            + list(':g/falls/d') + ['\r'] + list('6G$')
+            + list(':g/krzzt/d') + ['\r'] + list('6G$')
             + list(':wq') + ['\r'])
     res, _ = _run('spellwrights_forge', keys, dungeon=d)
     assert res['won'] and res['stars'] == 1, res
 
 
-def test_chamber_C_strikes_the_falling_and_keeps_the_hanging():
-    # :g/falls/d sweeps every falling bottle at once; the ones still hanging on the
-    # wall must survive (a blanket delete would lose them and bar the seal).
+def test_chamber_C_strikes_the_static_and_keeps_the_rhyme():
+    # :g/krzzt/d sweeps every line of static at once; the famous 2-liner
+    # between them must survive (a blanket delete would lose it and bar the seal).
     d = dg.build_dungeon_spellwrights_forge(1)
-    _run('spellwrights_forge', list(':g/falls/d') + ['\r'] + list(':q!') + ['\r'],
+    _run('spellwrights_forge', list(':g/krzzt/d') + ['\r'] + list(':q!') + ['\r'],
          dungeon=d)
     blob = ' || '.join(_texts(d.room))
-    assert 'falls' not in blob
-    for _r, keep in dg._FORGE_C_KEEP:              # the standing bottles survive
+    assert 'krzzt' not in blob
+    for _r, keep in dg._FORGE_C_KEEP:              # the rhyme survives
         assert keep in blob
 
 
 def test_sanctum_scroll_chest_present_and_survives_the_sweep():
     # The reward that balances the empty sanctum: an unassigned chest (→ a
     # random relic scroll) at row 13, last column — ABOVE every falling row,
-    # so :g/falls/d never collapses it out of the buffer.
+    # so :g/krzzt/d never collapses it out of the buffer.
     from engine.world import CellType
     d = dg.build_dungeon_spellwrights_forge(1)
     room = d.room
@@ -209,7 +210,7 @@ def test_sanctum_scroll_chest_present_and_survives_the_sweep():
     assert (chest[0].row, chest[0].col) == dg._FORGE_CHEST == (13, dg._FORGE_COLS - 2)
     assert chest[0].scroll_id in (None, '')          # unassigned → random relic
     assert dg._FORGE_CHEST[0] < min(r for r, _ in dg._FORGE_C_CURSED)
-    _run('spellwrights_forge', list(':g/falls/d') + ['\r'] + list(':q!') + ['\r'],
+    _run('spellwrights_forge', list(':g/krzzt/d') + ['\r'] + list(':q!') + ['\r'],
          dungeon=d)
     still = [e for e in room.entities if e.kind == 'chest_scroll']
     assert len(still) == 1                            # the sweep spared it
@@ -237,8 +238,8 @@ def test_seal_stays_shut_until_all_three_rites_done():
 def test_par_and_budget():
     import math
     r = dg.build_dungeon_spellwrights_forge(1).room
-    assert r.par == dg._SPELLWRIGHTS_PAR == 44
-    assert r.budget == max(math.ceil(44 * 1.4), 60)
+    assert r.par == dg._SPELLWRIGHTS_PAR == 45
+    assert r.budget == max(math.ceil(45 * 1.4), 60)
 
 
 def test_hint_bar_surfaces_the_whole_subst_family():

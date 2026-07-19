@@ -2663,9 +2663,9 @@ _LEVEL_INTROS = {
     'warden_manifold':     ('The Warden Manifold — he stamps himself into the world. Light the four braziers; the gate will draw and the fog will part.', 70),
     'warden_surveyor':     ('The Warden Surveyor — he keeps a long hall where the floor falls away between the words. Cross it word by word, over the void.', 60),
     'spellwrights_forge':  ('The Spellwright\'s Forge — three rhymes you know are carved here, and '
-                            'each is sung wrong its own way: a duck lows like a cow, a mouse runs the '
-                            'wrong way, and fallen bottles still crowd the wall. Mend what is corrupt, '
-                            'strike what has fallen, and spare what already rings true.', 70),
+                            'each is wronged its own way: a duck lows like a cow, a mouse runs the '
+                            'wrong way, and nonsense static breaks a rhyme apart. Mend what is corrupt, '
+                            'strike what is noise, and spare what already rings true.', 70),
     'culling_ledger':      ('The Culling Ledger — other rhymes have crept into the house that '
                             'Jack built. Set the numbers before you judge.', 60),
     'shelving_room':       ('The Shelving Room — the round was shelved blind, across the gap. '

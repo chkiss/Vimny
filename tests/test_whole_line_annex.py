@@ -43,11 +43,10 @@ from engine.world import CellType
 from content.levels import known_commands
 from generation.dungeon_gen import (
     build_dungeon_whole_line_annex, _wla_pick, _wla_route, _wla_answer,
-    _whole_line_dissimilar, _WLA_VERB,
-    _WLA_ROWS, _WLA_COLS, _WLA_COL_S, _WLA_LBL_COL, _WLA_LBL_END, _WLA_PLQ_COL,
+    _WLA_VERB, _WLA_DOORS,
+    _WLA_ROWS, _WLA_COLS, _WLA_COL_S, _WLA_LBL_COL, _WLA_LBL_END,
     _WLA_LESSON_ROWS, _WLA_GATE_ROW, _WLA_GATE_COL0, _WLA_EXIT, _WLA_PAR,
     _WLA_TRIGGERS, _WLA_N_WORD, _WLA_N_LINE, _WLA_N_SENT, _WLA_PLACEHOLDER,
-    _WLA_WORD_LENS, _WLA_MIX_MIN,
 )
 
 
@@ -140,16 +139,28 @@ def test_lesson_block_is_open_floor(seed):
 
 
 @pytest.mark.parametrize("seed", SEEDS)
-def test_plaque_is_in_the_west_wall(seed):
-    """The plaque sits WEST of the spine, in WALL cells (uncuttable, reflow-
-    immune, and excluded from the floor scans)."""
+def test_saying_prefixes_are_carved_in_the_west_stone(seed):
+    """Sense, not decree: each door with a prefix has it carved in WALL cells
+    (uncuttable, off the floor scans), right-aligned to end two cols shy of
+    the spine — the saying reads straight across the stone into the floor.
+    The wordmix scrambles carry no prefix (they name themselves)."""
     room = _room(seed)
-    for r in _WLA_LESSON_ROWS:
-        plq = room.char_run_at(r, _WLA_PLQ_COL)
-        assert plq is not None and plq.kind == 'verdant'
-        assert _WLA_PLQ_COL < _WLA_COL_S, "plaque is west of the spine"
-        for k in range(len(plq.symbols)):
-            assert room.cells[r][_WLA_PLQ_COL + k] == CellType.WALL
+    for L in room._wla_lessons:
+        r = L['row']
+        stones = [ru for ru in room.char_runs
+                  if ru.row == r and ru.kind == 'verdant']
+        if not L['prefix']:
+            assert not stones, (r, stones)
+            continue
+        assert stones, r
+        for ru in stones:
+            for k in range(len(ru.symbols)):
+                assert room.cells[r][ru.col + k] == CellType.WALL
+        east = max(ru.col + len(ru.symbols) - 1 for ru in stones)
+        assert east == _WLA_COL_S - 2
+        text = ' '.join(''.join(ru.symbols)
+                        for ru in sorted(stones, key=lambda u: u.col))
+        assert text == L['prefix']
 
 
 @pytest.mark.parametrize("seed", SEEDS)
@@ -169,50 +180,51 @@ def test_bolts_start_walled_exit_is_the_final_seal(seed):
 
 @pytest.mark.parametrize("seed", SEEDS)
 def test_lesson_mix(seed):
-    """Six word doors (lengths 4..14), the long three MIXED (kind 'wordmix', cE),
-    then two line, two rune doors — word doors first so the line-door cursor lands
+    """Three word doors, three wordmix (scrambled famous compounds, cE), two
+    line, two rune doors — word doors first so the line-door cursor lands
     mid-row off the previous east-ending edit."""
     room = _room(seed)
     kinds = [L['kind'] for L in room._wla_lessons]
-    word_kinds = ['word' if n < _WLA_MIX_MIN else 'wordmix' for n in _WLA_WORD_LENS]
-    assert kinds == word_kinds + ['line'] * _WLA_N_LINE + ['sent'] * _WLA_N_SENT
-    assert [L['len'] for L in room._wla_lessons if 'len' in L] == list(_WLA_WORD_LENS)
+    assert kinds == (['word'] * 3 + ['wordmix'] * 3
+                     + ['line'] * _WLA_N_LINE + ['sent'] * _WLA_N_SENT)
+    assert [L['len'] for L in room._wla_lessons] == [3, 5, 7, 10, 12, 14, 5, 5, 2, 2]
 
 
-@pytest.mark.parametrize("seed", SEEDS)
-def test_label_target_shapes(seed):
-    """word/wordmix: one word off (context kept) at the door's fixed length; the
-    long ones (>= _WLA_MIX_MIN) are MIXED — an internal punctuation mark, so `ce`
-    can't span them. line: a single wrong 6-letter word. sent: a fused ◆ → two
-    letters. No typed value holds a space (an internal hyphen is fine)."""
-    for L in _wla_pick(random.Random(seed)):
+def test_label_target_shapes():
+    """word: one word off, the saying's tail kept; wordmix: a hyphenated famous
+    compound with its pieces SCRAMBLED (ce stops at the hyphen, {n}s pays a
+    2-digit count — only cE both fits and prices); line: a single dissimilar
+    wrong word; sent: a fused ◆ → two letters. No typed value holds a space."""
+    for L in _wla_pick(random.Random(0)):
         assert ' ' not in L['typed'], "no typed value may contain a space"
-        if L['kind'] in ('word', 'wordmix'):
+        if L['kind'] == 'word':
             lw, tw = L['label'].split(), L['target'].split()
-            assert lw[1] == tw[1] and lw[0] != tw[0]           # context kept, word changed
-            assert L['typed'] == tw[0] and len(L['typed']) == L['len']
-            if L['kind'] == 'wordmix':
-                assert L['len'] >= _WLA_MIX_MIN
-                assert not L['typed'].isalnum(), "mixed words carry punctuation (force cE)"
-                assert not lw[0].isalnum()
-            else:
-                assert L['typed'].isalpha() and L['len'] < _WLA_MIX_MIN
+            assert lw[1:] == tw[1:] and lw[0] != tw[0]   # tail kept, word changed
+            assert L['typed'] == tw[0] and L['typed'].isalpha()
+            assert len(L['typed']) <= 9, "short cures: count-s stays single-digit"
+        elif L['kind'] == 'wordmix':
+            scramble = L['label'].split()[0]
+            tail = L['label'].split()[1:]
+            assert '-' in scramble and '-' in L['typed']
+            assert len(L['typed']) >= 10, "2-digit length: {n}s overpays"
+            assert sorted(scramble.split('-')) == sorted(L['typed'].split('-')), \
+                "the scramble is the same famous pieces, reordered"
+            assert scramble != L['typed']
+            assert tail and L['target'].split()[1:] == tail, \
+                "the kept tail bars the ce+retype substring false-open"
         elif L['kind'] == 'line':
             assert ' ' not in L['label'] and ' ' not in L['target']
             assert L['typed'] == L['target'] and L['label'] != L['target']
-            assert len(L['typed']) == 6
         else:
             assert L['label'].startswith(_WLA_PLACEHOLDER)
-            tw = L['target'].split()
-            assert L['typed'] == tw[0][:2] and len(L['typed']) == 2
-            assert L['label'].split()[1] == tw[1]              # context kept
+            assert L['typed'] == L['target'][:2] and len(L['typed']) == 2
+            assert L['target'][2:] == L['label'][1:], "the fused head hides 2 letters"
 
 
-@pytest.mark.parametrize("seed", SEEDS)
-def test_doors_independent(seed):
-    """Distinct words guarantee it: no target is a substring of another target
-    or of any label, so each change opens exactly its own bolt."""
-    lessons = _wla_pick(random.Random(seed))
+def test_doors_independent():
+    """No target is a substring of another target or of any label, so each
+    change opens exactly its own bolt (fixed texts — checked once)."""
+    lessons = _wla_pick(random.Random(0))
     targets = [L['target'] for L in lessons]
     labels = [L['label'] for L in lessons]
     for i, t in enumerate(targets):
@@ -223,33 +235,33 @@ def test_doors_independent(seed):
             assert t not in lb, (t, lb)
 
 
-def test_line_doors_resist_cheap_old_tool_edits():
-    """The cc-forcing margin is a single key (budget = par + TRIGGERS - 1), so a
-    line door whose wrong/right words are SIMILAR could be rewritten more cheaply
-    than `cc` with an already-known tool (a `r`, a count-`s`, or a shared
-    prefix/suffix change) — letting a player clear the hall without ever pressing
-    `cc`. `_draw_whole_line_pair` forbids that: each line-door pair differs in the
-    first AND last char and in >= 4 positions. Scanned WIDE (not just the 5 SEEDS,
-    where the gap hid)."""
-    for seed in range(1000):
-        for L in _wla_pick(random.Random(seed)):
-            if L['kind'] == 'line':
-                assert _whole_line_dissimilar(L['label'], L['target']), \
-                    (seed, L['label'], L['target'])
+def _hamming_margin(wrong, right):
+    """The cheapest r-chain rewrite costs ~2 keys per differing cell plus the
+    walk between them; it must never undercut the change verb's retype."""
+    if len(wrong) != len(right):
+        return None                      # length differs: r alone can never mend
+    return sum(a != b for a, b in zip(wrong, right))
 
 
-def test_word_doors_resist_cheap_old_tool_edits():
-    """The sharper L23 leak: a SIMILAR 4-letter word door can be rewritten with a
-    plain `r` (a pre-L23 tool) for fewer keys than `ce`, dropping the all-old route
-    under budget — so the whole hall falls with NO new command at all (no `c`, no
-    `s`; replay-confirmed on seed 247, `time`->`lime`). At 4 letters `_draw_whole_line_pair`
-    forces all four chars to differ, so the cheapest old rewrite is `de`+`i` = `ce`+1,
-    keeping the +1 forcing margin on every word door. Scanned WIDE."""
-    for seed in range(1000):
-        for L in _wla_pick(random.Random(seed)):
-            if L['kind'] == 'word':
-                wrong, right = L['label'].split()[0], L['target'].split()[0]
-                assert _whole_line_dissimilar(wrong, right), (seed, wrong, right)
+def test_doors_resist_cheap_old_tool_edits():
+    """The forcing margin is a single key (budget = par + TRIGGERS − 1), so a
+    door whose wrong/right words are SIMILAR could fall to a plain r-chain (a
+    pre-Annex tool) for less than the change verb, letting the hall be cleared
+    with no new command. Fixed texts — verify each pair: either the lengths
+    differ (r can never mend) or first+last differ and the r-chain (2 keys per
+    cell + the walk) prices above the verb's retype."""
+    for L in _wla_pick(random.Random(0)):
+        if L['kind'] == 'sent':
+            continue                     # the ◆ is untypable; r cannot spell 2 chars
+        wrong = L['label'].split()[0]
+        right = L['target'].split()[0]
+        h = _hamming_margin(wrong, right)
+        if h is None:
+            continue
+        verb_cost = 2 + len(L['typed'])              # ce/cE/cc + retype
+        r_chain = 3 * h                              # r{c} (2) + ~1 walk per cell
+        assert wrong[0] != right[0], (wrong, right)
+        assert r_chain >= verb_cost or h == len(wrong), (wrong, right, h)
 
 
 # ── access: the exit is eight changes deep, and no jump cheats it ─────────────
@@ -338,7 +350,8 @@ def test_count_s_solves_but_misses_par(seed, monkeypatch):
     for i, L in enumerate(lessons):
         pre = '' if i == 0 else ('j' if L['kind'] == 'line' else 'j^')
         if L['kind'] in ('word', 'wordmix'):
-            keys += _K(pre + f"{L['len']}s") + _K(L['typed']) + [ESC]   # count-s, never c
+            n = len(L['label'].split()[0])           # substitute the WRONG word's cells
+            keys += _K(pre + f'{n}s') + _K(L['typed']) + [ESC]   # count-s, never c
         elif L['kind'] == 'line':
             keys += _K(pre + 'cc') + _K(L['typed']) + [ESC]
         else:
@@ -349,17 +362,17 @@ def test_count_s_solves_but_misses_par(seed, monkeypatch):
 
 
 @pytest.mark.parametrize("seed", SEEDS)
-def test_plaques_survive_every_change(seed, monkeypatch):
-    """The west-wall plaque is reflow-immune: after the whole route (every kind
-    of edit) each plaque still reads its original target."""
+def test_stone_prefixes_survive_every_change(seed, monkeypatch):
+    """The carved prefixes are reflow-immune (glyphs in stone never ride an
+    edit): after the whole route each saying still reads across the wall."""
     dungeon = build_dungeon_whole_line_annex(seed)
     room = dungeon.rooms[0]
-    want = {r: room.char_run_at(r, _WLA_PLQ_COL).symbols for r in _WLA_LESSON_ROWS}
+    def stones():
+        return sorted((ru.row, ru.col, ru.symbols)
+                      for ru in room.char_runs if ru.kind == 'verdant')
+    want = stones()
     _drive(dungeon, _change_keys(room._wla_lessons), monkeypatch)
-    for r in _WLA_LESSON_ROWS:
-        plq = room.char_run_at(r, _WLA_PLQ_COL)
-        assert plq is not None and plq.symbols == want[r], \
-            f"plaque on row {r} was disturbed by an edit"
+    assert stones() == want, "a carved prefix was disturbed by an edit"
 
 
 @pytest.mark.parametrize("seed", SEEDS)

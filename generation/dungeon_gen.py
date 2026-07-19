@@ -8396,28 +8396,33 @@ _FORGE_DOOR  = 6                        # the blank corridor row: spawn, seal do
 # SENSE, NOT DECREE (blueprints/sense_not_decree.md §4, 2026-07-19): the
 # three chambers are three rhymes everyone knows, each corrupted the way
 # its rite mends. FIXED texts (their structure is the puzzle):
-#   A — OLD MACDONALD'S DUCK, written with 'moo' throughout: everyone knows
-#       the duck says quack, and the moos repeat WITHIN each line, so a
-#       /g-less :s leaves remnants — :%s/moo/quack/g. Drills the /g flag.
+#   A — OLD MACDONALD'S DUCK, written with 'moo' throughout: every line
+#       names the DUCK (playtest 2026-07-19 — the chorus alone read as a
+#       cow), everyone knows the duck says quack, and the moos repeat
+#       WITHIN each line, so a /g-less :s leaves remnants —
+#       :%s/moo/quack/g. Drills the /g flag.
 #   B — HICKORY DICKORY: the famous line says the mouse ran UP the clock,
 #       twice — but the MIDDLE line ('the clock struck one and the mouse
 #       ran down') is rightly DOWN, so a blanket :%s/down/up/g wrecks it
 #       self-evidently; :s one line, jj, & the other. Surgical :s + &.
-#   C — TEN GREEN BOTTLES: :g/falls/d sweeps every accidentally-falling
-#       bottle at once; the bottles still hanging on the wall must remain.
-_FORGE_A_WARDS   = [(2, 'with a moo moo here and a moo moo there'),
-                    (3, 'here a moo there a moo everywhere a moo moo'),
-                    (4, 'the little duck says moo moo all day')]
+#   C — TWINKLE TWINKLE, its two famous lines intact, with three lines of
+#       OBVIOUS NONSENSE STATIC ('krzzt…') between them — nothing to fix,
+#       only to strike: :g/krzzt/d sweeps the static at once. (Playtest
+#       2026-07-19: Ten Green Bottles was unfamiliar and its cursed lines
+#       looked fixable — a known 2-liner + unfixable junk reads clean.)
+_FORGE_A_WARDS   = [(2, 'the duck says moo moo here'),
+                    (3, 'the duck says moo moo there'),
+                    (4, 'everywhere the duck says moo moo')]
 _FORGE_B_CORRUPT = [(8, 'the mouse ran down the clock'),
                     (10, 'the mouse ran down the clock again')]
 _FORGE_B_KEEP    = (9, 'the clock struck one and the mouse ran down')
 # (Rows start at 14, NOT 13: :g/…/d REMOVES rows and destroys entities on them,
 # and the sanctum's scroll chest sits on row 13 — the litany begins below it.)
-_FORGE_C_CURSED  = [(14, 'one green bottle accidentally falls'),
-                    (16, 'another green bottle accidentally falls'),
-                    (18, 'a third green bottle accidentally falls')]
-_FORGE_C_KEEP    = [(15, 'nine green bottles hanging on the wall'),
-                    (17, 'eight green bottles hanging on the wall')]
+_FORGE_C_CURSED  = [(14, 'krzzt vrm blug krzzt'),
+                    (16, 'splug krzzt gnnn'),
+                    (18, 'krzzt krzzt fzzzp')]
+_FORGE_C_KEEP    = [(15, 'twinkle twinkle little star'),
+                    (17, 'how i wonder what you are')]
 _FORGE_CHEST     = (13, _FORGE_COLS - 2)   # sanctum scroll chest (random relic —
                                            # the forge names no scroll drop)
 
@@ -8434,10 +8439,10 @@ def _forge_text(room, row, col, text, kind):
 # /g mend, then 8G + surgical :s + jj + & (Chamber B, sparing the protected verse), then
 # Chamber C's :g delete, then the walk out.  Tests translate ⏎→Enter and drop the spaces.
 # par is this solve's measured engine cost — constant across seeds; the playthrough pins it.
-_SPELLWRIGHTS_ANSWER = ':%s/moo/quack/g⏎ 8G :s/down/up/⏎ jj& :g/falls/d⏎ 6G$'
-_SPELLWRIGHTS_PAR    = 44
-# 44 = :%s/moo/quack/g (15) + 8G (2) + :s/down/up/ (11) + jj (2) + & (1)
-#      + :g/falls/d (10) + 6G$ (3).  Chamber B's two verses straddle the
+_SPELLWRIGHTS_ANSWER = ':%s/moo/quack/g⏎ 8G :s/down/up/⏎ jj& :g/krzzt/d⏎ 6G$'
+_SPELLWRIGHTS_PAR    = 45
+# 45 = :%s/moo/quack/g (15) + 8G (2) + :s/down/up/ (11) + jj (2) + & (1)
+#      + :g/krzzt/d (11) + 6G$ (3).  Chamber B's two verses straddle the
 #      protected line, so no single command hits just them — the :s + &
 #      pair is the floor there; the cursor never lands on the door row
 #      after a rite, so the 3-key walk out is the floor too.
@@ -8493,9 +8498,9 @@ def build_dungeon_spellwrights_forge(seed: int) -> Dungeon:
         [t.replace('moo', 'quack') for _r, t in _FORGE_A_WARDS]     # A: /g-mended wards
         + [t.replace('down', 'up') for _r, t in _FORGE_B_CORRUPT]   # B: surgically mended
         + [_FORGE_B_KEEP[1]]                                        # B: the protected true line
-        + [t for _r, t in _FORGE_C_KEEP]                            # C: the standing bottles
+        + [t for _r, t in _FORGE_C_KEEP]                            # C: the famous 2-liner
     )
-    room._forge_purge = 'falls'          # no falling bottle may survive
+    room._forge_purge = 'krzzt'          # no line of static may survive
 
     # par is the true keystroke floor of the three rites + the walk out; measured by replay
     # across seeds (content is fixed, so par is constant).  See tests/test_spellwrights_forge.
@@ -9993,14 +9998,14 @@ def build_dungeon_inscription_halls(seed: int) -> Dungeon:
 #    bounded (they stop at the first shut bolt — engine `_cross_water`). No jump
 #    can reach the exit until the bolts honestly open. (The first cut kept the
 #    exit cell WALL until solved — a non-Vim hack, now retired for geometry.)
-_WLA_ROWS, _WLA_COLS = 15, 41        # widened/heightened for the 14-char word doors (and the
-                                     # WEST-wall plaque must hold the longest target, ~19 chars)
-_WLA_PLQ_COL  = 1                    # plaques sit in the WEST wall (reflow-immune), cols 1..19
-_WLA_COL_S    = 21                   # the spine — the gate's first standable; on lesson rows it
-                                     # carries the label. Pushed east so the west wall (cols 1..20)
-                                     # holds a 14-char-word + ctx plaque without spilling onto floor
+_WLA_ROWS, _WLA_COLS = 15, 47        # widened for the saying prefixes in the west stone (≤ 25
+                                     # chars — 'a stitch in time saves' is 22)
+_WLA_PLQ_COL  = 1                    # (retired name) the west stone band, cols 1..25
+_WLA_COL_S    = 27                   # the spine — the gate's first standable; on lesson rows it
+                                     # carries the label. The west wall (cols 1..26) holds each
+                                     # saying's carved PREFIX, ending two cols shy of the spine
 _WLA_LBL_COL  = _WLA_COL_S           # labels start AT the spine (= where cc drops the cursor)
-_WLA_LBL_END  = 39                   # label floor reaches this column (fits a 14-char word + ctx)
+_WLA_LBL_END  = 45                   # label floor reaches this column (fits the longest label)
 _WLA_LESSON_ROWS = tuple(range(2, 12))               # ten lesson rows, descended by j
 _WLA_THROAT_ROW  = 12                                # spine-ONLY row: the block joins the gate
                                                      # only at the spine (so no east column of
@@ -10009,53 +10014,44 @@ _WLA_GATE_ROW    = 13                                # the gate corridor: spine 
 _WLA_GATE_COL0   = 22                                # first bolt column (one per lesson)
 _WLA_N_WORD, _WLA_N_LINE, _WLA_N_SENT = 6, 2, 2
 _WLA_TRIGGERS = _WLA_N_WORD + _WLA_N_LINE + _WLA_N_SENT     # 10 doors
-_WLA_WORD_LENS = (4, 6, 8, 10, 12, 14)               # word doors lengthen by 2 each row
-_WLA_MIX_MIN   = 10                  # words THIS long (2-digit) are MIXED (punctuated) and force
-                                     # `cE`: `ce` stops at the punctuation, count-`s` overpays the
-                                     # 2-digit count — so only `cE` is both correct AND par-optimal
 _WLA_EXIT = (_WLA_GATE_ROW, _WLA_GATE_COL0 + _WLA_TRIGGERS)  # plain floor, east of the bolts
 _WLA_PLACEHOLDER = '◆'               # the fused rune — `s` spells it out
-_WLA_PAR = 106                       # measured (drive); pinned by the playthrough test
+_WLA_PAR = 101                       # measured (drive); pinned by the playthrough test
                                      # (finale is G$ = 2 keys, not 02j$ = 4)
-# Distinct words at FIXED lengths (par invariance needs fixed lengths, never
-# fixed letters): 4-letter for word/rune doors, 6-letter for the whole-line
-# doors — the deterministic fallback when the vocab draw comes up short.
-_WLA_FALLBACK_4 = (
-    'lock', 'veil', 'gate', 'bind', 'rune', 'dust', 'iron', 'moss',
-    'fern', 'silt', 'oath', 'wisp', 'mire', 'peat', 'gild', 'hush',
-)
-# A whole-line fallback pool with pairwise-distinct FIRST and LAST letters, so any
-# draw order yields a dissimilar (cc-forcing) pair. (Unreachable with the real
-# vocab — the 6-letter pool is hundreds deep — but kept honest.)
-_WLA_FALLBACK_6 = ('cipher', 'shadow', 'velvet', 'frozen',
-                   'marble', 'liquid', 'quartz', 'bishop')
-_WLA_FALLBACK_8 = ('absolute', 'crescent', 'darkened', 'flagrant',
-                   'gauntlet', 'helmeted', 'ironclad', 'keystone')
 
-# MIXED word pools — 2-digit-length tokens carrying an internal punctuation mark.
-# `ce` (word-class) stops at the punctuation, so it changes only the first run and
-# the bolt stays shut; only `cE` (WORD-class) spans the whole token. And because
-# the length is 2 digits, a `{n}s` substitute spends one key more than `cE`. So on
-# these doors `cE` alone is BOTH correct and par-optimal — the lesson. (The vocab
-# tables hold no word this long, mixed or otherwise, so these are the only source.)
-_WLA_WORDS_10 = (
-    'fire-blade', 'moon-cloak', 'soul-flame', 'rune-stone', 'bone-shard',
-    'dawn-light', 'void-touch', 'iron-grasp', 'gold-crown', 'frost-bite',
-    'blood-oath', 'storm-call', 'night-fall', 'ghost-fire', 'witch-hour',
-    'raven-wing',
+# SENSE, NOT DECREE (blueprints/sense_not_decree.md §2, the change levels):
+# every door is a saying the player knows, corrupted the way its verb mends.
+# (kind, stone prefix, floor label, door target, typed) — FIXED texts, their
+# letter-geometry is the puzzle:
+#   word    — the saying's prefix is CARVED IN THE WEST STONE up to the spine;
+#             the floor holds the wrong word + the saying's tail. `^ce` mends
+#             the word and keeps the tail; the cure is known by heart. Short
+#             typed cures (3/5/7) keep `{n}s` a single-digit TIE (allowed).
+#   wordmix — a famous HYPHENATED expression with its pieces SCRAMBLED
+#             ('round-go-merry'): instantly recognizable, retyped whole by
+#             heart. `ce` stops at the hyphen (wrong); `{n}s` overpays the
+#             2-digit count — only `cE` is correct AND par-optimal. And the
+#             scramble is hamming-far from the cure (asserted), so no r-chain
+#             undercuts the retype.
+#   line    — the floor is one wrong word, the saying's carved prefix names
+#             the famous last word ('time is │ water' → cc + money). The
+#             wrong word is dissimilar (the cc-forcing law).
+#   sent    — the saying's key word stands head-fused ('saves ◆ne'):
+#             s cuts the rune and spells the two letters everyone knows.
+_WLA_DOORS = (
+    ('word', 'a watched', 'jug never boils', 'pot never boils', 'pot'),
+    ('word', 'many hands make', 'heavy work', 'light work', 'light'),
+    ('word', 'the early bird', 'grabs the worm', 'catches the worm', 'catches'),
+    # the kept tail word is load-bearing: without it, ce + retype leaves the
+    # target as a SUBSTRING ('well-to-do-do-well') and false-opens the bolt
+    ('wordmix', '', 'to-do-well folk', 'well-to-do folk', 'well-to-do'),
+    ('wordmix', '', 'ending-never road', 'never-ending road', 'never-ending'),
+    ('wordmix', '', 'round-go-merry ride', 'merry-go-round ride', 'merry-go-round'),
+    ('line', 'time is', 'water', 'money', 'money'),
+    ('line', 'knowledge is', 'sword', 'power', 'power'),
+    ('sent', 'a stitch in time saves', '◆ne', 'nine', 'ni'),
+    ('sent', 'practice makes', '◆rfect', 'perfect', 'pe'),
 )
-_WLA_WORDS_12 = (
-    'shadow-blade', 'winter-storm', 'spirit-bound', 'dragon-blood',
-    'silver-crown', 'golden-chain', 'frozen-heart', 'molten-stone',
-    'hollow-crown', 'sacred-flame', 'broken-blade', 'cursed-bones',
-    'wicked-charm', 'raven-flight',
-)
-_WLA_WORDS_14 = (
-    'phantom-shield', 'crimson-shroud', 'thunder-strike', 'ancient-mantle',
-    'scarlet-shield', 'twisted-shadow', 'blasted-hollow', 'cracked-mirror',
-    'obsidian-blade', 'spectral-flame', 'withered-crown', 'serpent-shield',
-)
-_WLA_MIXED_POOLS = {10: _WLA_WORDS_10, 12: _WLA_WORDS_12, 14: _WLA_WORDS_14}
 
 
 def _whole_line_dissimilar(wrong: str, right: str) -> bool:
@@ -10088,78 +10084,13 @@ def _draw_whole_line_pair(stream):
     return wrong, right
 
 
-def _wla_independent(lessons) -> bool:
-    """No target reads inside another target, or inside any label — so each change
-    opens exactly its own bolt. Distinct words alone USED to guarantee this, but the
-    MIXED compound words embed common short words ('dragon-blood' carries 'dragon'),
-    so a plain line/word/sent target can now collide with one. This is the gate that
-    `_wla_pick` redraws against."""
-    targets = [L['target'] for L in lessons]
-    labels  = [L['label'] for L in lessons]
-    for i, t in enumerate(targets):
-        if any(j != i and t in u for j, u in enumerate(targets)):
-            return False
-        if any(t in lb for lb in labels):
-            return False
-    return True
-
-
 def _wla_pick(rng):
-    """`_wla_pick_once`, redrawn until the doors are independent (a mixed compound
-    word can embed a shorter target — see `_wla_independent`). The deep pools make a
-    collision rare, so this almost always returns on the first draw; the cap is a
-    safety net."""
-    lessons = _wla_pick_once(rng)
-    for _ in range(60):
-        if _wla_independent(lessons):
-            break
-        lessons = _wla_pick_once(rng)
-    return lessons
-
-
-def _wla_pick_once(rng):
-    """Ten lessons at FIXED word lengths (so par is seed-invariant) — a relabelling
-    each. Returns lesson dicts:
-      word    — short, plain. {'label':'wrong ctx','target':'right ctx','typed':'right'}
-                Lengths 4/6/8: `ce` and a `{n}s` substitute COST THE SAME, so the
-                novice may use either — count-`s` is allowed, not a cheat.
-      wordmix — long (10/12/14), MIXED (an internal punctuation mark). Same shape,
-                but `ce` stops at the punctuation (wrong) and `{n}s` overpays the
-                2-digit count, so only `cE` is correct AND par-optimal. THE LESSON.
-      line    — {'label':'wrongw','target':'rightw','typed':'rightw'}  (whole line, cc)
-      sent    — {'label':'◆st ctx','target':'fist ctx','typed':'fi'}   (a fused ◆, s)
-    No `typed` holds a SPACE (the karaoke answer can't represent one); an internal
-    hyphen is fine. All words are DISTINCT — door independence (no target is a
-    substring of another label/target). The word doors lengthen by 2 each row."""
-    _load_vocab_tables()
-    def _plain(n, fallback):
-        p = sorted({w for w in _VOCAB_PLAIN_BY_LEN.get(n, ())
-                    if w.isalpha() and w.islower()})
-        rng.shuffle(p)
-        return iter(p if len(p) >= 8 else list(fallback))
-    def _mixed(n):
-        p = list(_WLA_MIXED_POOLS[n]); rng.shuffle(p); return iter(p)
-    plain = {4: _plain(4, _WLA_FALLBACK_4), 6: _plain(6, _WLA_FALLBACK_6),
-             8: _plain(8, _WLA_FALLBACK_8)}
-    mixed = {n: _mixed(n) for n in _WLA_MIXED_POOLS}
-    w4 = plain[4]                                       # ctx + sent share the 4-letter stream
-    lessons = []
-    for n in _WLA_WORD_LENS:
-        src = plain[n] if n < _WLA_MIX_MIN else mixed[n]
-        wrong, right = _draw_whole_line_pair(src)       # dissimilar — the diff spans the whole
-        ctx = next(w4)                                  # word (no cheaper r/count-s rewrite)
-        lessons.append({'kind': 'word' if n < _WLA_MIX_MIN else 'wordmix', 'len': n,
-                        'label': f'{wrong} {ctx}', 'target': f'{right} {ctx}', 'typed': right})
-    for _ in range(_WLA_N_LINE):
-        wrong, right = _draw_whole_line_pair(plain[6])  # dissimilar — forces cc, no r/count-s cheese
-        lessons.append({'kind': 'line', 'label': wrong,
-                        'target': right, 'typed': right})
-    for _ in range(_WLA_N_SENT):
-        wanted, ctx = next(w4), next(w4)
-        lessons.append({'kind': 'sent',
-                        'label': f'{_WLA_PLACEHOLDER}{wanted[2:]} {ctx}',
-                        'target': f'{wanted} {ctx}', 'typed': wanted[:2]})
-    return lessons
+    """The ten fixed sense-doors as lesson dicts (the rng is unused — fixed
+    famous texts ARE the puzzle; kept for the builder-signature convention).
+    No `typed` holds a SPACE (the karaoke law); hyphens are fine."""
+    return [{'kind': kind, 'prefix': prefix, 'label': label,
+             'target': target, 'typed': typed, 'len': len(typed)}
+            for kind, prefix, label, target, typed in _WLA_DOORS]
 
 
 # Verb keys per door kind. ce changes to the (word-class) word's end; cE through a
@@ -10237,19 +10168,24 @@ def build_dungeon_whole_line_annex(seed: int) -> Dungeon:
     for i, lesson in enumerate(lessons):
         lrow = _WLA_LESSON_ROWS[i]
         lesson['row'] = lrow
-        if lesson['kind'] in ('word', 'wordmix'):
-            # Lay the word and its context as SEPARATE runs with a bare-floor gap,
-            # not one run with a space GLYPH: a space glyph reads as punctuation, so
-            # `E` would run straight THROUGH it and `cE` would eat the context. A
-            # real empty floor cell is whitespace, so `E` stops at the word's end
-            # (the L24 C-door fix). `e` still halts at the inner punctuation.
-            col = _WLA_LBL_COL
-            for w in lesson['label'].split(' '):
-                lay(lrow, col, w, 'ancient')
-                col += len(w) + 1
-        else:
-            lay(lrow, _WLA_LBL_COL, lesson['label'], 'ancient')    # wrong label, on the floor
-        lay(lrow, _WLA_PLQ_COL, lesson['target'], 'verdant')       # the plaque, in the WEST wall
+        # Lay the label word by word as SEPARATE runs with bare-floor gaps,
+        # not one run with a space GLYPH: a space glyph reads as punctuation,
+        # so `E` would run straight THROUGH it and `cE` would eat the context.
+        # A real empty floor cell is whitespace, so `E` stops at the word's
+        # end (the L24 C-door fix). `e` still halts at inner punctuation.
+        col = _WLA_LBL_COL
+        for w in lesson['label'].split(' '):
+            lay(lrow, col, w, 'ancient')
+            col += len(w) + 1
+        # The saying's PREFIX, carved in the west stone right-aligned to end
+        # two cols shy of the spine — the sense that replaces the old decree
+        # plaque (in WALL: uncuttable, off the floor scans; the wordmix
+        # scrambles carry no prefix, they name themselves).
+        if lesson['prefix']:
+            pcol = _WLA_COL_S - 1 - len(lesson['prefix'])
+            for w in lesson['prefix'].split(' '):
+                lay(lrow, pcol, w, 'verdant')
+                pcol += len(w) + 1
         doors.append((lesson['target'], (_WLA_GATE_ROW, _WLA_GATE_COL0 + i)))
     room._wla_doors   = tuple(doors)
     room._wla_lessons = tuple(lessons)
@@ -10302,17 +10238,17 @@ def build_dungeon_whole_line_annex(seed: int) -> Dungeon:
 #  - Reflow is now segment-bounded both ways (2026-06-26), so the plaque could sit
 #    east behind a bolt; it stays in the WEST wall here only to be uncuttable and
 #    off the floor scans.
-_CE_ROWS, _CE_COLS = 17, 29
-_CE_PLQ_COL  = 1                     # plaques in the WEST wall (uncuttable, off the scans)
-_CE_COL_S    = 11                    # the spine — the gate's first standable; on lesson rows it
-                                     # carries the label (no blank margin, so the word a cc/S
-                                     # lands at the spine reads aligned with every other label)
+_CE_ROWS, _CE_COLS = 17, 50
+_CE_PLQ_COL  = 1                     # (retired name) the west stone band, cols 1..25
+_CE_COL_S    = 27                    # the spine — the gate's first standable; on lesson rows it
+                                     # carries the label; the west wall (cols 1..26) holds each
+                                     # saying's carved PREFIX, ending two cols shy of the spine
 _CE_LBL_COL  = _CE_COL_S             # labels start AT the spine (= where cc/S drops the cursor)
-_CE_LBL_END  = 27                    # label floor reaches this column (fits the longest C label)
+_CE_LBL_END  = 47                    # label floor reaches this column (fits the longest label)
 _CE_LESSON_ROWS = tuple(range(2, 14))                # twelve doors, an open block (rows 2..13)
 _CE_THROAT_ROW  = 14                                 # spine-ONLY row: block → gate
 _CE_GATE_ROW    = 15                                 # the gate corridor: spine · bolts · exit
-_CE_GATE_COL0   = 12                                 # first bolt column (one per door)
+_CE_GATE_COL0   = 28                                 # first bolt column (one per door)
 # Door kinds in FIXED order (par invariance). The hall now DRILLS WHICH change tool
 # fits, not just the shorthands: S (whole line) and C (to line end) the two new
 # one-key shorthands, against the granular c-tools they DON'T replace —
@@ -10336,90 +10272,50 @@ _CE_SAVING = _CE_N_S + _CE_N_C                        # 6 doors that the shortha
 _CE_EXIT = (_CE_GATE_ROW, _CE_GATE_COL0 + _CE_TRIGGERS)   # plain floor, east of the bolts
 _CE_PLACEHOLDER = '◆'                # the fused rune — `s` spells it out
 _CE_SYMBOL      = '★'                # the WORD-spanning symbol — `cE` crosses it, `ce` stops
-# par is COMPUTED from the canonical route once below (seed-invariant — every door's
-# keystrokes and typed text are fixed length); pinned by tests.
+# par is COMPUTED from the canonical route once below (seed-invariant — the
+# texts are FIXED); pinned by tests.
 
-# Distinct words at FIXED lengths (par invariance needs fixed lengths): 6-letter
-# for the whole-line S doors (two per door — wrong label + right target), 4-letter
-# for the C tails / word / rune doors. Deterministic fallbacks when the vocab draw
-# is short. Eight 6-letter, twenty-one 4-letter are needed.
-# Pairwise-distinct first AND last letters (dissimilar in any draw order) — see
-# _WLA_FALLBACK_6. Eight 6-letter words are needed (four S doors, a pair each).
-_CE_FALLBACK_6 = ('cipher', 'shadow', 'velvet', 'frozen',
-                  'marble', 'liquid', 'quartz', 'bishop')
-_CE_FALLBACK_4 = (
-    'lock', 'veil', 'gate', 'bind', 'rune', 'dust', 'iron', 'moss',
-    'fern', 'silt', 'oath', 'wisp', 'mire', 'peat', 'gild', 'hush',
-    'kiln', 'tarn', 'wyrm', 'sear', 'lode', 'glen', 'rime', 'spar',
-    'cove', 'dune', 'fang', 'helm', 'jade', 'reef', 'thaw', 'yarn',
+# SENSE, NOT DECREE (blueprints/sense_not_decree.md §2, the change levels):
+# every door is a saying the player knows, corrupted the way its verb mends.
+# (kind, stone prefix, floor label, door target, typed) — the ALIGNMENT LAW
+# holds by construction: every S cure is EXACTLY 6 letters and every C
+# door's kept floor word EXACTLY 4, so the post-S cursor (label col + 5)
+# lands on the C door's wrong tail with a bare `j`.
+#   sline  — the saying's carved prefix names the famous last word; the
+#            floor is one dissimilar wrong word ('honesty is the best │
+#            butter'). S retypes it whole.
+#   ceol   — the kept floor word + a TWO-word junk tail; C rewrites the
+#            tail to the famous word ('no news is │ good slop murk' → C
+#            news). `ce` stops one word short.
+#   word   — one word off, tail kept ('a rolling │ rock gathers no moss').
+#   wordW  — the saying's key word wears a ★ scar ('ir★n is hot'): `ce`
+#            stops at the symbol; only `cE` retypes the WORD by heart.
+#   rune   — the key word stands head-fused ('◆ep' → de → deep).
+#   bracket— a wrong bracketed head on the famous stem ('(al)gether'):
+#            c% swaps exactly the bracket span for the true head.
+_CE_DOORS = (
+    ('sline', 'honesty is the best', 'butter', 'policy', 'policy'),
+    ('ceol', 'no news is', 'good slop murk', 'good news', 'news'),
+    ('word', 'a rolling', 'rock gathers no moss', 'stone gathers no moss', 'stone'),
+    ('sline', 'silence is', 'sacred', 'golden', 'golden'),
+    ('ceol', 'time', 'will gnaw sump', 'will tell', 'tell'),
+    ('wordW', 'strike while the', f'ir{_CE_SYMBOL}n is hot', 'iron is hot', 'iron'),
+    ('rune', 'still waters run', f'{_CE_PLACEHOLDER}ep', 'deep', 'de'),
+    ('sline', 'squeaky wheel gets the', 'polish', 'grease', 'grease'),
+    ('ceol', 'actions speak louder', 'than drab fume', 'than words', 'words'),
+    ('wordW', 'too many', f'co{_CE_SYMBOL}ks spoil the broth',
+     'cooks spoil the broth', 'cooks'),
+    ('rune', 'mightier than the', f'{_CE_PLACEHOLDER}ord', 'sword', 'sw'),
+    ('bracket', 'birds of a feather flock', '(al)gether', 'together', 'to'),
 )
 
 
 def _ce_pick(rng):
-    """Twelve lessons, each a (label → target) relabelling at FIXED word lengths
-    so par is seed-invariant. Returns lesson dicts:
-      sline  — {'label': 'wrongw', 'target': 'rightw', 'typed': 'rightw'}   (one 6-letter word)
-      ceol   — {'label': 'pre bad rot', 'target': 'pre fix', 'typed': 'fix'} (prefix kept, 2-word tail → 1)
-      word   — {'label': 'wrong ctx', 'target': 'right ctx', 'typed': 'right'}
-      wordW  — {'label': 'fr★ee ctx', 'target': 'step ctx', 'typed': 'step'}  (cE crosses ★, ce stops)
-      rune   — {'label': '◆st ctx',   'target': 'fist ctx',  'typed': 'fi'}
-      bracket— {'label': '(co)il ctx', 'target': 'buil ctx', 'typed': 'bu'}   (c% swaps the bracket span)
-    All words are drawn DISTINCT across the level, which alone guarantees door
-    independence (no target is a substring of another label/target): every
-    space-bearing target needs a unique two-word sequence, and the only space-free
-    target — the 6-letter S word — cannot sit inside a 4-letter word. No `typed`
-    value contains a SPACE (the C tail collapses to a single word), so the karaoke
-    answer tape is unambiguous."""
-    _load_vocab_tables()
-    def _pool(n, need, fallback):
-        p = sorted({w for w in _VOCAB_PLAIN_BY_LEN.get(n, ())
-                    if w.isalpha() and w.islower()})
-        rng.shuffle(p)
-        return iter(p if len(p) >= need else list(fallback))
-    # 4-letter draws: C pre/badA/badB/right; word wrong/right/ctx; each cE
-    # src/right/ctx; each rune wanted/ctx; bracket src/typed-src/ctx.
-    need4 = (_CE_KIND_ORDER.count('ceol') * 4 + _CE_KIND_ORDER.count('word') * 3
-             + _CE_KIND_ORDER.count('wordW') * 3 + _CE_KIND_ORDER.count('rune') * 2
-             + _CE_KIND_ORDER.count('bracket') * 3)
-    need6 = _CE_N_S * 2                    # S: wrong label + right target
-    w6 = _pool(6, need6, _CE_FALLBACK_6)
-    w4 = _pool(4, need4, _CE_FALLBACK_4)
-    lessons = []
-    for kind in _CE_KIND_ORDER:
-        if kind == 'sline':
-            wrong, right = _draw_whole_line_pair(w6)   # dissimilar — forces S, no r/count-s cheese
-            lessons.append({'kind': 'sline', 'label': wrong,
-                            'target': right, 'typed': right})
-        elif kind == 'ceol':
-            pre, badA, badB, right = next(w4), next(w4), next(w4), next(w4)
-            lessons.append({'kind': 'ceol', 'label': f'{pre} {badA} {badB}',
-                            'target': f'{pre} {right}', 'typed': right})
-        elif kind == 'word':
-            wrong, right, ctx = next(w4), next(w4), next(w4)
-            lessons.append({'kind': 'word', 'label': f'{wrong} {ctx}',
-                            'target': f'{right} {ctx}', 'typed': right})
-        elif kind == 'wordW':
-            # A symbol-spanning WORD: `ce` stops at the symbol (changes only the
-            # head), `cE` rewrites the whole WORD. Context word kept.
-            src, right, ctx = next(w4), next(w4), next(w4)
-            word_w = f'{src[:2]}{_CE_SYMBOL}{src[2:]}'     # e.g. 'mo★ss'
-            lessons.append({'kind': 'wordW', 'label': f'{word_w} {ctx}',
-                            'target': f'{right} {ctx}', 'typed': right})
-        elif kind == 'bracket':
-            # A bracketed head on a kept stem: `c%` changes '(' to its match ')'
-            # (just the bracketed bit), keeping the stem. `ce` stops inside, `cE`
-            # eats the stem, S/C clobber the context.
-            src, tsrc, ctx = next(w4), next(w4), next(w4)
-            junk, stem, fix = src[:2], src[2:], tsrc[:2]    # '(ju)st' -> 'fixst'
-            lessons.append({'kind': 'bracket',
-                            'label': f'({junk}){stem} {ctx}',
-                            'target': f'{fix}{stem} {ctx}', 'typed': fix})
-        else:                              # rune
-            wanted, ctx = next(w4), next(w4)
-            lessons.append({'kind': 'rune',
-                            'label': f'{_CE_PLACEHOLDER}{wanted[2:]} {ctx}',
-                            'target': f'{wanted} {ctx}', 'typed': wanted[:2]})
-    return lessons
+    """The twelve fixed sense-doors as lesson dicts (rng unused — fixed famous
+    texts ARE the puzzle). No `typed` holds a SPACE (the karaoke law)."""
+    return [{'kind': kind, 'prefix': prefix, 'label': label,
+             'target': target, 'typed': typed}
+            for kind, prefix, label, target, typed in _CE_DOORS]
 
 
 # Verb keys per door kind. S changes the whole line; C the line's tail; ce a word;
@@ -10455,17 +10351,10 @@ def _ce_answer(lessons):
     return ' '.join(keys + typed for keys, typed in _ce_route(lessons) if keys or typed)
 
 
-# Fixed typed length per door kind (par invariance): the whole-line S word is 6,
-# the C tail / word / cE replacement 4, the rune / bracket head 2.
-_CE_TYPED_LEN = {'sline': 6, 'ceol': 4, 'word': 4, 'wordW': 4, 'rune': 2, 'bracket': 2}
-
-
 def _ce_par() -> int:
-    """The canonical route's keystroke count, COMPUTED from _ce_route so it can
-    never drift from the verb/prefix maps. Seed-invariant — every door's keys and
-    typed text are fixed length — so a dummy lessons list with the right typed
-    lengths gives the exact par (no vocab draw needed)."""
-    dummy = [{'kind': k, 'typed': 'x' * _CE_TYPED_LEN[k]} for k in _CE_KIND_ORDER]
+    """The canonical route's keystroke count, COMPUTED from the fixed door
+    table via _ce_route so it can never drift from the verb/prefix maps."""
+    dummy = [{'kind': k, 'typed': t} for k, _p, _l, _t, t in _CE_DOORS]
     return sum(len(keys) + len(typed) for keys, typed in _ce_route(dummy))
 
 
@@ -10515,23 +10404,22 @@ def build_dungeon_change_extension(seed: int) -> Dungeon:
     for i, lesson in enumerate(lessons):
         lrow = _CE_LESSON_ROWS[i]
         lesson['row'] = lrow
-        if lesson['kind'] in ('ceol', 'wordW', 'bracket'):
-            # Lay each token as its OWN run with a bare-floor gap between them, not
-            # one run with an embedded space glyph: a space glyph is a punctuation
-            # 'word' (engine word-class quirk), so `w` and the `cE`/`c%` WORD scans
-            # would treat the whole "head ctx" as ONE non-blank WORD and eat the
-            # context. A real floor gap is genuine whitespace, so `cE` stops at the
-            # head's end and the C route's `w` lands on the wrong tail. The floor
-            # scan reconstructs the space from the empty cell, so the target reads
-            # identically. (Word/rune doors never scan across the space — `ce`/`s`
-            # stop at the first letter-word end — so they keep the single-run shape.)
-            col = _CE_LBL_COL
-            for word in lesson['label'].split(' '):
-                lay(lrow, col, word, 'ancient')
-                col += len(word) + 1
-        else:
-            lay(lrow, _CE_LBL_COL, lesson['label'], 'ancient')  # wrong label, on the floor
-        lay(lrow, _CE_PLQ_COL, lesson['target'], 'verdant')    # the plaque, in the WEST wall
+        # Lay each token as its OWN run with a bare-floor gap between them, not
+        # one run with an embedded space glyph: a space glyph is a punctuation
+        # 'word' (engine word-class quirk), so `w` and the `cE`/`c%` WORD scans
+        # would treat a "head ctx" pair as ONE non-blank WORD and eat the
+        # context. A real floor gap is genuine whitespace.
+        col = _CE_LBL_COL
+        for word in lesson['label'].split(' '):
+            lay(lrow, col, word, 'ancient')
+            col += len(word) + 1
+        # The saying's PREFIX, carved in the west stone (the sense that
+        # replaces the decree plaque) — right-aligned, two cols shy of the
+        # spine; uncuttable, off the floor scans.
+        pcol = _CE_COL_S - 1 - len(lesson['prefix'])
+        for word in lesson['prefix'].split(' '):
+            lay(lrow, pcol, word, 'verdant')
+            pcol += len(word) + 1
         doors.append((lesson['target'], (_CE_GATE_ROW, _CE_GATE_COL0 + i)))
     # The tick is the Annex's generic plaque-door scan, keyed on `room._wla_doors`.
     room._wla_doors   = tuple(doors)
