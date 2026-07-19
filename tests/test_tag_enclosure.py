@@ -30,9 +30,11 @@ from engine.world import CellType
 from generation.dungeon_gen import (
     build_dungeon_tag_enclosure,
     _TE_ROWS, _TE_COLS, _TE_SPINE, _TE_SHAFT_SEPS, _TE_THROAT,
-    _TE_GATE, _TE_BOLTS, _TE_EXIT, _TE_PAR, _TE_TEXT0, _TE_SHAPE,
+    _TE_GATE, _TE_BOLTS, _TE_EXIT, _TE_PAR, _TE_ANCHOR, _TE_NEST_ANCHOR,
+    _TE_SHAPE, _TE_TEXT_MIN, _TE_BAY_E,
     _TE_C1_ROWS, _TE_C2_ROWS, _TE_C3_ROWS, _TE_C4_ROWS, _TE_C5_ROWS,
 )
+from content import proverbs as pv
 from tests import SEEDS, cached_room
 
 ESC = Keystroke('\x1b', name='KEY_ESCAPE')
@@ -46,11 +48,15 @@ def _K(s):
     return [Keystroke(ch) for ch in s]
 
 
+def _cures(room):
+    return [m[2] for m in room._te_texts['misquotes']]
+
+
 # The canonical tape (== room.answer with Esc placed): one f> walk-in, then
 # the dot-chains ride the aligned columns; the nest discriminates dit/dat
 # from one landing; C5 aims with f< past the empty first element.
 def _canon_keys(room):
-    ca, cb = room._te_words['cures']
+    ca, cb = _cures(room)
     return (_K('jf>ditj.') + _K('2jcit') + _K(ca) + [ESC]
             + _K('jcit') + _K(cb) + [ESC]
             + _K('2jdatj.') + _K('2jditjdat')
@@ -60,7 +66,7 @@ def _canon_keys(room):
 # The leanest old-only rival: every element pays its own F< / f> / l
 # positioning before a count-x or d2f> even starts. Wins, at 1★ (> par).
 def _piecewise_rival_keys(room):
-    ca, cb = room._te_words['cures']
+    ca, cb = _cures(room)
     return (_K('jf>l3xj4x') + _K('2jct<') + _K(ca) + [ESC]
             + _K('jhhct<') + _K(cb) + [ESC]
             + _K('2jF<d2f>jd2f>') + _K('2jf>l3xjF<d2f>')
@@ -111,7 +117,7 @@ def test_par_answer_budget(seed):
     room = _room(seed)
     assert room.par == _TE_PAR
     assert room.budget == math.ceil(_TE_PAR * 1.4)
-    ca, cb = room._te_words['cures']
+    ca, cb = _cures(room)
     assert room.answer == (f'j f> dit j . 2j cit {ca} j cit {cb} '
                            f'2j dat j . 2j dit j dat 2j f< dit G $')
 
@@ -152,39 +158,35 @@ def test_no_chest(seed):
                 if e.kind in ('chest', 'chest_key', 'chest_scroll')]
 
 
-# ── plaques & vocabulary ──────────────────────────────────────────────────────
-
-def _plaque_text(room, r):
-    cells = {}
-    for ru in room.char_runs:
-        if ru.row == r and ru.col < _TE_SPINE:
-            for i, s in enumerate(ru.symbols):
-                cells[ru.col + i] = s
-    if not cells:
-        return ''
-    lo, hi = min(cells), max(cells)
-    return ''.join(cells.get(c, ' ') for c in range(lo, hi + 1))
-
+# ── the draw: anchored proverbs ───────────────────────────────────────────────
 
 @pytest.mark.parametrize("seed", SEEDS)
-def test_plaques_carry_the_full_readings_and_stay_off_the_spine(seed):
-    # The overflow regression (build-day): a 25-char plaque once reached the
-    # spine column and its last letter joined the FLOOR text of the row.
+def test_proverb_draw_anchors_and_fits(seed):
+    """Standard elements open at _TE_ANCHOR, nest/C5 at _TE_NEST_ANCHOR
+    (their inner/second '<' rides the chained landing); junk lengths fixed;
+    sayings distinct; junk foreign; misquote cures len 3."""
     room = _room(seed)
-    for targets, _dc in room._ss_doors:
-        for t in targets:
-            assert any(_plaque_text(room, r) == t for r in range(room.rows)), t
-    for ru in room.char_runs:
-        if ru.col < _TE_SPINE:
-            assert ru.col + len(ru.symbols) - 1 < _TE_SPINE
-
-
-@pytest.mark.parametrize("seed", SEEDS)
-def test_vocab_distinctness(seed):
-    room = _room(seed)
-    words = room._te_words
-    picks = [w for row in words['rows'].values() for w in row] + list(words['cures'])
-    assert len(set(picks)) == len(picks)
+    texts = room._te_texts
+    shape_by_row = dict(_TE_SHAPE)
+    junks = []
+    for (r, words, k, junk, tag) in texts['intruders']:
+        assert len(junk) == shape_by_row[r]
+        anchor = (_TE_NEST_ANCHOR if r in _TE_C4_ROWS + _TE_C5_ROWS
+                  else _TE_ANCHOR)
+        t0 = anchor - (pv.prefix_len(words, k) + 1)
+        assert t0 >= _TE_TEXT_MIN
+        ru = next(u for u in room.char_runs if u.row == r and u.col == anchor)
+        assert ru.symbols[0] == '<'
+        assert ru.col + len(ru.symbols) - 1 <= _TE_BAY_E
+        assert junk not in words
+        junks.append(junk)
+        assert all(len(n) == 3 for n in tag)
+    assert len(set(junks)) == len(junks)
+    for name, (words, idx, cure) in zip(texts['c2_names'],
+                                        texts['misquotes']):
+        assert len(cure) == 3 and len(words[idx]) >= 3 and len(name) == 3
+    sayings = [w for _r, w, *_ in texts['intruders']]
+    assert len({' '.join(w) for w in sayings}) == len(sayings)
 
 
 @pytest.mark.parametrize("seed", SEEDS)
@@ -237,16 +239,15 @@ def test_nest_resolves_the_innermost(monkeypatch):
     # dat on row 13 tears the whole inner element out, leaving the outer husk.
     dungeon = build_dungeon_tag_enclosure(0)
     room = dungeon.rooms[0]
-    ca, cb = room._te_words['cures']
+    ca, cb = _cures(room)
     keys = (_K('jf>ditj.') + _K('2jcit') + _K(ca) + [ESC]
             + _K('jcit') + _K(cb) + [ESC]
             + _K('2jdatj.') + _K('2jditjdat'))
     _drive(dungeon, keys, monkeypatch, finish=':q!\r')
+    tgt_a, tgt_b = room._ss_doors[3][0]
     r12, r13 = _TE_C4_ROWS
-    no12, ni12, _ = room._te_words['rows'][r12]
-    no13, _ni13, _ = room._te_words['rows'][r13]
-    assert main._wla_floor_text(room, r12).strip() == f'<{no12}><{ni12}></{ni12}></{no12}>'
-    assert main._wla_floor_text(room, r13).strip() == f'<{no13}></{no13}>'
+    assert main._wla_floor_text(room, r12).strip() == tgt_a
+    assert main._wla_floor_text(room, r13).strip() == tgt_b
 
 
 def test_undo_rebars_an_open_bolt(monkeypatch):

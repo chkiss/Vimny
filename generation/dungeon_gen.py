@@ -4348,115 +4348,110 @@ def build_dungeon_quote_enclosure(seed: int) -> Dungeon:
 # the walk to the content start, d2f> pays a key over dat, and ct< pays
 # the walk cit doesn't; % speaks the angle brackets but lands on single
 # marks, not name-matched pairs.
-_TE_ROWS, _TE_COLS = 19, 60
-_TE_SPINE   = 28                     # every row's first standable
-_TE_BAY_W   = 29                     # bay floor cols 29..57; east wall 58
-_TE_BAY_E   = 57
-_TE_PLQ_COL = 2                      # full true readings (≤25 chars, < spine)
-_TE_TEXT0   = 30                     # w1 starts here (len 4); element at 35
+_TE_ROWS, _TE_COLS = 19, 66
+_TE_SPINE   = 2                      # every row's first standable
+_TE_BAY_W   = 3                      # bay floor cols 3..63; east wall 64
+_TE_BAY_E   = 63
+_TE_TEXT_MIN = 3                     # earliest col a proverb may start
+_TE_ANCHOR  = 29                     # standard rows: '<' of the element
+_TE_NEST_ANCHOR = 24                 # nest/C5 rows: outer/first '<' (inner
+                                     # opens at 29 = the chained landing)
 _TE_C1_ROWS = (3, 4)
 _TE_C2_ROWS = (6, 7)
 _TE_C3_ROWS = (9, 10)
-_TE_C4_ROWS = (12, 13)               # nest rows carry NO w1/w2 (plaque width)
+_TE_C4_ROWS = (12, 13)
 _TE_C5_ROWS = (15,)
-_TE_SHAFT_SEPS = ((5, 40), (8, 42), (11, 35), (14, 35))
+_TE_SHAFT_SEPS = ((5, 34), (8, 36), (11, 29), (14, 29))
 _TE_THROAT  = 16
 _TE_GATE    = 17
-_TE_BOLTS   = {'c1': 29, 'c2': 30, 'c3': 31, 'c4': 32, 'c5': 33}
-_TE_EXIT    = (17, 34)               # the FINAL SEAL, east of every bolt
+_TE_BOLTS   = {'c1': 3, 'c2': 4, 'c3': 5, 'c4': 6, 'c5': 7}
+_TE_EXIT    = (17, 8)                # the FINAL SEAL, east of every bolt
 # (row, junk len); tag names are len 3 throughout, so on standard rows the
-# open tag sits at col 35 and the content at col 40 — the chained landings
-# stay inside each next element.
-_TE_SHAPE = ((3, 3), (4, 4), (6, 3), (7, 4), (9, 5), (10, 4),
-             (12, 3), (13, 3), (15, 3))
+# element content starts at col 34 — the chained landings stay inside each
+# next element whatever the proverb (the Word Enclosure anchor law: the
+# saying's prefix right-aligns west of the element).
+_TE_SHAPE = ((3, 3), (4, 4), (9, 5), (10, 4), (12, 3), (13, 3), (15, 3))
+_TE_CURE_LEN = 3
 _TE_PAR = 48            # hand-tallied along the driven tape (one f> walk-in)
 
 
-def _te_draw_words(rng) -> dict:
-    """Draw the enclosure vocabulary: seven w1/w2 pairs (standard rows),
-    nine junks, THIRTEEN len-3 tag names (nest rows and C5 carry two each),
-    two typed cures; all pairwise distinct."""
+def _te_draw_texts(rng) -> dict:
+    """Draw proverbs, junk and tag names for every slot (geometric fits
+    keep par seed-invariant). Tag names are len 3, thirteen of them; junks
+    distinct, foreign to their sayings."""
+    from content import proverbs as _pv
     _load_vocab_tables()
 
     def pool(length):
         return [w for w in _VOCAB_PLAIN_BY_LEN.get(length, ())
                 if w.isalpha() and w == w.lower()]
 
-    std_rows = [r for r, _jl in _TE_SHAPE
-                if r not in _TE_C4_ROWS + _TE_C5_ROWS]
-    for _ in range(80):
-        picks: list = []
+    def fits(words, k, anchor, fitlen):
+        t0 = anchor - (_pv.prefix_len(words, k) + 1)
+        last = anchor + fitlen + 1 + len(' '.join(words[k:])) - 1
+        return t0 >= _TE_TEXT_MIN and last <= _TE_BAY_E
 
-        def draw(length):
-            w = rng.choice(pool(length))
-            picks.append(w)
-            return w
+    def fits_misquote(entry):
+        words, idx, _cure = entry
+        t0 = _TE_ANCHOR - (_pv.prefix_len(words, idx) + 1)
+        tail = ' '.join(words[idx + 1:])
+        last = (_TE_ANCHOR + len(words[idx]) + 11
+                + (1 + len(tail) if tail else 0) - 1)
+        return (len(words[idx]) >= 3 and t0 >= _TE_TEXT_MIN
+                and last <= _TE_BAY_E)
 
-        rows = {}
-        for r, jl in _TE_SHAPE:
-            if r in _TE_C4_ROWS:                 # (outer, inner, junk)
-                rows[r] = (draw(3), draw(3), draw(jl))
-            elif r in _TE_C5_ROWS:               # (first, second, junk)
-                rows[r] = (draw(3), draw(3), draw(jl))
-            else:                                # (w1, name, junk, w2)
-                rows[r] = (draw(4), draw(3), draw(jl), draw(5))
-        cures = [draw(3), draw(3)]
-        if len(set(picks)) == len(picks):
-            return {'rows': rows, 'cures': cures, 'std_rows': std_rows}
-    raise ValueError('tag_enclosure: no distinct draw after 80 tries')
+    n_sayings = len(_TE_SHAPE) + len(_TE_C2_ROWS)  # intruder rows only draw 7
+    cure_pool = _pv.misquotes_by_cure_len(_TE_CURE_LEN)
+    for _ in range(200):
+        sayings = rng.sample(_pv.PLAIN, len(_TE_SHAPE))
+        names = rng.sample(pool(3), 13)
+        junks: list = []
+        rows = []
+        ni = iter(names)
+        ok = True
+        for (r, jlen), words in zip(_TE_SHAPE, sayings):
+            junk = rng.choice(pool(jlen))
+            if r in _TE_C4_ROWS:
+                tag = (next(ni), next(ni))               # (outer, inner)
+                anchor, fitlen = _TE_NEST_ANCHOR, 25
+            elif r in _TE_C5_ROWS:
+                tag = (next(ni), next(ni))               # (first, second)
+                anchor, fitlen = _TE_NEST_ANCHOR, 26
+            else:
+                tag = (next(ni),)
+                anchor, fitlen = _TE_ANCHOR, jlen + 11
+            ks = [k for k in range(1, len(words))
+                  if fits(words, k, anchor, fitlen)]
+            if not ks or junk in words or junk in names:
+                ok = False
+                break
+            junks.append(junk)
+            rows.append((r, words, rng.choice(ks), junk, tag))
+        if not ok or len(set(junks)) != len(junks):
+            continue
+        mis = rng.sample(cure_pool, len(_TE_C2_ROWS))
+        if not all(fits_misquote(m) for m in mis):
+            continue
+        return {'intruders': rows, 'misquotes': mis,
+                'c2_names': names[-2:]}
+    raise ValueError('tag_enclosure: no fitting draw after 200 tries')
 
 
 def build_dungeon_tag_enclosure(seed: int) -> Dungeon:
     """The Tag Enclosure (slug `tag_enclosure`): it at — name the element,
-    and the innermost answers."""
+    and the innermost answers. Sense, not decree: proverb bays; the
+    elements case junk stones or the saying's miswritten key word."""
+    from content.proverbs import prefix_len, text_of
     rng = random.Random(seed)
-    words = _te_draw_words(rng)
-
-    runs = []
-    plaques = []                                          # (row, target text)
-    doors_targets = {k: [] for k in ('c1', 'c2', 'c3', 'c4', 'c5')}
-    ca, cb = words['cures']
-    for r, _jl in _TE_SHAPE:
-        w = words['rows'][r]
-        if r in _TE_C4_ROWS:
-            no, ni, junk = w
-            text = f'<{no}><{ni}>{junk}</{ni}></{no}>'
-            runs.append((r, _TE_TEXT0, text))
-            tgt = (f'<{no}><{ni}></{ni}></{no}>' if r == _TE_C4_ROWS[0]
-                   else f'<{no}></{no}>')
-            doors_targets['c4'].append(tgt)
-            plaques.append((r, tgt))
-        elif r in _TE_C5_ROWS:
-            na, nb, junk = w
-            text = f'<{na}></{na}> <{nb}>{junk}</{nb}>'
-            runs.append((r, _TE_TEXT0, text))
-            tgt = f'<{na}></{na}> <{nb}></{nb}>'
-            doors_targets['c5'].append(tgt)
-            plaques.append((r, tgt))
-        else:
-            w1, name, junk, w2 = w
-            fit = f'<{name}>{junk}</{name}>'
-            runs += [(r, _TE_TEXT0, w1), (r, _TE_TEXT0 + 5, fit),
-                     (r, _TE_TEXT0 + 5 + len(fit) + 1, w2)]
-            if r in _TE_C1_ROWS:
-                tgt = f'{w1} <{name}></{name}> {w2}'
-                doors_targets['c1'].append(tgt)
-            elif r in _TE_C2_ROWS:
-                cure = ca if r == _TE_C2_ROWS[0] else cb
-                tgt = f'{w1} <{name}>{cure}</{name}> {w2}'
-                doors_targets['c2'].append(tgt)
-            else:                                # C3: the double-gap tear
-                tgt = f'{w1}  {w2}'
-                doors_targets['c3'].append(tgt)
-            plaques.append((r, tgt))
-    doors = tuple((tuple(doors_targets[k]), _TE_BOLTS[k])
-                  for k in ('c1', 'c2', 'c3', 'c4', 'c5'))
+    texts = _te_draw_texts(rng)
 
     R, C = _TE_ROWS, _TE_COLS
     cells = [[CellType.WALL] * C for _ in range(R)]
     for r in range(2, _TE_GATE + 1):                     # the spine
         cells[r][_TE_SPINE] = CellType.FLOOR
-    for r, _jl in _TE_SHAPE:                             # the bays
+    lesson_rows = (_TE_C1_ROWS + _TE_C2_ROWS + _TE_C3_ROWS
+                   + _TE_C4_ROWS + _TE_C5_ROWS)
+    for r in lesson_rows:                                # the bays
         for c in range(_TE_BAY_W, _TE_BAY_E + 1):
             cells[r][c] = CellType.FLOOR
     for r, c in _TE_SHAFT_SEPS:                          # the light shafts —
@@ -4466,16 +4461,58 @@ def build_dungeon_tag_enclosure(seed: int) -> Dungeon:
     room.cells = cells
     room.seed  = seed
 
-    for pr, ptext in plaques:                            # full true readings
-        col = _TE_PLQ_COL
-        for part in ptext.split(' '):
-            if part:
-                room.char_runs.append(CharRun(pr, col, tuple(part), 'verdant'))
-            col += len(part) + 1
-    for rr, cc, text in runs:
-        room.char_runs.append(CharRun(rr, cc, tuple(text), 'ancient'))
+    def lay(r, col, words_seq):
+        for w in words_seq:
+            room.char_runs.append(CharRun(r, col, tuple(w), 'ancient'))
+            col += len(w) + 1
+
+    doors_targets = {k: [] for k in ('c1', 'c2', 'c3', 'c4', 'c5')}
+    for (r, words, k, junk, tag) in texts['intruders']:
+        pre, suf = text_of(words[:k]), text_of(words[k:])
+        if r in _TE_C4_ROWS:
+            no, ni_ = tag
+            fit = f'<{no}><{ni_}>{junk}</{ni_}></{no}>'
+            tgt = (f'{pre} <{no}><{ni_}></{ni_}></{no}> {suf}'
+                   if r == _TE_C4_ROWS[0] else f'{pre} <{no}></{no}> {suf}')
+            doors_targets['c4'].append(tgt)
+            anchor = _TE_NEST_ANCHOR
+        elif r in _TE_C5_ROWS:
+            na, nb = tag
+            fit = f'<{na}></{na}> <{nb}>{junk}</{nb}>'
+            doors_targets['c5'].append(
+                f'{pre} <{na}></{na}> <{nb}></{nb}> {suf}')
+            anchor = _TE_NEST_ANCHOR
+        else:
+            name, = tag
+            fit = f'<{name}>{junk}</{name}>'
+            anchor = _TE_ANCHOR
+            if r in _TE_C1_ROWS:
+                doors_targets['c1'].append(f'{pre} <{name}></{name}> {suf}')
+            else:                                # C3: the double-gap tear
+                doors_targets['c3'].append(f'{pre}  {suf}')
+        t0 = anchor - (prefix_len(words, k) + 1)
+        lay(r, t0, words[:k])
+        room.char_runs.append(CharRun(r, anchor, tuple(fit), 'ancient'))
+        lay(r, anchor + len(fit) + 1, words[k:])
+    cures = []
+    for r, name, (words, idx, cure) in zip(_TE_C2_ROWS, texts['c2_names'],
+                                           texts['misquotes']):
+        t0 = _TE_ANCHOR - (prefix_len(words, idx) + 1)
+        lay(r, t0, words[:idx])
+        fit = f'<{name}>{words[idx]}</{name}>'
+        room.char_runs.append(CharRun(r, _TE_ANCHOR, tuple(fit), 'ancient'))
+        tail = words[idx + 1:]
+        if tail:
+            lay(r, _TE_ANCHOR + len(fit) + 1, tail)
+        doors_targets['c2'].append(
+            f'{text_of(words[:idx])} <{name}>{cure}</{name}>'
+            + (f' {text_of(tail)}' if tail else ''))
+        cures.append(cure)
+    doors = tuple((tuple(doors_targets[k]), _TE_BOLTS[k])
+                  for k in ('c1', 'c2', 'c3', 'c4', 'c5'))
+
     room._ss_doors = doors                               # the shared exact-text tick
-    room._te_words = words
+    room._te_texts = texts
 
     room.entities.append(Entity(kind='exit', row=_TE_EXIT[0], col=_TE_EXIT[1],
                                 edit_immune=True))
@@ -4485,6 +4522,7 @@ def build_dungeon_tag_enclosure(seed: int) -> Dungeon:
     room.rebuild_indexes()
     room.par    = _TE_PAR
     room.budget = math.ceil(_TE_PAR * 1.4)  # STANDARD: the walk-in route wins at 1★
+    ca, cb = cures
     room.answer = (f'j f> dit j . 2j cit {ca} j cit {cb} '
                    f'2j dat j . 2j dit j dat 2j f< dit G $')
 
