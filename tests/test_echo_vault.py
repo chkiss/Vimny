@@ -175,7 +175,7 @@ def test_par_is_locked_and_answer_tracks_the_combo(seed):
     p1, p2, p3 = _plaques(room)
     assert room.par == _EV_PAR
     toks = room.answer.split()
-    assert toks.count('.') == 3, "three plain echoes on the par path"
+    assert toks.count('.') == 4, "four plain echoes on the par path"
     assert '3.' in toks, "the triple falls to ONE count-dot"
     assert f'r{p1[_EV_WARPS1[0]]}' in toks
     assert f'r{p2[_EV_WARPS2[0]]}' in toks
@@ -185,10 +185,10 @@ def test_par_is_locked_and_answer_tracks_the_combo(seed):
 
 
 def test_all_r_route_is_star_soft():
-    """Mending every warp with r instead of . costs par+4 (the 3 plain dots
+    """Mending every warp with r instead of . costs par+5 (the 4 plain dots
     +1 each; 3r{d} over 3. +1) — within the ×1.4 budget, losing the star."""
     room = _room(SEEDS[0])
-    assert room.par + 4 <= room.budget
+    assert room.par + 5 <= room.budget
 
 
 def test_curriculum_guard():

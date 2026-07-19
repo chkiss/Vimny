@@ -9335,72 +9335,46 @@ def build_dungeon_quartermaster(seed: int) -> Dungeon:
 
 
 # ── The Echo Vault — . (dot-repeat) ───────────────────────────────────────────
-_EV_ROWS, _EV_COLS = 4, 52
+# SENSE, NOT DECREE (blueprints/sense_not_decree.md §5): the vault repeats
+# what it hears — so the FIRST two spans are famous repetition itself:
+#   phrase 1 = 'she sells sea shells' (every word carries exactly one 'e',
+#              all four warped: mend once with r, and the echo takes three)
+#   phrase 2 = 'humpty dumpty' (the 'u' pair — a fresh stroke re-primes)
+# FIXED texts, deliberately (their letter-geometry IS the puzzle); the
+# THIRD span stays a seeded digit beat — the count-dot lesson is numeric,
+# and no song supplies a lone digit plus its tripled twin (flagged).
+_EV_ROWS, _EV_COLS = 4, 62
 _EV_PLAQUE_ROW = 1                     # sealed plaque band (wall row, glyphs embedded)
 _EV_ROW        = 2                     # the single gauntlet row — one floor row seals
                                        # the plaques against any visual straddle (as in the Cipher Cell)
-_EV_FLOOR_LO, _EV_FLOOR_HI = 1, 49
+_EV_FLOOR_LO, _EV_FLOOR_HI = 1, 59
 _EV_SPAWN = (2, 2)
-_EV_EXIT  = (2, 49)                    # behind the final bolt; the single sealed row
+_EV_EXIT  = (2, 59)                    # behind the final bolt; the single sealed row
                                        # means every line jump lands on the row's FIRST
                                        # non-blank (col 4) and no other row can walk in
-# Segment columns. Shapes are FIXED across combos so par is seed-invariant:
-# phrase 1 = 4+3+4 letters, its letter warped at string offsets (1, 7, 10);
-# phrase 2 = 5+4 letters, warped at (3, 6); phrase 3 = word4 ⟨digit⟩ word3
-# ⟨digit×3⟩, digits warped at (5, 11, 12, 13) — the lone digit primes r, the
-# triple is the count-dot beat (3.).
-_EV_SEG1_COL, _EV_SEG2_COL, _EV_SEG3_COL = 4, 20, 33
-_EV_WARPS1 = (1, 7, 10)
-_EV_WARPS2 = (3, 6)
+_EV_PHRASE1, _EV_L1 = 'she sells sea shells', 'e'
+_EV_PHRASE2, _EV_L2 = 'humpty dumpty', 'u'
+_EV_SEG1_COL, _EV_SEG2_COL, _EV_SEG3_COL = 4, 27, 43
+_EV_WARPS1 = (2, 5, 11, 16)            # every 'e' in phrase 1
+_EV_WARPS2 = (1, 8)                    # every 'u' in phrase 2
 _EV_WARP3_SINGLE, _EV_WARP3_TRIPLE = 5, (11, 12, 13)
-_EV_BOLT_A = (2, 18)                   # opens while segment 1 reads as its plaque
-_EV_BOLT_B = (2, 31)                   # … segment 2
-_EV_BOLT_C = (2, 48)                   # … segment 3 — the seal before the exit
-# Combos: (phrase1, letter1), (phrase2, letter2), (word4, word3, digit).
-# Each phrase carries its letter EXACTLY at the warp offsets, and no mend
-# letter (or the digit) appears ANYWHERE else in the vault (asserted at
-# build): every copy gets warped, so the cure exists nowhere reachable —
-# true scarcity, on top of the register self-seal. Combos are normally
-# ASSEMBLED from the vocab corpus per seed (_ev_pick_combo — the shapes stay
-# fixed, so par holds); this static table is the deterministic fallback for
-# a corpus that can't satisfy a draw.
-_EV_COMBOS = (
-    (('mend the seal', 'e'), ('guard rust', 'r'), ('lock', 'map', '7')),
-    (('mist ski mild', 'i'), ('burnt numb', 'n'), ('gate', 'map', '3')),
-    (('bold who boat', 'o'), ('crust salt', 's'), ('dial', 'rim', '5')),
-    (('mast sea malt', 'a'), ('burnt numb', 'n'), ('rope', 'dim', '9')),
-)
-_EV_PAR = 25                           # seed-invariant; tallied in the answer below
+_EV_BOLT_A = (2, 25)                   # opens while segment 1 reads as its plaque
+_EV_BOLT_B = (2, 41)                   # … segment 2
+_EV_BOLT_C = (2, 58)                   # … segment 3 — the seal before the exit
+_EV_PAR = 29                           # seed-invariant; tallied in the answer below
 
 
 def _ev_pick_combo(rng):
-    """Assemble a seed-random Echo Vault combo from the vocab corpus.
-
-    The SHAPES are fixed (they are what keeps par seed-invariant): phrase 1 =
-    4+3+4 letters with the mend letter exactly once per word at indices
-    1/2/1; phrase 2 = 5+4 with its letter at 3/0; phrase 3 = a free 4- and
-    3-letter word plus a digit. Cross-segment scarcity is enforced in the
-    pools (each mend letter appears nowhere in the other segments), so the
-    builder's asserts hold for every draw. Deterministic per seed; falls
-    back to the static _EV_COMBOS table if the corpus can't satisfy."""
+    """The two famous phrases plus the seeded digit beat. The digit words
+    carry neither mend letter (scarcity: nothing reachable can donate an
+    'e' or 'u', and the digit appears only warped)."""
     _load_vocab_tables()
     low = {n: [w for w in _VOCAB_PLAIN_BY_LEN.get(n, ())
-               if w.isalpha() and w.islower()] for n in (3, 4, 5)}
-    for _ in range(40):
-        l1, l2 = rng.sample('abcdefghijklmnopqrstuvwxyz', 2)
-        a = [w for w in low[4] if w[1] == l1 and w.count(l1) == 1 and l2 not in w]
-        b = [w for w in low[3] if w[2] == l1 and w.count(l1) == 1 and l2 not in w]
-        d = [w for w in low[5] if w[3] == l2 and w.count(l2) == 1 and l1 not in w]
-        e = [w for w in low[4] if w[0] == l2 and w.count(l2) == 1 and l1 not in w]
-        f = [w for w in low[4] if l1 not in w and l2 not in w]
-        g = [w for w in low[3] if l1 not in w and l2 not in w]
-        if len(a) < 2 or not (b and d and e and f and g):
-            continue
-        w1, w3 = rng.sample(a, 2)
-        return ((f'{w1} {rng.choice(b)} {w3}', l1),
-                (f'{rng.choice(d)} {rng.choice(e)}', l2),
-                (rng.choice(f), rng.choice(g), rng.choice('23456789')))
-    return rng.choice(_EV_COMBOS)
+               if w.isalpha() and w.islower()] for n in (3, 4)}
+    f = [w for w in low[4] if _EV_L1 not in w and _EV_L2 not in w]
+    g = [w for w in low[3] if _EV_L1 not in w and _EV_L2 not in w]
+    return ((_EV_PHRASE1, _EV_L1), (_EV_PHRASE2, _EV_L2),
+            (rng.choice(f), rng.choice(g), rng.choice('23456789')))
 
 
 def build_dungeon_echo_vault(seed: int) -> Dungeon:
@@ -9496,15 +9470,16 @@ def build_dungeon_echo_vault(seed: int) -> Dungeon:
     ]
 
     room.rebuild_indexes()
-    # Par tally (combo shapes identical, so this holds for every seed):
-    #   w w r⟨l1⟩  w w .  w w .   (10) → mend once; the echo takes the other two
-    #   w w r⟨l2⟩  w .            (6)  → a new stroke re-primes the echo
-    #   w w r⟨d⟩   w w 3.         (8)  → the lone digit primes; 3. mends the triple
-    #   $                         (1)  → walk out through the drawn seal
+    # Par tally (fixed phrase geometry, so this holds for every seed; every
+    # mend MERGES its word, so each hop to the next warp is exactly w w):
+    #   w w r⟨e⟩  w w .  w w .  w w . (13) → mend one 'e'; the echo takes three
+    #   w w r⟨u⟩  w w .               (7)  → a new stroke re-primes the echo
+    #   w w r⟨d⟩  w w 3.              (8)  → the lone digit primes; 3. the triple
+    #   $                             (1)  → walk out through the drawn seal
     room.par    = _EV_PAR
     room.budget = math.ceil(_EV_PAR * 1.4)
-    room.answer = (f'w w r{l1} w w . w w . '
-                   f'w w r{l2} w . '
+    room.answer = (f'w w r{l1} w w . w w . w w . '
+                   f'w w r{l2} w w . '
                    f'w w r{digit} w w 3. $')
 
     apply_stone_fog(room)                 # sealed pockets sleep under fog
