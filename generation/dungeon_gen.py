@@ -4767,7 +4767,7 @@ def build_dungeon_sentence_enclosure(seed: int) -> Dungeon:
 # make the row non-blank and weld the cantos into one paragraph) — the
 # braziers are ENTITIES, which leave their rows blank. The gate row's
 # floor plaque is what stops dap's blank-run extension at the gate.
-_PE_ROWS, _PE_COLS = 30, 30
+_PE_ROWS, _PE_COLS = 30, 32
 _PE_SPAWN  = (1, 1)
 _PE_P1     = (2, 12)        # first canto: 11 content rows
 _PE_B1     = 13             # the warden's rest — must survive (dip, not dap)
@@ -4777,7 +4777,9 @@ _PE_B2     = 27             # its echo — dap's trailing blank block is BOTH ro
 _PE_GATE   = 28
 _PE_EXIT   = (28, 27)       # the sealed exit cell itself (plain stone until open)
 _PE_TEXT0  = 3
-_PE_GOB_COLS   = (17, 27)   # canto sentinels stand east, clear of the west aisle
+_PE_GOB_COLS   = (29, 29)   # canto sentinels: the clear column east of the
+                            # longest gift line (glyph-overlay law: an entity
+                            # letter must never sit on verse text)
 _PE_GUARD_COLS = (8, 13, 18, 23)
 _PE_SIGIL_COL  = 22         # the sigil's centre column (east, clear of the plaque)
 _PE_SIGIL      = ((0, 0), (1, -1), (1, 1), (2, -2), (2, 0), (2, 2))
@@ -4788,19 +4790,28 @@ _PE_BRAZIERS   = ((1, 22), (13, 21), (13, 23), (28, 20), (28, 22), (28, 24))
 _PE_PAR    = 9              # j dip j dap $ — best old-only (j 11dd j 14dd $) pays 11
 
 
+# SENSE, NOT DECREE (blueprints/sense_not_decree.md §2): the cantos are the
+# legion's PLUNDER-CHANT — the Twelve Days gift list (secular lines only,
+# PD), canto 1 running eleven-to-partridge (11 rows), canto 2 the full
+# twelve-to-partridge (12 rows). FIXED text, deliberately: no door reads it
+# and nothing is typed — its job is to be a block the player recognises as
+# the goblins' loot, stacked to the exact heights the counted-cut forcing
+# needs; the repeated lines are authentic to the song.
+_PE_GIFTS = ('twelve drummers drumming', 'eleven pipers piping',
+             'ten lords a leaping', 'nine ladies dancing',
+             'eight maids a milking', 'seven swans a swimming',
+             'six geese a laying', 'five gold rings',
+             'four calling birds', 'three french hens',
+             'two turtle doves', 'a partridge in a pear tree')
+
+
 def _pe_draw_words(rng) -> dict:
-    """Two short vocab words per canto row (the legion's verses)."""
-    _load_vocab_tables()
-
-    def pool(length):
-        return [w for w in _VOCAB_PLAIN_BY_LEN.get(length, ())
-                if w.isalpha() and w == w.lower()]
-
+    """One gift line per canto row: canto 1 = eleven..partridge (11 rows),
+    canto 2 = twelve..partridge (12 rows)."""
     rows = {}
-    for lo, hi in (_PE_P1, _PE_P2):
-        for r in range(lo, hi + 1):
-            rows[r] = (rng.choice(pool(rng.choice((3, 4, 5)))),
-                       rng.choice(pool(rng.choice((3, 4, 5)))))
+    for (lo, hi), lines in ((_PE_P1, _PE_GIFTS[1:]), (_PE_P2, _PE_GIFTS)):
+        for r, line in zip(range(lo, hi + 1), lines):
+            rows[r] = tuple(line.split(' '))
     return rows
 
 
@@ -4829,9 +4840,11 @@ def build_dungeon_paragraph_enclosure(seed: int) -> Dungeon:
     room.cells = cells
     room.seed  = seed
 
-    for r, (a, b) in words.items():                      # the cantos' verses
-        room.char_runs.append(CharRun(r, _PE_TEXT0, tuple(a), 'ancient'))
-        room.char_runs.append(CharRun(r, _PE_TEXT0 + len(a) + 1, tuple(b), 'ancient'))
+    for r, parts in words.items():                       # the cantos' verses
+        col = _PE_TEXT0
+        for w in parts:                                  # per-word runs (the
+            room.char_runs.append(CharRun(r, col, tuple(w), 'ancient'))
+            col += len(w) + 1                            # space-glyph law)
     # The gate plaque (floor runes): names the measure, and — being char runs —
     # keeps the gate row non-blank so dap's blank-run extension stops here.
     col = _PE_TEXT0
