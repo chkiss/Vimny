@@ -634,7 +634,20 @@ def _sc_twinkle_animation(term, room, player, moved, iw: int, game_h: int) -> No
     A transient overlay — the next _render restores the settled plaque."""
     vr = max(0, min(player.row - game_h // 2, room.rows - game_h))
     vc = max(0, min(player.col - iw    // 2,  room.cols - iw))
-    wbg = C.wall_bg()
+
+    def _cell_bg(rr, c):
+        """The TRUE background under (rr, c), so every animation frame blends
+        into the terrain instead of stamping one flat colour."""
+        if not (0 <= rr < room.rows and 0 <= c < room.cols):
+            return C.wall_bg()
+        ct = room.cells[rr][c]
+        if ct == CellType.WATER:
+            return C.water_bg()
+        if ct == CellType.WOOD_WALL:
+            return C.wood_wall_bg()
+        if ct == CellType.WALL or (rr, c) in room.fog_cells:
+            return C.wall_bg()
+        return C.floor_bg()
 
     def _draw(rr, c0, text, clr):
         sr = rr - vr + 3
@@ -644,7 +657,8 @@ def _sc_twinkle_animation(term, room, player, moved, iw: int, game_h: int) -> No
         for k, ch in enumerate(text):
             sc = c0 + k - vc + 1 + gut
             if 1 <= sc < 1 + iw:
-                print(term.move_yx(sr, sc) + wbg + clr + ch + term.normal, end='', flush=True)
+                print(term.move_yx(sr, sc) + _cell_bg(rr, c0 + k) + clr + ch
+                      + term.normal, end='', flush=True)
 
     dim_green = term.dim + C.rune_verdant()
     # ── beat 1: slide each plaque from old row → new row, clearing the trail ──
@@ -654,7 +668,7 @@ def _sc_twinkle_animation(term, room, player, moved, iw: int, game_h: int) -> No
         path = list(range(old_r, new_r + step, step))
         for i, rr in enumerate(path):
             if i > 0:
-                _draw(path[i - 1], c0, ' ' * len(text), term.normal)   # wipe the last frame
+                _draw(path[i - 1], c0, ' ' * len(text), '')   # wipe the last frame
             _draw(rr, c0, text, dim_green)
             time.sleep(0.09)
     # ── beat 2: re-ink each landed plaque letter-by-letter, white cooling to green
