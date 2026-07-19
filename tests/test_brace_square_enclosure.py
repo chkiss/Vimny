@@ -16,8 +16,9 @@
 #
 # SPDX-License-Identifier: GPL-3.0-or-later
 
-"""The Brace & Square Enclosure (i[ a[ i{ a{): choose the object, and in the
-nest choose the DEPTH — di{ and di[ carve different spans from one landing."""
+"""The Brace & Square Enclosure (i[ a[ i{ a{): proverbs by sense; choose the
+object, and in the nest choose the DEPTH — di{ and di[ carve different spans
+from one landing."""
 import math
 
 import pytest
@@ -26,11 +27,14 @@ from blessed import Terminal
 
 import main
 from engine.world import CellType
+from content import proverbs as pv
 from generation.dungeon_gen import (
     build_dungeon_brace_square_enclosure,
     _BSQ_ROWS, _BSQ_COLS, _BSQ_SPINE, _BSQ_SHAFT_SEPS, _BSQ_THROAT,
-    _BSQ_GATE, _BSQ_BOLTS, _BSQ_EXIT, _BSQ_PAR, _BSQ_TEXT0,
+    _BSQ_GATE, _BSQ_BOLTS, _BSQ_EXIT, _BSQ_PAR, _BSQ_TEXT_MIN,
+    _BSQ_NEST_W, _BSQ_BAY_E,
     _BSQ_C1_ROWS, _BSQ_C2_ROWS, _BSQ_C3_ROWS, _BSQ_C4_ROWS, _BSQ_C5_ROWS,
+    _BSQ_C1_SLOTS, _BSQ_C2_SLOTS, _BSQ_C3_SLOTS, _BSQ_C4_SLOTS, _BSQ_C5_SLOTS,
 )
 from tests import SEEDS, cached_room
 
@@ -45,23 +49,29 @@ def _K(s):
     return [Keystroke(ch) for ch in s]
 
 
+def _cures(room):
+    return [m[2] for m in room._bsq_texts['misquotes']]
+
+
 # The canonical tape (== room.answer with Esc placed): % entry, di[ husks
-# chained by dot, ci[ cures, the family switch to di{ (fresh — a blind dot
-# here would replay ci[+text), the NEST (di{ then di[ from the same landing
-# column), the da{ scar. 45 keys; the cures vary by seed.
+# chained by dot, ci[ cures (the miscut famous words, retyped by heart),
+# the family switch to di{ (fresh — a blind dot here would replay
+# ci[+text), the NEST (di{ then di[ from the same landing column), the da{
+# scar. 45 keys; the cures vary by seed but are all len 3.
 def _canon_keys(room):
-    ca, cb = room._bsq_words['cures']
+    ca, cb = _cures(room)
     return (_K('j%di[j.') + _K('2jci[') + _K(ca) + [ESC]
             + _K('jci[') + _K(cb) + [ESC]
             + _K('2jdi{j.') + _K('2jdi{jdi[') + _K('2jda{') + _K('G$'))
 
 
-# The leanest old-only rival (WITH its own best dot usage): walks and edge-
-# finds (dt] / ct] / dt} need the junk edge the landings don't give; the
-# scar falls to h d% — a paid h, never a win). Wins, at 1★ (55 > par).
+# The leanest old-only rival (WITH its own best dot usage), anchor-relative
+# so it is seed-invariant: F[ l finds the stone start from the % landing;
+# dt] / ct] / dt} need the junk edge the landings don't give; the scar
+# falls to h d% — a paid h, never a win. Wins, at 1★.
 def _piecewise_rival_keys(room):
-    ca, cb = room._bsq_words['cures']
-    return (_K('jwwldt]jhdt]') + _K('2jhct]') + _K(ca) + [ESC]
+    ca, cb = _cures(room)
+    return (_K('j%F[ldt]jh.') + _K('2jhct]') + _K(ca) + [ESC]
             + _K('jhhct]') + _K(cb) + [ESC]
             + _K('2jhdt}jl.') + _K('2jh.jhdt]') + _K('2jhd%') + _K('G$'))
 
@@ -110,7 +120,7 @@ def test_par_answer_budget(seed):
     room = _room(seed)
     assert room.par == _BSQ_PAR
     assert room.budget == math.ceil(_BSQ_PAR * 1.4)
-    ca, cb = room._bsq_words['cures']
+    ca, cb = _cures(room)
     assert room.answer == (f'j % di[ j . 2j ci[ {ca} j ci[ {cb} '
                            f'2j di{{ j . 2j di{{ j di[ 2j da{{ G $')
 
@@ -160,47 +170,47 @@ def test_no_chest(seed):
                 if e.kind in ('chest', 'chest_key', 'chest_scroll')]
 
 
-# ── plaques: full true readings, twin colours ────────────────────────────────
+# ── the draw: anchored proverbs, twin tags in stone ──────────────────────────
 
-def _plaque_text(room, r):
-    cells = {}
-    for ru in room.char_runs:
-        if ru.row == r and ru.col < _BSQ_SPINE:
-            for i, s in enumerate(ru.symbols):
-                cells[ru.col + i] = s
-    if not cells:
-        return ''
-    lo, hi = min(cells), max(cells)
-    return ''.join(cells.get(c, ' ') for c in range(lo, hi + 1))
+@pytest.mark.parametrize("seed", SEEDS)
+def test_proverb_draw_anchors_and_fits(seed):
+    room = _room(seed)
+    texts = room._bsq_texts
+    slot_by_row = {r: (jl, oc, d) for r, jl, oc, d in
+                   (_BSQ_C1_SLOTS + _BSQ_C3_SLOTS + _BSQ_C5_SLOTS)}
+    for (r, words, k, junk, oc, delim) in texts['intruders']:
+        jl, soc, sd = slot_by_row[r]
+        assert (oc, delim) == (soc, sd) and len(junk) == jl
+        if r == _BSQ_C1_ROWS[0]:
+            assert ' ' in junk, "row 3's stone is TWO WORDS"
+        t0 = oc - (pv.prefix_len(words, k) + 1)
+        assert t0 >= _BSQ_TEXT_MIN
+        assert oc + jl + 2 + len(' '.join(words[k:])) <= _BSQ_BAY_E
+        assert all(p not in words for p in junk.split(' '))
+    nest_oc = dict((r, oc) for r, oc in _BSQ_C4_SLOTS)
+    for (r, words, k, junk, flank, oc) in texts['nests']:
+        assert oc == nest_oc[r] and len(junk) == 3 and len(flank) == 3
+        t0 = oc - (pv.prefix_len(words, k) + 1)
+        assert t0 >= _BSQ_NEST_W, "nest prefixes clear the tag stone"
+        assert oc + 11 + len(' '.join(words[k:])) <= _BSQ_BAY_E
+        assert junk not in words and flank not in words
+    for (r, oc), (words, idx, cure) in zip(_BSQ_C2_SLOTS, texts['misquotes']):
+        assert len(cure) == 3 and len(words[idx]) >= 3
+    sayings = ([w for _r, w, *_ in texts['intruders']]
+               + [w for _r, w, *_ in texts['nests']])
+    assert len({' '.join(w) for w in sayings}) == len(sayings)
 
 
 @pytest.mark.parametrize("seed", SEEDS)
-def test_plaques_carry_the_full_readings(seed):
+def test_nest_tags_are_the_coloured_pair_in_stone(seed):
     room = _room(seed)
-    for targets, _dc in room._ss_doors:
-        for t in targets:
-            assert any(_plaque_text(room, r) == t for r in range(room.rows)), t
-
-
-@pytest.mark.parametrize("seed", SEEDS)
-def test_nest_plaques_are_the_coloured_pair(seed):
-    room = _room(seed)
-    kinds = {r: {ru.kind for ru in room.char_runs
-                 if ru.row == r and ru.col < _BSQ_SPINE}
-             for r in _BSQ_C4_ROWS}
-    assert kinds[12] == {'ember'}
-    assert kinds[13] == {'pedestal'}
-
-
-@pytest.mark.parametrize("seed", SEEDS)
-def test_vocab_slots_and_distinctness(seed):
-    room = _room(seed)
-    words = room._bsq_words
-    picks = [w for row in words['rows'] for part in row for w in part.split(' ')]
-    picks += list(words['cures']) + list(words['flanks'].values())
-    assert len(set(picks)) == len(picks)
-    assert all(len(c) == 3 for c in words['cures'])
-    assert all(len(f) == 3 for f in words['flanks'].values())
+    for r, kind in ((12, 'ember'), (13, 'pedestal')):
+        tags = [ru for ru in room.char_runs
+                if ru.row == r and ru.col < _BSQ_NEST_W]
+        assert tags and all(ru.kind == kind for ru in tags)
+        for ru in tags:                       # carved in stone, off the scans
+            for i in range(len(ru.symbols)):
+                assert room.cells[r][ru.col + i] == CellType.WALL
 
 
 # ── the doors ────────────────────────────────────────────────────────────────
@@ -220,14 +230,15 @@ def test_targets_are_not_already_true(seed):
 
 @pytest.mark.parametrize("seed", SEEDS)
 def test_nest_discrimination_di_bracket_cannot_open_the_brace_door(seed):
-    # di[ on row 12 yields 'w1 [] w2' — the row-13 door's SHAPE but never its
-    # WORDS (the draw is distinct), so C4a stays barred and C4b can't false-fire.
+    # di[ on row 12 yields 'pre [] suf' — the row-13 door's SHAPE but never
+    # its WORDS (distinct sayings), so C4a stays barred and C4b can't
+    # false-fire.
     room = _room(seed)
     tgt_a = room._ss_doors[3][0][0]                 # c4a target
     tgt_b = room._ss_doors[4][0][0]                 # c4b target
-    w1_12, w2_12 = (t for t in (room._bsq_words['rows'][6][0],
-                                room._bsq_words['rows'][6][2]))
-    wrong = f'{w1_12} [] {w2_12}'                   # di[ on row 12
+    nest12 = next(n for n in room._bsq_texts['nests'] if n[0] == 12)
+    _r, words, k, _j, _f, _oc = nest12
+    wrong = f'{pv.text_of(words[:k])} [] {pv.text_of(words[k:])}'
     assert wrong != tgt_a and wrong != tgt_b
 
 
@@ -253,7 +264,7 @@ def test_blind_dot_off_c2_is_a_costed_noop(monkeypatch):
     # the replay changes nothing — the family switch must be deliberate.
     dungeon = build_dungeon_brace_square_enclosure(0)
     room = dungeon.rooms[0]
-    ca, cb = room._bsq_words['cures']
+    ca, cb = _cures(room)
     keys = (_K('j%di[j.') + _K('2jci[') + _K(ca) + [ESC]
             + _K('jci[') + _K(cb) + [ESC] + _K('2j.'))
     _drive(dungeon, keys, monkeypatch, finish=':q!\r')
