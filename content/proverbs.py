@@ -60,6 +60,11 @@ PLAIN = (
     ('no', 'news', 'is', 'good', 'news'),
     ('two', 'wrongs', 'do', 'not', 'make', 'a', 'right'),
     ('the', 'pen', 'is', 'mightier', 'than', 'the', 'sword'),
+    ('time', 'is', 'money'),
+    ('haste', 'makes', 'waste'),
+    ('live', 'and', 'let', 'live'),
+    ('no', 'pain', 'no', 'gain'),
+    ('knowledge', 'is', 'power'),
 )
 
 # (wrong_words, idx, cure) — cure lengths are load-bearing (typed chars are

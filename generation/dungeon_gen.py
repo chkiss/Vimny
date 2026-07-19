@@ -4556,98 +4556,133 @@ def build_dungeon_tag_enclosure(seed: int) -> Dungeon:
 # head; whole-sentence spans cost the old tools their positioning (F./^/hh)
 # on every row; the C1-vs-C2 gap discrimination text-forces is-vs-as; '.'
 # repeats are 1 key and cannot be undercut.
-_SE_ROWS, _SE_COLS = 18, 54
-_SE_SPINE   = 22                     # every row's first standable
-_SE_BAY_W   = 23                     # bay floor cols 23..51; east wall 52
-_SE_BAY_E   = 51
-_SE_PLQ_COL = 2                      # full true readings (≤19 chars)
-_SE_TEXT0   = 24
+_SE_ROWS, _SE_COLS = 18, 69
+_SE_SPINE   = 2                      # every row's first standable
+_SE_BAY_W   = 3                      # bay floor cols 3..66; east wall 67
+_SE_BAY_E   = 66
+_SE_TEXT_MIN = 3                     # earliest col a west saying may start
+_SE_TEXT0   = 24                     # C5's first junk / C3's fixed rows
 _SE_C1_ROWS = (3, 4)
 _SE_C2_ROWS = (6, 7)
 _SE_C3_ROWS = (9, 10)
 _SE_C4_ROWS = (12,)
 _SE_C5_ROWS = (14,)
-_SE_SHAFT_SEPS = ((5, 33), (8, 31), (11, 33), (13, 29))
+_SE_SHAFT_SEPS = ((5, 33), (8, 31), (11, 35), (13, 30))
 _SE_THROAT  = 15
 _SE_GATE    = 16
-_SE_BOLTS   = {'c1': 23, 'c2': 24, 'c3': 25, 'c4': 26, 'c5': 27}
-_SE_EXIT    = (16, 28)               # the FINAL SEAL, east of every bolt
-_SE_PAR = 43            # hand-tallied along the driven tape (mid landings;
+_SE_BOLTS   = {'c1': 3, 'c2': 4, 'c3': 5, 'c4': 6, 'c5': 7}
+_SE_EXIT    = (16, 8)                # the FINAL SEAL, east of every bolt
+_SE_SPAWN   = (2, 37)                # over C1's junk word 2: j lands MID
+# SENSE, NOT DECREE: every row is famous sayings AS SENTENCES with a junk
+# sentence wedged in (C1 scar / C2 seam / C4 trailing / C5 keep-last), or
+# — C3, FIXED texts, seeded miswrite — the classics whose sentences the
+# player completes by heart: 'veni. ????. vici.' cured with `vidi.` and
+# 'live. ????. love.' cured with `laugh.` (single tokens, karaoke-safe;
+# the veni-vidi-vici strand returns at the Grandmaster's exam — a
+# deliberate callback). Par invariance is COLUMN-ANCHORED: each row's
+# TARGET sentence starts at its slot column; the west saying right-aligns.
+_SE_C1_JUNK = 33                     # 'aaa bbb.' at 33 (spawn drops on 37)
+_SE_C2_JUNK = 31
+_SE_C3_MID  = 30                     # the miswritten middle, len 4 + '.'
+_SE_C4_JUNK = 31
+_SE_C5_JUNK2 = 33                    # junkA at TEXT0, junkB at 33, saying 42
+_SE_EAST    = {'c1': 42, 'c2': 40, 'c5': 42}   # east sayings' start cols
+_SE_C3_FIX  = ((('veni',), 'vidi', ('vici',)),
+               (('live',), 'laugh', ('love',)))
+_SE_PAR = 44            # hand-tallied along the driven tape (mid landings;
                         # C5 falls to TWO DOTS riding C4's das — player-found
-                        # golf 2026-07-20: re-striking das there paid 2 over)
-
-
-def _se_draw_words(rng) -> dict:
-    """Draw the enclosure vocabulary. Per-chamber row SHAPES stagger the
-    first sentence's length so the chained landing column always falls
-    MID-target-sentence: C1/C5 rows open with a two-word sentence, C2 with
-    a lone len-5 word, C3/C4 with a lone len-4 word. Cures len 3."""
-    _load_vocab_tables()
-
-    def pool(length):
-        return [w for w in _VOCAB_PLAIN_BY_LEN.get(length, ())
-                if w.isalpha() and w == w.lower()]
-
-    for _ in range(80):
-        picks: list = []
-
-        def draw(length):
-            w = rng.choice(pool(length))
-            picks.append(w)
-            return w
-
-        rows = {}
-        for r in _SE_C1_ROWS + _SE_C5_ROWS:      # 3× two len-3 words
-            rows[r] = ([draw(3), draw(3)], [draw(3), draw(3)],
-                       [draw(3), draw(3)])
-        for r in _SE_C2_ROWS:                    # len-5 lone + 2× pairs
-            rows[r] = ([draw(5)], [draw(3), draw(3)], [draw(3), draw(3)])
-        for r in _SE_C3_ROWS:                    # len-4 lone + 2× pairs
-            rows[r] = ([draw(4)], [draw(3), draw(3)], [draw(3), draw(3)])
-        for r in _SE_C4_ROWS:                    # len-4 lone + one pair
-            rows[r] = ([draw(4)], [draw(3), draw(3)])
-        cures = [draw(3), draw(3)]
-        if len(set(picks)) == len(picks):
-            return {'rows': rows, 'cures': cures}
-    raise ValueError('sentence_enclosure: no distinct draw after 80 tries')
+                        # golf 2026-07-20; cures now 'vidi.' + 'laugh.')
 
 
 def _se_sentence(words) -> str:
     return ' '.join(words) + '.'
 
 
+def _se_draw_texts(rng) -> dict:
+    """Draw the sayings + junk. West sayings right-align to their slot,
+    east sayings start at fixed columns — both filtered by length so par
+    stays seed-invariant. Ten distinct sayings; junk foreign to all."""
+    from content import proverbs as _pv
+    _load_vocab_tables()
+
+    def pool(length):
+        return [w for w in _VOCAB_PLAIN_BY_LEN.get(length, ())
+                if w.isalpha() and w == w.lower()]
+
+    # (slot key, west cap incl '.', east cap incl '.') — west spans
+    # [t0, junk-2], east runs from _SE_EAST to the bay edge
+    west_caps = {'c1': _SE_C1_JUNK - 2 - _SE_TEXT_MIN + 1,
+                 'c2': _SE_C2_JUNK - 2 - _SE_TEXT_MIN + 1,
+                 'c4': _SE_C4_JUNK - 2 - _SE_TEXT_MIN + 1}
+    east_caps = {k: _SE_BAY_E - c + 1 for k, c in _SE_EAST.items()}
+
+    sent = [_se_sentence(w) for w in _pv.PLAIN]
+    for _ in range(200):
+        # fill the tightest slots first, straight from length-filtered
+        # candidates (a blind 10-sample starves the short-saying slots)
+        east_slots = ['c1', 'c1', 'c5', 'c2', 'c2']     # caps ascending-ish
+        west_slots = ['c2', 'c2', 'c4', 'c1', 'c1']
+        rest = list(sent)
+        picked = {}
+        ok = True
+        for tag, k in ([('e', k) for k in east_slots]
+                       + [('w', k) for k in west_slots]):
+            cap = east_caps[k] if tag == 'e' else west_caps[k]
+            cands = [s for s in rest if len(s) <= cap]
+            if not cands:
+                ok = False
+                break
+            s = rng.choice(cands)
+            rest.remove(s)
+            picked.setdefault(tag + k, []).append(s)
+        if not ok:
+            continue
+        east = (picked['ec1'] + picked['ec2'] + picked['ec5'])
+        west = (picked['wc1'] + picked['wc2'] + picked['wc4'])
+        saying_words = {w for s in east + west for w in s.rstrip('.').split(' ')}
+        junk3 = [w for w in rng.sample(pool(3), 20)
+                 if w not in saying_words][:14]
+        mids = [w for w in rng.sample(pool(4), 8)
+                if w not in saying_words][:2]
+        if len(junk3) < 14 or len(mids) < 2:
+            continue
+        return {'east': east, 'west': west, 'junk3': junk3, 'mids': mids}
+    raise ValueError('sentence_enclosure: no fitting draw after 200 tries')
+
+
 def build_dungeon_sentence_enclosure(seed: int) -> Dungeon:
     """The Sentence Enclosure (slug `sentence_enclosure`): is as — the
-    sentence under your hand, from anywhere inside it."""
+    sentence under your hand, from anywhere inside it. Sense, not decree:
+    the sentences are sayings the player knows whole."""
     rng = random.Random(seed)
-    words = _se_draw_words(rng)
-    ca, cb = words['cures']
+    texts = _se_draw_texts(rng)
+    e_c1a, e_c1b, e_c2a, e_c2b, e_c5 = texts['east']
+    w_c1a, w_c1b, w_c2a, w_c2b, w_c4 = texts['west']
+    j = iter(texts['junk3'])
 
-    runs, plaques = [], []
-    tgt = {}
-    for r, sents in words['rows'].items():
-        text = ' '.join(_se_sentence(s) for s in sents)
-        # Space-free runs with bare-floor gaps (the space-glyph law: a
-        # literal space glyph is a punctuation 'word' and breaks w / the
-        # sentence scanner) — the floor scan reconstructs the spacing.
-        col = _SE_TEXT0
-        for part in text.split(' '):
-            if part:
-                runs.append((r, col, part))
-            col += len(part) + 1
-        s_texts = [_se_sentence(s) for s in sents]
-        if r in _SE_C1_ROWS:                     # dis middle: DOUBLE gap
-            tgt[r] = f'{s_texts[0]}  {s_texts[2]}'
-        elif r in _SE_C2_ROWS:                   # das middle: SINGLE gap
-            tgt[r] = f'{s_texts[0]} {s_texts[2]}'
-        elif r in _SE_C3_ROWS:                   # cis middle: the cure
-            cure = ca if r == _SE_C3_ROWS[0] else cb
-            tgt[r] = f'{s_texts[0]} {cure}. {s_texts[2]}'
-        elif r in _SE_C4_ROWS:                   # das last: only s1 stands
-            tgt[r] = s_texts[0]
-        else:                                    # C5: only the LAST stands
-            tgt[r] = s_texts[2]
-        plaques.append((r, tgt[r]))
+    def jpair():
+        return f'{next(j)} {next(j)}.'
+
+    # row -> (full text, text0)
+    rows, tgt = {}, {}
+    for r, w_s, e_s, slot in ((3, w_c1a, e_c1a, _SE_C1_JUNK),
+                              (4, w_c1b, e_c1b, _SE_C1_JUNK)):
+        junk = jpair()
+        rows[r] = (f'{w_s} {junk} {e_s}', slot - 1 - len(w_s))
+        tgt[r] = f'{w_s}  {e_s}'                 # dis: the DOUBLE gap
+    for r, w_s, e_s, slot in ((6, w_c2a, e_c2a, _SE_C2_JUNK),
+                              (7, w_c2b, e_c2b, _SE_C2_JUNK)):
+        junk = jpair()
+        rows[r] = (f'{w_s} {junk} {e_s}', slot - 1 - len(w_s))
+        tgt[r] = f'{w_s} {e_s}'                  # das: the SINGLE gap
+    for r, ((s1, cure, s3), mid) in zip(_SE_C3_ROWS,
+                                        zip(_SE_C3_FIX, texts['mids'])):
+        rows[r] = (f'{_se_sentence(s1)} {mid}. {_se_sentence(s3)}', _SE_TEXT0)
+        tgt[r] = f'{_se_sentence(s1)} {cure}. {_se_sentence(s3)}'
+    rows[12] = (f'{w_c4} {jpair()}', _SE_C4_JUNK - 1 - len(w_c4))
+    tgt[12] = w_c4                               # das last: the saying stands
+    rows[14] = (f'{jpair()} {jpair()} {e_c5}', _SE_TEXT0)
+    tgt[14] = e_c5                               # C5: only the saying stands
     doors = ((tuple(tgt[r] for r in _SE_C1_ROWS), _SE_BOLTS['c1']),
              (tuple(tgt[r] for r in _SE_C2_ROWS), _SE_BOLTS['c2']),
              (tuple(tgt[r] for r in _SE_C3_ROWS), _SE_BOLTS['c3']),
@@ -4658,36 +4693,40 @@ def build_dungeon_sentence_enclosure(seed: int) -> Dungeon:
     cells = [[CellType.WALL] * C for _ in range(R)]
     for r in range(2, _SE_GATE + 1):                     # the spine
         cells[r][_SE_SPINE] = CellType.FLOOR
-    for r in words['rows']:                              # the bays
+    for r in rows:                                       # the bays
         for c in range(_SE_BAY_W, _SE_BAY_E + 1):
             cells[r][c] = CellType.FLOOR
     for r, c in _SE_SHAFT_SEPS:                          # the light shafts —
         cells[r][c] = CellType.FLOOR                     # NOT the throat row
+    cells[_SE_SPAWN[0]][_SE_SPAWN[1]] = CellType.FLOOR   # the drop-in
 
     room = Room(room_type=RoomType.ENTRY, rows=R, cols=C)
     room.cells = cells
     room.seed  = seed
 
-    for pr, ptext in plaques:                            # full true readings
-        col = _SE_PLQ_COL
-        for part in ptext.split(' '):
+    for r, (text, t0) in rows.items():
+        # Space-free runs with bare-floor gaps (the space-glyph law: a
+        # literal space glyph is a punctuation 'word' and breaks w / the
+        # sentence scanner) — the floor scan reconstructs the spacing.
+        col = t0
+        for part in text.split(' '):
             if part:
-                room.char_runs.append(CharRun(pr, col, tuple(part), 'verdant'))
+                room.char_runs.append(CharRun(r, col, tuple(part), 'ancient'))
             col += len(part) + 1
-    for rr, cc, text in runs:
-        room.char_runs.append(CharRun(rr, cc, tuple(text), 'ancient'))
     room._ss_doors = doors                               # the shared exact-text tick
-    room._se_words = words
+    room._se_texts = texts
+    room._se_rows = rows
 
     room.entities.append(Entity(kind='exit', row=_SE_EXIT[0], col=_SE_EXIT[1],
                                 edit_immune=True))
-    room.spawn_pos = (2, _SE_SPINE)
+    room.spawn_pos = _SE_SPAWN
     room.exit_pos  = _SE_EXIT
 
     room.rebuild_indexes()
     room.par    = _SE_PAR
     room.budget = math.ceil(_SE_PAR * 1.4)  # STANDARD: the edge-hunting route wins at 1★
-    room.answer = (f'j 5w dis j . 2j das j . 2j cis {ca}. j cis {cb}. '
+    ca, cb = (fix[1] for fix in _SE_C3_FIX)
+    room.answer = (f'j dis j . 2j das j . 2j cis {ca}. j cis {cb}. '
                    f'2j das 2j . . G $')
 
     dungeon = Dungeon(name='The Sentence Enclosure', seed=seed)

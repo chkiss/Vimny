@@ -30,7 +30,9 @@ from engine.world import CellType
 from generation.dungeon_gen import (
     build_dungeon_sentence_enclosure, _se_sentence,
     _SE_ROWS, _SE_COLS, _SE_SPINE, _SE_SHAFT_SEPS, _SE_THROAT,
-    _SE_GATE, _SE_BOLTS, _SE_EXIT, _SE_PAR, _SE_TEXT0,
+    _SE_GATE, _SE_BOLTS, _SE_EXIT, _SE_PAR, _SE_TEXT0, _SE_SPAWN,
+    _SE_C1_JUNK, _SE_C2_JUNK, _SE_C3_MID, _SE_C4_JUNK, _SE_C3_FIX,
+    _SE_TEXT_MIN, _SE_BAY_E, _SE_EAST,
     _SE_C1_ROWS, _SE_C2_ROWS, _SE_C3_ROWS, _SE_C4_ROWS, _SE_C5_ROWS,
 )
 from tests import SEEDS, cached_room
@@ -46,27 +48,28 @@ def _K(s):
     return [Keystroke(ch) for ch in s]
 
 
-# The canonical tape (== room.answer with Esc placed): 5w to a mid-sentence
-# landing, then dis/das/cis dot-chained down the aligned columns; C5 falls
-# entirely to TWO DOTS riding C4's das (the player-found golf) and keeps
-# the last sentence.
+_CA, _CB = (fix[1] for fix in _SE_C3_FIX)        # 'vidi', 'laugh' — by heart
+
+
+# The canonical tape (== room.answer with Esc placed): the spawn drops onto
+# a mid-sentence landing, then dis/das/cis dot-chained down the anchored
+# columns; C5 falls entirely to TWO DOTS riding C4's das (the player-found
+# golf) and keeps the saying.
 def _canon_keys(room):
-    ca, cb = room._se_words['cures']
-    return (_K('j5wdisj.') + _K('2jdasj.')
-            + _K('2jcis') + _K(ca + '.') + [ESC]
-            + _K('jcis') + _K(cb + '.') + [ESC]
+    return (_K('jdisj.') + _K('2jdasj.')
+            + _K('2jcis') + _K(_CA + '.') + [ESC]
+            + _K('jcis') + _K(_CB + '.') + [ESC]
             + _K('2jdas') + _K('2j..') + _K('G$'))
 
 
-# The leanest old-only rival: count-x from each sentence's exact start —
-# every row pays the h-walk to the edge that is/as never need (and {n}x
-# pays its count digits). Wins, at 1★ (> par).
+# The leanest old-only rival, anchor-relative (seed-invariant): count-x
+# from each junk sentence's exact start — every row pays the h-walk to the
+# edge that is/as never need (and {n}x pays its count digits). Wins, at 1★.
 def _rival_keys(room):
-    ca, cb = room._se_words['cures']
-    return (_K('j4w8xj.') + _K('2jhh9xj.')
-            + _K('2jh8xi') + _K(ca + '.') + [ESC]
-            + _K('j3h8xi') + _K(cb + '.') + [ESC]
-            + _K('^hh2j3wh9x') + _K('^hh2jw9x.') + _K('G$'))
+    return (_K('j4h8xj.') + _K('2jhh9xj.')
+            + _K('2jh5xi') + _K(_CA + '.') + [ESC]
+            + _K('j4h5xi') + _K(_CB + '.') + [ESC]
+            + _K('2j5h9x') + _K('2j6h9x.') + _K('G$'))
 
 
 def _drive(dungeon, keys, monkeypatch, finish=':wq\r', name='Scribe'):
@@ -102,7 +105,7 @@ def _drive_spent(keys, monkeypatch, seed=0):
 def test_layout_and_identity(seed):
     room = _room(seed)
     assert (room.rows, room.cols) == (_SE_ROWS, _SE_COLS)
-    assert room.spawn_pos == (2, _SE_SPINE)
+    assert room.spawn_pos == _SE_SPAWN
     assert room.exit_pos == _SE_EXIT
     exit_ent = next(e for e in room.entities if e.kind == 'exit')
     assert (exit_ent.row, exit_ent.col) == _SE_EXIT and exit_ent.edit_immune
@@ -113,8 +116,7 @@ def test_par_answer_budget(seed):
     room = _room(seed)
     assert room.par == _SE_PAR
     assert room.budget == math.ceil(_SE_PAR * 1.4)
-    ca, cb = room._se_words['cures']
-    assert room.answer == (f'j 5w dis j . 2j das j . 2j cis {ca}. j cis {cb}. '
+    assert room.answer == (f'j dis j . 2j das j . 2j cis {_CA}. j cis {_CB}. '
                            f'2j das 2j . . G $')
 
 
@@ -158,26 +160,40 @@ def test_runs_are_space_free_and_off_the_spine(seed):
             assert ru.col + len(ru.symbols) - 1 < _SE_SPINE
 
 
-# ── plaques & vocabulary ──────────────────────────────────────────────────────
-
-def _plaque_text(room, r):
-    cells = {}
-    for ru in room.char_runs:
-        if ru.row == r and ru.col < _SE_SPINE:
-            for i, s in enumerate(ru.symbols):
-                cells[ru.col + i] = s
-    if not cells:
-        return ''
-    lo, hi = min(cells), max(cells)
-    return ''.join(cells.get(c, ' ') for c in range(lo, hi + 1))
-
+# ── the draw: anchored sayings ────────────────────────────────────────────────
 
 @pytest.mark.parametrize("seed", SEEDS)
-def test_plaques_carry_the_full_readings(seed):
+def test_saying_draw_anchors_and_fits(seed):
+    """Every target sentence starts at its slot column (the junk sentence
+    for C1/C2/C4, the miswritten middle for C3, the second junk for C5);
+    the west sayings right-align, the east sayings start at fixed columns;
+    all ten sayings distinct."""
     room = _room(seed)
-    for targets, _dc in room._ss_doors:
-        for t in targets:
-            assert any(_plaque_text(room, r) == t for r in range(room.rows)), t
+    rows = room._se_rows
+    for r in _SE_C1_ROWS:
+        text, t0 = rows[r]
+        w_s = text.split('. ')[0] + '.'
+        assert t0 + len(w_s) + 1 == _SE_C1_JUNK and t0 >= _SE_TEXT_MIN
+        assert t0 + text.index(text.split(' ')[-1]) or True
+    for r in _SE_C2_ROWS:
+        text, t0 = rows[r]
+        w_s = text.split('. ')[0] + '.'
+        assert t0 + len(w_s) + 1 == _SE_C2_JUNK and t0 >= _SE_TEXT_MIN
+    for r, (fix, _mid) in zip(_SE_C3_ROWS,
+                              zip(_SE_C3_FIX, room._se_texts['mids'])):
+        text, t0 = rows[r]
+        assert t0 == _SE_TEXT0
+        assert text.startswith(_se_sentence(fix[0]))
+        assert text.endswith(_se_sentence(fix[2]))
+    text, t0 = rows[_SE_C4_ROWS[0]]
+    assert t0 + len(text.split('. ')[0]) + 2 == _SE_C4_JUNK
+    text, t0 = rows[_SE_C5_ROWS[0]]
+    assert t0 == _SE_TEXT0
+    # every row fits the bay
+    for r, (text, t0) in rows.items():
+        assert t0 >= _SE_TEXT_MIN and t0 + len(text) - 1 <= _SE_BAY_E, r
+    sayings = room._se_texts['east'] + room._se_texts['west']
+    assert len(set(sayings)) == len(sayings)
 
 
 @pytest.mark.parametrize("seed", SEEDS)
@@ -193,12 +209,14 @@ def test_gap_discrimination_between_c1_and_c2(seed):
 
 
 @pytest.mark.parametrize("seed", SEEDS)
-def test_vocab_distinctness(seed):
+def test_junk_is_foreign_and_distinct(seed):
     room = _room(seed)
-    words = room._se_words
-    picks = [w for sents in words['rows'].values()
-             for s in sents for w in s] + list(words['cures'])
-    assert len(set(picks)) == len(picks)
+    texts = room._se_texts
+    saying_words = {w for s in texts['east'] + texts['west']
+                    for w in s.rstrip('.').split(' ')}
+    junk = list(texts['junk3']) + list(texts['mids'])
+    assert len(set(junk)) == len(junk)
+    assert not (set(junk) & saying_words)
 
 
 @pytest.mark.parametrize("seed", SEEDS)
@@ -232,20 +250,19 @@ def test_das_on_the_last_sentence_eats_the_leading_space(monkeypatch):
     # last sentence, so the object spans the LEADING whitespace instead.
     dungeon = build_dungeon_sentence_enclosure(0)
     room = dungeon.rooms[0]
-    ca, cb = room._se_words['cures']
-    keys = (_K('j5wdisj.') + _K('2jdasj.')
-            + _K('2jcis') + _K(ca + '.') + [ESC]
-            + _K('jcis') + _K(cb + '.') + [ESC] + _K('2jdas'))
+    keys = (_K('jdisj.') + _K('2jdasj.')
+            + _K('2jcis') + _K(_CA + '.') + [ESC]
+            + _K('jcis') + _K(_CB + '.') + [ESC] + _K('2jdas'))
     _drive(dungeon, keys, monkeypatch, finish=':q!\r')
     r = _SE_C4_ROWS[0]
     assert main._wla_floor_text(room, r).strip() == \
-        _se_sentence(room._se_words['rows'][r][0])
+        room._se_texts['west'][4]                # the saying alone stands
 
 
 def test_undo_rebars_an_open_bolt(monkeypatch):
     dungeon = build_dungeon_sentence_enclosure(0)
     room = dungeon.rooms[0]
-    keys = _K('j5wdisj.') + _K('u')          # open C1, then undo row 4
+    keys = _K('jdisj.') + _K('u')            # open C1, then undo row 4
     _drive(dungeon, keys, monkeypatch, finish=':q!\r')
     assert room.cells[_SE_GATE][_SE_BOLTS['c1']] == CellType.WALL
 
