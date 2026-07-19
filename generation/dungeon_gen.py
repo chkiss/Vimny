@@ -5252,27 +5252,33 @@ _HE_BUDGET = 45                       # GENEROUS hand-set: the straight manual
                                       # x is always the LAST change) wins 1★
 
 
+# SENSE, NOT DECREE (blueprints/sense_not_decree.md §1): the echoes are a
+# famous song's repeated line, whose LAST word is what varies verse to
+# verse — the one shape the hall's mechanics need (shared `a b`, distinct
+# tails). One song per seed; every entry shares the exact `a junk b ◆tail`
+# structure, so the macro and par are pool-invariant. All PD:
+_HE_SONGS = (
+    ('had', 'a', ('cow', 'pig', 'duck', 'hen', 'dog')),        # Old MacDonald
+    ('wash', 'our', ('face', 'hands', 'clothes', 'hair', 'feet')),  # Mulberry Bush
+    ('build', 'with', ('clay', 'mortar', 'steel', 'gold', 'pound')),  # London Bridge
+    ('buy', 'a', ('bird', 'ring', 'glass', 'goat', 'cart')),   # Hush Little Baby
+    ('grundy', 'on', ('monday', 'tuesday', 'friday', 'saturday', 'sunday')),
+)                                                              # Solomon Grundy
+
+
 def _he_draw_words(rng) -> dict:
-    """One verse, five tails: a + junk + b shared, c1..c5 distinct."""
+    """One song, five tails; the junk word is seeded vocab, foreign to the
+    song (the blight the player recognises on sight)."""
     _load_vocab_tables()
 
     def pool(length):
         return [w for w in _VOCAB_PLAIN_BY_LEN.get(length, ())
                 if w.isalpha() and w == w.lower()]
 
-    for _ in range(80):
-        picks: list = []
-
-        def draw(length):
-            w = rng.choice(pool(length))
-            picks.append(w)
-            return w
-
-        d = {'a': draw(3), 'junk': draw(4), 'b': draw(3),
-             'tails': tuple(draw(3) for _ in range(5))}
-        if len(set(picks)) == len(picks):
-            return d
-    raise ValueError('hall_of_echoes: no distinct draw after 80 tries')
+    a, b, tails = _HE_SONGS[rng.randrange(len(_HE_SONGS))]
+    song_words = {a, b, *tails}
+    junk = rng.choice([w for w in pool(4) if w not in song_words])
+    return {'a': a, 'junk': junk, 'b': b, 'tails': tails}
 
 
 def build_dungeon_hall_of_echoes(seed: int) -> Dungeon:
@@ -5310,10 +5316,7 @@ def build_dungeon_hall_of_echoes(seed: int) -> Dungeon:
             room.char_runs.append(CharRun(r, col, tuple(part), kind))
             col += len(part) + 1
         target = f"{words['a']} {words['b']} {tail}"
-        col = _HE_PLQ_COL                                # west plaque = the target
-        for part in target.split(' '):
-            room.char_runs.append(CharRun(r, col, tuple(part), 'verdant'))
-            col += len(part) + 1
+        # no west plaques: the song line is its own true reading (sense law)
         doors.append(((target,), _HE_BOLTS[r]))
     room._ss_doors = tuple(doors)                        # the shared exact-text tick
     room._he_words = words

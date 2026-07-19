@@ -35,24 +35,28 @@ Blight: identical junk+◆ stamped into each row (the existing two-part-mend
 law). Constraint: the macro body must be position-independent across all
 five sets (leading ^, daw+x as today).
 
-## 2. The proverb family (23-25 change levels + 30 sight + 32-38 enclosures) — ALL
+## 2. The proverb family — SHIPPED 2026-07-19 for 30 + 32-38 (commits
+0a1a364..fc03719): shared pool `content/proverbs.py` (PLAIN word-tuples +
+MISQUOTES keyed by cure length); THE ANCHOR LAW — par invariance is
+COLUMN-anchored, not text-anchored: the corrupt/intruder word starts at a
+fixed slot column, the saying's prefix right-aligns west (rival tapes
+rebuilt anchor-relative). West plaque bands dropped everywhere (the
+player's memory is the plaque). 30 = sayings interrupted by rot-spans,
+restored whole (case chamber = flipped middles; fixed 6-cell flip-2 pool
+keeps the rival in the standard budget). 38 = the goblins' Twelve Days
+plunder-tally (11/12 gift lines). 37's C3 = veni/vidi/vici +
+live/laugh/love (fixed, cures typed by heart; the vidi strand returns at
+the Grandmaster — deliberate callback).
 
-One shared pattern: each door = a famous proverb misquoted by ONE word;
-the cure is the word everyone knows. Seed-randomized from a proverb pool
-FILTERED BY CURE LENGTH (pars must stay seed-invariant: pool entries keyed
-by (cure_len, object_type)). Starter pool: a stitch in time saves nine ·
-look before you leap · the early bird catches the worm · a watched pot
-never boils · too many cooks spoil the broth · actions speak louder than
-words · better late than never · practice makes perfect · birds of a
-feather flock together · a rolling stone gathers no moss · strike while
-the iron is hot · all that glitters is not gold · many hands make light
-work · honesty is the best policy · curiosity killed the cat. Per level:
-- 23-25 (ce/cc/S/C/R): whole-word/line miswrites of proverbs.
-- 30 (visual): the corrupt span inside a proverb.
-- 32 iw/aw: the wrong word; 33-34 brackets/braces: '(the worm)' style
-  asides; 35 quotes: the misquote INSIDE quotation marks (the natural
-  home); 36 it: '<title>look before you leap</title>'; 37 is: two-sentence
-  proverbs ('Look before you leap. …'); 38 ip: a whole proverb stanza.
+**REMAINING (next session): the change levels 22 (c/s) · 23 (S/C) · 25
+(R).** Blocker solved on paper, build pending: their length-progression
+forcing needs typed cures of len 10/12/14, which no proverb word supplies —
+use FAMOUS HYPHENATED EXPRESSIONS as the long cE doors (well-to-do /
+up-to-date 10 · hand-in-hand / never-ending 12 · merry-go-round /
+happy-go-lucky / helter-skelter / lost-and-found 14; misspelled on the
+floor, retyped by heart), and whole-proverb rows (anchor law) for the
+short word doors. Each is a full re-derivation: volume forcing, budget =
+par + SAVING − 1, dissimilarity laws superseded by fixed misquotes.
 
 ## 3. Sculpting Chambers (24, o/O/A/I) — ROW YOUR BOAT
 
