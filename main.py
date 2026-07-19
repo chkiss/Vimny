@@ -2660,9 +2660,10 @@ _LEVEL_INTROS = {
     'warden_scrivener':    ('The Warden Scrivener — he has copied these halls for an age and finished nothing. The great page waits, passage by passage, for a truer hand.', 70),
     'warden_manifold':     ('The Warden Manifold — he stamps himself into the world. Light the four braziers; the gate will draw and the fog will part.', 70),
     'warden_surveyor':     ('The Warden Surveyor — he keeps a long hall where the floor falls away between the words. Cross it word by word, over the void.', 60),
-    'spellwrights_forge':  ('The Spellwright\'s Forge — the old wards have rotted and cursed lines '
-                            'fester among the true. Mend what is corrupt, strike what is cursed, and '
-                            'spare what already rings true.', 70),
+    'spellwrights_forge':  ('The Spellwright\'s Forge — three rhymes you know are carved here, and '
+                            'each is sung wrong its own way: a duck lows like a cow, a mouse runs the '
+                            'wrong way, and fallen bottles still crowd the wall. Mend what is corrupt, '
+                            'strike what has fallen, and spare what already rings true.', 70),
     'culling_ledger':      ('The Culling Ledger — other rhymes have crept into the house that '
                             'Jack built. Set the numbers before you judge.', 60),
     'shelving_room':       ('The Shelving Room — the round was shelved blind, across the gap. '
@@ -3502,8 +3503,9 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
         # one-letter mangle ('the od gods…') or a half-mended /g-less ward can never match.
         if not all(any(m in t for t in texts) for m in mended):
             return                                    # a line is unmended, mangled, or wrecked
-        if any('curse' in t for t in texts):
-            return                                    # a cursed line still stands
+        purge = getattr(room, '_forge_purge', 'curse')
+        if any(purge in t for t in texts):
+            return                                    # a purge line still stands
         sr, sc = seal
         if room.cells[sr][sc] == CellType.WALL:
             room.cells[sr][sc] = CellType.FLOOR

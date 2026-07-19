@@ -8393,48 +8393,31 @@ _FORGE_DOOR  = 6                        # the blank corridor row: spawn, seal do
 # no word outside Chamber A contains the substring 'old' (no cold/gold/holds/bond…), only
 # Chamber B carries 'pale'/'pure', only Chamber C carries 'cursed'.
 #
-# The floor incantations were rewritten 2026-07-17 (writing-agent pass, user
-# pick "the forge-song"): the SURVIVING lines — the three A wards mended to
-# 'new', the two B verses mended to 'pure', B's kept 'pale' line, and C's two
-# sacred keepers — read TOP TO BOTTOM as one coherent poem (a smith waking the
-# forge and blessing the blade). The corruptions still self-label: a forge
-# RENEWS (iron, sparks, songs) so 'old' reads wrong; a heart and one's work
-# plainly want 'pure' while the moon is rightly pale; the 'cursed' lines are
-# struck while the 'sacred' ones are kept. Line lengths reach 41 (Chamber A),
-# which is why _FORGE_DIV was widened to 46.
-#
-# THE FINAL POEM (post-edit), in buffer order:
-#   new iron, new fire, i wake the forge        (A1)
-#   new sparks for the new blade i shape         (A2)
-#   new songs rise where the new hammer falls    (A3)
-#   shaped by a heart that beats pure            (B1)
-#   under a pale and patient moon                (B2, kept)
-#   my work lies pure beneath its light          (B3)
-#   sacred embers guard the coal                 (C2, kept)
-#   this blade is sacred, keep it well           (C4, kept)
-#
-# Chamber A — Ember Wards (rows 2-4): 'old' repeats WITHIN each line, so :s/old/new/
-# alone leaves remnants — only :%s/old/new/g mends a whole ward.  Drills the /g flag.
-_FORGE_A_WARDS   = [(2, 'old iron, old fire, i wake the forge'),
-                    (3, 'old sparks for the old blade i shape'),
-                    (4, 'old songs rise where the old hammer falls')]
-# Chamber B — Selfsame Verses (rows 8-10): 'pale'→'pure', but the MIDDLE line's 'pale'
-# is TRUE (verdant) and must remain.  A whole-buffer :%s/pale/pure/g wrecks it; the two
-# corrupt (ember) lines straddle the protected one so no single range covers just them —
-# :s one, jj past the true line, & the other.  Drills surgical :s + the & repeat.
-_FORGE_B_CORRUPT = [(8, 'shaped by a heart that beats pale'),
-                    (10, 'my work lies pale beneath its light')]
-_FORGE_B_KEEP    = (9, 'under a pale and patient moon')
-# Chamber C — Cursed Litany (rows 14-18): :g/cursed/d sweeps every cursed (ember) line at
-# once; the sacred (verdant) lines between them must remain (so a blanket delete fails).
-# Drills :g/pat/d and its selective, all-at-once global reach.
+# SENSE, NOT DECREE (blueprints/sense_not_decree.md §4, 2026-07-19): the
+# three chambers are three rhymes everyone knows, each corrupted the way
+# its rite mends. FIXED texts (their structure is the puzzle):
+#   A — OLD MACDONALD'S DUCK, written with 'moo' throughout: everyone knows
+#       the duck says quack, and the moos repeat WITHIN each line, so a
+#       /g-less :s leaves remnants — :%s/moo/quack/g. Drills the /g flag.
+#   B — HICKORY DICKORY: the famous line says the mouse ran UP the clock,
+#       twice — but the MIDDLE line ('the clock struck one and the mouse
+#       ran down') is rightly DOWN, so a blanket :%s/down/up/g wrecks it
+#       self-evidently; :s one line, jj, & the other. Surgical :s + &.
+#   C — TEN GREEN BOTTLES: :g/falls/d sweeps every accidentally-falling
+#       bottle at once; the bottles still hanging on the wall must remain.
+_FORGE_A_WARDS   = [(2, 'with a moo moo here and a moo moo there'),
+                    (3, 'here a moo there a moo everywhere a moo moo'),
+                    (4, 'the little duck says moo moo all day')]
+_FORGE_B_CORRUPT = [(8, 'the mouse ran down the clock'),
+                    (10, 'the mouse ran down the clock again')]
+_FORGE_B_KEEP    = (9, 'the clock struck one and the mouse ran down')
 # (Rows start at 14, NOT 13: :g/…/d REMOVES rows and destroys entities on them,
 # and the sanctum's scroll chest sits on row 13 — the litany begins below it.)
-_FORGE_C_CURSED  = [(14, 'cursed sparks die in the ash'),
-                    (16, 'no cursed thing survives this heat'),
-                    (18, 'cursed iron cracks and is thrown out')]
-_FORGE_C_KEEP    = [(15, 'sacred embers guard the coal'),
-                    (17, 'this blade is sacred, keep it well')]
+_FORGE_C_CURSED  = [(14, 'one green bottle accidentally falls'),
+                    (16, 'another green bottle accidentally falls'),
+                    (18, 'a third green bottle accidentally falls')]
+_FORGE_C_KEEP    = [(15, 'nine green bottles hanging on the wall'),
+                    (17, 'eight green bottles hanging on the wall')]
 _FORGE_CHEST     = (13, _FORGE_COLS - 2)   # sanctum scroll chest (random relic —
                                            # the forge names no scroll drop)
 
@@ -8451,12 +8434,13 @@ def _forge_text(room, row, col, text, kind):
 # /g mend, then 8G + surgical :s + jj + & (Chamber B, sparing the protected verse), then
 # Chamber C's :g delete, then the walk out.  Tests translate ⏎→Enter and drop the spaces.
 # par is this solve's measured engine cost — constant across seeds; the playthrough pins it.
-_SPELLWRIGHTS_ANSWER = ':%s/old/new/g⏎ 8G :s/pale/pure/⏎ jj& :g/cursed/d⏎ 6G$'
-_SPELLWRIGHTS_PAR    = 45
-# 45 = :%s/old/new/g (13) + 8G (2) + :s/pale/pure/ (13) + jj (2) + & (1) + :g/cursed/d (11)
-#      + 6G$ (3).  Chamber B's two verses straddle the protected line, so no single command
-#      hits just them — the :s + & pair is the floor there; the cursor never lands on the
-#      door row after a rite, so the 3-key walk out is the floor too.
+_SPELLWRIGHTS_ANSWER = ':%s/moo/quack/g⏎ 8G :s/down/up/⏎ jj& :g/falls/d⏎ 6G$'
+_SPELLWRIGHTS_PAR    = 44
+# 44 = :%s/moo/quack/g (15) + 8G (2) + :s/down/up/ (11) + jj (2) + & (1)
+#      + :g/falls/d (10) + 6G$ (3).  Chamber B's two verses straddle the
+#      protected line, so no single command hits just them — the :s + &
+#      pair is the floor there; the cursor never lands on the door row
+#      after a rite, so the 3-key walk out is the floor too.
 
 
 def _par_spellwrights_forge():
@@ -8506,11 +8490,12 @@ def build_dungeon_spellwrights_forge(seed: int) -> Dungeon:
     room._forge_seal = (_FORGE_DOOR, W)
     # Every phrase that must be present when the rite is true (mended or deliberately kept):
     room._forge_mended = (
-        [t.replace('old', 'new')   for _r, t in _FORGE_A_WARDS]    # A: /g-mended wards
-        + [t.replace('pale', 'pure') for _r, t in _FORGE_B_CORRUPT]  # B: surgically mended
-        + [_FORGE_B_KEEP[1]]                                         # B: the protected true line
-        + [t for _r, t in _FORGE_C_KEEP]                            # C: the sacred keep lines
+        [t.replace('moo', 'quack') for _r, t in _FORGE_A_WARDS]     # A: /g-mended wards
+        + [t.replace('down', 'up') for _r, t in _FORGE_B_CORRUPT]   # B: surgically mended
+        + [_FORGE_B_KEEP[1]]                                        # B: the protected true line
+        + [t for _r, t in _FORGE_C_KEEP]                            # C: the standing bottles
     )
+    room._forge_purge = 'falls'          # no falling bottle may survive
 
     # par is the true keystroke floor of the three rites + the walk out; measured by replay
     # across seeds (content is fixed, so par is constant).  See tests/test_spellwrights_forge.

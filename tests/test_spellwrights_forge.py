@@ -17,15 +17,17 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 
 """The Spellwright's Forge: three chambers, each forcing a different member of the
-:s / :g family, driven through the real run_dungeon keystroke loop.
+:s / :g family, driven through the real run_dungeon keystroke loop — and each a
+rhyme everyone knows (sense, not decree):
 
-  A — Ember Wards    : 'old' repeats within each line → :%s/old/new/g (the /g flag).
-  B — Selfsame Verses: two corrupt 'pale' verses flank a TRUE pale line → surgical
-                       :s + & (a whole-buffer :%s would wreck the protected line).
-  C — Cursed Litany  : cursed lines amid sacred keepers → :g/cursed/d.
+  A — the DUCK'S MOOS   : 'moo' repeats within each line → :%s/moo/quack/g (/g).
+  B — HICKORY DICKORY   : the mouse ran DOWN where the famous line runs UP, but
+                          the middle line's 'ran down' is TRUE → surgical :s + &
+                          (a whole-buffer :%s would wreck the protected line).
+  C — TEN GREEN BOTTLES : falling bottles amid ones still hanging → :g/falls/d.
 
-The sanctum seal dissolves only when every line that must remain reads its exact text
-and no cursed line survives."""
+The sanctum seal dissolves only when every line that must remain reads its exact
+text and no falling bottle survives."""
 import pytest
 from blessed import Terminal
 from blessed.keyboard import Keystroke
@@ -83,38 +85,38 @@ def test_builder_structure():
     assert 'exit' in kinds
     assert 'entry_marker' not in kinds                # cut 2026-07-17 (the flash)
     txts = _texts(r)
-    # Chamber A — three ember wards, each repeating the rot WITHIN the line (forces /g).
-    assert sum('old' in t for t in txts) == 3
-    assert all(t.count('old') >= 2 for t in txts if 'old' in t)
-    # Chamber B — two corrupt 'pale' verses + one TRUE pale line between them.
-    assert sum('pale' in t for t in txts) == 3
-    # Chamber C — three cursed lines + two sacred keepers.
-    assert sum('cursed' in t for t in txts) == 3
-    assert sum('sacred' in t for t in txts) == 2
+    # Chamber A — three moo lines, each repeating the rot WITHIN the line (forces /g).
+    assert sum('moo' in t for t in txts) == 3
+    assert all(t.count('moo') >= 2 for t in txts if 'moo' in t)
+    # Chamber B — two corrupt 'down' verses + one TRUE down line between them.
+    assert sum('down' in t for t in txts) == 3
+    # Chamber C — three falling bottles + two still hanging.
+    assert sum('falls' in t for t in txts) == 3
+    assert sum('hanging' in t for t in txts) == 2
 
 
 def test_vocabulary_is_chamber_separated():
-    # Each chamber's global rite must never reach another's lines: 'old' lives ONLY in
-    # Chamber A (no incidental cold/gold/holds/bond…), 'pale'/'pure' only in B, 'cursed'
-    # only in C.  This is what lets :%s/old/new/g be surgical and the rites independent.
+    # Each chamber's global rite must never reach another's lines: 'moo' lives ONLY in
+    # Chamber A (mouse ≠ moo), 'down'/'up' only in B, 'falls' only in C.  This is what
+    # lets :%s/moo/quack/g be surgical and the rites independent.
     r = dg.build_dungeon_spellwrights_forge(1).room
     A_rows = {rr for rr, _ in dg._FORGE_A_WARDS}
     B_rows = {rr for rr, _ in dg._FORGE_B_CORRUPT} | {dg._FORGE_B_KEEP[0]}
-    C_cursed = {rr for rr, _ in dg._FORGE_C_CURSED}
+    C_falls = {rr for rr, _ in dg._FORGE_C_CURSED}
     for row, t in enumerate(_texts(r)):
-        if 'old' in t:                     assert row in A_rows, (row, t)
-        if 'pale' in t or 'pure' in t:     assert row in B_rows, (row, t)
-        if 'cursed' in t:                  assert row in C_cursed, (row, t)
+        if 'moo' in t:                     assert row in A_rows, (row, t)
+        if 'down' in t or 'up' in t:       assert row in B_rows, (row, t)
+        if 'falls' in t:                   assert row in C_falls, (row, t)
 
 
 # ── the three rites: each lesson is forced ───────────────────────────────────
 def test_canonical_three_rites_win_two_stars():
-    # The full lesson, end to end: :%s/old/new/g (Chamber A — the /g flag), then
-    # 8G :s/pale/pure/ + jj & (Chamber B — surgical :s sparing the true line, & to
-    # repeat across the gap), then :g/cursed/d (Chamber C), then the walk out.
+    # The full lesson, end to end: :%s/moo/quack/g (Chamber A — the /g flag), then
+    # 8G :s/down/up/ + jj & (Chamber B — surgical :s sparing the true line, & to
+    # repeat across the gap), then :g/falls/d (Chamber C), then the walk out.
     for seed in (1, 42, 999, 12345, 1048583):
         d = dg.build_dungeon_spellwrights_forge(seed)
-        assert d.room.par == 45
+        assert d.room.par == dg._SPELLWRIGHTS_PAR
         keys = _replay(dg._SPELLWRIGHTS_ANSWER) + list(':wq') + ['\r']
         res, _ = _run('spellwrights_forge', keys, dungeon=d)
         assert res['won'] and res['stars'] == 2, (seed, res)
@@ -144,25 +146,26 @@ def test_non_admin_has_no_answer_sheet():
 
 
 def test_chamber_A_requires_the_g_flag():
-    # The wards repeat 'old' within the line; :%s/old/new (no /g) mends only the first
+    # The moos repeat within the line; :%s/moo/quack (no /g) mends only the first
     # per line, so the mended phrase never appears and the seal stays shut.
     d = dg.build_dungeon_spellwrights_forge(1)
-    keys = (list(':%s/old/new') + ['\r']                         # NO /g
-            + list('8G') + list(':s/pale/pure/') + ['\r'] + list('jj&')
-            + list(':g/cursed/d') + ['\r']
+    keys = (list(':%s/moo/quack') + ['\r']                       # NO /g
+            + list('8G') + list(':s/down/up/') + ['\r'] + list('jj&')
+            + list(':g/falls/d') + ['\r']
             + list(':q!') + ['\r'])
     _run('spellwrights_forge', keys, dungeon=d)
     assert not _seal_open(d.room)
-    assert any('old' in t for t in _texts(d.room))               # remnants survive
+    assert any('moo' in t for t in _texts(d.room))               # remnants survive
 
 
 def test_chamber_B_global_substitute_wrecks_the_protected_line():
-    # The lazy whole-buffer pale→pure also hits the TRUE middle line, so its exact text
-    # goes missing and the seal will not open — :%s is self-defeating here.
+    # The lazy whole-buffer down→up also hits the TRUE middle line ('the mouse ran
+    # down' after the clock strikes), so its exact text goes missing and the seal
+    # will not open — :%s is self-defeating here.
     d = dg.build_dungeon_spellwrights_forge(1)
-    keys = (list(':%s/old/new/g') + ['\r']
-            + list(':%s/pale/pure/g') + ['\r']                   # wrecks the protected line
-            + list(':g/cursed/d') + ['\r']
+    keys = (list(':%s/moo/quack/g') + ['\r']
+            + list(':%s/down/up/g') + ['\r']                     # wrecks the protected line
+            + list(':g/falls/d') + ['\r']
             + list(':q!') + ['\r'])
     _run('spellwrights_forge', keys, dungeon=d)
     assert not _seal_open(d.room)
@@ -173,31 +176,31 @@ def test_chamber_B_ampersand_is_the_par_route():
     # Repeating the verse fix with a second full :s instead of & still WINS but blows par
     # (1 star); only the canonical & route is 2-star.  So & is forced by par, not a gate.
     d = dg.build_dungeon_spellwrights_forge(1)
-    keys = (list(':%s/old/new/g') + ['\r']
-            + list('8G') + list(':s/pale/pure/') + ['\r']
-            + list('jj') + list(':s/pale/pure/') + ['\r']        # 2nd full :s, not &
-            + list(':g/cursed/d') + ['\r'] + list('6G$')
+    keys = (list(':%s/moo/quack/g') + ['\r']
+            + list('8G') + list(':s/down/up/') + ['\r']
+            + list('jj') + list(':s/down/up/') + ['\r']          # 2nd full :s, not &
+            + list(':g/falls/d') + ['\r'] + list('6G$')
             + list(':wq') + ['\r'])
     res, _ = _run('spellwrights_forge', keys, dungeon=d)
     assert res['won'] and res['stars'] == 1, res
 
 
-def test_chamber_C_strikes_the_cursed_and_keeps_the_sacred():
-    # :g/cursed/d sweeps every cursed line at once; the sacred keepers between them must
-    # survive (a blanket delete would lose them and bar the seal).
+def test_chamber_C_strikes_the_falling_and_keeps_the_hanging():
+    # :g/falls/d sweeps every falling bottle at once; the ones still hanging on the
+    # wall must survive (a blanket delete would lose them and bar the seal).
     d = dg.build_dungeon_spellwrights_forge(1)
-    _run('spellwrights_forge', list(':g/cursed/d') + ['\r'] + list(':q!') + ['\r'],
+    _run('spellwrights_forge', list(':g/falls/d') + ['\r'] + list(':q!') + ['\r'],
          dungeon=d)
     blob = ' || '.join(_texts(d.room))
-    assert 'cursed' not in blob
-    for _r, keep in dg._FORGE_C_KEEP:              # the sacred keepers survive
+    assert 'falls' not in blob
+    for _r, keep in dg._FORGE_C_KEEP:              # the standing bottles survive
         assert keep in blob
 
 
 def test_sanctum_scroll_chest_present_and_survives_the_sweep():
     # The reward that balances the empty sanctum: an unassigned chest (→ a
-    # random relic scroll) at row 13, last column — ABOVE every cursed row,
-    # so :g/cursed/d never collapses it out of the buffer.
+    # random relic scroll) at row 13, last column — ABOVE every falling row,
+    # so :g/falls/d never collapses it out of the buffer.
     from engine.world import CellType
     d = dg.build_dungeon_spellwrights_forge(1)
     room = d.room
@@ -206,7 +209,7 @@ def test_sanctum_scroll_chest_present_and_survives_the_sweep():
     assert (chest[0].row, chest[0].col) == dg._FORGE_CHEST == (13, dg._FORGE_COLS - 2)
     assert chest[0].scroll_id in (None, '')          # unassigned → random relic
     assert dg._FORGE_CHEST[0] < min(r for r, _ in dg._FORGE_C_CURSED)
-    _run('spellwrights_forge', list(':g/cursed/d') + ['\r'] + list(':q!') + ['\r'],
+    _run('spellwrights_forge', list(':g/falls/d') + ['\r'] + list(':q!') + ['\r'],
          dungeon=d)
     still = [e for e in room.entities if e.kind == 'chest_scroll']
     assert len(still) == 1                            # the sweep spared it
@@ -217,7 +220,7 @@ def test_snip_mangle_cannot_open_the_seal():
     # The historical cheese: snip one letter from each word to defeat a bare substring
     # check.  The exact-text rule means a mangle never produces the mended phrases.
     d = dg.build_dungeon_spellwrights_forge(1)
-    keys = (list(':%s/l//g') + ['\r'] + list(':%s/p//g') + ['\r']
+    keys = (list(':%s/o//g') + ['\r'] + list(':%s/l//g') + ['\r']
             + list(':q!') + ['\r'])
     _run('spellwrights_forge', keys, dungeon=d)
     assert not _seal_open(d.room)
@@ -226,21 +229,22 @@ def test_snip_mangle_cannot_open_the_seal():
 def test_seal_stays_shut_until_all_three_rites_done():
     d = dg.build_dungeon_spellwrights_forge(1)
     # Mend Chamber A only; Chambers B and C remain → seal stays shut.
-    _run('spellwrights_forge', list(':%s/old/new/g') + ['\r'] + list(':q!') + ['\r'],
+    _run('spellwrights_forge', list(':%s/moo/quack/g') + ['\r'] + list(':q!') + ['\r'],
          dungeon=d)
     assert not _seal_open(d.room)
 
 
 def test_par_and_budget():
+    import math
     r = dg.build_dungeon_spellwrights_forge(1).room
-    assert r.par == 45
-    assert r.budget == 63               # max(ceil(45*1.4), 60)
+    assert r.par == dg._SPELLWRIGHTS_PAR == 44
+    assert r.budget == max(math.ceil(44 * 1.4), 60)
 
 
 def test_hint_bar_surfaces_the_whole_subst_family():
     # The one 'subst' gate unlocks :s, :%s//g, :g/pat/d and & — but only the :s row
     # carries the token, so the bar must expand the family (like / → ? n N) or the
-    # :g/pat/d global delete the cursed lines NEED would be gated-in yet invisible.
+    # :g/pat/d global delete the falling lines NEED would be gated-in yet invisible.
     from render.hint_bar import hint_text
     from content.levels import known_commands
     bar = hint_text(known_commands('spellwrights_forge'), 'spellwrights_forge')
