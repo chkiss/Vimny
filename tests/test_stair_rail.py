@@ -49,9 +49,10 @@ def _K(s):
 _SPAWN = (_SR_STEP_ROWS[_SR_SPAWN_IDX], _SR_STEP_COLS[_SR_SPAWN_IDX])
 
 # The canonical tape (== room.answer): x the middle step, climb with - to the
-# two steps above, descend with + to the two below, then a single counted _
-# drops straight onto the exit at the gate's first non-blank.
-CANON = 'x2-x2-x6+x2+x5_'
+# two steps above, descend with + to the two below, then a counted + drops
+# straight onto the exit at the gate's first non-blank ({n}_ only ever TIES
+# {n-1}+, so the tape takes the +).
+CANON = 'x2-x2-x6+x2+x4+'
 
 # The k/j-walker: every step pays k/j + ^ where the rail pays -/+, and the
 # drop is walked with a counted j plus the caret. (The {nn}G route ties this
@@ -103,7 +104,7 @@ def test_par_answer_budget(seed):
     room = _room(seed)
     assert room.par == _SR_PAR
     assert room.budget == math.ceil(_SR_PAR * 1.4)
-    assert room.answer == 'x 2- x 2- x 6+ x 2+ x 5_'
+    assert room.answer == 'x 2- x 2- x 6+ x 2+ x 4+'
 
 
 @pytest.mark.parametrize("seed", SEEDS)

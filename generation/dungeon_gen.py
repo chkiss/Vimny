@@ -5025,16 +5025,17 @@ def build_dungeon_hall_of_echoes(seed: int) -> Dungeon:
 # word in one reach. The two steps ABOVE the spawn force `-` (up to the
 # first non-blank), the two BELOW force `+`; neither can be skipped, since
 # every step is its own bolt. Below the valley a shaft drops to the gate,
-# whose EXIT sits at the gate row's own first-non-blank with a bare
-# undercroft beneath it (G undershoots), so the descent is {n}_ landing
+# whose EXIT sits at the gate row's first-non-blank ONCE THE BOLTS have
+# ground back (they run contiguously east from the seal, opening east→west
+# as the words mend — each mend pulls the landing a cell closer); a bare
+# undercroft beneath it means G undershoots, so the descent is {n}+ landing
 # straight onto the seal — a plain {n}j lands beside it and still owes a ^.
 #
-# Redesigned 2026-07-17: the old level was a pure descent — `-` went unused
-# and the final `8_` tied a plain `7j` (a trailing `$` made the landing
-# column moot). NOTE: `_` cannot be UNIQUELY forced — `{n}_` is exactly
-# `{n-1}+`, and `_` alone is `^` — so the drop's `{n}_` merely TIES `{n-1}+`
-# while beating `j`/`G`; the level teaches `_` as a first-class descent, not
-# as the sole key. What IS strictly forced here is `-` (and `+`).
+# Redesigned 2026-07-17, tape fixed 2026-07-19: `_` cannot be UNIQUELY
+# forced — `{n}_` is exactly `{n-1}+`, and `_` alone is `^` — so the tape
+# takes the `+` (user call: showing `_` where `+` ties just confuses); `_`
+# is taught by name in the poem/hint bar as the synonym it is. What IS
+# strictly forced here is `-` (and `+`).
 _SR_ROWS, _SR_COLS = 26, 54
 _SR_PLQ_COL = 2
 _SR_WEST    = 22                      # blank floor's west edge (so ^/-/+/_ have work)
@@ -5048,10 +5049,15 @@ _SR_STEP_COLS = (24, 32, 26, 34, 26)  # zigzag — vertical neighbours never ali
 _SR_SPAWN_IDX = 2                     # index into the two tuples above (row 16)
 _SR_GATE    = 24
 _SR_EXIT    = (24, _SR_WEST)          # the FINAL SEAL, AT the gate row's first-non-blank
-_SR_BOLT_COLS = (24, 25, 26, 27, 28)  # per-word bolts, east of the exit
+# Per-word bolts run CONTIGUOUSLY east from the seal, barring the walk to it
+# (and pushing the gate row's first-non-blank east while any stands). Words
+# open them EAST→WEST, so each mend visibly pulls the future landing one
+# cell closer to the seal — the grinding IS the path opening.
+_SR_BOLT_COLS = (23, 24, 25, 26, 27)
 _SR_UNDERCROFT = 25                   # bare row — G undershoots the gate to here
 _SR_CHEST   = (25, 34)                # unassigned → the relic scroll pool
-_SR_PAR     = 15                      # x 2- x 2- x 6+ x 2+ x 5_
+_SR_PAR     = 15                      # x 2- x 2- x 6+ x 2+ x 4+ ({n}_ only ever
+                                      # TIES {n-1}+ — the tape takes the +)
 
 
 def _sr_draw_words(rng) -> tuple:
@@ -5092,7 +5098,8 @@ def build_dungeon_stair_rail(seed: int) -> Dungeon:
         col = _SR_STEP_COLS[k]
         room.char_runs.append(CharRun(r, col, tuple('◆' + words[k]), 'ember'))
         room.char_runs.append(CharRun(r, _SR_PLQ_COL, tuple(words[k]), 'verdant'))
-        doors.append(((words[k],), _SR_BOLT_COLS[k]))
+        # bolts open EAST→WEST: each mended step pulls the landing closer
+        doors.append(((words[k],), _SR_BOLT_COLS[len(_SR_STEP_ROWS) - 1 - k]))
     room._ss_doors = tuple(doors)                        # the shared exact-text tick
     room._sr_words = words
 
@@ -5106,7 +5113,7 @@ def build_dungeon_stair_rail(seed: int) -> Dungeon:
     apply_stone_fog(room)
     room.par    = _SR_PAR
     room.budget = math.ceil(_SR_PAR * 1.4)  # STANDARD: the k^/j^-walk wins at 1★
-    room.answer = 'x 2- x 2- x 6+ x 2+ x 5_'
+    room.answer = 'x 2- x 2- x 6+ x 2+ x 4+'
 
     dungeon = Dungeon(name='The Stair Rail', seed=seed)
     dungeon.rooms        = [room]
@@ -11815,13 +11822,12 @@ def build_dungeon_culling_ledger(seed: int) -> Dungeon:
             cells[r][c] = CellType.WATER
             fog.add((r, c))                        # DARK water until door one
     cells[_CL_GAP[0]][_CL_GAP[1]] = CellType.FLOOR   # the one gap in the stone
-    for c in range(2, 50):
-        cells[_CL_COR][c] = CellType.FLOOR         # the corridor…
-        if c > _CL_DOOR1[1]:
-            fog.add((_CL_COR, c))                  # …dark east of door one
-    for c in range(51, 55):
-        cells[_CL_COR][c] = CellType.FLOOR         # the dark exit pocket
-    fog.add((_CL_COR, _CL_DOOR2[1]))               # door two sleeps dark too
+    for c in range(2, 55):
+        cells[_CL_COR][c] = CellType.FLOOR         # the corridor, door two's own
+        if c > _CL_DOOR1[1]:                       # cell (the ENTITY bars it —
+            fog.add((_CL_COR, c))                  # floor beneath, so an opened
+                                                   # door is walkable), pocket;
+                                                   # dark east of door one
 
     room = Room(room_type=RoomType.ENTRY, rows=R, cols=C)
     room.cells     = cells
