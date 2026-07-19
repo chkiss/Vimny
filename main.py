@@ -2663,10 +2663,10 @@ _LEVEL_INTROS = {
     'spellwrights_forge':  ('The Spellwright\'s Forge — the old wards have rotted and cursed lines '
                             'fester among the true. Mend what is corrupt, strike what is cursed, and '
                             'spare what already rings true.', 70),
-    'culling_ledger':      ('The Culling Ledger — false lines fester in a ledger no foot can '
-                            'reach. Set the numbers before you judge.', 60),
-    'shelving_room':       ('The Shelving Room — the verses were shelved blind, across the gap. '
-                            'The wall remembers their order.', 60),
+    'culling_ledger':      ('The Culling Ledger — other rhymes have crept into the house that '
+                            'Jack built. Set the numbers before you judge.', 60),
+    'shelving_room':       ('The Shelving Room — the round was shelved blind, across the gap. '
+                            'Every voice sings twice; the echo answers a step behind.', 60),
     'refrain_vault':       ('The Refrain Vault — the old song is carved wrong where it falls, '
                             'and right where it builds. Its last line lies torn, past the '
                             'water.', 60),

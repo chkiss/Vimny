@@ -91,19 +91,25 @@ def test_dimensions_and_seal(seed):
 
 
 @pytest.mark.parametrize("seed", SEEDS)
-def test_shelf_reads_misshelved_and_plaque_reads_true(seed):
+def test_the_round_is_misfiled_but_known_by_heart(seed):
     r = _room(seed)
     targets = r._shr_targets
     assert len(targets) == 8
-    assert targets[7].strip() == targets[4].strip()      # the closing refrain
-    for i, t in enumerate(targets):
-        assert len(t) - len(t.lstrip()) == _SHR_INDENTS[i]
-    # shelf rows 1..7 carry the misshelved stanza, indent as designed
-    lines = [ln.strip() for ln in (t.strip() for t in targets)]
-    for row, (ti, ind) in enumerate(_SHR_INIT, start=1):
+    # Frère Jacques, the echo round: every call repeats as an echo one step
+    # deep — order and duplication by SENSE, the score only confirms it.
+    for i in range(0, 8, 2):
+        assert targets[i] == targets[i].lstrip()          # the call, flush
+        assert targets[i + 1] == '  ' + targets[i]        # the echo, a step deep
+    # shelf rows 1..7 carry the misfiled round, indent as designed
+    for row, (text, ind) in enumerate(_SHR_INIT, start=1):
         t = S.line_text(r, row)[0]
-        assert t.rstrip() == (' ' * ind) + lines[ti]
-    # the plaque column (wall glyphs west of the band) shows every target
+        assert t.rstrip() == (' ' * ind) + text
+    # the last echo was never shelved: three Ding lines will be needed,
+    # only one stands
+    dings = sum(1 for row in range(1, 8)
+                if 'Ding' in S.line_text(r, row)[0])
+    assert dings == 1
+    # the score column (wall glyphs west of the band) shows every target
     plq = {}
     for ru in r.char_runs:
         if ru.kind == 'verdant' and ru.col < _SHR_TX:
@@ -184,9 +190,9 @@ def test_fresh_rows_stay_misted_and_plaques_re_right(monkeypatch):
 # ── rivals ────────────────────────────────────────────────────────────────────
 
 def test_copy_delete_rival_to_the_move_loses_a_star(monkeypatch):
-    # :t + :d imitates :m for 9 keys where :m pays 5.
+    # :t + :d imitates :m at nearly twice the price.
     d = _fresh(0)
-    keys = _K(':2t4⏎:2d⏎:5t7⏎:3<⏎:6>⏎$')
+    keys = _K(':6t3⏎:7d⏎:6<⏎:7t7⏎:8>⏎$')
     result = _drive(d, keys, monkeypatch)
     assert result['won'] and result['stars'] == 1
 
@@ -194,7 +200,7 @@ def test_copy_delete_rival_to_the_move_loses_a_star(monkeypatch):
 def test_substitute_rival_to_the_indents_loses_a_star(monkeypatch):
     # :s/^ anchors imitate :> and :< at several times the cost.
     d = _fresh(0)
-    keys = _K(':2m4⏎:5t7⏎:3s/^  //⏎:6s/^/  /⏎$')
+    keys = _K(':6m3⏎:6s/^  //⏎:7t7⏎:8s/^/  /⏎$')
     result = _drive(d, keys, monkeypatch)
     assert result['won'] and result['stars'] == 1
 

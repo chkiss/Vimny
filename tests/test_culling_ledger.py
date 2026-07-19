@@ -149,14 +149,12 @@ def test_ledger_starts_dark_and_keeps_are_ordered(seed):
             assert (row, c) in r.fog_cells and (row, c) not in r.mist_cells
     for c in range(_CL_DOOR1[1] + 1, 50):          # and the corridor past door one
         assert (_CL_COR, c) in r.fog_cells
-    s4 = r.answer.split('/')[1]
-    b5 = r._ledger_blight
+    # THE HOUSE THAT JACK BUILT: every stanza-III keep bears the chain-word
+    # "that"; no intruder anywhere contains it (so :v/that/d reads true).
     for row in _CL_SACRED_III:
-        assert _strip(S.line_text(r, row)[0]).startswith(s4)
-    for row in _CL_BLIGHT_II:
-        assert b5 in S.line_text(r, row)[0]
-    for row in _CL_JUNK_III:
-        assert s4 not in S.line_text(r, row)[0]
+        assert _strip(S.line_text(r, row)[0]).startswith('that')
+    for row in [_CL_BLIGHT_I] + list(_CL_BLIGHT_II) + list(_CL_JUNK_III):
+        assert 'that' not in S.line_text(r, row)[0]
 
 
 @pytest.mark.parametrize("seed", SEEDS)
@@ -313,11 +311,21 @@ def test_global_delete_also_clobbers(monkeypatch):
 
 # ── rivals ────────────────────────────────────────────────────────────────────
 
-def test_global_delete_rival_loses_a_star(monkeypatch):
-    # :g/{b5}/d _ clears the block for 12 where :5,9d _ pays 7.
+def test_global_delete_of_the_chain_word_wrecks_the_keeps(monkeypatch):
+    # :g/that/d _ is the :v beat inverted — it culls the CHAIN and spares the
+    # intruders. The seal never opens.
     d = _fresh(0)
-    b5 = d.rooms[0]._ledger_blight
-    a = d.rooms[0].answer.replace(':5,9d␣_⏎', f':g/{b5}/d␣_⏎')
+    a = d.rooms[0].answer.replace(':6,13v/that/d␣_⏎', ':g/that/d␣_⏎')
+    result = _drive(d, _tape_keys(a), monkeypatch)
+    assert not result['won']
+
+
+def test_muffet_global_rival_loses_a_star(monkeypatch):
+    # :g/Muffet/d _ only reaches 2 of the block's 5 lines — the rest still
+    # need singles; the whole road overspends par.
+    d = _fresh(0)
+    a = d.rooms[0].answer.replace(':5,9d␣_⏎',
+                                  ':g/Muffet/d␣_⏎:5d␣_⏎:5d␣_⏎:5d␣_⏎')
     result = _drive(d, _tape_keys(a), monkeypatch)
     assert result['won'] and result['stars'] == 1
 

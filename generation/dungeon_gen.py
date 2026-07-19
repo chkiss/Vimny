@@ -11761,28 +11761,44 @@ _CL_JUNK_III    = (12, 14, 16, 17, 19)
 _CL_SACRED_III  = (13, 15, 18)
 _CL_GAPS        = (4, 11)
 _CL_PAR    = 35    # 2l(2) x(1) $(1) p(1)  :2d␣_(5) :5,9d␣_(7)
-                   # :6,13v/{s4}/d␣_(15)  $(1) p(1) $(1)
+                   # :6,13v/that/d␣_(15)  $(1) p(1) $(1)
 _CL_BUDGET = 60                      # generous: the :s-blanking longhand wins 1★
-
-
-def _cl_draw_words(rng):
-    """(s4, b5, pool): the sacred word (len 4), the blight word (len 5), and a
-    pool of distinct filler words containing neither as a substring."""
-    _load_vocab_tables()
-    p4, p5 = _VOCAB_PLAIN_BY_LEN[4], _VOCAB_PLAIN_BY_LEN[5]
-    for _ in range(200):
-        s4, b5 = rng.choice(p4), rng.choice(p5)
-        pool = [w for w in p4 + p5
-                if s4 not in w and b5 not in w and w not in (s4, b5)]
-        if len(pool) >= 43:                    # 9 keep + 3 + 10 blight + 6 + 15
-            return s4, b5, rng.sample(pool, 43)
-    raise RuntimeError('culling ledger: vocab too thin')
+# THE HOUSE THAT JACK BUILT (public domain) — solution by sense, not decree:
+# the true ledger is the cumulative chain, split at its clause seams, so its
+# ORDER is known by heart; every stanza-III keep line begins with the
+# chain-word "that" (the rhyme's own signature), so :v/that/d — keep what
+# bears the chain, cull the rest — is READ off the page, not decreed. The
+# intruders are whole OTHER nursery rhymes: one Humpty line squatting in
+# stanza I (:2d), all of Little Miss Muffet as the contiguous block
+# (:5,9d), and the rest of Humpty (plus a cheeky Jack-and-Jill) scattered
+# through stanza III. None of them contains "that".
+_CL_KEEPS = (
+    'This is the dog,',                    # rows 1, 3, 5 — the chain's head
+    'that worried the cat,',
+    'that killed the rat,',
+    'that ate the malt,',                  # rows 13, 15, 18 — every one
+    'that lay in the house',               # bears the chain-word
+    'that Jack built.',
+)
+_CL_BLIGHT_I_LINE = 'Humpty Dumpty sat on a wall,'
+_CL_BLOCK = (                              # Little Miss Muffet, whole
+    'Little Miss Muffet',
+    'sat on a tuffet,',
+    'eating her curds and whey;',
+    'along came a spider,',
+    'and frightened Miss Muffet away.',
+)
+_CL_JUNK = (                               # scattered through stanza III
+    'Humpty Dumpty had a great fall.',
+    "All the king's horses",
+    "and all the king's men",
+    "couldn't put Humpty together again.",
+    'Jack and Jill went up the hill.',     # Jack, but not the chain
+)
 
 
 def build_dungeon_culling_ledger(seed: int) -> Dungeon:
     dungeon = Dungeon(name='The Culling Ledger', seed=seed)
-    rng = random.Random(seed ^ 0x2C11)
-    s4, b5, pool = _cl_draw_words(rng)
     R, C, TX = _CL_ROWS, _CL_COLS, _CL_TX
 
     cells = [[CellType.WALL] * C for _ in range(R)]
@@ -11832,27 +11848,18 @@ def build_dungeon_culling_ledger(seed: int) -> Dungeon:
             cells[r][_CL_BRZ_COL] = CellType.FLOOR
             fog.add((r, _CL_BRZ_COL))
 
-    take = iter(pool)
-    keeps = []
-    for r in _CL_KEEP_ROWS:                        # stanza I/II true lines
-        t = f'{next(take)} {next(take)} {next(take)}'
-        keeps.append(t); carve(r, t, 'verdant')
-    carve(_CL_BLIGHT_I, f'{next(take)} {next(take)} {next(take)}', 'ember')
-    for i, r in enumerate(_CL_BLIGHT_II):          # the contiguous blight block
-        w1, w2 = next(take), next(take)
-        t = (f'{b5} {w1} {w2}', f'{w1} {b5} {w2}', f'{w1} {w2} {b5}')[i % 3]
-        carve(r, t, 'ember')
-    third = {}
-    for r in _CL_SACRED_III:                       # sacred lines lead with s4
-        t = f'{s4} {next(take)} {next(take)}'
-        third[r] = ('verdant', t)
-    for r in _CL_JUNK_III:
-        third[r] = ('ember', f'{next(take)} {next(take)} {next(take)}')
-    for r in sorted(third):                        # carve in row order…
+    for i, r in enumerate(_CL_KEEP_ROWS):          # the chain's head: dog,
+        carve(r, _CL_KEEPS[i], 'verdant')          # worried, killed
+    carve(_CL_BLIGHT_I, _CL_BLIGHT_I_LINE, 'ember')
+    for i, r in enumerate(_CL_BLIGHT_II):          # all of Miss Muffet, whole
+        carve(r, _CL_BLOCK[i], 'ember')
+    third = {r: ('verdant', _CL_KEEPS[3 + i])      # the chain's tail: every
+             for i, r in enumerate(_CL_SACRED_III)}  # line bears "that"
+    for i, r in enumerate(_CL_JUNK_III):
+        third[r] = ('ember', _CL_JUNK[i])
+    for r in sorted(third):
         kind, t = third[r]
         carve(r, t, kind)
-        if kind == 'verdant':
-            keeps.append(t)                        # …so keeps stays ledger-ordered
 
     # The cold brazier on the corridor — the finale lights it.
     room.char_runs.append(CharRun(_CL_COR, _CL_BRZ_COL, (_QM_EMBERS,), 'pedestal'))
@@ -11866,14 +11873,13 @@ def build_dungeon_culling_ledger(seed: int) -> Dungeon:
         Entity(kind='seal_door',   row=_CL_SEALDOOR[0], col=_CL_SEALDOOR[1]),
         Entity(kind='locked_door', row=_CL_DOOR2[0], col=_CL_DOOR2[1]),
     ]
-    room._ledger_keeps = tuple(keeps)              # the true lines, in order
-    room._ledger_blight = b5
+    room._ledger_keeps = _CL_KEEPS                 # the chain, in order
     room._ledger_lit = False                       # the corridor brazier, cold
 
     room.par    = _CL_PAR
     room.budget = _CL_BUDGET
-    room.answer = (f':set␣nu⏎ 2l x $ p :2d␣_⏎ :5,9d␣_⏎ '
-                   f':6,13v/{s4}/d␣_⏎ $ p $')
+    room.answer = (':set␣nu⏎ 2l x $ p :2d␣_⏎ :5,9d␣_⏎ '
+                   ':6,13v/that/d␣_⏎ $ p $')
 
     room.rebuild_indexes()
     pocket = {(_CL_COR, c) for c in range(51, 55)}  # the dark exit pocket
@@ -11904,29 +11910,35 @@ _SHR_GAL  = 9                        # the reading gallery
 _SHR_SEAL_COL  = 61
 _SHR_CHEST_COL = 66
 _SHR_EXIT_COL  = 70
-# Target stanza: 8 lines, refrain (line 5's text) closing at line 8.
-_SHR_INDENTS = (0, 2, 2, 0, 0, 2, 2, 0)
-# Initial shelf rows 1..7: (target_index, indent) — T4 shelved second, T3 a
-# step too deep, T6 flush that should stand deep, the refrain copy missing.
-_SHR_INIT = ((0, 0), (3, 0), (1, 2), (2, 4), (4, 0), (5, 0), (6, 2))
-_SHR_PAR    = 15                     # :2m4(4) + :5t7(4) + :3<(3) + :6>(3) + $(1)
+# FRÈRE JACQUES (traditional, public domain — the French original): an ECHO
+# ROUND, so the shelf's order and duplication are known BY SENSE — every
+# line is sung twice, the echo a step behind (and a step DEEP, the echo
+# convention; the west-wall score confirms it for those who don't know the
+# tune). The misfiling: the Dormez-vous echo shelved down among the wrong
+# pair (:m), the Sonnez echo a step too deep (:<), and the last echo never
+# shelved at all — :t copies the CALL, which lands flush, so the fresh echo
+# needs :> at once: duplication and depth are one gesture.
+_SHR_CALLS = ('Frère Jacques,', 'Dormez-vous?',
+              'Sonnez les matines!', 'Ding, daing, dong.')
+_SHR_INDENTS = (0, 2, 0, 2, 0, 2, 0, 2)           # call flush, echo a step deep
+# Initial shelf rows 1..7: (text, indent).
+_SHR_INIT = (
+    ('Frère Jacques,', 0),
+    ('Frère Jacques,', 2),
+    ('Dormez-vous?', 0),
+    ('Sonnez les matines!', 0),
+    ('Sonnez les matines!', 4),                    # the echo, a step too deep
+    ('Dormez-vous?', 2),                           # the stray echo (belongs at 4)
+    ('Ding, daing, dong.', 0),                     # its echo never shelved
+)
+_SHR_PAR    = 15                     # :6m3(4) + :6<(3) + :7t7(4) + :8>(3) + $(1)
 _SHR_BUDGET = 40                     # generous: the movers invite exploration
-
-
-def _shr_draw_words(rng):
-    _load_vocab_tables()
-    _CL_ = _VOCAB_PLAIN_BY_LEN
-    pool = rng.sample(_CL_[4] + _CL_[5], 21)
-    return [' '.join(pool[i * 3:i * 3 + 3]) for i in range(7)]
 
 
 def build_dungeon_shelving_room(seed: int) -> Dungeon:
     dungeon = Dungeon(name='The Shelving Room', seed=seed)
-    rng = random.Random(seed ^ 0x54E1)
-    lines = _shr_draw_words(rng)                   # T1..T7; refrain = T5
     R, C = _SHR_ROWS, _SHR_COLS
-    targets = [(' ' * _SHR_INDENTS[i]) + lines[i if i < 7 else 4]
-               for i in range(8)]
+    targets = [(' ' * _SHR_INDENTS[i]) + _SHR_CALLS[i // 2] for i in range(8)]
 
     cells = [[CellType.WALL] * C for _ in range(R)]
     mist: set = set()
@@ -11957,8 +11969,8 @@ def build_dungeon_shelving_room(seed: int) -> Dungeon:
 
     for i, t in enumerate(targets):                # the plaque column (rows 1..8)
         lay(i + 1, _SHR_PLQ + _SHR_INDENTS[i], t.strip(), 'verdant')
-    for r, (ti, ind) in enumerate(_SHR_INIT, start=1):   # the misshelved stanza
-        lay(r, _SHR_TX + ind, lines[ti], 'ancient')
+    for r, (text, ind) in enumerate(_SHR_INIT, start=1):   # the misfiled round
+        lay(r, _SHR_TX + ind, text, 'ancient')
 
     room.entities = [
         Entity(kind='exit',         row=_SHR_GAL, col=_SHR_EXIT_COL),
@@ -11971,7 +11983,7 @@ def build_dungeon_shelving_room(seed: int) -> Dungeon:
 
     room.par    = _SHR_PAR
     room.budget = _SHR_BUDGET
-    room.answer = ':set␣nu⏎ :2m4⏎ :5t7⏎ :3<⏎ :6>⏎ $'
+    room.answer = ':set␣nu⏎ :6m3⏎ :6<⏎ :7t7⏎ :8>⏎ $'
 
     room.rebuild_indexes()
     pocket = {(_SHR_GAL, c) for c in range(_SHR_SEAL_COL + 1, _SHR_EXIT_COL + 1)}
