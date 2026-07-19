@@ -61,10 +61,10 @@ def _K(s):
 # the spine, down to sesame + I se, o amen, and a single `j` drops onto the door
 # below the last verse (the carve's/amen's Esc fires the gate tick).
 def _canon_keys():
-    return (_K('O') + _K('keep') + [ESC] + _K('j')
-            + _K('A') + _K('hew') + [ESC] + _K('^') + _K('j')
-            + _K('I') + _K('se') + [ESC]
-            + _K('o') + _K('amen') + [ESC]
+    return (_K('O') + _K('row') + [ESC] + _K('j')
+            + _K('A') + _K('down') + [ESC] + _K('^') + _K('j')
+            + _K('I') + _K('mer') + [ESC]
+            + _K('o') + _K('dream') + [ESC]
             + _K('j'))
 
 
@@ -105,7 +105,7 @@ def test_only_seal_and_the_stub_are_given(seed):
     c0, c1 = _SC_BAND
     verses = [main._sc_leading_verse(room, r, c0, c1) for r in range(room.rows)]
     verses = [v for v in verses if v]
-    assert verses == ['seal', 'same']
+    assert verses == ['gently', 'rily']
 
 
 @pytest.mark.parametrize("seed", SEEDS)
@@ -189,8 +189,8 @@ def test_no_cheaper_route_beats_par(monkeypatch):
     assert won_g and spent_g == _SC_PAR, (won_g, spent_g)
     # no `^` after the carve: the cursor sits east of the seal floor, so `j` cannot
     # descend to sesame and the route cannot complete the votive cheaply
-    no_caret = (_K('O') + _K('keep') + [ESC] + _K('j') + _K('A') + _K('hew') + [ESC]
-                + _K('j') + _K('I') + _K('se') + [ESC] + _K('o') + _K('amen') + [ESC] + _K('j'))
+    no_caret = (_K('O') + _K('row') + [ESC] + _K('j') + _K('A') + _K('down') + [ESC]
+                + _K('j') + _K('I') + _K('mer') + [ESC] + _K('o') + _K('dream') + [ESC] + _K('j'))
     won_n, spent_n = _drive_spent(no_caret, monkeypatch)
     assert not (won_n and spent_n < _SC_PAR), "no winning route may spend less than par"
 
@@ -215,14 +215,14 @@ def test_the_door_opens_only_when_the_whole_votive_reads(seed, monkeypatch):
 # The canonical route with ONE act omitted — each must leave the vault sealed
 # (the votive verse or the carve is missing).
 _DROP = {
-    'O':  _K('j') + _K('A') + _K('hew') + [ESC] + _K('^') + _K('j')
-          + _K('I') + _K('se') + [ESC] + _K('o') + _K('amen') + [ESC] + _K('j'),
-    'A':  _K('O') + _K('keep') + [ESC] + _K('j') + _K('^') + _K('j')
-          + _K('I') + _K('se') + [ESC] + _K('o') + _K('amen') + [ESC] + _K('j'),
-    'I':  _K('O') + _K('keep') + [ESC] + _K('j') + _K('A') + _K('hew') + [ESC]
-          + _K('^') + _K('j') + _K('o') + _K('amen') + [ESC] + _K('j'),
-    'o':  _K('O') + _K('keep') + [ESC] + _K('j') + _K('A') + _K('hew') + [ESC]
-          + _K('^') + _K('j') + _K('I') + _K('se') + [ESC] + _K('j'),
+    'O':  _K('j') + _K('A') + _K('down') + [ESC] + _K('^') + _K('j')
+          + _K('I') + _K('mer') + [ESC] + _K('o') + _K('dream') + [ESC] + _K('j'),
+    'A':  _K('O') + _K('row') + [ESC] + _K('j') + _K('^') + _K('j')
+          + _K('I') + _K('mer') + [ESC] + _K('o') + _K('dream') + [ESC] + _K('j'),
+    'I':  _K('O') + _K('row') + [ESC] + _K('j') + _K('A') + _K('down') + [ESC]
+          + _K('^') + _K('j') + _K('o') + _K('dream') + [ESC] + _K('j'),
+    'o':  _K('O') + _K('row') + [ESC] + _K('j') + _K('A') + _K('down') + [ESC]
+          + _K('^') + _K('j') + _K('I') + _K('mer') + [ESC] + _K('j'),
 }
 
 
@@ -243,7 +243,7 @@ def test_A_alone_cannot_backdoor_the_sealed_door(monkeypatch):
     'what stops me just carving?' case: the four verses are still required."""
     dungeon = build_dungeon_sculpting_chambers(SEEDS[0])
     room = dungeon.rooms[0]
-    keys = _K('j') + _K('A') + _K('hew') + [ESC] + _K('jjjj')
+    keys = _K('j') + _K('A') + _K('down') + [ESC] + _K('jjjj')
     result = _drive(dungeon, keys, monkeypatch, finish=':q!\r')
     assert not result['won']
     er, ec = room.exit_pos
@@ -255,8 +255,8 @@ def test_the_carve_must_read_the_named_word(monkeypatch):
     and carving anything else leaves the votive-true tablet with the door SHUT.
     Carving `hew` opens it."""
     # do the whole votive, then carve a WRONG word — door stays sealed
-    wrong = (_K('O') + _K('keep') + [ESC] + _K('jj') + _K('I') + _K('se') + [ESC]
-             + _K('o') + _K('amen') + [ESC] + _K('kk') + _K('A') + _K('xyz') + [ESC] + _K('j'))
+    wrong = (_K('O') + _K('row') + [ESC] + _K('jj') + _K('I') + _K('mer') + [ESC]
+             + _K('o') + _K('dream') + [ESC] + _K('kk') + _K('A') + _K('xyz') + [ESC] + _K('j'))
     dungeon = build_dungeon_sculpting_chambers(SEEDS[0])
     assert not _drive(dungeon, wrong, monkeypatch)['won'], "a wrong carve must not open the door"
     # the right carve wins (covered by the full route) — and the plaque names it
@@ -280,7 +280,7 @@ def test_keep_is_above_and_amen_is_below_the_given_lines(monkeypatch):
     rows = {main._sc_leading_verse(room, r, c0, c1): r
             for r in range(room.rows)
             if main._sc_leading_verse(room, r, c0, c1)}
-    assert rows['keep'] < rows['seal'] < rows['sesame'] < rows['amen']
+    assert rows['row'] < rows['gently'] < rows['merrily'] < rows['dream']
 
 
 # ── undo re-seals the door (stateless tick) ───────────────────────────────────
@@ -291,8 +291,8 @@ def test_undo_reseals_the_door(monkeypatch):
     dungeon = build_dungeon_sculpting_chambers(SEEDS[0])
     room = dungeon.rooms[0]
     # write the whole votive, breach, then undo the last verse-write (amen)
-    keys = (_K('O') + _K('keep') + [ESC] + _K('jj') + _K('I') + _K('se') + [ESC]
-            + _K('o') + _K('amen') + [ESC] + _K('u'))
+    keys = (_K('O') + _K('row') + [ESC] + _K('jj') + _K('I') + _K('mer') + [ESC]
+            + _K('o') + _K('dream') + [ESC] + _K('u'))
     _drive(dungeon, keys, monkeypatch, finish=':q!\r')
     c0, c1 = _SC_BAND
     verses = [v for v in (main._sc_leading_verse(room, r, c0, c1)
@@ -340,7 +340,7 @@ def test_answer_is_the_real_keystroke_tape(seed, monkeypatch):
     omitted, spaces separators). Driven as admin it advances answer_pos to the
     end without diverging."""
     room = _room(seed)
-    assert room.answer == 'Okeep j Ahew ^ j Ise oamen j'
+    assert room.answer == 'Orow j Adown ^ j Imer odream j'
     dungeon = build_dungeon_sculpting_chambers(seed)
     troom = dungeon.rooms[0]
     _drive(dungeon, _canon_keys(), monkeypatch, finish=':q!\r', name='admin')

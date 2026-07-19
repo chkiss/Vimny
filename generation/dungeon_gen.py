@@ -10565,16 +10565,17 @@ def build_dungeon_change_extension(seed: int) -> Dungeon:
 #          wall column (the game's only wall→floor build). The vault's outer
 #          stone plugs the one corridor to the door; only A breaches it. ∞.
 #   • o/O — the VERTICAL sculptors: open a blank line below / above to carve a new
-#          verse of the vault's votive. The dedication must READ, line upon line,
-#          keep · seal · sesame · amen; only `seal` and the `same`-stub are given,
-#          so the player must OPEN the lines the other verses live on. `keep` sits
-#          ABOVE the topmost given line (only `O` reaches above) and `amen` BELOW
-#          the lowest (only `o` reaches below) — the two are forced apart by
-#          direction. ∞ (i/a cannot add a row).
-#   • I  — the votive's keystone: the `sesame` line is given only its tail
-#          (`same`); after the A-work the cursor sits far EAST, so `I` (first-non-
-#          blank insert, one key) jumps to the line start to prepend `se` →
-#          `sesame`. Soft-forced (`I` saves the ^i / 0i walk); the finale.
+#          verse of the vault's votive. SENSE, NOT DECREE (sense_not_decree.md
+#          §3): the votive is ROW YOUR BOAT's skeleton, one word per line —
+#          row · gently · merrily · dream (the karaoke law forbids typed
+#          spaces, so each verse is the line's key word). Only `gently` and
+#          the `rily`-stub are given; `row` sits ABOVE the topmost given line
+#          (only `O` reaches above) and `dream` BELOW the lowest (only `o`
+#          reaches below) — forced apart by direction. ∞ (i/a cannot add a row).
+#   • I  — the votive's keystone: the `merrily` line is given only its tail
+#          (`rily`); after the A-work the cursor sits far EAST, so `I` (first-
+#          non-blank insert, one key) jumps to the line start to prepend `mer`
+#          → `merrily`. Soft-forced (`I` saves the ^i / 0i walk); the finale.
 # The vault door (a single gated cell) opens the instant the votive reads true —
 # the password drops the key. The tick (`_sculpting_chambers_tick`) is text- and
 # exit_pos-relative, so it is immune to the row shifts o/O/I cause (the Manifold
@@ -10588,35 +10589,37 @@ _SC_PLQ  = 1                        # plaque column, in the WEST wall
 _SC_SEAL_ROW = 4                    # the given anchor line ('seal') at build
 _SC_PASS_ROW = 5                    # the given password line (tail 'same') just below it
 _SC_BAND = (_SC_WCOL, _SC_WCOL + 12)   # scan window for each row's leading verse
-_SC_TARGET = ('keep', 'seal', 'sesame', 'amen')   # the votive, read top → bottom
-_SC_CARVE  = 'hew'                  # the word A must CARVE into the seal line's stone (its plaque names it)
-_SC_SEAL_END = 17                   # the 'seal' segment's east edge — A's launch cell (bare gap)
-_SC_PLUG   = (18, 20)               # the solid stone east of 'seal' where A cuts _SC_CARVE
-_SC_EXIT_COL = 16                   # the vault door: a step SOUTH of the LAST verse (amen's end col)
+_SC_TARGET = ('row', 'gently', 'merrily', 'dream')  # the votive, read top → bottom
+_SC_CARVE  = 'down'                 # the word A CARVES after 'gently' — the line's
+                                    # own next word, known by heart (plaque confirms)
+_SC_SEAL_END = 19                   # the 'gently' segment's east edge — A's launch cell (bare gap)
+_SC_PLUG   = (20, 23)               # the solid stone east of 'gently' where A cuts _SC_CARVE
+_SC_EXIT_COL = 17                   # the vault door: a step SOUTH of the LAST verse (dream's end col)
 _SC_EXIT_ROW0 = _SC_PASS_ROW + 1    # at BUILD, one row below the password line; the o/O inserts
-                                    # slide it down so it ends up just below `amen` (exit_pos rides them)
+                                    # slide it down so it ends up just below `dream` (exit_pos rides them)
 
 
 # The route runs TOP-TO-BOTTOM, one act per line (the natural reading order):
-# O keep(5) · j(1) · A hew(4) · ^(1) · j(1) · I se(3) · o amen(5) · j(1) = 21.
+# O row(4) · j(1) · A down(5) · ^(1) · j(1) · I mer(4) · o dream(6) · j(1) = 23.
 # The carve is line 2's act, done IN PLACE (not saved for last); `^` returns from
 # the cut to the spine to keep descending. The door sits below the LAST verse
-# (amen), so completing the votive drops you onto it — and the carve's / amen's
+# (dream), so completing the votive drops you onto it — and the carve's / dream's
 # Esc fires the gate tick (main._content_ticks), so a single `j` steps through.
-# Esc is free/omitted; spaces separate tokens. The A-carve is the SPECIFIC word
-# `hew` (not filler) — named on the seal plaque (`seal hew`).
-_SC_PAR    = 21
-_SC_ANSWER = 'Okeep j Ahew ^ j Ise oamen j'
+# Esc is free/omitted; spaces separate tokens. The A-carve is `down` — 'gently
+# down', the line the player knows — confirmed on the plaque (`gently down`).
+_SC_PAR    = 23
+_SC_ANSWER = 'Orow j Adown ^ j Imer odream j'
 
 
 def build_dungeon_sculpting_chambers(seed: int) -> Dungeon:
     """The Sculpting Chambers (slug `sculpting_chambers`): I A o O.
 
-    A votive tablet the player carves open. `seal` and the `same`-stub are given;
-    O opens `keep` above, o opens `amen` below, I prepends `se` → `sesame`. When
-    the four verses read in order the vault door (a gated cell south of an
-    isolated corridor) unseals — but the corridor is walled off by a stone plug
-    that only A can breach. See the section header for the axis split."""
+    A votive tablet the player carves open — Row Your Boat's skeleton, one
+    word per line. `gently` and the `rily`-stub are given; O opens `row`
+    above, o opens `dream` below, I prepends `mer` → `merrily`, A carves
+    `down` after `gently`. When the four verses read in order the vault door
+    (a gated cell south of an isolated corridor) unseals. See the section
+    header for the axis split."""
     R, C = _SC_ROWS, _SC_COLS
     cells = [[CellType.WALL] * C for _ in range(R)]
 
@@ -10625,14 +10628,14 @@ def build_dungeon_sculpting_chambers(seed: int) -> Dungeon:
             cells[r][c] = CellType.FLOOR
 
     sr, pr = _SC_SEAL_ROW, _SC_PASS_ROW
-    floor(sr, _SC_WCOL, _SC_SEAL_END)             # 'seal' segment (+ a bare col: A's launch cell)
-    floor(pr, _SC_WCOL, _SC_WCOL + 5)              # the password line (fits 'sesame' + the `se` push)
-    # East of the 'seal' segment is SOLID STONE (sr, 14..). A cuts `hew` INTO it —
-    # a content inscription (only A writes into wall), NOT a path; the seal line's
-    # 2nd token must read `hew`. The vault door is elsewhere: a step SOUTH of the
-    # LAST verse (amen), which lands one row below the given password line —
-    # `_SC_EXIT_ROW0`. So the votive is carved top-to-bottom and the door drops you
-    # out at the bottom; A (an east-builder) can never back-door a door due south.
+    floor(sr, _SC_WCOL, _SC_SEAL_END)             # 'gently' segment (+ a bare col: A's launch cell)
+    floor(pr, _SC_WCOL, _SC_WCOL + 6)              # the password line (fits 'merrily' + the `mer` push)
+    # East of the 'gently' segment is SOLID STONE. A cuts `down` INTO it — a
+    # content inscription (only A writes into wall), NOT a path; the anchor
+    # line's 2nd token must read `down`. The vault door is elsewhere: a step
+    # SOUTH of the LAST verse (dream), one row below the given password line —
+    # `_SC_EXIT_ROW0`. So the votive is carved top-to-bottom and the door drops
+    # you out at the bottom; A (an east-builder) can never back-door it.
 
     room = Room(room_type=RoomType.ENTRY, rows=R, cols=C)
     room.cells = cells
@@ -10641,13 +10644,13 @@ def build_dungeon_sculpting_chambers(seed: int) -> Dungeon:
     def lay(r, c, text, kind):
         room.char_runs.append(CharRun(r, c, tuple(text), kind))
 
-    lay(sr, _SC_WCOL, 'seal', 'ancient')          # the given anchor verse
-    lay(pr, _SC_WCOL, 'same', 'ancient')          # the password's given tail
-    # The votive reference, in the WEST wall (verdant plaques). The seal plaque
-    # ALSO carries the carve word `hew` (`seal hew`), so the A-cut is a named
-    # sequence, not arbitrary filler. The tick keeps every plaque ALIGNED with its
-    # verse as o/O insert rows (see _sculpting_chambers_tick).
-    _plaque_text = {'seal': f'seal {_SC_CARVE}'}
+    lay(sr, _SC_WCOL, 'gently', 'ancient')        # the given anchor verse
+    lay(pr, _SC_WCOL, 'rily', 'ancient')          # the password's given tail
+    # The votive reference, in the WEST wall (verdant plaques — confirmation,
+    # not decree: the player knows the song). The anchor plaque carries the
+    # carve word too (`gently down`). The tick keeps every plaque ALIGNED
+    # with its verse as o/O insert rows (see _sculpting_chambers_tick).
+    _plaque_text = {'gently': f'gently {_SC_CARVE}'}
     for k, word in enumerate(_SC_TARGET):
         lay(sr - 1 + k, _SC_PLQ, _plaque_text.get(word, word), 'verdant')
 

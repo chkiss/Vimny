@@ -1895,10 +1895,12 @@ def _sc_leading_verse(room, r: int, c0: int, c1: int) -> str:
 
 
 def _sc_seal_row(room, c0: int, c1: int):
-    """The row whose floor verse leads with 'seal' — the votive's anchor (always
-    given, so always findable); the tablet's other slots are relative to it."""
+    """The row whose floor verse leads with the votive's ANCHOR (its second
+    verse, always given, so always findable — 'gently' in the Row Your Boat
+    votive); the tablet's other slots are relative to it."""
+    anchor = getattr(room, '_sc_target', ('', 'seal'))[1]
     return next((r for r in range(room.rows)
-                 if _sc_leading_verse(room, r, c0, c1) == 'seal'), None)
+                 if _sc_leading_verse(room, r, c0, c1) == anchor), None)
 
 
 def _sc_realign_plaques(room) -> list:
@@ -1911,7 +1913,7 @@ def _sc_realign_plaques(room) -> list:
     seal_row = _sc_seal_row(room, c0, c1)
     if seal_row is None:
         return []
-    base = target.index('seal')
+    base = 1                               # the anchor is the votive's 2nd verse
     slot = {w: seal_row + (target.index(w) - base) for w in target}
     moved = []
     for ru in [r for r in room.char_runs if r.kind == 'verdant']:
@@ -2633,7 +2635,7 @@ _LEVEL_INTROS = {
     'inscription_halls':   ('The Inscription Halls — the words were never finished, and a river bars the way. Make them whole, and the water itself will yield.', 70),
     'whole_line_annex':    ('The Change Annex — every door is mislabelled. The plaque in the wall remembers the true word; the floor has it wrong. Change cuts what is wrong and writes what is right, in a single breath.', 70),
     'change_extension':    ('The Change Extension — deeper into the mislabelled halls. Two strokes was the novice\'s way; a practised hand needs but one. Find where a single keystroke serves.', 70),
-    'sculpting_chambers':  ('The Sculpting Chambers — a votive lies half-cut in the stone, its verses broken and its lines run dry. The vault keeps faith with the whole prayer, and nothing less.', 70),
+    'sculpting_chambers':  ('The Sculpting Chambers — a boatman\'s round lies half-cut in the stone, one word to a line, its verses broken and its lines run dry. You have sung it since childhood; the vault keeps faith with the whole song, and nothing less.', 70),
     'overwrite_halls':     ('The Overwrite Halls — the words have rotted, some by a single stone, some in long streaks. Mend each corridor to match its plaque, and mind which rot runs on.', 70),
     'case_chambers':       ('The Case Chambers — every word survives letter-perfect, yet every door stays shut. Look closer: the shapes of the letters lie. The plaques keep the true forms, small and tall.', 70),
     'joiners_gate':        ('The Joiner\'s Gate — the old inscriptions were split, line from line, and scattered down the stacks. What was one line must be one line again; the plaques remember how each read whole.', 70),
