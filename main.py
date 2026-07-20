@@ -1422,6 +1422,14 @@ def _whole_line_annex_tick(room, player) -> list:
         if written(target) and not is_open:
             room.cells[gr][dc] = CellType.FLOOR
             msgs.append('The label reads true — the bolt grinds back!')
+            if getattr(room, '_wla_twinkle', False):
+                # the restore sparkle: the row that read true glitters
+                tw = getattr(room, '_sc_twinkle', None) or []
+                for r, t in enumerate(floor_rows):
+                    if target in t:
+                        tw.extend((r, r, ru.col, ru.symbols)
+                                  for ru in room._char_runs_by_row.get(r, []))
+                room._sc_twinkle = tw
         elif not written(target) and is_open and (player.row, player.col) != (gr, dc):
             room.cells[gr][dc] = CellType.WALL     # undone — the bolt re-bars
         all_true = all_true and written(target)
@@ -3420,6 +3428,10 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
                      'case_chambers', 'joiners_gate', 'g_sanctum', 'buried_word'):
             for _m in _whole_line_annex_tick(room, player):   # substring doors
                 _push(_m)
+            _tw = getattr(room, '_sc_twinkle', None)
+            if _tw:                       # a label read true: glitter
+                _sc_twinkle_animation(term, room, player, _tw, _iw(term), term.height - 8)
+                room._sc_twinkle = []
         if level == 'alignment_halls':
             for _m in _alignment_halls_tick(room, player):
                 _push(_m)

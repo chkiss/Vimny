@@ -51,8 +51,10 @@ from generation.dungeon_gen import (
     _whole_line_dissimilar,
     _CE_ROWS, _CE_COLS, _CE_COL_S, _CE_LBL_COL, _CE_LBL_END, _CE_PLQ_COL,
     _CE_LESSON_ROWS, _CE_THROAT_ROW, _CE_GATE_ROW, _CE_GATE_COL0, _CE_EXIT,
-    _CE_PAR, _CE_TRIGGERS, _CE_SAVING, _CE_N_S, _CE_N_C, _CE_KIND_ORDER,
+    _CE_PAR, _CE_TRIGGERS, _CE_BOLTS, _CE_SAVING, _CE_Y_SAVING,
+    _CE_N_S, _CE_N_C, _CE_KIND_ORDER,
     _CE_PREFIX, _CE_VERB, _CE_PLACEHOLDER, _CE_SYMBOL,
+    _CE_Y_ROW, _CE_Y_COL0, _CE_Y_LAID, _CE_Y_T1, _CE_Y_T2,
 )
 
 import pytest
@@ -102,6 +104,10 @@ def _old_keys(lessons):
             out += _K('c$') + _K(L['typed']) + [ESC]
         else:
             out += _K(_CE_VERB[L['kind']]) + _K(L['typed']) + [ESC]
+    # The Y hall without Y: mend the first half the same way, then RETYPE the
+    # second half letter-by-letter with o (+_CE_Y_SAVING keys over Y p + mends).
+    out += _K('j^wwwce') + _K('shame') + [ESC]
+    out += _K('o') + _K(_CE_Y_T2) + [ESC]
     return out + _K('G$')
 
 
@@ -111,7 +117,8 @@ def _drive(dungeon, keys, monkeypatch, finish=':wq\r', name='Scribe'):
     monkeypatch.setattr(main.time, 'sleep', lambda *a, **k: None)
     for anim in ('_fireworks_animation', '_win_animation', '_starfield_victory',
                  '_heart_container_animation', '_unlock_animation',
-                 '_void_fall_animation', '_drown_animation'):
+                 '_void_fall_animation', '_drown_animation',
+                 '_sc_twinkle_animation'):
         monkeypatch.setattr(main, anim, lambda *a, **k: None)
     term = Terminal()
     it = iter(keys)
@@ -129,9 +136,10 @@ def test_dimensions_anchors_par_budget(seed):
     assert room.spawn_pos == (_CE_LESSON_ROWS[0], _CE_LBL_COL)
     assert room.exit_pos == _CE_EXIT
     assert room.par == _CE_PAR
-    # tight margin (S2 by volume): below the shorthand-door count, so all-old overshoots
-    assert room.budget == _CE_PAR + _CE_SAVING - 1
-    assert room.budget - room.par < _CE_SAVING
+    # tight margin (S2 by volume): below the combined shorthand + Y savings,
+    # so the all-old route (cc/c$ + o-retyping the Y echo) overshoots by one
+    assert room.budget == _CE_PAR + _CE_SAVING + _CE_Y_SAVING - 1
+    assert room.budget - room.par < _CE_SAVING + _CE_Y_SAVING
 
 
 @pytest.mark.parametrize("seed", SEEDS)
@@ -173,7 +181,7 @@ def test_bolts_start_walled_exit_is_the_final_seal(seed):
     room = dungeon.rooms[0]
     p = Player(row=room.spawn_pos[0], col=room.spawn_pos[1])
     main._whole_line_annex_tick(room, p)
-    for i in range(_CE_TRIGGERS):
+    for i in range(_CE_BOLTS):
         assert room.cells[_bolt(i)[0]][_bolt(i)[1]] == CellType.WALL
     assert room.cells[_CE_EXIT[0]][_CE_EXIT[1]] == CellType.WALL
 
@@ -228,6 +236,13 @@ def test_label_target_shapes():
             assert lw[1:] == tw[1:], "context kept"
             assert L['typed'] == tw[0]
             assert _CE_SYMBOL not in tw[0], "the target head is plain"
+            # The scarred word is a DIFFERENT real word (an★il, cr★wn): no
+            # single r over the ★ can produce the cure, so cE is forced
+            # (playtest 2026-07-20 — the point-change cheese).
+            if len(lw[0]) == len(tw[0]):
+                others = sum(1 for a, b in zip(lw[0], tw[0])
+                             if a != b and a != _CE_SYMBOL)
+                assert others >= 1, (lw[0], tw[0], "r over the ★ would cure it")
         elif L['kind'] == 'bracket':
             lw = L['label'].split()
             assert lw[0].startswith('(') and ')' in lw[0], "a bracketed head"
@@ -329,8 +344,9 @@ def test_full_change_route_wins_par_perfect(seed, monkeypatch):
     room = dungeon.rooms[0]
     result = _drive(dungeon, _change_keys(room._ce_lessons), monkeypatch)
     assert result['won'] and result['stars'] == 2, result
-    for i in range(_CE_TRIGGERS):
-        assert room.cells[_bolt(i)[0]][_bolt(i)[1]] == CellType.FLOOR, "every bolt open"
+    gr = room.exit_pos[0]                 # the Y paste inserted a row: the gate rode down
+    for i in range(_CE_BOLTS):
+        assert room.cells[gr][_bolt(i)[1]] == CellType.FLOOR, "every bolt open"
 
 
 @pytest.mark.parametrize("seed", SEEDS)
@@ -423,14 +439,14 @@ def test_one_shut_bolt_bars_the_exit(seed, monkeypatch):
 
 # ── the shorthands really are the lesson ──────────────────────────────────────
 
-def test_curriculum_teaches_S_and_C():
-    """The level introduces exactly the two shorthands, on top of the inherited
-    `c` operator and `s`."""
+def test_curriculum_teaches_S_C_and_Y():
+    """The level introduces the two change shorthands AND the yank shorthand,
+    on top of the inherited `c` operator, `s`, and `y`."""
     known = set(known_commands('change_extension'))
-    assert {'S', 'C', 'c', 's'} <= known
+    assert {'S', 'C', 'Y', 'c', 's', 'y', 'p'} <= known
     # and they were NOT already known the level before (whole_line_annex)
     prior = set(known_commands('whole_line_annex'))
-    assert 'S' not in prior and 'C' not in prior
+    assert 'S' not in prior and 'C' not in prior and 'Y' not in prior
 
 
 @pytest.mark.parametrize("seed", SEEDS)
@@ -438,7 +454,7 @@ def test_route_uses_the_shorthands(seed):
     """The canonical answer really presses S and C (not cc/c$)."""
     room = _room(seed)
     answer = room.answer
-    assert 'S' in answer and 'C' in answer
+    assert 'S' in answer and 'C' in answer and 'Yp' in answer
     assert 'cc' not in answer and 'c$' not in answer
 
 
@@ -453,6 +469,41 @@ def test_answer_is_the_real_keystroke_tape(seed):
     expected = ''.join(keys + typed for keys, typed in _ce_route(room._ce_lessons))
     assert room.answer.replace(' ', '') == expected
     assert room.answer == _ce_answer(room._ce_lessons)
+
+
+# ── the Y hall: the two-ending saying ─────────────────────────────────────────
+
+@pytest.mark.parametrize("seed", SEEDS)
+def test_y_hall_lays_only_the_first_half(seed):
+    """The floor carries the corrupted FIRST half alone; the second half is
+    written nowhere — the saying itself is the key. No west carving on the Y
+    row (the row is its own hint)."""
+    room = _room(seed)
+    text = main._wla_floor_text(room, _CE_Y_ROW).strip()
+    assert text == _CE_Y_LAID
+    assert not any(ru.row == _CE_Y_ROW and ru.kind == 'verdant'
+                   for ru in room.char_runs)
+    for r in range(room.rows):
+        assert _CE_Y_T2 not in main._wla_floor_text(room, r)
+    # the wrong word is dissimilar from its cure — no r point-change
+    assert sum(a != b for a, b in zip('spite', 'shame')) >= 2
+
+
+@pytest.mark.parametrize("seed", SEEDS)
+def test_y_route_rings_both_y_bolts(seed, monkeypatch):
+    """Mend spite→shame (first bolt), Y p the line and re-point once→twice,
+    you→me (second bolt): the paste inserts a REAL row, the gate rides down,
+    and both halves read true."""
+    dungeon = build_dungeon_change_extension(seed)
+    room = dungeon.rooms[0]
+    _drive(dungeon, _change_keys(room._ce_lessons), monkeypatch, finish=':q!\r')
+    assert room.rows == _CE_ROWS + 1, "p inserted the echo row"
+    texts = [main._wla_floor_text(room, r) for r in range(room.rows)]
+    assert any(_CE_Y_T1 in t for t in texts)
+    assert any(_CE_Y_T2 in t for t in texts)
+    gr = room.exit_pos[0]
+    assert room.cells[gr][_bolt(_CE_TRIGGERS)[1]] == CellType.FLOOR
+    assert room.cells[gr][_bolt(_CE_TRIGGERS + 1)[1]] == CellType.FLOOR
 
 
 def test_admin_answer_tracking_follows_the_route(monkeypatch):

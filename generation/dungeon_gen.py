@@ -10316,7 +10316,7 @@ def build_dungeon_whole_line_annex(seed: int) -> Dungeon:
 #  - Reflow is now segment-bounded both ways (2026-06-26), so the plaque could sit
 #    east behind a bolt; it stays in the WEST wall here only to be uncuttable and
 #    off the floor scans.
-_CE_ROWS, _CE_COLS = 17, 50
+_CE_ROWS, _CE_COLS = 18, 50
 _CE_PLQ_COL  = 1                     # (retired name) the west stone band, cols 1..25
 _CE_COL_S    = 27                    # the spine — the gate's first standable; on lesson rows it
                                      # carries the label; the west wall (cols 1..26) holds each
@@ -10324,8 +10324,10 @@ _CE_COL_S    = 27                    # the spine — the gate's first standable;
 _CE_LBL_COL  = _CE_COL_S             # labels start AT the spine (= where cc/S drops the cursor)
 _CE_LBL_END  = 47                    # label floor reaches this column (fits the longest label)
 _CE_LESSON_ROWS = tuple(range(2, 14))                # twelve doors, an open block (rows 2..13)
-_CE_THROAT_ROW  = 14                                 # spine-ONLY row: block → gate
-_CE_GATE_ROW    = 15                                 # the gate corridor: spine · bolts · exit
+_CE_Y_ROW       = 14                                 # the Y hall: a wide floor row for the two-ending saying
+_CE_Y_COL0      = 22                                 # the Y hall's floor starts west of the spine (long line)
+_CE_THROAT_ROW  = 15                                 # spine-ONLY row: block → gate
+_CE_GATE_ROW    = 16                                 # the gate corridor: spine · bolts · exit
 _CE_GATE_COL0   = 28                                 # first bolt column (one per door)
 # Door kinds in FIXED order (par invariance). The hall now DRILLS WHICH change tool
 # fits, not just the shorthands: S (whole line) and C (to line end) the two new
@@ -10343,11 +10345,14 @@ _CE_GATE_COL0   = 28                                 # first bolt column (one pe
 # the label start, so they nest anywhere a C does not.
 _CE_KIND_ORDER = ('sline', 'ceol', 'word', 'sline', 'ceol', 'wordW',
                   'rune', 'sline', 'ceol', 'wordW', 'rune', 'bracket')
-_CE_TRIGGERS = len(_CE_KIND_ORDER)                   # 12 doors
+_CE_TRIGGERS = len(_CE_KIND_ORDER)                   # 12 label doors
+# The Y finale (the two-ending saying) rings TWO bolts — both halves must read.
+_CE_BOLTS = _CE_TRIGGERS + 2                         # 12 label bolts + the 2 Y bolts
 _CE_N_S = _CE_KIND_ORDER.count('sline')              # 3
 _CE_N_C = _CE_KIND_ORDER.count('ceol')               # 3
 _CE_SAVING = _CE_N_S + _CE_N_C                        # 6 doors that the shorthands shorten
-_CE_EXIT = (_CE_GATE_ROW, _CE_GATE_COL0 + _CE_TRIGGERS)   # plain floor, east of the bolts
+_CE_Y_SAVING = 8                                      # Y p + word-mends (18) vs o-retype (26)
+_CE_EXIT = (_CE_GATE_ROW, _CE_GATE_COL0 + _CE_BOLTS)   # plain floor, east of the bolts
 _CE_PLACEHOLDER = '◆'                # the fused rune — `s` spells it out
 _CE_SYMBOL      = '★'                # the WORD-spanning symbol — `cE` crosses it, `ce` stops
 # par is COMPUTED from the canonical route once below (seed-invariant — the
@@ -10377,15 +10382,30 @@ _CE_DOORS = (
     ('word', 'a rolling', 'rock gathers no moss', 'stone gathers no moss', 'stone'),
     ('sline', 'silence is', 'sacred', 'golden', 'golden'),
     ('ceol', 'time', 'will gnaw sump', 'will tell', 'tell'),
-    ('wordW', 'strike while the', f'ir{_CE_SYMBOL}n is hot', 'iron is hot', 'iron'),
+    # The ★-scarred word is a DIFFERENT real word from the cure (an★il, not
+    # ir★n): a lone `r` mends a scar but can never turn anvil into iron, so
+    # only cE retypes the WORD by heart (playtest 2026-07-20 — the point-
+    # change cheese).
+    ('wordW', 'strike while the', f'an{_CE_SYMBOL}il is hot', 'iron is hot', 'iron'),
     ('rune', 'still waters run', f'{_CE_PLACEHOLDER}ep', 'deep', 'de'),
     ('sline', 'squeaky wheel gets the', 'polish', 'grease', 'grease'),
     ('ceol', 'actions speak louder', 'than drab fume', 'than words', 'words'),
-    ('wordW', 'too many', f'co{_CE_SYMBOL}ks spoil the broth',
+    ('wordW', 'too many', f'cr{_CE_SYMBOL}wn spoil the broth',
      'cooks spoil the broth', 'cooks'),
     ('rune', 'mightier than the', f'{_CE_PLACEHOLDER}ord', 'sword', 'sw'),
     ('bracket', 'birds of a feather flock', '(al)gether', 'together', 'to'),
 )
+
+# The Y finale — the only famous saying whose SECOND half repeats the first's
+# stump with just the last words changed: fool me once, shame on you / fool me
+# twice, shame on me. The floor carries the FIRST half alone, one word wrong;
+# the second half is nowhere written — the saying itself is the key. Retyping
+# it letter-by-letter (o) costs 26; Y lifts the mended line whole, p lays it
+# below, and two word-mends turn the echo into the answer (18). Two bolts: one
+# per half.
+_CE_Y_LAID = 'fool me once spite on you'
+_CE_Y_T1   = 'fool me once shame on you'
+_CE_Y_T2   = 'fool me twice shame on me'
 
 
 def _ce_pick(rng):
@@ -10418,6 +10438,12 @@ def _ce_route(lessons):
     for i, L in enumerate(lessons):
         prefix = '' if i == 0 else _CE_PREFIX[L['kind']]
         steps.append((prefix + _CE_VERB[L['kind']], L['typed']))
+    # The Y finale: mend the first half's wrong word, lift the line, lay its
+    # echo, and re-point the echo's two turning words.
+    steps.append(('j^wwwce', 'shame'))     # spite → shame: the first half reads true
+    steps.append(('Yp', ''))               # the line, lifted and laid again below
+    steps.append(('wwce', 'twice'))        # once → twice
+    steps.append(('wwwce', 'me'))          # you → me
     steps.append(('G$', ''))               # G to the gate row (last line), $ east to the exit
     return steps
 
@@ -10461,6 +10487,8 @@ def build_dungeon_change_extension(seed: int) -> Dungeon:
     for r in _CE_LESSON_ROWS:                        # the open lesson block (label floor)
         for c in range(_CE_COL_S, _CE_LBL_END + 1):
             cells[r][c] = CellType.FLOOR
+    for c in range(_CE_Y_COL0, _CE_LBL_END + 1):     # the Y hall: wide floor for the long saying
+        cells[_CE_Y_ROW][c] = CellType.FLOOR
     cells[_CE_THROAT_ROW][_CE_COL_S] = CellType.FLOOR  # spine-only throat: block → gate
     cells[_CE_GATE_ROW][_CE_COL_S] = CellType.FLOOR    # the spine reaches the gate row
     # the exit cell STAYS WALL — the FINAL SEAL; the tick floors it when every
@@ -10499,8 +10527,19 @@ def build_dungeon_change_extension(seed: int) -> Dungeon:
             lay(lrow, pcol, word, 'verdant')
             pcol += len(word) + 1
         doors.append((lesson['target'], (_CE_GATE_ROW, _CE_GATE_COL0 + i)))
+    # The Y hall: the two-ending saying's FIRST half, one word wrong, on its
+    # own wide floor row (no west carving — the saying is its own hint; the
+    # second half lives nowhere but the player's memory). Two bolts, one per
+    # half read true.
+    col = _CE_Y_COL0
+    for word in _CE_Y_LAID.split(' '):
+        lay(_CE_Y_ROW, col, word, 'ancient')
+        col += len(word) + 1
+    doors.append((_CE_Y_T1, (_CE_GATE_ROW, _CE_GATE_COL0 + _CE_TRIGGERS)))
+    doors.append((_CE_Y_T2, (_CE_GATE_ROW, _CE_GATE_COL0 + _CE_TRIGGERS + 1)))
     # The tick is the Annex's generic plaque-door scan, keyed on `room._wla_doors`.
     room._wla_doors   = tuple(doors)
+    room._wla_twinkle = True               # a label read true glitters (the restore sparkle)
     room._ce_lessons  = tuple(lessons)
 
     room.entities.append(Entity(kind='exit', row=_CE_EXIT[0], col=_CE_EXIT[1],
@@ -10511,10 +10550,10 @@ def build_dungeon_change_extension(seed: int) -> Dungeon:
     room.rebuild_indexes()
     room.par    = _CE_PAR
     # TIGHT margin (S2 by volume): the all-old route swaps S→cc and C→c$ (+1 key
-    # each over the shorthand), so it costs par + _CE_SAVING; a margin of
-    # _CE_SAVING − 1 makes that route overshoot by one while the S/C route clears
-    # at par. Pinned by tests/test_change_extension.py.
-    room.budget = _CE_PAR + _CE_SAVING - 1
+    # each over the shorthand) and retypes the Y echo with o (+_CE_Y_SAVING);
+    # a margin of one less makes that route overshoot by one while the S/C/Y
+    # route clears at par. Pinned by tests/test_change_extension.py.
+    room.budget = _CE_PAR + _CE_SAVING + _CE_Y_SAVING - 1
     room.answer = _ce_answer(lessons)      # the real keystroke tape (karaoke)
 
     dungeon = Dungeon(name='The Change Extension', seed=seed)
