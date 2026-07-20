@@ -179,8 +179,27 @@ def test_G_undershoots_into_the_undercroft(monkeypatch):
 def test_undo_rebars_an_open_bolt(monkeypatch):
     dungeon = build_dungeon_stair_rail(0)
     room = dungeon.rooms[0]
-    _drive(dungeon, _K('xu'), monkeypatch, finish=':q!\r')   # spawn is ON S3
-    assert room.cells[_SR_GATE][_SR_BOLT_COLS[_SR_SPAWN_IDX]] == CellType.WALL
+    # spawn is ON S3 — its mend carves the FIRST corridor cell (nearest the
+    # valley); undo re-walls it
+    _drive(dungeon, _K('x'), monkeypatch, finish=':q!\r')
+    assert room.cells[_SR_GATE][_SR_BOLT_COLS[0]] == CellType.FLOOR
+    dungeon2 = build_dungeon_stair_rail(0)
+    room2 = dungeon2.rooms[0]
+    _drive(dungeon2, _K('xu'), monkeypatch, finish=':q!\r')
+    assert room2.cells[_SR_GATE][_SR_BOLT_COLS[0]] == CellType.WALL
+
+
+def test_each_mend_carves_the_corridor_east_to_west(monkeypatch):
+    # Following the canonical route, every x extends the stone-cut corridor
+    # one contiguous cell further west toward the seal.
+    legs = ['x', 'x2-x', 'x2-x2-x', 'x2-x2-x6+x', 'x2-x2-x6+x2+x']
+    for n, tape in enumerate(legs, start=1):
+        d = build_dungeon_stair_rail(0)
+        _drive(d, _K(tape), monkeypatch, finish=':q!\r')
+        r = d.rooms[0]
+        for i, dc in enumerate(_SR_BOLT_COLS):
+            want = CellType.FLOOR if i < n else CellType.WALL
+            assert r.cells[_SR_GATE][dc] == want
 
 
 # ── teleport audit ───────────────────────────────────────────────────────────
