@@ -266,6 +266,58 @@ def test_no_jump_lands_on_the_sealed_exit(monkeypatch):
     assert seen['pos'] != tuple(gmap.exit_pos)
 
 
+# ── the Vim showmode indicator ────────────────────────────────────────────────
+
+def test_recording_indicator_shows_and_clears(monkeypatch):
+    """While a macro records, the statusline appends Vim's `recording @a`
+    showmode indicator; it clears the moment the stop-q lands."""
+    import contextlib, io
+    import render.colors as Cx
+    import render.symbols as Sx
+    from engine.budget import Budget
+    from engine.player import Player
+    term = Terminal()
+    monkeypatch.setattr(Terminal, 'height', property(lambda self: 30))
+    Cx.init(term)
+    Sx.init(term)
+    d = build_dungeon_hall_of_echoes(0)
+    pl = Player(row=1, col=3)
+    pl.known_commands = set()
+
+    def _out(**kw):
+        f = io.StringIO()
+        with contextlib.redirect_stdout(f):
+            main.render_all(term, d, pl, Budget(total=100), '', **kw)
+        return f.getvalue()
+
+    assert 'recording @a' in _out(recording='a')
+    assert 'recording @' not in _out(recording='')
+
+
+def test_recording_flows_to_render_while_recording(monkeypatch):
+    """Driven: after `qb` the render receives recording='b'; after the stop-q
+    it receives ''."""
+    seen = []
+    real = main.render_all
+    monkeypatch.setattr(main, 'render_all',
+                        lambda *a, **k: seen.append(k.get('recording')))
+    monkeypatch.setattr(main.time, 'sleep', lambda *a, **k: None)
+    for anim in ('_fireworks_animation', '_win_animation', '_starfield_victory',
+                 '_heart_container_animation', '_unlock_animation',
+                 '_void_fall_animation', '_drown_animation', '_sc_twinkle_animation'):
+        monkeypatch.setattr(main, anim, lambda *a, **k: None)
+    monkeypatch.setattr(Terminal, 'height', property(lambda self: 45))
+    d = build_dungeon_hall_of_echoes(0)
+    term = Terminal()
+    # qb  (start), l (a recorded move), q (stop)
+    keys = _K('qblq') + _K(':q!\r')
+    it = iter(keys)
+    monkeypatch.setattr(term, 'inkey', lambda *a, **k: next(it, Keystroke('')))
+    main.run_dungeon(term, 'hall_of_echoes', {}, player_name='Scribe', _dungeon=d)
+    assert 'b' in seen, "the indicator was live while recording"
+    assert seen[-1] in ('', None), "the indicator cleared after stop-q"
+
+
 # ── curriculum ────────────────────────────────────────────────────────────────
 
 def test_curriculum_entry():

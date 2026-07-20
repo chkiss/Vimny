@@ -3526,6 +3526,7 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
         args (heart_flash, …) pass through."""
         kw.setdefault('attack_pos', _attack_pos())
         kw.setdefault('attack_sym', _attack_sym())
+        kw.setdefault('recording', recording_reg or '')   # Vim's showmode indicator
         # Stone-law fog re-reveal (auto_fog rooms only): what the eye can now
         # reach — through opened doors, over water — sheds its fog per frame.
         _auto_fog_tick(dungeon.room, player.row, player.col)

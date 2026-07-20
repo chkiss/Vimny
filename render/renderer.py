@@ -261,7 +261,7 @@ def wrap_room_col(drow: int, screen_c: int, width: int) -> int:
 def render_all(term: Terminal, dungeon: Dungeon, player: Player,
                budget: Budget, message: str = '',
                attack_pos: tuple | None = None, attack_sym: str = '',
-               heart_flash: bool = False):
+               heart_flash: bool = False, recording: str = ''):
     room   = dungeon.room
     iw     = _inner_w(term)
     output = []
@@ -634,8 +634,12 @@ def render_all(term: Terminal, dungeon: Dungeon, player: Player,
                       sl_fg + ' ' * sl_pad + rst +
                       bfg + S.BOX_V + rst)
     else:
-        # Statusline: mode label left, position+scroll right
+        # Statusline: mode label left, position+scroll right. Vim's showmode
+        # appends `recording @a` while a macro is being recorded (and keeps it
+        # there until the stop-q), so we do the same.
         sl_label = MODE_LABELS[mode]
+        if recording:
+            sl_label = f'{sl_label}  recording @{recording}'
         if mode == Mode.NORMAL:
             sl_mode_color = C.mode_normal()
         elif mode == Mode.INSERT:
