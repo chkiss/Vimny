@@ -2653,7 +2653,7 @@ _LEVEL_INTROS = {
     'paragraph_enclosure': ('The Paragraph Enclosure — the goblin legion stands mustered in two long cantos, chanting the tally of everything they have plundered, and six flames burn scattered down the hall among them. The gate keeps the Warden\'s Sigil: sign and seal are one.', 70),
     'buried_word': ('The Buried Word — one word stands alone at the hall\'s mouth, and nowhere else does it stand: down the hall it only hides, seamed into longer names. The seams are fused shut.', 70),
     'wet_ink': ('The Wet Ink — a writing ledge, an old saying mostly lost in the dark, and a gallery of cold braziers beneath it. Write its opening and you will know the rest. The scribes here wrote by firelight, and the fire answers only words already written.', 70),
-    'g_sanctum': ('The Last Reach — three long verses run east toward a crumbling brink, and each ends in a fused glyph hard against the fall. The keepers of this place went to the end of the line many times a day, and never once over it.', 70),
+    'g_sanctum': ('The Last Reach — three old sayings run east toward the flood. The keepers of this place went to the end of the line many times a day, and never once over it.', 70),
     'stair_rail': ('The Stair Rail — a broken stair winds down the shaft, each step\'s word set a little east of the last, and below the steps the floor falls a long way. The masons who cut these stairs never missed a landing.', 70),
     'hall_of_echoes': ('The Hall of Echoes — an old song\'s refrain sung five times down the hall, each verse ending its own way, and every one blighted the same way. The hall listens.', 70),
     'grandmasters_sanctum': ('The Grandmaster\'s Sanctum — a long gallery of seven proofs, and the master himself beyond the last stone, listening to every stroke. Nothing here is new; everything here is asked properly.', 70),
@@ -2669,9 +2669,7 @@ _LEVEL_INTROS = {
     'culling_ledger':      ('The Culling Ledger — other rhymes have crept into the house that '
                             'Jack built. Set the numbers before you judge.', 60),
     'shelving_room':       ('The Shelving Room — a round of four voices on a shelf no foot can '
-                            'reach: every voice sings twice, its echo one step deeper. One echo '
-                            'sits among the wrong pair, one sank too deep, and the last was '
-                            'never shelved at all. Only written orders move the verses.', 60),
+                            'reach: every voice sings twice, its echo one step deeper.', 60),
     'refrain_vault':       ('The Refrain Vault — the old song is carved wrong where it falls, '
                             'and right where it builds.', 60),
     'dummy':               ('Sandbox — all mechanics active. Type :edit to enter editor mode.', 60),
@@ -4344,6 +4342,7 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
                                 budget.spend(len(cmd) + 1)
                             room.rebuild_indexes()
                             _animate_reflow_falls()      # :> can shove glyphs off the brink
+                            _content_ticks()   # an ex edit opens its gate THIS turn
                             if _sg_msg:
                                 _push(_sg_msg)
                         elif _sg_msg and _sg_msg.startswith('E'):

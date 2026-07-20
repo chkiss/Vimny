@@ -202,6 +202,20 @@ def test_each_mend_carves_the_corridor_east_to_west(monkeypatch):
             assert r.cells[_SR_GATE][dc] == want
 
 
+def test_ex_substitute_opens_gates_the_same_turn(monkeypatch):
+    # An ex edit fires the gate ticks THIS turn (no one-key lag): the pasted
+    # :%s strike opens every bolt AND the seal immediately, so the very next
+    # {n}+ (from the last substituted row, where :%s parks the cursor) lands
+    # straight on the exit and :wq wins.
+    dungeon = build_dungeon_stair_rail(0)
+    result = _drive(dungeon, _K(':%s/◆//\r4+'), monkeypatch, finish=':wq\r')
+    assert result['won']
+    r = dungeon.rooms[0]
+    for dc in _SR_BOLT_COLS:
+        assert r.cells[_SR_GATE][dc] == CellType.FLOOR
+    assert r.cells[_SR_EXIT[0]][_SR_EXIT[1]] == CellType.FLOOR
+
+
 # ── teleport audit ───────────────────────────────────────────────────────────
 
 def test_no_jump_lands_on_the_sealed_exit(monkeypatch):

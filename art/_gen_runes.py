@@ -245,7 +245,7 @@ monarch monsoon moonbow niobium nitride nucleus nullify obelisk paddock
 pasture pelican pendant pennant perform persist rampart ravager redwood
 reflect regency remnant reserve residue respite restart restore sawdust
 scarlet scuttle sequoia serpent shelter shimmer taffeta tankard taproot
-tartlet tendril terrace texture thistle topsail topsoil torrent trestle
+tendril terrace texture thistle topsail topsoil torrent trestle
 triceps triplet ululate umbrage uniform unravel unusual vagrant valiant
 walkway warpath welding wetland willowy
 another arrange artisan balance between cabinet capable captain careful

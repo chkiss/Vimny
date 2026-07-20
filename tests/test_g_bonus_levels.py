@@ -113,14 +113,26 @@ def test_bw_hosts_are_real_words(seed):
 
 
 @pytest.mark.parametrize("seed", SEEDS)
-def test_bw_plaque_shows_the_true_host(seed):
+def test_bw_no_plaque_and_mend_is_unique(seed):
+    # NO plaque (playtest 2026-07-19): the corrupt cell has exactly ONE
+    # letter that completes a real vocab word — the mend is inferable from
+    # the word itself; the door reads that true host.
+    import generation.dungeon_gen as dg
+    dg._load_vocab_tables()
+    real = set(x for L in range(4, 8)
+               for x in dg._VOCAB_PLAIN_BY_LEN.get(L, ()))
     room = cached_room('build_dungeon_buried_word', seed)
-    for i, r in enumerate(_BW_BAYS):
+    assert not any(ru.col < _BW_STAND[1] and ru.row in _BW_BAYS
+                   for ru in room.char_runs)
+    w = room._bw_words['word']
+    for i, _r in enumerate(_BW_BAYS):
         host = room._bw_words['hosts'][i]
-        plq = next(ru for ru in room.char_runs
-                   if ru.row == r and ru.col == 2)     # _BW_PLQ_COL
-        assert ''.join(plq.symbols) == host           # matches the door target
-        target, _ = room._wla_doors[i]
+        corr = room._bw_words['corrupts'][i]
+        idx = host.index(w)
+        mends = [c for c in 'abcdefghijklmnopqrstuvwxyz'
+                 if host[:idx - 1] + c + host[idx:] in real]
+        assert mends == [host[idx - 1]], (host, corr, mends)
+        target, _dc = room._wla_doors[i]
         assert target == host
 
 

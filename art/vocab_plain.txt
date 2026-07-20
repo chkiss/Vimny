@@ -2186,7 +2186,6 @@ shimmer
 taffeta
 tankard
 taproot
-tartlet
 tendril
 terrace
 texture

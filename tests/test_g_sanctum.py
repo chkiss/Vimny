@@ -30,7 +30,7 @@ from engine.world import CellType
 from generation.dungeon_gen import (
     build_dungeon_g_sanctum,
     _GS_ROWS, _GS_COLS, _GS_SPINE, _GS_BAYS, _GS_NWORDS, _GS_POOL,
-    _GS_GATE, _GS_BOLTS, _GS_EXIT, _GS_PAR, _GS_PLQ_COL,
+    _GS_GATE, _GS_BOLTS, _GS_EXIT, _GS_PAR, _GS_VERSES,
 )
 from tests import SEEDS, cached_room
 
@@ -127,21 +127,37 @@ def test_verses_end_in_a_corrupt_tail_before_the_flood(seed):
 
 
 @pytest.mark.parametrize("seed", SEEDS)
-def test_plaque_shows_the_true_tail(seed):
+def test_no_plaque_and_sayings_known_by_heart(seed):
+    # SENSE, NOT DECREE: the verses are famous sayings — no plaque west of
+    # the spine; the true tail is not yet true on the floor.
     room = _room(seed)
     w = room._gs_words
+    assert not any(ru.col < _GS_SPINE for ru in room.char_runs)
     for i, r in enumerate(_GS_BAYS):
-        plq = next(ru for ru in room.char_runs
-                   if ru.row == r and ru.col == _GS_PLQ_COL)
-        assert ''.join(plq.symbols) == w['tails'][i]    # the plaque IS the repair goal
-        assert w['tails'][i] not in ''.join(
-            main._wla_floor_text(room, r))               # not yet true on the floor
+        assert w['tails'][i] not in ''.join(main._wla_floor_text(room, r))
+        # the laid verse is the saying with only the tail's last letter wrong
+        floor = ' '.join(''.join(ru.symbols)
+                         for ru in sorted((ru for ru in room.char_runs
+                                           if ru.row == r), key=lambda ru: ru.col))
+        want = _GS_VERSES[i][0].rsplit(' ', 1)[0] + ' ' + _GS_VERSES[i][1]
+        assert floor == want
 
 
-@pytest.mark.parametrize("seed", SEEDS)
-def test_word_counts_are_two_digit_and_unequal(seed):
+def test_word_counts_are_two_digit_and_adjacent_unequal():
     assert all(n >= 10 for n in _GS_NWORDS)
-    assert len(set(_GS_NWORDS)) == 3
+    # adjacent bays differ, so no count transfers blind to the next verse
+    assert _GS_NWORDS[0] != _GS_NWORDS[1] != _GS_NWORDS[2]
+
+
+def test_corruptions_are_visible_nonwords():
+    # The corrupt spelling differs from the true tail in ONLY the last
+    # letter and is itself no word — the wrongness is visible; the SAYING
+    # (not a dictionary) names the mend.
+    nonwords = {'curz', 'busj', 'boq'}
+    for verse, corr in _GS_VERSES:
+        tail = verse.rsplit(' ', 1)[1]
+        assert corr[:-1] == tail[:-1] and corr[-1] != tail[-1]
+        assert corr in nonwords
 
 
 @pytest.mark.parametrize("seed", SEEDS)
