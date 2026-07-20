@@ -4639,6 +4639,9 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
                 insert_co_buf = None
                 if not edit_mode:
                     _content_ticks()    # a completed write opens its gate THIS turn
+                    if msg_pool:        # surface its "bolt grinds back" this render
+                        msg_idx = 0
+                        message = _pool_msg(); msg_ttl = _MSG_ROTATE_TTL
             elif edit_mode:
                 r, c = player.row, player.col
                 if key.name == 'KEY_BACKSPACE' or str(key) == '\x7f':
@@ -4761,13 +4764,6 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
                             if block_ins is not None:
                                 block_ins['buf'] += ch   # replayed per row on Esc
                             insert_typed += ch           # '.' replays this on Esc
-                            if not edit_mode:
-                                # A buffer-content gate reads TRUE the instant the
-                                # cure is typed — open it mid-INSERT, no wait for
-                                # Esc (the Sight Sanctum Word chamber's single 's',
-                                # a Sculpting line's last glyph). The stateless
-                                # ticks re-bar if a later keystroke breaks the text.
-                                _content_ticks()
                         _animate_reflow_falls()
                         cur_ru = room.char_run_at(player.row, player.col)
                         if cur_ru is not None and cur_ru.kind == 'void':   # typed yourself off the ledge
@@ -4795,6 +4791,9 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
                 key_buf = ''
                 if not edit_mode:
                     _content_ticks()    # a completed overtype opens its gate THIS turn
+                    if msg_pool:        # surface its gate message this render
+                        msg_idx = 0
+                        message = _pool_msg(); msg_ttl = _MSG_ROTATE_TTL
             elif key.name == 'KEY_BACKSPACE' or str(key) == '\x7f':
                 if replace_stack:
                     replace_restore(room, player, replace_stack.pop())

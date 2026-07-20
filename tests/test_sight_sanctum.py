@@ -107,17 +107,20 @@ def _drive_spent(keys, monkeypatch, seed=0):
     return result['won'], box.get('spent')
 
 
-def test_word_chamber_bolt_grinds_the_instant_the_cure_is_typed(monkeypatch):
-    """Playtest 2026-07-20: the Word chamber's bolt must grind back the moment
-    the cure `s` is TYPED (mid-INSERT), not one key later on Esc — buffer-
-    content gates read true as the ink lands. Sample the bolt on the key AFTER
-    `s` (before any Esc): it is already open."""
+def test_word_chamber_bolt_and_message_land_on_the_esc(monkeypatch):
+    """Playtest 2026-07-20: the Word chamber's `v…c s` opens its bolt on the
+    Esc that commits the change (Vim-true — the change lands on Esc), AND the
+    'the bolt grinds back' message surfaces on THAT render (the insert-Esc path
+    used to open the gate but never surface the pooled message)."""
     dungeon = build_dungeon_sight_sanctum(2)      # seed 2: word tail 'make…'
     room = dungeon.rooms[0]
     a, b, _x = _letters(room)
-    # ...cut, ...word up through the typed cure 's', still in INSERT, then Esc + quit
-    keys = _K(f'jv2jt{a}d') + _K(f'4jv2jt{b}c') + _K('s') + [ESC] + _K(':q!\r')
-    monkeypatch.setattr(main, 'render_all', lambda *a, **k: None)
+    toks = _K(f'jv2jt{a}d') + _K(f'4jv2jt{b}c') + _K('s') + [ESC] + _K('l')
+    n_esc = len(_K(f'jv2jt{a}d') + _K(f'4jv2jt{b}c') + _K('s')) + 1   # index of the Esc
+    keys = toks + _K(':wq\r')
+    msgs = []
+    monkeypatch.setattr(main, 'render_all',
+                        lambda t, dg, pl, bg, message='', *a, **k: msgs.append(message))
     monkeypatch.setattr(main.time, 'sleep', lambda *a, **k: None)
     for anim in ('_fireworks_animation', '_win_animation', '_starfield_victory',
                  '_heart_container_animation', '_unlock_animation',
@@ -126,20 +129,20 @@ def test_word_chamber_bolt_grinds_the_instant_the_cure_is_typed(monkeypatch):
     monkeypatch.setattr(Terminal, 'height', property(lambda self: 41))
     term = Terminal()
     it = iter(keys)
-    n_before_esc = len(_K(f'jv2jt{a}d') + _K(f'4jv2jt{b}c') + _K('s'))
-    seen = {}
+    esc_bolt = {}
     calls = {'n': 0}
 
     def _inkey(*a, **k):
-        # right before the Esc is fetched, `s` has fully processed: check the bolt
-        if calls['n'] == n_before_esc:
-            seen['after_s'] = room.cells[_SS_GATE][_SS_BOLT0 + 1]
+        if calls['n'] == n_esc + 1:   # `l` is being fetched → the Esc fully processed
+            esc_bolt['v'] = room.cells[_SS_GATE][_SS_BOLT0 + 1]
         calls['n'] += 1
         return next(it, Keystroke(''))
     monkeypatch.setattr(term, 'inkey', _inkey)
     main.run_dungeon(term, 'sight_sanctum', {}, player_name='Scribe', _dungeon=dungeon)
-    assert seen.get('after_s') == CellType.FLOOR, \
-        "the Word bolt must open on the typed cure, before Esc"
+    assert esc_bolt.get('v') == CellType.FLOOR, "the Word bolt opens on the Esc"
+    # the grind message surfaced on some render (the Esc turn), not silently
+    assert any('grinds back' in m for m in msgs), \
+        "the 'bolt grinds back' message must surface, not be clobbered"
 
 
 # ── dungeon structure ─────────────────────────────────────────────────────────
