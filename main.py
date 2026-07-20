@@ -1456,14 +1456,6 @@ def _whole_line_annex_tick(room, player) -> list:
         if written(target) and not is_open:
             room.cells[gr][dc] = CellType.FLOOR
             msgs.append('The label reads true — the bolt grinds back!')
-            if getattr(room, '_wla_twinkle', False):
-                # the restore sparkle: the row that read true glitters
-                tw = getattr(room, '_sc_twinkle', None) or []
-                for r, t in enumerate(floor_rows):
-                    if target in t:
-                        tw.extend((r, r, ru.col, ru.symbols)
-                                  for ru in room._char_runs_by_row.get(r, []))
-                room._sc_twinkle = tw
         elif not written(target) and is_open and (player.row, player.col) != (gr, dc):
             room.cells[gr][dc] = CellType.WALL     # undone — the bolt re-bars
         all_true = all_true and written(target)
@@ -1475,7 +1467,45 @@ def _whole_line_annex_tick(room, player) -> list:
             msgs.append('Every label reads true — the final seal parts!')
         elif not all_true and seal_open and (player.row, player.col) != (er, ec):
             room.cells[er][ec] = CellType.WALL     # undone — the seal returns
+    # The Change Extension's Y hall: after `Yp` inserts the echo row, the row-
+    # shift bumps the second-verse plaque down one; slide it back with the
+    # restore twinkle (the Sculpting glitter, ported to the paste).
+    if getattr(room, '_ce_y_stump', None):
+        moved = _ce_realign_y_plaque(room)
+        if moved:
+            room._sc_twinkle = moved
     return msgs
+
+
+def _ce_realign_y_plaque(room) -> list:
+    """Keep the Y hall's second-verse plaque one row below the first-half line
+    (the echo's landing). A `Yp`/`YP` paste inserts a row and _shift_rows drifts
+    the plaque; re-lay it onto its slot and return the move so the render layer
+    can TWINKLE it (the guidance visibly following the paste). The first-half
+    row is the anchor — found by its stump, so this is shift-proof. STATELESS:
+    undoing the paste drops the row and the plaque settles back with no drift."""
+    stump = getattr(room, '_ce_y_stump', None)
+    if not stump:
+        return []
+    fool_rows = [r for r in range(room.rows) if stump in _wla_floor_text(room, r)]
+    if not fool_rows:
+        return []
+    y_row = min(fool_rows)
+    want = y_row + 1
+    if not (0 <= want < room.rows):
+        return []
+    # the Y plaque = the verdant runs at/below the Y row (door prefixes all sit
+    # ABOVE it, on the lesson rows), so they are never mistaken for it.
+    plaque = [ru for ru in room.char_runs if ru.kind == 'verdant' and ru.row >= y_row]
+    if not plaque or all(ru.row == want for ru in plaque):
+        return []
+    moved = []
+    for ru in plaque:
+        moved.append((ru.row, want, ru.col, ru.symbols))
+        room.char_runs.remove(ru)
+        room.char_runs.append(CharRun(want, ru.col, ru.symbols, ru.kind))
+    room.rebuild_indexes()
+    return moved
 
 
 def _alignment_halls_tick(room, player) -> list:

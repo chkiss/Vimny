@@ -54,7 +54,7 @@ from generation.dungeon_gen import (
     _CE_PAR, _CE_TRIGGERS, _CE_BOLTS, _CE_SAVING, _CE_Y_SAVING,
     _CE_N_S, _CE_N_C, _CE_KIND_ORDER,
     _CE_PREFIX, _CE_VERB, _CE_PLACEHOLDER, _CE_SYMBOL,
-    _CE_Y_ROW, _CE_Y_COL0, _CE_Y_LAID, _CE_Y_T1, _CE_Y_T2,
+    _CE_Y_ROW, _CE_Y_COL0, _CE_Y_LAID, _CE_Y_T1, _CE_Y_T2, _CE_Y_STEM,
 )
 
 import pytest
@@ -475,18 +475,59 @@ def test_answer_is_the_real_keystroke_tape(seed):
 
 @pytest.mark.parametrize("seed", SEEDS)
 def test_y_hall_lays_only_the_first_half(seed):
-    """The floor carries the corrupted FIRST half alone; the second half is
-    written nowhere — the saying itself is the key. No west carving on the Y
-    row (the row is its own hint)."""
+    """The floor carries the corrupted FIRST half alone; the full second half
+    is written NOWHERE on the floor — the saying is the key. The second verse's
+    STEM plaque sits in the west WALL one row below (the echo's landing), off
+    the floor scans."""
     room = _room(seed)
     text = main._wla_floor_text(room, _CE_Y_ROW).strip()
     assert text == _CE_Y_LAID
     assert not any(ru.row == _CE_Y_ROW and ru.kind == 'verdant'
                    for ru in room.char_runs)
     for r in range(room.rows):
-        assert _CE_Y_T2 not in main._wla_floor_text(room, r)
+        assert _CE_Y_T2 not in main._wla_floor_text(room, r)   # full 2nd half nowhere on floor
+    # the stem plaque is verdant, on WALL cells, one row below the Y row
+    stem_runs = [ru for ru in room.char_runs
+                 if ru.kind == 'verdant' and ru.row == _CE_Y_ROW + 1]
+    assert stem_runs, "the echo's stem plaque is laid below the Y row"
+    for ru in stem_runs:
+        for k in range(len(ru.symbols)):
+            assert room.cells[ru.row][ru.col + k] == CellType.WALL
+    assert ' '.join(''.join(ru.symbols) for ru in
+                    sorted(stem_runs, key=lambda u: u.col)) == _CE_Y_STEM
     # the wrong word is dissimilar from its cure — no r point-change
     assert sum(a != b for a, b in zip('spite', 'shame')) >= 2
+
+
+def test_y_paste_bumps_and_realigns_the_stem_plaque(monkeypatch):
+    """The Sculpting glitter, ported to the paste: a row inserted at the echo's
+    landing bumps the stem plaque down one, and the tick's re-align slides it
+    back to the echo row and flags it for the twinkle (room._sc_twinkle)."""
+    from engine.player import Player
+    from engine.reflow import _insert_blank_row
+    dungeon = build_dungeon_change_extension(SEEDS[0])
+    room = dungeon.rooms[0]
+    p = Player(row=_CE_Y_ROW, col=_CE_Y_COL0)
+    before = {ru.row for ru in room.char_runs
+              if ru.kind == 'verdant' and ''.join(ru.symbols) == 'fool'
+              and ru.row >= _CE_Y_ROW}
+    assert before == {_CE_Y_ROW + 1}
+    # simulate `Yp`: a linewise paste inserts a row at the echo's landing,
+    # shifting the stem plaque down one (Vim's _shift_rows).
+    _insert_blank_row(room, _CE_Y_ROW + 1, _CE_Y_ROW, p, blank=True)
+    bumped = {ru.row for ru in room.char_runs
+              if ru.kind == 'verdant' and ''.join(ru.symbols) == 'fool'
+              and ru.row >= _CE_Y_ROW}
+    assert bumped == {_CE_Y_ROW + 2}, "the row insertion drifted the plaque down"
+    # the tick re-aligns it and records the move for the twinkle
+    main._whole_line_annex_tick(room, p)
+    moved = getattr(room, '_sc_twinkle', None)
+    assert moved, "the re-align must flag the plaque for the twinkle"
+    assert all(new_r == _CE_Y_ROW + 1 for (_old, new_r, _c, _s) in moved)
+    settled = {ru.row for ru in room.char_runs
+               if ru.kind == 'verdant' and ''.join(ru.symbols) == 'fool'
+               and ru.row >= _CE_Y_ROW}
+    assert settled == {_CE_Y_ROW + 1}, "the plaque slid back to the echo row"
 
 
 @pytest.mark.parametrize("seed", SEEDS)

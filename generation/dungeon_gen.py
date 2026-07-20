@@ -10453,6 +10453,7 @@ _CE_DOORS = (
 _CE_Y_LAID = 'fool me once spite on you'
 _CE_Y_T1   = 'fool me once shame on you'
 _CE_Y_T2   = 'fool me twice shame on me'
+_CE_Y_STEM = 'fool me twice'             # the echo plaque (the second verse's stem)
 
 
 def _ce_pick(rng):
@@ -10575,18 +10576,28 @@ def build_dungeon_change_extension(seed: int) -> Dungeon:
             pcol += len(word) + 1
         doors.append((lesson['target'], (_CE_GATE_ROW, _CE_GATE_COL0 + i)))
     # The Y hall: the two-ending saying's FIRST half, one word wrong, on its
-    # own wide floor row (no west carving — the saying is its own hint; the
-    # second half lives nowhere but the player's memory). Two bolts, one per
-    # half read true.
+    # own wide floor row. Two bolts, one per half read true.
     col = _CE_Y_COL0
     for word in _CE_Y_LAID.split(' '):
         lay(_CE_Y_ROW, col, word, 'ancient')
         col += len(word) + 1
     doors.append((_CE_Y_T1, (_CE_GATE_ROW, _CE_GATE_COL0 + _CE_TRIGGERS)))
     doors.append((_CE_Y_T2, (_CE_GATE_ROW, _CE_GATE_COL0 + _CE_TRIGGERS + 1)))
+    # The SECOND verse's stem plaque waits in the west wall one row BELOW the
+    # first half — the echo's landing spot. Like every door here it names the
+    # saying's STEM (`fool me twice`, so `once`→`twice` is the hint and the
+    # rest is recalled), short enough to sit clear of the echo floor (cols
+    # 1..12, floor starts at _CE_Y_COL0). When `Yp` inserts the echo row, the
+    # row-shift bumps this plaque down one; the tick slides it back with the
+    # restore twinkle (the Sculpting glitter, ported to the paste). Wall cells,
+    # off the floor scans — it never feeds a bolt.
+    pcol = 1
+    for word in _CE_Y_STEM.split(' '):
+        lay(_CE_Y_ROW + 1, pcol, word, 'verdant')
+        pcol += len(word) + 1
     # The tick is the Annex's generic plaque-door scan, keyed on `room._wla_doors`.
     room._wla_doors   = tuple(doors)
-    room._wla_twinkle = True               # a label read true glitters (the restore sparkle)
+    room._ce_y_stump  = 'fool me once'     # anchors the echo-plaque re-align (the Y row)
     room._ce_lessons  = tuple(lessons)
 
     room.entities.append(Entity(kind='exit', row=_CE_EXIT[0], col=_CE_EXIT[1],
