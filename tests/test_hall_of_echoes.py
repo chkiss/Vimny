@@ -150,7 +150,7 @@ def test_chambers_are_exact_source_replicas():
     Vault's London Bridge reprise. Every tape segment records on a fresh
     register (qb, qc, qd — the named-register drill)."""
     chambers = _he_build_chambers(random.Random(0))
-    assert len(chambers) == 3
+    assert len(chambers) == 4
     # Echo Vault: the lock row carries warped runes; a plaque band above
     ev = chambers[0]
     lock = ''.join(''.join(sym for _c, sym in
@@ -170,13 +170,18 @@ def test_chambers_are_exact_source_replicas():
     # but it is LAID only once (the shelf) — the other four are pasted
     assert sum(1 for row in rv['rows']
                for _c, t, _k in row if t == 'my fair lady.') == 1
-    # Each chamber records on a fresh register in order — b, c, d. (The Echo
+    # Goblin Gauntlet: a lair of goblins felled by ;x (combat chamber)
+    gob = chambers[3]
+    assert gob.get('combat') and gob.get('goblins')
+    assert len(gob['goblins']) >= 4
+    assert ';x' in gob['tape'].replace(' ', '') and gob['tape'].startswith('fg')
+    # Each chamber records on a fresh register in order — b, c, d, e. (The Echo
     # Vault and Refrain segments lead with their recording; the Selection
-    # panel swap needs a one-time `ye` yank before its repeatable k-vbp unit,
-    # so its qc sits just after the setup — the exact puzzle is preserved
+    # panel swap needs a one-time `ye` yank, and the goblin lair a one-time
+    # `fg`, before their repeatable units — the exact puzzle is preserved
     # over a cosmetic leading-q.)
     regs = [re.search(r'q([a-z])', ch['tape']).group(1) for ch in chambers]
-    assert regs == ['b', 'c', 'd']
+    assert regs == ['b', 'c', 'd', 'e']
 
 
 def test_map_is_one_buffer_with_stone_bands():
@@ -220,6 +225,22 @@ def test_all_manual_road_wins_one_star(monkeypatch):
     result, spent = _drive_spent(d, keys, monkeypatch, budget=_HE_BUDGET)
     assert result['won'] and result['stars'] == 1
     assert _HE_PAR < spent <= _HE_BUDGET
+
+
+@pytest.mark.parametrize("seed", SEEDS)
+def test_goblin_lair_is_felled_by_the_semicolon_x_macro(seed, monkeypatch):
+    """The goblin chamber: `fg` sets last_f='g' and kills the first foe, then
+    the recorded `;x` (find-next-strike) replays down the lair. Driving the
+    full canonical run leaves NO goblin alive, and the lair's `lair` label
+    survives (it keeps the row a recognised run once cleared)."""
+    d = build_dungeon_hall_of_echoes(seed)
+    gmap = d.rooms[1]
+    goblins0 = [e for e in gmap.entities if e.kind == 'goblin']
+    assert len(goblins0) == 6 and all(e.ai == '' for e in goblins0)   # stationary foes
+    poem_tape, map_tape = d.rooms[0].answer, d.rooms[1].answer
+    _drive_spent(d, _K((poem_tape + map_tape).replace(' ', '')), monkeypatch)
+    assert not any(e.alive and e.kind == 'goblin' for e in gmap.entities)
+    assert any('lair' in main._wla_floor_text(gmap, r) for r in range(gmap.rows))
 
 
 def test_poem_hall_south_seal_advances_to_the_map(monkeypatch):

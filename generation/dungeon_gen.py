@@ -5237,9 +5237,9 @@ def build_dungeon_grandmasters_sanctum(seed: int) -> Dungeon:
 _HE_COLS  = 58
 _HE_TX    = 3                          # text head col in every hall
 _HE_GATE_COL = 2                       # the west gate cell in every band
-_HE_PAR    = 61                        # engine-measured: the full driven tape
-_HE_BUDGET = 160                       # GENEROUS hand-set: the all-manual
-                                       # road (measured 120) wins 1★
+_HE_PAR    = 72                        # engine-measured: the full driven tape
+_HE_BUDGET = 190                       # GENEROUS hand-set: the all-manual
+                                       # road wins 1★ (measured below)
 
 # The poem pool — all PD, all 10 lines. The intruders are deadpan one-word
 # asides (the Norm law: understatement over punchline), one per line, all
@@ -5297,16 +5297,17 @@ _HE_POEMS = (
 # The gauntlet chambers, v4 (playtest 2026-07-20): each chamber is the
 # EXACT puzzle from its source level — same generators, same texts, same
 # columns — chosen ONLY from levels whose own karaoke tape repeats a
-# 2+-character string (the macro-worthiness criterion). Exactly three
-# levels in the game qualify:
+# 2+-character string (the macro-worthiness criterion). Four levels qualify:
 #   the Echo Vault      — 'w w .' beats down one warped corridor
 #   the Selection Halls — 'k vbp' three times around the panel cycle
 #   the Refrain Vault   — 'p 3j' laying the refrain under each stanza
+#   the Goblin Gauntlet — '; x' felling a lair of goblins one by one (combat)
 # (The v3 alignment/joiner/sculpting/case/culling chambers repeated only
 # because they were invented uniform variants — exactly what the playtest
 # rejected — so they are out.) Every chamber solves on a fresh register
-# (qb, qc, qd after the poem hall's qa — the named-register drill).
+# (qb, qc, qd, qe after the poem hall's qa — the named-register drill).
 _HE_WARP = '♄'                          # kept: relic name used by older saves/tests
+_HE_GOB_C0, _HE_GOB_GAP, _HE_GOB_N = 10, 4, 6   # goblin lair: 6 foes, spaced 4
 
 
 def _he_build_chambers(rng):
@@ -5364,9 +5365,20 @@ def _he_build_chambers(rng):
     stanzas = tuple(t for t in _RV_TRUE if t != _RV_LADY)
     rv_rows = tuple(((2, ln, 'ancient'),) for ln in (_RV_LADY,) + stanzas)
     rv_done = (_RV_LADY,) + _RV_TRUE
-    rv_tape = 'qdyy3jpq 3@d 0 j'
+    rv_tape = 'qdyy3jpq 3@d 0 2j'                 # ↓ into the goblin lair
     chambers.append({'rows': rv_rows, 'done': rv_done,
                      'span': (2, 55), 'plaques': (), 'tape': rv_tape})
+
+    # ── the Goblin Gauntlet, verbatim: a row of goblins felled by ;x. `fg`
+    #    sets last_f='g' and kills the first; the repeated `;x` (find the
+    #    next 'g', strike) is the macro unit. A west 'lair' label (no 'g')
+    #    keeps the row a recognised run once the lair is cleared. ──
+    gob_cols = tuple(range(_HE_GOB_C0, _HE_GOB_C0 + _HE_GOB_N * _HE_GOB_GAP, _HE_GOB_GAP))
+    gob_tape = f'fgx qe;xq {_HE_GOB_N - 2}@e 0 j'
+    chambers.append({'rows': (((_HE_TX, 'lair', 'ancient'),),),
+                     'done': ('lair',), 'span': (2, _HE_GOB_C0 + _HE_GOB_N * _HE_GOB_GAP),
+                     'plaques': (), 'goblins': gob_cols, 'combat': True,
+                     'tape': gob_tape})
     return chambers
 
 
@@ -5404,7 +5416,7 @@ def _he_gauntlet_map(chambers, seed) -> Room:
     open as its chamber reads true (sight floods down to the next), and the
     exit in the last band, demanding EVERY chamber true. Row 1 is the Echo
     Vault's sealed plaque band, wall-embedded exactly as in the source."""
-    chain = tuple((ch['done'], None) for ch in chambers)
+    chain = tuple((ch['done'], None, ch.get('combat', False)) for ch in chambers)
     ROWS = 2 + sum(len(ch['rows']) for ch in chambers) + len(chambers)
     C = _HE_COLS
     cells = [[CellType.WALL] * C for _ in range(ROWS)]
@@ -5412,13 +5424,18 @@ def _he_gauntlet_map(chambers, seed) -> Room:
     r = 2                                           # 0 border, 1 plaque band
     for ch in chambers:
         lo, hi = ch['span']
+        last_row = r
         for row in ch['rows']:
             for c in range(lo, hi + 1):
                 cells[r][c] = CellType.FLOOR
             for col, text, kind in row:
                 for piece_col, piece in _he_pieces(col, text):
                     room.char_runs.append(CharRun(r, piece_col, tuple(piece), kind))
+            last_row = r
             r += 1
+        for gc in ch.get('goblins', ()):            # the lair's stationary foes
+            room.entities.append(Entity(kind='goblin', row=last_row, col=gc,
+                                        hp=1, max_hp=1, ai=''))
         r += 1                                      # the stone band (gate shut)
     # The Echo Vault's plaque band: the true readings, sealed in the stone
     # above the lock row (wall cells — uncuttable, off the floor scans).

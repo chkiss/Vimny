@@ -1685,14 +1685,22 @@ def _hall_of_echoes_tick(room, player) -> list:
     if cur:
         runs.append(cur)
     oks = []
-    for k, (texts, colreq) in enumerate(chain):
+    for k, spec in enumerate(chain):
+        texts, colreq = spec[0], spec[1]
+        combat = spec[2] if len(spec) > 2 else False
         if k >= len(runs):
             oks.append(False)
             continue
-        got = tuple(t.strip() for _r, t in runs[k])
-        ok = got == tuple(texts)
-        if ok and colreq is not None:
-            ok = all(len(t) - len(t.lstrip()) == colreq for _r, t in runs[k])
+        if combat:
+            # the goblin lair reads true when every foe on its row is felled
+            rows_k = {r for r, _t in runs[k]}
+            ok = not any(e.alive and e.kind == 'goblin' and e.row in rows_k
+                         for e in room.entities)
+        else:
+            got = tuple(t.strip() for _r, t in runs[k])
+            ok = got == tuple(texts)
+            if ok and colreq is not None:
+                ok = all(len(t) - len(t.lstrip()) == colreq for _r, t in runs[k])
         oks.append(ok)
     gcol = _dg._HE_GATE_COL
     for k in range(min(len(chain) - 1, len(runs))):    # intermediate gates
