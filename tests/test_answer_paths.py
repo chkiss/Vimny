@@ -267,7 +267,7 @@ _REPLAY_OWN_TEST = {
     'build_dungeon_inscription_halls': 'test_inscription_halls.py::test_full_playthrough_wins_par_perfect',
     'build_dungeon_whole_line_annex':  'test_whole_line_annex.py::test_full_change_route_wins_par_perfect',
     'build_dungeon_change_extension':  'test_change_extension.py::test_full_change_route_wins_par_perfect',
-    'build_dungeon_sculpting_chambers': 'test_sculpting_chambers.py::test_full_votive_route_wins_par_perfect',
+    'build_dungeon_sculpting_chambers': 'test_sculpting_chambers.py::test_full_poem_route_wins_par_perfect',
     'build_dungeon_overwrite_halls':   'test_overwrite_halls.py::test_full_R_route_wins_par_perfect',
     'build_dungeon_case_chambers':     'test_case_chambers.py::test_full_case_route_wins_par_perfect',
     'build_dungeon_joiners_gate':      'test_joiners_gate.py::test_full_join_route_wins_par_perfect',

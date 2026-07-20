@@ -1959,10 +1959,11 @@ def _sc_leading_verse(room, r: int, c0: int, c1: int) -> str:
 
 
 def _sc_seal_row(room, c0: int, c1: int):
-    """The row whose floor verse leads with the votive's ANCHOR (its second
-    verse, always given, so always findable — 'gently' in the Row Your Boat
-    votive); the tablet's other slots are relative to it."""
-    anchor = getattr(room, '_sc_target', ('', 'seal'))[1]
+    """The row whose floor verse leads with the votive's ANCHOR (the line
+    whose HEAD is given from build — 'merrily' in the Row Your Boat tablet);
+    the tablet's other slots are relative to it."""
+    idx = getattr(room, '_sc_anchor', 1)
+    anchor = getattr(room, '_sc_target', ('', 'seal'))[idx]
     return next((r for r in range(room.rows)
                  if _sc_leading_verse(room, r, c0, c1) == anchor), None)
 
@@ -1977,7 +1978,7 @@ def _sc_realign_plaques(room) -> list:
     seal_row = _sc_seal_row(room, c0, c1)
     if seal_row is None:
         return []
-    base = 1                               # the anchor is the votive's 2nd verse
+    base = getattr(room, '_sc_anchor', 1)  # the anchor line's index in the votive
     slot = {w: seal_row + (target.index(w) - base) for w in target}
     moved = []
     for ru in [r for r in room.char_runs if r.kind == 'verdant']:
@@ -2009,13 +2010,22 @@ def _sculpting_chambers_tick(room, player) -> list:
     if moved:
         room._sc_twinkle = moved       # the render layer sparkles the re-laid plaques
     c0, c1 = room._sc_band
-    seq = [v for v in (_sc_leading_verse(room, r, c0, c1) for r in range(room.rows)) if v]
-    votive = tuple(seq) == tuple(target)
-    carve = getattr(room, '_sc_carve', '')
-    seal_row = _sc_seal_row(room, c0, c1)
-    toks = _wla_floor_text(room, seal_row)[c0:c1 + 1].split() if seal_row is not None else []
-    carved = bool(carve) and len(toks) >= 2 and toks[1] == carve
-    done = votive and carved
+    lines = getattr(room, '_sc_lines', None)
+    if lines:
+        # The FULL-POEM tablet: every inscribed row's floor text, top to
+        # bottom, must equal its line word for word (the A launch cell is a
+        # single bare col, so token-joining normalises it away).
+        seq = [' '.join(_wla_floor_text(room, r)[c0:c1 + 1].split())
+               for r in range(room.rows)]
+        done = [t for t in seq if t] == list(lines)
+    else:
+        seq = [v for v in (_sc_leading_verse(room, r, c0, c1) for r in range(room.rows)) if v]
+        votive = tuple(seq) == tuple(target)
+        carve = getattr(room, '_sc_carve', '')
+        seal_row = _sc_seal_row(room, c0, c1)
+        toks = _wla_floor_text(room, seal_row)[c0:c1 + 1].split() if seal_row is not None else []
+        carved = bool(carve) and len(toks) >= 2 and toks[1] == carve
+        done = votive and carved
     er, ec = room.exit_pos
     is_open = room.cells[er][ec] != CellType.WALL
     if done and not is_open:
@@ -2699,7 +2709,7 @@ _LEVEL_INTROS = {
     'inscription_halls':   ('The Inscription Halls — the words were never finished, and a river bars the way. Make them whole, and the water itself will yield.', 70),
     'whole_line_annex':    ('The Change Annex — old sayings run out of the carved stone onto the floor, and where they touch the floor they go wrong. You know every one. Change cuts what is wrong and writes what is right, in a single breath.', 70),
     'change_extension':    ('The Change Extension — deeper into the halls of broken sayings. Two strokes was the novice\'s way; a practised hand needs but one. Find where a single keystroke serves.', 70),
-    'sculpting_chambers':  ('The Sculpting Chambers — a boatman\'s round lies half-cut in the stone, one word to a line, its verses broken and its lines run dry. You have sung it since childhood; the vault keeps faith with the whole song, and nothing less.', 70),
+    'sculpting_chambers':  ('The Sculpting Chambers — a boatman\'s round lies half-cut in the stone — a line gone above, a line gone below, and what remains wounded at either end. You have sung it since childhood; the vault keeps faith with the whole song, and nothing less.', 70),
     'overwrite_halls':     ('The Overwrite Halls — old sayings run from the carved stone onto the floor, and their last words have rotted: some by a single stone, some in long streaks. You know how each one ends; mind which rot runs on.', 70),
     'case_chambers':       ('The Case Chambers — every word survives letter-perfect, yet every door stays shut. Look closer: the shapes of the letters lie. The plaques keep the true forms, small and tall.', 70),
     'joiners_gate':        ('The Joiner\'s Gate — the old inscriptions were split, line from line, and scattered down the stacks. What was one line must be one line again; the plaques remember how each read whole.', 70),
