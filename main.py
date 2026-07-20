@@ -4761,6 +4761,13 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
                             if block_ins is not None:
                                 block_ins['buf'] += ch   # replayed per row on Esc
                             insert_typed += ch           # '.' replays this on Esc
+                            if not edit_mode:
+                                # A buffer-content gate reads TRUE the instant the
+                                # cure is typed — open it mid-INSERT, no wait for
+                                # Esc (the Sight Sanctum Word chamber's single 's',
+                                # a Sculpting line's last glyph). The stateless
+                                # ticks re-bar if a later keystroke breaks the text.
+                                _content_ticks()
                         _animate_reflow_falls()
                         cur_ru = room.char_run_at(player.row, player.col)
                         if cur_ru is not None and cur_ru.kind == 'void':   # typed yourself off the ledge
