@@ -5219,121 +5219,173 @@ def build_dungeon_grandmasters_sanctum(seed: int) -> Dungeon:
     return dungeon
 
 
-# ── The Hall of Echoes (40: q @ " — macros + named registers) ────────────────
+# ── The Hall of Echoes (47: q @ " — the macro gauntlet) ──────────────────────
 #
-# Five ECHO ROWS — the same blighted verse copied down the hall, each row
-# needing the SAME two-part mend (daw the junk word, x the fused ◆ off the
-# last word) but bearing a DISTINCT last word, so each of the five
-# exact-text bolts answers only its own row (identical targets would let
-# one mended row open every bolt — the row-agnostic matching law). Two
-# different edits per row means the dot can only carry HALF the work; the
-# macro carries all of it: record the first mend (qa ^ w daw w x j q),
-# then 4@a replays it down the hall. Replayed keys are budget-free
-# (Budget.frozen — the engine's macro pricing), so par is the RECORDING
-# plus three keys of replay. The dot-assisted manual mend wins at 1★
-# under the hand-set budget; the :s routes (subst is already taught at
-# 39) cannot name the untypable ◆ except by char-class and land ~31 —
-# also 1★. The ^ at the macro's head is what makes it position-
-# independent (j exits each row mid-text; ^ renormalises).
-_HE_ROWS, _HE_COLS = 10, 54
-_HE_SPINE  = 22
-_HE_PLQ_COL = 2
-_HE_TEXT0  = 24
-_HE_ECHOES = (2, 3, 4, 5, 6)          # the five copies of the verse
-_HE_THROAT = 7
-_HE_GATE   = 8
-_HE_BOLTS  = {2: 23, 3: 24, 4: 25, 5: 26, 6: 27}
-_HE_EXIT   = (8, 28)                  # the FINAL SEAL, east of every bolt
-_HE_PAR    = 13                       # qa j ^ w daw w x q 4@a G $ — the j RIDES
-                                      # INSIDE the macro (record the row-advance,
-                                      # not a separate leading j; playtest 2026-07-17)
-_HE_BUDGET = 45                       # GENEROUS hand-set: the straight manual
-                                      # mend (43 — the dot can't ride at all,
-                                      # x is always the LAST change) wins 1★
+# REBUILT 2026-07-20 (user direction): a chain of SEVEN distinct rooms,
+# each opening SOUTH into the next once its work reads true. Rooms 0 and 1
+# are POEM HALLS: a famous 10-line rhyme with one deadpan intruder word
+# prepended to every line (same word-position — the first). The mend is
+# the same on every line (daw at the line head), so the macro carries it:
+# fix line 1 by hand, record `qa j daw q`, then 8@a. Room 1 is a SECOND
+# poem with the SAME blight — the recording persists, so 8@a alone clears
+# it (macros outlive the hall that taught them). Rooms 2–6 replay five
+# earlier halls' repetitive beats, one room each, this time with macros:
+#   2 — the Echo Vault's r-mend hops   (l re · w l re · @)
+#   3 — the Alignment Halls' >> gallery
+#   4 — the Joiner's Gate's split pairs (J)
+#   5 — the Inscription Halls' unfinished words (A + letter)
+#   6 — the Case Chambers' flipped rows (g~~)
+# Each room uses a FRESH register (a b c d e f) — the named-register drill.
+# Replayed keys are budget-free (Budget.frozen), so par is recordings plus
+# replay invocations; the all-manual road wins, at 1★ under the hand-set
+# budget (forcing by PAR).
+_HE_COLS  = 58
+_HE_TX    = 3                          # text head col in every room
+_HE_PAR    = 73                        # engine-measured: the full driven tape
+_HE_BUDGET = 220                       # GENEROUS hand-set: the all-manual
+                                       # road (198 measured) wins 1★
+
+# The poem pool — all PD, all 10 lines. The intruders are deadpan one-word
+# asides (the Norm law: understatement over punchline), one per line, all
+# prepended at word position 1 so `daw` at the head is the uniform mend.
+_HE_POEMS = (
+    ('solomon grundy',
+     ('Solomon Grundy,', 'Born on a Monday,', 'Christened on Tuesday,',
+      'Married on Wednesday,', 'Took ill on Thursday,', 'Worse on Friday,',
+      'Died on Saturday,', 'Buried on Sunday.', 'This is the end',
+      'Of Solomon Grundy.'),
+     ('Allegedly', 'Regrettably', 'Somehow', 'Foolishly', 'Conveniently',
+      'Predictably', 'Eventually', 'Reluctantly', 'Frankly', 'Anyway')),
+    ('hush little baby',
+     ("Hush little baby, don't say a word,",
+      "Papa's gonna buy you a mockingbird.",
+      "And if that mockingbird won't sing,",
+      "Papa's gonna buy you a diamond ring.",
+      'And if that diamond ring turns to brass,',
+      "Papa's gonna buy you a looking glass.",
+      'And if that looking glass gets broke,',
+      "Papa's gonna buy you a billy goat.",
+      "And if that billy goat won't pull,",
+      "Papa's gonna buy you a cart and bull."),
+     ('Legally', 'Allegedly', 'Realistically', 'Reluctantly', 'Tragically',
+      'Regardless', 'Eventually', 'Predictably', 'Ultimately', 'Somehow')),
+    ('ding dong bell',
+     ('Ding, dong, bell,', "Pussy's in the well.", 'Who put her in?',
+      'Little Johnny Flynn.', 'Who pulled her out?', 'Little Tommy Stout.',
+      'What a naughty boy was that,', 'To try to drown poor pussy cat,',
+      'Who never did him any harm,',
+      "But killed all the mice in the farmer's barn."),
+     ('Suddenly', 'Apparently', 'Honestly', 'Obviously', 'Miraculously',
+      'Naturally', 'Objectively', 'Sadly', 'Importantly', 'Also')),
+    ('three little kittens',
+     ('Three little kittens,', 'They lost their mittens,',
+      'And they began to cry,', 'Oh, mother dear,', 'We sadly fear,',
+      'Our mittens we have lost.', 'What! Lost your mittens,',
+      'You naughty kittens!', 'Then you shall have no pie.',
+      'Mee-ow, mee-ow, mee-ow.'),
+     ('Statistically', 'Carelessly', 'Understandably', 'Anyway', 'Frankly',
+      'Presumably', 'Wow', 'Historically', 'Legally', 'Finally')),
+    ('one two buckle my shoe',
+     ('One, two, buckle my shoe;', 'Three, four, knock at the door;',
+      'Five, six, pick up sticks;', 'Seven, eight, lay them straight;',
+      'Nine, ten, a big fat hen;', 'Eleven, twelve, dig and delve;',
+      'Thirteen, fourteen, maids a-courting;',
+      'Fifteen, sixteen, maids in the kitchen;',
+      'Seventeen, eighteen, maids in waiting;',
+      'Nineteen, twenty, my plate is empty.'),
+     ('Roughly', 'Impressively', 'Gingerly', 'Meticulously', 'Somehow',
+      'Tediously', 'Scandalously', 'Efficiently', 'Inexplicably',
+      'Mercifully')),
+)
+
+# The five replay chambers: (text rows laid, true rows demanded, seal col,
+# required head col or None, the room's karaoke tape). Seal col = where the
+# canonical tape's cursor stands before its final 2j drop.
+_HE_INDENT = 2                          # == engine.operator.INDENT_WIDTH
+_HE_ALIGN_WORDS = ('stone', 'mason', 'plumb', 'level', 'arch', 'lintel',
+                   'course', 'keystone')
+_HE_CHAMBERS = (
+    # 2 — the Echo Vault's beat: one long row of warped bells, r + hops
+    ((('bxll ' * 8).rstrip(),), (('bell ' * 8).rstrip(),), _HE_TX, None,
+     'l re qb w l re q 6@b ^ 2j'),
+    # 3 — the Alignment Halls' beat: every course one step shy of the plumb
+    (_HE_ALIGN_WORDS,
+     _HE_ALIGN_WORDS, _HE_TX + _HE_INDENT, _HE_TX + _HE_INDENT,
+     '>> qc j >> q 6@c 2j'),
+    # 4 — the Joiner's Gate's beat: six split peals, J closes each seam
+    (('ding', 'dong bell') * 6, ('ding dong bell',) * 6, 7, None,
+     'J qd j J q 4@d 2j'),
+    # 5 — the Sculpting Chambers' beat: every echo missing its first letter
+    # (A appends past the trailing floor — engine law — so the write-in
+    # replay is I at the head, not A at the tail)
+    (('choes',) * 6, ('echoes',) * 6, _HE_TX, None,
+     'Ie qe j Ie q 4@e 2j'),
+    # 6 — the Case Chambers' beat: every echo shouted, g~~ lowers it
+    (('ECHO',) * 6, ('echo',) * 6, _HE_TX, None,
+     'g~~ qf j g~~ q 4@f 2j'),
+)
 
 
-# SENSE, NOT DECREE (blueprints/sense_not_decree.md §1): the echoes are a
-# famous song's repeated line, whose LAST word is what varies verse to
-# verse — the one shape the hall's mechanics need (shared `a b`, distinct
-# tails). One song per seed; every entry shares the exact `a junk b ◆tail`
-# structure, so the macro and par are pool-invariant. All PD:
-_HE_SONGS = (
-    ('had', 'a', ('cow', 'pig', 'duck', 'hen', 'dog')),        # Old MacDonald
-    ('wash', 'our', ('face', 'hands', 'clothes', 'hair', 'feet')),  # Mulberry Bush
-    ('build', 'with', ('clay', 'mortar', 'steel', 'gold', 'pound')),  # London Bridge
-    ('buy', 'a', ('bird', 'ring', 'glass', 'goat', 'cart')),   # Hush Little Baby
-    ('grundy', 'on', ('monday', 'tuesday', 'friday', 'saturday', 'sunday')),
-)                                                              # Solomon Grundy
+def _he_room(text_rows, true_rows, seal_col, head_col, answer, seed,
+             *, ember_first_word=False, final=False) -> Room:
+    """One chamber of the gauntlet: text rows, a walk corridor beneath, and
+    a south seal that _hall_of_echoes_tick opens when the room reads true.
+    The last chamber's seal carries the real exit entity."""
+    n = len(text_rows)
+    ROWS, C = n + 4, _HE_COLS
+    cells = [[CellType.WALL] * C for _ in range(ROWS)]
+    for r in range(1, n + 2):                     # text rows + the corridor
+        for c in range(2, C - 2):
+            cells[r][c] = CellType.FLOOR
+    # row n+2: the seal band — stone but for the seal cell (opened by tick);
+    # row n+3: the outer wall.
 
-
-def _he_draw_words(rng) -> dict:
-    """One song, five tails; the junk word is seeded vocab, foreign to the
-    song (the blight the player recognises on sight)."""
-    _load_vocab_tables()
-
-    def pool(length):
-        return [w for w in _VOCAB_PLAIN_BY_LEN.get(length, ())
-                if w.isalpha() and w == w.lower()]
-
-    a, b, tails = _HE_SONGS[rng.randrange(len(_HE_SONGS))]
-    song_words = {a, b, *tails}
-    junk = rng.choice([w for w in pool(4) if w not in song_words])
-    return {'a': a, 'junk': junk, 'b': b, 'tails': tails}
+    room = Room(room_type=RoomType.ENTRY, rows=ROWS, cols=C)
+    room.cells = cells
+    room.seed  = seed
+    for i, line in enumerate(text_rows):
+        col = _HE_TX
+        for k, wd in enumerate(line.split(' ')):
+            kind = 'ember' if (ember_first_word and k == 0) else 'ancient'
+            room.char_runs.append(CharRun(1 + i, col, tuple(wd), kind))
+            col += len(wd) + 1
+    room._heg_true = {'texts': tuple(true_rows),
+                      'col': head_col}
+    room.spawn_pos = (1, _HE_TX)
+    room.exit_pos  = (n + 2, seal_col)
+    if final:
+        room.entities.append(Entity(kind='exit', row=n + 2, col=seal_col,
+                                    edit_immune=True))
+    room.rebuild_indexes()
+    apply_stone_fog(room)
+    room.answer = answer
+    return room
 
 
 def build_dungeon_hall_of_echoes(seed: int) -> Dungeon:
     """The Hall of Echoes (slug `hall_of_echoes`): q @ " — record the mend
-    once, and let the echo do the rest."""
+    once, and let the echo do the rest, hall after hall."""
     rng = random.Random(seed)
-    words = _he_draw_words(rng)
-
-    R, C = _HE_ROWS, _HE_COLS
-    cells = [[CellType.WALL] * C for _ in range(R)]
-    for r in range(1, _HE_GATE + 1):                     # the spine
-        cells[r][_HE_SPINE] = CellType.FLOOR
-    for r in _HE_ECHOES:                                 # the echo rows
-        for c in range(_HE_SPINE, 52):
-            cells[r][c] = CellType.FLOOR
-    for dc in _HE_BOLTS.values():                        # gate row + bolts
-        cells[_HE_GATE][dc] = CellType.WALL
-    for c in range(_HE_SPINE, _HE_EXIT[1]):
-        if c not in _HE_BOLTS.values():
-            cells[_HE_GATE][c] = CellType.FLOOR
-    # _HE_EXIT itself stays WALL — the final seal (chassis-standard).
-
-    room = Room(room_type=RoomType.ENTRY, rows=R, cols=C)
-    room.cells = cells
-    room.seed  = seed
-
-    doors = []
-    for i, r in enumerate(_HE_ECHOES):
-        tail = words['tails'][i]
-        # The verse: `aaa jjjj bbb ◆tail` — daw pulls the junk out whole,
-        # x strikes the fused glyph, and the row reads `aaa bbb tail`.
-        col = _HE_TEXT0
-        for part, kind in ((words['a'], 'ancient'), (words['junk'], 'ancient'),
-                           (words['b'], 'ancient'), ('◆' + tail, 'ember')):
-            room.char_runs.append(CharRun(r, col, tuple(part), kind))
-            col += len(part) + 1
-        target = f"{words['a']} {words['b']} {tail}"
-        # no west plaques: the song line is its own true reading (sense law)
-        doors.append(((target,), _HE_BOLTS[r]))
-    room._ss_doors = tuple(doors)                        # the shared exact-text tick
-    room._he_words = words
-
-    room.entities.append(Entity(kind='exit', row=_HE_EXIT[0], col=_HE_EXIT[1],
-                                edit_immune=True))
-    room.spawn_pos = (1, _HE_SPINE)
-    room.exit_pos  = _HE_EXIT
-
-    room.rebuild_indexes()
-    apply_stone_fog(room)
-    room.par    = _HE_PAR
-    room.budget = _HE_BUDGET
-    room.answer = 'qa j ^ w daw w x q 4@a G $'
+    i, j = rng.sample(range(len(_HE_POEMS)), 2)
+    rooms = []
+    for k, (poem_idx, tape) in enumerate(
+            ((i, 'daw qa j daw q 8@a 2j'), (j, 'daw 9@a 2j'))):
+        _name, lines, intr = _HE_POEMS[poem_idx]
+        laid = tuple(f'{intr[t]} {lines[t]}' for t in range(10))
+        room = _he_room(laid, lines, _HE_TX, None, tape, seed,
+                        ember_first_word=True)
+        room._he_poem = _HE_POEMS[poem_idx][0]
+        rooms.append(room)
+    n_ch = len(_HE_CHAMBERS)
+    for k, (laid, true, sc, hc, tape) in enumerate(_HE_CHAMBERS):
+        rooms.append(_he_room(laid, true, sc, hc, tape, seed,
+                              final=(k == n_ch - 1)))
+    for room in rooms:
+        room.par    = _HE_PAR
+        room.budget = _HE_BUDGET
 
     dungeon = Dungeon(name='The Hall of Echoes', seed=seed)
-    dungeon.rooms        = [room]
+    dungeon.rooms        = rooms
     dungeon.current_room = 0
     return dungeon
 

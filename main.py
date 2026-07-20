@@ -1590,6 +1590,35 @@ def _sight_sanctum_tick(room, player) -> list:
     return msgs
 
 
+def _hall_of_echoes_tick(room, player) -> list:
+    """The Hall of Echoes gauntlet — each room's SOUTH seal parts when the
+    room reads true. `room._heg_true` demands the exact non-blank row texts
+    in order and (for the alignment chamber) the head column. STATELESS +
+    undo-aware, the hardened-chassis pattern; row-count-agnostic so the
+    Joiner chamber's collapsing rows judge correctly."""
+    spec = getattr(room, '_heg_true', None)
+    if spec is None:
+        return []
+    msgs = []
+    texts, heads = [], []
+    for r in range(room.rows):
+        t = _wla_floor_text(room, r)
+        if t.strip():
+            texts.append(t.strip())
+            heads.append(len(t) - len(t.lstrip()))
+    ok = tuple(texts) == spec['texts']
+    if ok and spec['col'] is not None:
+        ok = all(h == spec['col'] for h in heads)
+    er, ec = room.exit_pos
+    is_open = room.cells[er][ec] != CellType.WALL
+    if ok and not is_open:
+        room.cells[er][ec] = CellType.FLOOR
+        msgs.append('The hall rings true — the way south grinds open!')
+    elif not ok and is_open and (player.row, player.col) != (er, ec):
+        room.cells[er][ec] = CellType.WALL         # undone — the seal returns
+    return msgs
+
+
 def _paragraph_enclosure_tick(room, player) -> list:
     """The Warden's Sigil — the Paragraph Enclosure's seal. Six brazier
     flames ride the three rows that must survive (spawn row · the rest
@@ -2655,7 +2684,7 @@ _LEVEL_INTROS = {
     'wet_ink': ('The Wet Ink — a writing ledge, an old saying mostly lost in the dark, and a gallery of cold braziers beneath it. Write its opening and you will know the rest. The scribes here wrote by firelight, and the fire answers only words already written.', 70),
     'g_sanctum': ('The Last Reach — three old sayings run east toward the flood. The keepers of this place went to the end of the line many times a day, and never once over it.', 70),
     'stair_rail': ('The Stair Rail — a broken stair winds down the shaft, each step\'s word set a little east of the last, and below the steps the floor falls a long way. The masons who cut these stairs never missed a landing.', 70),
-    'hall_of_echoes': ('The Hall of Echoes — an old song\'s refrain sung five times down the hall, each verse ending its own way, and every one blighted the same way. The hall listens.', 70),
+    'hall_of_echoes': ('The Hall of Echoes — hall opens onto hall, and every hall repeats itself. The stone remembers.', 70),
     'grandmasters_sanctum': ('The Grandmaster\'s Sanctum — a long gallery of seven proofs, and the master himself beyond the last stone, listening to every stroke. Nothing here is new; everything here is asked properly.', 70),
     'gauntlet': ('The Gauntlet — every hall you have walked, folded into one long descent. Two of its chambers have no doors at all, and two of its verses have not been written yet. Sixteen bolts, one seal. Nothing here is new. Everything here is final.', 70),
     'binders_reliquary': ('The Binder\'s Reliquary — still water splits the vault, too wide to step and too deep to wade. On the far shore a single word is legible, and beyond it, the binder\'s last work.', 70),
@@ -3373,9 +3402,23 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
         if level in ('sight_sanctum', 'selection_halls', 'word_enclosure',
                      'bracket_enclosure', 'brace_square_enclosure',
                      'quote_enclosure', 'tag_enclosure', 'sentence_enclosure',
-                     'hall_of_echoes', 'stair_rail', 'wet_ink'):
+                     'stair_rail', 'wet_ink'):
             for _m in _sight_sanctum_tick(room, player):   # the shared exact-text tick
                 _push(_m)
+        if level == 'hall_of_echoes':
+            for _m in _hall_of_echoes_tick(room, player):  # per-room south seal
+                _push(_m)
+            # Through an open seal: the gauntlet advances to the next hall.
+            if ((player.row, player.col) == tuple(room.exit_pos)
+                    and dungeon.current_room < len(dungeon.rooms) - 1
+                    and room.cells[room.exit_pos[0]][room.exit_pos[1]]
+                        != CellType.WALL):
+                dungeon.current_room += 1
+                room = dungeon.room
+                player.row, player.col = room.spawn_pos
+                undo_stack.clear()                 # each hall keeps its own past
+                redo_stack.clear()
+                _push('The passage opens on another hall.')
         if level == 'paragraph_enclosure':
             for _m in _paragraph_enclosure_tick(room, player):
                 _push(_m)

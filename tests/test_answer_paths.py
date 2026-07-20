@@ -159,6 +159,8 @@ _ANSWER_NOT_TOKENISED = {
     'build_dungeon_culling_ledger',    # ex-command tape (:2d⏎ …); tests/test_culling_ledger.py
     'build_dungeon_shelving_room',     # ex-command tape (:2m4⏎ …); tests/test_shelving_room.py
     'build_dungeon_refrain_vault',     # :s/&/:y/p tape; tests/test_refrain_vault.py
+    'build_dungeon_hall_of_echoes',    # 7-room macro-gauntlet tape (q/@, insert);
+                                       # tests/test_hall_of_echoes.py
 }
 
 # Levels with a documented NON-1.4 budget. The Change Annex / Extension use a
@@ -170,7 +172,7 @@ _NONSTANDARD_BUDGET = {
     'build_dungeon_overwrite_halls',   # TIGHT: par + _OH_SAVING − 1 bars the all-S route
     'build_dungeon_indentation_sanctum',  # GENEROUS hand-set: the manual-mason route wins 1★
     'build_dungeon_selection_halls',   # GENEROUS hand-set 110: the void-push forces visual p
-    'build_dungeon_hall_of_echoes',    # GENEROUS hand-set 45: straight manual (43) wins 1★
+    'build_dungeon_hall_of_echoes',    # GENEROUS hand-set 220: all-manual (198) wins 1★
     'build_dungeon_gauntlet',          # GENEROUS hand-set 140: ~10 insert doors invite typos
     'build_dungeon_culling_ledger',    # GENEROUS hand-set 60: the :s-blanking longhand (~39) wins 1★
     'build_dungeon_shelving_room',     # GENEROUS hand-set 40: the :t+:d / :s^ longhands win 1★
@@ -281,6 +283,8 @@ _REPLAY_OWN_TEST = {
     'build_dungeon_sentence_enclosure': 'test_sentence_enclosure.py::test_canonical_run_wins_at_par',
     'build_dungeon_wet_ink': 'test_g_bonus_levels.py::test_wi_canonical_wins_at_par',
     'build_dungeon_gauntlet': 'test_gauntlet.py::test_canonical_run_wins_at_par',
+    'build_dungeon_hall_of_echoes':
+        'test_hall_of_echoes.py::test_canonical_macro_run_wins_at_par',
 }
 
 

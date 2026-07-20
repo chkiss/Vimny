@@ -16,45 +16,53 @@
 #
 # SPDX-License-Identifier: GPL-3.0-or-later
 
-"""The Hall of Echoes (q @ "): five copies of one blighted verse; record
-the two-part mend once, replay it down the hall. Replayed keys are
-budget-free; the dot can only carry half of each mend."""
-import math
+"""The Hall of Echoes (q @ ") — the macro gauntlet, v2 (2026-07-20).
 
+Seven rooms chained by south seals: two poem halls (a famous 10-line rhyme
+with one deadpan intruder word prepended to every line — daw at the head,
+recorded once, replayed down the hall; the recording PERSISTS into hall
+two), then five replay chambers reprising earlier levels' repetitive beats
+with macros (Echo Vault r-hops, Alignment >>, Joiner J, Sculpting I, Case
+g~~), each on a fresh register. Replayed keys are budget-free; the
+all-manual road wins at 1★ under the hand-set budget."""
 import pytest
 from blessed.keyboard import Keystroke
 from blessed import Terminal
 
 import main
 from engine.world import CellType
+from engine import substitute as S
 from generation.dungeon_gen import (
     build_dungeon_hall_of_echoes,
-    _HE_ROWS, _HE_COLS, _HE_SPINE, _HE_ECHOES, _HE_THROAT, _HE_GATE,
-    _HE_BOLTS, _HE_EXIT, _HE_PAR, _HE_BUDGET,
+    _HE_COLS, _HE_TX, _HE_PAR, _HE_BUDGET, _HE_POEMS, _HE_CHAMBERS,
 )
-from tests import SEEDS, cached_room
+from tests import SEEDS
 
-
-def _room(seed=0):
-    return cached_room('build_dungeon_hall_of_echoes', seed)
+ESC = Keystroke('\x1b', code=361, name='KEY_ESCAPE')
 
 
 def _K(s):
-    return [Keystroke(ch) for ch in s]
+    return [ESC if ch == '\x1b' else Keystroke(ch) for ch in s]
 
 
-# The canonical tape (== room.answer): the j RIDES INSIDE the macro — record
-# the row-advance as the macro's FIRST key, not a separate leading j, so the
-# recording mends the first echo and every replay steps down first. ^
-# renormalises the column, making the macro position-independent; 4@a replays
-# down the hall. (Recording the j saves the redundant leading j — 13, not 14.)
-CANON = 'qaj^wdawwxq4@aG$'
+# The canonical tape across all seven rooms (Esc written as \x1b; each
+# room's slice == its room.answer with separators dropped and Esc added).
+CANON = ('daw' 'qa' 'jdaw' 'q' '8@a' '2j'          # poem hall A
+         'daw' '9@a' '2j'                          # poem hall B: @a persists
+         'lre' 'qb' 'wlre' 'q' '6@b' '^2j'         # Echo Vault beat
+         '>>' 'qc' 'j>>' 'q' '6@c' '2j'            # Alignment beat
+         'J' 'qd' 'jJ' 'q' '4@d' '2j'              # Joiner beat
+         'Ie\x1b' 'qe' 'jIe\x1b' 'q' '4@e' '2j'    # Sculpting beat
+         'g~~' 'qf' 'jg~~' 'q' '4@f' '2j')         # Case beat → exit
 
-# The leanest old-only rival: the straight manual mend, five times over.
-# The dot cannot ride here at all — each mend ends with x, so `.` never
-# holds the daw when the next row needs it (the two-changes-per-row law).
-# Wins, at 1★ (43 ≤ budget 45 > par 13).
-RIVAL = 'j' + '^wdawwxj' * 5 + 'G$'
+# The all-manual road: every mend by hand. Wins, at 1★ (198 ≤ budget 220).
+MANUAL = ('daw' + 'jdaw' * 9 + '2j'
+          + 'daw' + 'jdaw' * 9 + '2j'
+          + 'lre' + 'wlre' * 7 + '^2j'
+          + '>>' + 'j>>' * 7 + '2j'
+          + 'J' + 'jJ' * 5 + '2j'
+          + 'Ie\x1b' + 'jIe\x1b' * 5 + '2j'
+          + 'g~~' + 'jg~~' * 5 + '2j')
 
 
 def _drive(dungeon, keys, monkeypatch, finish=':wq\r', name='Scribe'):
@@ -65,7 +73,7 @@ def _drive(dungeon, keys, monkeypatch, finish=':wq\r', name='Scribe'):
                  '_heart_container_animation', '_unlock_animation',
                  '_void_fall_animation', '_drown_animation'):
         monkeypatch.setattr(main, anim, lambda *a, **k: None)
-    monkeypatch.setattr(Terminal, 'height', property(lambda self: 41))
+    monkeypatch.setattr(Terminal, 'height', property(lambda self: 45))
     term = Terminal()
     it = iter(keys)
     monkeypatch.setattr(term, 'inkey', lambda *a, **k: next(it, Keystroke('')))
@@ -73,144 +81,123 @@ def _drive(dungeon, keys, monkeypatch, finish=':wq\r', name='Scribe'):
                             _dungeon=dungeon)
 
 
-def _drive_spent(keys, monkeypatch, seed=0):
+def _drive_spent(dungeon, keys, monkeypatch):
     box = {}
     orig = main._calc_stars
     monkeypatch.setattr(main, '_calc_stars',
                         lambda won, budget, room, player, level='':
                             (box.__setitem__('spent', budget.spent),
                              orig(won, budget, room, player, level))[1])
-    result = _drive(build_dungeon_hall_of_echoes(seed), keys, monkeypatch)
-    return result['won'], box.get('spent')
+    result = _drive(dungeon, keys, monkeypatch)
+    return result, box.get('spent')
 
 
 # ── structure ─────────────────────────────────────────────────────────────────
 
 @pytest.mark.parametrize("seed", SEEDS)
-def test_layout_and_identity(seed):
-    room = _room(seed)
-    assert (room.rows, room.cols) == (_HE_ROWS, _HE_COLS)
-    assert room.spawn_pos == (1, _HE_SPINE)
-    assert room.exit_pos == _HE_EXIT
-    exit_ent = next(e for e in room.entities if e.kind == 'exit')
-    assert (exit_ent.row, exit_ent.col) == _HE_EXIT and exit_ent.edit_immune
+def test_seven_rooms_and_two_distinct_poems(seed):
+    d = build_dungeon_hall_of_echoes(seed)
+    assert len(d.rooms) == 7
+    assert d.rooms[0]._he_poem != d.rooms[1]._he_poem
+    for room in d.rooms:
+        assert room.cols == _HE_COLS
+        assert room.par == _HE_PAR and room.budget == _HE_BUDGET
+        er, ec = room.exit_pos
+        assert room.cells[er][ec] == CellType.WALL     # every seal starts shut
+    # only the LAST room carries the real exit entity
+    for k, room in enumerate(d.rooms):
+        has_exit = any(e.kind == 'exit' for e in room.entities)
+        assert has_exit == (k == len(d.rooms) - 1)
+
+
+def test_poem_pool_shape():
+    # Every poem: 10 lines, 10 intruders, one intruder PREPENDED per line
+    # (the same word-position — the first), lines ≤ the room's floor width.
+    assert len(_HE_POEMS) == 5
+    for _name, lines, intr in _HE_POEMS:
+        assert len(lines) == 10 and len(intr) == 10
+        for w in intr:
+            assert w.isalpha()                  # daw takes it whole
+        for ln, w in zip(lines, intr):
+            assert len(w) + 1 + len(ln) <= _HE_COLS - _HE_TX - 3
 
 
 @pytest.mark.parametrize("seed", SEEDS)
-def test_par_answer_budget(seed):
-    room = _room(seed)
-    assert room.par == _HE_PAR
-    assert room.budget == _HE_BUDGET          # GENEROUS hand-set (non-1.4)
-    assert room.answer == 'qa j ^ w daw w x q 4@a G $'
+def test_poem_rooms_lay_intruder_plus_true_line(seed):
+    d = build_dungeon_hall_of_echoes(seed)
+    for room in d.rooms[:2]:
+        _name, lines, intr = next(p for p in _HE_POEMS if p[0] == room._he_poem)
+        for i in range(10):
+            t = S.line_text(room, 1 + i)[0].strip()
+            assert t == f'{intr[i]} {lines[i]}'
+            assert t != lines[i]
 
 
-@pytest.mark.parametrize("seed", SEEDS)
-def test_exit_and_bolts_start_sealed(seed):
-    room = _room(seed)
-    for dc in _HE_BOLTS.values():
-        assert room.cells[_HE_GATE][dc] == CellType.WALL
-    assert room.cells[_HE_EXIT[0]][_HE_EXIT[1]] == CellType.WALL
+def test_chamber_specs_match_their_beats():
+    # 5 replay chambers; each demands the exact true rows; the alignment
+    # chamber alone demands a head column.
+    assert len(_HE_CHAMBERS) == 5
+    cols = [hc for _l, _t, _sc, hc, _a in _HE_CHAMBERS]
+    assert sum(1 for c in cols if c is not None) == 1
 
 
-@pytest.mark.parametrize("seed", SEEDS)
-def test_echo_rows_are_identical_but_for_the_tail(seed):
-    room = _room(seed)
-    w = room._he_words
-    for i, r in enumerate(_HE_ECHOES):
-        text = main._wla_floor_text(room, r).strip()
-        assert text == f"{w['a']} {w['junk']} {w['b']} ◆{w['tails'][i]}"
-    assert len(set(w['tails'])) == 5          # five DISTINCT doors
-
-
-@pytest.mark.parametrize("seed", SEEDS)
-def test_targets_are_distinct_and_not_already_true(seed):
-    room = _room(seed)
-    texts = {main._wla_floor_text(room, r).strip() for r in range(room.rows)}
-    targets = [t for (ts, _dc) in room._ss_doors for t in ts]
-    assert len(set(targets)) == 5
-    for t in targets:
-        assert t not in texts
-
-
-@pytest.mark.parametrize("seed", SEEDS)
-def test_throat_is_spine_only(seed):
-    room = _room(seed)
-    cols = [c for c in range(room.cols) if room.is_passable(_HE_THROAT, c)]
-    assert cols == [_HE_SPINE]
-
-
-# ── playthroughs ─────────────────────────────────────────────────────────────
+# ── the driven gauntlet ──────────────────────────────────────────────────────
 
 @pytest.mark.parametrize("seed", SEEDS)
 def test_canonical_macro_run_wins_at_par(seed, monkeypatch):
-    won, spent = _drive_spent(_K(CANON), monkeypatch, seed)
-    assert won and spent == _HE_PAR
+    d = build_dungeon_hall_of_echoes(seed)
+    result, spent = _drive_spent(d, _K(CANON), monkeypatch)
+    assert result['won'] and result['stars'] == 2
+    assert spent == _HE_PAR
+    assert d.current_room == len(d.rooms) - 1
 
 
-@pytest.mark.parametrize("seed", SEEDS)
-def test_dot_manual_rival_wins_at_one_star(seed, monkeypatch):
-    room = _room(seed)
-    won, spent = _drive_spent(_K(RIVAL), monkeypatch, seed)
-    assert won and _HE_PAR < spent <= room.budget
+def test_all_manual_road_wins_one_star(monkeypatch):
+    d = build_dungeon_hall_of_echoes(0)
+    result, spent = _drive_spent(d, _K(MANUAL), monkeypatch)
+    assert result['won'] and result['stars'] == 1
+    assert _HE_PAR < spent <= _HE_BUDGET
 
 
-def test_replayed_keys_are_budget_free(monkeypatch):
-    # The whole point of the pricing: 4@a costs 3, not 4× the macro body.
-    dungeon = build_dungeon_hall_of_echoes(0)
-    box = {}
-    orig = main._calc_stars
-    monkeypatch.setattr(main, '_calc_stars',
-                        lambda won, budget, room, player, level='':
-                            (box.__setitem__('spent', budget.spent),
-                             orig(won, budget, room, player, level))[1])
-    _drive(dungeon, _K(CANON), monkeypatch)
-    assert box['spent'] == _HE_PAR
+def test_first_hall_macro_clears_the_second_hall(monkeypatch):
+    # The recording persists across the seal: in hall two, daw + 9@a alone
+    # mends the whole poem (no re-recording).
+    d = build_dungeon_hall_of_echoes(0)
+    tape = 'daw' 'qa' 'jdaw' 'q' '8@a' '2j' 'daw' '9@a'
+    _drive(d, _K(tape), monkeypatch, finish=':q!\r')
+    assert d.current_room == 1
+    room = d.rooms[1]
+    _name, lines, _intr = next(p for p in _HE_POEMS if p[0] == room._he_poem)
+    for i in range(10):
+        assert S.line_text(room, 1 + i)[0].strip() == lines[i]
 
 
-def test_macro_records_the_mend(monkeypatch):
-    dungeon = build_dungeon_hall_of_echoes(0)
-    room = dungeon.rooms[0]
-    seen = {}
-    orig = main._enemy_tick
-
-    def spy(room_, player):
-        seen['p'] = player
-        return orig(room_, player)
-
-    monkeypatch.setattr(main, '_enemy_tick', spy)
-    _drive(dungeon, _K('jqa^wdawwxjq'), monkeypatch, finish=':q!\r')
-    assert seen['p'].macros.get('a') == '^wdawwxj'
+def test_solved_hall_opens_south_and_advances(monkeypatch):
+    d = build_dungeon_hall_of_echoes(0)
+    room0 = d.rooms[0]
+    tape = 'daw' 'qa' 'jdaw' 'q' '8@a'
+    _drive(d, _K(tape), monkeypatch, finish=':q!\r')
+    er, ec = room0.exit_pos
+    assert room0.cells[er][ec] == CellType.FLOOR      # the south seal parted
+    assert d.current_room == 0                        # not stepped through yet
+    d2 = build_dungeon_hall_of_echoes(0)
+    _drive(d2, _K(tape + '2j'), monkeypatch, finish=':q!\r')
+    assert d2.current_room == 1                       # stepping south advances
 
 
-def test_one_mended_row_opens_only_its_own_bolt(monkeypatch):
-    # Distinct tails: the row-agnostic matcher must not open sibling bolts.
-    dungeon = build_dungeon_hall_of_echoes(0)
-    room = dungeon.rooms[0]
-    _drive(dungeon, _K('j^wdawwx'), monkeypatch, finish=':q!\r')
-    assert room.cells[_HE_GATE][_HE_BOLTS[2]] == CellType.FLOOR
-    for r in _HE_ECHOES[1:]:
-        assert room.cells[_HE_GATE][_HE_BOLTS[r]] == CellType.WALL
+def test_undo_rebars_the_south_seal(monkeypatch):
+    d = build_dungeon_hall_of_echoes(0)
+    room0 = d.rooms[0]
+    tape = 'daw' 'qa' 'jdaw' 'q' '8@a' 'u'
+    _drive(d, _K(tape), monkeypatch, finish=':q!\r')
+    er, ec = room0.exit_pos
+    assert room0.cells[er][ec] == CellType.WALL
 
 
-def test_half_mend_leaves_the_bolt_barred(monkeypatch):
-    # daw alone (the dot's share) is not the mend — the ◆ still stands.
-    dungeon = build_dungeon_hall_of_echoes(0)
-    room = dungeon.rooms[0]
-    _drive(dungeon, _K('j^wdaw'), monkeypatch, finish=':q!\r')
-    assert room.cells[_HE_GATE][_HE_BOLTS[2]] == CellType.WALL
-
-
-def test_undo_rebars_an_open_bolt(monkeypatch):
-    dungeon = build_dungeon_hall_of_echoes(0)
-    room = dungeon.rooms[0]
-    _drive(dungeon, _K('j^wdawwxu'), monkeypatch, finish=':q!\r')
-    assert room.cells[_HE_GATE][_HE_BOLTS[2]] == CellType.WALL
-
-
-# ── teleport audit ───────────────────────────────────────────────────────────
-
-def test_no_jump_lands_on_the_sealed_exit(monkeypatch):
-    dungeon = build_dungeon_hall_of_echoes(0)
+def test_no_jump_lands_on_a_sealed_south_door(monkeypatch):
+    # G from spawn lands the corridor row (last standable), never the seal.
+    d = build_dungeon_hall_of_echoes(0)
+    room0 = d.rooms[0]
     seen = {}
     orig = main._calc_stars
 
@@ -219,22 +206,15 @@ def test_no_jump_lands_on_the_sealed_exit(monkeypatch):
         return orig(won, budget, room_, player, level)
 
     monkeypatch.setattr(main, '_calc_stars', spy)
-    result = _drive(dungeon, _K('G$'), monkeypatch, finish=':wq\r')
+    result = _drive(d, _K('G'), monkeypatch, finish=':wq\r')
     assert not result['won']
-    assert seen['pos'][1] < _HE_EXIT[1], seen
+    assert seen['pos'][0] == room0.exit_pos[0] - 1    # the corridor, not the seal
+    assert d.current_room == 0
 
 
-@pytest.mark.parametrize("seed", SEEDS)
-def test_exit_unreachable_until_all_true(seed):
-    from collections import deque
-    room = _room(seed)
-    seen, dq = {room.spawn_pos}, deque([room.spawn_pos])
-    while dq:
-        r, c = dq.popleft()
-        for dr, dc in ((0, 1), (0, -1), (1, 0), (-1, 0)):
-            nr, nc = r + dr, c + dc
-            if (nr, nc) not in seen and 0 <= nr < room.rows and 0 <= nc < room.cols \
-                    and room.is_passable(nr, nc):
-                seen.add((nr, nc))
-                dq.append((nr, nc))
-    assert _HE_EXIT not in seen
+# ── curriculum ────────────────────────────────────────────────────────────────
+
+def test_curriculum_entry():
+    from content.levels import _BY_SLUG
+    lv = _BY_SLUG['hall_of_echoes']
+    assert lv['teaches'] == ['q', '@', 'reg_named']
