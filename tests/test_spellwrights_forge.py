@@ -200,14 +200,14 @@ def test_chamber_C_strikes_the_static_and_keeps_the_rhyme():
 
 def test_sanctum_scroll_chest_present_and_survives_the_sweep():
     # The reward that balances the empty sanctum: an unassigned chest (→ a
-    # random relic scroll) at row 13, last column — ABOVE every falling row,
+    # random relic scroll) at row 10, last column — ABOVE every falling row,
     # so :g/krzzt/d never collapses it out of the buffer.
     from engine.world import CellType
     d = dg.build_dungeon_spellwrights_forge(1)
     room = d.room
     chest = [e for e in room.entities if e.kind == 'chest_scroll']
     assert len(chest) == 1
-    assert (chest[0].row, chest[0].col) == dg._FORGE_CHEST == (13, dg._FORGE_COLS - 2)
+    assert (chest[0].row, chest[0].col) == dg._FORGE_CHEST == (10, dg._FORGE_COLS - 2)
     assert chest[0].scroll_id in (None, '')          # unassigned → random relic
     assert dg._FORGE_CHEST[0] < min(r for r, _ in dg._FORGE_C_CURSED)
     _run('spellwrights_forge', list(':g/krzzt/d') + ['\r'] + list(':q!') + ['\r'],

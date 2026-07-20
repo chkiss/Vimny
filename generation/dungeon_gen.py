@@ -8416,14 +8416,15 @@ _FORGE_A_WARDS   = [(2, 'the duck says moo moo here'),
 _FORGE_B_CORRUPT = [(8, 'the mouse ran down the clock'),
                     (10, 'the mouse ran down the clock again')]
 _FORGE_B_KEEP    = (9, 'the clock struck one and the mouse ran down')
-# (Rows start at 14, NOT 13: :g/…/d REMOVES rows and destroys entities on them,
-# and the sanctum's scroll chest sits on row 13 — the litany begins below it.)
+# (:g/…/d REMOVES rows and destroys entities on them — the sanctum's scroll
+# chest must sit ABOVE every cursed row; it sits on row 10, in the sanctum
+# east of the divider, so no workroom edit or cull can ever reach it.)
 _FORGE_C_CURSED  = [(14, 'krzzt vrm blug krzzt'),
                     (16, 'splug krzzt gnnn'),
                     (18, 'krzzt krzzt fzzzp')]
 _FORGE_C_KEEP    = [(15, 'twinkle twinkle little star'),
                     (17, 'how i wonder what you are')]
-_FORGE_CHEST     = (13, _FORGE_COLS - 2)   # sanctum scroll chest (random relic —
+_FORGE_CHEST     = (10, _FORGE_COLS - 2)   # sanctum scroll chest (random relic —
                                            # the forge names no scroll drop)
 
 
@@ -8483,7 +8484,7 @@ def build_dungeon_spellwrights_forge(seed: int) -> Dungeon:
     room.entities = [
         Entity(kind='exit',         row=_FORGE_DOOR, col=COLS - 2),
         # The sanctum's reward: an unassigned chest → a random relic scroll.
-        # Row 13 — ABOVE every cursed row, so :g/cursed/d never collapses it.
+        # ABOVE every cursed row, so :g/krzzt/d never collapses it.
         Entity(kind='chest_scroll', row=_FORGE_CHEST[0], col=_FORGE_CHEST[1]),
     ]
     # The seal: the divider cell on the corridor row.  main._forge_check opens it once the
