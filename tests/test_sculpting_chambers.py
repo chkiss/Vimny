@@ -30,9 +30,9 @@ from engine.world import CellType
 from content.levels import known_commands
 from generation.dungeon_gen import (
     build_dungeon_sculpting_chambers,
-    _SC_ROWS, _SC_COLS, _SC_PAR, _SC_TARGET, _SC_BAND, _SC_LINES,
+    _SC_ROWS, _SC_COLS, _SC_PAR, _SC_TARGET, _SC_BAND, _SC_LINES, _SC_COMPLETIONS,
     _SC_I_ROW, _SC_A_ROW, _SC_WCOL, _SC_PLQ, _SC_EXIT_COL, _SC_EXIT_ROW0,
-    _SC_I_GIVEN, _SC_A_GIVEN, _SC_I_TYPED, _SC_A_TYPED, _SC_ANSWER,
+    _SC_I_GIVEN, _SC_A_GIVEN, _SC_I_TYPED, _SC_A_TYPED, _SC_ANSWER, _SC_A_END,
 )
 
 import math
@@ -52,13 +52,14 @@ def _K(s):
     return [Keystroke(ch) for ch in s]
 
 
-# The canonical route runs TOP-TO-BOTTOM, one insert-entry per line:
-# O line1 · j · I 'gently down ' · j · A line3's rest · o line4 · j onto the door.
+# The canonical route runs TOP-TO-BOTTOM, one insert-entry per line, each
+# COMPLETING the line (the plaque already holds the first word):
+# O comp0 · j · I 'down ' · j · A comp2's rest · o comp3 · j onto the door.
 def _canon_keys():
-    return (_K('O') + _K(_SC_LINES[0]) + [ESC] + _K('j')
+    return (_K('O') + _K(_SC_COMPLETIONS[0]) + [ESC] + _K('j')
             + _K('I') + _K(_SC_I_TYPED) + [ESC] + _K('j')
             + _K('A') + _K(_SC_A_TYPED) + [ESC]
-            + _K('o') + _K(_SC_LINES[3]) + [ESC]
+            + _K('o') + _K(_SC_COMPLETIONS[3]) + [ESC]
             + _K('j'))
 
 
@@ -79,7 +80,8 @@ def _drive(dungeon, keys, monkeypatch, finish=':wq\r', name='Scribe'):
 
 
 def _poem_rows(room):
-    """The nonempty floor-band texts, top to bottom, space-normalised."""
+    """The nonempty floor-band texts (the COMPLETIONS), top to bottom,
+    space-normalised."""
     c0, c1 = _SC_BAND
     seq = [' '.join(main._wla_floor_text(room, r)[c0:c1 + 1].split())
            for r in range(room.rows)]
@@ -196,18 +198,23 @@ def test_par_is_the_measured_route_cost(monkeypatch):
 
 @pytest.mark.parametrize("seed", SEEDS)
 def test_the_door_opens_when_the_whole_poem_reads(seed, monkeypatch):
-    """Drive the route, then read the tablet: the four full lines stand in
-    order and the door is FLOOR. The longest line has outgrown the room's
-    build width — A carved past it."""
+    """Drive the route, then read the tablet: the four COMPLETIONS stand in
+    order (the plaque holds each head) and the door is FLOOR. The A line's
+    completion has been CARVED east into the stone that was solid at build."""
     dungeon = build_dungeon_sculpting_chambers(seed)
     room = dungeon.rooms[0]
     _drive(dungeon, _canon_keys(), monkeypatch, finish=':q!\r')
-    assert _poem_rows(room) == list(_SC_LINES)
+    assert _poem_rows(room) == list(_SC_COMPLETIONS)
     er, ec = room.exit_pos
     assert room.cells[er][ec] == CellType.FLOOR
-    assert _SC_WCOL + len(_SC_LINES[2]) > _SC_COLS - 1, \
-        "the A line must overrun the build width"
-    assert room.cols > _SC_COLS, "the buffer doubled under the carve"
+    # A carved a corridor: cells east of the given head that were WALL at build
+    # are now FLOOR bearing the completion's tail.
+    a_row = next(r for r in range(room.rows)
+                 if main._wla_floor_text(room, r).split()[:1] == ['merrily'])
+    assert _SC_WCOL + len(_SC_COMPLETIONS[2]) - 1 > _SC_A_END, \
+        "the A completion must run east past the build floor (into stone)"
+    assert room.cells[a_row][_SC_A_END + 3] == CellType.FLOOR, \
+        "the stone east of the launch cell was carved to floor"
 
 
 # ── each of I A o O is necessary (drop one → no win) ───────────────────────────
@@ -216,14 +223,14 @@ _DROP = {
     'O':  _K('j')
           + _K('I') + _K(_SC_I_TYPED) + [ESC] + _K('j')
           + _K('A') + _K(_SC_A_TYPED) + [ESC]
-          + _K('o') + _K(_SC_LINES[3]) + [ESC] + _K('j'),
-    'I':  _K('O') + _K(_SC_LINES[0]) + [ESC] + _K('jj')
+          + _K('o') + _K(_SC_COMPLETIONS[3]) + [ESC] + _K('j'),
+    'I':  _K('O') + _K(_SC_COMPLETIONS[0]) + [ESC] + _K('jj')
           + _K('A') + _K(_SC_A_TYPED) + [ESC]
-          + _K('o') + _K(_SC_LINES[3]) + [ESC] + _K('j'),
-    'A':  _K('O') + _K(_SC_LINES[0]) + [ESC] + _K('j')
+          + _K('o') + _K(_SC_COMPLETIONS[3]) + [ESC] + _K('j'),
+    'A':  _K('O') + _K(_SC_COMPLETIONS[0]) + [ESC] + _K('j')
           + _K('I') + _K(_SC_I_TYPED) + [ESC] + _K('j')
-          + _K('o') + _K(_SC_LINES[3]) + [ESC] + _K('j'),
-    'o':  _K('O') + _K(_SC_LINES[0]) + [ESC] + _K('j')
+          + _K('o') + _K(_SC_COMPLETIONS[3]) + [ESC] + _K('j'),
+    'o':  _K('O') + _K(_SC_COMPLETIONS[0]) + [ESC] + _K('j')
           + _K('I') + _K(_SC_I_TYPED) + [ESC] + _K('j')
           + _K('A') + _K(_SC_A_TYPED) + [ESC] + _K('jj'),
 }
@@ -256,7 +263,7 @@ def test_a_wrong_line_keeps_the_door_shut(monkeypatch):
     keys = (_K('O') + _K('row row row your goat') + [ESC] + _K('j')
             + _K('I') + _K(_SC_I_TYPED) + [ESC] + _K('j')
             + _K('A') + _K(_SC_A_TYPED) + [ESC]
-            + _K('o') + _K(_SC_LINES[3]) + [ESC] + _K('j'))
+            + _K('o') + _K(_SC_COMPLETIONS[3]) + [ESC] + _K('j'))
     dungeon = build_dungeon_sculpting_chambers(SEEDS[0])
     assert not _drive(dungeon, keys, monkeypatch)['won']
 
@@ -267,7 +274,7 @@ def test_line1_is_above_and_line4_is_below_the_given_lines(monkeypatch):
     dungeon = build_dungeon_sculpting_chambers(SEEDS[0])
     room = dungeon.rooms[0]
     _drive(dungeon, _canon_keys(), monkeypatch, finish=':q!\r')
-    assert _poem_rows(room) == list(_SC_LINES)   # top-to-bottom order holds
+    assert _poem_rows(room) == list(_SC_COMPLETIONS)   # top-to-bottom order holds
 
 
 # ── undo re-seals the door (stateless tick) ───────────────────────────────────
@@ -277,7 +284,7 @@ def test_undo_reseals_the_door(monkeypatch):
     room = dungeon.rooms[0]
     keys = _canon_keys()[:-1] + _K('u')          # undo the last line-write
     _drive(dungeon, keys, monkeypatch, finish=':q!\r')
-    assert _poem_rows(room) != list(_SC_LINES)
+    assert _poem_rows(room) != list(_SC_COMPLETIONS)
     er, ec = room.exit_pos
     assert room.cells[er][ec] == CellType.WALL, "door re-sealed"
 
@@ -286,21 +293,28 @@ def test_undo_reseals_the_door(monkeypatch):
 
 def test_plaques_realign_with_their_lines_after_inserts(monkeypatch):
     """o/O row-inserts drift the plaques; the tick re-lays each onto its
-    line's slot (relative to the merrily anchor). After the full route every
-    plaque sits DIRECTLY WEST of the line it names."""
+    line's slot (relative to the merrily anchor). After the full route the
+    plaques stand IN ORDER, one per completion row, directly west — the
+    plaque supplies each line's head and the floor its completion."""
     dungeon = build_dungeon_sculpting_chambers(SEEDS[0])
     room = dungeon.rooms[0]
     _drive(dungeon, _canon_keys(), monkeypatch, finish=':q!\r')
     c0, c1 = _SC_BAND
-    line_row = {main._wla_floor_text(room, r)[c0:c1 + 1].split()[0]: r
-                for r in range(room.rows)
-                if main._wla_floor_text(room, r)[c0:c1 + 1].split()}
+    completion_rows = [r for r in range(room.rows)
+                       if main._wla_floor_text(room, r)[c0:c1 + 1].split()]
+    plaques = sorted((ru.row, ''.join(ru.symbols)) for ru in room.char_runs
+                     if ru.kind == 'verdant')
+    # the four plaques sit on the four completion rows, in top-to-bottom order,
+    # each naming its line's first word
+    assert [row for row, _w in plaques] == completion_rows
+    assert [w for _row, w in plaques] == list(_SC_TARGET)
     for ru in room.char_runs:
-        if ru.kind != 'verdant':
-            continue
-        word = ''.join(ru.symbols)
-        assert ru.row == line_row[word], f"plaque {word!r} drifted off its line"
-        assert ru.col == _SC_PLQ
+        if ru.kind == 'verdant':
+            assert ru.col == _SC_PLQ
+    # and each plaque's head + its floor completion reconstitutes the full line
+    for (row, head), full in zip(plaques, _SC_LINES):
+        floor = ' '.join(main._wla_floor_text(room, row)[c0:c1 + 1].split())
+        assert f'{head} {floor}' == full
 
 
 # ── curriculum + karaoke ──────────────────────────────────────────────────────

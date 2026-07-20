@@ -10655,26 +10655,35 @@ _SC_LINES = ('row row row your boat',
              'merrily merrily merrily merrily',
              'life is but a dream')
 _SC_TARGET = tuple(ln.split()[0] for ln in _SC_LINES)   # the plaques: first words
+# PLAYTEST 2026-07-20: the plaque GIVES each line's first word — the player
+# only COMPLETES the line (types everything AFTER the first word), never
+# reproducing the plaque. So the FLOOR holds the completion (line minus its
+# first word); the tick checks that, and the plaque supplies the head.
+_SC_COMPLETIONS = tuple(ln.split(' ', 1)[1] for ln in _SC_LINES)
 _SC_ANCHOR_IDX = 2                  # the plaque anchor: line 3's head is given from build
-_SC_I_TYPED = 'gently down '        # I prepends this (the tail slides east 12)
-_SC_A_TYPED = 'merrily merrily'     # A appends this past the floor's east edge
-_SC_I_GIVEN = 'the stream'          # line 2's surviving tail
-_SC_A_GIVEN = 'merrily merrily'     # line 3's surviving head
-_SC_I_END  = _SC_WCOL + len(_SC_LINES[1]) + 1          # the I line's floor: room for the push
-_SC_A_END  = _SC_WCOL + len(_SC_A_GIVEN)               # the A line's floor: given + the launch cell
-_SC_EXIT_COL = _SC_WCOL + len(_SC_LINES[3]) - 1   # the vault door: a step SOUTH of
-                                    # the LAST line's final glyph ('dream''s m)
+_SC_I_TYPED = 'down '               # I prepends this onto the given tail (the push)
+_SC_A_TYPED = 'merrily merrily'     # A appends this onto the given head, carving east
+_SC_I_GIVEN = 'the stream'          # line 2's surviving tail (completion = 'down the stream')
+_SC_A_GIVEN = 'merrily'             # line 3's surviving head (completion = 'merrily'×3)
+# The I line's floor must also seat the O line's completion (O opens above it and
+# inherits its floor segment), so size it to the longest blank-typed completion.
+_SC_I_END  = _SC_WCOL + max(len(_SC_COMPLETIONS[0]), len(_SC_COMPLETIONS[1]))
+_SC_A_END  = _SC_WCOL + len(_SC_A_GIVEN)               # the A line's floor: given head + launch cell
+                                    # (short — A must CARVE the rest east into the stone)
+_SC_EXIT_COL = _SC_WCOL + len(_SC_COMPLETIONS[3]) - 1  # the vault door: a step SOUTH of
+                                    # the LAST completion's final glyph ('dream''s m)
 _SC_EXIT_ROW0 = _SC_A_ROW + 1       # at BUILD, one row below the A line; the o/O inserts
                                     # slide it down so it ends up just below line 4 (exit_pos rides)
 
 
-# The route runs TOP-TO-BOTTOM, one insert-entry per line:
-# O line1(1+21) · j(1) · I 'gently down '(1+12) · j(1) · A line3-rest(1+15) ·
-# o line4(1+19) · j(1) = 74 (engine-measured; pinned by the driven test).
+# The route runs TOP-TO-BOTTOM, one insert-entry per line — each COMPLETING the
+# line (the plaque already carries the first word):
+# O 'row row your boat' · j · I 'down ' · j · A 'merrily merrily' (carves) ·
+# o 'is but a dream' · j. par ENGINE-MEASURED; pinned by the driven test.
 # Esc is free/omitted; spaces separate tape tokens; a TYPED space is ␣.
-_SC_PAR    = 74
-_SC_ANSWER = ('Orow␣row␣row␣your␣boat j Igently␣down␣ j '
-              'Amerrily␣merrily olife␣is␣but␣a␣dream j')
+_SC_PAR    = 58
+_SC_ANSWER = ('Orow␣row␣your␣boat j Idown␣ j '
+              'Amerrily␣merrily ois␣but␣a␣dream j')
 
 
 def build_dungeon_sculpting_chambers(seed: int) -> Dungeon:
@@ -10716,7 +10725,7 @@ def build_dungeon_sculpting_chambers(seed: int) -> Dungeon:
         lay(ar + (k - _SC_ANCHOR_IDX), _SC_PLQ, word, 'verdant')
 
     room._sc_target = _SC_TARGET
-    room._sc_lines  = _SC_LINES
+    room._sc_lines  = _SC_COMPLETIONS         # the FLOOR reads the completions (plaque holds the head)
     room._sc_anchor = _SC_ANCHOR_IDX
     room._sc_band   = _SC_BAND
 
