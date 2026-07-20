@@ -74,6 +74,28 @@ def test_sg_family_not_claimed_and_vice_versa():
     assert S.looks_like_ex_range('2d', r, p) and not S.looks_like_sg('2d', r, p)
 
 
+# ── addresses: the offset forms (playtest 2026-07-20 audit) ──────────────────
+def test_address_offsets_including_bare_number_after_dot():
+    """split_range resolves every address form in the ex-range reference: line
+    numbers, ., $, marks, +N/-N offsets, and Vim's `.5` == `.+5` (a bare number
+    after a dot-address is an implicit +N)."""
+    r = _room(['l1', 'l2', 'l3', 'l4', 'l5', 'l6', 'l7', 'l8', 'l9', 'l10'])
+    p = _player(row=4)                     # current line = 5 (0-based row 4)
+    p.marks = {'a': (1, 0), 'b': (7, 0)}
+    def span(cmd):
+        lo, hi, rest = S.split_range(cmd, r, p)
+        return lo, hi, rest
+    assert span('$d')        == (9, 9, 'd')
+    assert span('.d')        == (4, 4, 'd')
+    assert span('.+1,$d')    == (5, 9, 'd')
+    assert span('1,.-1d')    == (0, 3, 'd')
+    assert span('.,.+3d')    == (4, 7, 'd')
+    assert span('.,.3d')     == (4, 7, 'd')     # .3 == .+3 (the bare-number form)
+    assert span('.5d')       == (9, 9, 'd')     # .5 == .+5  → row 9
+    assert span(".,'bd")     == (4, 7, 'd')     # current line to mark b
+    assert span("'a,'bd")    == (1, 7, 'd')
+
+
 # ── :[range]d ────────────────────────────────────────────────────────────────
 def test_delete_current_line_by_default():
     r = _room(['aa', 'bb', 'cc'])

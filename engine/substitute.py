@@ -243,12 +243,13 @@ def _read_addr(s: str, i: int, room, player):
     not lines), exactly as {n}G lands — so :3d strikes the row `:set nu` calls 3."""
     n = len(s)
     base = None
+    dot_addr = False                    # base came from a . $ ' address (not a line number)
     if i < n and s[i] == '.':
-        base = player.row; i += 1
+        base = player.row; i += 1; dot_addr = True
     elif i < n and s[i] == '$':
-        base = _last_standable_row(room); i += 1
+        base = _last_standable_row(room); i += 1; dot_addr = True
     elif i < n and s[i] == "'" and i + 1 < n:
-        mk = s[i + 1]; i += 2
+        mk = s[i + 1]; i += 2; dot_addr = True
         if mk == '<' and player.last_visual_anchor is not None:
             base = min(player.last_visual_anchor[0], player.last_visual_cursor[0])
         elif mk == '>' and player.last_visual_anchor is not None:
@@ -263,16 +264,22 @@ def _read_addr(s: str, i: int, room, player):
             j += 1
         base = room.first_standable_row() + int(s[i:j]) - 1   # gutter line → row
         i = j
-    # offsets:  +N / -N (repeatable)
-    while i < n and s[i] in '+-':
-        sign = 1 if s[i] == '+' else -1
-        i += 1
+    # offsets:  +N / -N (repeatable).  A BARE number after a dot-address is an
+    # implicit +N (Vim: `.5` == `.+5`, `.,.5` == `.,.+5`); after a plain line
+    # number a digit would just be part of that number, so it never reaches here.
+    while i < n and (s[i] in '+-' or (dot_addr and s[i].isdigit())):
+        if s[i] in '+-':
+            sign = 1 if s[i] == '+' else -1
+            i += 1
+        else:
+            sign = 1                    # unsigned trailing number → +N
         j = i
         while j < n and s[j].isdigit():
             j += 1
         step = int(s[i:j]) if j > i else 1
         base = (player.row if base is None else base) + sign * step
         i = j
+        dot_addr = True                 # `.5+2` etc. keep chaining as offsets
     return base, i
 
 

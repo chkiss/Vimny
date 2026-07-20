@@ -274,6 +274,7 @@ def test_recording_indicator_shows_and_clears(monkeypatch):
     import contextlib, io
     import render.colors as Cx
     import render.symbols as Sx
+    from render.renderer import render_all as _render_all   # the real one (main's may be stubbed)
     from engine.budget import Budget
     from engine.player import Player
     term = Terminal()
@@ -287,7 +288,7 @@ def test_recording_indicator_shows_and_clears(monkeypatch):
     def _out(**kw):
         f = io.StringIO()
         with contextlib.redirect_stdout(f):
-            main.render_all(term, d, pl, Budget(total=100), '', **kw)
+            _render_all(term, d, pl, Budget(total=100), '', **kw)
         return f.getvalue()
 
     assert 'recording @a' in _out(recording='a')
