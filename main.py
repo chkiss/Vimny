@@ -2668,11 +2668,12 @@ _LEVEL_INTROS = {
                             'strike what is noise, and spare what already rings true.', 70),
     'culling_ledger':      ('The Culling Ledger — other rhymes have crept into the house that '
                             'Jack built. Set the numbers before you judge.', 60),
-    'shelving_room':       ('The Shelving Room — the round was shelved blind, across the gap. '
-                            'Every voice sings twice; the echo answers a step behind.', 60),
+    'shelving_room':       ('The Shelving Room — a round of four voices on a shelf no foot can '
+                            'reach: every voice sings twice, its echo one step deeper. One echo '
+                            'sits among the wrong pair, one sank too deep, and the last was '
+                            'never shelved at all. Only written orders move the verses.', 60),
     'refrain_vault':       ('The Refrain Vault — the old song is carved wrong where it falls, '
-                            'and right where it builds. Its last line lies torn, past the '
-                            'water.', 60),
+                            'and right where it builds.', 60),
     'dummy':               ('Sandbox — all mechanics active. Type :edit to enter editor mode.', 60),
     'archivists_library':  ("The Archivist's Library — the whole catalogue has spilled "
                             'into a single endless line.', 80),
@@ -3608,55 +3609,46 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
                         room.mist_cells.add((r, c))
 
     def _shelving_tick():
-        """The Shelving Room: re-mist fresh shelf rows, re-right the plaque
-        column (row inserts drag it), and open the seal once the shelf reads
-        the plaque exactly — indent included, blank rows ignored."""
+        """The Shelving Room: re-mist fresh shelf rows; each mended misfiling
+        grinds back its own gallery bolt (STATELESS, any order); the seal
+        parts once the whole round reads true — indent included, blank rows
+        ignored. No plaque: the round is an echo, and the shelf's own sound
+        pairs carry the convention (every voice twice, the echo a step
+        deep)."""
         targets = getattr(room, '_shr_targets', None)
         if targets is None:
             return
         _chasm_remist()
-        # Re-right the plaque column: verdant runs west of the shelf band
-        # belong at rows 1..8, whatever the buffer has done underneath them.
-        plq = room._shr_plaque
-        stale = [ru for ru in room.char_runs
-                 if ru.kind == 'verdant' and ru.col < _dg._SHR_TX]
-        want = set()
-        for i, (ind, text) in enumerate(plq):
-            if i + 1 >= room.rows - 1:           # the buffer has been gutted —
-                break                            # don't carve past its floor
-            col = _dg._SHR_PLQ + ind
-            for wd in text.split(' '):
-                want.add((i + 1, col, wd))
-                col += len(wd) + 1
-        have = {(ru.row, ru.col, ''.join(ru.symbols)) for ru in stale}
-        if have != want:
-            for ru in stale:
-                room.remove_char_run(ru)
-            placed: dict = {}
-            for (r, col, wd) in sorted(want):
-                room.add_char_run(CharRun(r, col, tuple(wd), 'verdant'))
-                placed.setdefault((col, wd), []).append(r)
-            room.rebuild_indexes()
-            # THE PLAQUE-RESTORE LAW: an edit may drag or dent a plaque, but
-            # the wall remembers — it re-rights itself under the sculpting
-            # glitter, canonical edit or not.
-            moved = []
-            for ru in stale:
-                wd = ''.join(ru.symbols)
-                rs = placed.get((ru.col, wd))
-                new_r = rs.pop(0) if rs else ru.row
-                if new_r != ru.row:
-                    moved.append((ru.row, new_r, ru.col, wd))
-            room._sc_twinkle = moved
-        if getattr(room, '_shr_seal_col', None) is None:
-            return
         gal = _subst._last_standable_row(room)
-        texts = []
+        lines = []                       # (indent, stripped text), shelf order
         for r in range(1, gal - 1):
             t = _subst.line_text(room, r)[0].rstrip()
-            if t:
-                texts.append(t)
-        if texts != list(targets):
+            if t.strip():
+                lines.append((len(t) - len(t.lstrip()), t.strip()))
+        calls = _dg._SHR_CALLS
+        texts = [t for _, t in lines]
+
+        def paired(call):                # the voice's rows read call-then-echo
+            return tuple(i for i, t in lines if t == call) == (0, 2)
+
+        collapsed = [t for i, t in enumerate(texts)
+                     if i == 0 or texts[i - 1] != t]
+        conds = (collapsed == list(calls),        # voices adjacent, song order
+                 paired(calls[2]),                # the Sonnez echo at its step
+                 texts.count(calls[3]) == 2,      # the last echo shelved
+                 paired(calls[3]))                # ...and at its step
+        for ok, dc in zip(conds, _dg._SHR_BOLT_COLS):
+            is_open = room.cells[gal][dc] != CellType.WALL
+            if ok and not is_open:
+                room.cells[gal][dc] = CellType.FLOOR
+                _push('A voice finds its shelf — a bolt grinds back!')
+            elif not ok and is_open and (player.row, player.col) != (gal, dc):
+                room.cells[gal][dc] = CellType.WALL    # undone — it re-bars
+        if getattr(room, '_shr_seal_col', None) is None:
+            return
+        full = [t.rstrip() for r in range(1, gal - 1)
+                for t in (_subst.line_text(room, r)[0],) if t.rstrip()]
+        if full != list(targets):
             return
         sc = room._shr_seal_col
         if room.cells[gal][sc] == CellType.WALL:
@@ -3664,7 +3656,7 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
         room.fog_cells = {(fr, fc) for (fr, fc) in room.fog_cells
                           if not (fr == gal and fc > sc)}   # unveil the pocket
         room._shr_seal_col = None
-        _push('The stanza stands as the wall remembers it. The way opens!')
+        _push('The round sings in order, echo under call. The way opens!')
 
     def _refrain_tick():
         """The Refrain Vault (London Bridge): re-mist the torn-line chasm, then
@@ -3963,12 +3955,7 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
         elif level == 'culling_ledger':
             _ledger_check()                      # open the seal once the ledger reads true
         elif level == 'shelving_room':
-            _shelving_tick()                     # re-mist, re-right plaques, seal check
-            _tw = getattr(room, '_sc_twinkle', None)
-            if _tw:                              # the plaque re-rights: glitter
-                _sc_twinkle_animation(term, room, player, _tw, _iw(term),
-                                      term.height - 8)
-                room._sc_twinkle = []
+            _shelving_tick()                     # re-mist, bolts, seal check
         elif level == 'refrain_vault':
             _refrain_tick()                      # re-mist the chasm, seal check
         # Macro playback: drain queued keystrokes before reading the terminal.

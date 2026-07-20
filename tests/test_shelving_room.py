@@ -18,11 +18,12 @@
 
 """The Shelving Room (41) — the movers: :m :t :> :<.
 
-The Culling Ledger's chasm chassis: a misted shelf no foot can reach, the
-true stanza carved in the west wall. Canonical :2m4 + :5t7 + :3< + :6> + $,
-par 17. :m/:t are structural row surgery (fog and mist ride along); the
-_shelving_tick re-mists any bare shelf floor and re-rights the plaque
-column after row inserts drag it."""
+The Culling Ledger's chasm chassis: a misted shelf no foot can reach, NO
+plaque (the round is an echo — the true shelf is known by sense). Each
+mended misfiling grinds back its own gallery bolt, in any order; the seal
+parts when the whole round reads true. Canonical :set nu + :6m3 + :6< +
+:7t7 + :8> + $, par 15. :m/:t are structural row surgery (fog and mist
+ride along); _shelving_tick re-mists any bare shelf floor each turn."""
 from collections import deque
 
 import pytest
@@ -34,9 +35,9 @@ from engine.world import CellType
 from engine import substitute as S
 from generation.dungeon_gen import (
     build_dungeon_shelving_room,
-    _SHR_ROWS, _SHR_COLS, _SHR_PLQ, _SHR_TX, _SHR_BAND, _SHR_WTR, _SHR_GAL,
-    _SHR_SEAL_COL, _SHR_EXIT_COL, _SHR_INDENTS, _SHR_INIT, _SHR_PAR,
-    _SHR_BUDGET,
+    _SHR_ROWS, _SHR_COLS, _SHR_TX, _SHR_BAND, _SHR_WTR, _SHR_GAL,
+    _SHR_SEAL_COL, _SHR_EXIT_COL, _SHR_BOLT_COLS, _SHR_CALLS, _SHR_INIT,
+    _SHR_PAR, _SHR_BUDGET,
 )
 from tests import SEEDS, cached_room
 
@@ -86,6 +87,8 @@ def test_dimensions_and_seal(seed):
     r = _room(seed)
     assert (r.rows, r.cols) == (_SHR_ROWS, _SHR_COLS)
     assert r.cells[_SHR_GAL][_SHR_SEAL_COL] == CellType.WALL
+    for dc in _SHR_BOLT_COLS:                       # the four bolts, all barred
+        assert r.cells[_SHR_GAL][dc] == CellType.WALL
     assert r.exit_pos == (_SHR_GAL, _SHR_EXIT_COL)
     assert r.par == _SHR_PAR and r.budget == _SHR_BUDGET
 
@@ -109,15 +112,9 @@ def test_the_round_is_misfiled_but_known_by_heart(seed):
     dings = sum(1 for row in range(1, 8)
                 if 'Ding' in S.line_text(r, row)[0])
     assert dings == 1
-    # the score column (wall glyphs west of the band) shows every target
-    plq = {}
-    for ru in r.char_runs:
-        if ru.kind == 'verdant' and ru.col < _SHR_TX:
-            plq.setdefault(ru.row, []).append(ru)
-    for i in range(8):
-        runs = sorted(plq[i + 1], key=lambda ru: ru.col)
-        assert runs[0].col == _SHR_PLQ + _SHR_INDENTS[i]
-        assert ' '.join(''.join(ru.symbols) for ru in runs) == targets[i].strip()
+    # NO plaque (playtest 2026-07-19): the shelf's own sound pairs carry
+    # the echo convention — nothing carved west of the band
+    assert not any(ru.col < _SHR_TX for ru in r.char_runs)
 
 
 @pytest.mark.parametrize("seed", SEEDS)
@@ -169,10 +166,9 @@ def test_admin_karaoke_stays_in_sync(seed, monkeypatch):
     assert room.answer_pos == len(room.answer.replace(' ', ''))
 
 
-def test_fresh_rows_stay_misted_and_plaques_re_right(monkeypatch):
+def test_fresh_rows_stay_misted(monkeypatch):
     # After the full canonical run the buffer has grown a row: no bare shelf
-    # floor anywhere (the tick re-mists) and the plaque column still reads
-    # the eight targets at rows 1..8.
+    # floor anywhere (the tick re-mists).
     d = _fresh(0)
     result = _drive(d, _tape_keys(d.rooms[0].answer), monkeypatch)
     assert result['won']
@@ -182,9 +178,43 @@ def test_fresh_rows_stay_misted_and_plaques_re_right(monkeypatch):
         for c in range(r.cols):
             if r.cells[row][c] == CellType.FLOOR:
                 assert (row, c) in r.fog_cells
-    plq_rows = {ru.row for ru in r.char_runs
-                if ru.kind == 'verdant' and ru.col < _SHR_TX}
-    assert plq_rows == set(range(1, 9))
+
+
+# ── the orderless bolts ───────────────────────────────────────────────────────
+
+def test_each_fix_grinds_its_own_bolt(monkeypatch):
+    # From fresh, one fix in isolation opens exactly its bolt.
+    fixes = ((':6m3⏎', 0),      # the stray echo rejoins its pair → order
+             (':5<⏎',  1),      # the Sonnez echo un-deepens → its step
+             (':7t7⏎', 2))      # the last echo shelved → duplication
+    for tape, want in fixes:
+        d = _fresh(0)
+        r = d.rooms[0]
+        _drive(d, _K(tape), monkeypatch, finish=':q!\r')
+        gal = S._last_standable_row(r)      # :t grows the buffer — re-find it
+        for i, dc in enumerate(_SHR_BOLT_COLS):
+            state = CellType.FLOOR if i == want else CellType.WALL
+            assert r.cells[gal][dc] == state, (tape, i)
+
+
+def test_fixes_in_any_order_still_win_at_par(monkeypatch):
+    # The scrambled route: shelve the last echo first, set it, then the
+    # Sonnez step, then the stray — same spend, same 2★.
+    d = _fresh(0)
+    r = d.rooms[0]
+    result = _drive(d, _K(':7t7⏎:8>⏎:5<⏎:6m3⏎$'), monkeypatch)
+    assert result['won'] and result['stars'] == 2
+    gal = S._last_standable_row(r)
+    for dc in _SHR_BOLT_COLS:
+        assert r.cells[gal][dc] == CellType.FLOOR
+
+
+def test_undo_rebars_a_ground_bolt(monkeypatch):
+    d = _fresh(0)
+    r = d.rooms[0]
+    _drive(d, _K(':7t7⏎u'), monkeypatch, finish=':q!\r')
+    gal = S._last_standable_row(r)
+    assert r.cells[gal][_SHR_BOLT_COLS[2]] == CellType.WALL
 
 
 # ── rivals ────────────────────────────────────────────────────────────────────
