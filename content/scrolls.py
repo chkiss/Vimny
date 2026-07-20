@@ -379,13 +379,15 @@ SECOND_STRIDE_SCROLL = {
 REGEX_CLASSES_SCROLL = {
     'title': '◈   The Glyph-Kinds   ◈',
     'lines': [
+        ('dim',    "  — the Seeker's Grammar of regex · leaf i of v —"),
+        ('blank',),
         ('dim',    '  A searcher learns to name what it seeks.'),
         ('blank',),
-        ('cmd',    '.',  'any single character'),
-        ('cmd',    '\\w', 'a word character  (\\W: not one)'),
-        ('cmd',    '\\d', 'a digit          (\\D: not one)'),
-        ('cmd',    '\\s', 'whitespace       (\\S: not one)'),
-        ('cmd',    '\\a', 'a letter   \\l lower   \\u UPPER'),
+        ('cmd',    '/c.t',   'cat, cot, c9t — . is any one glyph'),
+        ('cmd',    '/\\d\\d',  'any two digits   (\\D: a non-digit)'),
+        ('cmd',    '/\\w',    'a word character (\\W: not one)'),
+        ('cmd',    '/\\s',    'whitespace       (\\S: not one)'),
+        ('cmd',    '/\\a',    'a letter   \\l lower   \\u UPPER'),
         ('blank',),
         ('amber',  '  Seek a kind, not only a character.'),
     ],
@@ -394,7 +396,9 @@ REGEX_CLASSES_SCROLL = {
 REGEX_ANCHORS_SCROLL = {
     'title': '◈   The Anchors & Bounds   ◈',
     'lines': [
-        ('dim',    '  Where a thing sits matters as much as what it is.'),
+        ('dim',    "  — the Seeker's Grammar of regex · leaf ii of v —"),
+        ('blank',),
+        ('dim',    '  A pattern heeds not just the glyph, but its place.'),
         ('blank',),
         ('cmd',    '^',   'the start of the line'),
         ('cmd',    '$',   'the end of the line'),
@@ -409,7 +413,9 @@ REGEX_ANCHORS_SCROLL = {
 REGEX_QUANTIFIERS_SCROLL = {
     'title': '◈   The Many & The Maybe   ◈',
     'lines': [
-        ('dim',    '  One glyph may stand for none, or for a throng.'),
+        ('dim',    "  — the Seeker's Grammar of regex · leaf iii of v —"),
+        ('blank',),
+        ('dim',    '  In a pattern, one glyph may stand for a throng.'),
         ('blank',),
         ('cmd',    '*',     'zero or more of what precedes'),
         ('cmd',    '\\+',    'one or more'),
@@ -423,6 +429,8 @@ REGEX_QUANTIFIERS_SCROLL = {
 REGEX_COLLECTIONS_SCROLL = {
     'title': '◈   The Gathered Glyphs   ◈',
     'lines': [
+        ('dim',    "  — the Seeker's Grammar of regex · leaf iv of v —"),
+        ('blank',),
         ('dim',    '  Offer the searcher a choice of marks.'),
         ('blank',),
         ('cmd',    '[abc]',  'any one of a, b or c'),
@@ -438,7 +446,9 @@ REGEX_COLLECTIONS_SCROLL = {
 REGEX_MAGIC_SCROLL = {
     'title': '◈   The Magic Levels   ◈',
     'lines': [
-        ('dim',    '  Why so many backslashes? Change the law.'),
+        ('dim',    "  — the Seeker's Grammar of regex · leaf v of v —"),
+        ('blank',),
+        ('dim',    '  Why the backslashes in a pattern? Change the law.'),
         ('blank',),
         ('cmd',    '\\v', 'very magic — + ? ( ) | need no backslash'),
         ('cmd',    '\\V', 'very nomagic — almost all glyphs literal'),
