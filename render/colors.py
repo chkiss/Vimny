@@ -99,6 +99,8 @@ def statusline_bg(): return _term.on_color_rgb(12, 12, 20)       # matches wall 
 def statusline_fg(): return _term.color_rgb(160, 170, 190)       # cool silver, readable
 def error_bg():      return _term.on_color_rgb(170, 25, 25)      # dark red, error state
 def error_fg():      return _term.bright_white                    # sharp contrast on error
+def cmd_cursor_bg(): return _term.on_color_rgb(185, 185, 195)    # the cmdline block cursor
+def cmd_cursor_fg(): return _term.color_rgb(12, 12, 20)          # dark glyph under the block
 
 def water_bg():              return _term.on_color_rgb(5, 15, 55)        # deep data-stream blue
 def water_fg(r, g, b):       return _term.color_rgb(r, g, b)

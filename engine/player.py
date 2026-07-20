@@ -61,6 +61,7 @@ class Player:
 
     # command-mode line
     cmd_line: str = ''
+    cmd_cursor: int = 0           # insertion point within cmd_line (arrow-editable)
     # statusline error (e.g. E37); cleared on next keypress
     error: str = ''
 

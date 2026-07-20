@@ -96,6 +96,40 @@ def _cmd_append(cmd_line: str, key) -> str:
         return cmd_line
     return cmd_line + str(key)
 
+
+def _cmd_insert(player, text: str) -> None:
+    """Insert `text` into player.cmd_line at the cursor (Vim's command line is
+    editable mid-string), advancing the cursor past it."""
+    c = player.cmd_cursor
+    player.cmd_line = player.cmd_line[:c] + text + player.cmd_line[c:]
+    player.cmd_cursor = c + len(text)
+
+
+def _cmd_backspace(player) -> None:
+    """Delete the char BEFORE the cursor (Vim's <BS>); no-op at column 0."""
+    c = player.cmd_cursor
+    if c > 0:
+        player.cmd_line = player.cmd_line[:c - 1] + player.cmd_line[c:]
+        player.cmd_cursor = c - 1
+
+
+def _cmd_arrow(player, key) -> bool:
+    """Handle Left/Right/Home/End cursor motion on the command line. Returns
+    True if the key was a recognised cursor motion (and was applied)."""
+    name = key.name
+    n = len(player.cmd_line)
+    if name == 'KEY_LEFT':
+        player.cmd_cursor = max(0, player.cmd_cursor - 1)
+    elif name == 'KEY_RIGHT':
+        player.cmd_cursor = min(n, player.cmd_cursor + 1)
+    elif name == 'KEY_HOME':
+        player.cmd_cursor = 0
+    elif name == 'KEY_END':
+        player.cmd_cursor = n
+    else:
+        return False
+    return True
+
 class _CmdLine:
     """Shared ':' command-line state for the netrw-style screens (overworld,
     scroll library, parent dir, colors): accumulates typed input and Tab-completes
@@ -4149,6 +4183,7 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
             if key.name == 'KEY_ESCAPE':
                 player.mode = Mode.NORMAL
                 player.cmd_line = ''
+                player.cmd_cursor = 0
                 room._cmd_karaoke = False
             elif key.name == 'KEY_ENTER' or str(key) in ('\n', '\r'):
                 if getattr(room, '_cmd_karaoke', False):
@@ -4157,6 +4192,7 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
                 cmd = player.cmd_line.strip()
                 player.mode    = Mode.NORMAL
                 player.cmd_line = ''
+                player.cmd_cursor = 0
                 msg_pool.clear()
                 msg_idx = 0
 
@@ -4447,22 +4483,24 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
                     _push(f'Unknown command: :{cmd}')
 
             elif key.name == 'KEY_BACKSPACE' or str(key) == '\x7f':
-                player.cmd_line = player.cmd_line[:-1]
+                _cmd_backspace(player)
+            elif _cmd_arrow(player, key):                  # ←/→/Home/End: edit mid-line
+                pass
             elif search_creg_pending:
                 # second key after <C-r>: <C-w> pulls the word under the cursor,
                 # otherwise the named register's text, into the search line.
                 search_creg_pending = False
                 if not key.is_sequence:
                     if str(key) == '\x17':
-                        player.cmd_line += _word_under_cursor(room, player) or ''
+                        _cmd_insert(player, _word_under_cursor(room, player) or '')
                     else:
-                        player.cmd_line += _clip_to_text(_reg_read(player, str(key)))
+                        _cmd_insert(player, _clip_to_text(_reg_read(player, str(key))))
             elif str(key) == '\x12':                       # <C-r> — insert into the search line
                 search_creg_pending = True
-            else:
-                player.cmd_line = _cmd_append(player.cmd_line, key)
+            elif not key.is_sequence:
+                _cmd_insert(player, str(key))              # insert AT the cursor
                 if (getattr(room, '_cmd_karaoke', False)
-                        and not key.is_sequence and len(str(key)) == 1):
+                        and len(str(key)) == 1):
                     _advance_answer(str(key))              # karaoke: advance per typed cmd char
             if msg_pool:
                 msg_idx = 0
@@ -4477,6 +4515,7 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
                 player.mode = search_return_mode or Mode.NORMAL   # back to visual if launched there
                 search_return_mode = None
                 player.cmd_line = ''
+                player.cmd_cursor = 0
                 room._search_karaoke = False
             elif key.name == 'KEY_ENTER' or str(key) in ('\n', '\r'):
                 if getattr(room, '_search_karaoke', False):
@@ -4491,6 +4530,7 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
                 player.mode     = search_return_mode or Mode.NORMAL
                 search_return_mode = None
                 player.cmd_line = ''
+                player.cmd_cursor = 0
                 if pattern:
                     player.last_search = (pattern, fwd)
                     player.hl_suppressed = False        # a fresh search re-lights matches
@@ -4516,11 +4556,13 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
                     else:
                         _push(f'Pattern not found: {pattern}')
             elif key.name == 'KEY_BACKSPACE' or str(key) == '\x7f':
-                player.cmd_line = player.cmd_line[:-1]
-            else:
-                player.cmd_line = _cmd_append(player.cmd_line, key)
+                _cmd_backspace(player)
+            elif _cmd_arrow(player, key):                  # ←/→/Home/End on the search line
+                pass
+            elif not key.is_sequence:
+                _cmd_insert(player, str(key))
                 if (getattr(room, '_search_karaoke', False)
-                        and not key.is_sequence and len(str(key)) == 1):
+                        and len(str(key)) == 1):
                     _advance_answer(str(key))              # karaoke: advance per pattern char
             _render(message)
             continue
@@ -5313,6 +5355,7 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
                         room.answer_pos += 1                # consume the ':'
                 player.mode     = Mode.COMMAND
                 player.cmd_line = ''
+                player.cmd_cursor = 0
             elif m == 'insert':
                 if edit_mode:
                     player.mode = Mode.INSERT          # admin map-editing placement
@@ -5344,6 +5387,7 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
                 if '/' in player.known_commands or 'admin' in player.known_commands:
                     player.mode = Mode.SEARCH
                     player.cmd_line = ''
+                    player.cmd_cursor = 0
                     player.search_forward = action.get('forward', True)
                     # Karaoke: the '/' or '?' was already matched by the NORMAL tracker
                     # (it isn't excluded like ':'); now track the pattern + Enter that

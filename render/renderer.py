@@ -258,6 +258,25 @@ def wrap_room_col(drow: int, screen_c: int, width: int) -> int:
     return drow * width + screen_c
 
 
+def _cmdline_with_cursor(prefix: str, text: str, cursor: int, width: int,
+                         sl_bg: str, sl_fg: str) -> str:
+    """Render an ex/search command line with a reverse-video block cursor at
+    `cursor` (an index into `text`, so the prefix offsets it). Past the end of
+    the text the cursor sits on a trailing space — Vim's cmdline cursor."""
+    rst = C.normal_fg()
+    cur = max(0, min(cursor, len(text)))
+    body = text + ' '                                   # room for the end-cursor
+    idx  = len(prefix) + cur                            # cursor's column in the full line
+    full = prefix + body
+    cur_ch = full[idx] if idx < len(full) else ' '
+    left, right = full[:idx], full[idx + 1:]
+    pad = max(0, width - len(full))
+    return (sl_bg + C.mode_command() + left +
+            C.cmd_cursor_bg() + C.cmd_cursor_fg() + cur_ch +
+            sl_bg + C.mode_command() + right +
+            sl_fg + ' ' * pad + rst)
+
+
 def render_all(term: Terminal, dungeon: Dungeon, player: Player,
                budget: Budget, message: str = '',
                attack_pos: tuple | None = None, attack_sym: str = '',
@@ -618,20 +637,20 @@ def render_all(term: Terminal, dungeon: Dungeon, player: Player,
                       ' ' * err_pad + rst +
                       bfg + S.BOX_V + rst)
     elif mode == Mode.COMMAND:
-        # Command line: show typed command flush-left, no ruler
-        cmd_text = ':' + player.cmd_line
-        sl_pad   = max(0, sl_w - len(cmd_text))
+        # Command line: prefix + typed command, with a block cursor at the
+        # edit position (Vim's cmdline cursor — arrow-editable mid-string).
         output.append(bfg + S.BOX_V + rst +
-                      sl_bg + C.mode_command() + cmd_text +
-                      sl_fg + ' ' * sl_pad + rst +
+                      _cmdline_with_cursor(':', player.cmd_line,
+                                           player.cmd_cursor, sl_w,
+                                           sl_bg, sl_fg) +
                       bfg + S.BOX_V + rst)
     elif mode == Mode.SEARCH:
-        # Search line: show '/' or '?' prefix + typed pattern, flush-left
-        cmd_text = ('/' if player.search_forward else '?') + player.cmd_line
-        sl_pad   = max(0, sl_w - len(cmd_text))
+        # Search line: '/' or '?' prefix + typed pattern, with the block cursor
+        prefix = '/' if player.search_forward else '?'
         output.append(bfg + S.BOX_V + rst +
-                      sl_bg + C.mode_command() + cmd_text +
-                      sl_fg + ' ' * sl_pad + rst +
+                      _cmdline_with_cursor(prefix, player.cmd_line,
+                                           player.cmd_cursor, sl_w,
+                                           sl_bg, sl_fg) +
                       bfg + S.BOX_V + rst)
     else:
         # Statusline: mode label left, position+scroll right. Vim's showmode
