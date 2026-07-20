@@ -5221,29 +5221,30 @@ def build_dungeon_grandmasters_sanctum(seed: int) -> Dungeon:
 
 # ── The Hall of Echoes (47: q @ " — the macro gauntlet) ──────────────────────
 #
-# REBUILT 2026-07-20 (user direction): a chain of SEVEN distinct rooms,
-# each opening SOUTH into the next once its work reads true. Rooms 0 and 1
-# are POEM HALLS: a famous 10-line rhyme with one deadpan intruder word
-# prepended to every line (same word-position — the first). The mend is
-# the same on every line (daw at the line head), so the macro carries it:
-# fix line 1 by hand, record `qa j daw q`, then 8@a. Room 1 is a SECOND
-# poem with the SAME blight — the recording persists, so 8@a alone clears
-# it (macros outlive the hall that taught them). Rooms 2–6 replay five
-# earlier halls' repetitive beats, one room each, this time with macros:
-#   2 — the Echo Vault's r-mend hops   (l re · w l re · @)
-#   3 — the Alignment Halls' >> gallery
-#   4 — the Joiner's Gate's split pairs (J)
-#   5 — the Inscription Halls' unfinished words (A + letter)
-#   6 — the Case Chambers' flipped rows (g~~)
-# Each room uses a FRESH register (a b c d e f) — the named-register drill.
-# Replayed keys are budget-free (Budget.frozen), so par is recordings plus
-# replay invocations; the all-manual road wins, at 1★ under the hand-set
-# budget (forcing by PAR).
+# v3 (playtest 2026-07-20): ONE poem hall, then ONE tall gauntlet MAP of
+# six chambers stacked south (nothing wipes — the whole descent stays on
+# screen, the viewport scrolls). Every chamber replays an EARLIER level's
+# repetitive beat with that level's OWN look (its words, its glyphs):
+#   2 — the Echo Vault: 'she sells sea shells' with every e a warped rune
+#   3 — the Alignment Halls: masonry words one >> shy of the plumb
+#   4 — the Joiner's Gate: split inscriptions, J closes each seam
+#   5 — the Sculpting Chambers: 'errily' rows missing merrily's m (I)
+#   6 — the Case Chambers: GRANITE shouted, g~~ lowers it
+#   7 — the Culling Ledger: Humpty squatting between Jack's lines (dd)
+# Chambers are runs of text rows split by stone bands; each band carries a
+# west gate that grinds open when its chamber reads true (sight floods
+# through — the next chamber lights as you finish the one above). The
+# exit sits under the last band and needs EVERY chamber true. EVERY tape
+# leads with its recording — qa in the poem hall, then qb…qg, one fresh
+# register per chamber (the named-register drill). Replayed keys are
+# budget-free (Budget.frozen); the all-manual road wins, at 1★ under the
+# hand-set budget (forcing by PAR).
 _HE_COLS  = 58
-_HE_TX    = 3                          # text head col in every room
-_HE_PAR    = 73                        # engine-measured: the full driven tape
+_HE_TX    = 3                          # text head col in every hall
+_HE_GATE_COL = 2                       # the west gate cell in every band
+_HE_PAR    = 62                        # engine-measured: the full driven tape
 _HE_BUDGET = 220                       # GENEROUS hand-set: the all-manual
-                                       # road (198 measured) wins 1★
+                                       # road (143 measured) wins 1★
 
 # The poem pool — all PD, all 10 lines. The intruders are deadpan one-word
 # asides (the Norm law: understatement over punchline), one per line, all
@@ -5298,67 +5299,107 @@ _HE_POEMS = (
       'Mercifully')),
 )
 
-# The five replay chambers: (text rows laid, true rows demanded, seal col,
-# required head col or None, the room's karaoke tape). Seal col = where the
-# canonical tape's cursor stands before its final 2j drop.
+# The six gauntlet chambers, each wearing its ORIGINAL level's face:
+# (laid rows, done rows, required head col or None, karaoke tape segment).
+# Every tape segment LEADS with its recording (qb…qg).
 _HE_INDENT = 2                          # == engine.operator.INDENT_WIDTH
-_HE_ALIGN_WORDS = ('stone', 'mason', 'plumb', 'level', 'arch', 'lintel',
-                   'course', 'keystone')
+_HE_WARP   = '♄'                        # the Echo Vault's warped rune (untypable)
+_HE_EV_LAID = ('she sells sea shells she sells sea shells'
+               .replace('e', _HE_WARP),)
+_HE_EV_DONE = ('she sells sea shells she sells sea shells',)
+_HE_CULL_JUNK = ('Humpty Dumpty sat on a wall,',
+                 'Humpty Dumpty had a great fall.',
+                 "All the king's horses",
+                 "and all the king's men")
+_HE_CULL_KEEP = ('This is the dog,', 'that worried the cat,',
+                 'that killed the rat,', 'that ate the malt,')
 _HE_CHAMBERS = (
-    # 2 — the Echo Vault's beat: one long row of warped bells, r + hops
-    ((('bxll ' * 8).rstrip(),), (('bell ' * 8).rstrip(),), _HE_TX, None,
-     'l re qb w l re q 6@b ^ 2j'),
-    # 3 — the Alignment Halls' beat: every course one step shy of the plumb
-    (_HE_ALIGN_WORDS,
-     _HE_ALIGN_WORDS, _HE_TX + _HE_INDENT, _HE_TX + _HE_INDENT,
-     '>> qc j >> q 6@c 2j'),
-    # 4 — the Joiner's Gate's beat: six split peals, J closes each seam
-    (('ding', 'dong bell') * 6, ('ding dong bell',) * 6, 7, None,
-     'J qd j J q 4@d 2j'),
-    # 5 — the Sculpting Chambers' beat: every echo missing its first letter
-    # (A appends past the trailing floor — engine law — so the write-in
-    # replay is I at the head, not A at the tail)
-    (('choes',) * 6, ('echoes',) * 6, _HE_TX, None,
-     'Ie qe j Ie q 4@e 2j'),
-    # 6 — the Case Chambers' beat: every echo shouted, g~~ lowers it
-    (('ECHO',) * 6, ('echo',) * 6, _HE_TX, None,
-     'g~~ qf j g~~ q 4@f 2j'),
+    # 2 — the Echo Vault: every e a warped rune; r mends, the word merges,
+    #     w w is the hop (the mend-merge law) — record mend+hop, replay
+    (_HE_EV_LAID, _HE_EV_DONE, None, 'qb re w w q 7@b 0 2j'),
+    # 3 — the Alignment Halls: masonry one step west of the plumb
+    (('lintel', 'beam', 'sill', 'corbel'),
+     ('lintel', 'beam', 'sill', 'corbel'), _HE_TX + _HE_INDENT,
+     'qc >> j q 3@c 0 2j'),
+    # 4 — the Joiner's Gate: four split inscriptions, J closes each seam
+    (('the way', 'is up', 'the seam', 'is shut',
+      'the hall', 'is long', 'the song', 'is old'),
+     ('the way is up', 'the seam is shut', 'the hall is long',
+      'the song is old'), None,
+     'qd J j q 3@d 0 2j'),
+    # 5 — the Sculpting Chambers: merrily merrily merrily merrily, every
+    #     row missing its m (I writes at the head; A appends past the
+    #     trailing floor — engine law)
+    (('errily',) * 4, ('merrily',) * 4, None, 'qe Im j q 3@e 0 2j'),
+    # 6 — the Case Chambers: granite shouted, g~~ lowers it
+    (('GRANITE',) * 4, ('granite',) * 4, None, 'qf g~~ j q 3@f 0 2j'),
+    # 7 — the Culling Ledger: Humpty between Jack's lines, dd culls him
+    (tuple(x for p in zip(_HE_CULL_JUNK, _HE_CULL_KEEP) for x in p),
+     _HE_CULL_KEEP, None, 'qg dd j q 3@g 0 j'),
 )
 
 
-def _he_room(text_rows, true_rows, seal_col, head_col, answer, seed,
-             *, ember_first_word=False, final=False) -> Room:
-    """One chamber of the gauntlet: text rows, a walk corridor beneath, and
-    a south seal that _hall_of_echoes_tick opens when the room reads true.
-    The last chamber's seal carries the real exit entity."""
-    n = len(text_rows)
-    ROWS, C = n + 4, _HE_COLS
+def _he_poem_room(poem, seed) -> Room:
+    """The poem hall: ten corrupted lines, a walk corridor, a south seal."""
+    _name, lines, intr = poem
+    laid = tuple(f'{intr[t]} {lines[t]}' for t in range(10))
+    ROWS, C = 14, _HE_COLS               # 1..10 text, 11 corridor, 12 seal
     cells = [[CellType.WALL] * C for _ in range(ROWS)]
-    for r in range(1, n + 2):                     # text rows + the corridor
+    for r in range(1, 12):
         for c in range(2, C - 2):
             cells[r][c] = CellType.FLOOR
-    # row n+2: the seal band — stone but for the seal cell (opened by tick);
-    # row n+3: the outer wall.
 
     room = Room(room_type=RoomType.ENTRY, rows=ROWS, cols=C)
     room.cells = cells
     room.seed  = seed
-    for i, line in enumerate(text_rows):
+    for i, line in enumerate(laid):
         col = _HE_TX
-        for k, wd in enumerate(line.split(' ')):
-            kind = 'ember' if (ember_first_word and k == 0) else 'ancient'
-            room.char_runs.append(CharRun(1 + i, col, tuple(wd), kind))
+        for wd in line.split(' '):
+            room.char_runs.append(CharRun(1 + i, col, tuple(wd), 'ancient'))
             col += len(wd) + 1
-    room._heg_true = {'texts': tuple(true_rows),
-                      'col': head_col}
-    room.spawn_pos = (1, _HE_TX)
-    room.exit_pos  = (n + 2, seal_col)
-    if final:
-        room.entities.append(Entity(kind='exit', row=n + 2, col=seal_col,
-                                    edit_immune=True))
+    room._heg_chain = ((lines, None),)
+    room._he_poem   = poem[0]
+    room.spawn_pos  = (1, _HE_TX)
+    room.exit_pos   = (12, _HE_TX)       # the south seal → the gauntlet map
     room.rebuild_indexes()
     apply_stone_fog(room)
-    room.answer = answer
+    room.answer = 'qa daw j q 9@a j'
+    return room
+
+
+def _he_gauntlet_map(seed) -> Room:
+    """The six chambers on ONE tall map (the viewport scrolls): runs of text
+    rows split by stone bands, a west gate in each band that grinds open as
+    its chamber reads true (sight floods down to the next), and the exit
+    under the last band, demanding EVERY chamber true."""
+    chain = tuple((done, col) for _laid, done, col, _tape in _HE_CHAMBERS)
+    ROWS = 1 + sum(len(laid) for laid, _d, _c, _t in _HE_CHAMBERS) \
+             + len(_HE_CHAMBERS)                    # top wall + text + bands
+    C = _HE_COLS
+    cells = [[CellType.WALL] * C for _ in range(ROWS)]
+    room = Room(room_type=RoomType.ENTRY, rows=ROWS, cols=C)
+    r = 1
+    for laid, _done, _col, _tape in _HE_CHAMBERS:
+        for line in laid:
+            for c in range(2, C - 2):
+                cells[r][c] = CellType.FLOOR
+            col = _HE_TX
+            for wd in line.split(' '):
+                room.char_runs.append(CharRun(r, col, tuple(wd), 'ancient'))
+                col += len(wd) + 1
+            r += 1
+        r += 1                                      # the stone band (gate shut)
+    room.cells = cells
+    room.seed  = seed
+    room._heg_chain = chain
+    # spawn ON the first warped rune — the Echo Vault beat records at once
+    room.spawn_pos = (1, _HE_TX + _HE_EV_LAID[0].index(_HE_WARP))
+    room.exit_pos  = (ROWS - 1, _HE_GATE_COL)       # under the last band
+    room.entities.append(Entity(kind='exit', row=ROWS - 1, col=_HE_GATE_COL,
+                                edit_immune=True))
+    room.rebuild_indexes()
+    apply_stone_fog(room)
+    room.answer = ' '.join(t for _l, _d, _c, t in _HE_CHAMBERS)
     return room
 
 
@@ -5366,20 +5407,8 @@ def build_dungeon_hall_of_echoes(seed: int) -> Dungeon:
     """The Hall of Echoes (slug `hall_of_echoes`): q @ " — record the mend
     once, and let the echo do the rest, hall after hall."""
     rng = random.Random(seed)
-    i, j = rng.sample(range(len(_HE_POEMS)), 2)
-    rooms = []
-    for k, (poem_idx, tape) in enumerate(
-            ((i, 'daw qa j daw q 8@a 2j'), (j, 'daw 9@a 2j'))):
-        _name, lines, intr = _HE_POEMS[poem_idx]
-        laid = tuple(f'{intr[t]} {lines[t]}' for t in range(10))
-        room = _he_room(laid, lines, _HE_TX, None, tape, seed,
-                        ember_first_word=True)
-        room._he_poem = _HE_POEMS[poem_idx][0]
-        rooms.append(room)
-    n_ch = len(_HE_CHAMBERS)
-    for k, (laid, true, sc, hc, tape) in enumerate(_HE_CHAMBERS):
-        rooms.append(_he_room(laid, true, sc, hc, tape, seed,
-                              final=(k == n_ch - 1)))
+    poem = _HE_POEMS[rng.randrange(len(_HE_POEMS))]
+    rooms = [_he_poem_room(poem, seed), _he_gauntlet_map(seed)]
     for room in rooms:
         room.par    = _HE_PAR
         room.budget = _HE_BUDGET

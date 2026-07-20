@@ -1591,31 +1591,58 @@ def _sight_sanctum_tick(room, player) -> list:
 
 
 def _hall_of_echoes_tick(room, player) -> list:
-    """The Hall of Echoes gauntlet — each room's SOUTH seal parts when the
-    room reads true. `room._heg_true` demands the exact non-blank row texts
-    in order and (for the alignment chamber) the head column. STATELESS +
-    undo-aware, the hardened-chassis pattern; row-count-agnostic so the
-    Joiner chamber's collapsing rows judge correctly."""
-    spec = getattr(room, '_heg_true', None)
-    if spec is None:
+    """The Hall of Echoes gauntlet — chambers are RUNS of text rows split by
+    stone bands. `room._heg_chain` holds one (done-texts, head-col) spec per
+    chamber, in map order; each intermediate band's west gate grinds open
+    while its chamber reads true, and the final seal (room.exit_pos)
+    demands EVERY chamber true. STATELESS + undo-aware; runs are re-derived
+    each tick, so J-collapses and dd-culls ride correctly (rows shift, the
+    bands shift with them)."""
+    chain = getattr(room, '_heg_chain', None)
+    if chain is None:
         return []
     msgs = []
-    texts, heads = [], []
+    runs, cur = [], []
     for r in range(room.rows):
         t = _wla_floor_text(room, r)
         if t.strip():
-            texts.append(t.strip())
-            heads.append(len(t) - len(t.lstrip()))
-    ok = tuple(texts) == spec['texts']
-    if ok and spec['col'] is not None:
-        ok = all(h == spec['col'] for h in heads)
+            cur.append((r, t))
+        elif cur:
+            runs.append(cur)
+            cur = []
+    if cur:
+        runs.append(cur)
+    oks = []
+    for k, (texts, colreq) in enumerate(chain):
+        if k >= len(runs):
+            oks.append(False)
+            continue
+        got = tuple(t.strip() for _r, t in runs[k])
+        ok = got == tuple(texts)
+        if ok and colreq is not None:
+            ok = all(len(t) - len(t.lstrip()) == colreq for _r, t in runs[k])
+        oks.append(ok)
+    gcol = _dg._HE_GATE_COL
+    for k in range(min(len(chain) - 1, len(runs))):    # intermediate gates
+        gr = runs[k][-1][0] + 1
+        if gr >= room.rows - 1:
+            continue
+        is_open = room.cells[gr][gcol] != CellType.WALL
+        if oks[k] and not is_open:
+            room.cells[gr][gcol] = CellType.FLOOR
+            msgs.append('The chamber rings true — the way south grinds open!')
+        elif not oks[k] and is_open and (player.row, player.col) != (gr, gcol):
+            room.cells[gr][gcol] = CellType.WALL       # undone — it re-bars
     er, ec = room.exit_pos
+    if not (0 <= er < room.rows):
+        return msgs                    # a mangled buffer — never crash the tick
+    all_ok = len(runs) == len(chain) and all(oks)
     is_open = room.cells[er][ec] != CellType.WALL
-    if ok and not is_open:
+    if all_ok and not is_open:
         room.cells[er][ec] = CellType.FLOOR
-        msgs.append('The hall rings true — the way south grinds open!')
-    elif not ok and is_open and (player.row, player.col) != (er, ec):
-        room.cells[er][ec] = CellType.WALL         # undone — the seal returns
+        msgs.append('Every hall rings true — the last seal parts!')
+    elif not all_ok and is_open and (player.row, player.col) != (er, ec):
+        room.cells[er][ec] = CellType.WALL             # undone — it returns
     return msgs
 
 
