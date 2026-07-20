@@ -309,6 +309,40 @@ def test_global_delete_also_clobbers(monkeypatch):
     assert not result['won']
 
 
+def test_one_wide_v_cull_is_lawful_and_wins(monkeypatch):
+    # The whole ledger in ONE breath: :2,19v/that/d _ keeps exactly the
+    # chain (playtest 2026-07-19). It reads the same truth off the page,
+    # so it is a lawful 2★ road — and at 32 keys it undercuts par 35.
+    d = _fresh(0)
+    r = d.rooms[0]
+    tape = ':set␣nu⏎ 2l x $ p :2,19v/that/d␣_⏎ $ p $'
+    result = _drive(d, _tape_keys(tape), monkeypatch)
+    assert result['won'] and result['stars'] == 2
+    assert r._ledger_lit is True
+
+
+def test_blackhole_register_needs_no_space(monkeypatch):
+    # Vim-faithful: the command name stops at the first non-alphabetic
+    # char, so :v//d_ is the same black-hole delete as :v//d _.
+    d = _fresh(0)
+    tape = '2l x $ p :2,19v/that/d_⏎ $ p $'
+    result = _drive(d, _tape_keys(tape), monkeypatch)
+    assert result['won'] and result['stars'] == 2
+
+
+def test_blind_global_cull_is_refused():
+    # The unseen-line law binds :g/:v deletes too: with the ledger still
+    # dark, the wide :v is refused outright — nothing culled, no light.
+    d = _fresh(0)
+    r = d.rooms[0]
+    from engine.player import Player
+    p = Player(name='t')
+    p.row, p.col = r.spawn_pos
+    handled, msg, _ns, nl = S.run_ex('2,19v/that/d _', r, p)
+    assert handled and nl == 0 and 'dark' in msg
+    assert r.rows == _CL_ROWS
+
+
 # ── rivals ────────────────────────────────────────────────────────────────────
 
 def test_global_delete_of_the_chain_word_wrecks_the_keeps(monkeypatch):
@@ -333,8 +367,8 @@ def test_muffet_global_rival_loses_a_star(monkeypatch):
 def test_subst_blanking_longhand_wins_one_star(monkeypatch):
     # The register-safe longhand: blank the false lines with :s (no clobber,
     # no _ needed) — lawful, far over par, inside budget 60. The blind rows
-    # still need door one first (the unseen law covers only the ex-range
-    # family, but the :v pattern needs the revealed sacred word anyway).
+    # still need door one first (the unseen law covers the ex-range family
+    # and :g/:v deletes; the :v pattern needs the revealed word anyway).
     d = _fresh(0)
     s4 = d.rooms[0].answer.split('/')[1]
     keys = _K(f'2lx$p:2s/.*//⏎:6,10s/.*//⏎:12,19v/{s4}/s%.*%%⏎$p$')

@@ -49,7 +49,10 @@ from engine.world import CellType, CharRun
 from engine.vimregex import compile_sub
 
 _WALLS = (CellType.WALL, CellType.WOOD_WALL)
-_G_DEL_RE = re.compile(r'(?:d|delete)(?:\s+([a-zA-Z"_]))?$')   # :g//d [reg]
+# :g//d [reg] — a non-alpha register (`_` `"`) may follow with NO space
+# (Vim-faithful: the command name stops at the first non-alphabetic char,
+# so `:v//d_` is delete-into-the-black-hole, same as `:v//d _`).
+_G_DEL_RE = re.compile(r'(?:d|delete)(?:\s*([_"])|\s+([a-zA-Z]))?$')
 
 
 # ── line text ↔ row ──────────────────────────────────────────────────────────
@@ -578,8 +581,13 @@ def run_global(room, player, lo, hi, rest, *, confirm=None,
 
     _dm = _G_DEL_RE.match(subcmd)
     if _dm:
+        # The UNSEEN-LINE LAW binds :g/:v deletes too: you cannot cull a
+        # line whose glyphs the dark still hides (misted rows read fine).
+        for row in marked:
+            if _rows_unseen(room, row, row):
+                return _UNSEEN_MSG, 0, 0
         from engine.registers import write_register
-        reg = _dm.group(1)
+        reg = _dm.group(1) or _dm.group(2)
         # Vim-faithful: :g//d fills the register like any delete ("_ discards).
         clip = {'linewise': True,
                 'rows': [r_ for row in sorted(marked)
