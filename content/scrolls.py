@@ -389,6 +389,8 @@ REGEX_CLASSES_SCROLL = {
         ('cmd',    '/\\s',    'whitespace       (\\S: not one)'),
         ('cmd',    '/\\a',    'a letter   \\l lower   \\u UPPER'),
         ('blank',),
+        ('dim',    '  The same grammar serves ? and :s and :g.'),
+        ('blank',),
         ('amber',  '  Seek a kind, not only a character.'),
     ],
 }
