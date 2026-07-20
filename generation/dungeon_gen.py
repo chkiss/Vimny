@@ -5347,12 +5347,15 @@ def build_dungeon_hall_of_echoes(seed: int) -> Dungeon:
 # beside the next — the j/k-walker pays a trailing ^ where +/- land on the
 # word in one reach. The two steps ABOVE the spawn force `-` (up to the
 # first non-blank), the two BELOW force `+`; neither can be skipped, since
-# every step is its own bolt. Below the valley a shaft drops to the gate,
-# whose EXIT sits at the gate row's first-non-blank ONCE THE BOLTS have
-# ground back (they run contiguously east from the seal, opening east→west
-# as the words mend — each mend pulls the landing a cell closer); a bare
-# undercroft beneath it means G undershoots, so the descent is {n}+ landing
-# straight onto the seal — a plain {n}j lands beside it and still owes a ^.
+# every step is its own bolt. Below the valley the gate row runs WEST into
+# solid stone: each mended word CARVES the next cell of a corridor through
+# the stone toward the sealed exit (playtest 2026-07-19 — the old bolts
+# were lone wall cells inside the valley floor, and opening them read as
+# random floor, not a path being cut). With every step mended the corridor
+# meets the seal, the seal parts, and the gate row's first-non-blank
+# becomes the exit itself — so the final {n}+ lands straight on it; a bare
+# undercroft beneath means G undershoots, and a plain {n}j lands beside
+# the landing and still owes a ^.
 #
 # Redesigned 2026-07-17, tape fixed 2026-07-19: `_` cannot be UNIQUELY
 # forced — `{n}_` is exactly `{n-1}+`, and `_` alone is `^` — so the tape
@@ -5371,12 +5374,12 @@ _SR_STEP_ROWS = (12, 14, 16, 18, 20)  # S1..S5; the player spawns on S3 (the mid
 _SR_STEP_COLS = (24, 32, 26, 34, 26)  # zigzag — vertical neighbours never align
 _SR_SPAWN_IDX = 2                     # index into the two tuples above (row 16)
 _SR_GATE    = 24
-_SR_EXIT    = (24, _SR_WEST)          # the FINAL SEAL, AT the gate row's first-non-blank
-# Per-word bolts run CONTIGUOUSLY east from the seal, barring the walk to it
-# (and pushing the gate row's first-non-blank east while any stands). Words
-# open them EAST→WEST, so each mend visibly pulls the future landing one
-# cell closer to the seal — the grinding IS the path opening.
-_SR_BOLT_COLS = (23, 24, 25, 26, 27)
+_SR_EXIT    = (24, 16)                # the FINAL SEAL, in the stone west of the valley
+# The corridor cells between the valley's west edge and the seal, all stone
+# until carved. Each step's mend floors ITS cell; the assignment follows
+# the canonical mend order (S3 S2 S1 S4 S5), so the driven route carves
+# east→west, one clean cut deeper per word — the grinding IS the path.
+_SR_BOLT_COLS = (21, 20, 19, 18, 17)  # cols, in canonical mend order
 _SR_UNDERCROFT = 25                   # bare row — G undershoots the gate to here
 _SR_CHEST   = (25, 34)                # unassigned → the relic scroll pool
 _SR_PAR     = 15                      # x 2- x 2- x 6+ x 2+ x 4+ ({n}_ only ever
@@ -5408,21 +5411,22 @@ def build_dungeon_stair_rail(seed: int) -> Dungeon:
     for r in range(_SR_STEP_ROWS[0], _SR_UNDERCROFT + 1):
         for c in range(_SR_WEST, _SR_EAST):
             cells[r][c] = CellType.FLOOR
-    for dc in _SR_BOLT_COLS:                               # the per-word bolts
-        cells[_SR_GATE][dc] = CellType.WALL
-    cells[_SR_EXIT[0]][_SR_EXIT[1]] = CellType.WALL        # the FINAL SEAL (the fnb)
+    # The corridor cells (_SR_BOLT_COLS) and the seal are west of the valley
+    # and already stone — each mend carves its cell; the tick floors them.
 
     room = Room(room_type=RoomType.ENTRY, rows=R, cols=C)
     room.cells = cells
     room.seed  = seed
 
     doors = []
+    mend_order = (2, 1, 0, 3, 4)          # S3 (spawn) → S2 → S1 → S4 → S5
     for k, r in enumerate(_SR_STEP_ROWS):
         col = _SR_STEP_COLS[k]
         room.char_runs.append(CharRun(r, col, tuple('◆' + words[k]), 'ember'))
         room.char_runs.append(CharRun(r, _SR_PLQ_COL, tuple(words[k]), 'verdant'))
-        # bolts open EAST→WEST: each mended step pulls the landing closer
-        doors.append(((words[k],), _SR_BOLT_COLS[len(_SR_STEP_ROWS) - 1 - k]))
+        # each mended step carves its own corridor cell, east→west along
+        # the canonical route (any other order carves the same passage)
+        doors.append(((words[k],), _SR_BOLT_COLS[mend_order.index(k)]))
     room._ss_doors = tuple(doors)                        # the shared exact-text tick
     room._sr_words = words
 
@@ -11956,8 +11960,10 @@ _CL_BLIGHT_II   = (6, 7, 8, 9, 10)
 _CL_JUNK_III    = (12, 14, 16, 17, 19)
 _CL_SACRED_III  = (13, 15, 18)
 _CL_GAPS        = (4, 11)
-_CL_PAR    = 35    # 2l(2) x(1) $(1) p(1)  :2d␣_(5) :5,9d␣_(7)
-                   # :6,13v/that/d␣_(15)  $(1) p(1) $(1)
+_CL_PAR    = 23    # the wide cull (playtest 2026-07-19): one :2,19v/that/d _
+                   # keeps exactly the chain — engine-measured spend of the
+                   # canonical tape below. The three-beat longhand
+                   # (:2d :5,9d :6,13v) still wins, at 1★ (35 spent).
 _CL_BUDGET = 60                      # generous: the :s-blanking longhand wins 1★
 # THE HOUSE THAT JACK BUILT (public domain) — solution by sense, not decree:
 # the true ledger is the cumulative chain, split at its clause seams, so its
@@ -11965,9 +11971,11 @@ _CL_BUDGET = 60                      # generous: the :s-blanking longhand wins 1
 # chain-word "that" (the rhyme's own signature), so :v/that/d — keep what
 # bears the chain, cull the rest — is READ off the page, not decreed. The
 # intruders are whole OTHER nursery rhymes: one Humpty line squatting in
-# stanza I (:2d), all of Little Miss Muffet as the contiguous block
-# (:5,9d), and the rest of Humpty (plus a cheeky Jack-and-Jill) scattered
-# through stanza III. None of them contains "that".
+# stanza I, all of Little Miss Muffet as a contiguous block, and the rest
+# of Humpty (plus a cheeky Jack-and-Jill) scattered through stanza III.
+# None of them contains "that" — and the chain's HEAD ('This is the dog,')
+# doesn't either, so the canonical wide cull ranges PAST it (:2,19v); the
+# ranged :2d / :5,9d beats remain the three-beat 1★ longhand.
 _CL_KEEPS = (
     'This is the dog,',                    # rows 1, 3, 5 — the chain's head
     'that worried the cat,',
@@ -12073,8 +12081,7 @@ def build_dungeon_culling_ledger(seed: int) -> Dungeon:
 
     room.par    = _CL_PAR
     room.budget = _CL_BUDGET
-    room.answer = (':set␣nu⏎ 2l x $ p :2d␣_⏎ :5,9d␣_⏎ '
-                   ':6,13v/that/d␣_⏎ $ p $')
+    room.answer = ':set␣nu⏎ 2l x $ p :2,19v/that/d␣_⏎ $ p $'
 
     room.rebuild_indexes()
     pocket = {(_CL_COR, c) for c in range(51, 55)}  # the dark exit pocket
@@ -12086,18 +12093,19 @@ def build_dungeon_culling_ledger(seed: int) -> Dungeon:
 
 
 # ── The Shelving Room (display 41) — the movers: :m :t :> :< ─────────────────
-# The Culling Ledger's chasm chassis, second lesson: verses were shelved
-# BLIND across the gap — one out of order, the closing refrain never shelved
-# at all, two landed at the wrong depth. The true stanza is carved in the
-# WEST WALL (a plaque column, row for row beside the shelf); the seal opens
-# when the shelf reads the plaque exactly, indent included. No cell on a
-# shelf row is passable (misted floor band), so the only movers are the
-# ranged ex commands: :m reorders, :t shelves the missing copy, :> :< set
-# the depth. A fresh :t/:m row is born unfogged — main's _shelving_tick
-# re-mists ANY bare shelf floor each turn (the chasm law is stateless) and
-# re-rights the plaque column after row inserts drag it.
+# The Culling Ledger's chasm chassis, second lesson: the round was misfiled
+# — one echo sits among the wrong pair, one sank a step too deep, and the
+# last was never shelved at all. NO PLAQUE (playtest 2026-07-19): the round
+# is an echo — every voice sings twice, the echo a step deeper than its
+# call — so the true shelf is known by SENSE; the shelf's own sound pairs
+# show the convention. Each mended misfiling grinds back its own gallery
+# bolt, IN ANY ORDER (`_SHR_BOLT_COLS`, main's _shelving_tick conditions);
+# the seal parts when the whole round reads true, indent included. No cell
+# on a shelf row is passable (misted floor band), so the only movers are
+# the ranged ex commands: :m reorders, :t shelves the missing copy, :> :<
+# set the depth. A fresh :t/:m row is born unfogged — the tick re-mists
+# ANY bare shelf floor each turn (the chasm law is stateless).
 _SHR_ROWS, _SHR_COLS = 11, 72
-_SHR_PLQ  = 3                        # plaque head col (wall glyphs, + indent)
 _SHR_TX   = 30                       # shelf floor band head col
 _SHR_BAND = (30, 66)                 # the misted floor band on every shelf row
 _SHR_WTR  = 8                        # the water course (sight-line + line 8's home)
@@ -12105,6 +12113,10 @@ _SHR_GAL  = 9                        # the reading gallery
 _SHR_SEAL_COL  = 61
 _SHR_CHEST_COL = 66
 _SHR_EXIT_COL  = 70
+# The four gallery bolts west of the seal — one per misfiling, orderless:
+# voices in song order and paired · the Sonnez echo at its step · the last
+# echo shelved · the last echo at its step.
+_SHR_BOLT_COLS = (57, 58, 59, 60)
 # FRÈRE JACQUES (traditional, public domain — the French original): an ECHO
 # ROUND, so the shelf's order and duplication are known BY SENSE — every
 # line is sung twice, the echo a step behind (and a step DEEP, the echo
@@ -12148,6 +12160,8 @@ def build_dungeon_shelving_room(seed: int) -> Dungeon:
         cells[_SHR_GAL][c] = CellType.FLOOR        # the reading gallery (west of
     for c in range(_SHR_SEAL_COL + 1, _SHR_EXIT_COL + 1):    # the band is stone —
         cells[_SHR_GAL][c] = CellType.FLOOR        # nothing to walk there)
+    for c in _SHR_BOLT_COLS:                       # the per-misfiling bolts
+        cells[_SHR_GAL][c] = CellType.WALL
     # (_SHR_GAL, _SHR_SEAL_COL) stays WALL until _shelving_tick opens it.
 
     room = Room(room_type=RoomType.ENTRY, rows=R, cols=C)
@@ -12162,8 +12176,6 @@ def build_dungeon_shelving_room(seed: int) -> Dungeon:
             room.char_runs.append(CharRun(r, col, tuple(wd), kind))
             col += len(wd) + 1
 
-    for i, t in enumerate(targets):                # the plaque column (rows 1..8)
-        lay(i + 1, _SHR_PLQ + _SHR_INDENTS[i], t.strip(), 'verdant')
     for r, (text, ind) in enumerate(_SHR_INIT, start=1):   # the misfiled round
         lay(r, _SHR_TX + ind, text, 'ancient')
 
@@ -12172,8 +12184,6 @@ def build_dungeon_shelving_room(seed: int) -> Dungeon:
         Entity(kind='chest_scroll', row=_SHR_GAL, col=_SHR_CHEST_COL),
     ]
     room._shr_targets = tuple(targets)
-    room._shr_plaque  = tuple((_SHR_INDENTS[i], targets[i].strip())
-                              for i in range(8))
     room._shr_seal_col = _SHR_SEAL_COL
 
     room.par    = _SHR_PAR

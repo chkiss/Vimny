@@ -24,7 +24,9 @@ there is only one key — the black hole (:d _) is the lesson. The unseen-line
 law bars culling the still-dark ledger, so door one must open first (which
 parts the mist); when the ledger reads true, the corridor brazier catches
 the verdant lines' fire and its light unveils the exit pocket. Canonical
-`2l x $ p :2d _ :5,9d _ :6,13v/{s4}/d _ $ p 4l`, par 36."""
+(playtest 2026-07-19): the ONE wide cull — `:set nu⏎ 2l x $ p
+:2,19v/that/d _⏎ $ p $`, par 23; the three-beat longhand (:2d _ · :5,9d _
+· :6,13v _) still wins, at 1★ (35 spent)."""
 from collections import deque
 
 import pytest
@@ -271,10 +273,11 @@ def test_finale_lights_the_brazier(monkeypatch):
 # ── the register lesson: skip the black hole and the key is ash ───────────────
 
 def test_clobbering_delete_loses_the_key(monkeypatch):
-    # :2d without _ overwrites the held key — door two never opens.
+    # a plain ranged :2d without _ overwrites the held key — door two never
+    # opens.
     d = _fresh(0)
-    a = d.rooms[0].answer.replace(':2d␣_⏎', ':2d⏎')
-    result = _drive(d, _tape_keys(a), monkeypatch)
+    tape = ':set␣nu⏎ 2l x $ p :2d⏎ :2,19v/that/d␣_⏎ $ p $'
+    result = _drive(d, _tape_keys(tape), monkeypatch)
     assert not result['won']
 
 
@@ -284,10 +287,8 @@ def test_stashing_the_key_loses_it(monkeypatch):
     # empties — so the stash never shields a plain cull.
     d = _fresh(0)
     r = d.rooms[0]
-    a = r.answer
-    a = a.replace('$ p :2d␣_⏎', '$ p p :2d⏎')     # try to drop a copy
-    a = a.replace(':5,9d␣_⏎', ':5,9d⏎')
-    result = _drive(d, _tape_keys(a), monkeypatch)
+    tape = ':set␣nu⏎ 2l x $ p p :2,19v/that/d⏎ $ p $'   # drop a copy, cull plain
+    result = _drive(d, _tape_keys(tape), monkeypatch)
     assert not result['won']
     assert not any(e.kind == 'floor_key' and e.alive for e in r.entities)
 
@@ -309,15 +310,15 @@ def test_global_delete_also_clobbers(monkeypatch):
     assert not result['won']
 
 
-def test_one_wide_v_cull_is_lawful_and_wins(monkeypatch):
-    # The whole ledger in ONE breath: :2,19v/that/d _ keeps exactly the
-    # chain (playtest 2026-07-19). It reads the same truth off the page,
-    # so it is a lawful 2★ road — and at 32 keys it undercuts par 35.
+def test_three_beat_longhand_wins_one_star(monkeypatch):
+    # The old canonical: :2d _ · :5,9d _ · :6,13v _ — three beats where one
+    # wide :v does it all. Still lawful, still lights the brazier, but at
+    # 35 spent it lands over par 23: 1★.
     d = _fresh(0)
     r = d.rooms[0]
-    tape = ':set␣nu⏎ 2l x $ p :2,19v/that/d␣_⏎ $ p $'
+    tape = ':set␣nu⏎ 2l x $ p :2d␣_⏎ :5,9d␣_⏎ :6,13v/that/d␣_⏎ $ p $'
     result = _drive(d, _tape_keys(tape), monkeypatch)
-    assert result['won'] and result['stars'] == 2
+    assert result['won'] and result['stars'] == 1
     assert r._ledger_lit is True
 
 
@@ -349,19 +350,9 @@ def test_global_delete_of_the_chain_word_wrecks_the_keeps(monkeypatch):
     # :g/that/d _ is the :v beat inverted — it culls the CHAIN and spares the
     # intruders. The seal never opens.
     d = _fresh(0)
-    a = d.rooms[0].answer.replace(':6,13v/that/d␣_⏎', ':g/that/d␣_⏎')
+    a = d.rooms[0].answer.replace(':2,19v/that/d␣_⏎', ':2,19g/that/d␣_⏎')
     result = _drive(d, _tape_keys(a), monkeypatch)
     assert not result['won']
-
-
-def test_muffet_global_rival_loses_a_star(monkeypatch):
-    # :g/Muffet/d _ only reaches 2 of the block's 5 lines — the rest still
-    # need singles; the whole road overspends par.
-    d = _fresh(0)
-    a = d.rooms[0].answer.replace(':5,9d␣_⏎',
-                                  ':g/Muffet/d␣_⏎:5d␣_⏎:5d␣_⏎:5d␣_⏎')
-    result = _drive(d, _tape_keys(a), monkeypatch)
-    assert result['won'] and result['stars'] == 1
 
 
 def test_subst_blanking_longhand_wins_one_star(monkeypatch):
