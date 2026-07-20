@@ -662,7 +662,9 @@ def _parse_ex_range(rest: str, room, player):
 
 
 def looks_like_ex_range(cmd: str, room, player) -> bool:
-    """True if cmd (after a leading range) is a d/y/m/t/>/</j ex command."""
+    """True if cmd (after a leading range) is a d/y/m/t/>/</j ex command —
+    judged on the FIRST bar segment (`:1j|1y` routes like `:1j`)."""
+    cmd = _split_bar(cmd)[0]
     try:
         _lo, _hi, rest = split_range(cmd, room, player)
     except Exception:                          # noqa: BLE001
@@ -897,7 +899,10 @@ def run_ex_range(room, player, lo, hi, spec):
 
 # ── public entry ─────────────────────────────────────────────────────────────
 def looks_like_sg(cmd: str, room, player) -> bool:
-    """True if cmd (after a leading range) is a substitute or global command."""
+    """True if cmd (after a leading range) is a substitute or global command
+    — judged on the FIRST bar segment (:g/:v consume the bar anyway)."""
+    if not _bar_exempt(cmd, room, player):
+        cmd = _split_bar(cmd)[0]
     try:
         _lo, _hi, rest = split_range(cmd, room, player)
     except Exception:                          # noqa: BLE001
@@ -905,8 +910,67 @@ def looks_like_sg(cmd: str, room, player) -> bool:
     return bool(rest) and (rest[0] in 'sgv&')
 
 
+def _split_bar(cmd: str):
+    """Vim's :bar law — split at the first unescaped `|` (a chained command
+    follows). Returns (head, tail-or-None). The :g/:v exemption (those
+    commands consume the bar as part of their body) is applied by the
+    caller, per segment."""
+    i, n = 0, len(cmd)
+    while i < n:
+        ch = cmd[i]
+        if ch == '\\':
+            i += 2
+            continue
+        if ch == '|':
+            return cmd[:i], cmd[i + 1:]
+        i += 1
+    return cmd, None
+
+
+def _bar_exempt(cmd, room, player) -> bool:
+    """True when the command after the range is :g/:v — the bar belongs to
+    its body (Vim-faithful; :s does NOT see the bar)."""
+    try:
+        _lo, _hi, rest = split_range(cmd, room, player)
+    except Exception:                          # noqa: BLE001
+        return False
+    return rest[:1] in ('g', 'v')
+
+
 def run_ex(cmd, room, player, *, confirm=None, insert_row=None, delete_row=None):
-    """Execute a :s / :g / :v / :& command. Returns (handled, message, n_subs, n_lines)."""
+    """Execute a :s / :g / :v / :& / ex-range command line, honouring `|`
+    chaining (`:1j|1y`). Returns (handled, message, n_subs, n_lines) —
+    handled if the FIRST segment was an editor command; counts summed; on
+    an E-message the rest of the chain is abandoned (Vim aborts on error)."""
+    handled_any = False
+    msg_out = None
+    tot_ns = tot_nl = 0
+    seg = cmd
+    while seg is not None:
+        if _bar_exempt(seg, room, player):
+            head, seg = seg, None
+        else:
+            head, seg = _split_bar(seg)
+        handled, msg, ns, nl = _run_ex_one(head, room, player, confirm=confirm,
+                                           insert_row=insert_row,
+                                           delete_row=delete_row)
+        if not handled:
+            if not handled_any:
+                return False, None, 0, 0
+            return True, f'E492: Not an editor command: {head}', tot_ns, tot_nl
+        handled_any = True
+        tot_ns += ns
+        tot_nl += nl
+        if msg is not None:
+            msg_out = msg
+        if msg is not None and msg.startswith('E'):
+            break                              # error aborts the chain
+    return handled_any, msg_out, tot_ns, tot_nl
+
+
+def _run_ex_one(cmd, room, player, *, confirm=None, insert_row=None,
+                delete_row=None):
+    """One bar-segment of an ex command line."""
     lo, hi, rest = split_range(cmd, room, player)
     if not rest:
         return False, None, 0, 0

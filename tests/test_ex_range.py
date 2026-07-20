@@ -307,3 +307,39 @@ def test_copy_of_immune_row_is_allowed():
     handled, _msg, _ns, nl = S.run_ex('1t$', r, _player())
     assert handled and nl == 1                     # :t doesn't cut — no parry
     assert _all(r) == ['aa', 'bb', 'aa']
+
+
+# ── the bar: | chains ex commands (Vim :bar law) ─────────────────────────────
+def test_bar_chains_join_then_yank():
+    # :1j|1y — join lines 1-2, then yank the joined line, one command line.
+    r = _room(['my fair', 'lady.', 'walk'])
+    p = _player(2, 0)
+    handled, _msg, _ns, _nl = S.run_ex('1j|1y', r, p)
+    assert handled
+    assert _text(r, 0).rstrip() == 'my fair lady.'
+    clip = p.registers.get('"')
+    assert clip and clip.get('linewise')
+
+
+def test_bar_error_aborts_the_chain():
+    # the first segment errors (unknown command) → the delete never runs
+    r = _room(['aa', 'bb', 'cc'])
+    handled, msg, _ns, _nl = S.run_ex('1q|2d', r, _player())
+    assert not handled or 'E' in (msg or '')
+    assert r.rows == 3
+
+
+def test_bar_second_segment_unknown_reports_e492():
+    r = _room(['aa', 'bb', 'cc'])
+    handled, msg, _ns, _nl = S.run_ex('2d|1q', r, _player())
+    assert handled and msg.startswith('E492')
+    assert r.rows == 2                             # the first segment DID run
+
+
+def test_bar_inside_global_body_is_not_split():
+    # :g consumes the bar (Vim-faithful): the bar reaches run_global's body.
+    r = _room(['aa', 'bb', 'aa'])
+    handled, msg, _ns, _nl = S.run_ex('g/aa/p', r, _player())
+    assert handled and '2 lines' in msg
+    handled2, _msg2, _ns2, _nl2 = S.run_ex('g/a|b/d', r, _player())
+    assert handled2                                # bar stayed in the body
