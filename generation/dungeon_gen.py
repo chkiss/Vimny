@@ -12521,6 +12521,9 @@ def build_dungeon_warden_eternal(seed: int) -> Dungeon:
             entities.append(Entity(kind='warden', row=mid, col=C // 2,
                                    hp=whp, max_hp=whp, ai='', tag='eternal',
                                    edit_immune=True))
+            # a VISIBLE shield — the tell for edit-immunity: your cuts glance
+            # off him (steel, not text), so he is felled by the blade (x) alone.
+            entities.append(Entity(kind='shield', row=mid, col=C // 2 - 1))
         placed = {(mid, C // 2)}
         for _ in range(gcount):
             for _try in range(30):
@@ -12544,13 +12547,27 @@ def build_dungeon_warden_eternal(seed: int) -> Dungeon:
     boss = Entity(kind='warden', row=29, col=50, hp=6, max_hp=6, ai='',
                   tag='eternal_boss', edit_immune=True)
     entities.append(boss)
-    # the horde — sized so hand-killing is grind and a /g-x macro is the answer.
-    hplaced = {(29, 50)}
-    for _ in range(24):
+    # his visible ward — set ABOVE him (shields block movement; keep it off the
+    # row-29 walk to the exit).
+    entities.append(Entity(kind='shield', row=28, col=50))
+    # THE RANK — a wall of goblins drawn up STATIONARY on the boss's own row,
+    # flanking him. They hold formation, so ONE line-cut fells them all: `0 d$`
+    # (or D) shears the whole row charwise — the minions die, the shielded
+    # Warden's ward turns the blade (no collapse; charwise d spares edit_immune).
+    # This is the level's line-deletion lesson, distinct from the macro swarm.
+    rank_cols = [c for c in range(_WDE_SEAL_COL - 14, _WDE_SEAL_COL) if c != 50]
+    hplaced = {(29, 50), (29, 49)}
+    for rc in rank_cols:
+        entities.append(Entity(kind='goblin', row=29, col=rc, hp=1, max_hp=1,
+                               ai='', tag='rank'))
+        hplaced.add((29, rc))
+    # the swarm — MOBILE goblins scattered across the hall (NOT the boss row),
+    # sized so hand-killing is grind and a /g-x macro is the master's answer.
+    for _ in range(18):
         for _try in range(60):
             gr = rng.randint(_WDE_FINALE_TOP, _WDE_FINALE_BOT)
             gc = rng.randint(3, _WDE_SEAL_COL - 2)
-            if (gr, gc) not in hplaced:
+            if gr != 29 and (gr, gc) not in hplaced:
                 hplaced.add((gr, gc))
                 entities.append(Entity(kind='goblin', row=gr, col=gc, hp=1,
                                        max_hp=1, ai='chase', ai_speed=2,
@@ -12568,6 +12585,7 @@ def build_dungeon_warden_eternal(seed: int) -> Dungeon:
     room._wde_seal    = {'col': _WDE_SEAL_COL,
                          'rows': tuple(range(_WDE_FINALE_TOP, _WDE_FINALE_BOT + 1))}
     room._wde_boss_tag = 'eternal_boss'
+    room._wde_hat_drop = (boss.row, boss.col)   # where the hat falls, on the exit path
     room._wde_revealed = False
     room.rebuild_indexes()
     apply_stone_fog(room)                 # each chamber sleeps until its gate opens

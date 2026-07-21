@@ -66,9 +66,17 @@ def test_structure(seed):
     assert r.search_glyph_entities is True      # /g finds goblins, /W the Warden
     boss = [e for e in r.entities if e.tag == 'eternal_boss']
     assert len(boss) == 1 and boss[0].kind == 'warden' and boss[0].edit_immune
-    # a real horde — enough that hand-killing is grind and a macro is the answer
-    horde = [e for e in r.entities if e.tag == 'horde']
-    assert len(horde) >= 20
+    # the boss and every edit-immune warden carry a VISIBLE shield (the tell)
+    shields = [e for e in r.entities if e.kind == 'shield']
+    immune_wardens = [e for e in r.entities if e.kind == 'warden' and e.edit_immune]
+    assert len(shields) == len(immune_wardens) >= 1
+    for w in immune_wardens:                     # a shield sits right beside him
+        assert any(abs(s.row - w.row) + abs(s.col - w.col) == 1 for s in shields)
+    # a MOBILE swarm (macro answer) + a STATIONARY rank on the boss row (line-cut)
+    swarm = [e for e in r.entities if e.tag == 'horde']
+    rank  = [e for e in r.entities if e.tag == 'rank']
+    assert len(swarm) >= 12
+    assert len(rank) >= 8 and all(e.row == boss[0].row and e.ai == '' for e in rank)
 
 
 @pytest.mark.parametrize('seed', SEEDS)
@@ -122,13 +130,43 @@ def test_seal_needs_boss_and_whole_horde(seed):
     main._warden_eternal_tick(r, p)
     assert r.cells[seal['rows'][0]][seal['col']] == CellType.WALL
     assert p.has_hat is False
-    # clear the horde too: seal parts, the hat is granted
+    # clear every goblin too: the seal parts and the Warden LEAVES HIS HAT
     for e in r.entities:
-        if e.tag == 'horde':
+        if e.kind == 'goblin':
             e.hp, e.alive = 0, False
     main._warden_eternal_tick(r, p)
     assert all(r.cells[row][seal['col']] == CellType.FLOOR for row in seal['rows'])
+    hat = [e for e in r.entities if e.kind == 'hat']
+    assert len(hat) == 1                       # dropped, not yet worn
+    assert p.has_hat is False
+
+
+@pytest.mark.parametrize('seed', SEEDS)
+def test_hat_is_picked_up_by_stepping_onto_it(seed):
+    r = _room(seed)
+    p = Player(row=dg._WDE_FINALE_TOP, col=1)
+    for e in r.entities:                       # win the fight
+        if e.kind in ('warden', 'goblin'):
+            e.hp, e.alive = 0, False
+    main._warden_eternal_tick(r, p)            # seal parts, hat drops
+    hat = next(e for e in r.entities if e.kind == 'hat')
+    p.row, p.col = hat.row, hat.col            # step onto it
+    main._warden_eternal_tick(r, p)
     assert p.has_hat is True
+    assert not any(e.kind == 'hat' and e.alive for e in r.entities)
+
+
+@pytest.mark.parametrize('seed', SEEDS)
+def test_rank_is_line_cuttable_while_the_shielded_boss_is_not(seed):
+    # The line-deletion invariant: the stationary rank on the boss row is NOT
+    # edit-immune (a charwise d$/D kills it), while the boss on that same row IS
+    # edit-immune (his shield turns the blade) — so one line-cut shears the
+    # minions and leaves the Warden for the blade. No collapse: charwise, not dd.
+    r = _room(seed)
+    boss = next(e for e in r.entities if e.tag == 'eternal_boss')
+    rank = [e for e in r.entities if e.tag == 'rank']
+    assert rank and all(e.row == boss.row and not e.edit_immune for e in rank)
+    assert boss.edit_immune                      # the shield survives the sweep
 
 
 # ── teleport / walking audit: the exit is unreachable while sealed ────────────

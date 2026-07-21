@@ -550,7 +550,11 @@ WARDENS_REST_SCROLL = {
         ('dim',   'who wants, at the last, to lose.'),
         ('blank',),
         ('amber', 'The buffer is yours now, end to end.'),
-        ('amber', 'Wear the hat. Go anywhere. Edit the world.'),
+        ('dim',   'The hat is no ornament. Wear it —'),
+        ('amber', ':set hat'),
+        ('dim',   'and every command I taught, and every'),
+        ('dim',   "one I did not, is yours, in any hall."),
+        ('dim',   '(:set nohat sets the old bounds back.)'),
     ],
 }
 

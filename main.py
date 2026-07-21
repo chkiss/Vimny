@@ -1910,21 +1910,36 @@ def _warden_eternal_tick(room, player) -> list:
         msgs.append('The wizard lowers his hood — and it is the Warden, who '
                     'blessed your every step. "Now," he breathes. "Show me."')
 
-    # 3) the seal parts when the Warden AND his whole horde are dead
+    # 3) the seal parts when the Warden AND his whole horde are dead — and he
+    #    LEAVES HIS HAT on the stone where he fell (a lootable ⏶ the player
+    #    walks over on the way out; picking it up is step 4).
     seal = getattr(room, '_wde_seal', None)
     if seal and room.cells[seal['rows'][0]][seal['col']] == CellType.WALL:
         boss = next((e for e in room.entities
                      if e.tag == room._wde_boss_tag and e.alive), None)
-        horde = any(e.alive and e.tag == 'horde'
-                    for e in room.entities if e.kind == 'goblin')
+        horde = any(e.alive for e in room.entities if e.kind == 'goblin')
         if boss is None and not horde:
             for r in seal['rows']:
                 room.cells[r][seal['col']] = CellType.FLOOR
+            drop = getattr(room, '_wde_hat_drop', (seal['rows'][len(seal['rows']) // 2],
+                                                   seal['col'] - 7))
+            if not any(e.kind == 'hat' for e in room.entities):
+                room.entities.append(Entity(kind='hat', row=drop[0], col=drop[1]))
             room.rebuild_indexes()
-            player.has_hat = True         # persisted by the win-save on exit
-            msgs.append("The Warden falls still at last. He lifts his hat from "
-                        "his brow and sets it on the stone — yours now. The "
-                        "way out is open. (:set hat to wear it, anywhere.)")
+            msgs.append("The Warden falls still at last, and lays his hat upon "
+                        "the stone. The way out is open — take up the hat as "
+                        "you go.")
+
+    # 4) pick up the hat by stepping onto it (grants has_hat; :set hat wears it)
+    hat = next((e for e in room.entities
+                if e.kind == 'hat' and e.row == player.row and e.col == player.col),
+               None)
+    if hat is not None and not player.has_hat:
+        room.kill_entity(hat)
+        room.rebuild_indexes()
+        player.has_hat = True             # persisted by the win-save on exit
+        msgs.append("You take up the Warden's hat. It is lighter than it looks. "
+                    "(Type  :set hat  to wear it — every command, in any hall.)")
     return msgs
 
 
