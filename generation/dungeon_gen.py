@@ -5407,7 +5407,8 @@ def _he_build_chambers(rng):
     stanzas = tuple(t for t in _RV_TRUE if t != _RV_LADY)
     rv_rows = tuple(((2, ln, 'ancient'),) for ln in (_RV_LADY,) + stanzas)
     rv_done = (_RV_LADY,) + _RV_TRUE
-    rv_tape = 'qdyy3jpq 3@d 0 2j'                 # ↓ into the goblin lair
+    rv_tape = 'qdyy3jpq 3@d 2j'                   # ↓ into the goblin lair
+    # (linewise p lands the cursor at col 0 already — no 0 needed)
     chambers.append({'rows': rv_rows, 'done': rv_done,
                      'span': (2, 55), 'plaques': (), 'tape': rv_tape})
 
