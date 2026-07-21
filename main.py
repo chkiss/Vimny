@@ -1911,7 +1911,7 @@ def _warden_eternal_tick(room, player) -> list:
                     'blessed your every step. "Now," he breathes. "Show me."')
 
     # 3) the seal parts when the Warden AND his whole horde are dead — and he
-    #    LEAVES HIS HAT on the stone where he fell (a lootable ⏶ the player
+    #    LEAVES HIS HAT on the stone where he fell (a lootable Δ the player
     #    walks over on the way out; picking it up is step 4).
     seal = getattr(room, '_wde_seal', None)
     if seal and room.cells[seal['rows'][0]][seal['col']] == CellType.WALL:

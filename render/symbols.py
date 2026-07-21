@@ -34,7 +34,7 @@ DOOR_V       = '▮'
 DOOR_LOCKED  = '🔒'   # may be replaced by init() if terminal renders it as 2-wide
 EXIT         = '◉'
 SHIELD       = '⛨'   # may be replaced by init() if terminal renders it as 2-wide
-HAT          = '⏶'   # the Warden's/wizard's hat (dropped by the final boss); → '^' if 2-wide
+HAT          = 'Δ'   # the Warden's/wizard's hat (dropped by the final boss); → '^' if 2-wide
 
 
 def init(term) -> None:
