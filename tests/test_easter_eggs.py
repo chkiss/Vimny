@@ -168,6 +168,20 @@ def test_cat_persists_as_a_harmless_critter():
     assert cats and all(entity_letter(c) == 'c' and not c.ai for c in cats)
 
 
+def test_uppercase_creature_letters_make_the_swelled_form():
+    # D = a big hound, C = a big cat — the uppercase form is the swelled one,
+    # just like G is a swelled goblin.
+    r, p = _room_and_master()
+    main._goblin_substitute('%s/g/D/', r, p, lambda m: None)
+    dogs = [e for e in r.entities if e.kind == 'ally']
+    assert dogs and all(e.swole and entity_letter(e) == 'D' for e in dogs)
+
+    r, p = _room_and_master()
+    main._goblin_substitute('%s/g/C/', r, p, lambda m: None)
+    cats = [e for e in r.entities if e.kind == 'critter']
+    assert cats and all(e.swole and entity_letter(e) == 'C' for e in cats)
+
+
 def test_swelling_an_ally_keeps_it_yours():
     from engine.world import Entity
     d = dg.build_dungeon_warden_eternal(0)

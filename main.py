@@ -38,7 +38,7 @@ from engine.vim_parser import parse, parse_visual_textobj
 from engine.command_guard import (action_allowed as _action_allowed,
                                   guard_message as _guard_message,
                                   _MOTION_GUARD as _MOTION_GUARD_TABLE)
-from engine.world import Entity, CellType, CharRun, Dungeon, clone_entity
+from engine.world import Entity, CellType, CharRun, Dungeon, clone_entity, entity_letter
 from engine.motion import (apply_motion, _apply_esc, _reveal_from,
                            _first_non_blank_col, auto_fog_tick as _auto_fog_tick)
 from engine.text_object import compute_text_object, resolve_text_object, TextObjectType
@@ -2957,6 +2957,19 @@ _ELF_TRADES = [
 _GOBLIN_SUB_RE = re.compile(r'^\s*(%?)\s*(?:\d+\s*,\s*\d+\s*)?s/([^/]*)/([^/]*)/?[gcinp]*\s*$')
 
 
+def _swell(e, want: bool) -> None:
+    """Set a creature's swelled state (uppercase glyph): bigger + tougher.
+    Mirrors engine.operator.case_entities but on a known entity (no cell lookup,
+    so it is robust to an entity sharing a cell with, e.g., a chest)."""
+    if want == e.swole:
+        return
+    e.swole = want
+    if want:
+        e.max_hp += 2; e.hp += 2
+    else:
+        e.max_hp = max(1, e.max_hp - 2); e.hp = max(1, e.hp - 2)
+
+
 def _goblin_substitute(cmd: str, room, player, push) -> bool:
     """Handle `:s/g/X/` as a creature Easter egg. Returns True if it consumed the
     command (a goblin was targeted), False to fall through to normal substitute.
@@ -2966,13 +2979,16 @@ def _goblin_substitute(cmd: str, room, player, push) -> bool:
     if not m:
         return False
     whole, pat, rep = m.group(1), m.group(2), m.group(3)
-    if pat != 'g':                                   # only the goblin glyph
+    if len(pat) != 1:                                # single-glyph patterns only
         return False
     rows = range(room.rows) if whole == '%' else (player.row,)
-    gobs = [e for e in room.entities if e.alive and e.kind == 'goblin'
-            and e.tag not in ('echo', 'zombie', 'demon') and e.row in rows]
+    # match creatures by their CURRENT glyph, so :s/g/…, :s/G/…, :s/d/…, :s/Z/…
+    # all target the right beasts (case-sensitive, Vim-true).
+    gobs = [e for e in room.entities if e.alive and e.row in rows
+            and e.kind in ('goblin', 'ally', 'critter') and e.tag != 'echo'
+            and entity_letter(e) == pat]
     if not gobs:
-        return False                                 # no plain goblins → normal :s
+        return False                                 # no matching creatures → normal :s
     if not (getattr(player, 'hat_worn', False) or 'admin' in player.known_commands):
         push('They only heed the hand beneath the hat. Not yours.')
         return True
@@ -2983,7 +2999,7 @@ def _goblin_substitute(cmd: str, room, player, push) -> bool:
     if rep1 == '!':                                  # burst into cheerful flame
         room._pending_boom = [(g.row, g.col) for g in gobs]   # caller detonates
         return True
-    if rep1 == 'e':                                  # the elf's shitty bargain
+    if rep1 in ('e', 'E'):                           # the elf's shitty bargain
         offer, key, result = random.choice(_ELF_TRADES)
         for g in gobs:
             room.kill_entity(g)
@@ -2993,33 +3009,49 @@ def _goblin_substitute(cmd: str, room, player, push) -> bool:
         return True
 
     # ── in-place transforms: the creature STAYS ──────────────────────────────
-    if rep1 in ('G', 'g'):                           # case op: swell / shrink
-        case_entities(room, [(g.row, g.col) for g in gobs],
-                      'gU' if rep1 == 'G' else 'gu')
+    # The persistent-creature letters are case-aware: the UPPERCASE form is the
+    # swelled one (g/G goblin, d/D hound, c/C cat), routed through the same
+    # engine case rule so it is bigger + sharper-eyed exactly like ~ or gU.
+    base, up = rep1.lower(), rep1.isupper()
+    cells = [(g.row, g.col) for g in gobs]
+
+    if base == 'g':                                  # goblin: case op swell/shrink
+        for g in gobs:
+            _swell(g, up)
         room.rebuild_indexes()
         push(('The goblins swell into Goblins — bigger, and sharper-eyed.'
-              if rep1 == 'G' else 'The Goblins shrink back to goblins.') + tail)
+              if up else 'The Goblins shrink back to goblins.') + tail)
         return True
-    if rep1 in _GOBLIN_SUB_TRANSFORM:                # z / & — raise a worse thing
-        tag, hp, ai, spd, msg = _GOBLIN_SUB_TRANSFORM[rep1]
+    if base == 'd':                                  # a hound on YOUR side (D = big)
+        for g in gobs:
+            g.kind, g.tag, g.ai, g.ai_speed = 'ally', 'dog', 'hunt', 1
+            g.max_hp, g.hp, g.swole = 2, 2, False
+            _swell(g, up)
+        room.rebuild_indexes()
+        push((('A great hound' if up else 'A loyal hound')
+              + ' takes your side.') + tail)
+        return True
+    if base == 'c':                                  # a harmless cat (C = big)
+        for g in gobs:
+            g.kind, g.tag, g.ai = 'critter', 'cat', ''
+            g.max_hp, g.hp, g.swole = 1, 1, False
+            _swell(g, up)
+        room.rebuild_indexes()
+        push('Poof. A cat. It meows once and plots your downfall.' + tail)
+        return True
+    if base == 'z':                                  # raise the dead
+        tag, hp, ai, spd, msg = _GOBLIN_SUB_TRANSFORM['z']
         for g in gobs:
             g.tag, g.max_hp, g.hp, g.ai, g.ai_speed, g.swole = tag, hp, hp, ai, spd, False
         room.rebuild_indexes()
         push(msg + tail)
         return True
-    if rep1 == 'd':                                  # a loyal hound on YOUR side
+    if rep1 == '&':                                  # summon something worse
+        tag, hp, ai, spd, msg = _GOBLIN_SUB_TRANSFORM['&']
         for g in gobs:
-            g.kind, g.tag, g.ai, g.ai_speed = 'ally', 'dog', 'hunt', 1
-            g.max_hp, g.hp, g.swole = 2, 2, False
+            g.tag, g.max_hp, g.hp, g.ai, g.ai_speed, g.swole = tag, hp, hp, ai, spd, False
         room.rebuild_indexes()
-        push('It becomes a loyal hound and takes your side.' + tail)
-        return True
-    if rep1 == 'c':                                  # a harmless cat (it stays)
-        for g in gobs:
-            g.kind, g.tag, g.ai = 'critter', 'cat', ''
-            g.max_hp, g.hp, g.swole = 1, 1, False
-        room.rebuild_indexes()
-        push('Poof. A cat. It meows once and plots your downfall.' + tail)
+        push(msg + tail)
         return True
 
     # ── REMOVE effects (default: turn into that harmless letter) ─────────────
