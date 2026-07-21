@@ -183,6 +183,43 @@ def test_counted_e_rival_wins_at_one_star(seed, monkeypatch):
     assert won and _GS_PAR < spent <= room.budget
 
 
+def _tail_cols(room):
+    cols = []
+    for r in _GS_BAYS:
+        run = max((ru for ru in room.char_runs if ru.row == r and ru.kind == 'ancient'),
+                  key=lambda ru: ru.col)
+        cols.append(run.col + len(run.symbols) - 1)      # the corrupt last glyph
+    return cols
+
+
+@pytest.mark.parametrize("seed", SEEDS)
+def test_adjacent_tails_separated_so_no_jh_cheat(seed):
+    """Playtest 2026-07-20: adjacent verse tails must sit >= 3 columns apart,
+    so `j` then an h/l walk to the next tail costs more than g_ (2 keys). When
+    two tails were one column apart (…bush@66 / …boy@65), `j h` cheated g_."""
+    cols = _tail_cols(_room(seed))
+    for a, b in zip(cols, cols[1:]):
+        assert abs(a - b) >= 3, (cols, "adjacent tails too close — j h would cheat g_")
+
+
+def test_j_walk_rival_overshoots_par(monkeypatch):
+    """The cheat the playtest found: reach each next tail by `j` (down, same
+    column) then an h/l walk, never g_. With the tails staggered this pays far
+    more than g_'s two flat keys, so it lands OVER par (1 star)."""
+    room = _room(0)
+    f = room._gs_words['fixes']
+    cols = _tail_cols(room)
+    keys = f'jg_r{f[0]}'                                  # mend verse 1 (g_ used once to start)
+    cur = cols[0]
+    for i in (1, 2):
+        dc = cols[i] - cur                               # j lands at `cur`; walk to tail i
+        keys += 'j' + ('l' if dc > 0 else 'h') * abs(dc) + 'r' + f[i]
+        cur = cols[i]
+    keys += 'G$'
+    won, spent = _drive_spent(_K(keys), monkeypatch, 0)
+    assert won and spent > _GS_PAR, (spent, _GS_PAR)     # the j-walk is dearer than g_
+
+
 def test_dollar_drowns_in_the_flood(monkeypatch):
     # The forcing terrain: $ overshoots the text onto the water.
     dungeon = build_dungeon_g_sanctum(0)

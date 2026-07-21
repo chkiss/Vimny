@@ -5618,11 +5618,19 @@ _GS_BAYS   = (2, 3, 4)                # adjacent — + chains them
 # Every saying is 10+ words ({n}e pays two digits where g_ pays two keys
 # flat); ADJACENT rows differ in count, so no count transfers blind to the
 # next verse. Widths ≤ 47 chars — the text ends shy of the flood.
+# The tails must land at WELL-SEPARATED columns (playtest 2026-07-20): when two
+# ADJACENT tails sat one column apart (…bush@66 / …boy@65), `j h` reached the
+# next edit spot cheaper than g_. The verses stay 10+ words (the {n}e defense),
+# but the LAST is INDENTED (_GS_STARTS) so its tail swings clear — every
+# adjacent pair of tails is now ≥ 4 columns apart, so a `j` then h/l walk to
+# the tail costs far more than g_'s two flat keys.
 _GS_VERSES = (
-    ('an ounce of prevention is worth a pound of cure', 'curz'),   # 10 words
-    ('a bird in the hand is worth two in the bush',     'busj'),   # 11 words
-    ('all work and no play makes jack a dull boy',      'boq'),    # 10 words
+    ('an ounce of prevention is worth a pound of cure', 'curz'),   # 10w, tail @ col 70
+    ('a bird in the hand is worth two in the bush',     'busj'),   # 11w, tail @ col 66
+    ('all work and no play makes jack a dull boy',      'boq'),    # 10w, indented → col 70
 )
+_GS_STARTS = (24, 24, 29)             # the third verse is indented so its tail
+                                      # (col 70) sits clear of the second's (col 66)
 _GS_NWORDS = tuple(len(v.split()) for v, _c in _GS_VERSES)
 _GS_TEXT0  = 24
 _GS_POOL   = (72, 73)                 # the flood: $ lands here and drowns
@@ -5670,7 +5678,7 @@ def build_dungeon_g_sanctum(seed: int) -> Dungeon:
     doors = []
     for i, r in enumerate(_GS_BAYS):
         verse = words['rows'][i]
-        col = _GS_TEXT0
+        col = _GS_STARTS[i]                              # indented verses stagger the tails
         for k, part in enumerate(verse):
             # the last word wears its CORRUPT spelling (last letter wrong);
             # g_ lands on that letter and r{fix} mends it.
