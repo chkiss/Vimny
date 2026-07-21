@@ -148,17 +148,24 @@ READERS_KEY_SCROLL = {
 # Relic — the ex line-number address. :{n} lands exactly where {n}G lands but
 # is one key dearer (the colon), so it can never undercut a par; what it
 # teaches is the ADDRESS idea, which the Spellwright's ranges later build on.
+# It also names the RELATIVE addresses (. $ .+N .N) — engine-supported but
+# taught nowhere else; they pair with :set rnu (The Numbered Ledger), whose
+# gutter draws the offset so `.5` (== .+5) reads straight off the screen.
 # Rides the 'G' gate — pool-held until G is learned (_RELIC_PREREQ).
 NUMBERED_DOORS_SCROLL = {
     'title': '◈   The Numbered Doors   ◈',
     'lines': [
         ('dim',    '  Type : and the dungeon leans in to listen.'),
         ('blank',),
-        ('cmd',    ':{n}', 'go to line n, first non-blank'),
+        ('cmd',    ':{n}', 'go to line n (where {n}G lands)'),
+        ('cmd',    '.  $', 'this line  ·  the last line'),
+        ('cmd',    '.+N', 'N lines down  ·  .-N up'),
+        ('cmd',    '.N', 'a bare N reads as .+N'),
         ('blank',),
-        ('dim',    '  Same landing as {n}G — but the ledger'),
-        ('dim',    '  keeps numbers for grander work: pairs'),
-        ('dim',    '  of them mark a range for later spells.'),
+        ('dim',    '  Pairs of these mark a range for the'),
+        ("dim",    "  ledger's grander spells. With :set rnu"),
+        ('dim',    '  the gutter counts from the cursor,'),
+        ('dim',    '  so the offset is already drawn.'),
         ('blank',),
         ('amber',  '  Know the address, know the way.'),
     ],
