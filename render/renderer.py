@@ -209,9 +209,13 @@ def _ent_cell_str(ent, room, r: int, c: int, mode, floor_bg: str) -> str:
             return floor_bg + C.boss_echo_fg(ent.shade) + entity_letter(ent) + rst
         return floor_bg + C.enemy_fg() + entity_letter(ent) + rst
     if ent.kind == 'warden':
+        # A remote cut just glanced off him: he throws up his shield this frame
+        # (the tell for edit-immunity — struck from afar and unharmed).
+        if (r, c) in getattr(room, '_ward_flash', ()):
+            return floor_bg + C.boss_fg() + S.SHIELD + rst
         # The Warden Eternal, once unmasked, wears his aura: a slow violet→blue
         # shimmer — the wizard/warden/W revealed in all his majesty.
-        if ent.tag == 'eternal_boss' and getattr(room, '_we_revealed', False):
+        if ent.tag == 'eternal_boss' and getattr(room, '_wde_revealed', False):
             return floor_bg + C.shimmer_fg(time.time() * 0.5) + entity_letter(ent) + rst
         return floor_bg + C.boss_fg() + entity_letter(ent) + rst
     if ent.kind == 'shield':

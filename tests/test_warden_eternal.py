@@ -66,12 +66,11 @@ def test_structure(seed):
     assert r.search_glyph_entities is True      # /g finds goblins, /W the Warden
     boss = [e for e in r.entities if e.tag == 'eternal_boss']
     assert len(boss) == 1 and boss[0].kind == 'warden' and boss[0].edit_immune
-    # the boss and every edit-immune warden carry a VISIBLE shield (the tell)
-    shields = [e for e in r.entities if e.kind == 'shield']
+    # the boss and the chamber wardens are edit-immune (their shield is a
+    # dynamic flash on a parried remote cut, not a static entity)
     immune_wardens = [e for e in r.entities if e.kind == 'warden' and e.edit_immune]
-    assert len(shields) == len(immune_wardens) >= 1
-    for w in immune_wardens:                     # a shield sits right beside him
-        assert any(abs(s.row - w.row) + abs(s.col - w.col) == 1 for s in shields)
+    assert len(immune_wardens) >= 1
+    assert not any(e.kind == 'shield' for e in r.entities)   # no static shields here
     # a MOBILE swarm (macro answer) + a STATIONARY rank on the boss row (line-cut)
     swarm = [e for e in r.entities if e.tag == 'horde']
     rank  = [e for e in r.entities if e.tag == 'rank']
@@ -154,6 +153,38 @@ def test_hat_is_picked_up_by_stepping_onto_it(seed):
     main._warden_eternal_tick(r, p)
     assert p.has_hat is True
     assert not any(e.kind == 'hat' and e.alive for e in r.entities)
+
+
+def test_line_cut_shears_the_rank_and_flashes_the_ward(monkeypatch):
+    """Drive it: with the swarm/chambers pre-cleared, walk to the boss row and
+    d$ — the stationary rank dies in one charwise cut, the edit-immune Warden
+    survives, and his shield flashes on his cell that frame."""
+    d = dg.build_dungeon_warden_eternal(0)
+    r = d.rooms[0]
+    boss = next(e for e in r.entities if e.tag == 'eternal_boss')
+    for e in r.entities:                       # leave only the rank + the boss
+        if e.tag in ('eternal', 'horde'):
+            e.hp, e.alive = 0, False
+    flashes = []
+
+    def _cap(term, dungeon, player, budget, message='', *a, **k):
+        if getattr(r, '_ward_flash', None):
+            flashes.append(set(r._ward_flash))
+
+    monkeypatch.setattr(main, 'render_all', _cap)
+    monkeypatch.setattr(main.time, 'sleep', lambda *a, **k: None)
+    monkeypatch.setattr(main.SM, 'save_progress', lambda *a, **k: None)
+    monkeypatch.setattr(Terminal, 'height', property(lambda self: 41))
+    script = [Keystroke('j')] * (boss.row - r.spawn_pos[0])   # down to the boss row
+    script += [Keystroke('0'), Keystroke('d'), Keystroke('$')]
+    script += [Keystroke(c) for c in ':q!\r']
+    term = Terminal()
+    it = iter(script)
+    monkeypatch.setattr(term, 'inkey', lambda *a, **k: next(it, Keystroke('')))
+    main.run_dungeon(term, 'warden_eternal', {}, player_name='Hero', _dungeon=d)
+    assert not any(e.alive for e in r.entities if e.tag == 'rank')   # rank sheared
+    assert boss.alive                                               # ward held
+    assert any((boss.row, boss.col) in f for f in flashes)          # shield flashed
 
 
 @pytest.mark.parametrize('seed', SEEDS)

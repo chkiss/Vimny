@@ -4270,6 +4270,7 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
 
         last_activity = time.time()
         player.error = ''   # clear any statusline error on the next keypress
+        room._ward_flash = set()   # a shield-flash lives for one action only
 
         # ── The Codex pane has focus while open (:help semantics) ────────────
         # Reading is free: no pane key spends budget, and no pane key reaches
@@ -5179,6 +5180,7 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
                         for _w in _immune_wardens:
                             if room.rows > 2:
                                 _do_warden_move(room, _w, player)
+                        room._ward_flash = {(_w.row, _w.col) for _w in _immune_wardens}
                         _push('The Warden twists out of your cut — only a precise x can land on him!')
                     else:
                         # A warded door (or other anchored fixture) parried instead.
@@ -6383,7 +6385,15 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
                     insert_typed = ''
                 else:                          # 'd'
                     _rows_before = room.rows
+                    # note any warded wardens in the cut's span — if they outlive
+                    # the cut (edit-immune), they flash their shield this frame.
+                    _warded = [e for e in room.entities
+                               if e.alive and e.kind == 'warden' and e.edit_immune
+                               and tobj.start_row <= e.row <= tobj.end_row]
                     _clip = op_delete(room, player, tobj, collapse=True)
+                    _survived = [e for e in _warded if e.alive]
+                    if _survived:
+                        room._ward_flash = {(e.row, e.col) for e in _survived}
                     if tobj.type is TextObjectType.LINEWISE and room.rows == _rows_before:
                         # The line-cut was PARRIED: an edit-immune door or boss
                         # anchors this row (or it is the dungeon's last line) and
@@ -7678,10 +7688,12 @@ def main():
                 SM.save_progress(progress, player.name)
 
             if dung_result.get('first_written_completion'):
-                run_wizard_blessing(
-                    term,
-                    select_next_lesson_quote(level),
-                )
+                # After the final level, the wizard gives his farewell (the
+                # Warden unmasked); every other level previews the next lesson.
+                _blessing = (select_quote_by_name('final blessing')
+                             if level == 'warden_eternal'
+                             else select_next_lesson_quote(level))
+                run_wizard_blessing(term, _blessing)
 
 
 

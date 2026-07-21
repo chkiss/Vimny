@@ -12521,9 +12521,6 @@ def build_dungeon_warden_eternal(seed: int) -> Dungeon:
             entities.append(Entity(kind='warden', row=mid, col=C // 2,
                                    hp=whp, max_hp=whp, ai='', tag='eternal',
                                    edit_immune=True))
-            # a VISIBLE shield — the tell for edit-immunity: your cuts glance
-            # off him (steel, not text), so he is felled by the blade (x) alone.
-            entities.append(Entity(kind='shield', row=mid, col=C // 2 - 1))
         placed = {(mid, C // 2)}
         for _ in range(gcount):
             for _try in range(30):
@@ -12547,9 +12544,6 @@ def build_dungeon_warden_eternal(seed: int) -> Dungeon:
     boss = Entity(kind='warden', row=29, col=50, hp=6, max_hp=6, ai='',
                   tag='eternal_boss', edit_immune=True)
     entities.append(boss)
-    # his visible ward — set ABOVE him (shields block movement; keep it off the
-    # row-29 walk to the exit).
-    entities.append(Entity(kind='shield', row=28, col=50))
     # THE RANK — a wall of goblins drawn up STATIONARY on the boss's own row,
     # flanking him. They hold formation, so ONE line-cut fells them all: `0 d$`
     # (or D) shears the whole row charwise — the minions die, the shielded

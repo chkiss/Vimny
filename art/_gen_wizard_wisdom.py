@@ -95,6 +95,14 @@ POEMS: list[tuple[str | None, str, list[str]]] = [
         'Lost? Esc. Return to stillness.',
         'Rest at home row.',
     ]),
+    # THE FINAL BLESSING — recited after the Warden Eternal, the last level. The
+    # wizard, unmasked as the Warden who taught by ordeal, sends the master off.
+    (None, 'final blessing', [
+        "I wore the Warden's face at every gate.",
+        'No door is left to me to hold shut.',
+        'The buffer is yours now, end to end.',
+        'Wear the hat, and look before you leap.',
+    ]),
 
     # ── Lesson poems, keyed by the slug they introduce ───────────────────────
     ('line_halls', 'line motions', [           # The Line Halls — ^ $ 0

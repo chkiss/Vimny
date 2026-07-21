@@ -71,6 +71,17 @@
       ]
     },
     {
+      "introduces_slug": null,
+      "name": "final blessing",
+      "line_count": 4,
+      "quote": [
+        "    I wore the Warden's face at every gate.     ",
+        "      No door is left to me to hold shut.       ",
+        "      The buffer is yours now, end to end.      ",
+        "    Wear the hat, and look before you leap.     "
+      ]
+    },
+    {
       "introduces_slug": "line_halls",
       "name": "line motions",
       "line_count": 4,
