@@ -39,6 +39,7 @@ def search_hl_bg():  return _term.on_color_rgb(70, 60, 12)       # hlsearch — 
 def search_cur_bg(): return _term.on_color_rgb(150, 120, 18)     # incsearch target — bright amber
 def player_fg():     return _term.bright_white                    # cursor: sharp, no warmth
 def enemy_fg():      return _term.color_rgb(100, 155, 80)        # muted olive, enemy life
+def zombie_fg():     return _term.color_rgb(120, 190, 95)        # sickly green, the risen dead
 def enemy_frozen():  return _term.color_rgb(80, 200, 240)        # ice-blue, frozen state
 def boss_fg():       return _term.color_rgb(210, 35, 45)         # hard red, critical threat
 # Impostor Wardens (goblin tag='echo') — a spread of reds centred on the Warden's own

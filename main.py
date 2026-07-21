@@ -19,7 +19,7 @@
 
 """Vimny — entry point and main game loop."""
 from __future__ import annotations
-import random, time, argparse
+import random, time, argparse, re
 from collections import deque
 from blessed import Terminal
 import render.colors as C
@@ -2918,6 +2918,92 @@ def _clip_from_cut_chars(items: list, base_col: int) -> dict:
     return {'linewise': False, 'rows': [{'width': width, 'char_runs': runes}]}
 
 
+# ── Easter egg: the hat-wearer may :s/g/X/ a goblin into something else ───────
+# The goblins answer only their master; wearing the Warden's hat makes you him.
+# Each effect REMOVES the goblin (so seals/combat still resolve — no softlock);
+# they differ in flavour and what letter, if any, is left on the floor. Nods to
+# Dwarf Fortress (the cat that plots your downfall; the goblin that bursts into
+# cheerful flame) and the roguelikes (the NetHack pet dog, the pile of gold).
+# REMOVE effects: the goblin vanishes (optionally leaving a letter on the floor).
+_GOBLIN_SUB_EGGS = {
+    'f': ('The goblin unclenches, waves once, and wanders off.', None),
+    'h': ('The goblin loses its head about it. An h is left.',   'h'),
+    'c': ('Poof. A cat. It meows once and plots your downfall.',  None),
+    'd': ('It becomes a loyal hound and pads after you.',         None),
+    '$': ('The goblin clinks into a heap of gold. Greedy.',       '$'),
+    '@': ('Now an adventurer. It looks as lost as you are.',      None),
+}
+# TRANSFORM effects: the goblin STAYS, as a new hostile that chases and attacks.
+#   (tag, hp, ai, ai_speed, message)
+_GOBLIN_SUB_TRANSFORM = {
+    'z': ('zombie', 2, 'chase', 2, 'The goblin greys, groans, and rises — undead now.'),
+    '&': ('demon',  3, 'chase', 1, "A demon uncoils where it stood. You shouldn't have."),
+}
+# The elf's shitty trades (offer, consequence-key, result-line). Opt-in via y.
+_ELF_TRADES = [
+    ('a vial of healing', 'hp',       'The vial was poison. (-1 heart, chump.)'),
+    ('a map to treasure', 'register', 'The "map" was your own notes. Pockets emptied.'),
+    ('a charm of safety', 'demon',    'The charm summons a demon at your side. Safe!'),
+]
+_GOBLIN_SUB_RE = re.compile(r'^\s*(%?)\s*(?:\d+\s*,\s*\d+\s*)?s/([^/]*)/([^/]*)/?[gcinp]*\s*$')
+
+
+def _goblin_substitute(cmd: str, room, player, push) -> bool:
+    """Handle `:s/g/X/` as a creature Easter egg. Returns True if it consumed the
+    command (a goblin was targeted), False to fall through to normal substitute.
+    '!' marks goblins in room._pending_boom for the caller to detonate; 'e' arms
+    room._elf_trade for the caller's y/n prompt."""
+    m = _GOBLIN_SUB_RE.match(cmd)
+    if not m:
+        return False
+    whole, pat, rep = m.group(1), m.group(2), m.group(3)
+    if pat != 'g':                                   # only the goblin glyph
+        return False
+    rows = range(room.rows) if whole == '%' else (player.row,)
+    gobs = [e for e in room.entities if e.alive and e.kind == 'goblin'
+            and e.tag not in ('echo', 'zombie', 'demon') and e.row in rows]
+    if not gobs:
+        return False                                 # no plain goblins → normal :s
+    if not (getattr(player, 'hat_worn', False) or 'admin' in player.known_commands):
+        push('They only heed the hand beneath the hat. Not yours.')
+        return True
+    rep1 = rep[:1]
+    n = len(gobs)
+    tail = f'  (×{n})' if n > 1 else ''
+
+    if rep1 == '!':                                  # burst into cheerful flame
+        room._pending_boom = [(g.row, g.col) for g in gobs]   # caller detonates
+        return True
+    if rep1 in _GOBLIN_SUB_TRANSFORM:                # raise a worse thing
+        tag, hp, ai, spd, msg = _GOBLIN_SUB_TRANSFORM[rep1]
+        for g in gobs:
+            g.tag, g.max_hp, g.hp, g.ai, g.ai_speed, g.swole = tag, hp, hp, ai, spd, False
+        room.rebuild_indexes()
+        push(msg + tail)
+        return True
+    if rep1 == 'e':                                  # the elf's shitty bargain
+        offer, key, result = random.choice(_ELF_TRADES)
+        for g in gobs:
+            room.kill_entity(g)
+        room._elf_trade = {'key': key, 'result': result}
+        room.rebuild_indexes()
+        push(f'An elf sidles up: "{offer} — a fair trade, friend. Accept? (y/n)"')
+        return True
+
+    # REMOVE effects (default: turn into that harmless letter)
+    msg, drop = _GOBLIN_SUB_EGGS.get(
+        rep1, (f'The goblin is now a harmless {rep1}.' if rep1 else
+               'The goblin simply is not, any more.', rep1 or None))
+    for g in gobs:
+        gr, gc = g.row, g.col
+        room.kill_entity(g)
+        if drop and room.char_run_at(gr, gc) is None:
+            room.add_char_run(CharRun(gr, gc, (drop,), 'ancient'))
+    room.rebuild_indexes()
+    push(msg + tail)
+    return True
+
+
 def _drop_key(room, row: int, col: int, tag: str = '') -> bool:
     """Place a floor_key (optionally colour-tagged) at (row, col) if free.
     Returns True if a key was placed."""
@@ -3413,6 +3499,22 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
 
     def _attack_pos() -> tuple | None:
         return attack_flash_pos if attack_flash_sym else None
+
+    def _goblin_boom(r, c):
+        """The :s/g/!/ egg: detonate the goblin at (r,c) with the real explosion
+        animation, then remove it."""
+        g = room.entity_at(r, c)
+        iw_now     = _iw(term)
+        game_h_now = term.height - 8
+        vr = max(0, min(player.row - game_h_now // 2, room.rows - game_h_now))
+        vc = max(0, min(player.col - iw_now     // 2, room.cols - iw_now))
+        vr, vc = max(0, vr), max(0, vc)
+        scr_r = 3 + (r - vr)
+        scr_c = 1 + (c - vc) + _gutter_w(player)
+        _explosion_animation(term, room, r, c, scr_r, scr_c, iw_now, game_h_now)
+        if g is not None and g.kind == 'goblin':
+            room.kill_entity(g)
+        room.rebuild_indexes()
 
     def _detonate(ent, message):
         """Set off a dynamite charge at ent's cell: animate, damage nearby wood
@@ -4155,6 +4257,10 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
 
     if level in _LEVEL_INTROS:
         message, msg_ttl = _LEVEL_INTROS[level]
+    # Return to the First Cave wearing the Warden's hat, and the stone knows you.
+    if level == 'first_cave' and getattr(player, 'has_hat', False):
+        message = "You've walked these stones before, haven't you? Welcome back, master."
+        msg_ttl = _MSG_ROTATE_TTL
 
     def _room_has_water() -> bool:
         return any(ct == CellType.WATER for cells_row in room.cells for ct in cells_row)
@@ -4276,6 +4382,34 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
         last_activity = time.time()
         player.error = ''   # clear any statusline error on the next keypress
         room._ward_flash = set()   # a shield-flash lives for one action only
+
+        # ── The elf's shitty trade (from :s/g/e/) awaits a y/n ────────────────
+        if getattr(room, '_elf_trade', None) and player.mode == Mode.NORMAL \
+                and not key.is_sequence:
+            _trade = room._elf_trade
+            room._elf_trade = None
+            if str(key).lower() == 'y':
+                _tk = _trade['key']
+                if _tk == 'hp':
+                    player.take_damage(2)
+                elif _tk == 'register':
+                    player.registers.pop('"', None)
+                elif _tk == 'demon':
+                    for _dr, _dc in ((0, 1), (0, -1), (1, 0), (-1, 0)):
+                        _nr, _nc = player.row + _dr, player.col + _dc
+                        if room.is_passable(_nr, _nc) and room.entity_at(_nr, _nc) is None:
+                            room.add_entity(Entity(kind='goblin', row=_nr, col=_nc,
+                                                   hp=3, max_hp=3, ai='chase',
+                                                   ai_speed=1, tag='demon'))
+                            break
+                    room.rebuild_indexes()
+                _push(_trade['result'])
+                if player.is_dead:
+                    message = '** GAME OVER ** Type  :e  to re-load the dungeon.'
+            else:
+                _push('The elf shrugs and melts back into the trees.')
+            _render(_pool_msg() if not player.is_dead else message)
+            continue
 
         # ── The Codex pane has focus while open (:help semantics) ────────────
         # Reading is free: no pane key spends budget, and no pane key reaches
@@ -4592,6 +4726,15 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
                             else:
                                 player.codex_pane = _pane
 
+                elif cmd == 'help!':
+                    player.error = "E478: Don't panic!"      # Vim's own joke
+                elif cmd in ('smile', 'smile!'):
+                    _push('ᕕ( ᐛ )ᕗ  the old wizard grins back at you.')
+                elif cmd in ('Ni', 'Ni!'):
+                    _push('The wizard blinks. "We demand... a shrubbery!"')
+                elif cmd == 'xyzzy':
+                    _push('Nothing happens.')                # Colossal Cave, honoured
+
                 elif cmd.isdigit():
                     # :{n} — go to line n (Vim-true). Same semantics as {n}G
                     # (lands on the row's first non-blank), gated on G, and
@@ -4612,6 +4755,16 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
                             undo_stack.append((_gn_from[0], _gn_from[1], _gn_spent,
                                                cmd_start_ans[0], cmd_start_ans[1]))
                             redo_stack.clear()
+
+                elif (_subst.looks_like_sg(cmd, room, player)
+                      and _goblin_substitute(cmd, room, player, _push)):
+                    _boom = getattr(room, '_pending_boom', None)
+                    if _boom:                        # :s/g/!/ — cheerful flame
+                        room._pending_boom = []
+                        _push('The goblins burst into cheerful flame. !!')
+                        _render(_pool_msg())
+                        for (_br, _bc) in _boom:
+                            _goblin_boom(_br, _bc)
 
                 elif (_subst.looks_like_sg(cmd, room, player)
                       or _subst.looks_like_ex_range(cmd, room, player)):
@@ -6247,6 +6400,22 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
 
         elif action['type'] == 'case_char':
             if not edit_mode and not _action_allowed(action, player.known_commands) and _blocked(action):
+                continue
+            # Easter egg: ~ a goblin and it toggles its OWN case — g swells into
+            # a bigger, meaner G and stays that way. (You did this to yourself.)
+            _gob = room.entity_at(player.row, player.col)
+            if (_gob is not None and _gob.kind == 'goblin' and _gob.tag != 'echo'
+                    and not _gob.swole):
+                undo_stack.append(_snapshot(room, player, budget))
+                redo_stack.clear()
+                _gob.swole = True
+                _gob.max_hp += 2
+                _gob.hp     += 2
+                room.rebuild_indexes()
+                if not edit_mode:
+                    budget.spend(_keystroke_cost(count, '~', action.get('count_given', False)))
+                _push('You toggle its case — the goblin swells into a Goblin, and grins.')
+                _render(_pool_msg())
                 continue
             (ed_undo if edit_mode else undo_stack).append(
                 _ed_snapshot(room, player) if edit_mode else _snapshot(room, player, budget))

@@ -61,6 +61,7 @@ class Entity:
     tag:          str = ''  # variant tag, e.g. 'gold' or 'red' for colored keys/doors
     scroll_id:    str = ''  # chest_scroll only: the specific scroll this chest drops
                             # ('' = pull a random relic scroll from the pool)
+    swole:        bool = False  # a goblin ~-toggled into a bigger 'G' (Easter egg)
     edit_immune:  bool = False  # True = survives editing-delete (visual/operator x/d/dd,
                             # reflow remove_row); a boss parried by its shield, chipped
                             # only by normal-mode x. See engine/visual + The Warden Pathfinder.
@@ -112,7 +113,13 @@ def entity_letter(ent) -> Optional[str]:
     f/t and /. This is what f/F/t/T and search target, and what the renderer's
     letter-kinds draw, so changing a glyph here updates every command at once."""
     if ent.kind == 'goblin':
-        return 'W' if ent.tag == 'echo' else 'g'   # echo goblins are the Hunt's impostor Ws
+        if ent.tag == 'echo':
+            return 'W'                             # echo goblins are the Hunt's impostor Ws
+        if ent.tag == 'zombie':
+            return 'Z'                             # :s/g/z/ raised the dead
+        if ent.tag == 'demon':
+            return '&'                             # :s/g/&/ summoned something worse
+        return 'G' if ent.swole else 'g'           # ~-toggled goblins grow into a 'G'
     return _ENTITY_LETTER.get(ent.kind)
 
 
@@ -154,7 +161,7 @@ class Room:
     answer_diverged: bool       = False  # admin pressed a wrong key
     wood_damage: dict           = field(default_factory=dict)  # (r,c) -> half-steps received (1=cracked)
     wrap_buffer: bool           = False  # single-line text buffer (rows==1); ':set wrap' soft-wraps it across screen rows (The Archivist's Library)
-    search_glyph_entities: bool = False  # if True, / search overlays entity glyphs (so /W finds the Warden + echoes wherever they leap) — The Warden Pathfinder. Off elsewhere so par stays identical.
+    search_glyph_entities: bool = True   # / search overlays entity glyphs (so /W finds the Warden, /g a goblin) — ON everywhere as of 2026-07-21. Audited: no answer-tape letter collides with an entity glyph, and the only exit-adjacent entities (grandmaster W, warden_eternal + hall_of_echoes goblins) sit behind seals, so no /entity jump cheeses a par. Full suite passes forced-on.
     wrap_width:           int   = 0      # fixed ':set wrap' fold width (0 = wrap to live content width); the Wardenverse pins it so stone walls land at fold edges on any terminal.
 
     def __post_init__(self):
