@@ -99,9 +99,9 @@ POEMS: list[tuple[str | None, str, list[str]]] = [
     # wizard, unmasked as the Warden who taught by ordeal, sends the master off.
     (None, 'final blessing', [
         "I wore the Warden's face at every gate.",
-        'No door is left to me to hold shut.',
-        'The buffer is yours now, end to end.',
-        'Wear the hat, and look before you leap.',
+        'None remain. The buffer is yours, end to end.',
+        'Some treasure yet waits in these halls’ chests.',
+        'Wear my hat with :set hat. Look before you leap.',
     ]),
 
     # ── Lesson poems, keyed by the slug they introduce ───────────────────────

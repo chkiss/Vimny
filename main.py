@@ -2952,6 +2952,12 @@ def _on_kill(ent, player, room=None, level: str = '') -> str:
         if level == 'warden_scrivener':
             return ('The Warden Scrivener is undone — the manuscript stands '
                     'finished, and the seal draws open.')
+        if level == 'warden_eternal':
+            # His key opens the treasure locked into this chamber's east wall.
+            if room is not None and ent.tag == 'eternal':
+                _drop_key(room, ent.row, ent.col)
+                return 'The Warden falls! A key drops — some chest here will answer to it. 🗝'
+            return ''                                    # the final boss holds no key
         # Every Warden drops the key to its keep's locked exit door (no auto-open).
         if room is not None:
             _drop_key(room, ent.row, ent.col)

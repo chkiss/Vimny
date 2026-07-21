@@ -79,6 +79,21 @@ def test_structure(seed):
 
 
 @pytest.mark.parametrize('seed', SEEDS)
+def test_each_warden_guards_a_locked_treasure_chest(seed):
+    # Every chamber warden's dropped key has a purpose: a locked chest walled
+    # into the chamber, chest one cell east of its door, pocket sealed but for it.
+    r = _room(seed)
+    wardens = [e for e in r.entities if e.kind == 'warden' and e.tag == 'eternal']
+    doors   = [e for e in r.entities if e.kind == 'locked_door']
+    chests  = [e for e in r.entities if e.kind == 'chest_scroll']
+    assert len(doors) == len(wardens) >= 4
+    for d in doors:
+        assert any(c.row == d.row and c.col == d.col + 1 for c in chests)  # chest behind
+        assert r.cells[d.row][d.col + 1] == CellType.FLOOR                 # the pocket
+        assert r.cells[d.row - 1][d.col + 1] == CellType.WALL              # sealed off
+
+
+@pytest.mark.parametrize('seed', SEEDS)
 def test_every_chamber_starts_sealed(seed):
     r = _room(seed)
     for g in r._wde_gates:
