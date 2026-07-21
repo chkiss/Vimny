@@ -102,6 +102,33 @@ def test_elf_arms_a_trade_prompt():
     assert 'y/n' in msgs[-1]
 
 
+# ── the g<->G rule lives in ONE place (case_entities) for every case command ──
+def test_case_ops_are_the_single_source_of_the_swelled_glyph():
+    from engine.operator import case_entities
+    r, p = _room_and_master()
+    cells = [(e.row, e.col) for e in r.entities
+             if e.kind == 'goblin' and e.tag == 'horde'][:3]
+    assert case_entities(r, cells, 'gU') == 3          # uppercase → swell
+    for (rr, cc) in cells:
+        e = r.entity_at(rr, cc)
+        assert e.swole and entity_letter(e) == 'G' and main._sight_radius(e) == 10
+    assert case_entities(r, cells, 'gu') == 3           # lowercase → shrink back
+    for (rr, cc) in cells:
+        assert not r.entity_at(rr, cc).swole
+
+
+def test_case_rule_is_uniform_across_goblin_dog_cat():
+    from engine.world import Entity
+    from engine.operator import case_entities
+    r, _ = _room_and_master()
+    dog = Entity(kind='ally', tag='dog', row=2, col=2, hp=2, max_hp=2)
+    cat = Entity(kind='critter', tag='cat', row=2, col=4, hp=1, max_hp=1)
+    r.entities += [dog, cat]
+    r.rebuild_indexes()
+    case_entities(r, [(2, 2), (2, 4)], 'gU')
+    assert entity_letter(dog) == 'D' and entity_letter(cat) == 'C'
+
+
 # ── sight: demons are relentless, G-goblins see twice as far ─────────────────
 def test_demon_sees_everywhere_and_swole_sees_double():
     r, p = _room_and_master()

@@ -393,6 +393,35 @@ def _case_cols(room, row: int, lo: int, hi: int, op: str) -> bool:
     return changed
 
 
+_SWELLABLE = ('goblin', 'ally', 'critter')
+
+
+def case_entities(room, cells, op: str) -> int:
+    """Case ops act on CREATURES too, from whatever command: uppercasing a
+    goblin's `g` into a `G` swells it (bigger, sharper-eyed); lowercasing shrinks
+    it back; `~`/`g~` toggles. Applies to any swellable creature (goblin/ally/
+    critter, but not the impostor echo Ws) whose cell is in `cells`. Returns the
+    number of creatures changed. This is the SINGLE home of the g<->G rule, so
+    ~, gU, gUU, gu, visual U/u/~ and :s all produce the same entity."""
+    seen, n = set(), 0
+    upper = True if op in ('gU', 'U') else False if op in ('gu', 'u') else None
+    for (r, c) in cells:
+        e = room.entity_at(r, c)
+        if e is None or id(e) in seen or e.kind not in _SWELLABLE or e.tag == 'echo':
+            continue
+        seen.add(id(e))
+        want = (not e.swole) if upper is None else upper
+        if want == e.swole:
+            continue
+        e.swole = want
+        if want:
+            e.max_hp += 2; e.hp += 2
+        else:
+            e.max_hp = max(1, e.max_hp - 2); e.hp = max(1, e.hp - 2)
+        n += 1
+    return n
+
+
 def op_case(room, player, text_obj, op: str) -> bool:
     """Apply a case operator (gU/gu/g~) over the span; cursor → span start."""
     linewise, spans = _clip(text_obj)
@@ -405,6 +434,7 @@ def op_case(room, player, text_obj, op: str) -> bool:
             lo, hi = ext
         if hi >= lo:
             changed |= _case_cols(room, row, lo, hi, op)
+            changed |= case_entities(room, [(row, c) for c in range(lo, hi + 1)], op) > 0
     if linewise:
         _cursor_to_line_start(room, player, text_obj.start_row)
     else:
@@ -413,7 +443,9 @@ def op_case(room, player, text_obj, op: str) -> bool:
 
 
 def case_char(room, player, count: int = 1) -> bool:
-    """`~`: toggle case of `count` symbols from the cursor, advancing each time."""
+    """`~`: toggle case of `count` symbols from the cursor, advancing each time.
+    Toggles a creature under the cursor too (g<->G, d<->D, c<->C) via the shared
+    case_entities rule."""
     changed = False
     for _ in range(count):
         r, c = player.row, player.col
@@ -423,6 +455,8 @@ def case_char(room, player, count: int = 1) -> bool:
             new = list(ru.symbols)
             new[k] = new[k].swapcase()
             ru.symbols = tuple(new)
+            changed = True
+        if case_entities(room, [(r, c)], 'g~'):
             changed = True
         if c + 1 < room.cols and room.is_passable(r, c + 1):
             player.col += 1

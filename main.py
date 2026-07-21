@@ -60,7 +60,7 @@ from content.scrolls import (
 )
 
 _JUMP_MOTIONS = frozenset({'G', 'gg', '%', '{', '}', '(', ')'})
-from engine.operator import op_delete, op_yank, op_paste, op_case, op_join, case_char, apply_indent, apply_equalize, law_column, INDENT_WIDTH, entity_clip
+from engine.operator import op_delete, op_yank, op_paste, op_case, op_join, case_char, case_entities, apply_indent, apply_equalize, law_column, INDENT_WIDTH, entity_clip
 from engine.reflow import is_ledge, close_gap, void_col, _insert_blank_row, remove_row, split_line_down
 from engine import substitute as _subst
 from engine.insert import (
@@ -2993,11 +2993,12 @@ def _goblin_substitute(cmd: str, room, player, push) -> bool:
         return True
 
     # ── in-place transforms: the creature STAYS ──────────────────────────────
-    if rep1 == 'G':                                  # swell into a G — doubled sight
-        for g in gobs:
-            g.swole, g.max_hp, g.hp = True, g.max_hp + 2, g.hp + 2
+    if rep1 in ('G', 'g'):                           # case op: swell / shrink
+        case_entities(room, [(g.row, g.col) for g in gobs],
+                      'gU' if rep1 == 'G' else 'gu')
         room.rebuild_indexes()
-        push('The goblins swell into Goblins — bigger, and sharper-eyed.' + tail)
+        push(('The goblins swell into Goblins — bigger, and sharper-eyed.'
+              if rep1 == 'G' else 'The Goblins shrink back to goblins.') + tail)
         return True
     if rep1 in _GOBLIN_SUB_TRANSFORM:                # z / & — raise a worse thing
         tag, hp, ai, spd, msg = _GOBLIN_SUB_TRANSFORM[rep1]
@@ -6455,27 +6456,8 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
         elif action['type'] == 'case_char':
             if not edit_mode and not _action_allowed(action, player.known_commands) and _blocked(action):
                 continue
-            # Easter egg: ~ a goblin and it toggles its OWN case — g swells into
-            # a bigger, meaner G and stays that way. (You did this to yourself.)
-            _gob = room.entity_at(player.row, player.col)
-            if (_gob is not None and _gob.kind in ('goblin', 'ally', 'critter')
-                    and _gob.tag != 'echo' and not _gob.swole):
-                undo_stack.append(_snapshot(room, player, budget))
-                redo_stack.clear()
-                _gob.swole = True
-                _gob.max_hp += 2
-                _gob.hp     += 2
-                room.rebuild_indexes()
-                if not edit_mode:
-                    budget.spend(_keystroke_cost(count, '~', action.get('count_given', False)))
-                _swell_line = {
-                    'goblin':  'You toggle its case — the goblin swells into a Goblin, and grins.',
-                    'ally':    'Your hound swells into a Hound — bigger teeth, same loyalty.',
-                    'critter': 'The cat swells into a Cat. It is unimpressed, but larger.',
-                }[_gob.kind]
-                _push(_swell_line)
-                _render(_pool_msg())
-                continue
+            # (~ on a creature swells/shrinks it g<->G — handled inside case_char
+            # via the shared engine.operator.case_entities rule.)
             (ed_undo if edit_mode else undo_stack).append(
                 _ed_snapshot(room, player) if edit_mode else _snapshot(room, player, budget))
             (ed_redo if edit_mode else redo_stack).clear()
