@@ -3387,7 +3387,7 @@ def build_dungeon_sight_sanctum(seed: int) -> Dungeon:
 # All six chambers anchor at the SHAFT column, so every hop is a plain {n}j
 # (the nav-golf audit); the answer tape shows <C-v> as ^v — load-bearing,
 # unlike Esc, so it must be visible (the tracker eats both chars at once).
-_SH_ROWS, _SH_COLS = 32, 26
+_SH_ROWS, _SH_COLS = 32, 44   # the gallery WIDENS at the foot for the proverbs
 _SH_SPINE  = 13                     # every row's first standable
 _SH_BAY_W  = 14                     # bay floor cols 14..24; east wall 25
 _SH_BAY_E  = 24
@@ -3400,14 +3400,44 @@ _SH_RECT_ROWS   = (13, 14, 15)      # block case toggle
 _SH_INS_ROWS    = (17, 18, 19)      # block insert
 _SH_STAMP_ROWS  = (21, 22, 23)      # block overstrike (<C-v> r)
 _SH_PANEL_ROWS  = (25, 26, 27, 28)  # the four panels (visual p, the swap)
-_SH_PANEL_FLK   = 15                # panel flank word (len 3) at cols 15..17
-_SH_PANEL_W0    = 19                # panel word (len 6) at cols 19..24
+_SH_PANEL_BAY_E = 42                # the panels' wider bay (proverbs, cols 14..42;
+                                    # the trailing floor absorbs a long word's
+                                    # open_gap so no swapped glyph hits the wall)
+_SH_PROV_COL    = 15                # each proverb's head column
 _SH_SHAFT_SEPS  = (4, 6, 8, 12, 16, 20, 24)  # separators the shaft pierces
 _SH_THROAT = 29                     # spine-only (teleport audit)
 _SH_GATE   = 30
 _SH_BOLT0  = 14                     # bolts cols 14..21, one per chamber
 _SH_EXIT   = (30, 22)               # the FINAL SEAL
-_SH_PAR    = 64
+_SH_PAR    = 74
+
+# The proverb pool for the panel cycle (~20; four are drawn per seed). Each
+# reads as a known saying whose STEM implies its final word, so a wrong last
+# word is self-evidently wrong — no plaque needed (proverb-style, the
+# sense-not-decree law). The four rows wear each other's last words rotated
+# one frame down; the visual-paste swap (k$vbp) rotates them home. Kept short
+# enough (≤ 22 chars) to sit in the widened foot bay; last words all distinct.
+_SH_PROVERBS = (
+    'no pain, no gain', 'easy come, easy go', 'live and let live',
+    'haste makes waste', 'knowledge is power', 'time is money',
+    'silence is golden', 'look before you leap', 'still waters run deep',
+    'patience is a virtue', 'the truth will out', 'better late than never',
+    'practice makes perfect', 'let sleeping dogs lie', 'beggars can\'t choose',
+    'waste not, want not', 'seeing is believing', 'birds flock together',
+    'slow and steady wins', 'hope springs eternal',
+)
+
+
+def _sh_draw_proverbs(rng):
+    """Four proverbs with DISTINCT last words (so no rotation frame reads true
+    by accident). Returns a list of (stem, last) — stem is everything up to
+    the final space, last is the swap word."""
+    for _ in range(40):
+        pick = rng.sample(_SH_PROVERBS, 4)
+        lasts = [p.rsplit(' ', 1)[1] for p in pick]
+        if len(set(lasts)) == 4:
+            return [tuple(p.rsplit(' ', 1)) for p in pick]
+    raise ValueError('selection_halls: no distinct-last-word proverb draw')
 
 
 def _sh_flip_mask(word: str) -> str:
@@ -3460,14 +3490,13 @@ def _sh_draw_words(rng) -> dict:
             continue
         stamp_letter = rng.choice(letters6)
         stamp = rng.sample(by_l6[stamp_letter], 3)
-        panels = rng.sample(pool(6), 4)          # the 4-cycle panel words
-        flanks = rng.sample(pool(3), 4)
-        picks = case3 + stripe + rect + ins + stamp + panels + flanks
+        proverbs = _sh_draw_proverbs(rng)        # the 4-cycle panel proverbs
+        picks = case3 + stripe + rect + ins + stamp
         if len(set(picks)) == len(picks):
             return {'case': case3, 'stripe': stripe, 'rect': rect,
                     'ins': ins, 'letter': letter,
                     'stamp': stamp, 'stamp_letter': stamp_letter,
-                    'panels': panels, 'flanks': flanks}
+                    'proverbs': proverbs}
     raise ValueError('selection_halls: no distinct draw after 80 tries')
 
 
@@ -3514,14 +3543,20 @@ def build_dungeon_selection_halls(seed: int) -> Dungeon:
     for r, w in zip(_SH_STAMP_ROWS, words['stamp']):
         runs.append((r, t0, w[:2] + '#' + w[3:]))
     chambers.append((_SH_STAMP_ROWS, tuple(runs), tuple(words['stamp'])))
-    # the four panels: each row holds the PREVIOUS row's true word (a 4-cycle
-    # rotated one frame down); flanks make every row's reading distinct
+    # the four panels: each row is a PROVERB whose FINAL word is rotated one
+    # frame down (row i wears row (i-1)'s ending), so every row reads as a
+    # known saying with the wrong last word — self-evidently wrong, no plaque.
+    # The visual-paste swap (…$bvep…) rotates the endings home.
+    prov = words['proverbs']                             # [(stem, last), ...]
     runs, targets_p = [], []
     for i, r in enumerate(_SH_PANEL_ROWS):
-        wrong = words['panels'][(i - 1) % 4]     # row i wears panel i-1
-        runs += [(r, _SH_PANEL_FLK, words['flanks'][i]),
-                 (r, _SH_PANEL_W0, wrong)]
-        targets_p.append(f"{words['flanks'][i]} {words['panels'][i]}")
+        stem = prov[i][0]
+        wrong = prov[(i - 1) % 4][1]                     # the previous ending
+        col = _SH_PROV_COL
+        for wd in f'{stem} {wrong}'.split(' '):          # one run per word
+            runs.append((r, col, wd))
+            col += len(wd) + 1
+        targets_p.append(f'{stem} {prov[i][1]}')
     chambers.append((_SH_PANEL_ROWS, tuple(runs), tuple(targets_p)))
 
     R, C = _SH_ROWS, _SH_COLS
@@ -3529,8 +3564,9 @@ def build_dungeon_selection_halls(seed: int) -> Dungeon:
     for r in range(2, _SH_GATE + 1):                     # the spine
         cells[r][_SH_SPINE] = CellType.FLOOR
     for rows, _runs, _targets in chambers:               # the bays
+        bay_e = _SH_PANEL_BAY_E if rows == _SH_PANEL_ROWS else _SH_BAY_E
         for r in rows:
-            for c in range(_SH_BAY_W, _SH_BAY_E + 1):
+            for c in range(_SH_BAY_W, bay_e + 1):
                 cells[r][c] = CellType.FLOOR
     for r in _SH_SHAFT_SEPS:                             # the light shaft —
         cells[r][_SH_SHAFT] = CellType.FLOOR             # NOT the throat row
@@ -3544,6 +3580,8 @@ def build_dungeon_selection_halls(seed: int) -> Dungeon:
         for rr, cc, text in runs:
             room.char_runs.append(CharRun(rr, cc, tuple(text), 'ancient'))
         doors.append((targets, _SH_BOLT0 + i))
+        if rows == _SH_PANEL_ROWS:
+            continue                                     # proverb-style: no plaque
         for pr, ptext in zip(rows, targets):             # full true readings
             room.char_runs.append(CharRun(pr, _SH_PLQ_COL, tuple(ptext), 'verdant'))
     room._ss_doors = tuple(doors)                        # the shared exact-text tick
@@ -3556,17 +3594,17 @@ def build_dungeon_selection_halls(seed: int) -> Dungeon:
 
     room.rebuild_indexes()
     room.par    = _SH_PAR
-    room.budget = 110   # GENEROUS hand-set (old-route min 109 + 1; the route
-    # pays two count-x digit charges since the 2026-07-19 {n}x law): the four
-    # panels' bay wall EATS the old P-then-delete juggle's displaced word
-    # (the void-push), so the honest old route must RETYPE two panels and
-    # rebuild a third — visual p is terrain-forced, and 1.4·par (90) would
-    # make the old route unwinnable (the 1★ law). Indentation precedent.
-    # <C-v> shows on the tape as ^v (load-bearing, unlike Esc — a player
-    # following the tape must see it; the tracker eats both chars at once)
+    room.budget = 122   # GENEROUS hand-set: the panels are now PROVERBS whose
+    # endings are rotated one frame; the visual-paste swap (…$bvep…) rotates
+    # them home for one key each, but the old-only route must RETYPE all four
+    # correct endings (ce{word}) — and the longest proverb endings push that
+    # route to ~115 keys. So the budget clears the worst old route (it wins,
+    # at 1★) while par (74) still buys the 2nd star only with the swap (the
+    # 1★ law; 1.4·par would make the old route unwinnable). <C-v> shows on the
+    # tape as ^v (load-bearing, unlike Esc; the tracker eats both chars at once)
     sl = words['stamp_letter']
     room.answer = (f'j VU 2j Vu 2j V~ 2j ^v2jld 4j ^v2j3l~ 4j ^v2jI{letter} '
-                   f'4j ^v2jr{sl} 4j w ye 3j vep k vbp k vbp k vbp G $')
+                   f'4j ^v2jr{sl} 4j $bvey 3j $bvep k$bvep k$bvep k$bvep G $')
 
     dungeon = Dungeon(name='The Selection Halls', seed=seed)
     dungeon.rooms        = [room]
@@ -5237,7 +5275,7 @@ def build_dungeon_grandmasters_sanctum(seed: int) -> Dungeon:
 _HE_COLS  = 58
 _HE_TX    = 3                          # text head col in every hall
 _HE_GATE_COL = 2                       # the west gate cell in every band
-_HE_PAR    = 72                        # engine-measured: the full driven tape
+_HE_PAR    = 77                        # engine-measured: the full driven tape
 _HE_BUDGET = 190                       # GENEROUS hand-set: the all-manual
                                        # road wins 1★ (measured below)
 
@@ -5263,7 +5301,7 @@ _HE_POEMS = (
       "Papa's gonna buy you a billy goat.",
       "And if that billy goat won't pull,",
       "Papa's gonna buy you a cart and bull."),
-     ('Legally', 'Allegedly', 'Realistically', 'Reluctantly', 'Tragically',
+     ('Please', 'Allegedly', 'Realistically', 'Reluctantly', 'Tragically',
       'Regardless', 'Eventually', 'Predictably', 'Ultimately', 'Somehow')),
     ('ding dong bell',
      ('Ding, dong, bell,', "Pussy's in the well.", 'Who put her in?',
@@ -5345,19 +5383,23 @@ def _he_build_chambers(rng):
     chambers.append({'rows': ev_rows, 'done': (ev_done.strip(),),
                      'span': (2, 56), 'plaques': ev_plaques, 'tape': ev_tape})
 
-    # ── the Selection Halls' panel cycle, verbatim: each row wears the
-    #    PREVIOUS row's true word; yank once, and every visual paste hands
-    #    the register the next row's cure (the swap) ──
+    # ── the Selection Halls' panel cycle, verbatim: four PROVERBS whose
+    #    ENDINGS are rotated one frame down (each row reads a known saying with
+    #    the wrong last word). Yank one ending, and every visual paste hands
+    #    the register the next row's ending — the swap rotates them home. The
+    #    reach is column-independent ($b → the last word), so the macro is
+    #    k$bvep no matter how the proverbs line up. ──
     words = _sh_draw_words(rng)
+    prov = words['proverbs']
     pn_rows, pn_done = [], []
     for i in range(4):
-        wrong = words['panels'][(i - 1) % 4]
-        pn_rows.append(((_SH_PANEL_FLK, words['flanks'][i], 'ancient'),
-                        (_SH_PANEL_W0, wrong, 'ancient')))
-        pn_done.append(f"{words['flanks'][i]} {words['panels'][i]}")
-    pn_tape = 'ww ye 3j vep qckvbpq 2@c 0 5j'
+        stem = prov[i][0]
+        wrong = prov[(i - 1) % 4][1]
+        pn_rows.append(((4, f'{stem} {wrong}', 'ancient'),))
+        pn_done.append(f'{stem} {prov[i][1]}')
+    pn_tape = '$bvey 3j $bvep qck$bvepq 2@c 0 5j'
     chambers.append({'rows': tuple(pn_rows), 'done': tuple(pn_done),
-                     'span': (2, _SH_PANEL_W0 + 7), 'plaques': (), 'tape': pn_tape})
+                     'span': (2, 44), 'plaques': (), 'tape': pn_tape})
 
     # ── the Refrain Vault's reprise, verbatim: London Bridge's twelve
     #    verses with the refrain given ONCE, on the shelf above — yank it,

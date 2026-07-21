@@ -59,7 +59,7 @@ def _canon_keys(room):
     return (_K('jVU2jVu2jV~2j') + [CV] + _K('2jld') + _K('4j') + [CV]
             + _K('2j3l~') + _K('4j') + [CV] + _K('2jI') + _K(w['letter']) + [ESC]
             + _K('4j') + [CV] + _K('2jr') + _K(w['stamp_letter'])
-            + _K('4jwye3jvepkvbpkvbpkvbp') + _K('G$'))
+            + _K('4j$bvey3j$bvepk$bvepk$bvepk$bvep') + _K('G$'))
 
 
 # The leanest old-only rival: gUU/guu/g~~ for the trio, 2x + dot down the
@@ -71,7 +71,6 @@ def _canon_keys(room):
 # route pays two count-x digit charges under the 2026-07-19 {n}x law).
 def _rival_keys(room):
     w = room._sh_words
-    pa = w['panels']
     keys = (_K('jgUU2jguu2jg~~2j') + _K('2xj.j.') + _K('2j')
             + _K('4~j4h.j4h.') + _K('4h2j'))
     for i in range(3):
@@ -79,10 +78,14 @@ def _rival_keys(room):
         if i < 2:
             keys += _K('j')
     keys += _K('2j^2lr') + _K(w['stamp_letter']) + _K('j^2l.j^2l.')
-    keys += _K('2j^w6x') + _K('3j^wP')
-    keys += _K('k^wce') + _K(pa[2]) + [ESC]
-    keys += _K('k^wce') + _K(pa[1]) + [ESC]
-    keys += _K('k^ea') + _K(' ' + pa[0]) + [ESC]
+    # the four panels, old-only: retype each wrong ending in place with ce
+    # (no visual swap) — correct but keystroke-heavier than the …$bvep… cycle
+    prov = w['proverbs']
+    keys += _K('2j')                                # row 23 → panel r0 (row 25)
+    for i in range(4):
+        keys += _K('$bce') + _K(prov[i][1]) + [ESC]
+        if i < 3:
+            keys += _K('j')
     return keys + _K('G$')
 
 
@@ -140,12 +143,12 @@ def test_layout_and_identity(seed):
 def test_par_answer_budget(seed):
     room = _room(seed)
     assert room.par == _SH_PAR
-    assert room.budget == 110, "GENEROUS hand-set: old min 109 + 1 (the void-push)"
+    assert room.budget == 122, "GENEROUS hand-set: clears the worst old ce-retype"
     L, sl = room._sh_words['letter'], room._sh_words['stamp_letter']
     # <C-v> shows as ^v — LOAD-BEARING on the tape (playtest: omitting it
     # made the tape unplayable; a d2j swallowed a stripe row)
     assert room.answer == (f'j VU 2j Vu 2j V~ 2j ^v2jld 4j ^v2j3l~ 4j ^v2jI{L} '
-                           f'4j ^v2jr{sl} 4j w ye 3j vep k vbp k vbp k vbp G $')
+                           f'4j ^v2jr{sl} 4j $bvey 3j $bvep k$bvep k$bvep k$bvep G $')
 
 
 @pytest.mark.parametrize("seed", SEEDS)
@@ -185,10 +188,11 @@ def test_word_draw_slot_shapes(seed):
     assert all(x[2] == w['letter'] for x in w['ins'])
     assert [len(x) for x in w['stamp']] == [6, 6, 6]
     assert all(x[2] == w['stamp_letter'] for x in w['stamp'])
-    assert [len(x) for x in w['panels']] == [6, 6, 6, 6]
-    assert [len(x) for x in w['flanks']] == [3, 3, 3, 3]
-    picks = (w['case'] + w['stripe'] + w['rect'] + w['ins']
-             + w['stamp'] + w['panels'] + w['flanks'])
+    # the four panels are proverbs (stem, last) with DISTINCT last words
+    prov = w['proverbs']
+    assert len(prov) == 4
+    assert len({last for _stem, last in prov}) == 4
+    picks = w['case'] + w['stripe'] + w['rect'] + w['ins'] + w['stamp']
     assert len(set(picks)) == len(picks)
 
 
