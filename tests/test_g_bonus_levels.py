@@ -29,7 +29,7 @@ import main
 from engine.world import CellType
 from generation.dungeon_gen import (
     build_dungeon_buried_word, _BW_BAYS, _BW_GATE, _BW_BOLTS, _BW_EXIT,
-    _BW_PAR, _BW_STAND,
+    _BW_PAR, _BW_STAND, _BW_SPINE,
     build_dungeon_wet_ink, _WI_LEDGE, _WI_PLQ_COL, _WI_SOURCE, _WI_BRAZIERS,
     _WI_GATE, _WI_BOLT, _WI_EXIT, _WI_PAR, _QM_FLAME, _QM_EMBERS,
 )
@@ -78,7 +78,10 @@ def test_bw_structure(seed):
     words fall at DIFFERENT columns, so g*/n hunts them (no more single words
     stacked at one column that `j r x` would sweep)."""
     room = cached_room('build_dungeon_buried_word', seed)
-    assert room.spawn_pos == _BW_STAND
+    # spawn WEST of 'one' (playtest 2026-07-20): the player walks onto it so
+    # the word reads clear at the mouth instead of hiding under the cursor
+    assert room.spawn_pos == (_BW_STAND[0], _BW_SPINE)
+    assert room.spawn_pos != _BW_STAND
     w = room._bw_words['word']                       # 'one'
     stand = next(ru for ru in room.char_runs if ru.row == _BW_STAND[0]
                  and ru.col == _BW_STAND[1])
@@ -131,7 +134,8 @@ def test_bw_no_plaque_and_door_reads_the_true_word(seed):
 
 def _bw_canon(room):
     f = room._bw_words['fixes']
-    return f'g*hr{f[0]}lnhr{f[1]}lnhr{f[2]}G$'
+    walk = _BW_STAND[1] - _BW_SPINE                  # {n}l onto 'one' from spawn
+    return f'{walk}lg*hr{f[0]}lnhr{f[1]}lnhr{f[2]}G$'
 
 
 @pytest.mark.parametrize("seed", SEEDS)
@@ -146,9 +150,10 @@ def test_bw_typed_search_rival_wins_at_one_star(seed, monkeypatch):
     d = build_dungeon_buried_word(seed)
     f = d.rooms[0]._bw_words['fixes']
     w = d.rooms[0]._bw_words['word']
-    # /word finds the same buried copies (literal), but the typed search
-    # costs word-length+1 up front where g* is two flat — the same r mends.
-    keys = _K(f'/{w}\rhr{f[0]}lnhr{f[1]}lnhr{f[2]}G$')
+    walk = _BW_STAND[1] - _BW_SPINE
+    # walk onto 'one' (same as the g* route), then /word finds the same buried
+    # copies — but the typed search costs word-length+1 where g* is two flat.
+    keys = _K(f'{walk}l/{w}\rhr{f[0]}lnhr{f[1]}lnhr{f[2]}G$')
     won, spent = _spent(d, 'buried_word', keys, monkeypatch)
     assert won and _BW_PAR < spent <= d.rooms[0].budget
 

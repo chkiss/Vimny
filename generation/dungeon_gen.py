@@ -5734,7 +5734,7 @@ _BW_THROAT  = 5
 _BW_GATE    = 6
 _BW_BOLTS   = {2: 23, 3: 24, 4: 25}
 _BW_EXIT    = (6, 26)                 # the FINAL SEAL, east of every bolt
-_BW_PAR     = 17                      # g* h r{f} l n h r{f} l n h r{f} G $
+_BW_PAR     = 19                      # 2l (walk onto 'one') g* h r{f} l n ×3 G $
 _BW_STANDING = 'one'                  # the word that stands alone at the mouth
 # A little VERSE (playtest 2026-07-20: single words stacked at one column let
 # `j r x` beat the hunt). The target 'one' is buried in a real word on each
@@ -5816,18 +5816,22 @@ def build_dungeon_buried_word(seed: int) -> Dungeon:
 
     room.entities.append(Entity(kind='exit', row=_BW_EXIT[0], col=_BW_EXIT[1],
                                 edit_immune=True))
-    room.spawn_pos = _BW_STAND
+    # Spawn WEST of the standing word (playtest 2026-07-20): so 'one' reads
+    # clear at the hall's mouth instead of hidden under the cursor — the
+    # player walks onto it, then g* hunts the buried echoes.
+    room.spawn_pos = (_BW_STAND[0], _BW_SPINE)
     room.exit_pos  = _BW_EXIT
 
     room.rebuild_indexes()
     apply_stone_fog(room)
     room.par    = _BW_PAR
     room.budget = math.ceil(_BW_PAR * 1.4)
-    # r mends in place (no shift), so l steps back onto the word before n —
-    # else n re-finds THIS line's word (which now sits one cell ahead of the
-    # cursor). g*/n do the hunting across the staggered lines.
+    # {n}l walks east onto 'one'; then g* takes it. r mends in place (no shift),
+    # so l steps back onto the word before n — else n re-finds THIS line's word
+    # (one cell ahead now). g*/n do the hunting across the staggered lines.
     f = words['fixes']
-    room.answer = f'g* h r{f[0]} l n h r{f[1]} l n h r{f[2]} G $'
+    walk = _BW_STAND[1] - _BW_SPINE
+    room.answer = f'{walk}l g* h r{f[0]} l n h r{f[1]} l n h r{f[2]} G $'
 
     dungeon = Dungeon(name='The Buried Word', seed=seed)
     dungeon.rooms        = [room]
