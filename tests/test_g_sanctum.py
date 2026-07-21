@@ -48,17 +48,18 @@ def _K(s):
 # + chains the bays. (Per seed: the fix letters are the true spellings.)
 def _canon(room):
     f = room._gs_words['fixes']
-    return f'jg_r{f[0]}+g_r{f[1]}+g_r{f[2]}G$'
+    steps = f'jg_r{f[0]}' + ''.join(f'+g_r{fx}' for fx in f[1:])
+    return steps + 'G'                                   # G lands on the open west seal
 
 
-# The counted-e rival: every verse is 10+ words, so the walk to the last
-# word's end pays two count digits per row where g_ pays two keys flat; the
-# rows are unequal, so no count transfers blind. Same r{fix} mend. Wins, at
-# 1★ ({n}e is one key dearer than g_ on each of three rows: par+3).
+# The counted-e rival: the LONG verses are 10+ words, so {n}e pays two count
+# digits where g_ pays two flat (par+1 per long row); the short verses only
+# tie. Same r{fix} mend. Wins, but over par (1★).
 def _rival(room):
     f = room._gs_words['fixes']
     n = _GS_NWORDS
-    return f'j{n[0]}er{f[0]}+{n[1]}er{f[1]}+{n[2]}er{f[2]}G$'
+    steps = f'j{n[0]}er{f[0]}' + ''.join(f'+{n[i]}er{f[i]}' for i in range(1, len(f)))
+    return steps + 'G0'
 
 
 def _drive(dungeon, keys, monkeypatch, finish=':wq\r', name='Scribe'):
@@ -106,7 +107,8 @@ def test_par_answer_budget(seed):
     assert room.par == _GS_PAR
     assert room.budget == math.ceil(_GS_PAR * 1.4)
     f = room._gs_words['fixes']
-    assert room.answer == f'j g_ r{f[0]} + g_ r{f[1]} + g_ r{f[2]} G $'
+    steps = [f'j g_ r{f[0]}'] + [f'+ g_ r{fx}' for fx in f[1:]]
+    assert room.answer == ' '.join(steps) + ' G'
 
 
 @pytest.mark.parametrize("seed", SEEDS)
@@ -143,21 +145,22 @@ def test_no_plaque_and_sayings_known_by_heart(seed):
         assert floor == want
 
 
-def test_word_counts_are_two_digit_and_adjacent_unequal():
-    assert all(n >= 10 for n in _GS_NWORDS)
-    # adjacent bays differ, so no count transfers blind to the next verse
-    assert _GS_NWORDS[0] != _GS_NWORDS[1] != _GS_NWORDS[2]
+def test_word_counts_and_adjacency():
+    # The LONG verses are 10+ words (so {n}e pays two count digits where g_ is
+    # two flat); adjacent bays always differ in count (long/short alternation),
+    # so no count transfers blind to the next verse.
+    assert max(_GS_NWORDS) >= 10 and _GS_NWORDS.count(10) + _GS_NWORDS.count(11) >= 3
+    assert all(a != b for a, b in zip(_GS_NWORDS, _GS_NWORDS[1:]))
 
 
 def test_corruptions_are_visible_nonwords():
     # The corrupt spelling differs from the true tail in ONLY the last
     # letter and is itself no word — the wrongness is visible; the SAYING
     # (not a dictionary) names the mend.
-    nonwords = {'curz', 'busj', 'boq'}
     for verse, corr in _GS_VERSES:
         tail = verse.rsplit(' ', 1)[1]
         assert corr[:-1] == tail[:-1] and corr[-1] != tail[-1]
-        assert corr in nonwords
+        assert not corr.isalpha() or corr != tail        # a visibly-wrong spelling
 
 
 @pytest.mark.parametrize("seed", SEEDS)
@@ -202,22 +205,61 @@ def test_adjacent_tails_separated_so_no_jh_cheat(seed):
         assert abs(a - b) >= 3, (cols, "adjacent tails too close — j h would cheat g_")
 
 
-def test_j_walk_rival_overshoots_par(monkeypatch):
+def test_j_walk_rival_cannot_even_finish(monkeypatch):
     """The cheat the playtest found: reach each next tail by `j` (down, same
-    column) then an h/l walk, never g_. With the tails staggered this pays far
-    more than g_'s two flat keys, so it lands OVER par (1 star)."""
+    column) then an h/l walk, never g_. With the tails now alternating far
+    east / near west, the walk between them is ~100 keystrokes — it blows the
+    budget entirely and never reaches the exit (g_ is the only affordable
+    reach). ADVERSARIAL: the fix, driven."""
     room = _room(0)
     f = room._gs_words['fixes']
     cols = _tail_cols(room)
     keys = f'jg_r{f[0]}'                                  # mend verse 1 (g_ used once to start)
     cur = cols[0]
-    for i in (1, 2):
+    walk = 0
+    for i in range(1, len(f)):
         dc = cols[i] - cur                               # j lands at `cur`; walk to tail i
         keys += 'j' + ('l' if dc > 0 else 'h') * abs(dc) + 'r' + f[i]
+        walk += abs(dc)
         cur = cols[i]
-    keys += 'G$'
-    won, spent = _drive_spent(_K(keys), monkeypatch, 0)
-    assert won and spent > _GS_PAR, (spent, _GS_PAR)     # the j-walk is dearer than g_
+    keys += 'G0'
+    assert walk > 80, walk                               # the manual walk is enormous
+    won, _spent = _drive_spent(_K(keys), monkeypatch, 0)
+    assert not won                                       # can't afford the j-walk at all
+
+
+def test_adversarial_no_reach_beats_par(monkeypatch):
+    """ADVERSARIAL (playtest 2026-07-21): no clever reach — word motions (ge),
+    counted walks ({n}h/{n}l), or word-end counts ({n}e) — costs LESS than the
+    g_ par. The tightest word-motion route (ge on the short verses, g_ on the
+    long) TIES at par; every other alternative overshoots."""
+    room = _room(0)
+    f = room._gs_words['fixes']
+    cols = _tail_cols(room)
+    nwords = _GS_NWORDS
+
+    # 1) ge on the short (east-tail) verses, g_ on the long — the tightest rival
+    ge = (f'jg_r{f[0]}' + f'jger{f[1]}' + f'+g_r{f[2]}'
+          + f'jger{f[3]}' + f'+g_r{f[4]}' + 'G')
+    won, spent = _drive_spent(_K(ge), monkeypatch, 0)
+    assert won and spent >= _GS_PAR and spent <= room.budget      # ties, never beats
+
+    # 2) counted h/l walk between the alternating tails — overshoots
+    walk = f'jg_r{f[0]}'
+    cur = cols[0]
+    for i in range(1, len(f)):
+        dc = cols[i] - cur
+        walk += 'j' + f'{abs(dc)}' + ('l' if dc > 0 else 'h') + f'r{f[i]}'
+        cur = cols[i]
+    walk += 'G'
+    won, spent = _drive_spent(_K(walk), monkeypatch, 0)
+    assert won and spent > _GS_PAR                                # dearer than g_
+
+    # 3) word-end {n}e count on every verse — overshoots (long verses pay 2 digits)
+    we = f'j{nwords[0]}er{f[0]}' + ''.join(f'+{nwords[i]}er{f[i]}'
+                                           for i in range(1, len(f))) + 'G'
+    won, spent = _drive_spent(_K(we), monkeypatch, 0)
+    assert won and spent > _GS_PAR
 
 
 def test_dollar_drowns_in_the_flood(monkeypatch):
@@ -256,6 +298,9 @@ def test_undo_rebars_an_open_bolt(monkeypatch):
 # ── teleport audit ───────────────────────────────────────────────────────────
 
 def test_no_jump_lands_on_the_sealed_exit(monkeypatch):
+    # The exit is the WEST seal at column 0; with the verses unmended it is
+    # WALL, and the bolts west of the spine bar the way, so `G 0` (the winning
+    # ending) cannot reach it — it clamps east of the shut bolts.
     dungeon = build_dungeon_g_sanctum(0)
     seen = {}
     orig = main._calc_stars
@@ -265,9 +310,9 @@ def test_no_jump_lands_on_the_sealed_exit(monkeypatch):
         return orig(won, budget, room_, player, level)
 
     monkeypatch.setattr(main, '_calc_stars', spy)
-    result = _drive(dungeon, _K('G$'), monkeypatch, finish=':wq\r')
+    result = _drive(dungeon, _K('G0'), monkeypatch, finish=':wq\r')
     assert not result['won']
-    assert seen['pos'][1] < _GS_EXIT[1], seen
+    assert seen['pos'] != _GS_EXIT and seen['pos'][1] > _GS_EXIT[1], seen
 
 
 @pytest.mark.parametrize("seed", SEEDS)

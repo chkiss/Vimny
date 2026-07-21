@@ -5612,33 +5612,35 @@ def build_dungeon_stair_rail(seed: int) -> Dungeon:
 # chosen so no r-candidate but the true letter makes an English word. The
 # rest of the family (g* g# gi gp gP) rides the same g_family token as
 # taught conveniences — their honest par-forcing collapses to ties.
-_GS_ROWS, _GS_COLS = 8, 78
+_GS_ROWS, _GS_COLS = 10, 78
 _GS_SPINE  = 22
-_GS_BAYS   = (2, 3, 4)                # adjacent — + chains them
-# Every saying is 10+ words ({n}e pays two digits where g_ pays two keys
-# flat); ADJACENT rows differ in count, so no count transfers blind to the
-# next verse. Widths ≤ 47 chars — the text ends shy of the flood.
-# The tails must land at WELL-SEPARATED columns (playtest 2026-07-20): when two
-# ADJACENT tails sat one column apart (…bush@66 / …boy@65), `j h` reached the
-# next edit spot cheaper than g_. The verses stay 10+ words (the {n}e defense),
-# but the LAST is INDENTED (_GS_STARTS) so its tail swings clear — every
-# adjacent pair of tails is now ≥ 4 columns apart, so a `j` then h/l walk to
-# the tail costs far more than g_'s two flat keys.
+_GS_BAYS   = (2, 3, 4, 5, 6)          # adjacent — + chains them
+# A FIVE-LINE poem (playtest 2026-07-20): two SHORT sayings are inset between
+# the three long ones, LEFT-ALIGNED, so the corrupt tails alternate far east
+# (long, ~col 66-70) and near west (short, ~col 40-41). Every adjacent pair of
+# tails is now > 20 columns apart, so a `j` then h/l walk to the next tail
+# costs FAR more than g_'s two flat keys — no more `j h` cheat between stacked
+# tails. The long verses stay 10+ words (the {n}e count-defense pays two digits
+# there); the short verses lean on the column spread. Widths end shy of the
+# flood (col 72), which still drowns any `$` overshoot.
 _GS_VERSES = (
     ('an ounce of prevention is worth a pound of cure', 'curz'),   # 10w, tail @ col 70
+    ('haste makes waste',                              'wastz'),   #  3w, tail @ col 40
     ('a bird in the hand is worth two in the bush',     'busj'),   # 11w, tail @ col 66
-    ('all work and no play makes jack a dull boy',      'boq'),    # 10w, indented → col 70
+    ('knowledge is power',                             'powez'),   #  3w, tail @ col 41
+    ('all work and no play makes jack a dull boy',      'boq'),    # 10w, tail @ col 65
 )
-_GS_STARTS = (24, 24, 29)             # the third verse is indented so its tail
-                                      # (col 70) sits clear of the second's (col 66)
 _GS_NWORDS = tuple(len(v.split()) for v, _c in _GS_VERSES)
 _GS_TEXT0  = 24
 _GS_POOL   = (72, 73)                 # the flood: $ lands here and drowns
-_GS_THROAT = 5
-_GS_GATE   = 6
-_GS_BOLTS  = {2: 68, 3: 69, 4: 70}
-_GS_EXIT   = (6, 71)                  # the FINAL SEAL, east of every bolt
-_GS_PAR    = 17                       # j g_ r{f} + g_ r{f} + g_ r{f} G $
+_GS_THROAT = 7                        # spine-only row joins the bays to the gate
+_GS_GATE   = 8
+# The exit and its per-verse bolts sit at the WEST end now (playtest: no need
+# for the exit way out east). The player mends the tails (east), then walks the
+# gate row back WEST through the bolts to the seal at column 0.
+_GS_BOLTS  = {2: 5, 3: 4, 4: 3, 5: 2, 6: 1}
+_GS_EXIT   = (8, 0)                   # the FINAL SEAL, WEST of every bolt
+_GS_PAR    = 26                       # j g_ r{f} (+ g_ r{f})×4 G 0  (measured)
 
 
 def _gs_words() -> dict:
@@ -5665,11 +5667,13 @@ def build_dungeon_g_sanctum(seed: int) -> Dungeon:
             cells[r][c] = CellType.FLOOR
         for c in _GS_POOL:                               # the flood at the brink
             cells[r][c] = CellType.WATER
-    for c in range(_GS_SPINE, _GS_EXIT[1]):              # gate row + bolts
+    # The gate row runs from the spine WEST to the seal at column 0; the bolts
+    # sit between them (one per verse), and the exit (col 0) is the final seal.
+    for c in range(0, _GS_SPINE + 1):
         cells[_GS_GATE][c] = CellType.FLOOR
     for dc in _GS_BOLTS.values():
         cells[_GS_GATE][dc] = CellType.WALL
-    # _GS_EXIT itself stays WALL — the final seal (chassis-standard).
+    cells[_GS_EXIT[0]][_GS_EXIT[1]] = CellType.WALL      # the final seal (chassis-standard)
 
     room = Room(room_type=RoomType.ENTRY, rows=R, cols=C)
     room.cells = cells
@@ -5678,7 +5682,7 @@ def build_dungeon_g_sanctum(seed: int) -> Dungeon:
     doors = []
     for i, r in enumerate(_GS_BAYS):
         verse = words['rows'][i]
-        col = _GS_STARTS[i]                              # indented verses stagger the tails
+        col = _GS_TEXT0                                  # LEFT-ALIGNED (no indent)
         for k, part in enumerate(verse):
             # the last word wears its CORRUPT spelling (last letter wrong);
             # g_ lands on that letter and r{fix} mends it.
@@ -5701,7 +5705,12 @@ def build_dungeon_g_sanctum(seed: int) -> Dungeon:
     room.par    = _GS_PAR
     room.budget = math.ceil(_GS_PAR * 1.4)  # STANDARD: the counted-e walk wins at 1★
     f = words['fixes']
-    room.answer = f'j g_ r{f[0]} + g_ r{f[1]} + g_ r{f[2]} G $'
+    # g_ reaches each tail (east), r mends; the FIRST verse is reached by j, the
+    # rest by + (down to the next head). After the last mend every bolt is open,
+    # so G drops to the gate row and lands on its first standable cell — the
+    # seal at column 0 — winning in one key.
+    steps = [f'j g_ r{f[0]}'] + [f'+ g_ r{fx}' for fx in f[1:]]
+    room.answer = ' '.join(steps) + ' G'
 
     dungeon = Dungeon(name='The Last Reach', seed=seed)
     dungeon.rooms        = [room]
