@@ -48,12 +48,15 @@ def _drive(script, progress):
     it = iter(script + _cmd('q!'))
     _orig_render = main.render_all
     _orig_inkey = term.inkey
+    _orig_save = main.SM.save_progress
     main.render_all = _cap
+    main.SM.save_progress = lambda *a, **k: None   # never touch the real save dir
     term.inkey = lambda *a, **k: next(it, _ks(''))
     try:
         main.run_dungeon(term, 'first_cave', progress, player_name='Normand')
     finally:
         main.render_all = _orig_render
+        main.SM.save_progress = _orig_save
         term.inkey = _orig_inkey
     return grab.get('player'), msgs
 
