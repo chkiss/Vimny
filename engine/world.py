@@ -120,6 +120,10 @@ def entity_letter(ent) -> Optional[str]:
         if ent.tag == 'demon':
             return '&'                             # :s/g/&/ summoned something worse
         return 'G' if ent.swole else 'g'           # ~-toggled goblins grow into a 'G'
+    if ent.kind == 'ally':                         # :s/g/d/ — a hound on your side
+        return 'D' if ent.swole else 'd'
+    if ent.kind == 'critter':                      # :s/g/c/ — a harmless cat
+        return 'C' if ent.swole else 'c'
     return _ENTITY_LETTER.get(ent.kind)
 
 

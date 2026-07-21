@@ -212,6 +212,10 @@ def _ent_cell_str(ent, room, r: int, c: int, mode, floor_bg: str) -> str:
         if ent.tag == 'demon':                      # hot red, summoned worse (Easter egg)
             return floor_bg + C.boss_fg() + entity_letter(ent) + rst
         return floor_bg + C.enemy_fg() + entity_letter(ent) + rst
+    if ent.kind == 'ally':                          # a hound on your side (Easter egg)
+        return floor_bg + C.ally_fg() + entity_letter(ent) + rst
+    if ent.kind == 'critter':                       # a harmless cat (Easter egg)
+        return floor_bg + C.critter_fg() + entity_letter(ent) + rst
     if ent.kind == 'warden':
         # A remote cut just glanced off him: he throws up his shield this frame
         # (the tell for edit-immunity — struck from afar and unharmed).

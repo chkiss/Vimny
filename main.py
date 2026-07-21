@@ -209,6 +209,17 @@ def _clip_to_text(clip) -> str:
 _EXPL_DAMAGE = {0: 3, 1: 3, 2: 2, 3: 1}   # 0-1: 1.5♥  2: 1♥  3: 0.5♥
 
 _ALERT_RADIUS           = 5   # Manhattan dist at which goblins start chasing
+
+
+def _sight_radius(ent) -> int:
+    """How far a chaser can see the player. Egg creatures see farther: a demon
+    (:s/g/&/) is relentless — it hunts from anywhere; a swelled Goblin
+    (:s/g/G/ or ~) has doubled sight."""
+    if getattr(ent, 'tag', '') == 'demon':
+        return 10 ** 9
+    if getattr(ent, 'swole', False):
+        return _ALERT_RADIUS * 2
+    return _ALERT_RADIUS
 _ATTACK_RADIUS          = 1   # Manhattan dist at which goblins attack each turn
 _WARDEN_SUMMON_INTERVAL = 6   # turns between warden summons
 _MSG_ROTATE_TTL         = 10  # ticks per combat message (~1 s at 0.1 s inkey timeout)
@@ -2928,8 +2939,6 @@ def _clip_from_cut_chars(items: list, base_col: int) -> dict:
 _GOBLIN_SUB_EGGS = {
     'f': ('The goblin unclenches, waves once, and wanders off.', None),
     'h': ('The goblin loses its head about it. An h is left.',   'h'),
-    'c': ('Poof. A cat. It meows once and plots your downfall.',  None),
-    'd': ('It becomes a loyal hound and pads after you.',         None),
     '$': ('The goblin clinks into a heap of gold. Greedy.',       '$'),
     '@': ('Now an adventurer. It looks as lost as you are.',      None),
 }
@@ -2974,13 +2983,6 @@ def _goblin_substitute(cmd: str, room, player, push) -> bool:
     if rep1 == '!':                                  # burst into cheerful flame
         room._pending_boom = [(g.row, g.col) for g in gobs]   # caller detonates
         return True
-    if rep1 in _GOBLIN_SUB_TRANSFORM:                # raise a worse thing
-        tag, hp, ai, spd, msg = _GOBLIN_SUB_TRANSFORM[rep1]
-        for g in gobs:
-            g.tag, g.max_hp, g.hp, g.ai, g.ai_speed, g.swole = tag, hp, hp, ai, spd, False
-        room.rebuild_indexes()
-        push(msg + tail)
-        return True
     if rep1 == 'e':                                  # the elf's shitty bargain
         offer, key, result = random.choice(_ELF_TRADES)
         for g in gobs:
@@ -2990,7 +2992,36 @@ def _goblin_substitute(cmd: str, room, player, push) -> bool:
         push(f'An elf sidles up: "{offer} — a fair trade, friend. Accept? (y/n)"')
         return True
 
-    # REMOVE effects (default: turn into that harmless letter)
+    # ── in-place transforms: the creature STAYS ──────────────────────────────
+    if rep1 == 'G':                                  # swell into a G — doubled sight
+        for g in gobs:
+            g.swole, g.max_hp, g.hp = True, g.max_hp + 2, g.hp + 2
+        room.rebuild_indexes()
+        push('The goblins swell into Goblins — bigger, and sharper-eyed.' + tail)
+        return True
+    if rep1 in _GOBLIN_SUB_TRANSFORM:                # z / & — raise a worse thing
+        tag, hp, ai, spd, msg = _GOBLIN_SUB_TRANSFORM[rep1]
+        for g in gobs:
+            g.tag, g.max_hp, g.hp, g.ai, g.ai_speed, g.swole = tag, hp, hp, ai, spd, False
+        room.rebuild_indexes()
+        push(msg + tail)
+        return True
+    if rep1 == 'd':                                  # a loyal hound on YOUR side
+        for g in gobs:
+            g.kind, g.tag, g.ai, g.ai_speed = 'ally', 'dog', 'hunt', 1
+            g.max_hp, g.hp, g.swole = 2, 2, False
+        room.rebuild_indexes()
+        push('It becomes a loyal hound and takes your side.' + tail)
+        return True
+    if rep1 == 'c':                                  # a harmless cat (it stays)
+        for g in gobs:
+            g.kind, g.tag, g.ai = 'critter', 'cat', ''
+            g.max_hp, g.hp, g.swole = 1, 1, False
+        room.rebuild_indexes()
+        push('Poof. A cat. It meows once and plots your downfall.' + tail)
+        return True
+
+    # ── REMOVE effects (default: turn into that harmless letter) ─────────────
     msg, drop = _GOBLIN_SUB_EGGS.get(
         rep1, (f'The goblin is now a harmless {rep1}.' if rep1 else
                'The goblin simply is not, any more.', rep1 or None))
@@ -3234,6 +3265,29 @@ def _enemy_tick(room, player) -> list:
     for ent in list(room.entities):
         if not ent.alive:
             continue
+        if ent.kind == 'ally' and ent.ai == 'hunt':
+            # A hound on your side (:s/g/d/): it hunts the nearest hostile and
+            # mauls it (harder if swelled). It never turns on you.
+            foes = [e for e in room.entities if e.alive and e.kind == 'goblin']
+            if foes:
+                tgt = min(foes, key=lambda e: _manhattan(ent.row, ent.col, e.row, e.col))
+                ent.ai_tick += 1
+                if ent.ai_tick % max(1, ent.ai_speed) == 0:
+                    if _manhattan(ent.row, ent.col, tgt.row, tgt.col) <= 1:
+                        tgt.hp -= 2 if ent.swole else 1
+                        if tgt.hp <= 0:
+                            room.kill_entity(tgt)
+                            msgs.append('Your hound fells a foe!')
+                    else:
+                        dr, dc = tgt.row - ent.row, tgt.col - ent.col
+                        if abs(dr) >= abs(dc):
+                            nr, nc = ent.row + ((dr > 0) - (dr < 0)), ent.col
+                        else:
+                            nr, nc = ent.row, ent.col + ((dc > 0) - (dc < 0))
+                        if ((nr, nc) != (player.row, player.col)
+                                and _steppable(room, player, nr, nc)):
+                            room.move_entity(ent, nr, nc)
+            continue
         if ent.kind == 'archivist':
             w = getattr(room, '_wrap_w', 0) or 1
             if getattr(room, 'lib_hostile', False):
@@ -3329,7 +3383,7 @@ def _enemy_tick(room, player) -> list:
                 msgs.append('The Warden summoned a goblin minion!')
         if not ent.ai:
             continue
-        if dist > _ALERT_RADIUS:
+        if dist > _sight_radius(ent):
             continue
         ent.ai_tick += 1
         if ent.ai_tick % ent.ai_speed != 0:
@@ -6404,8 +6458,8 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
             # Easter egg: ~ a goblin and it toggles its OWN case — g swells into
             # a bigger, meaner G and stays that way. (You did this to yourself.)
             _gob = room.entity_at(player.row, player.col)
-            if (_gob is not None and _gob.kind == 'goblin' and _gob.tag != 'echo'
-                    and not _gob.swole):
+            if (_gob is not None and _gob.kind in ('goblin', 'ally', 'critter')
+                    and _gob.tag != 'echo' and not _gob.swole):
                 undo_stack.append(_snapshot(room, player, budget))
                 redo_stack.clear()
                 _gob.swole = True
@@ -6414,7 +6468,12 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
                 room.rebuild_indexes()
                 if not edit_mode:
                     budget.spend(_keystroke_cost(count, '~', action.get('count_given', False)))
-                _push('You toggle its case — the goblin swells into a Goblin, and grins.')
+                _swell_line = {
+                    'goblin':  'You toggle its case — the goblin swells into a Goblin, and grins.',
+                    'ally':    'Your hound swells into a Hound — bigger teeth, same loyalty.',
+                    'critter': 'The cat swells into a Cat. It is unimpressed, but larger.',
+                }[_gob.kind]
+                _push(_swell_line)
                 _render(_pool_msg())
                 continue
             (ed_undo if edit_mode else undo_stack).append(

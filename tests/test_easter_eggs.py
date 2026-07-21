@@ -102,6 +102,68 @@ def test_elf_arms_a_trade_prompt():
     assert 'y/n' in msgs[-1]
 
 
+# ── sight: demons are relentless, G-goblins see twice as far ─────────────────
+def test_demon_sees_everywhere_and_swole_sees_double():
+    r, p = _room_and_master()
+    main._goblin_substitute('%s/g/&/', r, p, lambda m: None)
+    dem = next(e for e in r.entities if e.tag == 'demon')
+    assert main._sight_radius(dem) > 1000            # relentless, unlimited range
+
+    r, p = _room_and_master()
+    main._goblin_substitute('%s/g/G/', r, p, lambda m: None)
+    big = next(e for e in r.entities if e.swole and e.kind == 'goblin')
+    assert main._sight_radius(big) == main._ALERT_RADIUS * 2   # doubled sight
+    assert entity_letter(big) == 'G'
+
+
+# ── the dog fights on your side ───────────────────────────────────────────────
+def test_dog_is_an_ally_that_mauls_the_nearest_foe():
+    from engine.world import Entity
+    r, p = _room_and_master()
+    for e in list(r.entities):                       # clear the board of goblins
+        if e.kind == 'goblin':
+            e.alive, e.hp = False, 0
+    r.entities = [e for e in r.entities if e.kind != 'goblin']
+    dog = Entity(kind='ally', tag='dog', row=10, col=10, hp=2, max_hp=2,
+                 ai='hunt', ai_speed=1)
+    foe = Entity(kind='goblin', tag='horde', row=10, col=11, hp=1, max_hp=1,
+                 ai='chase', ai_speed=1)
+    r.entities += [dog, foe]
+    r.rebuild_indexes()
+    main._enemy_tick(r, p)
+    assert not foe.alive                             # the hound felled it
+
+
+def test_cat_persists_as_a_harmless_critter():
+    r, p = _room_and_master()
+    main._goblin_substitute('%s/g/c/', r, p, lambda m: None)
+    cats = [e for e in r.entities if e.kind == 'critter']
+    assert cats and all(entity_letter(c) == 'c' and not c.ai for c in cats)
+
+
+def test_swelling_an_ally_keeps_it_yours():
+    from engine.world import Entity
+    d = dg.build_dungeon_warden_eternal(0)
+    r = d.rooms[0]
+    dog = Entity(kind='ally', tag='dog', row=r.spawn_pos[0], col=r.spawn_pos[1],
+                 hp=2, max_hp=2, ai='hunt', ai_speed=1)
+    r.entities.append(dog)
+    r.rebuild_indexes()
+    import main as _m
+    from blessed import Terminal
+    _m_render = _m.render_all
+    Terminal.height = property(lambda self: 41)
+    term = Terminal()
+    it = iter([Keystroke('~')] + [Keystroke(c) for c in ':q!\r'])
+    _m.render_all = lambda *a, **k: None
+    _m.time.sleep = lambda *a, **k: None
+    _m.SM.save_progress = lambda *a, **k: None
+    term.inkey = lambda *a, **k: next(it, Keystroke(''))
+    _m.run_dungeon(term, 'warden_eternal', {}, player_name='Hero', _dungeon=d)
+    _m.render_all = _m_render
+    assert dog.swole and entity_letter(dog) == 'D' and dog.kind == 'ally'
+
+
 # ── ~ swells a goblin into a G (driven through the real loop) ─────────────────
 def test_tilde_swells_a_goblin(monkeypatch):
     d = dg.build_dungeon_warden_eternal(0)
