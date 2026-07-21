@@ -435,7 +435,10 @@ def render_save_select(term: Terminal, saves: list[dict], cursor: int,
         for idx, save_data in enumerate(saves):
             name     = save_data.get('player_name', 'Unknown')
             progress = save_data.get('progress', {})
-            earned   = sum(v.get('stars', 0) for v in progress.values())
+            # progress also holds non-level meta keys (max_hp, extras, has_hat…),
+            # so only count star totals from the per-level dicts.
+            earned   = sum(v.get('stars', 0) for v in progress.values()
+                           if isinstance(v, dict))
             pct      = min(100, int(earned / total_possible * 100)) if total_possible else 0
             filled   = round(pct / 100 * BAR_W)
             bar      = '█' * filled + '░' * (BAR_W - filled)

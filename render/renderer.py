@@ -207,6 +207,10 @@ def _ent_cell_str(ent, room, r: int, c: int, mode, floor_bg: str) -> str:
             return floor_bg + C.boss_echo_fg(ent.shade) + entity_letter(ent) + rst
         return floor_bg + C.enemy_fg() + entity_letter(ent) + rst
     if ent.kind == 'warden':
+        # The Warden Eternal, once unmasked, wears his aura: a slow violet→blue
+        # shimmer — the wizard/warden/W revealed in all his majesty.
+        if ent.tag == 'eternal_boss' and getattr(room, '_we_revealed', False):
+            return floor_bg + C.shimmer_fg(time.time() * 0.5) + entity_letter(ent) + rst
         return floor_bg + C.boss_fg() + entity_letter(ent) + rst
     if ent.kind == 'shield':
         return floor_bg + C.boss_fg() + S.SHIELD + rst
@@ -459,7 +463,10 @@ def render_all(term: Terminal, dungeon: Dungeon, player: Player,
             )
             if show_under:
                 return _ent_cell_str(ent_under, room, room_r, room_c, mode, floor_bg)
-            return floor_bg + C.player_fg() + S.PLAYER + C.normal_fg()
+            # Wearing the Warden's hat shimmers the cursor with his aura.
+            _pfg = (C.shimmer_fg(time.time() * 0.5)
+                    if getattr(player, 'hat_worn', False) else C.player_fg())
+            return floor_bg + _pfg + S.PLAYER + C.normal_fg()
 
         # Torn floor (Warden mega-attack) — a void pit until he pastes it back
         if (room_r, room_c) in _torn:

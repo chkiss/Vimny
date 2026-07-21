@@ -129,6 +129,7 @@ _SKIP_LEVELS = {
     'build_dungeon_archivists_library',  # The Archivist's Library (contextual :e!/:w loop; no keystroke par)
     'build_dungeon_spellwrights_forge',  # The Spellwright's Forge (:s/:g rites; no foot-path par solver)
     'build_dungeon_grandmasters_sanctum',  # The Grandmaster's Sanctum (boss; two rooms, par=None)
+    'build_dungeon_warden_eternal',  # The Warden Eternal (FINAL boss; combat descent + horde, par=None, not par-forced)
 }
 _XFAIL_LEVELS: dict = {}
 

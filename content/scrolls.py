@@ -538,7 +538,31 @@ EDIT_BY_NAME_SCROLL = {
 # id matches the key stored in progress['extras'] when the scroll is discovered.
 # dropped_by / level_slug / level_name are display metadata only.
 
+# The epilogue scroll — dropped by the Warden Eternal (the FINAL boss). No
+# smudges: there is no next tier to tease. It closes the book.
+WARDENS_REST_SCROLL = {
+    'title': "◈   The Warden's Rest   ◈",
+    'lines': [
+        ('dim',   'I set the doors. I mislabelled the plaques.'),
+        ('dim',   'I flooded the halls and hid the words,'),
+        ('dim',   'and blessed you at every threshold —'),
+        ('dim',   'because a teacher is only a warden'),
+        ('dim',   'who wants, at the last, to lose.'),
+        ('blank',),
+        ('amber', 'The buffer is yours now, end to end.'),
+        ('amber', 'Wear the hat. Go anywhere. Edit the world.'),
+    ],
+}
+
 SCROLL_CATALOG = [
+    {
+        'id':         'wardens_rest',
+        'title':      "The Warden's Rest",
+        'dropped_by': 'The Warden Eternal',
+        'level_slug': 'warden_eternal',
+        'level_name': 'The Warden Eternal',
+        'content':    WARDENS_REST_SCROLL,
+    },
     {
         'id':         'register',
         'title':      'The Unnamed Register',

@@ -79,6 +79,25 @@ def rune_ember():    return _term.color_rgb(175, 100, 35)        # sepia amber, 
 def rune_pedestal(): return _term.color_rgb(120, 70, 30)         # dying embers, a cold brazier
 def rgb_fg(rgb):     return _term.color_rgb(*rgb)                # animated colors (flame flicker)
 
+# The Warden Eternal's aura + the worn-hat cursor: a slow "breathing" shimmer
+# cycling violet → periwinkle → white → blue. `phase` (float, wraps at 1.0)
+# is driven off time in the renderer; stops are interpolated for a smooth glow.
+_SHIMMER = [
+    (150,  90, 220),   # violet
+    (150, 160, 235),   # periwinkle
+    (235, 240, 255),   # near-white
+    ( 80, 140, 235),   # blue
+]
+def shimmer_fg(phase=0.0):
+    n = len(_SHIMMER)
+    x = (phase % 1.0) * n
+    i = int(x); f = x - i
+    r0, g0, b0 = _SHIMMER[i % n]
+    r1, g1, b1 = _SHIMMER[(i + 1) % n]
+    return _term.color_rgb(int(r0 + (r1 - r0) * f),
+                           int(g0 + (g1 - g0) * f),
+                           int(b0 + (b1 - b0) * f))
+
 def budget_ok():     return _term.color_rgb(0, 210, 90)          # phosphor green, plenty left
 def budget_low():    return _term.color_rgb(215, 195, 35)        # amber caution, watch it
 def budget_crit():   return _term.color_rgb(215, 40, 40)         # hard red, nearly spent

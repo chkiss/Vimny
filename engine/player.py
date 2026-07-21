@@ -58,6 +58,8 @@ class Player:
     incsearch: bool = True        # ':set incsearch' — preview matches while typing / or ?
     wrap: bool = False            # ':set wrap' — soft-wrap a single-line buffer across screen rows (The Archivist's Library). Off by default: only renders on Room.wrap_buffer rooms, which open nowrap.
     hl_suppressed: bool = False   # ':noh' cleared the current highlight (until the next search)
+    has_hat: bool = False         # looted the Warden Eternal's hat (permanent, saved to progress)
+    hat_worn: bool = False        # ':set hat' — wearing it grants admin-like all-command access; cursor shimmers
 
     # command-mode line
     cmd_line: str = ''

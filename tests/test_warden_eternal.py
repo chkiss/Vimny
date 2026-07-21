@@ -1,0 +1,177 @@
+# Vimny — a Vim-teaching dungeon crawler.
+# Copyright (C) 2026 Chas Kissick
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see <https://www.gnu.org/licenses/>.
+#
+# SPDX-License-Identifier: GPL-3.0-or-later
+
+"""The Warden Eternal (final boss): six-warden descent + the Unmasking. NOT
+par-forced (par=None, win = survival). The macro-forced horde and the wizard
+reveal are the culmination. Tests the tick machinery directly — the chambers
+open on clearing, the reveal fires, the seal parts only when the Warden and his
+whole horde are dead, and the exit stays walled/unreachable while sealed."""
+from collections import deque
+
+import pytest
+from blessed import Terminal
+from blessed.keyboard import Keystroke
+
+import main
+import generation.dungeon_gen as dg
+from engine.world import CellType
+from engine.player import Player
+from tests import SEEDS
+
+
+def _room(seed):
+    return dg.build_dungeon_warden_eternal(seed).rooms[0]
+
+
+def _bfs_reaches(room, start, goal):
+    seen = {start}
+    q = deque([start])
+    while q:
+        r, c = q.popleft()
+        if (r, c) == goal:
+            return True
+        for dr, dc in ((1, 0), (-1, 0), (0, 1), (0, -1)):
+            nr, nc = r + dr, c + dc
+            if (0 <= nr < room.rows and 0 <= nc < room.cols
+                    and (nr, nc) not in seen
+                    and room.cells[nr][nc] != CellType.WALL):
+                seen.add((nr, nc))
+                q.append((nr, nc))
+    return False
+
+
+# ── structure ────────────────────────────────────────────────────────────────
+@pytest.mark.parametrize('seed', SEEDS)
+def test_structure(seed):
+    r = _room(seed)
+    assert (r.rows, r.cols) == (dg._WDE_ROWS, dg._WDE_COLS)
+    assert r.par is None                       # NOT par-forced
+    assert r.budget == dg._WDE_BUDGET
+    assert len(r._wde_gates) == len(dg._WDE_CHAMBERS) == 6
+    assert r.search_glyph_entities is True      # /g finds goblins, /W the Warden
+    boss = [e for e in r.entities if e.tag == 'eternal_boss']
+    assert len(boss) == 1 and boss[0].kind == 'warden' and boss[0].edit_immune
+    # a real horde — enough that hand-killing is grind and a macro is the answer
+    horde = [e for e in r.entities if e.tag == 'horde']
+    assert len(horde) >= 20
+
+
+@pytest.mark.parametrize('seed', SEEDS)
+def test_every_chamber_starts_sealed(seed):
+    r = _room(seed)
+    for g in r._wde_gates:
+        assert r.cells[g['band']][g['col']] == CellType.WALL
+
+
+# ── the descent: a chamber opens only when its foes are cleared ───────────────
+@pytest.mark.parametrize('seed', SEEDS)
+def test_chamber_opens_on_clear(seed):
+    r = _room(seed)
+    p = Player(row=r.spawn_pos[0], col=r.spawn_pos[1])
+    g = r._wde_gates[0]
+    top, bot = g['rows']
+    # still-alive foes: tick keeps it shut
+    main._warden_eternal_tick(r, p)
+    assert r.cells[g['band']][g['col']] == CellType.WALL
+    # clear the chamber
+    for e in r.entities:
+        if e.tag == 'eternal' and top <= e.row <= bot:
+            e.hp, e.alive = 0, False
+    main._warden_eternal_tick(r, p)
+    assert r.cells[g['band']][g['col']] == CellType.FLOOR
+
+
+# ── the Unmasking ─────────────────────────────────────────────────────────────
+@pytest.mark.parametrize('seed', SEEDS)
+def test_reveal_fires_in_the_finale(seed):
+    r = _room(seed)
+    p = Player(row=r.spawn_pos[0], col=r.spawn_pos[1])
+    main._warden_eternal_tick(r, p)
+    assert r._wde_revealed is False
+    p.row = dg._WDE_FINALE_TOP
+    msgs = main._warden_eternal_tick(r, p)
+    assert r._wde_revealed is True
+    assert any('Warden' in m for m in msgs)
+
+
+# ── the seal parts only when the Warden AND the horde are dead ────────────────
+@pytest.mark.parametrize('seed', SEEDS)
+def test_seal_needs_boss_and_whole_horde(seed):
+    r = _room(seed)
+    p = Player(row=dg._WDE_FINALE_TOP, col=1)
+    seal = r._wde_seal
+    # kill the boss but leave the horde: seal stays shut
+    for e in r.entities:
+        if e.tag == 'eternal_boss':
+            e.hp, e.alive = 0, False
+    main._warden_eternal_tick(r, p)
+    assert r.cells[seal['rows'][0]][seal['col']] == CellType.WALL
+    assert p.has_hat is False
+    # clear the horde too: seal parts, the hat is granted
+    for e in r.entities:
+        if e.tag == 'horde':
+            e.hp, e.alive = 0, False
+    main._warden_eternal_tick(r, p)
+    assert all(r.cells[row][seal['col']] == CellType.FLOOR for row in seal['rows'])
+    assert p.has_hat is True
+
+
+# ── teleport / walking audit: the exit is unreachable while sealed ────────────
+@pytest.mark.parametrize('seed', SEEDS)
+def test_exit_unreachable_while_sealed(seed):
+    r = _room(seed)
+    assert not _bfs_reaches(r, r.spawn_pos, r.exit_pos)
+    # no row's first non-blank standable column is the exit column — so no
+    # G/gg/H/M/L teleport lands on the exit while the seal is shut.
+    exit_c = r.exit_pos[1]
+    for row in range(r.rows):
+        first = next((c for c in range(r.cols)
+                      if r.cells[row][c] != CellType.WALL), None)
+        assert first != exit_c    # every jump lands west of the sealed pocket
+
+
+# ── end-to-end: the whole descent through the real run_dungeon loop ───────────
+def test_full_descent_wins_and_grants_the_hat(monkeypatch):
+    """Drive the FULL loop with every foe pre-cleared, so the live tick chain
+    (gates open → the Unmasking → the seal parts → win) runs end-to-end and the
+    hat is granted and persisted. Combat itself is shipped machinery, exercised
+    elsewhere; this pins the boss's own state machine through run_dungeon."""
+    d = dg.build_dungeon_warden_eternal(0)
+    r = d.rooms[0]
+    for e in r.entities:                       # the victory lap, foes already down
+        if e.kind in ('warden', 'goblin'):
+            e.hp, e.alive = 0, False
+    for anim in ('_fireworks_animation', '_win_animation', '_starfield_victory',
+                 '_heart_container_animation', '_unlock_animation'):
+        monkeypatch.setattr(main, anim, lambda *a, **k: None)
+    monkeypatch.setattr(main, 'render_all', lambda *a, **k: None)
+    monkeypatch.setattr(main.time, 'sleep', lambda *a, **k: None)
+    monkeypatch.setattr(Terminal, 'height', property(lambda self: 41))
+    # walk straight down the spine, then east across the parted seal to the exit
+    script = [Keystroke('j')] * (dg._WDE_EXIT[0] - r.spawn_pos[0])
+    script += [Keystroke('l')] * (dg._WDE_EXIT[1] - r.spawn_pos[1])
+    script += [Keystroke(c) for c in ':wq\r']
+    term = Terminal()
+    it = iter(script)
+    monkeypatch.setattr(term, 'inkey', lambda *a, **k: next(it, Keystroke('')))
+    progress = {}
+    res = main.run_dungeon(term, 'warden_eternal', progress, player_name='Hero',
+                           _dungeon=d)
+    assert res['won'] is True
+    assert progress.get('has_hat') is True     # the hat, persisted on the win-save
+    assert r._wde_revealed is True             # the Unmasking fired

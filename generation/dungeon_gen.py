@@ -12437,3 +12437,145 @@ def build_dungeon_shelving_room(seed: int) -> Dungeon:
     dungeon.rooms        = [room]
     dungeon.current_room = 0
     return dungeon
+
+
+# ── The Warden Eternal (FINAL BOSS) ──────────────────────────────────────────
+# A vertical descent back through all six wardens the player has already
+# beaten, then The Unmasking: the blessing-wizard is the Warden Eternal, the W
+# glyph that was the clue all along. NOT par-forced (par=None, win = survival);
+# the finale's horde is sized so a kill-macro (qa /g⏎ x q → @a) is the master's
+# answer — the payoff of the Hall of Echoes. See blueprints/act_7.md v3.
+_WDE_COLS    = 60
+_WDE_SPINE   = 1                      # the descent column (open in every chamber)
+_WDE_TEXT    = 4                      # west label head col
+_WDE_BUDGET  = 400                    # roomy: the fight is unsequenced, unmetered
+
+# Each chamber: (top_row, bot_row, band_row) — content rows then the stone band
+# below with a passage cell at _WDE_SPINE that opens when the chamber is cleared.
+_WDE_CHAMBERS = [
+    (1,  3,  4),
+    (5,  7,  8),
+    (9,  11, 12),
+    (13, 15, 16),
+    (17, 19, 20),
+    (21, 23, 24),
+]
+_WDE_FINALE_TOP = 25
+_WDE_FINALE_BOT = 33
+_WDE_ROWS       = 35                  # rows 0..34 (34 = bottom wall)
+_WDE_SEAL_COL   = 57                  # the boss seal; the exit pocket lies east
+_WDE_EXIT       = (29, 58)
+
+# Per-chamber flavour + roster. Labels EVOKE each warden (never enumerate a
+# command — the world-text law). rosters: (warden_hp or 0, goblin_count).
+_WDE_CHAMBER_SPECS = [
+    ("Here you first drew steel.",        0, 3),   # the Keep
+    ("The eye that measured you, returns.", 3, 2), # the Surveyor
+    ("The maze-maker, come round again.",  3, 3),  # the Pathfinder
+    ("He who folded the halls.",           4, 3),  # the Manifold
+    ("The hand that rewrote you.",         4, 4),  # the Scrivener
+    ("The last teacher, unteaching.",      5, 4),  # the Grandmaster
+]
+# The wizard's parting verse, laid along the finale's west wall as he unmasks.
+_WDE_FINALE_LABEL = "You knew my face. You never knew my name."
+
+
+def build_dungeon_warden_eternal(seed: int) -> Dungeon:
+    """The Warden Eternal (slug `warden_eternal`): the final boss. Six warden
+    callbacks, then the Unmasking + the macro-forced horde. par=None."""
+    rng = random.Random(seed ^ 0x3ADE)
+    R, C = _WDE_ROWS, _WDE_COLS
+    cells = [[CellType.WALL] * C for _ in range(R)]
+
+    # Carve each chamber full-width floor; the band below stays solid WALL with
+    # a single passage cell at the spine (opened by the tick when cleared).
+    for (top, bot, band) in _WDE_CHAMBERS:
+        for r in range(top, bot + 1):
+            for c in range(1, C - 1):
+                cells[r][c] = CellType.FLOOR
+        # band row: solid wall (passage cell punched open later by the tick)
+
+    # The finale hall: full-width floor, minus the sealed exit pocket east of
+    # _WDE_SEAL_COL (reachable only when the Warden is unmade).
+    for r in range(_WDE_FINALE_TOP, _WDE_FINALE_BOT + 1):
+        for c in range(1, _WDE_SEAL_COL):
+            cells[r][c] = CellType.FLOOR
+    # the exit pocket (a lone standable cell behind the seal)
+    cells[_WDE_EXIT[0]][_WDE_EXIT[1]] = CellType.FLOOR
+
+    room = Room(room_type=RoomType.BOSS, rows=R, cols=C)
+    room.cells     = cells
+    room.seed      = seed
+    room.spawn_pos = (_WDE_CHAMBERS[0][0], _WDE_SPINE)
+    room.exit_pos  = _WDE_EXIT
+
+    entities = []
+    gates = []
+    for i, (top, bot, band) in enumerate(_WDE_CHAMBERS):
+        label, whp, gcount = _WDE_CHAMBER_SPECS[i]
+        room.char_runs.append(CharRun(top, _WDE_TEXT, tuple(label), 'ancient'))
+        # the returning warden (stationary, tagged so it neither chases nor
+        # summons — a clean duel), then goblin minions that chase.
+        mid = (top + bot) // 2
+        if whp:
+            entities.append(Entity(kind='warden', row=mid, col=C // 2,
+                                   hp=whp, max_hp=whp, ai='', tag='eternal',
+                                   edit_immune=True))
+        placed = {(mid, C // 2)}
+        for _ in range(gcount):
+            for _try in range(30):
+                gr = rng.randint(top, bot)
+                gc = rng.randint(4, C - 3)
+                if (gr, gc) not in placed:
+                    placed.add((gr, gc))
+                    entities.append(Entity(kind='goblin', row=gr, col=gc,
+                                           hp=1, max_hp=1, ai='chase',
+                                           ai_speed=1, tag='eternal'))
+                    break
+        gates.append({'band': band, 'col': _WDE_SPINE,
+                      'rows': (top, bot), 'reveal': None})
+    # reveal-range for each chamber below the first = its own content rows
+    for i in range(1, len(gates)):
+        gates[i]['reveal'] = _WDE_CHAMBERS[i]
+
+    # ── The Unmasking: the wizard = the Warden Eternal = the W glyph ──────────
+    room.char_runs.append(
+        CharRun(_WDE_FINALE_TOP, _WDE_TEXT, tuple(_WDE_FINALE_LABEL), 'ancient'))
+    boss = Entity(kind='warden', row=29, col=50, hp=6, max_hp=6, ai='',
+                  tag='eternal_boss', edit_immune=True)
+    entities.append(boss)
+    # the horde — sized so hand-killing is grind and a /g-x macro is the answer.
+    hplaced = {(29, 50)}
+    for _ in range(24):
+        for _try in range(60):
+            gr = rng.randint(_WDE_FINALE_TOP, _WDE_FINALE_BOT)
+            gc = rng.randint(3, _WDE_SEAL_COL - 2)
+            if (gr, gc) not in hplaced:
+                hplaced.add((gr, gc))
+                entities.append(Entity(kind='goblin', row=gr, col=gc, hp=1,
+                                       max_hp=1, ai='chase', ai_speed=2,
+                                       tag='horde'))
+                break
+    entities.append(Entity(kind='exit', row=_WDE_EXIT[0], col=_WDE_EXIT[1]))
+    # The Warden's Rest — the epilogue scroll, waiting on the last stone before
+    # the seal (looted with x on the way out, once the fight is won).
+    entities.append(Entity(kind='chest_scroll', row=_WDE_EXIT[0],
+                           col=_WDE_SEAL_COL - 1, scroll_id='wardens_rest'))
+
+    room.entities = entities
+    room.search_glyph_entities = True     # /g finds goblins, /W finds the Warden
+    room._wde_gates   = gates
+    room._wde_seal    = {'col': _WDE_SEAL_COL,
+                         'rows': tuple(range(_WDE_FINALE_TOP, _WDE_FINALE_BOT + 1))}
+    room._wde_boss_tag = 'eternal_boss'
+    room._wde_revealed = False
+    room.rebuild_indexes()
+    apply_stone_fog(room)                 # each chamber sleeps until its gate opens
+    room.par    = None                    # NOT par-forced — the victory lap
+    room.budget = _WDE_BUDGET
+    room.answer = ''                      # combat boss: no fixed karaoke route
+
+    dungeon = Dungeon(name='The Warden Eternal', seed=seed)
+    dungeon.rooms        = [room]
+    dungeon.current_room = 0
+    return dungeon

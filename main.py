@@ -1869,6 +1869,65 @@ def _grandmasters_arena_tick(room, player) -> list:
     return msgs
 
 
+def _warden_eternal_tick(room, player) -> list:
+    """The Warden Eternal (final boss): the six-warden descent, then the
+    Unmasking. Each chamber's stone band opens its spine passage once every
+    'eternal'-tagged foe in that chamber's rows is dead (and reveals the
+    chamber below). When the player reaches the finale the wizard unmasks —
+    the W was the Warden all along — and the horde is loosed. The seal to the
+    exit parts only when the Warden AND his whole horde are dead; he leaves
+    his hat on the stone (player.has_hat, persisted on the win-save). Stateless
+    per turn, so undo restores the world and the gates together. par=None."""
+    msgs = []
+    gates = getattr(room, '_wde_gates', None)
+    if gates is None:
+        return msgs
+
+    # 1) open each cleared chamber's passage, revealing the chamber below
+    for g in gates:
+        band, col = g['band'], g['col']
+        if room.cells[band][col] != CellType.WALL:
+            continue
+        top, bot = g['rows']
+        if any(e.alive and e.tag == 'eternal' and top <= e.row <= bot
+               for e in room.entities if e.kind in ('warden', 'goblin')):
+            continue
+        room.cells[band][col] = CellType.FLOOR
+        rev = g.get('reveal')
+        if rev:
+            rtop, rbot, _b = rev
+            room.fog_cells = {(fr, fc) for (fr, fc) in room.fog_cells
+                              if not (rtop <= fr <= rbot)}
+        room.rebuild_indexes()
+        msgs.append('The stone grinds aside — the way down opens.')
+
+    # 2) the Unmasking, when the player steps into the finale hall
+    if not getattr(room, '_wde_revealed', False) and player.row >= _dg._WDE_FINALE_TOP:
+        room._wde_revealed = True
+        room.fog_cells = {(fr, fc) for (fr, fc) in room.fog_cells
+                          if fr < _dg._WDE_FINALE_TOP}
+        room.rebuild_indexes()
+        msgs.append('The wizard lowers his hood — and it is the Warden, who '
+                    'blessed your every step. "Now," he breathes. "Show me."')
+
+    # 3) the seal parts when the Warden AND his whole horde are dead
+    seal = getattr(room, '_wde_seal', None)
+    if seal and room.cells[seal['rows'][0]][seal['col']] == CellType.WALL:
+        boss = next((e for e in room.entities
+                     if e.tag == room._wde_boss_tag and e.alive), None)
+        horde = any(e.alive and e.tag == 'horde'
+                    for e in room.entities if e.kind == 'goblin')
+        if boss is None and not horde:
+            for r in seal['rows']:
+                room.cells[r][seal['col']] = CellType.FLOOR
+            room.rebuild_indexes()
+            player.has_hat = True         # persisted by the win-save on exit
+            msgs.append("The Warden falls still at last. He lifts his hat from "
+                        "his brow and sets it on the stone — yours now. The "
+                        "way out is open. (:set hat to wear it, anywhere.)")
+    return msgs
+
+
 def _gauntlet_tick(room, player) -> list:
     """The Gauntlet's sixteen bolts + FINAL SEAL — the Annex chassis widened
     to three door kinds (room._gnt_doors = (kind, target, bolt_col)):
@@ -2804,6 +2863,7 @@ _LEVEL_INTROS = {
     'hall_of_echoes': ('The Hall of Echoes — hall opens onto hall, and every hall repeats itself. The stone remembers.', 70),
     'grandmasters_sanctum': ('The Grandmaster\'s Sanctum — a long gallery of seven proofs, and the master himself beyond the last stone, listening to every stroke. Nothing here is new; everything here is asked properly.', 70),
     'gauntlet': ('The Gauntlet — every hall you have walked, folded into one long descent. Two of its chambers have no doors at all, and two of its verses have not been written yet. Sixteen bolts, one seal. Nothing here is new. Everything here is final.', 70),
+    'warden_eternal': ('The Warden Eternal — six wardens you have already beaten wait in the dark, one behind each stone, and something older waits below them all. It has walked beside you the whole way, and blessed every door. Go down and meet it.', 70),
     'binders_reliquary': ('The Binder\'s Reliquary — still water splits the vault, too wide to step and too deep to wade. On the far shore a single word is legible, and beyond it, the binder\'s last work.', 70),
     'warden_scrivener':    ('The Warden Scrivener — he has copied these halls for an age and finished nothing. The great page waits, passage by passage, for a truer hand.', 70),
     'warden_manifold':     ('The Warden Manifold — he stamps himself into the world. Light the four braziers; the gate will draw and the fog will part.', 70),
@@ -3143,7 +3203,8 @@ def _enemy_tick(room, player) -> list:
         dist = _manhattan(player.row, player.col, ent.row, ent.col)
         if ent.kind == 'warden' \
                 and ent.tag not in ('surveyor', 'verse', 'manifold', 'stamp',
-                                    'scrivener', 'grandmaster') \
+                                    'scrivener', 'grandmaster',
+                                    'eternal', 'eternal_boss') \
                 and dist <= _ALERT_RADIUS:
             has_goblins = any(
                 e.alive and e.summoner_uid == ent.uid
@@ -3254,6 +3315,13 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
     for _cmd in progress.get('extras', []):
         if _cmd != _gated and _cmd not in player.known_commands:
             player.known_commands = player.known_commands + [_cmd]
+    # The Warden Eternal's hat — a permanent post-game unlock. Once looted it is
+    # saved to progress; wearing it (`:set hat`) grants admin-like all-command
+    # access in ANY level. The worn state persists across levels too.
+    player.has_hat  = progress.get('has_hat', False)
+    player.hat_worn = player.has_hat and progress.get('hat_worn', False)
+    if player.hat_worn and 'admin' not in player.known_commands:
+        player.known_commands = player.known_commands + ['admin']
     dungeon.level_slug = level   # lets the renderer show the act's hint on bosses
 
     # Remove heart containers already collected by this player.
@@ -3554,6 +3622,9 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
                 _push('In the pocket\'s shadow, a second word wakes.')
         if level == 'wet_ink':
             for _m in _wet_ink_tick(room, player):    # braziers, fuel gate, fog
+                _push(_m)
+        if level == 'warden_eternal':
+            for _m in _warden_eternal_tick(room, player):
                 _push(_m)
         if level == 'gauntlet':
             for _m in _gauntlet_tick(room, player):
@@ -4274,6 +4345,8 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
                             progress[level] = {'complete': True,
                                                'stars': max(stars, prev)}
                             last_saved_stars = max(stars, last_saved_stars)
+                            if player.has_hat:       # the Warden Eternal's gift
+                                progress['has_hat'] = True
                         _commit_hearts()
                         SM.save_progress(progress, player_name)
                         _push('Saved.')
@@ -4287,6 +4360,8 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
                         prev = progress.get(level, {}).get('stars', 0)
                         if prev == 0 and stars >= 1:
                             _first_written_completion = True
+                    if player.has_hat:                       # the Warden Eternal's gift
+                        progress['has_hat'] = True           # (caller persists progress)
                     _commit_hearts()                         # caller saves on 'wq'
                     return {'won': won, 'stars': stars, 'action': 'wq',
                             'first_written_completion': _first_written_completion}
@@ -4409,6 +4484,32 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
                         _push(':nohlsearch')
                     else:
                         _push("You haven't learned search yet.")
+
+                elif cmd.split()[0:1] == ['set'] and cmd[len('set'):].strip() in (
+                        'hat', 'nohat', 'hat!', 'invhat', 'hat?'):
+                    # The Warden's hat — worn via `:set hat` once looted (The
+                    # Warden Eternal). Vim-faithful `:set` idiom; wearing it makes
+                    # every spell available anywhere (admin sentinel) and shimmers
+                    # the cursor. Gated behind actually holding the hat.
+                    _hb = cmd[len('set'):].strip()
+                    if not (player.has_hat or player_name == 'admin'):
+                        _push("You have no hat to wear.")
+                    elif _hb == 'hat?':
+                        _push('hat' if player.hat_worn else 'nohat')
+                    else:
+                        _worn = (not player.hat_worn) if _hb in ('hat!', 'invhat') \
+                                else (_hb == 'hat')
+                        player.hat_worn = _worn
+                        if _worn and 'admin' not in player.known_commands:
+                            player.known_commands = player.known_commands + ['admin']
+                        elif not _worn and player_name != 'admin':
+                            player.known_commands = [c for c in player.known_commands
+                                                     if c != 'admin']
+                        progress['has_hat']  = player.has_hat
+                        progress['hat_worn'] = player.hat_worn
+                        SM.save_progress(progress, player_name)
+                        _push("The Warden's hat settles on your brow — every spell is yours."
+                              if _worn else "You doff the hat; the old bounds return.")
 
                 elif cmd.split()[0:1] == ['set']:
                     # :set number/relativenumber + the boolean hlsearch/incsearch,
@@ -5783,7 +5884,8 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
                     if cur.kind == 'warden' and cur.hp > 0 \
                             and cur.tag not in ('surveyor', 'verse',
                                                 'manifold', 'stamp',
-                                                'scrivener', 'grandmaster'):
+                                                'scrivener', 'grandmaster',
+                                                'eternal', 'eternal_boss'):
                         move_msg = _do_warden_move(room, cur, player)
                         if move_msg:
                             _push(move_msg)

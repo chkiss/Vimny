@@ -16,16 +16,139 @@
 
 ---
 
-## Level 45.1 — The Warden Eternal (FINAL BOSS) — v2 plan, 2026-07-18
+## Level 48.1 — The Warden Eternal (FINAL BOSS) — v3 plan, 2026-07-21
 
-> Supersedes the v1 three-phase design in full. v1 relied on three things that
-> are now dead or contrary to project law: (a) the **mana pool** (retired
-> 2026-06-15 — substitution shipped token-gated at the Spellwright's Forge);
-> (b) **tight-budget forcing** (the S2 1.24×/1.30× multipliers — we now force
-> by PAR: sub-optimal routes WIN at 1★, budgets stay generous); (c) the **wave
-> timer** (CHALLENGE C6 — cut entirely; a respawn tick is a new engine system
-> whose only job is punishing slow play, i.e. budget-thinking; static fire per
-> phase does the forcing).
+> **v3 supersedes the v2 three-phase / par-forced design** (kept below as
+> historical detail). Two user decisions (2026-07-21) reshaped it:
+> (1) **NO par-forcing** — this is the victory lap, not a teaching gate;
+> `par = None`, budget hand-set generous, WIN = survival (Pathfinder /
+> Grandmaster precedent). Every chamber is a *showcase*, not a star-gate.
+> (2) **Six-warden callback + the reveal**: the wizard who blessed the player
+> before every level **was the Warden the whole time** — the whole curriculum
+> was his trial by fire. The boss is the mentor dropping his disguise; the
+> reward is his **hat**. Renumbered 45.1 → **48.1** (ex-range + g-levels
+> shifted the chain).
+
+**Role in the curriculum.** The Gauntlet already examined pure editing. The
+Eternal is the emotional capstone: a descent back through **all six wardens**
+the player has already beaten (Keep · Surveyor · Pathfinder · Manifold ·
+Scrivener · Grandmaster), each antechamber reprising that warden's signature
+mechanic as a victory-lap trial, ending in **The Unmasking** — the wizard
+steps from the dark and is the Warden Eternal. No new commands (`teaches: []`).
+
+### Structure — six antechambers + the Unmasking
+
+One composite arena, a vertical descent, scripted by a plain
+`_warden_eternal_tick` in `main.py` (grandmasters/gauntlet tick precedent — no
+new boss-state architecture). Each chamber is gated by a plaque/seal door and
+reprises exactly one prior warden's scroll-skill (`_SCROLL_DROPS` ids in
+parens). None is par-forced — the door opens when the trial is *met*, generous
+budget throughout:
+
+1. **The Keep's Gate** (`wardens_keep` → combat/`x`) — a short goblin-pack
+   duel; where the whole journey's fighting began. Seal opens on last kill.
+2. **The Surveyor's Span** (`warden_surveyor` → `visual`) — a visual-mode
+   select-and-strike beat (`v{motion}` then operate); his gift was The
+   Warden's Sight.
+3. **The Pathfinder's Verse** (`warden_pathfinder` → `d_op`, the mega-attack,
+   `/W`, the wardenverse) — the telegraphed `warden_mega.py` attack on rotating
+   safe pillars + a `/W` "find the true warden among echoes" beat.
+4. **The Manifold's Echo** (`warden_manifold` → `y_op`, `.`) — a yank/paste +
+   dot-repeat chamber (five echo-wardens, Hall-of-Echoes two-part mend so `.`
+   can't carry a whole row; macro-friendly but not forced).
+5. **The Scrivener's Leaves** (`warden_scrivener` → `text_obj`) — text-object
+   mends (`ciw` / `ci"` / `dit`) on corrupted verses.
+6. **The Grandmaster's Seal** (`grandmasters_sanctum` → `visual_op`) — the
+   staggered ranged-operator gallery reprise; the last door before the throne.
+
+**The Unmasking (finale) — macros are the intended best line.** Beyond the
+sixth seal the wizard is waiting — the same figure who recited every blessing
+poem. On approach he drops the robe: he is the **Warden Eternal**
+(`edit_immune`, ~6 HP, the mega-attack). He does not fight alone: he summons
+**hordes of goblins** — ranks large enough that hand-killing one-by-one is
+grinding, deliberate tedium. The MASTER'S answer is to **record a kill-macro
+and replay it**: e.g. `qa /g⏎ x q` (search to the next goblin glyph, strike,
+stop) then `@a` / `20@a` mows the whole horde regardless of layout — search
+finds each goblin wherever it stands, so ONE macro scales to any wave. This is
+the payoff of the Hall of Echoes: the final fight is won not by faster
+fingers but by **writing a program**. Design for **multiple new macros**
+(user directive): distinct enemy glyphs / registers reward a small kit —
+`@a` for the goblin rank (`/g x`), `@b` for a second pattern (a different
+glyph or a move-then-strike), and macros that CALL macros (record `@a` inside a
+bigger sweep). Between waves the boss's mega-attack forces marked-pillar
+dodging, so the loop is *record → replay to clear the horde → dodge → strike
+the boss*. NOT par-forced: hand-killing still wins eventually; the horde is
+merely SIZED so the macro is the obvious mastery, never a star-gate.
+On his defeat he leaves behind **the wizard's hat** (a lootable Entity) and
+**The Warden's Rest** epilogue scroll (zero smudges). `boss_seal` on the exit
+until `_check_boss_cleared`; exit east of a bolt row per the teleport audit
+(assert no jump reaches it while sealed, BFS can't either).
+
+**Macro-horde engine checks (flag at build):** (a) goblin glyphs must be
+`/`-searchable — reuse the Pathfinder `search_glyph_entities` overlay so `/g`
+lands the cursor ON a goblin cell; (b) `x` must kill the entity the search
+landed on (x-attacks the entity on the player's own cell — verify a
+search-landing counts as "on"); (c) macro replay over an emptying board must
+degrade gracefully (a `@a` whose `/g` finds nothing should no-op, not error —
+`_MACRO_MAX` recursion cap + failed-search abort already exist); (d) summoning
+is stateless/undo-safe like the Operator's Vault key-drop tick (resolve counts
+live each tick; never hold entity refs across undo). All are small extensions
+of shipped systems, not new architecture.
+
+**Reward / ending.** Hat pickup + The Warden's Rest scroll + the existing
+`warden_eternal` wizard-wisdom poem as the send-off (its last line is already
+"Go gently, traveler."). The hat is the tangible "you are the master now"
+token; the reveal recontextualises every poem the player has read.
+`_SCROLL_DROPS['warden_eternal']` = a NON-smudge epilogue scroll (no next tier
+to tease) via `_render_standard_scroll`.
+
+**Par / budget / tests.** `par = None`, budget hand-set generous; add to
+`_SKIP_LEVELS` in `test_answer_paths.py` (combat boss, no keystroke par) and
+flag that exemption to the user. Tests on the `test_grandmasters_sanctum` /
+`test_warden_pathfinder` template: per-chamber structure + seal-open
+conditions, mega-attack safe-pillar survivability, the Unmasking transition,
+exit teleport-audit (no jump/BFS reaches sealed exit), hat + scroll drop. NO
+cheese-probe par battery (nothing to par-force). Answer tape optional (skip).
+
+**Reveal plumbing — RESOLVED 2026-07-21 (user):**
+
+1. **Wizard = Warden = the `W` glyph** — it has been the clue all along (every
+   warden renders `W`). No new glyph. On the Unmasking, color the boss `W` with
+   a **calm shimmering "breathing" effect** cycling violet / periwinkle / white
+   / blue (a slow phase over ticks, like the mega telegraph but serene) — "the
+   Wizard/Warden in all his majesty". New palette entry `warden_eternal_fg` +
+   a per-tick phase index the renderer reads.
+
+2. **The wizard's hat is WEARABLE and vim-faithful via `:set`.** Picking it up
+   grants the item; the player then chooses to don/doff it with **`:set hat`** /
+   **`:set nohat`** — reusing the game's established `:set` idiom (`:set wrap`,
+   `:set nu`). Wearing it makes `known_commands` return the FULL command set
+   (admin-like) **in every level, including early ones** — the master may use
+   any spell anywhere. It is a PERMANENT post-game unlock (saved to progress
+   once looted; the toggle state also persists). **Cursor tell (vim-faithful):**
+   Vim signals mode by cursor shape/color (`guicursor`); here, wearing the hat
+   renders the player cursor with the same violet→blue **shimmer** as the
+   unmasked Warden — you literally carry his aura. `:set nohat` returns the
+   normal cursor and normal per-level gating. Implementation: `player.has_hat`
+   (looted) + `player.hat_worn` (toggle); `command_guard.action_allowed`
+   short-circuits to allow-all when `hat_worn`; the cursor renderer picks the
+   shimmer palette when `hat_worn`; `:set hat`/`nohat` parsed alongside the
+   existing set-options. Gate the toggle behind `has_hat` (no early cheat).
+
+3. **`/g` + `x` verified as the macro-kill primitive** (build-time check #3
+   confirmed proceed): reuse `search_glyph_entities` so `/g` lands on a goblin;
+   `x` kills the entity on the landed cell; empty-board `@a` no-ops via the
+   existing failed-search abort.
+
+---
+
+### v2 (SUPERSEDED — par-forced three-phase, kept for reference) — 2026-07-18
+
+> The three-phase ranged-`:s` / macros / timed-combat design below is
+> superseded by v3's six-warden callback. Its *mechanics* (fire rows via
+> ranged `:s`, echo-warden two-part mend, mega-attack finale) are still the
+> best raw material for chambers 3–6 — mine them, but they are showcases now,
+> not par-gates.
 
 **Role in the curriculum.** The player arrives having passed the Gauntlet —
 pure editing mastery is already examined. The boss is therefore the thing the
