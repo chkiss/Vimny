@@ -16,18 +16,18 @@
 #
 # SPDX-License-Identifier: GPL-3.0-or-later
 
-"""The Hall of Echoes (q @ ") — the macro gauntlet, v4 (2026-07-20).
+"""The Hall of Echoes (q @ ") — the macro gauntlet, v5 (2026-07-21).
 
-Two rooms. Room 0: a poem hall — one famous 10-line rhyme (5-poem pool)
-with a deadpan intruder word prepended to every line; daw at the head,
-recorded once (qa), replayed down the hall. Room 1: ONE tall map of REPLICA
-chambers stacked south, each the EXACT puzzle from a source level whose own
-tape repeats a 2+-char string — the Echo Vault (w w r/., qb), the Selection
-Halls' panel cycle (k vbp, qc), the Refrain Vault's reprise (p 3j, qd).
-Chambers are runs of text rows split by stone bands whose west gates grind
-open as each chamber reads true; the exit in the last band needs every
-chamber true. Replayed keys are budget-free; the all-manual road wins at
-1★ (120 measured ≤ budget 160)."""
+ONE tall map (the viewport scrolls). The FIRST run is a poem hall — one
+famous 10-line rhyme (5-poem pool) with a deadpan intruder word prepended to
+every line; daw at the head, recorded once (qa), replayed down the run. Below
+it, stacked south, the REPLICA chambers, each the EXACT puzzle from a source
+level whose own tape repeats a 2+-char string — the Echo Vault (w w r/., qb),
+the Selection Halls' panel cycle of PROVERBS ($bvep, qc), the Refrain Vault's
+reprise (p 3j, qd), the Goblin lair (;x, qe). Runs are split by stone bands
+whose west gates grind open as each run reads true — the descent never leaves
+the map; the exit in the last band needs every run true. Replayed keys are
+budget-free; the all-manual road wins at 1★ (≤ budget)."""
 import re
 
 import pytest
@@ -51,9 +51,17 @@ def _K(s):
     return [ESC if ch == '\x1b' else Keystroke(ch) for ch in s]
 
 
-def _tapes(seed):
-    d = build_dungeon_hall_of_echoes(seed)
-    return d.rooms[0].answer, d.rooms[1].answer
+def _tape(seed):
+    """The single map's full driven tape (poem run + every replica chamber)."""
+    return build_dungeon_hall_of_echoes(seed).rooms[0].answer
+
+
+def _real_chambers(seed):
+    """The replica chambers built with the SAME rng the builder uses (it draws
+    the poem first, so a fresh Random(seed) would diverge)."""
+    rng = random.Random(seed)
+    rng.randrange(len(_HE_POEMS))                  # the builder's poem pick
+    return _he_build_chambers(rng)
 
 
 def _expand(tape):
@@ -104,19 +112,15 @@ def _drive_spent(dungeon, keys, monkeypatch, budget=9999):
 # ── structure ─────────────────────────────────────────────────────────────────
 
 @pytest.mark.parametrize("seed", SEEDS)
-def test_two_rooms_poem_hall_and_gauntlet_map(seed):
+def test_one_map_poem_run_then_gauntlet(seed):
     d = build_dungeon_hall_of_echoes(seed)
-    assert len(d.rooms) == 2
-    poem, gmap = d.rooms
-    assert poem._he_poem in {p[0] for p in _HE_POEMS}
-    for room in d.rooms:
-        assert room.cols == _HE_COLS
-        assert room.par == _HE_PAR and room.budget == _HE_BUDGET
-    er, ec = poem.exit_pos
-    assert poem.cells[er][ec] == CellType.WALL
-    assert not any(e.kind == 'exit' for e in poem.entities)
+    assert len(d.rooms) == 1                        # the descent never leaves it
+    gmap = d.rooms[0]
+    assert gmap._he_poem in {p[0] for p in _HE_POEMS}
+    assert gmap.cols == _HE_COLS
+    assert gmap.par == _HE_PAR and gmap.budget == _HE_BUDGET
     ge, gc = gmap.exit_pos
-    assert gmap.cells[ge][gc] == CellType.WALL
+    assert gmap.cells[ge][gc] == CellType.WALL      # sealed until every run true
     assert any(e.kind == 'exit' and (e.row, e.col) == (ge, gc)
                for e in gmap.entities)
 
@@ -132,15 +136,17 @@ def test_poem_pool_shape():
 
 
 @pytest.mark.parametrize("seed", SEEDS)
-def test_poem_hall_lays_intruder_plus_true_line_uncolored(seed):
+def test_poem_run_lays_intruder_plus_true_line(seed):
     from engine import substitute as S
     d = build_dungeon_hall_of_echoes(seed)
     room = d.rooms[0]
     _name, lines, intr = next(p for p in _HE_POEMS if p[0] == room._he_poem)
-    for i in range(10):
-        t = S.line_text(room, 1 + i)[0].strip()
+    for i in range(10):                             # the poem run is rows 2..11
+        t = S.line_text(room, 2 + i)[0].strip()
         assert t == f'{intr[i]} {lines[i]}'
-    assert all(ru.kind == 'ancient' for ru in room.char_runs)
+    poem_rows = {2 + i for i in range(10)}
+    assert all(ru.kind == 'ancient'
+               for ru in room.char_runs if ru.row in poem_rows)
 
 
 def test_chambers_are_exact_source_replicas():
@@ -158,11 +164,12 @@ def test_chambers_are_exact_source_replicas():
                             for k, s in enumerate(text)]))
     assert any(g in lock for g in ('♄', '☿', '♆', '⚸'))
     assert ev['plaques'], "the Echo Vault keeps its sealed plaque band"
-    # Selection Halls: four panel rows, a 4-cycle (each row wears another's word)
+    # Selection Halls: four panel PROVERBS with distinct last words (a 4-cycle
+    # of the endings — each row reads a saying with the wrong final word)
     pn = chambers[1]
     assert len(pn['done']) == 4
-    words = [d.split()[1] for d in pn['done']]
-    assert len(set(words)) == 4
+    lasts = [d.split()[-1] for d in pn['done']]
+    assert len(set(lasts)) == 4
     # Refrain Vault: the reprise — 'my fair lady.' given once, laid four times
     rv = chambers[2]
     # the reprise appears 4 times in the true song, plus the given shelf copy
@@ -186,12 +193,12 @@ def test_chambers_are_exact_source_replicas():
 
 def test_map_is_one_buffer_with_stone_bands():
     d = build_dungeon_hall_of_echoes(0)
-    gmap = d.rooms[1]
-    chambers = _he_build_chambers(random.Random(0))
+    gmap = d.rooms[0]
+    # the poem run (10 rows) then the four replica chambers, split by bands
+    expected = [10] + [len(ch['rows']) for ch in _he_build_chambers(random.Random(0))]
     runs, cur = [], 0
-    for r in range(2, gmap.rows):          # row 1 is the sealed plaque band
-        has_text = any(main._wla_floor_text(gmap, r).strip()
-                       for _ in [0]) and bool(
+    for r in range(2, gmap.rows):
+        has_text = bool(main._wla_floor_text(gmap, r).strip()) and bool(
                        [ru for ru in gmap._char_runs_by_row.get(r, [])
                         if gmap.cells[r][ru.col] != CellType.WALL])
         if has_text:
@@ -201,8 +208,7 @@ def test_map_is_one_buffer_with_stone_bands():
             cur = 0
     if cur:
         runs.append(cur)
-    assert len(runs) == len(chambers)
-    assert runs == [len(ch['rows']) for ch in chambers]
+    assert runs == expected
 
 
 # ── the driven gauntlet ──────────────────────────────────────────────────────
@@ -210,18 +216,16 @@ def test_map_is_one_buffer_with_stone_bands():
 @pytest.mark.parametrize("seed", SEEDS)
 def test_canonical_macro_run_wins_at_par(seed, monkeypatch):
     d = build_dungeon_hall_of_echoes(seed)
-    poem_tape, map_tape = d.rooms[0].answer, d.rooms[1].answer
-    keys = _K((poem_tape + ' ' + map_tape).replace(' ', ''))
+    keys = _K(d.rooms[0].answer.replace(' ', ''))
     result, spent = _drive_spent(d, keys, monkeypatch)
     assert result['won'] and result['stars'] == 2, (result, spent)
     assert spent == _HE_PAR
-    assert d.current_room == 1
+    assert d.current_room == 0
 
 
 def test_all_manual_road_wins_one_star(monkeypatch):
     d = build_dungeon_hall_of_echoes(0)
-    poem_tape, map_tape = d.rooms[0].answer, d.rooms[1].answer
-    keys = _K(_expand(poem_tape) + _expand(map_tape))
+    keys = _K(_expand(d.rooms[0].answer))
     result, spent = _drive_spent(d, keys, monkeypatch, budget=_HE_BUDGET)
     assert result['won'] and result['stars'] == 1
     assert _HE_PAR < spent <= _HE_BUDGET
@@ -234,38 +238,38 @@ def test_goblin_lair_is_felled_by_the_semicolon_x_macro(seed, monkeypatch):
     full canonical run leaves NO goblin alive, and the lair's `lair` label
     survives (it keeps the row a recognised run once cleared)."""
     d = build_dungeon_hall_of_echoes(seed)
-    gmap = d.rooms[1]
+    gmap = d.rooms[0]
     goblins0 = [e for e in gmap.entities if e.kind == 'goblin']
     assert len(goblins0) == 6 and all(e.ai == '' for e in goblins0)   # stationary foes
-    poem_tape, map_tape = d.rooms[0].answer, d.rooms[1].answer
-    _drive_spent(d, _K((poem_tape + map_tape).replace(' ', '')), monkeypatch)
+    _drive_spent(d, _K(gmap.answer.replace(' ', '')), monkeypatch)
     assert not any(e.alive and e.kind == 'goblin' for e in gmap.entities)
     assert any('lair' in main._wla_floor_text(gmap, r) for r in range(gmap.rows))
 
 
-def test_poem_hall_south_seal_advances_to_the_map(monkeypatch):
+def test_poem_run_grinds_its_band_gate(monkeypatch):
+    """Mending the poem run opens the band's west gate directly beneath it
+    (the descent onto the first chamber) — it never leaves the map, and the
+    final exit stays sealed."""
     d = build_dungeon_hall_of_echoes(0)
-    poem = d.rooms[0]
-    _drive(d, _K('qadawjq9@a'), monkeypatch, finish=':q!\r')
-    er, ec = poem.exit_pos
-    assert poem.cells[er][ec] == CellType.FLOOR
+    gmap = d.rooms[0]
+    _drive_spent(d, _K('qadawjq9@a'), monkeypatch)
+    assert gmap.cells[12][_HE_GATE_COL] == CellType.FLOOR   # band under rows 2..11
     assert d.current_room == 0
-    d2 = build_dungeon_hall_of_echoes(0)
-    _drive(d2, _K('qadawjq9@aj'), monkeypatch, finish=':q!\r')
-    assert d2.current_room == 1
+    ge, gc = gmap.exit_pos
+    assert gmap.cells[ge][gc] == CellType.WALL
 
 
 def test_first_chamber_grinds_its_band_gate(monkeypatch):
-    """Solving the Echo Vault chamber alone opens the FIRST band's west gate
-    (sight floods to the next chamber); the exit stays sealed."""
+    """Solving the Echo Vault chamber (after the poem) opens the band gate
+    directly beneath its run; the exit stays sealed."""
     d = build_dungeon_hall_of_echoes(0)
-    poem_tape, map_tape = d.rooms[0].answer, d.rooms[1].answer
-    ev_seg = map_tape.split('0 5j')[0]            # up to the end of the EV chamber
-    keys = _K((poem_tape + 'j' + ev_seg).replace(' ', ''))
+    chambers = _real_chambers(0)
+    poem_seg = 'qa daw j q 9@a 0 2j'
+    ev_seg = chambers[0]['tape']
+    keys = _K((poem_seg + ev_seg).replace(' ', ''))
     _drive_spent(d, keys, monkeypatch)
-    gmap = d.rooms[1]
-    chambers = _he_build_chambers(random.Random(0))
-    band = 2 + len(chambers[0]['rows'])           # row under the EV run
+    gmap = d.rooms[0]
+    band = 2 + 10 + 1 + len(chambers[0]['rows'])   # poem(10)+band(1)+EV run
     assert gmap.cells[band][_HE_GATE_COL] == CellType.FLOOR
     ge, gc = gmap.exit_pos
     assert gmap.cells[ge][gc] == CellType.WALL
@@ -283,7 +287,7 @@ def test_no_jump_lands_on_the_sealed_exit(monkeypatch):
     monkeypatch.setattr(main, '_calc_stars', spy)
     result = _drive(d, _K('qadawjq9@ajG'), monkeypatch, finish=':wq\r')
     assert not result['won']
-    gmap = d.rooms[1]
+    gmap = d.rooms[0]
     assert seen['pos'] != tuple(gmap.exit_pos)
 
 
