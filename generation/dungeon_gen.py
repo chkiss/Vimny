@@ -5727,59 +5727,44 @@ _BW_GATE    = 6
 _BW_BOLTS   = {2: 23, 3: 24, 4: 25}
 _BW_EXIT    = (6, 26)                 # the FINAL SEAL, east of every bolt
 _BW_PAR     = 17                      # g* h r{f} l n h r{f} l n h r{f} G $
+_BW_STANDING = 'one'                  # the word that stands alone at the mouth
+# A little VERSE (playtest 2026-07-20: single words stacked at one column let
+# `j r x` beat the hunt). The target 'one' is buried in a real word on each
+# line, and the lines are STAGGERED so the buried words fall at DIFFERENT
+# columns — g*/n hunts them; manual j/h nav would cost more. The reader mends
+# each by the verse's sense (no plaque; the rhyme names the word).
+_BW_VERSE = (   # (bay_row, col, true_line, host — the host holds the buried 'one')
+    (2, _BW_TEXT0,       'alone he stood,',     'alone'),
+    (3, _BW_TEXT0 + 5,   'upon his throne,',    'throne'),
+    (4, _BW_TEXT0 + 10,  'as cold as stone.',   'stone'),
+)
 
 
-def _bw_draw_words(rng) -> dict:
-    """A short target word (len 3) and three REAL longer words that contain
-    it (buried, with a non-empty prefix). Each host word gets ONE corrupt
-    letter — the cell just before the buried word — so g* still finds the
-    target; h steps onto the corruption, r{fix} mends it."""
-    _load_vocab_tables()
-
-    def pool(length):
-        return [w for w in _VOCAB_PLAIN_BY_LEN.get(length, ())
-                if w.isalpha() and w == w.lower()]
-
-    allwords = set(w for L in range(4, 8) for w in pool(L))
-    hosts_by_len = [w for L in range(4, 8) for w in pool(L)]
-    targets = [w for w in pool(3)]
-    alph = 'abcdefghijklmnopqrstuvwxyz'
-    for _ in range(400):
-        t = rng.choice(targets)
-        # real words that BURY the target once, past position 0 (a prefix to corrupt)
-        hosts = [w for w in hosts_by_len
-                 if w != t and w.count(t) == 1 and w.index(t) >= 1]
-        if len(hosts) < 3:
-            continue
-        picks = rng.sample(hosts, 3)
-        corrupts, fixes, ok = [], [], True
-        for word in picks:
-            idx = word.index(t)                        # corrupt the cell before it
-            correct = word[idx - 1]
-            wrong = rng.choice([c for c in alph if c != correct])
-            corr = word[:idx - 1] + wrong + word[idx:]
-            if corr in allwords or corr.count(t) != 1:
-                ok = False                             # corruption ≠ real word;
-                break                                  # target still buried once
-            # NO PLAQUE: the mend must be inferable — exactly ONE letter
-            # completes the corrupt spelling into a real vocab word.
-            mends = [c for c in alph
-                     if word[:idx - 1] + c + word[idx:] in allwords]
-            if mends != [correct]:
-                ok = False
-                break
-            corrupts.append(corr)
-            fixes.append(correct)
-        if ok:
-            return {'word': t, 'hosts': picks, 'corrupts': corrupts, 'fixes': fixes}
-    raise ValueError('buried_word: no clean draw after 400 tries')
+def _bw_verse_data() -> dict:
+    """The fixed verse as (hosts, corrupt lines, fix chars, rows, cols). Each
+    host's corrupt cell is the one just BEFORE the buried 'one', so g* still
+    finds the target and h steps onto the corruption; r{fix} mends it."""
+    hosts, corr_lines, fixes, rows, cols = [], [], [], [], []
+    for bay, col, line, host in _BW_VERSE:
+        hidx = line.index(host)
+        oidx = host.index(_BW_STANDING)            # 'one' within the host
+        cell = hidx + oidx - 1                      # the cell before 'one' (line coords)
+        correct = line[cell]
+        wrong = 'x' if correct != 'x' else 'z'
+        hosts.append(host)
+        corr_lines.append(line[:cell] + wrong + line[cell + 1:])
+        fixes.append(correct)
+        rows.append(bay)
+        cols.append(col)
+    return {'word': _BW_STANDING, 'hosts': hosts, 'corrupt_lines': corr_lines,
+            'fixes': fixes, 'rows': rows, 'cols': cols,
+            'true_lines': [l for _b, _c, l, _h in _BW_VERSE]}
 
 
 def build_dungeon_buried_word(seed: int) -> Dungeon:
     """The Buried Word (slug `buried_word`, bonus): g* — the word hunted
     inside other words."""
-    rng = random.Random(seed)
-    words = _bw_draw_words(rng)
+    words = _bw_verse_data()
     w = words['word']
 
     R, C = _BW_ROWS, _BW_COLS
@@ -5804,12 +5789,21 @@ def build_dungeon_buried_word(seed: int) -> Dungeon:
     room.char_runs.append(CharRun(*_BW_STAND, tuple(w), 'verdant'))
     doors = []
     for i, r in enumerate(_BW_BAYS):
-        host = words['hosts'][i]                         # the true real word
-        corr = words['corrupts'][i]                      # …with one wrong letter
-        room.char_runs.append(CharRun(r, _BW_TEXT0, tuple(corr), 'ember'))
-        # No plaque: the host's true spelling is the ONLY real-word mend.
+        host = words['hosts'][i]                          # the true real word
+        line = words['corrupt_lines'][i]                  # verse line, host corrupt
+        col  = words['cols'][i]                           # STAGGERED — not stacked
+        hidx = words['true_lines'][i].index(host)         # host's char offset in the line
+        # Lay the line word by word: the word covering the (corrupt) host reads
+        # 'ember', the verse's other words 'ancient' — one run each, gaps between.
+        off = 0
+        for word in line.split(' '):
+            if word:
+                kind = 'ember' if off <= hidx < off + len(word) else 'ancient'
+                room.char_runs.append(CharRun(r, col + off, tuple(word), kind))
+            off += len(word) + 1
+        # No plaque: the verse's sense names the true word.
         doors.append((host, (_BW_GATE, _BW_BOLTS[r])))
-    room._wla_doors = tuple(doors)                       # the substring tick
+    room._wla_doors = tuple(doors)                        # the substring tick
     room._bw_words = words
 
     room.entities.append(Entity(kind='exit', row=_BW_EXIT[0], col=_BW_EXIT[1],
@@ -5822,8 +5816,8 @@ def build_dungeon_buried_word(seed: int) -> Dungeon:
     room.par    = _BW_PAR
     room.budget = math.ceil(_BW_PAR * 1.4)
     # r mends in place (no shift), so l steps back onto the word before n —
-    # else n re-finds THIS row's word (which now sits one cell ahead of the
-    # cursor). The old ◆-x route shifted the word onto the cursor for free.
+    # else n re-finds THIS line's word (which now sits one cell ahead of the
+    # cursor). g*/n do the hunting across the staggered lines.
     f = words['fixes']
     room.answer = f'g* h r{f[0]} l n h r{f[1]} l n h r{f[2]} G $'
 

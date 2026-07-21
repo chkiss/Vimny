@@ -73,65 +73,58 @@ def _spent(dungeon, slug, keys, monkeypatch):
 
 @pytest.mark.parametrize("seed", SEEDS)
 def test_bw_structure(seed):
+    """The verse (playtest 2026-07-20): the target 'one' stands alone at the
+    mouth, then is BURIED in a real word on each STAGGERED line — the buried
+    words fall at DIFFERENT columns, so g*/n hunts them (no more single words
+    stacked at one column that `j r x` would sweep)."""
     room = cached_room('build_dungeon_buried_word', seed)
     assert room.spawn_pos == _BW_STAND
-    w = room._bw_words['word']
+    w = room._bw_words['word']                       # 'one'
     stand = next(ru for ru in room.char_runs if ru.row == _BW_STAND[0]
                  and ru.col == _BW_STAND[1])
     assert ''.join(stand.symbols) == w
+    host_cols = []
     for i, r in enumerate(_BW_BAYS):
-        # a REAL word buries the target; ONE letter (the cell before it) is
-        # corrupt, but the target itself is intact so g* finds it.
+        host = room._bw_words['hosts'][i]            # e.g. 'alone'
         run = next(ru for ru in room.char_runs
                    if ru.row == r and ru.kind == 'ember')
-        text = ''.join(run.symbols)
-        host = room._bw_words['hosts'][i]
-        corr = room._bw_words['corrupts'][i]
-        assert text == corr and corr != host        # the corrupt spelling laid
-        assert len(corr) == len(host)               # one substituted letter
-        assert sum(a != b for a, b in zip(corr, host)) == 1
-        assert text.count(w) == 1 and w in text     # g* will find it (once)
+        text = ''.join(run.symbols)                  # the corrupt host, e.g. 'thxone,'
+        core = text.rstrip('.,;:')                   # drop trailing verse punctuation
+        assert w in core and core.count(w) == 1      # g* finds the buried word once
+        assert len(core) == len(host)                # one substituted cell
+        assert sum(a != b for a, b in zip(core, host)) == 1
         idx = host.index(w)
-        assert corr[idx:] == host[idx:] and corr[idx - 1] != host[idx - 1]  # before it
-    # the buried word never stands alone below the ledge (whole-word *
-    # would find nothing)
+        assert core[idx:] == host[idx:] and core[idx - 1] != host[idx - 1]  # before it
+        host_cols.append(run.col + idx)              # the buried word's column
+    # the STAGGER: no two buried words share a column (else j/manual nav cheats)
+    assert len(set(host_cols)) == len(host_cols)
+    # the buried word never stands alone below the ledge (whole-word * finds none)
     for r in _BW_BAYS:
         for ru in room.char_runs:
             if ru.row == r:
-                assert ''.join(ru.symbols) != w
+                assert ''.join(ru.symbols).rstrip('.,;:') != w
 
 
 @pytest.mark.parametrize("seed", SEEDS)
 def test_bw_hosts_are_real_words(seed):
-    import generation.dungeon_gen as dg
-    dg._load_vocab_tables()
-    real = set(x for L in range(4, 8)
-               for x in dg._VOCAB_PLAIN_BY_LEN.get(L, ()))
+    # The verse's hosts are real English words that bury the target (hand-
+    # picked for the rhyme, so not gated on the game's vocab table).
     room = cached_room('build_dungeon_buried_word', seed)
+    w = room._bw_words['word']
     for host in room._bw_words['hosts']:
-        assert host in real                          # actual words, not nonsense
+        assert host.isalpha() and len(host) >= 4
+        assert w in host and host != w and host.index(w) >= 1
 
 
 @pytest.mark.parametrize("seed", SEEDS)
-def test_bw_no_plaque_and_mend_is_unique(seed):
-    # NO plaque (playtest 2026-07-19): the corrupt cell has exactly ONE
-    # letter that completes a real vocab word — the mend is inferable from
-    # the word itself; the door reads that true host.
-    import generation.dungeon_gen as dg
-    dg._load_vocab_tables()
-    real = set(x for L in range(4, 8)
-               for x in dg._VOCAB_PLAIN_BY_LEN.get(L, ()))
+def test_bw_no_plaque_and_door_reads_the_true_word(seed):
+    # NO plaque: the mend is named by the VERSE's sense (the rhyme), and the
+    # door demands the exact true host — a wrong-but-real word won't open it.
     room = cached_room('build_dungeon_buried_word', seed)
     assert not any(ru.col < _BW_STAND[1] and ru.row in _BW_BAYS
                    for ru in room.char_runs)
-    w = room._bw_words['word']
     for i, _r in enumerate(_BW_BAYS):
         host = room._bw_words['hosts'][i]
-        corr = room._bw_words['corrupts'][i]
-        idx = host.index(w)
-        mends = [c for c in 'abcdefghijklmnopqrstuvwxyz'
-                 if host[:idx - 1] + c + host[idx:] in real]
-        assert mends == [host[idx - 1]], (host, corr, mends)
         target, _dc = room._wla_doors[i]
         assert target == host
 
