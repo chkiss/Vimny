@@ -101,7 +101,7 @@ POEMS: list[tuple[str | None, str, list[str]]] = [
         "I wore the Warden's face at every gate.",
         'None remain. The buffer is yours, end to end.',
         'Some treasure yet waits in these halls’ chests.',
-        'Wear my hat with :set hat. Look before you leap.',
+        'Wear my hat with :set hat. Look before you leap!',
     ]),
 
     # ── Lesson poems, keyed by the slug they introduce ───────────────────────

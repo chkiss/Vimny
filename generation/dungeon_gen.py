@@ -12522,20 +12522,10 @@ def build_dungeon_warden_eternal(seed: int) -> Dungeon:
             entities.append(Entity(kind='warden', row=mid, col=C // 2,
                                    hp=whp, max_hp=whp, ai='', tag='eternal',
                                    edit_immune=True))
-            # HIS TREASURE — a locked chest walled into the chamber's east side,
-            # opened by the key he drops (p the key on the door). A relic scroll
-            # waits within: the keys mean something now.
-            tcol = C - 2
-            for rr in range(top, bot + 1):
-                cells[rr][tcol] = CellType.WALL          # seal the nook off...
-            cells[mid][tcol] = CellType.FLOOR            # ...but for the pocket
-            entities.append(Entity(kind='locked_door', row=mid, col=tcol - 1))
-            entities.append(Entity(kind='chest_scroll', row=mid, col=tcol))
-            placed |= {(mid, tcol), (mid, tcol - 1)}
         for _ in range(gcount):
             for _try in range(30):
                 gr = rng.randint(top, bot)
-                gc = rng.randint(4, C - 4)               # clear of the nook door
+                gc = rng.randint(4, C - 3)
                 if (gr, gc) not in placed:
                     placed.add((gr, gc))
                     entities.append(Entity(kind='goblin', row=gr, col=gc,

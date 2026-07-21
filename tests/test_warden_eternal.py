@@ -79,18 +79,14 @@ def test_structure(seed):
 
 
 @pytest.mark.parametrize('seed', SEEDS)
-def test_each_warden_guards_a_locked_treasure_chest(seed):
-    # Every chamber warden's dropped key has a purpose: a locked chest walled
-    # into the chamber, chest one cell east of its door, pocket sealed but for it.
+def test_no_useless_keys_or_treasure_in_the_final_map(seed):
+    # The keys-open-nothing note: no locked doors, no key-bearing chests here —
+    # gates open on clearing, the seal on the kill. (The one chest is the
+    # epilogue scroll in the exit pocket.)
     r = _room(seed)
-    wardens = [e for e in r.entities if e.kind == 'warden' and e.tag == 'eternal']
-    doors   = [e for e in r.entities if e.kind == 'locked_door']
-    chests  = [e for e in r.entities if e.kind == 'chest_scroll']
-    assert len(doors) == len(wardens) >= 4
-    for d in doors:
-        assert any(c.row == d.row and c.col == d.col + 1 for c in chests)  # chest behind
-        assert r.cells[d.row][d.col + 1] == CellType.FLOOR                 # the pocket
-        assert r.cells[d.row - 1][d.col + 1] == CellType.WALL              # sealed off
+    assert not any(e.kind == 'locked_door' for e in r.entities)
+    chests = [e for e in r.entities if e.kind in ('chest', 'chest_key', 'chest_scroll')]
+    assert len(chests) == 1 and chests[0].scroll_id == 'wardens_rest'
 
 
 @pytest.mark.parametrize('seed', SEEDS)
