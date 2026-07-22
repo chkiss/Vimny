@@ -4643,6 +4643,9 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
                 and not key.is_sequence and str(key).lower() in ('y', 'n')):
             _trade = room._elf_trade
             room._elf_trade = None
+            msg_pool.clear()                             # drop the persistent offer
+            msg_idx = 0
+            msg_ttl = _MSG_ROTATE_TTL
             _elf = next((e for e in room.entities if id(e) == _trade.get('elf_id')), None)
             if str(key).lower() == 'y' and player.gold < _trade['cost']:
                 _push(f'"No coin, no deal." The elf sniffs. (you have {player.gold} gold)')
@@ -4674,7 +4677,8 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
                 _push('The elf shrugs and wanders off.')
                 if _elf is not None:                     # declined — wanders, no re-offer
                     _elf.tag, _elf.ai = 'spent', 'wander'
-            _render(_pool_msg() if not player.is_dead else message)
+            message = message if player.is_dead else _pool_msg()
+            _render(message)
             continue
 
         # ── The Codex pane has focus while open (:help semantics) ────────────
@@ -7081,7 +7085,8 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
                     if id(_ae) not in engaged_entities:
                         engaged_entities.add(id(_ae))
                         _aname = ('Warden' if _ae.kind == 'warden' else
-                                  'Archivist' if _ae.kind == 'archivist' else _ae.kind)
+                                  'Archivist' if _ae.kind == 'archivist' else
+                                  _creature_name(_entity_glyph(_ae)))   # zombie/demon/cat
                         _push(f'The {_aname} is engaging you in combat!')
             else:
                 engaged_entities.clear()
