@@ -8832,16 +8832,13 @@ _PF_MAIN_ROW         = 12
 _PF_COLUMNS          = ((8, 22), (8, 44), (15, 22), (15, 44))   # column cells (impassable)
 _PF_FIGHT            = (1, 22, 1, 66)       # fight area (mega tears floor only here; treasure is east)
 _PF_WARDEN_START     = (12, 39)            # centre of the hall
-# Impostor Wardens — goblins disguised as the Warden (tag='echo', a red 'W'), spread
-# across the hall so the player enters to "a myriad of Wardens".  Each carries a shade
-# index (a slightly different red); the real Warden hides among them at (12,39).
-# (row, col, shade)
+# Impostor Wardens — goblins disguised as the Warden (tag='echo', a red 'W'). Two
+# echoes flanking the center. The real Warden starts at center (12,39) but may swap
+# with a random echo. After the wardenverse collapse, all echoes are revealed as
+# plain goblins (hp=1, tag='') for cleanup. (row, col, shade)
 _PF_ECHO_CELLS       = (
-    ( 4, 26, 1), ( 4, 34, 4), ( 4, 44, 2), ( 4, 52, 6),
-    ( 8, 30, 3), ( 8, 50, 5), ( 8, 58, 0),
-    (12, 28, 2), (12, 50, 7), (12, 58, 1),
-    (16, 30, 6), (16, 50, 3), (16, 58, 4),
-    (20, 26, 0), (20, 34, 5), (20, 44, 7), (20, 52, 2),
+    (12, 26, 0),   # West
+    (12, 52, 1),   # East
 )
 # Treasure room: a chamber behind a locked door on the east wall (every level has one).
 # The key drops in the arena once the wardenverse has collapsed AND the last minion is dead.
@@ -8910,8 +8907,9 @@ def build_dungeon_warden_pathfinder(seed: int) -> Dungeon:
     arena.entities.append(shield)
     echoes = []
     for (r, c, sh) in _PF_ECHO_CELLS:
-        # hp=2: the first x strikes off the Warden-disguise (→ plain goblin), the second kills.
-        g = Entity(kind='goblin', row=r, col=c, hp=2, max_hp=2, tag='echo', shade=sh)
+        # Echoes are disguised as 'W' (tag='echo') but auto-unmask after the verse collapse.
+        # Each takes only 1 hit to kill (after automatic unmasking).
+        g = Entity(kind='goblin', row=r, col=c, hp=1, max_hp=1, tag='echo', shade=sh)
         echoes.append(g)
         arena.entities.append(g)
 

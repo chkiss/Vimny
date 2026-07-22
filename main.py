@@ -4403,8 +4403,8 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
         spotted_goblins.add(id(e))
     if _entry_goblins:
         if level == 'warden_pathfinder':
-            # Every goblin in the hall is disguised as the Warden — suppress the goblin
-            # count; the player just sees a crowd of red Ws.  x once to strip a disguise.
+            # Two echoes disguised as the Warden — suppress the goblin count. The player
+            # sees a few red Ws. All echoes auto-unmask after the verse collapse.
             msg_pool.append('You see a myriad of Wardens!')
         else:
             msg_pool.append(_goblin_msg(_goblin_sighting(len(_entry_goblins))))
@@ -6240,6 +6240,12 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
                                 room = dungeon.room
                                 player.row, player.col = (12, 60)
                                 player.wrap = False
+                                # Unmask all remaining echoes — the Warden's illusions fail
+                                for e in arena.entities:
+                                    if e.kind == 'goblin' and e.tag == 'echo' and e.alive:
+                                        e.tag = ''       # no longer disguised as 'W'
+                                        e.hp = 1         # revealed goblins have 1 HP
+                                        e.max_hp = 1
                                 undo_stack.clear()           # verse snapshots can't restore the arena
                                 redo_stack.clear()
                                 any_water = _room_has_water()
@@ -6247,7 +6253,8 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
                                 if any(e.alive and e.kind == 'goblin' for e in room.entities):
                                     # minions remain — the key drops when the last one falls (per-turn check)
                                     _push('You cut him down and the wardenverse collapses — you are '
-                                          'flung back into the arena!  Hunt down the last minions.')
+                                          'flung back into the arena!  The Warden\'s illusions fail: '
+                                          'his echoes stand revealed as goblins.')
                                 else:
                                     # already clear — the collapse itself shakes the key loose
                                     room.key_dropped = True
@@ -6260,12 +6267,6 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
                                     _remove_warden_shields(room)
                                     room.surveyor_threat = None  # clear any lingering telegraph
                                 _push(_on_kill(cur, player, room, level) or 'Enemy defeated!')
-                    elif cur.kind == 'goblin' and cur.tag == 'echo':
-                        # First x strikes the Warden-disguise off — a plain goblin beneath,
-                        # which the next x will finish.  /W no longer finds it; it renders 'g'.
-                        cur.tag = ''
-                        _push('You strike a false Warden — the disguise sloughs away: '
-                              'just a goblin!')
                     else:
                         _push(f'Hit! ({cur.hp}/{cur.max_hp} HP)')
                 elif cur and cur.kind == 'shield':
