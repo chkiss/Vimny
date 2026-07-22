@@ -94,12 +94,51 @@ def test_flame_marks_goblins_for_detonation():
     assert len(r._pending_boom) == len(_goblins(r))   # caller detonates these
 
 
-def test_elf_arms_a_trade_prompt():
+def test_elf_becomes_a_persistent_merchant_entity():
     r, p = _room_and_master()
-    msgs = []
-    main._goblin_substitute('%s/g/e/', r, p, msgs.append)
-    assert r._elf_trade and r._elf_trade['key'] in ('hp', 'register', 'demon')
-    assert 'y/n' in msgs[-1]
+    main._goblin_substitute('%s/g/e/', r, p, lambda m: None)
+    elves = [e for e in r.entities if e.kind == 'elf']
+    assert elves and all(entity_letter(e) == 'e' and e.tag == 'elf' for e in elves)
+
+
+def test_gold_becomes_a_pickup_coin():
+    r, p = _room_and_master()
+    main._goblin_substitute('%s/g/$/', r, p, lambda m: None)
+    coins = [e for e in r.entities if e.kind == 'gold']
+    assert coins and all(entity_letter(e) == '$' for e in coins)
+
+
+def test_elf_trade_accepts_on_y_and_debits_gold(monkeypatch):
+    from engine.world import Entity
+    d = dg.build_dungeon_warden_eternal(0)
+    r = d.rooms[0]
+    for e in list(r.entities):                        # clear the board
+        if e.kind == 'goblin':
+            e.alive, e.hp = False, 0
+    r.entities = [e for e in r.entities if e.kind != 'goblin']
+    sr, sc = r.spawn_pos
+    r.entities.append(Entity(kind='elf', tag='elf', row=sr, col=sc + 1))
+    r.rebuild_indexes()
+    monkeypatch.setattr(main.random, 'choice', lambda seq: seq[0])   # the 2-gold vial
+    grab = {}
+
+    def _cap(term, dungeon, player, budget, message='', *a, **k):
+        grab['p'] = player
+
+    monkeypatch.setattr(main, 'render_all', _cap)
+    monkeypatch.setattr(main.time, 'sleep', lambda *a, **k: None)
+    monkeypatch.setattr(main.SM, 'save_progress', lambda *a, **k: None)
+    monkeypatch.setattr(Terminal, 'height', property(lambda self: 41))
+    term = Terminal()
+    # step onto the elf (triggers the bargain), then 'y' accepts
+    it = iter([Keystroke('l'), Keystroke('y')] + [Keystroke(c) for c in ':q!\r'])
+    monkeypatch.setattr(term, 'inkey', lambda *a, **k: next(it, Keystroke('')))
+    main.run_dungeon(term, 'warden_eternal',
+                     {'has_hat': True, 'hat_worn': True, 'gold': 5},
+                     player_name='Hero', _dungeon=d)
+    p = grab['p']
+    assert p.gold == 3                                 # 5 - 2 (the vial's price)
+    assert not any(e.kind == 'elf' and e.alive for e in r.entities)   # dealt and gone
 
 
 # ── the g<->G rule lives in ONE place (case_entities) for every case command ──
@@ -165,7 +204,7 @@ def test_cat_persists_as_a_harmless_critter():
     r, p = _room_and_master()
     main._goblin_substitute('%s/g/c/', r, p, lambda m: None)
     cats = [e for e in r.entities if e.kind == 'critter']
-    assert cats and all(entity_letter(c) == 'c' and not c.ai for c in cats)
+    assert cats and all(entity_letter(c) == 'c' and c.ai == 'wander' for c in cats)
 
 
 def test_uppercase_creature_letters_make_the_swelled_form():

@@ -216,6 +216,10 @@ def _ent_cell_str(ent, room, r: int, c: int, mode, floor_bg: str) -> str:
         return floor_bg + C.ally_fg() + entity_letter(ent) + rst
     if ent.kind == 'critter':                       # a harmless cat (Easter egg)
         return floor_bg + C.critter_fg() + entity_letter(ent) + rst
+    if ent.kind == 'gold':                          # a coin (Easter egg)
+        return floor_bg + C.key_gold_fg() + entity_letter(ent) + rst
+    if ent.kind == 'elf':                           # a merchant elf (Easter egg)
+        return floor_bg + C.zombie_fg() + entity_letter(ent) + rst
     if ent.kind == 'warden':
         # A remote cut just glanced off him: he throws up his shield this frame
         # (the tell for edit-immunity — struck from afar and unharmed).

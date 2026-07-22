@@ -439,8 +439,14 @@ def substitute(room, player, lo, hi, spec, *, confirm=None,
     last_changed = None
     # Descending so a \r line-split (which inserts rows below) never reindexes a
     # row we have yet to visit.
+    _fog  = getattr(room, 'fog_cells', set())
+    _mist = getattr(room, 'mist_cells', set())
     for row in range(hi, lo - 1, -1):
         text, l0, l1, kinds = _read_line(room, row)
+        # You cannot rewrite what you cannot read: a plain-fogged row is skipped
+        # (misted text is seen-through-haze and stays fair game).
+        if text and (row, l0) in _fog and (row, l0) not in _mist:
+            continue
         dkind = line_kind(room, row)
         if confirming:
             new_text, new_kinds, n = _sub_line_confirm(

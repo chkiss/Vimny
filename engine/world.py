@@ -124,6 +124,10 @@ def entity_letter(ent) -> Optional[str]:
         return 'D' if ent.swole else 'd'
     if ent.kind == 'critter':                      # :s/g/c/ — a harmless cat
         return 'C' if ent.swole else 'c'
+    if ent.kind == 'gold':                         # :s/g/$/ — a coin to pick up
+        return '$'
+    if ent.kind == 'elf':                          # :s/g/e/ — a merchant of bad bargains
+        return 'e'
     return _ENTITY_LETTER.get(ent.kind)
 
 

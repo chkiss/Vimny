@@ -60,6 +60,7 @@ class Player:
     hl_suppressed: bool = False   # ':noh' cleared the current highlight (until the next search)
     has_hat: bool = False         # looted the Warden Eternal's hat (permanent, saved to progress)
     hat_worn: bool = False        # ':set hat' — wearing it grants admin-like all-command access; cursor shimmers
+    gold: int = 0                 # coins picked up from :s/g/$/ gold (spent at elf trades)
 
     # command-mode line
     cmd_line: str = ''

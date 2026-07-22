@@ -2937,11 +2937,15 @@ def _clip_from_cut_chars(items: list, base_col: int) -> dict:
 # cheerful flame) and the roguelikes (the NetHack pet dog, the pile of gold).
 # REMOVE effects: the goblin vanishes (optionally leaving a letter on the floor).
 _GOBLIN_SUB_EGGS = {
-    'f': ('The goblin unclenches, waves once, and wanders off.', None),
-    'h': ('The goblin loses its head about it. An h is left.',   'h'),
-    '$': ('The goblin clinks into a heap of gold. Greedy.',       '$'),
-    '@': ('Now an adventurer. It looks as lost as you are.',      None),
+    'f': ('The {name} unclenches, waves once, and wanders off.', None),
+    'h': ('The {name} loses its head about it. An h is left.',   'h'),
+    '@': ('The {name} is now an adventurer, as lost as you are.', None),
 }
+# The SOURCE creature's name, by the glyph the pattern matched (so a cat turned
+# to gold reads "The cat clinks…", not "The goblin…").
+_CREATURE_NAMES = {'g': 'goblin', 'G': 'goblin', 'd': 'hound', 'D': 'hound',
+                   'c': 'cat', 'C': 'cat', 'z': 'zombie', 'Z': 'zombie',
+                   '&': 'demon', 'e': 'elf', '$': 'coin'}
 # TRANSFORM effects: the goblin STAYS, as a new hostile that chases and attacks.
 #   (tag, hp, ai, ai_speed, message)
 _GOBLIN_SUB_TRANSFORM = {
@@ -2949,10 +2953,12 @@ _GOBLIN_SUB_TRANSFORM = {
     '&': ('demon',  3, 'chase', 1, "A demon uncoils where it stood. You shouldn't have."),
 }
 # The elf's shitty trades (offer, consequence-key, result-line). Opt-in via y.
+# (offer, gold cost, consequence-key, result-line). The elf charges gold you
+# picked up from :s/g/$/, then swindles you anyway.
 _ELF_TRADES = [
-    ('a vial of healing', 'hp',       'The vial was poison. (-1 heart, chump.)'),
-    ('a map to treasure', 'register', 'The "map" was your own notes. Pockets emptied.'),
-    ('a charm of safety', 'demon',    'The charm summons a demon at your side. Safe!'),
+    ('a vial of healing', 2, 'hp',       'The vial was poison. (-1 heart, chump.)'),
+    ('a map to treasure', 1, 'register', 'The "map" was your own notes. Pockets emptied.'),
+    ('a charm of safety', 3, 'demon',    'The charm summons a demon at your side. Safe!'),
 ]
 _GOBLIN_SUB_RE = re.compile(r'^\s*(%?)\s*(?:\d+\s*,\s*\d+\s*)?s/([^/]*)/([^/]*)/?[gcinp]*\s*$')
 
@@ -2995,32 +3001,23 @@ def _goblin_substitute(cmd: str, room, player, push) -> bool:
     rep1 = rep[:1]
     n = len(gobs)
     tail = f'  (×{n})' if n > 1 else ''
+    name = _CREATURE_NAMES.get(pat, 'creature')      # the SOURCE creature's name
 
     if rep1 == '!':                                  # burst into cheerful flame
         room._pending_boom = [(g.row, g.col) for g in gobs]   # caller detonates
         return True
-    if rep1 in ('e', 'E'):                           # the elf's shitty bargain
-        offer, key, result = random.choice(_ELF_TRADES)
-        for g in gobs:
-            room.kill_entity(g)
-        room._elf_trade = {'key': key, 'result': result}
-        room.rebuild_indexes()
-        push(f'An elf sidles up: "{offer} — a fair trade, friend. Accept? (y/n)"')
-        return True
-
     # ── in-place transforms: the creature STAYS ──────────────────────────────
     # The persistent-creature letters are case-aware: the UPPERCASE form is the
     # swelled one (g/G goblin, d/D hound, c/C cat), routed through the same
     # engine case rule so it is bigger + sharper-eyed exactly like ~ or gU.
     base, up = rep1.lower(), rep1.isupper()
-    cells = [(g.row, g.col) for g in gobs]
 
     if base == 'g':                                  # goblin: case op swell/shrink
         for g in gobs:
             _swell(g, up)
         room.rebuild_indexes()
-        push(('The goblins swell into Goblins — bigger, and sharper-eyed.'
-              if up else 'The Goblins shrink back to goblins.') + tail)
+        push((f'The {name}s swell — bigger, and sharper-eyed.'
+              if up else f'The {name}s shrink back down.') + tail)
         return True
     if base == 'd':                                  # a hound on YOUR side (D = big)
         for g in gobs:
@@ -3028,43 +3025,53 @@ def _goblin_substitute(cmd: str, room, player, push) -> bool:
             g.max_hp, g.hp, g.swole = 2, 2, False
             _swell(g, up)
         room.rebuild_indexes()
-        push((('A great hound' if up else 'A loyal hound')
-              + ' takes your side.') + tail)
+        push(f'The {name} becomes {"a great" if up else "a loyal"} hound and takes your side.' + tail)
         return True
     if base == 'c':                                  # a harmless cat (C = big)
         for g in gobs:
-            g.kind, g.tag, g.ai = 'critter', 'cat', ''
+            g.kind, g.tag, g.ai = 'critter', 'cat', 'wander'
             g.max_hp, g.hp, g.swole = 1, 1, False
+            g.summon_timer = random.randint(3, 10)   # turns until its next meow
             _swell(g, up)
         room.rebuild_indexes()
-        push('Poof. A cat. It meows once and plots your downfall.' + tail)
+        push(f'The {name} is now a cat. It meows, and plots your downfall.' + tail)
         return True
-    if base == 'z':                                  # raise the dead
-        tag, hp, ai, spd, msg = _GOBLIN_SUB_TRANSFORM['z']
+    if rep1 == '$':                                  # a coin of gold to pick up
         for g in gobs:
+            g.kind, g.tag, g.ai = 'gold', 'gold', ''
+            g.max_hp, g.hp, g.swole = 1, 1, False
+        room.rebuild_indexes()
+        push(f'The {name} clinks into a coin of gold — step on it to pocket it.' + tail)
+        return True
+    if base == 'e':                                  # a merchant elf (it STAYS)
+        for g in gobs:
+            g.kind, g.tag, g.ai = 'elf', 'elf', ''
+            g.max_hp, g.hp, g.swole = 1, 1, False
+        room.rebuild_indexes()
+        push(f'The {name} becomes an elf, keen to make you a deal.' + tail)
+        return True
+    if base == 'z' or rep1 == '&':                   # raise the dead / summon worse
+        tag, hp, ai, spd, _msg = _GOBLIN_SUB_TRANSFORM['z' if base == 'z' else '&']
+        verb = 'greys, groans, and rises — undead now.' if base == 'z' \
+            else "twists into a demon. You shouldn't have."
+        for g in gobs:
+            g.kind = 'goblin'                        # a hostile again (was cat/dog?)
             g.tag, g.max_hp, g.hp, g.ai, g.ai_speed, g.swole = tag, hp, hp, ai, spd, False
         room.rebuild_indexes()
-        push(msg + tail)
-        return True
-    if rep1 == '&':                                  # summon something worse
-        tag, hp, ai, spd, msg = _GOBLIN_SUB_TRANSFORM['&']
-        for g in gobs:
-            g.tag, g.max_hp, g.hp, g.ai, g.ai_speed, g.swole = tag, hp, hp, ai, spd, False
-        room.rebuild_indexes()
-        push(msg + tail)
+        push(f'The {name} {verb}' + tail)
         return True
 
     # ── REMOVE effects (default: turn into that harmless letter) ─────────────
     msg, drop = _GOBLIN_SUB_EGGS.get(
-        rep1, (f'The goblin is now a harmless {rep1}.' if rep1 else
-               'The goblin simply is not, any more.', rep1 or None))
+        rep1, (f'The {name} is now a harmless {rep1}.' if rep1 else
+               f'The {name} simply is not, any more.', rep1 or None))
     for g in gobs:
         gr, gc = g.row, g.col
         room.kill_entity(g)
         if drop and room.char_run_at(gr, gc) is None:
             room.add_char_run(CharRun(gr, gc, (drop,), 'ancient'))
     room.rebuild_indexes()
-    push(msg + tail)
+    push(msg.format(name=name) + tail)
     return True
 
 
@@ -3298,28 +3305,46 @@ def _enemy_tick(room, player) -> list:
     for ent in list(room.entities):
         if not ent.alive:
             continue
-        if ent.kind == 'ally' and ent.ai == 'hunt':
+        if ent.kind == 'ally':
             # A hound on your side (:s/g/d/): it hunts the nearest hostile and
-            # mauls it (harder if swelled). It never turns on you.
+            # mauls it (harder if swelled); with the field clear it trots back to
+            # heel beside you. It never turns on you.
+            ent.ai_tick += 1
+            if ent.ai_tick % max(1, ent.ai_speed) != 0:
+                continue
             foes = [e for e in room.entities if e.alive and e.kind == 'goblin']
-            if foes:
-                tgt = min(foes, key=lambda e: _manhattan(ent.row, ent.col, e.row, e.col))
-                ent.ai_tick += 1
-                if ent.ai_tick % max(1, ent.ai_speed) == 0:
-                    if _manhattan(ent.row, ent.col, tgt.row, tgt.col) <= 1:
-                        tgt.hp -= 2 if ent.swole else 1
-                        if tgt.hp <= 0:
-                            room.kill_entity(tgt)
-                            msgs.append('Your hound fells a foe!')
-                    else:
-                        dr, dc = tgt.row - ent.row, tgt.col - ent.col
-                        if abs(dr) >= abs(dc):
-                            nr, nc = ent.row + ((dr > 0) - (dr < 0)), ent.col
-                        else:
-                            nr, nc = ent.row, ent.col + ((dc > 0) - (dc < 0))
-                        if ((nr, nc) != (player.row, player.col)
-                                and _steppable(room, player, nr, nc)):
-                            room.move_entity(ent, nr, nc)
+            tgt = (min(foes, key=lambda e: _manhattan(ent.row, ent.col, e.row, e.col))
+                   if foes else None)
+            if tgt is not None and _manhattan(ent.row, ent.col, tgt.row, tgt.col) <= 1:
+                tgt.hp -= 2 if ent.swole else 1
+                if tgt.hp <= 0:
+                    room.kill_entity(tgt)
+                    msgs.append('Your hound fells a foe!')
+                continue
+            goal = (tgt.row, tgt.col) if tgt else (player.row, player.col)
+            if tgt is None and _manhattan(ent.row, ent.col, *goal) <= 1:
+                continue                             # already at heel — hold
+            dr, dc = goal[0] - ent.row, goal[1] - ent.col
+            if abs(dr) >= abs(dc):
+                nr, nc = ent.row + ((dr > 0) - (dr < 0)), ent.col
+            else:
+                nr, nc = ent.row, ent.col + ((dc > 0) - (dc < 0))
+            if (nr, nc) != (player.row, player.col) and _steppable(room, player, nr, nc):
+                room.move_entity(ent, nr, nc)
+            continue
+        if ent.kind == 'critter':
+            # A cat (:s/g/c/): ambles idly and yowls now and then; a big Cat ROARS.
+            ent.ai_tick += 1
+            ent.summon_timer -= 1
+            if ent.summon_timer <= 0:
+                ent.summon_timer = random.randint(3, 10)
+                msgs.append('A great Cat ROARS — the walls tremble.'
+                            if ent.swole else 'Meow.')
+            if ent.ai_tick % 2 == 0:
+                dr, dc = random.choice(_ORTHO)
+                nr, nc = ent.row + dr, ent.col + dc
+                if (nr, nc) != (player.row, player.col) and _steppable(room, player, nr, nc):
+                    room.move_entity(ent, nr, nc)
             continue
         if ent.kind == 'archivist':
             w = getattr(room, '_wrap_w', 0) or 1
@@ -3511,6 +3536,7 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
     # The Warden Eternal's hat — a permanent post-game unlock. Once looted it is
     # saved to progress; wearing it (`:set hat`) grants admin-like all-command
     # access in ANY level. The worn state persists across levels too.
+    player.gold     = progress.get('gold', 0)
     player.has_hat  = progress.get('has_hat', False)
     player.hat_worn = player.has_hat and progress.get('hat_worn', False)
     if player.hat_worn and 'admin' not in player.known_commands:
@@ -4475,7 +4501,14 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
                 and not key.is_sequence:
             _trade = room._elf_trade
             room._elf_trade = None
-            if str(key).lower() == 'y':
+            _elf = next((e for e in room.entities if id(e) == _trade.get('elf_id')), None)
+            if str(key).lower() == 'y' and player.gold < _trade['cost']:
+                _push(f'"No coin, no deal." The elf sniffs. (you have {player.gold} gold)')
+                if _elf is not None:
+                    _elf.tag = 'elf'                     # still open to a later offer
+            elif str(key).lower() == 'y':
+                player.gold -= _trade['cost']            # debited whether or not it's a swindle
+                progress['gold'] = player.gold
                 _tk = _trade['key']
                 if _tk == 'hp':
                     player.take_damage(2)
@@ -4489,12 +4522,16 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
                                                    hp=3, max_hp=3, ai='chase',
                                                    ai_speed=1, tag='demon'))
                             break
-                    room.rebuild_indexes()
                 _push(_trade['result'])
+                if _elf is not None:
+                    room.kill_entity(_elf)               # dealt and gone
+                room.rebuild_indexes()
                 if player.is_dead:
                     message = '** GAME OVER ** Type  :e  to re-load the dungeon.'
             else:
                 _push('The elf shrugs and melts back into the trees.')
+                if _elf is not None:
+                    _elf.tag = 'spent'                   # declined — no re-offer
             _render(_pool_msg() if not player.is_dead else message)
             continue
 
@@ -5988,7 +6025,7 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
             else:
                 done = sum(_pop_history_step(redo_stack, undo_stack, room, player, budget, is_redo=True)
                            for _ in range(count))
-            _push(f'{done} change(s) redone.' if done else 'Nothing to redo.')
+            _push(f'{done} change(s) redone.' if done else 'Already at newest change')
 
         elif action['type'] == 'interact':
             if action.get('before'):
@@ -6756,6 +6793,25 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
                          if action['type'] == 'interact' and cur_combat_target
                          else None)
             tick_msgs = _enemy_tick(room, player)
+            # Easter-egg economy: pocket a coin underfoot; an adjacent untraded
+            # elf opens a bargain (one at a time, only within a cell).
+            _coin = room.entity_at(player.row, player.col)
+            if _coin is not None and _coin.kind == 'gold':
+                room.kill_entity(_coin); room.rebuild_indexes()
+                player.gold += 1
+                progress['gold'] = player.gold
+                tick_msgs.insert(0, f'You pocket a coin. (gold: {player.gold})')
+            if not getattr(room, '_elf_trade', None):
+                for _elf in list(room._entity_by_kind.get('elf', [])):
+                    if (_elf.alive and _elf.tag == 'elf'
+                            and _manhattan(player.row, player.col, _elf.row, _elf.col) <= 1):
+                        _offer, _cost, _key, _res = random.choice(_ELF_TRADES)
+                        room._elf_trade = {'elf_id': id(_elf), 'cost': _cost,
+                                           'key': _key, 'result': _res}
+                        _elf.tag = 'offering'
+                        tick_msgs.insert(0, f'The elf leans in: "{_offer} — {_cost} '
+                                            'gold. Deal? (y/n)"')
+                        break
             _surveyor_tick()                  # the Surveyor's telegraph → resolve cadence
             _mega = getattr(room, 'mega', None)   # the floor-cut has no creature — flash where it hit
             if _mega and _mega.get('hit_player'):
