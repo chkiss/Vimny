@@ -29,7 +29,7 @@ from render.utils import inner_w as _iw
 from render.overworld import (render_overworld, build_lines, default_cursor,
                               line_search_text)
 from engine.vimregex import compile_vim as _vre_compile
-from render.title import render_title, render_save_select, select_quote, select_quote_by_name, select_next_lesson_quote, MENU_ITEMS as _TITLE_MENU, NAME_MAX as _NAME_MAX
+from render.title import render_title, render_save_select, select_quote, select_quote_by_name, select_next_lesson_quote, next_lesson_quote_entry, format_quote, MENU_ITEMS as _TITLE_MENU, NAME_MAX as _NAME_MAX
 from render.wizard_blessing import run_wizard_blessing
 from engine.player import Player
 from engine.modes import Mode
@@ -321,6 +321,20 @@ def _known_from_progress(progress: dict) -> set:
         if isinstance(rec, dict) and (rec.get('complete') or rec.get('stars', 0) >= 1):
             known.update(_known_commands(slug))
     return known
+
+
+def _record_blessing_seen(progress: dict, player_name: str, name: str) -> None:
+    """Bind a just-recited blessing into progress['blessings_seen'] so it appears
+    in the scroll library's blessings/ subtree and the Codex blessings fold."""
+    from content.blessings import blessing_id_for_name
+    bid = blessing_id_for_name(name)
+    if not bid:
+        return
+    seen = list(progress.get('blessings_seen', []))
+    if bid not in seen:
+        seen.append(bid)
+        progress['blessings_seen'] = seen
+        SM.save_progress(progress, player_name)
 
 
 def _smudge_gate_met(gate, known) -> bool:
@@ -632,6 +646,11 @@ def _show_scroll_by_id(term: Terminal, iw: int, game_h: int,
         _show_reliquary_scroll(term, iw, game_h, known)
     elif sid in _STD_SCROLLS:
         _render_standard_scroll(term, iw, game_h, _STD_SCROLLS[sid], known)
+    elif sid.startswith('blessing_'):
+        from content.blessings import blessing_scroll_content
+        _bc = blessing_scroll_content(sid)
+        if _bc is not None:
+            _render_standard_scroll(term, iw, game_h, _bc, known)
     else:
         _show_catalog_scroll(term, iw, game_h, sid, known)
 
@@ -4982,15 +5001,23 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
                         _push('You carry no codex to open.')
                     else:
                         from engine.codex import CodexPane, scroll_sections
-                        from content.scrolls import SCROLL_CATALOG
-                        _sections = scroll_sections(SCROLL_CATALOG,
-                                                    progress.get('extras', []))
-                        _sections += list(getattr(room, '_codex_extra', ()))
-                        if not _sections:
+                        from content.scrolls import SCROLL_CATALOG, RELIC_SCROLL_IDS
+                        from content.blessings import blessing_sections
+                        _extras = progress.get('extras', [])
+                        _codex_cat  = [s for s in SCROLL_CATALOG if s['id'] not in RELIC_SCROLL_IDS]
+                        _relic_cat  = [s for s in SCROLL_CATALOG if s['id'] in RELIC_SCROLL_IDS]
+                        _codex_secs = (scroll_sections(_codex_cat, _extras)
+                                       + list(getattr(room, '_codex_extra', ())))
+                        _relic_secs = scroll_sections(_relic_cat, _extras)
+                        _bless_secs = blessing_sections(progress.get('blessings_seen', []))
+                        _groups = [g for g in (('codex', _codex_secs),
+                                               ('relics', _relic_secs),
+                                               ('blessings', _bless_secs)) if g[1]]
+                        if not _groups:
                             _push('The Codex is empty — no pages bound yet.')
                         else:
                             _arg = cmd.split(' ', 1)[1].strip() if ' ' in cmd else ''
-                            _pane = CodexPane(_sections)
+                            _pane = CodexPane(groups=_groups)
                             if _arg and not _pane.jump_to(_arg):
                                 _push(f'E149: Sorry, no help for {_arg}')
                             else:
@@ -7258,7 +7285,9 @@ def run_scroll_library(term: Terminal, player: Player, progress: dict) -> str | 
                 pass  # ./ or a subtree header — stay
             else:
                 scroll = _r['scroll']
-                if scroll['id'] in discovered:
+                _disc  = (set(progress.get('blessings_seen', []))
+                          if _r.get('group') == 'blessings' else discovered)
+                if scroll['id'] in _disc:
                     iw     = _iw(term)
                     game_h = term.height - 5
                     _render()
@@ -8173,6 +8202,7 @@ def main():
             # at the First Cave until the player has earned at least 1 star there.
             if level == 'first_cave' and progress.get('first_cave', {}).get('stars', 0) == 0:
                 run_wizard_blessing(term, select_quote_by_name('home row'))
+                _record_blessing_seen(progress, player.name, 'home row')
 
             dung_result = run_dungeon(term, level, progress, player.name)
 
@@ -8190,10 +8220,16 @@ def main():
             if dung_result.get('first_written_completion'):
                 # After the final level, the wizard gives his farewell (the
                 # Warden unmasked); every other level previews the next lesson.
-                _blessing = (select_quote_by_name('final blessing')
-                             if level == 'warden_eternal'
-                             else select_next_lesson_quote(level))
-                run_wizard_blessing(term, _blessing)
+                if level == 'warden_eternal':
+                    run_wizard_blessing(term, select_quote_by_name('final blessing'))
+                    _record_blessing_seen(progress, player.name, 'final blessing')
+                else:
+                    _entry = next_lesson_quote_entry(level)
+                    if _entry is not None:
+                        run_wizard_blessing(term, format_quote(_entry))
+                        _record_blessing_seen(progress, player.name, _entry['name'])
+                    else:
+                        run_wizard_blessing(term, select_next_lesson_quote(level))
 
 
 

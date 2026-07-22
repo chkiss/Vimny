@@ -81,6 +81,11 @@ def _fmt_quote(chosen: dict) -> tuple[str, str, str, str]:
         return (pad, lines[0], pad, pad)
 
 
+def format_quote(entry: dict) -> tuple[str, str, str, str]:
+    """Public: format a wisdom entry dict into the 4 box-inner strings."""
+    return _fmt_quote(entry)
+
+
 def _generic_pool() -> list[dict]:
     """Poems with no specific level (title flavour + blessing fallback)."""
     return [q for q in _QUOTES if q.get('introduces_slug') is None]
@@ -134,6 +139,22 @@ def select_next_lesson_quote(completed_slug: str) -> tuple[str, str, str, str]:
         blank = ' ' * _BOX_INNER_W
         return (blank, blank, blank, blank)
     return _fmt_quote(_random.choice(pool))
+
+
+def next_lesson_quote_entry(completed_slug: str) -> dict | None:
+    """The wisdom entry (poem dict, with 'name') for the level after
+    completed_slug — the companion to select_next_lesson_quote that keeps the
+    name and the shown verse in sync (so the blessing can be recorded as seen)."""
+    visible_slugs = [l['slug'] for l in LEVELS if not l.get('admin_only')]
+    try:
+        nxt = visible_slugs.index(completed_slug) + 1
+        next_slug = visible_slugs[nxt] if nxt < len(visible_slugs) else None
+    except ValueError:
+        next_slug = None
+    pool = [q for q in _QUOTES if q.get('introduces_slug') == next_slug] if next_slug is not None else []
+    if not pool:
+        pool = _generic_pool()
+    return _random.choice(pool) if pool else None
 
 
 _WIZARD_ART: tuple[str, ...] = (

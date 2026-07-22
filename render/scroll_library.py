@@ -29,24 +29,35 @@ import render.colors as C
 import render.symbols as S
 import render.netrw_chrome as NC
 from content.scrolls import SCROLL_CATALOG, RELIC_SCROLL_IDS
+from content.blessings import BLESSING_CATALOG
 from render.utils import inner_w as _iw, subtree_lines, tree_glyph
 
-# Subtree labels (netrw directory style). Change these two strings to rename
+# Subtree labels (netrw directory style). Change these strings to rename
 # the categories everywhere.
-CODEX_LABEL  = 'codex/'
-RELICS_LABEL = 'relics/'
+CODEX_LABEL     = 'codex/'
+RELICS_LABEL    = 'relics/'
+BLESSINGS_LABEL = 'blessings/'
 
 
 def library_rows() -> list[dict]:
     """Ordered, flat list of navigable rows in the scroll library. Each row is
     a dict with a 'type': 'parent' | 'self' | 'subhdr' | 'scroll'. A subhdr
-    carries 'label'; a scroll carries 'scroll' (catalog entry) and 'last' (True
-    for the final entry under its subtree, for the └ tree glyph)."""
+    carries 'label'; a scroll carries 'scroll' (catalog entry), 'last' (True
+    for the final entry under its subtree, for the └ tree glyph) and 'group'
+    ('codex' | 'relics' | 'blessings' — which discovered-set gates it)."""
     rows: list[dict] = [{'type': 'parent'}, {'type': 'self'}]
     codex  = [s for s in SCROLL_CATALOG if s['id'] not in RELIC_SCROLL_IDS]
     relics = [s for s in SCROLL_CATALOG if s['id'] in RELIC_SCROLL_IDS]
-    rows += subtree_lines(CODEX_LABEL,  codex,  'scroll', 'scroll')
-    rows += subtree_lines(RELICS_LABEL, relics, 'scroll', 'scroll')
+
+    def _tag(subtree_rows, group):
+        for r in subtree_rows:
+            if r['type'] == 'scroll':
+                r['group'] = group
+        return subtree_rows
+
+    rows += _tag(subtree_lines(CODEX_LABEL,     codex,            'scroll', 'scroll'), 'codex')
+    rows += _tag(subtree_lines(RELICS_LABEL,    relics,           'scroll', 'scroll'), 'relics')
+    rows += _tag(subtree_lines(BLESSINGS_LABEL, BLESSING_CATALOG, 'scroll', 'scroll'), 'blessings')
     return rows
 
 
@@ -59,6 +70,7 @@ def render_scroll_library(
 ) -> None:
     discovered = set(progress.get('extras', []))
     seen       = set(progress.get('scrolls_seen', []))
+    bless_seen = set(progress.get('blessings_seen', []))
     iw  = _iw(term)
     bfg = C.border_fg()
     rst = C.normal_fg()
@@ -71,8 +83,9 @@ def render_scroll_library(
     out.append(NC.border_h(iw, bfg, rst, S.BOX_LT, S.BOX_RT))
 
     game_h  = term.height - 5
-    n_disc  = sum(1 for s in SCROLL_CATALOG if s['id'] in discovered)
-    n_total = len(SCROLL_CATALOG)
+    n_disc  = (sum(1 for s in SCROLL_CATALOG if s['id'] in discovered)
+               + sum(1 for b in BLESSING_CATALOG if b['id'] in bless_seen))
+    n_total = len(SCROLL_CATALOG) + len(BLESSING_CATALOG)
 
     sb   = C.sel_bg()
     dfc  = C.dir_fg()
@@ -118,9 +131,11 @@ def render_scroll_library(
             out.append(_row(is_cursor, len(r['label']), dfc + r['label']))
             continue
 
-        # scroll row, indented under its subtree with a ├/└ tree glyph
+        # scroll row, indented under its subtree with a ├/└ tree glyph. A
+        # blessing row is gated on blessings_seen instead of found-scroll extras.
         scroll    = r['scroll']
-        is_disc   = scroll['id'] in discovered
+        disc_set  = bless_seen if r.get('group') == 'blessings' else discovered
+        is_disc   = scroll['id'] in disc_set
         is_new    = is_disc and scroll['id'] not in seen
         prefix    = '  ' + tree_glyph(r['last']) + ' '   # 4 visible columns
 
