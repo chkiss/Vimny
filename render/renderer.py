@@ -766,7 +766,14 @@ def render_all(term: Terminal, dungeon: Dungeon, player: Player,
         hint_text = _hint_text(known, getattr(dungeon, 'level_slug', None))
     if 'admin' in known:
         hint_text += '  :e refresh'
-    hint_text = hint_text[:iw]
+    if len(hint_text) > iw:
+        # Truncate at a whole-command boundary (double space), never mid-word,
+        # and mark the cut with an ellipsis so the cheat sheet stays legible.
+        cut = hint_text[:iw - 1]
+        sp  = cut.rfind('  ')
+        if sp > iw // 3:
+            cut = cut[:sp]
+        hint_text = cut.rstrip() + '…'
     hint = C.hint_fg() + hint_text + rst
     output.append(bfg + S.BOX_V + rst + hint +
                   ' ' * max(0, iw - len(hint_text)) + bfg + S.BOX_V + rst)
