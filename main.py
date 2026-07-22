@@ -1956,19 +1956,8 @@ def _warden_eternal_tick(room, player) -> list:
                 room.entities.append(Entity(kind='hat', row=drop[0], col=drop[1]))
             room.rebuild_indexes()
             msgs.append("The Warden falls still at last, and lays his hat upon "
-                        "the stone. The way out is open — take up the hat as "
-                        "you go.")
-
-    # 4) pick up the hat by stepping onto it (grants has_hat; :set hat wears it)
-    hat = next((e for e in room.entities
-                if e.kind == 'hat' and e.row == player.row and e.col == player.col),
-               None)
-    if hat is not None and not player.has_hat:
-        room.kill_entity(hat)
-        room.rebuild_indexes()
-        player.has_hat = True             # persisted by the win-save on exit
-        msgs.append("You take up the Warden's hat. It is lighter than it looks. "
-                    "(Type  :set hat  to wear it — every command, in any hall.)")
+                        "the stone. The way out is open — x the hat to take it up.")
+    # (The hat is looted with x / dl like any other item — see the interact block.)
     return msgs
 
 
@@ -2965,6 +2954,29 @@ _BASE_NAMES = {'g': 'goblin', 'd': 'hound', 'c': 'cat', 'z': 'zombie',
                '&': 'demon', 'e': 'elf', '$': 'coin', 'w': 'warden'}
 _SWELLABLE_LETTERS = ('g', 'd', 'c')             # the ones with a "big" (uppercase) form
 
+# (HP, attack) per creature glyph, from the playtest table. HP = x-hits to fell
+# it; attack = half-hearts of damage it deals per hit (the player has 6 = 3♥).
+_CREATURE_HP_ATK = {'g': (1, 1), 'G': (2, 1), '&': (3, 2), 'Z': (1, 1),
+                    'z': (1, 1), 'c': (1, 0), 'C': (2, 3), 'd': (1, 2),
+                    'D': (2, 3), 'e': (2, 2)}
+
+
+def _hp_atk(glyph: str) -> tuple:
+    return _CREATURE_HP_ATK.get(glyph, (1, 1))
+
+
+def _entity_glyph(e) -> str:
+    return entity_letter(e) or 'g'
+
+
+def _is_hostile_creature(e) -> bool:
+    """Egg creatures that ATTACK the player: demons, zombies, big cats."""
+    if e.kind == 'goblin' and e.tag in ('demon', 'zombie'):
+        return True
+    if e.kind == 'critter' and e.swole:          # a big Cat is aggressive
+        return True
+    return False
+
 
 def _creature_name(glyph: str) -> str:
     """A creature's spoken name from its glyph — the uppercase (swelled) form of a
@@ -3051,11 +3063,15 @@ def _goblin_substitute(cmd: str, room, player, push) -> bool:
     # shared case rule so they are bigger + sharper-eyed exactly like ~ or gU.
     base, up = rep1.lower(), rep1.isupper()
 
+    def _sethp(g, glyph):
+        g.max_hp = g.hp = _hp_atk(glyph)[0]
+
     if base == 'g':                                  # goblin (G = big)
         for g in gobs:
             if g.kind != 'goblin' or g.tag in ('zombie', 'demon'):
                 _reset(g, 'goblin', '', 'chase', 1)
             _swell(g, up)
+            _sethp(g, 'G' if up else 'g')
         room.rebuild_indexes()
         push(f'The {name} is now a {_creature_name("G" if up else "g")}.' + tail)
         return True
@@ -3063,17 +3079,19 @@ def _goblin_substitute(cmd: str, room, player, push) -> bool:
         for g in gobs:
             _reset(g, 'ally', 'dog', 'hunt', 2)
             _swell(g, up)
+            _sethp(g, 'D' if up else 'd')
         room.rebuild_indexes()
         push(f'The {name} becomes a {_creature_name("D" if up else "d")} and takes your side.' + tail)
         return True
-    if base == 'c':                                  # a harmless cat (C = big, roars)
+    if base == 'c':                                  # a cat (c = friendly, C = a big aggressor)
         for g in gobs:
             _reset(g, 'critter', 'cat', 'wander', 1)
             g.summon_timer = random.randint(3, 10)   # turns until its next meow
             _swell(g, up)
+            _sethp(g, 'C' if up else 'c')
         room.rebuild_indexes()
         push(f'The {name} is now a {_creature_name("C" if up else "c")}. '
-             'It meows, and plots your downfall.' + tail)
+             + ('It bares its claws.' if up else 'It purrs, and plots your downfall.') + tail)
         return True
     if rep1 == '$':                                  # a coin of gold to pick up
         for g in gobs:
@@ -3084,6 +3102,7 @@ def _goblin_substitute(cmd: str, room, player, push) -> bool:
     if base == 'e':                                  # a merchant elf (it STAYS)
         for g in gobs:
             _reset(g, 'elf', 'elf', '', 1)
+            _sethp(g, 'e')
         room.rebuild_indexes()
         push(f'The {name} becomes an elf, keen to make you a deal.' + tail)
         return True
@@ -3093,6 +3112,7 @@ def _goblin_substitute(cmd: str, room, player, push) -> bool:
             else "twists into a demon. You shouldn't have."
         for g in gobs:
             _reset(g, 'goblin', tag, ai, hp, spd)
+            _sethp(g, 'Z' if base == 'z' else '&')
         room.rebuild_indexes()
         push(f'The {name} {verb}' + tail)
         return True
@@ -3353,7 +3373,7 @@ def _enemy_tick(room, player) -> list:
             tgt = (min(foes, key=lambda e: _manhattan(ent.row, ent.col, e.row, e.col))
                    if foes else None)
             if tgt is not None and _manhattan(ent.row, ent.col, tgt.row, tgt.col) <= 1:
-                tgt.hp -= 2 if ent.swole else 1
+                tgt.hp -= _hp_atk('D' if ent.swole else 'd')[1]   # D=3, d=2
                 if tgt.hp <= 0:
                     room.kill_entity(tgt)
                     msgs.append('Your hound fells a foe!')
@@ -3665,6 +3685,10 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
         _explosion_animation(term, room, r, c, scr_r, scr_c, iw_now, game_h_now)
         if g is not None and g.kind == 'goblin':
             room.kill_entity(g)
+        # Stand too close to the blast and it hurts — you can die by your own fire.
+        _dist = abs(player.row - r) + abs(player.col - c)
+        if _dist in _EXPL_DAMAGE:
+            player.take_damage(_EXPL_DAMAGE[_dist])
         room.rebuild_indexes()
 
     def _detonate(ent, message):
@@ -4535,8 +4559,10 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
         room._ward_flash = set()   # a shield-flash lives for one action only
 
         # ── The elf's shitty trade (from :s/g/e/) awaits a y/n ────────────────
-        if getattr(room, '_elf_trade', None) and player.mode == Mode.NORMAL \
-                and not key.is_sequence:
+        # Only y/n resolve it; every other key (x to attack the elf, a step away)
+        # falls through and is handled normally, leaving the offer standing.
+        if (getattr(room, '_elf_trade', None) and player.mode == Mode.NORMAL
+                and not key.is_sequence and str(key).lower() in ('y', 'n')):
             _trade = room._elf_trade
             room._elf_trade = None
             _elf = next((e for e in room.entities if id(e) == _trade.get('elf_id')), None)
@@ -4927,6 +4953,10 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
                         _render(_pool_msg())
                         for (_br, _bc) in _boom:
                             _goblin_boom(_br, _bc)
+                        if player.is_dead:
+                            message = '** GAME OVER ** Type  :e  to re-load the dungeon.'
+                            msg_ttl = 2
+                            _render(message)
 
                 elif (_subst.looks_like_sg(cmd, room, player)
                       or _subst.looks_like_ex_range(cmd, room, player)):
@@ -6205,7 +6235,24 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
                     budget.spend(1)
                     _push('Key picked up — use p to unlock a door.')
                     interacted = True
-                elif cur and (cur.kind in ('goblin', 'warden', 'wanderer')
+                elif cur and cur.kind == 'hat':
+                    # The Warden's hat is looted like any item — x it (or dl).
+                    undo_stack.append(_snapshot(room, player, budget, ans=cmd_start_ans))
+                    redo_stack.clear()
+                    room.kill_entity(cur); room.rebuild_indexes()
+                    player.has_hat = True
+                    budget.spend(1)
+                    _push("You take up the Warden's hat. (Type  :set hat  to wear "
+                          "it — every command, in any hall.)")
+                    interacted = True
+                elif cur and cur.kind == 'ally':
+                    _push('The dog pets you back.')      # your own hound — no harm
+                    interacted = True
+                elif cur and cur.kind == 'critter' and not cur.swole:
+                    _push('The cat purrs.')              # a friendly cat — no harm
+                    interacted = True
+                elif cur and (cur.kind in ('goblin', 'warden', 'wanderer', 'elf')
+                              or (cur.kind == 'critter' and cur.swole)
                               or (cur.kind == 'archivist' and getattr(room, 'lib_hostile', False))):
                     undo_stack.append(_snapshot(room, player, budget, ans=cmd_start_ans))
                     redo_stack.clear()
@@ -6268,6 +6315,15 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
                             _push('His shields shatter — the Warden retreated into the '
                                   'wardenverse!  Try to follow him:  :e wardenverse')
                         else:
+                            # An elf spills its coins when felled; every other egg
+                            # creature just vanishes (as goblins always have).
+                            if cur.kind == 'elf':
+                                room.add_entity(Entity(kind='gold', row=cur.row,
+                                                       col=cur.col, tag='gold'))
+                                _push('The elf drops its coins as it falls.')
+                                _et = getattr(room, '_elf_trade', None)
+                                if _et and _et.get('elf_id') == id(cur):
+                                    room._elf_trade = None   # its offer dies with it
                             room.kill_entity(cur)
                             _reg_write(player, '"', entity_clip(cur), is_delete=True)
                             if cur.kind == 'warden' and cur.tag == 'verse':
@@ -6866,16 +6922,25 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
                          if getattr(room, 'lib_hostile', False) else [])
             attackers = []
             for ent in (*room._entity_by_kind.get('goblin', []),
-                        *room._entity_by_kind.get('warden', []), *_arch_atk):
+                        *room._entity_by_kind.get('warden', []),
+                        *room._entity_by_kind.get('critter', []), *_arch_atk):
                 if not ent.alive:
                     continue
+                if ent.kind == 'critter' and not ent.swole:
+                    continue                          # a small cat is harmless
                 if id(ent) == xd_id:
                     continue
                 if id(ent) not in prev_adjacent_ids:
                     continue
                 if _manhattan(player.row, player.col, ent.row, ent.col) <= _ATTACK_RADIUS:
                     attackers.append(ent)
-                    player.take_damage(10 if ent.kind == 'archivist' else 1)
+                    if ent.kind == 'archivist':
+                        _dmg = 10
+                    elif ent.kind in ('goblin', 'critter'):
+                        _dmg = _hp_atk(_entity_glyph(ent))[1]   # &=2 Z=1 C=3 g=1
+                    else:
+                        _dmg = 1                       # a warden
+                    player.take_damage(max(1, _dmg))
                     if player.is_dead:
                         message = '** GAME OVER ** Type  :e  to re-load the dungeon.'
                         msg_ttl = 2

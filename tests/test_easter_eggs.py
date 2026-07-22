@@ -80,7 +80,7 @@ def test_zombie_and_demon_transform_and_stay_hostile():
     r, p = _room_and_master()
     main._goblin_substitute('%s/g/z/', r, p, lambda m: None)
     z = [e for e in r.entities if e.tag == 'zombie' and e.alive]
-    assert z and all(entity_letter(e) == 'Z' and e.ai == 'chase' and e.hp == 2 for e in z)
+    assert z and all(entity_letter(e) == 'Z' and e.ai == 'chase' and e.hp == 1 for e in z)
 
     r, p = _room_and_master()
     main._goblin_substitute('%s/g/&/', r, p, lambda m: None)
@@ -107,6 +107,61 @@ def test_gold_becomes_a_pickup_coin():
     main._goblin_substitute('%s/g/$/', r, p, lambda m: None)
     coins = [e for e in r.entities if e.kind == 'gold']
     assert coins and all(entity_letter(e) == '$' for e in coins)
+
+
+# ── combat: hat looted with x; friendlies petted; elves drop gold ────────────
+def _drive_x_on(kind, tag, keys_before, monkeypatch, hp=1, swole=False, progress=None):
+    """Place a single creature at spawn+1 in a cleared arena, run `keys_before`
+    then :q!, and return (room, player, messages)."""
+    from engine.world import Entity
+    d = dg.build_dungeon_warden_eternal(0)
+    r = d.rooms[0]
+    for e in list(r.entities):
+        if e.kind in ('goblin', 'warden'):
+            e.alive = False
+    r.entities = [e for e in r.entities if e.kind not in ('goblin', 'warden')]
+    sr, sc = r.spawn_pos
+    ent = Entity(kind=kind, tag=tag, row=sr, col=sc + 1, hp=hp, max_hp=hp, swole=swole)
+    r.entities.append(ent)
+    r.rebuild_indexes()
+    msgs = []
+    monkeypatch.setattr(main, 'render_all',
+                        lambda *a, m='', **k: msgs.append(k.get('message', '')))
+    monkeypatch.setattr(main, 'render_all',
+                        lambda term, dg_, pl, bu, message='', *a, **k: msgs.append(message))
+    monkeypatch.setattr(main.time, 'sleep', lambda *a, **k: None)
+    monkeypatch.setattr(main.SM, 'save_progress', lambda *a, **k: None)
+    monkeypatch.setattr(Terminal, 'height', property(lambda self: 41))
+    term = Terminal()
+    it = iter([Keystroke(k) for k in keys_before] + [Keystroke(c) for c in ':q!\r'])
+    monkeypatch.setattr(term, 'inkey', lambda *a, **k: next(it, Keystroke('')))
+    main.run_dungeon(term, 'warden_eternal', progress or {'has_hat': True, 'hat_worn': True},
+                     player_name='Hero', _dungeon=d)
+    return r, ent, [m for m in msgs if m]
+
+
+def test_x_a_dog_pets_you_back(monkeypatch):
+    r, dog, msgs = _drive_x_on('ally', 'dog', ['l', 'x'], monkeypatch)
+    assert dog.alive and any('pets you back' in m for m in msgs)
+
+
+def test_x_a_cat_purrs(monkeypatch):
+    r, cat, msgs = _drive_x_on('critter', 'cat', ['l', 'x'], monkeypatch)
+    assert cat.alive and any('purrs' in m for m in msgs)
+
+
+def test_x_an_elf_drops_gold(monkeypatch):
+    # a 1-HP elf felled in one x leaves a coin behind
+    r, elf, msgs = _drive_x_on('elf', 'elf', ['l', 'x'], monkeypatch, hp=1)
+    assert not elf.alive
+    assert any(e.kind == 'gold' and e.alive for e in r.entities)
+
+
+def test_x_loots_the_hat(monkeypatch):
+    r, hat, msgs = _drive_x_on('hat', '', ['l', 'x'], monkeypatch,
+                               progress={})   # no hat yet
+    assert not hat.alive
+    assert any('hat' in m.lower() for m in msgs)
 
 
 def test_elf_trade_accepts_on_y_and_debits_gold(monkeypatch):

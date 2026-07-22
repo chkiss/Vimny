@@ -152,7 +152,9 @@ def test_seal_needs_boss_and_whole_horde(seed):
 
 
 @pytest.mark.parametrize('seed', SEEDS)
-def test_hat_is_picked_up_by_stepping_onto_it(seed):
+def test_hat_drops_and_is_not_auto_collected(seed):
+    # The Warden leaves his hat where he falls; it must be LOOTED with x (or dl),
+    # never picked up by merely walking onto it.
     r = _room(seed)
     p = Player(row=dg._WDE_FINALE_TOP, col=1)
     for e in r.entities:                       # win the fight
@@ -160,10 +162,10 @@ def test_hat_is_picked_up_by_stepping_onto_it(seed):
             e.hp, e.alive = 0, False
     main._warden_eternal_tick(r, p)            # seal parts, hat drops
     hat = next(e for e in r.entities if e.kind == 'hat')
-    p.row, p.col = hat.row, hat.col            # step onto it
+    p.row, p.col = hat.row, hat.col            # stand on it
     main._warden_eternal_tick(r, p)
-    assert p.has_hat is True
-    assert not any(e.kind == 'hat' and e.alive for e in r.entities)
+    assert p.has_hat is False                  # walking does NOT collect it
+    assert hat.alive                           # still there, awaiting x
 
 
 def test_line_cut_shears_the_rank_and_flashes_the_ward(monkeypatch):
@@ -242,9 +244,12 @@ def test_full_descent_wins_and_grants_the_hat(monkeypatch):
     monkeypatch.setattr(main, 'render_all', lambda *a, **k: None)
     monkeypatch.setattr(main.time, 'sleep', lambda *a, **k: None)
     monkeypatch.setattr(Terminal, 'height', property(lambda self: 41))
-    # walk straight down the spine, then east across the parted seal to the exit
-    script = [Keystroke('j')] * (dg._WDE_EXIT[0] - r.spawn_pos[0])
-    script += [Keystroke('l')] * (dg._WDE_EXIT[1] - r.spawn_pos[1])
+    # walk down the spine, east to the dropped hat, x it, then on to the exit
+    hat_row, hat_col = r._wde_hat_drop
+    script  = [Keystroke('j')] * (hat_row - r.spawn_pos[0])
+    script += [Keystroke('l')] * (hat_col - r.spawn_pos[1])
+    script += [Keystroke('x')]                                    # loot the hat
+    script += [Keystroke('l')] * (dg._WDE_EXIT[1] - hat_col)
     script += [Keystroke(c) for c in ':wq\r']
     term = Terminal()
     it = iter(script)
