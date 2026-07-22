@@ -3329,6 +3329,33 @@ def _steppable(room, player, r: int, c: int) -> bool:
     return room.is_passable(r, c) and not room.entity_at(r, c)
 
 
+def _bfs_step(room, player, start, goal, cap: int = 900):
+    """The first step of the shortest walkable path from `start` to a cell
+    ADJACENT to `goal`, routing AROUND stone walls (unlike a goblin's greedy
+    lunge). None if already adjacent or no path within `cap` explored cells.
+    This is what makes the ally hounds smarter than goblins/zombies."""
+    sr, sc = start
+    gr, gc = goal
+    if abs(sr - gr) + abs(sc - gc) <= 1:
+        return None                                  # already at the goal's side
+    prev = {(sr, sc): None}
+    q = deque([(sr, sc)])
+    while q and len(prev) < cap:
+        r, c = q.popleft()
+        for dr, dc in _ORTHO:
+            nr, nc = r + dr, c + dc
+            if (nr, nc) in prev or not _steppable(room, player, nr, nc):
+                continue
+            prev[(nr, nc)] = (r, c)
+            if abs(nr - gr) + abs(nc - gc) <= 1:     # reached the goal's side
+                cur = (nr, nc)
+                while prev[cur] != (sr, sc):
+                    cur = prev[cur]
+                return cur
+            q.append((nr, nc))
+    return None
+
+
 def _detour_step(room, player, ent, dist: int):
     """First cell of a 2-move path that ends no farther from the player, or None.
 
@@ -3382,15 +3409,11 @@ def _enemy_tick(room, player) -> list:
                 goal = (tgt.row, tgt.col) if tgt else (player.row, player.col)
                 if tgt is None and _manhattan(ent.row, ent.col, *goal) <= 1:
                     break                                # at heel — hold
-                dr, dc = goal[0] - ent.row, goal[1] - ent.col
-                if abs(dr) >= abs(dc):
-                    nr, nc = ent.row + ((dr > 0) - (dr < 0)), ent.col
-                else:
-                    nr, nc = ent.row, ent.col + ((dc > 0) - (dc < 0))
-                if (nr, nc) != (player.row, player.col) and _steppable(room, player, nr, nc):
-                    room.move_entity(ent, nr, nc)
-                else:
-                    break                                # blocked — stop this turn
+                # smarter than a goblin: BFS a route AROUND stone walls
+                step = _bfs_step(room, player, (ent.row, ent.col), goal)
+                if step is None:
+                    break                                # no path this turn
+                room.move_entity(ent, *step)
             continue
         if ent.kind == 'critter' or (ent.kind == 'elf' and ent.ai == 'wander'):
             # A cat (:s/g/c/) ambles and yowls; a big Cat ROARS. A spent elf
