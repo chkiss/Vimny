@@ -996,7 +996,7 @@ def _fireworks_animation(term, iw, dungeon, player):
     term.inkey(timeout=1.1)  # be read — or skipped (fires after every par-perfect finish)
 
 
-def _starfield_victory(term, iw, dungeon, player):
+def _starfield_victory(term, iw, dungeon, player, level):
     """Boss-completion finish: a lasting, sky-accurate twinkling starfield behind
     the 'VIM AD ASTRA' banner. Held until the player presses a key — a permanent
     celebration rather than a passing burst (see CREDITS.md)."""
@@ -1006,9 +1006,11 @@ def _starfield_victory(term, iw, dungeon, player):
     bg_at  = _victory_cell_bg(term, room, player, iw, game_h)
     center = h // 2 - 1
 
+    # Final boss gets the completion message; other bosses get the journey-continues message
+    subtitle = '  Go among the stars!  ' if level == 'warden_eternal' else '  Onward and upward — the stars draw nearer.  '
     banner_rows = [
         '  ' + _spaced_title('VIM AD ASTRA') + '  ',
-        '  Onward and upward — the stars draw nearer.  ',
+        subtitle,
     ]
     banner_band = set(range(center, center + len(banner_rows)))
     title_col   = term.bright_white + term.bold
@@ -5933,7 +5935,7 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
                     _render('')
                     iw  = _iw(term)
                     if level_type(level) == 'boss':
-                        _starfield_victory(term, iw, dungeon, player)
+                        _starfield_victory(term, iw, dungeon, player, level)
                         message = 'VIM AD ASTRA — the way upward opens. Type :wq to return to the overworld.'
                     elif (room.par or 0) > 0 and budget.spent <= room.par:
                         _fireworks_animation(term, iw, dungeon, player)
