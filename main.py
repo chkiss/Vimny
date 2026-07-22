@@ -222,7 +222,7 @@ def _sight_radius(ent) -> int:
     return _ALERT_RADIUS
 _ATTACK_RADIUS          = 1   # Manhattan dist at which goblins attack each turn
 _WARDEN_SUMMON_INTERVAL = 6   # turns between warden summons
-_MSG_ROTATE_TTL         = 10  # ticks per combat message (~1 s at 0.1 s inkey timeout)
+_MSG_ROTATE_TTL         = 20  # ticks per combat message (~2 s) — multi-message (1/3…) cycles at this pace
 
 _SCROLL_TEXT_OPERATOR_CODEX = """\
 The Operator's Codex

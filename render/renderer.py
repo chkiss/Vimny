@@ -357,15 +357,19 @@ def render_all(term: Terminal, dungeon: Dungeon, player: Player,
     keys_s   = keys_color + f'Keys:{spent:2d}' + rst
     budget_s = C.hint_fg() + f' Budget:{budget.total:2d}' + rst
     par_s    = C.hint_fg() + f' Par:{room.par or "-"}' + rst
+    # Gold (Easter-egg coins picked up from :s/g/$/) shows only once you have some.
+    _gold = getattr(player, 'gold', 0)
+    gold_plain = f'  ${_gold}' if _gold else ''
+    gold_s     = (C.key_gold_fg() + f'  ${_gold}' + rst) if _gold else ''
 
     dname = dungeon.name[:30]      # 30 fits the longest names (Brace & Square
                                    # Enclosure = 28, Grandmaster's Sanctum = 25)
-    status_plain = f'  {"♥"*full_h}{"♡"*half_h}{"░"*empty_h}  {dname}  {ml}  Keys:{spent:2d} Budget:{budget.total:2d}  Par:{room.par or "-"}'
+    status_plain = f'  {"♥"*full_h}{"♡"*half_h}{"░"*empty_h}  {dname}  {ml}  Keys:{spent:2d} Budget:{budget.total:2d}  Par:{room.par or "-"}{gold_plain}'
     padding = max(0, iw - len(status_plain))
     status_line = (bfg + S.BOX_V + rst +
                    f'  {hp_str}  ' +
                    C.normal_fg() + dname + '  ' +
-                   mode_s + '  ' + keys_s + ' ' + budget_s + par_s +
+                   mode_s + '  ' + keys_s + ' ' + budget_s + par_s + gold_s +
                    ' ' * padding +
                    bfg + S.BOX_V + rst)
     output.append(status_line)
