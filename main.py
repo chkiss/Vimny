@@ -209,7 +209,6 @@ def _clip_to_text(clip) -> str:
 _EXPL_DAMAGE = {0: 3, 1: 3, 2: 2, 3: 1}   # 0-1: 1.5♥  2: 1♥  3: 0.5♥
 
 _ALERT_RADIUS           = 5   # Manhattan dist at which goblins start chasing
-_HOUND_RANGE            = 8   # an ally hound engages a hostile within this range, else heels
 
 
 def _sight_radius(ent) -> int:
@@ -3329,11 +3328,29 @@ def _steppable(room, player, r: int, c: int) -> bool:
     return room.is_passable(r, c) and not room.entity_at(r, c)
 
 
-def _bfs_step(room, player, start, goal, cap: int = 900):
+def _greedy_step_toward(room, player, ent, goal):
+    """A last-resort single step toward `goal` (dominant axis first, then the
+    other, then any free neighbour). None only if fully boxed in."""
+    gr, gc = goal
+    dr, dc = gr - ent.row, gc - ent.col
+    if abs(dr) >= abs(dc):
+        cands = [(ent.row + ((dr > 0) - (dr < 0)), ent.col),
+                 (ent.row, ent.col + ((dc > 0) - (dc < 0)))]
+    else:
+        cands = [(ent.row, ent.col + ((dc > 0) - (dc < 0))),
+                 (ent.row + ((dr > 0) - (dr < 0)), ent.col)]
+    cands += [(ent.row + a, ent.col + b) for a, b in _ORTHO]
+    for nr, nc in cands:
+        if (nr, nc) != (ent.row, ent.col) and _steppable(room, player, nr, nc):
+            return (nr, nc)
+    return None
+
+
+def _bfs_step(room, player, start, goal, cap: int = 1400):
     """The first step of the shortest walkable path from `start` to a cell
     ADJACENT to `goal`, routing AROUND stone walls (unlike a goblin's greedy
-    lunge). None if already adjacent or no path within `cap` explored cells.
-    This is what makes the ally hounds smarter than goblins/zombies."""
+    lunge). None if already adjacent or no path within `cap` explored cells."""
+    ok = _steppable
     sr, sc = start
     gr, gc = goal
     if abs(sr - gr) + abs(sc - gc) <= 1:
@@ -3344,7 +3361,7 @@ def _bfs_step(room, player, start, goal, cap: int = 900):
         r, c = q.popleft()
         for dr, dc in _ORTHO:
             nr, nc = r + dr, c + dc
-            if (nr, nc) in prev or not _steppable(room, player, nr, nc):
+            if (nr, nc) in prev or not ok(room, player, nr, nc):
                 continue
             prev[(nr, nc)] = (r, c)
             if abs(nr - gr) + abs(nc - gc) <= 1:     # reached the goal's side
@@ -3391,28 +3408,41 @@ def _enemy_tick(room, player) -> list:
             continue
         if ent.kind == 'ally':
             # A hound on your side (:s/g/d/): FAST (double speed; a big Hound
-            # triple), it savages the nearest hostile WITHIN RANGE, else trots
-            # back to heel beside you. It never turns on you.
+            # triple). It FOLLOWS the player, biting any adjacent foe and
+            # diverting only to a nearby, reachable hostile — and it NEVER stands
+            # still: if the path is blocked it greedily shuffles toward you.
             _dmg = _hp_atk('D' if ent.swole else 'd')[1]     # D=3, d=2
+            _fog = getattr(room, 'fog_cells', set())
             for _ in range(3 if ent.swole else 2):           # moves per turn
                 foes = [e for e in room.entities if e.alive
-                        and e.kind in ('goblin', 'warden')
-                        and _manhattan(ent.row, ent.col, e.row, e.col) <= _HOUND_RANGE]
-                tgt = (min(foes, key=lambda e: _manhattan(ent.row, ent.col, e.row, e.col))
-                       if foes else None)
-                if tgt is not None and _manhattan(ent.row, ent.col, tgt.row, tgt.col) <= 1:
-                    tgt.hp -= _dmg
-                    if tgt.hp <= 0:
-                        room.kill_entity(tgt)
+                        and e.kind in ('goblin', 'warden') and e.tag != 'echo'
+                        and (e.row, e.col) not in _fog]
+                # bite any foe already at our side
+                adj = next((e for e in foes
+                            if _manhattan(ent.row, ent.col, e.row, e.col) <= 1), None)
+                if adj is not None:
+                    adj.hp -= _dmg
+                    if adj.hp <= 0:
+                        room.kill_entity(adj)
                         msgs.append('Your hound fells a foe!')
-                    continue                             # bite, then step again
-                goal = (tgt.row, tgt.col) if tgt else (player.row, player.col)
-                if tgt is None and _manhattan(ent.row, ent.col, *goal) <= 1:
-                    break                                # at heel — hold
-                # smarter than a goblin: BFS a route AROUND stone walls
-                step = _bfs_step(room, player, (ent.row, ent.col), goal)
+                    continue
+                # divert only to a CLOSE, reachable hostile; else follow the player
+                step = None
+                for f in sorted((e for e in foes
+                                 if _manhattan(ent.row, ent.col, e.row, e.col) <= 5),
+                                key=lambda e: _manhattan(ent.row, ent.col, e.row, e.col)):
+                    step = _bfs_step(room, player, (ent.row, ent.col), (f.row, f.col))
+                    if step is not None:
+                        break
                 if step is None:
-                    break                                # no path this turn
+                    if _manhattan(ent.row, ent.col, player.row, player.col) <= 1:
+                        break                            # at heel — hold
+                    step = (_bfs_step(room, player, (ent.row, ent.col),
+                                      (player.row, player.col))
+                            or _greedy_step_toward(room, player, ent,
+                                                   (player.row, player.col)))
+                if step is None:
+                    break
                 room.move_entity(ent, *step)
             continue
         if ent.kind == 'critter' or (ent.kind == 'elf' and ent.ai == 'wander'):
