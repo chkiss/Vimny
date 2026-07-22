@@ -61,13 +61,26 @@ def library_rows() -> list[dict]:
     return rows
 
 
+def _viewport_top(cursor: int, top: int, avail: int, n: int) -> int:
+    """Vim-like viewport top: keep `top` unless the cursor has left the window."""
+    max_off = max(0, n - avail)
+    if cursor < top:
+        top = cursor
+    elif cursor >= top + avail:
+        top = cursor - avail + 1
+    return max(0, min(top, max_off))
+
+
 def render_scroll_library(
     term: Terminal,
     player: Player,
     progress: dict,
     cursor_row: int,
     cmd_line: str | None = None,
-) -> None:
+    scroll_offset: int = 0,
+) -> int:
+    """Render the library and return the (possibly adjusted) scroll_offset so the
+    caller can keep the viewport in sync as the cursor moves."""
     discovered = set(progress.get('extras', []))
     seen       = set(progress.get('scrolls_seen', []))
     bless_seen = set(progress.get('blessings_seen', []))
@@ -116,9 +129,14 @@ def render_scroll_library(
     ]
     out.extend(hdr_rows)
 
-    # ── Navigable rows: ../ ./ then the codex/ and relics/ subtrees ───────────
-    rows = library_rows()
-    for idx, r in enumerate(rows):
+    # ── Navigable rows: ../ ./ then the codex/ relics/ blessings/ subtrees ─────
+    # The list can outgrow the window (many blessings), so scroll a viewport of
+    # the navigable rows beneath the fixed header, netrw-style.
+    rows  = library_rows()
+    avail = max(1, game_h - len(hdr_rows))
+    scroll_offset = _viewport_top(cursor_row, scroll_offset, avail, len(rows))
+    vis_rows = list(enumerate(rows))[scroll_offset:scroll_offset + avail]
+    for idx, r in vis_rows:
         is_cursor = idx == cursor_row
         t = r['type']
         if t == 'parent':
@@ -168,7 +186,7 @@ def render_scroll_library(
         out.append(_row(is_cursor, iw, colored))
 
     # ── Empty rows ────────────────────────────────────────────────────────────
-    rows_used = len(hdr_rows) + len(rows)
+    rows_used = len(hdr_rows) + len(vis_rows)
     for _ in range(max(0, game_h - rows_used)):
         out.append(NC.empty_row(iw, bfg, rst))
 
@@ -177,3 +195,4 @@ def render_scroll_library(
     out.append(NC.border_h(iw, bfg, rst, S.BOX_BL, S.BOX_BR))
 
     print(term.home + term.clear + '\n'.join(out), end='', flush=True)
+    return scroll_offset

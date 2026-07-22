@@ -7239,11 +7239,14 @@ def run_scroll_library(term: Terminal, player: Player, progress: dict) -> str | 
     discovered  = set(progress.get('extras', []))
     # start on the first actual scroll (skip ../ ./ and the first subtree header)
     cursor_row  = next((i for i, r in enumerate(_rows) if r['type'] == 'scroll'), 0)
+    scroll_off  = 0
     cmdline     = _CmdLine(_SL_COMPLETIONS)
 
     def _render():
-        render_scroll_library(term, player, progress, cursor_row,
-                              cmdline.line if cmdline.active else None)
+        nonlocal scroll_off
+        scroll_off = render_scroll_library(term, player, progress, cursor_row,
+                                           cmdline.line if cmdline.active else None,
+                                           scroll_off)
 
     _render()
 

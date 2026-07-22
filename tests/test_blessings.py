@@ -13,7 +13,7 @@ from content.blessings import (BLESSING_CATALOG, blessing_by_id,
                                blessing_id_for_name, blessing_scroll_content,
                                blessing_sections)
 from engine.codex import CodexPane
-from render.scroll_library import library_rows
+from render.scroll_library import library_rows, _viewport_top
 
 
 # ── catalogue ────────────────────────────────────────────────────────────────
@@ -74,6 +74,20 @@ def test_library_has_a_blessings_subtree():
     assert 'blessings/' in labels
     groups = {r['group'] for r in rows if r['type'] == 'scroll'}
     assert groups == {'codex', 'relics', 'blessings'}
+
+
+def test_library_scrolls_a_viewport_so_the_cursor_stays_visible():
+    # with 64 blessings the navigable list outgrows any window; the viewport
+    # must follow the cursor instead of clipping to the tail (regression).
+    n = len(library_rows())
+    avail = 20
+    assert n > avail                              # the list really does overflow
+    # cursor at top → offset 0; cursor past the window → it scrolls into view
+    assert _viewport_top(0, 0, avail, n) == 0
+    top = _viewport_top(n - 1, 0, avail, n)
+    assert top <= n - 1 < top + avail             # last row is visible
+    # a cursor already inside the window doesn't move the viewport
+    assert _viewport_top(5, 3, avail, n) == 3
 
 
 def test_every_blessing_appears_as_a_library_row():
