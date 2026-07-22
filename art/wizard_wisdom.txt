@@ -206,10 +206,10 @@
       "name": "%",
       "line_count": 4,
       "quote": [
-        "        ( and ) are two ends of one arc.        ",
-        "      % steps from either to its partner.       ",
-        "     Stand on the open, land on the close—      ",
-        "        one hop, and the pair is closed.        "
+        "     ( ) [ ] { } — every pair has two ends.     ",
+        "     % leaps from one bracket to its match.     ",
+        "     Stand on the open, land on the close;      ",
+        "      one hop spans the whole nested arc.       "
       ]
     },
     {

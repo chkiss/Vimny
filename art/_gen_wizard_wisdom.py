@@ -171,10 +171,10 @@ POEMS: list[tuple[str | None, str, list[str]]] = [
         'Your eye already knows the row.',
     ]),
     ('bracket_vaults', '%', [                  # The Bracket Vaults — %
-        '( and ) are two ends of one arc.',
-        '% steps from either to its partner.',
-        'Stand on the open, land on the close—',
-        'one hop, and the pair is closed.',
+        '( ) [ ] { } — every pair has two ends.',
+        '% leaps from one bracket to its match.',
+        'Stand on the open, land on the close;',
+        'one hop spans the whole nested arc.',
     ]),
     ('runic_archives', '} {', [                # The Runic Archives — } {
         '} leaps the blank to the next block.',
