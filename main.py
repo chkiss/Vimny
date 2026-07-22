@@ -209,6 +209,7 @@ def _clip_to_text(clip) -> str:
 _EXPL_DAMAGE = {0: 3, 1: 3, 2: 2, 3: 1}   # 0-1: 1.5♥  2: 1♥  3: 0.5♥
 
 _ALERT_RADIUS           = 5   # Manhattan dist at which goblins start chasing
+_HOUND_RANGE            = 8   # an ally hound engages a hostile within this range, else heels
 
 
 def _sight_radius(ent) -> int:
@@ -3362,32 +3363,34 @@ def _enemy_tick(room, player) -> list:
         if not ent.alive:
             continue
         if ent.kind == 'ally':
-            # A hound on your side (:s/g/d/): it hunts the nearest hostile and
-            # mauls it (harder if swelled); with the field clear it trots back to
-            # heel beside you. It never turns on you.
-            ent.ai_tick += 1
-            if ent.ai_tick % max(1, ent.ai_speed) != 0:
-                continue
-            foes = [e for e in room.entities if e.alive
-                    and e.kind in ('goblin', 'warden')]   # hounds bite Wardens too
-            tgt = (min(foes, key=lambda e: _manhattan(ent.row, ent.col, e.row, e.col))
-                   if foes else None)
-            if tgt is not None and _manhattan(ent.row, ent.col, tgt.row, tgt.col) <= 1:
-                tgt.hp -= _hp_atk('D' if ent.swole else 'd')[1]   # D=3, d=2
-                if tgt.hp <= 0:
-                    room.kill_entity(tgt)
-                    msgs.append('Your hound fells a foe!')
-                continue
-            goal = (tgt.row, tgt.col) if tgt else (player.row, player.col)
-            if tgt is None and _manhattan(ent.row, ent.col, *goal) <= 1:
-                continue                             # already at heel — hold
-            dr, dc = goal[0] - ent.row, goal[1] - ent.col
-            if abs(dr) >= abs(dc):
-                nr, nc = ent.row + ((dr > 0) - (dr < 0)), ent.col
-            else:
-                nr, nc = ent.row, ent.col + ((dc > 0) - (dc < 0))
-            if (nr, nc) != (player.row, player.col) and _steppable(room, player, nr, nc):
-                room.move_entity(ent, nr, nc)
+            # A hound on your side (:s/g/d/): FAST (double speed; a big Hound
+            # triple), it savages the nearest hostile WITHIN RANGE, else trots
+            # back to heel beside you. It never turns on you.
+            _dmg = _hp_atk('D' if ent.swole else 'd')[1]     # D=3, d=2
+            for _ in range(3 if ent.swole else 2):           # moves per turn
+                foes = [e for e in room.entities if e.alive
+                        and e.kind in ('goblin', 'warden')
+                        and _manhattan(ent.row, ent.col, e.row, e.col) <= _HOUND_RANGE]
+                tgt = (min(foes, key=lambda e: _manhattan(ent.row, ent.col, e.row, e.col))
+                       if foes else None)
+                if tgt is not None and _manhattan(ent.row, ent.col, tgt.row, tgt.col) <= 1:
+                    tgt.hp -= _dmg
+                    if tgt.hp <= 0:
+                        room.kill_entity(tgt)
+                        msgs.append('Your hound fells a foe!')
+                    continue                             # bite, then step again
+                goal = (tgt.row, tgt.col) if tgt else (player.row, player.col)
+                if tgt is None and _manhattan(ent.row, ent.col, *goal) <= 1:
+                    break                                # at heel — hold
+                dr, dc = goal[0] - ent.row, goal[1] - ent.col
+                if abs(dr) >= abs(dc):
+                    nr, nc = ent.row + ((dr > 0) - (dr < 0)), ent.col
+                else:
+                    nr, nc = ent.row, ent.col + ((dc > 0) - (dc < 0))
+                if (nr, nc) != (player.row, player.col) and _steppable(room, player, nr, nc):
+                    room.move_entity(ent, nr, nc)
+                else:
+                    break                                # blocked — stop this turn
             continue
         if ent.kind == 'critter' or (ent.kind == 'elf' and ent.ai == 'wander'):
             # A cat (:s/g/c/) ambles and yowls; a big Cat ROARS. A spent elf
