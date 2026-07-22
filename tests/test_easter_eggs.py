@@ -157,6 +157,24 @@ def test_x_an_elf_drops_gold(monkeypatch):
     assert any(e.kind == 'gold' and e.alive for e in r.entities)
 
 
+def test_hound_bites_once_per_turn():
+    # a big Hound (attack 3, triple SPEED) must deal 3 to a foe per turn, not 9 —
+    # movement is fast, biting is once.
+    from engine.world import Room, RoomType, CellType, Entity
+    r = Room(room_type=RoomType.ENTRY, rows=3, cols=20)
+    r.cells = [[CellType.FLOOR] * 20 for _ in range(3)]
+    p = Player(row=1, col=1)
+    D = Entity(kind='ally', tag='dog', row=1, col=5, hp=2, max_hp=2,
+               ai='hunt', swole=True)
+    w = Entity(kind='warden', tag='x', row=1, col=6, hp=9, max_hp=9, ai='')
+    r.entities = [D, w]
+    r.rebuild_indexes()
+    main._enemy_tick(r, p)
+    assert w.hp == 6                               # 9 - 3 (one bite), not 9 - 9
+    # and it recorded a direction arrow in its own colour
+    assert (D.row, D.col, w.row, w.col, 'ally') in r._atk_arrows
+
+
 def test_x_loots_the_hat(monkeypatch):
     r, hat, msgs = _drive_x_on('hat', '', ['l', 'x'], monkeypatch,
                                progress={})   # no hat yet

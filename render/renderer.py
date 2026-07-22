@@ -169,6 +169,17 @@ def _reg_display(items: list) -> tuple[str, int]:
     return ''.join(parts), vis
 
 
+_ARROW_DIRS = {(1, 0): '↓', (-1, 0): '↑', (0, 1): '→', (0, -1): '←'}
+
+
+def _arrow_color(ckey: str) -> str:
+    """Attack-arrow colour = the attacker's normal glyph colour."""
+    return {'ally':    C.ally_fg(),   'goblin':  C.enemy_fg(),
+            'demon':   C.boss_fg(),   'critter': C.critter_fg(),
+            'elf':     C.zombie_fg(), 'warden':  C.boss_fg(),
+            'zombie':  C.zombie_fg()}.get(ckey, C.enemy_fg())
+
+
 def _ent_cell_str(ent, room, r: int, c: int, mode, floor_bg: str) -> str:
     """Return the colored terminal string for one entity cell (no trailing reset needed)."""
     rst = C.normal_fg()
@@ -510,6 +521,16 @@ def render_all(term: Terminal, dungeon: Dungeon, player: Player,
             # full colour but never standable, searchable, or cuttable (the fog
             # bars feet and match-landings; only ranged ex commands reach it).
             # Fall through to the ordinary char-run rendering.
+
+        # Attack-direction arrows (room._atk_arrows): every attacker — goblin,
+        # hound, elf, big cat, Warden — flashes a directional arrow in the colour
+        # of its own glyph, pointing at what it struck.
+        for (_fr, _fc, _tr, _tc, _ck) in getattr(room, '_atk_arrows', ()):
+            if (_fr, _fc) == (room_r, room_c):
+                _dr = (_tr > _fr) - (_tr < _fr)
+                _dc = (_tc > _fc) - (_tc < _fc)
+                return (floor_bg + _arrow_color(_ck)
+                        + _ARROW_DIRS.get((_dr, _dc), '✕') + C.normal_fg())
 
         # Entity?
         ent = room.entity_at(room_r, room_c)

@@ -2969,6 +2969,21 @@ def _entity_glyph(e) -> str:
     return entity_letter(e) or 'g'
 
 
+def _arrow_key(e) -> str:
+    """Attack-arrow colour key = the attacker's glyph identity."""
+    if e.kind == 'ally':
+        return 'ally'
+    if e.kind == 'warden':
+        return 'warden'
+    if e.kind == 'critter':
+        return 'critter'
+    if e.kind == 'elf':
+        return 'elf'
+    if e.kind == 'goblin' and e.tag in ('demon', 'zombie'):
+        return e.tag
+    return 'goblin'
+
+
 def _is_hostile_creature(e) -> bool:
     """Egg creatures that ATTACK the player: demons, zombies, big cats."""
     if e.kind == 'goblin' and e.tag in ('demon', 'zombie'):
@@ -3411,21 +3426,27 @@ def _enemy_tick(room, player) -> list:
             # triple). It FOLLOWS the player, biting any adjacent foe and
             # diverting only to a nearby, reachable hostile — and it NEVER stands
             # still: if the path is blocked it greedily shuffles toward you.
-            _dmg = _hp_atk('D' if ent.swole else 'd')[1]     # D=3, d=2
+            _dmg = _hp_atk('D' if ent.swole else 'd')[1]     # D=3, d=2 per BITE
             _fog = getattr(room, 'fog_cells', set())
+            # It moves up to `speed` cells; the moment it reaches a foe it bites
+            # ONCE (not once per step) and its turn ends — so a big Hound deals 3,
+            # not 9, a turn.
             for _ in range(3 if ent.swole else 2):           # moves per turn
                 foes = [e for e in room.entities if e.alive
                         and e.kind in ('goblin', 'warden') and e.tag != 'echo'
                         and (e.row, e.col) not in _fog]
-                # bite any foe already at our side
                 adj = next((e for e in foes
                             if _manhattan(ent.row, ent.col, e.row, e.col) <= 1), None)
                 if adj is not None:
+                    _ar, _ac = adj.row, adj.col
                     adj.hp -= _dmg
                     if adj.hp <= 0:
                         room.kill_entity(adj)
                         msgs.append('Your hound fells a foe!')
-                    continue
+                    # a colored direction arrow at the hound, pointing at the bite
+                    room._atk_arrows = getattr(room, '_atk_arrows', [])
+                    room._atk_arrows.append((ent.row, ent.col, _ar, _ac, 'ally'))
+                    break                                # one bite, turn over
                 # divert only to a CLOSE, reachable hostile; else follow the player
                 step = None
                 for f in sorted((e for e in foes
@@ -4613,6 +4634,7 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
         last_activity = time.time()
         player.error = ''   # clear any statusline error on the next keypress
         room._ward_flash = set()   # a shield-flash lives for one action only
+        room._atk_arrows = []      # attack-direction arrows live for one action only
 
         # ── The elf's shitty trade (from :s/g/e/) awaits a y/n ────────────────
         # Only y/n resolve it; every other key (x to attack the elf, a step away)
@@ -6997,6 +7019,8 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
                     else:
                         _dmg = 1                       # a warden
                     player.take_damage(max(1, _dmg))
+                    room._atk_arrows.append((ent.row, ent.col, player.row,
+                                             player.col, _arrow_key(ent)))
                     if player.is_dead:
                         message = '** GAME OVER ** Type  :e  to re-load the dungeon.'
                         msg_ttl = 2
