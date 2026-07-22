@@ -9226,6 +9226,9 @@ def build_dungeon_operators_vault(seed: int) -> Dungeon:
     room.par    = 92                              # dd's Vim-true fnb landing
     room.answer = _OV_ANSWER                      # (2026-07-12) saved a key
     room.budget = math.ceil(92 * 1.4)
+    # A d-operator teaching level: bare-w navigation must stay precise (text
+    # words only), so opt out of the jump-to-entity word-stop behaviour.
+    room.entity_word_stops = False
 
     dungeon = Dungeon(name="The Operator's Vault", seed=seed)
     dungeon.rooms        = [room]

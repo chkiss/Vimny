@@ -196,15 +196,29 @@ def _is_word_char(ch: str) -> bool:
 # void run blocks the leap). Both stop at the first impassable cell — no word
 # motion sails over a wall.
 
+# When True (set only for the duration of a NAVIGATION apply_motion — not an
+# operator's span computation), a content entity on BARE FLOOR is a word cell,
+# so w/b/e/ge/gE can jump straight onto a key or a goblin. An entity standing ON
+# text keeps that text's class (it is part of the word it stands on, never its
+# own word). Operators (dw/de/cw) run with this OFF, so deletes are unchanged.
+_ENTITY_STOPS = False
+
+
 def _glyph_class(room, row: int, c: int):
     """The word-class of the glyph at (row, c) — _is_word_char as a bool — or None
-    when the cell is impassable, bare floor, or a void rune (not a word cell)."""
+    when the cell is impassable, bare floor, or a void rune (not a word cell).
+    With _ENTITY_STOPS on, a content entity on otherwise-blank floor counts as a
+    word cell (a jump target), reusing the CARET_TRANSPARENT rule ^ already uses."""
     if not room.is_passable(row, c):
         return None
     ru = room.char_run_at(row, c)
-    if ru is None or ru.kind == 'void':
-        return None
-    return _is_word_char(ru.symbols[c - ru.col])
+    if ru is not None and ru.kind != 'void':
+        return _is_word_char(ru.symbols[c - ru.col])
+    if _ENTITY_STOPS and getattr(room, 'entity_word_stops', True):
+        ent = room.entity_at(row, c)
+        if ent is not None and ent.alive and ent.kind not in CARET_TRANSPARENT:
+            return True
+    return None
 
 
 def _run_edge(room, row: int, col: int, step: int) -> int:
@@ -248,6 +262,8 @@ def _WORD_edge(room, row: int, col: int, step: int) -> int:
     ADJACENT non-void clusters (no floor gap) — walking `step`. Assumes (row, col)
     is on a non-void cluster."""
     ru = room.char_run_at(row, col)
+    if ru is None:
+        return col            # cursor sits on a bare entity cell (a 1-cell WORD)
     while True:
         edge = (ru.col + len(ru.symbols) - 1) if step > 0 else ru.col
         nxt = edge + step
@@ -407,7 +423,20 @@ def _sentence_starts_all(room) -> list:
     return out
 
 
-def apply_motion(player, motion, count, room, target=None, count_given: bool = True, game_h: int = 0):
+def apply_motion(player, motion, count, room, target=None, count_given: bool = True,
+                 game_h: int = 0, entity_stops: bool = True):
+    """Navigation motions default to entity_stops=True: w/b/e/ge may land on a
+    key or foe. Operator span computation (compute_text_object) passes
+    entity_stops=False so dw/de/cw keep pure text-word boundaries."""
+    global _ENTITY_STOPS
+    _saved, _ENTITY_STOPS = _ENTITY_STOPS, entity_stops
+    try:
+        return _apply_motion_impl(player, motion, count, room, target, count_given, game_h)
+    finally:
+        _ENTITY_STOPS = _saved
+
+
+def _apply_motion_impl(player, motion, count, room, target=None, count_given: bool = True, game_h: int = 0):
     moved = False
     _start = (player.row, player.col)     # word-motion landing guard (see return)
     for _ in range(count):
@@ -659,20 +688,21 @@ def apply_motion(player, motion, count, room, target=None, count_given: bool = T
                 moved = True
             break
         elif motion == 'ge':
-            # Backward to the end of the previous word (a non-void CharRun).
+            # Backward to the end of the previous word. Uses the word-class scan
+            # (not raw char runs), so with entity_stops it also lands on a key or
+            # foe sitting on bare floor (its own 1-cell word).
             row = player.row
             best = None
             nc = player.col - 1
             while nc >= 0:
                 if not room.is_passable(row, nc):
                     break
-                ru = room.char_run_at(row, nc)
-                if ru and ru.kind != 'void':
-                    end_col = ru.col + len(ru.symbols) - 1
+                if _glyph_class(room, row, nc) is not None:
+                    end_col = _run_edge(room, row, nc, +1)
                     if end_col < player.col:
                         best = end_col
                         break
-                    nc = ru.col - 1   # cursor at/within this word: skip left of its start
+                    nc = _run_edge(room, row, nc, -1) - 1   # skip left of this word
                     continue
                 nc -= 1
             if best is not None:

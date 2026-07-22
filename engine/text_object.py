@@ -102,7 +102,8 @@ def compute_text_object(player, action: dict, room) -> TextObject | None:
             if n > 1:                       # c{n}w → end of the nth word
                 save = (player.row, player.col, player.last_f)
                 player.row, player.col = sr, end_col
-                apply_motion(player, 'E' if motion == 'W' else 'e', n - 1, room)
+                apply_motion(player, 'E' if motion == 'W' else 'e', n - 1, room,
+                             entity_stops=False)
                 end_col = player.col
                 player.row, player.col, player.last_f = save
             if end_col >= sc:
@@ -111,7 +112,8 @@ def compute_text_object(player, action: dict, room) -> TextObject | None:
     # Run the real motion on a cloned cursor to find where it lands.
     save_row, save_col, save_f = player.row, player.col, player.last_f
     apply_motion(player, motion, count * mc, room, action.get('target'),
-                 count_given=action.get('motion_count_given', True))
+                 count_given=action.get('motion_count_given', True),
+                 entity_stops=False)
     dr, dc = player.row, player.col
     player.row, player.col, player.last_f = save_row, save_col, save_f
 
