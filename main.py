@@ -1893,6 +1893,15 @@ def _warden_eternal_tick(room, player) -> list:
     gates = getattr(room, '_wde_gates', None)
     if gates is None:
         return msgs
+    if room.rows < _dg._WDE_ROWS:
+        # The floor has been dug clean away (dG and the like collapsed rows out
+        # from under the arena). A NetHack/Dwarf-Fortress wink instead of a crash
+        # — there is nothing left to stand on, so the run is void.
+        if not getattr(room, '_floor_gone', False):
+            room._floor_gone = True
+            msgs.append('You have dug too greedily and too deep — there is no '
+                        'floor left here. Type  :e  to reload the dungeon.')
+        return msgs
 
     # 1) open each cleared chamber's passage, revealing the chamber below
     for g in gates:
@@ -1925,13 +1934,22 @@ def _warden_eternal_tick(room, player) -> list:
     #    LEAVES HIS HAT on the stone where he fell (a lootable Δ the player
     #    walks over on the way out; picking it up is step 4).
     seal = getattr(room, '_wde_seal', None)
-    if seal and room.cells[seal['rows'][0]][seal['col']] == CellType.WALL:
+    if seal and (seal['rows'][0] >= room.rows or seal['col'] >= room.cols):
+        # The arena floor has been dug clean away (dG and the like collapsed the
+        # rows out from under the seal). A NetHack/Dwarf-Fortress wink instead of
+        # a crash — there is nothing left to stand on, so the run is void.
+        if not getattr(room, '_floor_gone', False):
+            room._floor_gone = True
+            msgs.append('You have dug too greedily and too deep — there is no '
+                        'floor left here. Type  :e  to reload the dungeon.')
+    elif seal and room.cells[seal['rows'][0]][seal['col']] == CellType.WALL:
         boss = next((e for e in room.entities
                      if e.tag == room._wde_boss_tag and e.alive), None)
         horde = any(e.alive for e in room.entities if e.kind == 'goblin')
         if boss is None and not horde:
             for r in seal['rows']:
-                room.cells[r][seal['col']] = CellType.FLOOR
+                if r < room.rows:
+                    room.cells[r][seal['col']] = CellType.FLOOR
             drop = getattr(room, '_wde_hat_drop', (seal['rows'][len(seal['rows']) // 2],
                                                    seal['col'] - 7))
             if not any(e.kind == 'hat' for e in room.entities):
