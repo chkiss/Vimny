@@ -3369,13 +3369,15 @@ def _enemy_tick(room, player) -> list:
             if (nr, nc) != (player.row, player.col) and _steppable(room, player, nr, nc):
                 room.move_entity(ent, nr, nc)
             continue
-        if ent.kind == 'critter':
-            # A cat (:s/g/c/): ambles idly and yowls now and then; a big Cat ROARS.
+        if ent.kind == 'critter' or (ent.kind == 'elf' and ent.ai == 'wander'):
+            # A cat (:s/g/c/) ambles and yowls; a big Cat ROARS. A spent elf
+            # (post-trade) wanders the same way, but silently.
             ent.ai_tick += 1
-            ent.summon_timer -= 1
-            if ent.summon_timer <= 0:
-                ent.summon_timer = random.randint(3, 10)
-                msgs.append('ROAR' if ent.swole else 'Meow.')
+            if ent.kind == 'critter':
+                ent.summon_timer -= 1
+                if ent.summon_timer <= 0:
+                    ent.summon_timer = random.randint(3, 10)
+                    msgs.append('ROAR' if ent.swole else 'Meow.')
             if ent.ai_tick % 2 == 0:
                 dr, dc = random.choice(_ORTHO)
                 nr, nc = ent.row + dr, ent.col + dc
@@ -4559,15 +4561,15 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
                                                    ai_speed=1, tag='demon'))
                             break
                 _push(_trade['result'])
-                if _elf is not None:
-                    room.kill_entity(_elf)               # dealt and gone
+                if _elf is not None:                     # dealt — now it wanders off
+                    _elf.tag, _elf.ai = 'spent', 'wander'
                 room.rebuild_indexes()
                 if player.is_dead:
                     message = '** GAME OVER ** Type  :e  to re-load the dungeon.'
             else:
-                _push('The elf shrugs and melts back into the trees.')
-                if _elf is not None:
-                    _elf.tag = 'spent'                   # declined — no re-offer
+                _push('The elf shrugs and wanders off.')
+                if _elf is not None:                     # declined — wanders, no re-offer
+                    _elf.tag, _elf.ai = 'spent', 'wander'
             _render(_pool_msg() if not player.is_dead else message)
             continue
 
@@ -6843,11 +6845,11 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
                     if (_elf.alive and _elf.tag == 'elf'
                             and _manhattan(player.row, player.col, _elf.row, _elf.col) <= 1):
                         _offer, _cost, _key, _res = random.choice(_ELF_TRADES)
+                        _prompt = (f'The elf offers {_offer} for {_cost} gold. '
+                                   'Deal? (y = yes, n = no)')
                         room._elf_trade = {'elf_id': id(_elf), 'cost': _cost,
-                                           'key': _key, 'result': _res}
+                                           'key': _key, 'result': _res, 'prompt': _prompt}
                         _elf.tag = 'offering'
-                        tick_msgs.insert(0, f'The elf leans in: "{_offer} — {_cost} '
-                                            'gold. Deal? (y/n)"')
                         break
             _surveyor_tick()                  # the Surveyor's telegraph → resolve cadence
             _mega = getattr(room, 'mega', None)   # the floor-cut has no creature — flash where it hit
@@ -6919,6 +6921,14 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
             # Warden summon message
             if tick_msgs and not player.is_dead:
                 _push(tick_msgs[0])
+            # A pending elf bargain PRE-EMPTS the message queue so it is never
+            # buried — it shows every turn until you answer y or n.
+            _et = getattr(room, '_elf_trade', None)
+            if _et:
+                msg_pool[:] = [_et['prompt']]
+                msg_idx = 0
+                message = _et['prompt']
+                msg_ttl = 999
 
             # Engagement: fire for any attacker now adjacent
             if attackers:

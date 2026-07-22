@@ -139,7 +139,8 @@ def test_elf_trade_accepts_on_y_and_debits_gold(monkeypatch):
                      player_name='Hero', _dungeon=d)
     p = grab['p']
     assert p.gold == 3                                 # 5 - 2 (the vial's price)
-    assert not any(e.kind == 'elf' and e.alive for e in r.entities)   # dealt and gone
+    elf = next(e for e in r.entities if e.kind == 'elf')
+    assert elf.tag == 'spent' and elf.ai == 'wander'   # dealt — now it wanders off
 
 
 # ── the g<->G rule lives in ONE place (case_entities) for every case command ──
