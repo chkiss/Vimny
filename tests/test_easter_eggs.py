@@ -29,6 +29,7 @@ from engine.world import entity_letter
 
 def _room_and_master():
     r = dg.build_dungeon_warden_eternal(0).rooms[0]
+    r.fog_cells = set()                    # reveal — the egg skips fogged creatures
     p = Player(row=29, col=1)
     p.hat_worn = True
     p.known_commands = p.known_commands + ['admin']
@@ -53,7 +54,7 @@ def test_bareheaded_cannot_command_the_goblins():
 def test_non_goblin_substitute_falls_through():
     r, p = _room_and_master()
     assert main._goblin_substitute('%s/foo/bar/', r, p, lambda m: None) is False
-    assert main._goblin_substitute('%s/W/x/', r, p, lambda m: None) is False   # not 'g'
+    assert main._goblin_substitute('%s/q/x/', r, p, lambda m: None) is False   # no 'q' creature
 
 
 # ── remove effects ────────────────────────────────────────────────────────────

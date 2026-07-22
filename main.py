@@ -2941,11 +2941,20 @@ _GOBLIN_SUB_EGGS = {
     'h': ('The {name} loses its head about it. An h is left.',   'h'),
     '@': ('The {name} is now an adventurer, as lost as you are.', None),
 }
-# The SOURCE creature's name, by the glyph the pattern matched (so a cat turned
-# to gold reads "The cat clinks…", not "The goblin…").
-_CREATURE_NAMES = {'g': 'goblin', 'G': 'goblin', 'd': 'hound', 'D': 'hound',
-                   'c': 'cat', 'C': 'cat', 'z': 'zombie', 'Z': 'zombie',
-                   '&': 'demon', 'e': 'elf', '$': 'coin'}
+# Every transformable egg-creature kind — matched by glyph, uniformly.
+_EGG_CREATURE_KINDS = ('goblin', 'ally', 'critter', 'elf', 'gold', 'warden')
+_BASE_NAMES = {'g': 'goblin', 'd': 'hound', 'c': 'cat', 'z': 'zombie',
+               '&': 'demon', 'e': 'elf', '$': 'coin', 'w': 'warden'}
+_SWELLABLE_LETTERS = ('g', 'd', 'c')             # the ones with a "big" (uppercase) form
+
+
+def _creature_name(glyph: str) -> str:
+    """A creature's spoken name from its glyph — the uppercase (swelled) form of a
+    swellable letter reads "big X" (big cat, big goblin, big hound)."""
+    base = _BASE_NAMES.get(glyph.lower(), 'creature')
+    if glyph.isupper() and glyph.lower() in _SWELLABLE_LETTERS:
+        return 'big ' + base
+    return base
 # TRANSFORM effects: the goblin STAYS, as a new hostile that chases and attacks.
 #   (tag, hp, ai, ai_speed, message)
 _GOBLIN_SUB_TRANSFORM = {
@@ -2985,14 +2994,21 @@ def _goblin_substitute(cmd: str, room, player, push) -> bool:
     if not m:
         return False
     whole, pat, rep = m.group(1), m.group(2), m.group(3)
+    if len(pat) == 2 and pat[0] == '\\':            # a backslash-escaped glyph (\$)
+        pat = pat[1]
     if len(pat) != 1:                                # single-glyph patterns only
         return False
     rows = range(room.rows) if whole == '%' else (player.row,)
-    # match creatures by their CURRENT glyph, so :s/g/…, :s/G/…, :s/d/…, :s/Z/…
-    # all target the right beasts (case-sensitive, Vim-true).
+    _fog  = getattr(room, 'fog_cells', set())
+    _mist = getattr(room, 'mist_cells', set())
+    # ONE unified match: every transformable creature by its CURRENT glyph, so
+    # :s/g/…, :s/G/…, :s/d/…, :s/Z/…, :s/e/…, :s/$/…, :s/W/… all target the right
+    # beasts (case-sensitive, Vim-true). Fogged cells are skipped — you cannot
+    # transform what you cannot see.
     gobs = [e for e in room.entities if e.alive and e.row in rows
-            and e.kind in ('goblin', 'ally', 'critter') and e.tag != 'echo'
-            and entity_letter(e) == pat]
+            and e.kind in _EGG_CREATURE_KINDS
+            and entity_letter(e) == pat
+            and ((e.row, e.col) not in _fog or (e.row, e.col) in _mist)]
     if not gobs:
         return False                                 # no matching creatures → normal :s
     if not (getattr(player, 'hat_worn', False) or 'admin' in player.known_commands):
@@ -3001,52 +3017,55 @@ def _goblin_substitute(cmd: str, room, player, push) -> bool:
     rep1 = rep[:1]
     n = len(gobs)
     tail = f'  (×{n})' if n > 1 else ''
-    name = _CREATURE_NAMES.get(pat, 'creature')      # the SOURCE creature's name
+    name = _creature_name(pat)                       # the SOURCE creature's name
 
     if rep1 == '!':                                  # burst into cheerful flame
         room._pending_boom = [(g.row, g.col) for g in gobs]   # caller detonates
         return True
+
+    def _reset(g, kind, tag, ai, hp, speed=1):
+        g.kind, g.tag, g.ai, g.ai_speed = kind, tag, ai, speed
+        g.max_hp = g.hp = hp
+        g.swole = g.edit_immune = False              # a transformed Warden loses its ward
+
     # ── in-place transforms: the creature STAYS ──────────────────────────────
-    # The persistent-creature letters are case-aware: the UPPERCASE form is the
-    # swelled one (g/G goblin, d/D hound, c/C cat), routed through the same
-    # engine case rule so it is bigger + sharper-eyed exactly like ~ or gU.
+    # Uppercase swellable letters (G/D/C) are the "big" form, routed through the
+    # shared case rule so they are bigger + sharper-eyed exactly like ~ or gU.
     base, up = rep1.lower(), rep1.isupper()
 
-    if base == 'g':                                  # goblin: case op swell/shrink
+    if base == 'g':                                  # goblin (G = big)
         for g in gobs:
+            if g.kind != 'goblin' or g.tag in ('zombie', 'demon'):
+                _reset(g, 'goblin', '', 'chase', 1)
             _swell(g, up)
         room.rebuild_indexes()
-        push((f'The {name}s swell — bigger, and sharper-eyed.'
-              if up else f'The {name}s shrink back down.') + tail)
+        push(f'The {name} is now a {_creature_name("G" if up else "g")}.' + tail)
         return True
     if base == 'd':                                  # a hound on YOUR side (D = big)
         for g in gobs:
-            g.kind, g.tag, g.ai, g.ai_speed = 'ally', 'dog', 'hunt', 1
-            g.max_hp, g.hp, g.swole = 2, 2, False
+            _reset(g, 'ally', 'dog', 'hunt', 2)
             _swell(g, up)
         room.rebuild_indexes()
-        push(f'The {name} becomes {"a great" if up else "a loyal"} hound and takes your side.' + tail)
+        push(f'The {name} becomes a {_creature_name("D" if up else "d")} and takes your side.' + tail)
         return True
-    if base == 'c':                                  # a harmless cat (C = big)
+    if base == 'c':                                  # a harmless cat (C = big, roars)
         for g in gobs:
-            g.kind, g.tag, g.ai = 'critter', 'cat', 'wander'
-            g.max_hp, g.hp, g.swole = 1, 1, False
+            _reset(g, 'critter', 'cat', 'wander', 1)
             g.summon_timer = random.randint(3, 10)   # turns until its next meow
             _swell(g, up)
         room.rebuild_indexes()
-        push(f'The {name} is now a cat. It meows, and plots your downfall.' + tail)
+        push(f'The {name} is now a {_creature_name("C" if up else "c")}. '
+             'It meows, and plots your downfall.' + tail)
         return True
     if rep1 == '$':                                  # a coin of gold to pick up
         for g in gobs:
-            g.kind, g.tag, g.ai = 'gold', 'gold', ''
-            g.max_hp, g.hp, g.swole = 1, 1, False
+            _reset(g, 'gold', 'gold', '', 1)
         room.rebuild_indexes()
         push(f'The {name} clinks into a coin of gold — step on it to pocket it.' + tail)
         return True
     if base == 'e':                                  # a merchant elf (it STAYS)
         for g in gobs:
-            g.kind, g.tag, g.ai = 'elf', 'elf', ''
-            g.max_hp, g.hp, g.swole = 1, 1, False
+            _reset(g, 'elf', 'elf', '', 1)
         room.rebuild_indexes()
         push(f'The {name} becomes an elf, keen to make you a deal.' + tail)
         return True
@@ -3055,8 +3074,7 @@ def _goblin_substitute(cmd: str, room, player, push) -> bool:
         verb = 'greys, groans, and rises — undead now.' if base == 'z' \
             else "twists into a demon. You shouldn't have."
         for g in gobs:
-            g.kind = 'goblin'                        # a hostile again (was cat/dog?)
-            g.tag, g.max_hp, g.hp, g.ai, g.ai_speed, g.swole = tag, hp, hp, ai, spd, False
+            _reset(g, 'goblin', tag, ai, hp, spd)
         room.rebuild_indexes()
         push(f'The {name} {verb}' + tail)
         return True
@@ -3312,7 +3330,8 @@ def _enemy_tick(room, player) -> list:
             ent.ai_tick += 1
             if ent.ai_tick % max(1, ent.ai_speed) != 0:
                 continue
-            foes = [e for e in room.entities if e.alive and e.kind == 'goblin']
+            foes = [e for e in room.entities if e.alive
+                    and e.kind in ('goblin', 'warden')]   # hounds bite Wardens too
             tgt = (min(foes, key=lambda e: _manhattan(ent.row, ent.col, e.row, e.col))
                    if foes else None)
             if tgt is not None and _manhattan(ent.row, ent.col, tgt.row, tgt.col) <= 1:
@@ -3338,8 +3357,7 @@ def _enemy_tick(room, player) -> list:
             ent.summon_timer -= 1
             if ent.summon_timer <= 0:
                 ent.summon_timer = random.randint(3, 10)
-                msgs.append('A great Cat ROARS — the walls tremble.'
-                            if ent.swole else 'Meow.')
+                msgs.append('ROAR' if ent.swole else 'Meow.')
             if ent.ai_tick % 2 == 0:
                 dr, dc = random.choice(_ORTHO)
                 nr, nc = ent.row + dr, ent.col + dc
