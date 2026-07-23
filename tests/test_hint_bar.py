@@ -118,3 +118,64 @@ def test_deferred_commands_are_neither_usable_nor_shown_early(slug, blocked):
         frag = {'o': 'new line below', 'O': 'new line above',
                 'I': 'insert at start', 'A': 'append at end'}[keys]
         assert frag not in bar, f"{slug}: {frag!r} shown before its lesson"
+
+
+# ── Two-row wrapping: long cheat sheets flow onto a second row, never overflow ──
+from render.renderer import _wrap_cheatsheet
+
+
+def test_wrap_short_stays_one_row():
+    assert _wrap_cheatsheet('a:x  b:y', 78) == ['a:x  b:y']
+
+
+def test_wrap_long_splits_into_two_rows_at_command_boundaries():
+    txt = hint_text(list(known_commands('warden_scrivener')), 'warden_scrivener')
+    rows = _wrap_cheatsheet(txt, 78, max_rows=2)
+    assert 1 <= len(rows) <= 2
+    for r in rows:
+        assert len(r) <= 78
+    # break is at a command boundary: no row ends in the middle of a 'keys:desc'
+    # (i.e. rejoining with a double space reconstructs a prefix of the original)
+    assert txt.startswith(rows[0])
+
+
+def test_wrap_caps_at_max_rows_and_ellipsizes_the_overflow():
+    txt = hint_text(list(known_commands('grandmasters_sanctum')), 'grandmasters_sanctum')
+    rows = _wrap_cheatsheet(txt, 78, max_rows=2)      # 366 chars, 2×78 < 366
+    assert len(rows) == 2
+    assert all(len(r) <= 78 for r in rows)
+    assert rows[-1].endswith('…')
+
+
+def test_wide_terminal_fits_a_boss_bar_in_two_rows_without_ellipsis():
+    txt = hint_text(list(known_commands('warden_scrivener')), 'warden_scrivener')
+    rows = _wrap_cheatsheet(txt, 187, max_rows=2)     # full width shows it all
+    assert not rows[-1].endswith('…')
+
+
+def test_two_row_hint_steals_one_game_row_so_the_frame_still_fits():
+    """A wrapped (2-row) hint must not make the box taller than the terminal —
+    the game area gives up exactly one row."""
+    import io, contextlib
+    from blessed import Terminal
+    import render.colors as C, render.symbols as S
+    from render.renderer import render_all
+    from generation.dungeon_gen import (build_dungeon_first_cave,
+                                         build_dungeon_warden_scrivener)
+    from engine.player import Player
+    from engine.budget import Budget
+
+    term = Terminal(force_styling=True); C.init(term); S.init(term)
+
+    def frame_rows(slug, builder):
+        d = builder(1); d.level_slug = slug
+        room = d.room
+        p = Player(row=room.spawn_pos[0], col=room.spawn_pos[1])
+        p.known_commands = list(known_commands(slug))
+        buf = io.StringIO()
+        with contextlib.redirect_stdout(buf):
+            render_all(term, d, p, Budget(room.budget or 20), 'NORMAL')
+        return buf.getvalue().count('\n') + 1
+
+    assert frame_rows('first_cave', build_dungeon_first_cave) == term.height          # 1-row hint
+    assert frame_rows('warden_scrivener', build_dungeon_warden_scrivener) == term.height  # 2-row hint

@@ -312,6 +312,36 @@ def _cmdline_with_cursor(prefix: str, text: str, cursor: int, width: int,
             sl_fg + ' ' * pad + rst)
 
 
+def _wrap_cheatsheet(text: str, iw: int, max_rows: int = 2) -> list[str]:
+    """Wrap a hint cheat-sheet into up to `max_rows` lines, breaking ONLY at
+    command boundaries (the double space between entries), never mid-command.
+    If content still remains past the last allowed row, that row is
+    ellipsis-truncated so nothing overflows the box."""
+    if len(text) <= iw:
+        return [text]
+    lines: list[str] = []
+    rest = text
+    while rest and len(lines) < max_rows:
+        if len(rest) <= iw:
+            lines.append(rest)
+            rest = ''
+            break
+        cut = rest[:iw]
+        sp  = cut.rfind('  ')
+        if sp > iw // 3:
+            lines.append(rest[:sp].rstrip())
+            rest = rest[sp:].lstrip()
+        else:                                   # no clean boundary → hard cut
+            lines.append(rest[:iw])
+            rest = rest[iw:]
+    if rest:                                    # overflowed max_rows → ellipsize
+        last = lines[-1]
+        if len(last) >= iw:
+            last = last[:iw - 1]
+        lines[-1] = last.rstrip() + '…'
+    return lines
+
+
 def render_all(term: Terminal, dungeon: Dungeon, player: Player,
                budget: Budget, message: str = '',
                attack_pos: tuple | None = None, attack_sym: str = '',
@@ -390,9 +420,21 @@ def render_all(term: Terminal, dungeon: Dungeon, player: Player,
     # ── Row 2: separator ──────────────────────────────────────────────────
     output.append(border_h(S.BOX_LT, S.BOX_RT))
 
+    # ── Hint cheat-sheet (computed early: it may take a 2nd row, which steals
+    #    one row from the game area so the box height still fits the terminal) ──
+    known = player.known_commands
+    if 'editor' in known:
+        _hint_raw = 's:toggle wall  :rune ancient|verdant|void|ember  :entity exit|door|locked_door|chest|dynamite|wanderer|goblin|warden  :save <name>  :wq write+quit'
+    else:
+        _hint_raw = _hint_text(known, getattr(dungeon, 'level_slug', None))
+    if 'admin' in known:
+        _hint_raw += '  :e refresh'
+    hint_lines = _wrap_cheatsheet(_hint_raw, iw, max_rows=2)
+
     # ── Game area ─────────────────────────────────────────────────────────
-    # 8 rows: top_border, status, top_sep, [game_h rows], statusline, message, bot_sep, hint, bot_border
-    game_h  = term.height - 8
+    # 8 fixed rows: top_border, status, top_sep, [game_h rows], statusline,
+    # message, bot_sep, hint, bot_border — plus one per EXTRA hint row.
+    game_h  = term.height - 8 - (len(hint_lines) - 1)
     # :set number gutter (dungeon line numbers) — opt-in via player.number_mode;
     # default 'none' leaves the layout exactly as before (no gutter).
     number_mode = getattr(player, 'number_mode', 'none')
@@ -781,25 +823,11 @@ def render_all(term: Terminal, dungeon: Dungeon, player: Player,
     else:
         output.append(bfg + S.BOX_V + rst + ' ' * iw + bfg + S.BOX_V + rst)
 
-    # ── Hint bar ──────────────────────────────────────────────────────────
-    known = player.known_commands
-    if 'editor' in known:
-        hint_text = 's:toggle wall  :rune ancient|verdant|void|ember  :entity exit|door|locked_door|chest|dynamite|wanderer|goblin|warden  :save <name>  :wq write+quit'
-    else:
-        hint_text = _hint_text(known, getattr(dungeon, 'level_slug', None))
-    if 'admin' in known:
-        hint_text += '  :e refresh'
-    if len(hint_text) > iw:
-        # Truncate at a whole-command boundary (double space), never mid-word,
-        # and mark the cut with an ellipsis so the cheat sheet stays legible.
-        cut = hint_text[:iw - 1]
-        sp  = cut.rfind('  ')
-        if sp > iw // 3:
-            cut = cut[:sp]
-        hint_text = cut.rstrip() + '…'
-    hint = C.hint_fg() + hint_text + rst
-    output.append(bfg + S.BOX_V + rst + hint +
-                  ' ' * max(0, iw - len(hint_text)) + bfg + S.BOX_V + rst)
+    # ── Hint bar (wraps to a 2nd row when the cheat sheet is long) ──────────
+    for _line in hint_lines:
+        hint = C.hint_fg() + _line + rst
+        output.append(bfg + S.BOX_V + rst + hint +
+                      ' ' * max(0, iw - len(_line)) + bfg + S.BOX_V + rst)
 
     # ── Bottom border ──────────────────────────────────────────────────────
     output.append(border_h(S.BOX_BL, S.BOX_BR))
