@@ -46,8 +46,24 @@ _MOTION_GUARD: dict[str, str] = {
 }
 
 
-def action_allowed(action: dict, known: list | set, edit_mode: bool = False) -> bool:
-    """Return True iff the player may execute action given their known_commands."""
+def is_saddle_register(reg) -> bool:
+    """True for the registers that ride in the horse's saddle — the numbered,
+    small-delete, black-hole, search, read-only, expression and selection
+    registers (everything named by a digit or symbol). The unnamed register ("")
+    and the named / macro registers (a-z, A-Z) have their own gates and stay
+    accessible whether or not the horse is around, so they are NOT saddle
+    registers. See blueprints/registry_wing.md."""
+    return reg is not None and reg != '"' and not reg.isalpha()
+
+
+def action_allowed(action: dict, known: list | set, edit_mode: bool = False,
+                   horse_present: bool = True) -> bool:
+    """Return True iff the player may execute action given their known_commands.
+
+    horse_present gates the *saddle* registers (see is_saddle_register): those
+    can only be reached when the horse is in the room — on boss levels and any
+    horse-blocked level they are unavailable. Defaults True so non-dungeon callers
+    (and the unnamed / named-macro registers) are unaffected."""
     t = action['type']
     count     = action.get('count', 1)
     known_set = set(known)
@@ -65,6 +81,9 @@ def action_allowed(action: dict, known: list | set, edit_mode: bool = False) -> 
     # Using an explicit (non-unnamed) register requires learning named registers.
     reg = action.get('register')
     if reg is not None and reg != '"' and 'reg_named' not in known_set:
+        return False
+    # The saddle registers ride with the horse — blocked when he isn't here.
+    if is_saddle_register(reg) and not horse_present:
         return False
 
     if t == 'operator':
@@ -175,12 +194,15 @@ def action_allowed(action: dict, known: list | set, edit_mode: bool = False) -> 
     return True
 
 
-def guard_message(action: dict, known: list | set = ()) -> str:
+def guard_message(action: dict, known: list | set = (),
+                  horse_present: bool = True) -> str:
     """Human-readable reason why action_allowed returned False."""
     t = action['type']
     reg = action.get('register')
     if reg is not None and reg != '"' and 'reg_named' not in set(known):
         return f"You haven't learned the \"{reg} register yet."
+    if is_saddle_register(reg) and not horse_present:
+        return f"The \"{reg} register rides in the horse's saddle — he isn't here."
     if t == 'motion':
         known_set = set(known)
         m = action['motion']

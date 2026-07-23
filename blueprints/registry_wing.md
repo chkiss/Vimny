@@ -17,6 +17,18 @@ the horse carries your clips — his saddlebag *is* the selection register
 Revealed as its own overworld section, like the hidden-levels wing — not on the
 main chain, hangs off nothing, teaches only mastery.
 
+**The saddle gate (SHIPPED 2026-07-23).** The horse's saddle holds the registers,
+so the register machinery only works when the horse is in the room. `command_guard.
+is_saddle_register(reg)` marks the saddle registers — every register named by a
+**digit or symbol** (`"0`–`"9` `"-` `"_` `"/` `":` `".` `"%` `"#` `"=` `"*` `"+`).
+`action_allowed(..., horse_present=)` (wrapped in `run_dungeon._action_allowed` with
+the live `_horse_here()` state) blocks them on any horse-free level — bosses, the
+combat crushes, the whole pre-adoption game. **Exempt** (their own gates, no horse
+needed): the **unnamed** register `""` (token `register`) and the **named / macro**
+registers `"a`–`"z` / `"A`–`"Z` (token `reg_named`, the `q`/`@` machinery). This is
+why the wing's puzzles are safe: the registers they teach simply don't exist off the
+saddle, so no boss or main-chain par can lean on them.
+
 **House rules (unchanged).** Every level is solved with the register it teaches.
 Forcing is **by par, not budget**: an old-register route still *wins* but overpays
 and drops the 2nd star. Runtime placement / gating only where it touches the

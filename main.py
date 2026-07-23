@@ -35,8 +35,8 @@ from engine.player import Player
 from engine.modes import Mode
 from engine.budget import Budget
 from engine.vim_parser import parse, parse_visual_textobj
-from engine.command_guard import (action_allowed as _action_allowed,
-                                  guard_message as _guard_message,
+from engine.command_guard import (action_allowed as _action_allowed_raw,
+                                  guard_message as _guard_message_raw,
                                   _MOTION_GUARD as _MOTION_GUARD_TABLE)
 from engine.world import Entity, CellType, CharRun, Dungeon, clone_entity, entity_letter
 from engine.motion import (apply_motion, _apply_esc, _reveal_from,
@@ -4252,6 +4252,18 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
         # reach — through opened doors, over water — sheds its fog per frame.
         _auto_fog_tick(dungeon.room, player.row, player.col)
         render_all(term, dungeon, player, budget, msg, **kw)
+
+    def _horse_here() -> bool:
+        """Is the horse in the room? The saddle registers ride with him."""
+        return any(e.kind == 'horse' for e in dungeon.room.entities)
+
+    def _action_allowed(action, known, edit_mode=False):
+        # Wrap the pure guard with the live horse state so the saddle registers
+        # are gated on the horse's presence (blocked on boss / horse-free levels).
+        return _action_allowed_raw(action, known, edit_mode, horse_present=_horse_here())
+
+    def _guard_message(action, known=()):
+        return _guard_message_raw(action, known, horse_present=_horse_here())
 
     def _blocked(action) -> bool:
         """A gated command the player hasn't learned: explain why, render, and return

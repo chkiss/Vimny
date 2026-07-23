@@ -158,6 +158,24 @@ def test_companion_glyph_rides_the_status_bar(capsys):
     assert S.HORSE in out
 
 
+def test_saddle_registers_ride_with_the_horse():
+    from engine.command_guard import action_allowed, is_saddle_register
+    # the saddle registers: digits + symbols; NOT "" and NOT the named/macro a-z.
+    assert is_saddle_register('0') and is_saddle_register('_') and is_saddle_register('/')
+    assert not is_saddle_register('"')          # unnamed — own gate
+    assert not is_saddle_register('a')           # named / macro — own gate
+    assert not is_saddle_register('A')           # append to a named register
+    known = {'reg_named', 'y', 'p', 'd'}
+    numbered = {'type': 'paste', 'register': '0'}
+    # horse present → allowed; horse absent → blocked (saddle stays with him)
+    assert action_allowed(numbered, known, horse_present=True)
+    assert not action_allowed(numbered, known, horse_present=False)
+    # the unnamed and named/macro registers work with or without the horse
+    for r in ('"', 'a'):
+        act = {'type': 'paste', 'register': r}
+        assert action_allowed(act, known, horse_present=False)
+
+
 def test_horse_only_appears_post_game():
     # run_dungeon injects the horse only when warden_eternal is complete; the
     # builder itself never places one (so the fresh First Cave stays clean).
