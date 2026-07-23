@@ -63,6 +63,7 @@ def test_horse_follows_within_the_trail_band(seed):
     room = build_dungeon_first_cave(seed).room
     _place_first_cave_horse(room)
     h = _horse(room)
+    h.tag = 'Artax'                              # named → he follows
     player = Player(row=room.spawn_pos[0], col=room.spawn_pos[1])
     for _ in range(60):
         _enemy_tick(room, player)
@@ -74,16 +75,36 @@ def test_horse_follows_within_the_trail_band(seed):
 
 @pytest.mark.parametrize('seed', SEEDS)
 def test_horse_holds_when_already_at_heel(seed):
-    # Standing next to the player (within the band), he does not fidget.
+    # A named horse standing next to the player (within the band) does not fidget.
     room = build_dungeon_first_cave(seed).room
     _place_first_cave_horse(room)
     h = _horse(room)
+    h.tag = 'Artax'
     player = Player(row=h.row, col=h.col)
-    # step the player one cell off the horse if possible, else keep them adjacent
-    player.row = h.row
     before = (h.row, h.col)
     _enemy_tick(room, player)
     assert (h.row, h.col) == before          # co-located/adjacent → holds station
+
+
+def test_unadopted_horse_wanders_like_a_cat():
+    # Un-named, he ambles a cell at a time (never a Vim leap toward you) and never
+    # steps onto the player.
+    import random as _r
+    _r.seed(0)
+    room = build_dungeon_first_cave(SEEDS[0]).room
+    _place_first_cave_horse(room)
+    h = _horse(room)
+    assert not h.tag                         # un-adopted
+    player = Player(row=room.spawn_pos[0], col=room.spawn_pos[1])
+    seen = set()
+    for _ in range(60):
+        prev = (h.row, h.col)
+        _enemy_tick(room, player)
+        seen.add((h.row, h.col))
+        assert (h.row, h.col) != (player.row, player.col)
+        assert _manhattan(prev[0], prev[1], h.row, h.col) <= 1   # single-cell ambles
+        assert room.is_passable(h.row, h.col)
+    assert len(seen) > 1                      # he actually wandered
 
 
 def _feed(term, monkeypatch, keys):

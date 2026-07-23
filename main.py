@@ -3597,10 +3597,20 @@ def _enemy_tick(room, player) -> list:
                 room.move_entity(ent, *step)
             continue
         if ent.kind == 'horse':
-            # The wizard's old horse trails you at 2-3 cells, riding Vim motions.
-            step = _horse_step(room, player, ent)
-            if step is not None:
-                room.move_entity(ent, *step)
+            # Named (ent.tag holds his name), he trails you at 2-3 cells, riding Vim
+            # motions. Un-adopted, he ambles at random like a stray cat until you
+            # name him — approach and x him for the naming popup.
+            if ent.tag:
+                step = _horse_step(room, player, ent)
+                if step is not None:
+                    room.move_entity(ent, *step)
+            else:
+                ent.ai_tick += 1
+                if ent.ai_tick % 2 == 0:
+                    dr, dc = random.choice(_ORTHO)
+                    nr, nc = ent.row + dr, ent.col + dc
+                    if (nr, nc) != (player.row, player.col) and _steppable(room, player, nr, nc):
+                        room.move_entity(ent, nr, nc)
             continue
         if ent.kind == 'critter' or (ent.kind == 'elf' and ent.ai == 'wander'):
             # A cat (:s/g/c/) ambles and yowls; a big Cat ROARS. A spent elf
@@ -3870,6 +3880,11 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
     if progress.get('warden_eternal', {}).get('complete') and not _horse_blocked(level, room):
         if level == 'first_cave' or progress.get('horse_name'):
             _place_first_cave_horse(room)
+            _hname = progress.get('horse_name')
+            if _hname:                          # tag = his name → he follows (see _enemy_tick)
+                for _e in room.entities:
+                    if _e.kind == 'horse':
+                        _e.tag = _hname
 
     budget  = Budget(room.budget or 20)
 
@@ -6536,8 +6551,16 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
                         _push(f"{_hn} leans into your hand. He'll carry you home "
                               "whenever you're ready.")
                     else:
-                        _push("The wizard's old horse. He waited the whole way down, "
-                              "and back. He'll carry you home when you're ready.")
+                        # Not yet named (you waved him off): x re-opens the naming
+                        # popup so you can take him up when you're ready.
+                        _nm = _prompt_horse_name(term, _iw(term), term.height - 8)
+                        if _nm:
+                            progress['horse_name'] = cur.tag = _nm
+                            progress['horse_met'] = True
+                            SM.save_progress(progress, player_name)
+                            _push(f'{_nm} lifts his head. He stays at your heel now.')
+                        else:
+                            _push("The horse waits, patient. Name him when you're ready.")
                     interacted = True
                 elif cur and (cur.kind in ('goblin', 'warden', 'wanderer', 'elf')
                               or (cur.kind == 'critter' and cur.swole)
@@ -7193,10 +7216,11 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
                     _hname = _prompt_horse_name(term, _iw(term), term.height - 8)
                     progress['horse_met'] = True
                     if _hname:
-                        progress['horse_name'] = _hname
+                        progress['horse_name'] = _hz.tag = _hname
                     SM.save_progress(progress, player_name)
                     tick_msgs = [f'{_hname} falls in at your heel.' if _hname
-                                 else 'The horse falls in at your heel.']
+                                 else 'The horse stays put, unhurried. '
+                                      '(x him when you have a name.)']
             if not getattr(room, '_elf_trade', None):
                 for _elf in list(room._entity_by_kind.get('elf', [])):
                     if (_elf.alive and _elf.tag == 'elf'
