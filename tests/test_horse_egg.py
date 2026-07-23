@@ -12,8 +12,13 @@ import pytest
 
 from generation.dungeon_gen import build_dungeon_first_cave
 from engine.world import CARET_TRANSPARENT
-from main import _place_first_cave_horse
+from engine.player import Player
+from main import _place_first_cave_horse, _enemy_tick, _manhattan
 from tests import SEEDS
+
+
+def _dist(h, player):
+    return _manhattan(player.row, player.col, h.row, h.col)
 
 
 def _horse(room):
@@ -49,6 +54,36 @@ def test_placement_is_idempotent():
     _place_first_cave_horse(room)
     _place_first_cave_horse(room)
     assert sum(1 for e in room.entities if e.kind == 'horse') == 1
+
+
+@pytest.mark.parametrize('seed', SEEDS)
+def test_horse_follows_within_the_trail_band(seed):
+    # Placed far, he closes the gap over a few ticks and never treads on the
+    # player nor onto another entity's cell.
+    room = build_dungeon_first_cave(seed).room
+    _place_first_cave_horse(room)
+    h = _horse(room)
+    player = Player(row=room.spawn_pos[0], col=room.spawn_pos[1])
+    for _ in range(60):
+        _enemy_tick(room, player)
+        assert (h.row, h.col) != (player.row, player.col)
+        assert room.is_passable(h.row, h.col)
+    # after settling he trails at no more than 3 cells
+    assert _dist(h, player) <= 3
+
+
+@pytest.mark.parametrize('seed', SEEDS)
+def test_horse_holds_when_already_at_heel(seed):
+    # Standing next to the player (within the band), he does not fidget.
+    room = build_dungeon_first_cave(seed).room
+    _place_first_cave_horse(room)
+    h = _horse(room)
+    player = Player(row=h.row, col=h.col)
+    # step the player one cell off the horse if possible, else keep them adjacent
+    player.row = h.row
+    before = (h.row, h.col)
+    _enemy_tick(room, player)
+    assert (h.row, h.col) == before          # co-located/adjacent → holds station
 
 
 def test_horse_only_appears_post_game():

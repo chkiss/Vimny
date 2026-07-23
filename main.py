@@ -3409,6 +3409,54 @@ def _bfs_step(room, player, start, goal, cap: int = 1400):
     return None
 
 
+_HORSE_TRAIL = 3        # trails the player at 2-3 cells; only closes past this
+_HORSE_MOTIONS = ('w', 'W', 'e', 'E', 'b', 'B', 'ge', '^', '0', '$', '%', '+', '-')
+
+
+def _horse_vim_landing(room, ent, motion, count):
+    """Where a Vim motion would carry a cursor placed on the horse's cell —
+    (row, col), or None if it doesn't move (or the motion errors on this buffer)."""
+    shim = Player(row=ent.row, col=ent.col)
+    try:
+        apply_motion(shim, motion, count, room)
+    except Exception:
+        return None
+    if (shim.row, shim.col) == (ent.row, ent.col):
+        return None
+    return (shim.row, shim.col)
+
+
+def _horse_step(room, player, ent):
+    """The wizard's horse RIDES Vim to follow: each turn it picks the word/line
+    motion (w/b/e/^/0/$/% and count-j/k across rows) that best keeps it trailing
+    the player at 2-3 cells. Returns a landing (r, c), or None to hold station.
+
+    It holds once within the trail band, closes the gap when it grows, and never
+    treads on the player. A plain BFS step is the last resort so a corridor with
+    no useful horizontal motion can't strand it."""
+    cur = _manhattan(player.row, player.col, ent.row, ent.col)
+    if cur <= _HORSE_TRAIL:
+        return None                                  # at heel — hold
+    cands = [_horse_vim_landing(room, ent, m, 1) for m in _HORSE_MOTIONS]
+    dr = player.row - ent.row                        # count-j / count-k to change rows
+    if dr:
+        cands.append(_horse_vim_landing(room, ent, 'j' if dr > 0 else 'k',
+                                        min(abs(dr), 4)))
+    best = None
+    for p in cands:
+        if p is None or not _steppable(room, player, *p):
+            continue
+        nd = _manhattan(player.row, player.col, *p)
+        if nd >= cur:
+            continue                                 # must close the gap
+        key = (0 if 2 <= nd <= _HORSE_TRAIL else 1, abs(nd - 2), nd)
+        if best is None or key < best[0]:
+            best = (key, p)
+    if best is not None:
+        return best[1]
+    return _bfs_step(room, player, (ent.row, ent.col), (player.row, player.col))
+
+
 def _detour_step(room, player, ent, dist: int):
     """First cell of a 2-move path that ends no farther from the player, or None.
 
@@ -3485,6 +3533,12 @@ def _enemy_tick(room, player) -> list:
                                                    (player.row, player.col)))
                 if step is None:
                     break
+                room.move_entity(ent, *step)
+            continue
+        if ent.kind == 'horse':
+            # The wizard's old horse trails you at 2-3 cells, riding Vim motions.
+            step = _horse_step(room, player, ent)
+            if step is not None:
                 room.move_entity(ent, *step)
             continue
         if ent.kind == 'critter' or (ent.kind == 'elf' and ent.ai == 'wander'):
