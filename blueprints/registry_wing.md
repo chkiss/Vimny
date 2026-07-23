@@ -14,8 +14,16 @@ the horse carries your clips — his saddlebag *is* the selection register
 (Level VII), which ties the wing back to the reward that unlocked it.
 
 **Unlock gate.** `progress.get('horse_name')` is truthy (horse named/adopted).
-Revealed as its own overworld section, like the hidden-levels wing — not on the
-main chain, hangs off nothing, teaches only mastery.
+
+**Overworld placement (user, 2026-07-23).** The nine levels + the boss are listed
+**after The Warden Eternal** in the `world/` menu. Concretely: append their `LEVELS`
+entries *after* the `warden_eternal` (display 48.1) entry — the world menu renders in
+`LEVELS` order, and `dummy` is `admin_only` (filtered out for players), so appended
+entries fall at the visible tail. They stay **hidden until adoption** (gate the rows
+on `progress.get('horse_name')`, the way the hidden-levels wing hides its rows), so a
+player who has beaten the game but not taken up the horse sees the menu end at the
+Warden Eternal; adopting him reveals the Registry below it. Displays are cosmetic
+(propose `R1`–`R9` + `R9.1` for the boss, or 49–57.1) — the slug is identity.
 
 **The saddle gate (SHIPPED 2026-07-23).** The horse's saddle holds the registers,
 so the register machinery only works when the horse is in the room. `command_guard.
@@ -67,6 +75,38 @@ linchpin) → III/IV (isolation & multiplexing) → V (read-only strings) → VI
 
 ---
 
+## Proverbs over plaques — sense, not decree (user, 2026-07-23)
+
+Extend the famous-text program (`blueprints/sense_not_decree.md`, pool
+`content/proverbs.py`) into this wing: wherever a level would otherwise carve a
+**plaque that decrees the answer**, use a WELL-KNOWN PUBLIC-DOMAIN proverb or verse
+whose *structure* is the solution — the player repairs / completes / retrieves a text
+they know by heart, and any plaque demotes to confirmation. Registers are an
+unusually good fit: their whole point is *which stored fragment do I bring back*, and
+a remembered saying tells you which fragment without a sign spelling it out.
+
+**Where it lands (per level):**
+
+| # | Register | Proverb/poem opportunity (replaces the plaque) |
+|---|---|---|
+| I    | `""`         | Complete a proverb missing one word: yank the stray word, `p` it into the gap. The saying (not a plaque) says which word belongs; the clobber-twist strands it, and the saying's shape shows what's still missing. |
+| II   | `"0`/`"1`–`9`| **Poem-as-ring.** Delete three lines of a known stanza in sequence; the gate wants the *oldest* — the player knows the poem's line order, so the numbered ring is retrieval, not guesswork. Yank-chamber: complete a proverb whose key word you `"0p` back after `dd`s clobber `""`. |
+| III  | `"-`         | A single wrong word in a MISQUOTE (`content/proverbs.py`): the small charwise cut that fixes it survives in `"-` past an unrelated linewise `dd`. The famous line is the cue. |
+| IV   | `"a`–`"z`, `"A` | Three cure-words from three proverbs → `"a`/`"b`/`"c`. Append chamber: gather the scattered fragments of ONE famous couplet, in order, into `"A`; the assembled line is verse the player knows. |
+| V    | `":` `".` `"%` `"#` | **The plaque-honest exception** — a *records office* where dry labels are diegetically right (file names, last command). Minimal proverb use; `".` can re-stamp a short famous phrase you inscribe once. Keep the clerical texture; don't force verse here. |
+| VI   | `"=`         | A **counting rhyme** supplies the numbers to compute: "One for sorrow, two for joy…" (magpies) or "Thirty days hath September…". The rhyme is the riddle; `"=` does the sum. |
+| VII  | `"*`/`"+`    | **Couplet across the boundary.** Carry the first half of a famous couplet in `"*`; the exit chamber's door wants the whole. Its shape means you know what the saddlebag holds. |
+| VIII | `"_`         | A proverb interrupted by junk words (INTRUDER shape): `"_dd` the junk into the void so the key word you carry in `""` survives. The saying flags which words are intruders. |
+| IX   | `"/`         | A **buried/repeated word** in a tongue-twister or proverb (the Buried-Word chassis): `/` the word you know from the saying, then `"/p` inscribes the pattern. |
+
+**Anchor law still applies** (`sense_not_decree.md` §2): par invariance is
+**column-anchored**, not text-anchored — pool-drawn sayings must have their fixed slot
+column fall where the register op lands, with the prefix right-aligned west. Every
+conversion is a mini-rebuild: text → re-derived par → rival re-audit → karaoke. Keep
+texts universally known and long out of copyright; refuse copyrighted lyrics.
+
+---
+
 ## Per-level design
 
 ### I — The Unnamed Hold (`""`)
@@ -82,9 +122,11 @@ Two chambers.
   `dd` (each overwrites `""`). The door needs the key word — only `"0p` (the yank
   register, untouched by deletes) still holds it. Old route: re-yank after the
   deletes → detour → over par.
-- **The ring:** three plaques were deleted in sequence; the gate wants the
-  **oldest**. `"1p`/`"2p`/`"3p` walk the delete ring (or `"1p` then `.` to rotate).
-  Forcing: no non-numbered register reaches a superseded delete.
+- **The ring (poem-as-ring):** three lines of a stanza the player knows are deleted
+  in sequence; the gate wants the **oldest**. Because it's a remembered poem, its
+  line order is known — `"1p`/`"2p`/`"3p` walk the delete ring (or `"1p` then `.` to
+  rotate) to *retrieve* it, no plaque decreeing which line was first. Forcing: no
+  non-numbered register reaches a superseded delete.
 
 ### III — The Small Cut (`"-`)
 Charwise deletes < one line land in `"-` (and `""`); a **linewise** delete pushes the
@@ -202,3 +244,8 @@ Quartermaster / Hall of Echoes / mislabelled-doors levels.
    allowed grammar (`+ - * /`, parens?) before implementing VI.
 3. **Saddlebag persistence key** — store the `"*` clip in `progress['saddlebag']`;
    confirm it should also survive save/quit (proposed: yes — it's the horse's).
+4. **Text picks** — choose the specific proverbs/verse per level from the
+   `content/proverbs.py` pool (extend it as needed): the II stanza (line order must
+   be famous), the IV couplet to fragment-and-append, the VI counting rhyme, the VII
+   couplet to split across the boundary. Each pick then drives a re-derived par +
+   rival re-audit (anchor law). V stays deliberately plaque/records-clerical.
