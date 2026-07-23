@@ -3650,6 +3650,34 @@ def _visual_mode_toggle(raw: str, key_str: str):
     return None
 
 
+def _place_first_cave_horse(room) -> None:
+    """Stand the wizard's horse (♞) on an empty floor cell near the entry — a
+    post-game Easter egg. No-op if one is already there or no free cell exists."""
+    from engine.world import CellType
+    if any(e.kind == 'horse' for e in room.entities):
+        return
+    sr, sc = room.spawn_pos
+    er, ec = room.exit_pos if room.exit_pos else (-1, -1)
+    best = None
+    for r in range(room.rows):
+        for c in range(room.cols):
+            if room.cells[r][c] not in (CellType.FLOOR, CellType.CORRIDOR):
+                continue
+            if (r, c) in ((sr, sc), (er, ec)):
+                continue
+            if room.entity_at(r, c) is not None or room.char_run_at(r, c) is not None:
+                continue
+            d = abs(r - sr) + abs(c - sc)
+            if d < 2:                      # give the player a step of breathing room
+                continue
+            if best is None or d < best[0]:
+                best = (d, r, c)
+    if best is not None:
+        _, r, c = best
+        room.entities.append(Entity(kind='horse', row=r, col=c))
+        room.rebuild_indexes()
+
+
 # ── Dungeon game loop ──────────────────────────────────────────────────────────
 
 def run_dungeon(term: Terminal, level: str, progress: dict,
@@ -3704,6 +3732,11 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
     for _e in list(room.entities):
         if _e.kind == 'heart_container' and [level, _e.row, _e.col] in _collected:
             room.kill_entity(_e)
+
+    # Post-game: the wizard's horse waits in the First Cave once the Warden
+    # Eternal is beaten — a quiet reward, standing near where you first stepped in.
+    if level == 'first_cave' and progress.get('warden_eternal', {}).get('complete'):
+        _place_first_cave_horse(room)
 
     budget  = Budget(room.budget or 20)
 
@@ -6361,6 +6394,10 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
                     interacted = True
                 elif cur and cur.kind == 'critter' and not cur.swole:
                     _push('The cat purrs.')              # a friendly cat — no harm
+                    interacted = True
+                elif cur and cur.kind == 'horse':        # the wizard's horse — post-game
+                    _push("The wizard's old horse. He waited the whole way down, "
+                          "and back. He'll carry you home when you're ready.")
                     interacted = True
                 elif cur and (cur.kind in ('goblin', 'warden', 'wanderer', 'elf')
                               or (cur.kind == 'critter' and cur.swole)

@@ -194,6 +194,8 @@ def _ent_cell_str(ent, room, r: int, c: int, mode, floor_bg: str) -> str:
         return floor_bg + C.chest_fg() + S.CHEST + rst
     if ent.kind == 'hat':                       # the Warden's hat on the ground
         return floor_bg + C.shimmer_fg(time.time() * 0.5) + S.HAT + rst
+    if ent.kind == 'horse':                     # the wizard's horse, post-game (Easter egg)
+        return floor_bg + C.horse_fg() + S.HORSE + rst
     if ent.kind == 'door':
         sym = S.DOOR_V if _is_vertical_door(room, r, c, 'door') else S.DOOR_H
         return floor_bg + C.door_fg() + sym + rst

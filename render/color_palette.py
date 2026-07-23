@@ -86,6 +86,7 @@ _META: dict[str, tuple[str, str, str]] = {
     'wood_wall_damaged_fg': ('#A0692D', 'Wood wall damaged', 'fg'),
     'dir_fg':               ('#64A0E6', 'Directory',         'fg'),
     'entry_fg':             ('#DCD7C8', 'Entry marker',      'fg'),
+    'horse_fg':             ('#B2966E', "Horse (wizard's)",  'fg'),
 }
 
 # ── Curated groups (function names only — no duplicated data) ─────────────────
@@ -100,6 +101,7 @@ _GROUPS: list[tuple[str, list[str]]] = [
     ('Combat',     ['dynamite_fg', 'expl_near', 'expl_mid', 'expl_far']),
     ('Navigation', ['exit_fg', 'door_fg', 'locked_door_fg']),
     ('Keys & Chests', ['chest_fg', 'key_fg', 'key_gold_fg', 'key_red_fg']),
+    ('Companions', ['horse_fg']),
     ('Runes',      ['rune_ancient', 'rune_verdant', 'rune_void', 'rune_ember']),
     ('Budget',     ['budget_ok', 'budget_low', 'budget_crit']),
     ('Modes',      ['mode_normal', 'mode_insert', 'mode_visual', 'mode_command']),

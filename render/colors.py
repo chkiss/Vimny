@@ -131,6 +131,8 @@ def wood_wall_bg():          return _term.on_color_rgb(80, 45, 14)       # dark 
 def wood_wall_damaged_bg():  return _term.on_color_rgb(48, 24, 5)        # charred, near-void
 def wood_wall_damaged_fg():  return _term.color_rgb(150, 95, 38)         # splinter amber, damage
 
+def horse_fg():  return _term.color_rgb(178, 150, 110)   # dun roan, the wizard's old horse
+
 def dir_fg():    return _term.color_rgb(80, 145, 220)    # electric netrw blue, directory
 def entry_fg():  return _term.color_rgb(205, 210, 215)   # cool near-white, file entry
 def sel_bg():    return _term.on_color_rgb(20, 28, 45)   # cold cursor line, screen glow

@@ -35,17 +35,20 @@ DOOR_LOCKED  = '🔒'   # may be replaced by init() if terminal renders it as 2-
 EXIT         = '◉'
 SHIELD       = '⛨'   # may be replaced by init() if terminal renders it as 2-wide
 HAT          = 'Δ'   # the Warden's/wizard's hat (dropped by the final boss); → '^' if 2-wide
+HORSE        = '♞'   # the wizard's horse (post-game, in the First Cave); → 'h' if 2-wide
 
 
 def init(term) -> None:
     """Replace wide glyphs with single-width fallbacks when the terminal renders them as 2 columns."""
-    global DOOR_LOCKED, SHIELD, HAT
+    global DOOR_LOCKED, SHIELD, HAT, HORSE
     if term.length(DOOR_LOCKED) != 1:
         DOOR_LOCKED = '⊡'
     if term.length(SHIELD) != 1:
         SHIELD = '◆'
     if term.length(HAT) != 1:
         HAT = '^'
+    if term.length(HORSE) != 1:
+        HORSE = 'h'
 
 BOX_TL = '┌'; BOX_TR = '┐'; BOX_BL = '└'; BOX_BR = '┘'
 BOX_H  = '─'; BOX_V  = '│'

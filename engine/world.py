@@ -135,7 +135,7 @@ def entity_letter(ent) -> Optional[str]:
 # on them). Every OTHER live entity (a foe, key, chest, heart…) counts as content
 # the caret lands on.
 CARET_TRANSPARENT = frozenset({'door', 'locked_door', 'seal_door', 'exit',
-                               'entry_marker', 'boss_seal'})
+                               'entry_marker', 'boss_seal', 'horse'})
 
 
 @dataclass
