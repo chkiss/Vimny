@@ -486,6 +486,67 @@ def _show_reliquary_scroll(term: Terminal, iw: int, game_h: int,
     term.inkey()
 
 
+def _prompt_horse_name(term: Terminal, iw: int, game_h: int) -> str:
+    """A centred amber popup the first time the horse reaches your side: type a
+    name and press Enter, or Esc to leave him nameless. Returns the entered name
+    (stripped) or '' if skipped/blank."""
+    BOX_IW = 54; BOX_BW = BOX_IW + 4
+    box_bg  = term.on_color_rgb(10, 8, 2)
+    amber_b = term.color_rgb(220, 175, 35) + term.bold
+    amber   = term.color_rgb(220, 175, 35)
+    body    = term.color_rgb(185, 150, 55)
+    hi      = term.color_rgb(255, 220, 60) + term.bold
+    rst     = term.normal
+    col_off = max(1, (iw + 2 - BOX_BW) // 2)
+    bdr = box_bg + amber_b; inn = box_bg
+
+    def row(vis, colored):
+        return (bdr + '║ ' + rst + inn + colored +
+                inn + ' ' * max(0, BOX_IW - vis) + bdr + ' ║' + rst)
+
+    blank = row(0, '')
+
+    def centred(text, col):
+        l = (BOX_IW - len(text)) // 2; r = BOX_IW - len(text) - l
+        return row(BOX_IW, ' ' * l + col + text + inn + ' ' * r)
+
+    sep_h = '═' * (BOX_IW + 2)
+    _PROMPT = [
+        "The wizard's old horse noses your open hand,",
+        "patient as the road behind you.",
+        '',
+        'What name will you give him?',
+    ]
+
+    name_buf = ''
+    while True:
+        field = (name_buf + '_')[:BOX_IW - 4]
+        lF = (BOX_IW - len(field)) // 2; rF = BOX_IW - len(field) - lF
+        input_row = row(BOX_IW, ' ' * lF + hi + field + inn + ' ' * rF)
+        foot = '[ Enter ] name him   ·   [ Esc ] not yet'
+        footer = centred(foot, body)
+        lines = [
+            bdr + '╔' + sep_h + '╗' + rst, blank,
+            *[centred(t, amber) if t else blank for t in _PROMPT],
+            blank, input_row, blank, footer, blank,
+            bdr + '╚' + sep_h + '╝' + rst,
+        ]
+        row_off = 3 + max(0, (game_h - len(lines)) // 2)
+        for i, line in enumerate(lines):
+            print(term.move_yx(row_off + i, col_off) + line, end='', flush=True)
+
+        key = term.inkey()
+        raw = str(key) if not key.is_sequence else ''
+        if key.name == 'KEY_ESCAPE':
+            return ''
+        if key.name == 'KEY_ENTER' or raw in ('\n', '\r'):
+            return name_buf.strip()
+        if key.name == 'KEY_BACKSPACE' or raw == '\x7f':
+            name_buf = name_buf[:-1]
+        elif raw and raw.isprintable() and len(name_buf) < _NAME_MAX:
+            name_buf += raw
+
+
 def _render_standard_scroll(term: Terminal, iw: int, game_h: int, content: dict,
                             known: set | None = None) -> None:
     """Render any scroll whose 'lines' list uses blank/dim/amber/cmd/smudge specs.
@@ -3704,6 +3765,22 @@ def _visual_mode_toggle(raw: str, key_str: str):
     return None
 
 
+# Levels that bar the companion horse. Bosses are climactic one-on-ones (a horse
+# trotting through would break the staging); the two pure-combat crushes and the
+# admin dummy have no room for him. A level can also opt out at runtime by setting
+# room.no_horse = True. Everywhere else, a named horse tags along.
+_HORSE_BLOCKED_SLUGS = {'goblin_gauntlet', 'gauntlet', 'dummy'}
+
+
+def _horse_blocked(level: str, room) -> bool:
+    """True if this level flags the companion horse out (boss / combat / opt-out)."""
+    if getattr(room, 'no_horse', False):
+        return True
+    if level_type(level) == 'boss':
+        return True
+    return level in _HORSE_BLOCKED_SLUGS
+
+
 def _place_first_cave_horse(room) -> None:
     """Stand the wizard's horse (♞) on an empty floor cell near the entry — a
     post-game Easter egg. No-op if one is already there or no free cell exists."""
@@ -3787,10 +3864,12 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
         if _e.kind == 'heart_container' and [level, _e.row, _e.col] in _collected:
             room.kill_entity(_e)
 
-    # Post-game: the wizard's horse waits in the First Cave once the Warden
-    # Eternal is beaten — a quiet reward, standing near where you first stepped in.
-    if level == 'first_cave' and progress.get('warden_eternal', {}).get('complete'):
-        _place_first_cave_horse(room)
+    # Post-game companion: the wizard's horse. Once the Warden Eternal is beaten he
+    # waits in the First Cave (where you meet and name him); once named he follows
+    # you into every level, save those flagged to bar him (see _horse_blocked).
+    if progress.get('warden_eternal', {}).get('complete') and not _horse_blocked(level, room):
+        if level == 'first_cave' or progress.get('horse_name'):
+            _place_first_cave_horse(room)
 
     budget  = Budget(room.budget or 20)
 
@@ -4152,6 +4231,8 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
         kw.setdefault('attack_pos', _attack_pos())
         kw.setdefault('attack_sym', _attack_sym())
         kw.setdefault('recording', recording_reg or '')   # Vim's showmode indicator
+        kw.setdefault('companion', progress.get('horse_name', '')
+                      if any(e.kind == 'horse' for e in dungeon.room.entities) else '')
         # Stone-law fog re-reveal (auto_fog rooms only): what the eye can now
         # reach — through opened doors, over water — sheds its fog per frame.
         _auto_fog_tick(dungeon.room, player.row, player.col)
@@ -6450,8 +6531,13 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
                     _push('The cat purrs.')              # a friendly cat — no harm
                     interacted = True
                 elif cur and cur.kind == 'horse':        # the wizard's horse — post-game
-                    _push("The wizard's old horse. He waited the whole way down, "
-                          "and back. He'll carry you home when you're ready.")
+                    _hn = progress.get('horse_name')
+                    if _hn:
+                        _push(f"{_hn} leans into your hand. He'll carry you home "
+                              "whenever you're ready.")
+                    else:
+                        _push("The wizard's old horse. He waited the whole way down, "
+                              "and back. He'll carry you home when you're ready.")
                     interacted = True
                 elif cur and (cur.kind in ('goblin', 'warden', 'wanderer', 'elf')
                               or (cur.kind == 'critter' and cur.swole)
@@ -7098,6 +7184,19 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
                 player.gold += 1
                 progress['gold'] = player.gold
                 tick_msgs.insert(0, f'You pocket a coin. (gold: {player.gold})')
+            # First meeting with the wizard's horse: he comes to your side and you
+            # name him. Once named (or waved off), his name colours every message.
+            if not progress.get('horse_met'):
+                _hz = next((e for e in room.entities if e.kind == 'horse'), None)
+                if _hz is not None and _manhattan(player.row, player.col,
+                                                  _hz.row, _hz.col) <= 1:
+                    _hname = _prompt_horse_name(term, _iw(term), term.height - 8)
+                    progress['horse_met'] = True
+                    if _hname:
+                        progress['horse_name'] = _hname
+                    SM.save_progress(progress, player_name)
+                    tick_msgs = [f'{_hname} falls in at your heel.' if _hname
+                                 else 'The horse falls in at your heel.']
             if not getattr(room, '_elf_trade', None):
                 for _elf in list(room._entity_by_kind.get('elf', [])):
                     if (_elf.alive and _elf.tag == 'elf'

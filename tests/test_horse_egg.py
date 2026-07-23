@@ -86,6 +86,57 @@ def test_horse_holds_when_already_at_heel(seed):
     assert (h.row, h.col) == before          # co-located/adjacent → holds station
 
 
+def _feed(term, monkeypatch, keys):
+    it = iter(keys)
+    from blessed.keyboard import Keystroke
+    monkeypatch.setattr(term, 'inkey', lambda *a, **k: next(it, Keystroke('')))
+
+
+def test_naming_prompt_returns_typed_name(monkeypatch):
+    from blessed import Terminal
+    from blessed.keyboard import Keystroke
+    import main
+    term = Terminal()
+    keys = [Keystroke(c) for c in 'Artax'] + [Keystroke('\r')]
+    _feed(term, monkeypatch, keys)
+    assert main._prompt_horse_name(term, 80, 30) == 'Artax'
+
+
+def test_naming_prompt_esc_leaves_him_nameless(monkeypatch):
+    from blessed import Terminal
+    from blessed.keyboard import Keystroke
+    import main
+    term = Terminal()
+    esc = Keystroke('\x1b', code=361, name='KEY_ESCAPE')
+    _feed(term, monkeypatch, [esc])
+    assert main._prompt_horse_name(term, 80, 30) == ''
+
+
+def test_horse_blocked_on_bosses_and_combat():
+    import main
+    room = build_dungeon_first_cave(SEEDS[0]).room
+    assert main._horse_blocked('wardens_keep', room)      # boss
+    assert main._horse_blocked('goblin_gauntlet', room)   # combat crush
+    assert not main._horse_blocked('rune_halls', room)    # ordinary motion level
+    room.no_horse = True                                  # runtime opt-out flag
+    assert main._horse_blocked('rune_halls', room)
+
+
+def test_companion_glyph_rides_the_status_bar(capsys):
+    from blessed import Terminal
+    from engine.budget import Budget
+    from render import symbols as S
+    from render import colors as C
+    from render.renderer import render_all
+    term = Terminal()
+    C.init(term); S.init(term)
+    d = build_dungeon_first_cave(SEEDS[0])
+    player = Player(row=d.room.spawn_pos[0], col=d.room.spawn_pos[1])
+    render_all(term, d, player, Budget(20), companion='Artax')
+    out = capsys.readouterr().out
+    assert S.HORSE in out
+
+
 def test_horse_only_appears_post_game():
     # run_dungeon injects the horse only when warden_eternal is complete; the
     # builder itself never places one (so the fresh First Cave stays clean).

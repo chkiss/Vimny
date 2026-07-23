@@ -345,7 +345,8 @@ def _wrap_cheatsheet(text: str, iw: int, max_rows: int = 2) -> list[str]:
 def render_all(term: Terminal, dungeon: Dungeon, player: Player,
                budget: Budget, message: str = '',
                attack_pos: tuple | None = None, attack_sym: str = '',
-               heart_flash: bool = False, recording: str = ''):
+               heart_flash: bool = False, recording: str = '',
+               companion: str = ''):
     room   = dungeon.room
     iw     = _inner_w(term)
     output = []
@@ -373,6 +374,10 @@ def render_all(term: Terminal, dungeon: Dungeon, player: Player,
         hp_str  = (C.heart_full()  + S.HEART_FULL  + rst) * full_h
         hp_str += (C.heart_half()  + S.HEART_HALF  + rst) * half_h
         hp_str += (C.heart_empty() + S.HEART_EMPTY + rst) * empty_h
+
+    # Companion horse: his glyph rides beside your hearts once you've named him.
+    horse_plain = f' {S.HORSE}' if companion else ''
+    horse_s     = (C.horse_fg() + S.HORSE + rst) if companion else ''
 
     mode    = player.mode
     ml      = MODE_LABELS[mode]
@@ -407,10 +412,10 @@ def render_all(term: Terminal, dungeon: Dungeon, player: Player,
 
     dname = dungeon.name[:30]      # 30 fits the longest names (Brace & Square
                                    # Enclosure = 28, Grandmaster's Sanctum = 25)
-    status_plain = f'  {"♥"*full_h}{"♡"*half_h}{"░"*empty_h}  {dname}  {ml}  Keys:{spent:2d} Budget:{budget.total:2d}  Par:{room.par or "-"}{gold_plain}'
+    status_plain = f'  {"♥"*full_h}{"♡"*half_h}{"░"*empty_h}{horse_plain}  {dname}  {ml}  Keys:{spent:2d} Budget:{budget.total:2d}  Par:{room.par or "-"}{gold_plain}'
     padding = max(0, iw - len(status_plain))
     status_line = (bfg + S.BOX_V + rst +
-                   f'  {hp_str}  ' +
+                   f'  {hp_str}' + (horse_s and ' ' + horse_s) + '  ' +
                    C.normal_fg() + dname + '  ' +
                    mode_s + '  ' + keys_s + ' ' + budget_s + par_s + gold_s +
                    ' ' * padding +
