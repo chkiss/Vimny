@@ -7228,25 +7228,45 @@ def run_scroll_library(term: Terminal, player: Player, progress: dict) -> str | 
             'parent' → go up to ~/.vimny/ parent view
             'saves'  → open character select
     """
-    from render.scroll_library import render_scroll_library, library_rows
+    from render.scroll_library import (render_scroll_library, library_rows,
+                                        row_label, row_section_key)
 
     _rows = library_rows()
 
     _SL_COMPLETIONS = ['../', 'saves/', 'world/']
 
-    _known = _known_from_progress(progress)
+    _known    = _known_from_progress(progress)
+    is_admin  = player.name == 'admin'
 
-    discovered  = set(progress.get('extras', []))
+    def _gate(tok, label):
+        if is_admin or tok in _known:
+            return True
+        player.error = f"You haven't learned {label} yet."
+        return False
+
+    discovered = set(progress.get('extras', []))
+    bless_seen = set(progress.get('blessings_seen', []))
+
+    def _label(r):        return row_label(r, discovered, bless_seen)
+    def _avail():         return max(1, (term.height - 5) - 6)   # game_h − header rows
+
+    # Buffer-local marks, session-scoped on the player (like the overworld's).
+    if not hasattr(player, 'scroll_marks'):
+        player.scroll_marks = {}
+
     # start on the first actual scroll (skip ../ ./ and the first subtree header)
-    cursor_row  = next((i for i, r in enumerate(_rows) if r['type'] == 'scroll'), 0)
-    scroll_off  = 0
-    cmdline     = _CmdLine(_SL_COMPLETIONS)
+    start = next((i for i, r in enumerate(_rows) if r['type'] == 'scroll'), 0)
+    nav = NetrwNav(player=player, get_lines=lambda: _rows, label=_label,
+                   section_key=row_section_key, gate=_gate, avail=_avail,
+                   completions=_SL_COMPLETIONS, marks=player.scroll_marks,
+                   cursor=start)
 
     def _render():
-        nonlocal scroll_off
-        scroll_off = render_scroll_library(term, player, progress, cursor_row,
-                                           cmdline.line if cmdline.active else None,
-                                           scroll_off)
+        cmd_line = (nav.searching['buf'] if nav.searching
+                    else nav.cmdline.line if nav.cmdline.active else None)
+        cmd_pfx  = nav.searching['pfx'] if nav.searching else ':'
+        nav.scroll_offset = render_scroll_library(
+            term, player, progress, nav.cursor, cmd_line, nav.scroll_offset, cmd_pfx)
 
     _render()
 
@@ -7255,43 +7275,39 @@ def run_scroll_library(term: Terminal, player: Player, progress: dict) -> str | 
         if not key:
             continue
 
-        if cmdline.active:
-            cmd = cmdline.feed(key)
-            if cmd:
-                if cmd in ('q', 'q!'):
-                    return None
-                _e_path = cmd[2:].rstrip('/') if cmd.startswith('e ') else ''
-                if _e_path in ('..', '../'):
-                    return 'parent'
-                if _e_path in ('saves',):
-                    return 'saves'
-                if _e_path in ('world',):
-                    return None
+        out = nav.feed(key)
+        if out is None:
             _render()
             continue
 
-        raw = str(key) if not key.is_sequence else ''
+        if out[0] == 'cmd':
+            cmd = out[1]
+            if cmd in ('q', 'q!'):
+                return None
+            _e_path = cmd[2:].rstrip('/') if cmd.startswith('e ') else ''
+            if _e_path in ('..', '../'):
+                return 'parent'
+            if _e_path in ('saves',):
+                return 'saves'
+            if _e_path in ('world',):
+                return None
+            _render()
+            continue
 
+        raw = out[1]
         if key.name == 'KEY_ESCAPE':
             return None
-        elif raw == ':':
-            cmdline.open()
         elif raw == '-':
             return 'parent'
-        elif raw == 'j':
-            cursor_row = min(cursor_row + 1, len(_rows) - 1)
-        elif raw == 'k':
-            cursor_row = max(cursor_row - 1, 0)
         elif key.name == 'KEY_ENTER' or raw in ('\n', '\r'):
-            _r = _rows[cursor_row]
+            _r = _rows[nav.cursor]
             if _r['type'] == 'parent':
                 return 'parent'
             elif _r['type'] in ('self', 'subhdr'):
                 pass  # ./ or a subtree header — stay
             else:
                 scroll = _r['scroll']
-                _disc  = (set(progress.get('blessings_seen', []))
-                          if _r.get('group') == 'blessings' else discovered)
+                _disc  = bless_seen if _r.get('group') == 'blessings' else discovered
                 if scroll['id'] in _disc:
                     iw     = _iw(term)
                     game_h = term.height - 5
@@ -7309,21 +7325,30 @@ def run_scroll_library(term: Terminal, player: Player, progress: dict) -> str | 
 # ── Color palette loop (~/.vimny/colors/) ────────────────────────────────────
 
 def run_colors(term: Terminal, player: Player) -> None:
-    """Show the color palette (admin only). Returns when the player exits."""
-    from render.color_palette import render_color_palette, content_row_count
+    """Show the color palette (admin only). Returns when the player exits.
 
-    scroll_top = 0
-    cmdline    = _CmdLine()
+    Admin-only, so every motion is ungated — but it drives the same shared
+    NetrwNav engine as the overworld and scroll library, so gg/G/{n}G, H/M/L,
+    {/}, w, /-search, counts and the rest all work over the colour list."""
+    from render.color_palette import (render_color_palette, palette_rows,
+                                       row_label, row_section_key)
 
-    def _max_scroll() -> int:
-        game_h    = term.height - 5
-        reserved  = 7  # 6 hdr rows + ../
-        visible_h = max(0, game_h - reserved)
-        return max(0, content_row_count() - visible_h)
+    _rows = palette_rows()
+    if not hasattr(player, 'color_marks'):
+        player.color_marks = {}
+
+    nav = NetrwNav(player=player, get_lines=lambda: _rows, label=row_label,
+                   section_key=row_section_key, gate=lambda tok, label: True,
+                   avail=lambda: max(1, (term.height - 5) - 6),   # game_h − header
+                   completions=['../', 'saves/', 'scrolls/', 'world/'],
+                   marks=player.color_marks, cursor=0)
 
     def _render():
-        render_color_palette(term, player, scroll_top,
-                             cmdline.line if cmdline.active else None)
+        cmd_line = (nav.searching['buf'] if nav.searching
+                    else nav.cmdline.line if nav.cmdline.active else None)
+        cmd_pfx  = nav.searching['pfx'] if nav.searching else ':'
+        nav.scroll_offset = render_color_palette(
+            term, player, nav.cursor, nav.scroll_offset, cmd_line, cmd_pfx)
 
     _render()
 
@@ -7332,23 +7357,21 @@ def run_colors(term: Terminal, player: Player) -> None:
         if not key:
             continue
 
-        if cmdline.active:
-            cmd = cmdline.feed(key)
-            if cmd and (cmd in ('q', 'q!') or cmd.startswith('e ')):
+        out = nav.feed(key)
+        if out is None:
+            _render()
+            continue
+
+        if out[0] == 'cmd':
+            cmd = out[1]
+            if cmd in ('q', 'q!') or cmd.startswith('e '):
                 return
             _render()
             continue
 
-        raw = str(key) if not key.is_sequence else ''
-
+        raw = out[1]
         if key.name == 'KEY_ESCAPE' or raw == '-':
             return
-        elif raw == ':':
-            cmdline.open()
-        elif raw == 'j':
-            scroll_top = min(scroll_top + 1, _max_scroll())
-        elif raw == 'k':
-            scroll_top = max(scroll_top - 1, 0)
 
         _render()
 
@@ -7559,16 +7582,19 @@ def run_title(term: Terminal, has_save: bool) -> tuple[str, str]:
 
 # ── Overworld loop ─────────────────────────────────────────────────────────────
 
-def _ow_section(lines: list, cursor: int, direction: int) -> int:
-    """{ / } over the overworld buffer: the first line of the prev/next section
-    (comments → dirs → levels → customs)."""
-    grp = {'comment': 'c', 'parent': 'd', 'self': 'd', 'level': 'l',
+_OW_GRP = {'comment': 'c', 'parent': 'd', 'self': 'd', 'level': 'l',
            'subhdr': 'x', 'custom': 'x'}
-    starts, prev = [], None
-    for i, ln in enumerate(lines):
-        g = grp.get(ln['type'])
-        if g != prev:
-            starts.append(i); prev = g
+
+
+def _ow_section_key(ln: dict) -> str:
+    """Section grouping for `{`/`}` over the overworld (comments → dirs →
+    levels → customs)."""
+    return _OW_GRP.get(ln['type'])
+
+
+def _ow_section(lines: list, cursor: int, direction: int) -> int:
+    """{ / } over the overworld buffer: the first line of the prev/next section."""
+    starts = _section_starts(lines, _ow_section_key)
     if direction < 0:
         before = [s for s in starts if s < cursor]
         return before[-1] if before else 0
@@ -7654,6 +7680,365 @@ def _owm_word_at(text: str, c: int) -> str | None:
     return text[lo:hi + 1]
 
 
+def _section_starts(lines: list, key_of) -> list:
+    """Indices where a new section begins, given a per-line grouping key. Shared
+    by `{`/`}` across every netrw buffer (overworld, scroll library, …)."""
+    starts, prev = [], object()
+    for i, ln in enumerate(lines):
+        g = key_of(ln)
+        if g != prev:
+            starts.append(i); prev = g
+    return starts
+
+
+class NetrwNav:
+    """The shared netrw motion engine for the overworld / scroll library / any
+    read-only, cursor-over-lines buffer. It owns the Vim navigation state —
+    cursor, viewport offset, curswant column, counts, marks, the jump list,
+    pending g/z/f/mark prefixes, and the `/`/`?` + `:` command lines — so every
+    such screen gets gg, G, {n}G, H/M/L, {/}, w/b/e, f/F/t/T, ;/,, `*`/`#`, marks,
+    Ctrl-o/i, Ctrl-d/u/f/b and `/`-search identically.
+
+    The host supplies the buffer-specific pieces via callables: `get_lines()`
+    (the live line list), `label(ln)` (a line's motion/search text), `section_key(ln)`
+    (grouping for `{`/`}`), `gate(tok, label)` (learned-command gating — returns
+    True/sets player.error), `avail()` (viewport height), plus a `marks` dict and
+    the `:`-completion list.
+
+    `feed(key)` handles one keypress and returns:
+      * ``None`` — fully consumed (motion/search/count/…); the host re-renders.
+      * ``('cmd', text)`` — a completed `:` command for the host to interpret.
+      * ``('key', raw, key)`` — a key the engine doesn't own (Enter, D, R, -,
+        Esc, …); the host dispatches it.
+    The host keeps `self.scroll_offset` in sync by writing back whatever its
+    renderer computes each frame.
+    """
+
+    def __init__(self, *, player, get_lines, label, section_key, gate, avail,
+                 completions=None, marks=None, cursor=0):
+        self.player       = player
+        self._get_lines   = get_lines
+        self._label_of    = label
+        self._section_key = section_key
+        self._gate        = gate
+        self._avail       = avail
+        self.marks        = marks if marks is not None else {}
+        self.cmdline      = _CmdLine(completions or [])
+
+        self.cursor        = cursor
+        self.scroll_offset = 0
+        self.want_col      = 0
+        self.count_buf     = ''
+        self.pending_g     = False
+        self.pending_z     = False
+        self.pending_mark  = ''
+        self.pending_find  = ''
+        self.searching     = None       # None | {'pfx': '/'|'?', 'buf': str}
+        self.last_f        = None       # (cmd, char) for ; and ,
+
+        self.jump_list: list = []
+        self.jump_idx        = 0
+        self.last_jump       = None
+
+    # ── cursor helpers ────────────────────────────────────────────────────────
+    def _lines(self):           return self._get_lines()
+    def _lbl(self, i=None):
+        lines = self._lines()
+        return self._label_of(lines[self.cursor if i is None else i])
+    def _eff(self, i=None):     return min(self.want_col, max(0, len(self._lbl(i)) - 1))
+    def col(self):              return self._eff()
+
+    def _mgate(self, mkey, label):
+        tok = _MOTION_GUARD_TABLE.get(mkey)
+        return tok is None or self._gate(tok, label)
+
+    def _jump_to(self, target):
+        """A JUMP motion (G / { } / search / mark / :{n}): record the origin in
+        the jump list + '' mark, exactly like Vim."""
+        if target == self.cursor:
+            return
+        self.last_jump = self.cursor
+        del self.jump_list[self.jump_idx:]
+        self.jump_list.append(self.cursor)
+        self.jump_idx = len(self.jump_list)
+        self.cursor = target
+
+    # ── search over the visible buffer text ───────────────────────────────────
+    def _match_cols(self, pattern, text):
+        pat = _vre_compile(pattern)
+        if pat is not None:
+            return sorted({s for s, _e in pat.finditer(text)})
+        cols, k = [], text.find(pattern)
+        while k >= 0:
+            cols.append(k)
+            k = text.find(pattern, k + 1)
+        return cols
+
+    def _search_from(self, pattern, fwd, start, start_col):
+        lines = self._lines()
+        n = len(lines)
+        here = self._match_cols(pattern, self._label_of(lines[start]))
+        if fwd:
+            after = [c for c in here if c > start_col]
+            if after:
+                return (start, after[0]), False
+            for step in range(1, n + 1):
+                i = (start + step) % n
+                cols = self._match_cols(pattern, self._label_of(lines[i]))
+                if cols:
+                    return (i, cols[0]), (i <= start)
+            return None, False
+        before = [c for c in here if c < start_col]
+        if before:
+            return (start, before[-1]), False
+        for step in range(1, n + 1):
+            i = (start - step) % n
+            cols = self._match_cols(pattern, self._label_of(lines[i]))
+            if cols:
+                return (i, cols[-1]), (i >= start)
+        return None, False
+
+    def _run_search(self, pattern, fwd):
+        if not pattern:
+            self.player.error = 'E35: No previous regular expression'
+            return
+        self.player.last_search = (pattern, fwd)
+        hit, wrapped = self._search_from(pattern, fwd, self.cursor, self._eff())
+        if hit is None:
+            self.player.error = f'E486: Pattern not found: {pattern}'
+        else:
+            self._jump_to(hit[0])
+            self.want_col = hit[1]
+            if wrapped:
+                self.player.error = ('search hit BOTTOM, continuing at TOP'
+                                     if fwd else 'search hit TOP, continuing at BOTTOM')
+
+    # ── the keypress state machine ────────────────────────────────────────────
+    def feed(self, key):
+        # ── search input (/ ?) ────────────────────────────────────────────────
+        if self.searching is not None:
+            if key.name == 'KEY_ESCAPE':
+                self.searching = None
+            elif key.name == 'KEY_ENTER' or str(key) in ('\n', '\r'):
+                pat = self.searching['buf'] or (self.player.last_search or ('', True))[0]
+                fwd = self.searching['pfx'] == '/'
+                self.searching = None
+                self._run_search(pat, fwd)
+            elif key.name == 'KEY_BACKSPACE' or str(key) == '\x7f':
+                if self.searching['buf']:
+                    self.searching['buf'] = self.searching['buf'][:-1]
+                else:
+                    self.searching = None
+            elif not key.is_sequence and len(str(key)) == 1 and str(key).isprintable():
+                self.searching['buf'] += str(key)
+            return None
+
+        # ── command line (:) ──────────────────────────────────────────────────
+        if self.cmdline.active:
+            cmd = self.cmdline.feed(key)
+            if cmd:
+                if cmd.isdigit():                       # :{n} — line address
+                    if self._gate('line_addr', ':{n}'):
+                        self._jump_to(max(0, min(int(cmd) - 1, len(self._lines()) - 1)))
+                    return None
+                return ('cmd', cmd)
+            return None
+
+        raw  = str(key) if not key.is_sequence else ''
+        self.player.error = ''
+        lines = self._lines()
+        last  = len(lines) - 1
+
+        # gg / g* / g# / g_ (falls through to normal handling if not a g-seq)
+        if self.pending_g:
+            self.pending_g = False
+            if raw == 'g':
+                self._jump_to(0); self.count_buf = ''; return None
+            if raw in ('*', '#'):
+                if self._gate('g_family', 'the g-family'):
+                    word = _owm_word_at(self._lbl(), self._eff())
+                    if word is None:
+                        self.player.error = 'E348: No string under cursor'
+                    else:
+                        self._run_search('\\V' + word, raw == '*')
+                self.count_buf = ''; return None
+            if raw == '_':
+                if self._gate('g_family', 'the g-family'):
+                    self.want_col = max(0, len(self._lbl().rstrip()) - 1)
+                self.count_buf = ''; return None
+            # else: not a g-sequence → continue below
+
+        # z{z,t,b} — view scroll (free)
+        if self.pending_z:
+            self.pending_z = False
+            avail = self._avail()
+            max_off = max(0, len(lines) - avail)
+            if raw == 'z':
+                self.scroll_offset = max(0, min(self.cursor - avail // 2, max_off))
+            elif raw == 't':
+                self.scroll_offset = max(0, min(self.cursor, max_off))
+            elif raw == 'b':
+                self.scroll_offset = max(0, min(self.cursor - avail + 1, max_off))
+            self.count_buf = ''; return None
+
+        # f/F/t/T — awaiting the target char
+        if self.pending_find:
+            pf, self.pending_find = self.pending_find, ''
+            if not key.is_sequence and len(raw) == 1 and raw.isprintable():
+                fwd, till = pf in 'ft', pf in 'tT'
+                hit = _owm_find(self._lbl(), self._eff(), raw, fwd, till)
+                self.last_f = (pf, raw)
+                if hit is not None:
+                    self.want_col = hit
+            self.count_buf = ''; return None
+
+        # count prefix ('0' alone is not a count)
+        if raw.isdigit() and (raw != '0' or self.count_buf):
+            self.count_buf += raw
+            return None
+        n_given = bool(self.count_buf)
+        n = int(self.count_buf) if self.count_buf else 1
+        self.count_buf = ''
+
+        # m{a} / '{a} / `{a}
+        if self.pending_mark:
+            pm, self.pending_mark = self.pending_mark, ''
+            if pm == 'm':
+                if raw.isalpha() and raw.islower():
+                    self.marks[raw] = (self.cursor, self._eff())
+            elif raw in ("'", '`') and pm in ("'", '`'):
+                if self.last_jump is not None:
+                    self._jump_to(self.last_jump)
+            elif raw.isalpha() and raw.islower():
+                if raw in self.marks:
+                    mr, mc = self.marks[raw]
+                    self._jump_to(min(mr, last))
+                    if pm == '`':
+                        self.want_col = mc
+                    else:
+                        t = self._lbl()
+                        self.want_col = len(t) - len(t.lstrip()) if t.strip() else 0
+                else:
+                    self.player.error = f'E20: Mark not set: {raw}'
+            return None
+
+        if raw == ':':
+            self.cmdline.open()
+        elif raw in ('/', '?'):
+            if self._gate('/', 'search'):
+                self.searching = {'pfx': raw, 'buf': ''}
+        elif raw in ('n', 'N'):
+            if self._gate('/', 'search'):
+                if not self.player.last_search:
+                    self.player.error = 'E35: No previous regular expression'
+                else:
+                    pat, base_fwd = self.player.last_search
+                    self._run_search(pat, base_fwd if raw == 'n' else not base_fwd)
+        elif raw == 'h':
+            if n <= 1 or self._gate('count', 'counts'):
+                self.want_col = max(0, self._eff() - n)
+        elif raw == 'l':
+            if n <= 1 or self._gate('count', 'counts'):
+                self.want_col = min(max(0, len(self._lbl()) - 1), self._eff() + n)
+        elif raw == '0' and not n_given:
+            self.want_col = 0
+        elif raw == '^':
+            t = self._lbl()
+            self.want_col = len(t) - len(t.lstrip()) if t.strip() else 0
+        elif raw == '$':
+            self.want_col = 10 ** 9
+        elif raw and raw in 'wbeWBE':
+            if self._mgate(raw, raw):
+                fn = {'w': _owm_w, 'b': _owm_b, 'e': _owm_e,
+                      'W': _owm_w, 'B': _owm_b, 'E': _owm_e}[raw]
+                c = self._eff()
+                for _ in range(n):
+                    c = fn(self._lbl(), c, raw.isupper())
+                self.want_col = c
+        elif raw and raw in 'fFtT':
+            if self._mgate(raw, raw):
+                self.pending_find = raw
+        elif raw in (';', ','):
+            if self._mgate(raw, raw) and self.last_f:
+                pf, ch = self.last_f
+                if raw == ',':
+                    pf = {'f': 'F', 'F': 'f', 't': 'T', 'T': 't'}[pf]
+                hit = _owm_find(self._lbl(), self._eff(), ch, pf in 'ft', pf in 'tT')
+                if hit is not None:
+                    self.want_col = hit
+        elif raw in ('*', '#'):
+            if self._gate('*', '* (search word)'):
+                word = _owm_word_at(self._lbl(), self._eff())
+                if word is None:
+                    self.player.error = 'E348: No string under cursor'
+                else:
+                    self._run_search('\\<' + word + '\\>', raw == '*')
+        elif raw == 'z':
+            self.pending_z = True
+        elif raw in ("m'`") and raw:
+            if self._gate('mark', 'marks'):
+                self.pending_mark = raw
+        elif raw == '\x0f':                             # Ctrl-o
+            if self._gate('jump', 'the jump list'):
+                if self.jump_idx > 0:
+                    if self.jump_idx == len(self.jump_list):
+                        self.jump_list.append(self.cursor)
+                    self.jump_idx -= 1
+                    self.cursor = min(self.jump_list[self.jump_idx], last)
+        elif raw == '\t':                               # Ctrl-i (Tab)
+            if self._gate('jump', 'the jump list'):
+                if self.jump_idx + 1 < len(self.jump_list):
+                    self.jump_idx += 1
+                    self.cursor = min(self.jump_list[self.jump_idx], last)
+        elif raw == 'j':
+            if n <= 1 or self._gate('count', 'counts'):
+                self.cursor = min(self.cursor + n, last)
+        elif raw == 'k':
+            if n <= 1 or self._gate('count', 'counts'):
+                self.cursor = max(self.cursor - n, 0)
+        elif raw == 'g':
+            self.pending_g = True
+        elif raw == 'G':
+            if (n <= 1 or self._gate('count', 'counts')) and self._gate('G', 'G'):
+                self._jump_to(max(0, min(n - 1, last)) if n_given else last)
+        elif raw == 'H':
+            if self._gate('H', 'H'):
+                self.cursor = min(self.scroll_offset, last)
+        elif raw == 'M':
+            if self._gate('M', 'M'):
+                vc = min(self._avail(), last - self.scroll_offset + 1)
+                self.cursor = min(self.scroll_offset + (vc - 1) // 2, last)
+        elif raw == 'L':
+            if self._gate('L', 'L'):
+                self.cursor = min(self.scroll_offset + self._avail() - 1, last)
+        elif raw == '{':
+            if self._gate('{', '{'):
+                self._jump_to(self._section(-1))
+        elif raw == '}':
+            if self._gate('}', '}'):
+                self._jump_to(self._section(+1))
+        elif raw == '\x04':                             # Ctrl-d
+            self.cursor = min(self.cursor + self._avail() // 2, last)
+        elif raw == '\x15':                             # Ctrl-u
+            self.cursor = max(self.cursor - self._avail() // 2, 0)
+        elif raw == '\x06':                             # Ctrl-f
+            self.cursor = min(self.cursor + self._avail(), last)
+        elif raw == '\x02':                             # Ctrl-b
+            self.cursor = max(self.cursor - self._avail(), 0)
+        else:
+            return ('key', raw, key)                    # host's to handle
+        return None
+
+    def _section(self, direction):
+        lines = self._lines()
+        starts = _section_starts(lines, self._section_key)
+        if direction < 0:
+            before = [s for s in starts if s < self.cursor]
+            return before[-1] if before else 0
+        after = [s for s in starts if s > self.cursor]
+        return after[0] if after else len(lines) - 1
+
+
 def run_overworld(term: Terminal, player: Player, progress: dict,
                   initial_cursor: int | None = None) -> dict:
     """The netrw overworld (~/.vimny/world/) as a real netrw buffer.
@@ -7675,134 +8060,50 @@ def run_overworld(term: Terminal, player: Player, progress: dict,
 
     customs = _layouts()
     lines   = build_lines(visible, customs)
-    cursor  = default_cursor(lines) if initial_cursor is None else initial_cursor
-    cursor  = max(0, min(cursor, len(lines) - 1))
+    start   = default_cursor(lines) if initial_cursor is None else initial_cursor
+    start   = max(0, min(start, len(lines) - 1))
 
     learned  = _known_from_progress(progress)
     is_admin = player.name == 'admin'
-    def _has(tok): return is_admin or tok in learned
     def _gate(tok, label):
-        if _has(tok):
+        if is_admin or tok in learned:
             return True
         player.error = f"You haven't learned {label} yet."
         return False
 
     number_mode    = 'number'
-    cmdline        = _CmdLine(_OW_COMPLETIONS)
     renaming       = None        # None, or the in-progress new-name buffer
     pending_delete = False
-    pending_g      = False
-    pending_mark   = ''          # 'm' | "'" | '`' awaiting its register letter
-    pending_z      = False       # z awaiting z/t/b (view scroll)
-    pending_find   = ''          # 'f'|'F'|'t'|'T' awaiting its target char
-    searching      = None        # None, or {'pfx': '/'|'?', 'buf': str}
-    count_buf      = ''
-    scroll_offset  = 0
-    avail          = max(1, term.height - 5)
-    # The COLUMN cursor (Vim's curswant model): want_col is the sticky
-    # desired column; the effective column on any line is min(want, len-1)
-    # over that line's label. $ wants line-end forever (want = huge).
-    want_col   = 0
-    ow_last_f  = None            # (cmd, char) for ; and ,
 
-    def _label(i=None):
-        return line_search_text(lines[cursor if i is None else i])
-
-    def _eff(i=None):
-        return min(want_col, max(0, len(_label(i)) - 1))
-
-    def _mgate(mkey, label):
-        tok = _MOTION_GUARD_TABLE.get(mkey)
-        return tok is None or _gate(tok, label)
-    # Buffer-local marks + the jump list, netrw-style: session-scoped on the
-    # player (the overworld is one buffer; re-entering it keeps your marks).
+    # Buffer-local marks, netrw-style: session-scoped on the player (the
+    # overworld is one buffer; re-entering it keeps your marks).
     if not hasattr(player, 'ow_marks'):
         player.ow_marks = {}
-    jump_list: list = []         # cursor lines, Ctrl-o back / Ctrl-i (Tab) fwd
-    jump_idx  = 0
-    last_jump = None             # `''` — where the last jump left from
 
-    def _jump_to(target):
-        """A JUMP motion (G / { } / search / mark / :{n}): remember where we
-        left from, exactly like Vim's jump list + '' mark."""
-        nonlocal cursor, jump_idx, last_jump
-        if target == cursor:
-            return
-        last_jump = cursor
-        del jump_list[jump_idx:]
-        jump_list.append(cursor)
-        jump_idx = len(jump_list)
-        cursor = target
-
-    def _match_cols(pattern, text):
-        """Sorted match-start columns of `pattern` in `text` (vimregex, with
-        literal-substring fallback for untranslatable patterns)."""
-        pat = _vre_compile(pattern)
-        if pat is not None:
-            return sorted({s for s, _e in pat.finditer(text)})
-        cols, k = [], text.find(pattern)
-        while k >= 0:
-            cols.append(k)
-            k = text.find(pattern, k + 1)
-        return cols
-
-    def _search_from(pattern, fwd, start, start_col):
-        """First match strictly after/before (start, start_col), wrapscan —
-        Vim's wrapping search over the buffer's VISIBLE text, column-exact.
-        Returns ((line, col)|None, wrapped)."""
-        n = len(lines)
-        here = _match_cols(pattern, line_search_text(lines[start]))
-        if fwd:
-            after = [c for c in here if c > start_col]
-            if after:
-                return (start, after[0]), False
-            for step in range(1, n + 1):
-                i = (start + step) % n
-                cols = _match_cols(pattern, line_search_text(lines[i]))
-                if cols:
-                    return (i, cols[0]), (i <= start)
-            return None, False
-        before = [c for c in here if c < start_col]
-        if before:
-            return (start, before[-1]), False
-        for step in range(1, n + 1):
-            i = (start - step) % n
-            cols = _match_cols(pattern, line_search_text(lines[i]))
-            if cols:
-                return (i, cols[-1]), (i >= start)
-        return None, False
-
-    def _run_search(pattern, fwd):
-        nonlocal want_col
-        if not pattern:
-            player.error = 'E35: No previous regular expression'
-            return
-        player.last_search = (pattern, fwd)
-        hit, wrapped = _search_from(pattern, fwd, cursor, _eff())
-        if hit is None:
-            player.error = f'E486: Pattern not found: {pattern}'
-        else:
-            _jump_to(hit[0])
-            want_col = hit[1]                 # the cursor lands ON the match
-            if wrapped:
-                player.error = ('search hit BOTTOM, continuing at TOP'
-                                if fwd else 'search hit TOP, continuing at BOTTOM')
+    # All Vim navigation — gg/G/{n}G, H/M/L, { }, w b e, f F t T, ; ,, * #,
+    # marks, Ctrl-o/i, Ctrl-d/u/f/b, counts, and the / ? + : lines — lives in
+    # the shared NetrwNav engine (the same one the scroll library uses).
+    nav = NetrwNav(player=player, get_lines=lambda: lines, label=line_search_text,
+                   section_key=_ow_section_key, gate=_gate,
+                   avail=lambda: max(1, term.height - 5),
+                   completions=_OW_COMPLETIONS, marks=player.ow_marks, cursor=start)
 
     def _rebuild():
-        nonlocal customs, lines, cursor
+        nonlocal customs, lines
         customs = _layouts()
         lines   = build_lines(visible, customs)
-        cursor  = max(0, min(cursor, len(lines) - 1))
+        nav.cursor = max(0, min(nav.cursor, len(lines) - 1))
 
     def _render():
-        nonlocal scroll_offset
-        scroll_offset, cy, cx = render_overworld(
-            term, player, progress, cursor, lines,
-            cmd_line=(searching['buf'] if searching
-                      else cmdline.line if cmdline.active else None),
-            cmd_prefix=(searching['pfx'] if searching else ':'),
+        cmd_line = (nav.searching['buf'] if nav.searching
+                    else nav.cmdline.line if nav.cmdline.active else None)
+        cmd_pfx  = nav.searching['pfx'] if nav.searching else ':'
+        scroll, cy, cx = render_overworld(
+            term, player, progress, nav.cursor, lines,
+            cmd_line=cmd_line, cmd_prefix=cmd_pfx,
             number_mode=number_mode, deleting=pending_delete,
-            renaming=renaming, scroll_offset=scroll_offset, col=_eff())
+            renaming=renaming, scroll_offset=nav.scroll_offset, col=nav.col())
+        nav.scroll_offset = scroll
         print(term.move_yx(cy, cx) + (term.cvvis or term.cnorm), end='', flush=True)  # blinking cursor
 
     def _done(result):
@@ -7821,7 +8122,7 @@ def run_overworld(term: Terminal, player: Player, progress: dict,
             if key.name == 'KEY_ESCAPE':
                 renaming = None
             elif key.name == 'KEY_ENTER' or str(key) in ('\n', '\r'):
-                ln = lines[cursor]
+                ln = lines[nav.cursor]
                 if ln['type'] == 'custom' and renaming.strip():
                     SM.rename_layout(ln['layout'].get('layout_name', ''), renaming.strip())
                     _rebuild()
@@ -7833,265 +8134,55 @@ def run_overworld(term: Terminal, player: Player, progress: dict,
             _render()
             continue
 
-        # ── Search input (/ and ? — the netrw buffer is a real buffer) ────────
-        if searching is not None:
-            if key.name == 'KEY_ESCAPE':
-                searching = None
-            elif key.name == 'KEY_ENTER' or str(key) in ('\n', '\r'):
-                pat = searching['buf'] or (player.last_search or ('', True))[0]
-                fwd = searching['pfx'] == '/'
-                searching = None
-                _run_search(pat, fwd)
-            elif key.name == 'KEY_BACKSPACE' or str(key) == '\x7f':
-                if searching['buf']:
-                    searching['buf'] = searching['buf'][:-1]
-                else:
-                    searching = None                   # BS past the prompt closes it
-            elif not key.is_sequence and len(str(key)) == 1 and str(key).isprintable():
-                searching['buf'] += str(key)
-            _render()
-            continue
-
-        # ── Command mode ──────────────────────────────────────────────────────
-        if cmdline.active:
-            cmd = cmdline.feed(key)
-            if cmd:
-                if cmd.isdigit():                      # :{n} — the line address
-                    if _gate('line_addr', ':{n}'):
-                        _jump_to(max(0, min(int(cmd) - 1, len(lines) - 1)))
-                    _render()
-                    continue
-                if cmd in ('q', 'q!', 'wq'):
-                    if cmd == 'wq':
-                        SM.save_progress(progress, player.name)
-                    return _done({'action': 'quit', 'cursor': cursor})
-                if cmd in ('set number', 'set nu'):
-                    number_mode = 'number'
-                elif cmd in ('set relativenumber', 'set rnu'):
-                    number_mode = 'relativenumber'
-                elif cmd in ('set nonumber', 'set nonu'):
-                    number_mode = 'none'
-                elif cmd in ('set norelativenumber', 'set nornu'):
-                    number_mode = 'number'
-                else:
-                    _e_path = cmd[2:].rstrip('/') if cmd.startswith('e ') else ''
-                    if _e_path in ('saves',):
-                        return _done({'action': 'browse_saves', 'cursor': cursor})
-                    if _e_path in ('scrolls',):
-                        return _done({'action': 'scrolls', 'cursor': cursor})
-                    if _e_path in ('..', '../'):
-                        return _done({'action': 'parent_view', 'cursor': cursor})
-                    # Unknown commands silently ignored
-            _render()
-            continue
-
-        # ── Navigation ──────────────────────────────────────────────────────────
-        raw = str(key) if not key.is_sequence else ''
-        player.error = ''                              # clear any transient message
-        ln        = lines[cursor]
-        on_custom = ln['type'] == 'custom'
-        last      = len(lines) - 1
-
-        # D — delete a custom layout (netrw deletes with D); confirm with y.
+        # ── D — delete a custom layout (netrw); the next key confirms with y ────
         if pending_delete:
             pending_delete = False
-            count_buf = ''
-            if raw == 'y' and on_custom:
+            ln = lines[nav.cursor]
+            if str(key) == 'y' and ln['type'] == 'custom':
                 SM.delete_layout(ln['layout'].get('layout_name', ''))
                 _rebuild()
             _render()
             continue                                   # any non-y key cancels
 
-        # gg — jump to the first line
-        if pending_g:
-            pending_g = False
-            if raw == 'g':
-                _jump_to(0)
-                count_buf = ''
-                _render()
-                continue
-            if raw in ('*', '#'):                      # g* / g# — substring search
-                if _gate('g_family', 'the g-family'):
-                    word = _owm_word_at(_label(), _eff())
-                    if word is None:
-                        player.error = 'E348: No string under cursor'
-                    else:
-                        _run_search('\\V' + word, raw == '*')
-                count_buf = ''
-                _render()
-                continue
-            if raw == '_':                             # g_ — last non-blank
-                if _gate('g_family', 'the g-family'):
-                    want_col = max(0, len(_label().rstrip()) - 1)
-                count_buf = ''
-                _render()
-                continue
-            # not a g-sequence → fall through
-
-        # z{z,t,b} — view scrolling (free, like Ctrl-d/u/f/b: view-only)
-        if pending_z:
-            pending_z = False
-            max_off = max(0, len(lines) - avail)
-            if raw == 'z':
-                scroll_offset = max(0, min(cursor - avail // 2, max_off))
-            elif raw == 't':
-                scroll_offset = max(0, min(cursor, max_off))
-            elif raw == 'b':
-                scroll_offset = max(0, min(cursor - avail + 1, max_off))
-            count_buf = ''
+        # ── Everything else: the shared netrw motion engine ────────────────────
+        out = nav.feed(key)
+        if out is None:
             _render()
             continue
 
-        # f/F/t/T — awaiting the target character
-        if pending_find:
-            pf, pending_find = pending_find, ''
-            if not key.is_sequence and len(raw) == 1 and raw.isprintable():
-                fwd, till = pf in 'ft', pf in 'tT'
-                hit = _owm_find(_label(), _eff(), raw, fwd, till)
-                ow_last_f = (pf, raw)
-                if hit is not None:
-                    want_col = hit
-            count_buf = ''
+        if out[0] == 'cmd':
+            cmd = out[1]
+            if cmd in ('q', 'q!', 'wq'):
+                if cmd == 'wq':
+                    SM.save_progress(progress, player.name)
+                return _done({'action': 'quit', 'cursor': nav.cursor})
+            if cmd in ('set number', 'set nu'):
+                number_mode = 'number'
+            elif cmd in ('set relativenumber', 'set rnu'):
+                number_mode = 'relativenumber'
+            elif cmd in ('set nonumber', 'set nonu'):
+                number_mode = 'none'
+            elif cmd in ('set norelativenumber', 'set nornu'):
+                number_mode = 'number'
+            else:
+                _e_path = cmd[2:].rstrip('/') if cmd.startswith('e ') else ''
+                if _e_path in ('saves',):
+                    return _done({'action': 'browse_saves', 'cursor': nav.cursor})
+                if _e_path in ('scrolls',):
+                    return _done({'action': 'scrolls', 'cursor': nav.cursor})
+                if _e_path in ('..', '../'):
+                    return _done({'action': 'parent_view', 'cursor': nav.cursor})
+                # Unknown commands silently ignored
             _render()
             continue
 
-        # count prefix ('0' alone is not a count)
-        if raw.isdigit() and (raw != '0' or count_buf):
-            count_buf += raw
-            _render()
-            continue
-        n_given = bool(count_buf)
-        n = int(count_buf) if count_buf else 1
-        count_buf = ''
-
-        # m{a} / '{a} / `{a} — buffer-local marks ('' jumps back)
-        if pending_mark:
-            pm, pending_mark = pending_mark, ''
-            if pm == 'm':
-                if raw.isalpha() and raw.islower():
-                    player.ow_marks[raw] = (cursor, _eff())
-            elif raw in ("'", '`') and pm in ("'", '`'):
-                if last_jump is not None:              # '' — back where you jumped from
-                    _jump_to(last_jump)
-            elif raw.isalpha() and raw.islower():
-                if raw in player.ow_marks:
-                    mr, mc = player.ow_marks[raw]
-                    _jump_to(min(mr, last))
-                    if pm == '`':                      # ` — exact column; ' — first non-blank
-                        want_col = mc
-                    else:
-                        t = _label()
-                        want_col = len(t) - len(t.lstrip()) if t.strip() else 0
-                else:
-                    player.error = f'E20: Mark not set: {raw}'
-            _render()
-            continue
-
-        if raw == ':':
-            cmdline.open()
-        elif raw in ('/', '?'):
-            if _gate('/', 'search'):
-                searching = {'pfx': raw, 'buf': ''}
-        elif raw in ('n', 'N'):
-            if _gate('/', 'search'):
-                if not player.last_search:
-                    player.error = 'E35: No previous regular expression'
-                else:
-                    pat, base_fwd = player.last_search
-                    _run_search(pat, base_fwd if raw == 'n' else not base_fwd)
-        elif raw == 'h':
-            if n <= 1 or _gate('count', 'counts'):
-                want_col = max(0, _eff() - n)
-        elif raw == 'l':
-            if n <= 1 or _gate('count', 'counts'):
-                want_col = min(max(0, len(_label()) - 1), _eff() + n)
-        elif raw == '0' and not n_given:
-            want_col = 0
-        elif raw == '^':
-            t = _label()
-            want_col = len(t) - len(t.lstrip()) if t.strip() else 0
-        elif raw == '$':
-            want_col = 10 ** 9                         # curswant: line-end, forever
-        elif raw and raw in 'wbeWBE':
-            if _mgate(raw, raw):
-                fn = {'w': _owm_w, 'b': _owm_b, 'e': _owm_e,
-                      'W': _owm_w, 'B': _owm_b, 'E': _owm_e}[raw]
-                c = _eff()
-                for _ in range(n):
-                    c = fn(_label(), c, raw.isupper())
-                want_col = c
-        elif raw and raw in 'fFtT':
-            if _mgate(raw, raw):
-                pending_find = raw
-        elif raw in (';', ','):
-            if _mgate(raw, raw) and ow_last_f:
-                pf, ch = ow_last_f
-                if raw == ',':
-                    pf = {'f': 'F', 'F': 'f', 't': 'T', 'T': 't'}[pf]
-                hit = _owm_find(_label(), _eff(), ch, pf in 'ft', pf in 'tT')
-                if hit is not None:
-                    want_col = hit
-        elif raw in ('*', '#'):
-            if _gate('*', '* (search word)'):
-                word = _owm_word_at(_label(), _eff())
-                if word is None:
-                    player.error = 'E348: No string under cursor'
-                else:                                  # Vim-true whole word
-                    _run_search('\\<' + word + '\\>', raw == '*')
-        elif raw == 'z':
-            pending_z = True
-        elif raw in ("m'`") and raw:
-            if _gate('mark', 'marks'):
-                pending_mark = raw
-        elif raw == '\x0f':                            # Ctrl-o — jump back
-            if _gate('jump', 'the jump list'):
-                if jump_idx > 0:
-                    if jump_idx == len(jump_list):     # entering history: save here
-                        jump_list.append(cursor)
-                    jump_idx -= 1
-                    cursor = min(jump_list[jump_idx], last)
-        elif raw == '\t':                              # Ctrl-i (Tab) — jump forward
-            if _gate('jump', 'the jump list'):
-                if jump_idx + 1 < len(jump_list):
-                    jump_idx += 1
-                    cursor = min(jump_list[jump_idx], last)
-        elif raw == '-':
-            return _done({'action': 'parent_view', 'cursor': cursor})
-        elif raw == 'j':
-            if n <= 1 or _gate('count', 'counts'):
-                cursor = min(cursor + n, last)
-        elif raw == 'k':
-            if n <= 1 or _gate('count', 'counts'):
-                cursor = max(cursor - n, 0)
-        elif raw == 'g':
-            pending_g = True
-        elif raw == 'G':                               # {n}G → line n; bare G → last line
-            if (n <= 1 or _gate('count', 'counts')) and _gate('G', 'G'):
-                _jump_to(max(0, min(n - 1, last)) if n_given else last)
-        elif raw == 'H':
-            if _gate('H', 'H'):
-                cursor = min(scroll_offset, last)
-        elif raw == 'M':
-            if _gate('M', 'M'):
-                vc = min(avail, last - scroll_offset + 1)
-                cursor = min(scroll_offset + (vc - 1) // 2, last)
-        elif raw == 'L':
-            if _gate('L', 'L'):
-                cursor = min(scroll_offset + avail - 1, last)
-        elif raw == '{':
-            if _gate('{', '{'):
-                _jump_to(_ow_section(lines, cursor, -1))
-        elif raw == '}':
-            if _gate('}', '}'):
-                _jump_to(_ow_section(lines, cursor, +1))
-        elif raw == '\x04':                            # Ctrl-d — half page down
-            cursor = min(cursor + avail // 2, last)
-        elif raw == '\x15':                            # Ctrl-u — half page up
-            cursor = max(cursor - avail // 2, 0)
-        elif raw == '\x06':                            # Ctrl-f — page down
-            cursor = min(cursor + avail, last)
-        elif raw == '\x02':                            # Ctrl-b — page up
-            cursor = max(cursor - avail, 0)
+        # out[0] == 'key' — a keystroke the engine doesn't own (Enter / D / R /
+        # d / - and the like); dispatch the overworld-specific actions.
+        raw       = out[1]
+        ln        = lines[nav.cursor]
+        on_custom = ln['type'] == 'custom'
+        if raw == '-':
+            return _done({'action': 'parent_view', 'cursor': nav.cursor})
         elif raw == 'D':                               # netrw delete (custom only)
             if on_custom:
                 pending_delete = True
@@ -8107,13 +8198,13 @@ def run_overworld(term: Terminal, player: Player, progress: dict,
         elif key.name == 'KEY_ENTER' or raw in ('\n', '\r'):
             t = ln['type']
             if t == 'parent':
-                return _done({'action': 'parent_view', 'cursor': cursor})
+                return _done({'action': 'parent_view', 'cursor': nav.cursor})
             elif t == 'level':
                 lid = ln['level']['slug']
                 if is_unlocked(lid, progress, player.name):
-                    return _done({'action': 'enter', 'level': lid, 'cursor': cursor})
+                    return _done({'action': 'enter', 'level': lid, 'cursor': nav.cursor})
             elif t == 'custom':
-                return _done({'action': 'open_custom', 'layout': ln['layout'], 'cursor': cursor})
+                return _done({'action': 'open_custom', 'layout': ln['layout'], 'cursor': nav.cursor})
             # comment / self / subhdr → no-op
 
         _render()

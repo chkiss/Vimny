@@ -151,57 +151,87 @@ def _entry_meta(name: str) -> tuple[str, str, str]:
     return ('?', '', kind)
 
 
-def content_row_count() -> int:
-    """Total scrollable content rows (for scroll bounds)."""
-    groups = _resolved_groups()
-    total  = 1  # initial blank
-    for _, names in groups:
-        total += 2 + len(names)  # section header + entries + trailing blank
-    return total
+def palette_rows() -> list[dict]:
+    """The navigable buffer for the colors screen — a flat list of row dicts the
+    shared NetrwNav engine drives (mirrors the scroll library's `library_rows`).
+    Row types: 'parent' (../), 'section' (a colour group header), 'entry' (one
+    colour), 'blank'. Each carries a 'group' key for `{`/`}` and a 'plain' label
+    for `/`-search and word motions."""
+    rows: list[dict] = [{'type': 'parent', 'group': 'nav', 'plain': '../'},
+                        {'type': 'blank',  'group': 'nav', 'plain': ''}]
+    for gi, (group_name, names) in enumerate(_resolved_groups()):
+        rows.append({'type': 'section', 'group': gi, 'title': group_name,
+                     'plain': group_name})
+        for name in names:
+            _hex, role, _kind = _entry_meta(name)
+            rows.append({'type': 'entry', 'group': gi, 'name': name,
+                         'plain': f'{name} {role}'.strip()})
+        rows.append({'type': 'blank', 'group': gi, 'plain': ''})
+    return rows
 
 
-def _build_content_rows(iw: int) -> list[str]:
+def row_label(r: dict) -> str:
+    """Motion/search text of a palette row (mirrors what's drawn)."""
+    return r.get('plain', '')
+
+
+def row_section_key(r: dict) -> str:
+    """Grouping for `{`/`}` — the ../ nav rows, then one section per colour group."""
+    return r['group']
+
+
+def _row_colored(r: dict, iw: int, is_cursor: bool) -> str:
+    """One palette row as a colour-coded, iw-wide string; the cursor row is laid
+    on the cursor-line background (swatches keep their own colour)."""
     floor = C.floor_bg()
     dfc   = C.dir_fg()
     rst   = C.normal_fg()
+    bg    = C.sel_bg() if is_cursor else ''
+    restore = rst + bg                       # after a swatch: clear, reapply row bg
 
-    def _blank() -> str:
-        return ' ' * iw
+    t = r['type']
+    if t == 'parent':
+        return bg + dfc + '../' + restore + ' ' * max(0, iw - 3) + rst
+    if t == 'blank':
+        return bg + ' ' * iw + rst
+    if t == 'section':
+        plain = f'" {r["title"]}'
+        return bg + dfc + plain + restore + ' ' * max(0, iw - len(plain)) + rst
 
-    def _section(title: str) -> str:
-        plain = f'" {title}'
-        return dfc + plain + rst + ' ' * max(0, iw - len(plain))
+    name = r['name']
+    fn   = getattr(C, name)
+    hex_str, role, kind = _entry_meta(name)
+    if kind == 'bg':
+        swatch = fn() + ' ' * _SW + restore
+    else:
+        swatch = floor + fn() + _SWATCH + restore
+    visible = 2 + _SW + 2 + _NW + 2 + _HW + 2 + len(role)
+    pad     = max(0, iw - visible)
+    return (bg + '  ' + swatch +
+            '  ' + restore + f'{name:<{_NW}}' +
+            '  ' + dfc + f'{hex_str:<{_HW}}' + restore +
+            '  ' + C.hint_fg() + role + restore +
+            ' ' * pad + rst)
 
-    def _entry_row(name: str) -> str:
-        fn             = getattr(C, name)
-        hex_str, role, kind = _entry_meta(name)
-        if kind == 'bg':
-            swatch = fn() + ' ' * _SW + rst
-        else:
-            swatch = floor + fn() + _SWATCH + rst
-        visible = 2 + _SW + 2 + _NW + 2 + _HW + 2 + len(role)
-        pad     = max(0, iw - visible)
-        return ('  ' + swatch +
-                '  ' + rst + f'{name:<{_NW}}' +
-                '  ' + dfc + f'{hex_str:<{_HW}}' + rst +
-                '  ' + C.hint_fg() + role + rst +
-                ' ' * pad)
 
-    rows: list[str] = [_blank()]
-    for group_name, names in _resolved_groups():
-        rows.append(_section(group_name))
-        for name in names:
-            rows.append(_entry_row(name))
-        rows.append(_blank())
-    return rows
+def _viewport_top(cursor: int, top: int, avail: int, n: int) -> int:
+    """Vim-like viewport top: keep `top` unless the cursor has left the window."""
+    max_off = max(0, n - avail)
+    if cursor < top:
+        top = cursor
+    elif cursor >= top + avail:
+        top = cursor - avail + 1
+    return max(0, min(top, max_off))
 
 
 def render_color_palette(
     term: Terminal,
     player: Player,
-    scroll_top: int = 0,
+    cursor: int = 0,
+    scroll_offset: int = 0,
     cmd_line: str | None = None,
-) -> None:
+    cmd_prefix: str = ':',
+) -> int:
     iw  = _iw(term)
     bfg = C.border_fg()
     rst = C.normal_fg()
@@ -273,17 +303,15 @@ def render_color_palette(
     ]
     out.extend(hdr_rows)
 
-    # ── ../ entry ─────────────────────────────────────────────────────────────
-    out.append(_box_row(dfc + '../' + rst + ' ' * max(0, iw - 3)))
+    # ── Navigable content (../ + colour groups), scrolled as a viewport ────────
+    rows      = palette_rows()
+    reserved  = len(hdr_rows)
+    visible_h = max(1, game_h - reserved)
+    scroll_offset = _viewport_top(cursor, scroll_offset, visible_h, len(rows))
+    window    = list(enumerate(rows))[scroll_offset:scroll_offset + visible_h]
 
-    # ── Scrollable content ────────────────────────────────────────────────────
-    content   = _build_content_rows(iw)
-    reserved  = len(hdr_rows) + 1  # header rows + ../
-    visible_h = max(0, game_h - reserved)
-    window    = content[scroll_top : scroll_top + visible_h]
-
-    for row in window:
-        out.append(_box_row(row))
+    for idx, r in window:
+        out.append(_box_row(_row_colored(r, iw, idx == cursor)))
     for _ in range(visible_h - len(window)):
         out.append(_box_row(' ' * iw))
 
@@ -292,14 +320,14 @@ def render_color_palette(
     sl_lbl = '-- COLORS --'
 
     if cmd_line is not None:
-        cmd_text = ':' + cmd_line
+        cmd_text = cmd_prefix + cmd_line
         sl_pad   = max(0, sl_w - len(cmd_text))
         out.append(bfg + S.BOX_V + rst +
                    C.mode_command() + cmd_text + rst + ' ' * sl_pad +
                    bfg + S.BOX_V + rst)
     else:
-        total    = len(content)
-        sl_right = f'{scroll_top + 1}/{total} '
+        total    = len(rows)
+        sl_right = f'{cursor + 1}/{total} '
         sl_mid   = max(0, sl_w - len(sl_lbl) - 2 - len(sl_right))
         out.append(bfg + S.BOX_V + rst +
                    C.mode_normal() + ' ' + sl_lbl + ' ' +
@@ -310,3 +338,4 @@ def render_color_palette(
     out.append(border_h(S.BOX_BL, S.BOX_BR))
 
     print(term.home + term.clear + '\n'.join(out), end='', flush=True)
+    return scroll_offset

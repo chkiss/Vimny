@@ -61,6 +61,31 @@ def library_rows() -> list[dict]:
     return rows
 
 
+def row_label(r: dict, discovered=(), bless_seen=()) -> str:
+    """The motion/search text of a library row (mirrors what's drawn): ``../``,
+    ``./``, a subtree label, or a scroll title (``???`` while undiscovered)."""
+    t = r['type']
+    if t == 'parent':
+        return '../'
+    if t == 'self':
+        return './'
+    if t == 'subhdr':
+        return r['label']
+    disc = bless_seen if r.get('group') == 'blessings' else discovered
+    return r['scroll']['title'] if r['scroll']['id'] in disc else '???'
+
+
+def row_section_key(r: dict) -> str:
+    """Grouping for `{`/`}` — the nav rows, then each subtree (its header and its
+    scrolls share a key so a section spans the whole subtree)."""
+    t = r['type']
+    if t in ('parent', 'self'):
+        return 'nav'
+    if t == 'subhdr':
+        return r['label'].rstrip('/')      # 'codex/' → 'codex' (matches scroll group)
+    return r.get('group', 'scroll')
+
+
 def _viewport_top(cursor: int, top: int, avail: int, n: int) -> int:
     """Vim-like viewport top: keep `top` unless the cursor has left the window."""
     max_off = max(0, n - avail)
@@ -78,6 +103,7 @@ def render_scroll_library(
     cursor_row: int,
     cmd_line: str | None = None,
     scroll_offset: int = 0,
+    cmd_prefix: str = ':',
 ) -> int:
     """Render the library and return the (possibly adjusted) scroll_offset so the
     caller can keep the viewport in sync as the cursor moves."""
@@ -191,7 +217,8 @@ def render_scroll_library(
         out.append(NC.empty_row(iw, bfg, rst))
 
     # ── Statusline / command line / bottom border ──────────────────────────────
-    out.append(NC.bottom_statusline(iw, bfg, rst, sl_label, cursor_row, len(rows), cmd_line))
+    out.append(NC.bottom_statusline(iw, bfg, rst, sl_label, cursor_row, len(rows),
+                                    cmd_line, cmd_prefix))
     out.append(NC.border_h(iw, bfg, rst, S.BOX_BL, S.BOX_BR))
 
     print(term.home + term.clear + '\n'.join(out), end='', flush=True)
