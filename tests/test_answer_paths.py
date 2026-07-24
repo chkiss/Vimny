@@ -79,6 +79,11 @@ def _token_ks_cost(token: str) -> int:
         return len(m.group(1)) + 1
     if len(token) == 3 and token[0] in 'dyc' and token[1] in 'ia':
         return 3      # operator + text object ('dip', 'das', 'yi('): three keys
+    if len(token) == 2 and token[0] in 'dyc':
+        # operator + a one-char motion / doubled operator ('dw','ye','d$','cb',
+        # 'dd','yy'): TWO keys — the operator key AND the motion key both spend
+        # (the engine charges both; a 2-char op token is never a count or textobj).
+        return 2
     if len(token) >= 2 and token[0] in 'ia' and token[1:].isalpha():
         # insert tokens ('ica', 'agate'): the entry key + each typed char
         # spend 1; Esc spends NOTHING (main's INSERT loop only charges
@@ -162,10 +167,6 @@ _ANSWER_NOT_TOKENISED = {
     'build_dungeon_refrain_vault',     # :s/&/:y/p tape; tests/test_refrain_vault.py
     'build_dungeon_hall_of_echoes',    # 7-room macro-gauntlet tape (q/@, insert);
                                        # tests/test_hall_of_echoes.py
-    'build_dungeon_register_unnamed_hold',  # ye/dw operator+motion tape — the cost
-                                       # model reads a 2-char dX/yX as 1 key, but the
-                                       # engine charges 2; par pinned by
-                                       # tests/test_register_unnamed_hold.py
 }
 
 # Levels with a documented NON-1.4 budget. The Change Annex / Extension use a
@@ -182,8 +183,6 @@ _NONSTANDARD_BUDGET = {
     'build_dungeon_culling_ledger',    # GENEROUS hand-set 60: the :s-blanking longhand (~39) wins 1★
     'build_dungeon_shelving_room',     # GENEROUS hand-set 40: the :t+:d / :s^ longhands win 1★
     'build_dungeon_refrain_vault',     # GENEROUS hand-set 60: the ranged-:s mix (~39) wins 1★
-    'build_dungeon_register_unnamed_hold',  # GENEROUS hand-set 28: golf par 16, a clean
-                                            # manual register run / retype (~24) wins 1★
 }
 
 from tests import SEEDS as _UNIVERSAL_SEEDS

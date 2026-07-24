@@ -3852,11 +3852,12 @@ _R1_GAP_HEAD   = ('cleanliness', 'is', 'next', 'to')   # + the quarried 'godline
 _R1_PAR = 16                          # the optimal driven tape below (register golf:
                                       # ye grabs " godliness" in one stroke, fo p lays
                                       # it, dw cuts the intruder). Test-pinned.
-_R1_BUDGET = 33                       # GENEROUS hand-set (non-1.4): the golf par (16)
-                                      # is far under a clean MANUAL register solve (~24),
-                                      # a retype (~24), OR a clobber-then-re-yank RECOVERY
-                                      # (~32) — all of which must still WIN at 1★ so the
-                                      # sting never strands. See _NONSTANDARD_BUDGET.
+                                      # STANDARD ceil(16*1.4)=23 budget: tight on purpose —
+                                      # a post-game mastery level rewards the register golf.
+                                      # A verbose manual run / retype (~24) or a clobber
+                                      # recovery (~32) overshoot and are barred; the register
+                                      # tools are the way through, and the sting may strand
+                                      # a fumbled run (user call — recover with undo, or restart).
 
 
 def build_dungeon_register_unnamed_hold(seed: int) -> Dungeon:
@@ -3906,7 +3907,7 @@ def build_dungeon_register_unnamed_hold(seed: int) -> Dungeon:
 
     room.rebuild_indexes()
     room.par    = _R1_PAR
-    room.budget = _R1_BUDGET
+    room.budget = math.ceil(_R1_PAR * 1.4)
     # The optimal tape (adversarially found): ye grabs the quarry WITH its leading
     # space in one stroke (from the spine col, e jumps to the word end), fo p lays
     # it just past "to" in the gap — all while "" is clean — THEN climb back (- k)

@@ -120,12 +120,19 @@ false. The lesson: a delete clobbers what you carry. Fix by ORDER (yank+paste th
 gap first, then daw) or re-yank; nothing is walled off so the sting costs only a
 retry. **Par 16** = the adversarially-golfed optimum (`j ye 4j fo p - k fq dw G l`:
 `ye` grabs " godliness" with its leading space in one stroke, `fo p` lays it, `dw`
-cuts the intruder). **Budget 33** is a GENEROUS hand-set (`_NONSTANDARD_BUDGET`): a
-clean manual register run (~24), a retype (~24), and a clobber-then-re-yank recovery
-(~32) all still WIN at 1★ so the sting never strands. The tempting yank→daw→paste
-order fails outright. The `ye`/`dw` operator+motions aren't tokeniser-readable
-(`_ANSWER_NOT_TOKENISED`), so par is pinned by the level's own driven test. Seal-only
-tick `_register_unnamed_hold_tick`. Sense, not decree: both bays are famous sayings.
+cuts the intruder). **Budget is STANDARD** `ceil(16*1.4)=23` — tight on purpose (a
+post-game mastery level): a looser register order (~17) still wins at 1★, but a
+verbose retype (~24) or a clobber-then-re-yank recovery (~32) OVERSHOOT and are
+barred, so the register tools are the way through and a fumbled run can strand
+(user call — recover with undo, or restart). The tempting yank→daw→paste fails
+outright. Seal-only tick `_register_unnamed_hold_tick`. Sense, not decree: both bays
+are famous sayings.
+
+**Cost-model fix (bonus of this level):** `_token_ks_cost` in
+`tests/test_answer_paths.py` under-charged a 2-char operator+motion (`ye`/`dw`/`d$`/
+`dd`) as 1 key when the engine charges 2. No shipped answer used such a token before
+this level, so the bug was latent; patched to return 2, letting this answer stay
+tokeniser-validated (no `_ANSWER_NOT_TOKENISED` / `_NONSTANDARD_BUDGET` exemption).
 
 ### II — The Delete Ring (`"0`, `"1`–`"9`) — richest level in the wing
 Two chambers.
