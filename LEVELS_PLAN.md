@@ -102,6 +102,7 @@ Curriculum order is the order of `LEVELS`. Blueprints: `blueprints/act_*.md`.
 | 47 | `hall_of_echoes` | The Hall of Echoes | `q @ "` |  |
 | 48 | `gauntlet` | The Gauntlet | — |  |
 | 48.1 | `warden_eternal` | The Warden Eternal | — | boss |
+| R1 | `register_unnamed_hold` | The Register I | `yiw  P` |  |
 | 99 | `dummy` | Dummy Dungeon | `d x s y p yy P` |  |
 <!-- END GENERATED CURRICULUM TABLE -->
 

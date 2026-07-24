@@ -58,7 +58,10 @@ def _drive(keys, monkeypatch, tokens=ALL_TOKENS):
 
 
 def _lines():
-    visible = [l for l in LEVELS if not l.get('admin_only')]
+    # mirror run_overworld's visibility for a horseless player: admin-only and
+    # the post-adoption Registry wing are hidden.
+    visible = [l for l in LEVELS
+               if not l.get('admin_only') and l.get('wing') != 'registry']
     return build_lines(visible, [])
 
 

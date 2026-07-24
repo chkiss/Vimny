@@ -440,6 +440,12 @@ POEMS: list[tuple[str | None, str, list[str]]] = [
         'Two verses are unwritten: open the line.',
         'Walk it once, clean, and the last seal parts.',
     ]),
+    ('register_unnamed_hold', 'the unnamed hold', [  # The Register I — "" (bonus)
+        'y lifts a word to the one plain hold;',
+        'p lays it back where the saying wants it.',
+        'But the hold keeps only your latest take—',
+        'and cutting takes. Paste before you cut.',
+    ]),
     ('warden_eternal', 'warden eternal', [     # The Warden Eternal (final boss)
         'The last Warden is every Warden.',
         'No key remains for me to give—',

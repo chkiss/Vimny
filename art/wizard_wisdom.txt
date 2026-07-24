@@ -695,6 +695,17 @@
       ]
     },
     {
+      "introduces_slug": "register_unnamed_hold",
+      "name": "the unnamed hold",
+      "line_count": 4,
+      "quote": [
+        "     y lifts a word to the one plain hold;      ",
+        "   p lays it back where the saying wants it.    ",
+        "   But the hold keeps only your latest take—    ",
+        "    and cutting takes. Paste before you cut.    "
+      ]
+    },
+    {
       "introduces_slug": "warden_eternal",
       "name": "warden eternal",
       "line_count": 4,

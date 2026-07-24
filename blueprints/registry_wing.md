@@ -109,12 +109,19 @@ texts universally known and long out of copyright; refuse copyrighted lyrics.
 
 ## Per-level design
 
-### I — The Unnamed Hold (`""`)
-The one holding cell. Ferry a word across a gap: `yw` … `p`. Teaching twist: a
-required delete midway **clobbers** the carried word (because `d` also writes
-`""`), stranding you — you must redo the yank. This deliberately exposes `""`'s
-single-slot volatility; the frustration is the hook for Level II. Forcing: trivial
-foundation; pin 2★ with a driven route.
+### I — The Unnamed Hold (`""`) — SHIPPED 2026-07-23
+`build_dungeon_register_unnamed_hold` + `tests/test_register_unnamed_hold.py`.
+Vertical spine, three bays top→bottom: DAW ("look before you {junk} leap"), QUARRY
+(the lone word "godliness"), a **spine gate** (stone until the daw bay reads true),
+then GAP ("cleanliness is next to ____"). The gate makes the clobber UNAVOIDABLE:
+the quarry (above the gate) can't reach the gap (below it) without cutting the
+intruder, and that `daw` overwrites `""` with the junk. Taught order: **cut → yank →
+paste** — the yank AFTER the delete. Naive yank-first strands the paste (bay stays
+false); re-yanking after the clobber recovers, so it never strands. Forcing holds
+three ways (all driven): retyping the 9-letter word wins but at 1★ (par 25);
+yank-first fails; the gate bars the gap until the daw. Dedicated tick
+`_register_unnamed_hold_tick` (gate + final seal); `apply_stone_fog` sleeps the gap
+bay behind the gate. Sense, not decree: both bays are famous sayings.
 
 ### II — The Delete Ring (`"0`, `"1`–`"9`) — richest level in the wing
 Two chambers.

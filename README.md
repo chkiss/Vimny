@@ -123,7 +123,8 @@ The curriculum is defined in `content/levels.py` (canonical) and mirrored in `LE
 | 46 | The Wet Ink | `gi` | Playable |
 | 47 | The Hall of Echoes | `q @ "` | Playable |
 | 48 | The Gauntlet | — | Playable |
-| 48.1 | The Warden Eternal | (boss) | Planned |
+| 48.1 | The Warden Eternal | (boss) | Playable |
+| R1 | The Register I | `yiw  P` | Playable |
 <!-- END GENERATED LEVELS TABLE -->
 
 ## Commands

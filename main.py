@@ -1755,6 +1755,32 @@ def _sight_sanctum_tick(room, player) -> list:
     return msgs
 
 
+def _register_unnamed_hold_tick(room, player) -> list:
+    """The Register I gate + seal.  The spine gate (room._r1_gate_cell) is stone
+    until the daw bay reads its true saying; the exit seal parts once BOTH the
+    daw bay and the paste bay read true.  Stateless + undo-aware (texts are
+    re-read each tick); a gate/seal never closes under the player's own feet."""
+    texts = {_wla_floor_text(room, r).strip() for r in range(room.rows)}
+    daw_ok = room._r1_daw_target in texts
+    gap_ok = room._r1_gap_target in texts
+    msgs = []
+    gr, gc = room._r1_gate_cell
+    gate_open = room.cells[gr][gc] != CellType.WALL
+    if daw_ok and not gate_open:
+        room.cells[gr][gc] = CellType.FLOOR
+        msgs.append('The stray word falls away — the passage opens.')
+    elif not daw_ok and gate_open and (player.row, player.col) != (gr, gc):
+        room.cells[gr][gc] = CellType.WALL
+    er, ec = room.exit_pos
+    seal_open = room.cells[er][ec] != CellType.WALL
+    if daw_ok and gap_ok and not seal_open:
+        room.cells[er][ec] = CellType.FLOOR
+        msgs.append('Both sayings read true — the seal parts.')
+    elif not (daw_ok and gap_ok) and seal_open and (player.row, player.col) != (er, ec):
+        room.cells[er][ec] = CellType.WALL
+    return msgs
+
+
 def _hall_of_echoes_tick(room, player) -> list:
     """The Hall of Echoes gauntlet — chambers are RUNS of text rows split by
     stone bands. `room._heg_chain` holds one (done-texts, head-col) spec per
@@ -2974,6 +3000,7 @@ _LEVEL_INTROS = {
     'buried_word': ('The Buried Word — one word stands alone at the hall\'s mouth, and nowhere else does it stand: down the hall it only hides, seamed into longer names. The seams are fused shut.', 70),
     'wet_ink': ('The Wet Ink — a writing ledge, an old saying mostly lost in the dark, and a gallery of cold braziers beneath it. Write its opening and you will know the rest. The scribes here wrote by firelight, and the fire answers only words already written.', 70),
     'g_sanctum': ('The Last Reach — three old sayings run east toward the flood. The keepers of this place went to the end of the line many times a day, and never once over it.', 70),
+    'register_unnamed_hold': ('The Register I — the horse waits at the mouth, and his saddle bears whatever you last took up. What it holds, it holds only until your hand closes on the next thing; and a blade closes a hand as surely as a grasp.', 70),
     'stair_rail': ('The Stair Rail — a broken stair winds down the shaft, each step\'s word set a little east of the last, and below the steps the floor falls a long way. The masons who cut these stairs never missed a landing.', 70),
     'hall_of_echoes': ('The Hall of Echoes — hall opens onto hall, and every hall repeats itself. The stone remembers.', 70),
     'grandmasters_sanctum': ('The Grandmaster\'s Sanctum — a long gallery of seven proofs, and the master himself beyond the last stone, listening to every stroke. Nothing here is new; everything here is asked properly.', 70),
@@ -4169,6 +4196,9 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
                      'quote_enclosure', 'tag_enclosure', 'sentence_enclosure',
                      'stair_rail', 'wet_ink'):
             for _m in _sight_sanctum_tick(room, player):   # the shared exact-text tick
+                _push(_m)
+        if level == 'register_unnamed_hold':
+            for _m in _register_unnamed_hold_tick(room, player):
                 _push(_m)
         if level == 'hall_of_echoes':
             for _m in _hall_of_echoes_tick(room, player):  # per-room south seal
@@ -8279,7 +8309,15 @@ def run_overworld(term: Terminal, player: Player, progress: dict,
     """
     _OW_COMPLETIONS = ['../', 'saves/', 'scrolls/']
 
-    visible = [l for l in LEVELS if not l.get('admin_only') or player.name == 'admin']
+    def _wing_shown(l):
+        # The Registry wing hides in the world/ menu until the horse is adopted
+        # (his saddle holds the registers). Admin sees everything.
+        if l.get('wing') == 'registry' and player.name != 'admin':
+            return bool(progress.get('horse_name'))
+        return True
+
+    visible = [l for l in LEVELS
+               if (not l.get('admin_only') or player.name == 'admin') and _wing_shown(l)]
 
     def _layouts():
         return SM.list_layouts() if player.name == 'admin' else []
