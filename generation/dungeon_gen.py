@@ -3849,7 +3849,14 @@ _R1_DAW_PREFIX = ('look', 'before', 'you')
 _R1_DAW_JUNK   = 'quill'
 _R1_DAW_SUFFIX = ('leap',)
 _R1_GAP_HEAD   = ('cleanliness', 'is', 'next', 'to')   # + the quarried 'godliness'
-_R1_PAR = 25                          # tallied along the driven tape below; test-pinned
+_R1_PAR = 16                          # the optimal driven tape below (register golf:
+                                      # ye grabs " godliness" in one stroke, fo p lays
+                                      # it, dw cuts the intruder). Test-pinned.
+_R1_BUDGET = 33                       # GENEROUS hand-set (non-1.4): the golf par (16)
+                                      # is far under a clean MANUAL register solve (~24),
+                                      # a retype (~24), OR a clobber-then-re-yank RECOVERY
+                                      # (~32) — all of which must still WIN at 1★ so the
+                                      # sting never strands. See _NONSTANDARD_BUDGET.
 
 
 def build_dungeon_register_unnamed_hold(seed: int) -> Dungeon:
@@ -3899,11 +3906,13 @@ def build_dungeon_register_unnamed_hold(seed: int) -> Dungeon:
 
     room.rebuild_indexes()
     room.par    = _R1_PAR
-    room.budget = math.ceil(_R1_PAR * 1.4)
-    # The par tape avoids the clobber by ORDER: yank the quarry + paste the gap
-    # FIRST (while "" is clean), THEN climb back to daw the intruder, then out.
-    # (No | col-motion — a relic, not taught; every vertical hop is via the spine.)
-    room.answer = ('j ^ yiw 0 4j ^ 4e l p 0 2k fq daw 0 4j l')
+    room.budget = _R1_BUDGET
+    # The optimal tape (adversarially found): ye grabs the quarry WITH its leading
+    # space in one stroke (from the spine col, e jumps to the word end), fo p lays
+    # it just past "to" in the gap — all while "" is clean — THEN climb back (- k)
+    # and cut the intruder with dw, and G l to the seal. Yank+paste first dodges
+    # the clobber; doing it last (dw before the yank) also wins, one key dearer.
+    room.answer = ('j ye 4j fo p - k fq dw G l')
 
     dungeon = Dungeon(name='The Register I', seed=seed)
     dungeon.rooms        = [room]

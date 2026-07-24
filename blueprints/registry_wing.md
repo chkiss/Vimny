@@ -118,10 +118,14 @@ the natural plan is yank → walk down → paste — but the DAW sits between, a
 it en route overwrites `""` with the junk, so `p` lays the junk and the gap stays
 false. The lesson: a delete clobbers what you carry. Fix by ORDER (yank+paste the
 gap first, then daw) or re-yank; nothing is walled off so the sting costs only a
-retry. Forcing (all driven): par 25 = yank+paste-first tape; the tempting yank→daw→
-paste order fails; retyping the 9-letter word wins but at 1★ (28). Seal-only tick
-`_register_unnamed_hold_tick` (exit parts when both bays true). Sense, not decree:
-both bays are famous sayings.
+retry. **Par 16** = the adversarially-golfed optimum (`j ye 4j fo p - k fq dw G l`:
+`ye` grabs " godliness" with its leading space in one stroke, `fo p` lays it, `dw`
+cuts the intruder). **Budget 33** is a GENEROUS hand-set (`_NONSTANDARD_BUDGET`): a
+clean manual register run (~24), a retype (~24), and a clobber-then-re-yank recovery
+(~32) all still WIN at 1★ so the sting never strands. The tempting yank→daw→paste
+order fails outright. The `ye`/`dw` operator+motions aren't tokeniser-readable
+(`_ANSWER_NOT_TOKENISED`), so par is pinned by the level's own driven test. Seal-only
+tick `_register_unnamed_hold_tick`. Sense, not decree: both bays are famous sayings.
 
 ### II — The Delete Ring (`"0`, `"1`–`"9`) — richest level in the wing
 Two chambers.

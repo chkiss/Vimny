@@ -162,6 +162,10 @@ _ANSWER_NOT_TOKENISED = {
     'build_dungeon_refrain_vault',     # :s/&/:y/p tape; tests/test_refrain_vault.py
     'build_dungeon_hall_of_echoes',    # 7-room macro-gauntlet tape (q/@, insert);
                                        # tests/test_hall_of_echoes.py
+    'build_dungeon_register_unnamed_hold',  # ye/dw operator+motion tape — the cost
+                                       # model reads a 2-char dX/yX as 1 key, but the
+                                       # engine charges 2; par pinned by
+                                       # tests/test_register_unnamed_hold.py
 }
 
 # Levels with a documented NON-1.4 budget. The Change Annex / Extension use a
@@ -178,6 +182,8 @@ _NONSTANDARD_BUDGET = {
     'build_dungeon_culling_ledger',    # GENEROUS hand-set 60: the :s-blanking longhand (~39) wins 1★
     'build_dungeon_shelving_room',     # GENEROUS hand-set 40: the :t+:d / :s^ longhands win 1★
     'build_dungeon_refrain_vault',     # GENEROUS hand-set 60: the ranged-:s mix (~39) wins 1★
+    'build_dungeon_register_unnamed_hold',  # GENEROUS hand-set 28: golf par 16, a clean
+                                            # manual register run / retype (~24) wins 1★
 }
 
 from tests import SEEDS as _UNIVERSAL_SEEDS
