@@ -5,11 +5,12 @@
 
 """The Register I — The Unnamed Hold ("").  The first Registry bonus level.
 
-The geometry forces a delete BETWEEN the word's only source and where it must be
-laid: a spine gate (opened only by daw-ing the intruder bay) bars the gap bay, so
-the word yanked at the quarry cannot reach the gap without a clobbering cut.  The
-taught order is cut → yank → paste (the yank AFTER the delete).  See
-blueprints/registry_wing.md and dungeon_gen.build_dungeon_register_unnamed_hold."""
+Three open bays down a spine — QUARRY (the lone word), DAW (an intruder saying),
+GAP (a saying missing its last word) — ALL reachable from the start, so the layout
+tempts the ruinous order yank -> daw -> paste: the daw overwrites "" with the junk,
+so P lays the junk and the gap stays false.  The fix is to reorder (yank+paste
+first, then daw) or re-yank; nothing is walled off, so the sting only costs a retry.
+See blueprints/registry_wing.md and dungeon_gen.build_dungeon_register_unnamed_hold."""
 import math
 import pytest
 from blessed.keyboard import Keystroke
@@ -17,11 +18,11 @@ from blessed import Terminal
 
 import main
 from engine.world import CellType
+from engine.motion import _vision_flood, _FOGGABLE_CELLS
 from content.levels import LEVELS, is_unlocked, _BY_SLUG
 from generation.dungeon_gen import (build_dungeon_register_unnamed_hold as _build,
                                     _R1_PAR, _R1_GATE, _R1_SPINE, _R1_EXIT,
-                                    _R1_GATE_ROW, _R1_ROW_DAW, _R1_ROW_QUARRY,
-                                    _R1_ROW_GAP)
+                                    _R1_ROW_QUARRY, _R1_ROW_DAW, _R1_ROW_GAP)
 from tests import SEEDS
 
 ESC = Keystroke('\x1b', code=361, name='KEY_ESCAPE')
@@ -59,13 +60,13 @@ def _drive_spent(keys, monkeypatch, **kw):
     return result['won'], box.get('spent')
 
 
-# ── the canonical (par) tape: cut the intruder (opens the gate), yank the quarry
-# on the way down, paste it into the gap, then out — all vertical hops via the spine.
+# ── the canonical (par) tape: dodge the clobber by ORDER — yank the quarry and
+# paste the gap FIRST (while "" is clean), THEN climb back to daw, then out.
 def _canon():
-    return _K('j') + _K('fq') + _K('daw') \
-        + _K('0') + _K('2j') + _K('^') + _K('yiw') \
-        + _K('0') + _K('2j') + _K('^') + _K('4e') + _K('l') + _K('p') \
-        + _K('0') + _K('2j') + _K('l')
+    return _K('j') + _K('^') + _K('yiw') \
+        + _K('0') + _K('4j') + _K('^') + _K('4e') + _K('l') + _K('p') \
+        + _K('0') + _K('2k') + _K('fq') + _K('daw') \
+        + _K('0') + _K('4j') + _K('l')
 
 
 def test_canonical_tape_solves_at_two_stars(monkeypatch):
@@ -80,40 +81,39 @@ def test_par_equals_the_driven_tape(monkeypatch):
 
 def test_room_answer_matches_the_canonical_tape():
     room = _build(0).room
-    assert room.answer == 'j fq daw 0 2j ^ yiw 0 2j ^ 4e l p 0 2j l'
+    assert room.answer == 'j ^ yiw 0 4j ^ 4e l p 0 2k fq daw 0 4j l'
 
 
 def test_retyping_the_word_wins_but_drops_a_star(monkeypatch):
-    # necessity by par: heal the gate (daw), skip the quarry, and TYPE the missing
+    # necessity by par: skip the quarry, daw the intruder, and TYPE the missing
     # word into the gap. It still wins (inside the 1.4 budget) but overpays the 9
     # typed letters → 1 star; yank + paste is par.
-    rival = (_K('j') + _K('fq') + _K('daw')
-             + _K('0') + _K('4j') + _K('^') + _K('4e') + _K('l')
+    rival = (_K('3j') + _K('fq') + _K('daw')
+             + _K('0') + _K('2j') + _K('^') + _K('4e') + _K('l')
              + _K('a') + _K('godliness') + [ESC]
              + _K('0') + _K('2j') + _K('l'))
     won, spent = _drive_spent(rival, monkeypatch)
     assert won and spent > _R1_PAR, (won, spent)
 
 
-def test_the_clobber_is_forced_and_strands_the_paste(monkeypatch):
-    # The sting: grab the quarry word (yiw) first, then — to pass the spine gate —
-    # you must daw the intruder, which overwrites "" with the junk. P then lays the
-    # junk into the gap, so the paste bay never reads true → the level is not won.
-    wrong = (_K('3j') + _K('^') + _K('yiw')            # grab the word into ""
-             + _K('0') + _K('2k') + _K('fq') + _K('daw')  # daw to open the gate — clobbers ""
-             + _K('0') + _K('4j') + _K('^') + _K('4e') + _K('l') + _K('p')  # P lays junk
-             + _K('0') + _K('2j') + _K('l'))
-    result = _drive(wrong, monkeypatch)
+def test_the_tempting_order_clobbers_and_fails(monkeypatch):
+    # The sting the layout tempts: meet the word first (yank), walk down cutting
+    # the intruder on the way (daw — clobbers "" with the junk), then paste into
+    # the gap — P lays the junk, the gap stays false, the level is not won.
+    tempting = (_K('j') + _K('^') + _K('yiw')            # grab the word into ""
+                + _K('0') + _K('2j') + _K('fq') + _K('daw')  # daw en route — clobbers ""
+                + _K('0') + _K('2j') + _K('^') + _K('4e') + _K('l') + _K('p')  # P lays junk
+                + _K('0') + _K('2j') + _K('l'))
+    result = _drive(tempting, monkeypatch)
     assert not result['won'], result
 
 
 def test_reyank_after_the_clobber_recovers(monkeypatch):
-    # Recoverable, never stranding: after the clobber, go back up to the quarry,
-    # re-yank the word (now that the gate is open), descend and paste — it wins.
-    fix = (_K('3j') + _K('^') + _K('yiw')              # (clobbered later)
-           + _K('0') + _K('2k') + _K('fq') + _K('daw')   # gate opens, "" = junk
-           + _K('0') + _K('2j') + _K('^') + _K('yiw')   # re-yank the quarry word
-           + _K('0') + _K('2j') + _K('^') + _K('4e') + _K('l') + _K('p')
+    # Nothing is walled off: after the clobber, re-yank the quarry and paste — wins.
+    fix = (_K('j') + _K('^') + _K('yiw')                # (clobbered next)
+           + _K('0') + _K('2j') + _K('fq') + _K('daw')   # "" = junk
+           + _K('0') + _K('2k') + _K('^') + _K('yiw')    # re-yank the quarry word
+           + _K('0') + _K('4j') + _K('^') + _K('4e') + _K('l') + _K('p')
            + _K('0') + _K('2j') + _K('l'))
     result = _drive(fix, monkeypatch)
     assert result['won'], result
@@ -127,34 +127,32 @@ def test_dimensions_and_bays(seed):
     assert (room.rows, room.cols) == (ref.rows, ref.cols)
     assert room.par == _R1_PAR
     assert room.budget == math.ceil(_R1_PAR * 1.4)
-    assert main._wla_floor_text(room, _R1_ROW_DAW).strip() == 'look before you quill leap'
     assert main._wla_floor_text(room, _R1_ROW_QUARRY).strip() == 'godliness'
+    assert main._wla_floor_text(room, _R1_ROW_DAW).strip() == 'look before you quill leap'
     assert main._wla_floor_text(room, _R1_ROW_GAP).strip() == 'cleanliness is next to'
 
 
-def test_gate_and_seal_start_shut():
+def test_all_lines_reachable_from_the_start_no_fog():
+    # No gate, no fog: every bay is visible/reachable from spawn so the layout can
+    # tempt the yank. (The exit is WALL behind the seal, so it isn't foggable.)
+    room = _build(0).room
+    assert not room.fog_cells
+    foggable = {(r, c) for r in range(room.rows) for c in range(room.cols)
+                if room.cells[r][c] in _FOGGABLE_CELLS}
+    assert foggable <= _vision_flood(room, *room.spawn_pos)
+
+
+def test_seal_starts_shut():
     room = _build(0).room
     er, ec = room.exit_pos
-    assert room.cells[er][ec] == CellType.WALL                      # the final seal
-    assert room.cells[_R1_GATE_ROW][_R1_SPINE] == CellType.WALL      # the spine gate
-
-
-def test_gate_bars_the_gap_until_the_daw(monkeypatch):
-    # The gap bay lies below the gate; without healing the daw bay the gate is
-    # stone, so a straight descent to the gap can't win (it can't even paste).
-    stuck = (_K('3j') + _K('^') + _K('yiw')   # grab the quarry (gate still shut)
-             + _K('0') + _K('2j'))            # try to descend past the gate — blocked
-    result = _drive(stuck, monkeypatch)
-    assert not result['won'], result
+    assert room.cells[er][ec] == CellType.WALL
 
 
 def test_exit_is_behind_the_seal_not_a_jump_target():
-    # The exit sits just east of the spine on the gate row; every bay/spine row's
-    # first standable is the spine, so no line jump lands in the exit cell.
     room = _build(0).room
     er, ec = _R1_EXIT
     assert ec == _R1_SPINE + 1
-    for r in (_R1_ROW_DAW, _R1_ROW_QUARRY, _R1_ROW_GAP, _R1_GATE):
+    for r in (_R1_ROW_QUARRY, _R1_ROW_DAW, _R1_ROW_GAP, _R1_GATE):
         first = next((c for c in range(room.cols)
                       if room.cells[r][c] != CellType.WALL), None)
         assert first == _R1_SPINE, (r, first)

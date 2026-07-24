@@ -1756,27 +1756,18 @@ def _sight_sanctum_tick(room, player) -> list:
 
 
 def _register_unnamed_hold_tick(room, player) -> list:
-    """The Register I gate + seal.  The spine gate (room._r1_gate_cell) is stone
-    until the daw bay reads its true saying; the exit seal parts once BOTH the
-    daw bay and the paste bay read true.  Stateless + undo-aware (texts are
-    re-read each tick); a gate/seal never closes under the player's own feet."""
+    """The Register I exit seal — parts once BOTH the daw bay and the paste bay
+    read their true sayings.  Stateless + undo-aware (texts are re-read each
+    tick); the seal never closes under the player's own feet."""
     texts = {_wla_floor_text(room, r).strip() for r in range(room.rows)}
-    daw_ok = room._r1_daw_target in texts
-    gap_ok = room._r1_gap_target in texts
-    msgs = []
-    gr, gc = room._r1_gate_cell
-    gate_open = room.cells[gr][gc] != CellType.WALL
-    if daw_ok and not gate_open:
-        room.cells[gr][gc] = CellType.FLOOR
-        msgs.append('The stray word falls away — the passage opens.')
-    elif not daw_ok and gate_open and (player.row, player.col) != (gr, gc):
-        room.cells[gr][gc] = CellType.WALL
+    ok = room._r1_daw_target in texts and room._r1_gap_target in texts
     er, ec = room.exit_pos
     seal_open = room.cells[er][ec] != CellType.WALL
-    if daw_ok and gap_ok and not seal_open:
+    msgs = []
+    if ok and not seal_open:
         room.cells[er][ec] = CellType.FLOOR
         msgs.append('Both sayings read true — the seal parts.')
-    elif not (daw_ok and gap_ok) and seal_open and (player.row, player.col) != (er, ec):
+    elif not ok and seal_open and (player.row, player.col) != (er, ec):
         room.cells[er][ec] = CellType.WALL
     return msgs
 

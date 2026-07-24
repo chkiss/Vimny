@@ -3819,29 +3819,26 @@ def build_dungeon_word_enclosure(seed: int) -> Dungeon:
 # ── The Register I — The Unnamed Hold (the "" register) ───────────────────────
 # The first bonus wing level (unlocked once the horse is adopted — the saddle
 # holds the registers). It REFRESHES the unnamed register "" and teaches its
-# VOLATILITY: "" is one slot, and ANY delete overwrites it. The geometry forces
-# a delete to fall BETWEEN the only source of the word and where it must be laid:
+# VOLATILITY: "" is one slot, and ANY delete overwrites it. Three open bays run
+# down a spine, ALL reachable from the start (no gate, no fog) so the layout
+# TEMPTS the ruinous order:
 #
-#   spawn ─ DAW (row 3: "look before you {junk} leap") ─ QUARRY (row 5: the lone
-#   word "perfect") ─╫─ (spine gate, row 6) ─ GAP (row 7: "practice makes ____")
-#   ─ exit
+#   spawn ─ QUARRY (row 3: the lone word "godliness") ─ DAW (row 5: "look before
+#   you {junk} leap") ─ GAP (row 7: "cleanliness is next to ____") ─ exit
 #
-# The gate on the spine (below the quarry) is stone until the DAW bay (above the
-# quarry) reads its true saying — so you CANNOT reach the gap to paste without
-# first cutting the intruder, and that cut overwrites "" with the junk. Grab the
-# quarry word and then cut your way through, and your P lays the junk: the paste
-# bay stays false. The order the level teaches: cut FIRST (open the gate), THEN
-# yank the quarry on the way down, THEN paste — the yank must come AFTER the
-# delete. The quarry sits ON the descent (between daw and gap), so yanking it is
-# cheap and beats retyping the word; the gate makes the delete unavoidable. The
-# quarry stays reachable above the gate, so the sting teaches, never strands.
-# The exit seal wants both bays true. A dedicated tick runs the gate + seal.
+# You meet the word first, so the natural plan is yank it, walk down, and paste
+# it into the gap you can already see. But the daw bay sits BETWEEN them: cut the
+# intruder on the way and the delete overwrites "" with the junk, so your P lays
+# the junk and the gap stays false. The lesson: a delete clobbers what you carry.
+# The fix is to REORDER — yank + paste the gap FIRST, then daw; or daw first, then
+# yank + paste; or simply re-yank after the clobber. Nothing is walled off, so the
+# sting only ever costs a retry. The 9-letter word keeps yank + paste cheaper than
+# retyping it. The exit seal wants both bays true (a seal-only tick).
 _R1_ROWS, _R1_COLS = 11, 44
 _R1_SPINE = 2
 _R1_BAY_W, _R1_BAY_E = 3, 40
-_R1_ROW_DAW    = 3                    # the intruder saying — daw opens the gate
-_R1_ROW_QUARRY = 5                    # the lone word to carry (on the descent)
-_R1_GATE_ROW   = 6                    # spine gate cell (stone until the daw reads true)
+_R1_ROW_QUARRY = 3                    # the lone word — met first (tempts the yank)
+_R1_ROW_DAW    = 5                    # the intruder saying — daw clobbers ""
 _R1_ROW_GAP    = 7                    # the saying missing its last word (paste bay)
 _R1_GATE       = 9                    # the exit/seal row
 _R1_EXIT       = (9, 3)               # the FINAL SEAL, just east of the spine
@@ -3860,13 +3857,11 @@ def build_dungeon_register_unnamed_hold(seed: int) -> Dungeon:
     from content.proverbs import text_of
     R, C = _R1_ROWS, _R1_COLS
     cells = [[CellType.WALL] * C for _ in range(R)]
-    for r in range(2, _R1_GATE + 1):                     # the spine
+    for r in range(2, _R1_GATE + 1):                     # the spine (fully open)
         cells[r][_R1_SPINE] = CellType.FLOOR
     for r in (_R1_ROW_QUARRY, _R1_ROW_DAW, _R1_ROW_GAP):  # the three bays
         for c in range(_R1_BAY_W, _R1_BAY_E + 1):
             cells[r][c] = CellType.FLOOR
-    # THE SPINE GATE — stone until the daw bay reads true (tick-controlled).
-    cells[_R1_GATE_ROW][_R1_SPINE] = CellType.WALL
 
     room = Room(room_type=RoomType.ENTRY, rows=R, cols=C)
     room.cells = cells
@@ -3877,9 +3872,9 @@ def build_dungeon_register_unnamed_hold(seed: int) -> Dungeon:
             room.char_runs.append(CharRun(r, col, tuple(w), 'ancient'))
             col += len(w) + 1
 
-    # Quarry — the lone word.
+    # Quarry — the lone word (met first).
     lay(_R1_ROW_QUARRY, _R1_TEXTCOL, (_R1_QUARRY_WORD,))
-    # Daw bay — prefix, junk intruder, suffix (daw heals the seam → opens the gate).
+    # Daw bay — prefix, junk intruder, suffix (daw heals the seam; it clobbers "").
     lay(_R1_ROW_DAW, _R1_TEXTCOL, _R1_DAW_PREFIX)
     jcol = _R1_TEXTCOL + len(' '.join(_R1_DAW_PREFIX)) + 1
     lay(_R1_ROW_DAW, jcol, (_R1_DAW_JUNK,))
@@ -3895,7 +3890,6 @@ def build_dungeon_register_unnamed_hold(seed: int) -> Dungeon:
 
     room._r1_daw_target = daw_target
     room._r1_gap_target = gap_target
-    room._r1_gate_cell  = (_R1_GATE_ROW, _R1_SPINE)
     room._r1_gap        = (_R1_ROW_GAP, gap_start)       # read by the test/tape
 
     room.entities.append(Entity(kind='exit', row=_R1_EXIT[0], col=_R1_EXIT[1],
@@ -3906,13 +3900,10 @@ def build_dungeon_register_unnamed_hold(seed: int) -> Dungeon:
     room.rebuild_indexes()
     room.par    = _R1_PAR
     room.budget = math.ceil(_R1_PAR * 1.4)
-    # The taught order: cut the intruder FIRST (j fq daw — opens the spine gate),
-    # THEN yank the quarry word on the way down (0 2j ^ yiw), THEN descend past the
-    # open gate to the gap and paste (0 2j ^ 2e l p), then out along the spine.
+    # The par tape avoids the clobber by ORDER: yank the quarry + paste the gap
+    # FIRST (while "" is clean), THEN climb back to daw the intruder, then out.
     # (No | col-motion — a relic, not taught; every vertical hop is via the spine.)
-    room.answer = ('j fq daw 0 2j ^ yiw 0 2j ^ 4e l p 0 2j l')
-
-    apply_stone_fog(room)                 # the gap bay sleeps behind the shut gate
+    room.answer = ('j ^ yiw 0 4j ^ 4e l p 0 2k fq daw 0 4j l')
 
     dungeon = Dungeon(name='The Register I', seed=seed)
     dungeon.rooms        = [room]
