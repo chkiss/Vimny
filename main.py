@@ -4902,6 +4902,8 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
             message  = _pool_msg()
     # Return to the First Cave wearing the Warden's hat, and the stone knows you.
     if level == 'first_cave' and getattr(player, 'has_hat', False):
+        msg_pool.clear()          # this greeting REPLACES the intro; drop its parts
+        pool_ttl = _MSG_ROTATE_TTL
         message = "You've walked these stones before, haven't you? Welcome back, master."
         msg_ttl = _MSG_ROTATE_TTL
 
@@ -4944,7 +4946,7 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
             msg_pool.append('You spotted a Warden!')
     if msg_pool:
         message = _pool_msg()
-        msg_ttl = _MSG_ROTATE_TTL
+        msg_ttl = pool_ttl     # the pool may hold intro parts; don't clip part 1 to combat pace
 
     if level == 'archivists_library':
         _lib_relayout()                          # fit the page frame to the real viewport
