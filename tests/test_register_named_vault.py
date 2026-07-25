@@ -116,6 +116,14 @@ def test_the_macro_replays_the_bay_far_under_par(monkeypatch):
     assert won and spent < _R2_PAR, (won, spent)
 
 
+def test_recording_into_a_clobbers_the_word_stored_there(monkeypatch):
+    """Macros and text share one register store (vim's own rule), so recording
+    into `qa` destroys the word held in "a — and the run fails. The par tape
+    records into `qq` for exactly this reason."""
+    clobbered = _MACRO.replace('qq', 'qa').replace('3@q', '3@a')
+    assert not _drive(_tape(clobbered), monkeypatch)['won']
+
+
 def test_single_register_batching_wins_but_drops_a_star(monkeypatch):
     """THE LAW, driven: the best one-register route still WINS, but it must walk
     the vault twice and re-land every tail, so it lands over par at one star."""

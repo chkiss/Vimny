@@ -47,7 +47,8 @@ from engine.warden_mega import mega_tick
 from engine.options import apply_set as _apply_set, parse_modifier as _parse_set_mod
 from engine.macro import synth_key as _synth_key, record_char as _record_char
 from engine.jumplist import record_jump as _record_jump, jump_back as _jump_back, jump_forward as _jump_forward
-from engine.registers import write_register as _reg_write, read_register as _reg_read
+from engine.registers import (write_register as _reg_write, read_register as _reg_read,
+                              record_register as _reg_record, clip_to_keys as _reg_keys)
 from engine.visual import apply_visual, block_bounds, apply_visual_replace
 from content.scrolls import (
     # Codex scroll content rendered by _show_scroll_by_id (_STD_SCROLLS map);
@@ -4860,7 +4861,8 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
         if recording_reg is not None and not from_macro:
             if (player.mode == Mode.NORMAL and not key_buf
                     and not key.is_sequence and str(key) == 'q'):
-                player.macros[recording_reg] = macro_buf
+                # A macro IS a register: `qa` clobbers whatever text "a held.
+                _reg_record(player, recording_reg, macro_buf)
                 recording_reg = None
                 macro_buf = ''
                 if player_name == 'admin' and room.answer:
@@ -6351,7 +6353,9 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
             if not edit_mode and not _action_allowed(action, player.known_commands) and _blocked(action):
                 continue
             reg = macro_last if action['reg'] == '@' else action['reg']
-            keys = player.macros.get(reg) if reg else None
+            # Any register replays — including one you merely YANKED. Vim's `@`
+            # runs a register's contents as keystrokes, whatever put them there.
+            keys = _reg_keys(_reg_read(player, reg)) if reg else None
             if not keys:
                 _push('No macro to play.')
             else:
