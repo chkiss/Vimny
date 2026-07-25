@@ -134,17 +134,19 @@ are famous sayings.
 this level, so the bug was latent; patched to return 2, letting this answer stay
 tokeniser-validated (no `_ANSWER_NOT_TOKENISED` / `_NONSTANDARD_BUDGET` exemption).
 
-### II — The Named Vault (`"a`/`"b`) — SHIPPED 2026-07-25 (rebuilt same day)
+### II — The Named Vault (`"a`/`"b`) — SHIPPED 2026-07-25 (rebuilt TWICE same day)
 `build_dungeon_register_named_vault` + `tests/test_register_named_vault.py`.
-Two quarry words on **separate rows** (`saves`, `nine`); **four identical bays**
-each reading `a stitch in time` and wanting both. Yank once into `"a` and `"b`
-and the vault is nothing but pastes. par **57** (named, driven, seed-invariant),
-standard `ceil(57*1.4)=80` budget; the best single-register route (batching — lay
-one word in every bay, re-yank, lay the other) costs **62** → 1★. Fully open: no
-gates, no fog, so the bays read as a *rhythm* — a macro replays one bay and lands
-at **27**. That is the reward, not the requirement; par is the plain named route.
+**Two sayings, alternating.** Quarry rows 3–4 hold `godliness` and `invention`;
+six bays (rows 5–10) alternate `cleanliness is next to dust` / `necessity is the
+mother of dust`. Every bay is the same **exchange**: `$b diw "XP` — cut the junk
+word out, set the right word into the hole it left. par **69** (named, driven,
+seed-invariant), standard `ceil(69*1.4)=96` budget. The best one-register route
+(`"_diw` so the cut never eats its word, then batch one saying and walk back for
+the other) costs **74** → 1★. Fully open: no gates, no fog, and because the bays
+alternate the repeating unit is a **pair** — record it at the first bay and
+`2@q` the rest: **37**. The reward, not the requirement.
 
-#### FORCE BY CAPACITY, NOT BY SURVIVAL (the law this level was rebuilt to obey)
+#### FORCE BY CAPACITY, NOT BY SURVIVAL (rebuild #1)
 The first cut forced `"a` by **threat**: a `daw` clobbered `""`, so you had to
 hide the word somewhere safe. That is not forcing — it is a *protection* puzzle,
 and **any protection tool solves a protection puzzle**. `"_daw` sends the cut to
@@ -153,25 +155,37 @@ BEAT par. Worse, the player who found it had learned something true about Vim an
 was being punished for it. Pricing `"_` higher would have been a thumb on the
 scale hiding a design error.
 
-The unnamed register holds exactly **one thing**, no matter how well you protect
-it. So force on capacity: every bay wants two different words, `"_` becomes
-irrelevant (nothing is ever cut), and no protection trick substitutes.
+#### NEVER LET ONE CLIP HOLD BOTH WORDS (rebuild #2 — playtest, user 2026-07-25)
+Cut #2 forced by capacity, but put the two quarry words on adjacent rows and made
+every bay want **both**. The playtester ran `j J 0 y2e qa 2j fe p 0 4@a`: `J`
+joined the quarry rows, one `y2e` took both words as a single clip, and a macro
+did the vault **with no named register at all**. Separate *rows* is not a
+guard — `J`, `dd`, `:m`, and visual-block all reshape rows.
 
-**Guard against batching.** Two holes at the same tail are *order-free across
-lines*, so a one-register player can lay word A in all four bays, re-yank, then
-lay word B — only two yanks, not four. Here that still loses, because the second
-pass must walk the room again AND `fe` no longer lands on the tail (the first
-paste moved it), costing an extra motion per bay. Margin 5. **Check this on any
-future multi-clip level** — put the quarry words on separate rows too, or a single
-charwise yank takes both and no register is needed at all.
+The only durable guard is that **no single clip is ever wanted anywhere**: two
+sayings that share no word, one word per bay. Then a combined clip is garbage in
+every bay by construction, and it does not matter how the player rearranges the
+quarry. Alternation also kills `.` — the last change flips register every bay.
+
+**Deletions are what put `""` under fire.** Each bay must `diw` its junk word
+before it can paste, so the one-register rival needs `"_` on all six bays. Per
+bay that ties par exactly (`"_diw`+`P` = `diw`+`"aP` = 8); the entire margin is
+the **second walk of the vault** to fetch the other saying's word. Thin (5 keys)
+but real, and it is the honest gap — `"_` is a *reward* for knowing it here, not
+a hole.
+
+**Make the quarry words LONG.** `$b cw<word>` retypes a bay for `4+len(word)`
+against the register route's flat 8, so a short word makes the keyboard beat the
+vault outright. Nine letters each ⇒ 13 vs 8. `test_typing_the_word_costs_more_
+than_pasting_it` pins this.
 
 **The deeper limit (read before the next named-register level).** With the prefix
 charged, a named register costs +2 per paste while a one-register rival pays only
 extra *travel* — and travel is cheap because counts are cheap (`8k` = 2 keys). So
-for **additive** puzzles named registers barely win, and the margin grows only ~1
-per bay. The shape where named registers win decisively is **exchange** (swap two
-words: the source is destroyed by the edit, so you must hold both at once and no
-re-yank exists). Reach for that shape if a future level needs a wide margin.
+for **additive** puzzles named registers barely win. The shape that wins is
+**exchange**, which is what this level finally became: the paste lands in a hole
+the delete just made, so the two operations are welded together and the rival
+cannot decouple them.
 
 ### THE REGISTER-PREFIX CHARGE (engine law, user 2026-07-24)
 `"{reg}` is two real keypresses, so `main._register_prefix_cost(action)` adds 2 to

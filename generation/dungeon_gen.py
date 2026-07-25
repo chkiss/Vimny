@@ -3929,49 +3929,58 @@ def build_dungeon_register_unnamed_hold(seed: int) -> Dungeon:
 # leaves "" untouched, and came in UNDER par.  Worse, the player who found it
 # had learned something TRUE about Vim and was being punished for it.
 #
-# So the forcing property here is capacity.  The unnamed register holds exactly
-# ONE thing, no matter how carefully you protect it — and every gap bay in this
-# vault wants TWO different words:
+# The SECOND cut forced by capacity but put both quarry words on rows a `J`
+# apart, and every bay wanted both: a playtester joined the quarry rows, took
+# one clip with `y2e`, and macro'd the vault with no named register at all.
 #
-#   spawn ─ QUARRY A (row 3: "saves") ─ QUARRY B (row 4: "nine")
-#         ─ GAP (row 6) ─ GAP (row 8) ─ GAP (row 10) ─ GAP (row 12) ─ exit
+# So: capacity, across TWO SAYINGS that never want the same word.
 #
-#   each gap reads  "a stitch in time"  and wants  "a stitch in time saves nine"
+#   spawn ─ QUARRY A (row 3: "godliness") ─ QUARRY B (row 4: "invention")
+#         ─ bays rows 5..10, ALTERNATING saying A / saying B ─ seal (row 12)
 #
-# Yank " saves" into "a and " nine" into "b ONCE, then every bay is two pastes.
-# A single-register route must re-yank the other word on EVERY bay — and "_
-# buys nothing, because nothing is ever cut here.  The two quarry words sit on
-# SEPARATE rows so no one charwise yank can take both (a linewise 2yy pastes
-# whole lines, which fills nothing).
+#   an A bay reads  "cleanliness is next to dust"   → wants ... to godliness
+#   a  B bay reads  "necessity is the mother of dust" → wants ... of invention
 #
-# The room is FULLY OPEN from the spawn: no gates, no fog.  The four bays are
-# identical on purpose, so the A/B rhythm is visible as a rhythm — record the
-# bay once and replay it.  The macro lands far under par; that is the reward,
-# not the requirement.  Par is the plain named route, so what par forces is the
-# register lesson.
-_R2_ROWS, _R2_COLS = 16, 46
+# Joining the quarry rows now yields a clip no bay wants, because no bay wants
+# both words.  Every bay must first CUT its junk word — and that cut clobbers
+# "", so a one-register route has to spend `"_` on all six bays AND walk the
+# vault twice to fetch the other saying's word.  Two named registers hold both
+# clips the whole way down and the vault is one pass.  ("_ is still genuinely
+# useful here, which is the point: it is a reward for knowing it, not a hole.)
+#
+# The room is FULLY OPEN from the spawn: no gates, no fog.  The bays alternate,
+# so the repeating unit is a PAIR of bays — record the pair, replay it twice.
+# The macro lands far under par; that is the reward, not the requirement.
+_R2_ROWS, _R2_COLS = 14, 46
 _R2_SPINE = 2
-_R2_BAY_W, _R2_BAY_E = 3, 42
-_R2_QUARRY_ROWS = (3, 4)              # one word each — never both in one yank
-_R2_GAP_ROWS    = (6, 8, 10, 12)      # FOUR bays, each wanting BOTH words
-_R2_GATE        = 14                  # the exit/seal row
-_R2_EXIT        = (14, 3)
+_R2_BAY_W, _R2_BAY_E = 3, 40
+_R2_QUARRY_ROWS = (3, 4)              # one word each; no bay wants both
+_R2_BAY_ROWS    = (5, 6, 7, 8, 9, 10)  # SIX bays, alternating saying A / B
+_R2_GATE        = 12                  # the exit/seal row
+_R2_EXIT        = (12, 3)
 _R2_SPAWN       = (2, 2)
 _R2_TEXTCOL     = 3
-_R2_SAYING      = ('a', 'stitch', 'in', 'time', 'saves', 'nine')
-_R2_HEAD        = _R2_SAYING[:4]      # what every bay reads at the start
-_R2_QUARRY_WORDS = _R2_SAYING[4:]     # ('saves', 'nine') — the tail, quarried
-_R2_PAR = 57                          # the named optimal (driven); test-pinned
+_R2_JUNK        = 'dust'              # the wrong word every bay ends on
+_R2_SAYINGS     = (('cleanliness', 'is', 'next', 'to', 'godliness'),
+                   ('necessity', 'is', 'the', 'mother', 'of', 'invention'))
+_R2_QUARRY_WORDS = tuple(s[-1] for s in _R2_SAYINGS)
+_R2_STUBS        = tuple(s[:-1] + (_R2_JUNK,) for s in _R2_SAYINGS)
+_R2_PAR = 69                          # the named optimal (driven); test-pinned
+
+
+def _r2_saying_for(row: int) -> int:
+    """Bays alternate, so the repeating unit is a PAIR."""
+    return _R2_BAY_ROWS.index(row) % 2
 
 
 def build_dungeon_register_named_vault(seed: int) -> Dungeon:
-    """The Register II — The Named Vault ("a).  See the section header."""
+    """The Register II — The Named Vault ("a / "b).  See the section header."""
     from content.proverbs import text_of
     R, C = _R2_ROWS, _R2_COLS
     cells = [[CellType.WALL] * C for _ in range(R)]
     for r in range(2, _R2_GATE + 1):                     # the spine
         cells[r][_R2_SPINE] = CellType.FLOOR
-    for r in (*_R2_QUARRY_ROWS, *_R2_GAP_ROWS):          # every bay, fully open
+    for r in (*_R2_QUARRY_ROWS, *_R2_BAY_ROWS):          # every bay, fully open
         for c in range(_R2_BAY_W, _R2_BAY_E + 1):
             cells[r][c] = CellType.FLOOR
 
@@ -3986,11 +3995,11 @@ def build_dungeon_register_named_vault(seed: int) -> Dungeon:
 
     for qrow, word in zip(_R2_QUARRY_ROWS, _R2_QUARRY_WORDS):
         lay(qrow, _R2_TEXTCOL, (word,))
-    for grow in _R2_GAP_ROWS:
-        lay(grow, _R2_TEXTCOL, _R2_HEAD)
+    for brow in _R2_BAY_ROWS:
+        lay(brow, _R2_TEXTCOL, _R2_STUBS[_r2_saying_for(brow)])
 
-    room._r2_gap_target = text_of(_R2_SAYING)
-    room._r2_gaps       = _R2_GAP_ROWS
+    room._r2_targets = {r: text_of(_R2_SAYINGS[_r2_saying_for(r)])
+                        for r in _R2_BAY_ROWS}
 
     room.entities.append(Entity(kind='exit', row=_R2_EXIT[0], col=_R2_EXIT[1],
                                 edit_immune=True))
@@ -4000,13 +4009,16 @@ def build_dungeon_register_named_vault(seed: int) -> Dungeon:
     room.rebuild_indexes()
     room.par    = _R2_PAR
     room.budget = math.ceil(_R2_PAR * 1.4)
-    # Named optimal: quarry both words ONCE (the leading blank spine cell rides
-    # into each yank, so every paste carries its own separating space), then each
-    # bay is `fe` to the tail of "time" and two pastes. Both clips stay alive the
-    # whole way down — that is the entire lesson, and the four identical bays are
-    # the macro the player is invited to notice.
-    room.answer = ('j "aye j "bye 2j fe "ap "bp 0 2j fe "ap "bp '
-                   '0 2j fe "ap "bp 0 2j fe "ap "bp 0 2j l')
+    # Named optimal: quarry BOTH words once, then every bay is the same swap —
+    # `$b` onto the junk word, `diw` to cut it out, `"XP` to set the right word
+    # into the hole it left. Both clips stay alive the whole way down — that is
+    # the lesson — and the alternating bays are the pair-macro to notice.
+    _bay = lambda r: '$ b diw "%sP' % 'ab'[_r2_saying_for(r)]
+    # (`ye` leaves the cursor at the START of the yank, so the second quarry row
+    #  needs no `w` — dropping it keeps the tape honest against the audit.)
+    room.answer = ' '.join(['j w "aye j "bye j', _bay(_R2_BAY_ROWS[0])]
+                           + ['j ' + _bay(r) for r in _R2_BAY_ROWS[1:]]
+                           + ['0 2j l'])
     # NO fog and NO gates: the room is open from the spawn so the rhythm shows.
 
     dungeon = Dungeon(name='The Register II', seed=seed)

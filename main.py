@@ -1788,8 +1788,8 @@ def _register_named_vault_tick(room, player) -> list:
     its saying whole.  Stateless + undo-aware; it never shuts under the player's
     own feet."""
     msgs = []
-    ok = all(_wla_floor_text(room, r).strip() == room._r2_gap_target
-             for r in room._r2_gaps)
+    ok = all(_wla_floor_text(room, r).strip() == t
+             for r, t in room._r2_targets.items())
     er, ec = room.exit_pos
     seal_open = room.cells[er][ec] != CellType.WALL
     if ok and not seal_open:
@@ -3020,7 +3020,7 @@ _LEVEL_INTROS = {
     'wet_ink': ('The Wet Ink — a writing ledge, an old saying mostly lost in the dark, and a gallery of cold braziers beneath it. Write its opening and you will know the rest. The scribes here wrote by firelight, and the fire answers only words already written.', 70),
     'g_sanctum': ('The Last Reach — three old sayings run east toward the flood. The keepers of this place went to the end of the line many times a day, and never once over it.', 70),
     'register_unnamed_hold': ('The Register I — the horse waits at the mouth, and his saddle bears whatever you last took up. What it holds, it holds only until your hand closes on the next thing; and a blade closes a hand as surely as a grasp.', 70),
-    'register_named_vault': ('The Register II — the vault stands open, every alcove worn to the same shape, every one of them ending short. An open hand carries one thing. A vault has many doors, and a door remembers only what you have troubled to name.', 70),
+    'register_named_vault': ('The Register II — the vault stands open. Two sayings alternate down the alcoves and the same grey word has settled over the end of every one of them, so that each alcove is wrong in its own way. An open hand carries one thing, and cannot set it down and keep it. A vault has many doors, and a door remembers only what you have troubled to name.', 70),
     'stair_rail': ('The Stair Rail — a broken stair winds down the shaft, each step\'s word set a little east of the last, and below the steps the floor falls a long way. The masons who cut these stairs never missed a landing.', 70),
     'hall_of_echoes': ('The Hall of Echoes — hall opens onto hall, and every hall repeats itself. The stone remembers.', 70),
     'grandmasters_sanctum': ('The Grandmaster\'s Sanctum — a long gallery of seven proofs, and the master himself beyond the last stone, listening to every stroke. Nothing here is new; everything here is asked properly.', 70),
