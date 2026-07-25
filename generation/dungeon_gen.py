@@ -1408,116 +1408,270 @@ def build_dungeon_reliquary(seed: int) -> Dungeon:
     return dungeon
 
 
-def build_dungeon_dummy(seed: int) -> Dungeon:
-    """Admin editing sandbox — all editable element types, plus two fog-walled rooms.
+# ── The Dummy Dungeon (admin sandbox) ─────────────────────────────────────────
+# A showroom, not a level. Every entity kind, every glyph-CHANGING tag, every
+# CellType and every rune kind gets one labelled specimen, so an admin can see
+# what the game contains and practice the editor on it without hunting through
+# 33 levels. Tags that only change BEHAVIOUR (the warden ranks — surveyor,
+# scrivener, manifold, eternal…) are deliberately absent: they all paint the
+# same 'W', so eight of them would be eight identical exhibits.
+# `tests/test_dummy_dungeon.py` is the invariant — add a kind to the game, add
+# a specimen here.
 
-    Layout (rows 1-18):
-      Main room   cols 1-41  — open area with all entity/cell/character types
-      Wall divider col 42    — doorway at rows 9-10 (regular door)
-      Room A      cols 43-57 — water pool; accessed by opening the door
-      Wall divider col 58    — doorway at rows 9-10 (locked door)
-      Room B      cols 59-78 — contains the exit; accessed with a key
+_DUMMY_ROWS, _DUMMY_COLS = 34, 132
+_DUMMY_C0, _DUMMY_C1 = 4, 73   # the labelled-alcove span. Cols 1-3 are the SPINE:
+                               # every band's label row is stone, so without a
+                               # floor column running past their west end the
+                               # showroom would fall into disconnected strips.
+_DUMMY_DIV_W = 75    # showroom | reflow wing
+_DUMMY_DIV_E = 97    # reflow wing | scratchpad
+_DUMMY_YARD  = 30    # the open row both dividers open onto
+
+
+def build_dungeon_dummy(seed: int) -> Dungeon:
+    """Admin sandbox — a labelled showroom west, a free editing yard east.
+
+    Layout (34 x 132; the viewport scrolls on both axes):
+      Showroom    cols 1-73   — eight bands of labelled specimens off a west spine
+      Divider     col 75      — open doorway at the yard row
+      Reflow wing cols 76-96  — the three destructive reflow demos, quarantined
+                                behind stone so a wave can't sweep an exhibit
+      Divider     col 97      — locked door (an exhibit that is also the gate)
+      Scratchpad  cols 98-130 — blank floor to build on, and the exit
+
+    Bands run spec-row / label-row: friendlies 2/3, hostiles 5-7/8, loot 10/11,
+    keys 13/14, doors 16/17, fixtures 19/20, terrain 22-24/25, runes 27/28.
     """
-    ROWS, COLS = 20, 80
+    ROWS, COLS = _DUMMY_ROWS, _DUMMY_COLS
     dungeon = Dungeon(name='Dummy Dungeon', seed=seed)
     cells   = [[CellType.WALL] * COLS for _ in range(ROWS)]
 
-    # Main room floor
-    for r in range(1, ROWS - 1):
-        for c in range(1, 42):
+    for r in range(1, ROWS - 1):                     # one open slab; the bands
+        for c in range(1, COLS - 1):                 # carve their stone back in
             cells[r][c] = CellType.FLOOR
-
-    # Room A floor
     for r in range(1, ROWS - 1):
-        for c in range(43, 58):
-            cells[r][c] = CellType.FLOOR
+        cells[r][_DUMMY_DIV_W] = CellType.WALL
+        cells[r][_DUMMY_DIV_E] = CellType.WALL
+    cells[_DUMMY_YARD][_DUMMY_DIV_W] = CellType.FLOOR
+    cells[_DUMMY_YARD][_DUMMY_DIV_E] = CellType.FLOOR
 
-    # Room B floor
-    for r in range(1, ROWS - 1):
-        for c in range(59, COLS - 1):
-            cells[r][c] = CellType.FLOOR
+    ents:   list = []
+    chars:  list = []
+    sealed: set  = set()
+    mist:   set  = set()
+    spawn:  list = []
 
-    # Doorways carved into the dividing walls
-    cells[9][42]  = CellType.FLOOR   # regular door opening (top)
-    cells[10][42] = CellType.FLOOR   # regular door opening (bottom)
-    cells[9][58]  = CellType.FLOOR   # locked door opening (top)
-    cells[10][58] = CellType.FLOOR   # locked door opening (bottom)
+    def _band(label_row: int, items) -> None:
+        """Lay one band of exhibits west to east, naming each in the stone below.
 
-    # Wood wall block in main room: rows 4-12 cols 7-21; row 8 is shorter
-    for r in range(4, 13):
-        end_c = 14 if r == 8 else 22
-        for c in range(7, end_c):
-            cells[r][c] = CellType.WOOD_WALL
+        Labels live in WALL cells on purpose: stone is uncuttable and is skipped
+        by the floor text scans, so a stray `dd` in the aisle can never wipe the
+        sign off an exhibit. Each item is (label, place); `place` gets the column
+        it was allotted and does whatever that specimen needs.
+        """
+        for c in range(_DUMMY_C0, _DUMMY_C1 + 1):
+            cells[label_row][c] = CellType.WALL
+        c = _DUMMY_C0
+        for label, place in items:
+            width = max(len(label), 3) + 2
+            if c + width - 1 > _DUMMY_C1:
+                raise ValueError(f'dummy band {label_row} overflows its wall at {label!r}')
+            place(c)
+            chars.append(CharRun(row=label_row, col=c,
+                                 symbols=tuple(label), kind='ancient'))
+            c += width
 
-    # Demo corridor strip in main room
-    for c in range(25, 36):
-        cells[9][c] = CellType.CORRIDOR
+    def _at(row: int, **kw):
+        return lambda c: ents.append(Entity(row=row, col=c, **kw))
 
-    # Reflow water demo (row 13, clear of the wood-wall block): a 2-cell puddle
-    cells[13][9]  = CellType.WATER
-    cells[13][10] = CellType.WATER
+    def _jail(row: int, **kw):
+        """A specimen cell: stone on three sides, a door on the fourth.
 
-    # Water pool in Room A
-    for r in range(11, 17):
-        for c in range(44, 57):
-            cells[r][c] = CellType.WATER
+        The door earns its place twice over. Fog here is cast by
+        `apply_stone_fog`, which only STONE blocks — so the occupant is visible
+        from the aisle rather than hidden in the dark. And `_steppable` refuses
+        any cell that holds an entity, so the occupant can never cross its own
+        door: the cage holds for exactly the reason the fog clears, with no
+        engine change and no fog exemption. Delete the door and you release it.
+        """
+        def place(c):
+            cells[row - 1][c] = CellType.WALL
+            cells[row + 1][c] = CellType.WALL
+            cells[row][c - 1] = CellType.WALL
+            ents.append(Entity(row=row, col=c, **kw))
+            ents.append(Entity(kind='door', row=row, col=c + 1))
+        return place
+
+    def _patch(rows: range, ct: CellType):
+        def place(c):
+            for r in rows:
+                for cc in range(c, c + 3):
+                    cells[r][cc] = ct
+        return place
+
+    def _misted(rows: range):
+        def place(c):
+            for r in rows:
+                for cc in range(c, c + 3):
+                    cells[r][cc] = CellType.WATER
+                    mist.add((r, cc))
+        return place
+
+    def _fogbox(rows: range):
+        """A sealed 3x3 pocket. Stone hides it, so it starts fogged — cut one
+        wall and `auto_fog` reveals it, which is the fog law in one exhibit."""
+        def place(c):
+            for r in rows:
+                for cc in range(c, c + 3):
+                    cells[r][cc] = CellType.WALL
+            cells[rows.start + 1][c + 1] = CellType.FLOOR
+        return place
+
+    def _rune(row: int, sym: str, kind: str):
+        return lambda c: chars.append(CharRun(row=row, col=c,
+                                              symbols=(sym,), kind=kind))
+
+    def _gate(row: int):
+        """A registered gate: banded stone (╬) some level draws back."""
+        def place(c):
+            cells[row][c] = CellType.WALL
+            sealed.add((row, c))
+        return place
+
+    def _entry(row: int):
+        def place(c):
+            ents.append(Entity(kind='entry_marker', row=row, col=c))
+            spawn.append((row, c))
+        return place
+
+    # ── Friendlies — the whole `~`-toggle family sits in one eyeline, so g/G,
+    # d/D and c/C read as the same joke told three times.
+    _band(3, [
+        ('dog',       _at(2, kind='ally')),
+        ('big_dog',   _at(2, kind='ally',    swole=True)),
+        ('cat',       _at(2, kind='critter')),
+        ('big_cat',   _at(2, kind='critter', swole=True)),
+        ('elf',       _at(2, kind='elf')),
+        ('horse',     _at(2, kind='horse')),
+        ('archivist', _at(2, kind='archivist', ai='')),
+        ('wanderer',  _at(2, kind='wanderer')),
+    ])
+
+    # ── Hostiles, jailed. Live `chase` AI on the goblins: they strain against
+    # the door every tick and get nowhere, which is the point of the exhibit.
+    _band(8, [
+        ('goblin', _jail(6, kind='goblin', hp=1, max_hp=1, ai='chase', ai_speed=1)),
+        ('swole',  _jail(6, kind='goblin', hp=1, max_hp=1, ai='chase', ai_speed=1,
+                         swole=True)),
+        ('zombie', _jail(6, kind='goblin', hp=1, max_hp=1, ai='', tag='zombie')),
+        ('demon',  _jail(6, kind='goblin', hp=1, max_hp=1, ai='', tag='demon')),
+        # Two echo shades, not eight: enough to show the impostors are a SPREAD
+        # of reds rather than one colour. hp=2 so an unmasking strike is survived.
+        ('echo',   _jail(6, kind='goblin', hp=2, max_hp=2, ai='', tag='echo', shade=0)),
+        ('echo2',  _jail(6, kind='goblin', hp=2, max_hp=2, ai='', tag='echo', shade=3)),
+        ('warden', _jail(6, kind='warden', hp=5, max_hp=5, ai='', summon_timer=0)),
+    ])
+
+    _band(11, [
+        ('chest',     _at(10, kind='chest')),
+        ('key_chest', _at(10, kind='chest_key')),
+        ('scroll',    _at(10, kind='chest_scroll')),
+        ('coin',      _at(10, kind='gold')),
+        ('heart',     _at(10, kind='heart_container')),
+        ('shield',    _at(10, kind='shield')),
+        ('hat',       _at(10, kind='hat')),
+    ])
+
+    _band(14, [
+        ('floor_key', _at(13, kind='floor_key')),
+        ('gold_key',  _at(13, kind='floor_key', tag='gold')),
+        ('red_key',   _at(13, kind='floor_key', tag='red')),
+        ('blue_key',  _at(13, kind='floor_key', tag='blue')),
+    ])
+
+    _band(17, [
+        ('door',      _at(16, kind='door')),
+        ('gold_lock', _at(16, kind='locked_door', tag='gold')),
+        ('red_lock',  _at(16, kind='locked_door', tag='red')),
+        ('blue_lock', _at(16, kind='locked_door', tag='blue')),
+        ('seal_door', _at(16, kind='seal_door')),
+        ('boss_seal', _at(16, kind='boss_seal')),
+    ])
+
+    _band(20, [
+        ('brazier',  _at(19, kind='brazier', hp=1, max_hp=1, ai='')),
+        ('pedestal', _at(19, kind='pedestal')),
+        ('dynamite', _at(19, kind='dynamite')),
+        ('gate',     _gate(19)),
+        ('entry',    _entry(19)),
+    ])
+
+    _band(25, [
+        ('floor',    lambda c: None),                       # the slab as built
+        ('corridor', _patch(range(22, 25), CellType.CORRIDOR)),
+        ('stone',    _patch(range(22, 25), CellType.WALL)),
+        ('timber',   _patch(range(22, 25), CellType.WOOD_WALL)),
+        ('water',    _patch(range(22, 25), CellType.WATER)),
+        ('mist',     _misted(range(22, 25))),
+        ('fogbox',   _fogbox(range(22, 25))),
+    ])
+
+    _band(28, [
+        ('ancient', _rune(27, '∘', 'ancient')),
+        ('verdant', _rune(27, '·', 'verdant')),
+        ('void',    _rune(27, '○', 'void')),
+        ('ember',   _rune(27, '⊙', 'ember')),
+    ])
+
+    # ── Reflow wing (engine/reflow.py) — quarantined behind stone. On a ledge
+    # row, editing flows and content falls against the FIXED brinks: walls and
+    # void runes alike. Three demos of the one law, all destructive, which is
+    # why they no longer share a room with the exhibits.
+    # WATER WAVE: shove 'WAVE' into the puddle; the wave rolls right and sweeps
+    # away what it reaches — the goblin drowns, the key is lost.
+    cells[20][84] = CellType.WATER
+    cells[20][85] = CellType.WATER
+    chars.append(CharRun(row=20, col=80, symbols=tuple('WAVE'), kind='verdant'))
+    ents.append(Entity(kind='goblin',    row=20, col=86, hp=1, max_hp=1, ai=''))
+    ents.append(Entity(kind='floor_key', row=20, col=87))
+    # VOID MARGIN: the ○ brink sits on floor, so the cursor can step onto it and
+    # FALL IN; glyphs shoved past the brink tumble into the void.
+    chars.append(CharRun(row=22, col=78, symbols=tuple('GLYPHS'), kind='ancient'))
+    chars.append(CharRun(row=22, col=85, symbols=('○',) * 7,     kind='void'))
+    # WALL EDGE: the floor just ends at the divider. The cursor CLAMPS at the
+    # last cell; glyphs tipped against the wall fall off.
+    chars.append(CharRun(row=24, col=92, symbols=tuple('EDGE'), kind='ember'))
+    # Wing labels, in stone — leaving cols 94-96 open so the wing stays walkable
+    # from the yard doorway below.
+    for c in range(76, 94):
+        cells[26][c] = CellType.WALL
+    chars.append(CharRun(row=26, col=76, symbols=tuple('wave'), kind='ancient'))
+    chars.append(CharRun(row=26, col=82, symbols=tuple('void'), kind='ancient'))
+    chars.append(CharRun(row=26, col=88, symbols=tuple('edge'), kind='ancient'))
+
+    # ── The east divider's lock is itself the plain `locked_door` exhibit, and
+    # the scratchpad beyond it is deliberately empty — nothing to disturb.
+    ents.append(Entity(kind='locked_door', row=_DUMMY_YARD, col=_DUMMY_DIV_E))
+    ents.append(Entity(kind='exit',        row=16,          col=COLS - 3))
 
     composite = Room(room_type=RoomType.ENTRY, rows=ROWS, cols=COLS)
-    composite.cells = cells
-    composite.seed  = seed
-
-    composite.spawn_pos    = (1, 1)
-    composite.exit_pos = (9, 70)
-
-    composite.entities = [
-        Entity(kind='entry_marker', row=1,  col=1),
-        Entity(kind='dynamite',     row=8,  col=14),
-        Entity(kind='wanderer',     row=3,  col=35),
-        # Chests in main room
-        Entity(kind='chest',        row=3,  col=25),
-        Entity(kind='chest_key',    row=4,  col=25),
-        Entity(kind='chest_scroll', row=5,  col=25),
-        # Combat entities
-        Entity(kind='warden', row=4,  col=50, hp=5, max_hp=5, ai='',      summon_timer=0),
-        Entity(kind='goblin', row=17, col=3,  hp=1, max_hp=1, ai='chase', ai_speed=1),
-        Entity(kind='goblin',    row=13, col=11, hp=1, max_hp=1, ai=''),  # reflow water-wave: drowns
-        Entity(kind='floor_key', row=13, col=12),                        # reflow water-wave: swept away (lost)
-        # Room-divider door (fog boundary — opens into Room A)
-        Entity(kind='door',         row=9,  col=42),
-        Entity(kind='door',         row=10, col=42),
-        # Room-divider locked door (fog boundary — opens into Room B)
-        Entity(kind='locked_door',  row=9,  col=58),
-        Entity(kind='locked_door',  row=10, col=58),
-        # Exit at the far end of Room B
-        Entity(kind='exit',         row=9,  col=70),
-    ]
-
-    composite.char_runs = [
-        CharRun(row=2, col=3,  symbols=('∘',), kind='ancient'),
-        CharRun(row=2, col=8,  symbols=('·',), kind='verdant'),
-        CharRun(row=2, col=13, symbols=('○',), kind='void'),
-        CharRun(row=2, col=17, symbols=('⊙',), kind='ember'),
-        # ── Reflow pilot (engine/reflow.py): on a ledge row, editing flows and
-        # content falls against the FIXED brinks — walls and void runes alike.
-        # Three demos of the one law:
-        # Row 13 — WATER WAVE: shove the 'WAVE' glyphs into the puddle (cols 9-10);
-        # the wave rolls right and SWEEPS AWAY whatever it reaches — the goblin
-        # (col 11) drowns, the key (col 12) is lost.
-        CharRun(row=13, col=5,  symbols=tuple('WAVE'),   kind='verdant'),
-        # Row 14 — VOID MARGIN: the ○○○ brink (col 35) sits on floor, so the cursor
-        # can step onto it and FALL IN; glyphs past the brink tumble into the void.
-        CharRun(row=14, col=29, symbols=tuple('GLYPHS'), kind='ancient'),
-        CharRun(row=14, col=35, symbols=('○',) * 7,      kind='void'),
-        # Row 16 — WALL EDGE: the corridor just ends at the stone wall (col 42). The
-        # cursor CLAMPS at the last floor cell; glyphs tipped against the wall fall off.
-        CharRun(row=16, col=38, symbols=tuple('EDGE'),   kind='ember'),
-    ]
+    composite.cells     = cells
+    composite.seed      = seed
+    composite.spawn_pos = spawn[0]
+    composite.exit_pos  = (16, COLS - 3)
+    composite.entities  = ents
+    composite.char_runs = chars
 
     composite.par            = None
     composite.budget         = 99999
     composite.passable_walls = False
     composite.rebuild_indexes()
-    _fog_unreachable(composite, composite.spawn_pos[0], composite.spawn_pos[1])
+    # Stone fog, not reachability fog: a door is a grille you can see through,
+    # so every jailed specimen is on display while still being caged.
+    apply_stone_fog(composite)
+    composite.sealed_cells = sealed
+    composite.mist_cells   = set(mist)      # permanent haze: reveals skip it
+    composite.fog_cells   |= mist           # mist is a SUBSET of fog by contract
     dungeon.rooms        = [composite]
     dungeon.current_room = 0
     return dungeon

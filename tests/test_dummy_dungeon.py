@@ -41,11 +41,22 @@ EXPECTED_ENTITY_KINDS = {
     'entry_marker', 'exit', 'door', 'dynamite',
     'wanderer',
     'chest', 'chest_key', 'chest_scroll',
-    'locked_door',
+    'locked_door', 'seal_door', 'boss_seal',
     'goblin', 'warden',
-    'floor_key',            # reflow water-wave demo (row 13): swept away by a wave
+    'floor_key',            # reflow water-wave demo: swept away by a wave
+    'heart_container', 'shield', 'hat', 'gold',
+    'brazier', 'pedestal',
+    'horse', 'archivist',
+    'ally', 'critter', 'elf',   # the ~-toggle family: d/D, c/C, e
 }
 EXPECTED_RUNE_KINDS   = {'ancient', 'verdant', 'void', 'ember'}
+
+# Variant tags that CHANGE THE GLYPH OR COLOUR an entity paints — those are the
+# ones an admin can only learn by seeing. Tags that only change behaviour (the
+# warden ranks: surveyor, scrivener, manifold, eternal, stamp, verse,
+# grandmaster, pathfinder) all paint the same 'W' and are deliberately absent:
+# eight of them would be eight identical exhibits.
+EXPECTED_ENTITY_TAGS  = {'gold', 'red', 'blue', 'zombie', 'demon', 'echo'}
 
 # Cell types where _ed_cut should return a clip and leave FLOOR behind.
 # Structural floor types (FLOOR, CORRIDOR) are pasteable but not cuttable.
@@ -104,6 +115,106 @@ def test_no_unexpected_rune_kinds():
         f"Rune kind(s) {unexpected} found in dummy dungeon but not in "
         "EXPECTED_RUNE_KINDS — add them to the constant in this test file"
     )
+
+
+def test_all_glyph_tags_present():
+    room = build_dungeon_dummy(SEED).room
+    present = {e.tag for e in room.entities if e.alive and e.tag}
+    missing = sorted(EXPECTED_ENTITY_TAGS - present)
+    assert not missing, (
+        f"Entity tag(s) {missing} absent from dummy dungeon — "
+        "add an instance to build_dungeon_dummy() and to EXPECTED_ENTITY_TAGS above"
+    )
+
+
+def test_no_unexpected_glyph_tags():
+    room = build_dungeon_dummy(SEED).room
+    present = {e.tag for e in room.entities if e.alive and e.tag}
+    unexpected = sorted(present - EXPECTED_ENTITY_TAGS)
+    assert not unexpected, (
+        f"Entity tag(s) {unexpected} found in dummy dungeon but not in "
+        "EXPECTED_ENTITY_TAGS — add them to the constant in this test file"
+    )
+
+
+def test_swole_variants_present():
+    """g/G, d/D and c/C are three glyphs each, not one — show both halves."""
+    room = build_dungeon_dummy(SEED).room
+    swole = {e.kind for e in room.entities if e.alive and e.swole}
+    missing = sorted({'goblin', 'ally', 'critter'} - swole)
+    assert not missing, f"no swole exemplar for {missing} — the ~-toggle glyph is unseen"
+
+
+# ── The showroom holds together ──────────────────────────────────────────────
+
+def _reachable(room):
+    from collections import deque
+    seen = {room.spawn_pos}
+    q = deque([room.spawn_pos])
+    while q:
+        r, c = q.popleft()
+        for dr, dc in ((-1, 0), (1, 0), (0, -1), (0, 1)):
+            n = (r + dr, c + dc)
+            if n not in seen and room.is_passable(*n):
+                seen.add(n)
+                q.append(n)
+    return seen
+
+
+def test_every_exhibit_is_reachable():
+    """The label rows are solid stone; only the west spine keeps the bands
+    joined. If a band is ever widened past the spine this catches it."""
+    room = build_dungeon_dummy(SEED).room
+    seen = _reachable(room)
+    stranded = [(e.kind, e.row, e.col) for e in room.entities
+                if e.alive and e.kind not in ('exit', 'locked_door')
+                and not any((e.row + dr, e.col + dc) in seen
+                            for dr, dc in ((0, 0), (-1, 0), (1, 0), (0, -1), (0, 1)))]
+    assert not stranded, f"exhibit(s) walled off from the spine: {stranded}"
+
+
+def test_jailed_hostiles_cannot_escape():
+    """A jail is stone on three sides and a door on the fourth. `_steppable`
+    refuses any cell holding an entity, so the door itself is the bar — the
+    occupant can never cross it. Deleting the door releases it, by design."""
+    from main import _greedy_step_toward
+
+    class _P:
+        row, col = 0, 0
+
+    room = build_dungeon_dummy(SEED).room
+    player = _P()
+    player.row, player.col = room.spawn_pos
+    jailed = [e for e in room.entities
+              if e.alive and e.kind in ('goblin', 'warden') and 5 <= e.row <= 7]
+    assert len(jailed) == 7, f"expected 7 jailed specimens, found {len(jailed)}"
+    for e in jailed:
+        step = _greedy_step_toward(room, player, e, (player.row, player.col))
+        assert step is None, f"{e.kind} at ({e.row},{e.col}) escaped its cell to {step}"
+
+
+def test_jailed_hostiles_are_visible():
+    """Stone fog, not reachability fog — a door is a grille you can see through,
+    so a caged specimen is on display rather than hidden in the dark."""
+    room = build_dungeon_dummy(SEED).room
+    hidden = [(e.kind, e.row, e.col) for e in room.entities
+              if e.alive and 5 <= e.row <= 7 and (e.row, e.col) in room.fog_cells]
+    assert not hidden, f"jailed specimen(s) fogged out of view: {hidden}"
+
+
+def test_mist_is_a_subset_of_fog():
+    """`mist_cells` is documented as a subset of `fog_cells` — reveals skip it."""
+    room = build_dungeon_dummy(SEED).room
+    assert room.mist_cells, "no misted water in the dummy dungeon"
+    assert room.mist_cells <= room.fog_cells
+
+
+def test_sealed_gate_present():
+    """The ╬ band exhibit: a registered gate that is still WALL."""
+    room = build_dungeon_dummy(SEED).room
+    assert room.sealed_cells, "no sealed gate exhibit"
+    for r, c in room.sealed_cells:
+        assert room.cells[r][c] == CellType.WALL
 
 
 # ── Editability: paste (all cell types) ──────────────────────────────────────
