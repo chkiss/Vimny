@@ -4401,7 +4401,9 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
     def _ledger_check():
         """The Culling Ledger (v3). Each tick, statelessly:
         1. once door ONE is open, part the mist — the dark ledger becomes
-           misted (readable, still unwalkable; the unseen-line law lifts);
+           misted — readable, still unwalkable. This is design, not an engine
+           rule: nothing stops a fogged line being culled, so the ledger is
+           revealed first to keep the :v cull a reading task, not a guess;
         2. once the ledger reads EXACTLY its true lines, in order, the cold
            corridor brazier catches the verdant lines' fire and its light
            unveils the exit pocket (door TWO still wants the key).
