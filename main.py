@@ -2971,8 +2971,12 @@ def _wet_ink_tick(room, player) -> list:
     for k, rc in enumerate(braziers, start=1):
         if lit(*rc) and room.fog_cells & seg_fog[k - 1]:
             room.fog_cells -= seg_fog[k - 1]
-            msgs.append('The firelight spills up the stone — more of the '
-                        'inscription wakes.')
+            # Only the FIRST brazier gets a line. The reveal is on screen; after
+            # one telling, the rule is learned and the render says the rest.
+            if not getattr(room, '_qm_firelight_told', False):
+                room._qm_firelight_told = True
+                msgs.append('The firelight spills up the stone — more of the '
+                            'inscription wakes.')
     return msgs
 
 
@@ -3020,7 +3024,7 @@ _LEVEL_INTROS = {
     'wet_ink': ('The Wet Ink — a writing ledge, an old saying mostly lost in the dark, and a gallery of cold braziers beneath it. Write its opening and you will know the rest. The scribes here wrote by firelight, and the fire answers only words already written.', 70),
     'g_sanctum': ('The Last Reach — three old sayings run east toward the flood. The keepers of this place went to the end of the line many times a day, and never once over it.', 70),
     'register_unnamed_hold': ('The Register I — the horse waits at the mouth, and his saddle bears whatever you last took up. What it holds, it holds only until your hand closes on the next thing; and a blade closes a hand as surely as a grasp.', 70),
-    'register_named_vault': ('The Register II — the vault stands open. Two sayings alternate down the alcoves and the same grey word has settled over the end of every one of them, so that each alcove is wrong in its own way. An open hand carries one thing, and cannot set it down and keep it. A vault has many doors, and a door remembers only what you have troubled to name.', 70),
+    'register_named_vault': ('The Register II — the vault stands open, and grey dust has settled over the end of every saying in it. An open hand carries one thing, and cannot set it down and keep it.', 70),
     'stair_rail': ('The Stair Rail — a broken stair winds down the shaft, each step\'s word set a little east of the last, and below the steps the floor falls a long way. The masons who cut these stairs never missed a landing.', 70),
     'hall_of_echoes': ('The Hall of Echoes — hall opens onto hall, and every hall repeats itself. The stone remembers.', 70),
     'grandmasters_sanctum': ('The Grandmaster\'s Sanctum — a long gallery of seven proofs, and the master himself beyond the last stone, listening to every stroke. Nothing here is new; everything here is asked properly.', 70),
@@ -4141,7 +4145,7 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
         elif step is None:
             # v — enter visual mode: the anchor lands on his own cell
             room.surveyor_threat = {**anchor, 'step': 'aim'}
-            _push("The Warden's eye opens — he enters visual mode.")
+            _push("The Warden's eye opens — his gaze begins to span.")
         elif step == 'aim':
             if warden.hp > 3:
                 # Phase 1 ($/0): he commits to the side you were on LAST turn
@@ -4236,7 +4240,9 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
                 player.row, player.col = room.spawn_pos
                 undo_stack.clear()                 # each hall keeps its own past
                 redo_stack.clear()
-                _push('The passage opens on another hall.')
+                # The open passage is on screen; what is NOT is that the halls
+                # keep separate undo stacks, so the hall behind you is now final.
+                _push('The passage closes behind you — that hall is past mending.')
         if level == 'paragraph_enclosure':
             for _m in _paragraph_enclosure_tick(room, player):
                 _push(_m)
@@ -4418,7 +4424,11 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
                 if _rm_row(room, r, player):
                     if player.row >= r:
                         player.row = exit_row
-                    _push('The void swallows the false ledge!')
+                    # Told once: the fall is animated, so a repeat only narrates
+                    # what the player is already watching.
+                    if not getattr(room, '_cl_ledge_told', False):
+                        room._cl_ledge_told = True
+                        _push('The void swallows the false ledge!')
         _chasm_remist()                 # a :t/:m'd row must never become footing
         cor = _subst._last_standable_row(room)     # the corridor rides up
         door1_shut = any(e.kind == 'locked_door' and e.alive
@@ -6170,7 +6180,7 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
                         if _near and not room._lib_arch_flag:
                             room._lib_arch_flag = True
                             _push('MY LIBRARY! All on ONE LINE!')
-                            _push('Some fiend ran  :set nowrap  — put it right!')
+                            _push('A whole catalogue, spilled end to end — put it right!')
                         elif not _near:
                             room._lib_arch_flag = False
                     else:                                     # post-wrap step-wise brief
@@ -7438,7 +7448,7 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
                     )
                     if has_reg_key and id(ent) not in door_open_hint_shown:
                         door_open_hint_shown.add(id(ent))
-                        _push('Type p to put the key in the lock.')
+                        _push('The lock waits — the key is in your hand, not in the door.')
                     elif not has_reg_key and id(ent) not in door_hint_shown:
                         door_hint_shown.add(id(ent))
                         _push('This door requires a key.')

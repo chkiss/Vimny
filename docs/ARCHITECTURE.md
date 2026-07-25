@@ -38,8 +38,15 @@ Admin features: `:edit` enters editor mode on any dungeon; `:save <name>` writes
 - **void only where a path is guaranteed**: only `_place_runes_in_room`'s default kind set includes `void`. The first cave greedy-fills with void then calls **`_carve_void_path(composite, protected=…)`** — BFS a floor route (routing around `protected` guard cells) and delete void runs on it — to guarantee solvability. Other scatter zones use the void-free word set (`_WORD_RUNE_KINDS`).
 - **Deliberate non-normalized spacing**: The WORD Forge's `_l7_fill_row` keeps a **2–3 cell gap** on purpose — that spacing is what makes small-word `w` ≡ WORD `W`, which is the level's lesson. Don't normalize it to gap 1.
 
-## Par-solver toolkit (generation)
-### PAR IS THE OPTIMUM — no exceptions (law, user 2026-07-25)
+## Design laws
+
+These are the rules a new level must satisfy. They are collected here, rather
+than left as comments beside the level that first taught them, so that they can
+be argued with as a set — a law nobody can restate outside the code it justifies
+is not a law, it is a scar. Level-specific reasoning stays inline in the builder;
+anything that generalises belongs here.
+
+### PAR IS THE OPTIMUM — no exceptions
 
 **Par is the cheapest route that exists, whatever that route turns out to be.**
 If the optimum is a macro (`q`/`@`), a two-register setup, a `:g`, a counted
@@ -63,6 +70,64 @@ Two things follow that are easy to get wrong:
   cheaper than `0 {n}j` (it lands on the gate row's spine, then `l` onto the
   exit), and a macro's recording should start at the *earliest* repeating
   opportunity — including the leading motion in the body, not before it.
+
+### FORCE BY GEOMETRY, NOT BY SURVIVAL
+
+A level forces its lesson by making the puzzle *want* the new command — capacity,
+shape, distance. It never forces by making the alternative lethal or by narrowing
+the budget. "Two stars only with the new tool" teaches; "too tight to fumble"
+punishes.
+
+### NEVER LET ONE CLIP DO THE WORK OF TWO
+
+For any level that teaches multiple registers, **no single clip may be wanted
+anywhere**. Separate *rows* are not a guard — `J`, `dd`, `:m` and visual-block
+all reshape rows, and a playtester who joins two rows and yanks once has defeated
+capacity forcing without touching the lesson. The durable guard is content: two
+texts that share no word, one word per target, so a combined clip is garbage by
+construction and it does not matter how the player rearranges the source.
+
+Related, for register levels specifically: **exchange beats addition.** A named
+register costs `+2` per paste (see the prefix charge below) while a single-register
+rival pays only extra travel, and travel is cheap because counts are cheap. So on
+an *additive* puzzle named registers barely win. The shape that wins is exchange —
+the paste lands in the hole the delete just made, welding the two operations
+together so the rival cannot decouple them.
+
+### THE REGISTER-PREFIX CHARGE
+
+`"{reg}` is two real keypresses, so `main._register_prefix_cost(action)` adds 2 to
+every operator (`_operator_cost`) and every paste charge; the audit's
+`_token_ks_cost` matches (`"aye` = 4, `"ap` = 3). A named register buys
+**persistence, not free typing**. Charging 0 would make named registers a pure
+golf win and flatten the difficulty curve of every register level.
+
+### SENSE, NOT DECREE — puzzle texts are texts the player knows
+
+Puzzle text should be **well-known, public-domain** verse or prose whose structure
+*is* the solution: the player repairs a text they already know by heart, so the
+plaque demotes from decree ("make it say this") to confirmation. Copyrighted
+lyrics are refused; religious texts are avoided. Shared pool: `content/proverbs.py`.
+
+### INTROS SET THE SCENE
+
+The slug-keyed intro in `_LEVEL_INTROS` names the situation and the *feel* of the
+verb. It never enumerates the level's wrongs, its fixes, or the command family
+that solves it — discovering that is the puzzle. Keep them near the ~175-character
+house median. The wizard poem recited *before* entry is where commands may be
+named plainly. In-level banners follow the same rule, with one exception: a
+message may name a key when it teaches how Vim is *applied to Vimny* (that a key
+is picked up and pasted into a lock, that a door is opened with `:e`) rather than
+which key solves the puzzle.
+
+### BANNERS CARRY WHAT THE RENDER CANNOT
+
+A message that describes a visible change is noise. If the reveal, the fall, or
+the opening door is already animated, either drop the banner or replace it with
+the part the screen cannot show — what it cost, what it woke, what is now
+irreversible. Repeating events get told **once**.
+
+## Par-solver toolkit (generation)
 
 The per-level `_par_<slug>` solvers compute each dungeon's minimum-keystroke par. They share a toolkit at the top of `dungeon_gen.py` — supply a `neighbors(node)` generator; the machinery is shared:
 - **`_dijkstra(start, is_goal, neighbors)`** / **`_bfs(...)`** — generic least-keystroke / uniform-cost search; return `(cost, prev, end_node)`, reconstruct with `_join_path`. Nodes must be orderable so heap/FIFO tie-breaks (hence the chosen path) match the old hand-written loops.
