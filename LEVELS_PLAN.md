@@ -53,9 +53,25 @@ Blueprint: `blueprints/bonus_wing.md` — The Cartographer's Table, `zf`.
 `za` already exists (the Binder's Reliquary); the fold *creation* level does not.
 
 ### Insert-mode editing
-`<C-w>`, `<C-u>`, `<C-r>{reg}` — the keys that make insert mode more than
-typing. No blueprint yet; the hard part is forcing them, since a puzzle can
-rarely tell how a word got deleted.
+`<C-w>`, `<C-u>`, `<C-o>`, `<C-r>{reg}` — the keys that make insert mode more
+than typing. **All four are already implemented** (`main.py`, `engine/insert.py`)
+and reachable as the `ins_edit` / `ins_paste` relic scrolls. What is missing is a
+level, and the obstacle is the cost model, not the geometry:
+
+- `<C-w>`, `<C-u>` and Backspace all spend **nothing**. A route that fixes a
+  mistyped word with `<C-w>` and one that backspaces it letter by letter cost the
+  same, so no par gap exists and no level can force the lesson.
+- `<C-r>{reg}` spends **1 per pasted character** — identical to typing the text.
+  It can tie a typed route, never beat it.
+
+Repricing them by keystroke (Backspace and `<C-w>` at 1, `<C-r>{reg}` flat) would
+make all of this forceable, and was **considered and rejected**: a flat-cost
+register paste is cheaper than typing for any word of three characters or more,
+which hands every text-entry level in the game a shortcut. The cheese surface is
+worse than the missing lesson. These keys stay free flourishes.
+
+Anyone revisiting this needs a *new* forcing mechanism, not a new price — some
+way for the world, not the budget, to reward the correcting keys.
 
 ### Windows, tabs and buffers
 Vimny is one buffer per dungeon today. Multi-buffer play needs engine work

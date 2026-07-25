@@ -296,8 +296,14 @@ commands are deliberately out of scope:
   users rarely reach for.
 - **Window/tab/buffer management** — Vimny is a single buffer by design;
   each dungeon *is* the file. On the roadmap, not in the curriculum.
-- **Insert-mode editing keys** — `<C-w>`, `<C-u>`, `<C-r>{reg}`: on the
-  roadmap (see Upcoming features), not taught yet.
+- **Insert-mode editing keys** — `<C-w>`, `<C-u>`, `<C-o>`, `<C-r>{reg}` are
+  implemented and can be found as scrolls, but no level *teaches* them. They
+  are priced to be free (`<C-w>` and `<C-u>` cost nothing; `<C-r>` charges per
+  pasted character, exactly what typing the text would cost), so no puzzle can
+  force them at par — which is what a Vimny level does. Pricing them by
+  keystroke instead would make a register paste cheaper than typing and hand
+  every text-entry level a shortcut, so they stay free flourishes rather than
+  curriculum. See Upcoming features.
 - **Completion, plugins, ex-mode scripting** — out of scope.
 - **NORMAL-mode `Enter`** — a duplicate of `+`, which the Stair Rail
   already teaches.
