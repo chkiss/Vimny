@@ -37,6 +37,7 @@ def entries_for(player: Player) -> list[str]:
 def render_parent_dir(
     term: Terminal,
     player: Player,
+    progress: dict,
     cursor_row: int,
     cmd_line: str | None = None,
 ) -> None:
@@ -49,7 +50,7 @@ def render_parent_dir(
 
     # ── Top border / status bar / separator ────────────────────────────────────
     out.append(NC.border_h(iw, bfg, rst, S.BOX_TL, S.BOX_TR))
-    out.append(NC.status_bar(iw, bfg, rst, player, sl_label))
+    out.append(NC.status_bar(iw, bfg, rst, player, sl_label, progress.get('horse_name', '')))
     out.append(NC.border_h(iw, bfg, rst, S.BOX_LT, S.BOX_RT))
 
     game_h = term.height - 5

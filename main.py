@@ -7690,7 +7690,7 @@ def run_parent_dir(term: Terminal, player: Player, progress: dict) -> str | None
     cmdline     = _CmdLine(_PD_COMPLETIONS)
 
     def _render():
-        render_parent_dir(term, player, cursor_row,
+        render_parent_dir(term, player, progress, cursor_row,
                           cmdline.line if cmdline.active else None)
 
     _render()

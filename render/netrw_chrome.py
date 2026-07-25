@@ -40,21 +40,25 @@ def empty_row(iw, bfg, rst):
     return bfg + S.BOX_V + rst + ' ' * iw + bfg + S.BOX_V + rst
 
 
-def status_bar(iw, bfg, rst, player, label):
-    """Top status bar: 'Vimny  ⌨ <name>   ♥♥♥…   -- LABEL --', `label` centred."""
+def status_bar(iw, bfg, rst, player, label, companion=''):
+    """Top status bar: 'Vimny  ⌨ <name>   ♥♥♥ ♞   -- LABEL --', `label` centred.
+    The horse icon appears when the player has named the wizard's horse."""
     full_h       = player.hp // 2
     empty_h      = player.max_hp // 2 - full_h
     hearts_plain = S.HEART_FULL * full_h + S.HEART_EMPTY * empty_h
     hearts_col   = ((C.heart_full()  + S.HEART_FULL  + rst) * full_h +
                     (C.heart_empty() + S.HEART_EMPTY + rst) * empty_h)
+    # Companion horse: his glyph rides beside your hearts (matches dungeon status bar)
+    horse_plain  = f' {S.HORSE}' if companion else ''
+    horse_col    = (C.horse_fg() + S.HORSE + rst) if companion else ''
     name_tag     = '⌨  <' + player.name + '>'
-    left_cols    = len('Vimny  ') + len(name_tag) + 1 + len('  ') + len(hearts_plain) + len('  ')
+    left_cols    = len('Vimny  ') + len(name_tag) + 1 + len('  ') + len(hearts_plain) + len(horse_plain) + len('  ')
     lbl_start    = (iw - len(label)) // 2
     mid_gap      = max(1, lbl_start - left_cols)
     right_pad    = max(0, iw - left_cols - mid_gap - len(label))
     return (bfg + S.BOX_V + rst +
             C.normal_fg() + 'Vimny  ' + name_tag + rst +
-            '  ' + hearts_col + '  ' +
+            '  ' + hearts_col + ((' ' + horse_col) if horse_col else '') + '  ' +
             ' ' * mid_gap +
             C.mode_normal() + label + rst +
             ' ' * right_pad +

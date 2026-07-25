@@ -129,7 +129,7 @@ def render_overworld(term: Terminal, player: Player, progress: dict,
 
     # ── Rows 0–2: top border / status bar / separator ──────────────────────────
     out.append(NC.border_h(iw, bfg, rst, S.BOX_TL, S.BOX_TR))
-    out.append(NC.status_bar(iw, bfg, rst, player, ow_label))
+    out.append(NC.status_bar(iw, bfg, rst, player, ow_label, progress.get('horse_name', '')))
     out.append(NC.border_h(iw, bfg, rst, S.BOX_LT, S.BOX_RT))
 
     # ── Line area ──────────────────────────────────────────────────────────────
