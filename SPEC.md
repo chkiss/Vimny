@@ -3,7 +3,7 @@
 > **Scope.** This document holds design *vision*, the *UI layout* spec, and *not-yet-built*
 > mechanics. It is **not** the source of truth for the curriculum or command behavior — those
 > drifted here once and caused real bugs. Canonical sources:
-> - **Curriculum** (levels, command-unlock order): `content/levels.py` — mirrored in `LEVELS_PLAN.md` **Part 7**.
+> - **Curriculum** (levels, command-unlock order): `content/levels.py` — listed in `README.md`.
 > - **Command semantics**: the engine (`engine/`) + tests; quick reference in `README.md`.
 > - **Architecture, key files, conventions, budget formula**: `docs/ARCHITECTURE.md`.
 >
@@ -121,7 +121,7 @@ Every Vim navigation command has a direct, literal meaning in the dungeon. (Note
 
 Normal / Insert / Visual mode command **semantics** are canonical in the engine (`engine/`) +
 tests and summarized in `README.md`; the per-level unlock order is in `content/levels.py`
-(= `LEVELS_PLAN.md` Part 7). Basic Command mode (`:w` `:q` `:q!` `:wq` `:e` `:set number`) is
+. Basic Command mode (`:w` `:q` `:q!` `:wq` `:e` `:set number`) is
 covered by the save system and the curriculum. Substitution (`:s` / `:g` / `:v`
 / `&`) shipped at The Spellwright's Forge, token-gated like every other command
 (no "mana" economy); its semantics live in `engine/substitute.py` + tests.

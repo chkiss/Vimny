@@ -17,7 +17,7 @@
 #
 # SPDX-License-Identifier: GPL-3.0-or-later
 
-"""Generate the level + command tables in LEVELS_PLAN.md and README.md from the
+"""Generate the level + command tables in README.md from the
 canonical sources — `content/levels.py` (the curriculum) and
 `render/vim_commands.md` (the command reference).
 
@@ -29,8 +29,7 @@ Each table is spliced between its BEGIN/END markers; surrounding prose is left
 untouched. Do not hand-edit between the markers.
 
 Tables produced:
-  - LEVELS_PLAN.md Part 7  — full mirror (#, slug, name, commands, type)
-  - README.md Levels       — player-facing (#, name, commands, Playable/Planned)
+  - README.md Levels       — player-facing (#, name, commands)
   - README.md Commands     — command reference from render/vim_commands.md
 """
 from __future__ import annotations
@@ -42,7 +41,6 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 from content.levels import LEVELS
 
 _ROOT     = Path(__file__).parent.parent
-_PLAN     = _ROOT / 'LEVELS_PLAN.md'
 _README   = _ROOT / 'README.md'
 _VIM_CMDS = _ROOT / 'render' / 'vim_commands.md'
 
@@ -52,11 +50,6 @@ def _code(s: str) -> str:
     return f'`` {s} ``' if '`' in s else f'`{s}`'
 
 
-def _built_slugs() -> set[str]:
-    import generation.dungeon_gen as dg
-    return {n[len('build_dungeon_'):] for n in dir(dg) if n.startswith('build_dungeon_')}
-
-
 def _level_cmds_cell(lv: dict) -> str:
     cmds = lv.get('commands', '')
     if cmds:
@@ -64,22 +57,9 @@ def _level_cmds_cell(lv: dict) -> str:
     return {'boss': '(boss)', 'reliquary': '(bonus)'}.get(lv.get('type', ''), '—')
 
 
-def _plan_table() -> str:
-    # Part 7 has a `type` column, so an empty commands cell is just '—'
-    # (no need to repeat "(boss)").
-    head = ('| # | slug | Name | commands | type |\n'
-            '|---|------|------|----------|------|')
-    rows = [f"| {lv['display']} | `{lv['slug']}` | {lv['name']} | "
-            f"{_code(lv['commands']) if lv.get('commands') else '—'} | "
-            f"{lv.get('type', '')} |" for lv in LEVELS]
-    return head + '\n' + '\n'.join(rows)
-
-
 def _readme_levels_table() -> str:
-    built = _built_slugs()
-    head = '| # | Name | Commands | Status |\n|---|---|---|---|'
-    rows = [f"| {lv['display']} | {lv['name']} | {_level_cmds_cell(lv)} | "
-            f"{'Playable' if lv['slug'] in built else 'Planned'} |"
+    head = '| # | Name | Commands |\n|---|---|---|'
+    rows = [f"| {lv['display']} | {lv['name']} | {_level_cmds_cell(lv)} |"
             for lv in LEVELS if not lv.get('admin_only')]
     return head + '\n' + '\n'.join(rows)
 
@@ -111,11 +91,10 @@ def _splice(path: Path, name: str, block: str) -> None:
 
 
 def main() -> None:
-    _splice(_PLAN,   'CURRICULUM TABLE', _plan_table())
-    _splice(_README, 'LEVELS TABLE',     _readme_levels_table())
-    _splice(_README, 'COMMANDS TABLE',   _readme_commands_table())
+    _splice(_README, 'LEVELS TABLE',   _readme_levels_table())
+    _splice(_README, 'COMMANDS TABLE', _readme_commands_table())
     print(f'Regenerated doc tables ({len(LEVELS)} levels): '
-          'LEVELS_PLAN Part 7, README Levels, README Commands')
+          'README Levels, README Commands')
 
 
 if __name__ == '__main__':

@@ -58,74 +58,78 @@ Each dungeon is a text buffer. The floor is made of **characters, words, and spa
 
 > **Note — par is not the absolute minimum on search levels.** On levels that use search (`/`, `?`), par is computed assuming you type the **full search term** the level highlights (e.g. `/cipher⏎`). Because a search pattern only needs enough characters to land uniquely on the target, an expert can type a shorter prefix (e.g. `/cip⏎`) and finish *under* par. This is intentional and consistent across all search levels: par rewards "type the word you see," and the budget leaves headroom for prefix-search optimization.
 
-**Void runes**: Landing on a void cell costs 1 HP. Count motions pass through void cells silently; only the final landing cell triggers damage. This mirrors Vim's motion semantics exactly.
+**Terrain**: Levels use terrain to make a particular Vim command the *only* good answer, rather than merely the intended one.
+
+- **Void runes** — holes in the floor. Landing on one costs 1 HP, but count motions pass *through* them silently: only the final landing cell bites. So a void rune bars stepping, never jumping.
+- **Water** — impassable on foot; you have to jump over it.
+- **Fogged water** — impassable on foot *and* opaque, so a blind jump like `$` won't clear it. You have to aim at a character you can see.
 
 ## Levels
 
-The curriculum is defined in `content/levels.py` (canonical) and mirrored in `LEVELS_PLAN.md` Part 7. "Playable" means a generator is implemented; the rest are defined but not yet built. This table is generated — run `python3 content/_gen_curriculum_table.py` after curriculum changes.
+The main game sequence is complete — every level below is playable.
 
 <!-- BEGIN GENERATED LEVELS TABLE -->
-| # | Name | Commands | Status |
-|---|---|---|---|
-| 0 | The First Cave | `h j k l u :w :q :q!` | Playable |
-| 1 | The Line Halls | `^ $ 0` | Playable |
-| 1.1 | The Reliquary | `x` | Playable |
-| 2 | The Counting Crypts | `[count] prefix` | Playable |
-| 3 | The Rune Halls | `w b e` | Playable |
-| 4 | The Character Cataracts | `f F t T` | Playable |
-| 5 | The Goblin Gauntlet | `; , p` | Playable |
-| 5.1 | The Warden's Keep | (boss) | Playable |
-| 6 | The WORD Forge | `W B E` | Playable |
-| 7 | The Backward Vaults | `ge gE` | Playable |
-| 8 | The Lineheads | `G gg` | Playable |
-| 9 | The Screen Vault | `H M L` | Playable |
-| 10 | The Bracket Vaults | `%` | Playable |
-| 12 | The Runic Archives | `} {` | Playable |
-| 13 | The Sentence Corridor | `) (` | Playable |
-| 13.1 | The Warden Surveyor | (boss) | Playable |
-| 14 | The Seekers' Labyrinth | `/ ? n N * #` | Playable |
-| 14.1 | The Binder's Reliquary | `:h za :q` | Playable |
-| 15 | The Waypoint Sanctum | `` m ' ` `` | Playable |
-| 16 | The Archivist's Library | `:set wrap  :e!  :w {file}` | Playable |
-| 16.1 | The Warden Pathfinder | (boss) | Playable |
-| 17 | The Operator's Vault | `d{m}  dd` | Playable |
-| 18 | The Cipher Cell | `r  D  X` | Playable |
-| 19 | The Beacon Tiers | `y yy P` | Playable |
-| 20 | The Echo Vault | `.` | Playable |
-| 20.1 | The Warden Manifold | (boss) | Playable |
-| 21 | The Inscription Halls | `i a` | Playable |
-| 22 | The Change Annex | `c{m}  cE  cc  s` | Playable |
-| 23 | The Change Extension | `S  C  Y` | Playable |
-| 24 | The Sculpting Chambers | `I A o O` | Playable |
-| 25 | The Overwrite Halls | `R` | Playable |
-| 26 | The Case Chambers | `~ g~ gU gu` | Playable |
-| 27 | The Joiner's Gate | `J gJ` | Playable |
-| 28 | The Alignment Halls | `>> <<` | Playable |
-| 29 | The Indentation Sanctum | `>{m} <{m} =` | Playable |
-| 29.1 | The Warden Scrivener | (boss) | Playable |
-| 30 | The Sight Sanctum | `v {m} d/c/~` | Playable |
-| 31 | The Selection Halls | `V  <C-v>` | Playable |
-| 32 | The Word Enclosure | `iw aw iW aW` | Playable |
-| 33 | The Bracket Enclosure | `i( a(` | Playable |
-| 34 | The Brace & Square Enclosure | `i[ a[ i{ a{` | Playable |
-| 35 | The Quote Enclosure | `i" a" i' a'` | Playable |
-| 36 | The Tag Enclosure | `it at` | Playable |
-| 37 | The Sentence Enclosure | `is as` | Playable |
-| 38 | The Paragraph Enclosure | `ip ap` | Playable |
-| 38.1 | The Grandmaster's Sanctum | (boss) | Playable |
-| 39 | The Spellwright's Forge | `:s///  :g  &` | Playable |
-| 40 | The Culling Ledger | `:d _ :a,bd :v//d` | Playable |
-| 41 | The Shelving Room | `:m :t :> :<` | Playable |
-| 42 | The Refrain Vault | `& :&& :j :y` | Playable |
-| 43 | The Stair Rail | `+ - _` | Playable |
-| 44 | The Last Reach | `g_ g* gi gp` | Playable |
-| 45 | The Buried Word | `g* n` | Playable |
-| 46 | The Wet Ink | `gi` | Playable |
-| 47 | The Hall of Echoes | `q @ "` | Playable |
-| 48 | The Gauntlet | — | Playable |
-| 48.1 | The Warden Eternal | (boss) | Playable |
-| R1 | The Register I | `""  y  p` | Playable |
-| R2 | The Register II | `"ay  "by  "aP  "bP` | Playable |
+| # | Name | Commands |
+|---|---|---|
+| 0 | The First Cave | `h j k l u :w :q :q!` |
+| 1 | The Line Halls | `^ $ 0` |
+| 1.1 | The Reliquary | `x` |
+| 2 | The Counting Crypts | `[count] prefix` |
+| 3 | The Rune Halls | `w b e` |
+| 4 | The Character Cataracts | `f F t T` |
+| 5 | The Goblin Gauntlet | `; , p` |
+| 5.1 | The Warden's Keep | (boss) |
+| 6 | The WORD Forge | `W B E` |
+| 7 | The Backward Vaults | `ge gE` |
+| 8 | The Lineheads | `G gg` |
+| 9 | The Screen Vault | `H M L` |
+| 10 | The Bracket Vaults | `%` |
+| 12 | The Runic Archives | `} {` |
+| 13 | The Sentence Corridor | `) (` |
+| 13.1 | The Warden Surveyor | (boss) |
+| 14 | The Seekers' Labyrinth | `/ ? n N * #` |
+| 14.1 | The Binder's Reliquary | `:h za :q` |
+| 15 | The Waypoint Sanctum | `` m ' ` `` |
+| 16 | The Archivist's Library | `:set wrap  :e!  :w {file}` |
+| 16.1 | The Warden Pathfinder | (boss) |
+| 17 | The Operator's Vault | `d{m}  dd` |
+| 18 | The Cipher Cell | `r  D  X` |
+| 19 | The Beacon Tiers | `y yy P` |
+| 20 | The Echo Vault | `.` |
+| 20.1 | The Warden Manifold | (boss) |
+| 21 | The Inscription Halls | `i a` |
+| 22 | The Change Annex | `c{m}  cE  cc  s` |
+| 23 | The Change Extension | `S  C  Y` |
+| 24 | The Sculpting Chambers | `I A o O` |
+| 25 | The Overwrite Halls | `R` |
+| 26 | The Case Chambers | `~ g~ gU gu` |
+| 27 | The Joiner's Gate | `J gJ` |
+| 28 | The Alignment Halls | `>> <<` |
+| 29 | The Indentation Sanctum | `>{m} <{m} =` |
+| 29.1 | The Warden Scrivener | (boss) |
+| 30 | The Sight Sanctum | `v {m} d/c/~` |
+| 31 | The Selection Halls | `V  <C-v>` |
+| 32 | The Word Enclosure | `iw aw iW aW` |
+| 33 | The Bracket Enclosure | `i( a(` |
+| 34 | The Brace & Square Enclosure | `i[ a[ i{ a{` |
+| 35 | The Quote Enclosure | `i" a" i' a'` |
+| 36 | The Tag Enclosure | `it at` |
+| 37 | The Sentence Enclosure | `is as` |
+| 38 | The Paragraph Enclosure | `ip ap` |
+| 38.1 | The Grandmaster's Sanctum | (boss) |
+| 39 | The Spellwright's Forge | `:s///  :g  &` |
+| 40 | The Culling Ledger | `:d _ :a,bd :v//d` |
+| 41 | The Shelving Room | `:m :t :> :<` |
+| 42 | The Refrain Vault | `& :&& :j :y` |
+| 43 | The Stair Rail | `+ - _` |
+| 44 | The Last Reach | `g_ g* gi gp` |
+| 45 | The Buried Word | `g* n` |
+| 46 | The Wet Ink | `gi` |
+| 47 | The Hall of Echoes | `q @ "` |
+| 48 | The Gauntlet | — |
+| 48.1 | The Warden Eternal | (boss) |
+| R1 | The Register I | `""  y  p` |
+| R2 | The Register II | `"ay  "by  "aP  "bP` |
 <!-- END GENERATED LEVELS TABLE -->
 
 ## Commands
@@ -280,17 +284,13 @@ commands are deliberately out of scope:
 - **`U` (vi's line-undo)** — `u` and the redo scroll (`<C-r>`) cover the
   undo story; a third undo channel would complicate it for a key modern Vim
   users rarely reach for.
-- **`g*` / `g#`, `gi`** — planned for a post-game g-family bonus level
-  (with `gp`/`gP` and `g_`), not the main curriculum.
-- **Window/tab/buffer management** — on the post-game roadmap (after the
-  final boss); until then Vimny is a single buffer by design; each dungeon
-  *is* the file. Folds are under consideration for the same era.
+- **Window/tab/buffer management** — Vimny is a single buffer by design;
+  each dungeon *is* the file. On the roadmap, not in the curriculum.
+- **Insert-mode editing keys** — `<C-w>`, `<C-u>`, `<C-r>{reg}`: on the
+  roadmap (see Upcoming features), not taught yet.
 - **Completion, plugins, ex-mode scripting** — out of scope.
-- **Not yet, by design** — `+` / `-` / `_` (and NORMAL-mode `Enter`): these
-  cheap line motions would change the optimal solution of many existing
-  levels, so they wait on a full re-balance. `Y`, `X`, and a few visual-mode
-  refinements exist in the engine and unlock at their own lessons, like `D`
-  and `C` before them.
+- **NORMAL-mode `Enter`** — a duplicate of `+`, which the Stair Rail
+  already teaches.
 
 ## Project layout
 
@@ -318,14 +318,16 @@ save/
   save_manager.py        Progress I/O, layout save
 tests/                   pytest test suite
 SPEC.md                  Design vision, UI spec, forward-looking notes
-LEVELS_PLAN.md           Curriculum plan (Part 7 = canonical level table)
+LEVELS_PLAN.md           Design rubric + the levels not yet built
 ```
 
-## Running tests
+## Upcoming features
 
-```bash
-pytest
-```
+- **The Registry** — a bonus wing on the register family: the delete ring (`"0`, `"1`–`"9`), the small-delete register (`"-`), the read-only registers (`":` `".` `"%` `"#`), the expression register (`"=`), the system clipboard (`"*` `"+`), the black hole (`"_`), the search register (`"/`), and a boss to close it out. The first two levels are in.
+- **Folds** — `zf` / `za` and a level built around them.
+- **Level creation** — a documented path for writing and sharing your own dungeons, so the curriculum isn't limited to the ones shipped here.
+- **Insert-mode editing** — `<C-w>`, `<C-u>` and friends: the keys that make insert mode more than typing.
+- **Windows, tabs and buffers** — Vimny is one buffer per dungeon today; multi-buffer play is on the roadmap.
 
 ## Design principles
 
@@ -333,11 +335,9 @@ pytest
 - **Efficiency is enforced by par and budget.** The keystroke budget makes Vim's core value proposition central, and the par encourages the player to strive for perfect execution efficiency.
 - **Everything is a buffer.** Dungeons are files; the overworld is a directory; `:w`, `:q`, `:e` are real mechanics.
 
-See `LEVELS_PLAN.md` for the curriculum and `SPEC.md` for design vision & UI.
+See `LEVELS_PLAN.md` for what's planned next and `SPEC.md` for design vision & UI.
 
 ## License
 
 Vimny is free software, licensed under the **GNU General Public License v3.0** —
-see [`LICENSE`](LICENSE) for the full text. The only runtime dependency,
-[`blessed`](https://pypi.org/project/blessed/), is MIT-licensed and so
-GPL-compatible.
+see [`LICENSE`](LICENSE) for the full text.
