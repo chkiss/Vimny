@@ -11658,9 +11658,11 @@ def build_dungeon_indentation_sanctum(seed: int) -> Dungeon:
     # THE RITE'S OWN HEADING (playtest, user 2026-07-25): the galleries wear
     # their true word on the west wall, but the rite block wore nothing, so
     # nothing on screen said the block below was CODE — and `=` is the tool
-    # that seats code. One word in the wall band that divides the last gallery
-    # from the rite says it, without naming a key.
-    lay(_IS_BLANK_ROWS[1], _IS_PLQ_COL, 'the code', 'verdant')
+    # that seats code. Carved as a TAG, `<code>`, not as prose: the galleries'
+    # plaques are literal words the floor must match, so a plaque reading "the
+    # code" invites the player to go and write those words. A tag reads as a
+    # label ABOUT the block, which is what it is. It names no key.
+    lay(_IS_BLANK_ROWS[1], _IS_PLQ_COL, '<code>', 'verdant')
 
     nouns = rng.sample(_IS_NOUNS, 6 + sum(t.count('{n}') for t, _ in _IS_RITE))
     verbs = rng.sample(_IS_VERBS, sum(t.count('{v}') for t, _ in _IS_RITE))

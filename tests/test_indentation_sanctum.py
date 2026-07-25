@@ -357,13 +357,20 @@ def test_the_rite_wears_a_heading_that_says_it_is_code(monkeypatch):
     west wall, but the rite block wore nothing — nothing on screen said the
     block below was CODE, which is what `=` seats. The heading is carved in the
     WALL band that divides the last gallery from the rite: uncuttable, off the
-    floor scans, and it names no key."""
+    floor scans, and it names no key.
+
+    It is a TAG, not prose. Every other plaque in this level is a literal word
+    the floor must be made to match, so a heading reading "the code" would read
+    as one more of those — go and write those words. `<code>` reads as a label
+    ABOUT the block below it."""
     room = build_dungeon_indentation_sanctum(0).rooms[0]
     heading = [ru for ru in room.char_runs
                if ru.row == _IS_BLANK_ROWS[1] and ru.col < _IS_COL_S]
     assert heading, "the rite needs a heading"
     text = ' '.join(''.join(ru.symbols) for ru in sorted(heading, key=lambda u: u.col))
-    assert 'code' in text, text
+    assert text == '<code>', text
+    assert text.startswith('<') and text.endswith('>'), \
+        "a TAG, so it never reads as a word the floor must be made to match"
     for ru in heading:                       # in the WALL: uncuttable, unscanned
         for k in range(len(ru.symbols)):
             assert room.cells[ru.row][ru.col + k] == CellType.WALL
