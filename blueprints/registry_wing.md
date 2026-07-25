@@ -134,7 +134,33 @@ are famous sayings.
 this level, so the bug was latent; patched to return 2, letting this answer stay
 tokeniser-validated (no `_ANSWER_NOT_TOKENISED` / `_NONSTANDARD_BUDGET` exemption).
 
-### II — The Delete Ring (`"0`, `"1`–`"9`) — richest level in the wing
+### II — The Named Vault (`"a`) — SHIPPED 2026-07-24 (reordered ahead of the ring)
+`build_dungeon_register_named_vault` + `tests/test_register_named_vault.py`.
+The direct answer to Register I's clobber, so it now sits at II (the delete ring
+moves later). ONE quarry word must be laid into **four** gap bays; a cutting bay
+sits above a spine gate before each later gap, so every route MUST cut (clobbering
+`""`) between pastes. `"a` survives every cut → the quarry is visited once; the
+unnamed player climbs back and re-yanks three times. par **59** (named, driven,
+seed-invariant); the unnamed re-yank rival costs **64** → 1★ inside the standard
+`ceil(59*1.4)=83` budget.
+
+**Why four gaps, not one (load-bearing):** the `"{reg}` prefix is charged its two
+real keystrokes (user law 2026-07-24 — see below), so a named register costs +4 per
+word (yank prefix + paste prefix). With a single reuse the prefix overhead *exceeds*
+the one re-yank it saves and named LOSES (measured 29 vs 27). The advantage only
+compounds with repeated reuse: each extra gap costs named +2 but the unnamed player
+a whole re-yank detour (~+5). Four gaps put the margin at a safe 5 keys. **Any
+future named-register level must re-check this arithmetic** — named registers are
+not automatically cheaper in this cost model.
+
+### THE REGISTER-PREFIX CHARGE (engine law, user 2026-07-24)
+`"{reg}` is two real keypresses, so `main._register_prefix_cost(action)` adds 2 to
+every operator (`_operator_cost`) and every paste charge. A named register buys
+**persistence, not free typing**. The audit's `_token_ks_cost` matches (`"aye` = 4,
+`"ap` = 3). Before this, prefixes were charged 0 — which would have made named
+registers a pure golf win and broken the wing's whole difficulty curve.
+
+### (later) The Delete Ring (`"0`, `"1`–`"9`) — richest level in the wing
 Two chambers.
 - **Yank survives delete:** yank the key word, then clear three obstacle-words with
   `dd` (each overwrites `""`). The door needs the key word — only `"0p` (the yank

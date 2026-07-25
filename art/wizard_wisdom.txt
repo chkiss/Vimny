@@ -706,6 +706,17 @@
       ]
     },
     {
+      "introduces_slug": "register_named_vault",
+      "name": "the named vault",
+      "line_count": 4,
+      "quote": [
+        "  One hold is soon overwritten; name a second.  ",
+        "   \"ay fills the vault that bears the name a;   ",
+        "   \"ap pours from it, and pours again after —   ",
+        "   no blade between can empty what is named.    "
+      ]
+    },
+    {
       "introduces_slug": "warden_eternal",
       "name": "warden eternal",
       "line_count": 4,

@@ -120,6 +120,7 @@ LEVELS = [
     # Listed after the Warden Eternal; hidden in the world/ menu until the horse
     # is adopted (progress['horse_name']). Off the main teaching chain.
     {'display': 'R1',   'slug': 'register_unnamed_hold',  'name': 'The Register I',             'commands': 'yiw  P', 'wing': 'registry', 'teaches': []},
+    {'display': 'R2',   'slug': 'register_named_vault',   'name': 'The Register II',            'commands': '"ay  "ap', 'wing': 'registry', 'teaches': []},
     {'display': '99',   'slug': 'dummy',                 'name': 'Dummy Dungeon',              'commands': 'd x s y p yy P', 'admin_only': True, 'teaches': []},
 ]
 

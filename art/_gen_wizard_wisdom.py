@@ -446,6 +446,12 @@ POEMS: list[tuple[str | None, str, list[str]]] = [
         'But the hold keeps only your latest take—',
         'and cutting takes. Paste before you cut.',
     ]),
+    ('register_named_vault', 'the named vault', [  # The Register II — "a (bonus)
+        'One hold is soon overwritten; name a second.',
+        '"ay fills the vault that bears the name a;',
+        '"ap pours from it, and pours again after —',
+        'no blade between can empty what is named.',
+    ]),
     ('warden_eternal', 'warden eternal', [     # The Warden Eternal (final boss)
         'The last Warden is every Warden.',
         'No key remains for me to give—',

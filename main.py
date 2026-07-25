@@ -1156,13 +1156,22 @@ def _keystroke_cost(count: int, motion: str = '', count_given: bool = False) -> 
     return base
 
 
+def _register_prefix_cost(action: dict) -> int:
+    """`"{reg}` is TWO real keypresses (the quote and the register letter), so it
+    is charged like any other keystrokes — a named register buys persistence, not
+    free typing. 0 when no prefix was typed (the implicit unnamed register)."""
+    return 2 if action.get('register') is not None else 0
+
+
 def _operator_cost(action: dict) -> int:
-    """Keystroke cost of an operator command, e.g. dw=2, d3w=4, dd=2, gUiw=4, gUU=3."""
+    """Keystroke cost of an operator command, e.g. dw=2, d3w=4, dd=2, gUiw=4, gUU=3.
+    A typed `"{reg}` prefix adds its two keys ("ayw=4)."""
     count = action.get('count', 1)
     cg    = action.get('count_given', False)
+    reg = _register_prefix_cost(action)
     if 'shorthand' in action:              # D / C — ONE physical keypress, not d+$
-        return _count_prefix_cost(count, cg) + 1
-    c = len(action['op'])                  # 'd'=1, 'gU'=2
+        return reg + _count_prefix_cost(count, cg) + 1
+    c = reg + len(action['op'])            # 'd'=1, 'gU'=2
     c += _count_prefix_cost(count, cg)
     if 'textobj' in action:                # diw, ci( … (i/a + obj char)
         return c + 2
@@ -1764,6 +1773,36 @@ def _register_unnamed_hold_tick(room, player) -> list:
     er, ec = room.exit_pos
     seal_open = room.cells[er][ec] != CellType.WALL
     msgs = []
+    if ok and not seal_open:
+        room.cells[er][ec] = CellType.FLOOR
+        msgs.append('Both sayings read true — the seal parts.')
+    elif not ok and seal_open and (player.row, player.col) != (er, ec):
+        room.cells[er][ec] = CellType.WALL
+    return msgs
+
+
+def _register_named_vault_tick(room, player) -> list:
+    """The Register II gate + seal.  The spine gate opens once the daw bay reads
+    true; the exit seal parts once BOTH gap bays AND the daw bay read true.
+    Stateless + undo-aware; neither closes under the player's own feet."""
+    row_texts = [_wla_floor_text(room, r).strip() for r in range(room.rows)]
+    n_gaps = len(room._r2_gaps)
+    gaps_ok = row_texts.count(room._r2_gap_target) >= n_gaps   # EVERY gap bay filled
+    msgs = []
+    # Each spine gate opens while the daw bay above it reads its true saying.
+    daws_ok = []
+    for (gr, gc), drow in zip(room._r2_gate_cells, room._r2_daw_rows):
+        ok_d = _wla_floor_text(room, drow).strip() == room._r2_daw_target
+        daws_ok.append(ok_d)
+        gate_open = room.cells[gr][gc] != CellType.WALL
+        if ok_d and not gate_open:
+            room.cells[gr][gc] = CellType.FLOOR
+            msgs.append('The stray word falls away — the passage opens.')
+        elif not ok_d and gate_open and (player.row, player.col) != (gr, gc):
+            room.cells[gr][gc] = CellType.WALL
+    er, ec = room.exit_pos
+    seal_open = room.cells[er][ec] != CellType.WALL
+    ok = all(daws_ok) and gaps_ok
     if ok and not seal_open:
         room.cells[er][ec] = CellType.FLOOR
         msgs.append('Both sayings read true — the seal parts.')
@@ -2992,6 +3031,7 @@ _LEVEL_INTROS = {
     'wet_ink': ('The Wet Ink — a writing ledge, an old saying mostly lost in the dark, and a gallery of cold braziers beneath it. Write its opening and you will know the rest. The scribes here wrote by firelight, and the fire answers only words already written.', 70),
     'g_sanctum': ('The Last Reach — three old sayings run east toward the flood. The keepers of this place went to the end of the line many times a day, and never once over it.', 70),
     'register_unnamed_hold': ('The Register I — the horse waits at the mouth, and his saddle bears whatever you last took up. What it holds, it holds only until your hand closes on the next thing; and a blade closes a hand as surely as a grasp.', 70),
+    'register_named_vault': ('The Register II — the road ahead asks the same word set down twice, with a blade to swing between. What you carry plainly, that blade will spill; but a thing you have NAMED rides in a vault of its own, and rides it still when the blade has fallen.', 70),
     'stair_rail': ('The Stair Rail — a broken stair winds down the shaft, each step\'s word set a little east of the last, and below the steps the floor falls a long way. The masons who cut these stairs never missed a landing.', 70),
     'hall_of_echoes': ('The Hall of Echoes — hall opens onto hall, and every hall repeats itself. The stone remembers.', 70),
     'grandmasters_sanctum': ('The Grandmaster\'s Sanctum — a long gallery of seven proofs, and the master himself beyond the last stone, listening to every stroke. Nothing here is new; everything here is asked properly.', 70),
@@ -4190,6 +4230,9 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
                 _push(_m)
         if level == 'register_unnamed_hold':
             for _m in _register_unnamed_hold_tick(room, player):
+                _push(_m)
+        if level == 'register_named_vault':
+            for _m in _register_named_vault_tick(room, player):
                 _push(_m)
         if level == 'hall_of_echoes':
             for _m in _hall_of_echoes_tick(room, player):  # per-room south seal
@@ -6845,7 +6888,8 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
                     _kill_door_group(room, target.row, target.col, kind='locked_door')
                     player.row, player.col = target.row, target.col   # paste moves you over: step onto the unlocked door
                     _reveal_from(room, player.row, player.col)
-                    budget.spend(_keystroke_cost(count, 'p', action.get('count_given', False)))
+                    budget.spend(_keystroke_cost(count, 'p', action.get('count_given', False))
+                                 + _register_prefix_cost(action))
                     _push('Door unlocked!')
                 else:
                     _has_key = any(ed['tmpl'].get('kind') == 'floor_key' for ed in clip_entities)
@@ -6865,7 +6909,8 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
                 undo_stack.append(_snapshot(room, player, budget, ans=cmd_start_ans))
                 redo_stack.clear()
                 player.registers['"'] = None
-                budget.spend(_keystroke_cost(count, 'p', action.get('count_given', False)))
+                budget.spend(_keystroke_cost(count, 'p', action.get('count_given', False))
+                             + _register_prefix_cost(action))
                 _push('You lost the key!')
             elif clip and any(rw.get('char_runs') or rw.get('entities') for rw in clip['rows']):
                 # One register for everything cut/yanked: lay characters back down and
@@ -6879,7 +6924,8 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
                         # text — the stamp-run idiom (paste on, never step).
                         player.col += 1
                     budget.spend(_keystroke_cost(count, 'p', action.get('count_given', False))
-                                 + (1 if action.get('after_cursor') else 0))
+                                 + (1 if action.get('after_cursor') else 0)
+                                 + _register_prefix_cost(action))
                     spawned = next((ed['tmpl']['kind'] for ed in clip_entities), None)
                     _push(_PASTE_SPAWN_MSG[spawned] if spawned in _PASTE_SPAWN_MSG else 'Pasted.')
                 else:

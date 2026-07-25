@@ -3921,6 +3921,107 @@ def build_dungeon_register_unnamed_hold(seed: int) -> Dungeon:
     return dungeon
 
 
+# ── The Register II — The Named Vault (the "a register) ───────────────────────
+# The answer to Register I's clobber. The SAME chassis (quarry word, a daw
+# intruder, a gap to fill), but now the word must be laid TWICE, with the cut
+# forced BETWEEN the two pastes by a spine gate:
+#
+#   spawn ─ QUARRY (row 3: "godliness") ─ GAP1 (row 5) ─ DAW (row 7: the intruder,
+#   whose cut opens the gate) ─╫─ (spine gate, row 8) ─ GAP2 (row 9) ─ exit
+#
+# GAP2 lies behind the gate, so you MUST daw to reach it — and that daw clobbers
+# "". With the unnamed register you yank, paste GAP1, daw (clobber), and now ""
+# holds the junk: you must climb back to the quarry and RE-YANK before GAP2. With
+# a NAMED register the word rides in "a untouched by the cut: yank ONCE into "a,
+# then "ap into both gaps (the "a prefix is free). One yank vs two — the named
+# register is strictly the shorter road. Register prefixes cost 0 budget, so the
+# whole saving is the re-yank the unnamed player is forced to pay.
+_R2_ROWS, _R2_COLS = 21, 46
+_R2_SPINE = 2
+_R2_BAY_W, _R2_BAY_E = 3, 42
+_R2_ROW_QUARRY = 3                    # the ONE source of the word
+_R2_GAP_ROWS   = (5, 9, 13, 17)       # FOUR gaps, all wanting that word
+_R2_DAW_ROWS   = (7, 11, 15)          # a cutting bay before each later gap
+_R2_GATE_ROWS  = (8, 12, 16)          # spine gates, each opened by the daw above it
+_R2_GATE       = 19                   # the exit/seal row
+_R2_EXIT       = (19, 3)
+_R2_SPAWN      = (2, 2)
+_R2_TEXTCOL    = 3
+_R2_QUARRY_WORD = 'godliness'
+_R2_GAP_HEAD    = ('cleanliness', 'is', 'next', 'to')   # + 'godliness', every gap
+_R2_DAW_PREFIX  = ('look', 'before', 'you')
+_R2_DAW_JUNK    = 'quill'
+_R2_DAW_SUFFIX  = ('leap',)
+_R2_PAR = 59                          # the named optimal (driven below); test-pinned
+                                      # (the unnamed re-yank rival costs 64 → 1★)
+
+
+def build_dungeon_register_named_vault(seed: int) -> Dungeon:
+    """The Register II — The Named Vault ("a).  See the section header."""
+    from content.proverbs import text_of
+    R, C = _R2_ROWS, _R2_COLS
+    cells = [[CellType.WALL] * C for _ in range(R)]
+    for r in range(2, _R2_GATE + 1):                     # the spine
+        cells[r][_R2_SPINE] = CellType.FLOOR
+    for r in (_R2_ROW_QUARRY, *_R2_GAP_ROWS, *_R2_DAW_ROWS):
+        for c in range(_R2_BAY_W, _R2_BAY_E + 1):
+            cells[r][c] = CellType.FLOOR
+    for gr in _R2_GATE_ROWS:                             # THE SPINE GATES
+        cells[gr][_R2_SPINE] = CellType.WALL
+
+    room = Room(room_type=RoomType.ENTRY, rows=R, cols=C)
+    room.cells = cells
+    room.seed  = seed
+
+    def lay(r, col, words_seq):
+        for w in words_seq:
+            room.char_runs.append(CharRun(r, col, tuple(w), 'ancient'))
+            col += len(w) + 1
+
+    lay(_R2_ROW_QUARRY, _R2_TEXTCOL, (_R2_QUARRY_WORD,))
+    gap_target = text_of(_R2_GAP_HEAD + (_R2_QUARRY_WORD,))
+    gaps = []
+    for grow in _R2_GAP_ROWS:
+        col = _R2_TEXTCOL
+        lay(grow, col, _R2_GAP_HEAD)
+        for w in _R2_GAP_HEAD:
+            col += len(w) + 1
+        gaps.append((grow, col))
+    for drow in _R2_DAW_ROWS:
+        lay(drow, _R2_TEXTCOL, _R2_DAW_PREFIX)
+        jcol = _R2_TEXTCOL + len(' '.join(_R2_DAW_PREFIX)) + 1
+        lay(drow, jcol, (_R2_DAW_JUNK,))
+        lay(drow, jcol + len(_R2_DAW_JUNK) + 1, _R2_DAW_SUFFIX)
+    daw_target = text_of(_R2_DAW_PREFIX + _R2_DAW_SUFFIX)
+
+    room._r2_daw_target = daw_target
+    room._r2_gap_target = gap_target
+    room._r2_daw_rows   = _R2_DAW_ROWS
+    room._r2_gate_cells = tuple((gr, _R2_SPINE) for gr in _R2_GATE_ROWS)
+    room._r2_gaps       = tuple(gaps)
+
+    room.entities.append(Entity(kind='exit', row=_R2_EXIT[0], col=_R2_EXIT[1],
+                                edit_immune=True))
+    room.spawn_pos = _R2_SPAWN
+    room.exit_pos  = _R2_EXIT
+
+    room.rebuild_indexes()
+    room.par    = _R2_PAR
+    room.budget = math.ceil(_R2_PAR * 1.4)
+    # Named optimal: yank ONCE into "a, then paste all THREE gaps from it, cutting
+    # a gate open between each. "a survives every cut, so the quarry is visited
+    # once; the unnamed player must climb back and re-yank before gaps 2 and 3.
+    room.answer = ('j "aye 2j fo "ap 0 2j fq dw 0 2j fo "ap '
+                   '0 2j fq dw 0 2j fo "ap 0 2j fq dw 0 2j fo "ap G l')
+
+    apply_stone_fog(room)                 # GAP2 sleeps behind the shut gate
+
+    dungeon = Dungeon(name='The Register II', seed=seed)
+    dungeon.rooms        = [room]
+    dungeon.current_room = 0
+    return dungeon
+
+
 # ── The Bracket Enclosure (i( a() ────────────────────────────────────────────────
 # GEM SETTINGS, BY SENSE (blueprints/sense_not_decree.md §2): every bay is a
 # famous proverb whose parenthesized aside has gone wrong — a junk stone set

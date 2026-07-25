@@ -55,6 +55,11 @@ def _token_ks_cost(token: str) -> int:
       - g-prefix 2-key (ge, gE, gg): base 2; with count N: len(str(N)) + 2
       - f/F/t/T + target char (fr, Fw, t!, T!): base 2; with count: len+2
     """
+    if len(token) >= 2 and token[0] == '"':
+        # "{reg} register prefix (e.g. "aye, "ap, "add): TWO real keypresses (the
+        # quote and the register letter) on top of the operation that follows —
+        # "aye = 2 + ye(2) = 4, "ap = 2 + p(1) = 3.
+        return 2 + _token_ks_cost(token[2:])
     if token and token[0] in '/?' and token.endswith('⏎'):
         # search: /pat⏎ or ?pat⏎ — '/' charged + len(pat) chars, closing ⏎ free = len(pat)+1 (main.py)
         return len(token[1:-1]) + 1
