@@ -5496,9 +5496,8 @@ def build_dungeon_grandmasters_sanctum(seed: int) -> Dungeon:
 _HE_COLS  = 58
 _HE_TX    = 3                          # text head col in every hall
 _HE_GATE_COL = 2                       # the west gate cell in every band
-_HE_PAR    = 79                        # engine-measured: the full driven tape
-_HE_BUDGET = 190                       # GENEROUS hand-set: the all-manual
-                                       # road wins 1★ (measured below)
+_HE_PAR    = 76                        # engine-measured: the full driven tape
+_HE_BUDGET = math.ceil(_HE_PAR * 1.4)  # STANDARD (par-is-the-optimum law)
 
 # The poem pool — all PD, all 10 lines. The intruders are deadpan one-word
 # asides (the Norm law: understatement over punchline), one per line, all
@@ -5638,7 +5637,11 @@ def _he_build_chambers(rng):
     #    next 'g', strike) is the macro unit. A west 'lair' label (no 'g')
     #    keeps the row a recognised run once the lair is cleared. ──
     gob_cols = tuple(range(_HE_GOB_C0, _HE_GOB_C0 + _HE_GOB_N * _HE_GOB_GAP, _HE_GOB_GAP))
-    gob_tape = f'fgx qe;xq {_HE_GOB_N - 2}@e 0 j'
+    #    GOLFED (user, 2026-07-25): record the FIND ITSELF, not the `;` that
+    #    repeats it — `qg fgx q` makes the whole strike the macro unit, so the
+    #    first kill is inside the recording instead of paid for separately. And
+    #    `G` lands the descent on the exit band for one key where `0 j` took two.
+    gob_tape = f'qe fgx q {_HE_GOB_N - 1}@e G'
     chambers.append({'rows': (((_HE_TX, 'lair', 'ancient'),),),
                      'done': ('lair',), 'span': (2, _HE_GOB_C0 + _HE_GOB_N * _HE_GOB_GAP),
                      'plaques': (), 'goblins': gob_cols, 'combat': True,
@@ -11559,10 +11562,12 @@ def build_dungeon_alignment_halls(seed: int) -> Dungeon:
 #     (2 keys) snaps the whole rite to the law. The door check calls the
 #     SAME law_column the operator uses — solver and judge can never drift.
 #
-# FORCING BY PAR with a HAND-SET GENEROUS budget (non-1.4): the manual-mason
-# route (3>> banks, per-row >>/<</dot through the rite — no `=` ever) WINS at
-# 1 star (~30 keys, driven in tests); the budget bars only routes clumsier
-# than that. Blank FLOOR rows separate the bays, so `}` paragraph motions
+# FORCING BY PAR (the budget is the standard 1.4x, per the par-is-the-optimum
+# law): the manual-mason route (3>> banks, per-row >>/<</dot through the rite —
+# no `=` ever) costs ~30 against par 12. `=}` really is that dominant — it seats
+# a whole paragraph under the posted law for one stroke — so nothing clumsier
+# than the par route fits a standard budget, and the manual road does not
+# finish. That is the level being honest about how large the win is. Blank FLOOR rows separate the bays, so `}` paragraph motions
 # bound each bank and j descends freely (no spine detours — the old draft's
 # water terrain is dropped: floor rows are {n}G-landable and water is
 # insert-bridgeable, so terrain-S1 was always a fiction).
@@ -11608,9 +11613,9 @@ _IS_VERBS = ('bind', 'ward', 'mend', 'keep', 'cast', 'hew')
 # floor lets `4j` hop bay to bay with no spine detours, `G$` rides the open
 # bolts to the seal:  >} · 4j · <} · 4j · =} · G$  = 12 keys.
 # The manual-mason rival (no `=`): 3>> banks + per-row >>/<</dot through the
-# rite ≈ 30 — it WINS at 1 star under the hand-set budget below.
+# rite ≈ 30 — 2.5x par, so it does not fit the standard budget.
 _IS_PAR    = 12
-_IS_BUDGET = 31          # HAND-SET (non-1.4): manual-mason route (30) wins 1★
+_IS_BUDGET = math.ceil(_IS_PAR * 1.4)   # STANDARD (par-is-the-optimum law)
 _IS_ANSWER = '>} 4j <} 4j =} G$'
 
 
@@ -11650,6 +11655,12 @@ def build_dungeon_indentation_sanctum(seed: int) -> Dungeon:
     lay(0, 6, 'in these halls', 'verdant')
     lay(1, 6, 'the law is posted', 'verdant')            # gap lands at col 16
     lay(1, _IS_REGISTER, '│', 'verdant')                 # the plumb line, carved above
+    # THE RITE'S OWN HEADING (playtest, user 2026-07-25): the galleries wear
+    # their true word on the west wall, but the rite block wore nothing, so
+    # nothing on screen said the block below was CODE — and `=` is the tool
+    # that seats code. One word in the wall band that divides the last gallery
+    # from the rite says it, without naming a key.
+    lay(_IS_BLANK_ROWS[1], _IS_PLQ_COL, 'the code', 'verdant')
 
     nouns = rng.sample(_IS_NOUNS, 6 + sum(t.count('{n}') for t, _ in _IS_RITE))
     verbs = rng.sample(_IS_VERBS, sum(t.count('{v}') for t, _ in _IS_RITE))
