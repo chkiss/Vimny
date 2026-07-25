@@ -1150,8 +1150,8 @@ def _keystroke_cost(count: int, motion: str = '', count_given: bool = False) -> 
     # not undercut the count==1 discount that only a no-count motion earns.
     base = 1 + _count_prefix_cost(count, count_given)
     # multi-character motions: one extra keypress per extra character required
-    # NOTE: gj/gk are absent (they'd reprice the Archivist's Library) —
-    # flagged 2026-07-17 for review rather than silently changed here.
+    # NOTE: gj/gk are deliberately unpriced — pricing them would reprice the
+    # Archivist's Library.
     if motion in ('f', 'F', 't', 'T', 'gg', 'ge', 'gE', 'gJ', 'g_'):
         base += 1
     return base
@@ -1351,7 +1351,7 @@ def _kill_door_group(room, row: int, col: int, kind: str = 'door') -> None:
 
 
 def _operators_vault_tick(room, player) -> list:
-    # Fog reveal, per key (2026-07-19): a door-blocked flood from wherever
+    # Fog reveal, per key: a door-blocked flood from wherever
     # the player stands — so a corridor's pockets surface with its gate, and
     # the C10 collapse that drops the player onto the sealed ledge lights it
     # from where they land. (The player's own cell is always cleared first:
@@ -2482,8 +2482,8 @@ def _wsc_alcove_pos(room, k: int) -> tuple:
     column (columns never shift) for the niche silhouette — a non-wall cell
     walled on both sides with its back to the wall. The structure rides
     _shift_rows intact, so a mid-fight J cannot strand the re-manifest the
-    way static podium coords would; the walls stay plain stone (playtest:
-    no sigils). CELL-TYPE checks, not is_passable — the niche sleeps under
+    way static podium coords would; the walls stay plain stone (no
+    sigils). CELL-TYPE checks, not is_passable — the niche sleeps under
     fog (the Manifold law). Falls back to the build coords if a collapse
     somehow ate the silhouette."""
     col = _dg._WSC_ALCOVES[k][1]
@@ -3087,7 +3087,7 @@ _BASE_NAMES = {'g': 'goblin', 'd': 'hound', 'c': 'cat', 'z': 'zombie',
                '&': 'demon', 'e': 'elf', '$': 'coin', 'w': 'warden'}
 _SWELLABLE_LETTERS = ('g', 'd', 'c')             # the ones with a "big" (uppercase) form
 
-# (HP, attack) per creature glyph, from the playtest table. HP = x-hits to fell
+# (HP, attack) per creature glyph. HP = x-hits to fell
 # it; attack = half-hearts of damage it deals per hit (the player has 6 = 3♥).
 _CREATURE_HP_ATK = {'g': (1, 1), 'G': (2, 1), '&': (3, 2), 'Z': (1, 1),
                     'z': (1, 1), 'c': (1, 0), 'C': (2, 3), 'd': (1, 2),
@@ -6824,8 +6824,8 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
                         if is_ledge(room, player.row):
                             close_gap(room, player.row, player.col, count)   # ledge: pull the tail left
                         # `x`=1; `{n}x` pays its count digits — the count-s
-                        # law (2026-07-19: a flat 1 made {n}x undercut the
-                        # quote objects and inverted the Enclosure forcing).
+                        # law (a flat 1 would make {n}x undercut the quote
+                        # objects and invert the Enclosure forcing).
                         budget.spend(_keystroke_cost(count, '',
                                                      action.get('count_given', False)))
                         if len(cut_items) > 1:
@@ -6903,7 +6903,7 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
                               'There is no fuel to hold that flame.'))
             elif clip and any(ed['tmpl'].get('kind') == 'floor_key'
                               for ed in clip_entities):
-                # KEYS ARE SLIPPERY (global law, 2026-07-19): loosed anywhere
+                # KEYS ARE SLIPPERY (global law): loosed anywhere
                 # but onto a locked door, the key is gone — no pasted copy
                 # lands AND the hand empties. (p never consumes a register, so
                 # a floor paste would MINT a duplicate no cut could touch —

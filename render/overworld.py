@@ -50,7 +50,7 @@ def build_lines(levels: list, custom_layouts: list) -> list:
 def line_search_text(ln: dict) -> str:
     """The text `/` searches for a buffer line.
 
-    LAW (single source of truth, 2026-07-17): search must match what the
+    LAW (single source of truth): search must match what the
     renderer DRAWS — the label text, gutter excluded. Level and custom
     lines share their exact source strings with `_content` (key_for_slug /
     layout_name); comment lines use the width-INDEPENDENT core of their

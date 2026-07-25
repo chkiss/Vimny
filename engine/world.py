@@ -169,7 +169,11 @@ class Room:
     answer_diverged: bool       = False  # admin pressed a wrong key
     wood_damage: dict           = field(default_factory=dict)  # (r,c) -> half-steps received (1=cracked)
     wrap_buffer: bool           = False  # single-line text buffer (rows==1); ':set wrap' soft-wraps it across screen rows (The Archivist's Library)
-    search_glyph_entities: bool = True   # / search overlays entity glyphs (so /W finds the Warden, /g a goblin) — ON everywhere as of 2026-07-21. Audited: no answer-tape letter collides with an entity glyph, and the only exit-adjacent entities (grandmaster W, warden_eternal + hall_of_echoes goblins) sit behind seals, so no /entity jump cheeses a par. Full suite passes forced-on.
+    # `/` search overlays entity glyphs (so /W finds the Warden, /g a goblin).
+    # ON everywhere. Safe because no answer-tape letter collides with an entity
+    # glyph, and the only exit-adjacent entities (grandmaster W, warden_eternal
+    # + hall_of_echoes goblins) sit behind seals — so no /entity jump cheeses a par.
+    search_glyph_entities: bool = True
     wrap_width:           int   = 0      # fixed ':set wrap' fold width (0 = wrap to live content width); the Wardenverse pins it so stone walls land at fold edges on any terminal.
 
     def __post_init__(self):

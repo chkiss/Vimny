@@ -284,8 +284,7 @@ def _cross_water(room, r: int, c: int) -> bool:
     if (r, c) in room.fog_cells:
         return False
     ent = room.entity_at(r, c)
-    # Same blocker set as f/F/t/T (_SCAN_BLOCK): an unbroken seal_door stops $ / 0 / ^
-    # too (previously only the level's fog stopped them there — a latent inconsistency).
+    # Same blocker set as f/F/t/T (_SCAN_BLOCK): an unbroken seal_door stops $ / 0 / ^ too.
     return ent is None or ent.kind not in ('locked_door', 'shield', 'seal_door', 'boss_seal')
 
 

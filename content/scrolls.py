@@ -363,9 +363,8 @@ WANDERERS_THREAD_SCROLL = {
     ],
 }
 
-# Grants <C-r> (redo) — u's other hand. u itself is always-on from the first
-# cave; this relic completes the pair. (The Undo Sanctum level was cancelled
-# 2026-06-11; the 'redo' token lives here now.)
+# Grants <C-r> (redo) — u's other hand. `u` is always-on from the first cave;
+# this relic completes the pair and is the only source of the 'redo' token.
 SECOND_STRIDE_SCROLL = {
     'title': '◈   The Second Stride   ◈',
     'lines': [
@@ -487,8 +486,7 @@ SEALED_DEPARTURE_SCROLL = {
 # substitute family at the Spellwright's Forge (:s :%s :g & — token 'subst'),
 # then macros and named registers at the Hall of Echoes (q@ 'q', "a
 # 'reg_named'). Reveal-the-validated, smudge-the-next: the lines sleep under
-# the dip until each is learned. (Re-purposed 2026-07-17 from the old visual-
-# flourish stopgap, which taught nothing new past the Sight Sanctum.)
+# the dip until each is learned.
 REWRITING_WORD_SCROLL = {
     'title': "◈   The Rewriting Word   ◈",
     'lines': [

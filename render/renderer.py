@@ -666,7 +666,7 @@ def render_all(term: Terminal, dungeon: Dungeon, player: Player,
     # ── The Codex pane (:h) — a horizontal split over the game area ────────
     # :help opens another file read-only in a split and moves focus into it.
     # Vim's default puts help at the TOP; ours opens BELOW — the 'splitbelow'
-    # house style (user preference 2026-07-17: the dungeon stays put up top).
+    # house style: help opens below, so the dungeon stays put up top.
     # The pane replaces the BOTTOM rows of the game area (a pure view).
     pane = getattr(player, 'codex_pane', None)
     if pane is not None:

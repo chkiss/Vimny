@@ -1296,7 +1296,7 @@ def _place_frieze(composite, rng, row: int, c0: int, c1: int) -> None:
 
 
 def _place_frieze_sym(composite, rng, rows, c0: int, c1: int) -> None:
-    """Ornamental friezes with the masons' discipline (playtest 2026-07-17):
+    """Ornamental friezes with the masons' discipline:
     ONE seeded pattern, mirrored left↔right, stamped identically on every
     row in `rows` — so the top and bottom courses match and each reads as a
     palindrome about the chamber's centre."""
@@ -1397,8 +1397,8 @@ def build_dungeon_reliquary(seed: int) -> Dungeon:
     composite.budget = 35
     composite.answer = _reliquary_answer(word)
 
-    # The sanctum sleeps under fog until the seal breaks (playtest 2026-07-17:
-    # the divider hid nothing — the relic and exit were visible from spawn).
+    # The sanctum sleeps under fog until the seal breaks (a bare divider hides
+    # nothing — the relic and exit must not be visible from spawn).
     # Standard reachability fog; _check_seal_broken lifts it with the ward.
     _fog_unreachable(composite, *composite.spawn_pos)
 
@@ -3141,7 +3141,7 @@ _SS_EXIT   = (18, 7)                # the FINAL SEAL — stone until all read tr
 _SS_TAIL0  = 29                     # tail words sit at the row end (blight 15..28)
 _SS_SPAWN  = (2, 19)                # over the first blight: j drops onto it
 
-# SENSE, NOT DECREE (blueprints/sense_not_decree.md §2): every chamber is a
+# SENSE, NOT DECREE (the design law): every chamber is a
 # famous saying INTERRUPTED by a rot-span. The Cut/Word/Seal chambers keep
 # the saying's opening words at the head row's edge and its remainder at the
 # tail row's edge — the strike removes exactly the rot, and the saying
@@ -3340,7 +3340,7 @@ def build_dungeon_sight_sanctum(seed: int) -> Dungeon:
     room._ss_doors = tuple(doors)
     room._ss_words = words
     # no lintel: floating carved words over the spawn read as a locked door
-    # (playtest 2026-07-12) — the credo lives in the intro hint instead
+    # — the credo lives in the intro hint instead
 
     cells[_SS_SPAWN[0]][_SS_SPAWN[1]] = CellType.FLOOR   # the drop-in
     room.entities.append(Entity(kind='exit', row=_SS_EXIT[0], col=_SS_EXIT[1],
@@ -3365,7 +3365,7 @@ def build_dungeon_sight_sanctum(seed: int) -> Dungeon:
 # exact-text chassis (spine, anchor-aligned light shaft, gate-row bolts,
 # FINAL SEAL — the Sight Sanctum's proven bones):
 #
-#   • THE CASE TRIO (V, honestly price-forced — the g-prefix tax; user-found):
+#   • THE CASE TRIO (V, honestly price-forced — the g-prefix tax):
 #     VU (2) beats gUU (3) on a scattered-case line that must read UPPER;
 #     Vu (2) beats guu (3) on the mirror (and in visual, u LOWERCASES — it is
 #     not undo, the trap-lesson); V~ (2) beats g~~ (3) on a full-flip
@@ -3614,7 +3614,7 @@ def build_dungeon_selection_halls(seed: int) -> Dungeon:
 
 # ── The Word Enclosure (iw aw) ──────────────────────────────────────────────────
 # The first text objects: select by SHAPE, not by landing — and SENSE, NOT
-# DECREE (blueprints/sense_not_decree.md §2): every bay holds a famous
+# DECREE (the design law): every bay holds a famous
 # proverb the player knows by heart. Intruder rows lay a seeded junk word
 # INTO a true saying (the lesson deletes it); misquote rows swap one word
 # for a wrong one (the lesson cures it). No west plaque band — the player's
@@ -3857,7 +3857,7 @@ _R1_PAR = 16                          # the optimal driven tape below (register 
                                       # A verbose manual run / retype (~24) or a clobber
                                       # recovery (~32) overshoot and are barred; the register
                                       # tools are the way through, and the sting may strand
-                                      # a fumbled run (user call — recover with undo, or restart).
+                                      # a fumbled run (recover with undo, or restart).
 
 
 def build_dungeon_register_unnamed_hold(seed: int) -> Dungeon:
@@ -3922,18 +3922,11 @@ def build_dungeon_register_unnamed_hold(seed: int) -> Dungeon:
 
 
 # ── The Register II — The Named Vault (the "a / "b registers) ─────────────────
-# FORCED BY CAPACITY, NOT BY SURVIVAL.  The first cut of this level forced the
-# named register by THREAT: a daw clobbered "", so you had to hide the word
-# somewhere safe.  That is not forcing at all — it is a protection puzzle, and
-# any protection tool solves it.  `"_daw` sends the cut to the black hole,
-# leaves "" untouched, and came in UNDER par.  Worse, the player who found it
-# had learned something TRUE about Vim and was being punished for it.
-#
-# The SECOND cut forced by capacity but put both quarry words on rows a `J`
-# apart, and every bay wanted both: a playtester joined the quarry rows, took
-# one clip with `y2e`, and macro'd the vault with no named register at all.
-#
-# So: capacity, across TWO SAYINGS that never want the same word.
+# FORCED BY CAPACITY, NOT BY SURVIVAL.  INVARIANT: two sayings that share no
+# word, and exactly one word wanted per bay, so no single clip is ever enough.
+# That defeats both the `"_daw` route (protection, not capacity — the black
+# hole spares "" and any protection tool would do) and the `J`-then-`y2e`
+# route (one joined clip serving every bay, no named register needed).
 #
 #   spawn ─ QUARRY A (row 3: "godliness") ─ QUARRY B (row 4: "invention")
 #         ─ bays rows 5..10, ALTERNATING saying A / saying B ─ seal (row 12)
@@ -4038,7 +4031,7 @@ def build_dungeon_register_named_vault(seed: int) -> Dungeon:
 
 
 # ── The Bracket Enclosure (i( a() ────────────────────────────────────────────────
-# GEM SETTINGS, BY SENSE (blueprints/sense_not_decree.md §2): every bay is a
+# GEM SETTINGS, BY SENSE (the design law): every bay is a
 # famous proverb whose parenthesized aside has gone wrong — a junk stone set
 # into the saying, or the saying's KEY word set as a gem but miscut. No west
 # plaques: the player knows the true reading by heart. Par invariance is
@@ -4202,7 +4195,7 @@ def build_dungeon_bracket_enclosure(seed: int) -> Dungeon:
     room.par    = _BE_PAR
     room.budget = math.ceil(_BE_PAR * 1.4)   # STANDARD: the piecewise route wins at 1★
     ca, cb = (cures[r][0] for r in _BE_C2_ROWS)
-    # nav golf (user-found in playtest): % from the spine scans to the first
+    # nav golf (known shortcut): % from the spine scans to the first
     # '(' and jumps to its MATCH — j % lands ON the ')' and di( resolves
     # from the delimiter. Two keys under the w-walk, whatever the prefix.
     room.answer = (f'j % di( j . j . 2j ci( {ca} j ci( {cb} '
@@ -4220,7 +4213,7 @@ def build_dungeon_bracket_enclosure(seed: int) -> Dungeon:
 # lesson becomes CHOOSING the object — reading the delimiter under your hand —
 # and, in the nest chamber, resolving AMBIGUITY: from one cursor position
 # inside `[{jjj} bbb]`, di{ and di[ carve different spans. SENSE, NOT DECREE
-# (blueprints/sense_not_decree.md §2): every bay is a famous proverb wearing
+# (the design law): every bay is a famous proverb wearing
 # a bracketed aside gone wrong — junk stones in square or brace settings, or
 # the saying's key word miscut in its fitting. No west plaques except the
 # nest twins' ember/pedestal pair (which distinguish the twin DOORS, not the
@@ -4458,7 +4451,7 @@ def build_dungeon_brace_square_enclosure(seed: int) -> Dungeon:
 #                   takes the FIRST pair, which is already empty (di" from
 #                   the landing is a no-op), so the player must aim: one w
 #                   hops the empty pair onto the second's opening mark
-#                   (player-found golf 2026-07-20; 2f" pays a key more).
+#                   (known golf; 2f" pays a key more).
 #
 # Forcing audit (why par 45 needs the objects): the objects fire from the
 # spine while every old tool must first walk in (f"/w cost 1-3 keys before a
@@ -4896,8 +4889,8 @@ _SE_EAST    = {'c1': 42, 'c2': 40, 'c5': 42}   # east sayings' start cols
 _SE_C3_FIX  = ((('veni',), 'vidi', ('vici',)),
                (('live',), 'laugh', ('love',)))
 _SE_PAR = 44            # hand-tallied along the driven tape (mid landings;
-                        # C5 falls to TWO DOTS riding C4's das — player-found
-                        # golf 2026-07-20; cures now 'vidi.' + 'laugh.')
+                        # C5 falls to TWO DOTS riding C4's das — known golf;
+                        # cures are 'vidi.' + 'laugh.')
 
 
 def _se_sentence(words) -> str:
@@ -5096,7 +5089,7 @@ _PE_BRAZIERS   = ((1, 22), (13, 21), (13, 23), (28, 20), (28, 22), (28, 24))
 _PE_PAR    = 9              # j dip j dap $ — best old-only (j 11dd j 14dd $) pays 11
 
 
-# SENSE, NOT DECREE (blueprints/sense_not_decree.md §2): the cantos are the
+# SENSE, NOT DECREE (the design law): the cantos are the
 # legion's PLUNDER-CHANT — the Twelve Days gift list (secular lines only,
 # PD), canto 1 running eleven-to-partridge (11 rows), canto 2 the full
 # twelve-to-partridge (12 rows). FIXED text, deliberately: no door reads it
@@ -5326,7 +5319,7 @@ def _gms_bay_specs(w) -> list:
          f"{w['s_a']}. {w['s_cure']}. {w['s_b']}."),
         # 5 · TAG (dit): empty the named case, keep the case (dat tears
         # it). The name is DRAWN per seed — the Tag Enclosure's precedent
-        # (a fixed <b> was a hard-coding regression, caught 2026-07-17).
+        # (the name must derive from the tag, not be hard-coded).
         (f"{w['t_l']} <{w['t_name']}>{w['t_rt']}</{w['t_name']}> {w['t_m']}",
          f"{w['t_l']} <{w['t_name']}></{w['t_name']}> {w['t_m']}"),
         # 6 · BRACE (ci{): read the metal — the cure goes in the brace,
@@ -5480,7 +5473,7 @@ def build_dungeon_grandmasters_sanctum(seed: int) -> Dungeon:
 
 # ── The Hall of Echoes (47: q @ " — the macro gauntlet) ──────────────────────
 #
-# v4 (playtest 2026-07-20): ONE poem hall, then ONE tall gauntlet MAP of
+# ONE poem hall, then ONE tall gauntlet MAP of
 # replica chambers stacked south (nothing wipes — the whole descent stays
 # on screen, the viewport scrolls). Every chamber is the EXACT puzzle from
 # its source level (same pick functions, texts, columns), and sources are
@@ -5552,7 +5545,7 @@ _HE_POEMS = (
       'Mercifully')),
 )
 
-# The gauntlet chambers, v4 (playtest 2026-07-20): each chamber is the
+# The gauntlet chambers: each chamber is the
 # EXACT puzzle from its source level — same generators, same texts, same
 # columns — chosen ONLY from levels whose own karaoke tape repeats a
 # 2+-character string (the macro-worthiness criterion). Four levels qualify:
@@ -5560,9 +5553,8 @@ _HE_POEMS = (
 #   the Selection Halls — 'k vbp' three times around the panel cycle
 #   the Refrain Vault   — 'p 3j' laying the refrain under each stanza
 #   the Goblin Gauntlet — '; x' felling a lair of goblins one by one (combat)
-# (The v3 alignment/joiner/sculpting/case/culling chambers repeated only
-# because they were invented uniform variants — exactly what the playtest
-# rejected — so they are out.) Every chamber solves on a fresh register
+# A level does NOT qualify merely because uniform variants could be invented
+# for it: the repeat must already be in its own tape. Every chamber solves on a fresh register
 # (qb, qc, qd, qe after the poem hall's qa — the named-register drill).
 _HE_WARP = '♄'                          # kept: relic name used by older saves/tests
 _HE_GOB_C0, _HE_GOB_GAP, _HE_GOB_N = 10, 4, 6   # goblin lair: 6 foes, spaced 4
@@ -5637,7 +5629,7 @@ def _he_build_chambers(rng):
     #    next 'g', strike) is the macro unit. A west 'lair' label (no 'g')
     #    keeps the row a recognised run once the lair is cleared. ──
     gob_cols = tuple(range(_HE_GOB_C0, _HE_GOB_C0 + _HE_GOB_N * _HE_GOB_GAP, _HE_GOB_GAP))
-    #    GOLFED (user, 2026-07-25): record the FIND ITSELF, not the `;` that
+    #    GOLFED: record the FIND ITSELF, not the `;` that
     #    repeats it — `qg fgx q` makes the whole strike the macro unit, so the
     #    first kill is inside the recording instead of paid for separately. And
     #    `G` lands the descent on the exit band for one key where `0 j` took two.
@@ -5725,7 +5717,7 @@ def build_dungeon_hall_of_echoes(seed: int) -> Dungeon:
     rng = random.Random(seed)
     poem = _HE_POEMS[rng.randrange(len(_HE_POEMS))]
     # the poem hall is the FIRST run of ONE tall map — the descent never
-    # leaves it (playtest: rooms 2+ must continue the same map, not a new one)
+    # leaves it (rooms 2+ must continue the same map, not a new one)
     chambers = [_he_poem_chamber(poem)] + _he_build_chambers(rng)
     room = _he_gauntlet_map(chambers, seed)
     room.par    = _HE_PAR
@@ -5748,17 +5740,16 @@ def build_dungeon_hall_of_echoes(seed: int) -> Dungeon:
 # first non-blank), the two BELOW force `+`; neither can be skipped, since
 # every step is its own bolt. Below the valley the gate row runs WEST into
 # solid stone: each mended word CARVES the next cell of a corridor through
-# the stone toward the sealed exit (playtest 2026-07-19 — the old bolts
-# were lone wall cells inside the valley floor, and opening them read as
-# random floor, not a path being cut). With every step mended the corridor
+# the stone toward the sealed exit (lone wall cells inside the valley floor
+# would read as random floor when opened, not as a path being cut). With every step mended the corridor
 # meets the seal, the seal parts, and the gate row's first-non-blank
 # becomes the exit itself — so the final {n}+ lands straight on it; a bare
 # undercroft beneath means G undershoots, and a plain {n}j lands beside
 # the landing and still owes a ^.
 #
-# Redesigned 2026-07-17, tape fixed 2026-07-19: `_` cannot be UNIQUELY
+# `_` cannot be UNIQUELY
 # forced — `{n}_` is exactly `{n-1}+`, and `_` alone is `^` — so the tape
-# takes the `+` (user call: showing `_` where `+` ties just confuses); `_`
+# takes the `+` (house style: showing `_` where `+` ties just confuses); `_`
 # is taught by name in the poem/hint bar as the synonym it is. What IS
 # strictly forced here is `-` (and `+`).
 _SR_ROWS, _SR_COLS = 26, 54
@@ -5858,8 +5849,8 @@ def build_dungeon_stair_rail(seed: int) -> Dungeon:
 # back) chains row to row.
 #
 # The last GLYPH is a CORRUPTION: the tail word's final letter is wrong.
-# g_ lands on it and r{letter} mends it. SENSE, NOT DECREE (playtest
-# 2026-07-19, plaque removed): the three verses are FAMOUS SAYINGS, so the
+# g_ lands on it and r{letter} mends it. SENSE, NOT DECREE (no plaque):
+# the three verses are FAMOUS SAYINGS, so the
 # true last word — and its last letter — is known by heart; the rest of
 # the saying is the (long) navigation. The door reads the true tail word
 # as a substring. Corrupt spellings are fixed non-words (curz/busj/boq),
@@ -5869,7 +5860,7 @@ def build_dungeon_stair_rail(seed: int) -> Dungeon:
 _GS_ROWS, _GS_COLS = 10, 78
 _GS_SPINE  = 22
 _GS_BAYS   = (2, 3, 4, 5, 6)          # adjacent — + chains them
-# A FIVE-LINE poem (playtest 2026-07-20): two SHORT sayings are inset between
+# A FIVE-LINE poem: two SHORT sayings are inset between
 # the three long ones, LEFT-ALIGNED, so the corrupt tails alternate far east
 # (long, ~col 66-70) and near west (short, ~col 40-41). Every adjacent pair of
 # tails is now > 20 columns apart, so a `j` then h/l walk to the next tail
@@ -5889,8 +5880,8 @@ _GS_TEXT0  = 24
 _GS_POOL   = (72, 73)                 # the flood: $ lands here and drowns
 _GS_THROAT = 7                        # spine-only row joins the bays to the gate
 _GS_GATE   = 8
-# The exit and its per-verse bolts sit at the WEST end now (playtest: no need
-# for the exit way out east). The player mends the tails (east), then walks the
+# The exit and its per-verse bolts sit at the WEST end (no need for the exit
+# way out east). The player mends the tails (east), then walks the
 # gate row back WEST through the bolts to the seal at column 0.
 _GS_BOLTS  = {2: 5, 3: 4, 4: 3, 5: 2, 6: 1}
 _GS_EXIT   = (8, 0)                   # the FINAL SEAL, WEST of every bolt
@@ -5980,13 +5971,13 @@ def build_dungeon_g_sanctum(seed: int) -> Dungeon:
 # alone below the ledge. g* takes it literally and walks the chain; n
 # carries on. Each real word has ONE corrupt letter — the cell just before
 # the buried word — so g* still finds it; h steps onto the corruption and
-# r{fix} mends it. NO PLAQUE (playtest 2026-07-19): the draw demands that
+# r{fix} mends it. NO PLAQUE: the draw demands that
 # EXACTLY ONE letter completes the corrupt spelling into a real vocab word
 # — the mend is inferable from the word itself (the game vocab is the
 # dictionary; hosts stay randomized from it). The /typed-search rival
 # costs a few keys more — that margin is the whole game.
-# (Redesigned 2026-07-17: real words that CONTAIN the target — the true g*
-# use case — in place of the old nonsense {pre}{word}{post} concatenations.)
+# (Hosts are real words that CONTAIN the target — the true g* use case —
+# never nonsense {pre}{word}{post} concatenations.)
 _BW_ROWS, _BW_COLS = 8, 54
 _BW_SPINE   = 22
 _BW_PLQ_COL = 2
@@ -5999,8 +5990,8 @@ _BW_BOLTS   = {2: 23, 3: 24, 4: 25}
 _BW_EXIT    = (6, 26)                 # the FINAL SEAL, east of every bolt
 _BW_PAR     = 19                      # 2l (walk onto 'one') g* h r{f} l n ×3 G $
 _BW_STANDING = 'one'                  # the word that stands alone at the mouth
-# A little VERSE (playtest 2026-07-20: single words stacked at one column let
-# `j r x` beat the hunt). The target 'one' is buried in a real word on each
+# A little VERSE (single words stacked at one column would let `j r x` beat
+# the hunt). The target 'one' is buried in a real word on each
 # line, and the lines are STAGGERED so the buried words fall at DIFFERENT
 # columns — g*/n hunts them; manual j/h nav would cost more. The reader mends
 # each by the verse's sense (no plaque; the rhyme names the word).
@@ -6079,7 +6070,7 @@ def build_dungeon_buried_word(seed: int) -> Dungeon:
 
     room.entities.append(Entity(kind='exit', row=_BW_EXIT[0], col=_BW_EXIT[1],
                                 edit_immune=True))
-    # Spawn WEST of the standing word (playtest 2026-07-20): so 'one' reads
+    # Spawn WEST of the standing word: so 'one' reads
     # clear at the hall's mouth instead of hidden under the cursor — the
     # player walks onto it, then g* hunts the buried echoes.
     room.spawn_pos = (_BW_STAND[0], _BW_SPINE)
@@ -6125,7 +6116,7 @@ _WI_EXIT   = (6, 24)
 _WI_PAR    = 42                       # i{w1} 2+ yl w P gi␣{w2} 2+ 2w P
                                       # gi␣{w3} 2+ 3w P gi␣{w4} G $ (pinned)
 
-# SENSE, NOT DECREE (blueprints/sense_not_decree.md §6): the inscription is
+# SENSE, NOT DECREE (the design law): the inscription is
 # a four-word saying the player knows whole — writing the first words, they
 # know what the dark plaque quarters must say before the firelight shows
 # them. Both pool entries total 14 letters (words ≤ 4, the plaque pitch),
@@ -6213,17 +6204,16 @@ def build_dungeon_wet_ink(seed: int) -> Dungeon:
     return dungeon
 
 
-# (The Stamp Run — a gp level — was designed and CUT 2026-07-17: the
-# engine gives gp no niche. Ordinary paste self-chains at line end, the
-# Beacon flame-fill is insert-plus-tumble, and p+l ties gp everywhere
-# else. Recorded in the build log; gp remains a granted convenience.)
+# (There is no gp level: the engine gives gp no niche. Ordinary paste
+# self-chains at line end, the Beacon flame-fill is insert-plus-tumble, and
+# p+l ties gp everywhere else. gp remains a granted convenience.)
 
 
 # ── The Binder's Reliquary (:h — the Codex) ─────────────────────────────────
 #
 # A second reliquary (display 14.1, after the Seekers' Labyrinth), on the
 # FIRST Reliquary's two-chamber chassis — but the divider is WATER, not
-# stone (redesigned 2026-07-17 after playtest). Water is transparent: the
+# stone. Water is transparent: the
 # binder's pass-word is legible on the far shore. MIST (fog) lies on the
 # channel, so every line-scoped scan stops at the bank — $ / 0 / ^ by
 # _cross_water's fog check, f/F/t/T by the scan-fog law — while teleports
@@ -6651,8 +6641,8 @@ _WP_KEYWORD      = 'xyzzy'          # the magic word (Colossal Cave Adventure, 1
                                    # a non-word, so it can never collide with vocab
 _WP_KEY_WORD_POS = (2, 30)         # the FIRST magic word — thin TOP danger band (backward)
 _WP_DECOY_POS    = [(11, 12), (13, 24), (15, 34)]  # forward decoys (open danger floor)
-# The SECOND magic word (Colossal Cave's other teleporter) — the # lesson
-# (2026-07-17): the ? leg lands you in the xyzzy pocket, where plugh wakes
+# The SECOND magic word (Colossal Cave's other teleporter) — the # lesson:
+# the ? leg lands you in the xyzzy pocket, where plugh wakes
 # from a SCRIPTED fog (fogged text is unsearchable, so ?plugh from spawn
 # finds nothing — the fresh-word law); its backward twin sits in a second
 # misted pocket holding the gold key, its forward decoys price out * (a
@@ -6683,11 +6673,11 @@ def build_dungeon_waypoint_sanctum(seed: int) -> 'Dungeon':
     safe (one-time per player via progress['collected_hearts']), but the relic
     chests respawn each visit, so replaying farms a fresh relic each run until
     the pool empties.
-    REBALANCING LEVERS, post-playtesting (only if farming proves undesirable):
+    REBALANCING LEVERS (only if farming proves undesirable):
     (a) persist looted vault chests per-player, mirroring the collected_hearts
     mechanism, so each chest yields at most one relic ever; and/or (b) a
-    warden/summoner guarding the vault band. Both need real tuning/judgement, so
-    deferred until there are more players than Joseph testing."""
+    warden/summoner guarding the vault band. Both need real tuning/judgement,
+    so both are deferred until there is broader play data."""
     rng = random.Random(seed)
     R, C = _WP_ROWS, _WP_COLS
     dungeon = Dungeon(name='The Waypoint Sanctum', seed=seed)
@@ -6706,7 +6696,7 @@ def build_dungeon_waypoint_sanctum(seed: int) -> 'Dungeon':
     # ignores walls, lands inside. This forces the search up-leg exactly as the
     # moats (below) force the mark down-leg. The pocket spans the key cell through
     # the end of the rune; walls ceiling it (row 1) and flank it (row 2 sides).
-    # (Waterworks conversion 2026-07-18: the pocket ring, the sanctum seals
+    # (Waterworks: the pocket ring, the sanctum seals
     # and the vault boxes are MISTED WATER, not stone — everything is
     # visible, per the stone-fog law, while walking / scans stay barred:
     # water blocks feet, the mist on it blocks $ / 0 / ^ / f scans, and
@@ -6813,8 +6803,8 @@ def build_dungeon_waypoint_sanctum(seed: int) -> 'Dungeon':
     # BOTH sanctum plughs sleep under SCRIPTED fog (the Wet Ink pattern):
     # a fogged word is unsearchable — by EVERY search uniformly, # included
     # — so ?plugh from the spawn finds nothing (with only the stone fogged,
-    # the visible pocket-2 twin was a 15-key skip straight to the key —
-    # caught 2026-07-17). The level tick wakes the pair the moment the ?
+    # a visible pocket-2 twin would be a 15-key skip straight to the key).
+    # The level tick wakes the pair the moment the ?
     # leg lands in pocket 1; # then reaches the freshly-lit twin. The
     # forward DECOYS stay unfogged: they are the *-pricing, and a backward
     # search from the spawn never sees them.
@@ -6955,7 +6945,8 @@ def _bracket_vaults_fill_words(rng, width: int, min_words: int = 10):
             used += sep + L
         if used == width and len(words) >= min_words:
             return words
-    # Extremely unlikely fallback: shortest words padded — caller widths make this dead code.
+    # Unreachable at the widths this level uses (~50 cols vs a 10-word quota); kept as a
+    # guard so a narrower caller fails loudly instead of returning a short row.
     raise RuntimeError(f'could not pack {min_words}+ words into width {width}')
 
 
@@ -8429,7 +8420,7 @@ def build_dungeon_sentence_corridor(seed: int) -> 'Dungeon':
     # leaving `(` the shortest backtrack and par at 9. The par solver and the
     # cheese audit both refuse to land on void, so par stays the true minimum.
     # Spans only S1 (a dead-end stub off the spawn) ⇒ no wall-gap bypass.
-    # Shaved to THREE runes (playtest 2026-07-19): every jump that resolves
+    # THREE runes suffice: every jump that resolves
     # onto this row lands on its FIRST standable cell — the strip head — so
     # a 3-rune stub traps exactly as the old full-sentence pave did.
     _s1_r, _s1_c, _s1_text = _SENTENCE_CORRIDOR_SENTENCES[0]
@@ -8438,7 +8429,7 @@ def build_dungeon_sentence_corridor(seed: int) -> 'Dungeon':
     runes.append(CharRun(row=0, col=_s1_c,
                          symbols=tuple(_RUNE_CHAR['void'] * 3), kind='void'))
 
-    # ── Waterworks (2026-07-18): the inter-sentence gaps and the row-2
+    # ── Waterworks: the inter-sentence gaps and the row-2
     # separator are MISTED WATER, not stone — every sentence is visible from
     # spawn (the stone-fog law) while the physics hold: water bars feet, and
     # the mist stops $ / f at each sentence's end exactly as the stone gap
@@ -8793,7 +8784,7 @@ def build_dungeon_archivists_library(seed: int) -> Dungeon:
 # budget — :s / :g are the efficient way (the lesson).
 _FORGE_ROWS, _FORGE_COLS = 20, 58
 _FORGE_DIV   = 46                       # full-height divider wall; sanctum to its right
-                                        # (widened 2026-07-17: the forge-song's
+                                        # (wide enough that the forge-song's
                                         # longest line runs 41 chars, to col 42)
 _FORGE_DOOR  = 6                        # the blank corridor row: spawn, seal door, exit
 # Three chambers, each forcing a different member of the :s / :g family more than once.
@@ -8801,11 +8792,11 @@ _FORGE_DOOR  = 6                        # the blank corridor row: spawn, seal do
 # no word outside Chamber A contains the substring 'old' (no cold/gold/holds/bond…), only
 # Chamber B carries 'pale'/'pure', only Chamber C carries 'cursed'.
 #
-# SENSE, NOT DECREE (blueprints/sense_not_decree.md §4, 2026-07-19): the
+# SENSE, NOT DECREE: the
 # three chambers are three rhymes everyone knows, each corrupted the way
 # its rite mends. FIXED texts (their structure is the puzzle):
 #   A — OLD MACDONALD'S DUCK, written with 'moo' throughout: every line
-#       names the DUCK (playtest 2026-07-19 — the chorus alone read as a
+#       names the DUCK (the chorus alone reads as a
 #       cow), everyone knows the duck says quack, and the moos repeat
 #       WITHIN each line, so a /g-less :s leaves remnants —
 #       :%s/moo/quack/g. Drills the /g flag.
@@ -8815,9 +8806,9 @@ _FORGE_DOOR  = 6                        # the blank corridor row: spawn, seal do
 #       self-evidently; :s one line, jj, & the other. Surgical :s + &.
 #   C — TWINKLE TWINKLE, its two famous lines intact, with three lines of
 #       OBVIOUS NONSENSE STATIC ('krzzt…') between them — nothing to fix,
-#       only to strike: :g/krzzt/d sweeps the static at once. (Playtest
-#       2026-07-19: Ten Green Bottles was unfamiliar and its cursed lines
-#       looked fixable — a known 2-liner + unfixable junk reads clean.)
+#       only to strike: :g/krzzt/d sweeps the static at once. (A known
+#       2-liner plus unmistakably unfixable junk reads clean; an unfamiliar
+#       song with cursed-but-fixable-looking lines does not.)
 _FORGE_A_WARDS   = [(2, 'the duck says moo moo here'),
                     (3, 'the duck says moo moo there'),
                     (4, 'everywhere the duck says moo moo')]
@@ -9293,8 +9284,8 @@ def _ov_mixed_ok(tok: str) -> bool:
 
 def _ov_plain_ok(tok: str) -> bool:
     """A 'plain' token usable as a single word: every char a word char, so
-    w/b/e treat it as ONE word. The vocab file enforces this since the
-    2026-06-09 reclassification — kept as a guard so a future vocab edit
+    w/b/e treat it as ONE word. The vocab file enforces this — this stays
+    as a guard so a future vocab edit
     can't silently shift the lesson landings."""
     return all(_is_word_char(c) for c in tok)
 
@@ -9317,7 +9308,7 @@ def build_dungeon_operators_vault(seed: int) -> Dungeon:
         cells[top][col] = cells[top + 1][col] = CellType.FLOOR
     for (r, c) in _OV_POCKETS:                    # the oubliette pockets
         cells[r][c] = CellType.FLOOR
-    # A misted channel runs the whole west face (playtest 2026-07-19): cols
+    # A misted channel runs the whole west face: cols
     # 1-2 of every spacer row are WATER under MIST, one continuous seep
     # linking the pools so the col-1 oubliettes are seen ACROSS WATER, not
     # through stone. The mist matters twice: fogged water conducts no
@@ -9424,7 +9415,7 @@ def build_dungeon_operators_vault(seed: int) -> Dungeon:
 
     room.rebuild_indexes()
     _fog_unreachable(room, room.spawn_pos[0], room.spawn_pos[1])
-    # (2026-07-19) Only the CORRIDOR pockets are subtracted: they are the
+    # Only the CORRIDOR pockets are subtracted: they are the
     # visible pits (the warning), they're audit-clean — sight passes the
     # gate grilles — and fogging them phase-shifts the goblin AI against
     # the canonical tape (fog is impassable; a pocket mouth is a move
@@ -9436,7 +9427,7 @@ def build_dungeon_operators_vault(seed: int) -> Dungeon:
     # The west-face misted channel (see the note above): laid after the fog
     # flood so the build flood saw stone, permanently misted thereafter.
     # Every WALL cell in the strip converts — including the corridor rows'
-    # own col-1 stubs (playtest 2026-07-19: they read as interruptions), so
+    # own col-1 stubs (unconverted, they read as interruptions), so
     # the seep runs unbroken top to bottom. On a corridor row only col 1 is
     # stone (col 2 is its floor), and the mist keeps 0 / ^ landing at col 2.
     for r in range(_OV_CORR_ROWS[0], _OV_SPLIT_ROW):
@@ -9446,7 +9437,7 @@ def build_dungeon_operators_vault(seed: int) -> Dungeon:
                 room.fog_cells.add((r, c))
                 room.mist_cells.add((r, c))
     room.par    = 92                              # dd's Vim-true fnb landing
-    room.answer = _OV_ANSWER                      # (2026-07-12) saved a key
+    room.answer = _OV_ANSWER
     room.budget = math.ceil(92 * 1.4)
     # A d-operator teaching level: bare-w navigation must stay precise (text
     # words only), so opt out of the jump-to-entity word-stop behaviour.
@@ -9724,8 +9715,8 @@ def build_dungeon_quartermaster(seed: int) -> Dungeon:
     #                      copy — three tiers burn at rows 4/5/6 and the P
     #                      leaves the cursor ONE row under the seal row (the
     #                      exit row never shifts: p's insert is below it, P's
-    #                      is below it too). Player-found golf (2026-07-18);
-    #                      the old p p route paid an extra k to climb back.
+    #                      is below it too). The p p route pays an extra k
+    #                      to climb back.
     #   k 0         (2)  → up to the seal row; 0 walks west onto the exit
     room.par    = _QM_PAR
     room.budget = math.ceil(_QM_PAR * 1.4)
@@ -9740,7 +9731,7 @@ def build_dungeon_quartermaster(seed: int) -> Dungeon:
 
 
 # ── The Echo Vault — . (dot-repeat) ───────────────────────────────────────────
-# SENSE, NOT DECREE (blueprints/sense_not_decree.md §5): the vault repeats
+# SENSE, NOT DECREE (the design law): the vault repeats
 # what it hears — so the FIRST two spans are famous repetition itself:
 #   phrase 1 = 'she sells sea shells' (every word carries exactly one 'e',
 #              all four warped: mend once with r, and the echo takes three)
@@ -10340,10 +10331,9 @@ def build_dungeon_inscription_halls(seed: int) -> Dungeon:
     room.budget = math.ceil(_IH_PAR * 1.4)
     # Canonical answer — the sentence-hop route (drives the par; insert
     # tokens 'i…'/'a…' cost 1 + len(text), Esc spends nothing; ( ) e $ cost
-    # 1 each — see tests/test_answer_paths). Since the 2026-07-10 engine fix
-    # gate ticks fire ON the insert Esc, so the seals stand open before the
-    # first NORMAL key — a single $ sails the whole corridor onto the exit
-    # (the old tape's second $ was the pre-fix tick lag; playtest 2026-07-18):
+    # 1 each — see tests/test_answer_paths). Gate ticks fire ON the insert
+    # Esc, so the seals stand open before the first NORMAL key — a single $
+    # sails the whole corridor onto the exit (no second $ is needed):
     #   A: ( i{2}        = 1+3
     #   B: ) e a{1}      = 1+1+2
     #   C: ) i{1}        = 1+2
@@ -10386,7 +10376,7 @@ def build_dungeon_inscription_halls(seed: int) -> Dungeon:
 # pattern), and the budget margin is pinned BELOW the door count so the all-old
 # route overshoots.
 #
-# Three layout laws from the first playtest (all Vim-faithful — no state-toggled
+# Three layout laws (all Vim-faithful — no state-toggled
 # walls beyond the plaque-rule doors the whole family already uses):
 #  - PLAQUE IN THE WEST WALL. Reflow is segment-bounded in BOTH directions: a
 #    mid-row wall (or void rune) is a hard line boundary, so content on the far
@@ -10408,8 +10398,8 @@ def build_dungeon_inscription_halls(seed: int) -> Dungeon:
 #    standable cell. So every vertical jump (G / L / {n}G / H / M) lands on the
 #    reachable spine, never the isolated exit, and `$`/`0`/`|` are segment-
 #    bounded (they stop at the first shut bolt — engine `_cross_water`). No jump
-#    can reach the exit until the bolts honestly open. (The first cut kept the
-#    exit cell WALL until solved — a non-Vim hack, now retired for geometry.)
+#    can reach the exit until the bolts honestly open. (Keeping the exit cell a
+#    WALL until solved would be a non-Vim hack; the geometry does the work.)
 _WLA_ROWS, _WLA_COLS = 15, 47        # widened for the saying prefixes in the west stone (≤ 25
                                      # chars — 'a stitch in time saves' is 22)
 _WLA_PLQ_COL  = 1                    # (retired name) the west stone band, cols 1..25
@@ -10431,7 +10421,7 @@ _WLA_PLACEHOLDER = '◆'               # the fused rune — `s` spells it out
 _WLA_PAR = 101                       # measured (drive); pinned by the playthrough test
                                      # (finale is G$ = 2 keys, not 02j$ = 4)
 
-# SENSE, NOT DECREE (blueprints/sense_not_decree.md §2, the change levels):
+# SENSE, NOT DECREE (the change levels):
 # every door is a saying the player knows, corrupted the way its verb mends.
 # (kind, stone prefix, floor label, door target, typed) — FIXED texts, their
 # letter-geometry is the puzzle:
@@ -10647,7 +10637,7 @@ def build_dungeon_whole_line_annex(seed: int) -> Dungeon:
 #  - The C-door's TAIL is two wrong words so `ce` (change to word end) stops one
 #    word short — only `C`/`c$` rewrite the whole tail; the correct replacement is
 #    a SINGLE word, so the typed text never holds a space (the karaoke rule).
-#  - Reflow is now segment-bounded both ways (2026-06-26), so the plaque could sit
+#  - Reflow is segment-bounded both ways, so the plaque could sit
 #    east behind a bolt; it stays in the WEST wall here only to be uncuttable and
 #    off the floor scans.
 _CE_ROWS, _CE_COLS = 18, 50
@@ -10692,7 +10682,7 @@ _CE_SYMBOL      = '★'                # the WORD-spanning symbol — `cE` cross
 # par is COMPUTED from the canonical route once below (seed-invariant — the
 # texts are FIXED); pinned by tests.
 
-# SENSE, NOT DECREE (blueprints/sense_not_decree.md §2, the change levels):
+# SENSE, NOT DECREE (the change levels):
 # every door is a saying the player knows, corrupted the way its verb mends.
 # (kind, stone prefix, floor label, door target, typed) — the ALIGNMENT LAW
 # holds by construction: every S cure is EXACTLY 6 letters and every C
@@ -10718,8 +10708,7 @@ _CE_DOORS = (
     ('ceol', 'time', 'will gnaw sump', 'will tell', 'tell'),
     # The ★-scarred word is a DIFFERENT real word from the cure (an★il, not
     # ir★n): a lone `r` mends a scar but can never turn anvil into iron, so
-    # only cE retypes the WORD by heart (playtest 2026-07-20 — the point-
-    # change cheese).
+    # only cE retypes the WORD by heart (this closes the point-change cheese).
     ('wordW', 'strike while the', f'an{_CE_SYMBOL}il is hot', 'iron is hot', 'iron'),
     ('rune', 'still waters run', f'{_CE_PLACEHOLDER}ep', 'deep', 'de'),
     ('sline', 'squeaky wheel gets the', 'polish', 'grease', 'grease'),
@@ -10909,8 +10898,8 @@ def build_dungeon_change_extension(seed: int) -> Dungeon:
 
 # ── The Sculpting Chambers (I A o O) ──────────────────────────────────────────
 # The topology lesson — the four insert-ENTRIES that reshape the stone, one per
-# LINE of the FULL poem (playtest 2026-07-20: the skeleton-votive made no
-# sense; the whole of ROW YOUR BOAT is the tablet now). The west-wall plaques
+# LINE of the FULL poem (the whole of ROW YOUR BOAT is the tablet; a
+# skeleton-votive fragment would make no sense). The west-wall plaques
 # give each line's FIRST WORD only — the player knows the song; the stone
 # shows what remains of each line:
 #   • O  — line 1 is MISSING and sits ABOVE the topmost given line: only `O`
@@ -10942,7 +10931,7 @@ _SC_LINES = ('row row row your boat',
              'merrily merrily merrily merrily',
              'life is but a dream')
 _SC_TARGET = tuple(ln.split()[0] for ln in _SC_LINES)   # the plaques: first words
-# PLAYTEST 2026-07-20: the plaque GIVES each line's first word — the player
+# The plaque GIVES each line's first word — the player
 # only COMPLETES the line (types everything AFTER the first word), never
 # reproducing the plaque. So the FLOOR holds the completion (line minus its
 # first word); the tick checks that, and the plaque supplies the head.
@@ -11069,7 +11058,7 @@ _OH_TRIGGERS    = len(_OH_LESSON_ROWS)
 _OH_EXIT = (_OH_GATE_ROW, _OH_GATE_COL0 + _OH_TRIGGERS)   # plain floor, east of the bolts
 _OH_RUN = 'xzq'                     # the 3-cell corruption every stream shares (fx finds it)
 
-# SENSE, NOT DECREE (blueprints/sense_not_decree.md §2, the change levels):
+# SENSE, NOT DECREE (the change levels):
 # (kind, stone prefix, target, wrong). Every corridor's floor word FINISHES a
 # saying whose start is carved in the west stone — the cure is the letters
 # everyone knows. STREAM: a 3-cell varied run mid-word (fx→R fixes it, S/cc/ce
@@ -11198,8 +11187,8 @@ _CASE_ROWS, _CASE_COLS = 13, 27
 _CASE_PLQ_COL = 1                     # the true form, in the WEST wall (cols 1..11)
 _CASE_COL_S   = 15                    # the spine — every row's first standable; a
                                       # 3-col wall gap (12..14) breathes between the
-                                      # plaques and the floor (playtest 2026-07-12:
-                                      # an ADJACENT plaque run merged with the floor
+                                      # plaques and the floor (an ADJACENT
+                                      # plaque run merges with the floor
                                       # word and painted it plaque-colored)
 _CASE_LBL_COL = _CASE_COL_S            # the mis-cased word sits on the floor here
 _CASE_LESSON_ROWS = (2, 3, 4, 5, 6, 7, 8, 9)   # eight corridors, descended by j
@@ -11314,7 +11303,7 @@ def build_dungeon_case_chambers(seed: int) -> Dungeon:
 # (`bind veil`) needs the seam space → J; a fused plaque (`wardstone`) → gJ; a
 # wrong variant reads false, the bolt stays shut, and `u` restores the stack.
 #
-# J is a TERRAIN EDITOR, so the chassis had to be hardened first (2026-07-12):
+# J is a TERRAIN EDITOR, so the chassis must be hardened for it:
 #   • every join removes a row and slides the gate/bolts/exit UP —
 #     `_whole_line_annex_tick` derives the gate row from exit_pos each tick
 #     (which `_shift_rows` keeps true), so the bolts ride the collapses;
@@ -11649,15 +11638,15 @@ def build_dungeon_indentation_sanctum(seed: int) -> Dungeon:
             col += len(part) + 1
 
     # THE LINTEL — the law is not a passing tip but a carving that presides
-    # over the whole playthrough (playtest 2026-07-12): two lines in the top
+    # over the whole playthrough: two lines in the top
     # wall bands, laid so the plumb │ falls exactly through the word-gap at
     # the register column ("the law is │ posted").
     lay(0, 6, 'in these halls', 'verdant')
     lay(1, 6, 'the law is posted', 'verdant')            # gap lands at col 16
     lay(1, _IS_REGISTER, '│', 'verdant')                 # the plumb line, carved above
-    # THE RITE'S OWN HEADING (playtest, user 2026-07-25): the galleries wear
-    # their true word on the west wall, but the rite block wore nothing, so
-    # nothing on screen said the block below was CODE — and `=` is the tool
+    # THE RITE'S OWN HEADING: the galleries wear their true word on the west
+    # wall, but the rite block wears none, so without this nothing on screen
+    # would say the block below is CODE — and `=` is the tool
     # that seats code. Carved as a TAG, `<code>`, not as prose: the galleries'
     # plaques are literal words the floor must match, so a plaque reading "the
     # code" invites the player to go and write those words. A tag reads as a
@@ -11709,7 +11698,7 @@ def build_dungeon_indentation_sanctum(seed: int) -> Dungeon:
 # ── The Warden Scrivener (Act V boss) — "The Unfinished Manuscript" ───────────
 # He has copied these halls for an age and finished nothing. The hall IS the
 # page: margin glosses carved in the north and south borders, five alcoves of
-# plain stone where he shelters (playtest 2026-07-12: no sigils — the walls
+# plain stone where he shelters (no sigils — the walls
 # read as walls; alcoves are found by their GEOMETRY), and passage after
 # passage he refuses to finish. Every ward is stamped THE SAME DISTANCE from
 # its warden's alcove — three rows out into the page, under (or over) his
@@ -11758,7 +11747,7 @@ _WSC_GATE   = (13, 13)                  # draws when the threshold word is writt
 _WSC_HALL_TOP, _WSC_HALL_BOT = 2, 20
 _WSC_HALL_LO,  _WSC_HALL_HI  = 15, 65
 _WSC_MARGIN_ROWS = (1, 21)              # sealed border rows wearing the glosses
-# The columns encasing him stand SYMMETRIC across the hall (playtest): the
+# The columns encasing him stand SYMMETRIC across the hall: the
 # three north alcoves cut the hall in quarters (27/40/53 about center 40),
 # the two south alcoves cut it in thirds (32/48). The finale alcove is the
 # westmost — the rite lives at the west margin (the law's base).
@@ -11791,8 +11780,8 @@ _WSC_STAMP_ANCHORS = {
     4: ((-3, 45), (-2, 45)),            # A4 niche row 19 → rows 16, 17 (EAST)
     5: ((+4, 17), (+5, 15), (+6, 19), (+7, 17)),   # A5 row 3 → rows 7..10
 }
-# Chorus goblins (plain 'g' — copies of NOTHING; playtest: echo-tagged
-# goblins wore the Warden's own W), as (alcove_dr, col) anchors like the
+# Chorus goblins (plain 'g' — copies of NOTHING; echo-tagged goblins would
+# wear the Warden's own W), as (alcove_dr, col) anchors like the
 # stamps, on text-free rows (a goblin standing on a passage overlays its
 # letters and blinds the search). They gutter on the stagger.
 _WSC_SPAWNS = {4: ((-6, 45), (-7, 58)),
@@ -11863,8 +11852,8 @@ def build_dungeon_warden_scrivener(seed: int) -> Dungeon:
     # ritual; each alcove until its stagger; the pocket until the fall.
     # Fog runs to the FULL east wall: the pocket cells keep their own fog set
     # (excluded here so the ritual's hall reveal never unfogs them), and no
-    # gloss may poke past the veil (playtest: a south gloss once overflowed
-    # the fog's edge and its tail showed at level open).
+    # gloss may poke past the veil (a gloss overflowing the fog's edge shows
+    # its tail at level open).
     hall_fog = frozenset(
         (r, c) for r in range(1, 22) for c in range(14, _WSC_COLS - 1)
         if (r, c) not in _WSC_ALCOVES and (r, c) not in _WSC_POCKET)
@@ -11936,8 +11925,7 @@ def build_dungeon_warden_scrivener(seed: int) -> Dungeon:
 #
 # One continuous maze — every act folded into a single buffer, sixteen doors,
 # one FINAL SEAL. Nothing is new; everything is asked at once. teaches: [] —
-# an exam introduces nothing. Full design: blueprints/gauntlet.md (delete on
-# review). Par is HAND-TALLIED along the canonical tape and pinned by the
+# an exam introduces nothing. Par is HAND-TALLIED along the canonical tape and pinned by the
 # driven 2★ test; every door has a per-leg rival audit in its tests.
 #
 # THE ONE-MAZE LAWS (why the layout is what it is):
@@ -12149,7 +12137,7 @@ def build_dungeon_gauntlet(seed: int) -> Dungeon:
         cells[r][SP] = CellType.FLOOR               # the ◆ threshold cells
     # (the between-pocket rows hold NO stepping cell: a spine cell there
     # let + + hop island → island → gallery, riding each row's fnb — the
-    # user-found cheese; the courses are pure water now)
+    # cheese; the courses are pure water now)
     # The lower band's floor starts at TX, not the spine: S / o / O drop
     # their typed lines at the SEGMENT START, so the segment must start
     # where the text stands — the left-align law (every playable line
@@ -12291,10 +12279,10 @@ def build_dungeon_gauntlet(seed: int) -> Dungeon:
     lay(_GNT_R_YL, TX, _yline)
     door('dup', _yline)
     # The two verse doors: the lines DON'T EXIST until o authors them
-    # below the pasted pair (the rune scaffold courses were cut 2026-07-18
-    # — o from the row above always tied O from the row below, the same
-    # edit read from either bank, and the courses were the only lines the
-    # wall did not show). COLUMN-checked so a verse scattered elsewhere
+    # below the pasted pair (there are no rune scaffold courses — o from the
+    # row above always ties O from the row below, the same edit read from
+    # either bank, and such courses would be the only lines the wall did not
+    # show). COLUMN-checked so a verse scattered elsewhere
     # off-TX reads false.
     door('col', w['ow1'])
     door('col', w['ow2'])
@@ -12315,7 +12303,7 @@ def build_dungeon_gauntlet(seed: int) -> Dungeon:
         room.char_runs.append(CharRun(pr, SP, ('◆',), 'ancient'))
 
     # West-wall plaques: each door's FULL true reading on its own row (the
-    # playtest law — a partial cure word made the player guess the rest).
+    # law — a partial cure word would make the player guess the rest).
     # Substring doors read the FLOOR only, and a match starting in stone is
     # no search landing, so the plaques can carry the whole target safely.
     # Two exceptions that cannot fit or would mislead: the y-door shows the
@@ -12393,7 +12381,7 @@ def build_dungeon_gauntlet(seed: int) -> Dungeon:
 # and :{range}v//d. (Each row keeps ≥1 FLOOR cell so remove_row consents.)
 # Blighted lines render EMBER, true lines VERDANT (the forge's colour law).
 #
-# v3 (2026-07-19, the register lesson): the corridor holds a KEY CHEST, a
+# The register lesson: the corridor holds a KEY CHEST, a
 # LOCKED DOOR mid-way, and a second locked door before the exit. The key
 # lives in the unnamed register (engine law), a :d clobbers it, and there
 # is only one key — so every register-writing cull must go to the black
@@ -12435,7 +12423,7 @@ _CL_BLIGHT_II   = (6, 7, 8, 9, 10)
 _CL_JUNK_III    = (12, 14, 16, 17, 19)
 _CL_SACRED_III  = (13, 15, 18)
 _CL_GAPS        = (4, 11)
-_CL_PAR    = 23    # the wide cull (playtest 2026-07-19): one :2,19v/that/d _
+_CL_PAR    = 23    # the wide cull: one :2,19v/that/d _
                    # keeps exactly the chain — engine-measured spend of the
                    # canonical tape below. The three-beat longhand
                    # (:2d :5,9d :6,13v) still wins, at 1★ (35 spent).
@@ -12570,7 +12558,7 @@ def build_dungeon_culling_ledger(seed: int) -> Dungeon:
 # ── The Shelving Room (display 41) — the movers: :m :t :> :< ─────────────────
 # The Culling Ledger's chasm chassis, second lesson: the round was misfiled
 # — one echo sits among the wrong pair, one sank a step too deep, and the
-# last was never shelved at all. NO PLAQUE (playtest 2026-07-19): the round
+# last was never shelved at all. NO PLAQUE: the round
 # is an echo — every voice sings twice, the echo a step deeper than its
 # call — so the true shelf is known by SENSE; the shelf's own sound pairs
 # show the convention. Each mended misfiling grinds back its own gallery
@@ -12679,7 +12667,7 @@ def build_dungeon_shelving_room(seed: int) -> Dungeon:
 # beaten, then The Unmasking: the blessing-wizard is the Warden Eternal, the W
 # glyph that was the clue all along. NOT par-forced (par=None, win = survival);
 # the finale's horde is sized so a kill-macro (qa /g⏎ x q → @a) is the master's
-# answer — the payoff of the Hall of Echoes. See blueprints/act_7.md v3.
+# answer — the payoff of the Hall of Echoes.
 _WDE_COLS    = 60
 _WDE_SPINE   = 1                      # the descent column (open in every chamber)
 _WDE_TEXT    = 4                      # west label head col

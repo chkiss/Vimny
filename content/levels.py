@@ -70,10 +70,7 @@ LEVELS = [
     {'display': '17',   'slug': 'operators_vault',       'name': "The Operator's Vault",       'commands': 'd{m}  dd', 'teaches': ['d']},
     {'display': '18',   'slug': 'cipher_cell',           'name': 'The Cipher Cell',            'commands': 'r  D  X', 'teaches': ['r', 'D', 'X']},
     {'display': '19',   'slug': 'quartermaster',         'name': 'The Beacon Tiers',           'commands': 'y yy P', 'teaches': ['y', 'P']},
-    # The Undo Sanctum (slug undo_sanctum) was CANCELLED 2026-06-11: u is
-    # always-on, and <C-r> is granted by the 'redo' relic scroll instead
-    # (content/scrolls.py REDO scroll). The 'redo' token may return to the
-    # curriculum later if a level earns it.
+    # `u` is always-on; <C-r> comes from the redo relic scroll (content/scrolls.py).
     {'display': '20',   'slug': 'echo_vault',            'name': 'The Echo Vault',             'commands': '.', 'teaches': ['dot']},
     {'display': '20.1', 'slug': 'warden_manifold',       'name': 'The Warden Manifold',        'type': 'boss', 'after': 'echo_vault', 'teaches': []},
     {'display': '21',   'slug': 'inscription_halls',     'name': 'The Inscription Halls',      'commands': 'i a', 'teaches': ['insert']},
@@ -86,8 +83,8 @@ LEVELS = [
     {'display': '28',   'slug': 'alignment_halls',       'name': 'The Alignment Halls',        'commands': '>> <<', 'teaches': ['>', '<']},
     {'display': '29',   'slug': 'indentation_sanctum',   'name': 'The Indentation Sanctum',    'commands': '>{m} <{m} =', 'teaches': ['=']},
     {'display': '29.1', 'slug': 'warden_scrivener',      'name': 'The Warden Scrivener',       'type': 'boss', 'after': 'indentation_sanctum', 'teaches': []},
-    # The Sight Sanctum opens the act (relocated from display 14, 2026-06-27:
-    # Visual Mode is unforceable until ranged operators exist). It teaches the
+    # The Sight Sanctum opens the act: Visual Mode is unforceable until ranged
+    # operators exist, so it cannot sit any earlier. It teaches the
     # rite — select first, act second — so 'visual_op' (operators on a
     # selection) is taught HERE, not at the Grandmaster's drop.
     {'display': '30',   'slug': 'sight_sanctum',         'name': 'The Sight Sanctum',          'commands': 'v {m} d/c/~', 'teaches': ['visual', 'visual_op']},
@@ -111,7 +108,7 @@ LEVELS = [
     {'display': '45',   'slug': 'buried_word',           'name': 'The Buried Word',            'commands': 'g* n', 'teaches': []},
     {'display': '46',   'slug': 'wet_ink',               'name': 'The Wet Ink',                'commands': 'gi', 'teaches': []},
     # Macros cheese almost everything, so they are taught VERY LATE — after the
-    # g-levels, just before the exam (2026-07-17). The Gauntlet then plays WITH
+    # g-levels, just before the exam. The Gauntlet then plays WITH
     # q@ available (audited: its legs are distinct, no macro beats par).
     {'display': '47',   'slug': 'hall_of_echoes',        'name': 'The Hall of Echoes',         'commands': 'q @ "', 'teaches': ['q', '@', 'reg_named']},
     {'display': '48',   'slug': 'gauntlet',              'name': 'The Gauntlet',               'commands': '', 'teaches': []},
