@@ -13,8 +13,12 @@ landing in ""), which is the point: it is a reward for knowing it, not a hole.
 It still leaves you walking the vault twice to fetch the other saying's word.
 
 The room is fully open from the spawn and the bays alternate, so the repeating
-unit is a PAIR of bays — record the pair, replay it twice.  That macro lands far
-under par; the reward, not the requirement.  Par is the plain named route."""
+unit is a PAIR of bays — record the pair, replay it twice.  THAT IS PAR (34).
+Par is the optimum or it is a lie, and the plain named route is 69, so pinning
+par there would have handed two stars to every route in between.  The macro body
+still carries the register lesson: it pastes from both names, and it is recorded
+into `q` precisely because recording into `a` would destroy the word parked
+there."""
 import math
 import pytest
 from blessed.keyboard import Keystroke
@@ -78,61 +82,67 @@ def _tape(s):
     return keys
 
 
-# The named (par) tape: quarry BOTH words once, then every bay is the same swap.
-_NAMED = _build(0).room.answer
+# PAR IS THE MACRO ROUTE — the bays alternate, so the repeating unit is a PAIR,
+# recorded at the earliest opportunity and replayed over the remaining four.
+_MACRO = _build(0).room.answer
 
-# The reward: the bays alternate, so the repeating unit is a PAIR — recorded at
-# the FIRST opportunity (the first bay) and replayed over the remaining four.
-_MACRO = 'j w "aye j "bye j qq $b diw "aP j $b diw "bP j q 2@q 0 2j l'
+# Hand-repeating the vault with both named registers. It is the register lesson
+# without the macro lesson, it costs 69, and at a standard 1.4x budget (48) it
+# does NOT win. Par may not be a lie: a par of 69 would hand two stars to this.
+_BY_HAND = ('j w "aye j "bye j $ b diw "aP j $ b diw "bP j $ b diw "aP '
+            'j $ b diw "bP j $ b diw "aP j $ b diw "bP G l')
 
-# The single-register rival at its BEST: it knows "_ (so the cut never eats its
-# one word) and it batches — every bay of one saying, then back up the vault for
-# the other word.  Per bay it even ties par ("_ + P costs what "aP costs); what
-# it cannot avoid is walking the vault a second time.
-_RIVAL = ('j w ye 2j $b "_diw P 2j $b "_diw P 2j $b "_diw P '
-          '0 5k w ye 2j $b "_diw P 2j $b "_diw P 2j $b "_diw P 0 2j l')
+# The sub-optimal route that must still WIN, at one star: a ONE-REGISTER player
+# who macros. "_ keeps the cut off "" and a macro per saying keeps the walking
+# cheap — but there is still no way to hold both words, so the vault is walked
+# twice. 38 against par 34.
+_RIVAL = ('j w ye qq 2j $ b "_diw P q 2@q '
+          '0 5k w ye qq 2j $ b "_diw P q 2@q G l')
 
 
-def test_named_tape_solves_at_two_stars(monkeypatch):
-    result = _drive(_tape(_NAMED), monkeypatch)
+def test_the_pair_macro_is_par_at_two_stars(monkeypatch):
+    result = _drive(_tape(_MACRO), monkeypatch)
     assert result['won'] and result['stars'] == 2, result
 
 
-def test_par_equals_the_named_tape(monkeypatch):
-    won, spent = _drive_spent(_tape(_NAMED), monkeypatch)
+def test_par_equals_the_macro_tape(monkeypatch):
+    won, spent = _drive_spent(_tape(_MACRO), monkeypatch)
     assert won and spent == _R2_PAR, (won, spent)
 
 
 @pytest.mark.parametrize('seed', SEEDS)
 def test_par_is_seed_invariant(seed, monkeypatch):
-    won, spent = _drive_spent(_tape(_NAMED), monkeypatch, seed=seed)
+    won, spent = _drive_spent(_tape(_MACRO), monkeypatch, seed=seed)
     assert won and spent == _R2_PAR, (seed, won, spent)
 
 
-def test_the_pair_macro_replays_the_vault_far_under_par(monkeypatch):
-    """THE REWARD: alternating bays + registers that persist across playback."""
-    won, spent = _drive_spent(_tape(_MACRO), monkeypatch)
-    assert won and spent < _R2_PAR, (won, spent)
+def test_par_is_the_optimum_not_the_comfortable_route(monkeypatch):
+    """Hand-repeating the vault is the register lesson without the macro lesson.
+    It is nearly TWICE par, so it may not be par — pinning par there would have
+    handed two stars to it and to every route between."""
+    won, spent = _drive_spent(_tape(_BY_HAND), monkeypatch)
+    assert spent > _R2_PAR * 1.4 and not won, (won, spent)
 
 
 def test_recording_into_a_clobbers_the_word_stored_there(monkeypatch):
     """Macros and text share one register store (vim's own rule), so recording
-    into `qa` destroys the word held in "a — and the run fails. The macro tape
-    records into `qq` for exactly this reason."""
+    into `qa` destroys the word held in "a — and the run fails. Par records into
+    `qq` for exactly this reason."""
     clobbered = _MACRO.replace('qq', 'qa').replace('2@q', '2@a')
     assert not _drive(_tape(clobbered), monkeypatch)['won']
 
 
 # ── the shape of the forcing ─────────────────────────────────────────────────
 def test_the_best_single_register_route_wins_but_drops_a_star(monkeypatch):
-    """THE LAW, driven: even armed with "_ the one-register route must walk the
-    vault twice, so it lands over par at one star. It still WINS."""
+    """THE LAW, driven: even armed with "_ and a macro, the one-register route
+    must walk the vault twice, so it lands over par at one star. It still WINS —
+    forcing is by par, never by budget."""
     result = _drive(_tape(_RIVAL), monkeypatch)
     assert result['won'] and result['stars'] == 1, result
 
 
-def test_named_route_is_strictly_cheaper_than_the_single_register_one(monkeypatch):
-    _w1, named = _drive_spent(_tape(_NAMED), monkeypatch)
+def test_the_named_macro_is_strictly_cheaper_than_the_single_register_one(monkeypatch):
+    _w1, named = _drive_spent(_tape(_MACRO), monkeypatch)
     _w2, rival = _drive_spent(_tape(_RIVAL), monkeypatch)
     assert _w1 and _w2 and named < rival, (named, rival)
 

@@ -139,12 +139,25 @@ tokeniser-validated (no `_ANSWER_NOT_TOKENISED` / `_NONSTANDARD_BUDGET` exemptio
 **Two sayings, alternating.** Quarry rows 3–4 hold `godliness` and `invention`;
 six bays (rows 5–10) alternate `cleanliness is next to dust` / `necessity is the
 mother of dust`. Every bay is the same **exchange**: `$b diw "XP` — cut the junk
-word out, set the right word into the hole it left. par **69** (named, driven,
-seed-invariant), standard `ceil(69*1.4)=96` budget. The best one-register route
-(`"_diw` so the cut never eats its word, then batch one saying and walk back for
-the other) costs **74** → 1★. Fully open: no gates, no fog, and because the bays
-alternate the repeating unit is a **pair** — record it at the first bay and
-`2@q` the rest: **37**. The reward, not the requirement.
+word out, set the right word into the hole it left. Fully open: no gates, no fog,
+and because the bays alternate the repeating unit is a **pair**.
+
+**PAR IS THE MACRO ROUTE — 34** (`j w "aye j "bye qq j $ b diw "aP j $ b diw
+"bP q 2@q G l`), driven and seed-invariant, standard `ceil(34*1.4)=48` budget.
+
+#### PAR IS THE OPTIMUM OR IT IS A LIE (user, 2026-07-25)
+This level first shipped with par **69** — the plain named route — and the macro
+route at 37 was written up as "the reward, not the requirement." That is
+backwards: par at nearly **twice** the best route hands two stars to mediocre
+play and to every route in between. If a level invites a macro, the macro is par.
+The register lesson is not lost by moving par there — the macro *body* pastes
+from both names, and it must be recorded into `q` because `qa` would destroy the
+word parked in `"a` (macros and text share one store).
+
+Budget stays **standard**, so hand-repeating the vault (69) does not win. The
+sub-optimal route that must still win at 1★ is the **one-register player who
+macros**: `""` + `"_`, one macro per saying, two walks of the vault — **38**.
+What it loses is the named register, and a star is what that costs.
 
 #### FORCE BY CAPACITY, NOT BY SURVIVAL (rebuild #1)
 The first cut forced `"a` by **threat**: a `daw` clobbered `""`, so you had to
@@ -170,9 +183,9 @@ quarry. Alternation also kills `.` — the last change flips register every bay.
 **Deletions are what put `""` under fire.** Each bay must `diw` its junk word
 before it can paste, so the one-register rival needs `"_` on all six bays. Per
 bay that ties par exactly (`"_diw`+`P` = `diw`+`"aP` = 8); the entire margin is
-the **second walk of the vault** to fetch the other saying's word. Thin (5 keys)
-but real, and it is the honest gap — `"_` is a *reward* for knowing it here, not
-a hole.
+the **second walk of the vault** to fetch the other saying's word. Thin (4 keys
+under macro) but real, and it is the honest gap — `"_` is a *reward* for knowing
+it here, not a hole.
 
 **Make the quarry words LONG.** `$b cw<word>` retypes a bay for `4+len(word)`
 against the register route's flat 8, so a short word makes the keyboard beat the

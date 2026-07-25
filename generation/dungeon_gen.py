@@ -3950,7 +3950,14 @@ def build_dungeon_register_unnamed_hold(seed: int) -> Dungeon:
 #
 # The room is FULLY OPEN from the spawn: no gates, no fog.  The bays alternate,
 # so the repeating unit is a PAIR of bays — record the pair, replay it twice.
-# The macro lands far under par; that is the reward, not the requirement.
+#
+# PAR IS THE MACRO ROUTE (34), not the plain named route (69).  Par is the
+# OPTIMUM or it is a lie: a level whose par is twice its best route hands out
+# two stars for mediocre play.  Budget stays STANDARD (1.4× = 48), so this is
+# the one level in the wing where hand-repeating the vault does NOT win — but
+# the sub-optimal route that must still win at 1★ does: a ONE-REGISTER player
+# who macros (""+"_, a macro per saying, two walks of the vault) comes in at 38.
+# The lesson lost there is the named register, and the star is what it costs.
 _R2_ROWS, _R2_COLS = 14, 46
 _R2_SPINE = 2
 _R2_BAY_W, _R2_BAY_E = 3, 40
@@ -3965,7 +3972,7 @@ _R2_SAYINGS     = (('cleanliness', 'is', 'next', 'to', 'godliness'),
                    ('necessity', 'is', 'the', 'mother', 'of', 'invention'))
 _R2_QUARRY_WORDS = tuple(s[-1] for s in _R2_SAYINGS)
 _R2_STUBS        = tuple(s[:-1] + (_R2_JUNK,) for s in _R2_SAYINGS)
-_R2_PAR = 69                          # the named optimal (driven); test-pinned
+_R2_PAR = 34                          # the MACRO optimal (driven); test-pinned
 
 
 def _r2_saying_for(row: int) -> int:
@@ -4008,17 +4015,22 @@ def build_dungeon_register_named_vault(seed: int) -> Dungeon:
 
     room.rebuild_indexes()
     room.par    = _R2_PAR
-    room.budget = math.ceil(_R2_PAR * 1.4)
-    # Named optimal: quarry BOTH words once, then every bay is the same swap —
-    # `$b` onto the junk word, `diw` to cut it out, `"XP` to set the right word
-    # into the hole it left. Both clips stay alive the whole way down — that is
-    # the lesson — and the alternating bays are the pair-macro to notice.
+    room.budget = math.ceil(_R2_PAR * 1.4)              # STANDARD
+    # PAR IS THE MACRO ROUTE, because the macro route is the optimum and par may
+    # never be a lie: quarry both words, then record ONE PAIR of bays (the bays
+    # alternate, so the pair is the repeating unit) starting at the earliest
+    # opportunity, and `2@q` the rest.  Every bay is the same swap — `$b` onto
+    # the junk word, `diw` to cut it out, `"XP` to set the right word into the
+    # hole it left — so the macro body still carries the register lesson: it
+    # pastes from BOTH names, and it is recorded into `q` precisely because
+    # recording into `a` would destroy the word parked there.
     _bay = lambda r: '$ b diw "%sP' % 'ab'[_r2_saying_for(r)]
     # (`ye` leaves the cursor at the START of the yank, so the second quarry row
     #  needs no `w` — dropping it keeps the tape honest against the audit.)
-    room.answer = ' '.join(['j w "aye j "bye j', _bay(_R2_BAY_ROWS[0])]
-                           + ['j ' + _bay(r) for r in _R2_BAY_ROWS[1:]]
-                           + ['0 2j l'])
+    room.answer = ' '.join(['j w "aye j "bye qq',
+                            'j ' + _bay(_R2_BAY_ROWS[0]),
+                            'j ' + _bay(_R2_BAY_ROWS[1]),
+                            'q 2@q G l'])
     # NO fog and NO gates: the room is open from the spawn so the rhythm shows.
 
     dungeon = Dungeon(name='The Register II', seed=seed)
