@@ -8893,6 +8893,9 @@ def build_dungeon_spellwrights_forge(seed: int) -> Dungeon:
     # Demanding the exact text (not the mere absence of 'old'/'cursed') forbids the snip
     # mangle (`:%s/l//g` etc.) that once satisfied a bare substring check for pennies.
     room._forge_seal = (_FORGE_DOOR, W)
+    # Band the shut seal as stonework. Registered at build: the divider cell is
+    # fixed for the level's lifetime.
+    room.sealed_cells = {(_FORGE_DOOR, W)}
     # Every phrase that must be present when the rite is true (mended or deliberately kept):
     room._forge_mended = (
         [t.replace('moo', 'quack') for _r, t in _FORGE_A_WARDS]     # A: /g-mended wards
@@ -9590,6 +9593,9 @@ def build_dungeon_cipher_cell(seed: int) -> Dungeon:
         (_CC_ROW, _CC_CIPHER_B_COL, word_b, _CC_BOLT_C),
         (_CC_ROW, _CC_SPAN2[0], span_target(word_2, _CC_SPAN2), _CC_BOLT_D),
     ]
+    # Band the shut bolts as stonework. Registered at build: the level has no
+    # row-shifting edits, so the bolt cells are fixed for its lifetime.
+    room.sealed_cells = {pos for _r, _c0, _t, pos in room._cc_bolts}
 
     room.rebuild_indexes()
     # Par tally (combo shapes identical, so this holds for every seed):
@@ -9864,6 +9870,9 @@ def build_dungeon_echo_vault(seed: int) -> Dungeon:
         (_EV_ROW, _EV_SEG2_COL, phrase2, _EV_BOLT_B),
         (_EV_ROW, _EV_SEG3_COL, phrase3, _EV_BOLT_C),
     ]
+    # Band the shut bolts as stonework. Registered at build: the bolt cells are
+    # fixed for the level's lifetime (no row shifts here).
+    room.sealed_cells = {pos for _r, _c0, _t, pos in room._ev_bolts}
 
     room.rebuild_indexes()
     # Par tally (fixed phrase geometry, so this holds for every seed; every
@@ -10320,6 +10329,9 @@ def build_dungeon_inscription_halls(seed: int) -> Dungeon:
         _IH_FORD_WORD, 'verdant')                            # ford plaque, south border
 
     room._ih_bolts = tuple(bolts)
+    # Band the five shut exit walls as stonework. Registered at build: the seal
+    # coordinates are fixed for the level's lifetime.
+    room.sealed_cells = {cell for _word, cell in bolts}
 
     room.entities.append(Entity(kind='exit', row=_IH_EXIT[0], col=_IH_EXIT[1],
                                 edit_immune=True))
@@ -12648,6 +12660,10 @@ def build_dungeon_shelving_room(seed: int) -> Dungeon:
     ]
     room._shr_targets = tuple(targets)
     room._shr_seal_col = _SHR_SEAL_COL
+    # Band the shut gallery bolts + seal as stonework. Registered at build: the
+    # gallery row and its bolt columns are fixed for the level's lifetime.
+    room.sealed_cells = {(_SHR_GAL, c)
+                         for c in (*_SHR_BOLT_COLS, _SHR_SEAL_COL)}
 
     room.par    = _SHR_PAR
     room.budget = math.ceil(_SHR_PAR * 1.4)  # STANDARD (par-is-the-optimum law)

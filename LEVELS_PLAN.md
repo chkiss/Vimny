@@ -73,6 +73,12 @@ worse than the missing lesson. These keys stay free flourishes.
 Anyone revisiting this needs a *new* forcing mechanism, not a new price — some
 way for the world, not the budget, to reward the correcting keys.
 
+### Community levels (a system feature, not a level)
+Blueprint: `blueprints/level_sharing.md` — authoring, validation and sharing.
+The load-bearing decisions: a level is **declarative data, never code**; par comes
+from replaying an author-supplied karaoke tape, which doubles as the solvability
+proof; the budget is computed, never author-set.
+
 ### Windows, tabs and buffers
 Vimny is one buffer per dungeon today. Multi-buffer play needs engine work
 before it can be a level, and is the largest open item.

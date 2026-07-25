@@ -17,6 +17,7 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 
 WOOD_WALL_DAMAGED = '░'
+SEALED_WALL       = '╬'   # a gate: banded stone that some tick draws back
 
 FLOOR        = ' '
 CORRIDOR     = ' '

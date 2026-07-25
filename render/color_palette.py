@@ -84,6 +84,7 @@ _META: dict[str, tuple[str, str, str]] = {
     'hint_fg':              ('#5A5A5A', 'Hint bar',          'fg'),
     'border_fg':            ('#505064', 'Box borders',       'fg'),
     'wood_wall_damaged_fg': ('#A0692D', 'Wood wall damaged', 'fg'),
+    'sealed_wall_fg':       ('#4A5062', 'Sealed wall (gate)', 'fg'),
     'dir_fg':               ('#64A0E6', 'Directory',         'fg'),
     'entry_fg':             ('#DCD7C8', 'Entry marker',      'fg'),
     'horse_fg':             ('#B2966E', "Horse (wizard's)",  'fg'),
@@ -94,7 +95,7 @@ _GROUPS: list[tuple[str, list[str]]] = [
     ('Backgrounds', [
         'wall_bg', 'floor_bg', 'visual_sel_bg', 'statusline_bg',
         'error_bg', 'water_bg', 'wood_wall_bg', 'wood_wall_damaged_bg',
-        'wood_wall_damaged_fg', 'sel_bg',
+        'wood_wall_damaged_fg', 'sealed_wall_fg', 'sel_bg',
     ]),
     ('Entities',   ['player_fg', 'enemy_fg', 'enemy_frozen', 'boss_fg']),
     ('Hearts',     ['heart_full', 'heart_half', 'heart_empty']),

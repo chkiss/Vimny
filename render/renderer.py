@@ -188,6 +188,10 @@ def _ent_cell_str(ent, room, r: int, c: int, mode, floor_bg: str) -> str:
         # STONE until then (don't draw the open portal over a wall). It becomes the
         # portal the instant the cell is carved/opened to floor.
         if room.cells[r][c] == CellType.WALL:
+            # A registered gate still bands: the final seal is the one cell a
+            # player most needs to find, and blanking it hides the level's goal.
+            if (r, c) in room.sealed_cells:
+                return C.wall_bg() + C.sealed_wall_fg() + S.SEALED_WALL + rst
             return C.wall_bg() + ' ' + rst
         return floor_bg + C.exit_fg() + S.EXIT + rst
     if ent.kind in ('chest', 'chest_key', 'chest_scroll'):
@@ -618,6 +622,13 @@ def render_all(term: Terminal, dungeon: Dungeon, player: Player,
             ch, wr, wg, wb = _water_glyph(room_r, room_c)
             return C.water_bg() + C.water_fg(wr, wg, wb) + ch + C.normal_fg()
         elif ct == CellType.WALL:
+            # A gate reads as banded stone while it is shut. `sealed_cells` is a
+            # permanent registry, so the test is on the CELL: the moment a tick
+            # opens the gate it stops being WALL and the band is gone, and a
+            # re-seal (several levels re-shut on undo) brings it back for free.
+            if (room_r, room_c) in room.sealed_cells:
+                return (wall_bg + C.sealed_wall_fg()
+                        + S.SEALED_WALL + C.normal_fg())
             return wall_bg + ' ' + C.normal_fg()
         elif ct == CellType.WOOD_WALL:
             if room.wood_damage.get((room_r, room_c), 0):

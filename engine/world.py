@@ -168,6 +168,19 @@ class Room:
     answer_pos: int             = 0      # non-space chars of answer consumed by admin
     answer_diverged: bool       = False  # admin pressed a wrong key
     wood_damage: dict           = field(default_factory=dict)  # (r,c) -> half-steps received (1=cracked)
+    sealed_cells: set           = field(default_factory=set)   # (r,c) of every GATE cell: a wall some
+                                                               # level opens (and may re-shut).
+                                                               # DERIVED, never authoritative. The
+                                                               # renderer bands a cell only while it is
+                                                               # STILL WALL, so opening and re-sealing
+                                                               # need no bookkeeping — the cell flip
+                                                               # shows both. Written by whichever code
+                                                               # knows the live coordinates: at build
+                                                               # time for fixed gates, but rewritten each
+                                                               # tick where the row can move (the annex
+                                                               # chassis derives its gate row from
+                                                               # exit_pos, since J slides rows up). Never
+                                                               # snapshot it: it is recomputed, not state.
     wrap_buffer: bool           = False  # single-line text buffer (rows==1); ':set wrap' soft-wraps it across screen rows (The Archivist's Library)
     # `/` search overlays entity glyphs (so /W finds the Warden, /g a goblin).
     # ON everywhere. Safe because no answer-tape letter collides with an entity

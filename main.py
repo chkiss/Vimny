@@ -1553,6 +1553,11 @@ def _whole_line_annex_tick(room, player) -> list:
     # with it (the entity-anchor rule). The tuples keep their build-time row;
     # every chassis level lays its bolts on the exit's own row.
     gr = room.exit_pos[0]
+    # Band the live gate cells so shut bolts read as stonework, not blank wall.
+    # Recomputed here rather than at build time because `gr` rides the row shifts.
+    room.sealed_cells = {(gr, dc) for _t, (_dr, dc) in getattr(room, '_wla_doors', ())}
+    if getattr(room, '_wla_doors', ()) and room.exit_pos:
+        room.sealed_cells.add(room.exit_pos)
     all_true = True
     for target, (_dr, dc) in getattr(room, '_wla_doors', ()):
         is_open = room.cells[gr][dc] != CellType.WALL
@@ -1627,6 +1632,10 @@ def _alignment_halls_tick(room, player) -> list:
         return any(t[reg:reg + len(target)] == target for t in floor_rows)
 
     gr = room.exit_pos[0]
+    # Band the live gate cells so shut bolts read as stonework, not blank wall.
+    # Recomputed here rather than at build time because `gr` rides the row shifts.
+    room.sealed_cells = {(gr, dc) for _t, dc in getattr(room, '_ah_doors', ())}
+    room.sealed_cells.add(room.exit_pos)
     all_true = True
     for target, dc in getattr(room, '_ah_doors', ()):
         is_open = room.cells[gr][dc] != CellType.WALL
@@ -1746,6 +1755,10 @@ def _sight_sanctum_tick(room, player) -> list:
         return all(t in texts for t in targets)
 
     gr = room.exit_pos[0]
+    # Band the live gate cells so shut bolts read as stonework, not blank wall.
+    # Recomputed here rather than at build time because `gr` rides the row shifts.
+    room.sealed_cells = {(gr, dc) for _t, dc in getattr(room, '_ss_doors', ())}
+    room.sealed_cells.add(room.exit_pos)
     all_true = True
     for targets, dc in getattr(room, '_ss_doors', ()):
         is_open = room.cells[gr][dc] != CellType.WALL
@@ -1772,6 +1785,8 @@ def _register_unnamed_hold_tick(room, player) -> list:
     texts = {_wla_floor_text(room, r).strip() for r in range(room.rows)}
     ok = room._r1_daw_target in texts and room._r1_gap_target in texts
     er, ec = room.exit_pos
+    # Band the shut seal as stonework; derived here because exit_pos rides shifts.
+    room.sealed_cells = {(er, ec)}
     seal_open = room.cells[er][ec] != CellType.WALL
     msgs = []
     if ok and not seal_open:
@@ -1791,6 +1806,8 @@ def _register_named_vault_tick(room, player) -> list:
     ok = all(_wla_floor_text(room, r).strip() == t
              for r, t in room._r2_targets.items())
     er, ec = room.exit_pos
+    # Band the shut seal as stonework; derived here because exit_pos rides shifts.
+    room.sealed_cells = {(er, ec)}
     seal_open = room.cells[er][ec] != CellType.WALL
     if ok and not seal_open:
         room.cells[er][ec] = CellType.FLOOR
@@ -1841,10 +1858,14 @@ def _hall_of_echoes_tick(room, player) -> list:
                 ok = all(len(t) - len(t.lstrip()) == colreq for _r, t in runs[k])
         oks.append(ok)
     gcol = _dg._HE_GATE_COL
+    # Band the live gates as stonework. Derived here, not at build: the bands
+    # ride the row shifts, so each gate row is re-read from the live runs.
+    room.sealed_cells = set()
     for k in range(min(len(chain) - 1, len(runs))):    # intermediate gates
         gr = runs[k][-1][0] + 1
         if gr >= room.rows - 1:
             continue
+        room.sealed_cells.add((gr, gcol))
         is_open = room.cells[gr][gcol] != CellType.WALL
         if oks[k] and not is_open:
             room.cells[gr][gcol] = CellType.FLOOR
@@ -1854,6 +1875,7 @@ def _hall_of_echoes_tick(room, player) -> list:
     er, ec = room.exit_pos
     if not (0 <= er < room.rows):
         return msgs                    # a mangled buffer — never crash the tick
+    room.sealed_cells.add((er, ec))                     # the final seal
     all_ok = len(runs) == len(chain) and all(oks)
     is_open = room.cells[er][ec] != CellType.WALL
     if all_ok and not is_open:
@@ -1888,6 +1910,9 @@ def _paragraph_enclosure_tick(room, player) -> list:
                      == {(r0 + dr, c0 + dc) for dr, dc in _PE_SIGIL})
     all_true = sigil and not legion
     er, ec = room.exit_pos
+    # Band the shut seal as stonework; derived here because exit_pos rides the
+    # paragraph collapses.
+    room.sealed_cells = {(er, ec)}
     seal_open = room.cells[er][ec] != CellType.WALL
     if all_true and not seal_open:
         room.cells[er][ec] = CellType.FLOOR
@@ -1920,6 +1945,10 @@ def _grandmasters_gallery_tick(room, player) -> list:
     msgs = []
     texts = {_wla_floor_text(room, r).strip() for r in range(room.rows)}
     gr = room.exit_pos[0]
+    # Band the live bolts + final seal as stonework. Derived here rather than at
+    # build time because `gr` rides the paragraph bay's collapses.
+    room.sealed_cells = {(gr, dc) for _t, dc in getattr(room, '_gms_doors', ())}
+    room.sealed_cells.add((gr, room.exit_pos[1] - 1))
     all_true = True
     for i, (target, dc) in enumerate(getattr(room, '_gms_doors', ())):
         if target is None:                       # the legion bolt
@@ -1961,6 +1990,10 @@ def _grandmasters_arena_tick(room, player) -> list:
     lecterns = getattr(room, '_gm_lecterns', None)
     if not lecterns:
         return msgs
+    # Band the shut sanctum seal as stonework. Derived here rather than at build
+    # time because the seal rides exit_pos through the row shifts.
+    sc0 = getattr(room, '_gm_seal_col', None)
+    room.sealed_cells = {(room.exit_pos[0], sc0)} if sc0 is not None else set()
     blob = ' '.join(_wla_floor_text(room, r) for r in range(room.rows))
 
     def sheared(lc):                         # inner gone, the structure kept —
@@ -2029,6 +2062,15 @@ def _warden_eternal_tick(room, player) -> list:
             msgs.append('You have dug too greedily and too deep — there is no '
                         'floor left here. Type  :e  to reload the dungeon.')
         return msgs
+
+    # Band the chamber bands + the exit seal as stonework. Kept in the tick so
+    # a dug-away floor simply drops the out-of-range cells from the set.
+    seal0 = getattr(room, '_wde_seal', None)
+    room.sealed_cells = {(g['band'], g['col']) for g in gates
+                         if g['band'] < room.rows and g['col'] < room.cols}
+    if seal0 and seal0['col'] < room.cols:
+        room.sealed_cells |= {(r, seal0['col']) for r in seal0['rows']
+                              if r < room.rows}
 
     # 1) open each cleared chamber's passage, revealing the chamber below
     for g in gates:
@@ -2119,6 +2161,10 @@ def _gauntlet_tick(room, player) -> list:
         return sum(1 for t in stripped if t == target) >= 2      # 'dup'
 
     gr = room.exit_pos[0]
+    # Band the live bolts + final seal as stonework. Derived here rather than at
+    # build time because `gr` rides the row inserts (Y-p / O / o).
+    room.sealed_cells = {(gr, dc) for _k, _t, dc in getattr(room, '_gnt_doors', ())}
+    room.sealed_cells.add(room.exit_pos)
     all_true = True
     for kind, target, dc in getattr(room, '_gnt_doors', ()):
         ok = held(kind, target)
@@ -2222,6 +2268,10 @@ def _indentation_sanctum_tick(room, player) -> list:
         return True
 
     gr = room.exit_pos[0]
+    # Band the live bolts + final seal as stonework. Derived here rather than at
+    # build time because `gr` rides the rite's row shifts.
+    room.sealed_cells = {(gr, dc) for dc in room._is_bolts}
+    room.sealed_cells.add(room.exit_pos)
     conditions = (all(seated(w) for w in room._is_g1_words),
                   all(seated(w) for w in room._is_g2_words),
                   rite_lawful())
@@ -2318,6 +2368,9 @@ def _sculpting_chambers_tick(room, player) -> list:
         carved = bool(carve) and len(toks) >= 2 and toks[1] == carve
         done = votive and carved
     er, ec = room.exit_pos
+    # Band the shut vault door as stonework; derived here because exit_pos rides
+    # the o/O/I row shifts.
+    room.sealed_cells = {(er, ec)}
     is_open = room.cells[er][ec] != CellType.WALL
     if done and not is_open:
         room.cells[er][ec] = CellType.FLOOR
@@ -2576,6 +2629,10 @@ def _warden_scrivener_tick(room, player, spent: int = 0) -> list:
     alcove and stamps the next passage. The ward counter and the rot timer
     ride the undo snapshot (the Manifold convention)."""
     msgs = []
+    # Band the threshold gate + the final seal as stonework (the live alcove
+    # bolt joins below, once the warden it derives from is known).
+    room.sealed_cells = {c for c in (getattr(room, '_wsc_gate', None),
+                                     getattr(room, '_wsc_seal', None)) if c}
 
     # ── the threshold: the lintel's word, written on the desk ──
     word = getattr(room, '_wsc_threshold', '')
@@ -2612,7 +2669,7 @@ def _warden_scrivener_tick(room, player, spent: int = 0) -> list:
     ward = getattr(room, '_wsc_ward', 1)
     hits = warden.max_hp - warden.hp
     bolt = _wsc_bolt_cell(room, warden)
-
+    room.sealed_cells.add(bolt)       # the alcove bolt derives from the warden
     if hits >= ward:
         # Struck — he re-manifests at the next alcove and STAMPS.
         if (player.row, player.col) not in (bolt, (warden.row, warden.col)):
@@ -2704,6 +2761,10 @@ def _warden_manifold_tick(room, player, spent: int = 0) -> list:
     the gate + the HALL fog parts) and the final seal (+ the treasure-pocket
     fog) are text-derived and stateless."""
     msgs = []
+    # Band the ritual gate + the final seal as stonework (the live niche bolt
+    # joins below, once the warden it derives from is known).
+    room.sealed_cells = {c for c in (getattr(room, '_wm_gate', None),
+                                     getattr(room, '_wm_seal', None)) if c}
 
     # ── the opening ritual: four braziers → the gate + the hall's fog ──
     braziers = getattr(room, '_wm_braziers', ())
@@ -2751,7 +2812,7 @@ def _warden_manifold_tick(room, player, spent: int = 0) -> list:
     ward = getattr(room, '_wm_ward', 1)
     hits = warden.max_hp - warden.hp
     bolt = _wm_bolt_cell(room, warden)
-
+    room.sealed_cells.add(bolt)       # the niche bolt derives from the warden
     if hits >= ward:
         # Struck — he re-manifests at the next podium and STAMPS.
         if (player.row, player.col) not in (bolt, (warden.row, warden.col)):
@@ -2892,6 +2953,10 @@ def _quartermaster_tick(room, player) -> list:
 
     # Chain bolts (cumulative) on the hall row.
     hall_row = chain[0][0]
+    # Band the shut chain bolts as stonework (the seal joins below). Derived
+    # here because the hall row and the seal both ride the exit's row.
+    room.sealed_cells = {(hall_row, bc)
+                         for bc in getattr(room, '_qm_bolt_cols', ())}
     burning  = [lit(r, c) for r, c in chain]
     for i, bc in enumerate(getattr(room, '_qm_bolt_cols', ())):
         open_ = all(burning[:i + 1])
@@ -2909,6 +2974,7 @@ def _quartermaster_tick(room, player) -> list:
         base  = braziers[0][0]
         tiers = all(lit(base + k, c) for k in (0, 1, 2) for (_, c) in braziers)
         sr, sc = exit_e.row, getattr(room, '_qm_seal_col', exit_e.col - 1)
+        room.sealed_cells.add((sr, sc))
         open_ = tiers and all(burning)
         cur_open = room.cells[sr][sc] != CellType.WALL
         if open_ and not cur_open:
@@ -4569,6 +4635,9 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
                         room.mist_cells.add((r, cc))
         if getattr(room, '_rv_seal_col', None) is None or wtr is None:
             return
+        # Band the shut seal as stonework; derived here rather than at build
+        # because its row rides exit_pos through the :t row inserts.
+        room.sealed_cells = {(room.exit_pos[0], room._rv_seal_col)}
         sung = []
         for r in range(wtr + 1, room.rows - 1):
             t = _subst.line_text(room, r)[0].strip()
