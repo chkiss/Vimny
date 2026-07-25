@@ -3951,13 +3951,11 @@ def build_dungeon_register_unnamed_hold(seed: int) -> Dungeon:
 # The room is FULLY OPEN from the spawn: no gates, no fog.  The bays alternate,
 # so the repeating unit is a PAIR of bays — record the pair, replay it twice.
 #
-# PAR IS THE MACRO ROUTE (34), not the plain named route (69).  Par is the
-# OPTIMUM or it is a lie: a level whose par is twice its best route hands out
-# two stars for mediocre play.  Budget stays STANDARD (1.4× = 48), so this is
-# the one level in the wing where hand-repeating the vault does NOT win — but
-# the sub-optimal route that must still win at 1★ does: a ONE-REGISTER player
-# who macros (""+"_, a macro per saying, two walks of the vault) comes in at 38.
-# The lesson lost there is the named register, and the star is what it costs.
+# PAR IS THE MACRO ROUTE (34), not the plain named route (69) — par is the
+# OPTIMUM, whatever the optimum turns out to be (docs/ARCHITECTURE.md).  Moving
+# par onto the macro costs nothing here, because the macro CONTAINS the lesson:
+# its recorded body pastes from both names, so it cannot be recorded without
+# naming the words first.  Budget follows at the standard 1.4× (48).
 _R2_ROWS, _R2_COLS = 14, 46
 _R2_SPINE = 2
 _R2_BAY_W, _R2_BAY_E = 3, 40

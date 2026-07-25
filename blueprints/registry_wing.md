@@ -145,19 +145,25 @@ and because the bays alternate the repeating unit is a **pair**.
 **PAR IS THE MACRO ROUTE — 34** (`j w "aye j "bye qq j $ b diw "aP j $ b diw
 "bP q 2@q G l`), driven and seed-invariant, standard `ceil(34*1.4)=48` budget.
 
-#### PAR IS THE OPTIMUM OR IT IS A LIE (user, 2026-07-25)
-This level first shipped with par **69** — the plain named route — and the macro
-route at 37 was written up as "the reward, not the requirement." That is
-backwards: par at nearly **twice** the best route hands two stars to mediocre
-play and to every route in between. If a level invites a macro, the macro is par.
-The register lesson is not lost by moving par there — the macro *body* pastes
-from both names, and it must be recorded into `q` because `qa` would destroy the
-word parked in `"a` (macros and text share one store).
+#### PAR IS THE OPTIMUM — no exceptions (law, user 2026-07-25)
+Now a **game-wide law** in `docs/ARCHITECTURE.md`, not a note about this level.
+Whatever the cheapest route is — a macro, a two-register setup, anything — that
+is par, and the budget follows at `ceil(par × 1.4)`. **This wing gets no
+exception**, and neither does any other.
 
-Budget stays **standard**, so hand-repeating the vault (69) does not win. The
-sub-optimal route that must still win at 1★ is the **one-register player who
-macros**: `""` + `"_`, one macro per saying, two walks of the vault — **38**.
-What it loses is the named register, and a star is what that costs.
+This level is what forced the law. It first shipped par **69** (the plain named
+route) with the macro route at 37 written up as "the reward, not the
+requirement." Backwards: par at nearly twice the best route hands two stars to
+mediocre play and to every route in between.
+
+Moving par onto the macro cost nothing, because **the macro contains the
+lesson** — its body pastes from both names, and it must be recorded into `q`
+since `qa` would destroy the word parked in `"a`. Always check that before
+worrying a shortcut will eat the curriculum.
+
+At the standard budget hand-repeating the vault (69) does not win. The
+sub-optimal route that does, at 1★, is the **one-register player who macros**:
+`""` + `"_`, one macro per saying, two walks of the vault — **38**.
 
 #### FORCE BY CAPACITY, NOT BY SURVIVAL (rebuild #1)
 The first cut forced `"a` by **threat**: a `daw` clobbered `""`, so you had to

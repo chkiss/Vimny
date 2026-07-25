@@ -39,6 +39,31 @@ Admin features: `:edit` enters editor mode on any dungeon; `:save <name>` writes
 - **Deliberate non-normalized spacing**: The WORD Forge's `_l7_fill_row` keeps a **2–3 cell gap** on purpose — that spacing is what makes small-word `w` ≡ WORD `W`, which is the level's lesson. Don't normalize it to gap 1.
 
 ## Par-solver toolkit (generation)
+### PAR IS THE OPTIMUM — no exceptions (law, user 2026-07-25)
+
+**Par is the cheapest route that exists, whatever that route turns out to be.**
+If the optimum is a macro (`q`/`@`), a two-register setup, a `:g`, a counted
+repeat, or a trick nobody planned for, *that* sets par. There is no level and no
+wing where par may be pinned to "the route that teaches the lesson" while a
+cheaper route exists — a par above the optimum hands two stars to mediocre play,
+and to every route in between. If a level invites a shortcut, the shortcut is par.
+
+**The budget then follows: `ceil(par × 1.4)`, always.** The budget is not a
+design knob and is never hand-set to keep a favoured route alive. Forcing is by
+par: a sub-optimal route loses a star, and if the standard budget also puts it
+out of reach, that is the correct consequence, not a problem to tune around.
+
+Two things follow that are easy to get wrong:
+- **Moving par onto the shortcut does not cost you the lesson**, as long as the
+  shortcut *contains* it. The Register II macro is par at 34, and its recorded
+  body still pastes from both named registers — you cannot record it without
+  having named the words first. Check that the optimum contains the lesson;
+  don't retreat to a higher par to protect it.
+- **Golf the tape before pinning par.** `G` at the end of a route is very often
+  cheaper than `0 {n}j` (it lands on the gate row's spine, then `l` onto the
+  exit), and a macro's recording should start at the *earliest* repeating
+  opportunity — including the leading motion in the body, not before it.
+
 The per-level `_par_<slug>` solvers compute each dungeon's minimum-keystroke par. They share a toolkit at the top of `dungeon_gen.py` — supply a `neighbors(node)` generator; the machinery is shared:
 - **`_dijkstra(start, is_goal, neighbors)`** / **`_bfs(...)`** — generic least-keystroke / uniform-cost search; return `(cost, prev, end_node)`, reconstruct with `_join_path`. Nodes must be orderable so heap/FIFO tie-breaks (hence the chosen path) match the old hand-written loops.
 - **`_count_moves(passable, r, c, max_n, landable=None, dirs=_DIRS)`** — count-n `hjkl` (n=1→1 key, n>1→`len(str(n))+1`). `landable` lets a void cell block landing while the count passes through; `dirs` sets scan order where a solver needs a non-default tie-break order.
