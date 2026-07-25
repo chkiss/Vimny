@@ -36,6 +36,7 @@ from generation.dungeon_gen import (
     _OH_EXIT, _OH_TRIGGERS,
 )
 
+import math
 import pytest
 
 from tests import SEEDS, cached_room
@@ -130,7 +131,7 @@ def test_dimensions_anchors_par_budget(seed):
     assert room.exit_pos == _OH_EXIT
     assert room.par == _OH_PAR
     # TIGHT (Annex model): budget one below the all-S route, so it overshoots
-    assert room.budget == _OH_PAR + _OH_SAVING - 1
+    assert room.budget == math.ceil(_OH_PAR * 1.4)   # STANDARD
 
 
 def test_streams_carry_a_consecutive_varied_run_stitches_a_single_diff():
@@ -248,11 +249,13 @@ def test_no_cheaper_nav_beats_par(monkeypatch):
 
 @pytest.mark.parametrize("seed", SEEDS)
 def test_all_S_route_is_barred(seed, monkeypatch):
-    """Necessity, by volume: mending every stream with `S` (never `R`) costs
-    par + _OH_SAVING — one past the budget — so the path runs out."""
+    """Necessity by PAR, not by budget (par-is-the-optimum law, 2026-07-25).
+    Mending every stream with `S` (never `R`) costs par + _OH_SAVING. It used to
+    be BARRED by a hand-tightened budget; the budget is now the standard 1.4x,
+    so it WINS — and loses the second star."""
     dungeon = build_dungeon_overwrite_halls(seed)
     result = _drive(dungeon, _all_S_keys(), monkeypatch)
-    assert not result['won'], "the all-S route must run out of budget"
+    assert result['won'] and result['stars'] == 1, result
 
 
 def test_dot_cannot_mend_a_varied_run(monkeypatch):

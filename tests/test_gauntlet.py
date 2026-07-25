@@ -25,6 +25,7 @@ load-bearing forcing has a rival tape that wins at 1★ or fails its door.
 """
 from collections import deque
 
+import math
 import pytest
 from blessed.keyboard import Keystroke
 from blessed import Terminal
@@ -339,7 +340,7 @@ def test_par_boundary_is_exact(monkeypatch):
 
 
 def test_budget_is_hand_set(monkeypatch):
-    assert _room(0).budget == _GNT_BUDGET
+    assert _room(0).budget == math.ceil(_GNT_PAR * 1.4)   # STANDARD
 
 
 # ── rival tapes: each loses a star or fails its door ──────────────────────────

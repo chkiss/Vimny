@@ -24,6 +24,7 @@ both falling verses while sparing the middle. "my fair lady." exists ONLY
 as the torn line across the water: :1j + :1y once, then p at each verse
 end (yank once, lay it four times). Canonical: ranged :13,15s/up/down/g,
 :4,6&& while /g is fresh, join, yank, the paste tour. Par 41."""
+import math
 import pytest
 from blessed.keyboard import Keystroke
 from blessed import Terminal
@@ -93,7 +94,7 @@ def test_the_song_stands_written_wrong(seed):
     r = _room(seed)
     assert (r.rows, r.cols) == (_RV_ROWS, _RV_COLS)
     assert r.cells[_RV_SEAL_ROW][_RV_SEAL_COL] == CellType.WALL
-    assert r.par == _RV_PAR and r.budget == _RV_BUDGET
+    assert r.par == _RV_PAR and r.budget == math.ceil(_RV_PAR * 1.4)
     carved = [t for t in _RV_TRUE if t != 'my fair lady.']
     for i, true_line in enumerate(carved):
         row = _RV_SONG[0] + i

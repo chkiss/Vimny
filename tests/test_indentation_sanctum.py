@@ -43,6 +43,7 @@ from generation.dungeon_gen import (
     _IS_EXIT, _IS_TRIGGERS,
 )
 
+import math
 import pytest
 
 from tests import SEEDS, cached_room
@@ -90,6 +91,27 @@ def _drive(dungeon, keys, monkeypatch, finish=':wq\r', name='Scribe'):
                             _dungeon=dungeon)
 
 
+def _spend_uncapped(dungeon, keys, monkeypatch, _drive_fn):
+    """Drive a route with the budget UNCAPPED and return (won, spent).
+
+    PAR-IS-THE-OPTIMUM (docs/ARCHITECTURE.md): the budget follows par at 1.4x and
+    is never widened to keep a sub-optimal route alive, so a rival's claim to
+    test is that it costs MORE THAN PAR — not that it squeaks inside a hand-set
+    budget. Whether it also falls outside the standard budget is a consequence of
+    how much worse it is, not a design knob."""
+    box = {}
+    orig = main._calc_stars
+    monkeypatch.setattr(main, '_calc_stars',
+                        lambda won, budget, room, player, level='':
+                            (box.__setitem__('spent', budget.spent),
+                             orig(won, budget, room, player, level))[1])
+    for r in dungeon.rooms:
+        r.budget = 99999
+    result = _drive_fn(dungeon, keys, monkeypatch)
+    return result['won'], box.get('spent')
+
+
+
 def _drive_spent(keys, monkeypatch):
     box = {}
     orig = main._calc_stars
@@ -116,7 +138,7 @@ def test_dimensions_anchors_par_budget(seed):
     assert room.spawn_pos == (_IS_G1_ROWS[0], _IS_COL_S)
     assert room.exit_pos == _IS_EXIT
     assert room.par == _IS_PAR
-    assert room.budget == _IS_BUDGET     # HAND-SET: the manual-mason route wins 1★
+    assert room.budget == math.ceil(_IS_PAR * 1.4)   # STANDARD
 
 
 def test_rite_shape_parity_and_scatter():
@@ -273,8 +295,8 @@ def test_manual_mason_route_wins_at_one_star(seed, monkeypatch):
     >>/<</dot through the rite) WINS under the hand-set budget, at 1 star —
     forcing by PAR, not an unwinnable wall."""
     dungeon = build_dungeon_indentation_sanctum(seed)
-    result = _drive(dungeon, _manual_keys(), monkeypatch)
-    assert result['won'] and result['stars'] == 1, result
+    won, spent = _spend_uncapped(dungeon, _manual_keys(), monkeypatch, _drive)
+    assert won and spent > dungeon.rooms[0].par, (won, spent)
 
 
 def test_undo_rebars_bolt_and_seal(monkeypatch):

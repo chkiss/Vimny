@@ -53,6 +53,7 @@ from generation.dungeon_gen import (
 def _bolt(i):
     """The (row, col) of lesson i's gate bolt."""
     return (_WLA_GATE_ROW, _WLA_GATE_COL0 + i)
+import math
 import pytest
 import random
 
@@ -126,8 +127,7 @@ def test_dimensions_anchors_par_budget(seed):
     assert room.par == _WLA_PAR
     # forcing is by PAR (a count-s solve wins but misses stars); the budget stays
     # generous (par + TRIGGERS - 1) — enough only to bar the truly-old d/x+i route
-    assert room.budget == _WLA_PAR + _WLA_TRIGGERS - 1
-    assert room.budget - room.par < _WLA_TRIGGERS
+    assert room.budget == math.ceil(_WLA_PAR * 1.4)  # STANDARD
 
 
 @pytest.mark.parametrize("seed", SEEDS)
@@ -377,12 +377,14 @@ def test_stone_prefixes_survive_every_change(seed, monkeypatch):
 
 @pytest.mark.parametrize("seed", SEEDS)
 def test_all_old_route_is_barred(seed, monkeypatch):
-    """Necessity, by volume: the route that spends d/x + i on EVERY change
-    (never c, never s) costs par + TRIGGERS — one past the budget — so the
-    path runs out and the exit is never reached."""
+    """Necessity by PAR, not by budget (par-is-the-optimum law, 2026-07-25).
+    The route that spends d/x + i on EVERY change (never c, never s) costs
+    par + TRIGGERS. It used to be BARRED by a hand-tightened budget; the budget
+    is now the standard 1.4x, so it WINS — and loses the second star, which is
+    what a sub-optimal route is supposed to cost."""
     dungeon = build_dungeon_whole_line_annex(seed)
     result = _drive(dungeon, _old_keys(dungeon.rooms[0]._wla_lessons), monkeypatch)
-    assert not result['won'], "the all-old route must run out of budget"
+    assert result['won'] and result['stars'] == 1, result
 
 
 @pytest.mark.parametrize("seed", SEEDS)

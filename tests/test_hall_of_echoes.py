@@ -30,6 +30,7 @@ the map; the exit in the last band needs every run true. Replayed keys are
 budget-free; the all-manual road wins at 1★ (≤ budget)."""
 import re
 
+import math
 import pytest
 from blessed.keyboard import Keystroke
 from blessed import Terminal
@@ -118,7 +119,7 @@ def test_one_map_poem_run_then_gauntlet(seed):
     gmap = d.rooms[0]
     assert gmap._he_poem in {p[0] for p in _HE_POEMS}
     assert gmap.cols == _HE_COLS
-    assert gmap.par == _HE_PAR and gmap.budget == _HE_BUDGET
+    assert gmap.par == _HE_PAR and gmap.budget == math.ceil(_HE_PAR * 1.4)
     ge, gc = gmap.exit_pos
     assert gmap.cells[ge][gc] == CellType.WALL      # sealed until every run true
     assert any(e.kind == 'exit' and (e.row, e.col) == (ge, gc)

@@ -29,6 +29,7 @@ the verdant lines' fire and its light unveils the exit pocket. Canonical
 · :6,13v _) still wins, at 1★ (35 spent)."""
 from collections import deque
 
+import math
 import pytest
 from blessed.keyboard import Keystroke
 from blessed import Terminal
@@ -95,6 +96,27 @@ def _drive(dungeon, keys, monkeypatch, finish=':wq\r', player_name='Scribe'):
                             _dungeon=dungeon)
 
 
+def _spend_uncapped(dungeon, keys, monkeypatch, _drive_fn):
+    """Drive a route with the budget UNCAPPED and return (won, spent).
+
+    PAR-IS-THE-OPTIMUM (docs/ARCHITECTURE.md): the budget follows par at 1.4x and
+    is never widened to keep a sub-optimal route alive, so a rival's claim to
+    test is that it costs MORE THAN PAR — not that it squeaks inside a hand-set
+    budget. Whether it also falls outside the standard budget is a consequence of
+    how much worse it is, not a design knob."""
+    box = {}
+    orig = main._calc_stars
+    monkeypatch.setattr(main, '_calc_stars',
+                        lambda won, budget, room, player, level='':
+                            (box.__setitem__('spent', budget.spent),
+                             orig(won, budget, room, player, level))[1])
+    for r in dungeon.rooms:
+        r.budget = 99999
+    result = _drive_fn(dungeon, keys, monkeypatch)
+    return result['won'], box.get('spent')
+
+
+
 _CONTENT_ROWS = (list(_CL_KEEP_ROWS) + [_CL_BLIGHT_I] + list(_CL_BLIGHT_II)
                  + list(_CL_JUNK_III) + list(_CL_SACRED_III))
 
@@ -117,7 +139,7 @@ def test_dimensions_doors_and_braziers(seed):
     assert kinds[_CL_SEALDOOR] == 'seal_door'      # one cell east of the brazier
     assert _CL_SEALDOOR[1] == _CL_BRZ_COL + 1
     assert r.exit_pos == _CL_EXIT
-    assert r.par == _CL_PAR and r.budget == _CL_BUDGET
+    assert r.par == _CL_PAR and r.budget == math.ceil(_CL_PAR * 1.4)
     # the stone course is solid but for the one gap, east of door one
     for c in range(1, r.cols - 1):
         want = CellType.FLOOR if (_CL_WALL, c) == _CL_GAP else CellType.WALL
@@ -317,8 +339,8 @@ def test_three_beat_longhand_wins_one_star(monkeypatch):
     d = _fresh(0)
     r = d.rooms[0]
     tape = ':set␣nu⏎ 2l x $ p :2d␣_⏎ :5,9d␣_⏎ :6,13v/that/d␣_⏎ $ p $'
-    result = _drive(d, _tape_keys(tape), monkeypatch)
-    assert result['won'] and result['stars'] == 1
+    won, spent = _spend_uncapped(d, _tape_keys(tape), monkeypatch, _drive)
+    assert won and spent > r.par, (won, spent)
     assert r._ledger_lit is True
 
 
@@ -363,8 +385,8 @@ def test_subst_blanking_longhand_wins_one_star(monkeypatch):
     d = _fresh(0)
     s4 = d.rooms[0].answer.split('/')[1]
     keys = _K(f'2lx$p:2s/.*//⏎:6,10s/.*//⏎:12,19v/{s4}/s%.*%%⏎$p$')
-    result = _drive(d, keys, monkeypatch)
-    assert result['won'] and result['stars'] == 1
+    won, spent = _spend_uncapped(d, keys, monkeypatch, _drive)
+    assert won and spent > d.rooms[0].par, (won, spent)
 
 
 def test_scorched_earth_never_opens_the_way(monkeypatch):

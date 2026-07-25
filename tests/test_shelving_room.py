@@ -26,6 +26,7 @@ parts when the whole round reads true. Canonical :set nu + :6m3 + :6< +
 ride along); _shelving_tick re-mists any bare shelf floor each turn."""
 from collections import deque
 
+import math
 import pytest
 from blessed.keyboard import Keystroke
 from blessed import Terminal
@@ -80,6 +81,27 @@ def _drive(dungeon, keys, monkeypatch, finish=':wq\r', player_name='Scribe'):
                             _dungeon=dungeon)
 
 
+def _spend_uncapped(dungeon, keys, monkeypatch, _drive_fn):
+    """Drive a route with the budget UNCAPPED and return (won, spent).
+
+    PAR-IS-THE-OPTIMUM (docs/ARCHITECTURE.md): the budget follows par at 1.4x and
+    is never widened to keep a sub-optimal route alive, so a rival's claim to
+    test is that it costs MORE THAN PAR — not that it squeaks inside a hand-set
+    budget. Whether it also falls outside the standard budget is a consequence of
+    how much worse it is, not a design knob."""
+    box = {}
+    orig = main._calc_stars
+    monkeypatch.setattr(main, '_calc_stars',
+                        lambda won, budget, room, player, level='':
+                            (box.__setitem__('spent', budget.spent),
+                             orig(won, budget, room, player, level))[1])
+    for r in dungeon.rooms:
+        r.budget = 99999
+    result = _drive_fn(dungeon, keys, monkeypatch)
+    return result['won'], box.get('spent')
+
+
+
 # ── structure ─────────────────────────────────────────────────────────────────
 
 @pytest.mark.parametrize("seed", SEEDS)
@@ -90,7 +112,7 @@ def test_dimensions_and_seal(seed):
     for dc in _SHR_BOLT_COLS:                       # the four bolts, all barred
         assert r.cells[_SHR_GAL][dc] == CellType.WALL
     assert r.exit_pos == (_SHR_GAL, _SHR_EXIT_COL)
-    assert r.par == _SHR_PAR and r.budget == _SHR_BUDGET
+    assert r.par == _SHR_PAR and r.budget == math.ceil(_SHR_PAR * 1.4)
 
 
 @pytest.mark.parametrize("seed", SEEDS)
@@ -231,8 +253,8 @@ def test_substitute_rival_to_the_indents_loses_a_star(monkeypatch):
     # :s/^ anchors imitate :> and :< at several times the cost.
     d = _fresh(0)
     keys = _K(':6m3⏎:6s/^  //⏎:7t7⏎:8s/^/  /⏎$')
-    result = _drive(d, keys, monkeypatch)
-    assert result['won'] and result['stars'] == 1
+    won, spent = _spend_uncapped(d, keys, monkeypatch, _drive)
+    assert won and spent > d.rooms[0].par, (won, spent)
 
 
 def test_scorched_shelf_never_opens_the_seal(monkeypatch):

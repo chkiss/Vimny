@@ -177,7 +177,13 @@ _ANSWER_NOT_TOKENISED = {
 # Levels with a documented NON-1.4 budget. The Change Annex / Extension use a
 # TIGHT margin (S2 by volume — below the trigger count, so the all-old route
 # overshoots); their exact budgets are pinned by their own playthrough tests.
-_NONSTANDARD_BUDGET = {
+# EMPTIED 2026-07-25 by the PAR-IS-THE-OPTIMUM law (docs/ARCHITECTURE.md): the
+# budget is not a design knob. It follows par at ceil(par*1.4) on every level —
+# no tight budget to bar an old route (forcing is by par), no generous budget to
+# keep a favoured route winnable. Keep this set EMPTY; if a level seems to need
+# an exemption, its par is wrong.
+_NONSTANDARD_BUDGET = set()
+_RETIRED_NONSTANDARD_BUDGET = {
     'build_dungeon_whole_line_annex',
     'build_dungeon_change_extension',
     'build_dungeon_overwrite_halls',   # TIGHT: par + _OH_SAVING − 1 bars the all-S route

@@ -3594,7 +3594,7 @@ def build_dungeon_selection_halls(seed: int) -> Dungeon:
 
     room.rebuild_indexes()
     room.par    = _SH_PAR
-    room.budget = 122   # GENEROUS hand-set: the panels are now PROVERBS whose
+    room.budget = math.ceil(_SH_PAR * 1.4)   # STANDARD (par-is-the-optimum law)
     # endings are rotated one frame; the visual-paste swap (…$bvep…) rotates
     # them home for one key each, but the old-only route must RETYPE all four
     # correct endings (ce{word}) — and the longest proverb endings push that
@@ -5726,7 +5726,7 @@ def build_dungeon_hall_of_echoes(seed: int) -> Dungeon:
     chambers = [_he_poem_chamber(poem)] + _he_build_chambers(rng)
     room = _he_gauntlet_map(chambers, seed)
     room.par    = _HE_PAR
-    room.budget = _HE_BUDGET
+    room.budget = math.ceil(_HE_PAR * 1.4)   # STANDARD (par-is-the-optimum law)
 
     dungeon = Dungeon(name='The Hall of Echoes', seed=seed)
     dungeon.rooms        = [room]
@@ -9027,7 +9027,7 @@ def build_dungeon_refrain_vault(seed: int) -> Dungeon:
     room._rv_seal_col = _RV_SEAL_COL
 
     room.par    = _RV_PAR
-    room.budget = _RV_BUDGET
+    room.budget = math.ceil(_RV_PAR * 1.4)   # STANDARD (par-is-the-optimum law)
     room.answer = (':set␣nu⏎ :13,15s/up/down/g⏎ :4,6&&⏎ '
                    ':1j|1y⏎ p 3j p 3j p 3j p j $')
 
@@ -10612,7 +10612,7 @@ def build_dungeon_whole_line_annex(seed: int) -> Dungeon:
     # overpays the 2-digit count), so an all-`s` solve lands one key over par per
     # 2-digit door. The budget stays generous (par + TRIGGERS − 1) — enough to bar
     # only the truly-old d/x + i route (par + TRIGGERS). See the playthrough tests.
-    room.budget = _WLA_PAR + _WLA_TRIGGERS - 1
+    room.budget = math.ceil(_WLA_PAR * 1.4)  # STANDARD (par-is-the-optimum law)
     room.answer = _wla_answer(lessons)     # the real keystroke tape (karaoke)
 
     dungeon = Dungeon(name='The Change Annex', seed=seed)
@@ -10895,7 +10895,7 @@ def build_dungeon_change_extension(seed: int) -> Dungeon:
     # each over the shorthand) and retypes the Y echo with o (+_CE_Y_SAVING);
     # a margin of one less makes that route overshoot by one while the S/C/Y
     # route clears at par. Pinned by tests/test_change_extension.py.
-    room.budget = _CE_PAR + _CE_SAVING + _CE_Y_SAVING - 1
+    room.budget = math.ceil(_CE_PAR * 1.4)   # STANDARD (par-is-the-optimum law)
     room.answer = _ce_answer(lessons)      # the real keystroke tape (karaoke)
 
     dungeon = Dungeon(name='The Change Extension', seed=seed)
@@ -11145,7 +11145,7 @@ def build_dungeon_overwrite_halls(seed: int) -> Dungeon:
 
     room.rebuild_indexes()
     room.par    = _OH_PAR
-    room.budget = _OH_PAR + _OH_SAVING - 1       # TIGHT (Annex model): all-S overshoots by one
+    room.budget = math.ceil(_OH_PAR * 1.4)   # STANDARD (par-is-the-optimum law)
     room.answer = _OH_ANSWER
 
     dungeon = Dungeon(name='The Overwrite Halls', seed=seed)
@@ -11684,7 +11684,7 @@ def build_dungeon_indentation_sanctum(seed: int) -> Dungeon:
 
     room.rebuild_indexes()
     room.par    = _IS_PAR
-    room.budget = _IS_BUDGET
+    room.budget = math.ceil(_IS_PAR * 1.4)   # STANDARD (par-is-the-optimum law)
     room.answer = _IS_ANSWER
 
     dungeon = Dungeon(name='The Indentation Sanctum', seed=seed)
@@ -12353,7 +12353,7 @@ def build_dungeon_gauntlet(seed: int) -> Dungeon:
     room.fog_cells  = set(mist)                    # mist on every channel…
     room.mist_cells = set(mist)                    # …permanent: reveals skip it
     room.par    = _GNT_PAR
-    room.budget = _GNT_BUDGET
+    room.budget = math.ceil(_GNT_PAR * 1.4)  # STANDARD (par-is-the-optimum law)
     # The canonical tape (karaoke): every typed token is a single drawn word.
     room.answer = (
         f"k 3e x j b x b x j % l x j ( x "
@@ -12542,7 +12542,7 @@ def build_dungeon_culling_ledger(seed: int) -> Dungeon:
     room._ledger_lit = False                       # the corridor brazier, cold
 
     room.par    = _CL_PAR
-    room.budget = _CL_BUDGET
+    room.budget = math.ceil(_CL_PAR * 1.4)   # STANDARD (par-is-the-optimum law)
     room.answer = ':set␣nu⏎ 2l x $ p :2,19v/that/d␣_⏎ $ p $'
 
     room.rebuild_indexes()
@@ -12649,7 +12649,7 @@ def build_dungeon_shelving_room(seed: int) -> Dungeon:
     room._shr_seal_col = _SHR_SEAL_COL
 
     room.par    = _SHR_PAR
-    room.budget = _SHR_BUDGET
+    room.budget = math.ceil(_SHR_PAR * 1.4)  # STANDARD (par-is-the-optimum law)
     room.answer = ':set␣nu⏎ :6m3⏎ :6<⏎ :7t7⏎ :8>⏎ $'
 
     room.rebuild_indexes()

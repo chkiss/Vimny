@@ -57,6 +57,7 @@ from generation.dungeon_gen import (
     _CE_Y_ROW, _CE_Y_COL0, _CE_Y_LAID, _CE_Y_T1, _CE_Y_T2, _CE_Y_STEM,
 )
 
+import math
 import pytest
 import random
 
@@ -138,8 +139,7 @@ def test_dimensions_anchors_par_budget(seed):
     assert room.par == _CE_PAR
     # tight margin (S2 by volume): below the combined shorthand + Y savings,
     # so the all-old route (cc/c$ + o-retyping the Y echo) overshoots by one
-    assert room.budget == _CE_PAR + _CE_SAVING + _CE_Y_SAVING - 1
-    assert room.budget - room.par < _CE_SAVING + _CE_Y_SAVING
+    assert room.budget == math.ceil(_CE_PAR * 1.4)   # STANDARD
 
 
 @pytest.mark.parametrize("seed", SEEDS)
@@ -379,12 +379,13 @@ def test_stone_prefixes_survive_every_change(seed, monkeypatch):
 
 @pytest.mark.parametrize("seed", SEEDS)
 def test_all_old_route_is_barred(seed, monkeypatch):
-    """Necessity, by volume: the route that spends cc/c$ on EVERY shorthand
-    door (never S, never C) costs par + _CE_SAVING — one past the budget — so
-    the path runs out and the exit is never reached."""
+    """Necessity by PAR, not by budget (par-is-the-optimum law, 2026-07-25).
+    The route that spends cc/c$ on EVERY shorthand door (never S, never C) costs
+    par + _CE_SAVING. It used to be BARRED by a hand-tightened budget; the budget
+    is now the standard 1.4x, so it WINS — and loses the second star."""
     dungeon = build_dungeon_change_extension(seed)
     result = _drive(dungeon, _old_keys(dungeon.rooms[0]._ce_lessons), monkeypatch)
-    assert not result['won'], "the all-old route must run out of budget"
+    assert result['won'] and result['stars'] == 1, result
 
 
 @pytest.mark.parametrize("seed", SEEDS)
