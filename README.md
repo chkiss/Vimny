@@ -125,7 +125,7 @@ The curriculum is defined in `content/levels.py` (canonical) and mirrored in `LE
 | 48 | The Gauntlet | — | Playable |
 | 48.1 | The Warden Eternal | (boss) | Playable |
 | R1 | The Register I | `""  y  p` | Playable |
-| R2 | The Register II | `"ay  "ap` | Playable |
+| R2 | The Register II | `"ay  "by  "ap  "bp` | Playable |
 <!-- END GENERATED LEVELS TABLE -->
 
 ## Commands

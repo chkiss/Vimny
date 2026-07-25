@@ -3,13 +3,17 @@
 #
 # SPDX-License-Identifier: GPL-3.0-or-later
 
-"""The Register II — The Named Vault ("a).  The answer to Register I's clobber.
+"""The Register II — The Named Vault ("a / "b).
 
-ONE quarry word must be laid into FOUR gap bays, with a cutting bay (whose daw
-clobbers "") gating the way to each later gap.  A named register survives every
-cut, so the quarry is visited ONCE; the unnamed player must climb back and
-re-yank before gaps 2-4.  The `"a` prefix is charged its two real keystrokes, so
-the named saving is earned by the re-yanks it avoids, not by free typing."""
+FORCED BY CAPACITY, NOT BY SURVIVAL.  Every bay wants TWO different words, and
+the unnamed register holds exactly one thing — so no amount of protecting it
+helps.  In particular "_ buys nothing here: nothing is ever cut.  Yank both
+words once into "a and "b and the whole vault is pastes; carry one word at a
+time and you must walk the room twice and re-land every tail.
+
+The room is fully open from the spawn and the four bays are identical, so the
+rhythm is visible as a rhythm — a macro replays it far under par.  That is the
+reward, not the requirement: par is the plain named route."""
 import math
 import pytest
 from blessed.keyboard import Keystroke
@@ -20,22 +24,26 @@ from engine.world import CellType
 from content.levels import LEVELS, is_unlocked, _BY_SLUG
 from generation.dungeon_gen import (build_dungeon_register_named_vault as _build,
                                     _R2_PAR, _R2_SPINE, _R2_GATE, _R2_EXIT,
-                                    _R2_ROW_QUARRY, _R2_GAP_ROWS, _R2_DAW_ROWS,
-                                    _R2_GATE_ROWS, _R2_QUARRY_WORD)
+                                    _R2_QUARRY_ROWS, _R2_GAP_ROWS, _R2_HEAD,
+                                    _R2_SAYING, _R2_QUARRY_WORDS)
 from tests import SEEDS
 
-ESC = Keystroke('\x1b', code=361, name='KEY_ESCAPE')
+# The horse rides with the player through the whole Registry wing, and the wing
+# only exists once the Warden Eternal has fallen.
+_PROGRESS = {'horse_name': 'Artax', 'warden_eternal': {'complete': True}}
 
 
 def _K(s):
     return [Keystroke(ch) for ch in s]
 
 
-def _drive(keys, monkeypatch, finish=':wq\r', name='Scribe', seed=0):
+def _drive(keys, monkeypatch, finish=':wq\r', name='Scribe', seed=0,
+           progress=None):
     dungeon = _build(seed)
     keys = list(keys) + _K(finish)
     monkeypatch.setattr(main, 'render_all', lambda *a, **k: None)
     monkeypatch.setattr(main.time, 'sleep', lambda *a, **k: None)
+    monkeypatch.setattr(main, '_prompt_horse_name', lambda *a, **k: 'Artax')
     for anim in ('_fireworks_animation', '_win_animation', '_starfield_victory',
                  '_heart_container_animation', '_unlock_animation',
                  '_void_fall_animation', '_drown_animation', '_sc_twinkle_animation'):
@@ -44,8 +52,9 @@ def _drive(keys, monkeypatch, finish=':wq\r', name='Scribe', seed=0):
     term = Terminal()
     it = iter(keys)
     monkeypatch.setattr(term, 'inkey', lambda *a, **k: next(it, Keystroke('')))
-    return main.run_dungeon(term, 'register_named_vault', {}, player_name=name,
-                            _dungeon=dungeon)
+    return main.run_dungeon(term, 'register_named_vault',
+                            dict(_PROGRESS if progress is None else progress),
+                            player_name=name, _dungeon=dungeon)
 
 
 def _drive_spent(keys, monkeypatch, **kw):
@@ -66,15 +75,19 @@ def _tape(s):
     return keys
 
 
-# The named (par) tape: yank ONCE into "a, then paste all four gaps from it,
-# cutting a gate open between each. "a survives every cut.
-_NAMED = ('j "aye 2j fo "ap 0 2j fq dw 0 2j fo "ap '
-          '0 2j fq dw 0 2j fo "ap 0 2j fq dw 0 2j fo "ap G l')
+# The named (par) tape: quarry BOTH words once, then every bay is two pastes.
+_NAMED = ('j "aye j "bye 2j fe "ap "bp 0 2j fe "ap "bp '
+          '0 2j fe "ap "bp 0 2j fe "ap "bp 0 2j l')
 
-# The unnamed rival: "" is clobbered by every gate-cut, so the quarry must be
-# revisited before each later gap. Wins, but over par.
-_UNNAMED = ('j ye 2j fo p 0 2j fq dw 0 4k ye 0 6j fo p 0 2j fq dw 0 8k ye '
-            '0 10j fo p 0 2j fq dw 0 12k ye 0 14j fo p G l')
+# The reward: the four bays are identical, so record one and replay it.
+_MACRO = 'j "aye j "bye qq 0 2j fe "ap "bp q 3@q 0 2j l'
+
+# The single-register rival at its BEST — not a naive re-yank per bay, but the
+# clever batching route: lay "saves" in every bay, then re-yank and lay "nine".
+# It still walks the room twice, and on the second pass `fe` no longer lands on
+# the tail (the first paste moved it), so every bay costs an extra motion.
+_BATCH = ('j ye 3j fe p 0 2j fe p 0 2j fe p 0 2j fe p '
+          '0 8k ye 2j fe e p 0 2j fe e p 0 2j fe e p 0 2j fe e p 0 2j l')
 
 
 def test_named_tape_solves_at_two_stars(monkeypatch):
@@ -97,23 +110,28 @@ def test_par_is_seed_invariant(seed, monkeypatch):
     assert won and spent == _R2_PAR, (seed, won, spent)
 
 
-def test_unnamed_reyank_rival_wins_but_drops_a_star(monkeypatch):
-    """THE LAW, driven: the unnamed route still WINS (inside the standard budget)
-    but pays a re-yank per gate-cut, so it lands over par at one star. That gap is
-    the whole lesson — and it is earned AFTER paying the "a prefix's two keys."""
-    result = _drive(_tape(_UNNAMED), monkeypatch)
+def test_the_macro_replays_the_bay_far_under_par(monkeypatch):
+    """THE REWARD: identical bays + registers that persist across playback."""
+    won, spent = _drive_spent(_tape(_MACRO), monkeypatch)
+    assert won and spent < _R2_PAR, (won, spent)
+
+
+def test_single_register_batching_wins_but_drops_a_star(monkeypatch):
+    """THE LAW, driven: the best one-register route still WINS, but it must walk
+    the vault twice and re-land every tail, so it lands over par at one star."""
+    result = _drive(_tape(_BATCH), monkeypatch)
     assert result['won'] and result['stars'] == 1, result
 
 
-def test_named_route_is_strictly_cheaper_than_the_unnamed_one(monkeypatch):
+def test_named_route_is_strictly_cheaper_than_the_batching_one(monkeypatch):
     _w1, named = _drive_spent(_tape(_NAMED), monkeypatch)
-    _w2, unnamed = _drive_spent(_tape(_UNNAMED), monkeypatch)
-    assert named < unnamed, (named, unnamed)
+    _w2, batch = _drive_spent(_tape(_BATCH), monkeypatch)
+    assert named < batch, (named, batch)
 
 
 def test_register_prefix_is_charged_its_two_keys():
     # "a is two real keypresses on top of the operation — a named register buys
-    # persistence, not free typing.
+    # capacity, not free typing. The lesson has to survive paying for it.
     assert main._register_prefix_cost({'register': 'a'}) == 2
     assert main._register_prefix_cost({}) == 0
     plain = {'type': 'operator', 'op': 'y', 'motion': 'e'}
@@ -121,40 +139,57 @@ def test_register_prefix_is_charged_its_two_keys():
     assert main._operator_cost(named) == main._operator_cost(plain) + 2
 
 
-# ── layout ───────────────────────────────────────────────────────────────────
+# ── the shape of the forcing ─────────────────────────────────────────────────
+def test_the_black_hole_cannot_help_because_nothing_is_ever_cut():
+    """The first cut of this level forced "a by THREAT (a daw clobbered ""), and
+    `"_daw` beat par by protecting "" for 2 keys. Capacity forcing has no such
+    hole: there is no delete anywhere in the par route to redirect."""
+    assert 'd' not in _build(0).room.answer.replace('godliness', '')
+
+
+def test_every_bay_wants_both_quarry_words():
+    room = _build(0).room
+    head = ' '.join(_R2_HEAD)
+    for g in _R2_GAP_ROWS:
+        assert main._wla_floor_text(room, g).strip() == head
+    for w in _R2_QUARRY_WORDS:                 # neither word is already present
+        assert w not in head
+    assert room._r2_gap_target == ' '.join(_R2_SAYING)
+
+
+def test_quarry_words_sit_on_separate_rows():
+    # So no single charwise yank can take both (a linewise 2yy pastes whole
+    # lines, which fills no bay).
+    assert len(set(_R2_QUARRY_ROWS)) == len(_R2_QUARRY_WORDS) == 2
+
+
 @pytest.mark.parametrize('seed', SEEDS)
 def test_layout_and_budget(seed):
     room = _build(seed).room
     assert room.par == _R2_PAR
     assert room.budget == math.ceil(_R2_PAR * 1.4)      # STANDARD
-    assert main._wla_floor_text(room, _R2_ROW_QUARRY).strip() == _R2_QUARRY_WORD
-    for g in _R2_GAP_ROWS:                               # every gap starts unfilled
-        assert main._wla_floor_text(room, g).strip() == 'cleanliness is next to'
-    for d in _R2_DAW_ROWS:                               # every cutting bay is corrupt
-        assert main._wla_floor_text(room, d).strip() == 'look before you quill leap'
+    for qrow, word in zip(_R2_QUARRY_ROWS, _R2_QUARRY_WORDS):
+        assert main._wla_floor_text(room, qrow).strip() == word
 
 
-def test_gates_and_seal_start_shut():
+def test_the_vault_is_open_from_the_spawn():
+    """No gates and no fog: the bays are identical AND visible, which is what
+    makes the rhythm legible as a macro."""
+    room = _build(0).room
+    assert not getattr(room, 'fog', None)
+    for r in (*_R2_QUARRY_ROWS, *_R2_GAP_ROWS):
+        assert room.cells[r][_R2_SPINE] != CellType.WALL
+
+
+def test_only_the_seal_starts_shut():
     room = _build(0).room
     er, ec = room.exit_pos
     assert room.cells[er][ec] == CellType.WALL
-    for gr in _R2_GATE_ROWS:
-        assert room.cells[gr][_R2_SPINE] == CellType.WALL
-
-
-def test_every_gate_forces_a_cut_between_two_pastes():
-    # Structural proof of the lesson: each gate sits BETWEEN two gap bays, with a
-    # cutting bay above it — so no route can fill all four gaps without cutting
-    # (and clobbering "") in between.
-    for gate, daw in zip(_R2_GATE_ROWS, _R2_DAW_ROWS):
-        assert daw < gate                                   # the cut is above its gate
-        assert any(g < gate for g in _R2_GAP_ROWS)          # a gap before it
-        assert any(g > gate for g in _R2_GAP_ROWS)          # and a gap behind it
 
 
 def test_spine_is_every_rows_first_standable():
     room = _build(0).room
-    for r in (_R2_ROW_QUARRY, *_R2_GAP_ROWS, *_R2_DAW_ROWS, _R2_GATE):
+    for r in (*_R2_QUARRY_ROWS, *_R2_GAP_ROWS, _R2_GATE):
         first = next((c for c in range(room.cols)
                       if room.cells[r][c] != CellType.WALL), None)
         assert first == _R2_SPINE, (r, first)

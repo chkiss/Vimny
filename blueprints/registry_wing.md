@@ -134,24 +134,44 @@ are famous sayings.
 this level, so the bug was latent; patched to return 2, letting this answer stay
 tokeniser-validated (no `_ANSWER_NOT_TOKENISED` / `_NONSTANDARD_BUDGET` exemption).
 
-### II — The Named Vault (`"a`) — SHIPPED 2026-07-24 (reordered ahead of the ring)
+### II — The Named Vault (`"a`/`"b`) — SHIPPED 2026-07-25 (rebuilt same day)
 `build_dungeon_register_named_vault` + `tests/test_register_named_vault.py`.
-The direct answer to Register I's clobber, so it now sits at II (the delete ring
-moves later). ONE quarry word must be laid into **four** gap bays; a cutting bay
-sits above a spine gate before each later gap, so every route MUST cut (clobbering
-`""`) between pastes. `"a` survives every cut → the quarry is visited once; the
-unnamed player climbs back and re-yanks three times. par **59** (named, driven,
-seed-invariant); the unnamed re-yank rival costs **64** → 1★ inside the standard
-`ceil(59*1.4)=83` budget.
+Two quarry words on **separate rows** (`saves`, `nine`); **four identical bays**
+each reading `a stitch in time` and wanting both. Yank once into `"a` and `"b`
+and the vault is nothing but pastes. par **57** (named, driven, seed-invariant),
+standard `ceil(57*1.4)=80` budget; the best single-register route (batching — lay
+one word in every bay, re-yank, lay the other) costs **62** → 1★. Fully open: no
+gates, no fog, so the bays read as a *rhythm* — a macro replays one bay and lands
+at **27**. That is the reward, not the requirement; par is the plain named route.
 
-**Why four gaps, not one (load-bearing):** the `"{reg}` prefix is charged its two
-real keystrokes (user law 2026-07-24 — see below), so a named register costs +4 per
-word (yank prefix + paste prefix). With a single reuse the prefix overhead *exceeds*
-the one re-yank it saves and named LOSES (measured 29 vs 27). The advantage only
-compounds with repeated reuse: each extra gap costs named +2 but the unnamed player
-a whole re-yank detour (~+5). Four gaps put the margin at a safe 5 keys. **Any
-future named-register level must re-check this arithmetic** — named registers are
-not automatically cheaper in this cost model.
+#### FORCE BY CAPACITY, NOT BY SURVIVAL (the law this level was rebuilt to obey)
+The first cut forced `"a` by **threat**: a `daw` clobbered `""`, so you had to
+hide the word somewhere safe. That is not forcing — it is a *protection* puzzle,
+and **any protection tool solves a protection puzzle**. `"_daw` sends the cut to
+the black hole, leaves `""` untouched, and came in at **55 against par 59** — it
+BEAT par. Worse, the player who found it had learned something true about Vim and
+was being punished for it. Pricing `"_` higher would have been a thumb on the
+scale hiding a design error.
+
+The unnamed register holds exactly **one thing**, no matter how well you protect
+it. So force on capacity: every bay wants two different words, `"_` becomes
+irrelevant (nothing is ever cut), and no protection trick substitutes.
+
+**Guard against batching.** Two holes at the same tail are *order-free across
+lines*, so a one-register player can lay word A in all four bays, re-yank, then
+lay word B — only two yanks, not four. Here that still loses, because the second
+pass must walk the room again AND `fe` no longer lands on the tail (the first
+paste moved it), costing an extra motion per bay. Margin 5. **Check this on any
+future multi-clip level** — put the quarry words on separate rows too, or a single
+charwise yank takes both and no register is needed at all.
+
+**The deeper limit (read before the next named-register level).** With the prefix
+charged, a named register costs +2 per paste while a one-register rival pays only
+extra *travel* — and travel is cheap because counts are cheap (`8k` = 2 keys). So
+for **additive** puzzles named registers barely win, and the margin grows only ~1
+per bay. The shape where named registers win decisively is **exchange** (swap two
+words: the source is destroyed by the edit, so you must hold both at once and no
+re-yank exists). Reach for that shape if a future level needs a wide margin.
 
 ### THE REGISTER-PREFIX CHARGE (engine law, user 2026-07-24)
 `"{reg}` is two real keypresses, so `main._register_prefix_cost(action)` adds 2 to

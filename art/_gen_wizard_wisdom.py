@@ -447,10 +447,10 @@ POEMS: list[tuple[str | None, str, list[str]]] = [
         'and cutting takes. Paste before you cut.',
     ]),
     ('register_named_vault', 'the named vault', [  # The Register II — "a (bonus)
-        'One hold is soon overwritten; name a second.',
-        '"ay fills the vault that bears the name a;',
-        '"ap pours from it, and pours again after —',
-        'no blade between can empty what is named.',
+        'One hand holds one thing; the vault holds many.',
+        '"ay lays a word in the door marked a,',
+        '"by in the door marked b — and both keep,',
+        'so you walk the long room once, not twice.',
     ]),
     ('warden_eternal', 'warden eternal', [     # The Warden Eternal (final boss)
         'The last Warden is every Warden.',

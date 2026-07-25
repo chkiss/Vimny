@@ -1782,30 +1782,18 @@ def _register_unnamed_hold_tick(room, player) -> list:
 
 
 def _register_named_vault_tick(room, player) -> list:
-    """The Register II gate + seal.  The spine gate opens once the daw bay reads
-    true; the exit seal parts once BOTH gap bays AND the daw bay read true.
-    Stateless + undo-aware; neither closes under the player's own feet."""
-    row_texts = [_wla_floor_text(room, r).strip() for r in range(room.rows)]
-    n_gaps = len(room._r2_gaps)
-    gaps_ok = row_texts.count(room._r2_gap_target) >= n_gaps   # EVERY gap bay filled
+    """The Register II seal.  There are no gates — the vault is open from the
+    spawn — so the ONLY door is the exit seal, and it parts once every bay reads
+    its saying whole.  Stateless + undo-aware; it never shuts under the player's
+    own feet."""
     msgs = []
-    # Each spine gate opens while the daw bay above it reads its true saying.
-    daws_ok = []
-    for (gr, gc), drow in zip(room._r2_gate_cells, room._r2_daw_rows):
-        ok_d = _wla_floor_text(room, drow).strip() == room._r2_daw_target
-        daws_ok.append(ok_d)
-        gate_open = room.cells[gr][gc] != CellType.WALL
-        if ok_d and not gate_open:
-            room.cells[gr][gc] = CellType.FLOOR
-            msgs.append('The stray word falls away — the passage opens.')
-        elif not ok_d and gate_open and (player.row, player.col) != (gr, gc):
-            room.cells[gr][gc] = CellType.WALL
+    ok = all(_wla_floor_text(room, r).strip() == room._r2_gap_target
+             for r in room._r2_gaps)
     er, ec = room.exit_pos
     seal_open = room.cells[er][ec] != CellType.WALL
-    ok = all(daws_ok) and gaps_ok
     if ok and not seal_open:
         room.cells[er][ec] = CellType.FLOOR
-        msgs.append('Both sayings read true — the seal parts.')
+        msgs.append('Every saying reads true — the seal parts.')
     elif not ok and seal_open and (player.row, player.col) != (er, ec):
         room.cells[er][ec] = CellType.WALL
     return msgs
@@ -3031,7 +3019,7 @@ _LEVEL_INTROS = {
     'wet_ink': ('The Wet Ink — a writing ledge, an old saying mostly lost in the dark, and a gallery of cold braziers beneath it. Write its opening and you will know the rest. The scribes here wrote by firelight, and the fire answers only words already written.', 70),
     'g_sanctum': ('The Last Reach — three old sayings run east toward the flood. The keepers of this place went to the end of the line many times a day, and never once over it.', 70),
     'register_unnamed_hold': ('The Register I — the horse waits at the mouth, and his saddle bears whatever you last took up. What it holds, it holds only until your hand closes on the next thing; and a blade closes a hand as surely as a grasp.', 70),
-    'register_named_vault': ('The Register II — the road ahead asks the same word set down twice, with a blade to swing between. What you carry plainly, that blade will spill; but a thing you have NAMED rides in a vault of its own, and rides it still when the blade has fallen.', 70),
+    'register_named_vault': ('The Register II — the vault stands open, every alcove worn to the same shape, every one of them ending short. An open hand carries one thing. A vault has many doors, and a door remembers only what you have troubled to name.', 70),
     'stair_rail': ('The Stair Rail — a broken stair winds down the shaft, each step\'s word set a little east of the last, and below the steps the floor falls a long way. The masons who cut these stairs never missed a landing.', 70),
     'hall_of_echoes': ('The Hall of Echoes — hall opens onto hall, and every hall repeats itself. The stone remembers.', 70),
     'grandmasters_sanctum': ('The Grandmaster\'s Sanctum — a long gallery of seven proofs, and the master himself beyond the last stone, listening to every stroke. Nothing here is new; everything here is asked properly.', 70),

@@ -3921,39 +3921,47 @@ def build_dungeon_register_unnamed_hold(seed: int) -> Dungeon:
     return dungeon
 
 
-# ── The Register II — The Named Vault (the "a register) ───────────────────────
-# The answer to Register I's clobber. The SAME chassis (quarry word, a daw
-# intruder, a gap to fill), but now the word must be laid TWICE, with the cut
-# forced BETWEEN the two pastes by a spine gate:
+# ── The Register II — The Named Vault (the "a / "b registers) ─────────────────
+# FORCED BY CAPACITY, NOT BY SURVIVAL.  The first cut of this level forced the
+# named register by THREAT: a daw clobbered "", so you had to hide the word
+# somewhere safe.  That is not forcing at all — it is a protection puzzle, and
+# any protection tool solves it.  `"_daw` sends the cut to the black hole,
+# leaves "" untouched, and came in UNDER par.  Worse, the player who found it
+# had learned something TRUE about Vim and was being punished for it.
 #
-#   spawn ─ QUARRY (row 3: "godliness") ─ GAP1 (row 5) ─ DAW (row 7: the intruder,
-#   whose cut opens the gate) ─╫─ (spine gate, row 8) ─ GAP2 (row 9) ─ exit
+# So the forcing property here is capacity.  The unnamed register holds exactly
+# ONE thing, no matter how carefully you protect it — and every gap bay in this
+# vault wants TWO different words:
 #
-# GAP2 lies behind the gate, so you MUST daw to reach it — and that daw clobbers
-# "". With the unnamed register you yank, paste GAP1, daw (clobber), and now ""
-# holds the junk: you must climb back to the quarry and RE-YANK before GAP2. With
-# a NAMED register the word rides in "a untouched by the cut: yank ONCE into "a,
-# then "ap into both gaps (the "a prefix is free). One yank vs two — the named
-# register is strictly the shorter road. Register prefixes cost 0 budget, so the
-# whole saving is the re-yank the unnamed player is forced to pay.
-_R2_ROWS, _R2_COLS = 21, 46
+#   spawn ─ QUARRY A (row 3: "saves") ─ QUARRY B (row 4: "nine")
+#         ─ GAP (row 6) ─ GAP (row 8) ─ GAP (row 10) ─ GAP (row 12) ─ exit
+#
+#   each gap reads  "a stitch in time"  and wants  "a stitch in time saves nine"
+#
+# Yank " saves" into "a and " nine" into "b ONCE, then every bay is two pastes.
+# A single-register route must re-yank the other word on EVERY bay — and "_
+# buys nothing, because nothing is ever cut here.  The two quarry words sit on
+# SEPARATE rows so no one charwise yank can take both (a linewise 2yy pastes
+# whole lines, which fills nothing).
+#
+# The room is FULLY OPEN from the spawn: no gates, no fog.  The four bays are
+# identical on purpose, so the A/B rhythm is visible as a rhythm — record the
+# bay once and replay it.  The macro lands far under par; that is the reward,
+# not the requirement.  Par is the plain named route, so what par forces is the
+# register lesson.
+_R2_ROWS, _R2_COLS = 16, 46
 _R2_SPINE = 2
 _R2_BAY_W, _R2_BAY_E = 3, 42
-_R2_ROW_QUARRY = 3                    # the ONE source of the word
-_R2_GAP_ROWS   = (5, 9, 13, 17)       # FOUR gaps, all wanting that word
-_R2_DAW_ROWS   = (7, 11, 15)          # a cutting bay before each later gap
-_R2_GATE_ROWS  = (8, 12, 16)          # spine gates, each opened by the daw above it
-_R2_GATE       = 19                   # the exit/seal row
-_R2_EXIT       = (19, 3)
-_R2_SPAWN      = (2, 2)
-_R2_TEXTCOL    = 3
-_R2_QUARRY_WORD = 'godliness'
-_R2_GAP_HEAD    = ('cleanliness', 'is', 'next', 'to')   # + 'godliness', every gap
-_R2_DAW_PREFIX  = ('look', 'before', 'you')
-_R2_DAW_JUNK    = 'quill'
-_R2_DAW_SUFFIX  = ('leap',)
-_R2_PAR = 59                          # the named optimal (driven below); test-pinned
-                                      # (the unnamed re-yank rival costs 64 → 1★)
+_R2_QUARRY_ROWS = (3, 4)              # one word each — never both in one yank
+_R2_GAP_ROWS    = (6, 8, 10, 12)      # FOUR bays, each wanting BOTH words
+_R2_GATE        = 14                  # the exit/seal row
+_R2_EXIT        = (14, 3)
+_R2_SPAWN       = (2, 2)
+_R2_TEXTCOL     = 3
+_R2_SAYING      = ('a', 'stitch', 'in', 'time', 'saves', 'nine')
+_R2_HEAD        = _R2_SAYING[:4]      # what every bay reads at the start
+_R2_QUARRY_WORDS = _R2_SAYING[4:]     # ('saves', 'nine') — the tail, quarried
+_R2_PAR = 57                          # the named optimal (driven); test-pinned
 
 
 def build_dungeon_register_named_vault(seed: int) -> Dungeon:
@@ -3963,11 +3971,9 @@ def build_dungeon_register_named_vault(seed: int) -> Dungeon:
     cells = [[CellType.WALL] * C for _ in range(R)]
     for r in range(2, _R2_GATE + 1):                     # the spine
         cells[r][_R2_SPINE] = CellType.FLOOR
-    for r in (_R2_ROW_QUARRY, *_R2_GAP_ROWS, *_R2_DAW_ROWS):
+    for r in (*_R2_QUARRY_ROWS, *_R2_GAP_ROWS):          # every bay, fully open
         for c in range(_R2_BAY_W, _R2_BAY_E + 1):
             cells[r][c] = CellType.FLOOR
-    for gr in _R2_GATE_ROWS:                             # THE SPINE GATES
-        cells[gr][_R2_SPINE] = CellType.WALL
 
     room = Room(room_type=RoomType.ENTRY, rows=R, cols=C)
     room.cells = cells
@@ -3978,27 +3984,13 @@ def build_dungeon_register_named_vault(seed: int) -> Dungeon:
             room.char_runs.append(CharRun(r, col, tuple(w), 'ancient'))
             col += len(w) + 1
 
-    lay(_R2_ROW_QUARRY, _R2_TEXTCOL, (_R2_QUARRY_WORD,))
-    gap_target = text_of(_R2_GAP_HEAD + (_R2_QUARRY_WORD,))
-    gaps = []
+    for qrow, word in zip(_R2_QUARRY_ROWS, _R2_QUARRY_WORDS):
+        lay(qrow, _R2_TEXTCOL, (word,))
     for grow in _R2_GAP_ROWS:
-        col = _R2_TEXTCOL
-        lay(grow, col, _R2_GAP_HEAD)
-        for w in _R2_GAP_HEAD:
-            col += len(w) + 1
-        gaps.append((grow, col))
-    for drow in _R2_DAW_ROWS:
-        lay(drow, _R2_TEXTCOL, _R2_DAW_PREFIX)
-        jcol = _R2_TEXTCOL + len(' '.join(_R2_DAW_PREFIX)) + 1
-        lay(drow, jcol, (_R2_DAW_JUNK,))
-        lay(drow, jcol + len(_R2_DAW_JUNK) + 1, _R2_DAW_SUFFIX)
-    daw_target = text_of(_R2_DAW_PREFIX + _R2_DAW_SUFFIX)
+        lay(grow, _R2_TEXTCOL, _R2_HEAD)
 
-    room._r2_daw_target = daw_target
-    room._r2_gap_target = gap_target
-    room._r2_daw_rows   = _R2_DAW_ROWS
-    room._r2_gate_cells = tuple((gr, _R2_SPINE) for gr in _R2_GATE_ROWS)
-    room._r2_gaps       = tuple(gaps)
+    room._r2_gap_target = text_of(_R2_SAYING)
+    room._r2_gaps       = _R2_GAP_ROWS
 
     room.entities.append(Entity(kind='exit', row=_R2_EXIT[0], col=_R2_EXIT[1],
                                 edit_immune=True))
@@ -4008,13 +4000,14 @@ def build_dungeon_register_named_vault(seed: int) -> Dungeon:
     room.rebuild_indexes()
     room.par    = _R2_PAR
     room.budget = math.ceil(_R2_PAR * 1.4)
-    # Named optimal: yank ONCE into "a, then paste all THREE gaps from it, cutting
-    # a gate open between each. "a survives every cut, so the quarry is visited
-    # once; the unnamed player must climb back and re-yank before gaps 2 and 3.
-    room.answer = ('j "aye 2j fo "ap 0 2j fq dw 0 2j fo "ap '
-                   '0 2j fq dw 0 2j fo "ap 0 2j fq dw 0 2j fo "ap G l')
-
-    apply_stone_fog(room)                 # GAP2 sleeps behind the shut gate
+    # Named optimal: quarry both words ONCE (the leading blank spine cell rides
+    # into each yank, so every paste carries its own separating space), then each
+    # bay is `fe` to the tail of "time" and two pastes. Both clips stay alive the
+    # whole way down — that is the entire lesson, and the four identical bays are
+    # the macro the player is invited to notice.
+    room.answer = ('j "aye j "bye 2j fe "ap "bp 0 2j fe "ap "bp '
+                   '0 2j fe "ap "bp 0 2j fe "ap "bp 0 2j l')
+    # NO fog and NO gates: the room is open from the spawn so the rhythm shows.
 
     dungeon = Dungeon(name='The Register II', seed=seed)
     dungeon.rooms        = [room]
