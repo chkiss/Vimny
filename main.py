@@ -224,6 +224,36 @@ def _sight_radius(ent) -> int:
 _ATTACK_RADIUS          = 1   # Manhattan dist at which goblins attack each turn
 _WARDEN_SUMMON_INTERVAL = 6   # turns between warden summons
 _MSG_ROTATE_TTL         = 20  # ticks per combat message (~2 s) — multi-message (1/3…) cycles at this pace
+_INTRO_ROTATE_TTL       = 60  # ticks per intro part (~6 s) — prose needs longer on the bar than a combat line
+
+
+def _wrap_message(text: str, width: int) -> list[str]:
+    """Word-wrap a banner into parts that each fit the message bar.
+
+    The pool's own `(x/n)` prefix has to fit alongside the text, and how wide
+    that prefix is depends on how many parts there are — so grow the reservation
+    until the part count stops changing. Returns a single part when it already
+    fits, so short banners never gain a counter.
+    """
+    words = text.split()
+    if not words:
+        return []
+    reserve = 0
+    while True:
+        avail = max(16, width - reserve)
+        parts, cur = [], ''
+        for w in words:
+            if cur and len(cur) + 1 + len(w) > avail:
+                parts.append(cur)
+                cur = w
+            else:
+                cur = f'{cur} {w}' if cur else w
+        if cur:
+            parts.append(cur)
+        need = len(f'({len(parts)}/{len(parts)}) ') if len(parts) > 1 else 0
+        if need <= reserve:
+            return parts
+        reserve = need
 
 _SCROLL_TEXT_OPERATOR_CODEX = """\
 The Operator's Codex
@@ -4056,6 +4086,7 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
     seal_door_row: int = -1
     msg_pool: list = []            # combat messages for this turn (rotation buffer)
     msg_idx:  int  = 0             # current rotation index into msg_pool
+    pool_ttl: int  = _MSG_ROTATE_TTL   # dwell per pool part; intros slow it to reading pace
     attack_flash_sym: str   = ''      # directional arrow; '' = no flash active
     attack_flash_pos: tuple = (0, 0)  # goblin cell to flash on
     attack_flash_on:  bool  = True    # True → show arrow, False → show normal g
@@ -4240,8 +4271,10 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
         return (f'({msg_idx+1}/{n}) ' if n > 1 else '') + msg_pool[msg_idx]
 
     def _push(text: str) -> None:
+        nonlocal pool_ttl
         if text not in msg_pool:
             msg_pool.append(text)
+            pool_ttl = _MSG_ROTATE_TTL   # live events pace faster than an intro
 
     def _content_ticks() -> None:
         nonlocal room                 # the Sanctum's gate swaps the live room
@@ -4859,6 +4892,14 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
 
     if level in _LEVEL_INTROS:
         message, msg_ttl = _LEVEL_INTROS[level]
+        # Intros are prose and routinely outrun the bar, which would clip them to
+        # an ellipsis. Wrap to the live terminal width and hand the parts to the
+        # rotation pool, which numbers them (1/3…) and cycles at reading pace.
+        _intro_parts = _wrap_message(message, _iw(term))
+        if len(_intro_parts) > 1:
+            msg_pool.extend(_intro_parts)
+            pool_ttl = _INTRO_ROTATE_TTL
+            message  = _pool_msg()
     # Return to the First Cave wearing the Warden's hat, and the stone knows you.
     if level == 'first_cave' and getattr(player, 'has_hat', False):
         message = "You've walked these stones before, haven't you? Welcome back, master."
@@ -4971,7 +5012,7 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
                 if msg_pool:
                     msg_idx = (msg_idx + 1) % len(msg_pool)
                     message = _pool_msg()
-                    msg_ttl = _MSG_ROTATE_TTL
+                    msg_ttl = pool_ttl
                 else:
                     message = ''
 
