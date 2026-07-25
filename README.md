@@ -29,14 +29,24 @@ A TUI dungeon crawler that teaches Vim through play. The dungeons are text buffe
   grows with the window up to **189 columns** (the overworld and The Archivist's
   Library use the extra width); beyond that it stops widening.
 
-```bash
-pip install blessed
-```
+Linux and macOS are the supported platforms. Windows is untested — the game no
+longer *refuses* to start there, but `blessed`'s Windows support is partial and
+the terminal handling has not been verified.
 
 ## Running
 
+From a checkout:
+
 ```bash
+pip install blessed
 python main.py
+```
+
+Or install it:
+
+```bash
+pip install .
+vimny
 ```
 
 Player progress is saved automatically to `~/.Vimny/saves/<player>.json` (one file per player).

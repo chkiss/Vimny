@@ -10388,11 +10388,11 @@ def build_dungeon_inscription_halls(seed: int) -> Dungeon:
 #    scans that read each label. (Earlier, before the push was segment-bounded,
 #    an east plaque on wall cells got erased on the first keystroke; that hazard
 #    is gone, but west-wall placement remains the simplest safe home.)
-#  - NOTHING THE PLAYER TYPES MAY CONTAIN A SPACE. The admin "karaoke" answer
-#    sheet matches keystrokes against room.answer with spaces stripped as
-#    separators, so a typed space is unrepresentable. Hence line doors are a
-#    SINGLE wrong word (not a phrase), and `room.answer` is the real keystroke
-#    string (see _wla_route / _wla_answer below).
+#  - LINE DOORS ARE A SINGLE WORD, and `room.answer` is the real keystroke
+#    string (see _wla_route / _wla_answer below). The karaoke sheet strips plain
+#    spaces from room.answer as display separators, so a typed space must be
+#    written `␣` (and a typed Enter `⏎`). One word per door is this level's
+#    choice, not a global limit — multi-word typed text is representable.
 #  - THE EXIT IS PLAIN FLOOR, NOT A GATED WALL. The bolts stand in a row WEST of
 #    the exit on the gate row; the spine cell west of them is the row's first
 #    standable cell. So every vertical jump (G / L / {n}G / H / M) lands on the

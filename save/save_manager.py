@@ -16,14 +16,23 @@
 #
 # SPDX-License-Identifier: GPL-3.0-or-later
 
-import json, os, pwd, re, time
+import json, os, re, time
 from pathlib import Path
 from typing import Optional
 
+try:                                  # POSIX only; absent on Windows
+    import pwd
+except ImportError:                   # pragma: no cover - platform-dependent
+    pwd = None
+
+
 def _home() -> Path:
+    # Under sudo/doas, Path.home() is root's — resolve the invoking user's home
+    # instead so saves don't land in /root. Windows has neither pwd nor sudo,
+    # so the lookup is skipped and Path.home() is already correct there.
     for var in ('SUDO_USER', 'DOAS_USER'):
         user = os.environ.get(var)
-        if user and user != 'root':
+        if user and user != 'root' and pwd is not None:
             return Path(pwd.getpwnam(user).pw_dir)
     home = Path.home()
     if home == Path('/root'):
@@ -53,7 +62,7 @@ def _path(player_name: str) -> Path:
 
 def save_for(player_name: str, data: dict) -> None:
     SAVES_DIR.mkdir(parents=True, exist_ok=True)
-    with open(_path(player_name), 'w') as f:
+    with open(_path(player_name), 'w', encoding='utf-8') as f:
         json.dump(data, f, indent=2)
 
 
@@ -61,7 +70,7 @@ def load_for(player_name: str) -> Optional[dict]:
     p = _path(player_name)
     if not p.exists():
         return None
-    with open(p) as f:
+    with open(p, encoding='utf-8') as f:
         return json.load(f)
 
 
@@ -85,7 +94,7 @@ def list_saves() -> list[dict]:
     loaded: list[tuple[float, dict]] = []
     for p in SAVES_DIR.glob('*.json'):
         try:
-            with open(p) as f:
+            with open(p, encoding='utf-8') as f:
                 data = json.load(f)
         except (json.JSONDecodeError, OSError):
             continue
@@ -168,7 +177,7 @@ def list_layouts() -> list[dict]:
     result = []
     for p in LAYOUTS_DIR.glob('*.json'):
         try:
-            with open(p) as f:
+            with open(p, encoding='utf-8') as f:
                 result.append(json.load(f))
         except (json.JSONDecodeError, OSError):
             pass
@@ -181,7 +190,7 @@ def save_layout(name: str, data: dict) -> Path:
     LAYOUTS_DIR.mkdir(parents=True, exist_ok=True)
     path = LAYOUTS_DIR / f'{_slug(name)}.json'
     payload = {'layout_name': name, **data}
-    with open(path, 'w') as f:
+    with open(path, 'w', encoding='utf-8') as f:
         json.dump(payload, f, indent=2)
     return path
 
@@ -201,11 +210,11 @@ def rename_layout(old_name: str, new_name: str) -> bool:
     src = LAYOUTS_DIR / f'{_slug(old_name)}.json'
     if not new_name or not src.exists():
         return False
-    with open(src) as f:
+    with open(src, encoding='utf-8') as f:
         data = json.load(f)
     data['layout_name'] = new_name
     dst = LAYOUTS_DIR / f'{_slug(new_name)}.json'
-    with open(dst, 'w') as f:
+    with open(dst, 'w', encoding='utf-8') as f:
         json.dump(data, f, indent=2)
     if dst != src:
         src.unlink()
@@ -218,6 +227,6 @@ def save_scroll_text(title: str, text: str) -> Path:
     """Write full unsmudged scroll text to ~/.Vimny/scrolls/<slug>.txt."""
     SCROLLS_DIR.mkdir(parents=True, exist_ok=True)
     path = SCROLLS_DIR / f'{_slug(title)}.txt'
-    with open(path, 'w') as f:
+    with open(path, 'w', encoding='utf-8') as f:
         f.write(text)
     return path

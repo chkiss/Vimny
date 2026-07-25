@@ -35,7 +35,7 @@ def _parse(path: pathlib.Path) -> dict[str, tuple[str, str]]:
     cmd: dict[str, tuple[str, str]] = {}
     sep = re.compile(r'^\|[-| ]+\|')
     row = re.compile(r'^\|([^|]+)\|([^|]*)\|([^|]+)\|')
-    with open(path) as f:
+    with open(path, encoding='utf-8') as f:
         for line in f:
             line = line.rstrip()
             if not line.startswith('|') or sep.match(line):

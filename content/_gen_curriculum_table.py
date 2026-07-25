@@ -68,7 +68,7 @@ def _readme_commands_table() -> str:
     sep    = re.compile(r'^\|[-| ]+\|')
     rowpat = re.compile(r'^\|([^|]+)\|([^|]*)\|([^|]+)\|')
     rows   = []
-    for line in _VIM_CMDS.read_text().splitlines():
+    for line in _VIM_CMDS.read_text(encoding='utf-8').splitlines():
         if not line.startswith('|') or sep.match(line):
             continue
         m = rowpat.match(line)
@@ -83,7 +83,7 @@ def _readme_commands_table() -> str:
 
 def _splice(path: Path, name: str, block: str) -> None:
     begin, end = f'<!-- BEGIN GENERATED {name} -->', f'<!-- END GENERATED {name} -->'
-    text = path.read_text()
+    text = path.read_text(encoding='utf-8')
     pat  = re.compile(re.escape(begin) + r'.*?' + re.escape(end), re.DOTALL)
     if not pat.search(text):
         raise SystemExit(f'markers for {name!r} not found in {path.name}')

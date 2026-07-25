@@ -77,7 +77,7 @@ _TWINKLE_RGB = [
 def _parse_frames() -> dict[str, list[str]]:
     """Parse named art frames from wizard.txt into a name→lines dict."""
     try:
-        text = _ART_PATH.read_text()
+        text = _ART_PATH.read_text(encoding='utf-8')
     except FileNotFoundError:
         return {}
 

@@ -115,16 +115,6 @@ rather than be told it. The Culling Ledger's keep-lines all begin with the chain
 word "that" — the rhyme's own signature — so `:v/that/d` is read off the page, not
 decreed by a plaque.
 
-### NOTHING THE PLAYER TYPES MAY CONTAIN A SPACE
-
-The admin karaoke sheet matches keystrokes against `room.answer` with spaces
-stripped as separators, so **a typed space is unrepresentable**. This is a global
-authoring constraint, not a per-level quirk: it is why line doors are a single
-wrong word rather than a phrase, and it silently shapes every insert-mode puzzle
-in the game. If a lesson genuinely needs multi-word typed text, it cannot have a
-karaoke tape — set `room.answer = ''` (as the combat and arena rooms do) and pin
-par with a driven test instead.
-
 ### A PLAYABLE LINE MUST START WHERE ITS TEXT STARTS
 
 `S`, `o` and `O` drop their typed line at the **segment start**. So in any room
@@ -205,6 +195,7 @@ The per-level `_par_<slug>` solvers compute each dungeon's minimum-keystroke par
 - **Read-only property tests share builds via `tests.cached_room(builder_name, seed)`** (lru_cache in `tests/__init__.py`) — a dungeon is built once per (builder, seed) for the whole run. NEVER mutate a cached room; a test that simulates play calls its builder directly for a private copy.
 - The budget formula (`budget == ceil(par × 1.4)`) and answer cost are asserted ONCE, universally, in `tests/test_answer_paths.py` (auto-discovered over every `build_dungeon_*`); don't add per-level copies. Two documented opt-out sets live there: `_NONSTANDARD_BUDGET` (a level with a deliberately tight/non-1.4 budget — e.g. the Change Annex's S2 volume forcing, where the margin must sit BELOW the trigger count so the all-old route overshoots) and `_ANSWER_NOT_TOKENISED` (a level whose canonical answer isn't a space-separated token string — e.g. change/substitute routes whose typed phrases contain spaces). Both pin their specifics in the level's OWN test instead.
 - Command necessity: BFS with restricted command set; assert `cost > room.budget`.
+- **Answer-tape notation.** The admin karaoke sheet matches keystrokes against `room.answer` with plain spaces stripped as display separators, so a literal space cannot stand for itself: a space the player actually TYPES is written `␣`, and a typed Enter `⏎` (shipped examples: `gi␣{word}` in The Wet Ink, `:set␣nu⏎` in The Culling Ledger). `main.py` substitutes `␣` before matching; `tests/test_answer_paths.py` maps both back when driving a tape. Multi-word typed text is therefore representable. Rooms with no meaningful tape (combat, arenas) set `room.answer = ''` and pin par with a driven test instead.
 - File I/O tests: `monkeypatch.setattr('save.save_manager.SAVES_DIR', tmp_path)` to avoid touching `~/.Vimny`.
 - Motion/editor tests: build a minimal `Room` fixture with `rebuild_indexes()` rather than using a full dungeon.
 - Key files: `tests/test_counting_crypts.py` (template for level tests), `engine/motion.py` and `engine/editor.py` (source for motion/editor tests).

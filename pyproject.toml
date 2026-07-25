@@ -1,4 +1,41 @@
-# Project tooling config. (Vimny has no build step — this file holds tool settings only.)
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name            = "vimny"
+version         = "1.0.0"
+description     = "A TUI dungeon crawler that teaches Vim through play."
+readme          = "README.md"
+requires-python = ">=3.9"
+license         = { text = "GPL-3.0-or-later" }
+authors         = [{ name = "Chas Kissick" }]
+keywords        = ["vim", "game", "roguelike", "tui", "teaching"]
+dependencies    = ["blessed"]
+
+classifiers = [
+    "Development Status :: 5 - Production/Stable",
+    "Environment :: Console :: Curses",
+    "Intended Audience :: End Users/Desktop",
+    "License :: OSI Approved :: GNU General Public License v3 or later (GPLv3+)",
+    "Programming Language :: Python :: 3",
+    "Topic :: Games/Entertainment :: Puzzle Games",
+    "Topic :: Education",
+]
+
+[project.scripts]
+vimny = "main:main"
+
+[tool.setuptools]
+# Vimny runs from a checkout (`python main.py`); the package list is here so an
+# install is possible and `pip install .` does something sensible rather than
+# failing. `main` is a top-level module, not a package, hence py-modules.
+packages   = ["engine", "generation", "content", "render", "save", "art"]
+py-modules = ["main"]
+
+[tool.setuptools.package-data]
+render = ["*.md"]
+art    = ["*.txt"]
 
 [tool.vulture]
 # Dead-code detection.  Install once:  python -m pip install vulture

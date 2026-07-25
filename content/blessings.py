@@ -81,7 +81,7 @@ def _blessing_id(name: str, slug: str | None = None) -> str:
 
 def _load_poems() -> list[dict]:
     try:
-        text  = _WISDOM_PATH.read_text()
+        text  = _WISDOM_PATH.read_text(encoding='utf-8')
         start = text.index('{')
         end   = text.rindex('}') + 1
         return json.loads(text[start:end])['levels']
