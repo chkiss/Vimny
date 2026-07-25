@@ -84,7 +84,7 @@ _META: dict[str, tuple[str, str, str]] = {
     'hint_fg':              ('#5A5A5A', 'Hint bar',          'fg'),
     'border_fg':            ('#505064', 'Box borders',       'fg'),
     'wood_wall_damaged_fg': ('#A0692D', 'Wood wall damaged', 'fg'),
-    'sealed_wall_fg':       ('#4A5062', 'Sealed wall (gate)', 'fg'),
+    'sealed_wall_fg':       ('#1C1C23', 'Sealed wall (gate)', 'fg'),
     'dir_fg':               ('#64A0E6', 'Directory',         'fg'),
     'entry_fg':             ('#DCD7C8', 'Entry marker',      'fg'),
     'horse_fg':             ('#B2966E', "Horse (wizard's)",  'fg'),

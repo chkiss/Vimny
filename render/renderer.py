@@ -32,6 +32,27 @@ from render.utils import inner_w as _inner_w
 from render.hint_bar import hint_text as _hint_text
 
 
+def _seal_shown(room: Room, r: int, c: int) -> bool:
+    """True if a registered gate at (r,c) should show its band.
+
+    Fog never covers WALL cells — only open ones — so a gate is un-fogged from
+    the moment the level is built. Banding on that alone would draw every bolt
+    and seal in the dungeon through the dark, handing the player the layout.
+    A gate is DISCOVERED instead when some open cell beside it has been
+    revealed: that is exactly when a player could have seen the stonework.
+    """
+    if (r, c) not in room.sealed_cells:
+        return False
+    for dr, dc in ((-1, 0), (1, 0), (0, -1), (0, 1)):
+        nr, nc = r + dr, c + dc
+        if not (0 <= nr < room.rows and 0 <= nc < room.cols):
+            continue
+        if (room.cells[nr][nc] in (CellType.FLOOR, CellType.CORRIDOR, CellType.WATER)
+                and (nr, nc) not in room.fog_cells):
+            return True
+    return False
+
+
 def _is_vertical_door(room: Room, r: int, c: int, kind: str) -> bool:
     """Return True if the door at (r, c) is part of a vertical wall.
 
@@ -190,7 +211,7 @@ def _ent_cell_str(ent, room, r: int, c: int, mode, floor_bg: str) -> str:
         if room.cells[r][c] == CellType.WALL:
             # A registered gate still bands: the final seal is the one cell a
             # player most needs to find, and blanking it hides the level's goal.
-            if (r, c) in room.sealed_cells:
+            if _seal_shown(room, r, c):
                 return C.wall_bg() + C.sealed_wall_fg() + S.SEALED_WALL + rst
             return C.wall_bg() + ' ' + rst
         return floor_bg + C.exit_fg() + S.EXIT + rst
@@ -626,7 +647,7 @@ def render_all(term: Terminal, dungeon: Dungeon, player: Player,
             # permanent registry, so the test is on the CELL: the moment a tick
             # opens the gate it stops being WALL and the band is gone, and a
             # re-seal (several levels re-shut on undo) brings it back for free.
-            if (room_r, room_c) in room.sealed_cells:
+            if _seal_shown(room, room_r, room_c):
                 return (wall_bg + C.sealed_wall_fg()
                         + S.SEALED_WALL + C.normal_fg())
             return wall_bg + ' ' + C.normal_fg()

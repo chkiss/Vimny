@@ -4907,6 +4907,13 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
 
     if level == 'archivists_library':
         _lib_relayout()                          # fit the page frame to the real viewport
+    # Prime the content gates before the FIRST frame: the ticks are what register
+    # room.sealed_cells, so without this the bands only appear once the player has
+    # pressed a key. Their messages are discarded — nothing has happened yet, and
+    # the level's own intro owns the banner.
+    _pool_save, _msg_save, _ttl_save = msg_pool[:], message, msg_ttl
+    _content_ticks()
+    msg_pool[:], message, msg_ttl = _pool_save, _msg_save, _ttl_save
     _render(message)
 
     while True:
