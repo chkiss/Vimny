@@ -26,6 +26,7 @@ from engine.modes import Mode, MODE_LABELS
 from engine.visual import in_selection as _in_visual_sel
 from engine.search import match_cells as _match_cells, find_next as _find_next
 from engine.budget import Budget
+from engine import tape as _tape
 import render.colors as C
 import render.symbols as S
 from render.utils import inner_w as _inner_w
@@ -845,11 +846,29 @@ def render_all(term: Terminal, dungeon: Dungeon, player: Player,
 
         up_color  = C.answer_warn() if diverged else C.budget_ok()
         pad       = ' ' * max(0, up_w - len(win_text))
+
+        # Colour the upcoming stretch per character: green for keys the player
+        # PRESSES, white for text they TYPE. `Orow<Space>row…<Esc>` is a command
+        # wrapped around a line of a song, and reading it as one green blur is
+        # the thing that makes a long insert tape hard to follow.
+        # A diverged tape stays wholly orange — knowing the route is wrong
+        # matters more than knowing which part of it was prose.
+        lit = set() if diverged else {
+            i for a, b in _tape.literal_spans(ans) for i in range(a, b)}
+        runs, cur = [], None
+        for k, ch in enumerate(win_text):
+            if k < win_split:
+                col = C.answer_consumed()
+            else:
+                col = C.answer_literal() if (win_start + k) in lit else up_color
+            if col != cur:
+                runs.append(col)
+                cur = col
+            runs.append(ch)
         output.append(
             bfg + S.BOX_LT + rst +
-            C.budget_ok()       + prefix +
-            C.answer_consumed() + win_text[:win_split] +
-            up_color            + win_text[win_split:] + pad + rst +
+            C.budget_ok() + prefix +
+            ''.join(runs) + up_color + pad + rst +
             bfg + S.BOX_RT + rst)
     else:
         output.append(border_h(S.BOX_LT, S.BOX_RT))

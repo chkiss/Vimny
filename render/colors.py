@@ -112,6 +112,7 @@ def mode_command():  return _term.color_rgb(185, 185, 195)       # cool silver, 
 
 def answer_consumed(): return _term.color_rgb(60, 65, 75)        # near-invisible, spent hint
 def answer_warn():     return _term.color_rgb(215, 100, 10)      # orange, budget risk
+def answer_literal():  return _term.color_rgb(235, 238, 245)     # white: text TYPED, not a command
 
 def hint_fg():       return _term.color_rgb(85, 95, 115)         # blue-grey, ambient hint
 def border_fg():     return _term.color_rgb(45, 55, 80)          # dim terminal frame

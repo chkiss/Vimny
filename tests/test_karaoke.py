@@ -25,7 +25,7 @@ suite guards the two modes that were added later and had silently never worked:
   * COMMAND mode  — `:s` / `:g` ex-commands (the Spellwright's Forge)
   * SEARCH  mode  — `/pat` and `?pat` (Seekers' Labyrinth, the Waypoint Sanctum)
 
-The tape marks Enter with the glyph '⏎' and separates tokens with spaces (stripped for
+The tape marks Enter with the glyph '<CR>' and separates tokens with spaces (stripped for
 matching); _replay translates that to the raw keystrokes an admin would press.
 """
 import pytest
@@ -33,7 +33,10 @@ from blessed import Terminal
 from blessed.keyboard import Keystroke
 
 import main
+from engine.tape import to_keys
 import generation.dungeon_gen as dg
+import generation.dungeon_gen as dg
+from engine.tape import literal_spans, ESC, ENTER, CTRL_V, SPACE
 
 
 @pytest.fixture(autouse=True)
@@ -49,8 +52,8 @@ def _no_anim(monkeypatch):
 
 
 def _replay(tape):
-    """Karaoke tape → raw keystrokes: ⏎ → Enter, drop the visual space separators."""
-    return [Keystroke('\r' if c == '⏎' else c) for c in tape if c != ' ']
+    """Karaoke tape → raw keystrokes, via the one shared translator (engine/tape.py)."""
+    return to_keys(tape)
 
 
 def _drive_admin(slug, dungeon):
@@ -66,8 +69,8 @@ def _drive_admin(slug, dungeon):
 
 @pytest.mark.parametrize("slug", [
     'spellwrights_forge',   # COMMAND mode — :%s/.../g, :s/.../, :g/cursed/d
-    'seekers_labyrinth',    # SEARCH forward — /vault⏎
-    'waypoint_sanctum',     # SEARCH backward — ?xyzzy⏎
+    'seekers_labyrinth',    # SEARCH forward — /vault<CR>
+    'waypoint_sanctum',     # SEARCH backward — ?xyzzy<CR>
     'operators_vault',      # NORMAL operators + relic-chest scrolls (stubbed above)
     'cipher_cell',          # NORMAL r / D — a plain control
 ])
@@ -92,3 +95,85 @@ def test_non_admin_player_never_tracks_or_sees_the_tape():
     main.render_all = lambda *a, **k: None
     main.run_dungeon(term, 'spellwrights_forge', {}, player_name='Normand', _dungeon=d)
     assert d.room.answer == '' and d.room.answer_pos == 0
+
+
+# ── Which part of the sheet is TEXT, not keys ─────────────────────────────────
+
+def test_literal_spans_split_the_verb_from_the_words():
+    """`O` is a command, `row row your boat` is a song. The sheet colours the
+    two differently, so the split has to be exact."""
+    tape = 'Orow<Space>row<Space>your<Space>boat<Esc> j Idown<Esc>'
+    assert [tape[a:b] for a, b in literal_spans(tape)] == [
+        'row', 'row', 'your', 'boat', 'down']
+
+
+def test_a_typed_space_is_a_key_not_a_word():
+    """`<Space>` is something the player PRESSES, so it stays a command and
+    breaks the phrase around it rather than being swallowed into it."""
+    tape = 'Orow<Space>boat<Esc>'
+    assert [tape[a:b] for a, b in literal_spans(tape)] == ['row', 'boat']
+
+
+def test_a_text_object_is_not_an_insert_verb():
+    """The `i` in `diw` and the `a` in `daw` open nothing — reading them as
+    verbs would paint the rest of the tape as prose."""
+    assert literal_spans('j diw j . 2j daw j . G $') == []
+
+
+def test_a_search_pattern_is_a_word():
+    """`vault` is read off the map like any other word; `/` and `<CR>` are
+    Vim. Note the `a` inside `vault` — it must not open INSERT either."""
+    tape = '* n 0 x /vault<CR> $ p l'
+    assert [tape[a:b] for a, b in literal_spans(tape)] == ['vault']
+
+
+def test_a_substitution_marks_its_pattern_and_replacement():
+    """`:%s/` and the trailing `/g` are syntax; `moo` and `quack` are words."""
+    tape = ':%s/moo/quack/g<CR> 8G :s/down/up/<CR>'
+    assert [tape[a:b] for a, b in literal_spans(tape)] == [
+        'moo', 'quack', 'down', 'up']
+
+
+def test_a_global_marks_only_its_pattern():
+    """`:g`/`:v` carry a pattern and then a COMMAND — `d` is not a word."""
+    tape = ':g/krzzt/d<CR> :2,19v/that/d<Space>_<CR>'
+    assert [tape[a:b] for a, b in literal_spans(tape)] == ['krzzt', 'that']
+
+
+def test_an_ex_line_with_no_pattern_marks_nothing():
+    """`:set nu` and `:4,6&&` are all command — nothing was read off the map."""
+    assert literal_spans(':set<Space>nu<CR> :4,6&&<CR> :1j|1y<CR>') == []
+
+
+def test_the_verb_before_the_words_may_be_a_whole_change():
+    tape = '2j ciw hot<Esc> j cithand<Esc> j^cEwell-to-do<Esc>'
+    assert [tape[a:b] for a, b in literal_spans(tape)] == [
+        'hot', 'hand', 'well-to-do']
+
+
+def test_gi_opens_insert_though_it_starts_with_g():
+    """`gU`/`g~` are operators, `gi` resumes INSERT. The g-atom rule is
+    consulted before the verb table, so it must not swallow this one."""
+    tape = '* 3b gU3e + gi<Space>and<Esc>'
+    assert [tape[a:b] for a, b in literal_spans(tape)] == ['and']
+
+
+def test_no_span_ever_contains_a_space_or_a_token():
+    """Plain spaces are display spacing and `<Space>` is a keypress; neither
+    belongs inside a white run."""
+    for tape in ('2j ciw hot<Esc>', 'Orow<Space>boat<Esc>', ':%s/moo/quack/g<CR>'):
+        for a, b in literal_spans(tape):
+            span = tape[a:b]
+            assert ' ' not in span and '<' not in span, span
+
+
+@pytest.mark.parametrize("slug", ['sculpting_chambers', 'wet_ink',
+                                  'inscription_halls', 'gauntlet'])
+def test_every_span_is_text_a_player_types(slug):
+    """Whatever the scanner marks must be free of tape tokens other than
+    <Space> — an <Esc> or a <CR> inside a span means the run ran past its end."""
+    room = getattr(dg, f'build_dungeon_{slug}')(42).room
+    for a, b in literal_spans(room.answer):
+        span = room.answer[a:b]
+        assert ESC not in span and ENTER not in span and CTRL_V not in span, span
+        assert SPACE not in span, span
