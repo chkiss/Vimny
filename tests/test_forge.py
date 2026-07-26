@@ -495,3 +495,38 @@ def test_e_refuses_to_discard_unsaved_work():
     d = DRAFT.new('Probe', rows=8, cols=30)
     _forge_session(d, ':w\r' + 'lll:exit\r' + ':e\r:q!\r')
     assert d.level.exit == (1, 4), ':e threw away work without being forced'
+
+
+def test_a_custom_pool_uses_the_authors_own_word_lengths():
+    """`:vocab chat chien oiseau` then `:fill custom` must lay down THOSE words.
+
+    The stock 3-6 length range is right for the shipped pools and wrong for a
+    hand-written list: nothing in this vocabulary is 3 long, so the fill used to
+    raise "vocabulary pool is empty" at an author who had just handed it three
+    perfectly good words."""
+    d = DRAFT.new('Probe', rows=8, cols=40)
+    _forge_session(d, ':vocab chat chien oiseau\r'
+                      + 'jjv' + 'l' * 30 + T.ESC + ':fill custom\r:w\r:q!\r')
+    assert [f.length for f in d.level.fills] == [(4, 6)]
+    words = {''.join(r.symbols) for r in d.build().room.char_runs}
+    assert words and words <= {'chat', 'chien', 'oiseau'}, words
+
+
+def test_a_pool_missing_a_length_reaches_for_the_nearest_one():
+    """The old fallback was the 1-character table, which reads sensible and is
+    not: `plain` has no 1-character words at all, so `:fill plain 1-2` raised
+    "pool is empty" about the game's own stock vocabulary."""
+    from sharing import vocab
+    import random
+    rng = random.Random(1)
+    assert len(vocab.words('plain', 1, rng)) == 3     # nearest length plain has
+    assert len(vocab.words('custom', 9, rng, vocab.by_length(['chat']))) == 4
+
+
+def test_an_empty_vocabulary_still_says_so_plainly():
+    """The nearest-length fallback must not paper over the one case that really
+    is the author's mistake: naming `custom` with no words behind it."""
+    import random
+    from sharing import vocab
+    with pytest.raises(ValueError, match='declares no `vocabulary` block'):
+        vocab.words('custom', 4, random.Random(1), {})

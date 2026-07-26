@@ -129,6 +129,17 @@ paints over stone, so carve first and fill second.
 "vocabulary": ["chat", "chien", "oiseau"]
 ```
 
+In the forge that is `:vocab chat chien oiseau`, and then `:fill custom` over a
+selection. With no length range given, a custom fill uses the lengths your own
+words have — so those three words are exactly what lands. Give a range
+(`:fill custom 4-5`) and it narrows to the words that fit it.
+
+A fill scatters **single words at random**; it is not a way to write a specific
+sentence in a specific place. For that, type the text in INSERT mode like any
+other author, or lay a fill down and `:fill!` to take its words and edit them.
+Words are whitespace-separated, so a `vocabulary` entry can never contain a
+space — one entry is one word standing in one run of cells.
+
 Inline only — a level never fetches anything. Every character must occupy one
 cell: no control characters, no combining marks, and no double-width characters.
 Vimny's entire model is one glyph per cell, so a wide character silently shifts

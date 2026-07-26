@@ -5627,7 +5627,18 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
                         if _pool not in _VOCAB_POOLS:
                             _push(f'Unknown pool: {_pool}  ({"|".join(_VOCAB_POOLS)})')
                         else:
-                            _lo, _hi, _sp = 3, 6, 1
+                            # A custom pool defaults to the lengths the author's
+                            # own words HAVE. The stock 3-6 is right for the
+                            # shipped pools and wrong for a hand-written list:
+                            # `:vocab chat chien oiseau` has nothing 3 long, and
+                            # a fill asking for one would quietly get the
+                            # nearest-length fallback instead of the words the
+                            # author just typed.
+                            if _pool == 'custom' and _draft.level.vocabulary:
+                                _lens = [len(w) for w in _draft.level.vocabulary]
+                                _lo, _hi, _sp = min(_lens), max(_lens), 1
+                            else:
+                                _lo, _hi, _sp = 3, 6, 1
                             for _a2 in _args[1:]:
                                 if '-' in _a2:
                                     _p = _a2.split('-')

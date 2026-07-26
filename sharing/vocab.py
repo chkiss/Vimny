@@ -42,16 +42,31 @@ POOLS = ('plain', 'mixed', 'proverbs', 'misquotes', 'custom')
 
 def words(pool: str, length: int, rng: random.Random,
           custom: dict | None = None) -> str:
-    """One word of exactly `length` characters from `pool`.
+    """One word of exactly `length` characters from `pool`, or the nearest
+    length the pool actually has.
 
-    Falls back to the 1-character table when a pool has nothing at that length,
-    which is what the shipped builders already do — a fill directive should
-    thin out rather than crash on an unlucky length.
+    A fill directive should thin out rather than crash on an unlucky length. The
+    old fallback was the 1-character table, which reads sensible and is not:
+    `plain` has no 1-character words at all, and an author's `vocabulary` block
+    of three real words has almost none of the lengths a fill will ask for. Both
+    cases raised "vocabulary pool is empty" at an author who had just handed the
+    level a pool full of words — the single most confusing thing this module
+    could say. Reaching for the nearest length instead is what the fallback was
+    always trying to express.
+
+    Ties go to the SHORTER word: a fill lays words into a bounded region, and
+    overshooting the requested length is the failure that pushes the last word
+    off the end of the row.
     """
     table = word_table(pool, custom)
-    choices = table.get(length) or table.get(1)
+    choices = table.get(length)
+    if not choices and table:
+        choices = table[min(table, key=lambda n: (abs(n - length), n))]
     if not choices:
-        raise ValueError(f'vocabulary pool {pool!r} is empty')
+        raise ValueError(
+            f'vocabulary pool {pool!r} has no words in it'
+            + (' — the level\'s `vocabulary` block is empty'
+               if pool == 'custom' else ''))
     return rng.choice(choices)
 
 
