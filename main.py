@@ -886,19 +886,91 @@ def _explosion_animation(term, room, expl_r, expl_c, scr_r, scr_c, iw, game_h):
         time.sleep(delay)
 
 
+# ── The tumble: a glyph shoved over a ledge, or swept away by water ───────────
+#
+# The pace below is the original one — an unhurried 0.12s a frame, a full second
+# and a bit of fall. What changed is WHO WAITS FOR IT. This used to be played
+# INLINE: every insert that shoved a glyph into the void slept its way through
+# the whole animation before the next keystroke was read, per fallen cell, so a
+# 0.72s drop was a ~17 WPM typing limit and an edit that pushed five glyphs over
+# the brink stalled the game for three and a half seconds.
+#
+# A reflow's falls are now QUEUED (`room._falling`) and repainted by _render off
+# the clock — so the tumble takes exactly as long as it always did to watch, and
+# costs the typist nothing. That decoupling is also what makes a longer ladder
+# free: the fall reads longer than the old six-frame drop and still delays
+# nobody. Only the PLAYER's own fall (stepping onto a void rune, drowning) still
+# blocks, and should: the game is stopping to take a heart off them.
+_FALL_FRAME_S = 0.12                    # the original pace, restored
+_FALL_GLYPHS  = ('@', '◉', '◉', 'o', 'o', '·', '·', '˙', '˙', ' ')
+_VOID_HOT,  _VOID_COLD  = (110, 60, 160), (20,  5, 30)   # wizard-violet, guttering
+_DROWN_HOT, _DROWN_COLD = ( 60, 140, 210), ( 5, 25, 75)  # water-blue, sinking
+
+
+def _fall_frames(term, hot, cold):
+    """(escape, glyph) per frame — the colour ramps hot → cold down the ladder."""
+    n, out = len(_FALL_GLYPHS), []
+    for i, sym in enumerate(_FALL_GLYPHS):
+        if sym == ' ':
+            out.append((term.normal, sym))
+            continue
+        f   = i / (n - 1)
+        rgb = tuple(int(h + (c - h) * f) for h, c in zip(hot, cold))
+        out.append((term.color_rgb(*rgb) + (term.bold if i < 3 else ''), sym))
+    return out
+
+
+def _play_falls(term, cells, hot, cold):
+    """Tumble every screen cell in `cells` together, BLOCKING — one sleep per
+    frame rather than per cell. Only the player's own fall uses this."""
+    if not cells:
+        return
+    for color, sym in _fall_frames(term, hot, cold):
+        out = ''.join(term.move_yx(sr, sc) + color + sym + term.normal
+                      for (sr, sc) in cells)
+        print(out, end='', flush=True)
+        time.sleep(_FALL_FRAME_S)
+
+
+def _queue_falls(room, cells, hot, cold) -> None:
+    """Hand a batch of BUFFER cells to the render loop to tumble on its own time.
+
+    Buffer coordinates, not screen ones: the viewport can scroll out from under
+    a fall that is still in the air, and the drop has to stay over the cell it
+    is falling from."""
+    if not cells:
+        return
+    room._falling = getattr(room, '_falling', [])
+    room._falling.append({'cells': list(cells), 'hot': hot, 'cold': cold,
+                          't0': time.time()})
+
+
+def _draw_falls(term, room, player) -> bool:
+    """Paint the frame each queued fall is up to; drop the ones that have landed.
+
+    Called from _render, so a fall repaints over every redraw for as long as it
+    is in the air. Returns True while any fall is still going, which is what
+    keeps the idle loop rendering when the player has stopped typing."""
+    queue = getattr(room, '_falling', None)
+    if not queue:
+        return False
+    n, out, still = len(_FALL_GLYPHS), [], []
+    for fall in queue:
+        i = int((time.time() - fall['t0']) / _FALL_FRAME_S)
+        if i >= n:
+            continue                       # landed — the next render clears it
+        still.append(fall)
+        color, sym = _fall_frames(term, fall['hot'], fall['cold'])[i]
+        out += [term.move_yx(*_void_screen_xy(term, room, player, r, c))
+                + color + sym + term.normal for (r, c) in fall['cells']]
+    room._falling = still
+    if out:
+        print(''.join(out), end='', flush=True)
+    return bool(still)
+
+
 def _void_fall_animation(term, screen_r, screen_c):
-    frames = [
-        (term.color_rgb(110, 60, 160) + term.bold, '@'),
-        (term.color_rgb(80,  30, 120) + term.bold, '◉'),
-        (term.color_rgb(60,  20,  90),              'o'),
-        (term.color_rgb(40,  10,  60),              '·'),
-        (term.color_rgb(20,   5,  30),              '˙'),
-        (term.normal,                               ' '),
-    ]
-    for color, sym in frames:
-        print(term.move_yx(screen_r, screen_c) + color + sym + term.normal,
-              end='', flush=True)
-        time.sleep(0.12)
+    _play_falls(term, [(screen_r, screen_c)], _VOID_HOT, _VOID_COLD)
 
 
 def _gutter_w(player) -> int:
@@ -920,30 +992,19 @@ def _void_screen_xy(term, room, player, r, c):
 def _play_void_falls(term, dungeon, room, player):
     """Animate any characters the last reflow shoved over a ledge into the void.
 
-    Reads room._last_void_falls (populated by engine/reflow.py), plays the drop at
-    each fallen cell, then clears the list. Returns True if anything fell."""
+    Reads room._last_void_falls (populated by engine/reflow.py), queues the drop
+    at each fallen cell, then clears the list. Returns True if anything fell."""
     falls = getattr(room, '_last_void_falls', None)
     if not falls:
         return False
-    for (fr, fc, _sym) in falls:
-        _void_fall_animation(term, *_void_screen_xy(term, room, player, fr, fc))
+    _queue_falls(room, [(fr, fc) for (fr, fc, _sym) in falls],
+                 _VOID_HOT, _VOID_COLD)
     room._last_void_falls = []
     return True
 
 
 def _drown_animation(term, screen_r, screen_c):
-    frames = [
-        (term.color_rgb(60, 140, 210) + term.bold, '@'),
-        (term.color_rgb(40, 100, 175) + term.bold, '◉'),
-        (term.color_rgb(20,  70, 145),              'o'),
-        (term.color_rgb(10,  45, 110),              '·'),
-        (term.color_rgb( 5,  25,  75),              '˙'),
-        (term.normal,                               ' '),
-    ]
-    for color, sym in frames:
-        print(term.move_yx(screen_r, screen_c) + color + sym + term.normal,
-              end='', flush=True)
-        time.sleep(0.12)
+    _play_falls(term, [(screen_r, screen_c)], _DROWN_HOT, _DROWN_COLD)
 
 
 def _heart_container_animation(term, dungeon, player, budget, old_max_hp, message):
@@ -4470,6 +4531,10 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
         # reach — through opened doors, over water — sheds its fog per frame.
         _auto_fog_tick(dungeon.room, player.row, player.col)
         render_all(term, dungeon, player, budget, msg, **kw)
+        # Glyphs still in the air from an earlier reflow, painted over the top of
+        # the frame that just landed. Nothing here sleeps — the fall advances on
+        # the wall clock, so typing through it neither stalls nor skips it.
+        _draw_falls(term, dungeon.room, player)
 
     def _horse_here() -> bool:
         """Is the horse in the room? The saddle registers ride with him."""
@@ -4493,19 +4558,23 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
         return True
 
     def _animate_reflow_falls() -> None:
-        """Play the void-fall / drown animations the last reflow op queued
-        (room._last_void_falls / _last_drowns) and set the banner message."""
+        """Queue the void-fall / drown animations the last reflow op left behind
+        (room._last_void_falls / _last_drowns) and set the banner message.
+
+        Queue, not play: _draw_falls tumbles them off the clock, so the render
+        goes AFTER the queueing — otherwise the first frame of the drop would
+        not appear until the player's next keystroke."""
         nonlocal message, msg_ttl
         if room._last_void_falls:              # a glyph went over the brink
-            _render(message)
             _play_void_falls(term, dungeon, room, player)
+            _render(message)
             message = 'Over the brink — into the void it tumbles!'
             msg_ttl = 25
         if room._last_drowns:                  # a wave of water swept an entity away
-            _render(message)
-            for (dr, dc) in room._last_drowns:
-                _drown_animation(term, *_void_screen_xy(term, room, player, dr, dc))
+            _queue_falls(room, list(room._last_drowns),
+                         _DROWN_HOT, _DROWN_COLD)
             room._last_drowns = []
+            _render(message)
             message = 'A wave sweeps it away into the void!'
             msg_ttl = 25
 
@@ -5086,7 +5155,9 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
         if not key:
             water_active    = any_water and (time.time() - last_activity < _WATER_SETTLE_SECS)
             overlap_active  = room.entity_at(player.row, player.col) is not None
-            needs_render    = message != prev_message or water_active or overlap_active
+            needs_render    = (message != prev_message or water_active
+                               or overlap_active
+                               or bool(getattr(room, '_falling', None)))
             if attack_flash_sym:
                 attack_flash_ttl -= 1
                 if attack_flash_ttl <= 0:
