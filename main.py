@@ -4086,6 +4086,28 @@ def _place_first_cave_horse(room) -> None:
         room.rebuild_indexes()
 
 
+def _meta_name(lv, v):
+    """The one metadata field with no empty state: a level's file is named after
+    it, so clearing it would leave the draft with nowhere to be saved."""
+    if v:
+        lv.name = v
+
+
+#: The forge's metadata block: field → (read, write). Every one of them answers
+#: `:field?` as well as taking a value, which is the half Vim has always had and
+#: an authoring UI needs more than most — you cannot correct what you cannot read
+#: back, and `:meta` only summarises.
+_FORGE_META = {
+    'name':      (lambda lv: lv.name,                _meta_name),
+    'author':    (lambda lv: lv.author,              lambda lv, v: setattr(lv, 'author', v)),
+    'intro':     (lambda lv: lv.intro,               lambda lv, v: setattr(lv, 'intro', v)),
+    'alternate': (lambda lv: lv.alternate or '',     lambda lv, v: setattr(lv, 'alternate', v or None)),
+    'teaches':   (lambda lv: ' '.join(lv.teaches),   lambda lv, v: setattr(lv, 'teaches', v.split())),
+    'requires':  (lambda lv: ' '.join(lv.requires),  lambda lv, v: setattr(lv, 'requires', v.split())),
+    'vocab':     (lambda lv: ' '.join(lv.vocabulary), lambda lv, v: setattr(lv, 'vocabulary', v.split())),
+}
+
+
 # ── Dungeon game loop ──────────────────────────────────────────────────────────
 
 def run_dungeon(term: Terminal, level: str, progress: dict,
@@ -4148,6 +4170,15 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
     player.hat_worn = player.has_hat and progress.get('hat_worn', False)
     if player.hat_worn and 'admin' not in player.known_commands:
         player.known_commands = player.known_commands + ['admin']
+    if _record is not None:
+        # A take is played under the level's DECLARED command set and nothing
+        # else. The forge's author is the admin, and very likely wearing the
+        # hat — both of which hand out the `admin` token that makes
+        # `action_allowed` say yes to everything. Leave it in and the take
+        # cheerfully records a key the level never declared, which then fails
+        # for the first stranger who downloads it. Refusing here is the whole
+        # value of recording by playing.
+        player.known_commands = [c for c in player.known_commands if c != 'admin']
     dungeon.level_slug = level   # lets the renderer show the act's hint on bosses
     dungeon.forge      = _draft is not None   # → the authoring cheat-sheet
 
@@ -4160,7 +4191,11 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
     # Post-game companion: the wizard's horse. Once the Warden Eternal is beaten he
     # waits in the First Cave (where you meet and name him); once named he follows
     # you into every level, save those flagged to bar him (see _horse_blocked).
-    if progress.get('warden_eternal', {}).get('complete') and not _horse_blocked(level, room):
+    # …but never into a draft. A forge room is a level being written, and anything
+    # standing in it at save time is written into the file (see
+    # `format._TRANSIENT_KINDS`, which catches the ones already shipped).
+    if (_draft is None and progress.get('warden_eternal', {}).get('complete')
+            and not _horse_blocked(level, room)):
         if level == 'first_cave' or progress.get('horse_name'):
             _place_first_cave_horse(room)
             _hname = progress.get('horse_name')
@@ -4418,8 +4453,17 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
         if _record is None:
             SM.save_progress(data, who)
 
-    def _forge_rebuild() -> None:
-        """Re-render the open draft after a DIRECTIVE changed.
+    def _forge_rebuild() -> str:
+        """Re-render the open draft after a DIRECTIVE changed. Returns '' on
+        success, or the reason it could not be built.
+
+        A directive can be legal to write and impossible to grow — `:fill custom`
+        with no `:vocab` behind it is the honest example. The build raises, and
+        raising out of a command handler takes the whole game down with the
+        author's unsaved room inside it. So the failure is caught, the previous
+        room is left standing, and the caller undoes whatever it had already put
+        on the level. Callers must therefore treat a non-empty return as "that
+        did not happen".
 
         A fill is not a thing you can paint on: it grows its words at build time
         from the level's seed, so the only honest way to show an author what
@@ -4435,14 +4479,20 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
         """
         nonlocal dungeon, room, player, budget
         _r, _c = player.row, player.col
-        dungeon = _draft.build()
+        try:
+            _built = _draft.build()
+        except (ValueError, LF.LevelFormatError) as _exc:
+            return str(_exc)
+        dungeon = _built
         room    = dungeon.room
+        dungeon.name        = _draft.level.name
         dungeon.level_slug  = level
         dungeon.forge       = True
         room.passable_walls = edit_mode
         player.row = min(_r, room.rows - 1)
         player.col = min(_c, room.cols - 1)
         budget = Budget(room.budget or 20)
+        return ''
 
     def _push(text: str) -> None:
         nonlocal pool_ttl
@@ -5424,6 +5474,27 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
                             'spent': budget.spent, 'par': room.par,
                             'first_written_completion': False}
 
+                elif _draft is not None and cmd in ('e', 'e!'):
+                    # `:e` on a draft re-reads the FILE, like `:e` everywhere
+                    # else. It cannot mean the admin `:e` below — that rebuilds
+                    # the level named by the slug, and a draft's slug is the
+                    # placeholder 'community', so the admin branch would land the
+                    # author in The First Cave with their draft unopened.
+                    DRAFT.sync(_draft, room)
+                    _disk  = (_draft.path.read_text(encoding='utf-8')
+                              if _draft.path.exists() else '')
+                    _dirty = LF.dumps(_draft.level) != _disk
+                    if _dirty and cmd == 'e':
+                        player.error = 'E37: No write since last change (add ! to override)'
+                    else:
+                        _fresh = DRAFT.load(_draft.path)
+                        if not _fresh.ok:
+                            _push(f'Cannot re-read the draft: {_fresh.error}')
+                        else:
+                            _draft.level = _fresh.level
+                            _err = _forge_rebuild()
+                            _push(_err or f'"{_draft.level.name}" re-read from disk.')
+
                 elif cmd == 'e' and (player_name == 'admin' or player.is_dead):
                     seed    = random.randint(0, 2**31)
                     dungeon = _build_dungeon(level, seed, admin=(player_name == 'admin'))
@@ -5563,15 +5634,29 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
                                     _lo, _hi = int(_p[0]), int(_p[1])
                                 elif _a2.isdigit():
                                     _sp = int(_a2)
-                            _reg = (min(_a[0], _b[0]), min(_a[1], _b[1]),
-                                    max(_a[0], _b[0]), max(_a[1], _b[1]))
+                            # A LINEWISE selection means the whole line, so its
+                            # columns are the row's full width — not the two
+                            # cells the cursor happened to sit between, which is
+                            # all `'<,'>` records for it. Reading them literally
+                            # is how `V` came out as "cols 1-1".
+                            if player.last_visual_mode == Mode.VISUAL_LINE:
+                                _c1, _c2 = 0, room.cols - 1
+                            else:
+                                _c1, _c2 = min(_a[1], _b[1]), max(_a[1], _b[1])
+                            _reg = (min(_a[0], _b[0]), _c1,
+                                    max(_a[0], _b[0]), _c2)
                             _f = LF.Fill(region=_reg, pool=_pool,
                                          length=(_lo, _hi), spacing=_sp)
                             DRAFT.sync(_draft, room)     # keep what was painted
                             _draft.level.fills.append(_f)
-                            _forge_rebuild()
-                            _push(f'Fill: {_pool} {_lo}-{_hi} over '
-                                  f'rows {_reg[0]}-{_reg[2]}, cols {_reg[1]}-{_reg[3]}.')
+                            _err = _forge_rebuild()
+                            if _err:
+                                _draft.level.fills.remove(_f)
+                                _push(f'Fill refused — {_err}')
+                            else:
+                                _push(f'Fill: {_pool} {_lo}-{_hi} over '
+                                      f'rows {_reg[0]}-{_reg[2]}, '
+                                      f'cols {_c1}-{_c2}.')
 
                 elif _draft is not None and cmd == 'fill!' and edit_mode:
                     # Bake the fill under the cursor: its words stop being grown
@@ -5589,20 +5674,31 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
                         _forge_rebuild()
                         _push(f'Fill dropped — its {len(_kept)} word(s) are yours to edit now.')
 
-                elif _draft is not None and cmd.split()[0:1] in (
-                        ['name'], ['author'], ['intro'], ['teaches'],
-                        ['requires'], ['alternate'], ['vocab']) and edit_mode:
-                    _field, _, _val = cmd.partition(' ')
-                    _val = _val.strip()
-                    _lv  = _draft.level
-                    if _field == 'name'      and _val: _lv.name      = _val
-                    elif _field == 'author':           _lv.author    = _val
-                    elif _field == 'intro':            _lv.intro     = _val
-                    elif _field == 'alternate':        _lv.alternate = _val or None
-                    elif _field == 'teaches':          _lv.teaches   = _val.split()
-                    elif _field == 'requires':         _lv.requires  = _val.split()
-                    elif _field == 'vocab':            _lv.vocabulary = _val.split()
-                    _push(f'{_field}: {_val or "(cleared)"}')
+                elif (_draft is not None and edit_mode
+                      and cmd.partition(' ')[0].rstrip('?!') in _FORGE_META):
+                    # `:field value` sets, `:field?` (or a bare `:field`) asks,
+                    # `:field!` clears — Vim's `:set opt=v` / `:set opt?` split,
+                    # with the destructive form spelled out. A bare `:author`
+                    # used to CLEAR, which meant a mistyped query silently threw
+                    # away what it was asking about.
+                    _head, _, _val = cmd.partition(' ')
+                    _field = _head.rstrip('?!')
+                    _val   = _val.strip()
+                    _lv    = _draft.level
+                    _get, _set = _FORGE_META[_field]
+                    if _head.endswith('!'):
+                        _set(_lv, '')
+                        _push(f'{_field}: (cleared)')
+                    elif _val and not _head.endswith('?'):
+                        _set(_lv, _val)
+                        if _field == 'name':
+                            # The chrome names the level, so a rename that does
+                            # not reach it leaves the author looking at the old
+                            # title and doubting the command took.
+                            dungeon.name = _lv.name
+                        _push(f'{_field}: {_get(_lv)}')
+                    else:
+                        _push(f'{_field}={_get(_lv) or "(unset)"}')
 
                 elif _draft is not None and cmd == 'meta':
                     _lv = _draft.level

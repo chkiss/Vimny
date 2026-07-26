@@ -41,7 +41,7 @@ def _tiny(**kw) -> F.Level:
         solution=kw.pop('solution', 'llll'), **kw)
 
 
-def _record_take(lvl: F.Level, tape: str) -> tuple:
+def _record_take(lvl: F.Level, tape: str, player_name: str = 'Normand') -> tuple:
     """Play `tape` through the real loop with the recorder attached.
 
     Deliberately built here rather than by adding a `record` argument to
@@ -68,14 +68,17 @@ def _record_take(lvl: F.Level, tape: str) -> tuple:
 
     rec = {'tape': [], 'error': ''}
     with _headless(main):
-        result = main.run_dungeon(term, 'community', {}, player_name='Normand',
+        result = main.run_dungeon(term, 'community', {}, player_name=player_name,
                                   _dungeon=F.build(lvl), _known=lvl.known,
                                   _record=rec)
     return ''.join(rec['tape']), result
 
 
-def _forge_session(draft, script: str, player_name: str = 'admin'):
-    """Drive a real forge session: open `draft` in the editor and type `script`."""
+def _forge_session(draft, script: str, player_name: str = 'admin', dungeon=None):
+    """Drive a real forge session: open `draft` in the editor and type `script`.
+
+    Pass `dungeon` to keep a handle on the object the chrome renders from — the
+    only way to observe, from out here, what the status bar was showing."""
     import main
     from sharing.replay import _headless
 
@@ -94,7 +97,7 @@ def _forge_session(draft, script: str, player_name: str = 'admin'):
     colors.init(term)
     with _headless(main):
         return main.run_dungeon(term, 'community', {}, player_name=player_name,
-                                _dungeon=draft.build(), _start_edit=True,
+                                _dungeon=dungeon or draft.build(), _start_edit=True,
                                 _known=draft.level.known, _draft=draft)
 
 
@@ -362,3 +365,133 @@ def test_a_published_draft_carries_no_par_or_budget(tmp_path, monkeypatch):
     dest, _ = DRAFT.publish(DRAFT.Draft(path=tmp_path / 'x.json', level=_tiny()))
     data = json.loads(dest.read_text(encoding='utf-8'))
     assert 'par' not in data and 'budget' not in data
+
+
+# ── Regressions from the first playtest ───────────────────────────────────────
+
+def test_the_companion_horse_is_never_written_into_a_level():
+    """The wizard's horse is placed into whatever room the player walks into, so
+    an author who has finished the game finds him standing in their draft — and
+    `from_room` used to write him into the file. He is not decoration there: a
+    shipped horse re-fires the first-meeting naming PROMPT, which eats the keys
+    after it, so the trailing `:wq` of a recorded tape is swallowed and a level
+    that plays perfectly reports itself unsolvable."""
+    from engine.world import Entity
+    d = DRAFT.new('Stable', rows=8, cols=30)
+    room = d.build().room
+    room.entities.append(Entity(kind='horse', row=2, col=2, tag='Shadowfax'))
+    DRAFT.sync(d, room)
+    assert [e['kind'] for e in d.level.entities] == ['exit']
+
+
+def test_a_level_carrying_a_horse_swallows_its_own_tape():
+    """Why the rule above exists, stated as the failure it caused. Pin it so the
+    horse cannot come back through some other door."""
+    from sharing.replay import replay_tape
+    lvl = _tiny()
+    lvl.entities = [{'at': [1, 2], 'kind': 'horse', 'tag': ''}]
+    res = replay_tape(F.build(lvl), 'community', lvl.solution,
+                      known=lvl.known)
+    assert not res.won, 'the naming prompt no longer eats the tape'
+    # …and the identical level without him is solvable, so the horse is the
+    # whole of the difference.
+    ok = replay_tape(F.build(_tiny()), 'community', 'llll', known=_tiny().known)
+    assert ok.won
+
+
+def test_a_take_is_played_without_the_admin_override():
+    """`admin` (from the player name or the Warden's hat) makes `action_allowed`
+    say yes to everything. Left in place during a take it records a key the
+    level never declared, which then fails for the first stranger who downloads
+    it — destroying the one guarantee recording-by-playing offers."""
+    # The forge's author IS the admin, so the take must be run as one or the
+    # test proves nothing about the override it is meant to strip.
+    tape, res = _record_take(_tiny(requires=['l']), 'llll', player_name='admin')
+    assert res['won'] and tape == 'llll'
+
+    # `$` is undeclared, and on THIS level it lands squarely on the exit — so a
+    # take that wins is a take that was allowed to use it. As admin it used to
+    # sail through and go onto the tape.
+    def _dollar(requires):
+        lv = _tiny(requires=requires, solution='$')
+        lv.exit, lv.entities = (1, 8), [{'at': [1, 8], 'kind': 'exit'}]
+        return lv
+
+    assert _record_take(_dollar(['$']), '$', player_name='admin')[1]['won'], \
+        'the $ route must win when the level declares $'
+    tape, res = _record_take(_dollar(['l']), '$', player_name='admin')
+    assert not res['won'], '$ was undeclared and should have been refused'
+
+
+def test_a_linewise_selection_fills_the_whole_row():
+    """`V` records only the columns the cursor sat between, so reading `'<,'>`
+    literally turned a whole-line selection into `cols 1-1`."""
+    d = DRAFT.new('Probe', rows=8, cols=30)
+    _forge_session(d, 'jjV' + T.ESC + ':fill plain 3-4\r:w\r:q!\r')
+    assert [f.region for f in d.level.fills] == [(3, 0, 3, 29)]
+
+
+def test_a_fill_that_cannot_grow_is_refused_not_raised():
+    """`:fill custom` with no `:vocab` behind it is legal to write and impossible
+    to grow. It used to raise straight out of the command handler, taking the
+    game down with the author's unsaved room inside it."""
+    d = DRAFT.new('Probe', rows=8, cols=30)
+    _forge_session(d, 'jjv' + 'l' * 5 + T.ESC + ':fill custom\r:w\r:q!\r')
+    assert d.level.fills == [], 'the refused fill was kept anyway'
+
+
+def test_a_fill_that_can_grow_after_vocab_is_accepted():
+    d = DRAFT.new('Probe', rows=8, cols=30)
+    _forge_session(d, ':vocab chat chien\r' + 'jjv' + 'l' * 5 + T.ESC
+                      + ':fill custom\r:w\r:q!\r')
+    assert [f.pool for f in d.level.fills] == ['custom']
+
+
+def test_metadata_can_be_read_back():
+    """`:field?` asks, the way `:set opt?` does. An authoring UI needs the read
+    half more than most — you cannot correct what you cannot see."""
+    d = DRAFT.new('Probe', rows=8, cols=30)
+    res = _forge_session(d, ':author Chas\r:author?\r:q!\r')
+    assert d.level.author == 'Chas'
+
+
+def test_a_bare_metadata_command_asks_instead_of_clearing():
+    """It used to CLEAR, so a mistyped query silently threw away the thing it
+    was asking about. Destroying now takes the explicit `!`."""
+    d = DRAFT.new('Probe', rows=8, cols=30)
+    _forge_session(d, ':author Chas\r:author\r:q!\r')
+    assert d.level.author == 'Chas'
+    _forge_session(d, ':author!\r:q!\r')
+    assert d.level.author == ''
+
+
+def test_renaming_a_draft_renames_the_dungeon_on_screen():
+    """The chrome names the level; a rename that did not reach it left the
+    author looking at the old title and doubting the command took."""
+    d   = DRAFT.new('Before', rows=8, cols=30)
+    dng = d.build()
+    assert dng.name == 'Before'
+    _forge_session(d, ':name After\r:w\r:q!\r', dungeon=dng)
+    assert dng.name == 'After', 'the chrome still names the level "Before"'
+    assert d.level.name == 'After'
+    assert DRAFT._path('After').exists()
+    DRAFT._path('After').unlink()
+
+
+def test_e_rereads_the_draft_rather_than_leaving_for_the_first_cave():
+    """A draft's slug is the placeholder 'community', so the admin `:e` branch
+    rebuilt THAT — landing the author in The First Cave with their draft never
+    opened."""
+    d = DRAFT.new('Probe', rows=8, cols=30)
+    # The trailing :w is what makes this discriminating — without it the
+    # unsaved spawn move was never synced to the level either way, and the
+    # assertion held whether :e! reloaded anything or not.
+    _forge_session(d, 'lll:exit\r:w\r' + 'jj:spawn\r' + ':e!\r:w\r:q!\r')
+    assert d.level.exit == (1, 4), 'the saved edit did not survive the re-read'
+    assert d.level.spawn == (1, 1), 'the unsaved edit survived a :e! reload'
+
+
+def test_e_refuses_to_discard_unsaved_work():
+    d = DRAFT.new('Probe', rows=8, cols=30)
+    _forge_session(d, ':w\r' + 'lll:exit\r' + ':e\r:q!\r')
+    assert d.level.exit == (1, 4), ':e threw away work without being forced'

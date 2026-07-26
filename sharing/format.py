@@ -407,6 +407,16 @@ def _grown(fills, ru) -> bool:
     return any(f.covers(ru.row, ru.col) for f in fills)
 
 
+#: Entity kinds that belong to the SESSION, not to the level. The wizard's horse
+#: is placed into whatever room the player walks into, so an author who has beaten
+#: the game finds him standing in their draft — and `from_room` would happily write
+#: him into the file. That is not a cosmetic wart: a shipped horse re-triggers the
+#: first-meeting naming prompt for anyone who has not met him, and that prompt eats
+#: the keys after it, which is exactly how a recorded tape loses its trailing `:wq`
+#: and a level that plays perfectly reports itself unsolvable.
+_TRANSIENT_KINDS = frozenset({'horse'})
+
+
 def from_room(room, name: str, author: str = '', solution: str = '',
               teaches=(), requires=(), *, fills=None, vocabulary=(),
               intro: str = '', alternate: str | None = None,
@@ -419,6 +429,9 @@ def from_room(room, name: str, author: str = '', solution: str = '',
     lay the words on top of themselves. Anything standing inside a fill region
     is therefore dropped here and left to the directive — which is what makes an
     authored level round-trip through the editor unchanged.
+
+    Session entities (`_TRANSIENT_KINDS`) are dropped for the same reason: they
+    were never authored, they were walked in.
 
     Everything not derivable from the grid — the fills themselves, the author's
     vocabulary, the intro, the slug it stands in for — has to be passed in,
@@ -442,7 +455,8 @@ def from_room(room, name: str, author: str = '', solution: str = '',
         entities=[dict({'at': [e.row, e.col]},
                        **{f: getattr(e, f) for f in _ENTITY_FIELDS
                           if f not in ('row', 'col')})
-                  for e in room.entities if e.alive],
+                  for e in room.entities
+                  if e.alive and e.kind not in _TRANSIENT_KINDS],
         vocabulary=list(vocabulary),
         solution=solution or room.answer,
     )

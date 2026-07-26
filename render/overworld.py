@@ -194,6 +194,43 @@ def render_overworld(term: Terminal, player: Player, progress: dict,
             return None
         return mid_start - len(left), cw - len(right) - (mid_start + len(mid))
 
+    def _subtree_row(name, mid, badge, badge_col, tree, is_cursor):
+        """One custom//community//forge row: name, a middle column, a badge.
+
+        The middle column is dropped rather than truncated when the terminal is
+        narrow — a half-written command list reads as a level that requires `w`,
+        `b`, `e` when it also requires `f`, and a wrong claim is worse than no
+        claim. The name and the badge always survive."""
+        nc     = enfc if is_cursor else rst
+        left   = '  ' + tree + ' ' + name
+        room   = cw - len(left) - len(badge) - 2
+        if mid and len(mid) <= room:
+            gap_l = 2
+            gap_r = max(1, cw - len(left) - gap_l - len(mid) - len(badge))
+            body  = (C.hint_fg() + tree + ' ' + nc + name + ' ' * gap_l +
+                     dfc + mid + ' ' * gap_r + badge_col + badge)
+        else:
+            body = (C.hint_fg() + tree + ' ' + nc + name +
+                    ' ' * max(1, cw - 4 - len(name) - len(badge)) +
+                    badge_col + badge)
+        return '  ' + body, cw
+
+    def _shelf_mid(level) -> str:
+        """The middle column for a community level or draft: who wrote it, and
+        what it asks of you — `requires`, then `teaches` marked with a leading +.
+
+        Both command lists, not one. `requires` is what the level assumes you
+        already know and `teaches` is what it introduces, and a row showing only
+        one of them cannot answer the question the player is actually asking:
+        whether this is a level they can play yet. Shipped levels get the same
+        information from the curriculum; a community level has nowhere else to
+        say it."""
+        if level is None:
+            return ''
+        cmds = ' '.join(list(level.requires) + [f'+{t}' for t in level.teaches])
+        who  = f'by {level.author}' if level.author else ''
+        return '  '.join(p for p in (who, cmds) if p)
+
     def _content(idx, line):
         """(colored, visible_width) for a buffer line. is_cursor brightens it."""
         is_cursor = idx == cursor
@@ -210,11 +247,10 @@ def render_overworld(term: Terminal, player: Player, progress: dict,
         if t == 'custom':
             name = line['layout'].get('layout_name', '?')
             tree = tree_glyph(line.get('last'))
-            badge, badge_col = '[CUSTOM]', C.mode_insert()
-            nc = enfc if is_cursor else rst
-            spaces = max(1, cw - 4 - len(name) - len(badge))
-            return ('  ' + C.hint_fg() + tree + ' ' + nc + name + ' ' * spaces +
-                    badge_col + badge), cw
+            # A layout is a saved ROOM, not a level: it has no author block and
+            # no command list to show, so its middle column stays empty.
+            return _subtree_row(name, '', '[CUSTOM]', C.mode_insert(),
+                                tree, is_cursor)
         if t == 'community':
             shelf = line['shelf']
             name  = shelf.name
@@ -226,10 +262,8 @@ def render_overworld(term: Terminal, player: Player, progress: dict,
                 badge, badge_col = f'[par {shelf.report.par}]', C.chest_fg()
             else:
                 badge, badge_col = '[BROKEN]', C.error_fg()
-            nc = enfc if is_cursor else rst
-            spaces = max(1, cw - 4 - len(name) - len(badge))
-            return ('  ' + C.hint_fg() + tree + ' ' + nc + name + ' ' * spaces +
-                    badge_col + badge), cw
+            return _subtree_row(name, _shelf_mid(shelf.level), badge, badge_col,
+                                tree, is_cursor)
         if t == 'draft':
             d    = line['draft']
             name = d.name
@@ -244,10 +278,8 @@ def render_overworld(term: Terminal, player: Player, progress: dict,
                 badge, badge_col = '[NO TAPE]', C.hint_fg()
             else:
                 badge, badge_col = '[DRAFT]', C.mode_insert()
-            nc = enfc if is_cursor else rst
-            spaces = max(1, cw - 4 - len(name) - len(badge))
-            return ('  ' + C.hint_fg() + tree + ' ' + nc + name + ' ' * spaces +
-                    badge_col + badge), cw
+            return _subtree_row(name, _shelf_mid(d.level), badge, badge_col,
+                                tree, is_cursor)
         # level
         lv       = line['level']
         prog     = progress.get(lv['slug'], {})

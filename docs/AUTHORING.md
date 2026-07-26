@@ -38,6 +38,15 @@ they always have, plus the level's own properties:
 | `:check` | run the validator and report par, budget and warnings |
 | `:publish` | validate, then put it on the shelf in `~/.Vimny/levels/` |
 | `:w` / `:wq` | save the draft |
+| `:e` / `:e!` | re-read the draft from disk (`:e!` to discard unsaved work) |
+
+Every metadata command reads as well as writes, the way `:set` does: `:author
+Chas` sets it, `:author?` (or a bare `:author`) asks what it is now, and
+`:author!` clears it. Clearing takes the explicit `!` because a mistyped query
+should not throw away the thing it was asking about.
+
+A `V` (linewise) selection fills the **whole row**, not the columns your cursor
+happened to sit between.
 
 `:record` is the reason the forge exists. It does not record in the editor —
 an editor room has passable walls, no budget and no command gating, so a route
