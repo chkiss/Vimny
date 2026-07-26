@@ -286,3 +286,54 @@ def test_shield_removal_does_not_affect_other_entities():
 
     assert warden.alive
     assert not any(e.alive and e.kind == 'shield' for e in room.entities)
+
+
+# ── A hound is a combatant, not an invulnerable one ──────────────────────────
+#
+# The bug both of these pin: NOTHING in the game could ever damage an ally.
+# Hostiles only ever struck the player, so a hound bit first every turn and
+# took no answer — one dog walked a room clean.  And the hound could not even
+# see an impostor Warden, so an echo neither fought it nor was fought.
+
+def _hound_and_foe(foe, hound_hp=1):
+    """A hound and one hostile standing next to each other, far from the player."""
+    room   = _bare_room()
+    player = Player(row=5, col=1)
+    hound = Entity(kind='ally', row=1, col=10, hp=hound_hp, max_hp=hound_hp,
+                   tag='dog', ai='hunt')
+    foe.row, foe.col = 1, 11
+    room.add_entity(hound)
+    room.add_entity(foe)
+    room.rebuild_indexes()
+    return room, player, hound, foe
+
+
+def test_a_goblin_bites_the_hound_back():
+    goblin = Entity(kind='goblin', hp=3, max_hp=3, row=0, col=0, ai='chase')
+    room, player, hound, goblin = _hound_and_foe(goblin)
+
+    _enemy_tick(room, player)
+
+    assert goblin.hp < 3, 'the hound should have bitten'
+    assert not hound.alive, 'and a 1-HP hound should not survive the answer'
+
+
+def test_a_stationary_foe_still_defends_its_cell():
+    """ai='' means it cannot path to you — not that it is harmless up close."""
+    zombie = Entity(kind='goblin', hp=3, max_hp=3, row=0, col=0, ai='', tag='zombie')
+    room, player, hound, zombie = _hound_and_foe(zombie)
+
+    _enemy_tick(room, player)
+
+    assert not hound.alive
+
+
+def test_the_hound_smells_an_impostor_warden():
+    """An echo is a hostile: the hound bites it, and its first bite unmasks."""
+    echo = Entity(kind='goblin', hp=2, max_hp=2, row=0, col=0, ai='', tag='echo')
+    room, player, hound, echo = _hound_and_foe(echo, hound_hp=4)
+
+    _enemy_tick(room, player)
+
+    assert echo.tag == '' and echo.alive, 'one strike tears the disguise, as x does'
+    assert hound.hp < 4, 'and the echo answers'

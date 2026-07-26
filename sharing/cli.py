@@ -45,20 +45,19 @@ from sharing.replay import replay_tape
 from sharing.validate import validate
 
 
-# Levels the audit cannot replay end to end. This used to hold 21 entries —
-# every level whose tape contained an insert verb — because the notation omitted
-# <Esc> and the keys after one were typed into the buffer instead of executed.
-# Writing Esc as <Esc> (engine/tape.py) closed that, and re-probing showed 5 of the
-# 21 had never needed to be here at all: the list was copied from
-# `_REPLAY_OWN_TEST` in tests/test_answer_paths.py, which is about answer COST
-# tokenisation rather than replayability, and over-skipping is how a level
-# passes an audit vacuously.
+# Levels no single tape can replay end to end. The Grandmaster's Sanctum is TWO
+# rooms, and the arena deliberately has no karaoke (shear six strands in any
+# order — there is no fixed route), so its gallery tape cannot finish a level
+# that does not end in the gallery. Printed, never dropped.
 #
-# One genuine case remains, and it is not about Esc: the Grandmaster's Sanctum
-# is TWO rooms, and the arena deliberately has no karaoke (shear six strands in
-# any order — there is no fixed route). Its gallery tape cannot finish the level
-# because the level does not end in the gallery. Printed, never dropped.
-_IMPLICIT_ESC = {
+# It used to hold 21 entries — every level whose tape contained an insert verb —
+# because the notation omitted Esc and the keys after one were typed into the
+# buffer instead of executed. Writing <Esc> (engine/tape.py) closed that, and
+# re-probing showed 5 of the 21 had never needed to be here at all: the list was
+# copied from `_REPLAY_OWN_TEST` in tests/test_answer_paths.py, which is about
+# answer COST tokenisation rather than replayability. Over-skipping is how a
+# level passes an audit vacuously, so nothing joins this set unprobed.
+_NO_SINGLE_TAPE = {
     'grandmasters_sanctum',
 }
 
@@ -129,7 +128,7 @@ def _cmd_audit(args) -> int:
         builder = getattr(dg, f'build_dungeon_{slug}', None)
         if builder is None:
             continue
-        if slug in _IMPLICIT_ESC:
+        if slug in _NO_SINGLE_TAPE:
             print(f'{slug:26} — skipped: no single tape finishes it; '
                   f'par pinned by tests/test_{slug}.py')
             continue

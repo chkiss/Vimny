@@ -41,7 +41,8 @@ from engine.vim_parser import parse, parse_visual_textobj
 from engine.command_guard import (action_allowed as _action_allowed_raw,
                                   guard_message as _guard_message_raw,
                                   _MOTION_GUARD as _MOTION_GUARD_TABLE)
-from engine.world import Entity, CellType, CharRun, Dungeon, clone_entity, entity_letter
+from engine.world import (Entity, CellType, CharRun, Dungeon, clone_entity,
+                          entity_letter, strike_disguise)
 from engine.motion import (apply_motion, _apply_esc, _reveal_from,
                            _first_non_blank_col, auto_fog_tick as _auto_fog_tick)
 from engine.text_object import compute_text_object, resolve_text_object, TextObjectType
@@ -3122,8 +3123,8 @@ _LEVEL_INTROS = {
     'buried_word': ('The Buried Word — one word stands alone at the hall\'s mouth, and nowhere else does it stand: down the hall it only hides, seamed into longer names. The seams are fused shut.', 70),
     'wet_ink': ('The Wet Ink — a writing ledge, an old saying mostly lost in the dark, and a gallery of cold braziers beneath it. Write its opening and you will know the rest. The scribes here wrote by firelight, and the fire answers only words already written.', 70),
     'g_sanctum': ('The Last Reach — three old sayings run east toward the flood. The keepers of this place went to the end of the line many times a day, and never once over it.', 70),
-    'register_unnamed_hold': ('The Register I — the horse waits at the mouth, and his saddle bears whatever you last took up. What it holds, it holds only until your hand closes on the next thing; and a blade closes a hand as surely as a grasp.', 70),
-    'register_named_vault': ('The Register II — the vault stands open, and grey dust has settled over the end of every saying in it. An open hand carries one thing, and cannot set it down and keep it.', 70),
+    'register_unnamed_hold': ('The Unnamed Hold — the horse waits at the mouth, and his saddle bears whatever you last took up. What it holds, it holds only until your hand closes on the next thing; and a blade closes a hand as surely as a grasp.', 70),
+    'register_named_vault': ('The Named Vault — the vault stands open, and grey dust has settled over the end of every saying in it. An open hand carries one thing, and cannot set it down and keep it.', 70),
     'stair_rail': ('The Stair Rail — a broken stair winds down the shaft, each step\'s word set a little east of the last, and below the steps the floor falls a long way. The masons who cut these stairs never missed a landing.', 70),
     'hall_of_echoes': ('The Hall of Echoes — hall opens onto hall, and every hall repeats itself. The stone remembers.', 70),
     'grandmasters_sanctum': ('The Grandmaster\'s Sanctum — a long gallery of seven proofs, and the master himself beyond the last stone, listening to every stroke. Nothing here is new; everything here is asked properly.', 70),
@@ -3696,6 +3697,47 @@ def _detour_step(room, player, ent, dist: int):
     return None
 
 
+def _ally_foes(room) -> list:
+    """Everything a hound will bite — every live hostile it can smell.
+
+    An impostor Warden (a goblin wearing tag='echo') is a hostile like any
+    other, and the hound smells it like one; its first bite tears the disguise
+    off exactly as the player's own x does.
+    """
+    return [e for e in room.entities
+            if e.alive and e.kind in ('goblin', 'warden')]
+
+
+def _bites_allies(ent) -> bool:
+    """True if `ent` is something that mauls a hound standing next to it."""
+    return (ent.kind in ('goblin', 'warden')
+            or (ent.kind == 'critter' and ent.swole))
+
+
+def _bite_ally(room, ent) -> list:
+    """`ent` strikes one adjacent hound, if there is one.  Returns messages.
+
+    Whatever would bite the PLAYER bites a hound in its way.  Without this a
+    hound was untouchable — it struck first every turn and nothing in the game
+    could ever strike back, so a single dog walked a room clean.  A STATIONARY
+    hostile (ai='') bites too: a creature that cannot path to you can still
+    defend the cell it is standing in.
+    """
+    msgs = []
+    for a in room._entity_by_kind.get('ally', []):
+        if not a.alive or _manhattan(ent.row, ent.col, a.row, a.col) > _ATTACK_RADIUS:
+            continue
+        a.hp -= (1 if ent.kind == 'warden'
+                 else max(1, _hp_atk(_entity_glyph(ent))[1]))
+        room._atk_arrows = getattr(room, '_atk_arrows', [])
+        room._atk_arrows.append((ent.row, ent.col, a.row, a.col, _arrow_key(ent)))
+        if a.hp <= 0:
+            room.kill_entity(a)
+            msgs.append('Your hound falls.')
+        break                                    # one bite per hostile per turn
+    return msgs
+
+
 def _enemy_tick(room, player) -> list:
     msgs = []
     for ent in list(room.entities):
@@ -3712,17 +3754,25 @@ def _enemy_tick(room, player) -> list:
             # ONCE (not once per step) and its turn ends — so a big Hound deals 3,
             # not 9, a turn.
             for _ in range(3 if ent.swole else 2):           # moves per turn
-                foes = [e for e in room.entities if e.alive
-                        and e.kind in ('goblin', 'warden') and e.tag != 'echo'
-                        and (e.row, e.col) not in _fog]
+                foes = [e for e in _ally_foes(room)
+                        if (e.row, e.col) not in _fog]
                 adj = next((e for e in foes
                             if _manhattan(ent.row, ent.col, e.row, e.col) <= 1), None)
                 if adj is not None:
                     _ar, _ac = adj.row, adj.col
-                    adj.hp -= _dmg
-                    if adj.hp <= 0:
-                        room.kill_entity(adj)
-                        msgs.append('Your hound fells a foe!')
+                    if adj.kind == 'goblin' and adj.tag == 'echo':
+                        # Same price as the player's own x: one strike tears the
+                        # disguise off, the next one kills.
+                        if strike_disguise(adj):
+                            room.kill_entity(adj)
+                            msgs.append('Your hound fells a foe!')
+                        else:
+                            msgs.append('Your hound tears the disguise off a false Warden!')
+                    else:
+                        adj.hp -= _dmg
+                        if adj.hp <= 0:
+                            room.kill_entity(adj)
+                            msgs.append('Your hound fells a foe!')
                     # a colored direction arrow at the hound, pointing at the bite
                     room._atk_arrows = getattr(room, '_atk_arrows', [])
                     room._atk_arrows.append((ent.row, ent.col, _ar, _ac, 'ally'))
@@ -3849,6 +3899,8 @@ def _enemy_tick(room, player) -> list:
                     and (0, nc) != (player.row, player.col)):
                 room.move_entity(ent, 0, nc)
             continue
+        if _bites_allies(ent):
+            msgs += _bite_ally(room, ent)
         dist = _manhattan(player.row, player.col, ent.row, ent.col)
         if ent.kind == 'warden' \
                 and ent.tag not in ('surveyor', 'verse', 'manifold', 'stamp',

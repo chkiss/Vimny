@@ -138,8 +138,8 @@ The main game sequence is complete — every level below is playable.
 | 47 | The Hall of Echoes | `q @ "` |
 | 48 | The Gauntlet | — |
 | 48.1 | The Warden Eternal | (boss) |
-| R1 | The Register I | `""  y  p` |
-| R2 | The Register II | `"ay  "by  "aP  "bP` |
+| R1 | The Unnamed Hold | `""  y  p` |
+| R2 | The Named Vault | `"ay  "by  "aP  "bP` |
 <!-- END GENERATED LEVELS TABLE -->
 
 ## Commands

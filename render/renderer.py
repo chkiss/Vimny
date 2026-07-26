@@ -591,10 +591,12 @@ def render_all(term: Terminal, dungeon: Dungeon, player: Player,
             if (room.cells[room_r][room_c] == CellType.WATER
                     and (room_r, room_c) in room.mist_cells):
                 # MIST on water reads as hazy water, not stone — the channel
-                # stays visibly a channel (scans still stop at the fog).
+                # stays visibly a channel (scans still stop at the fog), but it
+                # must not read as OPEN water either, so it takes its own
+                # lifted-grey palette and the shade glyph rather than the '~'.
                 # Plain-fogged water is DARK like any hidden cell: an
                 # unrevealed pool gives nothing away.
-                return C.water_bg() + C.hint_fg() + '~' + C.normal_fg()
+                return C.mist_bg() + C.mist_fg() + S.MIST + C.normal_fg()
             if ((room_r, room_c) not in room.mist_cells
                     or room.char_run_at(room_r, room_c) is None):
                 return wall_bg + ' ' + C.normal_fg()

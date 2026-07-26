@@ -56,18 +56,21 @@ Ten register families, nine titled levels: the four **read-only / environment**
 registers (`":` `".` `"%` `"#`) are one family — "registers you can read but never
 write" — and share **one** level (V). Plus a boss capstone (**The Registrar**).
 
+The wing is ordered by the `display` key (`R1`, `R2`, …), which is all the
+ordering a player needs; each level's *name* is its own, not a numeral.
+
 | # | Overworld name | Register(s) | New token | Status |
 |---|---|---|---|---|
-| I    | The Register I — *The Unnamed Hold*    | `""`                 | reuses `register`   | refresher |
-| II   | The Register II — *The Delete Ring*    | `"0`, `"1`–`"9`      | `reg_numbered`      | new · core |
-| III  | The Register III — *The Small Cut*     | `"-`                 | `reg_small_delete`  | new |
-| IV   | The Register IV — *The Named Vaults*   | `"a`–`"z`, `"A` append | reuses `reg_named` | deepen |
-| V    | The Register V — *The Clerk's Ledger*  | `":` `".` `"%` `"#`  | `reg_readonly`      | new |
-| VI   | The Register VI — *The Reckoner*       | `"=`                 | `reg_expr`          | new |
-| VII  | The Register VII — *The Saddlebag*     | `"*` `"+`            | `reg_selection`     | new |
-| VIII | The Register VIII — *The Black Hole*   | `"_`                 | `reg_blackhole`     | new |
-| IX   | The Register IX — *The Seeker's Echo*  | `"/`                 | `reg_search`        | new |
-| —    | The Registrar (boss capstone)          | multi-register       | — (`type: boss`)    | new |
+| I    | The Unnamed Hold     | `""`                 | reuses `register`   | refresher · **shipped (`R1`)** |
+| II   | The Delete Ring      | `"0`, `"1`–`"9`      | `reg_numbered`      | new · core |
+| III  | The Small Cut        | `"-`                 | `reg_small_delete`  | new |
+| IV   | The Named Vault      | `"a`–`"z`, `"A` append | reuses `reg_named` | deepen · **shipped (`R2`)** |
+| V    | The Clerk's Ledger   | `":` `".` `"%` `"#`  | `reg_readonly`      | new |
+| VI   | The Reckoner         | `"=`                 | `reg_expr`          | new |
+| VII  | The Saddlebag        | `"*` `"+`            | `reg_selection`     | new |
+| VIII | The Black Hole       | `"_`                 | `reg_blackhole`     | new |
+| IX   | The Seeker's Echo    | `"/`                 | `reg_search`        | new |
+| —    | The Registrar (boss capstone) | multi-register | — (`type: boss`)   | new |
 
 Sequencing *is* the difficulty curve: I (refresher) → II (the ring, the conceptual
 linchpin) → III/IV (isolation & multiplexing) → V (read-only strings) → VI (compute)

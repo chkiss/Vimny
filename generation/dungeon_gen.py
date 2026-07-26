@@ -1560,8 +1560,9 @@ def build_dungeon_dummy(seed: int) -> Dungeon:
     # A jail row needs a plain aisle ABOVE and BELOW its two stone rows — set a
     # jail against a label row and its aisle has no way back to the west spine.
     _band(5, [
-        ('dog',       _jail(3, kind='ally')),
-        ('big_dog',   _jail(3, kind='ally',    swole=True)),
+        # A hound is a combatant like any other: it bites, and it can be bitten.
+        ('dog',       _jail(3, kind='ally', hp=1, max_hp=1)),
+        ('big_dog',   _jail(3, kind='ally', hp=2, max_hp=2, swole=True)),
         ('cat',       _jail(3, kind='critter')),
         ('big_cat',   _jail(3, kind='critter', swole=True)),
         ('elf',       _jail(3, kind='elf')),
@@ -4085,7 +4086,7 @@ def build_dungeon_register_unnamed_hold(seed: int) -> Dungeon:
     # the clobber; doing it last (dw before the yank) also wins, one key dearer.
     room.answer = ('j ye 4j fo p - k fq dw G l')
 
-    dungeon = Dungeon(name='The Register I', seed=seed)
+    dungeon = Dungeon(name='The Unnamed Hold', seed=seed)
     dungeon.rooms        = [room]
     dungeon.current_room = 0
     return dungeon
@@ -4194,7 +4195,7 @@ def build_dungeon_register_named_vault(seed: int) -> Dungeon:
                             'q 2@q G l'])
     # NO fog and NO gates: the room is open from the spawn so the rhythm shows.
 
-    dungeon = Dungeon(name='The Register II', seed=seed)
+    dungeon = Dungeon(name='The Named Vault', seed=seed)
     dungeon.rooms        = [room]
     dungeon.current_room = 0
     return dungeon

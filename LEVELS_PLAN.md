@@ -34,7 +34,7 @@ visual mode.
 
 ### The Registry — the bonus register wing
 Blueprint: `blueprints/registry_wing.md`. Two of its levels have shipped (The
-Register I, The Register II); the rest are designed and unbuilt:
+Unnamed Hold, The Named Vault); the rest are designed and unbuilt:
 
 | Level | Teaches |
 |---|---|
