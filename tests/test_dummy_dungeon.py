@@ -58,6 +58,13 @@ EXPECTED_RUNE_KINDS   = {'ancient', 'verdant', 'void', 'ember'}
 # eight of them would be eight identical exhibits.
 EXPECTED_ENTITY_TAGS  = {'gold', 'red', 'blue', 'zombie', 'demon', 'echo'}
 
+# The two bands whose specimens can move, and are therefore caged.
+JAIL_ROWS = {3, 8}
+
+# A blank cell in the east scratchpad — the wing that exists precisely so
+# editor tests have somewhere to scribble without disturbing an exhibit.
+SCRATCH = (16, 110)
+
 # Cell types where _ed_cut should return a clip and leave FLOOR behind.
 # Structural floor types (FLOOR, CORRIDOR) are pasteable but not cuttable.
 CUTTABLE_TYPES = {CellType.WALL, CellType.WATER, CellType.WOOD_WALL}
@@ -186,20 +193,34 @@ def test_jailed_hostiles_cannot_escape():
     player = _P()
     player.row, player.col = room.spawn_pos
     jailed = [e for e in room.entities
-              if e.alive and e.kind in ('goblin', 'warden') and 5 <= e.row <= 7]
-    assert len(jailed) == 7, f"expected 7 jailed specimens, found {len(jailed)}"
+              if e.alive and e.row in JAIL_ROWS and e.kind != 'door']
+    assert len(jailed) == 15, f"expected 15 jailed specimens, found {len(jailed)}"
     for e in jailed:
         step = _greedy_step_toward(room, player, e, (player.row, player.col))
         assert step is None, f"{e.kind} at ({e.row},{e.col}) escaped its cell to {step}"
 
 
-def test_jailed_hostiles_are_visible():
+def test_jailed_specimens_are_visible():
     """Stone fog, not reachability fog — a door is a grille you can see through,
     so a caged specimen is on display rather than hidden in the dark."""
     room = build_dungeon_dummy(SEED).room
     hidden = [(e.kind, e.row, e.col) for e in room.entities
-              if e.alive and 5 <= e.row <= 7 and (e.row, e.col) in room.fog_cells]
+              if e.alive and e.row in JAIL_ROWS and e.kind != 'door'
+              and (e.row, e.col) in room.fog_cells]
     assert not hidden, f"jailed specimen(s) fogged out of view: {hidden}"
+
+
+def test_jail_doors_draw_vertical():
+    """A jail's stone runs above and below the DOOR as well as the cell, so the
+    door reads as the north-south door it is instead of lying on its side."""
+    from render.renderer import _is_vertical_door
+    room = build_dungeon_dummy(SEED).room
+    doors = [e for e in room.entities
+             if e.alive and e.kind == 'door' and e.row in JAIL_ROWS]
+    assert len(doors) == 15, f"expected 15 jail doors, found {len(doors)}"
+    flat = [(e.row, e.col) for e in doors
+            if not _is_vertical_door(room, e.row, e.col, 'door')]
+    assert not flat, f"jail door(s) drawing horizontal in a vertical wall: {flat}"
 
 
 def test_mist_is_a_subset_of_fog():
@@ -223,7 +244,7 @@ def test_sealed_gate_present():
 def test_all_cell_types_are_pasteable(ct):
     """Every CellType must be placeable via _ed_paste (used by admin 'p' command)."""
     room = build_dungeon_dummy(SEED).room
-    r, c = 3, 3  # interior floor cell
+    r, c = SCRATCH
     item = {'type': 'cell', 'cell_type': ct}
     _ed_paste(room, r, c, [item])
     assert room.cells[r][c] == ct, f"CellType.{ct.name} not correctly set by _ed_paste"
@@ -235,7 +256,7 @@ def test_all_cell_types_are_pasteable(ct):
 def test_cuttable_types_survive_round_trip(ct):
     """x cuts the cell to FLOOR and returns a clip; p restores it."""
     room = build_dungeon_dummy(SEED).room
-    r, c = 3, 3
+    r, c = SCRATCH
     room.cells[r][c] = ct
 
     clip = _ed_cut(room, r, c)
@@ -251,13 +272,13 @@ def test_cuttable_types_survive_round_trip(ct):
 def test_floor_cut_returns_none():
     """FLOOR is not an obstacle; _ed_cut on an empty floor cell returns None."""
     room = build_dungeon_dummy(SEED).room
-    assert _ed_cut(room, 3, 3) is None
+    assert _ed_cut(room, *SCRATCH) is None
 
 
 def test_corridor_cut_returns_none():
     """CORRIDOR is structural floor; _ed_cut returns None (use paste to place it)."""
     room = build_dungeon_dummy(SEED).room
-    r, c = 3, 3
+    r, c = SCRATCH
     room.cells[r][c] = CellType.CORRIDOR
     assert _ed_cut(room, r, c) is None
 
@@ -267,7 +288,7 @@ def test_corridor_cut_returns_none():
 def test_subst_cycle_visits_all_cuttable_types():
     """Pressing s repeatedly from FLOOR must visit every type in CUTTABLE_TYPES."""
     room = build_dungeon_dummy(SEED).room
-    r, c = 3, 3
+    r, c = SCRATCH
     room.cells[r][c] = CellType.FLOOR
 
     seen = set()
@@ -287,7 +308,7 @@ def test_subst_cycle_visits_all_cuttable_types():
 def test_subst_cycle_returns_to_floor():
     """The s cycle must be closed — repeated presses return to FLOOR."""
     room = build_dungeon_dummy(SEED).room
-    r, c = 3, 3
+    r, c = SCRATCH
     room.cells[r][c] = CellType.FLOOR
 
     for _ in range(len(CellType) * 2):

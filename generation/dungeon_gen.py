@@ -1425,7 +1425,7 @@ _DUMMY_C0, _DUMMY_C1 = 4, 73   # the labelled-alcove span. Cols 1-3 are the SPIN
                                # showroom would fall into disconnected strips.
 _DUMMY_DIV_W = 75    # showroom | reflow wing
 _DUMMY_DIV_E = 97    # reflow wing | scratchpad
-_DUMMY_YARD  = 30    # the open row both dividers open onto
+_DUMMY_YARD  = 31    # the open row both dividers open onto
 
 
 def build_dungeon_dummy(seed: int) -> Dungeon:
@@ -1439,8 +1439,9 @@ def build_dungeon_dummy(seed: int) -> Dungeon:
       Divider     col 97      — locked door (an exhibit that is also the gate)
       Scratchpad  cols 98-130 — blank floor to build on, and the exit
 
-    Bands run spec-row / label-row: friendlies 2/3, hostiles 5-7/8, loot 10/11,
-    keys 13/14, doors 16/17, fixtures 19/20, terrain 22-24/25, runes 27/28.
+    Bands run spec-row / label-row: friendlies 2-4/5, hostiles 7-9/10,
+    loot 12/13, keys 15/16, doors 18/19, fixtures 21/22, terrain 24-26/27,
+    runes 29/30. Every specimen that can move is jailed.
     """
     ROWS, COLS = _DUMMY_ROWS, _DUMMY_COLS
     dungeon = Dungeon(name='Dummy Dungeon', seed=seed)
@@ -1487,16 +1488,24 @@ def build_dungeon_dummy(seed: int) -> Dungeon:
     def _jail(row: int, **kw):
         """A specimen cell: stone on three sides, a door on the fourth.
 
+        EVERY specimen is jailed, friendly ones included — an un-caged ally
+        beelines for the player the moment the sandbox opens, and an exhibit
+        that walks away is not an exhibit.
+
         The door earns its place twice over. Fog here is cast by
         `apply_stone_fog`, which only STONE blocks — so the occupant is visible
         from the aisle rather than hidden in the dark. And `_steppable` refuses
         any cell that holds an entity, so the occupant can never cross its own
         door: the cage holds for exactly the reason the fog clears, with no
         engine change and no fog exemption. Delete the door and you release it.
+
+        The stone runs above and below the DOOR as well as the cell, which is
+        what makes `_is_vertical_door` draw it as the north-south door it is.
         """
         def place(c):
-            cells[row - 1][c] = CellType.WALL
-            cells[row + 1][c] = CellType.WALL
+            for cc in (c, c + 1):
+                cells[row - 1][cc] = CellType.WALL
+                cells[row + 1][cc] = CellType.WALL
             cells[row][c - 1] = CellType.WALL
             ents.append(Entity(row=row, col=c, **kw))
             ents.append(Entity(kind='door', row=row, col=c + 1))
@@ -1545,82 +1554,88 @@ def build_dungeon_dummy(seed: int) -> Dungeon:
         return place
 
     # ── Friendlies — the whole `~`-toggle family sits in one eyeline, so g/G,
-    # d/D and c/C read as the same joke told three times.
-    _band(3, [
-        ('dog',       _at(2, kind='ally')),
-        ('big_dog',   _at(2, kind='ally',    swole=True)),
-        ('cat',       _at(2, kind='critter')),
-        ('big_cat',   _at(2, kind='critter', swole=True)),
-        ('elf',       _at(2, kind='elf')),
-        ('horse',     _at(2, kind='horse')),
-        ('archivist', _at(2, kind='archivist', ai='')),
-        ('wanderer',  _at(2, kind='wanderer')),
+    # d/D and c/C read as the same joke told three times. Jailed like the rest:
+    # an ally left loose runs to the player's side and the band empties itself.
+    # A jail row needs a plain aisle ABOVE and BELOW its two stone rows — set a
+    # jail against a label row and its aisle has no way back to the west spine.
+    _band(5, [
+        ('dog',       _jail(3, kind='ally')),
+        ('big_dog',   _jail(3, kind='ally',    swole=True)),
+        ('cat',       _jail(3, kind='critter')),
+        ('big_cat',   _jail(3, kind='critter', swole=True)),
+        ('elf',       _jail(3, kind='elf')),
+        ('horse',     _jail(3, kind='horse')),
+        ('archivist', _jail(3, kind='archivist', ai='')),
+        ('wanderer',  _jail(3, kind='wanderer')),
     ])
 
-    # ── Hostiles, jailed. Live `chase` AI on the goblins: they strain against
-    # the door every tick and get nowhere, which is the point of the exhibit.
-    _band(8, [
-        ('goblin', _jail(6, kind='goblin', hp=1, max_hp=1, ai='chase', ai_speed=1)),
-        ('swole',  _jail(6, kind='goblin', hp=1, max_hp=1, ai='chase', ai_speed=1,
+    # ── Hostiles. Live `chase` AI on the goblins: they strain against the door
+    # every tick and get nowhere, which is the point of the exhibit.
+    _band(10, [
+        ('goblin', _jail(8, kind='goblin', hp=1, max_hp=1, ai='chase', ai_speed=1)),
+        ('swole',  _jail(8, kind='goblin', hp=1, max_hp=1, ai='chase', ai_speed=1,
                          swole=True)),
-        ('zombie', _jail(6, kind='goblin', hp=1, max_hp=1, ai='', tag='zombie')),
-        ('demon',  _jail(6, kind='goblin', hp=1, max_hp=1, ai='', tag='demon')),
+        ('zombie', _jail(8, kind='goblin', hp=1, max_hp=1, ai='', tag='zombie')),
+        ('demon',  _jail(8, kind='goblin', hp=1, max_hp=1, ai='', tag='demon')),
         # Two echo shades, not eight: enough to show the impostors are a SPREAD
         # of reds rather than one colour. hp=2 so an unmasking strike is survived.
-        ('echo',   _jail(6, kind='goblin', hp=2, max_hp=2, ai='', tag='echo', shade=0)),
-        ('echo2',  _jail(6, kind='goblin', hp=2, max_hp=2, ai='', tag='echo', shade=3)),
-        ('warden', _jail(6, kind='warden', hp=5, max_hp=5, ai='', summon_timer=0)),
+        ('echo',   _jail(8, kind='goblin', hp=2, max_hp=2, ai='', tag='echo', shade=0)),
+        ('echo2',  _jail(8, kind='goblin', hp=2, max_hp=2, ai='', tag='echo', shade=3)),
+        ('warden', _jail(8, kind='warden', hp=5, max_hp=5, ai='', summon_timer=0)),
     ])
 
-    _band(11, [
-        ('chest',     _at(10, kind='chest')),
-        ('key_chest', _at(10, kind='chest_key')),
-        ('scroll',    _at(10, kind='chest_scroll')),
-        ('coin',      _at(10, kind='gold')),
-        ('heart',     _at(10, kind='heart_container')),
-        ('shield',    _at(10, kind='shield')),
-        ('hat',       _at(10, kind='hat')),
+    _band(13, [
+        ('chest',     _at(12, kind='chest')),
+        ('key_chest', _at(12, kind='chest_key')),
+        ('scroll',    _at(12, kind='chest_scroll')),
+        ('coin',      _at(12, kind='gold')),
+        ('heart',     _at(12, kind='heart_container')),
+        ('shield',    _at(12, kind='shield')),
+        ('hat',       _at(12, kind='hat')),
     ])
 
-    _band(14, [
-        ('floor_key', _at(13, kind='floor_key')),
-        ('gold_key',  _at(13, kind='floor_key', tag='gold')),
-        ('red_key',   _at(13, kind='floor_key', tag='red')),
-        ('blue_key',  _at(13, kind='floor_key', tag='blue')),
+    _band(16, [
+        ('floor_key', _at(15, kind='floor_key')),
+        ('gold_key',  _at(15, kind='floor_key', tag='gold')),
+        ('red_key',   _at(15, kind='floor_key', tag='red')),
+        ('blue_key',  _at(15, kind='floor_key', tag='blue')),
     ])
 
-    _band(17, [
-        ('door',      _at(16, kind='door')),
-        ('gold_lock', _at(16, kind='locked_door', tag='gold')),
-        ('red_lock',  _at(16, kind='locked_door', tag='red')),
-        ('blue_lock', _at(16, kind='locked_door', tag='blue')),
-        ('seal_door', _at(16, kind='seal_door')),
-        ('boss_seal', _at(16, kind='boss_seal')),
+    # Loose on the floor with open sky above and below, so these draw as the
+    # EAST-WEST doors they are — the jails and the wing dividers show the
+    # north-south form.
+    _band(19, [
+        ('door',      _at(18, kind='door')),
+        ('gold_lock', _at(18, kind='locked_door', tag='gold')),
+        ('red_lock',  _at(18, kind='locked_door', tag='red')),
+        ('blue_lock', _at(18, kind='locked_door', tag='blue')),
+        ('seal_door', _at(18, kind='seal_door')),
+        ('boss_seal', _at(18, kind='boss_seal')),
     ])
 
-    _band(20, [
-        ('brazier',  _at(19, kind='brazier', hp=1, max_hp=1, ai='')),
-        ('pedestal', _at(19, kind='pedestal')),
-        ('dynamite', _at(19, kind='dynamite')),
-        ('gate',     _gate(19)),
-        ('entry',    _entry(19)),
+    _band(22, [
+        ('brazier',  _at(21, kind='brazier', hp=1, max_hp=1, ai='')),
+        ('pedestal', _at(21, kind='pedestal')),
+        ('dynamite', _at(21, kind='dynamite')),
+        ('gate',     _gate(21)),
+        ('entry',    _entry(21)),
     ])
 
-    _band(25, [
+    _band(27, [
         ('floor',    lambda c: None),                       # the slab as built
-        ('corridor', _patch(range(22, 25), CellType.CORRIDOR)),
-        ('stone',    _patch(range(22, 25), CellType.WALL)),
-        ('timber',   _patch(range(22, 25), CellType.WOOD_WALL)),
-        ('water',    _patch(range(22, 25), CellType.WATER)),
-        ('mist',     _misted(range(22, 25))),
-        ('fogbox',   _fogbox(range(22, 25))),
+        ('corridor', _patch(range(24, 27), CellType.CORRIDOR)),
+        ('stone',    _patch(range(24, 27), CellType.WALL)),
+        ('timber',   _patch(range(24, 27), CellType.WOOD_WALL)),
+        ('water',    _patch(range(24, 27), CellType.WATER)),
+        ('mist',     _misted(range(24, 27))),
+        ('fogbox',   _fogbox(range(24, 27))),
     ])
 
-    _band(28, [
-        ('ancient', _rune(27, '∘', 'ancient')),
-        ('verdant', _rune(27, '·', 'verdant')),
-        ('void',    _rune(27, '○', 'void')),
-        ('ember',   _rune(27, '⊙', 'ember')),
+    _band(30, [
+        ('ancient', _rune(29, '∘', 'ancient')),
+        ('verdant', _rune(29, '·', 'verdant')),
+        ('void',    _rune(29, '○', 'void')),
+        ('ember',   _rune(29, '⊙', 'ember')),
     ])
 
     # ── Reflow wing (engine/reflow.py) — quarantined behind stone. On a ledge

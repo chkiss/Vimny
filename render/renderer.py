@@ -56,14 +56,20 @@ def _seal_shown(room: Room, r: int, c: int) -> bool:
 def _is_vertical_door(room: Room, r: int, c: int, kind: str) -> bool:
     """Return True if the door at (r, c) is part of a vertical wall.
 
-    A door is vertical when it has a same-kind door neighbour directly above or
-    below — i.e. it belongs to a stacked column group blocking east-west movement.
+    Two ways to belong to one. A stacked group — a same-kind door directly above
+    or below — is the original test, and covers the two-cell openings most levels
+    carve. But a LONE door set into a vertical wall is just as vertical, and used
+    to draw as a horizontal door lying on its side: stone above and stone below
+    is a wall running north-south whatever is standing in the gap.
     """
     for dr in (-1, 1):
         nb = room.entity_at(r + dr, c)
         if nb and nb.kind == kind:
             return True
-    return False
+    stone = (CellType.WALL, CellType.WOOD_WALL)
+    return (0 < r < room.rows - 1
+            and room.cells[r - 1][c] in stone
+            and room.cells[r + 1][c] in stone)
 
 # ── Water animation ────────────────────────────────────────────────────────────
 # Each frame: (char, rgb, duration_seconds).
