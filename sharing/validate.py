@@ -31,7 +31,7 @@ import math
 import unicodedata
 from dataclasses import dataclass, field
 
-from content.levels import LEVELS
+from content.levels import LEVELS, known_commands
 from engine.world import CellType
 from sharing import format as F
 from sharing.replay import replay_tape
@@ -159,23 +159,38 @@ def _check_vocabulary(lvl: F.Level, rep: Report) -> None:
                 break
 
 
-# ── 6. Command scope, and 6-the-other-one: substitution ──────────────────────
+# ── 6. Command scope, and: does an alternate fit where it says it does? ───────
 
 def _check_declarations(lvl: F.Level, rep: Report) -> None:
-    if lvl.substitutes is not None:
-        if lvl.substitutes not in _SHIPPED_SLUGS:
-            rep.fail('substitutes', f'{lvl.substitutes!r} is not a shipped level slug')
+    if lvl.alternate is not None:
+        if lvl.alternate not in _SHIPPED_SLUGS:
+            rep.fail('alternate', f'{lvl.alternate!r} is not a shipped level slug')
         else:
-            target = next(lv for lv in LEVELS if lv['slug'] == lvl.substitutes)
+            target = next(lv for lv in LEVELS if lv['slug'] == lvl.alternate)
             want   = set(target.get('teaches', []))
             got    = set(lvl.teaches)
             if want != got:
                 # Exactly, in both directions. Teaching MORE leaves the player
                 # ahead of the curriculum; teaching LESS leaves a later level
                 # depending on a command they never met.
-                rep.fail('substitutes',
-                         f'a stand-in for {lvl.substitutes!r} must teach exactly '
-                         f'{sorted(want)}, but this level teaches {sorted(got)}')
+                rep.fail('alternate',
+                         f'a level offered in place of {lvl.alternate!r} has to '
+                         f'teach exactly {sorted(want)}, but this one teaches '
+                         f'{sorted(got)}')
+            # The other half of "same place in the curriculum": what the level
+            # ASSUMES has to have been taught by the time a player gets here.
+            # `known_commands` is cumulative and INCLUDES the target, so the set
+            # a player actually arrives with is that minus the target's own
+            # lesson.
+            arrives_with = set(known_commands(lvl.alternate)) - want
+            # A token in both requires and teaches is reported once, by the
+            # `scope` rule below, with a clearer message than this one.
+            missing = (set(lvl.requires) - arrives_with
+                       - set(F.ALWAYS_ON) - set(lvl.teaches))
+            if missing:
+                rep.fail('alternate',
+                         f'this level needs {sorted(missing)}, which a player '
+                         f'reaching {lvl.alternate!r} has not been taught yet')
     overlap = set(lvl.requires) & set(lvl.teaches)
     if overlap:
         rep.fail('scope', f'token(s) {sorted(overlap)} are in both requires and '

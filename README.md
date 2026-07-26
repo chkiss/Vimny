@@ -66,7 +66,7 @@ Each dungeon is a text buffer. The floor is made of **characters, words, and spa
 
 **Keystroke budget**: Every puzzle room displays a budget. Reaching the exit within it completes the room. The par is the minimum possible keystrokes using the level's taught commands — hitting par earns a second star. `u` (undo) returns budget; you can backtrack freely.
 
-> **Note — par is not the absolute minimum on search levels.** On levels that use search (`/`, `?`), par is computed assuming you type the **full search term** the level highlights (e.g. `/cipher⏎`). Because a search pattern only needs enough characters to land uniquely on the target, an expert can type a shorter prefix (e.g. `/cip⏎`) and finish *under* par. This is intentional and consistent across all search levels: par rewards "type the word you see," and the budget leaves headroom for prefix-search optimization.
+> **Note — par is not the absolute minimum on search levels.** On levels that use search (`/`, `?`), par is computed assuming you type the **full search term** the level highlights (e.g. `/cipher<CR>`). Because a search pattern only needs enough characters to land uniquely on the target, an expert can type a shorter prefix (e.g. `/cip<CR>`) and finish *under* par. This is intentional and consistent across all search levels: par rewards "type the word you see," and the budget leaves headroom for prefix-search optimization.
 
 **Terrain**: Levels use terrain to make a particular Vim command the *only* good answer, rather than merely the intended one.
 
@@ -348,18 +348,19 @@ python3 -m sharing validate mylevel.json            # check it
 python3 -m sharing install  mylevel.json            # put it on your shelf
 ```
 
-Two things are worth knowing before you install a stranger's level:
+Two things worth knowing before you install a level someone else wrote:
 
-- **A level is data, never code.** The file is parsed into a room and nothing in
-  it is ever executed. That is the security boundary, not a review process.
-- **The game has no network code.** It reads a directory. Files get there
-  however you like — Vimny never fetches, phones home, or checks for updates.
-  It also does not moderate what a level file contains.
+- **A level is data, never code.** Vimny reads the file and builds a room from
+  it. Nothing in it is ever executed — that is what makes it safe to play,
+  rather than anyone having vetted it.
+- **The game never goes online.** It reads a folder on your machine. Files get
+  there however you like; Vimny never fetches, phones home, or checks for
+  updates, and it does not moderate what a level file says.
 
-Par for a community level is derived by replaying the author's own solution,
-so it is labelled *author's par*: it is the cost of a route that provably
-works, not a proof that no shorter one exists. Authors cannot set par or the
-budget themselves.
+A community level's par comes from replaying the author's own solution, so it is
+labelled *author's par* — the cost of a route that definitely works, not a
+promise that no shorter one exists. Nobody gets to type in their own par or
+budget.
 
 Full guide: [docs/AUTHORING.md](docs/AUTHORING.md).
 

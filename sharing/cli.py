@@ -45,19 +45,20 @@ from sharing.replay import replay_tape
 from sharing.validate import validate
 
 
-# Levels whose canonical tape contains an insert/change verb. The tape notation
-# omits <Esc> on purpose, so replaying the tape alone types the following keys
-# into the buffer instead of executing them. Their par is pinned by a driven
-# test that injects the Esc — mirrors `_REPLAY_OWN_TEST` in
-# tests/test_answer_paths.py, and the audit PRINTS them rather than dropping
-# them, so a level can never pass this audit invisibly.
+# Levels the audit cannot replay end to end. This used to hold 21 entries —
+# every level whose tape contained an insert verb — because the notation omitted
+# <Esc> and the keys after one were typed into the buffer instead of executed.
+# Writing Esc as <Esc> (engine/tape.py) closed that, and re-probing showed 5 of the
+# 21 had never needed to be here at all: the list was copied from
+# `_REPLAY_OWN_TEST` in tests/test_answer_paths.py, which is about answer COST
+# tokenisation rather than replayability, and over-skipping is how a level
+# passes an audit vacuously.
+#
+# One genuine case remains, and it is not about Esc: the Grandmaster's Sanctum
+# is TWO rooms, and the arena deliberately has no karaoke (shear six strands in
+# any order — there is no fixed route). Its gallery tape cannot finish the level
+# because the level does not end in the gallery. Printed, never dropped.
 _IMPLICIT_ESC = {
-    'inscription_halls', 'whole_line_annex', 'change_extension',
-    'sculpting_chambers', 'overwrite_halls', 'case_chambers', 'joiners_gate',
-    'alignment_halls', 'indentation_sanctum', 'sight_sanctum',
-    'selection_halls', 'word_enclosure', 'bracket_enclosure',
-    'brace_square_enclosure', 'quote_enclosure', 'tag_enclosure',
-    'sentence_enclosure', 'wet_ink', 'gauntlet', 'hall_of_echoes',
     'grandmasters_sanctum',
 }
 
@@ -68,7 +69,7 @@ def _cmd_validate(args) -> int:
         shelf = load_level(Path(name))
         print(f'── {name}')
         if shelf.level is None:
-            print(f'   REJECTED: {shelf.error}')
+            print(f'   cannot load this one: {shelf.error}')
             worst = 1
             continue
         rep = shelf.report
@@ -108,7 +109,7 @@ def _cmd_golf(args) -> int:
     if par is not None and res.spent < par:
         print()
         print(f'  CONFIRMED BEAT — {par - res.spent} keystroke(s) under par.')
-        print(f'  This is a bug in _par_{args.slug}, not a high score: par is '
+        print(f'  This is a bug in _par_{args.slug}, not a high score: par means '
               f'defined as the cheapest route that exists, so the recorded value '
               f'is simply wrong.')
         print(f'  Fix: correct _par_{args.slug} to {res.spent} and re-derive '
@@ -129,12 +130,7 @@ def _cmd_audit(args) -> int:
         if builder is None:
             continue
         if slug in _IMPLICIT_ESC:
-            # The tape notation deliberately OMITS <Esc> (it is a sequence key the
-            # live tracker skips), so an insert/change route cannot be replayed
-            # from its tape alone — the text after it would be typed into the
-            # buffer. These levels are par-pinned by their own driven tests,
-            # which inject the Esc. Reported, never silently skipped.
-            print(f'{slug:26} — skipped: tape carries an implicit <Esc>; '
+            print(f'{slug:26} — skipped: no single tape finishes it; '
                   f'par pinned by tests/test_{slug}.py')
             continue
         room = builder(args.seed).room
@@ -180,7 +176,7 @@ def _cmd_export(args) -> int:
 def _cmd_list(args) -> int:
     shelved = list_levels()
     if not shelved:
-        print('no community levels installed')
+        print('nothing on your shelf yet')
         return 0
     for s in shelved:
         status = f'par {s.report.par}' if s.ok else f'BROKEN: {s.error}'
@@ -191,7 +187,7 @@ def _cmd_list(args) -> int:
 def _cmd_install(args) -> int:
     shelf = install(Path(args.file))
     if not shelf.ok:
-        print(f'refused: {shelf.error}', file=sys.stderr)
+        print(f'not installed — {shelf.error}', file=sys.stderr)
         return 1
     print(f'installed {shelf.name} → {shelf.path}')
     return 0
@@ -202,11 +198,11 @@ def main(argv=None) -> int:
                                  description='Vimny community level tools')
     sub = ap.add_subparsers(dest='cmd', required=True)
 
-    p = sub.add_parser('validate', help='check level file(s); what CI runs')
+    p = sub.add_parser('validate', help='check a level file before you share it')
     p.add_argument('files', nargs='+')
     p.set_defaults(fn=_cmd_validate)
 
-    p = sub.add_parser('golf', help='replay a proposed tape against a shipped level')
+    p = sub.add_parser('golf', help='try a shorter route against a shipped level')
     p.add_argument('slug')
     g = p.add_mutually_exclusive_group(required=True)
     g.add_argument('--tape')
@@ -214,21 +210,21 @@ def main(argv=None) -> int:
     p.add_argument('--seed', type=int, default=42)
     p.set_defaults(fn=_cmd_golf)
 
-    p = sub.add_parser('audit', help="replay every shipped level's own tape")
+    p = sub.add_parser('audit', help="check every shipped level's own recorded route")
     p.add_argument('--seed', type=int, default=42)
     p.set_defaults(fn=_cmd_audit)
 
-    p = sub.add_parser('export', help='write a shipped level out as a level file')
+    p = sub.add_parser('export', help='write a shipped level out as a file you can edit')
     p.add_argument('slug')
     p.add_argument('out')
     p.add_argument('--seed', type=int, default=42)
     p.add_argument('--author', default='')
     p.set_defaults(fn=_cmd_export)
 
-    p = sub.add_parser('list', help='list installed community levels')
+    p = sub.add_parser('list', help='show the levels on your shelf')
     p.set_defaults(fn=_cmd_list)
 
-    p = sub.add_parser('install', help='validate and copy a level onto the shelf')
+    p = sub.add_parser('install', help='check a level and add it to your shelf')
     p.add_argument('file')
     p.set_defaults(fn=_cmd_install)
 

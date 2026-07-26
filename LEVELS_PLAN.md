@@ -83,7 +83,7 @@ under `community/`. There is no network code in the game and there must not be.
 
 The same replayer audits the shipped curriculum (`python3 -m sharing audit`) and
 found a real par bug on its first run — The Spellwright's Forge, par 45 for a
-44-keystroke route. Still open: substitution (§6, deliberately unbuilt), and a
+44-keystroke route. Still open: alternate swaps (§6, deliberately unbuilt), and a
 tape notation for `<Esc>` so insert/change routes can be validated at all.
 
 ### Windows, tabs and buffers

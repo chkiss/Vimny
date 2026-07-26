@@ -1,6 +1,6 @@
 # Community levels — authoring, validation, sharing
 
-Status: **built** (2026-07-25), except substitution. The design below stands as
+Status: **built** (2026-07-25), except alternates (§6). The design below stands as
 written; what shipped is noted per section and summarised in §7. Author-facing
 documentation is `docs/AUTHORING.md`; the code is the `sharing/` package.
 
@@ -9,7 +9,7 @@ It is a system feature, not a level.
 
 Two end goals, from the original ask:
 
-- **(a) Substitution** — a community level stands in for one of the shipped levels.
+- **(a) Alternates** — a community level stands in for one of the shipped levels.
 - **(b) A bonus wing** — downloadable levels played as extra content.
 
 (b) is achievable on the design below. (a) is achievable but carries a curriculum
@@ -120,7 +120,7 @@ teaches:       ["W", "B", "E"]      # tokens this level introduces
 requires:      ["w", "b", "0", "$"] # tokens assumed already known; the replay may
                                     # use nothing outside requires + teaches + always-on
 no_horse:      false                # bar the companion (room.no_horse / _horse_blocked)
-substitutes:   null                 # or a shipped slug — see §6
+alternate:     null                 # or a shipped slug — see §6
 
 geometry:
   rows: 20
@@ -231,21 +231,16 @@ level" trains people to give up.
 
 ---
 
-## 6. Substitution (goal *a*) — feasible, but keep it opt-in
+## 6. Alternates — a level offered in place of a shipped one (goal *a*)
 
-For a community level to stand in for a shipped one it must declare
-`substitutes: <slug>` and teach **exactly** that slug's `teaches` set — no more,
-because a later level would then depend on a command this player never met, and no
-less, for the same reason. The validator can enforce that mechanically.
+If you'd like to propose alternate or improved layouts for levels, submit a level
+labeled `alternate: <slug>`, and ensure the level teaches **exactly** that slug's
+`teaches` set — no more and no less (the level must have no dependencies _not_
+already taught in the curriculum as well). The validator enforces that
+mechanically; see also "Think you can do a shipped level better?".
 
-The residual risk is not mechanical but pedagogical: a substitute that is *valid*
-can still be *bad* — unfair, unreadable, or teaching the command in a way that
-does not stick — and a new player hitting it has no idea the curriculum has been
-tampered with. They will conclude Vimny is bad, not that the level is.
-
-So: substitution stays **off by default**, is enabled explicitly, and says clearly
-that the player is no longer playing the designed curriculum. The bonus wing (goal
-*b*) carries none of this risk and should ship first.
+The bonus wing (goal *b*) does not have this requirement and submissions are
+welcome for fun, playable levels that sit outside of the curriculum.
 
 ---
 
@@ -266,8 +261,8 @@ project will not host.
 **Voting** is the weakest part. The honest options are 👍 reactions on the PR or a
 Discussions thread — crude, gameable, and no worse than what a hand-rolled system
 would be at this scale. That is enough to sort a bonus wing by popularity, and it
-is *not* enough to gate substitution, which stays on the playtest label (§6).
-Vote-gating substitution would make the curriculum a popularity contest.
+is *not* enough to gate an alternate swap, which stays on the playtest label
+(§6). Vote-gating it would make the curriculum a popularity contest.
 
 **Two things GitHub should not be asked to do:**
 
@@ -304,8 +299,8 @@ the level is excluded outright from `tests/test_answer_paths.py`, so nothing had
 ever measured it. Exactly the argument this section makes: the claim was
 falsifiable by one artifact, and no community was needed to falsify it.
 
-**Not built:** step 8, substitution. The format and validator support it
-(`substitutes: <slug>`, enforced to teach exactly the target's lesson), but
+**Not built:** step 8, alternates. The format and validator support it
+(`alternate: <slug>`, enforced to teach exactly the target's lesson), but
 nothing consumes it yet — by design, per §6. The `vimny-levels` repository does
 not exist; its CI workflow does.
 
@@ -339,7 +334,7 @@ tape notation for Esc, and it is the next thing to build here.
 6. Import/export, the `~/.Vimny/levels/` directory, and the bonus-wing listing in
    netrw. No network code (§6a).
 7. The `vimny-levels` repo and its CI workflow (§6a).
-8. Only then: substitution (§6), gated on the playtest label.
+8. Only then: alternate swaps (§6), gated on the playtest label.
 
 Steps 1–2 are also plain quality-of-life wins for the admin editor, so they pay
 for themselves even if the sharing pipeline stalls.

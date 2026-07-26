@@ -89,7 +89,7 @@ class Level:
     teaches:     list = field(default_factory=list)
     requires:    list = field(default_factory=list)
     no_horse:    bool = False
-    substitutes: str | None = None
+    alternate:   str | None = None    # a shipped slug this level offers to replace
     rows:        int  = 20
     cols:        int  = 80
     cells:       list = field(default_factory=list)   # list[str] of cell codes
@@ -126,7 +126,7 @@ def parse(data: dict) -> Level:
             f'for a different version of the format.')
 
     unknown = set(data) - {'schema', 'name', 'author', 'seed', 'teaches',
-                           'requires', 'no_horse', 'substitutes', 'geometry',
+                           'requires', 'no_horse', 'alternate', 'geometry',
                            'fill', 'char_runs', 'entities', 'vocabulary',
                            'solution', 'intro'}
     if unknown:
@@ -145,7 +145,7 @@ def parse(data: dict) -> Level:
         teaches=list(data.get('teaches', [])),
         requires=list(data.get('requires', [])),
         no_horse=bool(data.get('no_horse', False)),
-        substitutes=data.get('substitutes'),
+        alternate=data.get('alternate'),
         rows=int(geo.get('rows', 0)),
         cols=int(geo.get('cols', 0)),
         cells=list(geo.get('cells', [])),
@@ -362,8 +362,8 @@ def dumps(lvl: Level) -> str:
                      'spawn': list(lvl.spawn), 'exit': list(lvl.exit)},
         'solution': lvl.solution,
     }
-    if lvl.substitutes:
-        data['substitutes'] = lvl.substitutes
+    if lvl.alternate:
+        data['alternate'] = lvl.alternate
     if lvl.intro:
         data['intro'] = lvl.intro
     if lvl.fills:

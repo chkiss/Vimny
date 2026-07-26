@@ -165,7 +165,7 @@ def test_custom_pool_uses_the_authors_own_words():
 # ── The replayer ──────────────────────────────────────────────────────────────
 
 def test_tape_notation_maps_typed_space_and_enter():
-    keys = tape_to_keys('a b␣c⏎')
+    keys = tape_to_keys('a b<Space>c<CR>')
     assert [str(k) for k in keys] == ['a', 'b', ' ', 'c', '\r']
 
 
@@ -261,17 +261,40 @@ def test_spawn_inside_stone_is_refused():
     assert any('spawn' in e for e in rep.errors)
 
 
-def test_a_substitute_must_teach_exactly_its_targets_lesson():
+def test_an_alternate_must_teach_exactly_the_same_lesson():
     lvl = _shipped_as_level('rune_halls')
-    lvl.substitutes = 'rune_halls'
+    lvl.alternate = 'rune_halls'
     lvl.teaches = ['w', 'b']                 # rune_halls teaches w, b, e
     rep = validate(lvl)
-    assert any(e.startswith('[substitutes]') for e in rep.errors)
+    assert any(e.startswith('[alternate]') for e in rep.errors)
 
 
-def test_substitutes_must_name_a_real_slug():
+def test_an_alternate_may_not_require_a_command_taught_later():
+    """The other half of "same place in the curriculum".
+
+    Teaching the right lesson is not enough: an alternate that ASSUMES a command
+    from further down the curriculum is unplayable at the point it sits, because
+    the player has not met it yet.
+    """
+    lvl = _shipped_as_level('rune_halls')
+    lvl.alternate = 'rune_halls'
+    lvl.teaches   = ['w', 'b', 'e']
+    lvl.requires  = ['h', 'j', 'k', 'l', 'f']    # f is taught much later
+    rep = validate(lvl)
+    assert any(e.startswith('[alternate]') and "'f'" in e for e in rep.errors)
+
+
+def test_an_alternate_may_require_anything_taught_before_it():
+    lvl = _shipped_as_level('rune_halls')
+    lvl.alternate = 'rune_halls'
+    lvl.teaches   = ['w', 'b', 'e']
+    rep = validate(lvl)
+    assert not any(e.startswith('[alternate]') for e in rep.errors), rep.errors
+
+
+def test_alternate_must_name_a_real_slug():
     lvl = _blank_level()
-    lvl.substitutes = 'not_a_level'
+    lvl.alternate = 'not_a_level'
     rep = validate(lvl)
     assert any('not a shipped level slug' in e for e in rep.errors)
 

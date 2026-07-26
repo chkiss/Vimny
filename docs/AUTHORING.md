@@ -1,9 +1,9 @@
 # Writing a Vimny level
 
-A community level is a **JSON file**, not code. Vimny parses it into a room and
-runs none of it — that is the security boundary, and it is why you can play a
-level a stranger wrote. Drop a file in `~/.Vimny/levels/` and it appears in the
-overworld under `community/`.
+A community level is a **JSON file**, not code. Vimny reads it, builds a room
+from it, and runs none of it — which is why it is safe to play a level a stranger
+wrote. Drop a file in `~/.Vimny/levels/` and it turns up in the overworld under
+`community/`.
 
 ```
 python3 -m sharing validate mylevel.json     # check it
@@ -109,12 +109,15 @@ The literal keystrokes that solve your level, in order. It does two jobs:
    rejected; and
 2. it **sets par** — Vimny replays it and counts what the engine charges.
 
-**You do not set par, and you do not set the budget.** Par is the replayed cost
-of your tape, and the budget is always `ceil(par × 1.4)`. Being able to declare
-either would let a level be tuned to hide a sloppy route.
+**You don't set par, and you don't set the budget** — there is nowhere in the
+file to put them. Par is whatever your tape actually costs when Vimny plays it
+back, and the budget follows as `ceil(par × 1.4)`. That way the numbers always
+describe the level as it really is.
 
-Notation: a plain space is a *display separator* and is stripped, so write a
-space you actually type as `␣` and a typed Enter as `⏎`. `<Esc>` is omitted.
+Notation: a plain space in the tape is just spacing for readability, so write a
+space you actually type as `<Space>`, a typed Enter as `<CR>`, and Esc as `<Esc>`. Esc costs
+nothing, but write it down anyway — without it the replay keeps typing your next
+keys into the buffer.
 
 > **Author's par, honestly.** Replaying your tape measures **your route**. It is
 > an upper bound, not a proof of the optimum — which is why community levels
@@ -134,14 +137,16 @@ space you actually type as `␣` and a typed Enter as `⏎`. `<Esc>` is omitted.
 | `bounds` | sizes and coordinates in range; spawn on floor |
 | `content` | vocabulary is printable, single-width, and bounded |
 | `scope` | `requires` and `teaches` do not overlap |
+| `alternate` | if you named a level to stand in for, you fit its curriculum slot |
 | `geometry` | the room actually builds |
 | `determinism` | two builds of your file are identical |
 | `solvable` | the tape replays and reaches the exit — **hard gate** |
 | `par` | derived from the replay; budget is `ceil(par × 1.4)` |
 | `golf` | *warning*: plain movement beats your tape |
 
-Every rejection names its rule. Validation runs on **load**, not only on
-submission, so hand-editing a file does not get you past it.
+Every rejection tells you which rule it broke and where. The same checks run
+whenever a level is loaded, not just when it is submitted, so a level that plays
+on your machine plays the same way on someone else's.
 
 ## Beating a shipped level's par
 
@@ -149,7 +154,7 @@ Every shipped par claims a solver found the cheapest route. If you find a
 shorter one, that claim is wrong, and your tape is the proof:
 
 ```
-python3 -m sharing golf spellwrights_forge --tape ':%s/moo/quack/g⏎ 8G ...'
+python3 -m sharing golf spellwrights_forge --tape ':%s/moo/quack/g<CR> 8G ...'
 ```
 
 A confirmed beat is a **bug report against that level's solver**, not a high
@@ -157,16 +162,46 @@ score — par is a property of the level and changes because the old value was
 wrong, not because you played well. This is how the pipeline's first run found
 The Spellwright's Forge claiming par 45 for a route that costs 44.
 
-## Substitution — standing in for a shipped level
+## Think you can do a shipped level better?
 
-`"substitutes": "rune_halls"` makes a level a candidate stand-in. It must teach
-*exactly* that level's lesson: teach more and the player runs ahead of the
-curriculum, teach less and a later level depends on a command they never met.
+Send it. If you have written a level you think teaches its lesson better than the
+one currently in the game, say which one it stands in for:
 
-Substitution is **off by default** and stays that way. A level can be perfectly
-valid and still be a bad *teacher*, and a new player who hits one has no way to
-know the curriculum was swapped — they will conclude Vimny is bad, not that the
-level is. The bonus wing carries none of that risk.
+```json
+"alternate": "rune_halls",
+"teaches": ["w", "b", "e"]
+```
+
+The one hard rule is that **it has to sit in the same place in the curriculum**.
+Vimny teaches commands in order, and every level after yours assumes the player
+arrived knowing everything taught so far — no more, no less. So your level has to
+teach the *same commands* as the one it replaces:
+
+- The Rune Halls teaches `w`, `b`, `e`. A replacement teaches exactly `w`, `b`,
+  `e`. ✅
+- Yours also throws in `f{char}` because it made a nicer puzzle. ❌ — the player
+  now arrives at The Finding Hall already knowing its lesson, and that level has
+  nothing left to teach them.
+- Yours drops `e` because your layout did not need it. ❌ — three levels later
+  something asks for `e` and the player has never seen it.
+
+The same goes for your `requires`: your level may lean on anything taught *before*
+the one it stands in for, and nothing that comes after. A replacement for The Rune
+Halls cannot need `f{char}` — the player has not met it yet.
+
+What you *may* change freely: the layout, the words, the fiction, the intro, the
+route, the difficulty. Those are the things worth improving.
+
+Validation checks the fit for you and names the commands you are over or under
+by. Whether your level is *better* is the part no tool can settle, so expect to be
+asked for playtesters before anything gets swapped.
+
+## Levels that are just fun
+
+None of the above applies if you are not trying to replace anything. Leave
+`alternate` out and your level lives in the bonus wing, where it can teach
+whatever it likes, in any order, to a player who already knows what they know.
+Those submissions are welcome too — they just have to be playable.
 
 ## What Vimny will not do
 
