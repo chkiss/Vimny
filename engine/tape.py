@@ -127,6 +127,30 @@ def to_keys(tape: str, term=None, *, separators: bool = True) -> list:
     return out
 
 
+def from_keystroke(key) -> str | None:
+    """One pressed key → the tape notation for it, or None if it cannot be written.
+
+    The inverse of `to_keys`, and the reason `:record` can exist: a tape typed
+    by hand is a transcription the author might get wrong, while a tape captured
+    from the keys that actually solved the level cannot be.
+
+    None means REFUSE, not "skip". An arrow key, Backspace or a function key is a
+    real keypress that moved the game, but the notation has no way to write it,
+    so a tape containing one would replay as something other than what was
+    played. Recording stops rather than hand back a tape that lies — and since
+    every one of those keys has a Vim spelling (`h`/`l`, `x`), refusing also
+    keeps a recorded route honest about being Vim.
+    """
+    if getattr(key, 'is_sequence', False):
+        return ESC if getattr(key, 'name', '') == 'KEY_ESCAPE' else None
+    ch = str(key)
+    if ch == '\x1b':  return ESC      # Esc read as a bare byte (no code attached)
+    if ch == '\r' or ch == '\n':      return ENTER
+    if ch == ' ':     return SPACE
+    if ch == '\x16':  return CTRL_V
+    return ch if ch.isprintable() and len(ch) == 1 else None
+
+
 # ── Which part of a tape is TEXT the player types, not keys they press ────────
 #
 # The karaoke sheet reads better when `Orow<Space>row<Space>your<Space>boat<Esc>`

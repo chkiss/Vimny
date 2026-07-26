@@ -11,6 +11,51 @@ python3 -m sharing install  mylevel.json     # put it on your shelf
 python3 -m sharing list                      # what's installed
 ```
 
+## The forge — writing one without leaving the game
+
+Everything below can be done in a text editor, and the format is documented so
+that it can be. But there is a second way in: the **forge**, an admin-only bench
+in the overworld under `forge/`, where a level is built by playing it.
+
+| key | in the overworld |
+|---|---|
+| `%` | new draft (netrw's new-file key) — names it, and it exists on disk at once |
+| `⏎` | open a draft in the editor |
+| `R` / `D` | rename / delete one |
+
+A draft opens straight into EDIT mode, where the painter's keys (`s` to cycle
+wall/wood/water, INSERT to write text, `:rune`, `:entity`, `d`/`y`/`p`) work as
+they always have, plus the level's own properties:
+
+| command | what it does |
+|---|---|
+| `:spawn` / `:exit` | put the spawn or the exit where you are standing |
+| `:fill <pool> [lo-hi] [spacing]` | fill the last VISUAL selection from a word pool |
+| `:fill!` | drop the fill under the cursor, keeping its words as text you own |
+| `:name` `:author` `:teaches` `:requires` `:intro` `:alternate` `:vocab` | the metadata block |
+| `:meta` | what the draft currently claims |
+| `:record` | **play the level; the keys you press become the tape** |
+| `:check` | run the validator and report par, budget and warnings |
+| `:publish` | validate, then put it on the shelf in `~/.Vimny/levels/` |
+| `:w` / `:wq` | save the draft |
+
+`:record` is the reason the forge exists. It does not record in the editor —
+an editor room has passable walls, no budget and no command gating, so a route
+recorded there is one no player could follow. It builds the level fresh, exactly
+as a player downloads it, gates you to the level's own `requires` + `teaches`,
+and drops you in to solve it. Reaching the exit ends the take; the keys become
+`solution`, and the validator immediately replays it to derive par. A key the
+notation cannot write (an arrow key, Backspace) ends the take rather than
+producing a tape that replays as something other than what you played.
+
+A **fill region is owned by its directive**, not by you: it regrows from the
+level's seed on every build, so the editor refuses edits inside one. `:fill!`
+is how you take the words for yourself.
+
+Drafts live in `~/.Vimny/drafts/`, and a draft file *is* a level file — the same
+schema, so publishing is a copy and there is no export step that can lose
+anything.
+
 ## Start from a level that already works
 
 The fastest way to see the format is to export one of the shipped levels:

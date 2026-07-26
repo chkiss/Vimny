@@ -460,7 +460,15 @@ def render_all(term: Terminal, dungeon: Dungeon, player: Player,
     # ── Hint cheat-sheet (computed early: it may take a 2nd row, which steals
     #    one row from the game area so the box height still fits the terminal) ──
     known = player.known_commands
-    if 'editor' in known:
+    if getattr(dungeon, 'forge', False):
+        # A draft is open. The painter's keys still apply, but what an author
+        # reaches for that the editor never had is the level's OWN properties —
+        # so those lead, and `:record` is named where it cannot be missed.
+        _hint_raw = ('s:toggle wall  :rune <kind>  :entity <kind>  :spawn/:exit here  '
+                     'V then :fill <pool> [lo-hi]  :fill! drop  '
+                     ':name/:author/:teaches/:requires/:intro  '
+                     ':record tape  :check  :publish  :w save')
+    elif 'editor' in known:
         _hint_raw = 's:toggle wall  :rune ancient|verdant|void|ember  :entity exit|door|locked_door|chest|dynamite|wanderer|goblin|warden  :save <name>  :wq write+quit'
     else:
         _hint_raw = _hint_text(known, getattr(dungeon, 'level_slug', None))

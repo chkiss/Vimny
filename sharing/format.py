@@ -80,6 +80,19 @@ class Fill:
     spacing: int   = 1        # blank cells between words
     kind:    str   = 'ancient'
 
+    def covers(self, row: int, col: int) -> bool:
+        r1, c1, r2, c2 = self.region
+        return min(r1, r2) <= row <= max(r1, r2) and min(c1, c2) <= col <= max(c1, c2)
+
+
+def in_fill(room, row: int, col: int):
+    """The fill covering (row, col), or None. The editor's lock and the export's
+    drop-list both ask this, so they can never disagree about where a fill ends."""
+    for f in getattr(room, 'fills', ()):
+        if f.covers(row, col):
+            return f
+    return None
+
 
 @dataclass
 class Level:
@@ -267,9 +280,18 @@ def build(lvl: Level, par: int | None = None) -> Dungeon:
                             else tuple(r['symbols']),
                     kind=str(r.get('kind', 'ancient')))
             for r in lvl.char_runs]
+    grown = []
     for f in lvl.fills:
-        runs.extend(_resolve_fill(f, room, rng, custom))
-    room.char_runs = runs
+        grown.extend(_resolve_fill(f, room, rng, custom))
+    room.char_runs = runs + grown
+
+    # The fill regions travel with the room so the editor can draw them, refuse
+    # edits inside them, and write them back out as directives. Which text a
+    # fill GREW is deliberately not recorded per-run: a row edit re-merges its
+    # runs into fresh objects, so any ownership pinned to an object identity
+    # would evaporate on the first keystroke. `in_fill` asks the regions
+    # instead, and a region is stable no matter how often the row is rebuilt.
+    room.fills = list(lvl.fills)
 
     room.entities = [_make_entity(e, i) for i, e in enumerate(lvl.entities)]
     if not any(e.kind == 'exit' for e in room.entities):
@@ -379,26 +401,48 @@ def dumps(lvl: Level) -> str:
     return json.dumps(data, indent=2, ensure_ascii=False) + '\n'
 
 
+def _grown(fills, ru) -> bool:
+    """True if a fill region covers this run's first cell — i.e. a directive grew
+    it and it must not also be written out by hand."""
+    return any(f.covers(ru.row, ru.col) for f in fills)
+
+
 def from_room(room, name: str, author: str = '', solution: str = '',
-              teaches=(), requires=()) -> Level:
+              teaches=(), requires=(), *, fills=None, vocabulary=(),
+              intro: str = '', alternate: str | None = None,
+              seed: int | None = None) -> Level:
     """Capture a live Room as an authored Level — the editor's export path.
 
-    Everything is written out explicitly (no fills): what the author built is
-    what ships. Fills are for hand-writing a file, not for round-tripping one.
+    Hand-placed text is written out explicitly; text a FILL grew is not. A fill
+    is a directive that re-resolves from the seed at build time, so writing its
+    words out as well would ship the level with both, and the second build would
+    lay the words on top of themselves. Anything standing inside a fill region
+    is therefore dropped here and left to the directive — which is what makes an
+    authored level round-trip through the editor unchanged.
+
+    Everything not derivable from the grid — the fills themselves, the author's
+    vocabulary, the intro, the slug it stands in for — has to be passed in,
+    because a Room has nowhere to remember it.
     """
+    if fills is None:
+        fills = list(getattr(room, 'fills', []))
     return Level(
-        name=name, author=author, seed=room.seed or 0,
+        name=name, author=author,
+        seed=room.seed or 0 if seed is None else seed,
         teaches=list(teaches), requires=list(requires),
         no_horse=bool(getattr(room, 'no_horse', False)),
+        alternate=alternate, intro=intro,
         rows=room.rows, cols=room.cols,
         cells=[encode_row(row) for row in room.cells],
         spawn=tuple(room.spawn_pos), exit=tuple(room.exit_pos or (1, 1)),
+        fills=list(fills),
         char_runs=[{'row': ru.row, 'col': ru.col,
                     'symbols': list(ru.symbols), 'kind': ru.kind}
-                   for ru in room.char_runs],
+                   for ru in room.char_runs if not _grown(fills, ru)],
         entities=[dict({'at': [e.row, e.col]},
                        **{f: getattr(e, f) for f in _ENTITY_FIELDS
                           if f not in ('row', 'col')})
                   for e in room.entities if e.alive],
+        vocabulary=list(vocabulary),
         solution=solution or room.answer,
     )

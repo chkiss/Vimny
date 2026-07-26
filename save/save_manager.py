@@ -46,6 +46,7 @@ SAVE_DIR    = _home() / '.Vimny'
 SAVES_DIR   = SAVE_DIR / 'saves'
 LAYOUTS_DIR = SAVE_DIR / 'layouts'
 SCROLLS_DIR = SAVE_DIR / 'scrolls'
+DRAFTS_DIR  = SAVE_DIR / 'drafts'    # levels being authored, in the shipping format
 
 
 def _slug(name: str) -> str:

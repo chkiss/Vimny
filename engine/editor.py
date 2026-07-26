@@ -95,12 +95,34 @@ def _split_run_at(room, row: int, col: int):
     return CharRun(row=row, col=col, symbols=(ru.symbols[idx],), kind=ru.kind)
 
 
+def in_fill(room, row: int, col: int):
+    """The fill directive covering (row, col), or None.
+
+    Duck-typed on `room.fills` so this stays in the engine: `sharing.format`
+    imports this module, not the other way round, and a Room that was never
+    built from a level file simply has no `fills` and is never locked.
+
+    Text inside a fill region belongs to the DIRECTIVE, which regrows it from
+    the level's seed on every build. Editing it is therefore not just futile but
+    invisible: the export drops everything standing in a fill region and lets
+    the directive speak for it, so a hand-edited word there would vanish at save
+    time without a word of complaint. Refusing the edit is the honest answer, and
+    `:fill!` is the way to take the words for yourself.
+    """
+    for f in getattr(room, 'fills', ()):
+        if f.covers(row, col):
+            return f
+    return None
+
+
 def _ed_cut(room, r, c):
     """Remove the character/entity/wall at (r, c); return a clip item or None.
 
     For character runs: extracts only the single symbol at column c, leaving
     any remaining symbols as split remnants.
     """
+    if in_fill(room, r, c):
+        return None
     cut = _split_run_at(room, r, c)
     if cut is not None:
         return {'type': 'rune', 'rune': cut}
@@ -144,6 +166,8 @@ def _ed_restore(room, player, snap: dict) -> None:
 
 def _ed_subst(room, r, c):
     """Cycle cell type FLOOR→WALL→WATER→FLOOR; also cut any character/entity."""
+    if in_fill(room, r, c):
+        return []                    # a fill owns this cell — see in_fill
     items = []
     if room.char_run_at(r, c) or room.entity_at(r, c):
         item = _ed_cut(room, r, c)
@@ -193,7 +217,8 @@ def _ed_row_items(room, r):
 
 def _ed_clear_row(room, r):
     removed = [e for e in room.entities if e.row == r and e.alive]
-    room.char_runs    = [ru for ru in room.char_runs    if ru.row != r]
+    room.char_runs    = [ru for ru in room.char_runs
+                         if ru.row != r or in_fill(room, ru.row, ru.col)]
     room.entities = [e  for e  in room.entities if not (e.row == r and e.alive)]
     room.rebuild_indexes()
     for e in removed:
@@ -213,6 +238,11 @@ def _ed_range_items(room, r1, c1, r2, c2):
                  for r in range(rlo, rhi + 1) for ru in room._char_runs_by_row.get(r, [])]
         ents  = [{'type': 'entity', 'entity': e} for e in room.entities
                  if e.alive and rlo <= e.row <= rhi]
+    # A range that sweeps over a fill leaves the fill standing. Operators are
+    # where this matters most — a `dG` down an authored level would otherwise
+    # take the fills' words with it and then have them grow back on the next
+    # build, which reads as the delete having silently failed.
+    runes = [i for i in runes if not in_fill(room, i['rune'].row, i['rune'].col)]
     return runes + ents
 
 

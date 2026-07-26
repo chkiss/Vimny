@@ -34,7 +34,8 @@ from content.levels import is_unlocked, level_type, key_for_slug
 from render.utils import inner_w as _iw, subtree_lines, tree_glyph
 
 
-def build_lines(levels: list, custom_layouts: list, community: list = ()) -> list:
+def build_lines(levels: list, custom_layouts: list, community: list = (),
+                drafts: list = ()) -> list:
     """The netrw buffer as a flat list of line dicts (comments + dirs + entries).
     Each: {'type': 'comment'|'parent'|'self'|'level'|'subhdr'|'custom'
            |'community', ...}.
@@ -50,6 +51,8 @@ def build_lines(levels: list, custom_layouts: list, community: list = ()) -> lis
         lines.append({'type': 'level', 'level': lv})
     lines += subtree_lines('custom/', custom_layouts, 'custom', 'layout')
     lines += subtree_lines('community/', list(community), 'community', 'shelf')
+    # forge/ is last: it is the only section that is not something to PLAY.
+    lines += subtree_lines('forge/', list(drafts), 'draft', 'draft')
     return lines
 
 
@@ -72,6 +75,8 @@ def line_search_text(ln: dict) -> str:
         return ln['layout'].get('layout_name', '?')
     if t == 'community':
         return ln['shelf'].name
+    if t == 'draft':
+        return ln['draft'].name
     if t == 'parent':
         return '../'
     if t == 'self':
@@ -94,7 +99,7 @@ def line_label_offset(ln: dict) -> int:
     line_search_text — same single-source law): custom layouts draw a
     2-space + tree-glyph indent before the name; everything else starts
     flush after the gutter."""
-    return 4 if ln['type'] in ('custom', 'community') else 0
+    return 4 if ln['type'] in ('custom', 'community', 'draft') else 0
 
 
 def default_cursor(lines: list) -> int:
@@ -221,6 +226,24 @@ def render_overworld(term: Terminal, player: Player, progress: dict,
                 badge, badge_col = f'[par {shelf.report.par}]', C.chest_fg()
             else:
                 badge, badge_col = '[BROKEN]', C.error_fg()
+            nc = enfc if is_cursor else rst
+            spaces = max(1, cw - 4 - len(name) - len(badge))
+            return ('  ' + C.hint_fg() + tree + ' ' + nc + name + ' ' * spaces +
+                    badge_col + badge), cw
+        if t == 'draft':
+            d    = line['draft']
+            name = d.name
+            tree = tree_glyph(line.get('last'))
+            # The badge is the draft's STATE, because that is the only thing an
+            # author wants from this row: whether it has a tape yet, and if so
+            # what it cost. A draft with no tape is the normal early condition,
+            # not a fault, so it does not wear the community shelf's [BROKEN].
+            if not d.ok:
+                badge, badge_col = '[UNREADABLE]', C.error_fg()
+            elif not d.level.solution:
+                badge, badge_col = '[NO TAPE]', C.hint_fg()
+            else:
+                badge, badge_col = '[DRAFT]', C.mode_insert()
             nc = enfc if is_cursor else rst
             spaces = max(1, cw - 4 - len(name) - len(badge))
             return ('  ' + C.hint_fg() + tree + ' ' + nc + name + ' ' * spaces +

@@ -29,13 +29,17 @@ from render.utils import inner_w as _iw
 from render.overworld import (render_overworld, build_lines, default_cursor,
                               line_search_text)
 from sharing.library import build_shelved, list_levels as community_levels
+import sharing.draft as DRAFT
+import sharing.format as LF
+from sharing.vocab import POOLS as _VOCAB_POOLS
 from engine.vimregex import compile_vim as _vre_compile
 from render.title import render_title, render_save_select, select_quote, select_quote_by_name, select_next_lesson_quote, next_lesson_quote_entry, format_quote, MENU_ITEMS as _TITLE_MENU, NAME_MAX as _NAME_MAX
 from render.wizard_blessing import run_wizard_blessing
 from engine.player import Player
 from engine.modes import Mode
 from engine.tape import (ESC as _TAPE_ESC, ENTER as _TAPE_ENTER,
-                         SPACE as _TAPE_SPACE, CTRL_V as _TAPE_CTRL_V)
+                         SPACE as _TAPE_SPACE, CTRL_V as _TAPE_CTRL_V,
+                         from_keystroke as _tape_key)
 from engine.budget import Budget
 from engine.vim_parser import parse, parse_visual_textobj
 from engine.command_guard import (action_allowed as _action_allowed_raw,
@@ -76,7 +80,7 @@ from engine.insert import (
 from engine.editor import (
     _merge_adjacent_char_runs, _split_run_at, _ed_cut, _ed_snapshot, _ed_restore, _ed_subst,
     _ed_paste, _ed_row_items, _ed_clear_row, _ed_range_items, _ed_delete_range,
-    _clip_desc, _serialize_room, _deserialize_room,
+    _clip_desc, _serialize_room, _deserialize_room, in_fill as _in_fill,
 )
 import generation.dungeon_gen as _dg
 from generation.room_gen import RUNE_CHAR as _RUNE_CHAR
@@ -4088,7 +4092,9 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
                 player_name: str = 'Normand',
                 _dungeon: Dungeon | None = None,
                 _start_edit: bool = False,
-                _known: list | None = None) -> dict:
+                _known: list | None = None,
+                _record: dict | None = None,
+                _draft=None) -> dict:
     """Run one dungeon level.
 
     Returns {'won': bool, 'stars': int, 'action': 'wq'|'quit',
@@ -4101,6 +4107,14 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
     slug, but a COMMUNITY level declares its own `requires` + `teaches` (there is
     no curriculum position to read it from), so the loader and the tape validator
     pass it explicitly. None = the curriculum answer, unchanged.
+    _draft: the `sharing.draft.Draft` this room was rendered from, when the forge
+    opened it. It — not the room — is the level: fills, vocabulary and the
+    metadata block live on it, and `:w` folds the room back into it and writes
+    a level file. Absent for every ordinary level.
+    _record: the forge's tape recorder — `{'tape': [...], 'error': ''}`. When set,
+    every real keystroke is appended in tape notation and NOTHING is written to
+    the player's save file: a recording take is a rehearsal, not a playthrough.
+    The tape comes back on the result as 'tape'.
     """
     if _dungeon is not None:
         dungeon = _dungeon
@@ -4135,6 +4149,7 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
     if player.hat_worn and 'admin' not in player.known_commands:
         player.known_commands = player.known_commands + ['admin']
     dungeon.level_slug = level   # lets the renderer show the act's hint on bosses
+    dungeon.forge      = _draft is not None   # → the authoring cheat-sheet
 
     # Remove heart containers already collected by this player.
     _collected = progress.get('collected_hearts', [])
@@ -4390,6 +4405,44 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
             return ''
         n = len(msg_pool)
         return (f'({msg_idx+1}/{n}) ' if n > 1 else '') + msg_pool[msg_idx]
+
+    def _save_progress(data: dict, who: str) -> None:
+        """Persist progress — unless this is a recording take, which persists
+        nothing.
+
+        A take runs under the AUTHOR's own name, so an unguarded write here
+        would not merely record a level nobody asked to have recorded: it would
+        overwrite that player's real save with the throwaway progress dict the
+        forge handed the take. Every write inside run_dungeon goes through this.
+        """
+        if _record is None:
+            SM.save_progress(data, who)
+
+    def _forge_rebuild() -> None:
+        """Re-render the open draft after a DIRECTIVE changed.
+
+        A fill is not a thing you can paint on: it grows its words at build time
+        from the level's seed, so the only honest way to show an author what
+        they just asked for is to build the level again and stand them back
+        where they were. Cheap enough to do per command — this runs on `:fill`,
+        never on a keystroke.
+
+        It deliberately does NOT sync the room back first. Sync takes the fill
+        list from the ROOM, which is one build behind, so syncing here would
+        undo the very directive the caller just added. Callers capture the
+        author's painting with an explicit `DRAFT.sync` BEFORE they touch the
+        level, and then call this.
+        """
+        nonlocal dungeon, room, player, budget
+        _r, _c = player.row, player.col
+        dungeon = _draft.build()
+        room    = dungeon.room
+        dungeon.level_slug  = level
+        dungeon.forge       = True
+        room.passable_walls = edit_mode
+        player.row = min(_r, room.rows - 1)
+        player.col = min(_c, room.cols - 1)
+        budget = Budget(room.budget or 20)
 
     def _push(text: str) -> None:
         nonlocal pool_ttl
@@ -5226,6 +5279,26 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
             _render(message)
             continue
 
+        # ── Tape recording (the forge's :record) ──────────────────────────────
+        # One capture point, ahead of every mode's dispatch, so a tape holds the
+        # keys in the order the game read them whatever mode they were read in —
+        # a route's `:%s/…<CR>` leg is as much of it as its motions.
+        #
+        # Replayed macro keys are skipped for the same reason the karaoke tracker
+        # skips them: the tape records `@b`, and recording what `@b` expanded to
+        # as well would make the tape play the macro's body twice.
+        # The take is over the moment the exit is reached: a tape ends at the
+        # win, and `replay_tape` supplies the closing `:wq` itself. Recording the
+        # author's own way out would put a second one on the tape.
+        if _record is not None and not from_macro and not _record.get('error') and not won:
+            _tok = _tape_key(key)
+            if _tok is None:
+                _record['error'] = (
+                    f'{key.name or "that key"} cannot be written on a tape — '
+                    f'use its Vim spelling and start the take again.')
+            else:
+                _record['tape'].append(_tok)
+
         # ── Admin answer tracking ─────────────────────────────────────────────
         # from_macro keys are skipped: the tape shows '@b', not the replayed
         # keystrokes — matching them against the tape after the '@b' token
@@ -5294,6 +5367,10 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
                         and cmd[2:].strip()):
                     _lib_file(cmd[2:].strip())   # :w {any filename} — only the suit names win
 
+                elif cmd == 'w' and _draft is not None:
+                    DRAFT.sync(_draft, room)
+                    _push(f'Draft saved: {DRAFT.save(_draft).name}')
+
                 elif cmd == 'w':
                     if edit_mode and player_name == 'admin':
                         path = SM.save_layout(dungeon.name, _serialize_room(room))
@@ -5310,11 +5387,14 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
                             if player.has_hat:       # the Warden Eternal's gift
                                 progress['has_hat'] = True
                         _commit_hearts()
-                        SM.save_progress(progress, player_name)
+                        _save_progress(progress, player_name)
                         _push('Saved.')
 
                 elif cmd == 'wq':
-                    if edit_mode and player_name == 'admin':
+                    if _draft is not None:
+                        DRAFT.sync(_draft, room)
+                        DRAFT.save(_draft)
+                    elif edit_mode and player_name == 'admin':
                         path = SM.save_layout(dungeon.name, _serialize_room(room))
                         _push(f'Layout saved: {path.name}')
                     stars = _calc_stars(won, budget, room, player, level)
@@ -5401,6 +5481,8 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
                     kind = cmd[5:].strip().lower()
                     if kind not in _RUNE_CHAR:
                         _push(f'Unknown rune kind: {kind}  (ancient|verdant|void|ember)')
+                    elif _in_fill(room, player.row, player.col):
+                        _push('A fill grows that text — :fill! to make it yours.')
                     else:
                         r, c = player.row, player.col
                         ed_undo.append(_ed_snapshot(room, player))
@@ -5442,6 +5524,151 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
                                                **_ENTITY_PRESETS[kind]))
                         _push(f'Placed {kind}.')
 
+                # ── The forge: authoring a shareable level ────────────────────
+                # These only exist when a DRAFT is open. Everything they touch is
+                # the thing a Room cannot hold — the declarative half of a level
+                # (fills, vocabulary, who it is for, what it teaches) — plus the
+                # two positions the editor could never set at all.
+                elif _draft is not None and cmd in ('spawn', 'exit') and edit_mode:
+                    ed_undo.append(_ed_snapshot(room, player))
+                    ed_redo.clear()
+                    if cmd == 'spawn':
+                        room.spawn_pos = (player.row, player.col)
+                    else:
+                        for _e in [e for e in room.entities if e.kind == 'exit']:
+                            room.remove_entity(_e)
+                        room.exit_pos = (player.row, player.col)
+                        room.add_entity(Entity(kind='exit', row=player.row,
+                                               col=player.col, hp=1, alive=True))
+                        room.rebuild_indexes()
+                    _push(f'{cmd.capitalize()} moved here.')
+
+                elif _draft is not None and cmd.split()[0:1] == ['fill'] and edit_mode:
+                    # `:fill <pool> [lo-hi] [spacing]` over the last VISUAL
+                    # selection — the same region `gv` would bring back, which is
+                    # what `'<,'>` means everywhere else in Vim.
+                    _args = cmd.split()[1:]
+                    _a, _b = player.last_visual_anchor, player.last_visual_cursor
+                    if _a is None or _b is None:
+                        _push('Select the region in VISUAL first, then :fill <pool>.')
+                    else:
+                        _pool = _args[0] if _args else 'plain'
+                        if _pool not in _VOCAB_POOLS:
+                            _push(f'Unknown pool: {_pool}  ({"|".join(_VOCAB_POOLS)})')
+                        else:
+                            _lo, _hi, _sp = 3, 6, 1
+                            for _a2 in _args[1:]:
+                                if '-' in _a2:
+                                    _p = _a2.split('-')
+                                    _lo, _hi = int(_p[0]), int(_p[1])
+                                elif _a2.isdigit():
+                                    _sp = int(_a2)
+                            _reg = (min(_a[0], _b[0]), min(_a[1], _b[1]),
+                                    max(_a[0], _b[0]), max(_a[1], _b[1]))
+                            _f = LF.Fill(region=_reg, pool=_pool,
+                                         length=(_lo, _hi), spacing=_sp)
+                            DRAFT.sync(_draft, room)     # keep what was painted
+                            _draft.level.fills.append(_f)
+                            _forge_rebuild()
+                            _push(f'Fill: {_pool} {_lo}-{_hi} over '
+                                  f'rows {_reg[0]}-{_reg[2]}, cols {_reg[1]}-{_reg[3]}.')
+
+                elif _draft is not None and cmd == 'fill!' and edit_mode:
+                    # Bake the fill under the cursor: its words stop being grown
+                    # from the seed and become text the author owns and can edit.
+                    _f = LF.in_fill(room, player.row, player.col)
+                    if _f is None:
+                        _push('No fill under the cursor.')
+                    else:
+                        _kept = [{'row': ru.row, 'col': ru.col,
+                                  'symbols': list(ru.symbols), 'kind': ru.kind}
+                                 for ru in room.char_runs if _f.covers(ru.row, ru.col)]
+                        DRAFT.sync(_draft, room)         # keep what was painted
+                        _draft.level.fills.remove(_f)
+                        _draft.level.char_runs = list(_draft.level.char_runs) + _kept
+                        _forge_rebuild()
+                        _push(f'Fill dropped — its {len(_kept)} word(s) are yours to edit now.')
+
+                elif _draft is not None and cmd.split()[0:1] in (
+                        ['name'], ['author'], ['intro'], ['teaches'],
+                        ['requires'], ['alternate'], ['vocab']) and edit_mode:
+                    _field, _, _val = cmd.partition(' ')
+                    _val = _val.strip()
+                    _lv  = _draft.level
+                    if _field == 'name'      and _val: _lv.name      = _val
+                    elif _field == 'author':           _lv.author    = _val
+                    elif _field == 'intro':            _lv.intro     = _val
+                    elif _field == 'alternate':        _lv.alternate = _val or None
+                    elif _field == 'teaches':          _lv.teaches   = _val.split()
+                    elif _field == 'requires':         _lv.requires  = _val.split()
+                    elif _field == 'vocab':            _lv.vocabulary = _val.split()
+                    _push(f'{_field}: {_val or "(cleared)"}')
+
+                elif _draft is not None and cmd == 'meta':
+                    _lv = _draft.level
+                    _push(f'"{_lv.name}" by {_lv.author or "(nobody)"} — seed {_lv.seed}')
+                    _push(f'teaches {_lv.teaches or "nothing"} · '
+                          f'requires {_lv.requires or "nothing"}'
+                          + (f' · stands in for {_lv.alternate}' if _lv.alternate else ''))
+                    _push(f'{len(_lv.fills)} fill(s) · tape: '
+                          + (f'{len(_lv.solution)} chars' if _lv.solution else 'not recorded'))
+
+                elif _draft is not None and cmd == 'record':
+                    # Record the tape by PLAYING the level, not by typing out the
+                    # keys you think would solve it.
+                    #
+                    # The take deliberately does not run here, in the editor: an
+                    # editor room has passable walls, no budget and no command
+                    # gating, so a route recorded in it would be one no player
+                    # could ever follow. It runs on a FRESH build of the level —
+                    # the same one a player downloads — under the level's own
+                    # declared `requires`+`teaches`, so a key the author forgot
+                    # to declare is refused during the take rather than
+                    # discovered by a stranger later.
+                    DRAFT.sync(_draft, room)
+                    _rec  = {'tape': [], 'error': ''}
+                    _take = _draft.build()
+                    _res  = run_dungeon(term, level, {}, player_name,
+                                        _dungeon=_take, _known=_draft.level.known,
+                                        _record=_rec)
+                    _tape = ''.join(_rec['tape'])
+                    if _rec['error']:
+                        _push(f'Take discarded — {_rec["error"]}')
+                    elif not _res['won']:
+                        _push('Take discarded — that run never reached the exit.')
+                    else:
+                        _draft.level.solution = _tape
+                        _rep = _draft.report()
+                        if _rep.ok:
+                            _push(f'Tape recorded — par {_rep.par}, budget {_rep.budget}.')
+                            for _w in _rep.warnings[:2]:
+                                _push(f'warning: {_w}')
+                        else:
+                            # The take won on screen but will not replay. Almost
+                            # always the level moved under it (an edit since the
+                            # last build), and the tape is worth less than the
+                            # warning, so say so and keep it for inspection.
+                            _push(f'Take kept, but it does not replay: {_rep.errors[0]}')
+                    DRAFT.save(_draft)
+                    _forge_rebuild()
+
+                elif _draft is not None and cmd in ('check', 'publish'):
+                    DRAFT.sync(_draft, room)
+                    _rep = _draft.report()
+                    for _e in _rep.errors[:3]:
+                        _push(_e)
+                    for _w in _rep.warnings[:2]:
+                        _push(f'warning: {_w}')
+                    if not _rep.ok:
+                        _push('Not shippable yet.' if cmd == 'publish' else 'Not valid yet.')
+                    elif cmd == 'check':
+                        _push(f'Valid — par {_rep.par}, budget {_rep.budget}.')
+                    else:
+                        _dest, _ = DRAFT.publish(_draft)
+                        DRAFT.save(_draft)
+                        _push(f'Published to {_dest.name} — par {_rep.par}, '
+                              f'budget {_rep.budget}. It is on the shelf.')
+
                 elif cmd in ('noh', 'nohl', 'nohls', 'nohlsearch'):
                     # :noh — clear the search highlight until the next search.
                     if '/' in player.known_commands or player_name == 'admin':
@@ -5472,7 +5699,7 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
                                                      if c != 'admin']
                         progress['has_hat']  = player.has_hat
                         progress['hat_worn'] = player.hat_worn
-                        SM.save_progress(progress, player_name)
+                        _save_progress(progress, player_name)
                         _push("The Warden's hat settles on your brow — every spell is yours."
                               if _worn else "You doff the hat; the old bounds return.")
 
@@ -5763,7 +5990,9 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
                         _merge_adjacent_char_runs(room, r)
                 elif not key.is_sequence:
                     ch = str(key)
-                    if ch.isprintable() and len(ch) == 1:
+                    if _in_fill(room, r, c):
+                        _push('A fill grows that text — :fill! to make it yours.')
+                    elif ch.isprintable() and len(ch) == 1:
                         ed_undo.append(_ed_snapshot(room, player))
                         _ed_cut(room, r, c)
                         room.add_char_run(CharRun(row=r, col=c,
@@ -5931,6 +6160,16 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
             vmode = player.mode
             if key.name == 'KEY_ESCAPE':
                 if player.visual_anchor is not None:
+                    # Remember the area being abandoned. Vim's `gv` reselects
+                    # the last visual area whether an operator was applied to it
+                    # or not, and anything else that reads `'<,'>` after the
+                    # fact — the forge's `:fill` — needs the selection the
+                    # player just made rather than the one before it. Saved
+                    # BEFORE the cursor is walked back to the anchor, or the two
+                    # ends of the selection would collapse into one.
+                    player.last_visual_anchor = player.visual_anchor
+                    player.last_visual_cursor = (player.row, player.col)
+                    player.last_visual_mode   = vmode
                     player.row, player.col = player.visual_anchor
                 player.mode = Mode.NORMAL
                 player.visual_anchor = None
@@ -6907,7 +7146,7 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
                         if _nm:
                             progress['horse_name'] = cur.tag = _nm
                             progress['horse_met'] = True
-                            SM.save_progress(progress, player_name)
+                            _save_progress(progress, player_name)
                             _push(f'{_nm} lifts his head. He stays at your heel now.')
                         else:
                             _push("The horse waits, patient. Name him when you're ready.")
@@ -7570,7 +7809,7 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
                     progress['horse_met'] = True
                     if _hname:
                         progress['horse_name'] = _hz.tag = _hname
-                    SM.save_progress(progress, player_name)
+                    _save_progress(progress, player_name)
                     tick_msgs = [f'{_hname} falls in at your heel.' if _hname
                                  else 'The horse stays put, unhurried. '
                                       '(x him when you have a name.)']
@@ -8150,7 +8389,7 @@ def run_title(term: Terminal, has_save: bool) -> tuple[str, str]:
 # ── Overworld loop ─────────────────────────────────────────────────────────────
 
 _OW_GRP = {'comment': 'c', 'parent': 'd', 'self': 'd', 'level': 'l',
-           'subhdr': 'x', 'custom': 'x', 'community': 'x'}
+           'subhdr': 'x', 'custom': 'x', 'community': 'x', 'draft': 'x'}
 
 
 def _ow_section_key(ln: dict) -> str:
@@ -8642,9 +8881,20 @@ def run_overworld(term: Terminal, player: Player, progress: dict,
         except Exception:                    # noqa: BLE001 — a bad shelf must
             return []                        # never keep the overworld from opening
 
+    def _drafts():
+        # Admin-only, like custom/: authoring is a designer's bench, not part of
+        # the game a player is here to play.
+        if player.name != 'admin':
+            return []
+        try:
+            return DRAFT.list_drafts()
+        except OSError:
+            return []
+
     customs = _layouts()
     shelf   = _community()
-    lines   = build_lines(visible, customs, shelf)
+    drafts  = _drafts()
+    lines   = build_lines(visible, customs, shelf, drafts)
     start   = default_cursor(lines) if initial_cursor is None else initial_cursor
     start   = max(0, min(start, len(lines) - 1))
 
@@ -8658,6 +8908,7 @@ def run_overworld(term: Terminal, player: Player, progress: dict,
 
     number_mode    = 'number'
     renaming       = None        # None, or the in-progress new-name buffer
+    naming_new     = False       # that buffer is naming a NEW draft (netrw %)
     pending_delete = False
 
     # Buffer-local marks, netrw-style: session-scoped on the player (the
@@ -8674,10 +8925,11 @@ def run_overworld(term: Terminal, player: Player, progress: dict,
                    completions=_OW_COMPLETIONS, marks=player.ow_marks, cursor=start)
 
     def _rebuild():
-        nonlocal customs, lines, shelf
+        nonlocal customs, lines, shelf, drafts
         customs = _layouts()
         shelf   = _community()
-        lines   = build_lines(visible, customs, shelf)
+        drafts  = _drafts()
+        lines   = build_lines(visible, customs, shelf, drafts)
         nav.cursor = max(0, min(nav.cursor, len(lines) - 1))
 
     def _render():
@@ -8706,13 +8958,28 @@ def run_overworld(term: Terminal, player: Player, progress: dict,
         # ── Rename input (netrw R) ──────────────────────────────────────────────
         if renaming is not None:
             if key.name == 'KEY_ESCAPE':
-                renaming = None
+                renaming, naming_new = None, False
             elif key.name == 'KEY_ENTER' or str(key) in ('\n', '\r'):
                 ln = lines[nav.cursor]
-                if ln['type'] == 'custom' and renaming.strip():
+                if naming_new and renaming.strip():
+                    # netrw's % — a new file in forge/. It is written straight
+                    # away so it exists on disk before a single edit, which is
+                    # what lets the author walk away from it and come back.
+                    _d = DRAFT.new(renaming.strip(), author=player.name)
+                    DRAFT.save(_d)
+                    renaming, naming_new = None, False
+                    _rebuild()
+                    return _done({'action': 'open_draft', 'draft': _d,
+                                  'cursor': nav.cursor})
+                if ln['type'] == 'draft' and renaming.strip() and ln['draft'].ok:
+                    _d = ln['draft']
+                    _d.level.name = renaming.strip()
+                    DRAFT.save(_d)
+                    _rebuild()
+                elif ln['type'] == 'custom' and renaming.strip():
                     SM.rename_layout(ln['layout'].get('layout_name', ''), renaming.strip())
                     _rebuild()
-                renaming = None
+                renaming, naming_new = None, False
             elif key.name == 'KEY_BACKSPACE' or str(key) == '\x7f':
                 renaming = renaming[:-1]
             elif not key.is_sequence and len(str(key)) == 1 and str(key).isprintable():
@@ -8726,6 +8993,9 @@ def run_overworld(term: Terminal, player: Player, progress: dict,
             ln = lines[nav.cursor]
             if str(key) == 'y' and ln['type'] == 'custom':
                 SM.delete_layout(ln['layout'].get('layout_name', ''))
+                _rebuild()
+            elif str(key) == 'y' and ln['type'] == 'draft':
+                DRAFT.delete(ln['draft'])
                 _rebuild()
             _render()
             continue                                   # any non-y key cancels
@@ -8767,16 +9037,24 @@ def run_overworld(term: Terminal, player: Player, progress: dict,
         raw       = out[1]
         ln        = lines[nav.cursor]
         on_custom = ln['type'] == 'custom'
+        on_draft  = ln['type'] == 'draft'
         if raw == '-':
             return _done({'action': 'parent_view', 'cursor': nav.cursor})
-        elif raw == 'D':                               # netrw delete (custom only)
-            if on_custom:
+        elif raw == '%':                               # netrw new file — a new draft
+            if player.name == 'admin':
+                renaming, naming_new = '', True
+            else:
+                player.error = 'Only the admin can forge new levels.'
+        elif raw == 'D':                               # netrw delete (custom / draft)
+            if on_custom or on_draft:
                 pending_delete = True
             else:
                 player.error = "Can't delete a built-in dungeon — only your own custom layouts."
-        elif raw == 'R':                               # netrw rename (custom only)
+        elif raw == 'R':                               # netrw rename (custom / draft)
             if on_custom:
                 renaming = ln['layout'].get('layout_name', '')
+            elif on_draft:
+                renaming = ln['draft'].name
             else:
                 player.error = "Can't rename a built-in dungeon — only your own custom layouts."
         elif raw == 'd':                               # read-only buffer (netrw is read-only)
@@ -8796,6 +9074,11 @@ def run_overworld(term: Terminal, player: Player, progress: dict,
                     return _done({'action': 'open_community', 'shelf': ln['shelf'],
                                   'cursor': nav.cursor})
                 player.error = ln['shelf'].error
+            elif t == 'draft':
+                if ln['draft'].ok:
+                    return _done({'action': 'open_draft', 'draft': ln['draft'],
+                                  'cursor': nav.cursor})
+                player.error = ln['draft'].error
             # comment / self / subhdr → no-op
 
         _render()
@@ -8891,6 +9174,17 @@ def main():
                             'stars': max(res['stars'], prev),
                         }
                     SM.save_progress(progress, player.name)
+                continue
+
+            if ow_result['action'] == 'open_draft':
+                draft = ow_result['draft']
+                # The forge opens under the 'community' slug for the same reason
+                # the shelf does: a draft has no curriculum position, so its
+                # command set comes from what it DECLARES, and nothing here may
+                # key progress against a shipped level's name.
+                run_dungeon(term, 'community', progress, player.name,
+                            _dungeon=draft.build(), _start_edit=True,
+                            _known=draft.level.known, _draft=draft)
                 continue
 
             if ow_result['action'] == 'open_custom':
