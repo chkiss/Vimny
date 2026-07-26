@@ -24,8 +24,8 @@ there is only one key — the black hole (:d _) is the lesson. The unseen-line
 law bars culling the still-dark ledger, so door one must open first (which
 parts the mist); when the ledger reads true, the corridor brazier catches
 the verdant lines' fire and its light unveils the exit pocket. Canonical
-(playtest 2026-07-19): the ONE wide cull — `:set nu⏎ 2l x $ p
-:2,19v/that/d _⏎ $ p $`, par 23; the three-beat longhand (:2d _ · :5,9d _
+(playtest 2026-07-19): the ONE wide cull — `:set nu<CR> 2l x $ p
+:2,19v/that/d _<CR> $ p $`, par 23; the three-beat longhand (:2d _ · :5,9d _
 · :6,13v _) still wins, at 1★ (35 spent)."""
 from collections import deque
 
@@ -46,6 +46,7 @@ from generation.dungeon_gen import (
 )
 from content.levels import LEVELS, known_commands
 from tests import SEEDS, cached_room
+from engine.tape import to_keys
 
 ENTER = Keystroke('\r', code=343, name='KEY_ENTER')
 
@@ -59,15 +60,12 @@ def _fresh(seed=0):
 
 
 def _K(s):
-    out = []
-    for ch in s:
-        if ch == '⏎':
-            out.append(ENTER)
-        elif ch == '␣':
-            out.append(Keystroke(' '))
-        else:
-            out.append(Keystroke(ch))
-    return out
+    """Keystroke string → keys. `to_keys` is the ONE converter: tokens like
+    `<CR>` and `<Space>` are several glyphs but one keystroke, so they can
+    only be matched whole (engine/tape.py). `separators=False`: this is a
+    hand-written keystroke string, not a tape, so a space in it is a space the
+    player types (`:6s/^  //`), never display spacing."""
+    return to_keys(s, separators=False)
 
 
 def _tape_keys(answer):
@@ -298,7 +296,7 @@ def test_clobbering_delete_loses_the_key(monkeypatch):
     # a plain ranged :2d without _ overwrites the held key — door two never
     # opens.
     d = _fresh(0)
-    tape = ':set␣nu⏎ 2l x $ p :2d⏎ :2,19v/that/d␣_⏎ $ p $'
+    tape = ':set<Space>nu<CR> 2l x $ p :2d<CR> :2,19v/that/d<Space>_<CR> $ p $'
     result = _drive(d, _tape_keys(tape), monkeypatch)
     assert not result['won']
 
@@ -309,7 +307,7 @@ def test_stashing_the_key_loses_it(monkeypatch):
     # empties — so the stash never shields a plain cull.
     d = _fresh(0)
     r = d.rooms[0]
-    tape = ':set␣nu⏎ 2l x $ p p :2,19v/that/d⏎ $ p $'   # drop a copy, cull plain
+    tape = ':set<Space>nu<CR> 2l x $ p p :2,19v/that/d<CR> $ p $'   # drop a copy, cull plain
     result = _drive(d, _tape_keys(tape), monkeypatch)
     assert not result['won']
     assert not any(e.kind == 'floor_key' and e.alive for e in r.entities)
@@ -327,7 +325,7 @@ def test_undo_dropped_key_persists_on_the_floor(monkeypatch):
 def test_global_delete_also_clobbers(monkeypatch):
     # :v//d without _ is register-writing too (Vim-faithful) — key lost.
     d = _fresh(0)
-    a = d.rooms[0].answer.replace('/d␣_⏎', '/d⏎')
+    a = d.rooms[0].answer.replace('/d<Space>_<CR>', '/d<CR>')
     result = _drive(d, _tape_keys(a), monkeypatch)
     assert not result['won']
 
@@ -338,7 +336,7 @@ def test_three_beat_longhand_wins_one_star(monkeypatch):
     # 35 spent it lands over par 23: 1★.
     d = _fresh(0)
     r = d.rooms[0]
-    tape = ':set␣nu⏎ 2l x $ p :2d␣_⏎ :5,9d␣_⏎ :6,13v/that/d␣_⏎ $ p $'
+    tape = ':set<Space>nu<CR> 2l x $ p :2d<Space>_<CR> :5,9d<Space>_<CR> :6,13v/that/d<Space>_<CR> $ p $'
     won, spent = _spend_uncapped(d, _tape_keys(tape), monkeypatch, _drive)
     assert won and spent > r.par, (won, spent)
     assert r._ledger_lit is True
@@ -348,7 +346,7 @@ def test_blackhole_register_needs_no_space(monkeypatch):
     # Vim-faithful: the command name stops at the first non-alphabetic
     # char, so :v//d_ is the same black-hole delete as :v//d _.
     d = _fresh(0)
-    tape = '2l x $ p :2,19v/that/d_⏎ $ p $'
+    tape = '2l x $ p :2,19v/that/d_<CR> $ p $'
     result = _drive(d, _tape_keys(tape), monkeypatch)
     assert result['won'] and result['stars'] == 2
 
@@ -372,7 +370,7 @@ def test_global_delete_of_the_chain_word_wrecks_the_keeps(monkeypatch):
     # :g/that/d _ is the :v beat inverted — it culls the CHAIN and spares the
     # intruders. The seal never opens.
     d = _fresh(0)
-    a = d.rooms[0].answer.replace(':2,19v/that/d␣_⏎', ':2,19g/that/d␣_⏎')
+    a = d.rooms[0].answer.replace(':2,19v/that/d<Space>_<CR>', ':2,19g/that/d<Space>_<CR>')
     result = _drive(d, _tape_keys(a), monkeypatch)
     assert not result['won']
 
@@ -384,14 +382,14 @@ def test_subst_blanking_longhand_wins_one_star(monkeypatch):
     # and :g/:v deletes; the :v pattern needs the revealed word anyway).
     d = _fresh(0)
     s4 = d.rooms[0].answer.split('/')[1]
-    keys = _K(f'2lx$p:2s/.*//⏎:6,10s/.*//⏎:12,19v/{s4}/s%.*%%⏎$p$')
+    keys = _K(f'2lx$p:2s/.*//<CR>:6,10s/.*//<CR>:12,19v/{s4}/s%.*%%<CR>$p$')
     won, spent = _spend_uncapped(d, keys, monkeypatch, _drive)
     assert won and spent > d.rooms[0].par, (won, spent)
 
 
 def test_scorched_earth_never_opens_the_way(monkeypatch):
     d = _fresh(0)
-    keys = _K('2lx$p:%d␣_⏎$')
+    keys = _K('2lx$p:%d<Space>_<CR>$')
     result = _drive(d, keys, monkeypatch)
     assert not result['won']
 

@@ -19,7 +19,7 @@
 """The Warden Pathfinder (Act III boss) — mechanics.
 
 C-PF-1: a boss core is immune to *editing*-delete. The player's Act III power
-combo `v/W⏎x` (visual + search-as-motion + delete) is a remote AoE that wipes
+combo `v/W<CR>x` (visual + search-as-motion + delete) is a remote AoE that wipes
 goblins and glyphs across its span — but it must NOT be able to one-shot the
 Warden. An entity with ``edit_immune=True`` survives every visual-delete path
 (single-row charwise, multi-row charwise, linewise, block) and every operator

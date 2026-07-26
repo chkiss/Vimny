@@ -41,6 +41,7 @@ from generation.dungeon_gen import (
     _GNT_R_NOOK, _GNT_R_GATE, _GNT_P1_COLS, _GNT_P2_COLS, _GNT_NOOK_COLS,
     _GNT_BOLT0, _GNT_EXIT, _GNT_CATCH, _GNT_PAR, _GNT_BUDGET,
 )
+from engine.tape import ESC as TAPE_ESC, to_keys
 from tests import SEEDS, cached_room
 
 ESC = Keystroke('\x1b', code=361, name='KEY_ESCAPE')
@@ -52,25 +53,20 @@ def _room(seed=0):
 
 
 def _K(s):
-    out = []
-    for ch in s:
-        out.append(ENTER if ch == '⏎' else Keystroke(ch))
-    return out
-
-
-# Tokens whose tail is TYPED text needing a closing Esc (insert-mode verbs).
-_TYPED = ('cit', 'C', 'S', 'O', 'o')
+    """Keystroke string → keys. `to_keys` is the ONE converter: tokens like
+    `<CR>` and `<Space>` are several glyphs but one keystroke, so they can
+    only be matched whole (engine/tape.py). `separators=False`: this is a
+    hand-written keystroke string, not a tape, so a space in it is a space the
+    player types (`:6s/^  //`), never display spacing."""
+    return to_keys(s, separators=False)
 
 
 def _tape_keys(answer):
-    """room.answer → keystrokes: spaces are display separators, ⏎ is Enter,
-    and every insert-verb token gets its Esc appended."""
-    keys = []
-    for tok in answer.split(' '):
-        keys += _K(tok)
-        if tok.startswith(_TYPED) and len(tok) > 1 and tok not in ('C', 'S'):
-            keys.append(ESC)
-    return keys
+    """room.answer → keystrokes, via the one shared translator (engine/tape.py).
+
+    This used to guess where the Esc keys went, from a table of insert-verb
+    prefixes. The tape writes Esc as <Esc> now, so there is nothing to guess."""
+    return to_keys(answer)
 
 
 def _drive(dungeon, keys, monkeypatch, finish=':wq\r', player_name='Scribe'):
@@ -381,15 +377,10 @@ def test_s_ties_r_documented(monkeypatch):
     room = d.rooms[0]
     rtok = next(t for t in room.answer.split(' ')
                 if len(t) == 2 and t[0] == 'r')
-    a = _swap(room.answer, rtok, 's' + rtok[1])
-    keys = []
-    for tok in a.split(' '):
-        keys += _K(tok)
-        if tok.startswith(_TYPED) and len(tok) > 1 and tok not in ('C', 'S'):
-            keys.append(ESC)
-        if tok == 's' + rtok[1]:
-            keys.append(ESC)                        # s enters insert; Esc is free
-    result = _drive(d, keys, monkeypatch)
+    # The swapped-in `s{c}` enters INSERT, so it needs its own <Esc> — the rest of
+    # the tape already carries Esc where it belongs.
+    a = _swap(room.answer, rtok, 's' + rtok[1] + TAPE_ESC)
+    result = _drive(d, _tape_keys(a), monkeypatch)
     assert result['won'] and result['stars'] == 2
 
 
@@ -421,8 +412,8 @@ def _cheese_probes(room):
     return [
         ('plus-plus ferry to the gallery', 'w * 3b', '+ +'),
         ('counted-G ferry to the gallery', 'w * 3b', '12G 3b'),
-        ('counted-G ferry to pocket 1', f'/{s1}⏎', '8G'),
-        ('gg ferry to the shelf', f'/{s1}⏎', 'gg'),
+        ('counted-G ferry to pocket 1', f'/{s1}<CR>', '8G'),
+        ('gg ferry to the shelf', f'/{s1}<CR>', 'gg'),
         ('counted-G ferry to pocket 2', 'n', '10G'),
         ('H ferry replacing the hash trip', 'j b # w yiw N', 'H w yiw 18G'),
         ('gg ferry replacing the hash trip', 'j b # w yiw N', 'gg w yiw 18G'),
@@ -432,9 +423,9 @@ def _cheese_probes(room):
         # remote row ops carry ≥4 keys of colon overhead, so they must never
         # undercut the on-site verbs — :t. is the sharpest (a remote self-dup
         # exactly reproducing Y p for one key more).
-        ('ex self-copy replacing Y p', 'Y p', ':t.⏎'),
+        ('ex self-copy replacing Y p', 'Y p', ':t.<CR>'),
         ('ex linewise yank replacing the hash trip', 'j b # w yiw N',
-         'j :1y⏎ p'),
+         'j :1y<CR> p'),
     ]
 
 

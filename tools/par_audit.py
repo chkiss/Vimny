@@ -186,8 +186,8 @@ def _replay_confirms(slug, path, game_h=None):
                '_void_fall_animation', '_drown_animation', '_heart_container_animation',
                '_play_void_falls'):
         setattr(main, fn, lambda *a, **k: None)
-    # '⏎' in a token is the Enter that submits a / ? search; everything else is literal.
-    keys = [Keystroke('\r') if ch == '⏎' else Keystroke(ch)
+    # '<CR>' in a token is the Enter that submits a / ? search; everything else is literal.
+    keys = [Keystroke('\r') if ch == '<CR>' else Keystroke(ch)
             for tok in path.split() for ch in tok]
     d = getattr(dg, f'build_dungeon_{slug}')(42)
     rec = {}

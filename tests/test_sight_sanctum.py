@@ -211,13 +211,13 @@ def test_bolt_opens_the_instant_the_strike_lands(monkeypatch):
 def test_seal_initial_is_pristine_level_wide(seed):
     """The Seal's search anchor: the tail's initial occurs in exactly one
     FLOOR position (its own) — the plaque copy is sealed in the wall, which
-    search skips — so /{x}⏎ has one landing."""
+    search skips — so /{x}<CR> has one landing."""
     room = _room(seed)
     _a, _b, x = _letters(room)
     positions = _match_positions(room, x)
     from generation.dungeon_gen import _SS_TAIL0
     # every floor match lives inside the tail itself (the initial may recur
-    # within its own text — /{x}⏎ still lands on the head), none elsewhere
+    # within its own text — /{x}<CR> still lands on the head), none elsewhere
     assert positions and positions[0] == (16, _SS_TAIL0), (x, positions)
     assert all(r == 16 and c >= _SS_TAIL0 for r, c in positions), (x, positions)
 
@@ -302,7 +302,7 @@ def test_piecewise_route_wins_at_one_star(seed, monkeypatch):
 
 def test_admin_karaoke_tape_tracks_to_the_end(monkeypatch):
     """The answer is the literal tape: driving it as admin never diverges and
-    consumes every char (⏎ marks the search Enter; Esc is skipped)."""
+    consumes every char (<CR> marks the search Enter; Esc is skipped)."""
     dungeon = build_dungeon_sight_sanctum(0)
     room = dungeon.rooms[0]
     _drive(dungeon, _canon_keys(room), monkeypatch, name='admin')

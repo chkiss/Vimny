@@ -64,6 +64,7 @@ from generation.dungeon_gen import (
 import pytest
 import random
 
+from engine import tape
 from tests import SEEDS, cached_room
 
 _FLOORS = (CellType.FLOOR, CellType.CORRIDOR)
@@ -76,18 +77,17 @@ def _room(seed):
 
 
 def _keys(answer: str, extra: str = '') -> list:
-    """room.answer → real keystrokes (insert tokens expand to entry key +
-    typed chars + Esc; Esc costs no budget)."""
-    out = []
-    for t in answer.split():
-        if len(t) >= 2 and t[0] in 'ia' and t[1:].isalpha():
-            out.append(Keystroke(t[0]))
-            out += [Keystroke(ch) for ch in t[1:]]
-            out.append(ESC)
-        else:
-            out += [Keystroke(ch) for ch in t]
-    out += [Keystroke(ch) for ch in extra]
-    return out
+    """room.answer → real keystrokes.
+
+    The tape writes Esc as `<Esc>` (engine/tape.py), so there is nothing to infer
+    and nothing to guess at: `to_keys` is the one converter. This used to sniff
+    insert tokens (`t[0] in 'ia' and t[1:].isalpha()`) and append an Esc of its
+    own — which silently stopped matching once the tape carried `<Esc>` itself, and
+    then fed the glyph through as printable text. The run never left INSERT, the
+    trailing `:q!` was typed into the buffer, and the test hung instead of
+    failing.
+    """
+    return tape.to_keys(answer) + [Keystroke(ch) for ch in extra]
 
 
 def _drive(dungeon, keys, monkeypatch, finish=':q!\r'):

@@ -34,6 +34,8 @@ from render.title import render_title, render_save_select, select_quote, select_
 from render.wizard_blessing import run_wizard_blessing
 from engine.player import Player
 from engine.modes import Mode
+from engine.tape import (ESC as _TAPE_ESC, ENTER as _TAPE_ENTER,
+                         SPACE as _TAPE_SPACE, CTRL_V as _TAPE_CTRL_V)
 from engine.budget import Budget
 from engine.vim_parser import parse, parse_visual_textobj
 from engine.command_guard import (action_allowed as _action_allowed_raw,
@@ -4695,20 +4697,25 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
         room._rv_seal_col = None
         _push('The song stands whole, verse for verse. The way opens!')
 
-    def _advance_answer(ch: str):
-        """Admin karaoke: advance the answer tape by one typed key (Enter passed as the
-        glyph '⏎', matching the tape's own Enter marker).  Spaces in the tape are visual
-        separators, stripped for matching.  Used for COMMAND-mode typing — the NORMAL-mode
-        tracker at the top of the loop never sees `:`-command chars — mirroring the
-        INSERT-mode advance.  Caller guarantees admin + a live tape."""
+    def _advance_answer(tok: str):
+        """Admin karaoke: advance the answer tape by one typed key.
+
+        `tok` is a tape token, so keys with no printable form arrive already
+        spelled Vim's way (`_TAPE_ENTER`, `_TAPE_ESC`) and are matched WHOLE —
+        `<CR>` is four glyphs on the sheet but one keystroke, and matching it a
+        character at a time would let the playhead stop half way inside a token.
+        Plain spaces in the tape are visual separators, stripped for matching.
+        Used for COMMAND-mode typing — the NORMAL-mode tracker at the top of the
+        loop never sees `:`-command chars — mirroring the INSERT-mode advance.
+        Caller guarantees admin + a live tape."""
         if room.answer_diverged:
             return
-        if ch == ' ':
-            ch = '␣'                      # a TYPED space: the tape marks it ␣
+        if tok == ' ':
+            tok = _TAPE_SPACE             # a TYPED space: the tape marks it <Space>
         _ap = room.answer.replace(' ', '')
         if room.answer_pos < len(_ap):
-            if ch == _ap[room.answer_pos]:
-                room.answer_pos += 1
+            if _ap.startswith(tok, room.answer_pos):
+                room.answer_pos += len(tok)
             else:
                 room.answer_diverged = True
 
@@ -5104,11 +5111,11 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
                 and not key.is_sequence and str(key) != ':'
                 and player.mode in (Mode.NORMAL, Mode.VISUAL,
                                     Mode.VISUAL_LINE, Mode.VISUAL_BLOCK)):
-            # '\x16' (<C-v>) appears on the tape as the two glyphs '^v' — it
-            # is LOAD-BEARING (unlike Esc, a player following the tape cannot
-            # infer it), so it must be shown; the tracker consumes both tape
-            # chars for the one keystroke (the ⏎ precedent, widened).
-            _tk = '^v' if str(key) == '\x16' else str(key)
+            # '\x16' appears on the tape as `<C-v>`. It is LOAD-BEARING
+            # (unlike Esc, a player following the tape cannot infer it), so it
+            # must be shown; the tracker consumes the whole token for the one
+            # keystroke.
+            _tk = _TAPE_CTRL_V if str(key) == '\x16' else str(key)
             if key_buf == '':
                 cmd_start_ans = (room.answer_pos, room.answer_diverged)
             if not room.answer_diverged:
@@ -5128,7 +5135,7 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
                 room._cmd_karaoke = False
             elif key.name == 'KEY_ENTER' or str(key) in ('\n', '\r'):
                 if getattr(room, '_cmd_karaoke', False):
-                    _advance_answer('⏎')                  # the tape marks Enter with ⏎
+                    _advance_answer(_TAPE_ENTER)          # the tape marks Enter <CR>
                     room._cmd_karaoke = False
                 cmd = player.cmd_line.strip()
                 player.mode    = Mode.NORMAL
@@ -5524,7 +5531,7 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
                 room._search_karaoke = False
             elif key.name == 'KEY_ENTER' or str(key) in ('\n', '\r'):
                 if getattr(room, '_search_karaoke', False):
-                    _advance_answer('⏎')                  # the tape marks Enter with ⏎
+                    _advance_answer(_TAPE_ENTER)          # the tape marks Enter <CR>
                     room._search_karaoke = False
                 pattern = player.cmd_line
                 fwd     = player.search_forward
@@ -5575,6 +5582,12 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
         # ── INSERT mode (admin text placement) ───────────────────────────────
         if player.mode == Mode.INSERT:
             if key.name == 'KEY_ESCAPE':
+                # Karaoke: the tape marks Esc `<Esc>`. It used to be omitted (a
+                # player following the sheet can infer that typing ends), but an
+                # omitted key cannot be REPLAYED — see engine/tape.py. Esc spends
+                # no budget, so writing it changes no level's par.
+                if player_name == 'admin' and room.answer:
+                    _advance_answer(_TAPE_ESC)
                 if block_ins is not None:
                     # Block insert (<C-v> I… / c…): on Esc the typed run
                     # replays into every other selected row at the anchor
@@ -5718,12 +5731,12 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
                         if (player_name == 'admin' and room.answer
                                 and not room.answer_diverged):
                             _ap = room.answer.replace(' ', '')
-                            # a TYPED space is marked ␣ in the tape (plain
+                            # a TYPED space is marked <Space> in the tape (plain
                             # spaces are separators, stripped above)
-                            _ck = '␣' if ch == ' ' else ch
+                            _ck = _TAPE_SPACE if ch == ' ' else ch
                             if room.answer_pos < len(_ap):
-                                if _ck == _ap[room.answer_pos]:
-                                    room.answer_pos += 1
+                                if _ap.startswith(_ck, room.answer_pos):
+                                    room.answer_pos += len(_ck)
                                 else:
                                     room.answer_diverged = True
                         prev_ins = (player.row, player.col)
@@ -5759,6 +5772,8 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
         # ── REPLACE mode (overtype; Backspace restores originals) ─────────────
         if player.mode == Mode.REPLACE:
             if key.name == 'KEY_ESCAPE':
+                if player_name == 'admin' and room.answer:
+                    _advance_answer(_TAPE_ESC)      # the tape marks Esc <Esc>
                 player.mode = Mode.NORMAL
                 if player.col > 0 and room.is_passable(player.row, player.col - 1):
                     player.col -= 1                    # vim retreats one on Esc

@@ -36,6 +36,7 @@ from blessed.keyboard import Keystroke
 import main
 import generation.dungeon_gen as dg
 import engine.substitute as S
+from engine.tape import to_keys
 
 
 def _ks(c, name=None):
@@ -70,9 +71,9 @@ def _seal_open(room):
 
 
 def _replay(tape):
-    """Translate a karaoke answer tape to raw keystrokes: ⏎ → Enter, drop the visual
+    """Translate a karaoke answer tape to raw keystrokes: <CR> → Enter, drop the visual
     space separators (no solve here ever types a literal space)."""
-    return ['\r' if c == '⏎' else c for c in tape if c != ' ']
+    return to_keys(tape)
 
 
 # ── structure ────────────────────────────────────────────────────────────────

@@ -21,6 +21,7 @@ from __future__ import annotations
 import heapq, math, os, random
 from collections import deque
 from engine.world import Dungeon, Room, RoomType, CellType, CharRun, Entity
+from engine.tape import ESC as _TAPE_ESC
 from engine.motion import (_fog_unreachable, _cell_char, _is_word_char,
                            apply_stone_fog)
 from generation.room_gen import make_room, RUNE_CHAR as _RUNE_CHAR
@@ -3278,7 +3279,7 @@ def build_dungeon_word_forge(seed: int) -> Dungeon:
 #     selection toggle reads true;
 #   • the SEARCH-EXTENDED selection — /{pat} from visual is a motion that
 #     grows the live selection across rows; no operator takes a search
-#     (the Seal chamber: v /{x}⏎ h d beats the eye-led v 2j t{x} d by one).
+#     (the Seal chamber: v /{x}<CR> h d beats the eye-led v 2j t{x} d by one).
 #
 # FORCING BY PAR (standard 1.4 budget): the leanest old route never clears
 # the middle blight rows (the doors check only the target rows) — D for
@@ -3326,7 +3327,7 @@ _SS_SPAWN  = (2, 19)                # over the first blight: j drops onto it
 #   j       v 2j t{a} d    — Cut:   7
 #   4j      v 2j t{b} c s  — Word:  9   (post-Esc cursor → the Case anchor)
 #   4j      v j e ~        — Case:  6   (cursor → selection start)
-#   3j      v /{x}⏎ h d    — Seal:  7   (the search Enter spends nothing)
+#   3j      v /{x}<CR> h d    — Seal:  7   (the search Enter spends nothing)
 #   G $                    — exit:  2
 _SS_PAR = 31
 
@@ -3353,7 +3354,7 @@ def _ss_answer(words: dict) -> str:
     a = words['cut'][1][0]        # the Cut tail's initial (t{a})
     b = words['word'][1][0]       # the Word tail's initial (t{b})
     x = words['seal'][1][0]       # the Seal tail's pristine initial (/{x})
-    return f'j v 2j t{a} d 4j v 2j t{b} c s 4j v j e ~ 3j v /{x}⏎ h d G $'
+    return f'j v 2j t{a} d 4j v 2j t{b} c s<Esc> 4j v j e ~ 3j v /{x}<CR> h d G $'
 
 
 def _ss_splits(saying_words, head_cap=16, tail_cap=15):
@@ -3373,7 +3374,7 @@ def _ss_draw_words(rng) -> dict:
     their fixed-split pools; the Cut chamber takes any fitting split of a
     fresh saying; the Seal draws LAST, filtered so its tail's INITIAL
     appears in no other laid letter (nor the decoys nor the typed 's') —
-    the pristine search anchor, /{x}⏎ has one landing."""
+    the pristine search anchor, /{x}<CR> has one landing."""
     from content import proverbs as _pv
 
     for _ in range(200):
@@ -3453,7 +3454,7 @@ def _ss_chambers(words: dict):
          ((11, head_at(g1), g1), (11, an, f1.upper()),
           (12, b0, f2.upper()), (12, b0 + len(f2) + 1, g2)),
          (f'{g1} {f1}', f'{f2} {g2}')),
-        # Seal (v /{x}⏎ h d): the tail's initial is pristine level-wide —
+        # Seal (v /{x}<CR> h d): the tail's initial is pristine level-wide —
         # the one named thing; name what you see
         ('seal', (14, 15, 16),
          ((14, head_at(s_head), s_head), (14, an, '#' * 10),
@@ -3554,7 +3555,7 @@ def build_dungeon_sight_sanctum(seed: int) -> Dungeon:
 # FORCING BY PAR (standard 1.4 budget): the leanest old-only route (gUU/guu/
 # g~~ + per-row dot chains) wins at 1★ a few keys inside the budget — driven.
 # All six chambers anchor at the SHAFT column, so every hop is a plain {n}j
-# (the nav-golf audit); the answer tape shows <C-v> as ^v — load-bearing,
+# (the nav-golf audit); the answer tape shows <C-v> as <C-v> — load-bearing,
 # unlike Esc, so it must be visible (the tracker eats both chars at once).
 _SH_ROWS, _SH_COLS = 32, 44   # the gallery WIDENS at the foot for the proverbs
 _SH_SPINE  = 13                     # every row's first standable
@@ -3770,10 +3771,10 @@ def build_dungeon_selection_halls(seed: int) -> Dungeon:
     # route to ~115 keys. So the budget clears the worst old route (it wins,
     # at 1★) while par (74) still buys the 2nd star only with the swap (the
     # 1★ law; 1.4·par would make the old route unwinnable). <C-v> shows on the
-    # tape as ^v (load-bearing, unlike Esc; the tracker eats both chars at once)
+    # tape as <C-v> (load-bearing, unlike Esc; the tracker eats both chars at once)
     sl = words['stamp_letter']
-    room.answer = (f'j VU 2j Vu 2j V~ 2j ^v2jld 4j ^v2j3l~ 4j ^v2jI{letter} '
-                   f'4j ^v2jr{sl} 4j $bvey 3j $bvep k$bvep k$bvep k$bvep G $')
+    room.answer = (f'j VU 2j Vu 2j V~ 2j <C-v>2jld 4j <C-v>2j3l~ 4j <C-v>2jI{letter}<Esc> '
+                   f'4j <C-v>2jr{sl} 4j $bvey 3j $bvep k$bvep k$bvep k$bvep G $')
 
     dungeon = Dungeon(name='The Selection Halls', seed=seed)
     dungeon.rooms        = [room]
@@ -3976,7 +3977,7 @@ def build_dungeon_word_enclosure(seed: int) -> Dungeon:
     room.par    = _WE_PAR
     room.budget = math.ceil(_WE_PAR * 1.4)   # STANDARD: the piecewise route wins at 1★
     ca, cb = (cures[r][0] for r in _WE_C2_ROWS)
-    room.answer = (f'j diw j . j . 2j ciw {ca} j ciw {cb} '
+    room.answer = (f'j diw j . j . 2j ciw {ca}<Esc> j ciw {cb}<Esc> '
                    f'2j daw j . 2j diW j . l 2j daW j . G $')
 
     dungeon = Dungeon(name='The Word Enclosure', seed=seed)
@@ -4367,7 +4368,7 @@ def build_dungeon_bracket_enclosure(seed: int) -> Dungeon:
     # nav golf (known shortcut): % from the spine scans to the first
     # '(' and jumps to its MATCH — j % lands ON the ')' and di( resolves
     # from the delimiter. Two keys under the w-walk, whatever the prefix.
-    room.answer = (f'j % di( j . j . 2j ci( {ca} j ci( {cb} '
+    room.answer = (f'j % di( j . j . 2j ci( {ca}<Esc> j ci( {cb}<Esc> '
                    f'2j da( j . G $')
 
     dungeon = Dungeon(name='The Bracket Enclosure', seed=seed)
@@ -4593,7 +4594,7 @@ def build_dungeon_brace_square_enclosure(seed: int) -> Dungeon:
     room.par    = _BSQ_PAR
     room.budget = math.ceil(_BSQ_PAR * 1.4)  # STANDARD: the piecewise route wins at 1★
     ca, cb = (cures[r][0] for r in _BSQ_C2_ROWS)
-    room.answer = (f'j % di[ j . 2j ci[ {ca} j ci[ {cb} '
+    room.answer = (f'j % di[ j . 2j ci[ {ca}<Esc> j ci[ {cb}<Esc> '
                    f'2j di{{ j . 2j di{{ j di[ 2j da{{ G $')
 
     dungeon = Dungeon(name='The Brace & Square Enclosure', seed=seed)
@@ -4780,7 +4781,7 @@ def build_dungeon_quote_enclosure(seed: int) -> Dungeon:
     room.rebuild_indexes()
     room.par    = _QE_PAR
     room.budget = math.ceil(_QE_PAR * 1.4)  # STANDARD: the walk-in route wins at 1★
-    room.answer = (f'j di" j . 2j ci" {ca} j ci" {cb} '
+    room.answer = (f'j di" j . 2j ci" {ca}<Esc> j ci" {cb}<Esc> '
                    f"2j di' j . 2j da\" j da' "
                    f'2j w di" G $')
 
@@ -4991,7 +4992,7 @@ def build_dungeon_tag_enclosure(seed: int) -> Dungeon:
     room.par    = _TE_PAR
     room.budget = math.ceil(_TE_PAR * 1.4)  # STANDARD: the walk-in route wins at 1★
     ca, cb = cures
-    room.answer = (f'j f> dit j . 2j cit {ca} j cit {cb} '
+    room.answer = (f'j f> dit j . 2j cit {ca}<Esc> j cit {cb}<Esc> '
                    f'2j dat j . 2j dit j dat 2j f< dit G $')
 
     dungeon = Dungeon(name='The Tag Enclosure', seed=seed)
@@ -5194,7 +5195,7 @@ def build_dungeon_sentence_enclosure(seed: int) -> Dungeon:
     room.par    = _SE_PAR
     room.budget = math.ceil(_SE_PAR * 1.4)  # STANDARD: the edge-hunting route wins at 1★
     ca, cb = (fix[1] for fix in _SE_C3_FIX)
-    room.answer = (f'j dis j . 2j das j . 2j cis {ca}. j cis {cb}. '
+    room.answer = (f'j dis j . 2j das j . 2j cis {ca}.<Esc> j cis {cb}.<Esc> '
                    f'2j das 2j . . G $')
 
     dungeon = Dungeon(name='The Sentence Enclosure', seed=seed)
@@ -5627,8 +5628,8 @@ def build_dungeon_grandmasters_sanctum(seed: int) -> Dungeon:
     # gate row, and $ rides the opened gate east past the transit cell —
     # the natural stroke from the bottom of the hall (G also works, but
     # the player is already on the last line).
-    gallery.answer = (f"2j w w diw 2j ci\" {words['q_cure']} 2j da[ "
-                      f"2j cis {words['s_cure']}. 2j dit 2j ci{{ {words['b_cure']} "
+    gallery.answer = (f"2j w w diw 2j ci\" {words['q_cure']}<Esc> 2j da[ "
+                      f"2j cis {words['s_cure']}.<Esc> 2j dit 2j ci{{ {words['b_cure']}<Esc> "
                       f"2j dap $")
     # The arena (The Unmaking) has NO karaoke — shear the six strands in any
     # order; the Grandmaster starts inside one and slips to another whenever
@@ -6282,8 +6283,8 @@ _WI_BRAZIERS = ((_WI_BRZ_ROW, 8), (_WI_BRZ_ROW, 13), (_WI_BRZ_ROW, 18))
 _WI_GATE   = 6
 _WI_BOLT   = 23
 _WI_EXIT   = (6, 24)
-_WI_PAR    = 42                       # i{w1} 2+ yl w P gi␣{w2} 2+ 2w P
-                                      # gi␣{w3} 2+ 3w P gi␣{w4} G $ (pinned)
+_WI_PAR    = 42                       # i{w1} 2+ yl w P gi<Space>{w2} 2+ 2w P
+                                      # gi<Space>{w3} 2+ 3w P gi<Space>{w4} G $ (pinned)
 
 # SENSE, NOT DECREE (the design law): the inscription is
 # a four-word saying the player knows whole — writing the first words, they
@@ -6364,8 +6365,8 @@ def build_dungeon_wet_ink(seed: int) -> Dungeon:
     room.fog_cells = set().union(*room._wi_seg_fog)
     room.par    = _WI_PAR
     room.budget = math.ceil(_WI_PAR * 1.4)
-    room.answer = (f'i{ws[0]} 2+ yl w P gi␣{ws[1]} 2+ 2w P '
-                   f'gi␣{ws[2]} 2+ 3w P gi␣{ws[3]} G $')
+    room.answer = (f'i{ws[0]}<Esc> 2+ yl w P gi<Space>{ws[1]}<Esc> 2+ 2w P '
+                   f'gi<Space>{ws[2]}<Esc> 2+ 3w P gi<Space>{ws[3]}<Esc> G $')
 
     dungeon = Dungeon(name='The Wet Ink', seed=seed)
     dungeon.rooms        = [room]
@@ -6387,7 +6388,7 @@ def build_dungeon_wet_ink(seed: int) -> Dungeon:
 # channel, so every line-scoped scan stops at the bank — $ / 0 / ^ by
 # _cross_water's fog check, f/F/t/T by the scan-fog law — while teleports
 # (G/H/M/L/{n}G) land on the row's first standable, the NEAR shore. Search
-# alone crosses: /{word}⏎ — the Labyrinth's lesson, cashed in. The bound
+# alone crosses: /{word}<CR> — the Labyrinth's lesson, cashed in. The bound
 # Codex waits BEYOND the
 # word (chest after crossing, never before), so :h cannot be opened until
 # the Codex is actually in hand (the command is gated on the 'readers_key'
@@ -6462,9 +6463,9 @@ def build_dungeon_binders_reliquary(seed: int) -> Dungeon:
     room.rebuild_indexes()
     room.par    = None                            # reward room, like the first
     room.budget = _BND_BUDGET
-    # /{word}⏎ lands on the word's first glyph; e to its end, step to the
+    # /{word}<CR> lands on the word's first glyph; e to its end, step to the
     # lectern, loot, step out. (Enter is free; '/' + the word are charged.)
-    room.answer = f'/{word}⏎ e 2l x l'
+    room.answer = f'/{word}<CR> e 2l x l'
 
     dungeon = Dungeon(name="The Binder's Reliquary", seed=seed)
     dungeon.rooms        = [room]
@@ -6481,7 +6482,7 @@ def build_dungeon_binders_reliquary(seed: int) -> Dungeon:
 # and be pulled to it.  Path-critical words are real typable vocab tokens:
 #   • 'maze'  appears 3× (the player SPAWNS on the first one): * jumps to the next,
 #     n walks the echoes forward, N walks them back.
-#   • 'vault' sits beside the red door at the very end: /vault⏎ lands the search.
+#   • 'vault' sits beside the red door at the very end: /vault<CR> lands the search.
 # Decor words (also vocab) flesh out the halls; none contains 'maze' or 'vault',
 # so they never perturb the two taught searches.
 #
@@ -6491,13 +6492,13 @@ def build_dungeon_binders_reliquary(seed: int) -> Dungeon:
 #   • 2nd 'maze' (5,1): a GOLD door (5,6) seals the RED key in a one-cell stub (5,7).
 #   • the RED door (1,18) caps the exit (1,19); 'vault' (1,7) shares its corridor.
 #
-# Optimal route (par 18):  * n 0 x N $ p l x /vault⏎ $ p l   (/vault⏎ = len+1: '/' charged, Enter free)
+# Optimal route (par 18):  * n 0 x N $ p l x /vault<CR> $ p l   (/vault<CR> = len+1: '/' charged, Enter free)
 #   * n    — 'maze'(1,1) → 2nd 'maze'(5,1) [a decoy] → 3rd 'maze'(11,15).
 #   0 x    — 0 halts on the gold key at (11,11) (left of the maze); x cuts it.
 #   N      — reverse the search: back to the 2nd 'maze'(5,1), the passed decoy.
 #   $ p l  — $ halts at (5,5) before the gold door; p opens it (gold), l → red key.
 #   x      — cut the red key (the register now holds red).
-#   /vault⏎— teleport to 'vault'(1,7), the exit corridor.
+#   /vault<CR>— teleport to 'vault'(1,7), the exit corridor.
 #   $ p l  — $ halts at (1,17) before the RED door; p opens it (red), l → exit.
 _SEEKERS_MAZE = [
     "#######################################",
@@ -6529,7 +6530,7 @@ _SEEKERS_WORD_POS     = [(1, 1), (5, 1), (11, 15)]
 _SEEKERS_DOORWORD     = 'vault'                # word beside the red door
 _SEEKERS_DOORWORD_POS = (1, 7)
 _SEEKERS_PAR          = 18
-_SEEKERS_ANSWER       = '* n 0 x N $ p l x /vault⏎ $ p l'
+_SEEKERS_ANSWER       = '* n 0 x N $ p l x /vault<CR> $ p l'
 
 
 def _seekers_runs(cells) -> list:
@@ -6651,7 +6652,7 @@ def _par_seekers_labyrinth(composite, no_search: bool = False, return_path: bool
     locked) doors behave exactly as in play — open doors are temporarily removed
     so motions cross them.  x at a key cell loads the register; p beside a door
     opens it iff the held key's colour matches.  Search is modelled as composite
-    edges: '/W⏎'/'?W⏎' + k·n reaches the k-th match forward/backward of any word W
+    edges: '/W<CR>'/'?W<CR>' + k·n reaches the k-th match forward/backward of any word W
     (cost len(W)+1+k — '/' charged, closing Enter free); '*' + k·n does the same
     for the word under the cursor (cost 1+k).  no_search drops all search edges —
     the foot-only bound that
@@ -6721,10 +6722,10 @@ def _par_seekers_labyrinth(composite, no_search: bool = False, return_path: bool
                 continue
             fwd = [m for m in ms if m > cur] + [m for m in ms if m <= cur]   # wrap
             for k, tgt in enumerate(fwd):
-                out.append((len(W) + 1 + k, tgt, f'/{W}⏎' + 'n' * k))
+                out.append((len(W) + 1 + k, tgt, f'/{W}<CR>' + 'n' * k))
             bwd = [m for m in reversed(ms) if m < cur] + [m for m in reversed(ms) if m >= cur]
             for k, tgt in enumerate(bwd):
-                out.append((len(W) + 1 + k, tgt, f'?{W}⏎' + 'n' * k))
+                out.append((len(W) + 1 + k, tgt, f'?{W}<CR>' + 'n' * k))
         ru = composite.char_run_at(r, c)
         if ru is not None:
             ms = _matches(''.join(ru.symbols))
@@ -6798,7 +6799,7 @@ def _par_seekers_labyrinth(composite, no_search: bool = False, return_path: bool
 # The exit is teleport-safe (not any jump target; behind the blocking exit lock).
 #
 # Optimal route (par 16):
-#   ma · ?xyzzy⏎ h x (key) · `a $ (home, then line-end) · p l → exit
+#   ma · ?xyzzy<CR> h x (key) · `a $ (home, then line-end) · p l → exit
 _WP_ROWS, _WP_COLS = 19, 46
 _WP_CROW   = 5                     # sanctum corridor row (mark row; wordless)
 _WP_SCROLL = (5, 1)                # chest_scroll — sanctum row's first-left cell -> 'a
@@ -6827,7 +6828,7 @@ _WP_PKT2_SPAN    = (6, 12)         # pocket-2 interior cols (key + plugh twin)
 _WP_DANGER_ROWS  = (1, 2, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17)
 _WP_VAULT_COLS   = (6, 10, 14, 18, 22, 26, 30, 34, 38, 42)  # vaults lining the sanctum underside
 _WP_PAR    = 17
-_WP_ANSWER = "ma ?xyzzy⏎ w # h x `a $ p l"
+_WP_ANSWER = "ma ?xyzzy<CR> w # h x `a $ p l"
 
 
 def build_dungeon_waypoint_sanctum(seed: int) -> 'Dungeon':
@@ -9002,18 +9003,18 @@ def _forge_text(room, row, col, text, kind):
             room.char_runs.append(CharRun(row, col + i, (ch,), kind))
 
 
-# The canonical three-rite solve, as an admin karaoke tape: Enter is the glyph '⏎' (so it
+# The canonical three-rite solve, as an admin karaoke tape: Enter is the glyph '<CR>' (so it
 # renders on the answer sheet and the live tracker can match an Enter keypress against it),
 # and spaces are visual token separators (stripped for matching, never typed).  Chamber A's
 # /g mend, then 8G + surgical :s + jj + & (Chamber B, sparing the protected verse), then
-# Chamber C's :g delete, then the walk out.  Tests translate ⏎→Enter and drop the spaces.
+# Chamber C's :g delete, then the walk out.  Tests translate <CR>→Enter and drop the spaces.
 # par is this solve's measured engine cost — constant across seeds; the playthrough pins it.
-_SPELLWRIGHTS_ANSWER = ':%s/moo/quack/g⏎ 8G :s/down/up/⏎ jj& :g/krzzt/d⏎ 6G$'
+_SPELLWRIGHTS_ANSWER = ':%s/moo/quack/g<CR> 8G :s/down/up/<CR> jj& :g/krzzt/d<CR> 6G$'
 _SPELLWRIGHTS_PAR    = 44
 # 44 = 47 keys typed MINUS the 3 command-line Enters, which execute the line
 #      rather than spending budget:
-#        :%s/moo/quack/g⏎ (16-1) + 8G (2) + :s/down/up/⏎ (12-1) + jj (2)
-#        + & (1) + :g/krzzt/d⏎ (11-1) + 6G$ (3)
+#        :%s/moo/quack/g<CR> (16-1) + 8G (2) + :s/down/up/<CR> (12-1) + jj (2)
+#        + & (1) + :g/krzzt/d<CR> (11-1) + 6G$ (3)
 #      Chamber B's two verses straddle the protected line, so no single
 #      command hits just them — the :s + & pair is the floor there; the cursor
 #      never lands on the door row after a rite, so the 3-key walk out is the
@@ -9202,8 +9203,8 @@ def build_dungeon_refrain_vault(seed: int) -> Dungeon:
 
     room.par    = _RV_PAR
     room.budget = math.ceil(_RV_PAR * 1.4)   # STANDARD (par-is-the-optimum law)
-    room.answer = (':set␣nu⏎ :13,15s/up/down/g⏎ :4,6&&⏎ '
-                   ':1j|1y⏎ p 3j p 3j p 3j p j $')
+    room.answer = (':set<Space>nu<CR> :13,15s/up/down/g<CR> :4,6&&<CR> '
+                   ':1j|1y<CR> p 3j p 3j p 3j p j $')
 
     room.rebuild_indexes()
     pocket = {(_RV_SEAL_ROW, col)
@@ -10529,11 +10530,11 @@ def build_dungeon_inscription_halls(seed: int) -> Dungeon:
     #   D: ) e a{2}      = 1+1+3
     #   ford: ) e agate $ = 1+1+5+1   → total 24
     m = [m_ for (_w, m_, _f) in lessons]
-    room.answer = (f'( i{m[0]} '
-                   f') e a{m[1]} '
-                   f') i{m[2]} '
-                   f') e a{m[3]} '
-                   f') e agate $')
+    room.answer = (f'( i{m[0]}<Esc> '
+                   f') e a{m[1]}<Esc> '
+                   f') i{m[2]}<Esc> '
+                   f') e a{m[3]}<Esc> '
+                   f') e agate<Esc> $')
 
     apply_stone_fog(room)                 # sealed pockets sleep under fog
     dungeon = Dungeon(name='The Inscription Halls', seed=seed)
@@ -10580,7 +10581,7 @@ def build_dungeon_inscription_halls(seed: int) -> Dungeon:
 #  - LINE DOORS ARE A SINGLE WORD, and `room.answer` is the real keystroke
 #    string (see _wla_route / _wla_answer below). The karaoke sheet strips plain
 #    spaces from room.answer as display separators, so a typed space must be
-#    written `␣` (and a typed Enter `⏎`). One word per door is this level's
+#    written `<Space>` (and a typed Enter `<CR>`). One word per door is this level's
 #    choice, not a global limit — multi-word typed text is representable.
 #  - THE EXIT IS PLAIN FLOOR, NOT A GATED WALL. The bolts stand in a row WEST of
 #    the exit on the gate row; the spine cell west of them is the row's first
@@ -10705,10 +10706,14 @@ def _wla_route(lessons):
 
 
 def _wla_answer(lessons):
-    """room.answer: the real keystroke tape (printable keys only — Esc omitted).
+    """room.answer: the real keystroke tape. A step that TYPES text is sealed with
+    Esc, written <Esc> (engine/tape.py): a player reading the sheet could infer it,
+    but a replayer cannot — an omitted Esc makes the following keys land in the
+    buffer as text. Esc spends no budget, so the tape's cost is unchanged.
     Spaces separate tokens for the karaoke display and are stripped when matched;
     no `typed` value contains a space, so the tape is unambiguous."""
-    return ' '.join(keys + typed for keys, typed in _wla_route(lessons) if keys or typed)
+    return ' '.join(keys + typed + (_TAPE_ESC if typed else '')
+                    for keys, typed in _wla_route(lessons) if keys or typed)
 
 
 def build_dungeon_whole_line_annex(seed: int) -> Dungeon:
@@ -10962,10 +10967,14 @@ def _ce_route(lessons):
 
 
 def _ce_answer(lessons):
-    """room.answer: the real keystroke tape (printable keys only — Esc omitted).
+    """room.answer: the real keystroke tape. A step that TYPES text is sealed with
+    Esc, written <Esc> (engine/tape.py): a player reading the sheet could infer it,
+    but a replayer cannot — an omitted Esc makes the following keys land in the
+    buffer as text. Esc spends no budget, so the tape's cost is unchanged.
     Spaces separate tokens for the karaoke display and are stripped when matched;
     no `typed` value contains a space, so the tape is unambiguous."""
-    return ' '.join(keys + typed for keys, typed in _ce_route(lessons) if keys or typed)
+    return ' '.join(keys + typed + (_TAPE_ESC if typed else '')
+                    for keys, typed in _ce_route(lessons) if keys or typed)
 
 
 def _ce_par() -> int:
@@ -11106,7 +11115,7 @@ def build_dungeon_change_extension(seed: int) -> Dungeon:
 # The vault door (a single gated cell south of line 4) opens while the whole
 # poem READS TRUE, line for line. The tick (`_sculpting_chambers_tick`) is
 # text- and exit_pos-relative, so it rides the row shifts o/O cause (the
-# Manifold discipline); typed spaces are lawful on the tape (marked ␣).
+# Manifold discipline); typed spaces are lawful on the tape (marked <Space>).
 _SC_ROWS, _SC_COLS = 9, 40
 _SC_WCOL = 13                       # the poem's lines start here — a wall GAP (cols 9-12)
                                     # breathes between the west-wall plaques and the carving floor
@@ -11145,10 +11154,10 @@ _SC_EXIT_ROW0 = _SC_A_ROW + 1       # at BUILD, one row below the A line; the o/
 # line (the plaque already carries the first word):
 # O 'row row your boat' · j · I 'down ' · j · A 'merrily merrily' (carves) ·
 # o 'is but a dream' · j. par ENGINE-MEASURED; pinned by the driven test.
-# Esc is free/omitted; spaces separate tape tokens; a TYPED space is ␣.
+# Esc is free/omitted; spaces separate tape tokens; a TYPED space is <Space>.
 _SC_PAR    = 58
-_SC_ANSWER = ('Orow␣row␣your␣boat j Idown␣ j '
-              'Amerrily␣merrily ois␣but␣a␣dream j')
+_SC_ANSWER = ('Orow<Space>row<Space>your<Space>boat<Esc> j Idown<Space><Esc> j '
+              'Amerrily<Space>merrily<Esc> ois<Space>but<Space>a<Space>dream<Esc> j')
 
 
 def build_dungeon_sculpting_chambers(seed: int) -> Dungeon:
@@ -11271,7 +11280,7 @@ _OH_LESSONS = (
 # (retype the whole word) and the `r`-chain both overshoot; the budget bars the
 # cheapest no-R route by one (par + _OH_SAVING − 1) — the Annex model.
 _OH_PAR    = 30
-_OH_ANSWER = 'fx Revi j Fx re j Fx Rrne j re j Fx Rlve G$'
+_OH_ANSWER = 'fx Revi<Esc> j Fx re j Fx Rrne<Esc> j re j Fx Rlve<Esc> G$'
 _OH_SAVING = 8
 
 
@@ -12457,7 +12466,7 @@ def build_dungeon_gauntlet(seed: int) -> Dungeon:
     door('sub', w['sword'])
     # r18 · y-door: two empty settings off the U1 anchor; the shelf word
     # fills both (the # trip). Each setting is a TWO-blank gap: the paste
-    # shoves the tail east, turning ' ␣' into ' word ' — so the finished
+    # shoves the tail east, turning ' <Space>' into ' word ' — so the finished
     # line reads with single spaces and IS its plaque.
     room.char_runs.append(CharRun(_GNT_R_Y1, TX, tuple(w['u1s']), 'ancient'))
     room.char_runs.append(CharRun(_GNT_R_Y1, TX + 5, tuple(w['ymid']),
@@ -12547,10 +12556,10 @@ def build_dungeon_gauntlet(seed: int) -> Dungeon:
     # The canonical tape (karaoke): every typed token is a single drawn word.
     room.answer = (
         f"k 3e x j b x b x j % l x j ( x "
-        f"/{w['s1']}⏎ 2e r{w['rcure'][5]} n w ~ ~ w * 3b gU3e "
-        f"+ cit{w['tc']} << j dw j w D j C{w['ccure']} j S{w['sword']} "
+        f"/{w['s1']}<CR> 2e r{w['rcure'][5]} n w ~ ~ w * 3b gU3e "
+        f"+ cit{w['tc']}<Esc> << j dw j w D j C{w['ccure']}<Esc> j S{w['sword']}<Esc> "
         f"j b # w yiw N qb e l p q w @b j Y p "
-        f"o{w['ow1']} o{w['ow2']} G $ h")
+        f"o{w['ow1']}<Esc> o{w['ow2']}<Esc> G $ h")
 
     dungeon = Dungeon(name='The Gauntlet', seed=seed)
     dungeon.rooms        = [room]
@@ -12733,7 +12742,7 @@ def build_dungeon_culling_ledger(seed: int) -> Dungeon:
 
     room.par    = _CL_PAR
     room.budget = math.ceil(_CL_PAR * 1.4)   # STANDARD (par-is-the-optimum law)
-    room.answer = ':set␣nu⏎ 2l x $ p :2,19v/that/d␣_⏎ $ p $'
+    room.answer = ':set<Space>nu<CR> 2l x $ p :2,19v/that/d<Space>_<CR> $ p $'
 
     room.rebuild_indexes()
     pocket = {(_CL_COR, c) for c in range(51, 55)}  # the dark exit pocket
@@ -12844,7 +12853,7 @@ def build_dungeon_shelving_room(seed: int) -> Dungeon:
 
     room.par    = _SHR_PAR
     room.budget = math.ceil(_SHR_PAR * 1.4)  # STANDARD (par-is-the-optimum law)
-    room.answer = ':set␣nu⏎ :6m3⏎ :6<⏎ :7t7⏎ :8>⏎ $'
+    room.answer = ':set<Space>nu<CR> :6m3<CR> :6<<CR> :7t7<CR> :8><CR> $'
 
     room.rebuild_indexes()
     pocket = {(_SHR_GAL, c) for c in range(_SHR_SEAL_COL + 1, _SHR_EXIT_COL + 1)}
@@ -12859,7 +12868,7 @@ def build_dungeon_shelving_room(seed: int) -> Dungeon:
 # A vertical descent back through all six wardens the player has already
 # beaten, then The Unmasking: the blessing-wizard is the Warden Eternal, the W
 # glyph that was the clue all along. NOT par-forced (par=None, win = survival);
-# the finale's horde is sized so a kill-macro (qa /g⏎ x q → @a) is the master's
+# the finale's horde is sized so a kill-macro (qa /g<CR> x q → @a) is the master's
 # answer — the payoff of the Hall of Echoes.
 _WDE_COLS    = 60
 _WDE_SPINE   = 1                      # the descent column (open in every chamber)

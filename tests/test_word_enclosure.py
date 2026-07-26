@@ -134,7 +134,7 @@ def test_par_answer_budget(seed):
     assert room.par == _WE_PAR
     assert room.budget == math.ceil(_WE_PAR * 1.4)
     ca, cb = _cures(room)
-    assert room.answer == (f'j diw j . j . 2j ciw {ca} j ciw {cb} '
+    assert room.answer == (f'j diw j . j . 2j ciw {ca}<Esc> j ciw {cb}<Esc> '
                            f'2j daw j . 2j diW j . l 2j daW j . G $')
 
 

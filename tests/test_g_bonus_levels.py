@@ -179,7 +179,7 @@ def test_bw_star_finds_nothing(monkeypatch):
 def _wi_canon_keys(ws):
     """The canonical tape: write a quarter, carry fire (w hops the ember
     words, P lights in place), gi back — ×3. Typed spaces join the quarters
-    (the tape marks them ␣)."""
+    (the tape marks them <Space>)."""
     return (_K('i') + _K(ws[0]) + [ESC] + _K('2+ylwP')
             + _K('gi ') + _K(ws[1]) + [ESC] + _K('2+2wP')
             + _K('gi ') + _K(ws[2]) + [ESC] + _K('2+3wP')

@@ -40,6 +40,7 @@ from generation.dungeon_gen import (
     _SHR_SEAL_COL, _SHR_EXIT_COL, _SHR_BOLT_COLS, _SHR_CALLS, _SHR_INIT,
     _SHR_PAR, _SHR_BUDGET,
 )
+from engine.tape import to_keys
 from tests import SEEDS, cached_room
 
 ENTER = Keystroke('\r', code=343, name='KEY_ENTER')
@@ -54,14 +55,17 @@ def _fresh(seed=0):
 
 
 def _K(s):
-    return [ENTER if ch == '⏎' else Keystroke(ch) for ch in s]
+    """Keystroke string → keys. `to_keys` is the ONE converter: tokens like
+    `<CR>` and `<Space>` are several glyphs but one keystroke, so they can
+    only be matched whole (engine/tape.py). `separators=False`: this is a
+    hand-written keystroke string, not a tape, so a space in it is a space the
+    player types (`:6s/^  //`), never display spacing."""
+    return to_keys(s, separators=False)
 
 
 def _tape_keys(answer):
-    keys = []
-    for tok in answer.split(' '):
-        keys += _K(tok)
-    return keys
+    """room.answer → keystrokes, via the one shared translator (engine/tape.py)."""
+    return to_keys(answer)
 
 
 def _drive(dungeon, keys, monkeypatch, finish=':wq\r', player_name='Scribe'):
@@ -206,9 +210,9 @@ def test_fresh_rows_stay_misted(monkeypatch):
 
 def test_each_fix_grinds_its_own_bolt(monkeypatch):
     # From fresh, one fix in isolation opens exactly its bolt.
-    fixes = ((':6m3⏎', 0),      # the stray echo rejoins its pair → order
-             (':5<⏎',  1),      # the Sonnez echo un-deepens → its step
-             (':7t7⏎', 2))      # the last echo shelved → duplication
+    fixes = ((':6m3<CR>', 0),      # the stray echo rejoins its pair → order
+             (':5<<CR>',  1),      # the Sonnez echo un-deepens → its step
+             (':7t7<CR>', 2))      # the last echo shelved → duplication
     for tape, want in fixes:
         d = _fresh(0)
         r = d.rooms[0]
@@ -224,7 +228,7 @@ def test_fixes_in_any_order_still_win_at_par(monkeypatch):
     # Sonnez step, then the stray — same spend, same 2★.
     d = _fresh(0)
     r = d.rooms[0]
-    result = _drive(d, _K(':7t7⏎:8>⏎:5<⏎:6m3⏎$'), monkeypatch)
+    result = _drive(d, _K(':7t7<CR>:8><CR>:5<<CR>:6m3<CR>$'), monkeypatch)
     assert result['won'] and result['stars'] == 2
     gal = S._last_standable_row(r)
     for dc in _SHR_BOLT_COLS:
@@ -234,7 +238,7 @@ def test_fixes_in_any_order_still_win_at_par(monkeypatch):
 def test_undo_rebars_a_ground_bolt(monkeypatch):
     d = _fresh(0)
     r = d.rooms[0]
-    _drive(d, _K(':7t7⏎u'), monkeypatch, finish=':q!\r')
+    _drive(d, _K(':7t7<CR>u'), monkeypatch, finish=':q!\r')
     gal = S._last_standable_row(r)
     assert r.cells[gal][_SHR_BOLT_COLS[2]] == CellType.WALL
 
@@ -244,7 +248,7 @@ def test_undo_rebars_a_ground_bolt(monkeypatch):
 def test_copy_delete_rival_to_the_move_loses_a_star(monkeypatch):
     # :t + :d imitates :m at nearly twice the price.
     d = _fresh(0)
-    keys = _K(':6t3⏎:7d⏎:6<⏎:7t7⏎:8>⏎$')
+    keys = _K(':6t3<CR>:7d<CR>:6<<CR>:7t7<CR>:8><CR>$')
     result = _drive(d, keys, monkeypatch)
     assert result['won'] and result['stars'] == 1
 
@@ -252,14 +256,14 @@ def test_copy_delete_rival_to_the_move_loses_a_star(monkeypatch):
 def test_substitute_rival_to_the_indents_loses_a_star(monkeypatch):
     # :s/^ anchors imitate :> and :< at several times the cost.
     d = _fresh(0)
-    keys = _K(':6m3⏎:6s/^  //⏎:7t7⏎:8s/^/  /⏎$')
+    keys = _K(':6m3<CR>:6s/^  //<CR>:7t7<CR>:8s/^/  /<CR>$')
     won, spent = _spend_uncapped(d, keys, monkeypatch, _drive)
     assert won and spent > d.rooms[0].par, (won, spent)
 
 
 def test_scorched_shelf_never_opens_the_seal(monkeypatch):
     d = _fresh(0)
-    result = _drive(d, _K(':1,7d⏎$'), monkeypatch)
+    result = _drive(d, _K(':1,7d<CR>$'), monkeypatch)
     assert not result['won']
 
 

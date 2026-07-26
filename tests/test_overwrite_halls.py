@@ -323,7 +323,7 @@ def test_answer_is_the_real_keystroke_tape(seed, monkeypatch):
     omitted, spaces separators). Driven as admin it advances answer_pos to the
     end without diverging — R-mode chars advance the tape too."""
     room = _room(seed)
-    assert room.answer == 'fx Revi j Fx re j Fx Rrne j re j Fx Rlve G$'
+    assert room.answer == 'fx Revi<Esc> j Fx re j Fx Rrne<Esc> j re j Fx Rlve<Esc> G$'
     dungeon = build_dungeon_overwrite_halls(seed)
     troom = dungeon.rooms[0]
     _drive(dungeon, _canon_keys(), monkeypatch, finish=':q!\r', name='admin')

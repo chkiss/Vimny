@@ -52,7 +52,7 @@ def _bolt(i):
     return (_SH_GATE, _SH_BOLT0 + i)
 
 
-# The canonical tape (== room.answer with <C-v>/Esc placed; ^v on the tape
+# The canonical tape (== room.answer with <C-v>/Esc placed; <C-v> on the tape
 # is the <C-v> keystroke). 64 keys; the typed letters vary by seed.
 def _canon_keys(room):
     w = room._sh_words
@@ -166,10 +166,10 @@ def test_par_answer_budget(seed):
     assert room.par == _SH_PAR
     assert room.budget == math.ceil(_SH_PAR * 1.4)   # STANDARD
     L, sl = room._sh_words['letter'], room._sh_words['stamp_letter']
-    # <C-v> shows as ^v — LOAD-BEARING on the tape (playtest: omitting it
+    # <C-v> shows as <C-v> — LOAD-BEARING on the tape (playtest: omitting it
     # made the tape unplayable; a d2j swallowed a stripe row)
-    assert room.answer == (f'j VU 2j Vu 2j V~ 2j ^v2jld 4j ^v2j3l~ 4j ^v2jI{L} '
-                           f'4j ^v2jr{sl} 4j $bvey 3j $bvep k$bvep k$bvep k$bvep G $')
+    assert room.answer == (f'j VU 2j Vu 2j V~ 2j <C-v>2jld 4j <C-v>2j3l~ 4j <C-v>2jI{L}<Esc> '
+                           f'4j <C-v>2jr{sl} 4j $bvey 3j $bvep k$bvep k$bvep k$bvep G $')
 
 
 @pytest.mark.parametrize("seed", SEEDS)

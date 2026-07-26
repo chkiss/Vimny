@@ -45,6 +45,8 @@ from dataclasses import dataclass, field
 from blessed import Terminal
 from blessed.keyboard import Keystroke
 
+from engine import tape as _tape
+
 # H/M/L land relative to the VIEWPORT, so a replay in a short terminal walks a
 # different route than the one the tape was recorded against — silently, and
 # only on the levels that use them. 33 playable rows plus the 8 rows of chrome
@@ -86,16 +88,14 @@ class ReplayResult:
         return self.won and not self.error
 
 
-def tape_to_keys(tape: str) -> list:
+def tape_to_keys(tape: str, term=None) -> list:
     """Turn a tape string into the Keystrokes the game loop reads.
 
-    Plain spaces are DISPLAY separators and are stripped — which is exactly why
-    a space the player really types is written `␣`, and a typed Enter `⏎`. See
-    the answer-tape notation in docs/ARCHITECTURE.md.
+    The notation lives in `engine/tape.py` — plain spaces are DISPLAY separators
+    and are stripped, which is why a typed space is `<Space>`, a typed Enter `<CR>`, and
+    Esc `<Esc>`.
     """
-    stripped = tape.replace(' ', '')
-    return [Keystroke('\r' if ch == '⏎' else ' ' if ch == '␣' else ch)
-            for ch in stripped]
+    return _tape.to_keys(tape, term)
 
 
 @contextlib.contextmanager
@@ -139,7 +139,8 @@ def replay_tape(dungeon, slug: str, tape: str, *,
     """
     import main
 
-    keys  = tape_to_keys(tape)
+    term = Terminal(force_styling=False)
+    keys  = tape_to_keys(tape, term)
     keys += [Keystroke(ch) for ch in ':wq\r']   # :wq is what reports the real win
     state = {'n': 0, 'overrun': False}
 
@@ -153,7 +154,6 @@ def replay_tape(dungeon, slug: str, tape: str, *,
         # the loop returns instead of hanging on a tape that never terminated.
         raise _TapeExhausted()
 
-    term = Terminal(force_styling=False)
     term.inkey = _inkey
     import render.colors as colors
     colors.init(term)              # combat and key colour paths call color_rgb()
@@ -167,14 +167,14 @@ def replay_tape(dungeon, slug: str, tape: str, *,
                 error=('the tape and the trailing :wq ran out before the level '
                        'returned — the route never reached the exit, or an '
                        'unterminated insert swallowed the :wq as typed text'),
-                keys=min(state['n'], len(tape.replace(' ', ''))))
+                keys=min(state['n'], len(_tape.strip_separators(tape))))
 
     return ReplayResult(
         won=bool(result.get('won')),
         stars=int(result.get('stars', 0)),
         spent=int(result.get('spent', 0)),
         par=result.get('par'),
-        keys=len(tape.replace(' ', '')),
+        keys=len(_tape.strip_separators(tape)),
     )
 
 

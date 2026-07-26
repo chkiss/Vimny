@@ -103,12 +103,12 @@ def test_search_costs_pattern_plus_one():
 
 
 def test_undo_then_n_repays_full_search_cost():
-    # /z⏎ → u → n  must cost the full 2 (re-pay), not 1.
+    # /z<CR> → u → n  must cost the full 2 (re-pay), not 1.
     assert _play([_ks('/'), _ks('z'), _ks('\r'), _ks('u'), _ks('n')]) == (2, 20)
 
 
 def test_legit_n_after_paid_search_is_one():
-    # /z⏎ (2) + n (1) = 3
+    # /z<CR> (2) + n (1) = 3
     assert _play([_ks('/'), _ks('z'), _ks('\r'), _ks('n')]) == (3, 30)
 
 

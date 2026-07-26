@@ -103,7 +103,7 @@ def cheese_min(slug, game_h=25):
     # search edges (/ ? *) — the buffer (and thus matches) is fixed, so these depend
     # only on the cursor cell. Use the REAL engine matcher (_match_positions is per-line,
     # i.e. richer than the seekers par solver's substring model — so it can surface cheese
-    # the par model itself missed). Cost mirrors the game: /W⏎ = len(W)+2, each n = +1.
+    # the par model itself missed). Cost mirrors the game: /W<CR> = len(W)+2, each n = +1.
     do_search = any(s in known for s in ('/', '?', '*'))
     search_cache: dict = {}
     if do_search:
@@ -125,12 +125,12 @@ def cheese_min(slug, game_h=25):
                 fwd = [m for m in ms if m > cur] + [m for m in ms if m <= cur]
                 for k, tgt in enumerate(fwd):
                     if tgt != cur and tgt not in voids:
-                        out.append((len(W) + 2 + k, tgt, f'/{W}⏎' + 'n' * k))
+                        out.append((len(W) + 2 + k, tgt, f'/{W}<CR>' + 'n' * k))
             if '?' in known:
                 bwd = [m for m in reversed(ms) if m < cur] + [m for m in reversed(ms) if m >= cur]
                 for k, tgt in enumerate(bwd):
                     if tgt != cur and tgt not in voids:
-                        out.append((len(W) + 2 + k, tgt, f'?{W}⏎' + 'n' * k))
+                        out.append((len(W) + 2 + k, tgt, f'?{W}<CR>' + 'n' * k))
         if '*' in known:
             ru = base.char_run_at(r, c)
             if ru is not None:

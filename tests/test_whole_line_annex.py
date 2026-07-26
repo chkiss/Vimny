@@ -38,6 +38,7 @@ from blessed import Terminal
 
 import main
 from engine.motion import apply_motion
+from engine.tape import ESC as TAPE_ESC
 from engine.player import Player
 from engine.world import CellType
 from content.levels import known_commands
@@ -440,11 +441,14 @@ def test_one_shut_bolt_bars_the_exit(seed, monkeypatch):
 
 @pytest.mark.parametrize("seed", SEEDS)
 def test_answer_is_the_real_keystroke_tape(seed):
-    """room.answer is the printable keystrokes of the canonical route (Esc
-    omitted, spaces only as separators), so the admin answer-sheet tracks it
-    keystroke for keystroke. No typed value contains a space."""
+    """room.answer is the printable keystrokes of the canonical route, so the
+    admin answer-sheet tracks it keystroke for keystroke. Plain spaces are
+    display separators; a step that TYPES text is sealed with Esc, written <Esc>
+    (engine/tape.py), because a replayer cannot infer it the way a reader can.
+    No typed value contains a space."""
     room = _room(seed)
-    expected = ''.join(keys + typed for keys, typed in _wla_route(room._wla_lessons))
+    expected = ''.join(keys + typed + (TAPE_ESC if typed else '')
+                       for keys, typed in _wla_route(room._wla_lessons))
     assert room.answer.replace(' ', '') == expected
     assert room.answer == _wla_answer(room._wla_lessons)
 

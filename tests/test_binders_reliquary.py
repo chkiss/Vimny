@@ -35,6 +35,7 @@ from generation.dungeon_gen import (
     _BND_WORD_COL, _BND_CHEST, _BND_EXIT, _BND_BUDGET,
 )
 from tests import SEEDS, cached_room
+from engine.tape import ENTER as TAPE_ENTER
 
 ENTER = Keystroke('\r', name='KEY_ENTER')
 
@@ -48,12 +49,12 @@ def _K(s):
 
 
 def _answer_keys(room):
-    # room.answer with ⏎ realized as Enter, plus ONE dismiss key for the
+    # room.answer with <CR> realized as Enter, plus ONE dismiss key for the
     # Codex Key scroll screen after the chest x.
     keys = []
     for tok in room.answer.split(' '):
-        if tok.endswith('⏎'):
-            keys += _K(tok[:-1]) + [ENTER]
+        if tok.endswith(TAPE_ENTER):
+            keys += _K(tok[:-len(TAPE_ENTER)]) + [ENTER]
         else:
             keys += _K(tok)
         if tok == 'x':
@@ -144,7 +145,7 @@ def test_the_word_is_the_only_text_on_the_far_shore(seed):
 @pytest.mark.parametrize("seed", SEEDS)
 def test_answer_and_colophon(seed):
     room = _room(seed)
-    assert room.answer == f'/{room._bnd_word}⏎ e 2l x l'
+    assert room.answer == f'/{room._bnd_word}<CR> e 2l x l'
     (title, body), = room._codex_extra
     assert title == "The Binder's Colophon"
     assert any(':h {name}' in ln for ln in body)

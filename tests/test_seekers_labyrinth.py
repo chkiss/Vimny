@@ -39,6 +39,7 @@ from engine.world import CellType
 from engine.player import Player
 from engine.motion import apply_motion
 from engine.search import find_next, word_under_cursor, match_cells
+from engine.tape import ENTER as TAPE_ENTER
 
 SEEDS = [1, 42, 999, 12345, 2 ** 20 + 7]
 
@@ -98,9 +99,9 @@ def _simulate(answer, room):
         room.rebuild_indexes()
 
     for tok in answer.split():
-        if '⏎' in tok:                                  # /pat⏎ or ?pat⏎
+        if TAPE_ENTER in tok:                             # /pat<CR> or ?pat<CR>
             fwd = tok[0] == '/'
-            pat = tok[1:-1]
+            pat = tok[1:-len(TAPE_ENTER)]
             last = (pat, fwd)
             dest = find_next(room, p, pat, fwd)
             assert dest is not None, f'{tok}: no match'

@@ -38,6 +38,7 @@ from generation.dungeon_gen import (
     _RV_SEAL_ROW, _RV_SEAL_COL, _RV_EXIT_COL, _RV_TRUE, _RV_PAR, _RV_BUDGET,
 )
 from tests import SEEDS, cached_room
+from engine.tape import to_keys
 
 ENTER = Keystroke('\r', code=343, name='KEY_ENTER')
 
@@ -51,15 +52,12 @@ def _fresh(seed=0):
 
 
 def _K(s):
-    out = []
-    for ch in s:
-        if ch == '⏎':
-            out.append(ENTER)
-        elif ch == '␣':
-            out.append(Keystroke(' '))
-        else:
-            out.append(Keystroke(ch))
-    return out
+    """Keystroke string → keys. `to_keys` is the ONE converter: tokens like
+    `<CR>` and `<Space>` are several glyphs but one keystroke, so they can
+    only be matched whole (engine/tape.py). `separators=False`: this is a
+    hand-written keystroke string, not a tape, so a space in it is a space the
+    player types (`:6s/^  //`), never display spacing."""
+    return to_keys(s, separators=False)
 
 
 def _tape_keys(answer):
@@ -161,13 +159,13 @@ def test_admin_karaoke_stays_in_sync(seed, monkeypatch):
 
 # ── rivals: the shortcut roads all lose or wreck the song ─────────────────────
 
-_TOUR = ':1j⏎:1y⏎p3jp3jp3jpj$'                     # join, yank, the paste tour
+_TOUR = ':1j<CR>:1y<CR>p3jp3jp3jpj$'                     # join, yank, the paste tour
 
 
 def test_blanket_substitute_wrecks_the_build_verse(monkeypatch):
     # :%s/up/down/g → "Build it down with wood and clay" — the seal stays shut.
     d = _fresh(0)
-    result = _drive(d, _K(':%s/up/down/g⏎' + _TOUR), monkeypatch)
+    result = _drive(d, _K(':%s/up/down/g<CR>' + _TOUR), monkeypatch)
     assert not result['won']
     r = d.rooms[0]
     assert any('Build it down' in S.line_text(r, row)[0]
@@ -176,14 +174,14 @@ def test_blanket_substitute_wrecks_the_build_verse(monkeypatch):
 
 def test_global_mend_wrecks_the_key_verse(monkeypatch):
     d = _fresh(0)
-    result = _drive(d, _K(':g/up/s//down/g⏎' + _TOUR), monkeypatch)
+    result = _drive(d, _K(':g/up/s//down/g<CR>' + _TOUR), monkeypatch)
     assert not result['won']
 
 
 def test_wide_ranged_repeat_wrecks_the_middle(monkeypatch):
     # :4,15&& sweeps the build and key verses too — no single range serves.
     d = _fresh(0)
-    result = _drive(d, _K(':13,15s/up/down/g⏎:4,15&&⏎' + _TOUR), monkeypatch)
+    result = _drive(d, _K(':13,15s/up/down/g<CR>:4,15&&<CR>' + _TOUR), monkeypatch)
     assert not result['won']
 
 
@@ -192,7 +190,7 @@ def test_ranged_substitute_longhand_wins_one_star(monkeypatch):
     # well over par 41, inside budget 60 (the second :s parks at the reprise,
     # so the tour needs a 9k walk back to verse one's end first).
     d = _fresh(0)
-    keys = _K(':4,6s/up/down/g⏎:13,15s/up/down/g⏎:1j⏎:1y⏎9kp3jp3jp3jpj$')
+    keys = _K(':4,6s/up/down/g<CR>:13,15s/up/down/g<CR>:1j<CR>:1y<CR>9kp3jp3jp3jpj$')
     result = _drive(d, keys, monkeypatch)
     assert result['won'] and result['stars'] == 1
 
@@ -201,7 +199,7 @@ def test_copied_chasm_slab_cannot_serve(monkeypatch):
     # :t ferries the joined refrain in still MISTED — text off the floor
     # never completes the song; only :1y + the p tour lays it down.
     d = _fresh(0)
-    keys = _K(':13,15s/up/down/g⏎:4,6&&⏎:1j⏎:1t5⏎:1t9⏎:1t13⏎:1t17⏎j$')
+    keys = _K(':13,15s/up/down/g<CR>:4,6&&<CR>:1j<CR>:1t5<CR>:1t9<CR>:1t13<CR>:1t17<CR>j$')
     result = _drive(d, keys, monkeypatch)
     assert not result['won']
 

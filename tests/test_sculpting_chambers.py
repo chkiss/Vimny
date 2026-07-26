@@ -16,7 +16,7 @@ what remains of each line — the verb is implied by the wound:
 The vault door (one gated cell south of the last line) unseals while the poem
 reads true line for line; the tick is text- and exit_pos-relative (rides the
 o/O row shifts), stateless, undo-safe. Typed spaces are lawful on the tape,
-marked ␣.
+marked <Space>.
 """
 from collections import deque
 
@@ -329,7 +329,7 @@ def test_curriculum_teaches_the_four_insert_entries():
 @pytest.mark.parametrize("seed", SEEDS)
 def test_answer_is_the_real_keystroke_tape(seed, monkeypatch):
     """room.answer is the printable keystrokes of the canonical route (Esc
-    omitted, spaces separators, TYPED spaces marked ␣). Driven as admin it
+    omitted, spaces separators, TYPED spaces marked <Space>). Driven as admin it
     advances answer_pos to the end without diverging."""
     room = _room(seed)
     assert room.answer == _SC_ANSWER

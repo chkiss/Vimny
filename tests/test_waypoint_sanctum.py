@@ -42,6 +42,7 @@ from engine.world import CellType
 from engine.player import Player
 from engine.motion import apply_motion, _first_non_blank_col
 from engine.search import find_next
+from engine.tape import ENTER as TAPE_ENTER
 
 SEEDS = [1, 42, 999, 12345, 2 ** 20 + 7]
 
@@ -81,9 +82,9 @@ def _simulate(answer, room):
         elif tok.startswith('`') and len(tok) == 2:               # `{a} -> exact
             p.row, p.col = marks[tok[1]]
             spent += 2
-        elif '⏎' in tok:                                          # /pat⏎ or ?pat⏎
+        elif TAPE_ENTER in tok:                                   # /pat<CR> or ?pat<CR>
             fwd = tok[0] == '/'
-            pat = tok[1:-1]
+            pat = tok[1:-len(TAPE_ENTER)]
             last = (pat, fwd)
             dest = find_next(room, p, pat, fwd)
             assert dest is not None, f'{tok}: no match'

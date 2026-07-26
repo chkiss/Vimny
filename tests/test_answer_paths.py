@@ -28,6 +28,7 @@ import pytest
 from blessed import Terminal
 from blessed.keyboard import Keystroke
 import main
+from engine.tape import ESC as _TAPE_ESC, ENTER as _TAPE_ENTER, to_keys
 import generation.dungeon_gen as _dg
 from tests import cached_room
 
@@ -54,15 +55,23 @@ def _token_ks_cost(token: str) -> int:
       - count-N + motion (4j, 63l, 9e): len(str(N)) + 1
       - g-prefix 2-key (ge, gE, gg): base 2; with count N: len(str(N)) + 2
       - f/F/t/T + target char (fr, Fw, t!, T!): base 2; with count: len+2
+
+    Esc (<Esc>) is stripped first: leaving INSERT spends nothing, which is what made
+    it safe to start writing Esc on tapes that were already par-pinned.
     """
+    token = token.replace(_TAPE_ESC, '')
+    if not token:
+        return 0
     if len(token) >= 2 and token[0] == '"':
         # "{reg} register prefix (e.g. "aye, "ap, "add): TWO real keypresses (the
         # quote and the register letter) on top of the operation that follows —
         # "aye = 2 + ye(2) = 4, "ap = 2 + p(1) = 3.
         return 2 + _token_ks_cost(token[2:])
-    if token and token[0] in '/?' and token.endswith('⏎'):
-        # search: /pat⏎ or ?pat⏎ — '/' charged + len(pat) chars, closing ⏎ free = len(pat)+1 (main.py)
-        return len(token[1:-1]) + 1
+    if token and token[0] in '/?' and token.endswith(_TAPE_ENTER):
+        # search: /pat<CR> or ?pat<CR> — '/' charged + len(pat) chars, closing
+        # <CR> free = len(pat)+1 (main.py). Slice by the TOKEN's length, not by
+        # one character: <CR> is four glyphs standing for a single keystroke.
+        return len(token[1:-len(_TAPE_ENTER)]) + 1
     if len(token) == 2 and token[0] in "m'`" and token[1].isalpha():
         return 2          # marks: m{a} set, '{a}/`{a} jump — two keys each (main.py)
     m = _GE_RE.match(token)
@@ -157,7 +166,7 @@ _ANSWER_NOT_TOKENISED = {
     'build_dungeon_joiners_gate',      # 4J/G$ multi-command tokens; tests/test_joiners_gate.py
     'build_dungeon_alignment_halls',   # >>/.gUU/G$ multi-command tokens; tests/test_alignment_halls.py
     'build_dungeon_indentation_sanctum',  # >}/4j/G$ multi-command tokens; tests/test_indentation_sanctum.py
-    'build_dungeon_sight_sanctum',     # visual tape with typed cure + /q⏎ search; tests/test_sight_sanctum.py
+    'build_dungeon_sight_sanctum',     # visual tape with typed cure + /q<CR> search; tests/test_sight_sanctum.py
     'build_dungeon_selection_halls',   # V/<C-v> tape (control keys untokenised); tests/test_selection_halls.py
     'build_dungeon_word_enclosure',    # diw/ciw+cure tape with typed text; tests/test_word_enclosure.py
     'build_dungeon_bracket_enclosure', # di(/ci(+cure tape with typed text; tests/test_bracket_enclosure.py
@@ -166,9 +175,9 @@ _ANSWER_NOT_TOKENISED = {
     'build_dungeon_tag_enclosure',     # dit/cit+cure tape with typed text; tests/test_tag_enclosure.py
     'build_dungeon_sentence_enclosure',  # dis/cis+cure tape with typed text; tests/test_sentence_enclosure.py
     'build_dungeon_wet_ink',           # i/gi tape with typed halves; tests/test_g_bonus_levels.py
-    'build_dungeon_gauntlet',          # the everything-exam tape (typed cures, /⏎, dots); tests/test_gauntlet.py
-    'build_dungeon_culling_ledger',    # ex-command tape (:2d⏎ …); tests/test_culling_ledger.py
-    'build_dungeon_shelving_room',     # ex-command tape (:2m4⏎ …); tests/test_shelving_room.py
+    'build_dungeon_gauntlet',          # the everything-exam tape (typed cures, /<CR>, dots); tests/test_gauntlet.py
+    'build_dungeon_culling_ledger',    # ex-command tape (:2d<CR> …); tests/test_culling_ledger.py
+    'build_dungeon_shelving_room',     # ex-command tape (:2m4<CR> …); tests/test_shelving_room.py
     'build_dungeon_refrain_vault',     # :s/&/:y/p tape; tests/test_refrain_vault.py
     'build_dungeon_hall_of_echoes',    # 7-room macro-gauntlet tape (q/@, insert);
                                        # tests/test_hall_of_echoes.py
@@ -277,7 +286,7 @@ def test_budget_is_ceil_par_times_1_4(builder, seed):
 _REPLAY_TERM_HEIGHT = 33 + 8
 
 # Levels whose tape enters INSERT/CHANGE mode, where a token-separating space is
-# an implicit <Esc> that the generic '⏎'→Enter / strip-spaces translation can't
+# an implicit <Esc> that the generic '<CR>'→Enter / strip-spaces translation can't
 # express.  Each has a dedicated full-playthrough win test that drives the engine
 # with the right Esc placement, so they are win-covered there, not here.
 _REPLAY_OWN_TEST = {
@@ -333,8 +342,7 @@ def _drive_to_win(builder, seed):
     dungeon = builder(seed)
     slug = builder.__name__[len('build_dungeon_'):]
     tape = dungeon.rooms[0].answer.replace(' ', '')          # spaces are visual separators
-    keys = [Keystroke('\r' if c == '⏎' else ' ' if c == '␣' else c)
-            for c in tape]                                   # ␣ = a TYPED space
+    keys = to_keys(tape)          # one shared translator: <Space> <CR> <Esc> <C-v> (engine/tape.py)
     keys += [Keystroke(c) for c in ':wq\r']                  # :wq returns the real win/stars
     term = Terminal(force_styling=False)
     import render.colors as _colors
