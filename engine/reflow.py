@@ -75,16 +75,28 @@ def _fixed_sink(room, row: int, c: int) -> bool:
     return _void_rune_at(room, row, c)
 
 
-def void_col(room, row: int) -> int:
+def void_col(room, row: int, from_col: int | None = None) -> int:
     """The first FIXED brink to the right (a wall or a void rune), used for cursor
     safety. Water is NOT a brink — it's movable, so the scan passes straight
     through it; treating water as a brink wrongly marks everything past a puddle
-    as 'the void'."""
-    vcols = [ru.col for ru in room._char_runs_by_row.get(row, []) if ru.kind == 'void']
-    char_cols = [ru.col for ru in room._char_runs_by_row.get(row, []) if ru.kind != 'void']
-    c = min(char_cols) if char_cols else 0
-    while c < room.cols and room.cells[row][c] in _WALLS:
-        c += 1                         # skip any leading wall into the corridor
+    as 'the void'.
+
+    `from_col` is where to start looking, and it MATTERS on any row that stone
+    divides into more than one segment. Without it the scan begins at the row's
+    leftmost glyph, so it reports whatever brink that segment happens to hit —
+    which may be nowhere near the cursor, and on the far side of a wall from it.
+    Pass the cursor's own column and the answer stays in the cursor's segment.
+    """
+    runs  = room._char_runs_by_row.get(row, [])
+    vcols = [ru.col for ru in runs
+             if ru.kind == 'void' and (from_col is None or ru.col >= from_col)]
+    if from_col is None:
+        char_cols = [ru.col for ru in runs if ru.kind != 'void']
+        c = min(char_cols) if char_cols else 0
+        while c < room.cols and room.cells[row][c] in _WALLS:
+            c += 1                     # skip any leading wall into the corridor
+    else:
+        c = max(0, min(from_col, room.cols - 1))
     while c < room.cols and room.cells[row][c] not in _WALLS and not _void_rune_at(room, row, c):
         c += 1                         # pass through floor AND water to the first fixed brink
     return min(min(vcols), c) if vcols else c

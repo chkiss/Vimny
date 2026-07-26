@@ -356,6 +356,27 @@ def test_water_is_not_a_brink_so_cells_past_it_arent_void():
     assert room._last_void_falls == []
 
 
+def test_void_col_stays_in_the_cursors_own_segment():
+    """Regression: a row split by stone has more than one brink.
+
+    Scanning from the row's leftmost glyph finds whichever brink THAT segment
+    hits, which can be far west of the cursor and on the far side of a wall.
+    The dummy dungeon's row 22 is exactly this shape — a label buried in the
+    west wall band, a wall at 75, then the typing floor at 76+ and the void
+    runes at 85 — and a typist who fell off the ledge anywhere past 76 was set
+    down at 74, in a segment they had never walked to.
+    """
+    room = _wave_room(cols=30)
+    room.char_runs = [CharRun(1, 2, ('l', 'a', 'b'), 'ancient'),   # west segment
+                      CharRun(1, 20, ('o', 'o'), 'void')]          # east brink
+    room.cells[1][10] = CellType.WALL             # the divider
+    room.rebuild_indexes()
+
+    assert void_col(room, 1) == 10                # unscoped: the divider, west segment
+    assert void_col(room, 1, 12) == 20            # from the east segment: the void runes
+    assert void_col(room, 1, 2) == 10             # from the west segment: still the divider
+
+
 # ── remove_row (vertical collapse — the inverse of o; powers dd) ──────────────────
 
 def _col_room(rows=6, cols=10):

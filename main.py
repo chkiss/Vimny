@@ -5881,7 +5881,11 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
                             _render(message)
                             _void_fall_animation(term, *_void_screen_xy(term, room, player, player.row, player.col))
                             player.take_damage(2)                          # 1 full heart
-                            safe_c = min(prev_ins[1], void_col(room, prev_ins[0]) - 1)
+                            # From the cursor's OWN column: a row split by stone
+                            # has more than one brink, and the nearest one west
+                            # belongs to a segment the typist was never in.
+                            safe_c = min(prev_ins[1],
+                                         void_col(room, prev_ins[0], prev_ins[1]) - 1)
                             player.row, player.col = prev_ins[0], max(safe_c, 0)   # stumble back to safe ground
                             player.mode = Mode.NORMAL
                             if player.is_dead:
