@@ -28,6 +28,7 @@ import render.symbols as S
 from render.utils import inner_w as _iw
 from render.overworld import (render_overworld, build_lines, default_cursor,
                               line_search_text)
+from sharing.library import build_shelved, list_levels as community_levels
 from engine.vimregex import compile_vim as _vre_compile
 from render.title import render_title, render_save_select, select_quote, select_quote_by_name, select_next_lesson_quote, next_lesson_quote_entry, format_quote, MENU_ITEMS as _TITLE_MENU, NAME_MAX as _NAME_MAX
 from render.wizard_blessing import run_wizard_blessing
@@ -8007,7 +8008,7 @@ def run_title(term: Terminal, has_save: bool) -> tuple[str, str]:
 # ── Overworld loop ─────────────────────────────────────────────────────────────
 
 _OW_GRP = {'comment': 'c', 'parent': 'd', 'self': 'd', 'level': 'l',
-           'subhdr': 'x', 'custom': 'x'}
+           'subhdr': 'x', 'custom': 'x', 'community': 'x'}
 
 
 def _ow_section_key(ln: dict) -> str:
@@ -8490,8 +8491,18 @@ def run_overworld(term: Terminal, player: Player, progress: dict,
     def _layouts():
         return SM.list_layouts() if player.name == 'admin' else []
 
+    def _community():
+        # Validated on every listing, not cached: a level file the player edits
+        # between visits gets re-checked, which is the whole point of validating
+        # on LOAD rather than only on submission.
+        try:
+            return community_levels()
+        except Exception:                    # noqa: BLE001 — a bad shelf must
+            return []                        # never keep the overworld from opening
+
     customs = _layouts()
-    lines   = build_lines(visible, customs)
+    shelf   = _community()
+    lines   = build_lines(visible, customs, shelf)
     start   = default_cursor(lines) if initial_cursor is None else initial_cursor
     start   = max(0, min(start, len(lines) - 1))
 
@@ -8521,9 +8532,10 @@ def run_overworld(term: Terminal, player: Player, progress: dict,
                    completions=_OW_COMPLETIONS, marks=player.ow_marks, cursor=start)
 
     def _rebuild():
-        nonlocal customs, lines
+        nonlocal customs, lines, shelf
         customs = _layouts()
-        lines   = build_lines(visible, customs)
+        shelf   = _community()
+        lines   = build_lines(visible, customs, shelf)
         nav.cursor = max(0, min(nav.cursor, len(lines) - 1))
 
     def _render():
@@ -8637,6 +8649,11 @@ def run_overworld(term: Terminal, player: Player, progress: dict,
                     return _done({'action': 'enter', 'level': lid, 'cursor': nav.cursor})
             elif t == 'custom':
                 return _done({'action': 'open_custom', 'layout': ln['layout'], 'cursor': nav.cursor})
+            elif t == 'community':
+                if ln['shelf'].ok:
+                    return _done({'action': 'open_community', 'shelf': ln['shelf'],
+                                  'cursor': nav.cursor})
+                player.error = ln['shelf'].error
             # comment / self / subhdr → no-op
 
         _render()
@@ -8712,6 +8729,26 @@ def main():
                         aux = (result if result in ('scrolls', 'saves', 'colors') else None)
                         if aux == 'saves':
                             aux = 'browse_saves'
+                continue
+
+            if ow_result['action'] == 'open_community':
+                shelf   = ow_result['shelf']
+                dungeon = build_shelved(shelf)
+                # Played as ITSELF, not as a stand-in for first_cave: its par
+                # came from replaying the author's tape, and its command set is
+                # the one the level declares — a community level has no
+                # curriculum position to derive either from. Progress keys by the
+                # namespaced slug, so it can never collide with a shipped level.
+                res = run_dungeon(term, shelf.slug, progress, player.name,
+                                  _dungeon=dungeon, _known=shelf.level.known)
+                if res['action'] == 'wq':
+                    if res['won']:
+                        prev = progress.get(shelf.slug, {}).get('stars', 0)
+                        progress[shelf.slug] = {
+                            'complete': True,
+                            'stars': max(res['stars'], prev),
+                        }
+                    SM.save_progress(progress, player.name)
                 continue
 
             if ow_result['action'] == 'open_custom':

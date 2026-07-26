@@ -73,11 +73,18 @@ worse than the missing lesson. These keys stay free flourishes.
 Anyone revisiting this needs a *new* forcing mechanism, not a new price — some
 way for the world, not the budget, to reward the correcting keys.
 
-### Community levels (a system feature, not a level)
-Blueprint: `blueprints/level_sharing.md` — authoring, validation and sharing.
-The load-bearing decisions: a level is **declarative data, never code**; par comes
-from replaying an author-supplied karaoke tape, which doubles as the solvability
-proof; the budget is computed, never author-set.
+### Community levels (a system feature, not a level) — BUILT 2026-07-25
+Blueprint: `blueprints/level_sharing.md`; author guide: `docs/AUTHORING.md`;
+code: the `sharing/` package. The load-bearing decisions held: a level is
+**declarative data, never code**; par comes from replaying an author-supplied
+karaoke tape, which doubles as the solvability proof; the budget is computed,
+never author-set. Levels live in `~/.Vimny/levels/` and appear in the overworld
+under `community/`. There is no network code in the game and there must not be.
+
+The same replayer audits the shipped curriculum (`python3 -m sharing audit`) and
+found a real par bug on its first run — The Spellwright's Forge, par 45 for a
+44-keystroke route. Still open: substitution (§6, deliberately unbuilt), and a
+tape notation for `<Esc>` so insert/change routes can be validated at all.
 
 ### Windows, tabs and buffers
 Vimny is one buffer per dungeon today. Multi-buffer play needs engine work

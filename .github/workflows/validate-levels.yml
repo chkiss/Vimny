@@ -1,0 +1,58 @@
+# Validate community level submissions.
+#
+# This is the reason GitHub is the right hub for the sharing pipeline: CI can
+# run the validator, so nobody ever has to trust a submission or playtest it to
+# discover it is broken. Schema, bounds, determinism, tape replay, par
+# derivation, budget, command scope and content limits all run headlessly, and
+# the pull request cannot merge until they pass.
+#
+# Intended for the separate `vimny-levels` repository (different review bar,
+# different moderation load, and it keeps the game's history clean). It lives
+# here so the workflow and the validator it calls stay in step.
+name: validate levels
+
+on:
+  pull_request:
+    paths:
+      - 'levels/**.json'
+  workflow_dispatch:
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install
+        run: pip install blessed
+
+      - name: Find changed level files
+        id: changed
+        run: |
+          git fetch --no-tags --depth=1 origin "$GITHUB_BASE_REF"
+          FILES=$(git diff --name-only "origin/$GITHUB_BASE_REF"...HEAD -- 'levels/*.json' | tr '\n' ' ')
+          echo "files=$FILES" >> "$GITHUB_OUTPUT"
+
+      - name: Validate
+        if: steps.changed.outputs.files != ''
+        run: python3 -m sharing validate ${{ steps.changed.outputs.files }}
+
+  # Par-improvement submissions (see blueprints/level_sharing.md §1a). A tape
+  # that finishes a SHIPPED level under its recorded par has falsified that
+  # level's solver, and the replay carries its own reproduction. Exit code 3
+  # means "confirmed beat" — a solver bug report, never a score.
+  audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install
+        run: pip install blessed
+      - name: Replay every shipped tape against its own par
+        run: python3 -m sharing audit

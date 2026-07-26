@@ -337,6 +337,32 @@ SPEC.md                  Design vision, UI spec, forward-looking notes
 LEVELS_PLAN.md           Design rubric + the levels not yet built
 ```
 
+## Community levels
+
+Levels can be written as plain JSON files and shared. Drop one in
+`~/.Vimny/levels/` and it shows up in the overworld under `community/`.
+
+```
+python3 -m sharing export rune_halls mylevel.json   # start from a working level
+python3 -m sharing validate mylevel.json            # check it
+python3 -m sharing install  mylevel.json            # put it on your shelf
+```
+
+Two things are worth knowing before you install a stranger's level:
+
+- **A level is data, never code.** The file is parsed into a room and nothing in
+  it is ever executed. That is the security boundary, not a review process.
+- **The game has no network code.** It reads a directory. Files get there
+  however you like — Vimny never fetches, phones home, or checks for updates.
+  It also does not moderate what a level file contains.
+
+Par for a community level is derived by replaying the author's own solution,
+so it is labelled *author's par*: it is the cost of a route that provably
+works, not a proof that no shorter one exists. Authors cannot set par or the
+budget themselves.
+
+Full guide: [docs/AUTHORING.md](docs/AUTHORING.md).
+
 ## Upcoming features
 
 - **The Registry** — a bonus wing on the register family: the delete ring (`"0`, `"1`–`"9`), the small-delete register (`"-`), the read-only registers (`":` `".` `"%` `"#`), the expression register (`"=`), the system clipboard (`"*` `"+`), the black hole (`"_`), the search register (`"/`), and a boss to close it out. The first two levels are in.

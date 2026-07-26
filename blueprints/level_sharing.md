@@ -1,7 +1,11 @@
 # Community levels — authoring, validation, sharing
 
-Status: **design, not built.** This is the plan for letting players write dungeons
-and pass them to each other. It is a system feature, not a level.
+Status: **built** (2026-07-25), except substitution. The design below stands as
+written; what shipped is noted per section and summarised in §7. Author-facing
+documentation is `docs/AUTHORING.md`; the code is the `sharing/` package.
+
+This is the plan for letting players write dungeons and pass them to each other.
+It is a system feature, not a level.
 
 Two end goals, from the original ask:
 
@@ -282,7 +286,41 @@ moderation load, and it keeps the game's history clean.
 
 ---
 
-## 7. Prerequisites, in order
+## 7. Prerequisites, in order — and what shipped
+
+**Built:** 2, 3, 4, 5, 6 and the tooling for 7. `sharing/replay.py` (the tape
+replayer), `sharing/format.py` (the declarative format), `sharing/vocab.py`
+(the shared `words()` API), `sharing/validate.py` (the eight rules),
+`sharing/library.py` (`~/.Vimny/levels/`, no network code) and
+`sharing/cli.py` (`python3 -m sharing {validate,golf,audit,export,list,install}`),
+plus the `community/` wing in the overworld and
+`.github/workflows/validate-levels.yml`.
+
+**§1a paid for itself immediately.** The audit's first run found The
+Spellwright's Forge claiming par 45 for a route its own canonical tape wins in
+44 — reproducible on every seed. The old figure was hand-tallied and counted
+neither the three command-line Enters nor their exemption from the budget, and
+the level is excluded outright from `tests/test_answer_paths.py`, so nothing had
+ever measured it. Exactly the argument this section makes: the claim was
+falsifiable by one artifact, and no community was needed to falsify it.
+
+**Not built:** step 8, substitution. The format and validator support it
+(`substitutes: <slug>`, enforced to teach exactly the target's lesson), but
+nothing consumes it yet — by design, per §6. The `vimny-levels` repository does
+not exist; its CI workflow does.
+
+**One limit worth recording:** a tape containing an insert or change verb cannot
+be replayed from the tape alone, because the notation omits `<Esc>` (a sequence
+key the live tracker skips) and the following keys would be typed into the
+buffer. Twenty-one shipped levels are in that position and are par-pinned by
+their own driven tests; `sharing audit` PRINTS each one as skipped rather than
+dropping it, so a level can never pass the audit invisibly. A community level
+whose route needs an insert verb cannot currently be validated — the fix is a
+tape notation for Esc, and it is the next thing to build here.
+
+### The original order
+
+
 
 1. Make custom layouts **playable at all**. Today the launcher hardcodes slug
    `first_cave`, forces edit mode on entry, and falls back to `Budget(20)` because

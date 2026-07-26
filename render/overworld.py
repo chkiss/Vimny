@@ -34,9 +34,14 @@ from content.levels import is_unlocked, level_type, key_for_slug
 from render.utils import inner_w as _iw, subtree_lines, tree_glyph
 
 
-def build_lines(levels: list, custom_layouts: list) -> list:
+def build_lines(levels: list, custom_layouts: list, community: list = ()) -> list:
     """The netrw buffer as a flat list of line dicts (comments + dirs + entries).
-    Each: {'type': 'comment'|'parent'|'self'|'level'|'subhdr'|'custom', ...}."""
+    Each: {'type': 'comment'|'parent'|'self'|'level'|'subhdr'|'custom'
+           |'community', ...}.
+
+    `community` holds validated shelf entries from ~/.Vimny/levels/ — the bonus
+    wing. It sits AFTER the curriculum and after custom/, because it is extra
+    content rather than part of the designed sequence."""
     lines: list = [{'type': 'comment', 'tag': t}
                    for t in ('div', 'title', 'path', 'sort', 'help', 'div')]
     lines.append({'type': 'parent'})
@@ -44,6 +49,7 @@ def build_lines(levels: list, custom_layouts: list) -> list:
     for lv in levels:
         lines.append({'type': 'level', 'level': lv})
     lines += subtree_lines('custom/', custom_layouts, 'custom', 'layout')
+    lines += subtree_lines('community/', list(community), 'community', 'shelf')
     return lines
 
 
@@ -64,6 +70,8 @@ def line_search_text(ln: dict) -> str:
         return key_for_slug(ln['level']['slug'])
     if t == 'custom':
         return ln['layout'].get('layout_name', '?')
+    if t == 'community':
+        return ln['shelf'].name
     if t == 'parent':
         return '../'
     if t == 'self':
@@ -86,7 +94,7 @@ def line_label_offset(ln: dict) -> int:
     line_search_text — same single-source law): custom layouts draw a
     2-space + tree-glyph indent before the name; everything else starts
     flush after the gutter."""
-    return 4 if ln['type'] == 'custom' else 0
+    return 4 if ln['type'] in ('custom', 'community') else 0
 
 
 def default_cursor(lines: list) -> int:
@@ -198,6 +206,21 @@ def render_overworld(term: Terminal, player: Player, progress: dict,
             name = line['layout'].get('layout_name', '?')
             tree = tree_glyph(line.get('last'))
             badge, badge_col = '[CUSTOM]', C.mode_insert()
+            nc = enfc if is_cursor else rst
+            spaces = max(1, cw - 4 - len(name) - len(badge))
+            return ('  ' + C.hint_fg() + tree + ' ' + nc + name + ' ' * spaces +
+                    badge_col + badge), cw
+        if t == 'community':
+            shelf = line['shelf']
+            name  = shelf.name
+            tree  = tree_glyph(line.get('last'))
+            # A broken level says so ON THE ROW. Hiding it would leave a player
+            # wondering where the file they downloaded went; naming the fault is
+            # what lets them fix it or tell the author.
+            if shelf.ok:
+                badge, badge_col = f'[par {shelf.report.par}]', C.chest_fg()
+            else:
+                badge, badge_col = '[BROKEN]', C.error_fg()
             nc = enfc if is_cursor else rst
             spaces = max(1, cw - 4 - len(name) - len(badge))
             return ('  ' + C.hint_fg() + tree + ' ' + nc + name + ' ' * spaces +
