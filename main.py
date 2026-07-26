@@ -3971,7 +3971,8 @@ def _place_first_cave_horse(room) -> None:
 def run_dungeon(term: Terminal, level: str, progress: dict,
                 player_name: str = 'Normand',
                 _dungeon: Dungeon | None = None,
-                _start_edit: bool = False) -> dict:
+                _start_edit: bool = False,
+                _known: list | None = None) -> dict:
     """Run one dungeon level.
 
     Returns {'won': bool, 'stars': int, 'action': 'wq'|'quit',
@@ -3980,6 +3981,10 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
     was the first time this level reached ≥1 star (prev stars == 0).
     _dungeon: pre-built Dungeon (used for custom layouts from the overworld).
     _start_edit: if True, enter edit mode immediately (admin custom levels).
+    _known: override the learned-command set. The curriculum derives it from the
+    slug, but a COMMUNITY level declares its own `requires` + `teaches` (there is
+    no curriculum position to read it from), so the loader and the tape validator
+    pass it explicitly. None = the curriculum answer, unchanged.
     """
     if _dungeon is not None:
         dungeon = _dungeon
@@ -3995,7 +4000,7 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
     player  = Player(row=_sp[0], col=_sp[1])
     player.max_hp = progress.get('max_hp', 6)
     player.hp     = player.max_hp
-    player.known_commands = _known_commands(level)
+    player.known_commands = list(_known) if _known is not None else _known_commands(level)
     if player_name == 'admin':
         player.known_commands = player.known_commands + ['admin', 'register']
     # On a boss level, the command its scroll gates stays LOCKED on entry — even
@@ -5190,6 +5195,7 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
                         progress['has_hat'] = True           # (caller persists progress)
                     _commit_hearts()                         # caller saves on 'wq'
                     return {'won': won, 'stars': stars, 'action': 'wq',
+                            'spent': budget.spent, 'par': room.par,
                             'first_written_completion': _first_written_completion}
 
                 elif cmd == 'q':
@@ -5199,10 +5205,12 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
                         player.error = 'E37: No write since last change (add ! to override)'
                     else:
                         return {'won': won, 'stars': stars, 'action': 'quit',
+                                'spent': budget.spent, 'par': room.par,
                                 'first_written_completion': _first_written_completion}
 
                 elif cmd == 'q!':
                     return {'won': False, 'stars': 0, 'action': 'quit',
+                            'spent': budget.spent, 'par': room.par,
                             'first_written_completion': False}
 
                 elif cmd == 'e' and (player_name == 'admin' or player.is_dead):

@@ -1,0 +1,404 @@
+# Vimny — a Vim-teaching dungeon crawler.
+# Copyright (C) 2026 Chas Kissick
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see <https://www.gnu.org/licenses/>.
+#
+# SPDX-License-Identifier: GPL-3.0-or-later
+
+"""The community level format: geometry, content directives, and a tape.
+
+**A level is data, never code.** A shipped level is a Python function; a
+community level must not be, because "download a level" would then mean "run a
+stranger's Python" and no amount of review fixes that. The format is the
+security boundary, so it is purely declarative — parsed into a `Room`, never
+executed. No expressions, no callables, no import hooks. Anything an author
+cannot express here is a gap in the schema to fill deliberately, never an escape
+hatch. This is the one decision that cannot be revisited cheaply.
+
+JSON rather than YAML: it is in the standard library, and the game ships with a
+single runtime dependency. Nothing in the format needs YAML's expressiveness,
+and YAML's implicit typing is a footgun for a file strangers author.
+
+Fills resolve at BUILD time against the level's own seed, so the level is
+byte-identical for the author who recorded the tape and every player who
+replays it. A directive that resolved differently for the two would leave the
+tape pointing at words that are no longer there.
+"""
+from __future__ import annotations
+
+import json
+import math
+import random
+import re
+from dataclasses import dataclass, field
+
+from engine.editor import _CELL_CODE, _CODE_CELL, _ENTITY_FIELDS
+from engine.world import CellType, CharRun, Entity, Room, RoomType
+from generation.dungeon_gen import Dungeon
+from sharing import vocab
+
+SCHEMA = 1
+
+#: Commands every player has, at every point in the curriculum.
+ALWAYS_ON = ('u', ':w', ':q', ':q!')
+
+MAX_ROWS, MAX_COLS = 60, 200      # _MAX_COLS in the reflow engine is 200
+MAX_ENTITIES       = 400
+MAX_FILLS          = 64
+MAX_VOCAB_WORDS    = 500
+MAX_WORD_LEN       = 20
+MAX_TAPE           = 4000
+
+_RLE = re.compile(r'(\d*)([A-Z])')
+
+
+class LevelFormatError(ValueError):
+    """A level file the parser cannot make a Room out of. Always names the field."""
+
+
+@dataclass
+class Fill:
+    """`fill this region with random words from a pool`.
+
+    The directive the whole feature was asked for: an author says what a floor
+    should be made of instead of painting every cell.
+    """
+    region:  tuple            # (r1, c1, r2, c2) inclusive
+    pool:    str   = 'plain'
+    length:  tuple = (3, 6)   # inclusive word-length range
+    spacing: int   = 1        # blank cells between words
+    kind:    str   = 'ancient'
+
+
+@dataclass
+class Level:
+    name:        str
+    author:      str  = ''
+    seed:        int  = 0
+    teaches:     list = field(default_factory=list)
+    requires:    list = field(default_factory=list)
+    no_horse:    bool = False
+    substitutes: str | None = None
+    rows:        int  = 20
+    cols:        int  = 80
+    cells:       list = field(default_factory=list)   # list[str] of cell codes
+    spawn:       tuple = (1, 1)
+    exit:        tuple = (1, 2)
+    fills:       list = field(default_factory=list)   # list[Fill]
+    char_runs:   list = field(default_factory=list)   # explicit text
+    entities:    list = field(default_factory=list)   # list[dict]
+    vocabulary:  list = field(default_factory=list)   # author's own words
+    solution:    str  = ''
+    intro:       str  = ''
+
+    @property
+    def known(self) -> list:
+        """The command set a player of this level is assumed to have.
+
+        A community level has no curriculum position to derive one from, so it
+        declares it: what it assumes (`requires`), what it introduces
+        (`teaches`), and the always-on set nobody has to learn.
+        """
+        return list(dict.fromkeys([*self.requires, *self.teaches, *ALWAYS_ON]))
+
+
+# ── Parsing ───────────────────────────────────────────────────────────────────
+
+def parse(data: dict) -> Level:
+    """Turn a decoded level file into a `Level`. Raises LevelFormatError."""
+    if not isinstance(data, dict):
+        raise LevelFormatError('level file must be a JSON object')
+    schema = data.get('schema')
+    if schema != SCHEMA:
+        raise LevelFormatError(
+            f'schema: expected {SCHEMA}, got {schema!r}. This level was written '
+            f'for a different version of the format.')
+
+    unknown = set(data) - {'schema', 'name', 'author', 'seed', 'teaches',
+                           'requires', 'no_horse', 'substitutes', 'geometry',
+                           'fill', 'char_runs', 'entities', 'vocabulary',
+                           'solution', 'intro'}
+    if unknown:
+        # Refuse rather than ignore: a silently-dropped key is a level that
+        # plays differently from the one its author tested.
+        raise LevelFormatError(f'unknown top-level key(s): {sorted(unknown)}')
+
+    geo = data.get('geometry')
+    if not isinstance(geo, dict):
+        raise LevelFormatError('geometry: required, and must be an object')
+
+    lvl = Level(
+        name=str(data.get('name', '')).strip(),
+        author=str(data.get('author', '')).strip(),
+        seed=int(data.get('seed', 0)),
+        teaches=list(data.get('teaches', [])),
+        requires=list(data.get('requires', [])),
+        no_horse=bool(data.get('no_horse', False)),
+        substitutes=data.get('substitutes'),
+        rows=int(geo.get('rows', 0)),
+        cols=int(geo.get('cols', 0)),
+        cells=list(geo.get('cells', [])),
+        spawn=tuple(geo.get('spawn', (1, 1))),
+        exit=tuple(geo.get('exit', (1, 2))),
+        fills=[_parse_fill(f, i) for i, f in enumerate(data.get('fill', []))],
+        char_runs=list(data.get('char_runs', [])),
+        entities=list(data.get('entities', [])),
+        vocabulary=list(data.get('vocabulary', [])),
+        solution=str(data.get('solution', '')),
+        intro=str(data.get('intro', '')),
+    )
+    if not lvl.name:
+        raise LevelFormatError('name: required')
+    return lvl
+
+
+def _parse_fill(f: dict, i: int) -> Fill:
+    if not isinstance(f, dict):
+        raise LevelFormatError(f'fill[{i}]: must be an object')
+    region = f.get('region')
+    if not (isinstance(region, (list, tuple)) and len(region) == 4):
+        raise LevelFormatError(f'fill[{i}].region: must be [r1, c1, r2, c2]')
+    length = f.get('length', [3, 6])
+    if isinstance(length, int):
+        length = [length, length]
+    if not (isinstance(length, (list, tuple)) and len(length) == 2):
+        raise LevelFormatError(f'fill[{i}].length: must be n or [min, max]')
+    return Fill(region=tuple(int(x) for x in region),
+                pool=str(f.get('pool', 'plain')),
+                length=(int(length[0]), int(length[1])),
+                spacing=int(f.get('spacing', 1)),
+                kind=str(f.get('kind', 'ancient')))
+
+
+def loads(text: str) -> Level:
+    try:
+        return parse(json.loads(text))
+    except json.JSONDecodeError as exc:
+        raise LevelFormatError(f'not valid JSON: {exc}') from None
+
+
+# ── Cell grids ────────────────────────────────────────────────────────────────
+
+def expand_row(row: str, cols: int, lineno: int) -> list:
+    """One `cells` row → a list of CellTypes.
+
+    Accepts both the plain form (`WFFFW`) and the run-length form (`W3F60W`),
+    because a 200-column room of mostly stone is unreadable written out in full
+    and unreviewable in a pull request.
+    """
+    out = []
+    pos = 0
+    for m in _RLE.finditer(row):
+        if m.start() != pos:
+            raise LevelFormatError(
+                f'geometry.cells[{lineno}]: unexpected {row[pos]!r} at column {pos}')
+        pos = m.end()
+        count = int(m.group(1)) if m.group(1) else 1
+        code  = m.group(2)
+        if code not in _CODE_CELL:
+            raise LevelFormatError(
+                f'geometry.cells[{lineno}]: unknown cell code {code!r}; '
+                f'known codes are {"".join(sorted(_CODE_CELL))}')
+        out.extend([_CODE_CELL[code]] * count)
+    if pos != len(row):
+        raise LevelFormatError(
+            f'geometry.cells[{lineno}]: unexpected {row[pos]!r} at column {pos}')
+    if len(out) != cols:
+        raise LevelFormatError(
+            f'geometry.cells[{lineno}]: expands to {len(out)} cells, expected {cols}')
+    return out
+
+
+def encode_row(cells: list) -> str:
+    """The inverse of expand_row, run-length encoded."""
+    out, run, prev = [], 0, None
+    for ct in cells:
+        code = _CELL_CODE[ct]
+        if code == prev:
+            run += 1
+        else:
+            if prev is not None:
+                out.append(f'{run if run > 1 else ""}{prev}')
+            prev, run = code, 1
+    if prev is not None:
+        out.append(f'{run if run > 1 else ""}{prev}')
+    return ''.join(out)
+
+
+# ── Building ──────────────────────────────────────────────────────────────────
+
+def build(lvl: Level, par: int | None = None) -> Dungeon:
+    """Turn a parsed Level into a playable Dungeon.
+
+    `par` is passed in rather than declared, because par is DERIVED from
+    replaying the author's tape and never author-set — otherwise an author could
+    hand themselves a budget. Until it is known the room carries a generous one
+    so the tape can be replayed at all; `finalize_par` then pins both.
+    """
+    if len(lvl.cells) != lvl.rows:
+        raise LevelFormatError(
+            f'geometry.cells: {len(lvl.cells)} rows, geometry.rows says {lvl.rows}')
+    cells = [expand_row(row, lvl.cols, i) for i, row in enumerate(lvl.cells)]
+
+    room = Room(room_type=RoomType.ENTRY, rows=lvl.rows, cols=lvl.cols)
+    room.cells     = cells
+    room.seed      = lvl.seed
+    room.spawn_pos = tuple(lvl.spawn)
+    room.exit_pos  = tuple(lvl.exit)
+    room.answer    = lvl.solution
+    room.no_horse  = lvl.no_horse
+
+    custom = vocab.by_length([w for w in lvl.vocabulary]) if lvl.vocabulary else None
+    rng    = random.Random(lvl.seed)
+
+    runs = [CharRun(row=int(r['row']), col=int(r['col']),
+                    symbols=tuple(r['symbols']) if not isinstance(r['symbols'], str)
+                            else tuple(r['symbols']),
+                    kind=str(r.get('kind', 'ancient')))
+            for r in lvl.char_runs]
+    for f in lvl.fills:
+        runs.extend(_resolve_fill(f, room, rng, custom))
+    room.char_runs = runs
+
+    room.entities = [_make_entity(e, i) for i, e in enumerate(lvl.entities)]
+    if not any(e.kind == 'exit' for e in room.entities):
+        room.entities.append(Entity(kind='exit', row=room.exit_pos[0],
+                                    col=room.exit_pos[1]))
+
+    room.rebuild_indexes()
+    finalize_par(room, par)
+
+    dungeon = Dungeon(name=lvl.name, seed=lvl.seed)
+    dungeon.rooms        = [room]
+    dungeon.current_room = 0
+    return dungeon
+
+
+def finalize_par(room, par: int | None) -> None:
+    """Pin par and derive the budget from it — `ceil(par * 1.4)`, no exceptions.
+
+    Authors do not get to pick a budget. Par is the cheapest route the tape
+    proves exists, and the budget is a fixed function of it; letting either be
+    declared would let a level be tuned to hide a sloppy route.
+    """
+    if par is None:
+        room.par    = None
+        room.budget = 99999        # replay-only: the tape has not been costed yet
+    else:
+        room.par    = par
+        room.budget = math.ceil(par * 1.4)
+
+
+def _make_entity(spec: dict, i: int) -> Entity:
+    if not isinstance(spec, dict):
+        raise LevelFormatError(f'entities[{i}]: must be an object')
+    at = spec.get('at')
+    if not (isinstance(at, (list, tuple)) and len(at) == 2):
+        raise LevelFormatError(f'entities[{i}].at: must be [row, col]')
+    kw = {k: v for k, v in spec.items() if k in _ENTITY_FIELDS}
+    kw.pop('row', None)
+    kw.pop('col', None)
+    if 'kind' not in kw:
+        raise LevelFormatError(f'entities[{i}].kind: required')
+    unknown = set(spec) - set(_ENTITY_FIELDS) - {'at'}
+    if unknown:
+        raise LevelFormatError(f'entities[{i}]: unknown field(s) {sorted(unknown)}')
+    return Entity(row=int(at[0]), col=int(at[1]), **kw)
+
+
+def _resolve_fill(f: Fill, room, rng: random.Random, custom) -> list:
+    """Lay words across a region, left to right, row by row.
+
+    Deterministic from the level seed and blind to everything else, so two
+    builds of the same file are identical — which validation asserts, and the
+    tape depends on.
+    """
+    r1, c1, r2, c2 = f.region
+    lo, hi = f.length
+    out = []
+    for r in range(max(0, r1), min(room.rows, r2 + 1)):
+        c = max(0, c1)
+        limit = min(room.cols - 1, c2)
+        while c <= limit:
+            length = rng.randint(lo, hi)
+            if c + length - 1 > limit:
+                break
+            # Only lay a word where the whole run stands on floor; a fill must
+            # not paint text into stone the author carved on purpose.
+            if all(room.cells[r][c + i] in (CellType.FLOOR, CellType.CORRIDOR)
+                   for i in range(length)):
+                word = vocab.words(f.pool, length, rng, custom)
+                out.append(CharRun(row=r, col=c, symbols=tuple(word), kind=f.kind))
+                c += length + f.spacing
+            else:
+                c += 1
+    return out
+
+
+# ── Writing ───────────────────────────────────────────────────────────────────
+
+def dumps(lvl: Level) -> str:
+    """Serialise a Level back to file text (stable key order, diffable)."""
+    data = {
+        'schema':   SCHEMA,
+        'name':     lvl.name,
+        'author':   lvl.author,
+        'seed':     lvl.seed,
+        'teaches':  lvl.teaches,
+        'requires': lvl.requires,
+        'no_horse': lvl.no_horse,
+        'geometry': {'rows': lvl.rows, 'cols': lvl.cols, 'cells': lvl.cells,
+                     'spawn': list(lvl.spawn), 'exit': list(lvl.exit)},
+        'solution': lvl.solution,
+    }
+    if lvl.substitutes:
+        data['substitutes'] = lvl.substitutes
+    if lvl.intro:
+        data['intro'] = lvl.intro
+    if lvl.fills:
+        data['fill'] = [{'region': list(f.region), 'pool': f.pool,
+                         'length': list(f.length), 'spacing': f.spacing,
+                         'kind': f.kind} for f in lvl.fills]
+    if lvl.char_runs:
+        data['char_runs'] = lvl.char_runs
+    if lvl.entities:
+        data['entities'] = lvl.entities
+    if lvl.vocabulary:
+        data['vocabulary'] = lvl.vocabulary
+    return json.dumps(data, indent=2, ensure_ascii=False) + '\n'
+
+
+def from_room(room, name: str, author: str = '', solution: str = '',
+              teaches=(), requires=()) -> Level:
+    """Capture a live Room as an authored Level — the editor's export path.
+
+    Everything is written out explicitly (no fills): what the author built is
+    what ships. Fills are for hand-writing a file, not for round-tripping one.
+    """
+    return Level(
+        name=name, author=author, seed=room.seed or 0,
+        teaches=list(teaches), requires=list(requires),
+        no_horse=bool(getattr(room, 'no_horse', False)),
+        rows=room.rows, cols=room.cols,
+        cells=[encode_row(row) for row in room.cells],
+        spawn=tuple(room.spawn_pos), exit=tuple(room.exit_pos or (1, 1)),
+        char_runs=[{'row': ru.row, 'col': ru.col,
+                    'symbols': list(ru.symbols), 'kind': ru.kind}
+                   for ru in room.char_runs],
+        entities=[dict({'at': [e.row, e.col]},
+                       **{f: getattr(e, f) for f in _ENTITY_FIELDS
+                          if f not in ('row', 'col')})
+                  for e in room.entities if e.alive],
+        solution=solution or room.answer,
+    )

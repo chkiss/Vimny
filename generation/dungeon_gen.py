@@ -9009,12 +9009,20 @@ def _forge_text(room, row, col, text, kind):
 # Chamber C's :g delete, then the walk out.  Tests translate ⏎→Enter and drop the spaces.
 # par is this solve's measured engine cost — constant across seeds; the playthrough pins it.
 _SPELLWRIGHTS_ANSWER = ':%s/moo/quack/g⏎ 8G :s/down/up/⏎ jj& :g/krzzt/d⏎ 6G$'
-_SPELLWRIGHTS_PAR    = 45
-# 45 = :%s/moo/quack/g (15) + 8G (2) + :s/down/up/ (11) + jj (2) + & (1)
-#      + :g/krzzt/d (11) + 6G$ (3).  Chamber B's two verses straddle the
-#      protected line, so no single command hits just them — the :s + &
-#      pair is the floor there; the cursor never lands on the door row
-#      after a rite, so the 3-key walk out is the floor too.
+_SPELLWRIGHTS_PAR    = 44
+# 44 = 47 keys typed MINUS the 3 command-line Enters, which execute the line
+#      rather than spending budget:
+#        :%s/moo/quack/g⏎ (16-1) + 8G (2) + :s/down/up/⏎ (12-1) + jj (2)
+#        + & (1) + :g/krzzt/d⏎ (11-1) + 6G$ (3)
+#      Chamber B's two verses straddle the protected line, so no single
+#      command hits just them — the :s + & pair is the floor there; the cursor
+#      never lands on the door row after a rite, so the 3-key walk out is the
+#      floor too.
+#      Was 45 until 2026-07-25: the old figure was hand-tallied and counted
+#      neither the Enters nor their exemption, and this level is excluded
+#      outright from tests/test_answer_paths.py, so nothing measured it. The
+#      headless replayer (`python3 -m sharing audit`) found it on its first
+#      run — which is the entire argument for §1a in blueprints/level_sharing.md.
 
 
 def _par_spellwrights_forge():

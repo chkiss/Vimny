@@ -249,6 +249,12 @@ _CELL_CODE = {CellType.WALL: 'W', CellType.FLOOR: 'F', CellType.CORRIDOR: 'C',
               CellType.WATER: 'A', CellType.WOOD_WALL: 'X'}
 _CODE_CELL = {code: cell for cell, code in _CELL_CODE.items()}
 
+# The Entity fields a save round-trips. `uid` is deliberately absent — it is
+# per-run identity, minted fresh on load, exactly as a paste-back mints one.
+_ENTITY_FIELDS = ('kind', 'row', 'col', 'hp', 'max_hp', 'ai', 'ai_speed',
+                  'summon_timer', 'origin_row', 'move_dir', 'tag',
+                  'scroll_id', 'swole', 'edit_immune', 'shade')
+
 
 def _deserialize_room(data: dict):
     """Reconstruct a Room from a dict produced by _serialize_room / save_layout."""
@@ -260,12 +266,20 @@ def _deserialize_room(data: dict):
     room.char_runs    = [CharRun(row=r['row'], col=r['col'],
                                  symbols=tuple(r['symbols']), kind=r['kind'])
                      for r in data.get('char_runs', [])]
-    room.entities = [Entity(kind=e['kind'], row=e['row'], col=e['col'])
+    room.entities = [Entity(**{k: v for k, v in e.items() if k in _ENTITY_FIELDS})
                      for e in data.get('entities', [])]
     ep = data.get('exit_pos')
     room.exit_pos = tuple(ep) if ep else None
     en = data.get('spawn_pos', [1, 1])
     room.spawn_pos = tuple(en)
+    room.seed        = data.get('seed')
+    room.answer      = data.get('answer', '')
+    room.par         = data.get('par')
+    room.budget      = data.get('budget', 0)
+    room.no_horse    = bool(data.get('no_horse', False))
+    room.fog_cells   = {tuple(p) for p in data.get('fog_cells', ())}
+    room.mist_cells  = {tuple(p) for p in data.get('mist_cells', ())}
+    room.sealed_cells = {tuple(p) for p in data.get('sealed_cells', ())}
     room.rebuild_indexes()
     return room
 
@@ -279,8 +293,21 @@ def _serialize_room(room) -> dict:
         'char_runs':    [{'row': ru.row, 'col': ru.col,
                       'symbols': list(ru.symbols), 'kind': ru.kind}
                      for ru in room.char_runs],
-        'entities': [{'kind': e.kind, 'row': e.row, 'col': e.col}
+        # Every field that makes an entity what it IS. Listing only kind/row/col
+        # used to bring a saved goblin back stationary at hp=1 with no AI, no
+        # tag and no immunity — a different creature wearing the same letter.
+        'entities': [{f: getattr(e, f) for f in _ENTITY_FIELDS}
                      for e in room.entities if e.alive],
         'spawn_pos': list(room.spawn_pos),
         'exit_pos': list(room.exit_pos) if room.exit_pos else None,
+        'seed':     room.seed,
+        'answer':   room.answer,
+        'par':      room.par,
+        'budget':   room.budget,
+        'no_horse': bool(getattr(room, 'no_horse', False)),
+        # Fog is not derivable from the grid — a level may lay it scripted — so
+        # a layout that does not carry it comes back with the dark burned off.
+        'fog_cells':    sorted(list(p) for p in room.fog_cells),
+        'mist_cells':   sorted(list(p) for p in room.mist_cells),
+        'sealed_cells': sorted(list(p) for p in room.sealed_cells),
     }

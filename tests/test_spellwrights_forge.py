@@ -238,8 +238,24 @@ def test_seal_stays_shut_until_all_three_rites_done():
 def test_par_and_budget():
     import math
     r = dg.build_dungeon_spellwrights_forge(1).room
-    assert r.par == dg._SPELLWRIGHTS_PAR == 45
-    assert r.budget == max(math.ceil(45 * 1.4), 60)
+    assert r.par == dg._SPELLWRIGHTS_PAR == 44
+    assert r.budget == max(math.ceil(44 * 1.4), 60)
+
+
+def test_par_is_what_the_engine_actually_charges():
+    """The par constant used to be hand-tallied, and was 1 too high — nothing
+    measured it, because this level is excluded outright from
+    tests/test_answer_paths.py. Replay the canonical tape and let the budget
+    say what it costs."""
+    from sharing.replay import replay_tape
+    from content.levels import known_commands
+    r = dg.build_dungeon_spellwrights_forge(1).room
+    res = replay_tape(dg.build_dungeon_spellwrights_forge(1),
+                      'spellwrights_forge', r.answer,
+                      known=known_commands('spellwrights_forge'))
+    assert res.won, f'the canonical tape no longer wins: {res.error}'
+    assert res.spent == dg._SPELLWRIGHTS_PAR, (
+        f'the tape costs {res.spent} but par claims {dg._SPELLWRIGHTS_PAR}')
 
 
 def test_hint_bar_surfaces_the_whole_subst_family():
