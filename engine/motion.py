@@ -102,24 +102,73 @@ def _vision_flood(room, start_r: int, start_c: int) -> set:
     return seen
 
 
-def apply_stone_fog(room) -> None:
-    """Initialise fog by the stone law — every foggable cell the eye cannot
-    reach from spawn (walls-only _vision_flood) starts fogged — and mark the
-    room `auto_fog` so the main loop re-reveals as walls open (a sealed
-    pocket unfogs the moment its door becomes floor and sight crosses).
-    Rooms with SCRIPTED fog (Manifold, Scrivener) must NOT use this: the
-    auto-reveal would instantly clear their re-laid fog."""
+def stone_law(room) -> set:
+    """Every foggable cell the eye cannot reach from spawn — the fog FLOOR.
+
+    Derived from the geometry, never stored, so it cannot drift away from the
+    walls the way a hand-kept fog set does.
+    """
+    if not room.spawn_pos:
+        return set()
     foggable = {(r, c) for r in range(room.rows) for c in range(room.cols)
                 if room.cells[r][c] in _FOGGABLE_CELLS}
-    room.fog_cells |= foggable - _vision_flood(room, *room.spawn_pos)
+    return foggable - _vision_flood(room, *room.spawn_pos)
+
+
+def apply_stone_fog(room) -> None:
+    """Initialise fog by the stone law, and mark the room `auto_fog` so the
+    main loop re-reveals as walls open (a sealed pocket unfogs the moment its
+    door becomes floor and sight crosses).
+    Rooms with SCRIPTED fog (Manifold, Scrivener) must NOT use this: the
+    auto-reveal would instantly clear their re-laid fog."""
+    room.fog_cells |= stone_law(room)
     room.auto_fog = True
+
+
+def enforce_fog_law(room) -> None:
+    """Hold every room to the stone law — what the eye cannot reach from spawn
+    is fogged — without disturbing anything a builder laid on top.
+
+    The law was opt-in until now: each builder called `apply_stone_fog` for
+    itself, and a room that never called it, or that grew a sealed pocket after
+    it did, showed the player straight through the stone. That is a drift bug,
+    not a style, and the evidence is unanimous — of the game's 62 rooms, every
+    single one fogs at least the law's cells except two that simply never
+    asked. So the law stops being something a builder remembers and becomes
+    something the world is held to.
+
+    Scripted fog is a SUPERSET, never a replacement, so this only ever adds —
+    and it leaves `auto_fog` alone, because whether a room re-reveals is a
+    design decision (the Manifold and the Scrivener re-lay their fog every turn
+    and must not have it lifted). A room that had no fog at all is opted into
+    auto-reveal, which is what every hand-written call to `apply_stone_fog`
+    already chose.
+
+    A WRAP BUFFER is exempt, and by what it IS rather than by name: one row of
+    text, where sight stops at the first segment wall and the law would fog
+    almost the whole line. A buffer is something you read, not a space you
+    explore, and the eye does not walk it.
+    """
+    if getattr(room, 'wrap_buffer', False):
+        return
+    if room.fog_cells:
+        room.fog_cells |= stone_law(room)      # scripted: keep its reveal rule
+    else:
+        apply_stone_fog(room)
 
 
 def auto_fog_tick(room, player_r: int, player_c: int) -> None:
     """Re-reveal for auto_fog rooms: lift fog from every cell now visible
-    from the player (walls-only sight). Called each tick by the main loop."""
+    from the player (walls-only sight). Called each tick by the main loop.
+
+    MIST is never lifted. The two fogs are different things wearing one field:
+    stone fog is ignorance, and looking cures it; mist is weather, and standing
+    next to it does not. Without this a misted level that also auto-reveals
+    would clear its own haze on turn one.
+    """
     if getattr(room, 'auto_fog', False) and room.fog_cells:
-        room.fog_cells -= _vision_flood(room, player_r, player_c)
+        room.fog_cells -= (_vision_flood(room, player_r, player_c)
+                           - (room.mist_cells or set()))
 
 
 def _reveal_from(room, player_r: int, player_c: int) -> None:

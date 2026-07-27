@@ -44,6 +44,7 @@ import re
 from dataclasses import dataclass, field, replace
 
 from engine.editor import _CELL_CODE, _CODE_CELL, _MIST_CODE, _ENTITY_FIELDS
+from engine.motion import apply_stone_fog
 from engine.world import (CellType, CharRun, DROPPABLE, Entity, Room, RoomType,
                           Seal, canonical_kind)
 from generation.dungeon_gen import Dungeon
@@ -467,6 +468,17 @@ def build(lvl: Level, par: int | None = None, seed: int | None = None) -> Dungeo
     if not any(e.kind == 'exit' for e in room.entities):
         room.entities.append(Entity(kind='exit', row=room.exit_pos[0],
                                     col=room.exit_pos[1]))
+
+    # The fog law, after the seals are shut and not before: a shut seal is a
+    # wall, and the pocket behind it is exactly what the eye cannot reach. Fog
+    # is DERIVED here rather than stored in the file, so it can never disagree
+    # with the walls an author painted — move a wall in the forge and the fog
+    # moves with it, with nothing to remember and nothing to re-run.
+    # A level file has no scripts, so the only fog it can carry is MIST — which
+    # is permanent by being mist, not by holding the reveal back. So a built
+    # level always re-reveals: walk in, and the pocket lights as sight crosses
+    # the opened seal, while the mist stays hazy for ever.
+    apply_stone_fog(room)
 
     room.rebuild_indexes()
     finalize_par(room, par)

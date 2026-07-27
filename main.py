@@ -50,7 +50,8 @@ from engine.world import (DROPPABLE, Entity, CellType, CharRun, Dungeon, Seal,
                           canonical_kind, clone_entity, entity_letter,
                           strike_disguise)
 from engine.motion import (apply_motion, _apply_esc, _reveal_from,
-                           _first_non_blank_col, auto_fog_tick as _auto_fog_tick)
+                           _first_non_blank_col, auto_fog_tick as _auto_fog_tick,
+                           enforce_fog_law as _enforce_fog_law)
 from engine.text_object import compute_text_object, resolve_text_object, TextObjectType
 from engine.search import find_next as _search_next, word_under_cursor as _word_under_cursor
 from engine.warden_mega import mega_tick
@@ -1844,8 +1845,15 @@ def _build_dungeon(slug: str, seed: int, game_h: int = 33, admin: bool = False):
     if slug == 'screen_vault':
         # The Screen Vault: only solve the (admin-only) answer path when admin —
         # its par-Dijkstra is too slow to run on every load (par is locked).
-        return builder(seed, game_h=game_h, compute_answer=admin)
-    return builder(seed)
+        dungeon = builder(seed, game_h=game_h, compute_answer=admin)
+    else:
+        dungeon = builder(seed)
+    # The fog law, applied to EVERY room of every level, here rather than sixty
+    # times in sixty builders. A builder may still lay scripted fog on top; what
+    # it may no longer do is forget the floor. (engine.motion.enforce_fog_law)
+    for _room in dungeon.rooms:
+        _enforce_fog_law(_room)
+    return dungeon
 
 
 # The Warden Manifold's boss ward state rides the undo snapshot — UNLIKE the
