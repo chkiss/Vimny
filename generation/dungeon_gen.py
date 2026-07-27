@@ -5942,7 +5942,7 @@ _SR_EXIT    = (24, 16)                # the FINAL SEAL, in the stone west of the
 # east→west, one clean cut deeper per word — the grinding IS the path.
 _SR_BOLT_COLS = (21, 20, 19, 18, 17)  # cols, in canonical mend order
 _SR_UNDERCROFT = 25                   # bare row — G undershoots the gate to here
-_SR_CHEST   = (25, 34)                # unassigned → the relic scroll pool
+_SR_CHEST   = (25, 34)                # unassigned scroll chest → the relic pool
 _SR_PAR     = 15                      # x 2- x 2- x 6+ x 2+ x 4+ ({n}_ only ever
                                       # TIES {n-1}+ — the tape takes the +)
 
@@ -5993,7 +5993,10 @@ def build_dungeon_stair_rail(seed: int) -> Dungeon:
 
     room.entities.append(Entity(kind='exit', row=_SR_EXIT[0], col=_SR_EXIT[1],
                                 edit_immune=True))
-    room.entities.append(Entity(kind='chest_random', row=_SR_CHEST[0], col=_SR_CHEST[1]))
+    # chest_SCROLL, not chest_random: the reward here is a relic scroll (an
+    # unassigned scroll chest draws from the relic pool), and a random chest
+    # rolled that intent away four times in five.
+    room.entities.append(Entity(kind='chest_scroll', row=_SR_CHEST[0], col=_SR_CHEST[1]))
     room.spawn_pos = (_SR_STEP_ROWS[_SR_SPAWN_IDX], _SR_STEP_COLS[_SR_SPAWN_IDX])
     room.exit_pos  = _SR_EXIT
 

@@ -132,7 +132,9 @@ def test_undercroft_is_below_the_gate(seed):
     standable = [r for r in range(room.rows)
                  if any(room.is_passable(r, c) for c in range(room.cols))]
     assert standable[-1] == _SR_UNDERCROFT > _SR_GATE
-    chest = next(e for e in room.entities if e.kind == 'chest_random')
+    # chest_SCROLL: the undercroft reward is a relic scroll, and a random chest
+    # paid it out only one time in three.
+    chest = next(e for e in room.entities if e.kind == 'chest_scroll')
     assert (chest.row, chest.col) == _SR_CHEST
 
 

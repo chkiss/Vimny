@@ -639,6 +639,57 @@ _ENTITY_SETTABLE = ('hp', 'max_hp', 'ai', 'ai_speed', 'tag', 'scroll_id',
 _ENTITY_INT_FIELDS  = ('hp', 'max_hp', 'ai_speed')
 _ENTITY_BOOL_FIELDS = ('swole', 'edit_immune')
 
+#: The COLOURS the renderer actually paints on a key or a lock. Tag pairing is
+#: pure string equality, so `tag=orange` pairs perfectly well — it just draws in
+#: the default brass, because there is no orange in `render/colors.py`. That gap
+#: is invisible from inside the game (you get a key; it is simply the wrong
+#: colour), which is exactly why the picker names the three it knows.
+_KEY_COLOURS = ('gold', 'red', 'blue')
+
+#: `(kind, field)` → the values the game recognises, for the picker to offer.
+#: A `('…', '(type your own)')` row is present wherever the field is genuinely
+#: open-ended, so the list narrows the choice without pretending to close it.
+#: Keyed by kind first, then by field alone, because `tag` means a colour on a
+#: key and a creature variant on a goblin.
+_ENTITY_CHOICES = {
+    ('floor_key',   'tag'): ('',) + _KEY_COLOURS,
+    ('locked_door', 'tag'): ('',) + _KEY_COLOURS,
+    ('chest_key',   'tag'): ('',) + _KEY_COLOURS,
+    ('goblin',      'tag'): ('', 'echo', 'zombie', 'demon'),
+    'ai':        ('chase', ''),
+    'drops':     ('',) + tuple(f'floor_key:{c}' for c in _KEY_COLOURS)
+                 + ('floor_key',) + tuple(f'chest_key:{c}' for c in _KEY_COLOURS)
+                 + ('chest_key', 'chest_random', 'chest_scroll',
+                    'heart_container', 'gold', 'dynamite'),
+    # 'scroll_id' is filled from SCROLL_CATALOG on demand — see _entity_choices.
+}
+
+#: What each offered value means, where the value alone does not say. Only the
+#: rows a reader would otherwise have to guess at.
+_CHOICE_NOTES = {
+    ('tag', ''):          'untagged — a door with no tag takes ANY key',
+    ('ai', ''):           'stationary',
+    ('ai', 'chase'):      'walks toward the player',
+    ('drops', ''):        'nothing',
+    ('scroll_id', ''):    'unassigned — draws from the relic pool',
+    ('tag', 'echo'):      'a false Warden: looks like a W',
+    ('tag', 'zombie'):    'risen dead',
+    ('tag', 'demon'):     'relentless — hunts from anywhere',
+}
+
+
+def _entity_choices(kind: str, field: str):
+    """The offered values for a field, or () when it is free-form (a number, a
+    group id, a name only the author knows).
+
+    `scroll_id` is read from the catalogue rather than listed, so a scroll added
+    tomorrow is offered tomorrow — a hand-copied list would drift, and an id
+    that does not match one silently shows no scroll at all."""
+    if field == 'scroll_id':
+        from content.scrolls import SCROLL_CATALOG
+        return ('',) + tuple(s['id'] for s in SCROLL_CATALOG)
+    return _ENTITY_CHOICES.get((kind, field), _ENTITY_CHOICES.get(field, ()))
+
 
 def _entity_field(ent, field: str, raw: str) -> str:
     """Set one `:entity` field from its typed text. Returns '' or the complaint.
@@ -710,13 +761,23 @@ def _pick_entity(term: Terminal, iw: int, game_h: int) -> str:
     sep_h = '═' * (BOX_IW + 2)
 
     def show(title, rows, sel, foot):
+        # A long list (28 scrolls) is WINDOWED, not drawn whole: the box is
+        # centred in the game area, so overflowing it would push its own top
+        # border off the screen and leave the author steering a list they
+        # cannot see the selected row of.
+        win   = max(3, game_h - 9)
+        first = 0 if len(rows) <= win else min(max(0, sel - win // 2),
+                                               len(rows) - win)
         lines = [edge + '╔' + sep_h + '╗' + rst, row(0, '')]
         lines.append(row(BOX_IW, head + ' ' + title
                          + box_bg + ' ' * max(0, BOX_IW - len(title) - 1)))
         lines.append(row(0, ''))
-        for i, text in enumerate(rows):
-            text = text[:BOX_IW]
+        for i in range(first, min(len(rows), first + win)):
+            text = rows[i][:BOX_IW]
             lines.append(row(len(text), (pick if i == sel else body) + text))
+        if len(rows) > win:
+            more = f' … {sel + 1}/{len(rows)}'
+            lines.append(row(len(more), body + more))
         lines.append(row(0, ''))
         lines.append(row(len(foot), body + foot))
         lines.append(row(0, ''))
@@ -741,6 +802,40 @@ def _pick_entity(term: Terminal, iw: int, game_h: int) -> str:
                 buf = buf[:-1]
             elif raw and raw.isprintable():
                 buf += raw
+
+    def pick_value(kind, field, current):
+        """Choose a field's value from what the game actually recognises.
+
+        This is the difference between a menu and a form. `tag=orange` pairs a
+        key to a door perfectly well — pairing is string equality — but the
+        renderer knows three colours, so an orange key comes out brass and
+        nothing anywhere says why. A list of the values that DO something turns
+        that silent gap into a visible one. The last row still opens the free
+        text field, because the narrow set is what the game paints, not what it
+        permits, and an author pairing on `tag=vault_b` is doing nothing wrong.
+        """
+        choices = _entity_choices(kind, field)
+        if not choices:
+            return read_value(current)
+        sel = choices.index(current) if current in choices else 0
+        while True:
+            rows = []
+            for v in choices:
+                note = _CHOICE_NOTES.get((field, v), '')
+                rows.append(f' {(v or "(none)"):<20}{note}')
+            rows.append(' » type something else')
+            show(f'{kind}.{field}', rows, sel,
+                 ' j/k move   ⏎ choose   Esc leave it unchanged')
+            key = term.inkey()
+            raw = str(key) if not key.is_sequence else ''
+            if key.name == 'KEY_ESCAPE':
+                return current
+            if raw == 'j' or key.name == 'KEY_DOWN':
+                sel = (sel + 1) % len(rows)
+            elif raw == 'k' or key.name == 'KEY_UP':
+                sel = (sel - 1) % len(rows)
+            elif key.name == 'KEY_ENTER' or raw in ('\n', '\r'):
+                return read_value(current) if sel == len(rows) - 1 else choices[sel]
 
     sel = 0
     while True:
@@ -784,7 +879,8 @@ def _pick_entity(term: Terminal, iw: int, game_h: int) -> str:
                 if fsel == len(rows) - 1:
                     return ' '.join([kind] + [f'{f}={vals[f]}'
                                               for f in fields if vals[f]])
-                vals[fields[fsel]] = read_value(vals[fields[fsel]])
+                vals[fields[fsel]] = pick_value(kind, fields[fsel],
+                                                vals[fields[fsel]])
 
 
 def _render_standard_scroll(term: Terminal, iw: int, game_h: int, content: dict,

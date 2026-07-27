@@ -173,10 +173,16 @@ with `x` — it goes into the unnamed register — and open the door by pasting 
 there with `p`. A `chest_key` carries its tag onto the key it gives up, so
 `{"kind": "chest_key", "tag": "gold"}` is a chest holding a gold key.
 
+Only **`gold`, `red` and `blue`** are painted as colours. Pairing is plain
+string equality, so `tag=vault_b` pairs a key to a door perfectly well — it
+just draws in the default brass. Use a colour when the colour is the clue.
+
 **`:entity` with no argument opens the palette**, and the palette can set the
 same fields the command can: pick a kind with `j`/`k` and Enter, then walk that
-kind's notable fields, Enter to type a value, and Enter on the last row to place
-it. It reports the command it just ran (`Placed by  :entity floor_key tag=red`)
+kind's notable fields, Enter to choose a value, and Enter on the last row to
+place it. Fields with a known set of values (`tag`, `ai`, `drops`, `scroll_id`)
+offer that set, with a last row for typing anything else.
+It reports the command it just ran (`Placed by  :entity floor_key tag=red`)
 — the menu answers "what can I place?", the command is still the mechanism.
 
 **`drops` is what a creature leaves behind when it dies**, written `kind` or

@@ -650,12 +650,12 @@ def test_the_picker_builds_a_red_key_not_just_a_default_one():
     anyone wants from it.
 
     Driven through the real key loop: `:entity` opens the palette, jjj walks to
-    floor_key, Enter chooses it, Enter opens `tag`, the value is typed, and the
-    last row places it. A picker that could only place the DEFAULT of each kind
-    would leave `:entity floor_key tag=red` as the only route to a red key."""
+    floor_key, Enter chooses it, Enter opens `tag`, jj picks red off the colour
+    list, and the last row places it. A picker that could only place the DEFAULT
+    of each kind would leave `:entity floor_key tag=red` as the only route."""
     import main
     d = DRAFT.new('Probe', rows=8, cols=30)
-    _forge_session(d, 'jl:entity\rjjj\r\rred\rj\r:w\r:q!\r')
+    _forge_session(d, 'jl:entity\rjjj\r\rjj\rj\r:w\r:q!\r')
     key = [e for e in d.level.entities if e['kind'] == 'floor_key']
     assert key and key[0]['tag'] == 'red'
     # …and the fields are opt-in: Enter straight through still places a plain one
@@ -663,6 +663,48 @@ def test_the_picker_builds_a_red_key_not_just_a_default_one():
     _forge_session(d2, 'jl:entity\rjjj\rj\r:w\r:q!\r')
     key = [e for e in d2.level.entities if e['kind'] == 'floor_key']
     assert key and key[0].get('tag', '') == ''
+
+
+def test_the_picker_offers_only_colours_the_game_paints():
+    """`tag=orange` pairs a key to a door perfectly well — pairing is string
+    equality — but the renderer knows three colours, so an orange key comes out
+    brass and nothing anywhere says why. The list is where that silent gap
+    becomes visible."""
+    import main
+    from render import renderer
+
+    offered = [c for c in main._entity_choices('floor_key', 'tag') if c]
+    assert offered == list(main._KEY_COLOURS)
+    # the claim under the list: these are exactly the tags the renderer branches
+    # on, so nothing offered is cosmetically dead and nothing live is withheld
+    import inspect
+    src = inspect.getsource(renderer._ent_cell_str)
+    for c in offered:
+        assert f"ent.tag == '{c}'" in src
+    assert 'orange' not in src
+
+
+def test_a_tag_the_list_does_not_offer_is_still_reachable():
+    """The narrow set is what the game PAINTS, not what it permits. An author
+    pairing on `tag=vault_b` is doing nothing wrong, so the last row of every
+    choice list opens the free text field."""
+    d = DRAFT.new('Probe', rows=8, cols=30)
+    # …\r opens tag, k wraps to the last row ("type something else"), then type
+    _forge_session(d, 'jl:entity\rjjj\r\rk\rvault_b\rj\r:w\r:q!\r')
+    key = [e for e in d.level.entities if e['kind'] == 'floor_key']
+    assert key and key[0]['tag'] == 'vault_b'
+
+
+def test_the_offered_scroll_ids_are_the_real_catalogue():
+    """Read from SCROLL_CATALOG, not hand-copied: an id that matches no scroll
+    shows no scroll at all, silently, and a hand-written list drifts the moment
+    a scroll is added."""
+    import main
+    from content.scrolls import SCROLL_CATALOG
+
+    offered = main._entity_choices('chest_scroll', 'scroll_id')
+    assert offered[0] == ''          # unassigned → the relic pool
+    assert set(offered[1:]) == {s['id'] for s in SCROLL_CATALOG}
 
 
 def test_a_red_chest_yields_a_red_key():
