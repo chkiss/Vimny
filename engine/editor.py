@@ -283,7 +283,8 @@ _CODE_CELL = {code: cell for cell, code in _CELL_CODE.items()}
 # per-run identity, minted fresh on load, exactly as a paste-back mints one.
 _ENTITY_FIELDS = ('kind', 'row', 'col', 'hp', 'max_hp', 'ai', 'ai_speed',
                   'summon_timer', 'origin_row', 'move_dir', 'tag',
-                  'scroll_id', 'swole', 'edit_immune', 'shade')
+                  'scroll_id', 'swole', 'edit_immune', 'shade',
+                  'drops', 'group')
 
 
 def _deserialize_room(data: dict):

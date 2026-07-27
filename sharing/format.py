@@ -44,7 +44,8 @@ import re
 from dataclasses import dataclass, field
 
 from engine.editor import _CELL_CODE, _CODE_CELL, _ENTITY_FIELDS
-from engine.world import CellType, CharRun, Entity, Room, RoomType
+from engine.world import (CellType, CharRun, DROPPABLE, Entity, Room, RoomType,
+                          Seal)
 from generation.dungeon_gen import Dungeon
 from sharing import vocab
 
@@ -56,6 +57,9 @@ ALWAYS_ON = ('u', ':w', ':q', ':q!')
 MAX_ROWS, MAX_COLS = 60, 200      # _MAX_COLS in the reflow engine is 200
 MAX_ENTITIES       = 400
 MAX_FILLS          = 64
+MAX_SEALS          = 32
+MAX_SEAL_CELLS     = 64           # cells one seal may open — a door, not a demolition
+MAX_SEAL_MATCH     = 200          # a password, not a paragraph (and ≤ MAX_COLS)
 MAX_VOCAB_WORDS    = 500
 MAX_WORD_LEN       = 20
 MAX_TAPE           = 4000
@@ -109,6 +113,7 @@ class Level:
     spawn:       tuple = (1, 1)
     exit:        tuple = (1, 2)
     fills:       list = field(default_factory=list)   # list[Fill]
+    seals:       list = field(default_factory=list)   # list[world.Seal]
     char_runs:   list = field(default_factory=list)   # explicit text
     entities:    list = field(default_factory=list)   # list[dict]
     vocabulary:  list = field(default_factory=list)   # author's own words
@@ -140,8 +145,8 @@ def parse(data: dict) -> Level:
 
     unknown = set(data) - {'schema', 'name', 'author', 'seed', 'teaches',
                            'requires', 'no_horse', 'alternate', 'geometry',
-                           'fill', 'char_runs', 'entities', 'vocabulary',
-                           'solution', 'intro'}
+                           'fill', 'seals', 'char_runs', 'entities',
+                           'vocabulary', 'solution', 'intro'}
     if unknown:
         # Refuse rather than ignore: a silently-dropped key is a level that
         # plays differently from the one its author tested.
@@ -165,6 +170,7 @@ def parse(data: dict) -> Level:
         spawn=tuple(geo.get('spawn', (1, 1))),
         exit=tuple(geo.get('exit', (1, 2))),
         fills=[_parse_fill(f, i) for i, f in enumerate(data.get('fill', []))],
+        seals=[_parse_seal(s, i) for i, s in enumerate(data.get('seals', []))],
         char_runs=list(data.get('char_runs', [])),
         entities=list(data.get('entities', [])),
         vocabulary=list(data.get('vocabulary', [])),
@@ -192,6 +198,55 @@ def _parse_fill(f: dict, i: int) -> Fill:
                 length=(int(length[0]), int(length[1])),
                 spacing=int(f.get('spacing', 1)),
                 kind=str(f.get('kind', 'ancient')))
+
+
+_SEAL_MODES = ('exact', 'contains')
+
+
+def _parse_seal(s: dict, i: int) -> Seal:
+    """One `seals` entry → a `world.Seal`.
+
+    Every failure names the field and says what was wanted, because a seal is the
+    one directive whose mistake is invisible: a mistyped `opens` cell does not
+    crash, it simply builds a door that never opens anywhere — and the author
+    finds out at the solvability gate, several minutes later, with no clue why.
+    """
+    if not isinstance(s, dict):
+        raise LevelFormatError(f'seals[{i}]: must be an object')
+    unknown = set(s) - {'region', 'match', 'opens', 'mode'}
+    if unknown:
+        raise LevelFormatError(f'seals[{i}]: unknown key(s) {sorted(unknown)}')
+    region = s.get('region')
+    if not (isinstance(region, (list, tuple)) and len(region) == 4):
+        raise LevelFormatError(f'seals[{i}].region: must be [r1, c1, r2, c2]')
+    match = s.get('match')
+    if not isinstance(match, str) or not match.strip():
+        raise LevelFormatError(f'seals[{i}].match: must be the text the region '
+                               f'has to read, and cannot be empty')
+    if len(match) > MAX_SEAL_MATCH:
+        raise LevelFormatError(f'seals[{i}].match: at most {MAX_SEAL_MATCH} characters')
+    opens = s.get('opens')
+    # A single [row, col] is allowed and is by far the common case: most doors
+    # are one cell, and making an author write [[9, 40]] to say so is a papercut
+    # they meet on their first seal.
+    if (isinstance(opens, (list, tuple)) and len(opens) == 2
+            and all(isinstance(v, int) for v in opens)):
+        opens = [opens]
+    if not (isinstance(opens, (list, tuple)) and opens):
+        raise LevelFormatError(f'seals[{i}].opens: must be [row, col] or a list of them')
+    if len(opens) > MAX_SEAL_CELLS:
+        raise LevelFormatError(f'seals[{i}].opens: at most {MAX_SEAL_CELLS} cells')
+    cells = []
+    for j, cell in enumerate(opens):
+        if not (isinstance(cell, (list, tuple)) and len(cell) == 2):
+            raise LevelFormatError(f'seals[{i}].opens[{j}]: must be [row, col]')
+        cells.append((int(cell[0]), int(cell[1])))
+    mode = str(s.get('mode', 'exact'))
+    if mode not in _SEAL_MODES:
+        raise LevelFormatError(f'seals[{i}].mode: must be one of '
+                               f'{", ".join(_SEAL_MODES)}, got {mode!r}')
+    return Seal(region=tuple(int(x) for x in region), match=match,
+                opens=tuple(cells), mode=mode)
 
 
 def loads(text: str) -> Level:
@@ -271,6 +326,19 @@ def build(lvl: Level, par: int | None = None) -> Dungeon:
     room.exit_pos  = tuple(lvl.exit)
     room.answer    = lvl.solution
     room.no_horse  = lvl.no_horse
+
+    # Seals are built SHUT, whatever the grid says, and before anything else reads
+    # the grid. A `cells` grid is written by `from_room` while the level was being
+    # played, so a door that happened to be open at save time would otherwise be
+    # encoded as floor and ship unsealed — the puzzle solved before the player
+    # arrives. Shutting them here rather than after the fills also keeps a fill
+    # from growing a word onto a door cell. The tick opens the door on turn one if
+    # the text really does read true, so nothing legitimate is lost.
+    room.seals = tuple(lvl.seals)
+    for _s in lvl.seals:
+        for _r, _c in _s.opens:
+            if 0 <= _r < room.rows and 0 <= _c < room.cols:
+                room.cells[_r][_c] = CellType.WALL
 
     custom = vocab.by_length([w for w in lvl.vocabulary]) if lvl.vocabulary else None
     rng    = random.Random(lvl.seed)
@@ -392,6 +460,10 @@ def dumps(lvl: Level) -> str:
         data['fill'] = [{'region': list(f.region), 'pool': f.pool,
                          'length': list(f.length), 'spacing': f.spacing,
                          'kind': f.kind} for f in lvl.fills]
+    if lvl.seals:
+        data['seals'] = [{'region': list(s.region), 'match': s.match,
+                          'opens': [list(c) for c in s.opens],
+                          'mode': s.mode} for s in lvl.seals]
     if lvl.char_runs:
         data['char_runs'] = lvl.char_runs
     if lvl.entities:
@@ -418,7 +490,7 @@ _TRANSIENT_KINDS = frozenset({'horse'})
 
 
 def from_room(room, name: str, author: str = '', solution: str = '',
-              teaches=(), requires=(), *, fills=None, vocabulary=(),
+              teaches=(), requires=(), *, fills=None, seals=None, vocabulary=(),
               intro: str = '', alternate: str | None = None,
               seed: int | None = None) -> Level:
     """Capture a live Room as an authored Level — the editor's export path.
@@ -431,7 +503,9 @@ def from_room(room, name: str, author: str = '', solution: str = '',
     authored level round-trip through the editor unchanged.
 
     Session entities (`_TRANSIENT_KINDS`) are dropped for the same reason: they
-    were never authored, they were walked in.
+    were never authored, they were walked in. Seal doors are re-shut for the
+    third form of it: their open state is a reading of the buffer, not a fact
+    about the room.
 
     Everything not derivable from the grid — the fills themselves, the author's
     vocabulary, the intro, the slug it stands in for — has to be passed in,
@@ -439,6 +513,20 @@ def from_room(room, name: str, author: str = '', solution: str = '',
     """
     if fills is None:
         fills = list(getattr(room, 'fills', []))
+    if seals is None:
+        seals = list(getattr(room, 'seals', ()))
+    # Write the seal cells out as STONE, whatever they are standing as right now.
+    # A seal cell is not terrain the author painted — it is a door the tick opens
+    # and shuts as the text changes, and the author is quite likely looking at it
+    # open, because that is how they just tested it. Encoding what is on screen
+    # would ship a level whose door starts open and whose puzzle is already
+    # solved. `build` shuts them again on load too; both ends hold the same line
+    # so neither depends on the other having done it.
+    grid = [list(row) for row in room.cells]
+    for s in seals:
+        for r, c in s.opens:
+            if 0 <= r < room.rows and 0 <= c < room.cols:
+                grid[r][c] = CellType.WALL
     return Level(
         name=name, author=author,
         seed=room.seed or 0 if seed is None else seed,
@@ -446,9 +534,9 @@ def from_room(room, name: str, author: str = '', solution: str = '',
         no_horse=bool(getattr(room, 'no_horse', False)),
         alternate=alternate, intro=intro,
         rows=room.rows, cols=room.cols,
-        cells=[encode_row(row) for row in room.cells],
+        cells=[encode_row(row) for row in grid],
         spawn=tuple(room.spawn_pos), exit=tuple(room.exit_pos or (1, 1)),
-        fills=list(fills),
+        fills=list(fills), seals=list(seals),
         char_runs=[{'row': ru.row, 'col': ru.col,
                     'symbols': list(ru.symbols), 'kind': ru.kind}
                    for ru in room.char_runs if not _grown(fills, ru)],

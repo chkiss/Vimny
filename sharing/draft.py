@@ -122,6 +122,7 @@ def sync(draft: Draft, room) -> None:
         room, lvl.name, author=lvl.author, solution=lvl.solution,
         teaches=lvl.teaches, requires=lvl.requires,
         fills=list(getattr(room, 'fills', lvl.fills)),
+        seals=list(getattr(room, 'seals', lvl.seals)),
         vocabulary=lvl.vocabulary, intro=lvl.intro, alternate=lvl.alternate,
         seed=lvl.seed)
 

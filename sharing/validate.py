@@ -96,6 +96,8 @@ def _check_bounds(lvl: F.Level, rep: Report) -> None:
         rep.fail('bounds', f'at most {F.MAX_ENTITIES} entities, got {len(lvl.entities)}')
     if len(lvl.fills) > F.MAX_FILLS:
         rep.fail('bounds', f'at most {F.MAX_FILLS} fill directives, got {len(lvl.fills)}')
+    if len(lvl.seals) > F.MAX_SEALS:
+        rep.fail('bounds', f'at most {F.MAX_SEALS} seals, got {len(lvl.seals)}')
     if len(lvl.solution) > F.MAX_TAPE:
         rep.fail('bounds', f'solution tape longer than {F.MAX_TAPE} keystrokes')
     if not lvl.solution.strip():
@@ -113,6 +115,16 @@ def _check_bounds(lvl: F.Level, rep: Report) -> None:
         at = e.get('at')
         if isinstance(at, (list, tuple)) and len(at) == 2:
             _in_range(f'entities[{i}].at', at)
+        # `drops` is the only field in the format that CREATES an entity at
+        # runtime — everything else describes something the file already listed
+        # and the checks above already counted. So it is the only field where a
+        # downloaded level could otherwise conjure something nobody validated:
+        # `drops: warden` on a goblin hatches a boss out of thin air. Loot only.
+        drop = str(e.get('drops', '') or '')
+        if drop and drop.partition(':')[0] not in F.DROPPABLE:
+            rep.fail('bounds', f'entities[{i}].drops: {drop!r} is not something a '
+                               f'creature may leave behind; allowed kinds are '
+                               f'{", ".join(sorted(F.DROPPABLE))}')
     for i, f in enumerate(lvl.fills):
         r1, c1, r2, c2 = f.region
         if r1 > r2 or c1 > c2:
@@ -124,6 +136,23 @@ def _check_bounds(lvl: F.Level, rep: Report) -> None:
                                f'declares no vocabulary')
         if f.length[0] < 1 or f.length[1] < f.length[0]:
             rep.fail('bounds', f'fill[{i}].length: {list(f.length)} is not a valid range')
+    for i, s in enumerate(lvl.seals):
+        r1, c1, r2, c2 = s.region
+        if r1 > r2 or c1 > c2:
+            rep.fail('bounds', f'seals[{i}].region is inside out: {list(s.region)}')
+        _in_range(f'seals[{i}].region start', (r1, c1))
+        _in_range(f'seals[{i}].region end', (r2, c2))
+        for j, cell in enumerate(s.opens):
+            _in_range(f'seals[{i}].opens[{j}]', cell)
+            if min(r1, r2) <= cell[0] <= max(r1, r2) and \
+               min(c1, c2) <= cell[1] <= max(c1, c2):
+                # A door inside its own condition is a door that opens, becomes
+                # walkable, gets written on, and re-shuts on whatever the player
+                # wrote — a loop with no honest reading. Refuse it while the
+                # author can still see which seal they meant.
+                rep.fail('bounds', f'seals[{i}].opens[{j}] {list(cell)} lies inside '
+                                   f"the seal's own region — a door cannot be part "
+                                   f'of the text that opens it')
 
 
 # ── 8. Content ────────────────────────────────────────────────────────────────

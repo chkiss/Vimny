@@ -45,8 +45,8 @@ from engine.vim_parser import parse, parse_visual_textobj
 from engine.command_guard import (action_allowed as _action_allowed_raw,
                                   guard_message as _guard_message_raw,
                                   _MOTION_GUARD as _MOTION_GUARD_TABLE)
-from engine.world import (Entity, CellType, CharRun, Dungeon, clone_entity,
-                          entity_letter, strike_disguise)
+from engine.world import (DROPPABLE, Entity, CellType, CharRun, Dungeon, Seal,
+                          clone_entity, entity_letter, strike_disguise)
 from engine.motion import (apply_motion, _apply_esc, _reveal_from,
                            _first_non_blank_col, auto_fog_tick as _auto_fog_tick)
 from engine.text_object import compute_text_object, resolve_text_object, TextObjectType
@@ -584,6 +584,142 @@ def _prompt_horse_name(term: Terminal, iw: int, game_h: int) -> str:
             name_buf = name_buf[:-1]
         elif raw and raw.isprintable() and len(name_buf) < _NAME_MAX:
             name_buf += raw
+
+
+#: The forge's entity palette: kind → (preset, what it is, the fields worth setting).
+#:
+#: One table, three consumers — the picker draws it, `:entity` validates against
+#: it, and `:entity` with no argument prints it. Before this, the presets lived
+#: inside the command handler and the list of kinds was a `'|'.join` in an error
+#: message, so the only way to learn what could be placed was to place something
+#: wrong. The `notes` column is the part an author actually needs: `locked_door`
+#: and `floor_key` are useless facts until you know they pair on `tag`.
+_ENTITY_PALETTE = {
+    'goblin':          (dict(hp=1, alive=True, max_hp=1, ai='chase', ai_speed=1),
+                        'chases you; x to fight',
+                        ('hp', 'ai_speed', 'tag', 'drops', 'group')),
+    'wanderer':        (dict(hp=1, alive=True, max_hp=1, ai='chase', ai_speed=2),
+                        'a slower chaser',
+                        ('hp', 'ai_speed', 'drops', 'group')),
+    'warden':          (dict(hp=5, alive=True, max_hp=5, ai='', ai_speed=1),
+                        'stationary boss, 5 hp',
+                        ('hp', 'edit_immune', 'drops', 'group')),
+    'floor_key':       (dict(hp=1, alive=True),
+                        'picked up with x; opens a locked_door of the same tag',
+                        ('tag',)),
+    'locked_door':     (dict(hp=1, alive=True),
+                        'opened by pasting a floor_key of the same tag',
+                        ('tag', 'edit_immune')),
+    'door':            (dict(hp=1, alive=True), 'opened with x', ()),
+    'chest':           (dict(hp=1, alive=True), 'x to open', ()),
+    'chest_key':       (dict(hp=1, alive=True), 'a chest holding a key', ('tag',)),
+    'chest_scroll':    (dict(hp=1, alive=True), 'a chest holding a scroll',
+                        ('scroll_id',)),
+    'heart_container': (dict(hp=1, alive=True), 'restores hp', ()),
+    'gold':            (dict(hp=1, alive=True), 'a coin', ()),
+    'dynamite':        (dict(hp=1, alive=True), 'blows out wood walls', ()),
+    'exit':            (dict(hp=1, alive=True), 'the way out (:exit moves it)', ()),
+}
+
+#: Fields `:entity` will set. A curated subset of `_ENTITY_FIELDS`: `kind`, `row`
+#: and `col` are what the command and the cursor already say, and the rest
+#: (`ai_tick`, `move_dir`, `shade`, `summoner_uid`) are running state no author
+#: has a reason to hand-set — offering them would only invite a level whose
+#: creatures start mid-stride.
+_ENTITY_SETTABLE = ('hp', 'max_hp', 'ai', 'ai_speed', 'tag', 'scroll_id',
+                    'swole', 'edit_immune', 'drops', 'group')
+_ENTITY_INT_FIELDS  = ('hp', 'max_hp', 'ai_speed')
+_ENTITY_BOOL_FIELDS = ('swole', 'edit_immune')
+
+
+def _entity_field(ent, field: str, raw: str) -> str:
+    """Set one `:entity` field from its typed text. Returns '' or the complaint.
+
+    Typed rather than assigned blind: `hp=lots` would otherwise store the string
+    'lots' on a dataclass that never type-checks it, and the level would build,
+    export, publish, and only fall over when something tried to subtract from it.
+    """
+    if field in _ENTITY_INT_FIELDS:
+        if not raw.lstrip('-').isdigit():
+            return f'{field} wants a number, got {raw!r}'
+        setattr(ent, field, int(raw))
+    elif field in _ENTITY_BOOL_FIELDS:
+        if raw.lower() not in ('true', 'false', '1', '0', 'yes', 'no'):
+            return f'{field} wants true or false, got {raw!r}'
+        setattr(ent, field, raw.lower() in ('true', '1', 'yes'))
+    elif field == 'drops':
+        if raw and raw.partition(':')[0] not in DROPPABLE:
+            return (f'nothing drops {raw!r} — try '
+                    + ', '.join(sorted(DROPPABLE)))
+        ent.drops = raw
+    else:
+        setattr(ent, field, raw)
+    return ''
+
+
+def _describe_entity(ent) -> str:
+    """`:entity?` — the creature under the cursor, and only what is true of it.
+
+    Every non-default field, none of the defaults. A dump of all fifteen would
+    bury `tag=gold` in a wall of `move_dir=1`, and the one thing an author opens
+    this for is to check the field they just set actually took."""
+    bits = [f'{f}={getattr(ent, f)}' for f in _ENTITY_SETTABLE
+            if getattr(ent, f) not in ('', 0, False, 1)]
+    return f'{ent.kind}' + (f'  {" ".join(bits)}' if bits else '  (defaults)')
+
+
+def _pick_entity(term: Terminal, iw: int, game_h: int) -> str:
+    """The palette, as a list you walk with j/k and choose with Enter.
+
+    A picker in a Vim-teaching game needs a defence, and it is this: the command
+    is the mechanism and the menu is a view of it. `:entity goblin tag=echo` is
+    the real interface, always available, recordable in a tape; this only answers
+    "what can I even place?", which is a question `:set` answers with a list too.
+    So it moves on j/k, leaves on Esc, and picking one just runs the command."""
+    BOX_IW = 62; BOX_BW = BOX_IW + 4
+    box_bg  = term.on_color_rgb(6, 8, 12)
+    edge    = box_bg + term.color_rgb(120, 170, 210) + term.bold
+    head    = term.color_rgb(190, 215, 240) + term.bold
+    body    = term.color_rgb(130, 150, 170)
+    pick    = term.color_rgb(255, 220, 60) + term.bold
+    rst     = term.normal
+    col_off = max(1, (iw + 2 - BOX_BW) // 2)
+    kinds   = list(_ENTITY_PALETTE)
+    sel     = 0
+
+    def row(vis, colored):
+        return (edge + '║ ' + rst + box_bg + colored +
+                box_bg + ' ' * max(0, BOX_IW - vis) + edge + ' ║' + rst)
+
+    sep_h = '═' * (BOX_IW + 2)
+    while True:
+        lines = [edge + '╔' + sep_h + '╗' + rst, row(0, '')]
+        lines.append(row(BOX_IW, head + ' place an entity' + box_bg
+                         + ' ' * (BOX_IW - 16)))
+        lines.append(row(0, ''))
+        for i, k in enumerate(kinds):
+            _, note, _flds = _ENTITY_PALETTE[k]
+            text = f' {k:<16}{note}'[:BOX_IW]
+            lines.append(row(len(text), (pick if i == sel else body) + text))
+        lines.append(row(0, ''))
+        foot = ' j/k move   ⏎ place here   Esc cancel'
+        lines.append(row(len(foot), body + foot))
+        lines.append(row(0, ''))
+        lines.append(edge + '╚' + sep_h + '╝' + rst)
+        row_off = 3 + max(0, (game_h - len(lines)) // 2)
+        for i, line in enumerate(lines):
+            print(term.move_yx(row_off + i, col_off) + line, end='', flush=True)
+
+        key = term.inkey()
+        raw = str(key) if not key.is_sequence else ''
+        if key.name == 'KEY_ESCAPE':
+            return ''
+        if key.name == 'KEY_ENTER' or raw in ('\n', '\r'):
+            return kinds[sel]
+        if raw == 'j' or key.name == 'KEY_DOWN':
+            sel = (sel + 1) % len(kinds)
+        elif raw == 'k' or key.name == 'KEY_UP':
+            sel = (sel - 1) % len(kinds)
 
 
 def _render_standard_scroll(term: Terminal, iw: int, game_h: int, content: dict,
@@ -1609,6 +1745,143 @@ def _inscription_halls_tick(room, player) -> list:
                         'a wall grinds open!')
         elif not written(word) and is_open and (player.row, player.col) != (gr, gc):
             room.cells[gr][gc] = CellType.WALL     # undone — the wall re-bars
+    return msgs
+
+
+def _drop_spec(ent) -> tuple:
+    """`drops` parsed: ('floor_key', 'gold') from 'floor_key:gold'. ('', '') if
+    the field is empty or names something outside `world.DROPPABLE` — the runtime
+    honours the same allowlist the validator enforces, so a file that slipped past
+    an older validator still cannot hatch anything here."""
+    kind, _, tag = (ent.drops or '').partition(':')
+    return (kind, tag) if kind in DROPPABLE else ('', '')
+
+
+def _drop_tick(room, player) -> list:
+    """Leave behind what the dead were carrying — the generic form of a rule the
+    game had written twice, incompatibly.
+
+    `_on_kill` had a literal `level == 'goblin_gauntlet'` branch, which only fires
+    on `x` combat: a goblin cut down with `dw` dropped nothing, because an editing
+    delete never reaches that hook. The Operator's Vault did it the durable way
+    instead — a per-turn tick recomputed from who is alive right now. This is that
+    way, generalised off goblins and out of the level table, so an author can hang
+    a drop on a zombie, a wanderer or a Warden with the same field.
+
+    STATELESS, hence undo-safe (the vault-tick principle): the drop is a statement
+    about the current roster, not an event that fired. Undo revives the creature
+    and takes its snapshot of the room back — the key goes with it — and re-killing
+    lays the key down again. Nothing is remembered, so nothing can desync.
+
+    A `group` makes the drop conditional on the WHOLE group being down; without
+    one, each creature answers for itself. The landing cell is the dead members'
+    own positions in (row, col) order, which is derived from the file rather than
+    from whichever one happened to die last — so the key falls in the same place
+    for every player, and in the same place after an undo.
+    """
+    msgs = []
+    carriers = [e for e in room.entities if _drop_spec(e)[0]]
+    if not carriers:
+        return msgs
+    held = _held_key(player)
+    held_tag = held.get('tag', '') if held is not None else None
+    groups: dict = {}
+    for e in carriers:
+        groups.setdefault((e.group or f'#{e.row},{e.col}'), []).append(e)
+
+    for members in groups.values():
+        if any(e.alive for e in members):
+            continue
+        kind, tag = _drop_spec(members[0])
+        # Already lying about, or in the player's hands? Then it has been dropped
+        # and this tick has nothing to say. Checking the world instead of a flag
+        # is what makes the whole thing undo-proof.
+        if any(e.alive and e.kind == kind and e.tag == tag for e in room.entities):
+            continue
+        if kind == 'floor_key' and held_tag == tag:
+            continue
+        for e in sorted(members, key=lambda e: (e.row, e.col)):
+            if not room.entity_at(e.row, e.col):
+                room.add_entity(Entity(kind=kind, row=e.row, col=e.col, tag=tag))
+                msgs.append(_DROP_BANNER.get(kind, 'Something falls from the fallen.'))
+                break
+    return msgs
+
+
+#: What the room says when a drop lands. Keyed by kind so the line describes the
+#: THING, not the level — an author gets the right sentence without writing one.
+_DROP_BANNER = {
+    'floor_key':       'The last of them falls — a key clatters to the floor.  🗝',
+    'chest':           'The last of them falls, and a chest is left standing.',
+    'chest_key':       'The last of them falls, and a chest is left standing.',
+    'heart_container': 'The last of them falls — something quick and red is left behind.',
+    'gold':            'The last of them falls, and coin spills across the stone.',
+    'dynamite':        'The last of them falls, and drops what it was going to use.',
+}
+
+
+def _seal_region_text(room, seal) -> str:
+    """The text standing in a seal's region, whitespace-normalised.
+
+    FLOOR and CORRIDOR cells only — the same restriction every hardcoded
+    text-match door in the game already applies, and for the same reason: the
+    target word is usually written on a plaque set into the wall beside the door,
+    and a scan that read the wall would find the door already satisfied by its own
+    label. An author who selects a strip that happens to include a plaque gets the
+    behaviour they wanted without knowing why.
+    """
+    r1, c1, r2, c2 = seal.region
+    out = []
+    for r in range(max(0, r1), min(room.rows, r2 + 1)):
+        line = [' '] * room.cols
+        for ru in room._char_runs_by_row.get(r, []):
+            for k, sym in enumerate(ru.symbols):
+                c = ru.col + k
+                if 0 <= c < room.cols and room.cells[r][c] in _WM_FLOORS:
+                    line[c] = sym
+        out.append(''.join(line[max(0, c1):c2 + 1]))
+    return ' '.join(' '.join(t.split()) for t in out).strip()
+
+
+def _seal_reads_true(room, seal) -> bool:
+    want = ' '.join(seal.match.split())
+    have = _seal_region_text(room, seal)
+    return (want in have) if seal.mode == 'contains' else (have == want)
+
+
+def _seal_tick(room, player) -> list:
+    """The declarative text-match doors (`room.seals`) — the plaque rule, made
+    into data.
+
+    Identical in law to `_whole_line_annex_tick` and its four siblings, and
+    deliberately so: a bolt stands open exactly while its region reads true, and
+    is re-barred the instant it does not. What changed is only where the rule
+    comes from — a `Seal` an author declared, rather than a tuple a builder
+    hardcoded. No-ops on a room with no seals, which is every shipped level.
+    """
+    msgs = []
+    if not room.seals:
+        return msgs
+    # Band every seal cell so a shut bolt reads as stonework rather than blank
+    # wall. Derived each tick, never authoritative — see Room.sealed_cells.
+    room.sealed_cells = {(r, c) for s in room.seals for (r, c) in s.opens}
+    for seal in room.seals:
+        true_now = _seal_reads_true(room, seal)
+        opened  = False
+        for (r, c) in seal.opens:
+            if not (0 <= r < room.rows and 0 <= c < room.cols):
+                continue
+            is_open = room.cells[r][c] != CellType.WALL
+            if true_now and not is_open:
+                room.cells[r][c] = CellType.FLOOR
+                opened = True          # ONE banner per seal, however wide the door
+            elif not true_now and is_open and (player.row, player.col) != (r, c):
+                # Never re-wall the cell the player is standing in: the annex
+                # doors have carried this guard since they were written, because
+                # sealing someone inside stone is not a puzzle, it is a crash.
+                room.cells[r][c] = CellType.WALL
+        if opened:
+            msgs.append('The words read true — a bolt grinds back!')
     return msgs
 
 
@@ -4506,6 +4779,14 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
         open the instant their text READS TRUE) and surface their messages. Called
         both in the per-turn dispatch AND on leaving INSERT/REPLACE (Esc), so an
         edit that completes a gate opens it THIS turn — no one-Normal-action lag."""
+        # The two DECLARATIVE gates run for every level, shipped or downloaded:
+        # they are driven by fields on the room, so they no-op unless something
+        # placed them. Every rule below this pair is slug-keyed because it was
+        # written before there was a way to say it in a file.
+        for _m in _drop_tick(room, player):
+            _push(_m)
+        for _m in _seal_tick(room, player):
+            _push(_m)
         if level == 'cipher_cell':
             for _m in _cipher_cell_tick(room, player):
                 _push(_m)
@@ -5566,34 +5847,80 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
                         _merge_adjacent_char_runs(room, r)
                         _push(f'Placed {kind} rune.')
 
-                elif cmd.startswith('entity ') and edit_mode and player_name == 'admin':
-                    _ENTITY_PRESETS = {
-                        'exit':         dict(hp=1, alive=True),
-                        'door':         dict(hp=1, alive=True),
-                        'locked_door':  dict(hp=1, alive=True),
-                        'chest':        dict(hp=1, alive=True),
-                        'chest_key':    dict(hp=1, alive=True),
-                        'chest_scroll': dict(hp=1, alive=True),
-                        'dynamite':     dict(hp=1, alive=True),
-                        'wanderer':     dict(hp=1, alive=True, max_hp=1, ai='chase', ai_speed=2),
-                        'goblin':       dict(hp=1, alive=True, max_hp=1, ai='chase', ai_speed=1),
-                        'warden':       dict(hp=5, alive=True, max_hp=5, ai='',      ai_speed=1),
-                    }
-                    kind = cmd[7:].strip().lower()
-                    if kind not in _ENTITY_PRESETS:
-                        kinds_str = '|'.join(_ENTITY_PRESETS)
-                        _push(f'Unknown entity kind: {kind}  ({kinds_str})')
-                    else:
-                        r, c = player.row, player.col
-                        ed_undo.append(_ed_snapshot(room, player))
-                        ed_redo.clear()
-                        existing = room.entity_at(r, c)
-                        if existing:
-                            room.entities.remove(existing)
+                elif (cmd.rstrip('?!') == 'entity' or cmd.startswith('entity ')) \
+                        and edit_mode and player_name == 'admin':
+                    # `:entity` is `:set`, applied to the cell under the cursor:
+                    #
+                    #   :entity goblin tag=echo hp=3   place, configured
+                    #   :entity tag=gold               retune what is already here
+                    #   :entity?                       what is here, non-defaults only
+                    #   :entity!                       remove it
+                    #   :entity                        the palette, as a picker
+                    #
+                    # Same read/write/clear split the forge's metadata commands
+                    # already use, and the same one the game teaches at the
+                    # Archivist's Library — so the authoring bench is not a
+                    # second language bolted onto a Vim game.
+                    _r, _c = player.row, player.col
+                    _here  = room.entity_at(_r, _c)
+                    _bare  = cmd.rstrip('?!') == 'entity'
+                    _toks  = cmd[7:].split()
+                    if _bare and cmd.endswith('?'):
+                        _push(_describe_entity(_here) if _here
+                              else 'Nothing here.')
+                    elif _bare and cmd.endswith('!'):
+                        if _here is None:
+                            _push('Nothing here to remove.')
+                        else:
+                            ed_undo.append(_ed_snapshot(room, player))
+                            ed_redo.clear()
+                            room.entities.remove(_here)
                             room.rebuild_indexes()
-                        room.add_entity(Entity(kind=kind, row=r, col=c,
-                                               **_ENTITY_PRESETS[kind]))
-                        _push(f'Placed {kind}.')
+                            _push(f'Removed {_here.kind}.')
+                    else:
+                        # A bare `:entity` opens the palette. It is a question
+                        # ("what can I place?"), and a list is the answer — but
+                        # the answer is delivered by running the command, so
+                        # nothing here is reachable only through the menu.
+                        _kind = ''
+                        if _bare:
+                            _kind = _pick_entity(term, _iw(term), term.height - 8)
+                            if not _kind:
+                                _push('')
+                        elif '=' not in _toks[0]:
+                            _kind = _toks[0].lower()
+                            _toks = _toks[1:]
+                        if _bare and not _kind:
+                            pass                      # cancelled out of the picker
+                        elif _kind and _kind not in _ENTITY_PALETTE:
+                            _push(f'Unknown entity kind: {_kind}  '
+                                  f'({"|".join(_ENTITY_PALETTE)})')
+                        elif not _kind and _here is None:
+                            _push('Nothing here to change — name a kind '
+                                  'to place one (:entity for the list).')
+                        else:
+                            ed_undo.append(_ed_snapshot(room, player))
+                            ed_redo.clear()
+                            if _kind:
+                                if _here is not None:
+                                    room.entities.remove(_here)
+                                    room.rebuild_indexes()
+                                _here = Entity(kind=_kind, row=_r, col=_c,
+                                               **_ENTITY_PALETTE[_kind][0])
+                                room.add_entity(_here)
+                            _bad = []
+                            for _t in _toks:
+                                _f, _eq, _v = _t.partition('=')
+                                if not _eq or _f not in _ENTITY_SETTABLE:
+                                    _bad.append(f'{_t} (try '
+                                                f'{"/".join(_ENTITY_SETTABLE)})')
+                                    continue
+                                _why = _entity_field(_here, _f, _v)
+                                if _why:
+                                    _bad.append(_why)
+                            _push('; '.join(_bad) if _bad
+                                  else f'{"Placed" if _kind else "Set"}: '
+                                       f'{_describe_entity(_here)}')
 
                 # ── The forge: authoring a shareable level ────────────────────
                 # These only exist when a DRAFT is open. Everything they touch is
@@ -5684,6 +6011,96 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
                         _draft.level.char_runs = list(_draft.level.char_runs) + _kept
                         _forge_rebuild()
                         _push(f'Fill dropped — its {len(_kept)} word(s) are yours to edit now.')
+
+                elif _draft is not None and edit_mode and (
+                        cmd.rstrip('?!') == 'seal' or cmd.startswith('seal ')):
+                    # `:seal <text>` over the last VISUAL selection arms a
+                    # text-match door: while that region reads <text>, the cells
+                    # you then `:bolt` stand open. Two commands, because the
+                    # condition and the door are in two different places and no
+                    # single gesture can point at both — the selection says where
+                    # to read, the cursor says what to open.
+                    #
+                    # A leading `*` means "somewhere in the region" rather than
+                    # "the region reads exactly this" — the glob sense it has
+                    # everywhere else. Write a literal one as `\*`.
+                    _a, _b = player.last_visual_anchor, player.last_visual_cursor
+                    _txt = cmd[5:].strip()
+                    if cmd.rstrip('?!') == 'seal' and cmd.endswith('?'):
+                        _ss = list(getattr(room, 'seals', ()))
+                        _push('; '.join(
+                            f'{s.match!r} @ ' + ' '.join(f'{r},{c}' for r, c in s.opens)
+                            + ('' if s.mode == 'exact' else ' (contains)')
+                            for s in _ss) or 'No seals in this level.')
+                    elif cmd.rstrip('?!') == 'seal' and cmd.endswith('!'):
+                        _ss = [s for s in getattr(room, 'seals', ())
+                               if (player.row, player.col) in s.opens]
+                        if not _ss:
+                            _push('No seal bolts this cell.')
+                        else:
+                            DRAFT.sync(_draft, room)
+                            for _s in _ss:
+                                _draft.level.seals.remove(_s)
+                            _forge_rebuild()
+                            _push(f'Seal removed — {len(_ss)} condition(s) gone.')
+                    elif not _txt:
+                        _push('Select the region in VISUAL, then '
+                              ':seal <the text it must read>.')
+                    elif _a is None or _b is None:
+                        _push('Select the region in VISUAL first, then :seal <text>.')
+                    else:
+                        _mode = 'exact'
+                        if _txt.startswith('*'):
+                            _mode, _txt = 'contains', _txt[1:].strip()
+                        elif _txt.startswith('\\*'):
+                            _txt = _txt[1:]
+                        if player.last_visual_mode == Mode.VISUAL_LINE:
+                            _c1, _c2 = 0, room.cols - 1   # V means the whole row
+                        else:
+                            _c1, _c2 = min(_a[1], _b[1]), max(_a[1], _b[1])
+                        _draft._pending_seal = (
+                            (min(_a[0], _b[0]), _c1, max(_a[0], _b[0]), _c2),
+                            _txt, _mode)
+                        _push(f'Seal armed on rows {min(_a[0], _b[0])}-'
+                              f'{max(_a[0], _b[0])}, cols {_c1}-{_c2} — '
+                              f'stand on the door and :bolt.')
+
+                elif _draft is not None and edit_mode and cmd == 'bolt':
+                    # Attach the cursor cell to the armed seal. Repeatable, so a
+                    # three-cell gate is three :bolts and not a syntax for ranges
+                    # nobody would remember.
+                    _pend = getattr(_draft, '_pending_seal', None)
+                    if _pend is None:
+                        _push('Nothing armed — :seal <text> over a selection first.')
+                    else:
+                        _reg, _txt, _mode = _pend
+                        _r1, _c1, _r2, _c2 = _reg
+                        if (_r1 <= player.row <= _r2 and _c1 <= player.col <= _c2):
+                            # See the validator: a door inside its own condition
+                            # opens, becomes walkable, gets written on, and then
+                            # re-shuts on whatever was written. Catch it here so
+                            # the author hears it while they can see both.
+                            _push('That cell is inside the seal\'s own region — '
+                                  'a door cannot be part of the text that opens it.')
+                        else:
+                            DRAFT.sync(_draft, room)
+                            _old = [s for s in _draft.level.seals
+                                    if (s.region, s.match, s.mode) == (_reg, _txt, _mode)]
+                            _cells = tuple(_old[0].opens) if _old else ()
+                            if _old:
+                                _draft.level.seals.remove(_old[0])
+                            _new = Seal(region=_reg, match=_txt, mode=_mode,
+                                        opens=_cells + ((player.row, player.col),))
+                            _draft.level.seals.append(_new)
+                            _err = _forge_rebuild()
+                            if _err:
+                                _draft.level.seals.remove(_new)
+                                _push(f'Bolt refused — {_err}')
+                            else:
+                                _push(f'Bolted: {len(_new.opens)} cell(s) open while '
+                                      f'that region reads {_txt!r}'
+                                      + ('' if _mode == 'exact' else ' (anywhere in it)')
+                                      + '.')
 
                 elif (_draft is not None and edit_mode
                       and cmd.partition(' ')[0].rstrip('?!') in _FORGE_META):

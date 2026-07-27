@@ -530,3 +530,244 @@ def test_an_empty_vocabulary_still_says_so_plainly():
     from sharing import vocab
     with pytest.raises(ValueError, match='declares no `vocabulary` block'):
         vocab.words('custom', 4, random.Random(1), {})
+
+
+# ── Entities as data: `drops`, `group`, and the `:set`-style :entity ───────────
+
+def _room_with(*ents, rows=5, cols=12):
+    """A tiny built room carrying the given entity specs."""
+    lvl = _tiny()
+    lvl.rows, lvl.cols = rows, cols
+    lvl.cells = [f'{cols}W'] + [f'W{cols - 2}FW'] * (rows - 2) + [f'{cols}W']
+    lvl.exit = (1, cols - 2)
+    lvl.entities = list(ents)
+    return F.build(lvl).room
+
+
+def _player_at(row, col):
+    from engine.player import Player
+    return Player(row=row, col=col)
+
+
+def test_a_single_creature_drops_what_it_carries():
+    """`drops` is a field on the creature, not a rule about goblins — the game
+    had this twice before (a `level == 'goblin_gauntlet'` branch and the vault's
+    tick) and could express it in a level file zero times."""
+    import main
+    room = _room_with({'kind': 'goblin', 'at': [1, 3], 'drops': 'floor_key:gold'})
+    gob  = room.entity_at(1, 3)
+    assert not main._drop_tick(room, _player_at(1, 1))      # alive: nothing yet
+    room.kill_entity(gob)
+    assert main._drop_tick(room, _player_at(1, 1))
+    key = room.entity_at(1, 3)
+    assert (key.kind, key.tag) == ('floor_key', 'gold')
+
+
+def test_the_drop_waits_for_the_last_of_a_group():
+    import main
+    room = _room_with({'kind': 'goblin', 'at': [1, 3], 'group': 'patrol',
+                       'drops': 'floor_key'},
+                      {'kind': 'goblin', 'at': [1, 5], 'group': 'patrol',
+                       'drops': 'floor_key'})
+    room.kill_entity(room.entity_at(1, 5))
+    main._drop_tick(room, _player_at(1, 1))
+    assert not [e for e in room.entities if e.kind == 'floor_key' and e.alive]
+    room.kill_entity(room.entity_at(1, 3))
+    main._drop_tick(room, _player_at(1, 1))
+    keys = [e for e in room.entities if e.kind == 'floor_key' and e.alive]
+    # ONE key, at the group's lowest (row, col) — derived from the file, so it
+    # lands in the same cell for every player and after every undo, rather than
+    # wherever the last one happened to be standing.
+    assert [(e.row, e.col) for e in keys] == [(1, 3)]
+
+
+def test_the_drop_is_a_reading_not_an_event():
+    """The whole reason it is a tick: it may run any number of times and must
+    say the same thing, because that is what makes undo safe."""
+    import main
+    room = _room_with({'kind': 'goblin', 'at': [1, 3], 'drops': 'floor_key'})
+    room.kill_entity(room.entity_at(1, 3))
+    for _ in range(4):
+        main._drop_tick(room, _player_at(1, 1))
+    assert len([e for e in room.entities if e.kind == 'floor_key' and e.alive]) == 1
+
+
+def test_a_creature_cannot_drop_a_creature():
+    """`drops` is the one field that CREATES an entity at runtime, so it is the
+    one field a downloaded file could use to hatch something nobody counted."""
+    import main
+    from sharing import validate as V
+    room = _room_with({'kind': 'goblin', 'at': [1, 3], 'drops': 'warden'})
+    room.kill_entity(room.entity_at(1, 3))
+    main._drop_tick(room, _player_at(1, 1))
+    assert not [e for e in room.entities if e.kind == 'warden']
+
+    lvl = _tiny()
+    lvl.entities = [{'kind': 'goblin', 'at': [2, 3], 'drops': 'warden'}]
+    rep = V.validate(lvl)
+    assert not rep.ok and any('drops' in e for e in rep.errors)
+
+
+def test_drops_and_group_survive_the_file():
+    lvl = _tiny()
+    lvl.entities = [{'kind': 'goblin', 'at': [2, 3], 'drops': 'floor_key:red',
+                     'group': 'patrol'}]
+    back = F.loads(F.dumps(lvl))
+    room = F.build(back).room
+    assert (room.entity_at(2, 3).drops, room.entity_at(2, 3).group) \
+        == ('floor_key:red', 'patrol')
+
+
+def test_entity_places_with_its_fields_set():
+    """`:entity kind field=value` — the `:set` form. Before this the command
+    placed a canned preset and there was no way to set `tag` at all, which meant
+    coloured keys and coloured doors were unreachable from the forge despite
+    working perfectly in the engine."""
+    d = DRAFT.new('Probe', rows=8, cols=30)
+    _forge_session(d, 'jl:entity goblin tag=echo hp=3 drops=floor_key:gold\r:w\r:q!\r')
+    ent = [e for e in d.level.entities if e['kind'] == 'goblin'][0]
+    assert (ent['tag'], ent['hp'], ent['drops']) == ('echo', 3, 'floor_key:gold')
+
+
+def test_entity_retunes_what_is_already_there():
+    d = DRAFT.new('Probe', rows=8, cols=30)
+    _forge_session(d, 'jl:entity locked_door\r:entity tag=gold\r:w\r:q!\r')
+    ent = [e for e in d.level.entities if e['kind'] == 'locked_door'][0]
+    assert ent['tag'] == 'gold'
+
+
+def test_entity_bang_removes_and_entity_refuses_a_bad_field():
+    d = DRAFT.new('Probe', rows=8, cols=30)
+    _forge_session(d, 'jl:entity goblin hp=lots\r:w\r:q!\r')
+    gob = [e for e in d.level.entities if e['kind'] == 'goblin']
+    assert gob and gob[0]['hp'] == 1, 'a bad value must not be stored'
+    _forge_session(d, 'jl:entity!\r:w\r:q!\r')
+    assert not [e for e in d.level.entities if e['kind'] == 'goblin']
+
+
+# ── Sealed doors: a text-match condition an author can declare ────────────────
+
+def _sealed(match='open sesame', mode='exact', opens=((2, 8),), text='open sesame'):
+    lvl = _tiny()
+    lvl.rows, lvl.cols = 5, 16
+    lvl.cells = ['16W', 'W14FW', 'W14FW', 'W14FW', '16W']
+    lvl.exit  = (3, 14)
+    lvl.seals = [F.Seal(region=(1, 1, 1, 12), match=match, mode=mode, opens=opens)]
+    if text:
+        lvl.char_runs = [{'row': 1, 'col': 1, 'symbols': list(text), 'kind': 'ancient'}]
+    return lvl
+
+
+def test_a_seal_stands_open_exactly_while_its_region_reads_true():
+    import main
+    room = F.build(_sealed()).room
+    p = _player_at(3, 1)
+    main._seal_tick(room, p)
+    assert room.cells[2][8] == CellType.FLOOR
+    # …and re-shuts the moment it does not. This is the undo story: undo restores
+    # the text, the tick re-reads it, and the door answers for what is there NOW.
+    room.remove_char_run(room.char_run_at(1, 1))
+    main._seal_tick(room, p)
+    assert room.cells[2][8] == CellType.WALL
+
+
+def test_exact_means_exact_and_contains_is_opt_in():
+    import main
+    p = _player_at(3, 1)
+    near = F.build(_sealed(match='sesame', text='open sesame')).room
+    main._seal_tick(near, p)
+    assert near.cells[2][8] == CellType.WALL, 'exact must not match a substring'
+
+    loose = F.build(_sealed(match='sesame', mode='contains',
+                            text='open sesame')).room
+    main._seal_tick(loose, p)
+    assert loose.cells[2][8] == CellType.FLOOR
+
+
+def test_a_seal_ships_shut_however_the_grid_was_saved():
+    """An author tests their door, it opens, they save — and `cells` records the
+    open cell as floor. Without re-shutting on both ends the level would arrive
+    with its puzzle already solved."""
+    lvl = _sealed()
+    lvl.cells = ['16W', 'W14FW', 'W14FW', 'W14FW', '16W']   # (2,8) is FLOOR here
+    room = F.build(lvl).room
+    assert room.cells[2][8] == CellType.WALL
+
+    # …and the export side holds the same line INDEPENDENTLY — asserted on the
+    # written grid, not on a rebuild, because `build` re-shuts them too and would
+    # cover for an export that wrote the door out standing open.
+    room.cells[2][8] = CellType.FLOOR
+    back = F.from_room(room, 'X', seals=list(room.seals))
+    assert F.expand_row(back.cells[2], back.cols, 2)[8] == CellType.WALL
+
+
+def test_a_seal_never_walls_the_player_in():
+    import main
+    room = F.build(_sealed()).room
+    main._seal_tick(room, _player_at(3, 1))
+    room.remove_char_run(room.char_run_at(1, 1))
+    main._seal_tick(room, _player_at(2, 8))          # standing in the doorway
+    assert room.cells[2][8] == CellType.FLOOR
+
+
+def test_a_seal_reads_only_walkable_stone():
+    """Every hardcoded text-match door in the game already ignores wall cells,
+    because the target word is usually on a plaque set into the wall beside the
+    door — and a scan that read the wall would find the door opened by its own
+    label."""
+    import main
+    lvl = _sealed(text='')
+    lvl.cells = ['16W', '16W', 'W14FW', 'W14FW', '16W']   # row 1 is solid stone
+    lvl.char_runs = [{'row': 1, 'col': 1, 'symbols': list('open sesame'),
+                      'kind': 'verdant'}]
+    room = F.build(lvl).room
+    assert room.cells[1][1] == CellType.WALL
+    main._seal_tick(room, _player_at(3, 1))
+    assert room.cells[2][8] == CellType.WALL
+
+    # …and the same words on walkable stone DO open it, so the assertion above
+    # is about the wall and not about the words being wrong.
+    lvl.cells = ['16W', 'W14FW', 'W14FW', 'W14FW', '16W']
+    ok = F.build(lvl).room
+    main._seal_tick(ok, _player_at(3, 1))
+    assert ok.cells[2][8] == CellType.FLOOR
+
+
+def test_a_door_cannot_be_part_of_the_text_that_opens_it():
+    from sharing import validate as V
+    lvl = _sealed(opens=((1, 3),))               # inside region (1,1)-(1,6)
+    rep = V.validate(lvl)
+    assert not rep.ok and any('inside' in e for e in rep.errors)
+
+
+def test_seals_survive_the_file():
+    lvl = _sealed(mode='contains', opens=((2, 8), (2, 9)))
+    back = F.loads(F.dumps(lvl))
+    assert back.seals == lvl.seals
+
+
+def test_the_forge_arms_a_seal_and_bolts_it():
+    """`:seal <text>` over a selection, then `:bolt` on the door. Two commands
+    because the condition and the door are in two places at once."""
+    d = DRAFT.new('Probe', rows=8, cols=30)
+    _forge_session(d, 'jv' + 'l' * 6 + T.ESC
+                      + 'jjlll:seal open sesame\r:bolt\r:w\r:q!\r')
+    assert len(d.level.seals) == 1
+    s = d.level.seals[0]
+    assert (s.match, s.mode, s.region[0], s.opens) == ('open sesame', 'exact', 2,
+                                                       ((4, 4),))
+
+
+def test_a_star_arms_the_looser_reading():
+    d = DRAFT.new('Probe', rows=8, cols=30)
+    _forge_session(d, 'jv' + 'l' * 6 + T.ESC
+                      + 'jjlll:seal *sesame\r:bolt\r:w\r:q!\r')
+    assert (d.level.seals[0].match, d.level.seals[0].mode) == ('sesame', 'contains')
+
+
+def test_bolting_twice_widens_one_door_rather_than_making_two():
+    d = DRAFT.new('Probe', rows=8, cols=30)
+    _forge_session(d, 'jv' + 'l' * 6 + T.ESC
+                      + 'jjlll:seal open sesame\r:bolt\rl:bolt\r:w\r:q!\r')
+    assert len(d.level.seals) == 1
+    assert d.level.seals[0].opens == ((4, 4), (4, 5))

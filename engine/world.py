@@ -40,6 +40,44 @@ class RoomType(Enum):
     BOSS    = auto()
     EXIT    = auto()
 
+#: Kinds an authored `Entity.drops` may name. A level file is data and stays data,
+#: but `drops` is the one field that CREATES an entity at runtime, so it is the one
+#: field where an allowlist earns its keep: without it a downloaded level could set
+#: `drops='warden'` on a goblin and hatch a boss the validator never counted. Loot
+#: only — nothing here moves, fights, or blocks a path. Lives beside the field it
+#: governs so the runtime and the validator can never be reading different lists.
+DROPPABLE = frozenset({'floor_key', 'chest', 'chest_key', 'heart_container',
+                       'gold', 'dynamite'})
+
+
+@dataclass(frozen=True)
+class Seal:
+    """A door held shut until a region of the buffer READS a particular way.
+
+    Vimny already had five of these — the Cipher Cell, the Echo Vault, the
+    Inscription Halls and the two `_wla_doors` families — and every one was a
+    tuple of coordinates a builder hardcoded onto the room, driven by its own
+    bespoke tick. Same rule five times, expressible in a level file zero times.
+    This is that rule, named once, so an author can declare it as data.
+
+    The law all five obeyed and this one keeps: a seal is **recomputed from the
+    buffer every turn and never remembered**. Opening is not an event that fires;
+    it is a reading that happens to be true right now. That is the whole reason
+    `u` re-shuts a door instead of leaving a level permanently solved by an edit
+    the player took back.
+    """
+    region: tuple      # (r1, c1, r2, c2) — the cells whose text is read
+    match:  str        # the text that must be there
+    opens:  tuple      # ((row, col), ...) — cells that stand FLOOR while it reads true
+    mode:   str = 'exact'   # 'exact': the region reads exactly `match` (stripped).
+                            # 'contains': `match` appears somewhere in it — the looser
+                            # rule the shipped annex doors use. Exact is the default
+                            # because an author who selected a strip and typed a
+                            # password means that strip, and a door that also opens
+                            # on a longer string containing the password is a
+                            # surprise they did not ask for.
+
+
 @dataclass
 class Entity:
     kind: str           # 'wanderer', 'guard', 'chest', 'exit', etc.
@@ -67,6 +105,14 @@ class Entity:
                             # only by normal-mode x. See engine/visual + The Warden Pathfinder.
     shade:        int = 0   # cosmetic colour index — the impostor Wardens (goblin tag='echo')
                             # each pick a slightly different red so the player sees a myriad.
+    drops:        str = ''  # what this leaves behind when it dies: a kind, optionally
+                            # 'kind:tag' ('floor_key:gold'). A FIELD, not a rule about
+                            # goblins — a zombie, a wanderer or a warden drops the same
+                            # way, because the drop belongs to the creature an author
+                            # placed and not to the level it was placed in.
+    group:        str = ''  # drop-group id. With it set, the drop is left only when the
+                            # LAST live member of the group dies — "kill the whole patrol
+                            # and the key falls". Empty = each creature drops for itself.
 
 
 def clone_entity(e: Entity, fresh_uid: bool = False, **overrides) -> Entity:
@@ -163,6 +209,12 @@ class Room:
                                                               # a subset of fog_cells that reveal
                                                               # floods neither cross nor clear
                                                               # (immutable per level — no snapshot)
+    seals: tuple                = ()     # Seal objects — declarative text-match doors.
+                                         # Empty for every shipped level today; the
+                                         # five hardcoded families keep their own ticks
+                                         # until they are worth porting. Driven by
+                                         # `_seal_tick`, which no-ops on an empty tuple,
+                                         # so carrying it costs nothing.
     passable_walls: bool        = False  # if True, walls are walkable (editor mode)
     answer: str                 = ''     # keystroke solution shown to admin
     answer_pos: int             = 0      # non-space chars of answer consumed by admin

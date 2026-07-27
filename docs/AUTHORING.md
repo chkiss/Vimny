@@ -32,6 +32,9 @@ they always have, plus the level's own properties:
 | `:spawn` / `:exit` | put the spawn or the exit where you are standing |
 | `:fill <pool> [lo-hi] [spacing]` | fill the last VISUAL selection from a word pool |
 | `:fill!` | drop the fill under the cursor, keeping its words as text you own |
+| `:entity [kind] [field=value …]` | place or retune the entity under the cursor (`:entity` alone opens the palette; `:entity?` reads it back; `:entity!` removes it) |
+| `:seal <text>` | arm a text-match door on the last VISUAL selection |
+| `:bolt` | make the cell you are standing on open while that seal reads true |
 | `:name` `:author` `:teaches` `:requires` `:intro` `:alternate` `:vocab` | the metadata block |
 | `:meta` | what the draft currently claims |
 | `:record` | **play the level; the keys you press become the tape** |
@@ -155,8 +158,67 @@ every column after it and the level you tested is not the level that renders.
 ```
 
 Everything that makes a creature what it is travels with it — `hp`, `ai`,
-`tag`, `swole`, `edit_immune`. An exit entity is added at `geometry.exit`
-automatically if you do not place one.
+`tag`, `swole`, `edit_immune`, `drops`, `group`. An exit entity is added at
+`geometry.exit` automatically if you do not place one.
+
+**Colours pair on `tag`.** A `floor_key` tagged `gold` opens a `locked_door`
+tagged `gold` and nothing else; an untagged door takes any key. Pick up a key
+with `x` — it goes into the unnamed register — and open the door by pasting it
+there with `p`.
+
+**`drops` is what a creature leaves behind when it dies**, written `kind` or
+`kind:tag`. It is a field on the creature, not a rule about goblins, so a
+zombie, a wanderer or a Warden all drop the same way. Only loot may be
+dropped — `floor_key`, `chest`, `chest_key`, `heart_container`, `gold`,
+`dynamite` — because `drops` is the one field in the format that creates
+something at runtime, and a level should not be able to hatch a boss the
+validator never counted.
+
+**`group` makes the drop wait for the whole group.** Give several creatures the
+same `group` and the drop lands only when the last of them falls, in the
+lowest-numbered member's cell:
+
+```json
+{"kind": "goblin", "at": [4, 20], "hp": 2, "ai": "chase",
+ "group": "patrol", "drops": "floor_key:gold"}
+```
+
+In the forge that is `:entity goblin group=patrol drops=floor_key:gold`. The
+drop is recomputed every turn from who is alive right now, never remembered —
+so `u` revives the patrol and takes the key back, and it does not matter whether
+you killed them with `x` or cut them down with `dw`.
+
+### `seals` — a door held shut until the text reads right
+
+```json
+"seals": [
+  {"region": [2, 2, 2, 14], "match": "this password", "opens": [9, 40]}
+]
+```
+
+The cells in `opens` stand as floor exactly while the buffer inside `region`
+reads `match`, and turn back to stone the moment it does not. `opens` takes a
+single `[row, col]` or a list of them, so a three-cell gate is one seal.
+
+`mode` is `"exact"` by default: the region reads that text and nothing else.
+`"contains"` opts into the looser rule, where the text merely has to appear
+somewhere inside the region.
+
+Two things a seal deliberately will not do. It **only reads walkable stone** —
+text written in wall cells never counts, which is what lets you set the password
+on a plaque beside the door without the door opening itself. And a cell in
+`opens` may not lie inside its own `region`: a door that is part of the text
+that opens it becomes walkable, gets written on, and re-shuts on whatever was
+written. The validator refuses that one by name.
+
+Because it is a reading and not an event, **undo re-seals**. There is no state
+to get out of step, and a seal cell is always written to the file as stone
+however it happened to be standing when you saved.
+
+In the forge: select the strip in VISUAL, `:seal this password`, then stand on
+the door and `:bolt` (again for each further cell). `:seal *word` arms the
+looser `contains` reading — the glob sense of `*` — and `:seal!` removes the
+seal bolting the cell you are on.
 
 ### `requires` and `teaches`
 
