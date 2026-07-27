@@ -47,8 +47,8 @@ from engine.command_guard import (action_allowed as _action_allowed_raw,
                                   guard_message as _guard_message_raw,
                                   _MOTION_GUARD as _MOTION_GUARD_TABLE)
 from engine.world import (DROPPABLE, Entity, CellType, CharRun, Dungeon, Seal,
-                          canonical_kind, clone_entity, entity_letter,
-                          strike_disguise)
+                          SEAL_OPENED, canonical_kind, clone_entity,
+                          entity_letter, strike_disguise)
 from engine.motion import (apply_motion, _apply_esc, _reveal_from,
                            _first_non_blank_col, auto_fog_tick as _auto_fog_tick,
                            enforce_fog_law as _enforce_fog_law)
@@ -2260,32 +2260,59 @@ def _seal_region_text(room, seal) -> str:
     return ' '.join(' '.join(t.split()) for t in out).strip()
 
 
-def _seal_reads_true(room, seal) -> bool:
-    want = ' '.join(seal.match.split())
+def _seal_target_reads_true(room, seal, target, rows) -> bool:
+    """Does ONE of a seal's targets read true right now?"""
+    if seal.scope == 'anyrow':
+        # Row-agnostic on purpose: charwise edits do not shift rows, but `dd`,
+        # `J`, `o` and `p` all do, and a door that named a row number would be
+        # undone by the first line removed above it.
+        return (any(target in t for t in rows) if seal.mode == 'contains'
+                else any(t.strip() == target for t in rows))
+    want = ' '.join(target.split())
     have = _seal_region_text(room, seal)
     return (want in have) if seal.mode == 'contains' else (have == want)
 
 
-def _seal_tick(room, player) -> list:
-    """The declarative text-match doors (`room.seals`) — the plaque rule, made
-    into data.
+def _seal_reads_true(room, seal, truths=(), rows=None) -> bool:
+    """Every target reads true, AND every seal this one requires does too."""
+    if rows is None:
+        rows = [_wla_floor_text(room, r) for r in range(room.rows)]
+    if not all(_seal_target_reads_true(room, seal, t, rows) for t in seal.match):
+        return False
+    return all(truths[i] for i in seal.requires if i < len(truths))
 
-    Identical in law to `_whole_line_annex_tick` and its four siblings, and
-    deliberately so: a bolt stands open exactly while its region reads true, and
-    is re-barred the instant it does not. What changed is only where the rule
-    comes from — a `Seal` an author declared, rather than a tuple a builder
-    hardcoded. No-ops on a room with no seals, which is every shipped level.
+
+def _seal_cells(room, seal) -> tuple:
+    """Where a seal's door actually IS this turn — see `Seal.anchor`."""
+    if seal.anchor == 'exit_row' and room.exit_pos:
+        return tuple((room.exit_pos[0], c) for (_r, c) in seal.opens)
+    return seal.opens
+
+
+def _seal_tick(room, player) -> list:
+    """The text-match doors (`room.seals`) — the plaque rule, made into data.
+
+    This is the ONE tick behind every content gate that is a reading of the
+    buffer: the ten exact-text chassis levels, the seven substring-label ones,
+    and anything an author declares in a file. A bolt stands open exactly while
+    its seal reads true, and is re-barred the instant it does not. Seals are
+    evaluated in order so that a `requires` can only look backwards, which is
+    what makes the final seal a one-pass conjunction with no cycle to guard
+    against. No-ops on a room with no seals.
     """
     msgs = []
     if not room.seals:
         return msgs
+    rows = [_wla_floor_text(room, r) for r in range(room.rows)]
     # Band every seal cell so a shut bolt reads as stonework rather than blank
     # wall. Derived each tick, never authoritative — see Room.sealed_cells.
-    room.sealed_cells = {(r, c) for s in room.seals for (r, c) in s.opens}
+    room.sealed_cells = {rc for s in room.seals for rc in _seal_cells(room, s)}
+    truths = []
     for seal in room.seals:
-        true_now = _seal_reads_true(room, seal)
+        true_now = _seal_reads_true(room, seal, truths, rows)
+        truths.append(true_now)
         opened  = False
-        for (r, c) in seal.opens:
+        for (r, c) in _seal_cells(room, seal):
             if not (0 <= r < room.rows and 0 <= c < room.cols):
                 continue
             is_open = room.cells[r][c] != CellType.WALL
@@ -2298,7 +2325,7 @@ def _seal_tick(room, player) -> list:
                 # sealing someone inside stone is not a puzzle, it is a crash.
                 room.cells[r][c] = CellType.WALL
         if opened:
-            msgs.append('The words read true — a bolt grinds back!')
+            msgs.append(seal.message or SEAL_OPENED)
     return msgs
 
 
@@ -2315,63 +2342,19 @@ def _wla_floor_text(room, r: int) -> str:
     return ''.join(line)
 
 
-def _whole_line_annex_tick(room, player) -> list:
-    """The Change Annex bolts — the plaque rule, fifth member (Cipher mended,
-    Beacon copied, Echo repeated, the Halls authored, the Annex RELABELS): a
-    gate-row bolt stands open exactly while its plaque's word READS TRUE on the
-    floor. Whole-row substring scans on floor text only (shift-proof; the
-    plaques live in walls and never count). STATELESS, hence undo-safe (the
-    vault-tick principle): undoing a change re-bars its bolt.
+def _ce_y_plaque_tick(room, player) -> list:
+    """The Change Extension's Y hall: after `Yp` inserts the echo row, the row-
+    shift bumps the second-verse plaque down one; slide it back with the restore
+    twinkle (the Sculpting glitter, ported to the paste).
 
-    The exit is the FINAL SEAL — stone until every plaque reads true (built as
-    WALL; the renderer shows a sealed exit as plain stone). The bolts alone
-    used to bar the way, but `A` (learned at the Sculpting Chambers) builds
-    floor east of any standable cell and `o`/`O` fabricate fresh rows, so
-    "plain floor east of the bolts" is reachable by carving — the seal, not
-    the geometry, is what holds. Same diegesis as the sculpting vault door:
-    stone that opens on content, undo re-seals it."""
-    msgs = []
-    floor_rows = [_wla_floor_text(room, r) for r in range(room.rows)]
-
-    def written(target):
-        return any(target in t for t in floor_rows)
-
-    # The gate row is DERIVED from exit_pos each tick, not read from the door
-    # tuples: J (the Joiner's Gate) removes rows and everything below the cut
-    # slides up — _shift_rows keeps exit_pos true, so the live gate row rides
-    # with it (the entity-anchor rule). The tuples keep their build-time row;
-    # every chassis level lays its bolts on the exit's own row.
-    gr = room.exit_pos[0]
-    # Band the live gate cells so shut bolts read as stonework, not blank wall.
-    # Recomputed here rather than at build time because `gr` rides the row shifts.
-    room.sealed_cells = {(gr, dc) for _t, (_dr, dc) in getattr(room, '_wla_doors', ())}
-    if getattr(room, '_wla_doors', ()) and room.exit_pos:
-        room.sealed_cells.add(room.exit_pos)
-    all_true = True
-    for target, (_dr, dc) in getattr(room, '_wla_doors', ()):
-        is_open = room.cells[gr][dc] != CellType.WALL
-        if written(target) and not is_open:
-            room.cells[gr][dc] = CellType.FLOOR
-            msgs.append('The label reads true — the bolt grinds back!')
-        elif not written(target) and is_open and (player.row, player.col) != (gr, dc):
-            room.cells[gr][dc] = CellType.WALL     # undone — the bolt re-bars
-        all_true = all_true and written(target)
-    if getattr(room, '_wla_doors', ()):
-        er, ec = room.exit_pos                     # rides row shifts (_shift_rows)
-        seal_open = room.cells[er][ec] != CellType.WALL
-        if all_true and not seal_open:
-            room.cells[er][ec] = CellType.FLOOR
-            msgs.append('Every label reads true — the final seal parts!')
-        elif not all_true and seal_open and (player.row, player.col) != (er, ec):
-            room.cells[er][ec] = CellType.WALL     # undone — the seal returns
-    # The Change Extension's Y hall: after `Yp` inserts the echo row, the row-
-    # shift bumps the second-verse plaque down one; slide it back with the
-    # restore twinkle (the Sculpting glitter, ported to the paste).
+    All this level's DOORS are seals now (`_seal_tick`); what is left here is
+    the one thing that is not a reading of the buffer but a rearrangement of it.
+    """
     if getattr(room, '_ce_y_stump', None):
         moved = _ce_realign_y_plaque(room)
         if moved:
             room._sc_twinkle = moved
-    return msgs
+    return []
 
 
 def _ce_realign_y_plaque(room) -> list:
@@ -2412,7 +2395,8 @@ def _alignment_halls_tick(room, player) -> list:
     check is shift-, case- and o/O-proof; the │ plumb glyphs in the wall bands
     mark the column). Two-sided by construction: an over-shifted word reads
     false again and the bolt re-bars. STATELESS + FINAL SEAL, the hardened-
-    chassis pattern (see _whole_line_annex_tick)."""
+    chassis pattern (see `world.gate_row_seals` — the Alignment Halls read a
+    COLUMN, which is the one thing a seal still cannot say)."""
     msgs = []
     reg = room._ah_register_col
     floor_rows = [_wla_floor_text(room, r) for r in range(room.rows)]
@@ -2526,45 +2510,6 @@ def _codex_feed(player, key):
         pane.search('', backward=True)
     elif k == ':':
         pane.cmd_input = ''
-
-
-def _sight_sanctum_tick(room, player) -> list:
-    """The Sight Sanctum bolts — the plaque rule as EXACT whole-row text: a
-    chamber's bolt stands open exactly while EVERY one of its true words reads
-    as the complete (stripped) text of some floor row. Exact matching is what
-    prices the level: the kept words must SURVIVE the strike (a linewise cut
-    that eats one is a dead route), and a half-cleared row still reads false.
-    Row-agnostic (charwise ops don't shift rows, but the piecewise dd route
-    does), case-sensitive, two-sided, STATELESS + FINAL SEAL — the hardened-
-    chassis pattern (see _whole_line_annex_tick)."""
-    msgs = []
-    texts = {_wla_floor_text(room, r).strip() for r in range(room.rows)}
-
-    def held(targets):
-        return all(t in texts for t in targets)
-
-    gr = room.exit_pos[0]
-    # Band the live gate cells so shut bolts read as stonework, not blank wall.
-    # Recomputed here rather than at build time because `gr` rides the row shifts.
-    room.sealed_cells = {(gr, dc) for _t, dc in getattr(room, '_ss_doors', ())}
-    room.sealed_cells.add(room.exit_pos)
-    all_true = True
-    for targets, dc in getattr(room, '_ss_doors', ()):
-        is_open = room.cells[gr][dc] != CellType.WALL
-        if held(targets) and not is_open:
-            room.cells[gr][dc] = CellType.FLOOR
-            msgs.append("The chamber's words read true — the bolt grinds back!")
-        elif not held(targets) and is_open and (player.row, player.col) != (gr, dc):
-            room.cells[gr][dc] = CellType.WALL     # undone — the bolt re-bars
-        all_true = all_true and held(targets)
-    er, ec = room.exit_pos
-    seal_open = room.cells[er][ec] != CellType.WALL
-    if all_true and not seal_open:
-        room.cells[er][ec] = CellType.FLOOR
-        msgs.append('Every chamber reads true — the final seal parts!')
-    elif not all_true and seal_open and (player.row, player.col) != (er, ec):
-        room.cells[er][ec] = CellType.WALL         # undone — the seal returns
-    return msgs
 
 
 def _register_unnamed_hold_tick(room, player) -> list:
@@ -5223,12 +5168,10 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
         if level == 'inscription_halls':
             for _m in _inscription_halls_tick(room, player):
                 _push(_m)
-        if level in ('whole_line_annex', 'change_extension', 'overwrite_halls',
-                     'case_chambers', 'joiners_gate', 'g_sanctum', 'buried_word'):
-            for _m in _whole_line_annex_tick(room, player):   # substring doors
-                _push(_m)
+        if level == 'change_extension':
+            _ce_y_plaque_tick(room, player)
             _tw = getattr(room, '_sc_twinkle', None)
-            if _tw:                       # a label read true: glitter
+            if _tw:                       # the plaque followed the paste: glitter
                 _sc_twinkle_animation(term, room, player, _tw, _iw(term), term.height - 8)
                 room._sc_twinkle = []
         if level == 'alignment_halls':
@@ -5236,12 +5179,6 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
                 _push(_m)
         if level == 'indentation_sanctum':
             for _m in _indentation_sanctum_tick(room, player):
-                _push(_m)
-        if level in ('sight_sanctum', 'selection_halls', 'word_enclosure',
-                     'bracket_enclosure', 'brace_square_enclosure',
-                     'quote_enclosure', 'tag_enclosure', 'sentence_enclosure',
-                     'stair_rail', 'wet_ink'):
-            for _m in _sight_sanctum_tick(room, player):   # the shared exact-text tick
                 _push(_m)
         if level == 'register_unnamed_hold':
             for _m in _register_unnamed_hold_tick(room, player):
@@ -6708,7 +6645,8 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
                         else:
                             DRAFT.sync(_draft, room)
                             _old = [s for s in _draft.level.seals
-                                    if (s.region, s.match, s.mode) == (_reg, _txt, _mode)]
+                                    if (s.region, s.match, s.mode)
+                                    == (_reg, (_txt,), _mode)]
                             _cells = tuple(_old[0].opens) if _old else ()
                             if _old:
                                 _draft.level.seals.remove(_old[0])

@@ -173,7 +173,7 @@ def test_bolts_start_walled_exit_is_the_final_seal(seed):
     dungeon = build_dungeon_whole_line_annex(seed)
     room = dungeon.rooms[0]
     p = Player(row=room.spawn_pos[0], col=room.spawn_pos[1])
-    main._whole_line_annex_tick(room, p)
+    main._seal_tick(room, p)
     for i in range(_WLA_TRIGGERS):
         assert room.cells[_bolt(i)[0]][_bolt(i)[1]] == CellType.WALL
     assert room.cells[_WLA_EXIT[0]][_WLA_EXIT[1]] == CellType.WALL

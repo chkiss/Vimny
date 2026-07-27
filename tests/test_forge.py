@@ -959,7 +959,7 @@ def test_the_forge_arms_a_seal_and_bolts_it():
                       + 'jjlll:seal open sesame\r:bolt\r:w\r:q!\r')
     assert len(d.level.seals) == 1
     s = d.level.seals[0]
-    assert (s.match, s.mode, s.region[0], s.opens) == ('open sesame', 'exact', 2,
+    assert (s.match, s.mode, s.region[0], s.opens) == (('open sesame',), 'exact', 2,
                                                        ((4, 4),))
 
 
@@ -975,7 +975,7 @@ def test_a_ranged_bolt_wires_a_whole_wall_to_one_trigger():
                       + 'gv:bolt\r:w\r:q!\r')
     assert len(d.level.seals) == 1
     s = d.level.seals[0]
-    assert s.match == 'open sesame'
+    assert s.match == ('open sesame',)     # one target, normalised to a tuple
     assert sorted(s.opens) == [(5, 7), (5, 8), (5, 9), (5, 10), (5, 11)]
     # and the wall is stone in the saved file — the tick is what swings it
     assert d.level.cells[5] == 'W6F5W17FW'
@@ -1010,7 +1010,7 @@ def test_a_star_arms_the_looser_reading():
     d = DRAFT.new('Probe', rows=8, cols=30)
     _forge_session(d, 'jv' + 'l' * 6 + T.ESC
                       + 'jjlll:seal *sesame\r:bolt\r:w\r:q!\r')
-    assert (d.level.seals[0].match, d.level.seals[0].mode) == ('sesame', 'contains')
+    assert (d.level.seals[0].match, d.level.seals[0].mode) == (('sesame',), 'contains')
 
 
 def test_bolting_twice_widens_one_door_rather_than_making_two():

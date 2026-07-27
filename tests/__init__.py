@@ -40,3 +40,13 @@ def cached_dungeon(builder_name: str, seed: int):
 def cached_room(builder_name: str, seed: int):
     """First room of the shared build — see cached_dungeon's READ-ONLY rule."""
     return cached_dungeon(builder_name, seed).rooms[0]
+
+
+def door_targets(room):
+    """The chassis bolts' target words, in gate order.
+
+    The seventeen chassis levels lay a row of bolts and then a FINAL SEAL that
+    requires all of them; the final seal reads no text of its own, so it is the
+    one seal with an empty `match` and it drops out here. Tests want the doors,
+    and they want them at the index the level built them at."""
+    return [s.match for s in room.seals if s.match]

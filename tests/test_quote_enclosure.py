@@ -35,7 +35,7 @@ from generation.dungeon_gen import (
     _QE_C1_ROWS, _QE_C2_ROWS, _QE_C3_ROWS, _QE_C4_ROWS, _QE_C5_ROWS,
 )
 from content import proverbs as pv
-from tests import SEEDS, cached_room
+from tests import SEEDS, cached_room, door_targets
 
 ESC = Keystroke('\x1b', name='KEY_ESCAPE')
 
@@ -198,7 +198,7 @@ def test_proverb_draw_anchors_and_fits(seed):
 def test_targets_are_not_already_true(seed):
     room = _room(seed)
     texts = {main._wla_floor_text(room, r).strip() for r in range(room.rows)}
-    for targets, _dc in room._ss_doors:
+    for targets in door_targets(room):
         for t in targets:
             assert t not in texts
 
@@ -209,7 +209,7 @@ def test_c4_targets_are_the_single_gap(seed):
     # heals to a SINGLE gap — the C4 doors read the PRISTINE saying, no scar
     # anywhere (where da( left the double gap).
     room = _room(seed)
-    for t in room._ss_doors[3][0]:
+    for t in door_targets(room)[3]:
         assert '  ' not in t
 
 
@@ -241,7 +241,7 @@ def test_blind_dot_off_c2_is_a_costed_noop(monkeypatch):
             + _K('jci"') + _K(cb) + [ESC] + _K('2j.'))
     _drive(dungeon, keys, monkeypatch, finish=':q!\r')
     texts = {main._wla_floor_text(room, r).strip() for r in range(room.rows)}
-    assert not any(t in texts for t in room._ss_doors[2][0])
+    assert not any(t in texts for t in door_targets(room)[2])
 
 
 def test_blind_seek_on_c5_hits_the_empty_first_pair(monkeypatch):
@@ -252,7 +252,7 @@ def test_blind_seek_on_c5_hits_the_empty_first_pair(monkeypatch):
     room = dungeon.rooms[0]
     keys = _K('j') * 13 + _K('di"')          # walk the spine to row 15; strike
     _drive(dungeon, keys, monkeypatch, finish=':q!\r')
-    assert main._wla_floor_text(room, 15).strip() != room._ss_doors[4][0][0]
+    assert main._wla_floor_text(room, 15).strip() != door_targets(room)[4][0]
     junk15 = next(n[3] for n in room._qe_texts['intruders'] if n[0] == 15)
     assert junk15 in main._wla_floor_text(room, 15)
 

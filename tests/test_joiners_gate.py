@@ -155,7 +155,7 @@ def test_doors_independent():
 def test_bolts_and_seal_start_stone(seed):
     room = build_dungeon_joiners_gate(seed).rooms[0]
     p = Player(row=room.spawn_pos[0], col=room.spawn_pos[1])
-    main._whole_line_annex_tick(room, p)
+    main._seal_tick(room, p)
     for i in range(_JG_TRIGGERS):
         assert room.cells[_JG_GATE_ROW][_bolt_col(i)] == CellType.WALL
     assert room.cells[_JG_EXIT[0]][_JG_EXIT[1]] == CellType.WALL

@@ -36,7 +36,7 @@ from generation.dungeon_gen import (
     _BSQ_C1_ROWS, _BSQ_C2_ROWS, _BSQ_C3_ROWS, _BSQ_C4_ROWS, _BSQ_C5_ROWS,
     _BSQ_C1_SLOTS, _BSQ_C2_SLOTS, _BSQ_C3_SLOTS, _BSQ_C4_SLOTS, _BSQ_C5_SLOTS,
 )
-from tests import SEEDS, cached_room
+from tests import SEEDS, cached_room, door_targets
 
 ESC = Keystroke('\x1b', name='KEY_ESCAPE')
 
@@ -223,7 +223,7 @@ def _floor_texts(room):
 def test_targets_are_not_already_true(seed):
     room = _room(seed)
     texts = _floor_texts(room)
-    for targets, _dc in room._ss_doors:
+    for targets in door_targets(room):
         for t in targets:
             assert t not in texts
 
@@ -234,8 +234,8 @@ def test_nest_discrimination_di_bracket_cannot_open_the_brace_door(seed):
     # its WORDS (distinct sayings), so C4a stays barred and C4b can't
     # false-fire.
     room = _room(seed)
-    tgt_a = room._ss_doors[3][0][0]                 # c4a target
-    tgt_b = room._ss_doors[4][0][0]                 # c4b target
+    tgt_a = door_targets(room)[3][0]                 # c4a target
+    tgt_b = door_targets(room)[4][0]                 # c4b target
     nest12 = next(n for n in room._bsq_texts['nests'] if n[0] == 12)
     _r, words, k, _j, _f, _oc = nest12
     wrong = f'{pv.text_of(words[:k])} [] {pv.text_of(words[k:])}'
@@ -269,7 +269,7 @@ def test_blind_dot_off_c2_is_a_costed_noop(monkeypatch):
             + _K('jci[') + _K(cb) + [ESC] + _K('2j.'))
     _drive(dungeon, keys, monkeypatch, finish=':q!\r')
     texts = _floor_texts(room)
-    c3_targets = room._ss_doors[2][0]
+    c3_targets = door_targets(room)[2]
     assert not any(t in texts for t in c3_targets)
 
 

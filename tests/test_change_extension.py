@@ -181,7 +181,7 @@ def test_bolts_start_walled_exit_is_the_final_seal(seed):
     dungeon = build_dungeon_change_extension(seed)
     room = dungeon.rooms[0]
     p = Player(row=room.spawn_pos[0], col=room.spawn_pos[1])
-    main._whole_line_annex_tick(room, p)
+    main._seal_tick(room, p)
     for i in range(_CE_BOLTS):
         assert room.cells[_bolt(i)[0]][_bolt(i)[1]] == CellType.WALL
     assert room.cells[_CE_EXIT[0]][_CE_EXIT[1]] == CellType.WALL
@@ -525,7 +525,7 @@ def test_y_paste_bumps_and_realigns_the_stem_plaque(monkeypatch):
               and ru.row >= _CE_Y_ROW}
     assert bumped == {_CE_Y_ROW + 2}, "the row insertion drifted the plaque down"
     # the tick re-aligns it and records the move for the twinkle
-    main._whole_line_annex_tick(room, p)
+    main._ce_y_plaque_tick(room, p)
     moved = getattr(room, '_sc_twinkle', None)
     assert moved, "the re-align must flag the plaque for the twinkle"
     assert all(new_r == _CE_Y_ROW + 1 for (_old, new_r, _c, _s) in moved)

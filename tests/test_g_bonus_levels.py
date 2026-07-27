@@ -33,7 +33,7 @@ from generation.dungeon_gen import (
     build_dungeon_wet_ink, _WI_LEDGE, _WI_PLQ_COL, _WI_SOURCE, _WI_BRAZIERS,
     _WI_GATE, _WI_BOLT, _WI_EXIT, _WI_PAR, _QM_FLAME, _QM_EMBERS,
 )
-from tests import SEEDS, cached_room
+from tests import SEEDS, cached_room, door_targets
 
 ESC = Keystroke('\x1b', name='KEY_ESCAPE')
 
@@ -128,7 +128,7 @@ def test_bw_no_plaque_and_door_reads_the_true_word(seed):
                    for ru in room.char_runs)
     for i, _r in enumerate(_BW_BAYS):
         host = room._bw_words['hosts'][i]
-        target, _dc = room._wla_doors[i]
+        target, = door_targets(room)[i]
         assert target == host
 
 
@@ -194,7 +194,7 @@ def test_wi_structure(seed):
     from generation.dungeon_gen import _WI_PHRASES
     assert ws in _WI_PHRASES and len(ws) == 4
     assert sum(len(w) for w in ws) == 14, "pool-invariant typed cost"
-    assert room._ss_doors[0][0] == (full,)
+    assert door_targets(room)[0] == (full,)
     # the whole inscription is laid at build, in the west WALL, one run
     # per quarter with a gap column for the space
     for k, w in enumerate(ws):

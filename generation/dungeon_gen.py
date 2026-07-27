@@ -20,7 +20,8 @@
 from __future__ import annotations
 import heapq, math, os, random
 from collections import deque
-from engine.world import Dungeon, Room, RoomType, CellType, CharRun, Entity
+from engine.world import (Dungeon, Room, RoomType, CellType, CharRun, Entity,
+                          gate_row_seals)
 from engine.tape import ESC as _TAPE_ESC
 from engine.motion import (_fog_unreachable, _cell_char, _is_word_char,
                            apply_stone_fog)
@@ -28,6 +29,43 @@ from generation.room_gen import make_room, RUNE_CHAR as _RUNE_CHAR
 
 _DIR_CHAR = {(-1, 0): 'k', (1, 0): 'j', (0, -1): 'h', (0, 1): 'l'}
 _DIRS = ((-1, 0), (1, 0), (0, -1), (0, 1))   # k j h l — the order every solver scans
+
+
+# ── The two door chassis ──────────────────────────────────────────────────────
+# Seventeen levels are built on the same gate: a row of bolts west of the exit,
+# each held open while its words read true on the floor, and the exit itself
+# stone until all of them do. They differ in ONE thing — whether a bolt wants
+# its word to BE a whole row or merely to appear somewhere on one — so that is
+# the only thing these two wrappers differ in. Both hand off to
+# `world.gate_row_seals`, which is also what the level format builds; there is
+# no separate tick behind either of them any more.
+
+def _chamber_gate(doors, exit_pos):
+    """Bolts that want EXACT whole rows — the Sight Sanctum family (ten levels).
+
+    Exactness is what prices these levels: the kept words must SURVIVE the
+    strike, so a linewise cut that eats one is a dead route and a half-cleared
+    row still reads false. `doors` is ``((targets, col), ...)``.
+    """
+    return gate_row_seals(
+        doors, exit_pos, mode='exact',
+        bolt_message="The chamber's words read true — the bolt grinds back!",
+        final_message='Every chamber reads true — the final seal parts!')
+
+
+def _label_gate(doors, exit_pos):
+    """Bolts that want a word written SOMEWHERE — the Change Annex family (seven).
+
+    A plaque names the true label and the bolt opens once that label stands on
+    the floor, wherever it stands. `doors` is the Annex's own shape,
+    ``((target, (row, col)), ...)`` — the row is dropped, because the gate row
+    is the exit's and is re-read every turn (`Seal.anchor`).
+    """
+    return gate_row_seals(
+        [(target, col) for target, (_row, col) in doors], exit_pos,
+        mode='contains',
+        bolt_message='The label reads true — the bolt grinds back!',
+        final_message='Every label reads true — the final seal parts!')
 
 
 # ── Par-solver toolkit ────────────────────────────────────────────────────────
@@ -3508,7 +3546,7 @@ def build_dungeon_sight_sanctum(seed: int) -> Dungeon:
                                                   'ancient'))
                 col += len(part) + 1
         doors.append((targets, _SS_BOLT0 + i))
-    room._ss_doors = tuple(doors)
+    room.seals = _chamber_gate(doors, _SS_EXIT)
     room._ss_words = words
     # no lintel: floating carved words over the spawn read as a locked door
     # — the credo lives in the intro hint instead
@@ -3755,7 +3793,7 @@ def build_dungeon_selection_halls(seed: int) -> Dungeon:
             continue                                     # proverb-style: no plaque
         for pr, ptext in zip(rows, targets):             # full true readings
             room.char_runs.append(CharRun(pr, _SH_PLQ_COL, tuple(ptext), 'verdant'))
-    room._ss_doors = tuple(doors)                        # the shared exact-text tick
+    room.seals = _chamber_gate(doors, _SH_EXIT)
     room._sh_words = words
 
     room.entities.append(Entity(kind='exit', row=_SH_EXIT[0], col=_SH_EXIT[1],
@@ -3965,8 +4003,8 @@ def build_dungeon_word_enclosure(seed: int) -> Dungeon:
     c5 = tuple(f'{truths[r][0]} {truths[r][1]}' for r in _WE_C5_ROWS)   # seam
     chambers = (c1, c2, c3, c4, c5)
 
-    room._ss_doors = tuple((tgt, _WE_BOLT0 + i)          # the shared exact-text tick
-                           for i, tgt in enumerate(chambers))
+    room.seals = _chamber_gate(tuple((tgt, _WE_BOLT0 + i)
+                                     for i, tgt in enumerate(chambers)), _WE_EXIT)
     room._we_texts = texts
 
     room.entities.append(Entity(kind='exit', row=_WE_EXIT[0], col=_WE_EXIT[1],
@@ -4353,8 +4391,8 @@ def build_dungeon_bracket_enclosure(seed: int) -> Dungeon:
     c3 = tuple(f'{truths[r][0]}  {truths[r][1]}' for r in _BE_C3_ROWS)
     chambers = (c1, c2, c3)
 
-    room._ss_doors = tuple((tgt, _BE_BOLT0 + i)          # the shared exact-text tick
-                           for i, tgt in enumerate(chambers))
+    room.seals = _chamber_gate(tuple((tgt, _BE_BOLT0 + i)
+                                     for i, tgt in enumerate(chambers)), _BE_EXIT)
     room._be_texts = texts
 
     room.entities.append(Entity(kind='exit', row=_BE_EXIT[0], col=_BE_EXIT[1],
@@ -4389,7 +4427,7 @@ def build_dungeon_bracket_enclosure(seed: int) -> Dungeon:
 # the saying's key word miscut in its fitting. No west plaques except the
 # nest twins' ember/pedestal pair (which distinguish the twin DOORS, not the
 # text). Par invariance is COLUMN-ANCHORED (the Word Enclosure law). Five
-# chambers on the exact-text chassis (_sight_sanctum_tick):
+# chambers on the exact-text chassis (`_chamber_gate` seals):
 #   C1 (rows 3-4)   di[ husk ×2, the second by dot   → 'pre [] suf'
 #   C2 (rows 6-7)   ci[ cures — the miscut famous word, retyped by heart
 #   C3 (rows 9-10)  di{ + dot (the family switch — a blind '.' straight off
@@ -4583,7 +4621,7 @@ def build_dungeon_brace_square_enclosure(seed: int) -> Dungeon:
     lay(12, _BSQ_PLQ_COL, ('braces',), 'ember')
     lay(13, _BSQ_PLQ_COL, ('square',), 'pedestal')
 
-    room._ss_doors = doors                               # the shared exact-text tick
+    room.seals = _chamber_gate(doors, _BSQ_EXIT)
     room._bsq_texts = texts
 
     room.entities.append(Entity(kind='exit', row=_BSQ_EXIT[0], col=_BSQ_EXIT[1],
@@ -4610,7 +4648,7 @@ def build_dungeon_brace_square_enclosure(seed: int) -> Dungeon:
 # that buys the level its headline lesson: the quote objects work from
 # ANYWHERE WEST of the pair (the resolver seeks forward), so every strike
 # here is thrown from the spine, no navigation into the setting at all.
-# Five chambers on the exact-text chassis (_sight_sanctum_tick):
+# Five chambers on the exact-text chassis (`_chamber_gate` seals):
 #   C1 (rows 3-4)   di" husk ×2, the second by dot     → 'w1 "" w2'
 #   C2 (rows 6-7)   ci" cures (typed, single tokens)   → 'w1 "cure" w2'
 #   C3 (rows 9-10)  di' — the quote-mark switch (a blind '.' off C2 replays
@@ -4770,7 +4808,7 @@ def build_dungeon_quote_enclosure(seed: int) -> Dungeon:
              (c3, _QE_BOLTS['c3']), (c4, _QE_BOLTS['c4']),
              (c5, _QE_BOLTS['c5']))
 
-    room._ss_doors = doors                               # the shared exact-text tick
+    room.seals = _chamber_gate(doors, _QE_EXIT)
     room._qe_texts = texts
     ca, cb = (cures[r][0] for r in _QE_C2_ROWS)
 
@@ -4981,7 +5019,7 @@ def build_dungeon_tag_enclosure(seed: int) -> Dungeon:
     doors = tuple((tuple(doors_targets[k]), _TE_BOLTS[k])
                   for k in ('c1', 'c2', 'c3', 'c4', 'c5'))
 
-    room._ss_doors = doors                               # the shared exact-text tick
+    room.seals = _chamber_gate(doors, _TE_EXIT)
     room._te_texts = texts
 
     room.entities.append(Entity(kind='exit', row=_TE_EXIT[0], col=_TE_EXIT[1],
@@ -5183,7 +5221,7 @@ def build_dungeon_sentence_enclosure(seed: int) -> Dungeon:
             if part:
                 room.char_runs.append(CharRun(r, col, tuple(part), 'ancient'))
             col += len(part) + 1
-    room._ss_doors = doors                               # the shared exact-text tick
+    room.seals = _chamber_gate(doors, _SE_EXIT)
     room._se_texts = texts
     room._se_rows = rows
 
@@ -5988,7 +6026,7 @@ def build_dungeon_stair_rail(seed: int) -> Dungeon:
         # each mended step carves its own corridor cell, east→west along
         # the canonical route (any other order carves the same passage)
         doors.append(((words[k],), _SR_BOLT_COLS[mend_order.index(k)]))
-    room._ss_doors = tuple(doors)                        # the shared exact-text tick
+    room.seals = _chamber_gate(doors, _SR_EXIT)
     room._sr_words = words
 
     room.entities.append(Entity(kind='exit', row=_SR_EXIT[0], col=_SR_EXIT[1],
@@ -6111,7 +6149,7 @@ def build_dungeon_g_sanctum(seed: int) -> Dungeon:
         # No plaque: the saying is known by heart — the true tail (and its
         # last letter) IS the memory. Substring door on the true tail.
         doors.append((words['tails'][i], (_GS_GATE, _GS_BOLTS[r])))
-    room._wla_doors = tuple(doors)                       # the substring tick
+    room.seals = _label_gate(doors, _GS_EXIT)
     room._gs_words = words
 
     room.entities.append(Entity(kind='exit', row=_GS_EXIT[0], col=_GS_EXIT[1],
@@ -6239,7 +6277,7 @@ def build_dungeon_buried_word(seed: int) -> Dungeon:
             off += len(word) + 1
         # No plaque: the verse's sense names the true word.
         doors.append((host, (_BW_GATE, _BW_BOLTS[r])))
-    room._wla_doors = tuple(doors)                        # the substring tick
+    room.seals = _label_gate(doors, _BW_EXIT)
     room._bw_words = words
 
     room.entities.append(Entity(kind='exit', row=_BW_EXIT[0], col=_BW_EXIT[1],
@@ -6346,7 +6384,7 @@ def build_dungeon_wet_ink(seed: int) -> Dungeon:
     room.char_runs.append(CharRun(*_WI_SOURCE, (_QM_FLAME,), 'flame'))
     for (br, bc) in _WI_BRAZIERS:
         room.char_runs.append(CharRun(br, bc, (_QM_EMBERS,), 'pedestal'))
-    room._ss_doors = (((full,), _WI_BOLT),)              # the full inscription
+    room.seals = _chamber_gate((((full,), _WI_BOLT),), _WI_EXIT)  # the full inscription
     room._wi_words = ws
     # The fuel gate starts source-only; _wet_ink_tick widens it as the
     # quarters are written (read by _flame_paste_blocked).
@@ -10746,10 +10784,14 @@ def build_dungeon_whole_line_annex(seed: int) -> Dungeon:
         for c in range(_WLA_COL_S, _WLA_LBL_END + 1):
             cells[r][c] = CellType.FLOOR
     cells[_WLA_THROAT_ROW][_WLA_COL_S] = CellType.FLOOR  # spine-only throat: block → gate
-    cells[_WLA_GATE_ROW][_WLA_COL_S] = CellType.FLOOR    # the spine reaches the gate row
+    # The spine's own gate-row cell is NOT carved: the bolt row spans it (the
+    # sixth bolt stands at the spine column), so the way down onto the gate row
+    # is a door like every other and opens when its label reads true. It was
+    # carved FLOOR here until 2026-07-27, which the tick re-walled on the first
+    # turn anyway — a one-frame lie, and one the level file could not tell.
     # the exit cell STAYS WALL — the FINAL SEAL; the tick floors it when every
     # plaque reads true (A/o can carve/fabricate floor, so geometry alone no
-    # longer bars the way east of the bolts — see _whole_line_annex_tick).
+    # longer bars the way east of the bolts — see the `_label_gate` seals).
     # The bolt cells (the gate row, between the spine and the exit) stay WALL at
     # build; the tick opens each when its label reads true. The exit needs no
     # gating: the throat row joins the block to the gate ONLY at the spine, so no
@@ -10787,7 +10829,7 @@ def build_dungeon_whole_line_annex(seed: int) -> Dungeon:
                 lay(lrow, pcol, w, 'verdant')
                 pcol += len(w) + 1
         doors.append((lesson['target'], (_WLA_GATE_ROW, _WLA_GATE_COL0 + i)))
-    room._wla_doors   = tuple(doors)
+    room.seals        = _label_gate(doors, _WLA_EXIT)
     room._wla_lessons = tuple(lessons)
 
     room.entities.append(Entity(kind='exit', row=_WLA_EXIT[0], col=_WLA_EXIT[1],
@@ -11019,7 +11061,7 @@ def build_dungeon_change_extension(seed: int) -> Dungeon:
     cells[_CE_GATE_ROW][_CE_COL_S] = CellType.FLOOR    # the spine reaches the gate row
     # the exit cell STAYS WALL — the FINAL SEAL; the tick floors it when every
     # plaque reads true (A/o can carve/fabricate floor, so geometry alone no
-    # longer bars the way east of the bolts — see _whole_line_annex_tick).
+    # longer bars the way east of the bolts — see the `_label_gate` seals).
     # The bolt cells (gate row, between spine and exit) stay WALL at build; the
     # tick opens each when its label reads true. The throat joins block→gate ONLY
     # at the spine, so no east column drops onto the exit; the exit is never a
@@ -11073,8 +11115,8 @@ def build_dungeon_change_extension(seed: int) -> Dungeon:
     for word in _CE_Y_STEM.split(' '):
         lay(_CE_Y_ROW + 1, pcol, word, 'verdant')
         pcol += len(word) + 1
-    # The tick is the Annex's generic plaque-door scan, keyed on `room._wla_doors`.
-    room._wla_doors   = tuple(doors)
+    # The doors are the Annex's own chassis, said as seals.
+    room.seals        = _label_gate(doors, _CE_EXIT)
     room._ce_y_stump  = 'fool me once'     # anchors the echo-plaque re-align (the Y row)
     room._ce_lessons  = tuple(lessons)
 
@@ -11244,8 +11286,8 @@ def build_dungeon_sculpting_chambers(seed: int) -> Dungeon:
 #     WHICH — stream vs stitch (the Overwrite Halls' r-vs-R discipline).
 # Geometry / tick are the Annex's: spine (each row's first standable), a plaque
 # in the WEST wall, a spine-only throat joining the block to the gate row, a row
-# of bolts, and a plain-floor exit east of them (`_whole_line_annex_tick`, keyed
-# on room._wla_doors; R overwrites IN PLACE so the floor scan is shift-free).
+# of bolts, and a plain-floor exit east of them (`_label_gate` seals; R
+# overwrites IN PLACE so the floor scan is shift-free).
 _OH_ROWS, _OH_COLS = 10, 39
 _OH_PLQ_COL = 1                     # (retired name) the west stone band, cols 1..25
 _OH_COL_S   = 27                    # the spine — the gate's first standable; the word floor
@@ -11304,7 +11346,7 @@ def build_dungeon_overwrite_halls(seed: int) -> Dungeon:
     cells[_OH_GATE_ROW][_OH_COL_S]   = CellType.FLOOR   # the spine reaches the gate row
     # the exit cell STAYS WALL — the FINAL SEAL; the tick floors it when every
     # plaque reads true (A/o can carve/fabricate floor, so geometry alone no
-    # longer bars the way east of the bolts — see _whole_line_annex_tick).
+    # longer bars the way east of the bolts — see the `_label_gate` seals).
     # the bolt cells (gate row, between spine and exit) stay WALL; the tick opens
     # each when its corridor reads true.
 
@@ -11329,7 +11371,7 @@ def build_dungeon_overwrite_halls(seed: int) -> Dungeon:
         doors.append((target, (_OH_GATE_ROW, _OH_GATE_COL0 + i)))
         lessons.append({'kind': kind, 'prefix': prefix, 'target': target,
                         'wrong': wrong, 'row': lrow})
-    room._wla_doors    = tuple(doors)                        # reuse the Annex tick
+    room.seals         = _label_gate(doors, _OH_EXIT)
     room._oh_lessons   = tuple(lessons)
 
     room.entities.append(Entity(kind='exit', row=_OH_EXIT[0], col=_OH_EXIT[1],
@@ -11384,7 +11426,7 @@ def build_dungeon_overwrite_halls(seed: int) -> Dungeon:
 # Geometry / tick are the Annex's: per-row EXACT-FIT floors (the corridor ends
 # where the word ends, so `$` lands on the last LETTER — the tilde door's nav),
 # spine at the label column, a spine-only throat row, a row of eight bolts, and
-# a plain-floor exit east of them (`_whole_line_annex_tick` on room._wla_doors).
+# a plain-floor exit east of them (`_label_gate` seals).
 _CASE_ROWS, _CASE_COLS = 13, 27
 _CASE_PLQ_COL = 1                     # the true form, in the WEST wall (cols 1..11)
 _CASE_COL_S   = 15                    # the spine — every row's first standable; a
@@ -11452,7 +11494,7 @@ def build_dungeon_case_chambers(seed: int) -> Dungeon:
     cells[_CASE_GATE_ROW][_CASE_COL_S]   = CellType.FLOOR   # the spine reaches the gate row
     # the exit cell STAYS WALL — the FINAL SEAL; the tick floors it when every
     # plaque reads true (A/o can carve/fabricate floor, so geometry alone no
-    # longer bars the way east of the bolts — see _whole_line_annex_tick).
+    # longer bars the way east of the bolts — see the `_label_gate` seals).
     # the bolt cells (gate row, between spine and exit) stay WALL; the tick opens
     # each when its corridor's case reads true.
 
@@ -11477,7 +11519,7 @@ def build_dungeon_case_chambers(seed: int) -> Dungeon:
         lay(lrow, _CASE_PLQ_COL, target, 'verdant')            # the true form, the WEST-wall plaque
         doors.append((target, (_CASE_GATE_ROW, _CASE_GATE_COL0 + i)))
         lessons.append({'kind': kind, 'target': target, 'wrong': wrong, 'row': lrow})
-    room._wla_doors  = tuple(doors)                          # reuse the Annex tick
+    room.seals       = _label_gate(doors, _CASE_EXIT)
     room._cc_lessons = tuple(lessons)
 
     room.entities.append(Entity(kind='exit', row=_CASE_EXIT[0], col=_CASE_EXIT[1],
@@ -11507,7 +11549,7 @@ def build_dungeon_case_chambers(seed: int) -> Dungeon:
 #
 # J is a TERRAIN EDITOR, so the chassis must be hardened for it:
 #   • every join removes a row and slides the gate/bolts/exit UP —
-#     `_whole_line_annex_tick` derives the gate row from exit_pos each tick
+#     `Seal.anchor` derives the gate row from exit_pos each tick
 #     (which `_shift_rows` keeps true), so the bolts ride the collapses;
 #   • the gate row itself is join-proof: `remove_row` refuses a row holding an
 #     edit_immune entity, and the exit entity is edit_immune;
@@ -11591,7 +11633,7 @@ def build_dungeon_joiners_gate(seed: int) -> Dungeon:
         lay(top, _JG_PLQ_COL, target, 'verdant')         # the true line, west-wall plaque
         doors.append((target, (_JG_GATE_ROW, _JG_GATE_COL0 + i)))
         lessons.append({'kind': kind, 'target': target, 'split': split, 'top': top})
-    room._wla_doors  = tuple(doors)                      # the (hardened) Annex tick
+    room.seals       = _label_gate(doors, _JG_EXIT)
     room._jg_lessons = tuple(lessons)
 
     room.entities.append(Entity(kind='exit', row=_JG_EXIT[0], col=_JG_EXIT[1],

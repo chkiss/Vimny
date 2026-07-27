@@ -201,7 +201,8 @@ def _parse_fill(f: dict, i: int) -> Fill:
                 kind=str(f.get('kind', 'ancient')))
 
 
-_SEAL_MODES = ('exact', 'contains')
+_SEAL_MODES  = ('exact', 'contains')
+_SEAL_SCOPES = ('region', 'anyrow')
 
 
 def _parse_seal(s: dict, i: int) -> Seal:
@@ -214,18 +215,56 @@ def _parse_seal(s: dict, i: int) -> Seal:
     """
     if not isinstance(s, dict):
         raise LevelFormatError(f'seals[{i}]: must be an object')
-    unknown = set(s) - {'region', 'match', 'opens', 'mode'}
+    unknown = set(s) - {'region', 'match', 'opens', 'mode', 'scope',
+                        'requires', 'anchor'}
     if unknown:
         raise LevelFormatError(f'seals[{i}]: unknown key(s) {sorted(unknown)}')
+    scope = str(s.get('scope', 'region'))
+    if scope not in _SEAL_SCOPES:
+        raise LevelFormatError(f'seals[{i}].scope: must be one of '
+                               f'{", ".join(_SEAL_SCOPES)}, got {scope!r}')
+    # `match` may be one string or several, ALL of which must read true. A door
+    # that wants a chamber's three sayings held at once is one seal, not three.
+    match = s.get('match', [])
+    if isinstance(match, str):
+        match = [match] if match else []
     region = s.get('region')
-    if not (isinstance(region, (list, tuple)) and len(region) == 4):
-        raise LevelFormatError(f'seals[{i}].region: must be [r1, c1, r2, c2]')
-    match = s.get('match')
-    if not isinstance(match, str) or not match.strip():
-        raise LevelFormatError(f'seals[{i}].match: must be the text the region '
-                               f'has to read, and cannot be empty')
-    if len(match) > MAX_SEAL_MATCH:
+    if scope == 'region' and match:
+        if not (isinstance(region, (list, tuple)) and len(region) == 4):
+            raise LevelFormatError(f'seals[{i}].region: must be [r1, c1, r2, c2]')
+        region = tuple(int(x) for x in region)
+    elif region:
+        raise LevelFormatError(
+            f'seals[{i}].region: this seal reads no region — '
+            + ('a scope="anyrow" seal reads every floor row'
+               if scope == 'anyrow' else
+               'a seal with no `match` reads only the seals it requires'))
+    else:
+        region = ()
+    if not isinstance(match, (list, tuple)) or not all(
+            isinstance(m, str) and m.strip() for m in match):
+        raise LevelFormatError(f'seals[{i}].match: must be the text the seal has '
+                               f'to read, or a list of texts, none of them empty')
+    if any(len(m) > MAX_SEAL_MATCH for m in match):
         raise LevelFormatError(f'seals[{i}].match: at most {MAX_SEAL_MATCH} characters')
+    requires = s.get('requires', [])
+    if not isinstance(requires, (list, tuple)) or not all(
+            isinstance(k, int) for k in requires):
+        raise LevelFormatError(f'seals[{i}].requires: must be a list of the '
+                               f'indices of earlier seals')
+    if any(not 0 <= k < i for k in requires):
+        # Earlier-only is what makes the conjunction one pass with no cycle to
+        # find. A seal that named a later one would open on a reading that had
+        # not been taken yet, which is a rule nobody can debug.
+        raise LevelFormatError(f'seals[{i}].requires: must name seals BEFORE '
+                               f'this one (0..{i - 1})')
+    if not match and not requires:
+        raise LevelFormatError(f'seals[{i}]: has nothing to read — give it a '
+                               f'`match`, or `requires` naming earlier seals')
+    anchor = str(s.get('anchor', ''))
+    if anchor not in ('', 'exit_row'):
+        raise LevelFormatError(f'seals[{i}].anchor: must be "" or "exit_row", '
+                               f'got {anchor!r}')
     opens = s.get('opens')
     # A single [row, col] is allowed and is by far the common case: most doors
     # are one cell, and making an author write [[9, 40]] to say so is a papercut
@@ -246,8 +285,8 @@ def _parse_seal(s: dict, i: int) -> Seal:
     if mode not in _SEAL_MODES:
         raise LevelFormatError(f'seals[{i}].mode: must be one of '
                                f'{", ".join(_SEAL_MODES)}, got {mode!r}')
-    return Seal(region=tuple(int(x) for x in region), match=match,
-                opens=tuple(cells), mode=mode)
+    return Seal(region=region, match=tuple(match), opens=tuple(cells), mode=mode,
+                scope=scope, requires=tuple(requires), anchor=anchor)
 
 
 def loads(text: str) -> Level:
@@ -384,10 +423,10 @@ def crop(lvl: Level) -> Level:
         fills=[replace(f, region=(f.region[0] - r1, f.region[1] - c1,
                                   f.region[2] - r1, f.region[3] - c1))
                for f in lvl.fills],
-        seals=[Seal(region=(s.region[0] - r1, s.region[1] - c1,
-                            s.region[2] - r1, s.region[3] - c1),
-                    match=s.match, mode=s.mode,
-                    opens=tuple(_mv(c) for c in s.opens))
+        seals=[replace(s, opens=tuple(_mv(c) for c in s.opens),
+                       region=((s.region[0] - r1, s.region[1] - c1,
+                                s.region[2] - r1, s.region[3] - c1)
+                               if s.region else ()))
                for s in lvl.seals],
     )
     return out
@@ -618,9 +657,24 @@ def dumps(lvl: Level) -> str:
                          'length': list(f.length), 'spacing': f.spacing,
                          'kind': f.kind} for f in lvl.fills]
     if lvl.seals:
-        data['seals'] = [{'region': list(s.region), 'match': s.match,
-                          'opens': [list(c) for c in s.opens],
-                          'mode': s.mode} for s in lvl.seals]
+        # Every optional axis is written only when it is not the default, so a
+        # plain region-and-password seal still reads as the four short lines it
+        # always was and an author is never shown machinery they did not ask for.
+        out = []
+        for s in lvl.seals:
+            d = {'opens': [list(c) for c in s.opens], 'mode': s.mode}
+            if s.region:
+                d['region'] = list(s.region)
+            if s.match:
+                d['match'] = s.match[0] if len(s.match) == 1 else list(s.match)
+            if s.scope != 'region':
+                d['scope'] = s.scope
+            if s.requires:
+                d['requires'] = list(s.requires)
+            if s.anchor:
+                d['anchor'] = s.anchor
+            out.append(d)
+        data['seals'] = out
     if lvl.char_runs:
         data['char_runs'] = lvl.char_runs
     if lvl.entities:

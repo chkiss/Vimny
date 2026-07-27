@@ -35,7 +35,7 @@ from generation.dungeon_gen import (
     _TE_C1_ROWS, _TE_C2_ROWS, _TE_C3_ROWS, _TE_C4_ROWS, _TE_C5_ROWS,
 )
 from content import proverbs as pv
-from tests import SEEDS, cached_room
+from tests import SEEDS, cached_room, door_targets
 
 ESC = Keystroke('\x1b', name='KEY_ESCAPE')
 
@@ -193,7 +193,7 @@ def test_proverb_draw_anchors_and_fits(seed):
 def test_targets_are_not_already_true(seed):
     room = _room(seed)
     texts = {main._wla_floor_text(room, r).strip() for r in range(room.rows)}
-    for targets, _dc in room._ss_doors:
+    for targets in door_targets(room):
         for t in targets:
             assert t not in texts
 
@@ -203,7 +203,7 @@ def test_c3_targets_are_the_double_gap(seed):
     # at spans the TAGS ONLY (no whitespace rule), so the tear-out reads
     # 'w1  w2' with TWO spaces — the da( scar, where da" left the single.
     room = _room(seed)
-    for t in room._ss_doors[2][0]:
+    for t in door_targets(room)[2]:
         assert '  ' in t
 
 
@@ -231,7 +231,7 @@ def test_spine_strike_is_nothing_here(monkeypatch):
     room = dungeon.rooms[0]
     _drive(dungeon, _K('jdit'), monkeypatch, finish=':q!\r')
     texts = {main._wla_floor_text(room, r).strip() for r in range(room.rows)}
-    assert not any(t in texts for t in room._ss_doors[0][0])
+    assert not any(t in texts for t in door_targets(room)[0])
 
 
 def test_nest_resolves_the_innermost(monkeypatch):
@@ -244,7 +244,7 @@ def test_nest_resolves_the_innermost(monkeypatch):
             + _K('jcit') + _K(cb) + [ESC]
             + _K('2jdatj.') + _K('2jditjdat'))
     _drive(dungeon, keys, monkeypatch, finish=':q!\r')
-    tgt_a, tgt_b = room._ss_doors[3][0]
+    tgt_a, tgt_b = door_targets(room)[3]
     r12, r13 = _TE_C4_ROWS
     assert main._wla_floor_text(room, r12).strip() == tgt_a
     assert main._wla_floor_text(room, r13).strip() == tgt_b

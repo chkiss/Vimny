@@ -63,32 +63,108 @@ def canonical_kind(kind: str) -> str:
     return _KIND_ALIASES.get(kind, kind)
 
 
+SEAL_MODES  = ('exact', 'contains')
+SEAL_SCOPES = ('region', 'anyrow')
+
+#: The banner a seal shows when it grinds back, if it names no other.
+SEAL_OPENED = 'The words read true — a bolt grinds back!'
+
+
 @dataclass(frozen=True)
 class Seal:
-    """A door held shut until a region of the buffer READS a particular way.
+    """A door held shut until the buffer READS a particular way.
 
-    Vimny already had five of these — the Cipher Cell, the Echo Vault, the
-    Inscription Halls and the two `_wla_doors` families — and every one was a
-    tuple of coordinates a builder hardcoded onto the room, driven by its own
-    bespoke tick. Same rule five times, expressible in a level file zero times.
-    This is that rule, named once, so an author can declare it as data.
+    Vimny grew seven of these — the Cipher Cell, the Echo Vault, the Inscription
+    Halls, the two register vaults, and the two big chassis families (`_ss_doors`
+    across ten levels, `_wla_doors` across seven) — and every one was a tuple of
+    coordinates a builder hardcoded onto the room, driven by its own bespoke
+    tick. The same rule, written seven times, expressible in a level file zero
+    times. This is that rule, named once, so a builder and an author declare it
+    the same way.
 
-    The law all five obeyed and this one keeps: a seal is **recomputed from the
+    The law all seven obeyed and this one keeps: a seal is **recomputed from the
     buffer every turn and never remembered**. Opening is not an event that fires;
     it is a reading that happens to be true right now. That is the whole reason
     `u` re-shuts a door instead of leaving a level permanently solved by an edit
     the player took back.
+
+    Four axes, which between them are everything the seven were doing:
+
+    `scope` — WHERE to read. `region` reads one rectangle of the buffer, which is
+    what an author who selected a strip and typed a password means. `anyrow`
+    reads every floor row and is satisfied if ANY of them answers, which is what
+    the chassis levels need: charwise edits do not shift rows but `dd`, `J`, `o`
+    and `p` do, and a door that named a row number would be undone by the first
+    line the player removed above it.
+
+    `mode` — HOW to compare. `exact` against the whole (stripped) text, which is
+    what prices a level whose kept words must SURVIVE the strike; `contains` for
+    the looser substring rule the label doors use.
+
+    `match` — a tuple of targets, ALL of which must read true. One door, several
+    words: a chamber holds its bolt only while every one of its sayings still
+    stands somewhere on the floor.
+
+    `requires` — indices of EARLIER seals in the same room that must also read
+    true. This is the FINAL SEAL, said as data: an exit that is stone until
+    every bolt before it has opened. Earlier-only, so the conjunction can never
+    make a cycle and can be evaluated in one pass. A seal with an empty `match`
+    and a non-empty `requires` is pure conjunction; a seal with empty `opens` is
+    a pure predicate that other seals can name.
+
+    `anchor` — where `opens` really is. `''` means the coordinates are literal.
+    `'exit_row'` replaces the ROW of every opened cell with the room's live
+    `exit_pos[0]`, because `J` and `dd` slide everything below a cut upwards and
+    `_shift_rows` keeps `exit_pos` true: the gate rides with the exit instead of
+    being left behind on the row it was built on. Columns are never shifted, so
+    they stay literal.
     """
-    region: tuple      # (r1, c1, r2, c2) — the cells whose text is read
-    match:  str        # the text that must be there
-    opens:  tuple      # ((row, col), ...) — cells that stand FLOOR while it reads true
-    mode:   str = 'exact'   # 'exact': the region reads exactly `match` (stripped).
-                            # 'contains': `match` appears somewhere in it — the looser
-                            # rule the shipped annex doors use. Exact is the default
-                            # because an author who selected a strip and typed a
-                            # password means that strip, and a door that also opens
-                            # on a longer string containing the password is a
-                            # surprise they did not ask for.
+    region:   tuple = ()    # (r1, c1, r2, c2) — the cells read under scope='region'
+    match:    tuple = ()    # targets, ALL of which must read true (a bare str is
+                            # accepted and wrapped — one target is the common case)
+    opens:    tuple = ()    # ((row, col), ...) — cells that stand FLOOR while true
+    mode:     str   = 'exact'
+    scope:    str   = 'region'
+    requires: tuple = ()    # indices of earlier seals that must also read true
+    anchor:   str   = ''    # '' | 'exit_row'
+    message:  str   = ''    # the banner when it opens; '' → SEAL_OPENED
+
+    def __post_init__(self):
+        if isinstance(self.match, str):
+            # One target, spelled the short way. Normalising here rather than at
+            # every reader is what lets `match='password'` and `match=('a','b')`
+            # be the same kind of thing downstream.
+            object.__setattr__(self, 'match',
+                               (self.match,) if self.match else ())
+        else:
+            object.__setattr__(self, 'match', tuple(self.match))
+        object.__setattr__(self, 'opens', tuple(tuple(c) for c in self.opens))
+        object.__setattr__(self, 'requires', tuple(int(i) for i in self.requires))
+
+
+def gate_row_seals(doors, exit_pos, *, mode: str = 'exact',
+                   bolt_message: str = '', final_message: str = '',
+                   final: bool = True) -> tuple:
+    """The chassis, as seals: a row of bolts, then the exit behind all of them.
+
+    `doors` is `((targets, col), ...)` — a bolt at `col` on the gate row, held
+    open while every one of `targets` reads true somewhere on the floor. The
+    gate row is not passed because it is not a fact: it is `exit_pos[0]`,
+    re-read each turn (`anchor='exit_row'`), so a `dd` above the gate slides the
+    bolts and the exit together.
+
+    The final seal is the exit itself, requiring every bolt — stone until the
+    whole level reads true, because since `A`/`o`/`O` a player can BUILD floor
+    toward an unguarded exit and geometry alone no longer contains anything.
+    """
+    seals = [Seal(match=targets, opens=((exit_pos[0], col),), mode=mode,
+                  scope='anyrow', anchor='exit_row', message=bolt_message)
+             for targets, col in doors]
+    if final:
+        seals.append(Seal(opens=(tuple(exit_pos),), anchor='exit_row',
+                          requires=tuple(range(len(seals))),
+                          message=final_message))
+    return tuple(seals)
 
 
 @dataclass

@@ -36,7 +36,7 @@ from generation.dungeon_gen import (
     _SS_ROWS, _SS_COLS, _SS_SPINE, _SS_BAY_W, _SS_BAY_E, _SS_SPAWN,
     _SS_GATE, _SS_BOLT0, _SS_EXIT, _SS_PAR, _ss_answer,
 )
-from tests import SEEDS, cached_room
+from tests import SEEDS, cached_room, door_targets
 
 ESC = Keystroke('\x1b', name='KEY_ESCAPE')
 
@@ -255,7 +255,7 @@ def test_word_draw_constraints_hold_across_many_seeds():
         positions = _match_positions(room, x)
         assert positions[0] == (16, _SS_TAIL0), (seed, x, positions)
         assert all(r == 16 and c >= _SS_TAIL0 for r, c in positions), (seed, x)
-        targets = [t for ts, _dc in room._ss_doors for t in ts]
+        targets = [t for ts in door_targets(room) for t in ts]
         assert len(set(targets)) == len(targets) == 8, (seed, targets)
 
 

@@ -143,6 +143,13 @@ def _check_bounds(lvl: F.Level, rep: Report) -> None:
         if f.length[0] < 1 or f.length[1] < f.length[0]:
             rep.fail('bounds', f'fill[{i}].length: {list(f.length)} is not a valid range')
     for i, s in enumerate(lvl.seals):
+        if not s.region:
+            # An `anyrow` seal reads the whole floor, so there is no rectangle to
+            # check and no way for a door to sit inside its own condition: the
+            # door is a WALL, and the scan reads floor text only.
+            for j, cell in enumerate(s.opens):
+                _in_range(f'seals[{i}].opens[{j}]', cell)
+            continue
         r1, c1, r2, c2 = s.region
         if r1 > r2 or c1 > c2:
             rep.fail('bounds', f'seals[{i}].region is inside out: {list(s.region)}')

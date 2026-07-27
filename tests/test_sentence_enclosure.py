@@ -35,7 +35,7 @@ from generation.dungeon_gen import (
     _SE_TEXT_MIN, _SE_BAY_E, _SE_EAST,
     _SE_C1_ROWS, _SE_C2_ROWS, _SE_C3_ROWS, _SE_C4_ROWS, _SE_C5_ROWS,
 )
-from tests import SEEDS, cached_room
+from tests import SEEDS, cached_room, door_targets
 
 ESC = Keystroke('\x1b', name='KEY_ESCAPE')
 
@@ -202,9 +202,9 @@ def test_gap_discrimination_between_c1_and_c2(seed):
     # SINGLE — the doors read the difference, so a d) golf on C1 produces
     # the wrong text.
     room = _room(seed)
-    for t in room._ss_doors[0][0]:
+    for t in door_targets(room)[0]:
         assert '  ' in t
-    for t in room._ss_doors[1][0]:
+    for t in door_targets(room)[1]:
         assert '  ' not in t
 
 
@@ -223,7 +223,7 @@ def test_junk_is_foreign_and_distinct(seed):
 def test_targets_are_not_already_true(seed):
     room = _room(seed)
     texts = {main._wla_floor_text(room, r).strip() for r in range(room.rows)}
-    for targets, _dc in room._ss_doors:
+    for targets in door_targets(room):
         for t in targets:
             assert t not in texts
 

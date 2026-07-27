@@ -328,6 +328,46 @@ single `[row, col]` or a list of them, so a three-cell gate is one seal.
 `"contains"` opts into the looser rule, where the text merely has to appear
 somewhere inside the region.
 
+**`match` may be a list**, and then every one of them has to read true at once —
+a chamber that holds its bolt only while all three of its sayings still stand is
+one seal, not three.
+
+#### Reading the whole floor instead of a rectangle
+
+```json
+{"scope": "anyrow", "match": "a watched pot never boils", "opens": [13, 22]}
+```
+
+`"scope": "anyrow"` drops the region and reads **every floor row**: the seal is
+true if any row answers. Reach for it the moment your level has a verb that
+moves lines around — `dd`, `J`, `o`, `p` all slide rows, and a seal that named a
+rectangle would be undone by the first line the player removed above it. With
+`mode: "exact"` the row must read *exactly* that text (which is what makes a
+half-cleared row read false); with `"contains"` the words merely have to appear
+on some row. An `anyrow` seal takes no `region`.
+
+#### A seal that waits for other seals
+
+```json
+{"requires": [0, 1, 2], "opens": [13, 32], "anchor": "exit_row"}
+```
+
+`requires` names **earlier** seals by index, all of which must read true. A seal
+with `requires` and no `match` reads no text of its own — it is pure conjunction,
+and that is how you write a **final seal**: a row of bolts, then an exit that is
+stone until every one of them has opened. Do that whenever your level teaches
+`A`, `o` or `O`, because a player who can build floor can walk around any gate
+that is only geometry. (Indices must point backwards, so the conjunction can
+never chase its own tail.)
+
+`"anchor": "exit_row"` puts the door on whatever row the exit is on *right now*
+rather than the row you wrote down. The column is still yours. Levels where rows
+can be cut or joined need it, or the gate is left behind on the row it was built
+on while the exit slides away.
+
+Seventeen shipped levels are built out of exactly these four pieces — see
+`world.gate_row_seals`, which is the whole chassis in nine lines.
+
 Two things a seal deliberately will not do. It **only reads walkable stone** —
 text written in wall cells never counts, which is what lets you set the password
 on a plaque beside the door without the door opening itself. And a cell in
