@@ -6907,6 +6907,26 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
                         message = _pool_msg() or message
                 _render(message)
                 continue
+            # `:` from VISUAL — vim leaves visual mode and opens the command
+            # line, having stamped the selection into the `'<` / `'>` marks.
+            # That is what makes `:fill` (and `:'<,'>s/…`) reachable without the
+            # Esc dance: the selection does not have to still be OPEN, it has to
+            # still be REMEMBERED, and this is where vim remembers it. We do not
+            # prefill the `'<,'>` range vim types for you — the forge's commands
+            # read the marks themselves, and a prefix every one of them would
+            # have to be told to ignore is a worse trade than the one keystroke
+            # it saves.
+            if not key_buf and raw == ':':
+                player.last_visual_anchor = anchor
+                player.last_visual_cursor = cursor
+                player.last_visual_mode   = vmode
+                player.visual_anchor = None
+                player.mode = Mode.COMMAND
+                player.cmd_line = ''
+                player.cmd_cursor = 0
+                room._cmd_karaoke = False   # no shipped tape enters `:` from visual
+                _render(message)
+                continue
             # Single-key visual commands (only when not mid multi-key motion)
             if not key_buf and raw == 'o':                 # swap ends
                 player.row, player.col = anchor

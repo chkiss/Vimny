@@ -64,6 +64,12 @@ A **fill region is owned by its directive**, not by you: it regrows from the
 level's seed on every build, so the editor refuses edits inside one. `:fill!`
 is how you take the words for yourself.
 
+Select the region and type `:` straight from VISUAL — `v`, walk the shape,
+`:fill plain`. Like vim, `:` leaves visual mode and stamps the selection into
+the `'<`/`'>` marks on the way out, and `:fill` reads exactly those marks: the
+selection has to be *remembered*, not still open. `gv` brings it back if you
+want to fill the same region twice with different pools.
+
 Drafts live in `~/.Vimny/drafts/`, and a draft file *is* a level file — the same
 schema, so publishing is a copy and there is no export step that can lose
 anything.

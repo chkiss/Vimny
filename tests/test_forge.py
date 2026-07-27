@@ -125,6 +125,26 @@ def test_a_visual_selection_becomes_a_fill():
     assert d.level.fills[0].length == (3, 4)
 
 
+def test_colon_straight_from_visual_fills_the_selection():
+    """`:` from VISUAL is how vim gets to the command line — it leaves visual
+    mode and stamps the selection into `'<`/`'>` on the way. Requiring Esc first
+    made the author hold the shape in their head across a keystroke that looks
+    like it throws the shape away."""
+    d = DRAFT.new('Probe', rows=8, cols=30)
+    _forge_session(d, 'jjv' + 'l' * 5 + ':fill plain 3-4\r:w\r:q!\r')
+    assert [f.region for f in d.level.fills] == [(3, 1, 3, 6)]
+
+
+def test_colon_from_visual_leaves_visual_like_vim():
+    """It is not a mode the command line runs UNDER: vim drops to normal, and so
+    a `gv` afterwards is what brings the region back."""
+    d = DRAFT.new('Probe', rows=8, cols=30)
+    # V (linewise) then `:` — the fill must read the WHOLE row, which is only
+    # true if the linewise mode was the one recorded at the `:`.
+    _forge_session(d, 'jjV:fill plain\r:w\r:q!\r')
+    assert [f.region for f in d.level.fills] == [(3, 0, 3, 29)]
+
+
 def test_adding_a_fill_does_not_wipe_the_fill_list():
     """The rebuild takes its fills from the ROOM, which is one build behind the
     level. Syncing after the append (rather than before) silently threw the new
