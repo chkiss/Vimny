@@ -41,6 +41,16 @@ def _tiny(**kw) -> F.Level:
         solution=kw.pop('solution', 'llll'), **kw)
 
 
+def _sized(**kw) -> F.Level:
+    """A level of an arbitrary shape — `_tiny` with nothing assumed about it."""
+    kw.setdefault('name', 'The Wide Stair')
+    kw.setdefault('seed', 7)
+    kw.setdefault('spawn', (1, 1))
+    kw.setdefault('exit', (1, 5))
+    kw.setdefault('solution', 'llll')
+    return F.Level(**kw)
+
+
 def _record_take(lvl: F.Level, tape: str, player_name: str = 'Normand') -> tuple:
     """Play `tape` through the real loop with the recorder attached.
 
@@ -201,8 +211,9 @@ def test_adding_a_fill_does_not_wipe_the_fill_list():
     directive away and left the author looking at words with nothing behind
     them."""
     d = DRAFT.new('Probe', rows=8, cols=30)
+    # the second is a LINE pool, so its region has to be wide enough for a saying
     _forge_session(d, 'jjv' + 'l' * 5 + T.ESC + ':fill plain\r'
-                      + 'jjv' + 'l' * 5 + T.ESC + ':fill proverbs\r:w\r:q!\r')
+                      + 'jj0v' + 'l' * 20 + T.ESC + ':fill proverbs\r:w\r:q!\r')
     assert len(d.level.fills) == 2
     assert [f.pool for f in d.level.fills] == ['plain', 'proverbs']
 
@@ -1090,7 +1101,7 @@ def test_a_bare_fill_opens_the_pool_list():
     """It used to mean `:fill plain` in silence — a default where a question
     was being asked."""
     d = DRAFT.new('Probe', rows=8, cols=30)
-    _forge_session(d, 'jv' + 'l' * 5 + ':fill\r' + 'jj\r' + ':w\r:q!\r')
+    _forge_session(d, 'jv' + 'l' * 20 + ':fill\r' + 'jj\r' + ':w\r:q!\r')
     assert [f.pool for f in d.level.fills] == ['proverbs']   # third row
 
 
@@ -1098,6 +1109,117 @@ def test_backing_out_of_a_picker_places_nothing():
     d = DRAFT.new('Probe', rows=8, cols=30)
     _forge_session(d, 'jl:rune\r' + T.ESC + ':w\r:q!\r')
     assert d.level.char_runs == []
+
+
+def test_a_line_pool_lays_whole_sayings():
+    """A proverb is a sentence. Taken apart into a bag of words by length it is
+    word salad wearing a proverb's vocabulary — and for `misquotes`, whose whole
+    point is one wrong word to spot and mend, there is nothing left to mend."""
+    from sharing import vocab
+    lvl = _sized(rows=8, cols=60,
+                 cells=['60W'] + ['W58FW'] * 6 + ['60W'],
+                 fills=[F.Fill(region=(2, 1, 5, 58), pool='proverbs',
+                               length=(3, 6), spacing=1)])
+    room = F.build(lvl).room
+    laid = {}
+    for ru in room.char_runs:
+        laid.setdefault(ru.row, []).append((ru.col, ''.join(ru.symbols)))
+    assert laid, 'the fill grew nothing at all'
+    known = {' '.join(s) for s in vocab.sayings('proverbs')}
+    for r, runs in laid.items():
+        # words one space apart belong to the same saying; a wider gap ends it
+        phrase, end = [], None
+        for c, word in sorted(runs):
+            if end is not None and c != end + 2:
+                assert ' '.join(phrase) in known, f'row {r}: {phrase} is not a proverb'
+                phrase = []
+            phrase.append(word)
+            end = c + len(word) - 1
+        assert ' '.join(phrase) in known, f'row {r}: {phrase} is not a proverb'
+
+
+def test_a_line_pool_refuses_a_region_too_narrow_to_hold_a_saying():
+    """Nothing would grow — which reads, on screen, exactly like a fill that
+    silently did not take."""
+    d = DRAFT.new('Probe', rows=8, cols=30)
+    _forge_session(d, 'jv' + 'l' * 5 + ':fill proverbs\r:w\r:q!\r')
+    assert d.level.fills == []
+
+
+def test_fill_reads_back_the_directive_under_the_cursor():
+    d = DRAFT.new('Probe', rows=8, cols=30)
+    # :fill? is a question, so nothing may change — the fill list is the proof
+    _forge_session(d, 'jv' + 'l' * 20 + ':fill plain\r' + 'jl:fill?\r:w\r:q!\r')
+    assert len(d.level.fills) == 1
+
+
+def test_the_words_are_rerolled_for_every_player():
+    """A fill is the author saying "a wall of words here", not "these words
+    here". Built at two seeds it must read differently, the way every shipped
+    level does when you enter it twice."""
+    lvl = _sized(rows=8, cols=60,
+                 cells=['60W'] + ['W58FW'] * 6 + ['60W'],
+                 fills=[F.Fill(region=(2, 1, 5, 58), pool='plain',
+                               length=(3, 6), spacing=1)])
+    one = F.build(lvl, seed=11).room
+    two = F.build(lvl, seed=12).room
+    text = lambda room: sorted((ru.row, ru.col, ''.join(ru.symbols))
+                               for ru in room.char_runs)
+    assert text(one) != text(two)
+    # …and one seed twice is still one room: nothing else is left to chance
+    assert text(F.build(lvl, seed=11).room) == text(one)
+
+
+def test_a_route_that_reads_its_own_scenery_is_refused():
+    """The freedom to re-roll is only safe because this is proven, not hoped
+    for: the tape must win at the same par whatever the words came out as.
+
+    The level here puts its exit exactly where a word happened to start, and
+    the route is `w` — word-hop onto it. That is a route reading its own
+    scenery: at any other arrangement the eighth word begins somewhere else."""
+    from sharing.validate import validate
+
+    def _lvl(exit_col, tape):
+        return _sized(rows=5, cols=60, seed=7,
+                      cells=['60W'] + ['W58FW'] * 3 + ['60W'],
+                      spawn=(1, 1), exit=(1, exit_col),
+                      teaches=['w'], requires=[],
+                      fills=[F.Fill(region=(1, 2, 1, 52), pool='plain',
+                                    length=(3, 6), spacing=1)],
+                      solution=tape)
+
+    # where the 8th word starts at the file's own seed — the fill is grown from
+    # the seed alone, so the exit can be placed after looking at it
+    starts = sorted(ru.col for ru in F.build(_lvl(2, 'w')).room.char_runs
+                    if ru.row == 1)
+    rep = validate(_lvl(starts[7], 'w' * 8))
+    assert not rep.ok
+    assert any('words grew' in e for e in rep.errors), rep.errors
+
+
+def test_publishing_trims_the_canvas_back_to_the_level():
+    """The canvas is not the level. A 100x100 draft whose room is 20x80 ships as
+    20x80 — cropping stone changes no motion, so par is untouched."""
+    lvl = DRAFT.new('CropProbe').level
+    tight = F.crop(lvl)
+    assert (tight.rows, tight.cols) == (20, 80)
+    assert tight.spawn == (1, 1)
+    assert F.crop(tight) is tight          # idempotent: already tight
+
+
+def test_cropping_carries_everything_with_it():
+    lvl = _sized(rows=20, cols=40,
+                 cells=['40W'] * 9 + ['20W18F2W'] + ['40W'] * 10,
+                 spawn=(9, 21), exit=(9, 30),
+                 char_runs=[{'row': 9, 'col': 25, 'symbols': list('door'),
+                             'kind': 'ancient'}],
+                 entities=[{'kind': 'goblin', 'at': [9, 28]}])
+    tight = F.crop(lvl)
+    assert (tight.rows, tight.cols) == (3, 20)
+    assert tight.cells == ['20W', 'W18FW', '20W']
+    assert tight.spawn == (1, 2) and tight.exit == (1, 11)
+    assert tight.char_runs[0]['col'] == 6
+    assert tight.entities[0]['at'] == [1, 9]
 
 
 def test_s_is_vims_s_again_in_the_editor():

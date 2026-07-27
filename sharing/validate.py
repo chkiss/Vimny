@@ -81,6 +81,8 @@ def validate(lvl: F.Level) -> Report:
 
     _check_solvable_and_par(lvl, rep)
     if rep.ok:
+        _check_fill_stability(lvl, rep)
+    if rep.ok:
         _check_golf(lvl, rep)
     return rep
 
@@ -242,12 +244,52 @@ def _try_build(lvl: F.Level, rep: Report):
     return None
 
 
-def _check_determinism(lvl: F.Level, first, rep: Report) -> None:
-    """Two builds of one file must be identical.
+#: Seeds a level with fills is replayed at before it may ship. Eight is enough
+#: to catch a route that reads the words (a fill is 3-6 letters a word, so a
+#: route depending on one word's length fails a seed better than half the time)
+#: and cheap enough to run on every `:check`.
+_STABILITY_SEEDS = 8
 
-    The tape was recorded against one arrangement of words. If a fill resolved
-    differently for the next player, their level is not the level the tape
-    solves — so this is a correctness rule, not tidiness.
+
+def _check_fill_stability(lvl: F.Level, rep: Report) -> None:
+    """The tape must solve the level at the same par WHATEVER the fills grew.
+
+    A fill is re-rolled on every playthrough, like every shipped level's. That
+    freedom is only safe if the author's route does not depend on which words
+    turned up, so it is proven here rather than hoped for: the tape is replayed
+    against several fresh arrangements and every one must win at the par the
+    file's own seed produced. A level that fails this is not unlucky — it has a
+    route that reads its own scenery, and the fix is to move the fill off the
+    solution path or to `:fill!` the words into text the author owns.
+    """
+    if not lvl.fills:
+        return                         # nothing to re-roll; one build is all there is
+    for i in range(_STABILITY_SEEDS):
+        seed = (lvl.seed + 1 + i * 7919) % (2 ** 31)
+        try:
+            dungeon = F.build(lvl, seed=seed)
+        except Exception as exc:       # noqa: BLE001 — author input
+            rep.fail('stability', f'the level fails to build at seed {seed}: {exc}')
+            return
+        result = replay_tape(dungeon, 'community', lvl.solution, known=lvl.known)
+        if result.error or not result.won or result.spent != rep.par:
+            rep.fail('stability',
+                     f'the fills are re-rolled for every player, and at seed '
+                     f'{seed} your tape '
+                     + (f'fails: {result.error}' if result.error else
+                        'never reaches the exit' if not result.won else
+                        f'costs {result.spent}, not the {rep.par} it costs here')
+                     + '. Your route depends on which words grew — move the fill '
+                       'off the solution path, or :fill! it into text you own.')
+            return
+
+
+def _check_determinism(lvl: F.Level, first, rep: Report) -> None:
+    """Two builds of one file, at ONE seed, must be identical.
+
+    Not a statement about the words — those are re-rolled per player now, and
+    `_check_fill_stability` is what keeps that honest. This is the narrower rule
+    that nothing else in a build is left to chance: same seed, same room.
     """
     try:
         second = F.build(lvl)

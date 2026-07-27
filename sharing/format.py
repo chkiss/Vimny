@@ -41,7 +41,7 @@ import json
 import math
 import random
 import re
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 
 from engine.editor import _CELL_CODE, _CODE_CELL, _MIST_CODE, _ENTITY_FIELDS
 from engine.world import (CellType, CharRun, DROPPABLE, Entity, Room, RoomType,
@@ -54,7 +54,7 @@ SCHEMA = 1
 #: Commands every player has, at every point in the curriculum.
 ALWAYS_ON = ('u', ':w', ':q', ':q!')
 
-MAX_ROWS, MAX_COLS = 60, 200      # _MAX_COLS in the reflow engine is 200
+MAX_ROWS, MAX_COLS = 200, 200     # _MAX_COLS in the reflow engine is 200
 MAX_ENTITIES       = 400
 MAX_FILLS          = 64
 MAX_SEALS          = 32
@@ -318,15 +318,99 @@ def encode_row(cells: list, mist_cols=()) -> str:
     return ''.join(out)
 
 
+def crop(lvl: Level) -> Level:
+    """The same level with its blank stone margins trimmed to one wall thick.
+
+    The forge hands an author a big canvas — you cannot select a region larger
+    than the room you are standing in, so the room has to be bigger than
+    anything anyone might want to draw. What ships should be the level, not the
+    canvas: a 100x100 file that is 94 rows of untouched stone is a level nobody
+    can read the diff of, and a viewport that starts by scrolling through
+    nothing.
+
+    Cropping is gameplay-neutral, which is why it can be done silently. Solid
+    stone is not a LINE — `gg`, `G` and the line numbers count from the first
+    standable row — and `$`/`0` stop at the walls that bound their own segment,
+    so removing whole rows and columns that contain nothing but wall changes no
+    motion, no distance and no par. One wall row and column are kept on every
+    side, because a room needs a border and content flush against the edge of
+    the grid is content with nothing to stop a motion.
+    """
+    grid = [expand_row(row, lvl.cols, i) for i, row in enumerate(lvl.cells)]
+    keep = set()
+    for r, row in enumerate(grid):
+        for c, ct in enumerate(row):
+            if ct != CellType.WALL:
+                keep.add((r, c))
+    for ru in lvl.char_runs:
+        for i in range(len(ru['symbols'])):
+            keep.add((int(ru['row']), int(ru['col']) + i))
+    for e in lvl.entities:
+        keep.add((int(e['at'][0]), int(e['at'][1])))
+    for f in lvl.fills:
+        keep.add((f.region[0], f.region[1]))
+        keep.add((f.region[2], f.region[3]))
+    for s in lvl.seals:
+        keep.add((s.region[0], s.region[1]))
+        keep.add((s.region[2], s.region[3]))
+        keep.update(tuple(c) for c in s.opens)
+    keep.add(tuple(lvl.spawn))
+    keep.add(tuple(lvl.exit))
+    if not keep:
+        return lvl
+    r1 = max(0, min(r for r, _ in keep) - 1)
+    r2 = min(lvl.rows - 1, max(r for r, _ in keep) + 1)
+    c1 = max(0, min(c for _, c in keep) - 1)
+    c2 = min(lvl.cols - 1, max(c for _, c in keep) + 1)
+    if (r1, c1, r2, c2) == (0, 0, lvl.rows - 1, lvl.cols - 1):
+        return lvl                                   # already tight
+
+    def _mv(pos):
+        return (int(pos[0]) - r1, int(pos[1]) - c1)
+
+    mist = {(r, c) for r, row in enumerate(lvl.cells)
+            for c in expand_row_mist(row, lvl.cols, r)[1]}
+    out = replace(
+        lvl,
+        rows=r2 - r1 + 1, cols=c2 - c1 + 1,
+        cells=[encode_row(grid[r][c1:c2 + 1],
+                          [c - c1 for (mr, c) in mist if mr == r])
+               for r in range(r1, r2 + 1)],
+        spawn=_mv(lvl.spawn), exit=_mv(lvl.exit),
+        char_runs=[{**ru, 'row': int(ru['row']) - r1, 'col': int(ru['col']) - c1}
+                   for ru in lvl.char_runs],
+        entities=[{**e, 'at': list(_mv(e['at']))} for e in lvl.entities],
+        fills=[replace(f, region=(f.region[0] - r1, f.region[1] - c1,
+                                  f.region[2] - r1, f.region[3] - c1))
+               for f in lvl.fills],
+        seals=[Seal(region=(s.region[0] - r1, s.region[1] - c1,
+                            s.region[2] - r1, s.region[3] - c1),
+                    match=s.match, mode=s.mode,
+                    opens=tuple(_mv(c) for c in s.opens))
+               for s in lvl.seals],
+    )
+    return out
+
+
 # ── Building ──────────────────────────────────────────────────────────────────
 
-def build(lvl: Level, par: int | None = None) -> Dungeon:
+def build(lvl: Level, par: int | None = None, seed: int | None = None) -> Dungeon:
     """Turn a parsed Level into a playable Dungeon.
 
     `par` is passed in rather than declared, because par is DERIVED from
     replaying the author's tape and never author-set — otherwise an author could
     hand themselves a budget. Until it is known the room carries a generous one
     so the tape can be replayed at all; `finalize_par` then pins both.
+
+    `seed` is what the FILLS grow from, and the play path passes a fresh one
+    every run — the same way a shipped level is built from a new random seed
+    each time it is entered. A fill is the author saying "a wall of words here",
+    not "these words here", and a wall that came out identical for every player
+    forever was a hard-coded block of text wearing a directive's clothes.
+    Omitted, it falls back to the file's own seed, which is what validation and
+    the editor want: a fixed arrangement to reason about. What keeps this honest
+    is `_check_fill_stability` — the tape must solve the level, at the same par,
+    whichever words grew.
     """
     if len(lvl.cells) != lvl.rows:
         raise LevelFormatError(
@@ -359,7 +443,7 @@ def build(lvl: Level, par: int | None = None) -> Dungeon:
                 room.cells[_r][_c] = CellType.WALL
 
     custom = vocab.by_length([w for w in lvl.vocabulary]) if lvl.vocabulary else None
-    rng    = random.Random(lvl.seed)
+    rng    = random.Random(lvl.seed if seed is None else seed)
 
     runs = [CharRun(row=int(r['row']), col=int(r['col']),
                     symbols=tuple(r['symbols']) if not isinstance(r['symbols'], str)
@@ -433,12 +517,9 @@ def _make_entity(spec: dict, i: int) -> Entity:
 
 
 def _resolve_fill(f: Fill, room, rng: random.Random, custom) -> list:
-    """Lay words across a region, left to right, row by row.
-
-    Deterministic from the level seed and blind to everything else, so two
-    builds of the same file are identical — which validation asserts, and the
-    tape depends on.
-    """
+    """Lay words across a region, left to right, row by row."""
+    if f.pool in vocab.LINE_POOLS:
+        return _resolve_fill_lines(f, room, rng)
     r1, c1, r2, c2 = f.region
     lo, hi = f.length
     out = []
@@ -456,6 +537,45 @@ def _resolve_fill(f: Fill, room, rng: random.Random, custom) -> list:
                 word = vocab.words(f.pool, length, rng, custom)
                 out.append(CharRun(row=r, col=c, symbols=tuple(word), kind=f.kind))
                 c += length + f.spacing
+            else:
+                c += 1
+    return out
+
+
+def _resolve_fill_lines(f: Fill, room, rng: random.Random) -> list:
+    """Lay WHOLE sayings across a region, one after another, row by row.
+
+    Each word is still its own CharRun — `w` and `e` must step word by word, as
+    they do over any other text — but the words of one saying are laid in order,
+    one space apart, so the row reads as the sentence it is. `length` is ignored
+    here: a saying is as long as it is, and the region's WIDTH is what decides
+    whether it fits. Only sayings that fit the space left on the row are
+    candidates, so a fill thins out at the right margin rather than laying half
+    a proverb.
+    """
+    r1, c1, r2, c2 = f.region
+    pool = vocab.sayings(f.pool)
+    out  = []
+    for r in range(max(0, r1), min(room.rows, r2 + 1)):
+        c     = max(0, c1)
+        limit = min(room.cols - 1, c2)
+        while c <= limit:
+            fits = [s for s in pool if c + vocab.saying_width(s) - 1 <= limit]
+            if not fits:
+                break
+            saying = rng.choice(fits)
+            width  = vocab.saying_width(saying)
+            if all(room.cells[r][c + i] in (CellType.FLOOR, CellType.CORRIDOR)
+                   for i in range(width)):
+                _c = c
+                for word in saying:
+                    out.append(CharRun(row=r, col=_c, symbols=tuple(word),
+                                       kind=f.kind))
+                    _c += len(word) + 1
+                # At least TWO blanks between sayings: one space is the gap
+                # INSIDE a saying, so a single space between them runs two
+                # proverbs together into one unreadable line.
+                c += width + max(2, f.spacing)
             else:
                 c += 1
     return out

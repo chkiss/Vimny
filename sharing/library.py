@@ -32,6 +32,7 @@ hand-edited file gets the same scrutiny as a reviewed one.
 from __future__ import annotations
 
 import json
+import random
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -108,7 +109,11 @@ def build_shelved(shelf: Shelved):
     """
     if not shelf.ok:
         raise ValueError(f'{shelf.path.name}: {shelf.error}')
-    return F.build(shelf.level, par=shelf.report.par)
+    # A FRESH seed every time it is played, exactly as a shipped level gets one.
+    # Par came from the tape and is pinned; validation proved the tape holds
+    # whatever the fills grow, so the words are free to be different.
+    return F.build(shelf.level, par=shelf.report.par,
+                   seed=random.randint(0, 2 ** 31 - 1))
 
 
 def install(path: Path) -> Shelved:

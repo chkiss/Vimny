@@ -49,9 +49,12 @@ from sharing import format as F
 from sharing.library import LEVELS_DIR
 from sharing.validate import Report, validate
 
-#: A new draft's room. Fits the stock terminal without scrolling, and is the
-#: same shape as most shipped levels.
-NEW_ROWS, NEW_COLS = 20, 80
+#: A new draft's room — a CANVAS, not a level. You cannot select a region larger
+#: than the room you are standing in, so a 20x80 draft quietly capped how big
+#: anything an author built could be, and there was no way to grow one. The
+#: canvas is big and what ships is trimmed to fit: `format.crop` takes the blank
+#: stone back off at publish time, so the generous size costs the reader nothing.
+NEW_ROWS, NEW_COLS = 100, 100
 
 
 @dataclass
@@ -85,12 +88,25 @@ class Draft:
 
 # ── The blank page ────────────────────────────────────────────────────────────
 
+#: The floor a new draft opens ON. The rest of the canvas is solid stone the
+#: author carves into with `:paint floor` — which is why the canvas can be huge
+#: without every new level being huge: stone nobody touched is trimmed at publish.
+OPEN_ROWS, OPEN_COLS = 20, 80
+
+
 def blank_cells(rows: int = NEW_ROWS, cols: int = NEW_COLS) -> list:
-    """A walled room with a floor in it — run-length encoded, like the format."""
-    wall  = F.encode_row([CellType.WALL] * cols)
-    inner = F.encode_row([CellType.WALL] + [CellType.FLOOR] * (cols - 2)
-                         + [CellType.WALL])
-    return [wall] + [inner] * (rows - 2) + [wall]
+    """A walled room in the corner of a stone canvas — run-length encoded.
+
+    The room is the familiar 20x80 so a draft still opens on somewhere to stand,
+    and it sits at the top-left so the author's first screen is that room rather
+    than a field of rock. Everything beyond it is stone waiting to be carved.
+    """
+    open_r = min(OPEN_ROWS, rows)
+    open_c = min(OPEN_COLS, cols)
+    wall   = F.encode_row([CellType.WALL] * cols)
+    inner  = F.encode_row([CellType.WALL] + [CellType.FLOOR] * (open_c - 2)
+                          + [CellType.WALL] * (cols - open_c + 1))
+    return [wall] + [inner] * (open_r - 2) + [wall] * (rows - open_r + 1)
 
 
 def new(name: str, author: str = '', rows: int = NEW_ROWS,
@@ -104,7 +120,10 @@ def new(name: str, author: str = '', rows: int = NEW_ROWS,
     lvl = F.Level(name=name.strip(), author=author.strip(),
                   seed=random.randint(0, 2 ** 31 - 1),
                   rows=rows, cols=cols, cells=blank_cells(rows, cols),
-                  spawn=(1, 1), exit=(rows - 2, cols - 2))
+                  spawn=(1, 1),
+                  # …in the room the draft opens on, not the far corner of the
+                  # canvas, which is solid rock.
+                  exit=(min(OPEN_ROWS, rows) - 2, min(OPEN_COLS, cols) - 2))
     return Draft(path=_path(lvl.name), level=lvl)
 
 
@@ -178,7 +197,18 @@ def publish(draft: Draft) -> tuple:
     rep = draft.report()
     if not rep.ok:
         return None, rep
+    # The canvas is not the level: trim the untouched stone margins to one wall
+    # thick. `crop` is gameplay-neutral (see its docstring), and this re-runs the
+    # validator on the cropped file rather than trusting that — if par came out
+    # different, something in the claim is wrong and the author must hear it
+    # instead of shipping a level whose budget no longer matches its route.
+    shipped = F.crop(draft.level)
+    if shipped is not draft.level:
+        crop_rep = validate(shipped)
+        if not crop_rep.ok or crop_rep.par != rep.par:
+            return None, crop_rep if not crop_rep.ok else rep
+        rep = crop_rep
     LEVELS_DIR.mkdir(parents=True, exist_ok=True)
     dest = LEVELS_DIR / f'{_slug(draft.level.name)}.json'
-    dest.write_text(F.dumps(draft.level), encoding='utf-8')
+    dest.write_text(F.dumps(shipped), encoding='utf-8')
     return dest, rep

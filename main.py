@@ -31,7 +31,8 @@ from render.overworld import (render_overworld, build_lines, default_cursor,
 from sharing.library import build_shelved, list_levels as community_levels
 import sharing.draft as DRAFT
 import sharing.format as LF
-from sharing.vocab import POOLS as _VOCAB_POOLS
+from sharing.vocab import (POOLS as _VOCAB_POOLS, LINE_POOLS as _VOCAB_LINE_POOLS,
+                           min_saying_width as _min_saying_width)
 from engine.vimregex import compile_vim as _vre_compile
 from render.title import render_title, render_save_select, select_quote, select_quote_by_name, select_next_lesson_quote, next_lesson_quote_entry, format_quote, MENU_ITEMS as _TITLE_MENU, NAME_MAX as _NAME_MAX
 from render.wizard_blessing import run_wizard_blessing
@@ -1014,6 +1015,97 @@ def _pick_one(term: Terminal, iw: int, game_h: int,
             sel = (sel - 1) % len(values)
         elif key.name == 'KEY_ENTER' or raw in ('\n', '\r'):
             return values[sel]
+
+
+def _pick_many(term: Terminal, iw: int, game_h: int,
+               title: str, options, chosen) -> list | None:
+    """A multi-select over a fixed list. Space toggles, ⏎ accepts, Esc cancels
+    (returning None, which is NOT the same as accepting an empty list).
+
+    The single-choice `_pick_one` cannot serve `:teaches` and `:requires`: those
+    fields hold a SET, and a picker that closed on the first pick would make the
+    two-token level harder to declare than typing it. `options` is
+    [(value, description), ...]; `chosen` is what is already set.
+    """
+    BOX_IW = 62; BOX_BW = BOX_IW + 4
+    box_bg  = term.on_color_rgb(6, 8, 12)
+    edge    = box_bg + term.color_rgb(120, 170, 210) + term.bold
+    head    = term.color_rgb(190, 215, 240) + term.bold
+    body    = term.color_rgb(130, 150, 170)
+    pick    = term.color_rgb(255, 220, 60) + term.bold
+    on      = term.color_rgb(120, 210, 140)
+    rst     = term.normal
+    col_off = max(1, (iw + 2 - BOX_BW) // 2)
+    values  = [v for v, _ in options]
+    have    = [v for v in chosen if v in values] + [v for v in chosen if v not in values]
+    sep_h   = '═' * (BOX_IW + 2)
+    width   = max([len(v) for v in values] or [1]) + 2
+
+    def row(vis, colored):
+        return (edge + '║ ' + rst + box_bg + colored +
+                box_bg + ' ' * max(0, BOX_IW - vis) + edge + ' ║' + rst)
+
+    sel = 0
+    while True:
+        # WINDOWED: a hundred tokens will not fit on any terminal, and a list
+        # that overflows pushes its own border off the screen.
+        rows = [f' [{"x" if v in have else " "}] {v:<{width}}{d}'
+                for v, d in options]
+        win   = max(3, game_h - 10)
+        first = 0 if len(rows) <= win else min(max(0, sel - win // 2),
+                                               len(rows) - win)
+        foot  = ' j/k move   space toggle   ⏎ accept   Esc cancel'
+        lines = [edge + '╔' + sep_h + '╗' + rst, row(0, '')]
+        lines.append(row(BOX_IW, head + ' ' + title
+                         + box_bg + ' ' * max(0, BOX_IW - len(title) - 1)))
+        lines.append(row(0, ''))
+        for i in range(first, min(len(rows), first + win)):
+            text = rows[i][:BOX_IW]
+            lines.append(row(len(text),
+                             (pick if i == sel else
+                              on if values[i] in have else body) + text))
+        picked = ' '.join(have) or '(none)'
+        lines.append(row(0, ''))
+        lines.append(row(min(BOX_IW, len(picked) + 1), body + ' ' + picked[:BOX_IW - 1]))
+        lines.append(row(len(foot), body + foot))
+        lines.append(row(0, ''))
+        lines.append(edge + '╚' + sep_h + '╝' + rst)
+        row_off = 3 + max(0, (game_h - len(lines)) // 2)
+        for i, line in enumerate(lines):
+            print(term.move_yx(row_off + i, col_off) + line, end='', flush=True)
+
+        key = term.inkey()
+        raw = str(key) if not key.is_sequence else ''
+        if key.name == 'KEY_ESCAPE':
+            return None
+        if raw == 'j' or key.name == 'KEY_DOWN':
+            sel = (sel + 1) % len(values)
+        elif raw == 'k' or key.name == 'KEY_UP':
+            sel = (sel - 1) % len(values)
+        elif raw == ' ':
+            if values[sel] in have:
+                have.remove(values[sel])
+            else:
+                have.append(values[sel])
+        elif key.name == 'KEY_ENTER' or raw in ('\n', '\r'):
+            return have
+
+
+#: Every token the curriculum gates on, in the order the game teaches them —
+#: which is the order an author wants to read them in, since a level's
+#: `requires` is nearly always "everything up to about here". Descriptions come
+#: from the same table the hint bar is built from, so the picker cannot drift
+#: from what the keys actually do.
+def _teachable_tokens() -> list:
+    from render.hint_bar import CMD as _CMD
+    out, seen = [], set()
+    for _lv in LEVELS:
+        for _t in _lv.get('teaches', ()):
+            if _t not in seen:
+                seen.add(_t)
+                _keys, _desc = _CMD.get(_t, (_t, ''))
+                out.append((_t, f'{_keys}  {_desc}'.strip() if _keys != _t else _desc))
+    return out
 
 
 #: The rune kinds, as the bare-`:rune` picker lists them. `void` is the only one
@@ -6397,6 +6489,24 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
                         room.rebuild_indexes()
                     _push(f'{cmd.capitalize()} moved here.')
 
+                elif _draft is not None and _rcmd == 'fill?' and edit_mode:
+                    # What grows here — the directive, not the words. The words
+                    # are re-rolled on every build; the directive is the thing
+                    # the author wrote and the only thing they can change.
+                    _f = _in_fill(room, player.row, player.col)
+                    if _f is None:
+                        _push('No fill here. '
+                              + (f'{len(_draft.level.fills)} in this level.'
+                                 if _draft.level.fills else 'None in this level.'))
+                    else:
+                        _r1, _c1, _r2, _c2 = _f.region
+                        _push(f':fill {_f.pool}'
+                              + ('' if _f.pool in _VOCAB_LINE_POOLS
+                                 else f' {_f.length[0]}-{_f.length[1]}')
+                              + (f' {_f.spacing}' if _f.spacing != 1 else '')
+                              + f'   rows {_r1}-{_r2}, cols {_c1}-{_c2}'
+                              + f'  ({(_r2 - _r1 + 1) * (_c2 - _c1 + 1)} cells)')
+
                 elif _draft is not None and _rcmd.split()[0:1] == ['fill'] and edit_mode:
                     # `:fill <pool> [lo-hi] [spacing]` over the last VISUAL
                     # selection — the same region `gv` would bring back, which is
@@ -6457,6 +6567,17 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
                                     max(_a[0], _b[0]), _c2)
                             _f = LF.Fill(region=_reg, pool=_pool,
                                          length=(_lo, _hi), spacing=_sp)
+                            _need = (_min_saying_width(_pool)
+                                     if _pool in _VOCAB_LINE_POOLS else 0)
+                            if _need and _c2 - _c1 + 1 < _need:
+                                # A line pool lays whole sayings. Too narrow and
+                                # nothing at all would grow — which reads, on
+                                # screen, exactly like a fill that did not take.
+                                _push(f'{_pool} lays whole sayings — the shortest '
+                                      f'needs {_need} columns and this selection '
+                                      f'is {_c2 - _c1 + 1} wide.')
+                                _render(message)
+                                continue
                             DRAFT.sync(_draft, room)     # keep what was painted
                             _draft.level.fills.append(_f)
                             _err = _forge_rebuild()
@@ -6591,17 +6712,35 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
 
                 elif (_draft is not None and edit_mode
                       and cmd.partition(' ')[0].rstrip('?!') in _FORGE_META):
-                    # `:field value` sets, `:field?` (or a bare `:field`) asks,
-                    # `:field!` clears — Vim's `:set opt=v` / `:set opt?` split,
-                    # with the destructive form spelled out. A bare `:author`
-                    # used to CLEAR, which meant a mistyped query silently threw
-                    # away what it was asking about.
+                    # `:field value` sets, `:field?` asks, `:field!` clears —
+                    # Vim's `:set opt=v` / `:set opt?` split, with the
+                    # destructive form spelled out. A bare `:author` used to
+                    # CLEAR, which meant a mistyped query silently threw away
+                    # what it was asking about; it asks now.
                     _head, _, _val = cmd.partition(' ')
                     _field = _head.rstrip('?!')
                     _val   = _val.strip()
                     _lv    = _draft.level
                     _get, _set = _FORGE_META[_field]
-                    if _head.endswith('!'):
+                    if _head == _field and not _val and _field in ('teaches', 'requires'):
+                        # …except these two, which hold a SET drawn from a list
+                        # the game already knows. A bare one opens that list as
+                        # a multi-select, preloaded with what is set: nobody
+                        # remembers that the text-object tokens are spelled `iw`
+                        # and `a(`, and a field you cannot spell is a field that
+                        # ships empty. `:teaches?` is still the plain question.
+                        _picked = _pick_many(
+                            term, _iw(term), term.height - 8,
+                            f'{_field} — space to toggle',
+                            _teachable_tokens(), _get(_lv).split())
+                        if _picked is None:
+                            _push('')                 # backed out of the picker
+                        else:
+                            _set(_lv, ' '.join(_picked))
+                            _push(f'{_field}: {_get(_lv) or "(none)"}'
+                                  + (f'   (:{_field} {" ".join(_picked)})'
+                                     if _picked else ''))
+                    elif _head.endswith('!'):
                         _set(_lv, '')
                         _push(f'{_field}: (cleared)')
                     elif _val and not _head.endswith('?'):

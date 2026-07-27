@@ -39,6 +39,35 @@ from content import proverbs
 #: Pools an author may name in a `fill` directive.
 POOLS = ('plain', 'mixed', 'proverbs', 'misquotes', 'custom')
 
+#: Pools laid a WHOLE SAYING at a time, not a word at a time.
+#:
+#: A proverb is a sentence, and a sentence taken apart into a bag of words by
+#: length is not a proverb — it is word salad wearing a proverb's vocabulary,
+#: which is exactly what `:fill misquotes` produced. Worse for `misquotes`
+#: specifically: the whole point of that pool is a saying with ONE word wrong,
+#: something a player can spot and mend. Shuffled, there is nothing to mend.
+LINE_POOLS = ('proverbs', 'misquotes')
+
+
+def sayings(pool: str) -> list:
+    """The whole sayings of a line pool, each a tuple of words."""
+    if pool == 'proverbs':
+        return list(proverbs.PLAIN)
+    if pool == 'misquotes':
+        return [wrong for wrong, _idx, _cure in proverbs.MISQUOTES]
+    raise ValueError(f'{pool!r} is not laid by the line; '
+                     f'line pools are {", ".join(LINE_POOLS)}')
+
+
+def saying_width(saying) -> int:
+    """How many cells a saying occupies, laid with one space between words."""
+    return sum(len(w) for w in saying) + len(saying) - 1
+
+
+def min_saying_width(pool: str) -> int:
+    """The narrowest region a line pool can put anything into at all."""
+    return min(saying_width(s) for s in sayings(pool))
+
 
 def words(pool: str, length: int, rng: random.Random,
           custom: dict | None = None) -> str:

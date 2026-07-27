@@ -32,7 +32,7 @@ always have, plus the level's own properties:
 | `:paint <kind>` | lay terrain down under the cursor, or over a `'<,'>` selection (`:paint` alone opens the palette; `:paint?` says what is there) |
 | `:spawn` / `:exit` | put the spawn or the exit where you are standing |
 | `:rune <kind>` | place one rune under the cursor (`:rune` alone opens the list) |
-| `:fill <pool> [lo-hi] [spacing]` | fill the last VISUAL selection from a word pool (`:fill` alone opens the list) |
+| `:fill <pool> [lo-hi] [spacing]` | fill the last VISUAL selection from a word pool (`:fill` alone opens the list; `:fill?` reads back the directive under the cursor) |
 | `:fill!` | drop the fill under the cursor, keeping its words as text you own |
 | `:entity [kind] [field=value …]` | place or retune the entity under the cursor (`:entity` alone opens the palette; `:entity?` reads it back; `:entity!` removes it) |
 | `:seal <text>` | arm a text-match door on the last VISUAL selection |
@@ -108,6 +108,16 @@ at the draft), not to a range, and typing one after that prefill is refused
 rather than run — `Esc` the command line and type it plain. The marks outlive
 the Esc.
 
+A draft opens on a 20x80 room in the corner of a **100x100 canvas**. The rest is
+solid stone: carve into it with `:paint floor` and the level can be as big as
+the canvas. Nothing you did not touch ships — `:publish` trims the blank stone
+margins back to one wall thick, which changes no motion and no par (stone is not
+a line, and `$`/`0` stop at the walls that bound their own segment anyway).
+
+`:teaches` and `:requires` hold a *set*, drawn from the tokens the game gates on,
+so a bare `:teaches` opens that list as a multi-select — space toggles, `⏎`
+accepts. `:teaches?` is still the plain question.
+
 Drafts live in `~/.Vimny/drafts/`, and a draft file *is* a level file — the same
 schema, so publishing is a copy and there is no export step that can lose
 anything.
@@ -163,15 +173,31 @@ Rather than placing every character by hand, name a region and a pool:
 |---|---|
 | `plain` | the shipped plain-word list |
 | `mixed` | the shipped list including symbol glyphs |
-| `proverbs` | words from the proverb collection |
-| `misquotes` | words from the misquoted-proverb collection |
+| `proverbs` | whole proverbs, one saying at a time |
+| `misquotes` | whole proverbs with one word wrong |
 | `custom` | your own `vocabulary` block |
 
-Fills resolve from the level's `seed`, so the level is **identical** for you and
-for every player. That is not tidiness — your solution tape was recorded against
-one arrangement of words, and a fill that landed differently for someone else
-would leave your tape pointing at text that is no longer there. A fill never
-paints over stone, so carve first and fill second.
+`proverbs` and `misquotes` are **line pools**: they lay a whole saying, in order,
+one space between its words and two between sayings. A proverb taken apart into
+a bag of words by length is not a proverb, and a misquote you cannot read is not
+something a player can mend. `length` is ignored for these — a saying is as long
+as it is — and the region has to be wide enough to hold the shortest one (13
+columns for `proverbs`, 20 for `misquotes`), or the fill is refused rather than
+growing nothing.
+
+**Fills are re-rolled for every player**, from a fresh seed each time the level
+is entered, exactly as every shipped level's words are. A fill is you saying "a
+wall of words here", not "these words here"; the file's own `seed` is only what
+the editor and the validator build from, so there is a fixed arrangement to
+reason about.
+
+What keeps that safe is a gate at publish time: your tape is replayed against
+eight fresh arrangements and every one must reach the exit at the same par. A
+route that depends on which words grew — hopping `w` onto an exit that happened
+to sit where a word started — is refused with the seed that broke it. Move the
+fill off the solution path, or `:fill!` it into text you own.
+
+A fill never paints over stone, so carve first and fill second.
 
 ### `vocabulary` — your own words
 
@@ -184,8 +210,8 @@ selection. With no length range given, a custom fill uses the lengths your own
 words have — so those three words are exactly what lands. Give a range
 (`:fill custom 4-5`) and it narrows to the words that fit it.
 
-A fill scatters **single words at random**; it is not a way to write a specific
-sentence in a specific place. For that, type the text in INSERT mode like any
+A word-pool fill scatters **single words at random**; it is not a way to write a
+specific sentence in a specific place. For that, type the text in INSERT mode like any
 other author, or lay a fill down and `:fill!` to take its words and edit them.
 Words are whitespace-separated, so a `vocabulary` entry can never contain a
 space — one entry is one word standing in one run of cells.
