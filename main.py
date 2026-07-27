@@ -9095,13 +9095,28 @@ class NetrwNav:
 
     # ── search over the visible buffer text ───────────────────────────────────
     def _match_cols(self, pattern, text):
-        pat = _vre_compile(pattern)
+        """Columns where `pattern` matches, ignoring case.
+
+        A netrw buffer searches with 'ignorecase' on: these labels are FILE
+        NAMES — `dungeon_03_the_rune_halls`, `Maze of Ana by Ana` — and their
+        capitalisation is the renderer's business, not something a player should
+        have to guess before they can jump to a row.
+
+        `\\c` is PREPENDED rather than forced with a regex flag so that `\\C`
+        still works: `_translate` walks the pattern in order and the last of the
+        pair wins, which is exactly Vim's rule for overriding 'ignorecase' from
+        inside a pattern. The literal fallback (an untranslatable pattern) folds
+        both sides instead, so the two paths agree."""
+        if not pattern:
+            return []
+        pat = _vre_compile('\\c' + pattern)
         if pat is not None:
             return sorted({s for s, _e in pat.finditer(text)})
-        cols, k = [], text.find(pattern)
+        low, text = pattern.lower(), text.lower()
+        cols, k = [], text.find(low)
         while k >= 0:
             cols.append(k)
-            k = text.find(pattern, k + 1)
+            k = text.find(low, k + 1)
         return cols
 
     def _search_from(self, pattern, fwd, start, start_col):

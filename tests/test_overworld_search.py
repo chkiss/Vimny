@@ -308,3 +308,24 @@ def test_search_text_matches_the_level_labels():
     for ln in _lines():
         if ln['type'] == 'level':
             assert line_search_text(ln) == key_for_slug(ln['level']['slug'])
+
+
+# ── ignorecase ────────────────────────────────────────────────────────────────
+
+def test_search_ignores_case_like_netrw(monkeypatch):
+    """Netrw searches with 'ignorecase' on. These labels are file names whose
+    capitalisation is the renderer's business — a player should not have to
+    guess it before they can jump to a row."""
+    result, _p = _drive(_K('/GOBLIN_GAUNTLET\r'), monkeypatch)
+    assert result['cursor'] == _line_of('goblin_gauntlet')
+
+
+def test_backslash_C_still_forces_case_sensitivity(monkeypatch):
+    """Vim's override: `\\C` inside the pattern beats 'ignorecase'. So the
+    upper-case pattern that just worked now finds nothing, and E486 says so."""
+    result, player = _drive(_K('/\\CGOBLIN_GAUNTLET\r'), monkeypatch)
+    assert result['cursor'] == default_cursor(_lines())
+    assert any('E486' in e for e in player.errlog)
+    # …and the same pattern in the label's own case still lands
+    result, _p = _drive(_K('/\\Cgoblin_gauntlet\r'), monkeypatch)
+    assert result['cursor'] == _line_of('goblin_gauntlet')
