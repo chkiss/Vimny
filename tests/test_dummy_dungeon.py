@@ -40,7 +40,7 @@ SEED = 42
 EXPECTED_ENTITY_KINDS = {
     'entry_marker', 'exit', 'door', 'dynamite',
     'wanderer',
-    'chest', 'chest_key', 'chest_scroll',
+    'chest_random', 'chest_key', 'chest_scroll',
     'locked_door', 'seal_door', 'boss_seal',
     'goblin', 'warden',
     'floor_key',            # reflow water-wave demo: swept away by a wave

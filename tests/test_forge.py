@@ -677,6 +677,38 @@ def test_a_red_chest_yields_a_red_key():
     assert chest.tag == 'red'
 
 
+def test_a_file_written_before_the_rename_still_loads():
+    """`chest` became `chest_random`. A kind is written into every saved layout,
+    every published level and every draft on disk, so a rename is a FORMAT
+    change — files already in the wild name the old kind, and the only
+    acceptable answer is to keep reading them.
+
+    Both load paths, because they are separate code: the community format and
+    the editor's own save. Nothing writes the old name back out, so a file heals
+    itself the next time it is saved."""
+    from engine.editor import _deserialize_room, _serialize_room
+    from engine.world import Room, RoomType, Entity, canonical_kind
+
+    lvl = _tiny()
+    lvl.entities = [{'kind': 'chest', 'at': [1, 3]},
+                    {'kind': 'goblin', 'at': [2, 3], 'drops': 'chest:red'}]
+    room = F.build(lvl).room
+    assert room.entity_at(1, 3).kind == 'chest_random'
+    # `drops` names a kind too, so it renames with it — and the validator has to
+    # agree with the parser or the file is refused for a rename nobody made
+    assert room.entity_at(2, 3).drops == 'chest_random:red'
+    from sharing import validate as V
+    assert not [e for e in V.validate(lvl).errors if 'drops' in e]
+
+    room = Room(room_type=RoomType.ENTRY, rows=4, cols=8)
+    room.cells = [[CellType.FLOOR] * 8 for _ in range(4)]
+    data = _serialize_room(room)
+    data['entities'] = [{'kind': 'chest', 'row': 1, 'col': 3}]
+    assert _deserialize_room(data).entity_at(1, 3).kind == 'chest_random'
+    # a kind that was never renamed passes through untouched
+    assert canonical_kind('goblin') == 'goblin'
+
+
 def test_the_wanderer_chases_but_never_strikes():
     """The palette calls it a half-speed chaser that does no damage — pinning
     that here because it is a claim about the ENGINE made in a menu, and the two

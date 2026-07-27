@@ -85,7 +85,7 @@ def test_no_useless_keys_or_treasure_in_the_final_map(seed):
     # epilogue scroll in the exit pocket.)
     r = _room(seed)
     assert not any(e.kind == 'locked_door' for e in r.entities)
-    chests = [e for e in r.entities if e.kind in ('chest', 'chest_key', 'chest_scroll')]
+    chests = [e for e in r.entities if e.kind in ('chest_random', 'chest_key', 'chest_scroll')]
     assert len(chests) == 1 and chests[0].scroll_id == 'wardens_rest'
 
 

@@ -46,7 +46,8 @@ from engine.command_guard import (action_allowed as _action_allowed_raw,
                                   guard_message as _guard_message_raw,
                                   _MOTION_GUARD as _MOTION_GUARD_TABLE)
 from engine.world import (DROPPABLE, Entity, CellType, CharRun, Dungeon, Seal,
-                          clone_entity, entity_letter, strike_disguise)
+                          canonical_kind, clone_entity, entity_letter,
+                          strike_disguise)
 from engine.motion import (apply_motion, _apply_esc, _reveal_from,
                            _first_non_blank_col, auto_fog_tick as _auto_fog_tick)
 from engine.text_object import compute_text_object, resolve_text_object, TextObjectType
@@ -331,7 +332,10 @@ Every word taken clean. Now take them all at once.
 """
 
 def _chest_loot(kind: str) -> str:
-    """Return the item type yielded by looting a chest."""
+    """Return the item type yielded by looting a chest.
+
+    `chest_random` rolls 50% key / 30% scroll / 20% heart. Those odds are quoted
+    verbatim in the `:entity` palette, so keep the two together."""
     if kind == 'chest_key':
         return 'key'
     if kind == 'chest_scroll':
@@ -611,8 +615,9 @@ _ENTITY_PALETTE = {
                         'opened by pasting a floor_key of the same tag',
                         ('tag', 'edit_immune')),
     'door':            (dict(hp=1, alive=True), 'opened with x', ()),
-    'chest':           (dict(hp=1, alive=True),
-                        'x to open; RANDOM loot — key, scroll or heart', ()),
+    'chest_random':    (dict(hp=1, alive=True),
+                        'x to open; random loot — 50% key, 30% scroll, 20% heart',
+                        ()),
     'chest_key':       (dict(hp=1, alive=True),
                         'a chest holding a key of the same tag', ('tag',)),
     'chest_scroll':    (dict(hp=1, alive=True), 'a chest holding a scroll',
@@ -651,7 +656,7 @@ def _entity_field(ent, field: str, raw: str) -> str:
             return f'{field} wants true or false, got {raw!r}'
         setattr(ent, field, raw.lower() in ('true', '1', 'yes'))
     elif field == 'drops':
-        if raw and raw.partition(':')[0] not in DROPPABLE:
+        if raw and canonical_kind(raw.partition(':')[0]) not in DROPPABLE:
             return (f'nothing drops {raw!r} — try '
                     + ', '.join(sorted(DROPPABLE)))
         ent.drops = raw
@@ -1814,6 +1819,7 @@ def _drop_spec(ent) -> tuple:
     honours the same allowlist the validator enforces, so a file that slipped past
     an older validator still cannot hatch anything here."""
     kind, _, tag = (ent.drops or '').partition(':')
+    kind = canonical_kind(kind)
     return (kind, tag) if kind in DROPPABLE else ('', '')
 
 
@@ -1872,7 +1878,7 @@ def _drop_tick(room, player) -> list:
 #: THING, not the level — an author gets the right sentence without writing one.
 _DROP_BANNER = {
     'floor_key':       'The last of them falls — a key clatters to the floor.  🗝',
-    'chest':           'The last of them falls, and a chest is left standing.',
+    'chest_random':    'The last of them falls, and a chest is left standing.',
     'chest_key':       'The last of them falls, and a chest is left standing.',
     'heart_container': 'The last of them falls — something quick and red is left behind.',
     'gold':            'The last of them falls, and coin spills across the stone.',
@@ -7615,7 +7621,7 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
             else:
                 interacted = False
                 cur = room.entity_at(player.row, player.col)
-                if cur and cur.kind in ('chest', 'chest_key', 'chest_scroll'):
+                if cur and cur.kind in ('chest_random', 'chest_key', 'chest_scroll'):
                     undo_stack.append(_snapshot(room, player, budget, ans=cmd_start_ans))
                     redo_stack.clear()
                     item = _chest_loot(cur.kind)

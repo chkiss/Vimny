@@ -20,7 +20,7 @@
 
 Rules enforced here:
   1. chest_key count == locked_door count  (every lock has exactly one key)
-  2. No plain 'chest' entities             (loot must be pre-assigned at generation)
+  2. No plain 'chest_random' entities             (loot must be pre-assigned at generation)
 
 The dummy dungeon is an admin sandbox and is intentionally excluded.
 """
@@ -60,7 +60,7 @@ def test_chest_keys_match_locked_doors(level, seed):
 @pytest.mark.parametrize('level', sorted(_BUILDERS))
 def test_no_untyped_chests(level, seed):
     room    = _room(level, seed)
-    unnamed = [e for e in room.entities if e.kind == 'chest' and e.alive]
+    unnamed = [e for e in room.entities if e.kind == 'chest_random' and e.alive]
     assert not unnamed, (
         f'level {level} seed {seed}: {len(unnamed)} untyped chest(s) — '
         'use chest_key or chest_scroll instead'

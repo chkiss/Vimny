@@ -185,7 +185,7 @@ def test_close_gap_pull_slides_past_an_entity():
     relies on corridor text sliding past its chests and keys) — a deliberate
     asymmetry with the push, which loses a glyph shoved onto an entity."""
     room = _room(letters='', void_n=0)
-    room.entities.append(Entity(kind='chest', row=1, col=8))
+    room.entities.append(Entity(kind='chest_random', row=1, col=8))
     room.char_runs = [CharRun(1, 5, ('a',), 'ancient'),
                       CharRun(1, 10, ('z',), 'ancient')]
     room.rebuild_indexes()

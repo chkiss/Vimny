@@ -38,7 +38,7 @@ def _make_room(rows=7, cols=16):
 class TestEntityAt:
     def test_hit(self):
         room = _make_room()
-        e = Entity(kind='chest', row=2, col=5)
+        e = Entity(kind='chest_random', row=2, col=5)
         room.add_entity(e)
         assert room.entity_at(2, 5) is e
 
@@ -48,20 +48,20 @@ class TestEntityAt:
 
     def test_dead_entity_excluded_by_rebuild(self):
         room = _make_room()
-        e = Entity(kind='chest', row=2, col=5, alive=False)
+        e = Entity(kind='chest_random', row=2, col=5, alive=False)
         room.entities.append(e)
         room.rebuild_indexes()
         assert room.entity_at(2, 5) is None
 
     def test_dead_entity_not_added_by_add_entity(self):
         room = _make_room()
-        e = Entity(kind='chest', row=2, col=5, alive=False)
+        e = Entity(kind='chest_random', row=2, col=5, alive=False)
         room.add_entity(e)
         assert room.entity_at(2, 5) is None
 
     def test_two_entities_different_cells(self):
         room = _make_room()
-        e1 = Entity(kind='chest', row=2, col=3)
+        e1 = Entity(kind='chest_random', row=2, col=3)
         e2 = Entity(kind='exit',  row=3, col=9)
         room.add_entity(e1)
         room.add_entity(e2)
@@ -81,7 +81,7 @@ class TestEntityMutationHelpers:
 
     def test_remove_entity_clears_index(self):
         room = _make_room()
-        e = Entity(kind='chest', row=2, col=5)
+        e = Entity(kind='chest_random', row=2, col=5)
         room.add_entity(e)
         room.remove_entity(e)
         assert room.entity_at(2, 5) is None
@@ -89,7 +89,7 @@ class TestEntityMutationHelpers:
 
     def test_kill_entity_clears_index_and_sets_alive_false(self):
         room = _make_room()
-        e = Entity(kind='chest', row=2, col=5)
+        e = Entity(kind='chest_random', row=2, col=5)
         room.add_entity(e)
         room.kill_entity(e)
         assert room.entity_at(2, 5) is None

@@ -120,8 +120,12 @@ def _check_bounds(lvl: F.Level, rep: Report) -> None:
         # and the checks above already counted. So it is the only field where a
         # downloaded level could otherwise conjure something nobody validated:
         # `drops: warden` on a goblin hatches a boss out of thin air. Loot only.
+        # Through `canonical_kind` first, so a renamed loot kind is not read as
+        # a kind nobody has ever heard of — the parser accepts the old name and
+        # the validator has to agree with it or the file is refused for a rename
+        # its author never made.
         drop = str(e.get('drops', '') or '')
-        if drop and drop.partition(':')[0] not in F.DROPPABLE:
+        if drop and F.canonical_kind(drop.partition(':')[0]) not in F.DROPPABLE:
             rep.fail('bounds', f'entities[{i}].drops: {drop!r} is not something a '
                                f'creature may leave behind; allowed kinds are '
                                f'{", ".join(sorted(F.DROPPABLE))}')

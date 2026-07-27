@@ -157,7 +157,7 @@ def test_light_shafts_pierce_separators_but_not_the_throat(seed):
 def test_no_chest(seed):
     room = _room(seed)
     assert not [e for e in room.entities
-                if e.kind in ('chest', 'chest_key', 'chest_scroll')]
+                if e.kind in ('chest_random', 'chest_key', 'chest_scroll')]
 
 
 # ── the draw: anchored proverbs ───────────────────────────────────────────────

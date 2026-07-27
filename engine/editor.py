@@ -19,7 +19,8 @@
 """Admin editor helpers: snapshot/restore, cut/paste, range operations."""
 from __future__ import annotations
 from engine.world import (
-    CellType, CharRun, Entity, Room, RoomType, clone_entity, normalize_row_word_kinds,
+    CellType, CharRun, Entity, Room, RoomType, canonical_kind, clone_entity,
+    normalize_row_word_kinds,
 )
 
 _SUBST_CYCLE = {
@@ -297,7 +298,11 @@ def _deserialize_room(data: dict):
     room.char_runs    = [CharRun(row=r['row'], col=r['col'],
                                  symbols=tuple(r['symbols']), kind=r['kind'])
                      for r in data.get('char_runs', [])]
-    room.entities = [Entity(**{k: v for k, v in e.items() if k in _ENTITY_FIELDS})
+    # `canonical_kind` on the way in: a layout saved before a kind was renamed
+    # still names the old one, and a save file that stops loading is a level the
+    # author simply loses.
+    room.entities = [Entity(**{k: (canonical_kind(v) if k == 'kind' else v)
+                               for k, v in e.items() if k in _ENTITY_FIELDS})
                      for e in data.get('entities', [])]
     ep = data.get('exit_pos')
     room.exit_pos = tuple(ep) if ep else None

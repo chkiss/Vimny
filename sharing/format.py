@@ -45,7 +45,7 @@ from dataclasses import dataclass, field
 
 from engine.editor import _CELL_CODE, _CODE_CELL, _ENTITY_FIELDS
 from engine.world import (CellType, CharRun, DROPPABLE, Entity, Room, RoomType,
-                          Seal)
+                          Seal, canonical_kind)
 from generation.dungeon_gen import Dungeon
 from sharing import vocab
 
@@ -401,6 +401,13 @@ def _make_entity(spec: dict, i: int) -> Entity:
     kw.pop('col', None)
     if 'kind' not in kw:
         raise LevelFormatError(f'entities[{i}].kind: required')
+    # A published level is written once and read forever. When a kind is
+    # renamed, every file already in the wild still names the old one, and the
+    # only acceptable answer is to keep reading it.
+    kw['kind'] = canonical_kind(str(kw['kind']))
+    if kw.get('drops'):
+        _k, _sep, _tag = str(kw['drops']).partition(':')
+        kw['drops'] = canonical_kind(_k) + _sep + _tag
     unknown = set(spec) - set(_ENTITY_FIELDS) - {'at'}
     if unknown:
         raise LevelFormatError(f'entities[{i}]: unknown field(s) {sorted(unknown)}')

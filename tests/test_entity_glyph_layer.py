@@ -101,7 +101,7 @@ def test_line_string_overlays_letter_on_text():
 def test_non_letter_entities_are_not_text_matchable():
     # doors/keys/chests/exits paint decorative symbols — entity_letter is None, so
     # f/t fall through to the char/terrain beneath (regression-guarded in test_motion).
-    for kind in ('door', 'locked_door', 'exit', 'floor_key', 'chest', 'heart_container',
+    for kind in ('door', 'locked_door', 'exit', 'floor_key', 'chest_random', 'heart_container',
                  'seal_door', 'entry_marker', 'shield'):
         assert entity_letter(Entity(kind=kind, row=0, col=0)) is None
 
@@ -109,4 +109,4 @@ def test_non_letter_entities_are_not_text_matchable():
 def test_caret_transparent_is_floorlike_only():
     # the caret passes through floor-like markers; foes/loot are content it stops on
     assert {'door', 'exit', 'seal_door'} <= CARET_TRANSPARENT
-    assert not ({'warden', 'goblin', 'floor_key', 'chest'} & CARET_TRANSPARENT)
+    assert not ({'warden', 'goblin', 'floor_key', 'chest_random'} & CARET_TRANSPARENT)

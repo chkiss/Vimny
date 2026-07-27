@@ -1587,7 +1587,7 @@ def build_dungeon_dummy(seed: int) -> Dungeon:
     ])
 
     _band(13, [
-        ('chest',     _at(12, kind='chest')),
+        ('chest',     _at(12, kind='chest_random')),
         ('key_chest', _at(12, kind='chest_key')),
         ('scroll',    _at(12, kind='chest_scroll')),
         ('coin',      _at(12, kind='gold')),
@@ -5993,7 +5993,7 @@ def build_dungeon_stair_rail(seed: int) -> Dungeon:
 
     room.entities.append(Entity(kind='exit', row=_SR_EXIT[0], col=_SR_EXIT[1],
                                 edit_immune=True))
-    room.entities.append(Entity(kind='chest', row=_SR_CHEST[0], col=_SR_CHEST[1]))
+    room.entities.append(Entity(kind='chest_random', row=_SR_CHEST[0], col=_SR_CHEST[1]))
     room.spawn_pos = (_SR_STEP_ROWS[_SR_SPAWN_IDX], _SR_STEP_COLS[_SR_SPAWN_IDX])
     room.exit_pos  = _SR_EXIT
 

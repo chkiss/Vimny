@@ -52,7 +52,7 @@ def make_room(room_type: RoomType, rows: int, cols: int, seed: int) -> Room:
         room.exit_pos = (rows - 2, cols - 2)
         room.entities.append(Entity(kind='exit', row=rows - 2, col=cols - 2))
     elif room_type == RoomType.CHEST:
-        room.entities.append(Entity(kind='chest', row=rows // 2, col=cols - 3))
+        room.entities.append(Entity(kind='chest_random', row=rows // 2, col=cols - 3))
     elif room_type in (RoomType.COMBAT,):
         # Place a couple of wanderers
         for _ in range(rng.randint(1, 2)):

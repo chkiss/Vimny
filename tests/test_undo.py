@@ -87,7 +87,7 @@ def _apply_undo(item, room, player, budget):
 def test_chest_x_undo_restores_entity():
     """x on a chest pushes a dict undo entry so the chest is restored."""
     room = _corridor()
-    chest = Entity(kind='chest', row=2, col=5)
+    chest = Entity(kind='chest_random', row=2, col=5)
     room.add_entity(chest)
     player = Player(row=2, col=5)
     budget = Budget(20)
@@ -102,7 +102,7 @@ def test_chest_x_undo_restores_entity():
     restored = room.entity_at(2, 5)
     assert restored is not None, "chest must be present after undo"
     assert restored.alive
-    assert restored.kind == 'chest'
+    assert restored.kind == 'chest_random'
 
 
 def test_chest_key_adds_floor_key_to_register():
@@ -236,7 +236,7 @@ def test_all_entity_mutations_undoable():
     edit mode, so the test guards against the omission.
     """
     room = _corridor()
-    chest = Entity(kind='chest',       row=2, col=2)
+    chest = Entity(kind='chest_random',       row=2, col=2)
     door  = Entity(kind='door',        row=2, col=4)
     dyn   = Entity(kind='dynamite',    row=2, col=7)
     ldoor = Entity(kind='locked_door', row=2, col=10)
@@ -253,7 +253,7 @@ def test_all_entity_mutations_undoable():
                   'entities': _snap(room), 'fog_cells': set(room.fog_cells)}
     room.kill_entity(chest)
     budget.spend(1)
-    entity_actions.append(('chest', chest_undo))
+    entity_actions.append(('chest_random', chest_undo))
 
     # --- door x ---
     door_undo = {'row': player.row, 'col': player.col, 'spent': budget.spent,

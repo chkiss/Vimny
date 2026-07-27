@@ -132,7 +132,7 @@ def test_undercroft_is_below_the_gate(seed):
     standable = [r for r in range(room.rows)
                  if any(room.is_passable(r, c) for c in range(room.cols))]
     assert standable[-1] == _SR_UNDERCROFT > _SR_GATE
-    chest = next(e for e in room.entities if e.kind == 'chest')
+    chest = next(e for e in room.entities if e.kind == 'chest_random')
     assert (chest.row, chest.col) == _SR_CHEST
 
 

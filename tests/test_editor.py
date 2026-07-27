@@ -139,7 +139,7 @@ class TestEdCut:
 
     def test_cut_entity(self):
         room = _make_room()
-        e = Entity(kind='chest', row=3, col=5)
+        e = Entity(kind='chest_random', row=3, col=5)
         room.add_entity(e)
         item = _ed_cut(room, 3, 5)
         assert item['type'] == 'entity'
@@ -190,7 +190,7 @@ class TestEdSnapshotRestore:
 
     def test_snapshot_creates_independent_entity_list(self):
         room = _make_room()
-        room.add_entity(Entity(kind='chest', row=2, col=3))
+        room.add_entity(Entity(kind='chest_random', row=2, col=3))
         p = _player()
         snap = _ed_snapshot(room, p)
         room.entities.clear()
@@ -319,12 +319,12 @@ class TestEdPaste:
 
     def test_paste_entity(self):
         room = _make_room()
-        src = Entity(kind='chest', row=0, col=0)
+        src = Entity(kind='chest_random', row=0, col=0)
         items = [{'type': 'entity', 'entity': src}]
         _ed_paste(room, 3, 7, items)
         e = room.entity_at(3, 7)
         assert e is not None
-        assert e.kind == 'chest'
+        assert e.kind == 'chest_random'
 
     def test_paste_entity_keeps_combat_fields_with_fresh_uid(self):
         room = _make_room()
@@ -387,7 +387,7 @@ class TestEdClearRow:
 
     def test_removes_alive_entities_from_row(self):
         room = _make_room()
-        room.add_entity(Entity(kind='chest', row=3, col=5))
+        room.add_entity(Entity(kind='chest_random', row=3, col=5))
         _ed_clear_row(room, 3)
         assert room.entity_at(3, 5) is None
 
@@ -451,8 +451,8 @@ class TestClipDesc:
         assert _clip_desc(item) == 'ancient rune'
 
     def test_entity_item(self):
-        item = {'type': 'entity', 'entity': Entity(kind='chest', row=0, col=0)}
-        assert _clip_desc(item) == 'chest'
+        item = {'type': 'entity', 'entity': Entity(kind='chest_random', row=0, col=0)}
+        assert _clip_desc(item) == 'chest_random'
 
     def test_wall_cell_item(self):
         item = {'type': 'cell', 'cell_type': CellType.WALL}
@@ -510,13 +510,13 @@ class TestSerializeRoom:
 
     def test_dead_entities_excluded(self):
         room = _make_room()
-        alive = Entity(kind='chest', row=2, col=3)
+        alive = Entity(kind='chest_random', row=2, col=3)
         dead  = Entity(kind='door',  row=4, col=7, alive=False)
         room.add_entity(alive)
         room.entities.append(dead)
         d = _serialize_room(room)
         assert len(d['entities']) == 1
-        assert d['entities'][0]['kind'] == 'chest'
+        assert d['entities'][0]['kind'] == 'chest_random'
 
     def test_entry_and_exit_pos(self):
         room = _make_room()

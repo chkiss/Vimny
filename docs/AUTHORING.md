@@ -161,6 +161,12 @@ Everything that makes a creature what it is travels with it — `hp`, `ai`,
 `tag`, `swole`, `edit_immune`, `drops`, `group`. An exit entity is added at
 `geometry.exit` automatically if you do not place one.
 
+The three chests are `chest_key` (a key), `chest_scroll` (a scroll) and
+`chest_random` (50% key, 30% scroll, 20% heart). A level that wants a specific
+reward should name it — `chest_random` is a gamble, and its odds are rolled at
+the moment of looting, so it is not something a solution tape can rely on.
+`chest_random` was called `chest` before; files that still say so keep working.
+
 **Colours pair on `tag`.** A `floor_key` tagged `gold` opens a `locked_door`
 tagged `gold` and nothing else; an untagged door takes any key. Pick up a key
 with `x` — it goes into the unnamed register — and open the door by pasting it
@@ -176,7 +182,7 @@ it. It reports the command it just ran (`Placed by  :entity floor_key tag=red`)
 **`drops` is what a creature leaves behind when it dies**, written `kind` or
 `kind:tag`. It is a field on the creature, not a rule about goblins, so a
 zombie, a wanderer or a Warden all drop the same way. Only loot may be
-dropped — `floor_key`, `chest`, `chest_key`, `heart_container`, `gold`,
+dropped — `floor_key`, `chest_random`, `chest_key`, `heart_container`, `gold`,
 `dynamite` — because `drops` is the one field in the format that creates
 something at runtime, and a level should not be able to hatch a boss the
 validator never counted.

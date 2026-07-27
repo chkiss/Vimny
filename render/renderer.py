@@ -128,7 +128,7 @@ _REG_ENTITY: dict[str, tuple[str, object]] = {
     'dynamite':       ('!',  lambda: C.dynamite_fg()),
     'door':           ('▬',  lambda: C.door_fg()),
     'locked_door':    ('⊞',  lambda: C.locked_door_fg()),
-    'chest':          ('🞔', lambda: C.chest_fg()),
+    'chest_random':   ('🞔', lambda: C.chest_fg()),
     'chest_key':      ('🞔', lambda: C.chest_fg()),
     'chest_scroll':   ('🞔', lambda: C.chest_fg()),
     'wanderer':       ('♟',  lambda: C.enemy_fg()),
@@ -222,7 +222,7 @@ def _ent_cell_str(ent, room, r: int, c: int, mode, floor_bg: str) -> str:
                 return C.wall_bg() + C.sealed_wall_fg() + S.SEALED_WALL + rst
             return C.wall_bg() + ' ' + rst
         return floor_bg + C.exit_fg() + S.EXIT + rst
-    if ent.kind in ('chest', 'chest_key', 'chest_scroll'):
+    if ent.kind in ('chest_random', 'chest_key', 'chest_scroll'):
         return floor_bg + C.chest_fg() + S.CHEST + rst
     if ent.kind == 'hat':                       # the Warden's hat on the ground
         return floor_bg + C.shimmer_fg(time.time() * 0.5) + S.HAT + rst

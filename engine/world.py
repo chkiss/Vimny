@@ -46,8 +46,21 @@ class RoomType(Enum):
 #: `drops='warden'` on a goblin and hatch a boss the validator never counted. Loot
 #: only — nothing here moves, fights, or blocks a path. Lives beside the field it
 #: governs so the runtime and the validator can never be reading different lists.
-DROPPABLE = frozenset({'floor_key', 'chest', 'chest_key', 'heart_container',
-                       'gold', 'dynamite'})
+DROPPABLE = frozenset({'floor_key', 'chest_random', 'chest_key',
+                       'heart_container', 'gold', 'dynamite'})
+
+#: Kinds that have been RENAMED, old name → current name. A kind is written into
+#: every saved layout, every published community level and every forge draft on
+#: disk, so a rename is a format change: files written before it still name the
+#: old kind and must keep working. Load paths run names through
+#: :func:`canonical_kind`; nothing writes an old name back out, so the alias is
+#: one-way and the files heal themselves on the next save.
+_KIND_ALIASES = {'chest': 'chest_random'}
+
+
+def canonical_kind(kind: str) -> str:
+    """The current name for a possibly-renamed entity kind."""
+    return _KIND_ALIASES.get(kind, kind)
 
 
 @dataclass(frozen=True)
@@ -80,7 +93,7 @@ class Seal:
 
 @dataclass
 class Entity:
-    kind: str           # 'wanderer', 'guard', 'chest', 'exit', etc.
+    kind: str           # 'wanderer', 'guard', 'chest_random', 'exit', etc.
     row: int
     col: int
     hp: int   = 1
