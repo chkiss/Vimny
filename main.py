@@ -6471,10 +6471,74 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
                             _push(f'This is {_w!r} — but a tape cannot name it '
                                   f'while this fill grows {_f.length[0]}-'
                                   f'{_f.length[1]} letter words: par would be a '
-                                  f'different number for every player.')
+                                  f'different number for every player. '
+                                  f':fill length={len(_w)} to settle it.')
                         else:
                             _push(f'{_w!r} is <fill{_n}.{_k}> — write that in the '
                                   f'solution and every player types their own.')
+
+                elif (_draft is not None and edit_mode
+                      and _rcmd.split()[0:1] == ['fill']
+                      and _rcmd.split()[1:]
+                      and all('=' in _a3 for _a3 in _rcmd.split()[1:])):
+                    # `:fill length=4` — retune the fill under the cursor IN
+                    # PLACE, the way `:entity field=value` retunes an entity.
+                    # Without this the only way to change a directive was to
+                    # re-select the region and `:fill` again, which APPENDS: two
+                    # overlapping directives growing words over each other. The
+                    # fill keeps its index in the list, because that index is
+                    # what a `<fill0.3>` in the solution is pointing at.
+                    _f = _in_fill(room, player.row, player.col)
+                    if _f is None:
+                        _push('No fill under the cursor. Stand in one to retune '
+                              'it, or select a region and :fill <pool> to make '
+                              'a new one.')
+                    else:
+                        _i    = _draft.level.fills.index(_f)
+                        _kw   = dict(pool=_f.pool, length=_f.length,
+                                     spacing=_f.spacing, kind=_f.kind)
+                        _bad  = ''
+                        for _a3 in _rcmd.split()[1:]:
+                            _k3, _, _v3 = _a3.partition('=')
+                            if _k3 == 'pool':
+                                if _v3 not in _VOCAB_POOLS:
+                                    _bad = (f'Unknown pool: {_v3}  '
+                                            f'({"|".join(_VOCAB_POOLS)})')
+                                _kw['pool'] = _v3
+                            elif _k3 == 'length':
+                                _p3 = _v3.split('-')
+                                if not all(_x.isdigit() for _x in _p3) or len(_p3) > 2:
+                                    _bad = (f'length={_v3}: write one number for '
+                                            f'words all the same length, or lo-hi '
+                                            f'for a range.')
+                                else:
+                                    _kw['length'] = (int(_p3[0]), int(_p3[-1]))
+                            elif _k3 == 'spacing' and _v3.isdigit():
+                                _kw['spacing'] = int(_v3)
+                            else:
+                                _bad = (f'{_a3}: a fill has pool, length and '
+                                        f'spacing.')
+                        if _bad:
+                            _push(_bad)
+                        else:
+                            _new = LF.Fill(region=_f.region, **_kw)
+                            DRAFT.sync(_draft, room)       # keep what was painted
+                            _draft.level.fills[_i] = _new
+                            _err = _forge_rebuild()
+                            if _err:
+                                _draft.level.fills[_i] = _f
+                                _forge_rebuild()
+                                _push(f'Fill refused — {_err}')
+                            else:
+                                _lo3, _hi3 = _new.length
+                                _push(f'fill[{_i}]: {_new.pool} '
+                                      + (f'{_lo3}' if _lo3 == _hi3
+                                         else f'{_lo3}-{_hi3}')
+                                      + f' letters, spacing {_new.spacing} — '
+                                      + ('a tape may name these words now.'
+                                         if _lo3 == _hi3 else
+                                         'a tape cannot name words of a rolled '
+                                         'length.'))
 
                 elif _draft is not None and _rcmd.split()[0:1] == ['fill'] and edit_mode:
                     # `:fill <pool> [lo-hi] [spacing]` over the last VISUAL
@@ -6491,7 +6555,7 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
                         # A bare `:fill` used to mean `:fill plain` silently.
                         # It is a question — which pools are there? — and the
                         # picker answers it, then names the line it stood for.
-                        _via = ''
+                        _via, _picked_len = '', ''
                         if _args:
                             _pool = _args[0]
                         else:
@@ -6500,6 +6564,30 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
                                 'fill the selection from',
                                 [(_p, _POOL_NOTES.get(_p, '')) for _p in _VOCAB_POOLS])
                             _via = f'   (:fill {_pool})' if _pool else ''
+                            # Second step: how long the words are. It belongs in
+                            # the menu because it is not a detail — a single
+                            # length is what lets a solution NAME one of these
+                            # words (`<fill0.3>`), and an author who never learns
+                            # that meets it as a refusal at :check instead. A
+                            # saying pool has no say in its own lengths, and a
+                            # custom pool takes them from the author's own words,
+                            # so neither is asked.
+                            if (_pool and _pool not in _VOCAB_LINE_POOLS
+                                    and not (_pool == 'custom'
+                                             and _draft.level.vocabulary)):
+                                _picked_len = _pick_one(
+                                    term, _iw(term), term.height - 8,
+                                    'how long are the words',
+                                    [('3-6', 'mixed — no tape can name these '
+                                             'words')]
+                                    + [(f'{_n3}-{_n3}',
+                                        f'all {_n3} letters — a tape can name '
+                                        f'them')
+                                       for _n3 in (3, 4, 5, 6)])
+                                if not _picked_len:
+                                    _pool = ''          # backed out of the step
+                                else:
+                                    _via = f'   (:fill {_pool} {_picked_len})'
                         if not _pool:
                             _push('')                 # backed out of the picker
                         elif _pool not in _VOCAB_POOLS:
@@ -6517,7 +6605,7 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
                                 _lo, _hi, _sp = min(_lens), max(_lens), 1
                             else:
                                 _lo, _hi, _sp = 3, 6, 1
-                            for _a2 in _args[1:]:
+                            for _a2 in ([_picked_len] if _picked_len else _args[1:]):
                                 if '-' in _a2:
                                     _p = _a2.split('-')
                                     _lo, _hi = int(_p[0]), int(_p[1])

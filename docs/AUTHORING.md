@@ -453,8 +453,12 @@ word tells you the reference for it:
 ```
 
 That is also where you find out you cannot: over a fill that rolls its lengths,
-`:fill?` says so instead, rather than letting you discover it at `:check` in a
-message about par.
+`:fill?` says so, and names the cure — `:fill length=4` retunes the fill under
+the cursor in place, keeping its region *and its position in the list*, which
+is what any `<fill0.…>` you have already written is pointing at. (Re-selecting
+the region and `:fill`ing it again would **add** a second directive on top of
+the first.) A bare `:fill` asks for the length as its second step, so you meet
+the choice while you are making the wall rather than at `:check`.
 
 Two rules come with it, and both are about par being **one number**:
 

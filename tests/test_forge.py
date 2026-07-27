@@ -227,6 +227,53 @@ def test_dropping_a_fill_hands_its_words_to_the_author():
     assert all(r['row'] == 3 for r in d.level.char_runs)
 
 
+def test_a_fill_can_be_retuned_in_place():
+    """Changing a directive used to mean selecting the region again and
+    `:fill`ing it, which APPENDS — two overlapping fills growing words over each
+    other. `:fill length=4` retunes the one under the cursor, the way
+    `:entity field=value` retunes an entity."""
+    d = DRAFT.new('Probe', rows=8, cols=30)
+    _forge_session(d, 'jjv' + 'l' * 20 + T.ESC + ':fill plain 3-6\r'
+                      + ':fill length=4\r:w\r:q!\r')
+    assert len(d.level.fills) == 1, 'a retune must not add a second directive'
+    assert d.level.fills[0].length == (4, 4)
+    assert d.level.fills[0].region == (3, 1, 3, 21), 'the region is untouched'
+
+
+def test_a_retune_keeps_the_fill_where_it_was_in_the_list():
+    """`<fill0.3>` in a solution points at a fill BY INDEX, so a retune that
+    reordered the list would silently repoint every reference in the tape."""
+    d = DRAFT.new('Probe', rows=8, cols=30)
+    _forge_session(d, 'jjv' + 'l' * 20 + T.ESC + ':fill plain 3-6\r'
+                      + 'jj0v' + 'l' * 20 + T.ESC + ':fill mixed 3-6\r'
+                      + 'kk0:fill length=5\r:w\r:q!\r')
+    assert [f.pool for f in d.level.fills] == ['plain', 'mixed']
+    assert [f.length for f in d.level.fills] == [(5, 5), (3, 6)]
+
+
+def test_retuning_where_there_is_no_fill_says_so():
+    d = DRAFT.new('Probe', rows=8, cols=30)
+    _forge_session(d, ':fill length=4\r:w\r:q!\r')
+    assert d.level.fills == []
+
+
+def test_a_bare_fill_also_asks_how_long_the_words_are():
+    """The length is not a detail: one length is what lets a solution NAME one
+    of these words, and an author who is never asked meets that as a refusal at
+    `:check` instead."""
+    d = DRAFT.new('Probe', rows=8, cols=30)
+    #                    pool: plain (first row)   length: 4-4 (third row)
+    _forge_session(d, 'jv' + 'l' * 20 + ':fill\r' + '\r' + 'jj\r' + ':w\r:q!\r')
+    assert [f.pool for f in d.level.fills] == ['plain']
+    assert d.level.fills[0].length == (4, 4)
+
+
+def test_backing_out_of_the_length_step_grows_nothing():
+    d = DRAFT.new('Probe', rows=8, cols=30)
+    _forge_session(d, 'jv' + 'l' * 20 + ':fill\r' + '\r' + T.ESC + ':w\r:q!\r')
+    assert d.level.fills == []
+
+
 def test_a_fill_survives_a_save_and_reopen(tmp_path, monkeypatch):
     monkeypatch.setattr(DRAFT, 'DRAFTS_DIR', tmp_path)
     d = DRAFT.new('Probe', rows=8, cols=30)
