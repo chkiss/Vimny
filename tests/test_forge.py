@@ -895,3 +895,28 @@ def test_bolting_twice_widens_one_door_rather_than_making_two():
                       + 'jjlll:seal open sesame\r:bolt\rl:bolt\r:w\r:q!\r')
     assert len(d.level.seals) == 1
     assert d.level.seals[0].opens == ((4, 4), (4, 5))
+
+
+def test_at_colon_replaces_the_same_entity_again():
+    """`.` repeats the last CHANGE; an Ex command is not one, so vim answers
+    `:entity goblin` again with `@:` — and `@@` after that. Placing a row of
+    identical entities is the commonest thing an author does, and before this
+    the only route was retyping the whole command each time."""
+    d = DRAFT.new('Probe', rows=8, cols=30)
+    _forge_session(d, 'jl:entity goblin tag=echo\rl@:l@@\r:w\r:q!\r')
+    gobs = sorted((e['at'][1], e.get('tag')) for e in d.level.entities
+                  if e['kind'] == 'goblin')
+    assert gobs == [(2, 'echo'), (3, 'echo'), (4, 'echo')]
+
+
+def test_the_colon_register_holds_the_bare_command_like_vim():
+    """Vim's `:` register holds `entity goblin` — the text, without the colon or
+    the <CR>. Those go back on at replay, so the register stays something you
+    could read or paste rather than a keystroke soup."""
+    from engine.registers import record_register, read_register, clip_to_keys
+
+    class _P:
+        registers = {}
+    p = _P()
+    record_register(p, ':', 'entity goblin tag=echo')
+    assert clip_to_keys(read_register(p, ':')) == 'entity goblin tag=echo'

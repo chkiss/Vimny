@@ -185,6 +185,25 @@ offer that set, with a last row for typing anything else.
 It reports the command it just ran (`Placed by  :entity floor_key tag=red`)
 — the menu answers "what can I place?", the command is still the mechanism.
 
+**To place the same thing again, `@:`** — and `@@` for each one after that.
+`.` will not do it: `.` repeats the last *change*, and an Ex command is not one,
+in Vimny exactly as in Vim. `@:` re-runs the last `:` command wherever the
+cursor now is, so a row of identical goblins is `:entity goblin tag=echo`
+once, then `l@:l@@l@@`.
+
+**`edit_immune` makes an entity survive editing.** It is a field on the entity
+(`warden` and `locked_door` offer it), and it does two things: a `d` that would
+sweep the entity's cell passes over it (`engine/operator.py`), and a `dd`/`J`
+that would collapse its whole row refuses to (`engine/reflow.py`). It is the
+"boss parries the blade" ward: a Warden so marked twists out of a visual cut
+("only a precise `x` can land on him"), which is what stops a boss fight from
+being won with `dG`. It is also how a level anchors a row it cannot afford to
+lose — nearly every shipped exit entity is `edit_immune`, and that is what
+stops a final `D` or `dG` from deleting the way out from under the player.
+
+It guards the **editing verbs only**. `x` combat damage still lands, by design:
+`edit_immune` says "this is a creature, not text", not "this is invincible".
+
 **`drops` is what a creature leaves behind when it dies**, written `kind` or
 `kind:tag`. It is a field on the creature, not a rule about goblins, so a
 zombie, a wanderer or a Warden all drop the same way. Only loot may be

@@ -5832,6 +5832,16 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
                 player.cmd_cursor = 0
                 msg_pool.clear()
                 msg_idx = 0
+                if cmd:
+                    # The `:` register — vim's record of the last Ex command, and
+                    # the reason `@:` repeats it. `.` deliberately does NOT: it
+                    # repeats the last CHANGE, and an Ex command is not one, so
+                    # an author who has just placed an entity with `:entity` and
+                    # wants another reaches for `@:` (then `@@`). Stored as the
+                    # bare command text, the way vim stores it, so `":p` pastes
+                    # something readable; the leading `:` and the <CR> are put
+                    # back at replay time.
+                    _reg_record(player, ':', cmd)
 
                 if level == 'warden_pathfinder' and cmd == 'e wardenverse':
                     if getattr(room, 'verse_collapsed', False):
@@ -7572,6 +7582,12 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
             # Any register replays — including one you merely YANKED. Vim's `@`
             # runs a register's contents as keystrokes, whatever put them there.
             keys = _reg_keys(_reg_read(player, reg)) if reg else None
+            if keys and reg == ':':
+                # `@:` re-runs the last Ex command. The `:` register holds the
+                # bare text (that is what vim shows you), so the colon and the
+                # <CR> that make it a command again are added here rather than
+                # baked into the stored value.
+                keys = ':' + keys + '\r'
             if not keys:
                 _push('No macro to play.')
             else:
