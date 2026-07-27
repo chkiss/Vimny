@@ -716,6 +716,31 @@ def _entity_field(ent, field: str, raw: str) -> str:
     return ''
 
 
+#: Cells an entity may stand on. Walls, wood and water are skipped by a ranged
+#: `:entity` rather than refused, so a selection swept across a room places into
+#: the room and not into its masonry — the author drew the region they could
+#: see, and the parts of it that are stone were never the point.
+_ENTITY_CELLS = (CellType.FLOOR, CellType.CORRIDOR)
+
+
+def _entity_cells(room, player) -> list:
+    """The cells of the last VISUAL selection an entity could occupy, in reading
+    order. The same region `:fill` takes — a LINEWISE selection is whole rows,
+    charwise/block is the rectangle between the two ends — because two commands
+    that both say `'<,'>` must mean the same shape by it."""
+    a, b = player.last_visual_anchor, player.last_visual_cursor
+    if a is None or b is None:
+        return []
+    if player.last_visual_mode == Mode.VISUAL_LINE:
+        c1, c2 = 0, room.cols - 1
+    else:
+        c1, c2 = min(a[1], b[1]), max(a[1], b[1])
+    return [(r, c)
+            for r in range(min(a[0], b[0]), max(a[0], b[0]) + 1)
+            for c in range(max(0, c1), min(room.cols - 1, c2) + 1)
+            if 0 <= r < room.rows and room.cells[r][c] in _ENTITY_CELLS]
+
+
 def _describe_entity(ent) -> str:
     """`:entity?` — the creature under the cursor, and only what is true of it.
 
@@ -6029,7 +6054,7 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
                         _merge_adjacent_char_runs(room, r)
                         _push(f'Placed {kind} rune.')
 
-                elif (cmd.rstrip('?!') == 'entity' or cmd.startswith('entity ')) \
+                elif (_rcmd.rstrip('?!') == 'entity' or _rcmd.startswith('entity ')) \
                         and edit_mode and player_name == 'admin':
                     # `:entity` is `:set`, applied to the cell under the cursor:
                     #
@@ -6045,20 +6070,43 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
                     # second language bolted onto a Vim game.
                     _r, _c = player.row, player.col
                     _here  = room.entity_at(_r, _c)
-                    _bare  = cmd.rstrip('?!') == 'entity'
-                    _toks  = cmd[7:].split()
-                    if _bare and cmd.endswith('?'):
-                        _push(_describe_entity(_here) if _here
-                              else 'Nothing here.')
-                    elif _bare and cmd.endswith('!'):
-                        if _here is None:
+                    _bare  = _rcmd.rstrip('?!') == 'entity'
+                    _toks  = _rcmd[7:].split()
+                    # `?` and `!` take the range too. A question asked of a
+                    # selection is answered about the selection (a tally, not the
+                    # one cell the cursor happens to be on), and `:'<,'>entity!`
+                    # is the eraser the ranged placement needs — put a rank down,
+                    # look at it, sweep it away.
+                    _sel = _entity_cells(room, player) if _vrange else []
+                    if _bare and _rcmd.endswith('?'):
+                        if _vrange:
+                            _tally = {}
+                            for _sr, _sc in _sel:
+                                _e = room.entity_at(_sr, _sc)
+                                if _e is not None:
+                                    _tally[_e.kind] = _tally.get(_e.kind, 0) + 1
+                            _push(f'Nothing in those {len(_sel)} cells.'
+                                  if not _tally else
+                                  ', '.join(f'{_n} × {_k}' for _k, _n
+                                            in sorted(_tally.items()))
+                                  + f'  ({len(_sel)} cells)')
+                        else:
+                            _push(_describe_entity(_here) if _here
+                                  else 'Nothing here.')
+                    elif _bare and _rcmd.endswith('!'):
+                        _gone = ([e for e in room.entities
+                                  if (e.row, e.col) in set(_sel)] if _vrange
+                                 else ([_here] if _here is not None else []))
+                        if not _gone:
                             _push('Nothing here to remove.')
                         else:
                             ed_undo.append(_ed_snapshot(room, player))
                             ed_redo.clear()
-                            room.entities.remove(_here)
+                            for _e in _gone:
+                                room.entities.remove(_e)
                             room.rebuild_indexes()
-                            _push(f'Removed {_here.kind}.')
+                            _push(f'Removed {_gone[0].kind}.' if len(_gone) == 1
+                                  else f'Removed {len(_gone)} entities.')
                     else:
                         # A bare `:entity` opens the palette. It is a question
                         # ("what can I place?"), and a list is the answer — but
@@ -6084,34 +6132,67 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
                         elif not _kind and _here is None:
                             _push('Nothing here to change — name a kind '
                                   'to place one (:entity for the list).')
+                        elif _vrange and not _entity_cells(room, player):
+                            _push('Nothing standable in that selection.')
                         else:
+                            # WITH a range, the command addresses every standable
+                            # cell of the selection instead of the one under the
+                            # cursor — a rank of goblins, a row of chests, a wall
+                            # of coins, in one command. It is the same region
+                            # `:fill` takes, and it means the same thing: the
+                            # shape you drew. Without one, the cursor cell, as
+                            # before. Walls and water are skipped rather than
+                            # refused, so a selection swept across a room places
+                            # into the room and not into its masonry.
                             ed_undo.append(_ed_snapshot(room, player))
                             ed_redo.clear()
-                            if _kind:
-                                if _here is not None:
-                                    room.entities.remove(_here)
-                                    room.rebuild_indexes()
-                                _here = Entity(kind=_kind, row=_r, col=_c,
-                                               **_ENTITY_PALETTE[_kind][0])
-                                room.add_entity(_here)
-                            _bad = []
-                            for _t in _toks:
-                                _f, _eq, _v = _t.partition('=')
-                                if not _eq or _f not in _ENTITY_SETTABLE:
-                                    _bad.append(f'{_t} (try '
-                                                f'{"/".join(_ENTITY_SETTABLE)})')
-                                    continue
-                                _why = _entity_field(_here, _f, _v)
-                                if _why:
-                                    _bad.append(_why)
+                            _targets = (_entity_cells(room, player) if _vrange
+                                        else [(_r, _c)])
+                            _bad, _made = [], []
+                            for _r, _c in _targets:
+                                _here = room.entity_at(_r, _c)
+                                if _kind:
+                                    if _here is not None:
+                                        room.entities.remove(_here)
+                                        room.rebuild_indexes()
+                                    _here = Entity(kind=_kind, row=_r, col=_c,
+                                                   **_ENTITY_PALETTE[_kind][0])
+                                    room.add_entity(_here)
+                                elif _here is None:
+                                    continue      # retune skips an empty cell
+                                _made.append(_here)
+                                for _t in _toks:
+                                    _f, _eq, _v = _t.partition('=')
+                                    if not _eq or _f not in _ENTITY_SETTABLE:
+                                        _bad.append(f'{_t} (try '
+                                                    f'{"/".join(_ENTITY_SETTABLE)})')
+                                        continue
+                                    _why = _entity_field(_here, _f, _v)
+                                    if _why:
+                                        _bad.append(_why)
+                                if _bad:
+                                    break         # one bad field is bad for all
+                            _bad = list(dict.fromkeys(_bad))
+                            _here = _made[-1] if _made else _here
                             # After a MENU placement, name the command that would
                             # have done the same thing. It is the one piece of
                             # information the screen cannot show, and it is how
                             # the picker teaches its own way out of being needed.
-                            _push('; '.join(_bad) if _bad
-                                  else (f'Placed by  :entity {_via}' if _via
-                                        else f'{"Placed" if _kind else "Set"}: '
-                                             f'{_describe_entity(_here)}'))
+                            # Over a RANGE, the count is that piece instead: a `V`
+                            # across a wide room holds more cells than it looks
+                            # like it does, and `u` is the answer if it is wrong.
+                            if _bad:
+                                _push('; '.join(_bad))
+                            elif len(_made) > 1:
+                                _push(f'{len(_made)} × {_here.kind} '
+                                      f'{"placed" if _kind else "set"} '
+                                      f'over {len(_targets)} cells.')
+                            elif not _made:
+                                _push('Nothing in that selection to change.')
+                            else:
+                                _push(f'Placed by  :entity {_via}' if _via
+                                      else f'{"Placed" if _kind else "Set"}: '
+                                           f'{_describe_entity(_here)}')
 
                 # ── The forge: authoring a shareable level ────────────────────
                 # These only exist when a DRAFT is open. Everything they touch is
@@ -6562,11 +6643,10 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
                 elif _vrange:
                     # Caught, not parsed. `:` from VISUAL hands you a range
                     # because most of what you do to a selection wants one; the
-                    # commands that are addressed to a PLACE instead (`:entity`
-                    # at the cursor, `:w` at the draft) are not a range command
-                    # with the range ignored, and pretending otherwise would let
-                    # `:'<,'>entity goblin` place one goblin and look like it
-                    # had filled the selection with them.
+                    # commands addressed to the DRAFT rather than to any part of
+                    # the map (`:w`, `:teaches`, `:name`) have nothing a region
+                    # could mean, and running one with the range ignored would
+                    # teach the author that the prefix is decoration.
                     _push(f":{_rcmd.split()[0] if _rcmd else '(nothing)'} does not "
                           'take a range — Esc the command line and type it plain.')
 

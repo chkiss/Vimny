@@ -189,6 +189,17 @@ Only **`gold`, `red` and `blue`** are painted as colours. Pairing is plain
 string equality, so `tag=vault_b` pairs a key to a door perfectly well — it
 just draws in the default brass. Use a colour when the colour is the clue.
 
+**`:entity` takes the `'<,'>` range**, and then it addresses every standable
+cell of the selection instead of the one under the cursor — a rank of goblins,
+a row of chests, a wall of coins, in one command. `v`, walk the shape, then
+`:entity goblin tag=echo`. Wall, wood and water cells inside the region are
+skipped rather than refused: the region was drawn around what you could see,
+and a creature sealed in the stonework can never be reached or fought.
+
+`:'<,'>entity!` sweeps the selection clear again (`gv` first, to get the region
+back), and `:'<,'>entity?` answers with a tally rather than one cell. The whole
+ranged placement is one `u`.
+
 **`:entity` with no argument opens the palette**, and the palette can set the
 same fields the command can: pick a kind with `j`/`k` and Enter, then walk that
 kind's notable fields, Enter to choose a value, and Enter on the last row to

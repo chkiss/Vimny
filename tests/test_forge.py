@@ -135,25 +135,53 @@ def test_colon_straight_from_visual_fills_the_selection():
     assert [f.region for f in d.level.fills] == [(3, 1, 3, 6)]
 
 
-def test_the_command_line_arrives_prefilled_with_the_range():
-    """Vim types `'<,'>` for you. It is also the only thing on screen that says
-    the selection survived the keystroke that visibly cleared it — so the fill
-    above works because the range is REAL, not because it was ignored."""
+def test_a_ranged_entity_fills_the_whole_selection():
+    """`:'<,'>entity goblin` is a RANK of goblins, not one at the cursor. The
+    range is prefilled by `:` and it is real — the same region `:fill` takes."""
     d = DRAFT.new('Probe', rows=8, cols=30)
-    # No `fill` typed at all: the line already holds the range, and a range with
-    # nothing addressed to it is caught rather than run.
-    _forge_session(d, 'jjv' + 'l' * 5 + ':entity goblin\r:w\r:q!\r')
-    assert not [e for e in d.level.entities if e['kind'] == 'goblin'], \
-        ":'<,'>entity must be refused, not quietly placed at the cursor"
+    _forge_session(d, 'jjv' + 'l' * 5 + ':entity goblin tag=echo\r:w\r:q!\r')
+    gobs = sorted(tuple(e['at']) for e in d.level.entities if e['kind'] == 'goblin')
+    assert gobs == [(3, 1), (3, 2), (3, 3), (3, 4), (3, 5), (3, 6)]
+    assert {e['tag'] for e in d.level.entities if e['kind'] == 'goblin'} == {'echo'}
 
 
-def test_esc_backs_out_of_the_range_for_a_command_that_has_no_use_for_it():
-    """The way out is vim's own: Esc the command line, type it plain. The marks
-    outlive that — the selection is remembered, not held open."""
+def test_without_a_range_entity_is_still_one_cell():
+    """The cursor form is untouched: no range, no rank."""
     d = DRAFT.new('Probe', rows=8, cols=30)
-    _forge_session(d, 'jjv' + 'l' * 5 + ':' + T.ESC + ':entity goblin\r'
-                      + ':fill plain\r:w\r:q!\r')
-    assert [e['kind'] for e in d.level.entities if e['kind'] == 'goblin'] == ['goblin']
+    _forge_session(d, 'jjllll:entity goblin\r:w\r:q!\r')
+    assert [tuple(e['at']) for e in d.level.entities if e['kind'] == 'goblin'] \
+        == [(3, 5)]
+
+
+def test_a_ranged_bang_sweeps_the_rank_away_again():
+    """The eraser the ranged placement needs — put a rank down, look at it,
+    `gv` and sweep it. Without `!` taking the range too, undoing a rank by hand
+    is one `:entity!` per cell."""
+    d = DRAFT.new('Probe', rows=8, cols=30)
+    _forge_session(d, 'jjv' + 'l' * 5 + ':entity goblin\r'
+                      + 'gv:entity!\r:w\r:q!\r')
+    assert not [e for e in d.level.entities if e['kind'] == 'goblin']
+
+
+def test_the_range_skips_masonry_rather_than_placing_into_it():
+    """A selection swept across a room is drawn around what the author can see.
+    The wall cells inside it were never the point — placing a goblin inside the
+    stonework would be a creature that cannot be reached or fought."""
+    d = DRAFT.new('Probe', rows=8, cols=30)
+    # column 0 and the last column are the room's border wall
+    _forge_session(d, 'jjV:entity goblin\r:w\r:q!\r')
+    cols = sorted(e['at'][1] for e in d.level.entities if e['kind'] == 'goblin')
+    assert cols and 0 not in cols and 29 not in cols
+
+
+def test_a_draft_command_still_refuses_the_range():
+    """`:w` is addressed to the DRAFT, not to any part of the map — there is no
+    region it could mean, so it is caught rather than run with the range
+    ignored. Esc, and the marks outlive it."""
+    d = DRAFT.new('Probe', rows=8, cols=30)
+    _forge_session(d, 'jjv' + 'l' * 5 + ':name Ranged\r'
+                      + ':' + T.ESC + ':fill plain\r:w\r:q!\r')
+    assert d.level.name == 'Probe', 'the ranged :name must not have landed'
     assert [f.region for f in d.level.fills] == [(3, 1, 3, 6)]
 
 
