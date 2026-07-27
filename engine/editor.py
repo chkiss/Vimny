@@ -143,8 +143,14 @@ def slot_at(room, row: int, col: int):
     keystroke; a position survives.
 
     `slot` is None on a gap between words: inside the region, but on nothing.
+
+    The fill number is the LEVEL's, not the room's: a tape counts fills across
+    every hall in walking order, and `fill_index0` is where this hall's own
+    fills start in that count. A hall that reported its fills from zero would
+    hand the author a reference that names a different fill in the file.
     """
-    for i, f in enumerate(getattr(room, 'fills', ())):
+    base = getattr(room, 'fill_index0', 0)
+    for i, f in enumerate(getattr(room, 'fills', ()), start=base):
         if not f.covers(row, col):
             continue
         laid = sorted((ru for ru in room.char_runs if f.covers(ru.row, ru.col)),

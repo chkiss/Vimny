@@ -92,33 +92,55 @@ def validate(lvl: F.Level) -> Report:
 # ── 2. Bounds ─────────────────────────────────────────────────────────────────
 
 def _check_bounds(lvl: F.Level, rep: Report) -> None:
-    if not 3 <= lvl.rows <= F.MAX_ROWS:
-        rep.fail('bounds', f'geometry.rows must be 3..{F.MAX_ROWS}, got {lvl.rows}')
-    if not 3 <= lvl.cols <= F.MAX_COLS:
-        rep.fail('bounds', f'geometry.cols must be 3..{F.MAX_COLS}, got {lvl.cols}')
-    if len(lvl.entities) > F.MAX_ENTITIES:
-        rep.fail('bounds', f'at most {F.MAX_ENTITIES} entities, got {len(lvl.entities)}')
-    if len(lvl.fills) > F.MAX_FILLS:
-        rep.fail('bounds', f'at most {F.MAX_FILLS} fill directives, got {len(lvl.fills)}')
-    if len(lvl.seals) > F.MAX_SEALS:
-        rep.fail('bounds', f'at most {F.MAX_SEALS} seals, got {len(lvl.seals)}')
+    # The caps are on the LEVEL, not the hall: a level that split four hundred
+    # entities across five halls would be exactly as heavy as one that put them
+    # in a single room, and the cap exists to bound the weight, not the tidiness.
+    halls = lvl.halls
+    if len(halls) > F.MAX_HALLS:
+        rep.fail('bounds', f'at most {F.MAX_HALLS} halls, got {len(halls)}')
+    _total = lambda key: sum(len(getattr(h, key)) for h in halls)
+    if _total('entities') > F.MAX_ENTITIES:
+        rep.fail('bounds', f'at most {F.MAX_ENTITIES} entities in a level, '
+                           f'got {_total("entities")}')
+    if _total('fills') > F.MAX_FILLS:
+        rep.fail('bounds', f'at most {F.MAX_FILLS} fill directives in a level, '
+                           f'got {_total("fills")}')
+    if _total('seals') > F.MAX_SEALS:
+        rep.fail('bounds', f'at most {F.MAX_SEALS} seals in a level, '
+                           f'got {_total("seals")}')
+    for h in halls:
+        _check_hall_bounds(h, lvl, rep)
     if len(lvl.solution) > F.MAX_TAPE:
         rep.fail('bounds', f'solution tape longer than {F.MAX_TAPE} keystrokes')
     if not lvl.solution.strip():
         rep.fail('bounds', 'solution: required — it is what proves the level '
                            'is solvable and what sets its par')
 
+
+def _check_hall_bounds(h: F.Hall, lvl: F.Level, rep: Report) -> None:
+    """Everything that has to be true of ONE hall's geometry and content.
+
+    Every message names `h.where` — `geometry` for the level's own hall,
+    `then[0].geometry` for the next — so an author with a five-hall level is
+    told which one to go and open.
+    """
+    if not 3 <= h.rows <= F.MAX_ROWS:
+        rep.fail('bounds', f'{h.where}.rows must be 3..{F.MAX_ROWS}, got {h.rows}')
+    if not 3 <= h.cols <= F.MAX_COLS:
+        rep.fail('bounds', f'{h.where}.cols must be 3..{F.MAX_COLS}, got {h.cols}')
+
     def _in_range(what, pos):
         r, c = pos
-        if not (0 <= r < lvl.rows and 0 <= c < lvl.cols):
-            rep.fail('bounds', f'{what} {list(pos)} is outside the {lvl.rows}x{lvl.cols} room')
+        if not (0 <= r < h.rows and 0 <= c < h.cols):
+            rep.fail('bounds', f'{what} {list(pos)} is outside the {h.rows}x{h.cols} hall')
 
-    _in_range('geometry.spawn', lvl.spawn)
-    _in_range('geometry.exit', lvl.exit)
-    for i, e in enumerate(lvl.entities):
+    _ent_at, _fill_at, _seal_at = h.at('entities'), h.at('fill'), h.at('seals')
+    _in_range(f'{h.where}.spawn', h.spawn)
+    _in_range(f'{h.where}.exit', h.exit)
+    for i, e in enumerate(h.entities):
         at = e.get('at')
         if isinstance(at, (list, tuple)) and len(at) == 2:
-            _in_range(f'entities[{i}].at', at)
+            _in_range(f'{_ent_at}[{i}].at', at)
         # `drops` is the only field in the format that CREATES an entity at
         # runtime — everything else describes something the file already listed
         # and the checks above already counted. So it is the only field where a
@@ -130,42 +152,43 @@ def _check_bounds(lvl: F.Level, rep: Report) -> None:
         # its author never made.
         drop = str(e.get('drops', '') or '')
         if drop and F.canonical_kind(drop.partition(':')[0]) not in F.DROPPABLE:
-            rep.fail('bounds', f'entities[{i}].drops: {drop!r} is not something a '
+            rep.fail('bounds', f'{_ent_at}[{i}].drops: {drop!r} is not something a '
                                f'creature may leave behind; allowed kinds are '
                                f'{", ".join(sorted(F.DROPPABLE))}')
-    for i, f in enumerate(lvl.fills):
+    for i, f in enumerate(h.fills):
         r1, c1, r2, c2 = f.region
         if r1 > r2 or c1 > c2:
-            rep.fail('bounds', f'fill[{i}].region is inside out: {list(f.region)}')
+            rep.fail('bounds', f'{_fill_at}[{i}].region is inside out: {list(f.region)}')
         if f.pool not in F.vocab.POOLS:
-            rep.fail('bounds', f'fill[{i}].pool: unknown pool {f.pool!r}')
+            rep.fail('bounds', f'{_fill_at}[{i}].pool: unknown pool {f.pool!r}')
         if f.pool == 'custom' and not lvl.vocabulary:
-            rep.fail('bounds', f"fill[{i}] uses the 'custom' pool but the level "
-                               f'declares no vocabulary')
+            rep.fail('bounds', f"{_fill_at}[{i}] uses the 'custom' pool but the "
+                               f'level declares no vocabulary')
         if f.length[0] < 1 or f.length[1] < f.length[0]:
-            rep.fail('bounds', f'fill[{i}].length: {list(f.length)} is not a valid range')
-    for i, s in enumerate(lvl.seals):
+            rep.fail('bounds', f'{_fill_at}[{i}].length: {list(f.length)} is not '
+                               f'a valid range')
+    for i, s in enumerate(h.seals):
         if not s.region:
             # An `anyrow` seal reads the whole floor, so there is no rectangle to
             # check and no way for a door to sit inside its own condition: the
             # door is a WALL, and the scan reads floor text only.
             for j, cell in enumerate(s.opens):
-                _in_range(f'seals[{i}].opens[{j}]', cell)
+                _in_range(f'{_seal_at}[{i}].opens[{j}]', cell)
             continue
         r1, c1, r2, c2 = s.region
         if r1 > r2 or c1 > c2:
-            rep.fail('bounds', f'seals[{i}].region is inside out: {list(s.region)}')
-        _in_range(f'seals[{i}].region start', (r1, c1))
-        _in_range(f'seals[{i}].region end', (r2, c2))
+            rep.fail('bounds', f'{_seal_at}[{i}].region is inside out: {list(s.region)}')
+        _in_range(f'{_seal_at}[{i}].region start', (r1, c1))
+        _in_range(f'{_seal_at}[{i}].region end', (r2, c2))
         for j, cell in enumerate(s.opens):
-            _in_range(f'seals[{i}].opens[{j}]', cell)
+            _in_range(f'{_seal_at}[{i}].opens[{j}]', cell)
             if min(r1, r2) <= cell[0] <= max(r1, r2) and \
                min(c1, c2) <= cell[1] <= max(c1, c2):
                 # A door inside its own condition is a door that opens, becomes
                 # walkable, gets written on, and re-shuts on whatever the player
                 # wrote — a loop with no honest reading. Refuse it while the
                 # author can still see which seal they meant.
-                rep.fail('bounds', f'seals[{i}].opens[{j}] {list(cell)} lies inside '
+                rep.fail('bounds', f'{_seal_at}[{i}].opens[{j}] {list(cell)} lies inside '
                                    f"the seal's own region — a door cannot be part "
                                    f'of the text that opens it')
 
@@ -185,12 +208,13 @@ def _check_slot_refs(lvl: F.Level, rep: Report) -> None:
     turned up decides both the word and its length, and `length` is not even
     consulted when they are laid.
     """
+    fills = lvl.all_fills          # counted across the halls, as the tape counts
     for n, k in _tape.slot_refs(lvl.solution):
-        if n >= len(lvl.fills):
+        if n >= len(fills):
             rep.fail('bounds', f'solution: <fill{n}.{k}> names fill {n}, but the '
-                               f'level has {len(lvl.fills)} fill directive(s)')
+                               f'level has {len(fills)} fill directive(s)')
             continue
-        f = lvl.fills[n]
+        f = fills[n]
         if f.pool in F.vocab.LINE_POOLS:
             rep.fail('bounds', f'solution: <fill{n}.{k}> reads a word out of a '
                                f'saying pool ({f.pool!r}). Which saying grew '
@@ -306,7 +330,7 @@ def _check_fill_stability(lvl: F.Level, rep: Report) -> None:
     route that reads its own scenery, and the fix is to move the fill off the
     solution path or to `:fill!` the words into text the author owns.
     """
-    if not lvl.fills:
+    if not lvl.all_fills:
         return                         # nothing to re-roll; one build is all there is
     for i in range(_STABILITY_SEEDS):
         seed = (lvl.seed + 1 + i * 7919) % (2 ** 31)
@@ -345,14 +369,18 @@ def _check_determinism(lvl: F.Level, first, rep: Report) -> None:
     except Exception as exc:                       # noqa: BLE001
         rep.fail('determinism', f'the second build failed where the first did not: {exc}')
         return
-    a, b = first.room, second.room
-    if a.cells != b.cells:
-        rep.fail('determinism', 'two builds produced different cell grids')
-    if _runs_key(a) != _runs_key(b):
-        rep.fail('determinism', 'two builds produced different text — a fill '
-                                'directive is not seeded deterministically')
-    if _ents_key(a) != _ents_key(b):
-        rep.fail('determinism', 'two builds produced different entities')
+    for i, (a, b) in enumerate(zip(first.rooms, second.rooms)):
+        where = 'geometry' if i == 0 else f'then[{i - 1}]'
+        if a.cells != b.cells:
+            rep.fail('determinism', f'two builds produced different cell grids '
+                                    f'in {where}')
+        if _runs_key(a) != _runs_key(b):
+            rep.fail('determinism', f'two builds produced different text in '
+                                    f'{where} — a fill directive is not seeded '
+                                    f'deterministically')
+        if _ents_key(a) != _ents_key(b):
+            rep.fail('determinism', f'two builds produced different entities '
+                                    f'in {where}')
 
 
 def _runs_key(room):
@@ -365,18 +393,20 @@ def _ents_key(room):
 
 
 def _check_standable(lvl: F.Level, dungeon, rep: Report) -> None:
-    room = dungeon.room
-    sr, sc = room.spawn_pos
-    if room.cells[sr][sc] not in _STANDABLE:
-        rep.fail('bounds', f'geometry.spawn {list(room.spawn_pos)} is not a '
-                           f'floor cell — the player would start inside stone')
-    er, ec = room.exit_pos
-    if room.cells[er][ec] not in _STANDABLE:
-        # A SEALED exit is legitimate (a gate opened by solving the level), so
-        # this is advice rather than a rejection — solvability is the real test.
-        rep.warn('bounds', f'geometry.exit {list(room.exit_pos)} is not floor. '
-                           f'That is fine for a sealed exit that a tick opens, '
-                           f'but nothing else will reach it.')
+    """Every hall has to be enterable, and every hall's exit is a door: the last
+    one out of the level, the others into the hall after."""
+    for hall, room in zip(lvl.halls, dungeon.rooms):
+        sr, sc = room.spawn_pos
+        if room.cells[sr][sc] not in _STANDABLE:
+            rep.fail('bounds', f'{hall.where}.spawn {list(room.spawn_pos)} is not '
+                               f'a floor cell — the player would start inside stone')
+        er, ec = room.exit_pos
+        if room.cells[er][ec] not in _STANDABLE:
+            # A SEALED exit is legitimate (a gate opened by solving the level), so
+            # this is advice rather than a rejection — solvability is the real test.
+            rep.warn('bounds', f'{hall.where}.exit {list(room.exit_pos)} is not '
+                               f'floor. That is fine for a sealed exit that a '
+                               f'tick opens, but nothing else will reach it.')
 
 
 # ── 4 + 5. Solvability and par ────────────────────────────────────────────────
@@ -424,7 +454,11 @@ def _check_golf(lvl: F.Level, rep: Report) -> None:
     """
     from generation.dungeon_gen import _dijkstra_par_count
     try:
-        lower = _dijkstra_par_count(F.build(lvl).room)
+        # Every hall has to be crossed spawn to exit, so the walk across each one
+        # adds up: the sum is still a LOWER bound on the whole descent, and
+        # measuring only the first hall would compare a room against a level.
+        per_hall = [_dijkstra_par_count(r) for r in F.build(lvl).rooms]
+        lower = None if any(x is None for x in per_hall) else sum(per_hall)
     except Exception:                              # noqa: BLE001 — advisory only
         return
     if lower is not None and rep.par is not None and lower < rep.par:

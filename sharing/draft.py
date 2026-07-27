@@ -149,7 +149,12 @@ def sync(draft: Draft, room) -> None:
         fills=list(getattr(room, 'fills', lvl.fills)),
         seals=list(getattr(room, 'seals', lvl.seals)),
         vocabulary=lvl.vocabulary, intro=lvl.intro, alternate=lvl.alternate,
-        seed=lvl.seed)
+        seed=lvl.seed,
+        # The forge edits ONE hall — the one the author is standing in, which is
+        # always the first. The halls after it are not on screen and nothing here
+        # has touched them, so they are handed straight back; dropping them would
+        # be an edit to a room the author never opened.
+        then=lvl.then)
 
 
 # ── Disk ──────────────────────────────────────────────────────────────────────

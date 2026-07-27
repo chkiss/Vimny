@@ -57,6 +57,7 @@ SCHEMA = 1
 ALWAYS_ON = ('u', ':w', ':q', ':q!')
 
 MAX_ROWS, MAX_COLS = 200, 200     # _MAX_COLS in the reflow engine is 200
+MAX_HALLS          = 8            # a level is a descent, not a dungeon crawl
 MAX_ENTITIES       = 400
 MAX_FILLS          = 64
 MAX_SEALS          = 32
@@ -101,6 +102,43 @@ def in_fill(room, row: int, col: int):
 
 
 @dataclass
+class Hall:
+    """One hall of a level: a room's worth of geometry and content.
+
+    A level is a DESCENT, not a map — halls are walked in order, each one's exit
+    is the next one's door, and there is no going back. That is the shape both
+    multi-room levels in the game already have, and it is the only shape worth
+    putting in a file: a room GRAPH would need doors that name rooms, a way to
+    say which door you came in by, and a spawn per door, and none of it buys a
+    level anybody has wanted to write.
+
+    The first hall is the level's own `geometry` and content keys, so the
+    overwhelmingly common one-hall level reads exactly as it always has. The
+    rest are `then` — which is also why they are not called `rooms[1:]`: an
+    author who writes `then[0]` should get the hall AFTER the first, and a list
+    whose zeroth entry was the second room is a trap laid on the first line.
+    """
+    rows:      int   = 20
+    cols:      int   = 80
+    cells:     list  = field(default_factory=list)
+    spawn:     tuple = (1, 1)
+    exit:      tuple = (1, 2)
+    fills:     list  = field(default_factory=list)
+    seals:     list  = field(default_factory=list)
+    char_runs: list  = field(default_factory=list)
+    entities:  list  = field(default_factory=list)
+    #: Where this hall's keys live in the FILE. Carried on the hall so that every
+    #: message about it — parser, validator, forge — names the place the author
+    #: has to go and edit, rather than a room number they never wrote down.
+    where:     str   = 'geometry'
+
+    def at(self, key: str) -> str:
+        """`'entities'` → `'then[0].entities'` — where one of this hall's other
+        keys lives in the file."""
+        return self.where[:-len('geometry')] + key
+
+
+@dataclass
 class Level:
     name:        str
     author:      str  = ''
@@ -118,9 +156,33 @@ class Level:
     seals:       list = field(default_factory=list)   # list[world.Seal]
     char_runs:   list = field(default_factory=list)   # explicit text
     entities:    list = field(default_factory=list)   # list[dict]
+    then:        list = field(default_factory=list)   # list[Hall] — halls 2..n
     vocabulary:  list = field(default_factory=list)   # author's own words
     solution:    str  = ''
     intro:       str  = ''
+
+    @property
+    def halls(self) -> list:
+        """Every hall, in walking order — the level's own keys, then `then`.
+
+        A projection, not storage: the first hall's fields ARE the Level's, so
+        there is no second copy to keep in step and a one-hall level has nothing
+        extra in it. Everything downstream loops over this and stops caring how
+        many halls there are.
+        """
+        return [Hall(rows=self.rows, cols=self.cols, cells=self.cells,
+                     spawn=self.spawn, exit=self.exit, fills=self.fills,
+                     seals=self.seals, char_runs=self.char_runs,
+                     entities=self.entities), *self.then]
+
+    @property
+    def all_fills(self) -> list:
+        """Every fill in the level, in hall order — which is also how a tape
+        counts them: `<fill4.0>` is the level's fifth fill, wherever it stands.
+        Numbering them per hall would make a reference mean a different word
+        depending on which hall you read it in, and a tape is one string with no
+        hall of its own."""
+        return [f for h in self.halls for f in h.fills]
 
     @property
     def known(self) -> list:
@@ -147,7 +209,7 @@ def parse(data: dict) -> Level:
 
     unknown = set(data) - {'schema', 'name', 'author', 'seed', 'teaches',
                            'requires', 'no_horse', 'alternate', 'geometry',
-                           'fill', 'seals', 'char_runs', 'entities',
+                           'fill', 'seals', 'char_runs', 'entities', 'then',
                            'vocabulary', 'solution', 'intro'}
     if unknown:
         # Refuse rather than ignore: a silently-dropped key is a level that
@@ -175,6 +237,7 @@ def parse(data: dict) -> Level:
         seals=[_parse_seal(s, i) for i, s in enumerate(data.get('seals', []))],
         char_runs=list(data.get('char_runs', [])),
         entities=list(data.get('entities', [])),
+        then=_parse_then(data.get('then', [])),
         vocabulary=list(data.get('vocabulary', [])),
         solution=str(data.get('solution', '')),
         intro=str(data.get('intro', '')),
@@ -184,17 +247,17 @@ def parse(data: dict) -> Level:
     return lvl
 
 
-def _parse_fill(f: dict, i: int) -> Fill:
+def _parse_fill(f: dict, i: int, at: str = 'fill') -> Fill:
     if not isinstance(f, dict):
-        raise LevelFormatError(f'fill[{i}]: must be an object')
+        raise LevelFormatError(f'{at}[{i}]: must be an object')
     region = f.get('region')
     if not (isinstance(region, (list, tuple)) and len(region) == 4):
-        raise LevelFormatError(f'fill[{i}].region: must be [r1, c1, r2, c2]')
+        raise LevelFormatError(f'{at}[{i}].region: must be [r1, c1, r2, c2]')
     length = f.get('length', [3, 6])
     if isinstance(length, int):
         length = [length, length]
     if not (isinstance(length, (list, tuple)) and len(length) == 2):
-        raise LevelFormatError(f'fill[{i}].length: must be n or [min, max]')
+        raise LevelFormatError(f'{at}[{i}].length: must be n or [min, max]')
     return Fill(region=tuple(int(x) for x in region),
                 pool=str(f.get('pool', 'plain')),
                 length=(int(length[0]), int(length[1])),
@@ -206,7 +269,7 @@ _SEAL_MODES  = ('exact', 'contains')
 _SEAL_SCOPES = ('region', 'anyrow')
 
 
-def _parse_seal(s: dict, i: int) -> Seal:
+def _parse_seal(s: dict, i: int, at: str = 'seals') -> Seal:
     """One `seals` entry → a `world.Seal`.
 
     Every failure names the field and says what was wanted, because a seal is the
@@ -215,14 +278,14 @@ def _parse_seal(s: dict, i: int) -> Seal:
     finds out at the solvability gate, several minutes later, with no clue why.
     """
     if not isinstance(s, dict):
-        raise LevelFormatError(f'seals[{i}]: must be an object')
+        raise LevelFormatError(f'{at}[{i}]: must be an object')
     unknown = set(s) - {'region', 'match', 'opens', 'mode', 'scope',
                         'requires', 'anchor'}
     if unknown:
-        raise LevelFormatError(f'seals[{i}]: unknown key(s) {sorted(unknown)}')
+        raise LevelFormatError(f'{at}[{i}]: unknown key(s) {sorted(unknown)}')
     scope = str(s.get('scope', 'region'))
     if scope not in _SEAL_SCOPES:
-        raise LevelFormatError(f'seals[{i}].scope: must be one of '
+        raise LevelFormatError(f'{at}[{i}].scope: must be one of '
                                f'{", ".join(_SEAL_SCOPES)}, got {scope!r}')
     # `match` may be one string or several, ALL of which must read true. A door
     # that wants a chamber's three sayings held at once is one seal, not three.
@@ -232,11 +295,11 @@ def _parse_seal(s: dict, i: int) -> Seal:
     region = s.get('region')
     if scope == 'region' and match:
         if not (isinstance(region, (list, tuple)) and len(region) == 4):
-            raise LevelFormatError(f'seals[{i}].region: must be [r1, c1, r2, c2]')
+            raise LevelFormatError(f'{at}[{i}].region: must be [r1, c1, r2, c2]')
         region = tuple(int(x) for x in region)
     elif region:
         raise LevelFormatError(
-            f'seals[{i}].region: this seal reads no region — '
+            f'{at}[{i}].region: this seal reads no region — '
             + ('a scope="anyrow" seal reads every floor row'
                if scope == 'anyrow' else
                'a seal with no `match` reads only the seals it requires'))
@@ -244,27 +307,27 @@ def _parse_seal(s: dict, i: int) -> Seal:
         region = ()
     if not isinstance(match, (list, tuple)) or not all(
             isinstance(m, str) and m.strip() for m in match):
-        raise LevelFormatError(f'seals[{i}].match: must be the text the seal has '
+        raise LevelFormatError(f'{at}[{i}].match: must be the text the seal has '
                                f'to read, or a list of texts, none of them empty')
     if any(len(m) > MAX_SEAL_MATCH for m in match):
-        raise LevelFormatError(f'seals[{i}].match: at most {MAX_SEAL_MATCH} characters')
+        raise LevelFormatError(f'{at}[{i}].match: at most {MAX_SEAL_MATCH} characters')
     requires = s.get('requires', [])
     if not isinstance(requires, (list, tuple)) or not all(
             isinstance(k, int) for k in requires):
-        raise LevelFormatError(f'seals[{i}].requires: must be a list of the '
+        raise LevelFormatError(f'{at}[{i}].requires: must be a list of the '
                                f'indices of earlier seals')
     if any(not 0 <= k < i for k in requires):
         # Earlier-only is what makes the conjunction one pass with no cycle to
         # find. A seal that named a later one would open on a reading that had
         # not been taken yet, which is a rule nobody can debug.
-        raise LevelFormatError(f'seals[{i}].requires: must name seals BEFORE '
+        raise LevelFormatError(f'{at}[{i}].requires: must name seals BEFORE '
                                f'this one (0..{i - 1})')
     if not match and not requires:
-        raise LevelFormatError(f'seals[{i}]: has nothing to read — give it a '
+        raise LevelFormatError(f'{at}[{i}]: has nothing to read — give it a '
                                f'`match`, or `requires` naming earlier seals')
     anchor = str(s.get('anchor', ''))
     if anchor not in ('', 'exit_row'):
-        raise LevelFormatError(f'seals[{i}].anchor: must be "" or "exit_row", '
+        raise LevelFormatError(f'{at}[{i}].anchor: must be "" or "exit_row", '
                                f'got {anchor!r}')
     opens = s.get('opens')
     # A single [row, col] is allowed and is by far the common case: most doors
@@ -274,20 +337,60 @@ def _parse_seal(s: dict, i: int) -> Seal:
             and all(isinstance(v, int) for v in opens)):
         opens = [opens]
     if not (isinstance(opens, (list, tuple)) and opens):
-        raise LevelFormatError(f'seals[{i}].opens: must be [row, col] or a list of them')
+        raise LevelFormatError(f'{at}[{i}].opens: must be [row, col] or a list of them')
     if len(opens) > MAX_SEAL_CELLS:
-        raise LevelFormatError(f'seals[{i}].opens: at most {MAX_SEAL_CELLS} cells')
+        raise LevelFormatError(f'{at}[{i}].opens: at most {MAX_SEAL_CELLS} cells')
     cells = []
     for j, cell in enumerate(opens):
         if not (isinstance(cell, (list, tuple)) and len(cell) == 2):
-            raise LevelFormatError(f'seals[{i}].opens[{j}]: must be [row, col]')
+            raise LevelFormatError(f'{at}[{i}].opens[{j}]: must be [row, col]')
         cells.append((int(cell[0]), int(cell[1])))
     mode = str(s.get('mode', 'exact'))
     if mode not in _SEAL_MODES:
-        raise LevelFormatError(f'seals[{i}].mode: must be one of '
+        raise LevelFormatError(f'{at}[{i}].mode: must be one of '
                                f'{", ".join(_SEAL_MODES)}, got {mode!r}')
     return Seal(region=region, match=tuple(match), opens=tuple(cells), mode=mode,
                 scope=scope, requires=tuple(requires), anchor=anchor)
+
+
+def _parse_then(halls) -> list:
+    """The `then` list → halls 2..n. Every message names `then[i].{key}`."""
+    if not isinstance(halls, (list, tuple)):
+        raise LevelFormatError('then: must be a list of halls, each with its own '
+                               '`geometry`')
+    if len(halls) > MAX_HALLS - 1:
+        raise LevelFormatError(f'then: a level may have at most {MAX_HALLS} halls, '
+                               f'got {len(halls) + 1}')
+    out = []
+    for i, h in enumerate(halls):
+        at = f'then[{i}]'
+        if not isinstance(h, dict):
+            raise LevelFormatError(f'{at}: must be an object')
+        unknown = set(h) - {'geometry', 'fill', 'seals', 'char_runs', 'entities'}
+        if unknown:
+            # Deliberately narrower than the top level: a hall is geometry and
+            # content, and everything else — the tape, the seed, what the level
+            # teaches — belongs to the LEVEL. A `solution` inside a hall would
+            # read as a second tape and there is only ever one.
+            raise LevelFormatError(f'{at}: unknown key(s) {sorted(unknown)}; a '
+                                   f'hall carries geometry and content only')
+        geo = h.get('geometry')
+        if not isinstance(geo, dict):
+            raise LevelFormatError(f'{at}.geometry: required, and must be an object')
+        out.append(Hall(
+            rows=int(geo.get('rows', 0)),
+            cols=int(geo.get('cols', 0)),
+            cells=list(geo.get('cells', [])),
+            spawn=tuple(geo.get('spawn', (1, 1))),
+            exit=tuple(geo.get('exit', (1, 2))),
+            fills=[_parse_fill(f, j, f'{at}.fill')
+                   for j, f in enumerate(h.get('fill', []))],
+            seals=[_parse_seal(s, j, f'{at}.seals')
+                   for j, s in enumerate(h.get('seals', []))],
+            char_runs=list(h.get('char_runs', [])),
+            entities=list(h.get('entities', [])),
+            where=f'{at}.geometry'))
+    return out
 
 
 def loads(text: str) -> Level:
@@ -299,7 +402,8 @@ def loads(text: str) -> Level:
 
 # ── Cell grids ────────────────────────────────────────────────────────────────
 
-def expand_row_mist(row: str, cols: int, lineno: int) -> tuple:
+def expand_row_mist(row: str, cols: int, lineno: int,
+                    where: str = 'geometry') -> tuple:
     """One `cells` row → (list of CellTypes, the columns that carry mist).
 
     Accepts both the plain form (`WFFFW`) and the run-length form (`W3F60W`),
@@ -315,7 +419,7 @@ def expand_row_mist(row: str, cols: int, lineno: int) -> tuple:
     for m in _RLE.finditer(row):
         if m.start() != pos:
             raise LevelFormatError(
-                f'geometry.cells[{lineno}]: unexpected {row[pos]!r} at column {pos}')
+                f'{where}.cells[{lineno}]: unexpected {row[pos]!r} at column {pos}')
         pos = m.end()
         count = int(m.group(1)) if m.group(1) else 1
         code  = m.group(2)
@@ -325,21 +429,22 @@ def expand_row_mist(row: str, cols: int, lineno: int) -> tuple:
             continue
         if code not in _CODE_CELL:
             raise LevelFormatError(
-                f'geometry.cells[{lineno}]: unknown cell code {code!r}; '
+                f'{where}.cells[{lineno}]: unknown cell code {code!r}; '
                 f'known codes are {"".join(sorted(set(_CODE_CELL) | {_MIST_CODE}))}')
         out.extend([_CODE_CELL[code]] * count)
     if pos != len(row):
         raise LevelFormatError(
-            f'geometry.cells[{lineno}]: unexpected {row[pos]!r} at column {pos}')
+            f'{where}.cells[{lineno}]: unexpected {row[pos]!r} at column {pos}')
     if len(out) != cols:
         raise LevelFormatError(
-            f'geometry.cells[{lineno}]: expands to {len(out)} cells, expected {cols}')
+            f'{where}.cells[{lineno}]: expands to {len(out)} cells, expected {cols}')
     return out, mist
 
 
-def expand_row(row: str, cols: int, lineno: int) -> list:
+def expand_row(row: str, cols: int, lineno: int,
+               where: str = 'geometry') -> list:
     """One `cells` row → a list of CellTypes, mist discarded."""
-    return expand_row_mist(row, cols, lineno)[0]
+    return expand_row_mist(row, cols, lineno, where)[0]
 
 
 def encode_row(cells: list, mist_cols=()) -> str:
@@ -377,60 +482,86 @@ def crop(lvl: Level) -> Level:
     side, because a room needs a border and content flush against the edge of
     the grid is content with nothing to stop a motion.
     """
-    grid = [expand_row(row, lvl.cols, i) for i, row in enumerate(lvl.cells)]
+    # `lvl.halls` is a fresh projection every time it is asked for, so it is asked
+    # for ONCE: the identity `_crop_hall` returns to say "nothing to take off" is
+    # only meaningful against the very objects it was handed.
+    before = lvl.halls
+    halls  = [_crop_hall(h) for h in before]
+    if all(a is b for a, b in zip(halls, before)):
+        return lvl                                   # every hall already tight
+    first = halls[0]
+    return replace(
+        lvl,
+        rows=first.rows, cols=first.cols, cells=first.cells,
+        spawn=first.spawn, exit=first.exit, fills=first.fills,
+        seals=first.seals, char_runs=first.char_runs, entities=first.entities,
+        then=halls[1:],
+    )
+
+
+def _crop_hall(h: Hall) -> Hall:
+    """One hall, trimmed. Returns `h` itself when there is nothing to take off —
+    which is how `crop` tells a level that needs no cropping from one that does,
+    and why a level whose every hall is already tight is returned unchanged
+    rather than rebuilt into an equal copy.
+
+    Each hall is trimmed on its OWN margins: they are separate grids that only
+    ever share a level, and a hall cropped to the width of its neighbour would
+    be padded with stone for no reason but tidiness.
+    """
+    grid = [expand_row(row, h.cols, i, h.where) for i, row in enumerate(h.cells)]
     keep = set()
     for r, row in enumerate(grid):
         for c, ct in enumerate(row):
             if ct != CellType.WALL:
                 keep.add((r, c))
-    for ru in lvl.char_runs:
+    for ru in h.char_runs:
         for i in range(len(ru['symbols'])):
             keep.add((int(ru['row']), int(ru['col']) + i))
-    for e in lvl.entities:
+    for e in h.entities:
         keep.add((int(e['at'][0]), int(e['at'][1])))
-    for f in lvl.fills:
+    for f in h.fills:
         keep.add((f.region[0], f.region[1]))
         keep.add((f.region[2], f.region[3]))
-    for s in lvl.seals:
+    for s in h.seals:
         keep.add((s.region[0], s.region[1]))
         keep.add((s.region[2], s.region[3]))
         keep.update(tuple(c) for c in s.opens)
-    keep.add(tuple(lvl.spawn))
-    keep.add(tuple(lvl.exit))
+    keep.add(tuple(h.spawn))
+    keep.add(tuple(h.exit))
     if not keep:
-        return lvl
+        return h
     r1 = max(0, min(r for r, _ in keep) - 1)
-    r2 = min(lvl.rows - 1, max(r for r, _ in keep) + 1)
+    r2 = min(h.rows - 1, max(r for r, _ in keep) + 1)
     c1 = max(0, min(c for _, c in keep) - 1)
-    c2 = min(lvl.cols - 1, max(c for _, c in keep) + 1)
-    if (r1, c1, r2, c2) == (0, 0, lvl.rows - 1, lvl.cols - 1):
-        return lvl                                   # already tight
+    c2 = min(h.cols - 1, max(c for _, c in keep) + 1)
+    if (r1, c1, r2, c2) == (0, 0, h.rows - 1, h.cols - 1):
+        return h                                     # already tight
 
     def _mv(pos):
         return (int(pos[0]) - r1, int(pos[1]) - c1)
 
-    mist = {(r, c) for r, row in enumerate(lvl.cells)
-            for c in expand_row_mist(row, lvl.cols, r)[1]}
-    out = replace(
-        lvl,
+    mist = {(r, c) for r, row in enumerate(h.cells)
+            for c in expand_row_mist(row, h.cols, r, h.where)[1]}
+    return replace(
+        h,
         rows=r2 - r1 + 1, cols=c2 - c1 + 1,
         cells=[encode_row(grid[r][c1:c2 + 1],
                           [c - c1 for (mr, c) in mist if mr == r])
                for r in range(r1, r2 + 1)],
-        spawn=_mv(lvl.spawn), exit=_mv(lvl.exit),
+        spawn=_mv(h.spawn), exit=_mv(h.exit),
         char_runs=[{**ru, 'row': int(ru['row']) - r1, 'col': int(ru['col']) - c1}
-                   for ru in lvl.char_runs],
-        entities=[{**e, 'at': list(_mv(e['at']))} for e in lvl.entities],
+                   for ru in h.char_runs],
+        entities=[{**e, 'at': list(_mv(e['at']))} for e in h.entities],
         fills=[replace(f, region=(f.region[0] - r1, f.region[1] - c1,
                                   f.region[2] - r1, f.region[3] - c1))
-               for f in lvl.fills],
+               for f in h.fills],
         seals=[replace(s, opens=tuple(_mv(c) for c in s.opens),
                        region=((s.region[0] - r1, s.region[1] - c1,
                                 s.region[2] - r1, s.region[3] - c1)
                                if s.region else ()))
-               for s in lvl.seals],
+               for s in h.seals],
     )
-    return out
 
 
 # ── Building ──────────────────────────────────────────────────────────────────
@@ -453,20 +584,62 @@ def build(lvl: Level, par: int | None = None, seed: int | None = None) -> Dungeo
     is `_check_fill_stability` — the tape must solve the level, at the same par,
     whichever words grew.
     """
-    if len(lvl.cells) != lvl.rows:
+    custom = vocab.by_length([w for w in lvl.vocabulary]) if lvl.vocabulary else None
+    # ONE rng for the whole level, drawn on hall by hall in walking order. Two
+    # halls seeded alike would grow the same wall of words twice, and the second
+    # would read as a copy of the first rather than another room in the same
+    # dungeon.
+    rng = random.Random(lvl.seed if seed is None else seed)
+
+    rooms, slots = [], []
+    for hall in lvl.halls:
+        room = _build_hall(hall, lvl, rng, custom)
+        # The level-wide index of this hall's first fill, so `slot_at` can name
+        # a word the same way the tape does no matter which hall it stands in.
+        room.fill_index0 = len(slots)
+        slots.extend(room.fill_slots)
+        finalize_par(room, par)
+        rooms.append(room)
+
+    # The tape belongs to the LEVEL, not to a hall: one route walks all of them,
+    # and the karaoke position travels with the player through the doors.
+    try:
+        rooms[0].answer = _tape.resolve_slots(lvl.solution, slots)
+    except _tape.UnknownSlot as exc:
+        raise LevelFormatError(str(exc)) from None
+    # The tape AS WRITTEN, kept so that saving the room back out writes the
+    # references the author wrote rather than the one roll they happened to get.
+    rooms[0].answer_source = lvl.solution
+    # Every hall but the last is a door: stand on its exit and the next one
+    # begins. Declared on the room rather than asked of the level, because the
+    # game loop holds a room and has no way back to the file it came from.
+    for room in rooms[:-1]:
+        room.advance_on_exit = True
+
+    dungeon = Dungeon(name=lvl.name, seed=lvl.seed)
+    dungeon.rooms        = rooms
+    dungeon.current_room = 0
+    return dungeon
+
+
+def _build_hall(hall: Hall, lvl: Level, rng: random.Random, custom) -> Room:
+    """One hall of a level → one Room. Everything level-wide is passed in."""
+    if len(hall.cells) != hall.rows:
         raise LevelFormatError(
-            f'geometry.cells: {len(lvl.cells)} rows, geometry.rows says {lvl.rows}')
-    grid = [expand_row_mist(row, lvl.cols, i) for i, row in enumerate(lvl.cells)]
+            f'{hall.where}.cells: {len(hall.cells)} rows, {hall.where}.rows says '
+            f'{hall.rows}')
+    grid = [expand_row_mist(row, hall.cols, i, hall.where)
+            for i, row in enumerate(hall.cells)]
     cells = [g[0] for g in grid]
     mist  = {(r, c) for r, (_, cols) in enumerate(grid) for c in cols}
 
-    room = Room(room_type=RoomType.ENTRY, rows=lvl.rows, cols=lvl.cols)
+    room = Room(room_type=RoomType.ENTRY, rows=hall.rows, cols=hall.cols)
     room.cells     = cells
     room.mist_cells = set(mist)
     room.fog_cells  = set(mist)      # mist is always a subset of the fog
     room.seed      = lvl.seed
-    room.spawn_pos = tuple(lvl.spawn)
-    room.exit_pos  = tuple(lvl.exit)
+    room.spawn_pos = tuple(hall.spawn)
+    room.exit_pos  = tuple(hall.exit)
     room.no_horse  = lvl.no_horse
 
     # Seals are built SHUT, whatever the grid says, and before anything else reads
@@ -476,22 +649,19 @@ def build(lvl: Level, par: int | None = None, seed: int | None = None) -> Dungeo
     # arrives. Shutting them here rather than after the fills also keeps a fill
     # from growing a word onto a door cell. The tick opens the door on turn one if
     # the text really does read true, so nothing legitimate is lost.
-    room.seals = tuple(lvl.seals)
-    for _s in lvl.seals:
+    room.seals = tuple(hall.seals)
+    for _s in hall.seals:
         for _r, _c in _s.opens:
             if 0 <= _r < room.rows and 0 <= _c < room.cols:
                 room.cells[_r][_c] = CellType.WALL
-
-    custom = vocab.by_length([w for w in lvl.vocabulary]) if lvl.vocabulary else None
-    rng    = random.Random(lvl.seed if seed is None else seed)
 
     runs = [CharRun(row=int(r['row']), col=int(r['col']),
                     symbols=tuple(r['symbols']) if not isinstance(r['symbols'], str)
                             else tuple(r['symbols']),
                     kind=str(r.get('kind', 'ancient')))
-            for r in lvl.char_runs]
+            for r in hall.char_runs]
     grown, slots = [], []
-    for f in lvl.fills:
+    for f in hall.fills:
         laid = _resolve_fill(f, room, rng, custom)
         slots.append([''.join(ru.symbols) for ru in laid])
         grown.extend(laid)
@@ -502,13 +672,6 @@ def build(lvl: Level, par: int | None = None, seed: int | None = None) -> Dungeo
     # can exist alongside the note below: it is never asked what a cell holds
     # NOW, only what the words were at the moment the room was made.
     room.fill_slots = slots
-    try:
-        room.answer = _tape.resolve_slots(lvl.solution, slots)
-    except _tape.UnknownSlot as exc:
-        raise LevelFormatError(str(exc)) from None
-    # The tape AS WRITTEN, kept so that saving the room back out writes the
-    # references the author wrote rather than the one roll they happened to get.
-    room.answer_source = lvl.solution
 
     # The fill regions travel with the room so the editor can draw them, refuse
     # edits inside them, and write them back out as directives. Which text a
@@ -516,9 +679,10 @@ def build(lvl: Level, par: int | None = None, seed: int | None = None) -> Dungeo
     # runs into fresh objects, so any ownership pinned to an object identity
     # would evaporate on the first keystroke. `in_fill` asks the regions
     # instead, and a region is stable no matter how often the row is rebuilt.
-    room.fills = list(lvl.fills)
+    room.fills = list(hall.fills)
 
-    room.entities = [_make_entity(e, i) for i, e in enumerate(lvl.entities)]
+    room.entities = [_make_entity(e, i, hall.at('entities'))
+                     for i, e in enumerate(hall.entities)]
     if not any(e.kind == 'exit' for e in room.entities):
         room.entities.append(Entity(kind='exit', row=room.exit_pos[0],
                                     col=room.exit_pos[1]))
@@ -535,12 +699,7 @@ def build(lvl: Level, par: int | None = None, seed: int | None = None) -> Dungeo
     apply_stone_fog(room)
 
     room.rebuild_indexes()
-    finalize_par(room, par)
-
-    dungeon = Dungeon(name=lvl.name, seed=lvl.seed)
-    dungeon.rooms        = [room]
-    dungeon.current_room = 0
-    return dungeon
+    return room
 
 
 def finalize_par(room, par: int | None) -> None:
@@ -558,17 +717,17 @@ def finalize_par(room, par: int | None) -> None:
         room.budget = math.ceil(par * 1.4)
 
 
-def _make_entity(spec: dict, i: int) -> Entity:
+def _make_entity(spec: dict, i: int, where: str = 'entities') -> Entity:
     if not isinstance(spec, dict):
-        raise LevelFormatError(f'entities[{i}]: must be an object')
+        raise LevelFormatError(f'{where}[{i}]: must be an object')
     at = spec.get('at')
     if not (isinstance(at, (list, tuple)) and len(at) == 2):
-        raise LevelFormatError(f'entities[{i}].at: must be [row, col]')
+        raise LevelFormatError(f'{where}[{i}].at: must be [row, col]')
     kw = {k: v for k, v in spec.items() if k in _ENTITY_FIELDS}
     kw.pop('row', None)
     kw.pop('col', None)
     if 'kind' not in kw:
-        raise LevelFormatError(f'entities[{i}].kind: required')
+        raise LevelFormatError(f'{where}[{i}].kind: required')
     # A published level is written once and read forever. When a kind is
     # renamed, every file already in the wild still names the old one, and the
     # only acceptable answer is to keep reading it.
@@ -578,7 +737,7 @@ def _make_entity(spec: dict, i: int) -> Entity:
         kw['drops'] = canonical_kind(_k) + _sep + _tag
     unknown = set(spec) - set(_ENTITY_FIELDS) - {'at'}
     if unknown:
-        raise LevelFormatError(f'entities[{i}]: unknown field(s) {sorted(unknown)}')
+        raise LevelFormatError(f'{where}[{i}]: unknown field(s) {sorted(unknown)}')
     return Entity(row=int(at[0]), col=int(at[1]), **kw)
 
 
@@ -667,16 +826,32 @@ def dumps(lvl: Level) -> str:
         data['alternate'] = lvl.alternate
     if lvl.intro:
         data['intro'] = lvl.intro
-    if lvl.fills:
+    data.update(_dump_content(lvl.halls[0]))
+    if lvl.then:
+        data['then'] = [{'geometry': {'rows': h.rows, 'cols': h.cols,
+                                      'cells': h.cells,
+                                      'spawn': list(h.spawn),
+                                      'exit': list(h.exit)},
+                         **_dump_content(h)} for h in lvl.then]
+    if lvl.vocabulary:
+        data['vocabulary'] = lvl.vocabulary
+    return json.dumps(data, indent=2, ensure_ascii=False) + '\n'
+
+
+def _dump_content(h: Hall) -> dict:
+    """One hall's content keys, empty ones left out. Shared by the level's own
+    block and every entry in `then`, so a hall reads the same wherever it is."""
+    data = {}
+    if h.fills:
         data['fill'] = [{'region': list(f.region), 'pool': f.pool,
                          'length': list(f.length), 'spacing': f.spacing,
-                         'kind': f.kind} for f in lvl.fills]
-    if lvl.seals:
+                         'kind': f.kind} for f in h.fills]
+    if h.seals:
         # Every optional axis is written only when it is not the default, so a
         # plain region-and-password seal still reads as the four short lines it
         # always was and an author is never shown machinery they did not ask for.
         out = []
-        for s in lvl.seals:
+        for s in h.seals:
             d = {'opens': [list(c) for c in s.opens], 'mode': s.mode}
             if s.region:
                 d['region'] = list(s.region)
@@ -690,13 +865,11 @@ def dumps(lvl: Level) -> str:
                 d['anchor'] = s.anchor
             out.append(d)
         data['seals'] = out
-    if lvl.char_runs:
-        data['char_runs'] = lvl.char_runs
-    if lvl.entities:
-        data['entities'] = lvl.entities
-    if lvl.vocabulary:
-        data['vocabulary'] = lvl.vocabulary
-    return json.dumps(data, indent=2, ensure_ascii=False) + '\n'
+    if h.char_runs:
+        data['char_runs'] = h.char_runs
+    if h.entities:
+        data['entities'] = h.entities
+    return data
 
 
 def _grown(fills, ru) -> bool:
@@ -718,7 +891,7 @@ _TRANSIENT_KINDS = frozenset({'horse'})
 def from_room(room, name: str, author: str = '', solution: str = '',
               teaches=(), requires=(), *, fills=None, seals=None, vocabulary=(),
               intro: str = '', alternate: str | None = None,
-              seed: int | None = None) -> Level:
+              seed: int | None = None, then=()) -> Level:
     """Capture a live Room as an authored Level — the editor's export path.
 
     Hand-placed text is written out explicitly; text a FILL grew is not. A fill
@@ -735,7 +908,39 @@ def from_room(room, name: str, author: str = '', solution: str = '',
 
     Everything not derivable from the grid — the fills themselves, the author's
     vocabulary, the intro, the slug it stands in for — has to be passed in,
-    because a Room has nowhere to remember it.
+    because a Room has nowhere to remember it. `then` is the sharpest case: this
+    captures ONE room, and a level's later halls are rooms nobody is standing
+    in. They ride through untouched, and a caller that forgets to pass them
+    saves a two-hall level as a one-hall one.
+    """
+    h = hall_from_room(room, fills=fills, seals=seals)
+    return Level(
+        name=name, author=author,
+        seed=room.seed or 0 if seed is None else seed,
+        teaches=list(teaches), requires=list(requires),
+        no_horse=bool(getattr(room, 'no_horse', False)),
+        alternate=alternate, intro=intro,
+        rows=h.rows, cols=h.cols, cells=h.cells,
+        spawn=h.spawn, exit=h.exit,
+        fills=h.fills, seals=h.seals,
+        char_runs=h.char_runs, entities=h.entities,
+        then=list(then),
+        vocabulary=list(vocabulary),
+        # The tape as WRITTEN wins over the tape as resolved: a level whose
+        # route says "the word in fill 0, slot 3" must be written back out
+        # saying that, not naming the one word this build happened to roll.
+        solution=solution or getattr(room, 'answer_source', '') or room.answer,
+    )
+
+
+def hall_from_room(room, *, fills=None, seals=None,
+                   where: str = 'geometry') -> Hall:
+    """Capture one live Room as one HALL — the half of `from_room` that is about
+    a room rather than a level.
+
+    Split out because a level of several halls is captured a room at a time:
+    `from_room` makes the first hall and the level around it, and every room
+    after it comes through here into `then`.
     """
     if fills is None:
         fills = list(getattr(room, 'fills', []))
@@ -756,12 +961,7 @@ def from_room(room, name: str, author: str = '', solution: str = '',
         for r, c in s.opens:
             if 0 <= r < room.rows and 0 <= c < room.cols:
                 grid[r][c] = CellType.WALL
-    return Level(
-        name=name, author=author,
-        seed=room.seed or 0 if seed is None else seed,
-        teaches=list(teaches), requires=list(requires),
-        no_horse=bool(getattr(room, 'no_horse', False)),
-        alternate=alternate, intro=intro,
+    return Hall(
         rows=room.rows, cols=room.cols,
         cells=[encode_row(row, _mist_by_row.get(r, ()))
                for r, row in enumerate(grid)],
@@ -775,9 +975,4 @@ def from_room(room, name: str, author: str = '', solution: str = '',
                           if f not in ('row', 'col')})
                   for e in room.entities
                   if e.alive and e.kind not in _TRANSIENT_KINDS],
-        vocabulary=list(vocabulary),
-        # The tape as WRITTEN wins over the tape as resolved: a level whose
-        # route says "the word in fill 0, slot 3" must be written back out
-        # saying that, not naming the one word this build happened to roll.
-        solution=solution or getattr(room, 'answer_source', '') or room.answer,
-    )
+        where=where)

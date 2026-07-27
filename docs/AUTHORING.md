@@ -486,6 +486,49 @@ the route — "count the words yourself, however many there are today" — Vimny
 cannot score that level. Par is one number, and a route that is four keys for
 one player and five for the next does not have one.
 
+### `then` — a level of more than one hall
+
+Most levels are one room. A level that is a **descent** — a gallery, then the
+arena you are chased into — writes the halls after the first in `then`:
+
+```json
+  "geometry": { "rows": 12, "cols": 60, "cells": ["..."],
+                "spawn": [1, 1], "exit": [10, 58] },
+  "seals": [ {"region": [2, 2, 2, 40], "match": "the gate stands open",
+              "opens": [10, 58]} ],
+  "then": [
+    { "geometry": { "rows": 20, "cols": 80, "cells": ["..."],
+                    "spawn": [1, 1], "exit": [18, 78] },
+      "entities": [ {"at": [9, 40], "kind": "warden"} ] }
+  ]
+```
+
+Halls are walked **in order, one way**. Stand on a hall's exit and the next one
+begins where its own `spawn` says; only the LAST hall's exit wins the level. To
+make a door conditional, put a seal on the exit cell — you cannot stand on
+stone, so nothing else is needed.
+
+Each hall carries its own `geometry`, `fill`, `seals`, `char_runs` and
+`entities`, and nothing else: the seed, the tape, what the level teaches and
+your `vocabulary` belong to the LEVEL. `then[0]` is the hall after the first,
+not the first.
+
+Three things follow from there being one level and several halls:
+
+* **One tape.** `solution` is the whole descent, in order, with no notation for
+  passing a door — walking onto the exit is what does it. Par is the whole
+  route.
+* **Fills are numbered across the level.** `<fill0.3>` is the level's first
+  fill wherever it stands; if hall one has two fills, the first fill in
+  `then[0]` is `<fill2.…>`. `:fill?` counts the same way, so standing on a word
+  always gives you a reference you can paste into the tape.
+* **The undo stack does not follow you.** Each hall keeps its own past; the
+  hall behind you is past mending.
+
+The forge cannot yet build a second hall — it edits the hall you are standing
+in, which is always the first, and passes the rest through untouched. A level
+with `then` is written by hand for now, and `:check` judges it in full.
+
 ### `no_horse`
 
 `true` bars the companion, and with it the saddle registers.
