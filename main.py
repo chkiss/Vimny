@@ -85,6 +85,7 @@ from engine.editor import (
     PAINT_KINDS,
     _ed_paste, _ed_row_items, _ed_clear_row, _ed_range_items, _ed_delete_range,
     _clip_desc, _serialize_room, _deserialize_room, in_fill as _in_fill,
+    slot_at as _slot_at,
 )
 import generation.dungeon_gen as _dg
 from generation.room_gen import RUNE_CHAR as _RUNE_CHAR
@@ -6459,6 +6460,21 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
                               + (f' {_f.spacing}' if _f.spacing != 1 else '')
                               + f'   rows {_r1}-{_r2}, cols {_c1}-{_c2}'
                               + f'  ({(_r2 - _r1 + 1) * (_c2 - _c1 + 1)} cells)')
+                        # And, standing on a word: the reference a tape would
+                        # use for it. Nobody can count to slot 23 by eye, and a
+                        # tape that names the wrong word fails at :check with a
+                        # message about par rather than about miscounting.
+                        _n, _k, _w = _slot_at(room, player.row, player.col)
+                        if _k is None:
+                            _push('Stand on a word to be told its slot.')
+                        elif _f.length[0] != _f.length[1]:
+                            _push(f'This is {_w!r} — but a tape cannot name it '
+                                  f'while this fill grows {_f.length[0]}-'
+                                  f'{_f.length[1]} letter words: par would be a '
+                                  f'different number for every player.')
+                        else:
+                            _push(f'{_w!r} is <fill{_n}.{_k}> — write that in the '
+                                  f'solution and every player types their own.')
 
                 elif _draft is not None and _rcmd.split()[0:1] == ['fill'] and edit_mode:
                     # `:fill <pool> [lo-hi] [spacing]` over the last VISUAL

@@ -128,6 +128,34 @@ def in_fill(room, row: int, col: int):
     return None
 
 
+def slot_at(room, row: int, col: int):
+    """`(fill, slot, word)` for the word under (row, col); None outside a fill.
+
+    How an author finds out what to write in a tape. A solution may name a
+    grown word — `<fill0.7>` — and counting words across a region by eye to
+    arrive at "slot 7" is a chore with a wrong answer at the end of it, so the
+    forge answers it by standing on the word instead.
+
+    The index is recomputed from where the words ARE — laying order is row,
+    then column, which is the order a fill puts them down in — rather than
+    remembered per run. A row edit re-merges its runs into fresh objects, so
+    anything pinned to an object's identity would evaporate on the first
+    keystroke; a position survives.
+
+    `slot` is None on a gap between words: inside the region, but on nothing.
+    """
+    for i, f in enumerate(getattr(room, 'fills', ())):
+        if not f.covers(row, col):
+            continue
+        laid = sorted((ru for ru in room.char_runs if f.covers(ru.row, ru.col)),
+                      key=lambda ru: (ru.row, ru.col))
+        for k, ru in enumerate(laid):
+            if ru.row == row and ru.col <= col < ru.col + len(ru.symbols):
+                return (i, k, ''.join(ru.symbols))
+        return (i, None, '')
+    return None
+
+
 def _ed_cut(room, r, c):
     """Remove the character/entity/wall at (r, c); return a clip item or None.
 

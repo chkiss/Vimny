@@ -38,6 +38,7 @@ from __future__ import annotations
 import pytest
 
 from engine import tape as T
+from engine.editor import slot_at
 from sharing import format as F
 from sharing.validate import validate
 
@@ -97,6 +98,29 @@ def test_the_reference_follows_the_roll():
         'a fixed-length fill must cost the same however it rolled')
 
 
+def test_a_fixed_length_fill_lays_the_SAME_WALL_for_every_player():
+    """The quiet consequence of the single-length law, and the thing that makes
+    a counted motion authorable at all. Word length is what decides where the
+    next word starts, so fixing it fixes every position and the count itself:
+    only the LETTERS are re-rolled. `3e` versus `4e` is therefore a decision an
+    author makes once, looking at their own build, and it is right for
+    everybody — which is why counts need no notation of their own.
+    """
+    def layout(length):
+        f = [F.Fill(region=(2, 2, 4, 25), pool='plain', length=length)]
+        return [[(ru.row, ru.col, len(ru.symbols))
+                 for ru in sorted(F.build(_level('l', fills=f), seed=s).room.char_runs,
+                                  key=lambda r: (r.row, r.col))]
+                for s in (11, 12)]
+
+    fixed_a, fixed_b = layout((4, 4))
+    assert fixed_a == fixed_b and fixed_a, 'a fixed-length fill must not move'
+    loose_a, loose_b = layout((3, 6))
+    assert loose_a != loose_b, (
+        'and a rolled-length one does move — which is the whole reason a tape '
+        'may not read from it')
+
+
 def test_a_reference_to_a_fill_that_is_not_there_is_refused():
     with pytest.raises(F.LevelFormatError, match='fill directive'):
         F.build(_level('i<fill3.0><Esc>'))
@@ -131,6 +155,29 @@ def test_a_reference_reads_as_the_word_it_stands_for():
     ref is standing in for a word, so all of it has to colour as one."""
     tape = 'i<fill0.1><Esc>'
     assert T.literal_spans(tape) == [(1, len(tape) - len(T.ESC))]
+
+
+# ── Finding the slot in the first place ───────────────────────────────────────
+
+def test_the_slot_under_the_cursor_can_be_asked_for():
+    """`:fill?` answers it, because nobody counts to slot 23 by eye."""
+    room = F.build(_level('l')).room
+    for k, word in enumerate(room.fill_slots[0]):
+        ru = sorted((r for r in room.char_runs), key=lambda r: (r.row, r.col))[k]
+        assert slot_at(room, ru.row, ru.col) == (0, k, word)
+        assert slot_at(room, ru.row, ru.col + 1)[1] == k, 'anywhere in the word'
+
+
+def test_a_gap_between_words_is_inside_the_fill_but_on_nothing():
+    room = F.build(_level('l')).room
+    first = sorted(room.char_runs, key=lambda r: (r.row, r.col))[0]
+    gap   = first.col + len(first.symbols)
+    assert slot_at(room, first.row, gap) == (0, None, '')
+
+
+def test_outside_every_fill_there_is_no_slot():
+    room = F.build(_level('l')).room
+    assert slot_at(room, 1, 1) is None, 'row 1 is outside the region'
 
 
 # ── The law that keeps par one number ─────────────────────────────────────────

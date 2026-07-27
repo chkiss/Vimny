@@ -445,6 +445,17 @@ words in the order they were laid — left to right, then down. Vimny substitute
 the real word when it builds the room, so what the player is scored against is
 ordinary letters, and what your file says is what you meant.
 
+**Don't count the words — stand on one and ask.** In the forge, `:fill?` over a
+word tells you the reference for it:
+
+```
+'addr' is <fill0.7> — write that in the solution and every player types their own.
+```
+
+That is also where you find out you cannot: over a fill that rolls its lengths,
+`:fill?` says so instead, rather than letting you discover it at `:check` in a
+message about par.
+
 Two rules come with it, and both are about par being **one number**:
 
 * the fill you read from must grow words of a **single length**
@@ -457,6 +468,19 @@ Two rules come with it, and both are about par being **one number**:
 A fill lays no word on stone and stops short of the right margin, so it can grow
 fewer words than its region looks like it holds. A slot that was never laid is
 refused by name rather than left in the tape.
+
+**What about `3e` versus `4e`?** A counted motion depends on where the words
+are, not on what they say — and a single-length fill lays them in exactly the
+same places for every player. Word length is what decides where the next word
+starts, so fixing the length fixes every position, and the number of words too;
+all that is re-rolled is the letters. Look at your own build, count once, and
+write `3e`: it is right for everybody. That is the same law doing both jobs,
+and it is why counts need no notation of their own.
+
+The flip side is a real limit worth knowing. If you *want* the roll to change
+the route — "count the words yourself, however many there are today" — Vimny
+cannot score that level. Par is one number, and a route that is four keys for
+one player and five for the next does not have one.
 
 ### `no_horse`
 
