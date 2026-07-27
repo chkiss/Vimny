@@ -139,9 +139,32 @@ def test_a_shelf_levels_command_list_sits_in_the_curriculum_column(term):
         i = row.index(text)
         return 2 * i + len(text)          # doubled centre, so no .5 rounding
 
-    assert _mid(ship, 'w b e') == _mid(mine, 'by Ana  w b +f +t')
-    # and the order is requires, then teaches marked — not the other way round
-    assert 'by Ana  w b +f +t' in mine
+    assert _mid(ship, 'w b e') == _mid(mine, 'w b +f +t')
+    # the order is requires, then teaches marked — not the other way round
+    assert 'w b +f +t' in mine
+    # …and the author rides with the NAME, in column one, not in that column
+    assert 'Maze of Ana by Ana' in mine
+    assert mine.index('by Ana') < mine.index('w b +f')
+
+
+def test_search_matches_the_label_the_renderer_draws(term):
+    """`line_search_text` carries the author too, because the row does.
+
+    The single-source law in that function's docstring: search matches what is
+    DRAWN. Now that "by Ana" is part of the name column, `/Ana` has to find it,
+    or `/` lies about the screen."""
+    from sharing.format import Level
+    from sharing.library import Shelved
+    from render.overworld import line_search_text
+
+    lvl = Level(name='Maze of Ana', author='Ana')
+    ln  = {'type': 'community',
+           'shelf': Shelved(path=Path('maze.json'), level=lvl,
+                            report=types.SimpleNamespace(par=1, budget=2, ok=True))}
+    assert line_search_text(ln) == 'Maze of Ana by Ana'
+    # an anonymous level keeps a bare name — no dangling "by"
+    ln['shelf'].level.author = ''
+    assert line_search_text(ln) == 'Maze of Ana'
 
 
 def test_a_long_shelf_name_drops_the_column_rather_than_overrunning_it(term):
@@ -161,4 +184,4 @@ def test_a_long_shelf_name_drops_the_column_rather_than_overrunning_it(term):
 
     row = next(r for r in _plain(term, build_lines(LEVELS[:5], [], [shelf], []), p)
                if 'AAAA' in r)
-    assert 'by Ana' not in row and '[par 12]' in row
+    assert 'w +f' not in row and '[par 12]' in row

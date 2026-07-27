@@ -379,7 +379,8 @@ def test_community_levels_appear_in_the_overworld_buffer(tmp_path, monkeypatch):
     lines = build_lines(LEVELS[:2], [], shelf)
     assert [ln['type'] for ln in lines[-2:]] == ['subhdr', 'community']
     assert line_search_text(lines[-2]) == 'community/'
-    assert line_search_text(lines[-1]) == 'The Salt Stair'
+    # the author trails the name in column one, and search sees what is drawn
+    assert line_search_text(lines[-1]) == 'The Salt Stair by tester'
 
 
 def test_the_wing_sits_after_the_curriculum(tmp_path, monkeypatch):

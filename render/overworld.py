@@ -56,6 +56,23 @@ def build_lines(levels: list, custom_layouts: list, community: list = (),
     return lines
 
 
+def entry_label(ln: dict) -> str:
+    """The first-column text of a community or draft row: the level's name with
+    its author trailing it.
+
+    The author belongs to the NAME. It is part of how you refer to a level you
+    downloaded — "Ana's maze" — whereas the middle column exists to answer one
+    other question, what the level asks of you, and mixing the two put the
+    command list on no consistent axis. Shared with `_content` under the
+    single-source law above, so `/Ana` finds the row the renderer draws.
+    """
+    entry = ln.get('shelf') or ln.get('draft')
+    if entry is None:
+        return ''
+    who = getattr(getattr(entry, 'level', None), 'author', '') or ''
+    return f'{entry.name} by {who}' if who else entry.name
+
+
 def line_search_text(ln: dict) -> str:
     """The text `/` searches for a buffer line.
 
@@ -73,10 +90,8 @@ def line_search_text(ln: dict) -> str:
         return key_for_slug(ln['level']['slug'])
     if t == 'custom':
         return ln['layout'].get('layout_name', '?')
-    if t == 'community':
-        return ln['shelf'].name
-    if t == 'draft':
-        return ln['draft'].name
+    if t in ('community', 'draft'):
+        return entry_label(ln)
     if t == 'parent':
         return '../'
     if t == 'self':
@@ -223,20 +238,19 @@ def render_overworld(term: Terminal, player: Player, progress: dict,
         return '  ' + body, cw
 
     def _shelf_mid(level) -> str:
-        """The middle column for a community level or draft: who wrote it, and
-        what it asks of you — `requires`, then `teaches` marked with a leading +.
+        """The middle column for a community level or draft: what it asks of
+        you — `requires`, then `teaches` marked with a leading +.
 
         Both command lists, not one. `requires` is what the level assumes you
         already know and `teaches` is what it introduces, and a row showing only
         one of them cannot answer the question the player is actually asking:
         whether this is a level they can play yet. Shipped levels get the same
         information from the curriculum; a community level has nowhere else to
-        say it."""
+        say it. The author is NOT here — it rides with the name in column one,
+        so this column holds commands and nothing else and can be read down."""
         if level is None:
             return ''
-        cmds = ' '.join(list(level.requires) + [f'+{t}' for t in level.teaches])
-        who  = f'by {level.author}' if level.author else ''
-        return '  '.join(p for p in (who, cmds) if p)
+        return ' '.join(list(level.requires) + [f'+{t}' for t in level.teaches])
 
     def _content(idx, line):
         """(colored, visible_width) for a buffer line. is_cursor brightens it."""
@@ -260,7 +274,7 @@ def render_overworld(term: Terminal, player: Player, progress: dict,
                                 tree, is_cursor)
         if t == 'community':
             shelf = line['shelf']
-            name  = shelf.name
+            name  = entry_label(line)
             tree  = tree_glyph(line.get('last'))
             # A broken level says so ON THE ROW. Hiding it would leave a player
             # wondering where the file they downloaded went; naming the fault is
@@ -273,7 +287,7 @@ def render_overworld(term: Terminal, player: Player, progress: dict,
                                 tree, is_cursor)
         if t == 'draft':
             d    = line['draft']
-            name = d.name
+            name = entry_label(line)
             tree = tree_glyph(line.get('last'))
             # The badge is the draft's STATE, because that is the only thing an
             # author wants from this row: whether it has a tape yet, and if so
