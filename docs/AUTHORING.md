@@ -197,7 +197,8 @@ What keeps that safe is a gate at publish time: your tape is replayed against
 eight fresh arrangements and every one must reach the exit at the same par. A
 route that depends on which words grew — hopping `w` onto an exit that happened
 to sit where a word started — is refused with the seed that broke it. Move the
-fill off the solution path, or `:fill!` it into text you own.
+fill off the solution path, name the words instead of spelling them (below), or
+`:fill!` it into text you own.
 
 A fill never paints over stone, so carve first and fill second.
 
@@ -428,6 +429,34 @@ keys into the buffer.
 > score against *author's par*, named as such. If plain movement alone beats
 > your tape, the validator warns you: that usually means the level does not
 > actually force the lesson it is teaching.
+
+#### Naming a word the fill grew
+
+A route that **types** a word off the floor cannot spell it out — the word is a
+different one for every player. Point at it instead:
+
+```json
+"solution": "wwce<fill0.4><Esc>"
+```
+
+`<fill0.4>` is *the word `fill[0]` grew in slot 4*. Both numbers count from
+zero, like `fill[0]` does everywhere else: fills in the order you wrote them,
+words in the order they were laid — left to right, then down. Vimny substitutes
+the real word when it builds the room, so what the player is scored against is
+ordinary letters, and what your file says is what you meant.
+
+Two rules come with it, and both are about par being **one number**:
+
+* the fill you read from must grow words of a **single length**
+  (`"length": 4`, not `[3, 6]`) — `ce` plus a word costs as many keys as the
+  word is long, so a fill that rolls its lengths is a level with a different
+  par for every player; and
+* you cannot read a word out of a **saying pool**, where which proverb turned up
+  decides the length too.
+
+A fill lays no word on stone and stops short of the right margin, so it can grow
+fewer words than its region looks like it holds. A slot that was never laid is
+refused by name rather than left in the tape.
 
 ### `no_horse`
 

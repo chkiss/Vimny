@@ -51,8 +51,19 @@ containing `i`, `a`, `c` or `R` could not be validated at all.
 
 Esc is free — leaving INSERT spends no budget — so writing it down does not
 change any level's par by a single keystroke.
+
+**Slot references** (`<fill0.3>`) are the fifth thing that is not a key, and the
+only one that is not a keystroke at all. A tape has to contain the literal words
+the player types — `cerune<Esc>` — but a `fill` directive grows different words
+for every player, so a tape naming one is a tape that solves nobody's level but
+its author's. A slot ref says which word instead of which letters: "whatever
+grew in fill 0, slot 3". It is resolved once, at build time, against the words
+that fill actually laid for THIS player, and everything downstream — the karaoke
+sheet, the replayer, the cost model — sees an ordinary tape of ordinary letters.
 """
 from __future__ import annotations
+
+import re
 
 SPACE  = '<Space>'   # a TYPED space (a plain ' ' in a tape is only a separator)
 ENTER  = '<CR>'      # a typed Enter
@@ -70,6 +81,48 @@ FREE = (ESC,)
 #: Back-compat alias: everything that is a written marker rather than a literal.
 MARKERS = (SPACE, ENTER, ESC)
 
+#: `<fill{n}.{k}>` — the word grown by fill n in slot k. BOTH are 0-based, to
+#: match `fill[0]` in the file and in every error message the format prints; a
+#: reference that counted from one while its own error message counted from zero
+#: would be a trap laid for the author who is already confused.
+SLOT_REF = re.compile(r'<fill(\d+)\.(\d+)>')
+
+
+class UnknownSlot(LookupError):
+    """A slot reference naming a fill, or a word, that the build never grew."""
+
+
+def slot_refs(tape: str) -> list:
+    """`[(fill, slot), …]` — every slot reference in `tape`, in order."""
+    return [(int(m.group(1)), int(m.group(2))) for m in SLOT_REF.finditer(tape)]
+
+
+def resolve_slots(tape: str, slots) -> str:
+    """Replace every `<fill{n}.{k}>` with the word that fill grew there.
+
+    `slots` is what the build recorded: one list of words per fill directive, in
+    laying order. Raises `UnknownSlot` rather than leaving the reference in
+    place — a tape that still reads `<fill0.3>` would be typed into the buffer
+    letter by letter, which is a route that silently does something else.
+
+    A fill can lay FEWER words than its region suggests (it skips stone, and it
+    thins out at the right margin), so an out-of-range slot is the ordinary way
+    to get this wrong and says so.
+    """
+    def _one(m):
+        n, k = int(m.group(1)), int(m.group(2))
+        if n >= len(slots):
+            raise UnknownSlot(
+                f'solution: {m.group(0)} names fill {n}, but this level has '
+                f'{len(slots)} fill directive(s)')
+        if k >= len(slots[n]):
+            raise UnknownSlot(
+                f'solution: {m.group(0)} names word {k} of fill {n}, which grew '
+                f'only {len(slots[n])} word(s) — a fill lays no word where the '
+                f'floor is stone, and stops short of the right margin')
+        return slots[n][k]
+    return SLOT_REF.sub(_one, tape)
+
 
 def strip_separators(tape: str) -> str:
     """The tape as matchable glyphs: plain spaces are display only."""
@@ -86,6 +139,11 @@ def token_at(plain: str, pos: int) -> str:
     for tok in TOKENS:
         if plain.startswith(tok, pos):
             return tok
+    # An UNRESOLVED slot reference is one atom too, so the forge can show and
+    # measure a tape that has not been built yet without chopping one in half.
+    m = SLOT_REF.match(plain, pos)
+    if m:
+        return m.group(0)
     return plain[pos:pos + 1]
 
 
@@ -254,7 +312,7 @@ def literal_spans(tape: str) -> list:
             if tok == ESC:
                 in_insert = False
             elif tok not in TOKENS:            # a token is a key, never a word
-                lit.add(i)
+                lit |= set(range(i, i + len(tok)))   # a slot ref is a word, whole
             i += len(tok)
             continue
         m = _CMDLINE.match(tape, i)

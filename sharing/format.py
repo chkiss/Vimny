@@ -43,6 +43,7 @@ import random
 import re
 from dataclasses import dataclass, field, replace
 
+from engine import tape as _tape
 from engine.editor import _CELL_CODE, _CODE_CELL, _MIST_CODE, _ENTITY_FIELDS
 from engine.motion import apply_stone_fog
 from engine.world import (CellType, CharRun, DROPPABLE, Entity, Room, RoomType,
@@ -466,7 +467,6 @@ def build(lvl: Level, par: int | None = None, seed: int | None = None) -> Dungeo
     room.seed      = lvl.seed
     room.spawn_pos = tuple(lvl.spawn)
     room.exit_pos  = tuple(lvl.exit)
-    room.answer    = lvl.solution
     room.no_horse  = lvl.no_horse
 
     # Seals are built SHUT, whatever the grid says, and before anything else reads
@@ -490,10 +490,25 @@ def build(lvl: Level, par: int | None = None, seed: int | None = None) -> Dungeo
                             else tuple(r['symbols']),
                     kind=str(r.get('kind', 'ancient')))
             for r in lvl.char_runs]
-    grown = []
+    grown, slots = [], []
     for f in lvl.fills:
-        grown.extend(_resolve_fill(f, room, rng, custom))
+        laid = _resolve_fill(f, room, rng, custom)
+        slots.append([''.join(ru.symbols) for ru in laid])
+        grown.extend(laid)
     room.char_runs = runs + grown
+
+    # What each fill grew, in laying order — the SLOTS a tape may point at. This
+    # is a record of one build and nothing reads it afterwards, which is why it
+    # can exist alongside the note below: it is never asked what a cell holds
+    # NOW, only what the words were at the moment the room was made.
+    room.fill_slots = slots
+    try:
+        room.answer = _tape.resolve_slots(lvl.solution, slots)
+    except _tape.UnknownSlot as exc:
+        raise LevelFormatError(str(exc)) from None
+    # The tape AS WRITTEN, kept so that saving the room back out writes the
+    # references the author wrote rather than the one roll they happened to get.
+    room.answer_source = lvl.solution
 
     # The fill regions travel with the room so the editor can draw them, refuse
     # edits inside them, and write them back out as directives. Which text a
@@ -761,5 +776,8 @@ def from_room(room, name: str, author: str = '', solution: str = '',
                   for e in room.entities
                   if e.alive and e.kind not in _TRANSIENT_KINDS],
         vocabulary=list(vocabulary),
-        solution=solution or room.answer,
+        # The tape as WRITTEN wins over the tape as resolved: a level whose
+        # route says "the word in fill 0, slot 3" must be written back out
+        # saying that, not naming the one word this build happened to roll.
+        solution=solution or getattr(room, 'answer_source', '') or room.answer,
     )

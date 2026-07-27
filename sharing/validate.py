@@ -32,6 +32,7 @@ import unicodedata
 from dataclasses import dataclass, field
 
 from content.levels import LEVELS, known_commands
+from engine import tape as _tape
 from engine.world import CellType
 from sharing import format as F
 from sharing.replay import replay_tape
@@ -64,6 +65,7 @@ def validate(lvl: F.Level) -> Report:
     rep = Report()
 
     _check_bounds(lvl, rep)
+    _check_slot_refs(lvl, rep)
     _check_vocabulary(lvl, rep)
     _check_declarations(lvl, rep)
     if not rep.ok:
@@ -166,6 +168,41 @@ def _check_bounds(lvl: F.Level, rep: Report) -> None:
                 rep.fail('bounds', f'seals[{i}].opens[{j}] {list(cell)} lies inside '
                                    f"the seal's own region — a door cannot be part "
                                    f'of the text that opens it')
+
+
+# ── 2b. Slot references ───────────────────────────────────────────────────────
+
+def _check_slot_refs(lvl: F.Level, rep: Report) -> None:
+    """A tape may name a grown word, but only where doing so costs the same.
+
+    `<fill0.3>` frees a route from the words that happened to grow — but not
+    from their LENGTH: `ce<fill0.3><Esc>` types as many keys as the word is
+    long, so a fill that rolls 3 to 6 letters is a level whose par is a
+    different number for every player. Par is one number, so a fill a tape reads
+    from has to grow words of one length.
+
+    A saying pool is refused outright rather than length-checked: which proverb
+    turned up decides both the word and its length, and `length` is not even
+    consulted when they are laid.
+    """
+    for n, k in _tape.slot_refs(lvl.solution):
+        if n >= len(lvl.fills):
+            rep.fail('bounds', f'solution: <fill{n}.{k}> names fill {n}, but the '
+                               f'level has {len(lvl.fills)} fill directive(s)')
+            continue
+        f = lvl.fills[n]
+        if f.pool in F.vocab.LINE_POOLS:
+            rep.fail('bounds', f'solution: <fill{n}.{k}> reads a word out of a '
+                               f'saying pool ({f.pool!r}). Which saying grew '
+                               f'decides both the word and its length, so the '
+                               f'route would cost a different number of keys for '
+                               f'every player. Read from a word pool instead.')
+        elif f.length[0] != f.length[1]:
+            rep.fail('bounds', f'solution: <fill{n}.{k}> reads a word out of a '
+                               f'fill that grows {f.length[0]}-{f.length[1]} '
+                               f'letter words, so typing it costs a different '
+                               f'number of keys for every player. Give fill[{n}] '
+                               f'a single length to point a tape at it.')
 
 
 # ── 8. Content ────────────────────────────────────────────────────────────────
@@ -278,7 +315,10 @@ def _check_fill_stability(lvl: F.Level, rep: Report) -> None:
         except Exception as exc:       # noqa: BLE001 — author input
             rep.fail('stability', f'the level fails to build at seed {seed}: {exc}')
             return
-        result = replay_tape(dungeon, 'community', lvl.solution, known=lvl.known)
+        # The tape THIS build resolved, not the one the file holds: a slot ref is
+        # a different word every seed, and that is the whole point of re-rolling.
+        result = replay_tape(dungeon, 'community', dungeon.room.answer,
+                             known=lvl.known)
         if result.error or not result.won or result.spent != rep.par:
             rep.fail('stability',
                      f'the fills are re-rolled for every player, and at seed '
@@ -287,7 +327,9 @@ def _check_fill_stability(lvl: F.Level, rep: Report) -> None:
                         'never reaches the exit' if not result.won else
                         f'costs {result.spent}, not the {rep.par} it costs here')
                      + '. Your route depends on which words grew — move the fill '
-                       'off the solution path, or :fill! it into text you own.')
+                       'off the solution path, name the words it grew with '
+                       '<fill0.3> references instead of spelling them out, or '
+                       ':fill! it into text you own.')
             return
 
 
@@ -349,7 +391,8 @@ def _check_solvable_and_par(lvl: F.Level, rep: Report) -> None:
     the curriculum runs on, and the replay fails.
     """
     dungeon = F.build(lvl)                          # fresh: the loop mutates it
-    result  = replay_tape(dungeon, 'community', lvl.solution, known=lvl.known)
+    result  = replay_tape(dungeon, 'community', dungeon.room.answer,
+                          known=lvl.known)
 
     if result.error:
         rep.fail('solvable', result.error)
