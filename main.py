@@ -599,7 +599,7 @@ _ENTITY_PALETTE = {
                         'chases you; x to fight',
                         ('hp', 'ai_speed', 'tag', 'drops', 'group')),
     'wanderer':        (dict(hp=1, alive=True, max_hp=1, ai='chase', ai_speed=2),
-                        'a slower chaser',
+                        'chases at half speed; never strikes',
                         ('hp', 'ai_speed', 'drops', 'group')),
     'warden':          (dict(hp=5, alive=True, max_hp=5, ai='', ai_speed=1),
                         'stationary boss, 5 hp',
@@ -611,13 +611,16 @@ _ENTITY_PALETTE = {
                         'opened by pasting a floor_key of the same tag',
                         ('tag', 'edit_immune')),
     'door':            (dict(hp=1, alive=True), 'opened with x', ()),
-    'chest':           (dict(hp=1, alive=True), 'x to open', ()),
-    'chest_key':       (dict(hp=1, alive=True), 'a chest holding a key', ('tag',)),
+    'chest':           (dict(hp=1, alive=True),
+                        'x to open; RANDOM loot — key, scroll or heart', ()),
+    'chest_key':       (dict(hp=1, alive=True),
+                        'a chest holding a key of the same tag', ('tag',)),
     'chest_scroll':    (dict(hp=1, alive=True), 'a chest holding a scroll',
                         ('scroll_id',)),
-    'heart_container': (dict(hp=1, alive=True), 'restores hp', ()),
+    'heart_container': (dict(hp=1, alive=True),
+                        'restores hp and increases max health', ()),
     'gold':            (dict(hp=1, alive=True), 'a coin', ()),
-    'dynamite':        (dict(hp=1, alive=True), 'blows out wood walls', ()),
+    'dynamite':        (dict(hp=1, alive=True), 'blows up', ()),
     'exit':            (dict(hp=1, alive=True), 'the way out (:exit moves it)', ()),
 }
 
@@ -669,13 +672,22 @@ def _describe_entity(ent) -> str:
 
 
 def _pick_entity(term: Terminal, iw: int, game_h: int) -> str:
-    """The palette, as a list you walk with j/k and choose with Enter.
+    """The palette, as two panes you walk with j/k. Returns the ARGUMENT TAIL of
+    the `:entity` command it built — `'goblin tag=red drops=floor_key:red'` — or
+    '' if the author backed out.
 
-    A picker in a Vim-teaching game needs a defence, and it is this: the command
-    is the mechanism and the menu is a view of it. `:entity goblin tag=echo` is
-    the real interface, always available, recordable in a tape; this only answers
-    "what can I even place?", which is a question `:set` answers with a list too.
-    So it moves on j/k, leaves on Esc, and picking one just runs the command."""
+    It returns the command rather than performing the placement because that is
+    the whole defence for having a menu in a Vim-teaching game: the command is
+    the mechanism and the menu is one view of it. `:entity goblin tag=red` is
+    always available, always typeable, and recordable in a tape; this only
+    answers "what can I place, and what can I set on it?" — and it answers by
+    composing the very line the author could have typed, which the caller then
+    echoes back so the menu teaches its way out of being needed.
+
+    Pane one is the kinds. Pane two is that kind's notable fields, because a
+    picker that could only place the DEFAULT goblin cannot make a red key, and a
+    red key is the first thing anyone wants from it.
+    """
     BOX_IW = 62; BOX_BW = BOX_IW + 4
     box_bg  = term.on_color_rgb(6, 8, 12)
     edge    = box_bg + term.color_rgb(120, 170, 210) + term.bold
@@ -685,24 +697,22 @@ def _pick_entity(term: Terminal, iw: int, game_h: int) -> str:
     rst     = term.normal
     col_off = max(1, (iw + 2 - BOX_BW) // 2)
     kinds   = list(_ENTITY_PALETTE)
-    sel     = 0
 
     def row(vis, colored):
         return (edge + '║ ' + rst + box_bg + colored +
                 box_bg + ' ' * max(0, BOX_IW - vis) + edge + ' ║' + rst)
 
     sep_h = '═' * (BOX_IW + 2)
-    while True:
+
+    def show(title, rows, sel, foot):
         lines = [edge + '╔' + sep_h + '╗' + rst, row(0, '')]
-        lines.append(row(BOX_IW, head + ' place an entity' + box_bg
-                         + ' ' * (BOX_IW - 16)))
+        lines.append(row(BOX_IW, head + ' ' + title
+                         + box_bg + ' ' * max(0, BOX_IW - len(title) - 1)))
         lines.append(row(0, ''))
-        for i, k in enumerate(kinds):
-            _, note, _flds = _ENTITY_PALETTE[k]
-            text = f' {k:<16}{note}'[:BOX_IW]
+        for i, text in enumerate(rows):
+            text = text[:BOX_IW]
             lines.append(row(len(text), (pick if i == sel else body) + text))
         lines.append(row(0, ''))
-        foot = ' j/k move   ⏎ place here   Esc cancel'
         lines.append(row(len(foot), body + foot))
         lines.append(row(0, ''))
         lines.append(edge + '╚' + sep_h + '╝' + rst)
@@ -710,16 +720,66 @@ def _pick_entity(term: Terminal, iw: int, game_h: int) -> str:
         for i, line in enumerate(lines):
             print(term.move_yx(row_off + i, col_off) + line, end='', flush=True)
 
+    def read_value(current):
+        """Type a field's value. Enter commits, Esc keeps what was there."""
+        buf = current
+        while True:
+            show('type a value, ⏎ to keep it', [f' > {buf}▏'], 0,
+                 ' ⏎ accept   Esc leave it unchanged')
+            key = term.inkey()
+            raw = str(key) if not key.is_sequence else ''
+            if key.name == 'KEY_ESCAPE':
+                return current
+            if key.name == 'KEY_ENTER' or raw in ('\n', '\r'):
+                return buf
+            if key.name == 'KEY_BACKSPACE' or raw in ('\x7f', '\b'):
+                buf = buf[:-1]
+            elif raw and raw.isprintable():
+                buf += raw
+
+    sel = 0
+    while True:
+        rows = [f' {k:<16}{_ENTITY_PALETTE[k][1]}' for k in kinds]
+        show('place an entity', rows, sel, ' j/k move   ⏎ choose   Esc cancel')
         key = term.inkey()
         raw = str(key) if not key.is_sequence else ''
         if key.name == 'KEY_ESCAPE':
             return ''
-        if key.name == 'KEY_ENTER' or raw in ('\n', '\r'):
-            return kinds[sel]
         if raw == 'j' or key.name == 'KEY_DOWN':
             sel = (sel + 1) % len(kinds)
-        elif raw == 'k' or key.name == 'KEY_UP':
+            continue
+        if raw == 'k' or key.name == 'KEY_UP':
             sel = (sel - 1) % len(kinds)
+            continue
+        if not (key.name == 'KEY_ENTER' or raw in ('\n', '\r')):
+            continue
+
+        kind   = kinds[sel]
+        fields = list(_ENTITY_PALETTE[kind][2])
+        if not fields:
+            return kind                       # nothing to tune — place it as-is
+        vals   = {f: '' for f in fields}
+        fsel   = 0
+        while True:
+            # The place row is the LAST row, so Enter-Enter straight through the
+            # menu still places a plain one: the fields are opt-in, not a gauntlet.
+            rows = [f' {f:<14}{vals[f] or "—"}' for f in fields]
+            rows.append(f' » place the {kind}')
+            show(f'{kind} — set what you need', rows, fsel,
+                 ' j/k move   ⏎ edit / place   Esc back')
+            key = term.inkey()
+            raw = str(key) if not key.is_sequence else ''
+            if key.name == 'KEY_ESCAPE':
+                break                         # back to the kinds
+            if raw == 'j' or key.name == 'KEY_DOWN':
+                fsel = (fsel + 1) % len(rows)
+            elif raw == 'k' or key.name == 'KEY_UP':
+                fsel = (fsel - 1) % len(rows)
+            elif key.name == 'KEY_ENTER' or raw in ('\n', '\r'):
+                if fsel == len(rows) - 1:
+                    return ' '.join([kind] + [f'{f}={vals[f]}'
+                                              for f in fields if vals[f]])
+                vals[fields[fsel]] = read_value(vals[fields[fsel]])
 
 
 def _render_standard_scroll(term: Terminal, iw: int, game_h: int, content: dict,
@@ -5883,9 +5943,13 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
                         # the answer is delivered by running the command, so
                         # nothing here is reachable only through the menu.
                         _kind = ''
+                        _via  = ''            # the line the picker composed
                         if _bare:
-                            _kind = _pick_entity(term, _iw(term), term.height - 8)
-                            if not _kind:
+                            _via  = _pick_entity(term, _iw(term), term.height - 8)
+                            _toks = _via.split()
+                            if _toks:
+                                _kind, _toks = _toks[0], _toks[1:]
+                            else:
                                 _push('')
                         elif '=' not in _toks[0]:
                             _kind = _toks[0].lower()
@@ -5918,9 +5982,14 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
                                 _why = _entity_field(_here, _f, _v)
                                 if _why:
                                     _bad.append(_why)
+                            # After a MENU placement, name the command that would
+                            # have done the same thing. It is the one piece of
+                            # information the screen cannot show, and it is how
+                            # the picker teaches its own way out of being needed.
                             _push('; '.join(_bad) if _bad
-                                  else f'{"Placed" if _kind else "Set"}: '
-                                       f'{_describe_entity(_here)}')
+                                  else (f'Placed by  :entity {_via}' if _via
+                                        else f'{"Placed" if _kind else "Set"}: '
+                                             f'{_describe_entity(_here)}'))
 
                 # ── The forge: authoring a shareable level ────────────────────
                 # These only exist when a DRAFT is open. Everything they touch is
@@ -7554,8 +7623,13 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
                     room.kill_entity(cur)
                     budget.spend(1)
                     if item == 'key':
+                        # The chest's tag rides onto the key. A `chest_key` with
+                        # tag='red' has to yield a RED key or the pairing an author
+                        # set up on the chest quietly dissolves at the moment of
+                        # looting, and the red door it was cut for never opens.
                         _reg_write(player, '"',
-                                   entity_clip(Entity(kind='floor_key', row=cur.row, col=cur.col)),
+                                   entity_clip(Entity(kind='floor_key', row=cur.row,
+                                                      col=cur.col, tag=cur.tag)),
                                    is_delete=True)
                         _push('You found a key!')
                     elif item == 'heart':

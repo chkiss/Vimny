@@ -164,7 +164,14 @@ Everything that makes a creature what it is travels with it — `hp`, `ai`,
 **Colours pair on `tag`.** A `floor_key` tagged `gold` opens a `locked_door`
 tagged `gold` and nothing else; an untagged door takes any key. Pick up a key
 with `x` — it goes into the unnamed register — and open the door by pasting it
-there with `p`.
+there with `p`. A `chest_key` carries its tag onto the key it gives up, so
+`{"kind": "chest_key", "tag": "gold"}` is a chest holding a gold key.
+
+**`:entity` with no argument opens the palette**, and the palette can set the
+same fields the command can: pick a kind with `j`/`k` and Enter, then walk that
+kind's notable fields, Enter to type a value, and Enter on the last row to place
+it. It reports the command it just ran (`Placed by  :entity floor_key tag=red`)
+— the menu answers "what can I place?", the command is still the mechanism.
 
 **`drops` is what a creature leaves behind when it dies**, written `kind` or
 `kind:tag`. It is a field on the creature, not a rule about goblins, so a

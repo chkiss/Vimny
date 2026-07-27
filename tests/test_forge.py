@@ -645,6 +645,56 @@ def test_entity_bang_removes_and_entity_refuses_a_bad_field():
     assert not [e for e in d.level.entities if e['kind'] == 'goblin']
 
 
+def test_the_picker_builds_a_red_key_not_just_a_default_one():
+    """The menu has to reach every field, or it cannot make the first thing
+    anyone wants from it.
+
+    Driven through the real key loop: `:entity` opens the palette, jjj walks to
+    floor_key, Enter chooses it, Enter opens `tag`, the value is typed, and the
+    last row places it. A picker that could only place the DEFAULT of each kind
+    would leave `:entity floor_key tag=red` as the only route to a red key."""
+    import main
+    d = DRAFT.new('Probe', rows=8, cols=30)
+    _forge_session(d, 'jl:entity\rjjj\r\rred\rj\r:w\r:q!\r')
+    key = [e for e in d.level.entities if e['kind'] == 'floor_key']
+    assert key and key[0]['tag'] == 'red'
+    # …and the fields are opt-in: Enter straight through still places a plain one
+    d2 = DRAFT.new('Probe', rows=8, cols=30)
+    _forge_session(d2, 'jl:entity\rjjj\rj\r:w\r:q!\r')
+    key = [e for e in d2.level.entities if e['kind'] == 'floor_key']
+    assert key and key[0].get('tag', '') == ''
+
+
+def test_a_red_chest_yields_a_red_key():
+    """A `chest_key` carries its tag onto the key it gives up. Without this the
+    pairing an author set on the chest dissolved at the moment of looting and
+    the red door it was cut for never opened."""
+    import main
+    from engine.world import Entity
+    room = _room_with({'kind': 'chest_key', 'at': [1, 3], 'tag': 'red'})
+    chest = room.entity_at(1, 3)
+    assert main._chest_loot('chest_key') == 'key'
+    assert chest.tag == 'red'
+
+
+def test_the_wanderer_chases_but_never_strikes():
+    """The palette calls it a half-speed chaser that does no damage — pinning
+    that here because it is a claim about the ENGINE made in a menu, and the two
+    can drift apart silently."""
+    import main
+    from engine.world import Entity
+    room = _room_with()
+    pre  = dict(main._ENTITY_PALETTE['wanderer'][0])
+    w    = Entity(kind='wanderer', row=1, col=5, **pre)
+    room.add_entity(w)
+    p = _player_at(1, 1)
+    start, hp = w.col, p.hp
+    for _ in range(8):
+        main._enemy_tick(room, p)
+    assert w.col < start, 'the wanderer never moved'
+    assert p.hp == hp, 'the wanderer dealt damage'
+
+
 # ── Sealed doors: a text-match condition an author can declare ────────────────
 
 def _sealed(match='open sesame', mode='exact', opens=((2, 8),), text='open sesame'):
