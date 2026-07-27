@@ -1071,6 +1071,19 @@ def test_paint_leaves_a_wall_plaque_standing():
     assert any(''.join(ru['symbols']).startswith('p') for ru in d.level.char_runs)
 
 
+def test_s_is_vims_s_again_in_the_editor():
+    """`s` walked a ring of cell types for as long as the forge has existed —
+    the one thing `s` means nowhere else in this game. `:paint` took that job
+    and the key went back to the buffer: cut what is here, then type."""
+    d = DRAFT.new('Probe', rows=8, cols=30)
+    _forge_session(d, 'jli' + 'cat' + T.ESC + 'hhhsb' + T.ESC + ':w\r:q!\r')
+    row = ''.join(''.join(ru['symbols']) for ru in d.level.char_runs
+                  if ru['row'] == 2)
+    assert 'bat' in row
+    # …and the cell it typed over is still floor: the ring would have walled it
+    assert F.expand_row(d.level.cells[2], d.level.cols, 2)[2] == CellType.FLOOR
+
+
 def test_an_unknown_paint_names_the_ones_that_exist():
     d = DRAFT.new('Probe', rows=8, cols=30)
     _forge_session(d, 'jll:paint lava\r:w\r:q!\r')

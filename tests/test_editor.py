@@ -289,6 +289,13 @@ class TestEdPaint:
         assert (3, 5) not in room.mist_cells
         assert (3, 5) not in room.fog_cells
 
+    def test_mist_keeps_waters_glyph(self):
+        """A channel under haze is still a channel. Mist is separated from open
+        water by its background and by never animating — not by wearing a
+        different glyph, which read as rubble."""
+        from render import symbols as S
+        assert S.MIST == '~'
+
     def test_paint_leaves_the_text_standing(self):
         """The whole reason `:paint` replaced the `s` cycle: a plaque set INTO a
         wall is the architecture's own advice, and the cycle cut it away."""

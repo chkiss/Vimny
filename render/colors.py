@@ -128,13 +128,15 @@ def cmd_cursor_fg(): return _term.color_rgb(12, 12, 20)          # dark glyph un
 def water_bg():              return _term.on_color_rgb(5, 15, 55)        # deep data-stream blue
 def water_fg(r, g, b):       return _term.color_rgb(r, g, b)
 
-# Misted water. It used to draw a '~' on water_bg in hint_fg — the SAME glyph on
-# the SAME background as open water, separated only by a foreground shade, and
-# since the water animation rests on a dim frame for 8 of its 24.8 seconds the
-# two exhibits read as one cell. Haze now lifts the background out of the deep
-# blue and takes the shade glyph the game already uses for "obscured".
+# Misted water. It is water, and it keeps water's '~' — a channel under haze is
+# still a channel, and a shade glyph made it read as rubble. What separates it
+# from open water is the BACKGROUND (lifted out of the deep blue, greyed, as fog
+# does to everything it sits on) and the stillness: open water animates through
+# four frames on a 24.8-second cycle, mist never moves. Drawing them apart on the
+# foreground alone was the earlier mistake — the water animation rests on a dim
+# frame for 8 of those seconds, and there the two exhibits read as one cell.
 def mist_bg():               return _term.on_color_rgb(22, 34, 58)       # channel under haze — lifted, greyed
-def mist_fg():               return _term.color_rgb(135, 150, 175)       # cold vapour, no phosphor in it
+def mist_fg():               return _term.color_rgb(95, 135, 190)        # water blue, drained by the vapour
 
 def wood_wall_bg():          return _term.on_color_rgb(80, 45, 14)       # dark timber, warm intruder
 def wood_wall_damaged_bg():  return _term.on_color_rgb(48, 24, 5)        # charred, near-void

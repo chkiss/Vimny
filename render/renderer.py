@@ -464,12 +464,16 @@ def render_all(term: Terminal, dungeon: Dungeon, player: Player,
         # A draft is open. The painter's keys still apply, but what an author
         # reaches for that the editor never had is the level's OWN properties —
         # so those lead, and `:record` is named where it cannot be missed.
-        _hint_raw = ('s:toggle wall  :rune <kind>  :entity <kind>  :spawn/:exit here  '
-                     'V then :fill <pool> [lo-hi]  :fill! drop  '
+        _hint_raw = (':paint <kind>  :rune <kind>  :entity <kind>  :spawn/:exit here  '
+                     'v then :fill <pool> [lo-hi]  :fill! drop  '
+                     'v then :seal <text>  :bolt door  '
                      ':name/:author/:teaches/:requires/:intro  '
                      ':record tape  :check  :publish  :w save')
     elif 'editor' in known:
-        _hint_raw = 's:toggle wall  :rune ancient|verdant|void|ember  :entity exit|door|locked_door|chest|dynamite|wanderer|goblin|warden  :save <name>  :wq write+quit'
+        # Kinds and paints are NOT enumerated here: both lists outgrew the bar,
+        # and both commands answer for themselves when typed bare.
+        _hint_raw = (':paint <kind>  :rune ancient|verdant|void|ember  '
+                     ':entity <kind>  :save <name>  :wq write+quit')
     else:
         _hint_raw = _hint_text(known, getattr(dungeon, 'level_slug', None))
     if 'admin' in known:
@@ -600,8 +604,8 @@ def render_all(term: Terminal, dungeon: Dungeon, player: Player,
                     and (room_r, room_c) in room.mist_cells):
                 # MIST on water reads as hazy water, not stone — the channel
                 # stays visibly a channel (scans still stop at the fog), but it
-                # must not read as OPEN water either, so it takes its own
-                # lifted-grey palette and the shade glyph rather than the '~'.
+                # must not read as OPEN water either, so it keeps water's '~' on
+                # its own lifted-grey background, and never animates.
                 # Plain-fogged water is DARK like any hidden cell: an
                 # unrevealed pool gives nothing away.
                 return C.mist_bg() + C.mist_fg() + S.MIST + C.normal_fg()

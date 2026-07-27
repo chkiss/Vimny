@@ -18,7 +18,7 @@
 
 WOOD_WALL_DAMAGED = '░'
 SEALED_WALL       = '╬'   # a gate: banded stone that some tick draws back
-MIST              = '░'   # haze on water — the game's shade glyph for "obscured"
+MIST              = '~'   # haze on water — still WATER, and it must read as water
 
 FLOOR        = ' '
 CORRIDOR     = ' '

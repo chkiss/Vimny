@@ -6264,7 +6264,9 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
                             else:
                                 _push('')
                         elif '=' not in _toks[0]:
-                            _kind = _toks[0].lower()
+                            # …through the rename map, so `:entity chest` still
+                            # means what it meant when the docs said it did.
+                            _kind = canonical_kind(_toks[0].lower())
                             _toks = _toks[1:]
                         if _bare and not _kind:
                             pass                      # cancelled out of the picker
@@ -8355,12 +8357,21 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
             player.last_change = action
 
         elif edit_mode and action['type'] == 'substitute':
-            # `s` used to walk a fixed ring of cell types, cutting whatever stood
-            # on the cell as it went. `:paint` replaced it: it can name every
-            # terrain (the ring never reached misted water), it takes a range,
-            # and it leaves the text alone so a plaque can be set INTO a wall.
-            _push('s no longer cycles terrain — :paint <kind>, '
-                  'or :paint for the list.')
+            # `s` is vim's `s` again — cut what is here, then type. It used to
+            # walk a ring of cell types instead, which is the one thing `s` does
+            # not mean anywhere else in this game; `:paint` took that job, and
+            # the key went back to the buffer where the author's fingers expect
+            # it. `S` takes the whole line, as it does everywhere.
+            ed_undo.append(_ed_snapshot(room, player))
+            ed_redo.clear()
+            if action.get('line'):
+                _ed_clear_row(room, player.row)
+                player.col = 0
+            else:
+                for _si in range(count):
+                    _ed_cut(room, player.row, player.col + _si)
+            player.mode = Mode.INSERT          # admin map-editing placement
+            player.last_change = action
 
         elif not edit_mode and action['type'] == 'paste' and _action_allowed(action, player.known_commands):
             before = action.get('before', False)
