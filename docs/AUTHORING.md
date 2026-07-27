@@ -43,7 +43,7 @@ always have, plus the level's own properties:
 | `:check` | run the validator and report par, budget and warnings |
 | `:publish` | validate, then put it on the shelf in `~/.Vimny/levels/` |
 | `:w` / `:wq` | save the draft |
-| `:e` / `:e!` | re-read the draft from disk (`:e!` to discard unsaved work) |
+| `:e` / `:e!` | re-read the draft from disk, re-rolling its fills (`:e!` to discard unsaved work) |
 
 Every metadata command reads as well as writes, the way `:set` does: `:author
 Chas` sets it, `:author?` (or a bare `:author`) asks what it is now, and
@@ -189,7 +189,9 @@ growing nothing.
 is entered, exactly as every shipped level's words are. A fill is you saying "a
 wall of words here", not "these words here"; the file's own `seed` is only what
 the editor and the validator build from, so there is a fixed arrangement to
-reason about.
+reason about. **`:e` re-rolls them** — it is your window onto somebody else's
+copy, and the only place in the forge where the words move. Reopen a few times
+before you publish: you are judging the region, not the draw.
 
 What keeps that safe is a gate at publish time: your tape is replayed against
 eight fresh arrangements and every one must reach the exit at the same par. A

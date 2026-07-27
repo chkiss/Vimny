@@ -76,14 +76,20 @@ class Draft:
         """What the validator makes of it right now — the same check CI runs."""
         return validate(self.level)
 
-    def build(self, par: int | None = None):
+    def build(self, par: int | None = None, seed: int | None = None):
         """Render the draft to a playable Dungeon.
 
         `par=None` while authoring, which leaves the budget generous: an author
         walking their own half-built level must not be cut off mid-thought by a
         budget derived from a tape that does not exist yet.
+
+        `seed=None` grows the fills from the level's own seed, which is what an
+        author wants for every incidental rebuild — the room should not rearrange
+        itself because they painted a wall. A caller that passes a seed is asking
+        the deliberate question a player's copy answers: what do the fills look
+        like for somebody else? Only `:e` does that.
         """
-        return F.build(self.level, par=par)
+        return F.build(self.level, par=par, seed=seed)
 
 
 # ── The blank page ────────────────────────────────────────────────────────────

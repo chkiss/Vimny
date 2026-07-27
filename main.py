@@ -5135,7 +5135,7 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
         if _record is None:
             SM.save_progress(data, who)
 
-    def _forge_rebuild() -> str:
+    def _forge_rebuild(reseed: bool = False) -> str:
         """Re-render the open draft after a DIRECTIVE changed. Returns '' on
         success, or the reason it could not be built.
 
@@ -5162,7 +5162,8 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
         nonlocal dungeon, room, player, budget
         _r, _c = player.row, player.col
         try:
-            _built = _draft.build()
+            _built = _draft.build(
+                seed=random.randint(0, 2 ** 31 - 1) if reseed else None)
         except (ValueError, LF.LevelFormatError) as _exc:
             return str(_exc)
         dungeon = _built
@@ -6202,8 +6203,15 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
                             _push(f'Cannot re-read the draft: {_fresh.error}')
                         else:
                             _draft.level = _fresh.level
-                            _err = _forge_rebuild()
-                            _push(_err or f'"{_draft.level.name}" re-read from disk.')
+                            # Reseeded, because a shipped level is: every player
+                            # who opens it grows their own words. `:e` is the one
+                            # place an author can see that happen, and a fill that
+                            # only ever reads back the arrangement it was born
+                            # with is a fill the author cannot judge.
+                            _err = _forge_rebuild(reseed=True)
+                            _push(_err or (f'"{_draft.level.name}" re-read from disk'
+                                           + (' — fills regrown.' if _draft.level.fills
+                                              else '.')))
 
                 elif cmd == 'e' and (player_name == 'admin' or player.is_dead):
                     seed    = random.randint(0, 2**31)

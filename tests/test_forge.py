@@ -1105,6 +1105,30 @@ def test_a_bare_fill_opens_the_pool_list():
     assert [f.pool for f in d.level.fills] == ['proverbs']   # third row
 
 
+def test_reopening_a_draft_regrows_its_fills():
+    """`:e` is the author's window onto somebody else's copy.
+
+    Every player who opens a shipped level grows their own words; an author who
+    only ever sees the arrangement their seed happened to give them is judging
+    one draw out of thousands. So `:e` — and only `:e`, never an incidental
+    rebuild — re-rolls, the way entering the level does."""
+    d = DRAFT.new('Probe', rows=8, cols=40)
+    real, built, seeds = d.build, [], []
+
+    def _spy(par=None, seed=None):
+        seeds.append(seed)
+        built.append(real(par=par, seed=seed))
+        return built[-1]
+
+    d.build = _spy
+    _forge_session(d, 'jv' + 'jjj' + 'l' * 30 + ':fill plain 3-6\r'
+                      + ':w\r:e\r:q!\r')
+    assert seeds[0] is None        # opening the draft: the author's own room
+    assert seeds[-1] is not None   # `:e`: a stranger's
+    words = lambda dg: sorted(''.join(ru.symbols) for ru in dg.room.char_runs)
+    assert words(built[-1]) and words(built[-1]) != words(built[-2])
+
+
 def test_backing_out_of_a_picker_places_nothing():
     d = DRAFT.new('Probe', rows=8, cols=30)
     _forge_session(d, 'jl:rune\r' + T.ESC + ':w\r:q!\r')
