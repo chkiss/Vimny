@@ -43,7 +43,7 @@ import random
 import re
 from dataclasses import dataclass, field
 
-from engine.editor import _CELL_CODE, _CODE_CELL, _ENTITY_FIELDS
+from engine.editor import _CELL_CODE, _CODE_CELL, _MIST_CODE, _ENTITY_FIELDS
 from engine.world import (CellType, CharRun, DROPPABLE, Entity, Room, RoomType,
                           Seal, canonical_kind)
 from generation.dungeon_gen import Dungeon
@@ -258,14 +258,18 @@ def loads(text: str) -> Level:
 
 # ── Cell grids ────────────────────────────────────────────────────────────────
 
-def expand_row(row: str, cols: int, lineno: int) -> list:
-    """One `cells` row → a list of CellTypes.
+def expand_row_mist(row: str, cols: int, lineno: int) -> tuple:
+    """One `cells` row → (list of CellTypes, the columns that carry mist).
 
     Accepts both the plain form (`WFFFW`) and the run-length form (`W3F60W`),
     because a 200-column room of mostly stone is unreadable written out in full
     and unreviewable in a pull request.
+
+    `M` is water with permanent mist over it. It expands to WATER here and the
+    haze comes back as a column number, because mist is not a cell type — see
+    `_MIST_CODE`.
     """
-    out = []
+    out, mist = [], []
     pos = 0
     for m in _RLE.finditer(row):
         if m.start() != pos:
@@ -274,10 +278,14 @@ def expand_row(row: str, cols: int, lineno: int) -> list:
         pos = m.end()
         count = int(m.group(1)) if m.group(1) else 1
         code  = m.group(2)
+        if code == _MIST_CODE:
+            mist.extend(range(len(out), len(out) + count))
+            out.extend([CellType.WATER] * count)
+            continue
         if code not in _CODE_CELL:
             raise LevelFormatError(
                 f'geometry.cells[{lineno}]: unknown cell code {code!r}; '
-                f'known codes are {"".join(sorted(_CODE_CELL))}')
+                f'known codes are {"".join(sorted(set(_CODE_CELL) | {_MIST_CODE}))}')
         out.extend([_CODE_CELL[code]] * count)
     if pos != len(row):
         raise LevelFormatError(
@@ -285,14 +293,20 @@ def expand_row(row: str, cols: int, lineno: int) -> list:
     if len(out) != cols:
         raise LevelFormatError(
             f'geometry.cells[{lineno}]: expands to {len(out)} cells, expected {cols}')
-    return out
+    return out, mist
 
 
-def encode_row(cells: list) -> str:
-    """The inverse of expand_row, run-length encoded."""
+def expand_row(row: str, cols: int, lineno: int) -> list:
+    """One `cells` row → a list of CellTypes, mist discarded."""
+    return expand_row_mist(row, cols, lineno)[0]
+
+
+def encode_row(cells: list, mist_cols=()) -> str:
+    """The inverse of expand_row_mist, run-length encoded."""
     out, run, prev = [], 0, None
-    for ct in cells:
-        code = _CELL_CODE[ct]
+    mist_cols = set(mist_cols)
+    for i, ct in enumerate(cells):
+        code = _MIST_CODE if i in mist_cols and ct == CellType.WATER else _CELL_CODE[ct]
         if code == prev:
             run += 1
         else:
@@ -317,10 +331,14 @@ def build(lvl: Level, par: int | None = None) -> Dungeon:
     if len(lvl.cells) != lvl.rows:
         raise LevelFormatError(
             f'geometry.cells: {len(lvl.cells)} rows, geometry.rows says {lvl.rows}')
-    cells = [expand_row(row, lvl.cols, i) for i, row in enumerate(lvl.cells)]
+    grid = [expand_row_mist(row, lvl.cols, i) for i, row in enumerate(lvl.cells)]
+    cells = [g[0] for g in grid]
+    mist  = {(r, c) for r, (_, cols) in enumerate(grid) for c in cols}
 
     room = Room(room_type=RoomType.ENTRY, rows=lvl.rows, cols=lvl.cols)
     room.cells     = cells
+    room.mist_cells = set(mist)
+    room.fog_cells  = set(mist)      # mist is always a subset of the fog
     room.seed      = lvl.seed
     room.spawn_pos = tuple(lvl.spawn)
     room.exit_pos  = tuple(lvl.exit)
@@ -530,6 +548,9 @@ def from_room(room, name: str, author: str = '', solution: str = '',
     # solved. `build` shuts them again on load too; both ends hold the same line
     # so neither depends on the other having done it.
     grid = [list(row) for row in room.cells]
+    _mist_by_row = {}
+    for r, c in getattr(room, 'mist_cells', ()):
+        _mist_by_row.setdefault(r, set()).add(c)
     for s in seals:
         for r, c in s.opens:
             if 0 <= r < room.rows and 0 <= c < room.cols:
@@ -541,7 +562,8 @@ def from_room(room, name: str, author: str = '', solution: str = '',
         no_horse=bool(getattr(room, 'no_horse', False)),
         alternate=alternate, intro=intro,
         rows=room.rows, cols=room.cols,
-        cells=[encode_row(row) for row in grid],
+        cells=[encode_row(row, _mist_by_row.get(r, ()))
+               for r, row in enumerate(grid)],
         spawn=tuple(room.spawn_pos), exit=tuple(room.exit_pos or (1, 1)),
         fills=list(fills), seals=list(seals),
         char_runs=[{'row': ru.row, 'col': ru.col,

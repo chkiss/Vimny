@@ -23,12 +23,24 @@ from engine.world import (
     normalize_row_word_kinds,
 )
 
-_SUBST_CYCLE = {
-    CellType.FLOOR:     CellType.WALL,
-    CellType.WALL:      CellType.WOOD_WALL,
-    CellType.WOOD_WALL: CellType.WATER,
-    CellType.WATER:     CellType.FLOOR,
-    CellType.CORRIDOR:  CellType.WALL,
+#: What `:paint` can lay down, name → (cell type, misted, one-line description).
+#:
+#: This is the whole vocabulary of the terrain, in one place, because the thing
+#: it replaced — the `s` cycle — could only ever be as complete as whoever last
+#: remembered to extend it, and it had no way to SAY what it knew. Misted water
+#: was reachable by no key at all. A named list is enumerable: the menu, the
+#: error message and the docs are all read off it, so a terrain that exists is a
+#: terrain an author can find.
+#:
+#: MIST is not a sixth CellType — it is water (or floor) under permanent fog,
+#: which is a pair of facts about a cell, so it is spelled as one paint.
+PAINT_KINDS = {
+    'floor':    (CellType.FLOOR,     False, 'open ground'),
+    'corridor': (CellType.CORRIDOR,  False, 'walkable, drawn as passage'),
+    'wall':     (CellType.WALL,      False, 'stone — blocks feet, bounds a line'),
+    'wood':     (CellType.WOOD_WALL, False, 'destructible wall — two hits of x'),
+    'water':    (CellType.WATER,     False, 'unwalkable; line motions cross it'),
+    'mist':     (CellType.WATER,     True,  'fogged water — hazy, never lit or crossed'),
 }
 
 
@@ -148,6 +160,8 @@ def _ed_snapshot(room, player) -> dict:
         'exit_pos':    room.exit_pos,
         'spawn_pos':   room.spawn_pos,
         'wood_damage': dict(room.wood_damage),
+        'mist_cells':  set(room.mist_cells),
+        'fog_cells':   set(room.fog_cells),
         'pr':          player.row,
         'pc':          player.col,
     }
@@ -160,24 +174,38 @@ def _ed_restore(room, player, snap: dict) -> None:
     room.exit_pos    = snap['exit_pos']
     room.spawn_pos    = snap['spawn_pos']
     room.wood_damage = snap.get('wood_damage', {})
+    # A painted mist is two facts about a cell; an undo that restored only the
+    # grid would leave the haze hanging over dry floor.
+    if 'mist_cells' in snap:
+        room.mist_cells = set(snap['mist_cells'])
+        room.fog_cells  = set(snap['fog_cells'])
     player.row       = snap['pr']
     player.col       = snap['pc']
     room.rebuild_indexes()
 
 
-def _ed_subst(room, r, c):
-    """Cycle cell type FLOOR→WALL→WATER→FLOOR; also cut any character/entity."""
+def _ed_paint(room, r, c, kind: str) -> bool:
+    """Lay one cell down as `kind`. False if a fill owns the cell.
+
+    Paint touches the CELL and nothing standing on it. The `s` cycle it replaced
+    cut the character and the entity along with the terrain, which made the one
+    thing the architecture asks for — a plaque set INTO a wall, where no `cc` can
+    wipe it and no floor scan reads it — impossible to paint: the wall arrived
+    and took the words with it. Removing things is what `x` and `d` are for.
+    """
     if in_fill(room, r, c):
-        return []                    # a fill owns this cell — see in_fill
-    items = []
-    if room.char_run_at(r, c) or room.entity_at(r, c):
-        item = _ed_cut(room, r, c)
-        if item:
-            items.append(item)
-    ct = room.cells[r][c]
-    room.cells[r][c] = _SUBST_CYCLE.get(ct, CellType.WALL)
-    items.append({'type': 'cell', 'cell_type': ct})
-    return items
+        return False                 # a fill owns this cell — see in_fill
+    ct, misted, _ = PAINT_KINDS[kind]
+    room.cells[r][c] = ct
+    if misted:
+        # Mist is a subset of the fog, always: the renderer reads the haze off
+        # `fog_cells` first and only then asks whether it is the permanent kind.
+        room.mist_cells.add((r, c))
+        room.fog_cells.add((r, c))
+    else:
+        room.mist_cells.discard((r, c))
+        room.fog_cells.discard((r, c))
+    return True
 
 
 def _ed_paste(room, r, start_c, items):
@@ -279,6 +307,14 @@ def _clip_desc(item) -> str:
 _CELL_CODE = {CellType.WALL: 'W', CellType.FLOOR: 'F', CellType.CORRIDOR: 'C',
               CellType.WATER: 'A', CellType.WOOD_WALL: 'X'}
 _CODE_CELL = {code: cell for cell, code in _CELL_CODE.items()}
+
+#: Misted water, in a shared level file. Mist is a property OF a cell — it draws
+#: as one, it is painted as one — so it rides the grid rather than a second list
+#: of coordinates that could disagree with it. Not a CellType, and so not in
+#: `_CELL_CODE`: only `sharing.format`'s row codec knows it, and only there does
+#: it split back into WATER + a mist entry.
+_MIST_CODE = 'M'
+assert _MIST_CODE not in _CODE_CELL
 
 # The Entity fields a save round-trips. `uid` is deliberately absent — it is
 # per-run identity, minted fresh on load, exactly as a paste-back mints one.

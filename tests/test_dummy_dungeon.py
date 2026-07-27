@@ -30,7 +30,7 @@ When you add a new CellType, entity kind, or rune kind:
 """
 import pytest
 from engine.world import CellType
-from engine.editor import _ed_cut, _ed_subst, _ed_paste
+from engine.editor import _ed_cut, _ed_paint, _ed_paste, PAINT_KINDS
 from generation.dungeon_gen import build_dungeon_dummy
 
 SEED = 42
@@ -283,37 +283,31 @@ def test_corridor_cut_returns_none():
     assert _ed_cut(room, r, c) is None
 
 
-# ── Editability: _ed_subst cycle covers all cuttable types ───────────────────
+# ── Editability: :paint can reach every cell type ─────────────────────────────
 
-def test_subst_cycle_visits_all_cuttable_types():
-    """Pressing s repeatedly from FLOOR must visit every type in CUTTABLE_TYPES."""
+def test_paint_can_reach_every_cell_type():
+    """Every CellType the game has must be nameable by some `:paint` kind.
+
+    This is the check the old `s` cycle could not make of itself: a ring is only
+    as complete as whoever last threaded a type onto it, and misted water was in
+    the engine for a year with no key that could lay it down."""
     room = build_dungeon_dummy(SEED).room
     r, c = SCRATCH
-    room.cells[r][c] = CellType.FLOOR
+    reachable = set()
+    for name in PAINT_KINDS:
+        _ed_paint(room, r, c, name)
+        reachable.add(room.cells[r][c])
 
-    seen = set()
-    for _ in range(len(CellType) * 2):
-        _ed_subst(room, r, c)
-        seen.add(room.cells[r][c])
-        if room.cells[r][c] == CellType.FLOOR:
-            break
-
-    missing = sorted(CUTTABLE_TYPES - seen, key=lambda x: x.name)
+    missing = sorted(set(CellType) - reachable, key=lambda x: x.name)
     assert not missing, (
-        f"_ed_subst cycle never visited {[ct.name for ct in missing]} — "
-        "add them to _SUBST_CYCLE in engine/editor.py"
+        f"no :paint kind lays down {[ct.name for ct in missing]} — "
+        "add them to PAINT_KINDS in engine/editor.py"
     )
 
 
-def test_subst_cycle_returns_to_floor():
-    """The s cycle must be closed — repeated presses return to FLOOR."""
+def test_paint_reaches_the_misted_water_the_cycle_never_could():
     room = build_dungeon_dummy(SEED).room
     r, c = SCRATCH
-    room.cells[r][c] = CellType.FLOOR
-
-    for _ in range(len(CellType) * 2):
-        _ed_subst(room, r, c)
-        if room.cells[r][c] == CellType.FLOOR:
-            return  # cycle closed
-
-    pytest.fail("_ed_subst cycle never returned to FLOOR")
+    _ed_paint(room, r, c, 'mist')
+    assert room.cells[r][c] == CellType.WATER
+    assert (r, c) in room.mist_cells

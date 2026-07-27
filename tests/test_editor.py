@@ -21,7 +21,7 @@ from engine.world import Room, RoomType, CellType, Entity, CharRun
 from engine.player import Player
 from engine.editor import (
     _merge_adjacent_char_runs,
-    _ed_cut, _ed_snapshot, _ed_restore, _ed_subst,
+    _ed_cut, _ed_snapshot, _ed_restore, _ed_paint, PAINT_KINDS,
     _ed_paste, _ed_clear_row,
     _ed_range_items, _ed_delete_range,
     _clip_desc, _serialize_room, _deserialize_room,
@@ -264,45 +264,39 @@ class TestEdSnapshotRestore:
             == (5, 'chase', 2, 'pathfinder', True, 'x', w.uid)
 
 
-# ── _ed_subst ─────────────────────────────────────────────────────────────────
+# ── _ed_paint ─────────────────────────────────────────────────────────────────
 
-class TestEdSubst:
-    def test_floor_toggles_to_wall(self):
+class TestEdPaint:
+    def test_every_paint_lands_the_cell_it_names(self):
         room = _make_room()
-        items = _ed_subst(room, 3, 5)
-        assert room.cells[3][5] == CellType.WALL
-        assert any(i['type'] == 'cell' and i['cell_type'] == CellType.FLOOR for i in items)
+        for name, (ct, _mist, _desc) in PAINT_KINDS.items():
+            assert _ed_paint(room, 3, 5, name) is True
+            assert room.cells[3][5] == ct, name
 
-    def test_wall_subst_cycles_to_wood_wall(self):
+    def test_mist_is_water_under_permanent_fog(self):
         room = _make_room()
-        items = _ed_subst(room, 0, 5)  # border cell is WALL
-        assert room.cells[0][5] == CellType.WOOD_WALL
-        cell_types = [i['cell_type'] for i in items if i['type'] == 'cell']
-        assert CellType.WALL in cell_types
-
-    def test_wood_wall_subst_cycles_to_water(self):
-        room = _make_room()
-        room.cells[3][5] = CellType.WOOD_WALL
-        items = _ed_subst(room, 3, 5)
+        _ed_paint(room, 3, 5, 'mist')
         assert room.cells[3][5] == CellType.WATER
-        cell_types = [i['cell_type'] for i in items if i['type'] == 'cell']
-        assert CellType.WOOD_WALL in cell_types
+        assert (3, 5) in room.mist_cells
+        # The renderer reads the haze off fog_cells first — mist that is not
+        # also fogged simply draws as open water.
+        assert (3, 5) in room.fog_cells
 
-    def test_water_subst_cycles_to_floor(self):
+    def test_painting_over_mist_clears_the_haze_too(self):
         room = _make_room()
-        room.cells[3][5] = CellType.WATER
-        items = _ed_subst(room, 3, 5)
-        assert room.cells[3][5] == CellType.FLOOR
-        cell_types = [i['cell_type'] for i in items if i['type'] == 'cell']
-        assert CellType.WATER in cell_types
+        _ed_paint(room, 3, 5, 'mist')
+        _ed_paint(room, 3, 5, 'floor')
+        assert (3, 5) not in room.mist_cells
+        assert (3, 5) not in room.fog_cells
 
-    def test_rune_cut_included_in_items(self):
+    def test_paint_leaves_the_text_standing(self):
+        """The whole reason `:paint` replaced the `s` cycle: a plaque set INTO a
+        wall is the architecture's own advice, and the cycle cut it away."""
         room = _make_room()
         room.add_char_run(CharRun(row=3, col=5, symbols=('∘',), kind='ancient'))
-        items = _ed_subst(room, 3, 5)
-        rune_items = [i for i in items if i['type'] == 'rune']
-        assert len(rune_items) == 1
-        assert room.char_run_at(3, 5) is None
+        _ed_paint(room, 3, 5, 'wall')
+        assert room.cells[3][5] == CellType.WALL
+        assert room.char_run_at(3, 5) is not None
 
 
 # ── _ed_paste ─────────────────────────────────────────────────────────────────

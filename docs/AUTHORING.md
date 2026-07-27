@@ -23,12 +23,13 @@ in the overworld under `forge/`, where a level is built by playing it.
 | `⏎` | open a draft in the editor |
 | `R` / `D` | rename / delete one |
 
-A draft opens straight into EDIT mode, where the painter's keys (`s` to cycle
-wall/wood/water, INSERT to write text, `:rune`, `:entity`, `d`/`y`/`p`) work as
-they always have, plus the level's own properties:
+A draft opens straight into EDIT mode, where the painter's keys (`:paint` for
+terrain, INSERT to write text, `:rune`, `:entity`, `d`/`y`/`p`) work as they
+always have, plus the level's own properties:
 
 | command | what it does |
 |---|---|
+| `:paint <kind>` | lay terrain down under the cursor, or over a `'<,'>` selection (`:paint` alone opens the palette; `:paint?` says what is there) |
 | `:spawn` / `:exit` | put the spawn or the exit where you are standing |
 | `:fill <pool> [lo-hi] [spacing]` | fill the last VISUAL selection from a word pool |
 | `:fill!` | drop the fill under the cursor, keeping its words as text you own |
@@ -59,6 +60,31 @@ and drops you in to solve it. Reaching the exit ends the take; the keys become
 `solution`, and the validator immediately replays it to derive par. A key the
 notation cannot write (an arrow key, Backspace) ends the take rather than
 producing a tape that replays as something other than what you played.
+
+### Painting terrain
+
+`:paint <kind>` lays down one named terrain — under the cursor, or over every
+cell of a `'<,'>` selection, so a river is one command:
+
+| kind | what it is |
+|---|---|
+| `floor` | open ground |
+| `corridor` | walkable, drawn as passage rather than room |
+| `wall` | stone — blocks feet, and bounds a line for `$`, `0`, reflow and the operators |
+| `wood` | destructible wall — two hits of `x` |
+| `water` | unwalkable, but line motions cross it |
+| `mist` | fogged water: hazy, never lit, and light will not flood past it |
+
+`:paint` on its own opens the palette; `:paint?` says what the cursor (or the
+whole selection, as a tally) is standing on. It replaced the old `s` cycle, which
+could only reach the terrains someone had remembered to thread onto the ring —
+misted water was drawn by the renderer and reachable by no key at all — and which
+could not answer *what else is there?*
+
+Paint touches the **cell**, not what stands on it. Writing text and then painting
+`wall` over it is how you set a plaque into stone: uncuttable by `cc` or `D`, and
+skipped by the floor scans that read the editable labels. `x` and `d` are for
+removing things.
 
 A **fill region is owned by its directive**, not by you: it regrows from the
 level's seed on every build, so the editor refuses edits inside one. `:fill!`
@@ -117,8 +143,11 @@ That writes a real, valid, playable level file. Change it and re-validate.
 
 One string per row, in run-length form: `3W60F16W` is three walls, sixty floor,
 sixteen walls. Codes are `W` wall, `F` floor, `C` corridor, `A` water,
-`X` wood wall (destructible). Each row must expand to exactly `cols` cells; if
-it does not, the validator tells you which row and by how much.
+`X` wood wall (destructible), and `M` misted water — water under permanent fog,
+which is a pair of facts about a cell but draws as one, so it rides the grid
+rather than a second list of coordinates that could disagree with it. Each row
+must expand to exactly `cols` cells; if it does not, the validator tells you
+which row and by how much.
 
 ### `fill` — "cover this floor in words"
 

@@ -26,7 +26,7 @@ from blessed.keyboard import Keystroke
 import engine.tape as T
 import sharing.draft as DRAFT
 import sharing.format as F
-from engine.editor import _ed_cut, _ed_subst, in_fill
+from engine.editor import _ed_cut, _ed_paint, in_fill
 from engine.world import CellType
 
 
@@ -386,7 +386,7 @@ def test_a_fill_region_refuses_edits():
     assert in_fill(room, 2, 2) is not None
     before = len(room.char_runs)
     assert _ed_cut(room, 2, 2) is None
-    assert _ed_subst(room, 2, 2) == []
+    assert _ed_paint(room, 2, 2, 'wall') is False
     assert len(room.char_runs) == before
 
 
@@ -957,10 +957,11 @@ def test_a_ranged_bolt_wires_a_whole_wall_to_one_trigger():
     retyped as many times as the wall is wide — with the range, the wall the
     author selected IS the door."""
     d = DRAFT.new('Probe', rows=8, cols=30)
-    # seal on row 2; drop to row 5, paint a five-cell wall, select it, bolt once
+    # seal on row 2; drop to row 5, paint a five-cell wall over the selection,
+    # bring the same selection back with gv, bolt once
     _forge_session(d, 'jv' + 'l' * 6 + ':seal open sesame\r'
-                      + 'jjj' + 'sl' * 4 + 's'
-                      + 'hhhhv' + 'l' * 4 + ':bolt\r:w\r:q!\r')
+                      + 'jjjv' + 'l' * 4 + ':paint wall\r'
+                      + 'gv:bolt\r:w\r:q!\r')
     assert len(d.level.seals) == 1
     s = d.level.seals[0]
     assert s.match == 'open sesame'
@@ -977,7 +978,7 @@ def test_a_ranged_bolt_takes_the_masonry_and_leaves_the_floor():
     d = DRAFT.new('Probe', rows=8, cols=30)
     # one painted wall cell in a nine-cell selection that is otherwise floor
     _forge_session(d, 'jv' + 'l' * 6 + ':seal open sesame\r'
-                      + 'jjj' + 'lll' + 's'
+                      + 'jjj' + 'lll' + ':paint wall\r'
                       + 'hhhv' + 'l' * 8 + ':bolt\r:w\r:q!\r')
     assert [tuple(c) for c in d.level.seals[0].opens] == [(5, 10)]
 
@@ -988,7 +989,7 @@ def test_a_ranged_bolt_refuses_to_swallow_its_own_condition():
     hole in it that nobody put there."""
     d = DRAFT.new('Probe', rows=8, cols=30)
     # a wall painted INSIDE the region the seal reads, then a whole-row bolt
-    _forge_session(d, 'j' + 'll' + 's' + 'hh'
+    _forge_session(d, 'j' + 'll' + ':paint wall\r' + 'hh'
                       + 'v' + 'l' * 6 + ':seal open sesame\r'
                       + 'V:bolt\r:w\r:q!\r')
     assert d.level.seals == []
@@ -1032,3 +1033,46 @@ def test_the_colon_register_holds_the_bare_command_like_vim():
     p = _P()
     record_register(p, ':', 'entity goblin tag=echo')
     assert clip_to_keys(read_register(p, ':')) == 'entity goblin tag=echo'
+
+
+def test_paint_lays_terrain_down_by_name():
+    d = DRAFT.new('Probe', rows=8, cols=30)
+    _forge_session(d, 'jll:paint water\r:w\r:q!\r')
+    assert F.expand_row(d.level.cells[2], d.level.cols, 2)[3] == CellType.WATER
+
+
+def test_paint_takes_the_range_like_fill():
+    """A river is one command, not a lap of the old cycle per cell."""
+    d = DRAFT.new('Probe', rows=8, cols=30)
+    _forge_session(d, 'jlv' + 'l' * 5 + ':paint water\r:w\r:q!\r')
+    row = F.expand_row(d.level.cells[2], d.level.cols, 2)
+    assert [i for i, ct in enumerate(row) if ct == CellType.WATER] == [2, 3, 4, 5, 6, 7]
+
+
+def test_painted_mist_survives_the_round_trip():
+    """Misted water is the terrain the `s` cycle could never reach — and the
+    reason it could not be painted is the same reason it could not be SAVED: the
+    grid had no code for it. `M` is water plus its permanent haze."""
+    d = DRAFT.new('Probe', rows=8, cols=30)
+    _forge_session(d, 'jll:paint mist\r:w\r:q!\r')
+    assert 'M' in d.level.cells[2]
+    room = F.build(d.level).room
+    assert room.cells[2][3] == CellType.WATER
+    assert (2, 3) in room.mist_cells
+    assert (2, 3) in room.fog_cells
+
+
+def test_paint_leaves_a_wall_plaque_standing():
+    """`s` cut the text as it laid the stone. A plaque set INTO a wall is what
+    the architecture asks for — uncuttable, unread by the floor scans — so the
+    brush that could not paint one was the wrong brush."""
+    d = DRAFT.new('Probe', rows=8, cols=30)
+    _forge_session(d, 'jli' + 'plaque' + T.ESC + ':paint wall\r:w\r:q!\r')
+    assert any(''.join(ru['symbols']).startswith('p') for ru in d.level.char_runs)
+
+
+def test_an_unknown_paint_names_the_ones_that_exist():
+    d = DRAFT.new('Probe', rows=8, cols=30)
+    _forge_session(d, 'jll:paint lava\r:w\r:q!\r')
+    row = F.expand_row(d.level.cells[2], d.level.cols, 2)
+    assert row[3] == CellType.FLOOR      # nothing guessed at, nothing painted

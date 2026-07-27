@@ -79,7 +79,8 @@ from engine.insert import (
     replace_chars, replace_overtype, replace_restore,
 )
 from engine.editor import (
-    _merge_adjacent_char_runs, _split_run_at, _ed_cut, _ed_snapshot, _ed_restore, _ed_subst,
+    _merge_adjacent_char_runs, _split_run_at, _ed_cut, _ed_snapshot, _ed_restore, _ed_paint,
+    PAINT_KINDS,
     _ed_paste, _ed_row_items, _ed_clear_row, _ed_range_items, _ed_delete_range,
     _clip_desc, _serialize_room, _deserialize_room, in_fill as _in_fill,
 )
@@ -760,6 +761,33 @@ def _range_cells(room, player) -> list:
             for c in range(max(0, c1), min(room.cols - 1, c2) + 1)]
 
 
+def _paint_name(room, r: int, c: int) -> str:
+    """What `:paint` would call the cell at (r, c)."""
+    ct     = room.cells[r][c]
+    misted = (r, c) in getattr(room, 'mist_cells', ())
+    for name, (kind_ct, kind_mist, _) in PAINT_KINDS.items():
+        if kind_ct == ct and kind_mist == misted:
+            return name
+    return ct.name.lower()
+
+
+def _paint_cells(room, cells: list, kind: str) -> str:
+    """Paint every cell, and report what actually landed.
+
+    A fill owns its own region and refuses the brush, so a selection swept over
+    one paints around it — and the count SAYS so, because "12 cells painted" over
+    a 20-cell selection is the only sign the author gets that eight of them
+    belong to a directive."""
+    done = sum(1 for r, c in cells if _ed_paint(room, r, c, kind))
+    room.rebuild_indexes()
+    if not done:
+        return ('A fill grows those cells — :fill! to make them yours.'
+                if cells else 'Nothing selected.')
+    skipped = len(cells) - done
+    return (f'Painted {done} cell{"" if done == 1 else "s"} {kind}.'
+            + (f'  {skipped} owned by a fill.' if skipped else ''))
+
+
 def _describe_entity(ent) -> str:
     """`:entity?` — the creature under the cursor, and only what is true of it.
 
@@ -925,6 +953,61 @@ def _pick_entity(term: Terminal, iw: int, game_h: int) -> str:
                                               for f in fields if vals[f]])
                 vals[fields[fsel]] = pick_value(kind, fields[fsel],
                                                 vals[fields[fsel]])
+
+
+def _pick_paint(term: Terminal, iw: int, game_h: int) -> str:
+    """The terrain palette. Returns the paint's NAME, or '' if the author backed out.
+
+    Same bargain as `_pick_entity`: the command is the mechanism, the menu is one
+    view of it, and the caller echoes back the `:paint` line it chose so the list
+    teaches its way out of being needed. One pane, because a cell has no fields —
+    what it is IS all there is to say about it.
+    """
+    BOX_IW = 62; BOX_BW = BOX_IW + 4
+    box_bg  = term.on_color_rgb(6, 8, 12)
+    edge    = box_bg + term.color_rgb(120, 170, 210) + term.bold
+    head    = term.color_rgb(190, 215, 240) + term.bold
+    body    = term.color_rgb(130, 150, 170)
+    pick    = term.color_rgb(255, 220, 60) + term.bold
+    rst     = term.normal
+    col_off = max(1, (iw + 2 - BOX_BW) // 2)
+    kinds   = list(PAINT_KINDS)
+    sep_h   = '═' * (BOX_IW + 2)
+
+    def row(vis, colored):
+        return (edge + '║ ' + rst + box_bg + colored +
+                box_bg + ' ' * max(0, BOX_IW - vis) + edge + ' ║' + rst)
+
+    sel = 0
+    while True:
+        rows  = [f' {k:<12}{PAINT_KINDS[k][2]}' for k in kinds]
+        title = 'paint a cell'
+        foot  = ' j/k move   ⏎ choose   Esc cancel'
+        lines = [edge + '╔' + sep_h + '╗' + rst, row(0, '')]
+        lines.append(row(BOX_IW, head + ' ' + title
+                         + box_bg + ' ' * max(0, BOX_IW - len(title) - 1)))
+        lines.append(row(0, ''))
+        for i, text in enumerate(rows):
+            text = text[:BOX_IW]
+            lines.append(row(len(text), (pick if i == sel else body) + text))
+        lines.append(row(0, ''))
+        lines.append(row(len(foot), body + foot))
+        lines.append(row(0, ''))
+        lines.append(edge + '╚' + sep_h + '╝' + rst)
+        row_off = 3 + max(0, (game_h - len(lines)) // 2)
+        for i, line in enumerate(lines):
+            print(term.move_yx(row_off + i, col_off) + line, end='', flush=True)
+
+        key = term.inkey()
+        raw = str(key) if not key.is_sequence else ''
+        if key.name == 'KEY_ESCAPE':
+            return ''
+        if raw == 'j' or key.name == 'KEY_DOWN':
+            sel = (sel + 1) % len(kinds)
+        elif raw == 'k' or key.name == 'KEY_UP':
+            sel = (sel - 1) % len(kinds)
+        elif key.name == 'KEY_ENTER' or raw in ('\n', '\r'):
+            return kinds[sel]
 
 
 def _render_standard_scroll(term: Terminal, iw: int, game_h: int, content: dict,
@@ -6042,7 +6125,7 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
                     if edit_mode:
                         if 'editor' not in player.known_commands:
                             player.known_commands = player.known_commands + ['editor']
-                        _push('EDIT mode ON — x:cut  s:subst  dd/yy  d/y{m}  p/P  :save <name>')
+                        _push('EDIT mode ON — x:cut  :paint  dd/yy  d/y{m}  p/P  :save <name>')
                     else:
                         player.known_commands = [c for c in player.known_commands if c != 'editor']
                         _push('EDIT mode OFF.')
@@ -6072,6 +6155,46 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
                                                   symbols=(_RUNE_CHAR[kind],), kind=kind))
                         _merge_adjacent_char_runs(room, r)
                         _push(f'Placed {kind} rune.')
+
+                elif (_rcmd.rstrip('?') == 'paint' or _rcmd.startswith('paint ')) \
+                        and edit_mode and player_name == 'admin':
+                    # `:paint <kind>` lays terrain down by NAME, where `s` used to
+                    # walk a fixed ring. A ring can only reach what someone
+                    # remembered to thread onto it — misted water was in the
+                    # engine, drawn by the renderer, reachable by no key — and it
+                    # cannot answer "what else is there?". A name can, and takes
+                    # the `'<,'>` range the way `:fill` does, so a river is one
+                    # command and not a lap of the cycle per cell.
+                    _kind = _rcmd[6:].strip().lower()
+                    _cells = (_range_cells(room, player) if _vrange
+                              else [(player.row, player.col)])
+                    if _rcmd.endswith('?'):
+                        _tally = {}
+                        for _pr, _pc in _cells:
+                            _tally[_paint_name(room, _pr, _pc)] = \
+                                _tally.get(_paint_name(room, _pr, _pc), 0) + 1
+                        _push(', '.join(f'{_n} × {_k}' if _n > 1 else _k
+                                        for _k, _n in sorted(_tally.items()))
+                              or 'Nothing there.')
+                    elif not _kind:
+                        # A bare `:paint` is the question "what can I lay down?",
+                        # and the palette answers it by composing the command.
+                        _kind = _pick_paint(term, _iw(term), term.height - 8)
+                        if not _kind:
+                            _push('')                    # backed out of the picker
+                        else:
+                            ed_undo.append(_ed_snapshot(room, player))
+                            ed_redo.clear()
+                            # Name the line that would have done the same thing —
+                            # the one thing the screen cannot show.
+                            _push(_paint_cells(room, _cells, _kind)
+                                  + f'   (:paint {_kind})')
+                    elif _kind not in PAINT_KINDS:
+                        _push(f'Unknown paint: {_kind}  ({"|".join(PAINT_KINDS)})')
+                    else:
+                        ed_undo.append(_ed_snapshot(room, player))
+                        ed_redo.clear()
+                        _push(_paint_cells(room, _cells, _kind))
 
                 elif (_rcmd.rstrip('?!') == 'entity' or _rcmd.startswith('entity ')) \
                         and edit_mode and player_name == 'admin':
@@ -8232,14 +8355,12 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
             player.last_change = action
 
         elif edit_mode and action['type'] == 'substitute':
-            ed_undo.append(_ed_snapshot(room, player))
-            ed_redo.clear()
-            all_items: list = []
-            for _si in range(count):
-                all_items.extend(_ed_subst(room, player.row, player.col + _si))
-            player.edit_clip = all_items
-            _push('Substituted: ' + ', '.join(_clip_desc(i) for i in all_items))
-            player.last_change = action
+            # `s` used to walk a fixed ring of cell types, cutting whatever stood
+            # on the cell as it went. `:paint` replaced it: it can name every
+            # terrain (the ring never reached misted water), it takes a range,
+            # and it leaves the text alone so a plaque can be set INTO a wall.
+            _push('s no longer cycles terrain — :paint <kind>, '
+                  'or :paint for the list.')
 
         elif not edit_mode and action['type'] == 'paste' and _action_allowed(action, player.known_commands):
             before = action.get('before', False)
