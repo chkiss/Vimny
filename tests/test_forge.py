@@ -135,6 +135,28 @@ def test_colon_straight_from_visual_fills_the_selection():
     assert [f.region for f in d.level.fills] == [(3, 1, 3, 6)]
 
 
+def test_the_command_line_arrives_prefilled_with_the_range():
+    """Vim types `'<,'>` for you. It is also the only thing on screen that says
+    the selection survived the keystroke that visibly cleared it — so the fill
+    above works because the range is REAL, not because it was ignored."""
+    d = DRAFT.new('Probe', rows=8, cols=30)
+    # No `fill` typed at all: the line already holds the range, and a range with
+    # nothing addressed to it is caught rather than run.
+    _forge_session(d, 'jjv' + 'l' * 5 + ':entity goblin\r:w\r:q!\r')
+    assert not [e for e in d.level.entities if e['kind'] == 'goblin'], \
+        ":'<,'>entity must be refused, not quietly placed at the cursor"
+
+
+def test_esc_backs_out_of_the_range_for_a_command_that_has_no_use_for_it():
+    """The way out is vim's own: Esc the command line, type it plain. The marks
+    outlive that — the selection is remembered, not held open."""
+    d = DRAFT.new('Probe', rows=8, cols=30)
+    _forge_session(d, 'jjv' + 'l' * 5 + ':' + T.ESC + ':entity goblin\r'
+                      + ':fill plain\r:w\r:q!\r')
+    assert [e['kind'] for e in d.level.entities if e['kind'] == 'goblin'] == ['goblin']
+    assert [f.region for f in d.level.fills] == [(3, 1, 3, 6)]
+
+
 def test_colon_from_visual_leaves_visual_like_vim():
     """It is not a mode the command line runs UNDER: vim drops to normal, and so
     a `gv` afterwards is what brings the region back."""

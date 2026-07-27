@@ -5827,6 +5827,16 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
                     _advance_answer(_TAPE_ENTER)          # the tape marks Enter <CR>
                     room._cmd_karaoke = False
                 cmd = player.cmd_line.strip()
+                # `:` from VISUAL prefills the `'<,'>` range vim prefills. Most
+                # of the forge's commands are not addressed by a range at all,
+                # so rather than teach each one to ignore a prefix, the prefix
+                # is stripped ONCE here for the one command that wants it
+                # (`:fill`) and CAUGHT at the bottom for the ones that do not —
+                # the answer to `:'<,'>entity` is "Esc first", not a guess at
+                # what the author meant. Substitute and the ex ranges are left
+                # the raw `cmd`: they parse `'<` themselves, properly.
+                _vrange = cmd.startswith("'<,'>")
+                _rcmd   = cmd[5:].lstrip() if _vrange else cmd
                 player.mode    = Mode.NORMAL
                 player.cmd_line = ''
                 player.cmd_cursor = 0
@@ -6122,11 +6132,14 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
                         room.rebuild_indexes()
                     _push(f'{cmd.capitalize()} moved here.')
 
-                elif _draft is not None and cmd.split()[0:1] == ['fill'] and edit_mode:
+                elif _draft is not None and _rcmd.split()[0:1] == ['fill'] and edit_mode:
                     # `:fill <pool> [lo-hi] [spacing]` over the last VISUAL
                     # selection — the same region `gv` would bring back, which is
-                    # what `'<,'>` means everywhere else in Vim.
-                    _args = cmd.split()[1:]
+                    # what `'<,'>` means everywhere else in Vim. Written with or
+                    # without that range: `:'<,'>fill plain` is what typing `:`
+                    # straight from the selection gives you, and it says out loud
+                    # the thing the bare form only implies.
+                    _args = _rcmd.split()[1:]
                     _a, _b = player.last_visual_anchor, player.last_visual_cursor
                     if _a is None or _b is None:
                         _push('Select the region in VISUAL first, then :fill <pool>.')
@@ -6546,6 +6559,17 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
                         elif _sg_msg:
                             _push(_sg_msg)
 
+                elif _vrange:
+                    # Caught, not parsed. `:` from VISUAL hands you a range
+                    # because most of what you do to a selection wants one; the
+                    # commands that are addressed to a PLACE instead (`:entity`
+                    # at the cursor, `:w` at the draft) are not a range command
+                    # with the range ignored, and pretending otherwise would let
+                    # `:'<,'>entity goblin` place one goblin and look like it
+                    # had filled the selection with them.
+                    _push(f":{_rcmd.split()[0] if _rcmd else '(nothing)'} does not "
+                          'take a range — Esc the command line and type it plain.')
+
                 else:
                     _push(f'Unknown command: :{cmd}')
 
@@ -6908,22 +6932,20 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
                 _render(message)
                 continue
             # `:` from VISUAL — vim leaves visual mode and opens the command
-            # line, having stamped the selection into the `'<` / `'>` marks.
-            # That is what makes `:fill` (and `:'<,'>s/…`) reachable without the
-            # Esc dance: the selection does not have to still be OPEN, it has to
-            # still be REMEMBERED, and this is where vim remembers it. We do not
-            # prefill the `'<,'>` range vim types for you — the forge's commands
-            # read the marks themselves, and a prefix every one of them would
-            # have to be told to ignore is a worse trade than the one keystroke
-            # it saves.
+            # line prefilled with `'<,'>`, having stamped the selection into
+            # those two marks on the way out. That is what makes `:fill` (and
+            # `:'<,'>s/…`) reachable without the Esc dance: the selection does
+            # not have to still be OPEN, it has to still be REMEMBERED. The
+            # prefilled range is also the only thing on screen that says the
+            # selection survived the keystroke that visibly cleared it.
             if not key_buf and raw == ':':
                 player.last_visual_anchor = anchor
                 player.last_visual_cursor = cursor
                 player.last_visual_mode   = vmode
                 player.visual_anchor = None
                 player.mode = Mode.COMMAND
-                player.cmd_line = ''
-                player.cmd_cursor = 0
+                player.cmd_line = "'<,'>"
+                player.cmd_cursor = len(player.cmd_line)
                 room._cmd_karaoke = False   # no shipped tape enters `:` from visual
                 _render(message)
                 continue

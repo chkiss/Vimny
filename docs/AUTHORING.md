@@ -65,10 +65,16 @@ level's seed on every build, so the editor refuses edits inside one. `:fill!`
 is how you take the words for yourself.
 
 Select the region and type `:` straight from VISUAL — `v`, walk the shape,
-`:fill plain`. Like vim, `:` leaves visual mode and stamps the selection into
-the `'<`/`'>` marks on the way out, and `:fill` reads exactly those marks: the
-selection has to be *remembered*, not still open. `gv` brings it back if you
-want to fill the same region twice with different pools.
+`:fill plain`. Like vim, `:` leaves visual mode, stamps the selection into the
+`'<`/`'>` marks on the way out, and hands you a command line already reading
+`:'<,'>`. `:fill` reads exactly those marks, so the selection has to be
+*remembered*, not still open; `gv` brings it back to fill the same region twice
+with different pools.
+
+Most forge commands are addressed to a **place** (`:entity` at the cursor, `:w`
+at the draft), not to a range, and typing one after that prefill is refused
+rather than run — `Esc` the command line and type it plain. The marks outlive
+the Esc.
 
 Drafts live in `~/.Vimny/drafts/`, and a draft file *is* a level file — the same
 schema, so publishing is a copy and there is no export step that can lose
