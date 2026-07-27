@@ -724,10 +724,30 @@ _ENTITY_CELLS = (CellType.FLOOR, CellType.CORRIDOR)
 
 
 def _entity_cells(room, player) -> list:
-    """The cells of the last VISUAL selection an entity could occupy, in reading
-    order. The same region `:fill` takes — a LINEWISE selection is whole rows,
-    charwise/block is the rectangle between the two ends — because two commands
-    that both say `'<,'>` must mean the same shape by it."""
+    """The cells of the last VISUAL selection an entity could occupy."""
+    return [(r, c) for r, c in _range_cells(room, player)
+            if room.cells[r][c] in _ENTITY_CELLS]
+
+
+def _bolt_cells(room, player) -> list:
+    """The MASONRY of the last VISUAL selection — what a ranged `:bolt` turns
+    into one door.
+
+    Walls only, where `:entity` takes the standable cells: each command takes
+    the half of the selection it can mean anything about. A seal writes its
+    `opens` cells out as stone and the tick swings them, so bolting a floor cell
+    would quietly wall off a square the author was standing on, and sweeping a
+    selection across a doorway would do it several times over. The author drew
+    the wall; the wall is what crumbles."""
+    return [(r, c) for r, c in _range_cells(room, player)
+            if room.cells[r][c] in (CellType.WALL, CellType.WOOD_WALL)]
+
+
+def _range_cells(room, player) -> list:
+    """Every in-bounds cell of the last VISUAL selection, in reading order. The
+    same region `:fill` takes — a LINEWISE selection is whole rows, charwise and
+    block are the rectangle between the ends — because every command that spells
+    its range `'<,'>` must mean the same shape by it."""
     a, b = player.last_visual_anchor, player.last_visual_cursor
     if a is None or b is None:
         return []
@@ -736,9 +756,8 @@ def _entity_cells(room, player) -> list:
     else:
         c1, c2 = min(a[1], b[1]), max(a[1], b[1])
     return [(r, c)
-            for r in range(min(a[0], b[0]), max(a[0], b[0]) + 1)
-            for c in range(max(0, c1), min(room.cols - 1, c2) + 1)
-            if 0 <= r < room.rows and room.cells[r][c] in _ENTITY_CELLS]
+            for r in range(max(0, min(a[0], b[0])), min(room.rows - 1, max(a[0], b[0])) + 1)
+            for c in range(max(0, c1), min(room.cols - 1, c2) + 1)]
 
 
 def _describe_entity(ent) -> str:
@@ -6288,7 +6307,7 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
                         _push(f'Fill dropped — its {len(_kept)} word(s) are yours to edit now.')
 
                 elif _draft is not None and edit_mode and (
-                        cmd.rstrip('?!') == 'seal' or cmd.startswith('seal ')):
+                        _rcmd.rstrip('?!') == 'seal' or _rcmd.startswith('seal ')):
                     # `:seal <text>` over the last VISUAL selection arms a
                     # text-match door: while that region reads <text>, the cells
                     # you then `:bolt` stand open. Two commands, because the
@@ -6300,14 +6319,14 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
                     # "the region reads exactly this" — the glob sense it has
                     # everywhere else. Write a literal one as `\*`.
                     _a, _b = player.last_visual_anchor, player.last_visual_cursor
-                    _txt = cmd[5:].strip()
-                    if cmd.rstrip('?!') == 'seal' and cmd.endswith('?'):
+                    _txt = _rcmd[5:].strip()
+                    if _rcmd.rstrip('?!') == 'seal' and _rcmd.endswith('?'):
                         _ss = list(getattr(room, 'seals', ()))
                         _push('; '.join(
                             f'{s.match!r} @ ' + ' '.join(f'{r},{c}' for r, c in s.opens)
                             + ('' if s.mode == 'exact' else ' (contains)')
                             for s in _ss) or 'No seals in this level.')
-                    elif cmd.rstrip('?!') == 'seal' and cmd.endswith('!'):
+                    elif _rcmd.rstrip('?!') == 'seal' and _rcmd.endswith('!'):
                         _ss = [s for s in getattr(room, 'seals', ())
                                if (player.row, player.col) in s.opens]
                         if not _ss:
@@ -6340,23 +6359,37 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
                               f'{max(_a[0], _b[0])}, cols {_c1}-{_c2} — '
                               f'stand on the door and :bolt.')
 
-                elif _draft is not None and edit_mode and cmd == 'bolt':
-                    # Attach the cursor cell to the armed seal. Repeatable, so a
-                    # three-cell gate is three :bolts and not a syntax for ranges
-                    # nobody would remember.
+                elif _draft is not None and edit_mode and _rcmd == 'bolt':
+                    # Attach cells to the armed seal. The cursor cell on its own,
+                    # or — with the `'<,'>` range — every cell of the selection,
+                    # which is how a whole WALL is wired to one trigger instead
+                    # of being bolted a cell at a time. Repeatable either way: a
+                    # second `:bolt` widens the same seal rather than making a
+                    # second one.
                     _pend = getattr(_draft, '_pending_seal', None)
+                    _want = (_bolt_cells(room, player) if _vrange
+                             else [(player.row, player.col)])
                     if _pend is None:
                         _push('Nothing armed — :seal <text> over a selection first.')
+                    elif not _want:
+                        _push('Nothing in that selection to bolt.')
                     else:
                         _reg, _txt, _mode = _pend
                         _r1, _c1, _r2, _c2 = _reg
-                        if (_r1 <= player.row <= _r2 and _c1 <= player.col <= _c2):
+                        _inside = [(r, c) for r, c in _want
+                                   if _r1 <= r <= _r2 and _c1 <= c <= _c2]
+                        if _inside:
                             # See the validator: a door inside its own condition
                             # opens, becomes walkable, gets written on, and then
                             # re-shuts on whatever was written. Catch it here so
-                            # the author hears it while they can see both.
-                            _push('That cell is inside the seal\'s own region — '
-                                  'a door cannot be part of the text that opens it.')
+                            # the author hears it while they can see both. The
+                            # overlap is REFUSED rather than quietly dropped —
+                            # the selection is the author saying which cells they
+                            # mean, and silently meaning fewer is how a wall ends
+                            # up with a hole in it nobody put there.
+                            _push(f'{len(_inside)} of those cells lie inside the '
+                                  "seal's own region — a door cannot be part of "
+                                  'the text that opens it.')
                         else:
                             DRAFT.sync(_draft, room)
                             _old = [s for s in _draft.level.seals
@@ -6364,8 +6397,9 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
                             _cells = tuple(_old[0].opens) if _old else ()
                             if _old:
                                 _draft.level.seals.remove(_old[0])
+                            _add = tuple(c for c in _want if c not in _cells)
                             _new = Seal(region=_reg, match=_txt, mode=_mode,
-                                        opens=_cells + ((player.row, player.col),))
+                                        opens=_cells + _add)
                             _draft.level.seals.append(_new)
                             _err = _forge_rebuild()
                             if _err:

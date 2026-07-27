@@ -34,7 +34,7 @@ they always have, plus the level's own properties:
 | `:fill!` | drop the fill under the cursor, keeping its words as text you own |
 | `:entity [kind] [field=value …]` | place or retune the entity under the cursor (`:entity` alone opens the palette; `:entity?` reads it back; `:entity!` removes it) |
 | `:seal <text>` | arm a text-match door on the last VISUAL selection |
-| `:bolt` | make the cell you are standing on open while that seal reads true |
+| `:bolt` | make the cell you are standing on — or every wall cell of a `'<,'>` selection — open while that seal reads true |
 | `:name` `:author` `:teaches` `:requires` `:intro` `:alternate` `:vocab` | the metadata block |
 | `:meta` | what the draft currently claims |
 | `:record` | **play the level; the keys you press become the tape** |
@@ -276,10 +276,23 @@ Because it is a reading and not an event, **undo re-seals**. There is no state
 to get out of step, and a seal cell is always written to the file as stone
 however it happened to be standing when you saved.
 
-In the forge: select the strip in VISUAL, `:seal this password`, then stand on
-the door and `:bolt` (again for each further cell). `:seal *word` arms the
-looser `contains` reading — the glob sense of `*` — and `:seal!` removes the
-seal bolting the cell you are on.
+In the forge: select the strip in VISUAL and `:seal this password` — typing `:`
+straight from the selection is the point, the region is what the seal reads.
+Then go to the door and `:bolt`.
+
+**`:bolt` takes the `'<,'>` range**, which is how a whole wall is wired to one
+trigger rather than bolted a cell at a time: select the wall, `:bolt`, and every
+masonry cell in the selection becomes the same door. Floor inside the selection
+is left alone — a seal writes its `opens` cells out as *stone*, so bolting floor
+would wall off squares the author was standing on. (Where `:entity` takes the
+standable half of a selection, `:bolt` takes the masonry: each command takes the
+half it can mean anything about.) A second `:bolt` widens the same seal rather
+than making a second one, and cells that lie inside the seal's own region are
+**refused** rather than quietly dropped — silently meaning fewer cells is how a
+wall ends up with a hole in it nobody put there.
+
+`:seal *word` arms the looser `contains` reading — the glob sense of `*` — and
+`:seal!` removes the seal bolting the cell you are on.
 
 ### `requires` and `teaches`
 

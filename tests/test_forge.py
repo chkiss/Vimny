@@ -952,6 +952,48 @@ def test_the_forge_arms_a_seal_and_bolts_it():
                                                        ((4, 4),))
 
 
+def test_a_ranged_bolt_wires_a_whole_wall_to_one_trigger():
+    """A gate is rarely one cell. Bolting it a cell at a time is the same seal
+    retyped as many times as the wall is wide — with the range, the wall the
+    author selected IS the door."""
+    d = DRAFT.new('Probe', rows=8, cols=30)
+    # seal on row 2; drop to row 5, paint a five-cell wall, select it, bolt once
+    _forge_session(d, 'jv' + 'l' * 6 + ':seal open sesame\r'
+                      + 'jjj' + 'sl' * 4 + 's'
+                      + 'hhhhv' + 'l' * 4 + ':bolt\r:w\r:q!\r')
+    assert len(d.level.seals) == 1
+    s = d.level.seals[0]
+    assert s.match == 'open sesame'
+    assert sorted(s.opens) == [(5, 7), (5, 8), (5, 9), (5, 10), (5, 11)]
+    # and the wall is stone in the saved file — the tick is what swings it
+    assert d.level.cells[5] == 'W6F5W17FW'
+
+
+def test_a_ranged_bolt_takes_the_masonry_and_leaves_the_floor():
+    """Walls only, where `:entity` takes the standable cells — each command
+    takes the half of the selection it can mean anything about. A seal writes
+    its opens cells out as STONE, so bolting floor would wall off squares the
+    author was standing on."""
+    d = DRAFT.new('Probe', rows=8, cols=30)
+    # one painted wall cell in a nine-cell selection that is otherwise floor
+    _forge_session(d, 'jv' + 'l' * 6 + ':seal open sesame\r'
+                      + 'jjj' + 'lll' + 's'
+                      + 'hhhv' + 'l' * 8 + ':bolt\r:w\r:q!\r')
+    assert [tuple(c) for c in d.level.seals[0].opens] == [(5, 10)]
+
+
+def test_a_ranged_bolt_refuses_to_swallow_its_own_condition():
+    """Refused, not quietly trimmed: the selection is the author saying which
+    cells they mean, and silently meaning fewer is how a wall ends up with a
+    hole in it that nobody put there."""
+    d = DRAFT.new('Probe', rows=8, cols=30)
+    # a wall painted INSIDE the region the seal reads, then a whole-row bolt
+    _forge_session(d, 'j' + 'll' + 's' + 'hh'
+                      + 'v' + 'l' * 6 + ':seal open sesame\r'
+                      + 'V:bolt\r:w\r:q!\r')
+    assert d.level.seals == []
+
+
 def test_a_star_arms_the_looser_reading():
     d = DRAFT.new('Probe', rows=8, cols=30)
     _forge_session(d, 'jv' + 'l' * 6 + T.ESC
