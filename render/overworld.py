@@ -200,13 +200,20 @@ def render_overworld(term: Terminal, player: Player, progress: dict,
         The middle column is dropped rather than truncated when the terminal is
         narrow — a half-written command list reads as a level that requires `w`,
         `b`, `e` when it also requires `f`, and a wrong claim is worse than no
-        claim. The name and the badge always survive."""
+        claim. The name and the badge always survive.
+
+        It is laid out with the SAME `_cols3` the curriculum rows use, so a
+        community level's `requires`/`+teaches` lands in the one middle column
+        rather than trailing its own name. That column is the answer to a single
+        question — what does this level ask of me — and a reader compares down
+        it; a list that starts at a different x on every row cannot be read that
+        way. `_cols3` returns None when the name is too long to leave the column
+        clear, which falls through to the badge-only form below."""
         nc     = enfc if is_cursor else rst
         left   = '  ' + tree + ' ' + name
-        room   = cw - len(left) - len(badge) - 2
-        if mid and len(mid) <= room:
-            gap_l = 2
-            gap_r = max(1, cw - len(left) - gap_l - len(mid) - len(badge))
+        cols   = _cols3(left, mid, badge) if mid else None
+        if cols is not None:
+            gap_l, gap_r = cols
             body  = (C.hint_fg() + tree + ' ' + nc + name + ' ' * gap_l +
                      dfc + mid + ' ' * gap_r + badge_col + badge)
         else:

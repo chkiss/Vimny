@@ -22,7 +22,19 @@ The cling bug: the old formula recomputed the offset from the cursor every frame
 pinning the cursor to the bottom edge once scrolled. The fix keeps a stateful
 offset and scrolls only when the cursor leaves the window.
 """
-from render.overworld import _scroll_offset, build_lines, default_cursor
+import io
+import re
+import contextlib
+import types
+from pathlib import Path
+
+import pytest
+from blessed import Terminal
+
+import render.colors as C
+import render.symbols as S
+from render.overworld import (_scroll_offset, build_lines, default_cursor,
+                              render_overworld)
 
 
 def _levels(n=3):
@@ -78,3 +90,75 @@ def test_clamps_to_bounds():
     assert _scroll_offset(0, 5, 10, 30) == 0       # never below 0
     assert _scroll_offset(100, 0, 10, 30) == 20    # never past max_off
     assert _scroll_offset(2, 0, 10, 3) == 0        # fewer entries than the window
+
+
+# ── the middle column is ONE column, shipped rows and shelf rows alike ───────
+
+@pytest.fixture
+def term():
+    t = Terminal()
+    C.init(t)
+    S.init(t)
+    return t
+
+
+def _plain(term, lines, player):
+    """The rendered overworld as plain rows, escape codes stripped."""
+    buf = io.StringIO()
+    with contextlib.redirect_stdout(buf):
+        render_overworld(term, player, {}, 0, lines)
+    return [re.sub(r'\x1b\[[0-9;?]*[a-zA-Z]', '', r) for r in buf.getvalue().splitlines()]
+
+
+def test_a_shelf_levels_command_list_sits_in_the_curriculum_column(term):
+    """A community row's `requires` + `+teaches` is CENTRED on the same axis as
+    a shipped level's command list.
+
+    Centre, not left edge: the curriculum column is centred between the widest
+    name and the widest badge, so `^ $ 0` and `h j k l u :w :q :q!` already
+    start at different x and share a midline. The middle column answers one
+    question — what does this level ask of me — and it is read by comparing
+    DOWN it. A shelf row that trailed its own name put that answer on no axis
+    at all."""
+    from engine.player import Player
+    from sharing.format import Level
+    from sharing.library import Shelved
+    from content.levels import LEVELS
+
+    lvl   = Level(name='Maze of Ana', author='Ana',
+                  requires=['w', 'b'], teaches=['f', 't'])
+    rep   = types.SimpleNamespace(par=12, budget=17, ok=True)
+    shelf = Shelved(path=Path('maze.json'), level=lvl, report=rep)
+    p     = Player()
+    p.name = 'admin'
+
+    rows = _plain(term, build_lines(LEVELS[:5], [], [shelf], []), p)
+    ship = next(r for r in rows if 'the_rune_halls' in r)
+    mine = next(r for r in rows if 'Maze of Ana' in r)
+    def _mid(row, text):
+        i = row.index(text)
+        return 2 * i + len(text)          # doubled centre, so no .5 rounding
+
+    assert _mid(ship, 'w b e') == _mid(mine, 'by Ana  w b +f +t')
+    # and the order is requires, then teaches marked — not the other way round
+    assert 'by Ana  w b +f +t' in mine
+
+
+def test_a_long_shelf_name_drops_the_column_rather_than_overrunning_it(term):
+    """When the name eats the column, the row keeps the name and the badge and
+    drops the list — a half-written `requires` is a false claim about what the
+    level needs, and worse than saying nothing."""
+    from engine.player import Player
+    from sharing.format import Level
+    from sharing.library import Shelved
+    from content.levels import LEVELS
+
+    lvl   = Level(name='A' * 90, author='Ana', requires=['w'], teaches=['f'])
+    rep   = types.SimpleNamespace(par=12, budget=17, ok=True)
+    shelf = Shelved(path=Path('long.json'), level=lvl, report=rep)
+    p     = Player()
+    p.name = 'admin'
+
+    row = next(r for r in _plain(term, build_lines(LEVELS[:5], [], [shelf], []), p)
+               if 'AAAA' in r)
+    assert 'by Ana' not in row and '[par 12]' in row
