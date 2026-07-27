@@ -31,7 +31,8 @@ always have, plus the level's own properties:
 |---|---|
 | `:paint <kind>` | lay terrain down under the cursor, or over a `'<,'>` selection (`:paint` alone opens the palette; `:paint?` says what is there) |
 | `:spawn` / `:exit` | put the spawn or the exit where you are standing |
-| `:fill <pool> [lo-hi] [spacing]` | fill the last VISUAL selection from a word pool |
+| `:rune <kind>` | place one rune under the cursor (`:rune` alone opens the list) |
+| `:fill <pool> [lo-hi] [spacing]` | fill the last VISUAL selection from a word pool (`:fill` alone opens the list) |
 | `:fill!` | drop the fill under the cursor, keeping its words as text you own |
 | `:entity [kind] [field=value …]` | place or retune the entity under the cursor (`:entity` alone opens the palette; `:entity?` reads it back; `:entity!` removes it) |
 | `:seal <text>` | arm a text-match door on the last VISUAL selection |
@@ -76,7 +77,12 @@ cell of a `'<,'>` selection, so a river is one command:
 | `mist` | fogged water: hazy, never lit, and light will not flood past it |
 
 `:paint` on its own opens the palette; `:paint?` says what the cursor (or the
-whole selection, as a tally) is standing on. It replaced the old `s` cycle, which
+whole selection, as a tally) is standing on. Every forge command whose argument
+comes from a list the game already knows does the same when typed bare —
+`:paint`, `:rune`, `:fill`, `:entity` — and each one names the line it composed
+on the way out, so the list teaches its way out of being needed. (The metadata
+commands are the exception: a bare `:author` *asks*, because `:field` / `:field?`
+/ `:field!` is a read/write/clear split, not a missing argument.) It replaced the old `s` cycle, which
 could only reach the terrains someone had remembered to thread onto the ring —
 misted water was drawn by the renderer and reachable by no key at all — and which
 could not answer *what else is there?*

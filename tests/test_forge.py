@@ -1071,6 +1071,35 @@ def test_paint_leaves_a_wall_plaque_standing():
     assert any(''.join(ru['symbols']).startswith('p') for ru in d.level.char_runs)
 
 
+def test_a_bare_rune_opens_the_list():
+    """Every forge command whose argument comes from a list the game already
+    knows answers the bare form with that list — the question being asked is
+    "which ones are there?"."""
+    d = DRAFT.new('Probe', rows=8, cols=30)
+    _forge_session(d, 'jl:rune\r' + 'jj\r' + ':w\r:q!\r')   # third row: void
+    assert [(ru['kind'], ru['col']) for ru in d.level.char_runs] == [('void', 2)]
+
+
+def test_a_bare_paint_opens_the_list():
+    d = DRAFT.new('Probe', rows=8, cols=30)
+    _forge_session(d, 'jl:paint\r' + 'j\r' + ':w\r:q!\r')   # second row: corridor
+    assert F.expand_row(d.level.cells[2], d.level.cols, 2)[2] == CellType.CORRIDOR
+
+
+def test_a_bare_fill_opens_the_pool_list():
+    """It used to mean `:fill plain` in silence — a default where a question
+    was being asked."""
+    d = DRAFT.new('Probe', rows=8, cols=30)
+    _forge_session(d, 'jv' + 'l' * 5 + ':fill\r' + 'jj\r' + ':w\r:q!\r')
+    assert [f.pool for f in d.level.fills] == ['proverbs']   # third row
+
+
+def test_backing_out_of_a_picker_places_nothing():
+    d = DRAFT.new('Probe', rows=8, cols=30)
+    _forge_session(d, 'jl:rune\r' + T.ESC + ':w\r:q!\r')
+    assert d.level.char_runs == []
+
+
 def test_s_is_vims_s_again_in_the_editor():
     """`s` walked a ring of cell types for as long as the forge has existed —
     the one thing `s` means nowhere else in this game. `:paint` took that job

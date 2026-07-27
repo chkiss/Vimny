@@ -955,13 +955,19 @@ def _pick_entity(term: Terminal, iw: int, game_h: int) -> str:
                                                 vals[fields[fsel]])
 
 
-def _pick_paint(term: Terminal, iw: int, game_h: int) -> str:
-    """The terrain palette. Returns the paint's NAME, or '' if the author backed out.
+def _pick_one(term: Terminal, iw: int, game_h: int,
+              title: str, options) -> str:
+    """A one-pane picker over a fixed list. Returns the chosen VALUE, or '' if
+    the author backed out. `options` is [(value, description), ...].
 
-    Same bargain as `_pick_entity`: the command is the mechanism, the menu is one
-    view of it, and the caller echoes back the `:paint` line it chose so the list
-    teaches its way out of being needed. One pane, because a cell has no fields —
-    what it is IS all there is to say about it.
+    Every forge command whose argument comes from a list the game already knows
+    — `:paint`, `:rune`, `:fill` — opens this when typed bare, because that is
+    the shape of the question they are being asked ("which ones are there?") and
+    a list is the only honest answer. `:entity` keeps its own two-pane picker: a
+    kind has FIELDS, and a menu that could only place the default goblin cannot
+    make a red key. The value is returned rather than acted on, so the caller can
+    echo back the command it stands for and the menu teaches its way out of
+    being needed.
     """
     BOX_IW = 62; BOX_BW = BOX_IW + 4
     box_bg  = term.on_color_rgb(6, 8, 12)
@@ -971,8 +977,9 @@ def _pick_paint(term: Terminal, iw: int, game_h: int) -> str:
     pick    = term.color_rgb(255, 220, 60) + term.bold
     rst     = term.normal
     col_off = max(1, (iw + 2 - BOX_BW) // 2)
-    kinds   = list(PAINT_KINDS)
+    values  = [v for v, _ in options]
     sep_h   = '═' * (BOX_IW + 2)
+    width   = max([len(v) for v in values] or [1]) + 2
 
     def row(vis, colored):
         return (edge + '║ ' + rst + box_bg + colored +
@@ -980,8 +987,7 @@ def _pick_paint(term: Terminal, iw: int, game_h: int) -> str:
 
     sel = 0
     while True:
-        rows  = [f' {k:<12}{PAINT_KINDS[k][2]}' for k in kinds]
-        title = 'paint a cell'
+        rows  = [f' {v:<{width}}{d}' for v, d in options]
         foot  = ' j/k move   ⏎ choose   Esc cancel'
         lines = [edge + '╔' + sep_h + '╗' + rst, row(0, '')]
         lines.append(row(BOX_IW, head + ' ' + title
@@ -1003,11 +1009,33 @@ def _pick_paint(term: Terminal, iw: int, game_h: int) -> str:
         if key.name == 'KEY_ESCAPE':
             return ''
         if raw == 'j' or key.name == 'KEY_DOWN':
-            sel = (sel + 1) % len(kinds)
+            sel = (sel + 1) % len(values)
         elif raw == 'k' or key.name == 'KEY_UP':
-            sel = (sel - 1) % len(kinds)
+            sel = (sel - 1) % len(values)
         elif key.name == 'KEY_ENTER' or raw in ('\n', '\r'):
-            return kinds[sel]
+            return values[sel]
+
+
+#: The rune kinds, as the bare-`:rune` picker lists them. `void` is the only one
+#: that carries a rule rather than a colour, so it is the only one whose line has
+#: to say anything: landing on it kills, though a line motion passes over it.
+_RUNE_NOTES = [
+    ('ancient', 'indigo — the default glyph'),
+    ('verdant', 'green — living text'),
+    ('void',    'violet — LETHAL to land on; jumps pass over it'),
+    ('ember',   'amber — the wizard\'s own hand'),
+]
+
+#: What each `:fill` pool draws from — the descriptions the bare-`:fill` picker
+#: shows. Keyed off `sharing.vocab.POOLS`, which stays the authority on which
+#: pools exist; a pool added there with no line here still lists, undescribed.
+_POOL_NOTES = {
+    'plain':     'the shipped plain-word list',
+    'mixed':     'MIXED case — the ~ and gU levels feed on these',
+    'proverbs':  'real proverbs, whole lines',
+    'misquotes': 'proverbs with one word wrong — something to mend',
+    'custom':    "the level's own :vocab words",
+}
 
 
 def _render_standard_scroll(term: Terminal, iw: int, game_h: int, content: dict,
@@ -6138,10 +6166,20 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
                     else:
                         _push('Usage:  :save <name>')
 
-                elif cmd.startswith('rune ') and edit_mode and player_name == 'admin':
-                    kind = cmd[5:].strip().lower()
-                    if kind not in _RUNE_CHAR:
-                        _push(f'Unknown rune kind: {kind}  (ancient|verdant|void|ember)')
+                elif (cmd == 'rune' or cmd.startswith('rune ')) \
+                        and edit_mode and player_name == 'admin':
+                    kind = cmd[4:].strip().lower()
+                    _via = ''
+                    if not kind:
+                        # Bare `:rune` asks which runes exist, and the list is
+                        # the answer — same as a bare `:paint` or `:entity`.
+                        kind = _pick_one(term, _iw(term), term.height - 8,
+                                         'place a rune', _RUNE_NOTES)
+                        _via = f'   (:rune {kind})' if kind else ''
+                    if not kind:
+                        _push('')                     # backed out of the picker
+                    elif kind not in _RUNE_CHAR:
+                        _push(f'Unknown rune kind: {kind}  ({"|".join(_RUNE_CHAR)})')
                     elif _in_fill(room, player.row, player.col):
                         _push('A fill grows that text — :fill! to make it yours.')
                     else:
@@ -6154,7 +6192,7 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
                         room.add_char_run(CharRun(row=r, col=c,
                                                   symbols=(_RUNE_CHAR[kind],), kind=kind))
                         _merge_adjacent_char_runs(room, r)
-                        _push(f'Placed {kind} rune.')
+                        _push(f'Placed {kind} rune.' + _via)
 
                 elif (_rcmd.rstrip('?') == 'paint' or _rcmd.startswith('paint ')) \
                         and edit_mode and player_name == 'admin':
@@ -6179,7 +6217,9 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
                     elif not _kind:
                         # A bare `:paint` is the question "what can I lay down?",
                         # and the palette answers it by composing the command.
-                        _kind = _pick_paint(term, _iw(term), term.height - 8)
+                        _kind = _pick_one(
+                            term, _iw(term), term.height - 8, 'paint a cell',
+                            [(_k, _v[2]) for _k, _v in PAINT_KINDS.items()])
                         if not _kind:
                             _push('')                    # backed out of the picker
                         else:
@@ -6369,8 +6409,21 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
                     if _a is None or _b is None:
                         _push('Select the region in VISUAL first, then :fill <pool>.')
                     else:
-                        _pool = _args[0] if _args else 'plain'
-                        if _pool not in _VOCAB_POOLS:
+                        # A bare `:fill` used to mean `:fill plain` silently.
+                        # It is a question — which pools are there? — and the
+                        # picker answers it, then names the line it stood for.
+                        _via = ''
+                        if _args:
+                            _pool = _args[0]
+                        else:
+                            _pool = _pick_one(
+                                term, _iw(term), term.height - 8,
+                                'fill the selection from',
+                                [(_p, _POOL_NOTES.get(_p, '')) for _p in _VOCAB_POOLS])
+                            _via = f'   (:fill {_pool})' if _pool else ''
+                        if not _pool:
+                            _push('')                 # backed out of the picker
+                        elif _pool not in _VOCAB_POOLS:
                             _push(f'Unknown pool: {_pool}  ({"|".join(_VOCAB_POOLS)})')
                         else:
                             # A custom pool defaults to the lengths the author's
@@ -6413,7 +6466,7 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
                             else:
                                 _push(f'Fill: {_pool} {_lo}-{_hi} over '
                                       f'rows {_reg[0]}-{_reg[2]}, '
-                                      f'cols {_c1}-{_c2}.')
+                                      f'cols {_c1}-{_c2}.' + _via)
 
                 elif _draft is not None and cmd == 'fill!' and edit_mode:
                     # Bake the fill under the cursor: its words stop being grown
