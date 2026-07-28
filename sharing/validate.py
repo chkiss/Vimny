@@ -78,6 +78,7 @@ def validate(lvl: F.Level) -> Report:
 
     _check_determinism(lvl, dungeon, rep)
     _check_standable(lvl, dungeon, rep)
+    _check_operable(lvl, dungeon, rep)
     if not rep.ok:
         return rep
 
@@ -409,6 +410,40 @@ def _check_standable(lvl: F.Level, dungeon, rep: Report) -> None:
             rep.warn('bounds', f'{chamber.where}.exit {list(room.exit_pos)} is not '
                                f'floor. That is fine for a sealed exit that a '
                                f'tick opens, but nothing else will reach it.')
+
+
+#: kind → the tokens ONE of which a player must know to work it. `x` is not in
+#: any of them: interact is always allowed, so a chest or a plain door needs no
+#: declaration. What is easy to place and impossible to use is the key/lock pair,
+#: which is worked by PASTING the key onto the lock.
+_OPERATED_BY = {
+    'locked_door': ('p', 'P', 'g_family'),
+    'floor_key':   ('p', 'P', 'g_family'),
+}
+
+
+def _check_operable(lvl: F.Level, dungeon, rep: Report) -> None:
+    """Warn about furniture the level's own command set cannot work.
+
+    A locked door is opened by cutting up the key (`x`, always allowed) and
+    pasting it onto the lock — so a level that declares neither `p` nor `P` ships
+    a door nobody can open. The author cannot see this: they built it in the
+    forge, where gating is off, and the first `:play` refuses a key they watched
+    themselves place. Advice rather than a rejection, because a level may
+    legitimately be winnable without opening a door — solvability is the tape's
+    job, and the tape may never touch it.
+    """
+    known = set(lvl.known)
+    for kind, tokens in _OPERATED_BY.items():
+        where = [(i, e) for i, room in enumerate(dungeon.rooms)
+                 for e in room.entities if e.kind == kind and e.alive]
+        if where and not (known & set(tokens)):
+            i, e = where[0]
+            rep.warn('operable',
+                     f'a {kind} at row {e.row}, column {e.col} is opened by '
+                     f'pasting a key onto it, but this level declares none of '
+                     f'{list(tokens[:2])} — nobody can open it. Add one to '
+                     f'requires or teaches.')
 
 
 # ── 4 + 5. Solvability and par ────────────────────────────────────────────────

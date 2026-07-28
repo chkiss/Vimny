@@ -769,9 +769,12 @@ def _build_chamber(chamber: Chamber, lvl: Level, rng: random.Random,
     # is permanent by being mist, not by holding the reveal back. So a built
     # level always re-reveals: walk in, and the pocket lights as sight crosses
     # the opened seal, while the mist stays hazy for ever.
-    apply_stone_fog(room)
-
+    # …and the indexes BEFORE the law, not after: an `opaque` door is a thing
+    # standing on a cell, so the law has to be able to ask what is standing
+    # there. Indexed after, `entity_at` answered None and a door an author
+    # declared opaque fogged nothing.
     room.rebuild_indexes()
+    apply_stone_fog(room)
     return room
 
 

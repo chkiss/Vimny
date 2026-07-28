@@ -1405,6 +1405,97 @@ def test_cropping_carries_everything_with_it():
     assert tight.entities[0]['at'] == [1, 9]
 
 
+# ── Doors: what blocks feet, and what blocks the eye ──────────────────────────
+#
+# A door is a THING STANDING ON a cell, not a kind of ground, and the two facts
+# about it are separate: `locked_door` blocks feet, `opaque` blocks sight. The
+# fog law is stone-bounded on purpose — a caged specimen has to be an exhibit
+# rather than a rumour — so a door that hides what is behind it has to say so.
+
+def _corridor(**kw) -> F.Level:
+    """One run of floor: spawn at the west end, exit at the east."""
+    kw.setdefault('spawn', (1, 1))
+    kw.setdefault('exit', (1, 10))
+    kw.setdefault('solution', '$')
+    kw.setdefault('teaches', ['$'])
+    return _sized(rows=3, cols=12, cells=['12W', 'W10FW', '12W'], **kw)
+
+
+def test_a_plain_door_is_a_grille_the_eye_crosses():
+    """Unchanged, and deliberately: fog derived from geometry is what stops a
+    door being a fog exemption every builder has to remember."""
+    lvl = _corridor(entities=[{'kind': 'door', 'at': [1, 5]}])
+    assert not F.build(lvl).room.fog_cells
+
+
+def test_an_opaque_door_fogs_everything_behind_it():
+    """The thing a level file could not say: darkness where there is no wall."""
+    lvl = _corridor(entities=[{'kind': 'door', 'at': [1, 5], 'opaque': True}])
+    fog = F.build(lvl).room.fog_cells
+    assert (1, 6) in fog and (1, 10) in fog, 'the far side is lit'
+    assert (1, 5) not in fog, 'you can see the door itself'
+    assert (1, 4) not in fog, 'the near side is where you are standing'
+
+
+def test_opening_an_opaque_door_is_what_lifts_its_fog():
+    """No scripted fog and nothing stored: kill the door and the law itself
+    says the room beyond is visible."""
+    from engine.motion import stone_law
+    room = F.build(_corridor(
+        entities=[{'kind': 'door', 'at': [1, 5], 'opaque': True}])).room
+    room.kill_entity(room.entity_at(1, 5))
+    assert not stone_law(room)
+
+
+def test_a_locked_door_blocks_feet_and_a_plain_one_does_not():
+    """The report: 'the door west of the Zombie doesn't block me'. It never
+    did — that is `locked_door`'s job, and a plain door is walked onto and
+    opened with x."""
+    plain = F.build(_corridor(entities=[{'kind': 'door', 'at': [1, 5]}])).room
+    shut  = F.build(_corridor(
+        entities=[{'kind': 'locked_door', 'at': [1, 5]}])).room
+    assert plain.is_passable(1, 5)
+    assert not shut.is_passable(1, 5)
+
+
+def test_opaque_survives_the_file():
+    lvl = _corridor(entities=[{'kind': 'door', 'at': [1, 5], 'opaque': True}])
+    back = F.loads(F.dumps(lvl))
+    assert back.entities[0]['opaque'] is True
+    assert F.build(back).room.fog_cells
+
+
+# ── Furniture the level's own commands cannot work ────────────────────────────
+
+def test_a_locked_door_in_a_level_that_never_taught_paste_is_flagged():
+    """The second half of the report: the key would not open the door. It is
+    opened by PASTING the key onto it, and the level declared no p — which the
+    author cannot see, because the forge does not gate."""
+    lvl = _corridor(entities=[{'kind': 'locked_door', 'at': [1, 5]},
+                              {'kind': 'floor_key', 'at': [1, 3]}],
+                    spawn=(1, 1), exit=(1, 2), solution='l')
+    from sharing.validate import validate
+    rep = validate(lvl)
+    assert any('nobody can open it' in w for w in rep.warnings), rep.warnings
+
+
+def test_declaring_the_paste_takes_the_warning_away():
+    lvl = _corridor(entities=[{'kind': 'locked_door', 'at': [1, 5]},
+                              {'kind': 'floor_key', 'at': [1, 3]}],
+                    spawn=(1, 1), exit=(1, 2), solution='l', requires=['p'])
+    from sharing.validate import validate
+    assert not [w for w in validate(lvl).warnings if 'nobody can open' in w]
+
+
+def test_paint_says_where_doors_actually_come_from():
+    """`Unknown paint: door` beside a palette with no door in it reads as 'this
+    game has no doors'."""
+    import main
+    assert ':entity door' in main._paint_complaint('door')
+    assert ':paint wood' in main._paint_complaint('door')
+    assert 'Unknown paint' in main._paint_complaint('marble')
+
+
 # ── The canvas can grow (`:canvas`) ───────────────────────────────────────────
 #
 # Crop is silent because it only takes stone off. Growing cannot be — nothing in

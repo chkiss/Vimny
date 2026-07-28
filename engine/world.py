@@ -192,6 +192,16 @@ class Entity:
     edit_immune:  bool = False  # True = survives editing-delete (visual/operator x/d/dd,
                             # reflow remove_row); a boss parried by its shield, chipped
                             # only by normal-mode x. See engine/visual + The Warden Pathfinder.
+    opaque:       bool = False  # a door the eye does NOT cross. The fog law is
+                            # STONE-bounded on purpose — an ordinary door is a
+                            # grille you see through, which is how a caged
+                            # specimen is an exhibit rather than a rumour. But a
+                            # door meant to hide what is behind it until it opens
+                            # could not be said at all before this: fog is derived
+                            # from geometry, and there is no geometry for "dark in
+                            # here". Set it and `_vision_flood` stops at the door,
+                            # so everything beyond starts fogged and is revealed
+                            # by opening it — no scripted fog, nothing stored.
     shade:        int = 0   # cosmetic colour index — the impostor Wardens (goblin tag='echo')
                             # each pick a slightly different red so the player sees a myriad.
     drops:        str = ''  # what this leaves behind when it dies: a kind, optionally

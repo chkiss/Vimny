@@ -613,12 +613,15 @@ _ENTITY_PALETTE = {
                         'stationary boss, 5 hp',
                         ('hp', 'edit_immune', 'drops', 'group')),
     'floor_key':       (dict(hp=1, alive=True),
-                        'picked up with x; opens a locked_door of the same tag',
+                        'x picks it up into "; p/P it onto a locked_door',
                         ('tag',)),
     'locked_door':     (dict(hp=1, alive=True),
-                        'opened by pasting a floor_key of the same tag',
-                        ('tag', 'edit_immune')),
-    'door':            (dict(hp=1, alive=True), 'opened with x', ()),
+                        'BLOCKS; stand beside it and p (east) / P (west) a '
+                        'floor_key of the same tag',
+                        ('tag', 'opaque', 'edit_immune')),
+    'door':            (dict(hp=1, alive=True),
+                        'does NOT block — stand on it and x; opaque=1 to darken '
+                        'what is beyond', ('opaque',)),
     'chest_random':    (dict(hp=1, alive=True),
                         'x to open; random loot — 50% key, 30% scroll, 20% heart',
                         ()),
@@ -639,9 +642,9 @@ _ENTITY_PALETTE = {
 #: has a reason to hand-set — offering them would only invite a level whose
 #: creatures start mid-stride.
 _ENTITY_SETTABLE = ('hp', 'max_hp', 'ai', 'ai_speed', 'tag', 'scroll_id',
-                    'swole', 'edit_immune', 'drops', 'group')
+                    'swole', 'edit_immune', 'drops', 'group', 'opaque')
 _ENTITY_INT_FIELDS  = ('hp', 'max_hp', 'ai_speed')
-_ENTITY_BOOL_FIELDS = ('swole', 'edit_immune')
+_ENTITY_BOOL_FIELDS = ('swole', 'edit_immune', 'opaque')
 
 #: The COLOURS the renderer actually paints on a key or a lock. Tag pairing is
 #: pure string equality, so `tag=orange` pairs perfectly well — it just draws in
@@ -660,6 +663,7 @@ _ENTITY_CHOICES = {
     ('locked_door', 'tag'): ('',) + _KEY_COLOURS,
     ('chest_key',   'tag'): ('',) + _KEY_COLOURS,
     ('goblin',      'tag'): ('', 'echo', 'zombie', 'demon'),
+    'opaque':    ('0', '1'),
     'ai':        ('chase', ''),
     'drops':     ('',) + tuple(f'floor_key:{c}' for c in _KEY_COLOURS)
                  + ('floor_key',) + tuple(f'chest_key:{c}' for c in _KEY_COLOURS)
@@ -679,6 +683,8 @@ _CHOICE_NOTES = {
     ('tag', 'echo'):      'a false Warden: looks like a W',
     ('tag', 'zombie'):    'risen dead',
     ('tag', 'demon'):     'relentless — hunts from anywhere',
+    ('opaque', '1'):      'the eye stops here: everything beyond starts fogged',
+    ('opaque', '0'):      'a grille — you see straight through it',
 }
 
 
@@ -772,6 +778,23 @@ def _paint_name(room, r: int, c: int) -> str:
         if kind_ct == ct and kind_mist == misted:
             return name
     return ct.name.lower()
+
+
+def _paint_complaint(kind: str) -> str:
+    """What `:paint <something it cannot lay>` should say.
+
+    A door is a THING STANDING ON a cell, not a kind of ground, so it is placed
+    with `:entity`. Worth answering by name rather than listing the terrains,
+    because "Unknown paint: door" beside a palette with no door in it reads as
+    "this game has no doors" — and the author's next question, whether a door
+    stops anyone, has a terrain answer (`wood`) that they will never find from
+    an error message about what `paint` is not.
+    """
+    if kind in _ENTITY_PALETTE:
+        return (f'{kind} is a thing, not ground — :entity {kind}'
+                + ('   (a barrier you break through instead: :paint wood)'
+                   if kind in ('door', 'locked_door') else ''))
+    return f'Unknown paint: {kind}  ({"|".join(PAINT_KINDS)})'
 
 
 def _paint_cells(room, cells: list, kind: str) -> str:
@@ -6343,7 +6366,7 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
                             _push(_paint_cells(room, _cells, _kind)
                                   + f'   (:paint {_kind})')
                     elif _kind not in PAINT_KINDS:
-                        _push(f'Unknown paint: {_kind}  ({"|".join(PAINT_KINDS)})')
+                        _push(_paint_complaint(_kind))
                     else:
                         ed_undo.append(_ed_snapshot(room, player))
                         ed_redo.clear()

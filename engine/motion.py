@@ -85,12 +85,21 @@ def _vision_flood(room, start_r: int, start_c: int) -> set:
     Only wall cells stop the eye — every other cell type (a brazier
     pedestal, a lava rune floor) is transparent even if not foggable. This
     is the fog LAW's visibility model: what stone hides, fog hides; what a
-    door or water merely bars, you see."""
+    door or water merely bars, you see.
+
+    The one exception an author can ask for: an `opaque` entity. A door that is
+    meant to hide the room behind it until it opens had no way to say so — fog
+    is derived from geometry and there is no geometry for darkness — so the door
+    itself carries the fact. The eye REACHES such a cell (you can see the door)
+    and stops there, which is exactly `_flood_reachable`'s rule for feet."""
     stone = (CellType.WALL, CellType.WOOD_WALL)
     seen = {(start_r, start_c)}
     q = deque([(start_r, start_c)])
     while q:
         r, c = q.popleft()
+        ent = room.entity_at(r, c)
+        if (r, c) != (start_r, start_c) and ent is not None and ent.opaque:
+            continue                       # seen, but the eye stops here
         for dr, dc in ((-1, 0), (1, 0), (0, -1), (0, 1)):
             nr, nc = r + dr, c + dc
             if (nr, nc) in seen:
