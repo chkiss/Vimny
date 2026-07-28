@@ -39,6 +39,7 @@ always have, plus the level's own properties:
 | `:bolt` | make the cell you are standing on — or every wall cell of a `'<,'>` selection — open while that seal reads true |
 | `:name` `:author` `:teaches` `:requires` `:intro` `:alternate` `:vocab` | the metadata block |
 | `:meta` | what the draft currently claims |
+| `:canvas <rows>x<cols>` | grow (or trim) the ground the level is drawn on (`:canvas` alone says how big it is) |
 | `:play` | **playtest — walk the level as a player, recording nothing** (`:play!` for no budget) |
 | `:record` | **play the level; the keys you press become the tape** |
 | `:check` | run the validator and report par, budget and warnings |
@@ -124,7 +125,11 @@ the Esc.
 
 A draft opens on a 20x80 room in the corner of a **100x100 canvas**. The rest is
 solid stone: carve into it with `:paint floor` and the level can be as big as
-the canvas. Nothing you did not touch ships — `:publish` trims the blank stone
+the canvas. `:canvas 40x120` changes that ground — the new stone goes on at the
+bottom and the right, so nothing already drawn moves and a tape recorded before
+the resize still plays. It shrinks too, as far as the content: the moment a
+smaller canvas would cut something it is refused rather than trimmed, because a
+level quietly missing its exit is worse than one that would not resize. Nothing you did not touch ships — `:publish` trims the blank stone
 margins back to one wall thick, which changes no motion and no par (stone is not
 a line, and `$`/`0` stop at the walls that bound their own segment anyway).
 

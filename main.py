@@ -6888,6 +6888,42 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
                     _push(f'{len(_lv.fills)} fill(s) · tape: '
                           + (f'{len(_lv.solution)} chars' if _lv.solution else 'not recorded'))
 
+                elif _draft is not None and (cmd == 'canvas'
+                                             or cmd.startswith('canvas ')):
+                    # THE CANVAS IS A COMMAND. A draft opens on a big field of
+                    # stone to carve into precisely because you cannot select a
+                    # region larger than the room you are standing in — but a
+                    # draft that opened small (or a level imported from one) had
+                    # no way to grow, and an author was capped at a size they
+                    # never chose. Cropping can be silent because it only ever
+                    # takes stone off; growing cannot be, because nothing in a
+                    # level says how much room its author still wants.
+                    _arg = cmd[len('canvas'):].strip().lower()
+                    if not _arg or _arg == '?':
+                        _push(f'canvas {room.rows}x{room.cols}'
+                              '   (:canvas 40x120 to change it)')
+                    else:
+                        _m = re.fullmatch(r'(\d+)\s*[x, ]\s*(\d+)', _arg)
+                        if not _m:
+                            _push('Usage:  :canvas <rows>x<cols>')
+                        else:
+                            DRAFT.sync(_draft, room)
+                            _was = _draft.level
+                            try:
+                                _draft.level = LF.resize(
+                                    _was, int(_m[1]), int(_m[2]))
+                            except LF.LevelFormatError as _exc:
+                                _push(str(_exc))
+                            else:
+                                _err = _forge_rebuild()
+                                if _err:
+                                    _draft.level = _was
+                                    _push(f'Canvas unchanged — {_err}')
+                                else:
+                                    _push(f'Canvas {room.rows}x{room.cols}. '
+                                          'The new ground is stone — carve it '
+                                          'with :paint floor.')
+
                 elif _draft is not None and cmd in ('play', 'play!'):
                     # PLAYTEST. `:record` was the only way to walk your own level
                     # as a player, and it is the wrong tool for the job: every

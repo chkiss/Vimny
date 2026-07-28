@@ -1405,6 +1405,65 @@ def test_cropping_carries_everything_with_it():
     assert tight.entities[0]['at'] == [1, 9]
 
 
+# ── The canvas can grow (`:canvas`) ───────────────────────────────────────────
+#
+# Crop is silent because it only takes stone off. Growing cannot be — nothing in
+# a level says how much room its author still wants — so it is a command.
+
+def test_growing_the_canvas_moves_nothing_that_was_already_on_it():
+    """The whole safety of it: new stone goes on the bottom and the right, so
+    every coordinate — and therefore any tape recorded against them — holds."""
+    lvl = _sized(rows=8, cols=30,
+                 cells=['30W'] + ['W28FW'] * 6 + ['30W'],
+                 spawn=(1, 1), exit=(6, 28),
+                 char_runs=[{'row': 2, 'col': 5, 'symbols': list('door'),
+                             'kind': 'ancient'}],
+                 entities=[{'kind': 'goblin', 'at': [3, 9]}],
+                 fills=[F.Fill(region=(4, 2, 4, 20), pool='plain',
+                               length=(4, 4), spacing=1)])
+    big = F.resize(lvl, 40, 120)
+    assert (big.rows, big.cols) == (40, 120)
+    assert big.spawn == lvl.spawn and big.exit == lvl.exit
+    assert big.entities == lvl.entities and big.char_runs == lvl.char_runs
+    assert big.fills[0].region == (4, 2, 4, 20)
+    room = F.build(big).room
+    assert [c.name for c in room.cells[1][:30]] == \
+           [c.name for c in F.build(lvl).room.cells[1]]
+    assert all(c == CellType.WALL for c in room.cells[39]), 'new ground is stone'
+
+
+def test_growing_and_cropping_are_each_others_undo():
+    lvl = DRAFT.new('CanvasProbe', rows=8, cols=30).level
+    assert F.crop(F.resize(lvl, 60, 90)).cells == F.crop(lvl).cells
+
+
+def test_the_canvas_will_not_shrink_over_something():
+    """Refused, not silently trimmed: a level quietly missing its exit is worse
+    than a level that would not resize."""
+    lvl = _sized(rows=8, cols=30, cells=['30W'] + ['W28FW'] * 6 + ['30W'],
+                 spawn=(1, 1), exit=(6, 28))
+    with pytest.raises(F.LevelFormatError, match='cut it'):
+        F.resize(lvl, 8, 10)
+    assert F.resize(lvl, 8, 30) is lvl                 # no change is no work
+
+
+def test_the_forge_can_grow_the_room_the_author_is_standing_in():
+    """The report: an author was capped inside a rectangle they never chose, on
+    a draft made before drafts opened on a canvas (2026-07-27)."""
+    d = DRAFT.new('Probe', rows=8, cols=30)
+    _forge_session(d, ':canvas 40x120\r:w\r:q!\r')
+    again = DRAFT.load(d.path).level
+    assert (again.rows, again.cols) == (40, 120)
+    assert again.spawn == (1, 1), 'the room the author was standing in moved'
+
+
+def test_a_canvas_the_format_would_refuse_is_refused_here_too():
+    d = DRAFT.new('Probe', rows=8, cols=30)
+    _forge_session(d, ':canvas 400x400\r:w\r:q!\r')
+    assert (DRAFT.load(d.path).level.rows,
+            DRAFT.load(d.path).level.cols) == (8, 30)
+
+
 def test_s_is_vims_s_again_in_the_editor():
     """`s` walked a ring of cell types for as long as the forge has existed —
     the one thing `s` means nowhere else in this game. `:paint` took that job

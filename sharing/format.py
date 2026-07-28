@@ -571,6 +571,71 @@ def _crop_chamber(h: Chamber) -> Chamber:
     )
 
 
+def resize(lvl: Level, rows: int, cols: int) -> Level:
+    """The same level on a bigger (or smaller) canvas. `crop`'s deliberate half.
+
+    Crop is automatic and silent because it only ever takes off stone nobody
+    touched. Growing cannot be automatic — nothing in a level says how much room
+    its author still wants — so it is a command, and this is what it does.
+
+    Everything is anchored at the TOP-LEFT, which is what makes it safe: the new
+    stone goes on at the bottom and the right, so not one existing cell, entity,
+    fill region or mark changes its coordinates, and a tape recorded before the
+    resize still plays. (Anchoring in the middle would move every row and column
+    and silently invalidate every one of them.)
+
+    Shrinking is allowed as far as the content: it is refused the moment it
+    would cut something, rather than dropping it, because a level quietly
+    missing the exit is worse than a level that would not resize.
+    """
+    if not 3 <= rows <= MAX_ROWS or not 3 <= cols <= MAX_COLS:
+        raise LevelFormatError(f'a canvas is 3..{MAX_ROWS} by 3..{MAX_COLS}')
+    h = lvl.chambers[0]
+    if (rows, cols) == (h.rows, h.cols):
+        return lvl
+    if rows < h.rows or cols < h.cols:
+        used = _content_extent(h)
+        # `rows - 2`, not `rows - 1`: the last row and column are the border, and
+        # content flush against the edge of the grid is content with nothing to
+        # stop a motion. Crop keeps that wall too.
+        if used and (used[0] > rows - 2 or used[1] > cols - 2):
+            raise LevelFormatError(
+                f'the level reaches row {used[0]}, column {used[1]} — '
+                f'a smaller canvas would cut it')
+    grid = [expand_row(row, h.cols, i, h.where) for i, row in enumerate(h.cells)]
+    mist = {(r, c) for r, row in enumerate(h.cells)
+            for c in expand_row_mist(row, h.cols, r, h.where)[1]}
+    stone = [CellType.WALL] * cols
+    out   = []
+    for r in range(rows):
+        row = (grid[r][:cols] + stone[h.cols:cols]) if r < h.rows else stone
+        out.append(encode_row(row, [c for (mr, c) in mist if mr == r and c < cols]))
+    return replace(lvl, rows=rows, cols=cols, cells=out)
+
+
+def _content_extent(h: Chamber) -> tuple[int, int] | None:
+    """The furthest row and column of the chamber anything at all occupies —
+    floor, text, an entity, a fill, a seal, the spawn or the exit."""
+    grid = [expand_row(row, h.cols, i, h.where) for i, row in enumerate(h.cells)]
+    keep = {(r, c) for r, row in enumerate(grid)
+            for c, ct in enumerate(row) if ct != CellType.WALL}
+    for ru in h.char_runs:
+        keep.add((int(ru['row']), int(ru['col']) + len(ru['symbols']) - 1))
+    for e in h.entities:
+        keep.add((int(e['at'][0]), int(e['at'][1])))
+    for f in h.fills:
+        keep.add((f.region[2], f.region[3]))
+    for s in h.seals:
+        if s.region:
+            keep.add((s.region[2], s.region[3]))
+        keep.update(tuple(c) for c in s.opens)
+    keep.add(tuple(h.spawn))
+    keep.add(tuple(h.exit))
+    if not keep:
+        return None
+    return max(r for r, _ in keep), max(c for _, c in keep)
+
+
 # ── Building ──────────────────────────────────────────────────────────────────
 
 def build(lvl: Level, par: int | None = None, seed: int | None = None) -> Dungeon:
