@@ -70,7 +70,11 @@ still a question. It builds it fresh, gates you the same way, and writes nothing
 down at the end: losing is allowed, and is usually the thing you wanted to find
 out. Once the level has a tape, `:play` runs under its real budget, so *is it
 doable in the budget* is a question you can ask by answering it; `:play!` drops
-the budget for a roam around a half-built room.
+the budget for a roam around a half-built room. `:e` inside either one restarts it — a rehearsal
+re-rolls the fills with it, so it is also how you ask what somebody else's copy
+of the room looks like; a take keeps the level's own seed, because a tape holds
+the letters you typed and re-rolling mid-take would write down a route through
+words no copy of the level has.
 
 ### Painting terrain
 

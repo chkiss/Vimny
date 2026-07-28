@@ -6203,18 +6203,39 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
                                            + (' — fills regrown.' if _draft.level.fills
                                               else '.')))
 
-                elif cmd == 'e' and (player_name == 'admin' or player.is_dead):
+                elif cmd == 'e' and (player_name == 'admin' or player.is_dead
+                                     or _record is not None):
                     seed    = random.randint(0, 2**31)
-                    dungeon = _build_dungeon(level, seed, admin=(player_name == 'admin'))
-                    room    = dungeon.room
-                    if player_name != 'admin':
-                        room.answer = ''
+                    if _record is not None and _record.get('rebuild') is not None:
+                        # A TAKE reloads THE LEVEL BEING PLAYED. `level` here is
+                        # whatever slug the overworld happened to open the forge
+                        # from, and rebuilding that would answer `:e` — restart
+                        # this — by putting the author in a different dungeon
+                        # altogether, with their draft nowhere on screen.
+                        # A new seed is still a new seed: the fills re-roll, so
+                        # `:e` is also how an author asks what somebody else's
+                        # copy of the room looks like.
+                        dungeon = _record['rebuild'](seed)
+                        room    = dungeon.room
+                        # Whatever was on the tape was played in a room that no
+                        # longer exists. Keeping it would splice two routes
+                        # through two different roomsful of words into one take.
+                        _record['tape'] = []
+                    else:
+                        dungeon = _build_dungeon(level, seed,
+                                                 admin=(player_name == 'admin'))
+                        room    = dungeon.room
+                        if player_name != 'admin':
+                            room.answer = ''
                     _sp2    = room.spawn_pos
                     player  = Player(row=_sp2[0], col=_sp2[1])
                     player.max_hp = progress.get('max_hp', 6)   # keep heart-container upgrades
                     player.hp     = player.max_hp
-                    player.known_commands = _known_commands(level)
-                    if player_name == 'admin':
+                    # A level that declared its own command set is reloaded under
+                    # it — the curriculum has no answer for a slug it never had.
+                    player.known_commands = (list(_known) if _known is not None
+                                             else _known_commands(level))
+                    if player_name == 'admin' and _record is None:
                         player.known_commands = player.known_commands + ['admin', 'register']
                     dungeon.level_slug = level
                     budget        = Budget(room.budget or 20)
@@ -6235,7 +6256,9 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
                     msg_pool             = []
                     msg_idx              = 0
                     any_water            = _room_has_water()
-                    _push('Dungeon restarted. Good luck.' if player_name != 'admin' else 'New dungeon loaded.')
+                    _push('Your level, from the top.' if _record is not None else
+                          'Dungeon restarted. Good luck.' if player_name != 'admin'
+                          else 'New dungeon loaded.')
 
                 elif cmd == 'edit' and player_name == 'admin':
                     edit_mode = not edit_mode
@@ -6888,7 +6911,9 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
                     _res  = run_dungeon(term, level, {}, player_name,
                                         _dungeon=_draft.build(par=_ppar),
                                         _known=_draft.level.known,
-                                        _record={'tape': [], 'error': '', 'off': True})
+                                        _record={'tape': [], 'error': '', 'off': True,
+                                                 'rebuild': lambda s: _draft.build(
+                                                     par=_ppar, seed=s)})
                     if _res['won']:
                         _push(f'Playtest cleared — {_res["stars"]} star'
                               f'{"" if _res["stars"] == 1 else "s"}'
@@ -6913,7 +6938,13 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
                     # to declare is refused during the take rather than
                     # discovered by a stranger later.
                     DRAFT.sync(_draft, room)
-                    _rec  = {'tape': [], 'error': ''}
+                    # `:e` during a take starts the take again, and deliberately
+                    # on the level's OWN seed: a tape holds the letters the
+                    # author typed, so re-rolling the fills mid-take would write
+                    # down a route through words that no copy of the level has.
+                    # (A rehearsal has no such worry and does re-roll.)
+                    _rec  = {'tape': [], 'error': '',
+                             'rebuild': lambda _s: _draft.build()}
                     _take = _draft.build()
                     _res  = run_dungeon(term, level, {}, player_name,
                                         _dungeon=_take, _known=_draft.level.known,

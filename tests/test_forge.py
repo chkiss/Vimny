@@ -378,6 +378,24 @@ def test_a_rehearsal_never_writes_to_the_players_save(monkeypatch):
     assert calls == []
 
 
+def test_reloading_inside_a_run_reloads_the_level_being_played():
+    """`:e` means START THIS AGAIN. The slug the forge was opened from is not
+    this level — reloading it dropped the author into the First Cave, with their
+    draft nowhere on screen (reported 2026-07-27)."""
+    import main
+    d = _playable_draft()
+    curriculum, rebuilt = [], []
+    real_slug, real_draft = main._build_dungeon, DRAFT.Draft.build
+    main._build_dungeon = lambda slug, *a, **kw: curriculum.append(slug)
+    DRAFT.Draft.build = lambda self, **kw: rebuilt.append(kw) or real_draft(self, **kw)
+    try:
+        _rehearse(d, ':e\rllll:wq\r')
+    finally:
+        main._build_dungeon, DRAFT.Draft.build = real_slug, real_draft
+    assert curriculum == [], f'`:e` went looking for a shipped level: {curriculum}'
+    assert len(rebuilt) >= 2, 'the reload never rebuilt the draft'
+
+
 def test_a_rehearsal_runs_under_the_budget_the_tape_bought():
     """`:play` asks the question the author actually has — is it doable in the
     budget — so it builds with par, and `:play!` is the roam that does not."""
