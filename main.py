@@ -6080,6 +6080,18 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
                     f'{key.name or "that key"} cannot be written on a tape — '
                     f'use its Vim spelling and start the take again.')
             else:
+                # Group the tape into commands the way a hand-written karaoke
+                # sheet is: a space BETWEEN commands, none WITHIN one. A key read
+                # in NORMAL mode with the parse buffer empty is the first key of a
+                # new command; a count's tail, an operator's motion, a typed
+                # word (INSERT) or a `:`-line (COMMAND) all arrive with a pending
+                # buffer or in another mode, so each stays one unbroken run. The
+                # spaces are separators (engine.tape.strip_separators strips them
+                # on every replay and tokenise), so this changes only how the tape
+                # READS — never how it plays, nor the par it earns.
+                if (_record['tape'] and not key_buf
+                        and player.mode == Mode.NORMAL):
+                    _record['tape'].append(' ')
                 _record['tape'].append(_tok)
 
         # ── Admin answer tracking ─────────────────────────────────────────────

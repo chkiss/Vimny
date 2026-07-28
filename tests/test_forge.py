@@ -418,10 +418,23 @@ def test_a_rehearsal_runs_under_the_budget_the_tape_bought():
 # ── The tape a take writes ────────────────────────────────────────────────────
 
 def test_recording_a_played_route_reproduces_the_tape():
-    """The whole promise of :record — what you played is what gets written."""
+    """The whole promise of :record — what you played is what gets written.
+    Written GROUPED: a space between commands, the way a hand-authored karaoke
+    sheet reads (four separate `l` moves → `l l l l`). The spaces are separators,
+    so stripping them recovers the keystrokes exactly."""
     played, result = _record_take(_tiny(), 'llll')
     assert result['won']
-    assert played == 'llll'
+    assert played == 'l l l l', played
+    assert played.replace(' ', '') == 'llll'
+
+
+def test_a_recorded_tape_groups_counts_with_their_command():
+    """The house style (see the generated `answer` tapes): a count rides with
+    the command it repeats — `2l`, not `2 l` — and the space falls between whole
+    commands. So a route of two counted hops reads as two groups, not four."""
+    played, result = _record_take(_tiny(requires=['count']), '2l2l')
+    assert result['won']
+    assert played == '2l 2l', played
 
 
 def test_the_take_stops_at_the_win_and_omits_the_closing_wq():
@@ -647,7 +660,7 @@ def test_a_take_is_played_without_the_admin_override():
     # The forge's author IS the admin, so the take must be run as one or the
     # test proves nothing about the override it is meant to strip.
     tape, res = _record_take(_tiny(requires=['l']), 'llll', player_name='admin')
-    assert res['won'] and tape == 'llll'
+    assert res['won'] and tape == 'l l l l'
 
     # `$` is undeclared, and on THIS level it lands squarely on the exit — so a
     # take that wins is a take that was allowed to use it. As admin it used to
