@@ -6967,6 +6967,13 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
                     # which is what a half-built level wants.
                     _rep0 = None if cmd.endswith('!') else _draft.report()
                     _ppar = _rep0.par if _rep0 is not None and _rep0.ok else None
+                    # A rehearsal is where you first WALK the level, so it is where
+                    # a furniture-can't-be-worked problem finally bites — the forge
+                    # never gates, so a locked door with no `p`/`P` declared looks
+                    # fine on the bench and only fails when someone plays. Say so
+                    # before the run rather than leaving the author stuck at it.
+                    for _w in (_rep0.warnings[:2] if _rep0 is not None else ()):
+                        _push(f'warning: {_w}')
                     _res  = run_dungeon(term, level, {}, player_name,
                                         _dungeon=_draft.build(par=_ppar),
                                         _known=_draft.level.known,

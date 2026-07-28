@@ -91,14 +91,23 @@ def _vision_flood(room, start_r: int, start_c: int) -> set:
     meant to hide the room behind it until it opens had no way to say so — fog
     is derived from geometry and there is no geometry for darkness — so the door
     itself carries the fact. The eye REACHES such a cell (you can see the door)
-    and stops there, which is exactly `_flood_reachable`'s rule for feet."""
+    and stops there, which is exactly `_flood_reachable`'s rule for feet.
+
+    The stop holds even when the eye BEGINS on the opaque cell — a plain door is
+    walkable, so a player can stand on a closed opaque door, and a closed door is
+    closed whichever side you are on. The start cell is still seen (you see the
+    door under your feet), but the flood does not pour out through it; the far
+    side stays dark until the door is opened and the cell is no longer opaque.
+    Sight already won west of here is kept — fog is only ever lifted, never
+    re-laid — so stepping onto the door reveals nothing new, and stepping PAST it
+    onto plain floor is what opens the pocket up to the next closed door."""
     stone = (CellType.WALL, CellType.WOOD_WALL)
     seen = {(start_r, start_c)}
     q = deque([(start_r, start_c)])
     while q:
         r, c = q.popleft()
         ent = room.entity_at(r, c)
-        if (r, c) != (start_r, start_c) and ent is not None and ent.opaque:
+        if ent is not None and ent.opaque:
             continue                       # seen, but the eye stops here
         for dr, dc in ((-1, 0), (1, 0), (0, -1), (0, 1)):
             nr, nc = r + dr, c + dc

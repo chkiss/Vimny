@@ -276,7 +276,11 @@ Fog is derived from the stone, and an ordinary door is a grille you can see
 through: that is what makes a caged specimen an exhibit rather than a rumour.
 Set **`"opaque": true`** on a door and the eye stops there instead — everything
 behind it starts fogged, and opening the door is what lifts it. Nothing is
-scripted and nothing is stored; move the door and the darkness moves with it.
+scripted and nothing is stored; move the door and the darkness moves with it. A
+closed door is closed from either side: if you stand ON an opaque plain door the
+far side stays dark, and only stepping PAST it opens the pocket beyond. For a
+door that both bars your feet and hides what is behind it, use an opaque
+`locked_door` — an opaque plain door fogs, but a player still walks onto it.
 
 **Colours pair on `tag`.** A `floor_key` tagged `gold` opens a `locked_door`
 tagged `gold` and nothing else; an untagged door takes any key. Pick up a key
@@ -284,8 +288,9 @@ with `x` — it goes into the unnamed register — and open the door by pasting 
 there: **`p` if the door is east of you, `P` if it is west**. Which means a
 level with a locked door has to DECLARE `p` (or `P`) in `requires` or `teaches`,
 or nobody can open it — `x` is always allowed, but pasting is a lesson like any
-other. `:check` warns when a level places a lock its own command set cannot
-work; you will not notice it in the forge, where nothing is gated. A `chest_key` carries its tag onto the key it gives up, so
+other. `:check` and `:play` both warn when a level places a lock its own command
+set cannot work; you will not notice it in the forge, where nothing is gated, so
+the warning greets you the moment you rehearse. A `chest_key` carries its tag onto the key it gives up, so
 `{"kind": "chest_key", "tag": "gold"}` is a chest holding a gold key.
 
 Only **`gold`, `red` and `blue`** are painted as colours. Pairing is plain

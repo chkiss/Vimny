@@ -1447,6 +1447,32 @@ def test_opening_an_opaque_door_is_what_lifts_its_fog():
     assert not stone_law(room)
 
 
+def test_standing_on_a_closed_opaque_door_does_not_see_past_it():
+    """The report: an opaque door 'un-fogs without ever opening it'. A plain door
+    is walkable, so the player can stand ON a closed opaque one — and a closed
+    door is closed from either side. The eye reaching the door from its own cell
+    must stop there too, or the far side lights up the moment you touch it."""
+    from engine.motion import auto_fog_tick
+    room = F.build(_corridor(
+        entities=[{'kind': 'door', 'at': [1, 5], 'opaque': True}])).room
+    assert (1, 6) in room.fog_cells and (1, 10) in room.fog_cells
+    auto_fog_tick(room, 1, 5)                     # stand on the closed door
+    assert (1, 6) in room.fog_cells, 'the far side lit up from the doorway'
+    assert (1, 10) in room.fog_cells
+    assert (1, 5) not in room.fog_cells, 'you still see the door under your feet'
+
+
+def test_stepping_past_an_opaque_door_is_what_opens_the_pocket():
+    """The other half of the same rule: once you are PAST the door, on plain
+    floor, sight floods the pocket normally (there is no second door to stop it),
+    and the door behind you — opaque or not — never re-fogs what you already saw."""
+    from engine.motion import auto_fog_tick
+    room = F.build(_corridor(
+        entities=[{'kind': 'door', 'at': [1, 5], 'opaque': True}])).room
+    auto_fog_tick(room, 1, 6)                     # stand one cell past the door
+    assert (1, 6) not in room.fog_cells and (1, 10) not in room.fog_cells
+
+
 def test_a_locked_door_blocks_feet_and_a_plain_one_does_not():
     """The report: 'the door west of the Zombie doesn't block me'. It never
     did — that is `locked_door`'s job, and a plain door is walked onto and
@@ -1485,6 +1511,20 @@ def test_declaring_the_paste_takes_the_warning_away():
                     spawn=(1, 1), exit=(1, 2), solution='l', requires=['p'])
     from sharing.validate import validate
     assert not [w for w in validate(lvl).warnings if 'nobody can open' in w]
+
+
+def test_a_rehearsal_surfaces_the_operable_warning():
+    """The report: `:play` said nothing about a lock nobody could open. A
+    rehearsal is where you first WALK the level, so it is where an un-openable
+    lock finally bites — the forge never gates. `:play` now runs `report()` and
+    pushes its warnings, so the author is told at the bench rather than left
+    standing at a door the level gave them no key-command for. The rehearsal
+    must still open (the warning is advisory, not a refusal)."""
+    lvl = _corridor(entities=[{'kind': 'locked_door', 'at': [1, 5]},
+                              {'kind': 'floor_key', 'at': [1, 3]}],
+                    spawn=(1, 1), exit=(1, 2), solution='l')
+    d = DRAFT.Draft(path=None, level=lvl)
+    _rehearse(d, 'l:q!\r')     # tally assertion inside proves :play opened
 
 
 def test_paint_says_where_doors_actually_come_from():
