@@ -39,6 +39,7 @@ always have, plus the level's own properties:
 | `:bolt` | make the cell you are standing on — or every wall cell of a `'<,'>` selection — open while that seal reads true |
 | `:name` `:author` `:teaches` `:requires` `:intro` `:alternate` `:vocab` | the metadata block |
 | `:meta` | what the draft currently claims |
+| `:play` | **playtest — walk the level as a player, recording nothing** (`:play!` for no budget) |
 | `:record` | **play the level; the keys you press become the tape** |
 | `:check` | run the validator and report par, budget and warnings |
 | `:publish` | validate, then put it on the shelf in `~/.Vimny/levels/` |
@@ -61,6 +62,15 @@ and drops you in to solve it. Reaching the exit ends the take; the keys become
 `solution`, and the validator immediately replays it to derive par. A key the
 notation cannot write (an arrow key, Backspace) ends the take rather than
 producing a tape that replays as something other than what you played.
+
+`:play` is the same walk with the recorder off. Every take that is not the
+definitive one still overwrites `solution`, so rehearsing with `:record` costs
+you the tape you already had — `:play` is what you reach for while the level is
+still a question. It builds it fresh, gates you the same way, and writes nothing
+down at the end: losing is allowed, and is usually the thing you wanted to find
+out. Once the level has a tape, `:play` runs under its real budget, so *is it
+doable in the budget* is a question you can ask by answering it; `:play!` drops
+the budget for a roam around a half-built room.
 
 ### Painting terrain
 

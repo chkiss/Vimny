@@ -84,11 +84,18 @@ def _record_take(lvl: F.Level, tape: str, player_name: str = 'Normand') -> tuple
     return ''.join(rec['tape']), result
 
 
-def _forge_session(draft, script: str, player_name: str = 'admin', dungeon=None):
+def _forge_session(draft, script: str, player_name: str = 'admin', dungeon=None,
+                   tally: dict | None = None):
     """Drive a real forge session: open `draft` in the editor and type `script`.
 
     Pass `dungeon` to keep a handle on the object the chrome renders from — the
-    only way to observe, from out here, what the status bar was showing."""
+    only way to observe, from out here, what the status bar was showing.
+
+    Pass `tally` to learn how much of the script was actually read. A command
+    that opens a RUN of its own (`:play`, `:record`) is invisible from here
+    otherwise: the session ends either way, and the keys the inner run should
+    have eaten are simply left on the floor. `tally['read'] == tally['total']`
+    is the assertion that the second loop really took them."""
     import main
     from sharing.replay import _headless
 
@@ -106,9 +113,12 @@ def _forge_session(draft, script: str, player_name: str = 'admin', dungeon=None)
     import render.colors as colors
     colors.init(term)
     with _headless(main):
-        return main.run_dungeon(term, 'community', {}, player_name=player_name,
-                                _dungeon=dungeon or draft.build(), _start_edit=True,
-                                _known=draft.level.known, _draft=draft)
+        result = main.run_dungeon(term, 'community', {}, player_name=player_name,
+                                  _dungeon=dungeon or draft.build(), _start_edit=True,
+                                  _known=draft.level.known, _draft=draft)
+    if tally is not None:
+        tally.update(read=state['n'], total=len(keys))
+    return result
 
 
 # ── Editing in the forge ──────────────────────────────────────────────────────
@@ -301,6 +311,90 @@ def test_escaping_a_visual_selection_still_remembers_it():
     d = DRAFT.new('Probe', rows=8, cols=30)
     _forge_session(d, 'jjv' + 'l' * 5 + T.ESC + ':fill plain\r:w\r:q!\r')
     assert d.level.fills, 'the selection was forgotten on Esc'
+
+
+# ── The rehearsal (`:play`) ───────────────────────────────────────────────────
+#
+# `:record` was once the only way to walk your own level, and a take always
+# overwrites the tape — so rehearsing cost the author the solution they had.
+# `:play` is the same walk with the recorder off.
+
+def _playable_draft(name='Playtest'):
+    """A draft that is already a finished level: four cells east onto the exit."""
+    d = DRAFT.new(name, rows=5, cols=10)
+    lvl = _tiny()
+    for f in ('rows', 'cols', 'cells', 'spawn', 'exit', 'solution'):
+        setattr(d.level, f, getattr(lvl, f))
+    DRAFT.save(d)
+    return d
+
+
+def _rehearse(draft, inside: str, cmd: str = ':play') -> dict:
+    """Type `:play`, play `inside` in the run it opens, then leave the forge.
+
+    The tally is the proof the run happened at all: if `:play` were not a command
+    the editor would eat `inside` itself, quit on its `:q!`, and leave the
+    session's own `:q!` unread."""
+    tally: dict = {}
+    _forge_session(draft, f'{cmd}\r{inside}:q!\r', tally=tally)
+    assert tally['read'] == tally['total'], (
+        'the rehearsal never opened — the editor read the route itself')
+    return tally
+
+
+def test_playing_a_level_does_not_touch_the_tape_even_when_it_wins():
+    """The sharp one. A winning rehearsal that quietly became the tape would
+    replace a deliberate route with whatever the author last wandered — so the
+    rehearsal here deliberately wins by a WORSE route than the one on file."""
+    d = _playable_draft()
+    _rehearse(d, 'jllllk:wq\r')
+    assert d.level.solution == 'llll', 'the rehearsal was written down'
+
+
+def test_a_rehearsal_is_a_run_of_its_own_and_not_an_edit_to_the_draft():
+    """The keys go to a FRESH build, not to the room on the bench: `x` in a
+    rehearsal breaks nothing the author will find when the run ends."""
+    d = _playable_draft()
+    before = list(d.level.cells)
+    _rehearse(d, 'xxxx:q!\r')
+    assert d.level.cells == before
+
+
+def test_a_rehearsal_that_loses_is_not_an_error():
+    """Losing is the information you came for, so it is reported, not refused —
+    and it still leaves the tape where it was."""
+    d = _playable_draft()
+    _rehearse(d, 'll:q!\r')
+    assert d.level.solution == 'llll'
+
+
+def test_a_rehearsal_never_writes_to_the_players_save(monkeypatch):
+    """Same guard a take has: a rehearsal runs under the AUTHOR's own name, so
+    an unguarded write would overwrite their real save."""
+    import save.save_manager as SM
+    calls = []
+    monkeypatch.setattr(SM, 'save_progress', lambda data, who: calls.append(who))
+    _rehearse(_playable_draft(), 'llll:wq\r')
+    assert calls == []
+
+
+def test_a_rehearsal_runs_under_the_budget_the_tape_bought():
+    """`:play` asks the question the author actually has — is it doable in the
+    budget — so it builds with par, and `:play!` is the roam that does not."""
+    d = _playable_draft()                    # tape 'llll' → par 4, budget 6
+    dungeons = []
+    real = DRAFT.Draft.build
+    DRAFT.Draft.build = lambda self, **kw: dungeons.append(
+        kw.get('par')) or real(self, **kw)
+    try:
+        dungeons.clear()
+        _rehearse(d, 'llll:wq\r')
+        assert 4 in dungeons, dungeons      # among the validator's own build and
+        dungeons.clear()                    # the bench being put back afterwards
+        _rehearse(d, 'llll:wq\r', cmd=':play!')
+        assert 4 not in dungeons, dungeons
+    finally:
+        DRAFT.Draft.build = real
 
 
 # ── The tape a take writes ────────────────────────────────────────────────────

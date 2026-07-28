@@ -6015,7 +6015,13 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
         # The take is over the moment the exit is reached: a tape ends at the
         # win, and `replay_tape` supplies the closing `:wq` itself. Recording the
         # author's own way out would put a second one on the tape.
-        if _record is not None and not from_macro and not _record.get('error') and not won:
+        # A REHEARSAL (`:play`) is a take with the recorder switched off: it
+        # wants everything else a take does — the fresh build, the declared
+        # command set, the untouched save file — and none of the tape. Nothing
+        # is written down, so a key the notation cannot spell is not a problem
+        # worth ending the run over.
+        if (_record is not None and not _record.get('off') and not from_macro
+                and not _record.get('error') and not won):
             _tok = _tape_key(key)
             if _tok is None:
                 _record['error'] = (
@@ -6858,6 +6864,41 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
                           + (f' · stands in for {_lv.alternate}' if _lv.alternate else ''))
                     _push(f'{len(_lv.fills)} fill(s) · tape: '
                           + (f'{len(_lv.solution)} chars' if _lv.solution else 'not recorded'))
+
+                elif _draft is not None and cmd in ('play', 'play!'):
+                    # PLAYTEST. `:record` was the only way to walk your own level
+                    # as a player, and it is the wrong tool for the job: every
+                    # take that is not the definitive one still overwrites the
+                    # tape you already had, so an author who just wanted to feel
+                    # the room out had to either lose their solution or solve the
+                    # level perfectly on every rehearsal.
+                    #
+                    # A rehearsal is a take with the recorder off: the same fresh
+                    # build a player downloads, the same declared `requires` +
+                    # `teaches` gate, the same untouched save file — and nothing
+                    # written down at the end. Losing is allowed, and is in fact
+                    # the information you came for.
+                    DRAFT.sync(_draft, room)
+                    # Under the real budget when the level knows one, because
+                    # "can it be done in the budget" is most of the question.
+                    # `:play!` is the roam: par None leaves the budget generous,
+                    # which is what a half-built level wants.
+                    _rep0 = None if cmd.endswith('!') else _draft.report()
+                    _ppar = _rep0.par if _rep0 is not None and _rep0.ok else None
+                    _res  = run_dungeon(term, level, {}, player_name,
+                                        _dungeon=_draft.build(par=_ppar),
+                                        _known=_draft.level.known,
+                                        _record={'tape': [], 'error': '', 'off': True})
+                    if _res['won']:
+                        _push(f'Playtest cleared — {_res["stars"]} star'
+                              f'{"" if _res["stars"] == 1 else "s"}'
+                              + (f' against par {_ppar}.' if _ppar else
+                                 ' (no budget — :play once there is a tape).'))
+                    else:
+                        _push('Playtest ended without reaching the exit.'
+                              + (f' Budget was {_rep0.budget}.' if _ppar else ''))
+                    _push('Nothing was recorded — :record when the route is the one.')
+                    _forge_rebuild()
 
                 elif _draft is not None and cmd == 'record':
                     # Record the tape by PLAYING the level, not by typing out the
