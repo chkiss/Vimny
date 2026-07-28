@@ -6988,7 +6988,6 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
                     else:
                         _push('Playtest ended without reaching the exit.'
                               + (f' Budget was {_rep0.budget}.' if _ppar else ''))
-                    _push('Nothing was recorded — :record when the route is the one.')
                     _forge_rebuild()
 
                 elif _draft is not None and cmd == 'record':
