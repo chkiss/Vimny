@@ -60,7 +60,7 @@ from engine.macro import synth_key as _synth_key, record_char as _record_char
 from engine.jumplist import record_jump as _record_jump, jump_back as _jump_back, jump_forward as _jump_forward
 from engine.registers import (write_register as _reg_write, read_register as _reg_read,
                               record_register as _reg_record, clip_to_keys as _reg_keys)
-from engine.visual import apply_visual, block_bounds, apply_visual_replace
+from engine.visual import apply_visual, block_bounds, apply_visual_replace, in_selection
 from content.scrolls import (
     # Codex scroll content rendered by _show_scroll_by_id (_STD_SCROLLS map);
     # every other catalogue scroll renders via _show_catalog_scroll.
@@ -761,20 +761,21 @@ def _bolt_cells(room, player) -> list:
 
 
 def _range_cells(room, player) -> list:
-    """Every in-bounds cell of the last VISUAL selection, in reading order. The
-    same region `:fill` takes — a LINEWISE selection is whole rows, charwise and
-    block are the rectangle between the ends — because every command that spells
-    its range `'<,'>` must mean the same shape by it."""
+    """Every in-bounds cell of the last VISUAL selection, in reading order —
+    exactly the shape the renderer highlights (`in_selection`), because every
+    command that spells its range `'<,'>` must mean the same cells the author
+    can see selected. LINEWISE (V) is whole rows; BLOCK (Ctrl-v) is the
+    rectangle between the ends; charwise (v) is the flowing span — top row from
+    the anchor column, whole middle rows, bottom row up to the cursor — NOT the
+    rectangle, which is what block already means."""
     a, b = player.last_visual_anchor, player.last_visual_cursor
     if a is None or b is None:
         return []
-    if player.last_visual_mode == Mode.VISUAL_LINE:
-        c1, c2 = 0, room.cols - 1
-    else:
-        c1, c2 = min(a[1], b[1]), max(a[1], b[1])
+    mode = player.last_visual_mode
     return [(r, c)
             for r in range(max(0, min(a[0], b[0])), min(room.rows - 1, max(a[0], b[0])) + 1)
-            for c in range(max(0, c1), min(room.cols - 1, c2) + 1)]
+            for c in range(room.cols)
+            if in_selection(a, b, mode, r, c)]
 
 
 def _paint_name(room, r: int, c: int) -> str:
