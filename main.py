@@ -633,6 +633,10 @@ _ENTITY_PALETTE = {
                         'restores hp and increases max health', ()),
     'gold':            (dict(hp=1, alive=True), 'a coin', ()),
     'dynamite':        (dict(hp=1, alive=True), 'blows up', ()),
+    'brazier':         (dict(hp=1, alive=True, max_hp=0, ai=''),
+                        'a standing flame; lit=0 for cold embers a pasted 🜂 '
+                        'lights. A mode="braziers" seal opens its bolt once every '
+                        'brazier in its region burns', ('lit',)),
     'exit':            (dict(hp=1, alive=True), 'the way out (:exit moves it)', ()),
 }
 
@@ -642,9 +646,9 @@ _ENTITY_PALETTE = {
 #: has a reason to hand-set — offering them would only invite a level whose
 #: creatures start mid-stride.
 _ENTITY_SETTABLE = ('hp', 'max_hp', 'ai', 'ai_speed', 'tag', 'scroll_id',
-                    'swole', 'edit_immune', 'drops', 'group', 'opaque')
+                    'swole', 'edit_immune', 'drops', 'group', 'opaque', 'lit')
 _ENTITY_INT_FIELDS  = ('hp', 'max_hp', 'ai_speed')
-_ENTITY_BOOL_FIELDS = ('swole', 'edit_immune', 'opaque')
+_ENTITY_BOOL_FIELDS = ('swole', 'edit_immune', 'opaque', 'lit')
 
 #: The COLOURS the renderer actually paints on a key or a lock. Tag pairing is
 #: pure string equality, so `tag=orange` pairs perfectly well — it just draws in
@@ -664,6 +668,7 @@ _ENTITY_CHOICES = {
     ('chest_key',   'tag'): ('',) + _KEY_COLOURS,
     ('goblin',      'tag'): ('', 'echo', 'zombie', 'demon'),
     'opaque':    ('0', '1'),
+    'lit':       ('1', '0'),
     'ai':        ('chase', ''),
     'drops':     ('',) + tuple(f'floor_key:{c}' for c in _KEY_COLOURS)
                  + ('floor_key',) + tuple(f'chest_key:{c}' for c in _KEY_COLOURS)
@@ -685,6 +690,8 @@ _CHOICE_NOTES = {
     ('tag', 'demon'):     'relentless — hunts from anywhere',
     ('opaque', '1'):      'the eye stops here: everything beyond starts fogged',
     ('opaque', '0'):      'a grille — you see straight through it',
+    ('lit', '1'):         'burning — the 🜂 flame',
+    ('lit', '0'):         'cold embers, waiting for a pasted flame',
 }
 
 

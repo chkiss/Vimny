@@ -173,6 +173,16 @@ def test_without_a_range_entity_is_still_one_cell():
         == [(3, 5)]
 
 
+def test_the_forge_can_place_a_cold_brazier():
+    """`:entity brazier lit=0` puts a cold brazier down — the piece an author
+    arranges into a lighting puzzle. lit rides the file, so it round-trips."""
+    d = DRAFT.new('Probe', rows=8, cols=30)
+    _forge_session(d, 'jjllll:entity brazier lit=0\r:w\r:q!\r')
+    brz = [e for e in d.level.entities if e['kind'] == 'brazier']
+    assert [tuple(e['at']) for e in brz] == [(3, 5)]
+    assert brz[0].get('lit') is False
+
+
 def test_a_ranged_bang_sweeps_the_rank_away_again():
     """The eraser the ranged placement needs — put a rank down, look at it,
     `gv` and sweep it. Without `!` taking the range too, undoing a rank by hand
