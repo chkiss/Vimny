@@ -3703,6 +3703,18 @@ def _flame_paste_blocked(room, player, clip, before: bool, count: int) -> bool:
     return False
 
 
+def _clip_is_fire(clip) -> bool:
+    """True if the register holds a flame — the 🜂 glyph an author lays down as a
+    yankable fire source. That is what a p/P pastes onto a cold brazier to light
+    it, the same way a floor_key pastes onto a lock."""
+    if not clip or not clip.get('rows'):
+        return False
+    return any(sym == _dg._QM_FLAME
+               for rw in clip['rows']
+               for rd in rw.get('char_runs', ())
+               for sym in rd['symbols'])
+
+
 def _quartermaster_tick(room, player) -> list:
     """The Beacon Tiers' doors — every cold brazier shows … embers; feed
     each one a flame. STATELESS, hence undo-safe (the vault-tick principle):
@@ -8899,6 +8911,20 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
                 else:
                     _has_key = any(ed['tmpl'].get('kind') == 'floor_key' for ed in clip_entities)
                     player.error = 'E: Wrong key for this door' if _has_key else 'E: No key held'
+            elif target and target.kind == 'brazier' and _clip_is_fire(clip):
+                # Paste FIRE onto a cold brazier to light it — the same p/P as a
+                # key onto a lock, and (like a key) the register is NOT consumed,
+                # so one yanked flame lights a whole gallery. Lighting one that
+                # already burns is a free no-op.
+                if target.lit:
+                    _push('That brazier already burns.')
+                else:
+                    undo_stack.append(_snapshot(room, player, budget, ans=cmd_start_ans))
+                    redo_stack.clear()
+                    target.lit = True
+                    budget.spend(_keystroke_cost(count, 'p', action.get('count_given', False))
+                                 + _register_prefix_cost(action))
+                    _push('The brazier catches — a flame stands.')
             elif _flame_paste_blocked(room, player, clip, before, count):
                 # The Beacon Tiers' fuel rule: flames lie only in braziers.
                 # A FREE no-op — nothing paid, nothing snapshotted.

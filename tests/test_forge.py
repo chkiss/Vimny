@@ -1074,6 +1074,26 @@ def test_a_brazier_seal_opens_only_while_every_brazier_burns():
     assert room.cells[2][8] == CellType.WALL, 'a snuffed brazier re-bars the bolt'
 
 
+def test_pasting_fire_lights_a_brazier_and_opens_its_bolt():
+    """The authorable brazier puzzle end to end: a flame source (a yankable 🜂),
+    a cold brazier, and a braziers-seal on the exit. yl the fire, p it onto the
+    brazier — it catches, every brazier in the region now burns, and the bolt
+    opens the way out."""
+    import generation.dungeon_gen as dg
+    lvl = _tiny(requires=['y', 'p'], solution='')
+    lvl.rows, lvl.cols = 3, 13
+    lvl.cells = ['13W', 'W9F3W', '13W']            # cols 1..9 floor; 10..12 wall
+    lvl.spawn, lvl.exit = (1, 1), (1, 10)
+    lvl.char_runs = [{'row': 1, 'col': 2, 'symbols': [dg._QM_FLAME], 'kind': 'flame'}]
+    lvl.entities  = [{'kind': 'brazier', 'at': [1, 4], 'lit': False},
+                     {'kind': 'exit', 'at': [1, 10]}]
+    lvl.seals = [F.Seal(region=(1, 4, 1, 4), mode='braziers', opens=((1, 10),))]
+    # l onto the flame, yl to hold it, l beside the brazier, p to light it,
+    # then east onto the freed exit.
+    _tape, result = _record_take(lvl, 'l' + 'yl' + 'l' + 'p' + 'l' * 7)
+    assert result['won'], 'the lit brazier should have opened the bolt'
+
+
 def test_a_brazier_seal_wants_a_region_and_refuses_text():
     import json
     base = {'schema': 1, 'name': 'B', 'seed': 1, 'teaches': ['$'], 'requires': [],
