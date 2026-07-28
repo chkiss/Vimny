@@ -434,16 +434,20 @@ def _check_operable(lvl: F.Level, dungeon, rep: Report) -> None:
     job, and the tape may never touch it.
     """
     known = set(lvl.known)
+    # A locked door and its key are the SAME missing lesson (the paste), so this
+    # names the door if there is one — the key alone otherwise — and says it once,
+    # rather than two near-identical lines crowding the bar.
     for kind, tokens in _OPERATED_BY.items():
-        where = [(i, e) for i, room in enumerate(dungeon.rooms)
+        if known & set(tokens):
+            continue
+        where = [e for room in dungeon.rooms
                  for e in room.entities if e.kind == kind and e.alive]
-        if where and not (known & set(tokens)):
-            i, e = where[0]
+        if where:
+            e = where[0]
             rep.warn('operable',
-                     f'a {kind} at row {e.row}, column {e.col} is opened by '
-                     f'pasting a key onto it, but this level declares none of '
-                     f'{list(tokens[:2])} — nobody can open it. Add one to '
-                     f'requires or teaches.')
+                     f'a {kind} at {e.row},{e.col}, but no p or P is taught — '
+                     f'no key can be pasted to open it.')
+            return
 
 
 # ── 4 + 5. Solvability and par ────────────────────────────────────────────────

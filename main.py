@@ -797,6 +797,15 @@ def _paint_complaint(kind: str) -> str:
     return f'Unknown paint: {kind}  ({"|".join(PAINT_KINDS)})'
 
 
+def _warn_display(w: str) -> str:
+    """A validator warning as the author should READ it on the bar.
+
+    The stored form carries a `[rule]` tag for the tests and the log; on the
+    banner it is noise in front of the one sentence that matters, so strip it
+    and lead with a plain 'Warning:'."""
+    return 'Warning: ' + re.sub(r'^\[[^\]]*\]\s*', '', w)
+
+
 def _paint_cells(room, cells: list, kind: str) -> str:
     """Paint every cell, and report what actually landed.
 
@@ -4775,6 +4784,7 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
                 _start_edit: bool = False,
                 _known: list | None = None,
                 _record: dict | None = None,
+                _notice: str | None = None,
                 _draft=None) -> dict:
     """Run one dungeon level.
 
@@ -5835,6 +5845,17 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
             msg_pool.extend(_intro_parts)
             pool_ttl = _INTRO_ROTATE_TTL
             message  = _pool_msg()
+    # A forge NOTICE (a `:play` rehearsal carrying a validator warning) opens the
+    # banner: the author is standing in the very room it names, which is the whole
+    # point of moving it off the bench. It leads the rotation and dwells at intro
+    # pace so it is read, not clipped.
+    if _notice:
+        msg_pool.insert(0, _notice)
+        msg_idx  = 0
+        message  = _notice
+        msg_ttl  = _INTRO_ROTATE_TTL
+        pool_ttl = _INTRO_ROTATE_TTL
+
     # Return to the First Cave wearing the Warden's hat, and the stone knows you.
     if level == 'first_cave' and getattr(player, 'has_hat', False):
         msg_pool.clear()          # this greeting REPLACES the intro; drop its parts
@@ -6970,13 +6991,17 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
                     # A rehearsal is where you first WALK the level, so it is where
                     # a furniture-can't-be-worked problem finally bites — the forge
                     # never gates, so a locked door with no `p`/`P` declared looks
-                    # fine on the bench and only fails when someone plays. Say so
-                    # before the run rather than leaving the author stuck at it.
-                    for _w in (_rep0.warnings[:2] if _rep0 is not None else ()):
-                        _push(f'warning: {_w}')
+                    # fine on the bench and only fails when someone plays. The
+                    # warning rides IN as the level's opening banner, where the
+                    # author is standing in the room it names — not as a line back
+                    # at the bench after they have already quit the run.
+                    _notice = ' '.join(_warn_display(_w)
+                                       for _w in (_rep0.warnings[:2]
+                                                  if _rep0 is not None else ()))
                     _res  = run_dungeon(term, level, {}, player_name,
                                         _dungeon=_draft.build(par=_ppar),
                                         _known=_draft.level.known,
+                                        _notice=_notice or None,
                                         _record={'tape': [], 'error': '', 'off': True,
                                                  'rebuild': lambda s: _draft.build(
                                                      par=_ppar, seed=s)})
@@ -7025,7 +7050,7 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
                         if _rep.ok:
                             _push(f'Tape recorded — par {_rep.par}, budget {_rep.budget}.')
                             for _w in _rep.warnings[:2]:
-                                _push(f'warning: {_w}')
+                                _push(_warn_display(_w))
                         else:
                             # The take won on screen but will not replay. Almost
                             # always the level moved under it (an edit since the
@@ -7041,7 +7066,7 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
                     for _e in _rep.errors[:3]:
                         _push(_e)
                     for _w in _rep.warnings[:2]:
-                        _push(f'warning: {_w}')
+                        _push(_warn_display(_w))
                     if not _rep.ok:
                         _push('Not shippable yet.' if cmd == 'publish' else 'Not valid yet.')
                     elif cmd == 'check':

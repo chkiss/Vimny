@@ -1502,7 +1502,9 @@ def test_a_locked_door_in_a_level_that_never_taught_paste_is_flagged():
                     spawn=(1, 1), exit=(1, 2), solution='l')
     from sharing.validate import validate
     rep = validate(lvl)
-    assert any('nobody can open it' in w for w in rep.warnings), rep.warnings
+    op = [w for w in rep.warnings if '[operable]' in w]
+    assert op == ['[operable] a locked_door at 1,5, but no p or P is taught — '
+                  'no key can be pasted to open it.'], rep.warnings
 
 
 def test_declaring_the_paste_takes_the_warning_away():
@@ -1510,21 +1512,31 @@ def test_declaring_the_paste_takes_the_warning_away():
                               {'kind': 'floor_key', 'at': [1, 3]}],
                     spawn=(1, 1), exit=(1, 2), solution='l', requires=['p'])
     from sharing.validate import validate
-    assert not [w for w in validate(lvl).warnings if 'nobody can open' in w]
+    assert not [w for w in validate(lvl).warnings if '[operable]' in w]
 
 
-def test_a_rehearsal_surfaces_the_operable_warning():
-    """The report: `:play` said nothing about a lock nobody could open. A
-    rehearsal is where you first WALK the level, so it is where an un-openable
-    lock finally bites — the forge never gates. `:play` now runs `report()` and
-    pushes its warnings, so the author is told at the bench rather than left
-    standing at a door the level gave them no key-command for. The rehearsal
-    must still open (the warning is advisory, not a refusal)."""
+def test_a_rehearsal_carries_the_operable_warning_in_as_the_banner(monkeypatch):
+    """The report: `:play` said nothing about a lock nobody could open, and when
+    it did the line came AFTER the run, back at the bench. A rehearsal is where
+    you first WALK the level, so the warning rides IN as the opening banner of
+    the played level — where the author is standing in the very room it names —
+    shortened and tagless. The rehearsal still opens (advice, not a refusal)."""
+    import main
     lvl = _corridor(entities=[{'kind': 'locked_door', 'at': [1, 5]},
                               {'kind': 'floor_key', 'at': [1, 3]}],
                     spawn=(1, 1), exit=(1, 2), solution='l')
     d = DRAFT.Draft(path=None, level=lvl)
+
+    seen, real = {}, main.run_dungeon
+    def _spy(*a, **k):
+        if k.get('_notice'):
+            seen['notice'] = k['_notice']
+        return real(*a, **k)
+    monkeypatch.setattr(main, 'run_dungeon', _spy)
+
     _rehearse(d, 'l:q!\r')     # tally assertion inside proves :play opened
+    assert seen.get('notice', '').startswith('Warning: a locked_door at 1,5')
+    assert '[operable]' not in seen['notice'], 'the rule tag leaked to the bar'
 
 
 def test_paint_says_where_doors_actually_come_from():
