@@ -470,10 +470,9 @@ def _check_solvable_and_par(lvl: F.Level, rep: Report) -> None:
         return
     if not result.won:
         rep.fail('solvable',
-                 'the solution tape replays without reaching the exit. Either the '
-                 'route is wrong, or it uses a command this level neither lists in '
-                 '`requires` nor `teaches` — a gated key is silently refused, and '
-                 'everything after it lands on the wrong cell.')
+                 'Solution tape fails to reach the exit. '
+                 ':record route is missing/wrong/uses a command not listed in '
+                 ':requires/:teaches.')
         return
 
     rep.par    = result.spent

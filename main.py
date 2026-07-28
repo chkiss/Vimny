@@ -2230,7 +2230,14 @@ def _drop_tick(room, player) -> list:
     for every player, and in the same place after an undo.
     """
     msgs = []
-    carriers = [e for e in room.entities if _drop_spec(e)[0]]
+    # A carrier that has ALREADY left its drop is done — even if the thing it
+    # dropped is now gone from the world (picked up and then spent, e.g. a key
+    # pasted onto a lock). Without this the tick, recomputing from the roster,
+    # sees no key lying about and no key held and lays a fresh one down every
+    # turn, at the dead carrier's cell — the "a key keeps appearing where the
+    # goblin died" bug. `dropped` rides the entity through undo, so reviving the
+    # carrier clears it and re-killing drops afresh.
+    carriers = [e for e in room.entities if _drop_spec(e)[0] and not e.dropped]
     if not carriers:
         return msgs
     held = _held_key(player)
@@ -2243,9 +2250,8 @@ def _drop_tick(room, player) -> list:
         if any(e.alive for e in members):
             continue
         kind, tag = _drop_spec(members[0])
-        # Already lying about, or in the player's hands? Then it has been dropped
-        # and this tick has nothing to say. Checking the world instead of a flag
-        # is what makes the whole thing undo-proof.
+        # Still lying about, or in the player's hands? Then this tick has nothing
+        # to add. (The `dropped` mark above is what covers the third case — spent.)
         if any(e.alive and e.kind == kind and e.tag == tag for e in room.entities):
             continue
         if kind == 'floor_key' and held_tag == tag:
@@ -2254,6 +2260,8 @@ def _drop_tick(room, player) -> list:
             if not room.entity_at(e.row, e.col):
                 room.add_entity(Entity(kind=kind, row=e.row, col=e.col, tag=tag))
                 msgs.append(_DROP_BANNER.get(kind, 'Something falls from the fallen.'))
+                for m in members:
+                    m.dropped = True         # the deed is done — do not respawn it
                 break
     return msgs
 

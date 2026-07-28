@@ -121,7 +121,7 @@ def test_the_exit_of_a_middle_chamber_does_not_win_the_level():
     lvl = _level('jjj', chambers=2, requires=[], teaches=[])
     rep = validate(lvl)
     assert not rep.ok
-    assert any('never reaches the exit' in e or 'reaching the exit' in e
+    assert any('reach the exit' in e or 'reaching the exit' in e
                for e in rep.errors), rep.errors
 
 

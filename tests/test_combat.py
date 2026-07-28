@@ -19,7 +19,8 @@
 """Tests for combat / enemy-tick behaviour in main.py."""
 from engine.world import Room, RoomType, CellType, Entity
 from engine.player import Player
-from main import _enemy_tick, _do_warden_move, _on_kill, _remove_warden_shields
+from main import (_enemy_tick, _do_warden_move, _on_kill, _remove_warden_shields,
+                  _drop_tick)
 
 ROWS, COLS = 7, 30
 
@@ -259,6 +260,55 @@ def test_warden_death_drops_a_key_and_leaves_the_door():
                for e in room.entities), "a key should drop on the Warden's cell"
     assert any(e.alive and e.kind == 'locked_door' for e in room.entities), \
         "the exit door stays locked until the key is used"
+
+
+def test_a_spent_drop_does_not_respawn_every_turn():
+    """The report: 'the east goblin drops a key at the position of the west
+    goblin'. `_drop_tick` recomputes drops from the roster each turn and only
+    suppressed a re-drop while the key was lying about or in hand — so a key
+    picked up AND spent (pasted onto a lock) was neither, looked never-dropped,
+    and fell again at the dead carrier's cell every turn. `dropped` marks the
+    deed done."""
+    room   = _bare_room()
+    player = Player(row=3, col=1)
+    gob    = Entity(kind='goblin', row=3, col=10, drops='floor_key')
+    room.add_entity(gob)
+
+    room.kill_entity(gob)
+    assert _drop_tick(room, player)                       # key drops
+    key = [e for e in room.entities if e.kind == 'floor_key' and e.alive]
+    assert [(e.row, e.col) for e in key] == [(3, 10)]
+
+    for e in key:                                         # picked up and SPENT
+        room.kill_entity(e)
+    room.rebuild_indexes()
+    assert not _drop_tick(room, player), 'the spent key respawned'
+    assert not _drop_tick(room, player)
+    assert not [e for e in room.entities if e.kind == 'floor_key' and e.alive]
+
+
+def test_reviving_a_carrier_lets_it_drop_again():
+    """Undo-safety of the `dropped` mark: it rides the entity through the
+    `clone_entity` snapshot, so a revived carrier (undo of its kill) has a clear
+    slate and re-killing drops afresh — the drop is never permanently spent."""
+    from engine.world import clone_entity
+    room   = _bare_room()
+    player = Player(row=3, col=1)
+    gob    = Entity(kind='goblin', row=3, col=10, drops='floor_key')
+    room.add_entity(gob)
+    room.kill_entity(gob)
+    _drop_tick(room, player)
+    assert gob.dropped is True
+
+    # An undo restores the pre-kill snapshot: the carrier alive, dropped clear.
+    revived = clone_entity(gob, dropped=False)
+    revived.hp, revived.alive = 1, True
+    room.entities = [e for e in room.entities
+                     if not (e.kind == 'floor_key')] + [revived]
+    room.entities.remove(gob)
+    room.rebuild_indexes()
+    room.kill_entity(revived)
+    assert _drop_tick(room, player), 'the revived carrier would not drop again'
 
 
 # ── Shield removal on Warden death ───────────────────────────────────────────

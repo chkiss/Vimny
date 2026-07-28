@@ -212,6 +212,15 @@ class Entity:
     group:        str = ''  # drop-group id. With it set, the drop is left only when the
                             # LAST live member of the group dies — "kill the whole patrol
                             # and the key falls". Empty = each creature drops for itself.
+    dropped:      bool = False  # runtime only: this carrier has already left its drop.
+                            # The drop tick recomputes from the roster each turn, which
+                            # respawned a key the moment it left the world — picked up
+                            # AND spent (pasted onto a lock) it was neither lying about
+                            # nor held, so it looked never-dropped and fell again. This
+                            # marks the deed done. Undo-safe: it rides the entity through
+                            # `clone_entity` snapshots, so reviving the carrier clears it
+                            # and re-killing drops afresh. Never serialised — always False
+                            # on a fresh build.
 
 
 def clone_entity(e: Entity, fresh_uid: bool = False, **overrides) -> Entity:
