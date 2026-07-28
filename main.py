@@ -2314,8 +2314,24 @@ def _seal_target_reads_true(room, seal, target, rows) -> bool:
     return (want in have) if seal.mode == 'contains' else (have == want)
 
 
+def _braziers_in(room, region) -> list:
+    """The live braziers standing inside a seal's rectangle."""
+    r1, c1, r2, c2 = region
+    return [e for e in room.entities if e.alive and e.kind == 'brazier'
+            and r1 <= e.row <= r2 and c1 <= e.col <= c2]
+
+
 def _seal_reads_true(room, seal, truths=(), rows=None) -> bool:
     """Every target reads true, AND every seal this one requires does too."""
+    if seal.mode == 'braziers':
+        # The brazier gate: open only while EVERY brazier in the region burns.
+        # Snuffing one (a cut darkens a brazier, it is not carried off) leaves it
+        # standing but cold, so `all(lit)` fails and the bolt re-bars — the run is
+        # lost until it is relit. An empty region never opens (nothing to light).
+        brz = _braziers_in(room, seal.region)
+        if not brz or not all(e.lit for e in brz):
+            return False
+        return all(truths[i] for i in seal.requires if i < len(truths))
     if rows is None:
         rows = [_wla_floor_text(room, r) for r in range(room.rows)]
     if not all(_seal_target_reads_true(room, seal, t, rows) for t in seal.match):

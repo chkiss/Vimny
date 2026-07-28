@@ -1048,6 +1048,50 @@ def test_a_seal_stands_open_exactly_while_its_region_reads_true():
     assert room.cells[2][8] == CellType.WALL
 
 
+def test_a_brazier_seal_opens_only_while_every_brazier_burns():
+    """The generalized brazier win: a mode="braziers" seal holds its bolt shut
+    until every brazier standing in its region is LIT. Snuffing one darkens it
+    (it is not carried off) so the bolt re-bars — the run is lost until relit."""
+    import main
+    lvl = _tiny()
+    lvl.rows, lvl.cols = 5, 16
+    lvl.cells = ['16W', 'W14FW', 'W14FW', 'W14FW', '16W']
+    lvl.exit  = (3, 14)
+    lvl.entities = [{'kind': 'brazier', 'at': [1, 4], 'lit': False},
+                    {'kind': 'brazier', 'at': [1, 8], 'lit': True}]
+    lvl.seals = [F.Seal(region=(1, 1, 1, 12), mode='braziers', opens=((2, 8),))]
+    room = F.build(lvl).room
+    p = _player_at(3, 1)
+    main._seal_tick(room, p)
+    assert room.cells[2][8] == CellType.WALL, 'one brazier still cold — bolt shut'
+    for e in room.entities:
+        if e.kind == 'brazier':
+            e.lit = True
+    main._seal_tick(room, p)
+    assert room.cells[2][8] == CellType.FLOOR, 'every brazier lit — bolt open'
+    next(e for e in room.entities if e.kind == 'brazier').lit = False
+    main._seal_tick(room, p)
+    assert room.cells[2][8] == CellType.WALL, 'a snuffed brazier re-bars the bolt'
+
+
+def test_a_brazier_seal_wants_a_region_and_refuses_text():
+    import json
+    base = {'schema': 1, 'name': 'B', 'seed': 1, 'teaches': ['$'], 'requires': [],
+            'geometry': {'rows': 3, 'cols': 12, 'cells': ['12W', 'W10FW', '12W'],
+                         'spawn': [1, 1], 'exit': [1, 10]},
+            'solution': 'l',
+            'entities': [{'kind': 'brazier', 'at': [1, 5], 'lit': False}]}
+    ok = dict(base, seals=[{'mode': 'braziers', 'region': [1, 4, 1, 6], 'opens': [1, 8]}])
+    assert F.loads(json.dumps(ok)).seals[0].mode == 'braziers'
+    no_region = dict(base, seals=[{'mode': 'braziers', 'opens': [1, 8]}])
+    with pytest.raises(F.LevelFormatError, match='needs'):
+        F.loads(json.dumps(no_region))
+    with_text = dict(base, seals=[{'mode': 'braziers', 'region': [1, 4, 1, 6],
+                                   'match': 'x', 'opens': [1, 8]}])
+    with pytest.raises(F.LevelFormatError, match='reads braziers'):
+        F.loads(json.dumps(with_text))
+
+
 def test_exact_means_exact_and_contains_is_opt_in():
     import main
     p = _player_at(3, 1)

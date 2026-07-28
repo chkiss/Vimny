@@ -272,7 +272,7 @@ def _parse_fill(f: dict, i: int, at: str = 'fill') -> Fill:
                 kind=str(f.get('kind', 'ancient')))
 
 
-_SEAL_MODES  = ('exact', 'contains')
+_SEAL_MODES  = ('exact', 'contains', 'braziers')
 _SEAL_SCOPES = ('region', 'anyrow')
 
 
@@ -294,13 +294,28 @@ def _parse_seal(s: dict, i: int, at: str = 'seals') -> Seal:
     if scope not in _SEAL_SCOPES:
         raise LevelFormatError(f'{at}[{i}].scope: must be one of '
                                f'{", ".join(_SEAL_SCOPES)}, got {scope!r}')
+    mode = str(s.get('mode', 'exact'))
+    if mode not in _SEAL_MODES:
+        raise LevelFormatError(f'{at}[{i}].mode: must be one of '
+                               f'{", ".join(_SEAL_MODES)}, got {mode!r}')
     # `match` may be one string or several, ALL of which must read true. A door
     # that wants a chamber's three sayings held at once is one seal, not three.
     match = s.get('match', [])
     if isinstance(match, str):
         match = [match] if match else []
     region = s.get('region')
-    if scope == 'region' and match:
+    # A `braziers` seal reads no TEXT: it opens while every brazier standing in
+    # its region burns. So it wants a region and refuses a `match`.
+    if mode == 'braziers':
+        if match:
+            raise LevelFormatError(f'{at}[{i}].match: a mode="braziers" seal reads '
+                                   f'braziers, not text — leave `match` empty')
+        if not (isinstance(region, (list, tuple)) and len(region) == 4):
+            raise LevelFormatError(f'{at}[{i}].region: a mode="braziers" seal needs '
+                                   f'[r1, c1, r2, c2] naming the braziers to light')
+        region = tuple(int(x) for x in region)
+        match = []
+    elif scope == 'region' and match:
         if not (isinstance(region, (list, tuple)) and len(region) == 4):
             raise LevelFormatError(f'{at}[{i}].region: must be [r1, c1, r2, c2]')
         region = tuple(int(x) for x in region)
@@ -329,7 +344,7 @@ def _parse_seal(s: dict, i: int, at: str = 'seals') -> Seal:
         # not been taken yet, which is a rule nobody can debug.
         raise LevelFormatError(f'{at}[{i}].requires: must name seals BEFORE '
                                f'this one (0..{i - 1})')
-    if not match and not requires:
+    if not match and not requires and mode != 'braziers':
         raise LevelFormatError(f'{at}[{i}]: has nothing to read — give it a '
                                f'`match`, or `requires` naming earlier seals')
     anchor = str(s.get('anchor', ''))
@@ -352,10 +367,6 @@ def _parse_seal(s: dict, i: int, at: str = 'seals') -> Seal:
         if not (isinstance(cell, (list, tuple)) and len(cell) == 2):
             raise LevelFormatError(f'{at}[{i}].opens[{j}]: must be [row, col]')
         cells.append((int(cell[0]), int(cell[1])))
-    mode = str(s.get('mode', 'exact'))
-    if mode not in _SEAL_MODES:
-        raise LevelFormatError(f'{at}[{i}].mode: must be one of '
-                               f'{", ".join(_SEAL_MODES)}, got {mode!r}')
     return Seal(region=region, match=tuple(match), opens=tuple(cells), mode=mode,
                 scope=scope, requires=tuple(requires), anchor=anchor)
 

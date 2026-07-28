@@ -63,7 +63,7 @@ def canonical_kind(kind: str) -> str:
     return _KIND_ALIASES.get(kind, kind)
 
 
-SEAL_MODES  = ('exact', 'contains')
+SEAL_MODES  = ('exact', 'contains', 'braziers')
 SEAL_SCOPES = ('region', 'anyrow')
 
 #: The banner a seal shows when it grinds back, if it names no other.
