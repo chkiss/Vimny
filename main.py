@@ -3711,15 +3711,13 @@ def _flame_paste_blocked(room, player, clip, before: bool, count: int) -> bool:
 
 
 def _clip_is_fire(clip) -> bool:
-    """True if the register holds a flame — the 🜂 glyph an author lays down as a
-    yankable fire source. That is what a p/P pastes onto a cold brazier to light
-    it, the same way a floor_key pastes onto a lock."""
-    if not clip or not clip.get('rows'):
-        return False
-    return any(sym == _dg._QM_FLAME
-               for rw in clip['rows']
-               for rd in rw.get('char_runs', ())
-               for sym in rd['symbols'])
+    """True if the register holds fire — a light taken off a lit brazier.
+
+    A lit brazier IS the flame; there is no flame without one. Yanking one (`yl`,
+    `y3l`, `yy`, `yiw`…) flags the clip as fire (see `operator.op_yank`) WITHOUT
+    moving the brazier, and p/P sets that light onto a cold brazier. Carrying a
+    light is therefore a normal yank, not a special verb."""
+    return bool(clip and clip.get('fire'))
 
 
 def _quartermaster_tick(room, player) -> list:
@@ -8918,20 +8916,24 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
                 else:
                     _has_key = any(ed['tmpl'].get('kind') == 'floor_key' for ed in clip_entities)
                     player.error = 'E: Wrong key for this door' if _has_key else 'E: No key held'
-            elif target and target.kind == 'brazier' and _clip_is_fire(clip):
-                # Paste FIRE onto a cold brazier to light it — the same p/P as a
-                # key onto a lock, and (like a key) the register is NOT consumed,
-                # so one yanked flame lights a whole gallery. Lighting one that
-                # already burns is a free no-op.
-                if target.lit:
-                    _push('That brazier already burns.')
+            elif _clip_is_fire(clip):
+                # Fire carried off a lit brazier. It LIGHTS a cold brazier and
+                # does nothing else: a brazier is too heavy to set down, so a fire
+                # paste never lays a second one — wherever it lands that is not a
+                # cold brazier, it is a free no-op. Like a key, the register is not
+                # consumed, so one light kindles a whole gallery.
+                if target and target.kind == 'brazier':
+                    if target.lit:
+                        _push('That brazier already burns.')
+                    else:
+                        undo_stack.append(_snapshot(room, player, budget, ans=cmd_start_ans))
+                        redo_stack.clear()
+                        target.lit = True
+                        budget.spend(_keystroke_cost(count, 'p', action.get('count_given', False))
+                                     + _register_prefix_cost(action))
+                        _push('The brazier catches — a flame stands.')
                 else:
-                    undo_stack.append(_snapshot(room, player, budget, ans=cmd_start_ans))
-                    redo_stack.clear()
-                    target.lit = True
-                    budget.spend(_keystroke_cost(count, 'p', action.get('count_given', False))
-                                 + _register_prefix_cost(action))
-                    _push('The brazier catches — a flame stands.')
+                    _push('There is no brazier here to hold the flame.')
             elif _flame_paste_blocked(room, player, clip, before, count):
                 # The Beacon Tiers' fuel rule: flames lie only in braziers.
                 # A FREE no-op — nothing paid, nothing snapshotted.

@@ -1084,24 +1084,23 @@ def test_a_brazier_seal_opens_only_while_every_brazier_burns():
     assert room.cells[2][8] == CellType.WALL, 'a snuffed brazier re-bars the bolt'
 
 
-def test_pasting_fire_lights_a_brazier_and_opens_its_bolt():
-    """The authorable brazier puzzle end to end: a flame source (a yankable 🜂),
-    a cold brazier, and a braziers-seal on the exit. yl the fire, p it onto the
-    brazier — it catches, every brazier in the region now burns, and the bolt
-    opens the way out."""
-    import generation.dungeon_gen as dg
+def test_carrying_fire_from_a_lit_brazier_lights_a_cold_one_and_opens_the_bolt():
+    """The authorable brazier puzzle end to end: a LIT brazier is the flame, a
+    cold brazier waits, and a braziers-seal gates the exit. Yank the lit brazier
+    to take a light, p it onto the cold one — it catches, every brazier in the
+    seal's region now burns, and the bolt opens."""
     lvl = _tiny(requires=['y', 'p'], solution='')
     lvl.rows, lvl.cols = 3, 13
     lvl.cells = ['13W', 'W9F3W', '13W']            # cols 1..9 floor; 10..12 wall
     lvl.spawn, lvl.exit = (1, 1), (1, 10)
-    lvl.char_runs = [{'row': 1, 'col': 2, 'symbols': [dg._QM_FLAME], 'kind': 'flame'}]
-    lvl.entities  = [{'kind': 'brazier', 'at': [1, 4], 'lit': False},
+    lvl.entities  = [{'kind': 'brazier', 'at': [1, 2], 'lit': True},    # the fire
+                     {'kind': 'brazier', 'at': [1, 4], 'lit': False},   # to light
                      {'kind': 'exit', 'at': [1, 10]}]
     lvl.seals = [F.Seal(region=(1, 4, 1, 4), mode='braziers', opens=((1, 10),))]
-    # l onto the flame, yl to hold it, l beside the brazier, p to light it,
-    # then east onto the freed exit.
+    # l onto the lit brazier, yl to take a light, l beside the cold one, p to
+    # light it, then east onto the freed exit.
     _tape, result = _record_take(lvl, 'l' + 'yl' + 'l' + 'p' + 'l' * 7)
-    assert result['won'], 'the lit brazier should have opened the bolt'
+    assert result['won'], 'the lit brazier should have kindled the cold one'
 
 
 def test_a_brazier_seal_wants_a_region_and_refuses_text():

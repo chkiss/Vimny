@@ -185,9 +185,27 @@ def _delete_cols(room, row: int, lo: int, hi: int) -> None:
         room._on_entity_destroyed(ent)
 
 
+def _span_has_lit_brazier(room, text_obj) -> bool:
+    """True if the yanked span covers a LIT brazier — a lit brazier is fire, and
+    yanking one (by any motion/count) takes a light off it."""
+    linewise, spans = _clip(text_obj)
+    for row, lo, hi in spans:
+        for e in room.entities:
+            if not (e.alive and e.kind == 'brazier' and e.lit and e.row == row):
+                continue
+            if linewise or lo is None or (lo <= e.col <= hi):
+                return True
+    return False
+
+
 def op_yank(room, player, text_obj) -> dict:
-    """Copy the span into a clip. Cursor unchanged."""
-    return capture(room, text_obj)
+    """Copy the span into a clip. Cursor unchanged. A span that covers a lit
+    brazier carries FIRE (the clip is flagged), which p/P uses to light a cold
+    brazier — the brazier itself never enters the clip and is never moved."""
+    clip = capture(room, text_obj)
+    if _span_has_lit_brazier(room, text_obj):
+        clip['fire'] = True
+    return clip
 
 
 def op_delete(room, player, text_obj, collapse: bool = False) -> dict:
