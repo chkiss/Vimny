@@ -278,10 +278,13 @@ def _ent_cell_str(ent, room, r: int, c: int, mode, floor_bg: str) -> str:
     if ent.kind == 'shield':
         return floor_bg + C.boss_fg() + S.SHIELD + rst
     if ent.kind == 'brazier':
-        # A standing flame (the Sigil) — the SAME flame the Beacon Tiers
-        # introduced: the 🜂 glyph with the flicker, just entity-borne here
-        # (an entity leaves its row blank; a flame CharRun would not).
-        return floor_bg + C.rgb_fg(_flame_color(r, c)) + '🜂' + rst
+        # A standing flame — the 🜂 glyph with the flicker when LIT, cold embers
+        # (…) when not. Entity-borne everywhere (an entity leaves its row blank;
+        # a flame CharRun would not), so the two old forms — the Sigil's flame
+        # entity and the Beacon Tiers' flame/pedestal char-runs — read as one.
+        if ent.lit:
+            return floor_bg + C.rgb_fg(_flame_color(r, c)) + '🜂' + rst
+        return floor_bg + C.rune_pedestal() + '…' + rst
     if ent.kind == 'heart_container':
         return floor_bg + C.heart_full() + '♥' + rst
     if ent.kind == 'floor_key':

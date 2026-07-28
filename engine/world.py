@@ -212,6 +212,11 @@ class Entity:
     group:        str = ''  # drop-group id. With it set, the drop is left only when the
                             # LAST live member of the group dies — "kill the whole patrol
                             # and the key falls". Empty = each creature drops for itself.
+    lit:          bool = True  # a brazier's flame. True → the 🜂 flame; False → cold
+                            # embers (…) that a pasted fire lights. Default True so an
+                            # author placing a brazier gets a lit one and every existing
+                            # brazier entity stays lit. Meaningful only for kind='brazier';
+                            # inert on anything else.
     dropped:      bool = False  # runtime only: this carrier has already left its drop.
                             # The drop tick recomputes from the roster each turn, which
                             # respawned a key the moment it left the world — picked up

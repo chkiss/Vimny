@@ -355,7 +355,7 @@ assert _MIST_CODE not in _CODE_CELL
 _ENTITY_FIELDS = ('kind', 'row', 'col', 'hp', 'max_hp', 'ai', 'ai_speed',
                   'summon_timer', 'origin_row', 'move_dir', 'tag',
                   'scroll_id', 'swole', 'edit_immune', 'shade',
-                  'drops', 'group', 'opaque')
+                  'drops', 'group', 'opaque', 'lit')
 
 
 def _deserialize_room(data: dict):
