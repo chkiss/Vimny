@@ -486,10 +486,10 @@ the route — "count the words yourself, however many there are today" — Vimny
 cannot score that level. Par is one number, and a route that is four keys for
 one player and five for the next does not have one.
 
-### `then` — a level of more than one hall
+### `then` — a level of more than one chamber
 
 Most levels are one room. A level that is a **descent** — a gallery, then the
-arena you are chased into — writes the halls after the first in `then`:
+arena you are chased into — writes the chambers after the first in `then`:
 
 ```json
   "geometry": { "rows": 12, "cols": 60, "cells": ["..."],
@@ -503,29 +503,32 @@ arena you are chased into — writes the halls after the first in `then`:
   ]
 ```
 
-Halls are walked **in order, one way**. Stand on a hall's exit and the next one
-begins where its own `spawn` says; only the LAST hall's exit wins the level. To
-make a door conditional, put a seal on the exit cell — you cannot stand on
-stone, so nothing else is needed.
+Chambers are walked **in order, one way**. Stand on a chamber's exit and the
+next one begins where its own `spawn` says; only the LAST chamber's exit wins
+the level. To make a door conditional, put a seal on the exit cell — you cannot
+stand on stone, so nothing else is needed.
 
-Each hall carries its own `geometry`, `fill`, `seals`, `char_runs` and
+("Chamber" and not "room": a `room` is the engine's single grid of cells, and
+the levels called *Halls* are levels. A chamber is one segment of a descent.)
+
+Each chamber carries its own `geometry`, `fill`, `seals`, `char_runs` and
 `entities`, and nothing else: the seed, the tape, what the level teaches and
-your `vocabulary` belong to the LEVEL. `then[0]` is the hall after the first,
-not the first.
+your `vocabulary` belong to the LEVEL. `then[0]` is the chamber after the
+first, not the first.
 
-Three things follow from there being one level and several halls:
+Three things follow from there being one level and several chambers:
 
 * **One tape.** `solution` is the whole descent, in order, with no notation for
   passing a door — walking onto the exit is what does it. Par is the whole
   route.
 * **Fills are numbered across the level.** `<fill0.3>` is the level's first
-  fill wherever it stands; if hall one has two fills, the first fill in
-  `then[0]` is `<fill2.…>`. `:fill?` counts the same way, so standing on a word
-  always gives you a reference you can paste into the tape.
-* **The undo stack does not follow you.** Each hall keeps its own past; the
-  hall behind you is past mending.
+  fill wherever it stands; if the first chamber has two fills, the first fill
+  in `then[0]` is `<fill2.…>`. `:fill?` counts the same way, so standing on a
+  word always gives you a reference you can paste into the tape.
+* **The undo stack does not follow you.** Each chamber keeps its own past; the
+  chamber behind you is past mending.
 
-The forge cannot yet build a second hall — it edits the hall you are standing
+The forge cannot yet build a second chamber — it edits the one you are standing
 in, which is always the first, and passes the rest through untouched. A level
 with `then` is written by hand for now, and `:check` judges it in full.
 

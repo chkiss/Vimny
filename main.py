@@ -5137,13 +5137,13 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
             msg_pool.append(text)
             pool_ttl = _MSG_ROTATE_TTL   # live events pace faster than an intro
 
-    def _hall_door() -> bool:
-        """The DECLARATIVE room change: a level of several halls, walked in order.
+    def _chamber_door() -> bool:
+        """The DECLARATIVE room change: a level of several chambers, in order.
 
-        Standing on the exit of any hall but the last opens the next one, so that
-        exit is a door and not the way out — which is why this is asked at the
-        win check itself rather than in the per-turn ticks. A hall's exit is
-        reached and the level ends on the same instant, and a rule that ran a
+        Standing on the exit of any chamber but the last opens the next one, so
+        that exit is a door and not the way out — which is why this is asked at
+        the win check itself rather than in the per-turn ticks. A chamber's exit
+        is reached and the level ends on the same instant, and a rule that ran a
         moment later would be answering a level that had already been won.
 
         A shut seal on the exit cell is what makes a door conditional; you cannot
@@ -5152,7 +5152,7 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
         nonlocal room
         if edit_mode:
             # Painting is not walking. An author who drags the cursor over the
-            # exit of the hall they are building must not be carried into the
+            # exit of the chamber they are building must not be carried into the
             # next one — the forge can only edit the first, so that is a room
             # they cannot get back out of.
             return False
@@ -5163,15 +5163,15 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
         dungeon.current_room += 1
         room = dungeon.room
         player.row, player.col = room.spawn_pos
-        # The tape is the LEVEL's, not the hall's: one route walks them all, so
-        # the karaoke sheet and how far along it the player is travel through the
-        # door with them.
+        # The tape is the LEVEL's, not the chamber's: one route walks them all,
+        # so the karaoke sheet and how far along it the player is travel through
+        # the door with them.
         room.answer, room.answer_pos, room.answer_diverged = tape_state
-        undo_stack.clear()                 # each hall keeps its own past
+        undo_stack.clear()                 # each chamber keeps its own past
         redo_stack.clear()
         # Not narration of the door — the door is on screen. What is NOT is that
-        # the hall behind you took its undo stack with it.
-        _push('The way closes behind you — that hall is past mending.')
+        # the chamber behind you took its undo stack with it.
+        _push('The way closes behind you — that chamber is past mending.')
         return True
 
     def _content_ticks() -> None:
@@ -5227,7 +5227,7 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
         if level == 'hall_of_echoes':
             for _m in _hall_of_echoes_tick(room, player):  # per-room south seal
                 _push(_m)
-            # Through an open seal: the gauntlet advances to the next hall.
+            # Through an open seal: the gauntlet advances to the next chamber.
             if ((player.row, player.col) == tuple(room.exit_pos)
                     and dungeon.current_room < len(dungeon.rooms) - 1
                     and room.cells[room.exit_pos[0]][room.exit_pos[1]]
@@ -5235,11 +5235,12 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
                 dungeon.current_room += 1
                 room = dungeon.room
                 player.row, player.col = room.spawn_pos
-                undo_stack.clear()                 # each hall keeps its own past
+                undo_stack.clear()              # each chamber keeps its own past
                 redo_stack.clear()
-                # The open passage is on screen; what is NOT is that the halls
-                # keep separate undo stacks, so the hall behind you is now final.
-                _push('The passage closes behind you — that hall is past mending.')
+                # The open passage is on screen; what is NOT is that the chambers
+                # keep separate undo stacks, so the one behind you is now final.
+                _push('The passage closes behind you — that chamber is past '
+                      'mending.')
         if level == 'paragraph_enclosure':
             for _m in _paragraph_enclosure_tick(room, player):
                 _push(_m)
@@ -7973,7 +7974,7 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
                 # Win / exit check
                 if ent is None:
                     ent = room.entity_at(player.row, player.col)
-                if ent and ent.kind == 'exit' and _hall_door():
+                if ent and ent.kind == 'exit' and _chamber_door():
                     ent = None                # that exit was a door, not the way out
                 if ent and ent.kind == 'exit' and not won:
                     won = True
