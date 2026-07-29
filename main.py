@@ -29,6 +29,7 @@ from render.utils import inner_w as _iw
 from render.overworld import (render_overworld, build_lines, default_cursor,
                               line_search_text)
 from sharing.library import build_shelved, list_levels as community_levels
+from sharing import remote as REMOTE
 import sharing.draft as DRAFT
 import sharing.format as LF
 from sharing.vocab import (POOLS as _VOCAB_POOLS, LINE_POOLS as _VOCAB_LINE_POOLS,
@@ -9784,6 +9785,103 @@ def run_parent_dir(term: Terminal, player: Player, progress: dict) -> str | None
         _render()
 
 
+def run_remote_shelf(term: Terminal, player: Player, progress: dict) -> None:
+    """Browse the online community shelf (chkiss/vimny-levels) and install a
+    level onto the local shelf.
+
+    Netrw browses remote paths for real, so `community/remote/` is not a bolt-on
+    — it is the most Vim-accurate directory the overworld has. j/k move; Enter
+    downloads the level under the cursor, validates it, and drops it on the local
+    shelf (where it turns up under `community/`); r re-fetches the manifest;
+    Esc / - go back. A level is inert JSON that the validator vets before it
+    lands, so nothing downloaded here can run on the player's machine.
+
+    Returns None — always back to the overworld, which re-lists `community/` so
+    a freshly installed level appears at once.
+    """
+    from render.remote_shelf import render_remote_shelf
+
+    entries: list = []
+    status         = 'fetching the shelf…'
+    cursor_row     = 0
+    cmdline        = _CmdLine([])
+
+    def _installed_slugs() -> set:
+        try:
+            return {s.path.stem for s in community_levels()}
+        except Exception:                          # noqa: BLE001
+            return set()
+
+    installed = _installed_slugs()
+
+    def _render():
+        render_remote_shelf(term, player, progress, entries, installed,
+                            cursor_row, status,
+                            cmdline.line if cmdline.active else None)
+
+    def _refresh():
+        nonlocal entries, status, cursor_row
+        status = 'fetching the shelf…'
+        _render()                                  # show the "fetching" note first
+        entries, err = REMOTE.fetch_manifest()
+        cursor_row   = 0
+        if err:
+            status = err
+        elif not entries:
+            status = 'the shelf is empty'
+        else:
+            status = f'{len(entries)} level(s) — Enter to install'
+
+    _refresh()
+    _render()
+
+    while True:
+        key = term.inkey(timeout=0.1)
+        if not key:
+            continue
+
+        if cmdline.active:
+            cmd = cmdline.feed(key)
+            if cmd:
+                if cmd in ('q', 'q!'):
+                    return None
+                _e_path = cmd[2:].rstrip('/') if cmd.startswith('e ') else ''
+                if _e_path in ('..', '../', 'world', 'community'):
+                    return None
+            _render()
+            continue
+
+        raw = str(key) if not key.is_sequence else ''
+
+        if key.name == 'KEY_ESCAPE' or raw == '-':
+            return None
+        elif raw == ':':
+            cmdline.open()
+        elif raw == 'r':
+            _refresh()
+        elif raw == 'j':
+            cursor_row = min(cursor_row + 1, max(0, len(entries) - 1))
+        elif raw == 'k':
+            cursor_row = max(cursor_row - 1, 0)
+        elif raw == 'g':
+            cursor_row = 0
+        elif raw == 'G':
+            cursor_row = max(0, len(entries) - 1)
+        elif key.name == 'KEY_ENTER' or raw in ('\n', '\r'):
+            if entries:
+                entry  = entries[cursor_row]
+                status = f'installing {entry.name}…'
+                _render()
+                shelf = REMOTE.install_entry(entry)
+                if shelf.ok:
+                    installed = _installed_slugs()
+                    status    = f'installed {shelf.name} → community/'
+                else:
+                    status    = f'{entry.name}: {shelf.error}'
+
+        _render()
+
+
 # ── Title screen loop ─────────────────────────────────────────────────────────
 
 def run_title(term: Terminal, has_save: bool) -> tuple[str, str]:
@@ -10398,9 +10496,10 @@ def run_overworld(term: Terminal, player: Player, progress: dict,
     view. D deletes a custom layout (y to confirm), R renames it, d/dd hit the
     read-only buffer; :set number/relativenumber/nonumber toggle the gutter.
 
-    Returns {'action': 'enter'|'open_custom'|'browse_saves'|'scrolls'|'parent_view'|'quit', ...}.
+    Returns {'action': 'enter'|'open_custom'|'browse_saves'|'scrolls'
+             |'browse_remote'|'parent_view'|'quit', ...}.
     """
-    _OW_COMPLETIONS = ['../', 'saves/', 'scrolls/']
+    _OW_COMPLETIONS = ['../', 'saves/', 'scrolls/', 'remote/']
 
     def _wing_shown(l):
         # The Registry wing hides in the world/ menu until the horse is adopted
@@ -10483,7 +10582,8 @@ def run_overworld(term: Terminal, player: Player, progress: dict,
             term, player, progress, nav.cursor, lines,
             cmd_line=cmd_line, cmd_prefix=cmd_pfx,
             number_mode=number_mode, deleting=pending_delete,
-            renaming=renaming, scroll_offset=nav.scroll_offset, col=nav.col())
+            renaming=renaming, naming_new=naming_new,
+            scroll_offset=nav.scroll_offset, col=nav.col())
         nav.scroll_offset = scroll
         print(term.move_yx(cy, cx) + (term.cvvis or term.cnorm), end='', flush=True)  # blinking cursor
 
@@ -10569,6 +10669,8 @@ def run_overworld(term: Terminal, player: Player, progress: dict,
                     return _done({'action': 'browse_saves', 'cursor': nav.cursor})
                 if _e_path in ('scrolls',):
                     return _done({'action': 'scrolls', 'cursor': nav.cursor})
+                if _e_path in ('remote', 'community/remote'):
+                    return _done({'action': 'browse_remote', 'cursor': nav.cursor})
                 if _e_path in ('..', '../'):
                     return _done({'action': 'parent_view', 'cursor': nav.cursor})
                 # Unknown commands silently ignored
@@ -10675,6 +10777,9 @@ def main():
 
             # ── Auxiliary screen dispatch (browse_saves / scrolls / parent_view) ──
             aux = ow_result['action']
+            if aux == 'browse_remote':
+                run_remote_shelf(term, player, progress)
+                continue                           # back to the overworld (re-lists community/)
             if aux in ('browse_saves', 'scrolls', 'parent_view', 'colors'):
                 while aux in ('browse_saves', 'scrolls', 'parent_view', 'colors'):
                     if aux == 'browse_saves':

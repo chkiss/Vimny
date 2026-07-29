@@ -142,6 +142,7 @@ def render_overworld(term: Terminal, player: Player, progress: dict,
                      cmd_line: str | None = None, cmd_prefix: str = ':',
                      number_mode: str = 'number',
                      deleting: bool = False, renaming: str | None = None,
+                     naming_new: bool = False,
                      scroll_offset: int = 0, col: int = 0) -> tuple[int, int, int]:
     """Render the overworld; returns (scroll_offset, cursor_y, cursor_x) so the
     caller can place the live cursor. ``number_mode`` ∈ {'number','relativenumber','none'}."""
@@ -373,7 +374,7 @@ def render_overworld(term: Terminal, player: Player, progress: dict,
         out.append(_bar(C.error_bg() + C.error_fg(),
                         'Delete this custom layout?  y to confirm · any other key cancels'))
     elif renaming is not None:
-        text = 'Rename to: ' + renaming
+        text = ('Enter filename: ' if naming_new else 'Rename to: ') + renaming
         out.append(_bar(C.mode_command(), text))
         cur_y, cur_x = sl_y, 1 + 1 + len(text)
     elif player.error:
