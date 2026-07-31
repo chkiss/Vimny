@@ -63,6 +63,15 @@ class Draft:
     path:  Path
     level: F.Level
     error: str = ''                       # set when the file would not parse
+    #: WHICH CHAMBER THE AUTHOR IS STANDING IN. A level is a descent of up to
+    #: `format.MAX_CHAMBERS` chambers, and the forge shows exactly one of them at
+    #: a time — there is one cursor and one screen. This is the index into
+    #: `level.chambers`, so 0 is the level's own geometry and n is `then[n-1]`.
+    #: It is deliberately NOT saved to the file: which room an author last had
+    #: open is a fact about the editing session, not about the level, and a
+    #: draft that reopened into chamber 4 because that is where its author left
+    #: off would be a file that renders differently for the next reader.
+    chamber: int = 0
 
     @property
     def name(self) -> str:
@@ -141,20 +150,74 @@ def sync(draft: Draft, room) -> None:
     Fills, vocabulary and the metadata block survive because they are read off
     the Level and handed straight back — a Room has nowhere to keep them, so
     anything not carried across here would be silently lost on the first save.
+
+    The forge edits ONE chamber at a time — `draft.chamber`, the one the author
+    is standing in. The others are not on screen and nothing here has touched
+    them, so they ride through untouched; dropping them would be an edit to a
+    room the author never opened.
     """
     lvl = draft.level
+    fills = list(getattr(room, 'fills', lvl.fills))
+    seals = list(getattr(room, 'seals', lvl.seals))
+    if draft.chamber:
+        # A later chamber: only that entry of `then` changes. Everything
+        # level-wide — the name, the tape, the vocabulary, chamber 0 — belongs
+        # to the level and is none of this room's business.
+        i = draft.chamber - 1
+        then = list(lvl.then)
+        then[i] = F.chamber_from_room(room, fills=fills, seals=seals,
+                                      where=f'then[{i}].geometry')
+        lvl.then = then
+        return
     draft.level = F.from_room(
         room, lvl.name, author=lvl.author, solution=lvl.solution,
         teaches=lvl.teaches, requires=lvl.requires,
-        fills=list(getattr(room, 'fills', lvl.fills)),
-        seals=list(getattr(room, 'seals', lvl.seals)),
+        fills=fills, seals=seals,
         vocabulary=lvl.vocabulary, intro=lvl.intro, alternate=lvl.alternate,
-        seed=lvl.seed,
-        # The forge edits ONE chamber — the one the author stands in, which is
-        # always the first. Those after it are not on screen and nothing here
-        # has touched them, so they are handed straight back; dropping them would
-        # be an edit to a room the author never opened.
-        then=lvl.then)
+        seed=lvl.seed, then=lvl.then)
+
+
+# ── Chambers ──────────────────────────────────────────────────────────────────
+# A level is a DESCENT: chamber 1, then chamber 2, and the exit of each is the
+# door into the next. The forge builds them one at a time because there is one
+# cursor and one screen; `:chamber` is how an author moves between them.
+
+def add_chamber(draft: Draft) -> int:
+    """Append a blank chamber and return its index (its `level.chambers` slot).
+
+    Blank means the same canvas `new()` opens on, so a second chamber starts
+    exactly as welcoming as the first — an author who has to carve a room out of
+    solid rock before they can put anything in it would reasonably conclude the
+    feature was not finished.
+    """
+    if len(draft.level.chambers) >= F.MAX_CHAMBERS:
+        raise ValueError(f'a level may have at most {F.MAX_CHAMBERS} chambers — '
+                         'a descent, not a dungeon crawl')
+    i = len(draft.level.then)
+    draft.level.then.append(F.Chamber(
+        rows=NEW_ROWS, cols=NEW_COLS, cells=blank_cells(NEW_ROWS, NEW_COLS),
+        spawn=(1, 1),
+        exit=(min(OPEN_ROWS, NEW_ROWS) - 2, min(OPEN_COLS, NEW_COLS) - 2),
+        where=f'then[{i}].geometry'))
+    return len(draft.level.chambers) - 1
+
+
+def delete_chamber(draft: Draft, index: int) -> None:
+    """Remove one chamber. Chamber 1 cannot go: it is the level's own geometry,
+    it is where the player spawns, and a level with no first room is not a level
+    with one fewer chamber — it is nothing."""
+    if index <= 0:
+        raise ValueError('the first chamber is the level itself — it cannot be '
+                         'removed, only edited')
+    if index > len(draft.level.then):
+        raise ValueError(f'there is no chamber {index + 1}')
+    draft.level.then.pop(index - 1)
+    # `where` names a chamber's place in the FILE, and every entry after the
+    # hole just moved. Left stale, the next parse error would send its author to
+    # a key that is no longer the one they are looking at.
+    for i, h in enumerate(draft.level.then):
+        h.where = f'then[{i}].geometry'
+    draft.chamber = min(draft.chamber, len(draft.level.chambers) - 1)
 
 
 # ── Disk ──────────────────────────────────────────────────────────────────────

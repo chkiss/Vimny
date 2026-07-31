@@ -37,6 +37,7 @@ always have, plus the level's own properties:
 | `:entity [kind] [field=value …]` | place or retune the entity under the cursor (`:entity` alone opens the palette; `:entity?` reads it back; `:entity!` removes it) |
 | `:seal <text>` | arm a text-match door on the last VISUAL selection |
 | `:bolt` | make the cell you are standing on — or every wall cell of a `'<,'>` selection — open while that seal reads true |
+| `:chamber [n\|new]` | move between the level's chambers, or add one (`:chamber` alone says where you are; `:chamber!` removes the one you are in) |
 | `:name` `:author` `:teaches` `:requires` `:intro` `:alternate` `:vocab` | the metadata block |
 | `:meta` | what the draft currently claims |
 | `:canvas <rows>x<cols>` | grow (or trim) the ground the level is drawn on (`:canvas` alone says how big it is) |
@@ -572,9 +573,24 @@ Three things follow from there being one level and several chambers:
 * **The undo stack does not follow you.** Each chamber keeps its own past; the
   chamber behind you is past mending.
 
-The forge cannot yet build a second chamber — it edits the one you are standing
-in, which is always the first, and passes the rest through untouched. A level
-with `then` is written by hand for now, and `:check` judges it in full.
+#### Building one in the forge
+
+`:chamber new` appends a chamber and stands you in it, on the same blank canvas
+a new draft opens on. `:chamber 2` moves to the second, `:chamber` on its own
+says where you are, and `:chamber!` removes the one you are in.
+
+The forge shows **one chamber at a time** — there is one cursor and one screen —
+so `:chamber` is the whole of moving between them. What you paint is folded back
+into that chamber and no other: the level's name, tape, vocabulary and metadata
+are the LEVEL's, and the chambers you are not standing in ride through untouched.
+
+Which chamber you had open is **not saved**. It is a fact about your editing
+session, and a draft that reopened into chamber 4 because that is where its
+author left off would be a file that renders differently for the next reader.
+
+The first chamber cannot be removed: it is the level's own `geometry` and where
+the player spawns. A level may hold at most 8 chambers — a descent, not a
+dungeon crawl.
 
 ### `no_horse`
 

@@ -244,8 +244,10 @@ Also open:
 - **Multi-line `@` replay** — see Known bugs below. Fix when a level first wants it.
 - **Is the Wardenverse's reactive reflow generic or library-specific?** Decides
   whether `warden_pathfinder` can port behind a `wrap_buffer` boolean.
-- **The forge cannot BUILD a `then` chamber** (named limit from phase 4) — it
-  edits chamber 0 and passes the rest through.
+- ~~The forge cannot BUILD a `then` chamber~~ — **closed 2026-07-31.**
+  `draft.chamber` + `:chamber [n|new]` / `:chamber!`; `sync` folds the edited
+  room into that slot alone. Which chamber is open is session state, never
+  saved. `tests/test_forge_chambers.py`.
 - **`Entity.opaque` exists but no shipped level uses it.** The 11 scripted-fog
   `KNOWN_GAPS` were never re-examined to see whether opaque doors could now say
   what they mean, which would shrink the phase-1 exemption list without new code.

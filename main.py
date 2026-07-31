@@ -843,6 +843,58 @@ def _describe_entity(ent) -> str:
     return f'{ent.kind}' + (f'  {" ".join(bits)}' if bits else '  (defaults)')
 
 
+#: ONE inner width for every forge picker (`:entity`, `:paint`, `:fill`, `:rune`,
+#: `:teaches`, `:requires` — each of which opens its menu when typed bare).
+#: They were 62 and their contents are prose, so the longest palette note ran to
+#: 152 columns and was sliced mid-word: an author reading "…stand beside it and p
+#: (east) / P (" had been told less than nothing.
+#:
+#: 74 is the widest that still fits the narrowest terminal the game supports.
+#: `render.utils.inner_w` floors at 78 (an 80-column screen less its two frame
+#: borders) and a box is `BOX_IW + 4` wide including its own, so 74 gives 78 —
+#: exactly the playfield, sitting between the frame rather than on top of it.
+#: Widening is only half the answer; `_popup_fit` / `_popup_wrap` are the other
+#: half, because prose will outgrow any width you pick.
+POPUP_IW = 74
+
+
+def _popup_fit(text: str, width: int) -> str:
+    """`text` for one row, cut at a WORD boundary with an ellipsis if it must be.
+
+    A hard slice at the box edge is what produced "…and p (east) / P (". Cutting
+    at a space and saying so with `…` at least tells the reader that there is
+    more, and the full line is under their cursor in the detail pane."""
+    if len(text) <= width:
+        return text
+    cut = text[:max(0, width - 2)]
+    if ' ' in cut[1:]:
+        cut = cut[:cut.rindex(' ')]
+    return cut.rstrip(' ,;:') + ' …'
+
+
+def _popup_wrap(text: str, width: int, limit: int = 3) -> list:
+    """`text` wrapped to `width`, at most `limit` lines (the last one elided).
+
+    Used for the detail pane under a picker's list, which is where the prose the
+    row could not hold actually gets read."""
+    words, lines, cur = str(text).split(), [], ''
+    for w in words:
+        if cur and len(cur) + 1 + len(w) > width:
+            lines.append(cur)
+            cur = w
+            if len(lines) == limit:
+                break
+        else:
+            cur = f'{cur} {w}'.strip()
+    if len(lines) < limit and cur:
+        lines.append(cur)
+    if len(lines) == limit and words:
+        used = sum(len(l.split()) for l in lines)
+        if used < len(words):
+            lines[-1] = _popup_fit(lines[-1] + ' …', width)
+    return lines
+
+
 def _pick_entity(term: Terminal, iw: int, game_h: int) -> str:
     """The palette, as two panes you walk with j/k. Returns the ARGUMENT TAIL of
     the `:entity` command it built — `'goblin tag=red drops=floor_key:red'` — or
@@ -860,11 +912,12 @@ def _pick_entity(term: Terminal, iw: int, game_h: int) -> str:
     picker that could only place the DEFAULT goblin cannot make a red key, and a
     red key is the first thing anyone wants from it.
     """
-    BOX_IW = 62; BOX_BW = BOX_IW + 4
+    BOX_IW = POPUP_IW; BOX_BW = BOX_IW + 4
     box_bg  = term.on_color_rgb(6, 8, 12)
     edge    = box_bg + term.color_rgb(120, 170, 210) + term.bold
     head    = term.color_rgb(190, 215, 240) + term.bold
     body    = term.color_rgb(130, 150, 170)
+    dim     = term.color_rgb(105, 120, 140)
     pick    = term.color_rgb(255, 220, 60) + term.bold
     rst     = term.normal
     col_off = max(1, (iw + 2 - BOX_BW) // 2)
@@ -876,12 +929,16 @@ def _pick_entity(term: Terminal, iw: int, game_h: int) -> str:
 
     sep_h = '═' * (BOX_IW + 2)
 
-    def show(title, rows, sel, foot):
+    def show(title, rows, sel, foot, detail=''):
         # A long list (28 scrolls) is WINDOWED, not drawn whole: the box is
         # centred in the game area, so overflowing it would push its own top
         # border off the screen and leave the author steering a list they
         # cannot see the selected row of.
-        win   = max(3, game_h - 9)
+        # Only when the row actually had to be cut — an author reading a line
+        # that fits does not need it repeated underneath.
+        clipped = sel < len(rows) and len(rows[sel]) > BOX_IW
+        detail_lines = _popup_wrap(detail, BOX_IW - 3) if detail and clipped else []
+        win   = max(3, game_h - 9 - (len(detail_lines) + 1 if detail_lines else 0))
         first = 0 if len(rows) <= win else min(max(0, sel - win // 2),
                                                len(rows) - win)
         lines = [edge + '╔' + sep_h + '╗' + rst, row(0, '')]
@@ -889,11 +946,19 @@ def _pick_entity(term: Terminal, iw: int, game_h: int) -> str:
                          + box_bg + ' ' * max(0, BOX_IW - len(title) - 1)))
         lines.append(row(0, ''))
         for i in range(first, min(len(rows), first + win)):
-            text = rows[i][:BOX_IW]
+            text = _popup_fit(rows[i], BOX_IW)
             lines.append(row(len(text), (pick if i == sel else body) + text))
         if len(rows) > win:
             more = f' … {sel + 1}/{len(rows)}'
             lines.append(row(len(more), body + more))
+        # The DETAIL PANE — the selected row's prose in full, wrapped. The rows
+        # are one line each so the list stays walkable; this is where the part
+        # that did not fit on the row is actually read, which is what makes the
+        # word-boundary cut above honest rather than a nicer-looking lie.
+        if detail_lines:
+            lines.append(row(0, ''))
+            for d in detail_lines:
+                lines.append(row(len(d) + 2, dim + '  ' + d))
         lines.append(row(0, ''))
         lines.append(row(len(foot), body + foot))
         lines.append(row(0, ''))
@@ -935,13 +1000,16 @@ def _pick_entity(term: Terminal, iw: int, game_h: int) -> str:
             return read_value(current)
         sel = choices.index(current) if current in choices else 0
         while True:
-            rows = []
+            rows, notes = [], []
             for v in choices:
                 note = _CHOICE_NOTES.get((field, v), '')
+                notes.append(note)
                 rows.append(f' {(v or "(none)"):<20}{note}')
             rows.append(' » type something else')
+            notes.append('')
             show(f'{kind}.{field}', rows, sel,
-                 ' j/k move   ⏎ choose   Esc leave it unchanged')
+                 ' j/k move   ⏎ choose   Esc leave it unchanged',
+                 detail=notes[sel] if sel < len(notes) else '')
             key = term.inkey()
             raw = str(key) if not key.is_sequence else ''
             if key.name == 'KEY_ESCAPE':
@@ -956,7 +1024,8 @@ def _pick_entity(term: Terminal, iw: int, game_h: int) -> str:
     sel = 0
     while True:
         rows = [f' {k:<16}{_ENTITY_PALETTE[k][1]}' for k in kinds]
-        show('place an entity', rows, sel, ' j/k move   ⏎ choose   Esc cancel')
+        show('place an entity', rows, sel, ' j/k move   ⏎ choose   Esc cancel',
+             detail=_ENTITY_PALETTE[kinds[sel]][1])
         key = term.inkey()
         raw = str(key) if not key.is_sequence else ''
         if key.name == 'KEY_ESCAPE':
@@ -1013,11 +1082,12 @@ def _pick_one(term: Terminal, iw: int, game_h: int,
     echo back the command it stands for and the menu teaches its way out of
     being needed.
     """
-    BOX_IW = 62; BOX_BW = BOX_IW + 4
+    BOX_IW = POPUP_IW; BOX_BW = BOX_IW + 4
     box_bg  = term.on_color_rgb(6, 8, 12)
     edge    = box_bg + term.color_rgb(120, 170, 210) + term.bold
     head    = term.color_rgb(190, 215, 240) + term.bold
     body    = term.color_rgb(130, 150, 170)
+    dim     = term.color_rgb(105, 120, 140)
     pick    = term.color_rgb(255, 220, 60) + term.bold
     rst     = term.normal
     col_off = max(1, (iw + 2 - BOX_BW) // 2)
@@ -1038,8 +1108,11 @@ def _pick_one(term: Terminal, iw: int, game_h: int,
                          + box_bg + ' ' * max(0, BOX_IW - len(title) - 1)))
         lines.append(row(0, ''))
         for i, text in enumerate(rows):
-            text = text[:BOX_IW]
+            text = _popup_fit(text, BOX_IW)
             lines.append(row(len(text), (pick if i == sel else body) + text))
+        if options and len(rows[sel]) > BOX_IW:      # only what had to be cut
+            for d in _popup_wrap(options[sel][1], BOX_IW - 3):
+                lines.append(row(len(d) + 2, dim + '  ' + d))
         lines.append(row(0, ''))
         lines.append(row(len(foot), body + foot))
         lines.append(row(0, ''))
@@ -1070,7 +1143,7 @@ def _pick_many(term: Terminal, iw: int, game_h: int,
     two-token level harder to declare than typing it. `options` is
     [(value, description), ...]; `chosen` is what is already set.
     """
-    BOX_IW = 62; BOX_BW = BOX_IW + 4
+    BOX_IW = POPUP_IW; BOX_BW = BOX_IW + 4
     box_bg  = term.on_color_rgb(6, 8, 12)
     edge    = box_bg + term.color_rgb(120, 170, 210) + term.bold
     head    = term.color_rgb(190, 215, 240) + term.bold
@@ -1103,13 +1176,18 @@ def _pick_many(term: Terminal, iw: int, game_h: int,
                          + box_bg + ' ' * max(0, BOX_IW - len(title) - 1)))
         lines.append(row(0, ''))
         for i in range(first, min(len(rows), first + win)):
-            text = rows[i][:BOX_IW]
+            text = _popup_fit(rows[i], BOX_IW)
             lines.append(row(len(text),
                              (pick if i == sel else
                               on if values[i] in have else body) + text))
         picked = ' '.join(have) or '(none)'
         lines.append(row(0, ''))
-        lines.append(row(min(BOX_IW, len(picked) + 1), body + ' ' + picked[:BOX_IW - 1]))
+        # WRAPPED, not sliced: this line is the answer to "what have I chosen",
+        # and a `:teaches` set of eight tokens overran 61 columns and silently
+        # lost its tail — so the author could not see the very thing they were
+        # picking. It is the one place in the box that may take more than a row.
+        for p in _popup_wrap(picked, BOX_IW - 1, limit=3):
+            lines.append(row(len(p) + 1, body + ' ' + p))
         lines.append(row(len(foot), body + foot))
         lines.append(row(0, ''))
         lines.append(edge + '╚' + sep_h + '╝' + rst)
@@ -5197,6 +5275,10 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
         except (ValueError, LF.LevelFormatError) as _exc:
             return str(_exc)
         dungeon = _built
+        # Stand the author back in the chamber they are editing. `build` always
+        # opens on the first — that is where a PLAYER starts — but the forge
+        # shows whichever one `:chamber` last selected.
+        dungeon.current_room = min(_draft.chamber, len(dungeon.rooms) - 1)
         room    = dungeon.room
         dungeon.name        = _draft.level.name
         dungeon.level_slug  = level
@@ -6933,6 +7015,70 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
                                       f'that region reads {_txt!r}'
                                       + ('' if _mode == 'exact' else ' (anywhere in it)')
                                       + '.')
+
+                elif (_draft is not None and edit_mode
+                      and (_rcmd.rstrip('?!') == 'chamber'
+                           or _rcmd.startswith('chamber '))):
+                    # A level is a DESCENT: walk the exit of one chamber and the
+                    # next begins. The forge shows ONE at a time — there is one
+                    # cursor and one screen — so this is how an author moves
+                    # between them, adds one, or drops one.
+                    #
+                    # Chambers are numbered from ONE here and from zero in the
+                    # file (`then[0]` is the second chamber). The author's count
+                    # is the one they can see: `-- CHAMBER 2/3 --` on the status
+                    # line is the same 2 they type.
+                    _arg   = _rcmd.partition(' ')[2].strip()
+                    _total = len(_draft.level.chambers)
+                    _cur   = _draft.chamber
+                    if _rcmd.endswith('!') and not _arg:
+                        # Drop the one on screen.
+                        try:
+                            DRAFT.delete_chamber(_draft, _cur)
+                        except ValueError as _exc:
+                            _push(str(_exc))
+                        else:
+                            _err = _forge_rebuild()
+                            _push(f'Chamber {_cur + 1} removed — '
+                                  f'{len(_draft.level.chambers)} left.'
+                                  if not _err else f'Refused — {_err}')
+                    elif not _arg or _rcmd.endswith('?'):
+                        _push(f'Chamber {_cur + 1} of {_total}. '
+                              ':chamber <n> to move, :chamber new to add'
+                              + (', :chamber! to remove this one' if _cur else '')
+                              + '.')
+                    elif _arg == 'new':
+                        DRAFT.sync(_draft, room)      # keep what is on screen
+                        try:
+                            _new_i = DRAFT.add_chamber(_draft)
+                        except ValueError as _exc:
+                            _push(str(_exc))
+                        else:
+                            _was, _draft.chamber = _draft.chamber, _new_i
+                            _err = _forge_rebuild()
+                            if _err:
+                                _draft.chamber = _was
+                                _draft.level.then.pop()
+                                _forge_rebuild()
+                                _push(f'Refused — {_err}')
+                            else:
+                                _push(f'Chamber {_new_i + 1} of '
+                                      f'{len(_draft.level.chambers)} — a blank '
+                                      'room. The one before it opens onto this.')
+                    elif _arg.isdigit() and 1 <= int(_arg) <= _total:
+                        DRAFT.sync(_draft, room)      # before we leave the room
+                        _draft.chamber = int(_arg) - 1
+                        _err = _forge_rebuild()
+                        if _err:
+                            _draft.chamber = _cur
+                            _forge_rebuild()
+                            _push(f'Refused — {_err}')
+                        else:
+                            player.row, player.col = room.spawn_pos
+                            _push(f'Chamber {_draft.chamber + 1} of {_total}.')
+                    else:
+                        _push(f'No chamber {_arg!r} — there '
+                              f'{"is" if _total == 1 else "are"} {_total}.')
 
                 elif (_draft is not None and edit_mode
                       and cmd.partition(' ')[0].rstrip('?!') in _FORGE_META):
