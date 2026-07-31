@@ -226,8 +226,44 @@ The per-level `_par_<slug>` solvers compute each dungeon's minimum-keystroke par
 - At `min_confidence = 60` it also surfaces *candidates* that need human triage: module-level constant tables (e.g. unused glyphs in `render/symbols.py`) and enum members (`RoomType.SAFE/BOSS`) read only via `S.NAME` attribute access or from tests can be false positives — verify with a `grep` before deleting.
 - Complement with the produce/consume check for entity `kind` strings: a kind consumed (`.kind == 'x'`, `_entity_by_kind.get('x')`) but never produced (`Entity(kind='x')`) is dead dispatch — this is how the orphaned `keystone` mechanism was found.
 
+## Open work
+The agreed six-phase **port** — one materialiser instead of two, so the forge is
+complete by construction rather than by assurance. Phases 0–4 landed; the gap is
+a number, watched by `tests/test_round_trip.py` (43/60 lossless as of 2026-07-27).
+Landing a phase means deleting lines from that test's `KNOWN_GAPS` in the same
+commit — a stale exemption is an audit passing vacuously.
+
+| # | Work | Buys |
+|---|---|---|
+| 0–4 | ✅ done (`5d07dcd`, `9cb7678`, `6a5bdb8`, 3 commits, `0ebb392`+`3ae5436`) | round-trip probe; derived fog; `Seal` generalised over 17 slugs; slot refs + forge affordances; chambers (`then`) |
+| 5 | `paste(level, into, at)` | `hall_of_echoes`; the forge gains level import |
+| 6 | Builders return `Level`, level by level | one materialiser — **must answer for engine-only `Seal.message`** (an author-supplied banner is a text channel into another player's screen, so it is deliberately not in the file format; a shipped level rebuilt from its own file falls back to generic wording) |
+| — | excepted, by agreement | `archivists_library`, warden combat AI, `screen_vault` |
+
+Also open:
+- **Multi-line `@` replay** — see Known bugs below. Fix when a level first wants it.
+- **Is the Wardenverse's reactive reflow generic or library-specific?** Decides
+  whether `warden_pathfinder` can port behind a `wrap_buffer` boolean.
+- **The forge cannot BUILD a `then` chamber** (named limit from phase 4) — it
+  edits chamber 0 and passes the rest through.
+- **`Entity.opaque` exists but no shipped level uses it.** The 11 scripted-fog
+  `KNOWN_GAPS` were never re-examined to see whether opaque doors could now say
+  what they mean, which would shrink the phase-1 exemption list without new code.
+- ~~Drop `chest_random` from the `:entity` palette~~ — **closed 2026-07-31, kept
+  deliberately.** It was a standing open offer, never taken up; it stays.
+
 ## Known bugs
-None currently. Previously known bugs (now fixed):
+- **`@` replays only the FIRST line of a multi-line register** (`registers.clip_to_keys`
+  reads `clip['rows'][0]`). Since macros and text share one register store
+  (unified 2026-07-25), a register can hold a linewise clip — `yy` a row of
+  keystrokes, or `qA`-append across lines — and vim would run all of it. Nothing
+  reaches it today: recordings are single-line and every level that uses `@`
+  yanks charwise, so it is a latent divergence rather than a live bug. It bites
+  the first time a level invites the player to yank lines and run them (a likely
+  Registry-wing move). Fix = join the rows in `clip_to_keys`; check what a
+  linewise clip's row separator should replay as before doing it.
+
+Previously known bugs (now fixed):
 - `30l` trailing-zero split: fixed in `vim_parser.py` via `(count and buf[i] == '0')` guard. The same bug later resurfaced in the operator grammar (`d10w` parsed as `d0`+`w`) and visual text-object counts (`v10iw`) — fixed 2026-06-09 with the same guard in `_operator_target` / `parse_visual_textobj`. A count typed before a `"` register (`2"add`) was also dropped; counts now multiply (`2"a3dd` = 6 lines, Vim-faithful).
 - `3j 59l 3k` void bypass: fixed — fog wall at door column blocks count motions past it.
 - `x` then `u` left the character deleted (a free delete): fixed — the cut snapshot is taken BEFORE `_ed_cut` mutates the row, so undo restores the cut character.
