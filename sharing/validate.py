@@ -93,15 +93,15 @@ def validate(lvl: F.Level) -> Report:
 # ── 2. Bounds ─────────────────────────────────────────────────────────────────
 
 def _check_bounds(lvl: F.Level, rep: Report) -> None:
-    # The caps are on the LEVEL, not the chamber: a level that split four
-    # hundred entities across five chambers would be exactly as heavy as one
+    # The caps are on the LEVEL, not the room: a level that split four
+    # hundred entities across five rooms would be exactly as heavy as one
     # that put them in a single room, and the cap exists to bound the weight,
     # not the tidiness.
-    chambers = lvl.chambers
-    if len(chambers) > F.MAX_CHAMBERS:
-        rep.fail('bounds', f'at most {F.MAX_CHAMBERS} chambers, '
-                           f'got {len(chambers)}')
-    _total = lambda key: sum(len(getattr(h, key)) for h in chambers)
+    rooms = lvl.rooms
+    if len(rooms) > F.MAX_ROOMS:
+        rep.fail('bounds', f'at most {F.MAX_ROOMS} rooms, '
+                           f'got {len(rooms)}')
+    _total = lambda key: sum(len(getattr(h, key)) for h in rooms)
     if _total('entities') > F.MAX_ENTITIES:
         rep.fail('bounds', f'at most {F.MAX_ENTITIES} entities in a level, '
                            f'got {_total("entities")}')
@@ -111,8 +111,8 @@ def _check_bounds(lvl: F.Level, rep: Report) -> None:
     if _total('seals') > F.MAX_SEALS:
         rep.fail('bounds', f'at most {F.MAX_SEALS} seals in a level, '
                            f'got {_total("seals")}')
-    for h in chambers:
-        _check_chamber_bounds(h, lvl, rep)
+    for h in rooms:
+        _check_room_bounds(h, lvl, rep)
     if len(lvl.solution) > F.MAX_TAPE:
         rep.fail('bounds', f'solution tape longer than {F.MAX_TAPE} keystrokes')
     if not lvl.solution.strip():
@@ -120,11 +120,11 @@ def _check_bounds(lvl: F.Level, rep: Report) -> None:
                            'is solvable and what sets its par')
 
 
-def _check_chamber_bounds(h: F.Chamber, lvl: F.Level, rep: Report) -> None:
-    """Everything that has to be true of ONE chamber's geometry and content.
+def _check_room_bounds(h: F.Room, lvl: F.Level, rep: Report) -> None:
+    """Everything that has to be true of ONE room's geometry and content.
 
-    Every message names `h.where` — `geometry` for the level's own chamber,
-    `then[0].geometry` for the next — so an author with a five-chamber level is
+    Every message names `h.where` — `geometry` for the level's own room,
+    `then[0].geometry` for the next — so an author with a five-room level is
     told which one to go and open.
     """
     if not 3 <= h.rows <= F.MAX_ROWS:
@@ -135,7 +135,7 @@ def _check_chamber_bounds(h: F.Chamber, lvl: F.Level, rep: Report) -> None:
     def _in_range(what, pos):
         r, c = pos
         if not (0 <= r < h.rows and 0 <= c < h.cols):
-            rep.fail('bounds', f'{what} {list(pos)} is outside the {h.rows}x{h.cols} chamber')
+            rep.fail('bounds', f'{what} {list(pos)} is outside the {h.rows}x{h.cols} room')
 
     _ent_at, _fill_at, _seal_at = h.at('entities'), h.at('fill'), h.at('seals')
     _in_range(f'{h.where}.spawn', h.spawn)
@@ -211,7 +211,7 @@ def _check_slot_refs(lvl: F.Level, rep: Report) -> None:
     turned up decides both the word and its length, and `length` is not even
     consulted when they are laid.
     """
-    fills = lvl.all_fills       # counted across the chambers, as the tape counts
+    fills = lvl.all_fills       # counted across the rooms, as the tape counts
     for n, k in _tape.slot_refs(lvl.solution):
         if n >= len(fills):
             rep.fail('bounds', f'solution: <fill{n}.{k}> names fill {n}, but the '
@@ -396,18 +396,18 @@ def _ents_key(room):
 
 
 def _check_standable(lvl: F.Level, dungeon, rep: Report) -> None:
-    """Every chamber has to be enterable, and every chamber's exit is a door:
-    the last one out of the level, the others into the chamber after."""
-    for chamber, room in zip(lvl.chambers, dungeon.rooms):
+    """Every room has to be enterable, and every room's exit is a door:
+    the last one out of the level, the others into the room after."""
+    for spec, room in zip(lvl.rooms, dungeon.rooms):
         sr, sc = room.spawn_pos
         if room.cells[sr][sc] not in _STANDABLE:
-            rep.fail('bounds', f'{chamber.where}.spawn {list(room.spawn_pos)} is not '
+            rep.fail('bounds', f'{spec.where}.spawn {list(room.spawn_pos)} is not '
                                f'a floor cell — the player would start inside stone')
         er, ec = room.exit_pos
         if room.cells[er][ec] not in _STANDABLE:
             # A SEALED exit is legitimate (a gate opened by solving the level), so
             # this is advice rather than a rejection — solvability is the real test.
-            rep.warn('bounds', f'{chamber.where}.exit {list(room.exit_pos)} is not '
+            rep.warn('bounds', f'{spec.where}.exit {list(room.exit_pos)} is not '
                                f'floor. That is fine for a sealed exit that a '
                                f'tick opens, but nothing else will reach it.')
 
@@ -494,12 +494,12 @@ def _check_golf(lvl: F.Level, rep: Report) -> None:
     """
     from generation.dungeon_gen import _dijkstra_par_count
     try:
-        # Every chamber has to be crossed spawn to exit, so the walk across each
+        # Every room has to be crossed spawn to exit, so the walk across each
         # one adds up: the sum is still a LOWER bound on the whole descent, and
         # measuring only the first would compare a room against a level.
-        per_chamber = [_dijkstra_par_count(r) for r in F.build(lvl).rooms]
-        lower = (None if any(x is None for x in per_chamber)
-                 else sum(per_chamber))
+        per_room = [_dijkstra_par_count(r) for r in F.build(lvl).rooms]
+        lower = (None if any(x is None for x in per_room)
+                 else sum(per_room))
     except Exception:                              # noqa: BLE001 — advisory only
         return
     if lower is not None and rep.par is not None and lower < rep.par:

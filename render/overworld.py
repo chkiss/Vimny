@@ -185,12 +185,41 @@ def render_overworld(term: Terminal, player: Player, progress: dict,
     qh_pfx = '"   Quick Help: '
     qh_prs = [('j/k', 'move'), ('gg/G', 'top/bot'), ('Enter', 'open'),
               ('D', 'del'), ('R', 'rename'), ('-', 'up'), (':q', 'quit')]
+    # `%` is netrw's "new file", and here it forges a new level. It is the ONLY
+    # way to start one and it is admin-only, so it is listed for the admin and
+    # for nobody else — a key everyone can see but only one player may press is
+    # worse than one that is simply not advertised. It goes NEAR THE FRONT
+    # rather than at the end because the line is trimmed from the end on a
+    # narrow terminal, and the hint that exists to be discovered is the one that
+    # must not be the first casualty.
+    if player.name == 'admin':
+        qh_prs.insert(3, ('%', 'new'))
+
+    def _help_line() -> str:
+        """The hint row, never wider than the box.
+
+        `_row` pads with `max(0, cw - vis)` and does nothing when a row is too
+        long, so an over-wide line does not clip — it pushes the right border
+        out, which reads as the frame being broken rather than the text being
+        long. This row was already 82 columns against a 74-column content width
+        on an 80-column terminal, so it was doing exactly that before `%` was
+        ever added to it. Pairs are dropped from the END until it fits: a
+        shorter list of hints is honest, half a border is not.
+        """
+        prs = list(qh_prs)
+        while prs:
+            line = qh_pfx + '  '.join(f'{k}:{d}' for k, d in prs)
+            if len(line) <= cw:
+                return line
+            prs.pop()
+        return qh_pfx.rstrip()[:cw]
+
     comment_text = {
         'div':   '" ' + '=' * max(0, cw - 2),
         'title': ndl + ' ' * max(0, cw - len(ndl) - len(ver)) + ver,
         'path':  '"   ~/.vimny/world/',
         'sort':  '"   Sorted by      discovery order',
-        'help':  qh_pfx + '  '.join(f'{k}:{d}' for k, d in qh_prs),
+        'help':  _help_line(),
     }
 
     def _cols3(left, mid, right):

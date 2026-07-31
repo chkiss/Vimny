@@ -46,7 +46,8 @@ from dataclasses import dataclass, field, replace
 from engine import tape as _tape
 from engine.editor import _CELL_CODE, _CODE_CELL, _MIST_CODE, _ENTITY_FIELDS
 from engine.motion import apply_stone_fog
-from engine.world import (CellType, CharRun, DROPPABLE, Entity, Room, RoomType,
+from engine.world import (CellType, CharRun, DROPPABLE, Entity,
+                          Room as LiveRoom, RoomType,
                           Seal, canonical_kind)
 from generation.dungeon_gen import Dungeon
 from sharing import vocab
@@ -57,7 +58,7 @@ SCHEMA = 1
 ALWAYS_ON = ('u', ':w', ':q', ':q!')
 
 MAX_ROWS, MAX_COLS = 200, 200     # _MAX_COLS in the reflow engine is 200
-MAX_CHAMBERS       = 8            # a level is a descent, not a dungeon crawl
+MAX_ROOMS       = 8            # a level is a descent, not a dungeon crawl
 MAX_ENTITIES       = 400
 MAX_FILLS          = 64
 MAX_SEALS          = 32
@@ -102,27 +103,32 @@ def in_fill(room, row: int, col: int):
 
 
 @dataclass
-class Chamber:
-    """One chamber of a level: a room's worth of geometry and content.
+class Room:
+    """One room of a level: a room's worth of geometry and content.
 
-    A level is a DESCENT, not a map — chambers are walked in order, each one's
+    A level is a DESCENT, not a map — rooms are walked in order, each one's
     exit is the next one's door, and there is no going back. That is the shape
     both multi-room levels in the game already have, and it is the only shape
     worth putting in a file: a room GRAPH would need doors that name rooms, a
     way to say which door you came in by, and a spawn per door, and none of it
     buys a level anybody has wanted to write.
 
-    CHAMBER, not "hall" and not "room". `Room` is the engine's buffer class —
-    a grid of cells that 60 of 62 levels have exactly one of — and reusing it
-    for "a segment of a descent" would make `dungeon.rooms` mean two things.
-    "Hall" is worse: six shipped levels are NAMED Halls and one of them is a
-    slug, so `hall` in this file and `hall` in `main.py` would be different
-    nouns. `main._hall_of_echoes_tick` already called its segments chambers.
+    ROOM, not "chamber" and not "hall". A CHAMBER is a part of one map joined
+    to the rest of it by a hallway or a door — what `main._hall_of_echoes_tick`
+    calls its segments, all of them inside a single grid you can walk across.
+    These are not that: each one is its own grid, and they are what
+    `dungeon.rooms` already holds, so "room" is the word the engine was using
+    for them all along. ("Hall" is worse than either: six shipped levels are
+    NAMED Halls and one of them is a slug.)
 
-    The first chamber is the level's own `geometry` and content keys, so the
-    overwhelmingly common one-chamber level reads exactly as it always has. The
+    That does mean this module has two Rooms in it. `Room` here is a room AS
+    WRITTEN — geometry and content, inert. The engine's live buffer class is
+    imported as `LiveRoom`, and `build` turns each of these into one of those.
+
+    The first room is the level's own `geometry` and content keys, so the
+    overwhelmingly common one-room level reads exactly as it always has. The
     rest are `then` — which is also why they are not called `rooms[1:]`: an
-    author who writes `then[0]` should get the chamber AFTER the first, and a
+    author who writes `then[0]` should get the room AFTER the first, and a
     list whose zeroth entry was the second room is a trap laid on line one.
     """
     rows:      int   = 20
@@ -134,13 +140,13 @@ class Chamber:
     seals:     list  = field(default_factory=list)
     char_runs: list  = field(default_factory=list)
     entities:  list  = field(default_factory=list)
-    #: Where this chamber's keys live in the FILE. Carried on it so that every
+    #: Where this room's keys live in the FILE. Carried on it so that every
     #: message about it — parser, validator, forge — names the place the author
     #: has to go and edit, rather than a room number they never wrote down.
     where:     str   = 'geometry'
 
     def at(self, key: str) -> str:
-        """`'entities'` → `'then[0].entities'` — where one of this chamber's
+        """`'entities'` → `'then[0].entities'` — where one of this room's
         other keys lives in the file."""
         return self.where[:-len('geometry')] + key
 
@@ -163,33 +169,33 @@ class Level:
     seals:       list = field(default_factory=list)   # list[world.Seal]
     char_runs:   list = field(default_factory=list)   # explicit text
     entities:    list = field(default_factory=list)   # list[dict]
-    then:        list = field(default_factory=list)   # list[Chamber] — 2..n
+    then:        list = field(default_factory=list)   # list[Room] — 2..n
     vocabulary:  list = field(default_factory=list)   # author's own words
     solution:    str  = ''
     intro:       str  = ''
 
     @property
-    def chambers(self) -> list:
-        """Every chamber, in walking order — the level's own keys, then `then`.
+    def rooms(self) -> list:
+        """Every room, in walking order — the level's own keys, then `then`.
 
-        A projection, not storage: the first chamber's fields ARE the Level's,
-        so there is no second copy to keep in step and a one-chamber level has
+        A projection, not storage: the first room's fields ARE the Level's,
+        so there is no second copy to keep in step and a one-room level has
         nothing extra in it. Everything downstream loops over this and stops
-        caring how many chambers there are.
+        caring how many rooms there are.
         """
-        return [Chamber(rows=self.rows, cols=self.cols, cells=self.cells,
+        return [Room(rows=self.rows, cols=self.cols, cells=self.cells,
                      spawn=self.spawn, exit=self.exit, fills=self.fills,
                      seals=self.seals, char_runs=self.char_runs,
                      entities=self.entities), *self.then]
 
     @property
     def all_fills(self) -> list:
-        """Every fill in the level, in chamber order — which is also how a tape
+        """Every fill in the level, in room order — which is also how a tape
         counts them: `<fill4.0>` is the level's fifth fill, wherever it stands.
-        Numbering them per chamber would make a reference mean a different word
+        Numbering them per room would make a reference mean a different word
         depending on which one you read it in, and a tape is one string with no
-        chamber of its own."""
-        return [f for c in self.chambers for f in c.fills]
+        room of its own."""
+        return [f for c in self.rooms for f in c.fills]
 
     @property
     def known(self) -> list:
@@ -299,7 +305,7 @@ def _parse_seal(s: dict, i: int, at: str = 'seals') -> Seal:
         raise LevelFormatError(f'{at}[{i}].mode: must be one of '
                                f'{", ".join(_SEAL_MODES)}, got {mode!r}')
     # `match` may be one string or several, ALL of which must read true. A door
-    # that wants a chamber's three sayings held at once is one seal, not three.
+    # that wants a room's three sayings held at once is one seal, not three.
     match = s.get('match', [])
     if isinstance(match, str):
         match = [match] if match else []
@@ -371,31 +377,31 @@ def _parse_seal(s: dict, i: int, at: str = 'seals') -> Seal:
                 scope=scope, requires=tuple(requires), anchor=anchor)
 
 
-def _parse_then(chambers) -> list:
-    """The `then` list → chambers 2..n. Every message names `then[i].{key}`."""
-    if not isinstance(chambers, (list, tuple)):
-        raise LevelFormatError('then: must be a list of chambers, each with its '
+def _parse_then(rooms) -> list:
+    """The `then` list → rooms 2..n. Every message names `then[i].{key}`."""
+    if not isinstance(rooms, (list, tuple)):
+        raise LevelFormatError('then: must be a list of rooms, each with its '
                                'own `geometry`')
-    if len(chambers) > MAX_CHAMBERS - 1:
-        raise LevelFormatError(f'then: a level may have at most {MAX_CHAMBERS} '
-                               f'chambers, got {len(chambers) + 1}')
+    if len(rooms) > MAX_ROOMS - 1:
+        raise LevelFormatError(f'then: a level may have at most {MAX_ROOMS} '
+                               f'rooms, got {len(rooms) + 1}')
     out = []
-    for i, h in enumerate(chambers):
+    for i, h in enumerate(rooms):
         at = f'then[{i}]'
         if not isinstance(h, dict):
             raise LevelFormatError(f'{at}: must be an object')
         unknown = set(h) - {'geometry', 'fill', 'seals', 'char_runs', 'entities'}
         if unknown:
-            # Deliberately narrower than the top level: a chamber is geometry
+            # Deliberately narrower than the top level: a room is geometry
             # and content, and everything else — the tape, the seed, what the
             # level teaches — belongs to the LEVEL. A `solution` inside a
-            # chamber would read as a second tape and there is only ever one.
+            # room would read as a second tape and there is only ever one.
             raise LevelFormatError(f'{at}: unknown key(s) {sorted(unknown)}; a '
-                                   f'chamber carries geometry and content only')
+                                   f'room carries geometry and content only')
         geo = h.get('geometry')
         if not isinstance(geo, dict):
             raise LevelFormatError(f'{at}.geometry: required, and must be an object')
-        out.append(Chamber(
+        out.append(Room(
             rows=int(geo.get('rows', 0)),
             cols=int(geo.get('cols', 0)),
             cells=list(geo.get('cells', [])),
@@ -500,30 +506,30 @@ def crop(lvl: Level) -> Level:
     side, because a room needs a border and content flush against the edge of
     the grid is content with nothing to stop a motion.
     """
-    # `lvl.chambers` is a fresh projection every time it is asked for, so it is
-    # asked for ONCE: the identity `_crop_chamber` returns to say "nothing to
+    # `lvl.rooms` is a fresh projection every time it is asked for, so it is
+    # asked for ONCE: the identity `_crop_room` returns to say "nothing to
     # take off" is only meaningful against the very objects it was handed.
-    before   = lvl.chambers
-    chambers = [_crop_chamber(c) for c in before]
-    if all(a is b for a, b in zip(chambers, before)):
-        return lvl                               # every chamber already tight
-    first = chambers[0]
+    before   = lvl.rooms
+    rooms = [_crop_room(c) for c in before]
+    if all(a is b for a, b in zip(rooms, before)):
+        return lvl                               # every room already tight
+    first = rooms[0]
     return replace(
         lvl,
         rows=first.rows, cols=first.cols, cells=first.cells,
         spawn=first.spawn, exit=first.exit, fills=first.fills,
         seals=first.seals, char_runs=first.char_runs, entities=first.entities,
-        then=chambers[1:],
+        then=rooms[1:],
     )
 
 
-def _crop_chamber(h: Chamber) -> Chamber:
-    """One chamber, trimmed. Returns `h` itself when there is nothing to take
+def _crop_room(h: Room) -> Room:
+    """One room, trimmed. Returns `h` itself when there is nothing to take
     off — which is how `crop` tells a level that needs no cropping from one that
-    does, and why a level whose every chamber is already tight is returned
+    does, and why a level whose every room is already tight is returned
     unchanged rather than rebuilt into an equal copy.
 
-    Each chamber is trimmed on its OWN margins: they are separate grids that
+    Each room is trimmed on its OWN margins: they are separate grids that
     only ever share a level, and one cropped to the width of its neighbour would
     be padded with stone for no reason but tidiness.
     """
@@ -601,7 +607,7 @@ def resize(lvl: Level, rows: int, cols: int) -> Level:
     """
     if not 3 <= rows <= MAX_ROWS or not 3 <= cols <= MAX_COLS:
         raise LevelFormatError(f'a canvas is 3..{MAX_ROWS} by 3..{MAX_COLS}')
-    h = lvl.chambers[0]
+    h = lvl.rooms[0]
     if (rows, cols) == (h.rows, h.cols):
         return lvl
     if rows < h.rows or cols < h.cols:
@@ -624,8 +630,8 @@ def resize(lvl: Level, rows: int, cols: int) -> Level:
     return replace(lvl, rows=rows, cols=cols, cells=out)
 
 
-def _content_extent(h: Chamber) -> tuple[int, int] | None:
-    """The furthest row and column of the chamber anything at all occupies —
+def _content_extent(h: Room) -> tuple[int, int] | None:
+    """The furthest row and column of the room anything at all occupies —
     floor, text, an entity, a fill, a seal, the spawn or the exit."""
     grid = [expand_row(row, h.cols, i, h.where) for i, row in enumerate(h.cells)]
     keep = {(r, c) for r, row in enumerate(grid)
@@ -668,23 +674,23 @@ def build(lvl: Level, par: int | None = None, seed: int | None = None) -> Dungeo
     whichever words grew.
     """
     custom = vocab.by_length([w for w in lvl.vocabulary]) if lvl.vocabulary else None
-    # ONE rng for the whole level, drawn on chamber by chamber in walking order.
-    # Two chambers seeded alike would grow the same wall of words twice, and the
+    # ONE rng for the whole level, drawn on room by room in walking order.
+    # Two rooms seeded alike would grow the same wall of words twice, and the
     # second would read as a copy of the first rather than another room in the
     # same dungeon.
     rng = random.Random(lvl.seed if seed is None else seed)
 
     rooms, slots = [], []
-    for chamber in lvl.chambers:
-        room = _build_chamber(chamber, lvl, rng, custom)
-        # The level-wide index of this chamber's first fill, so `slot_at` can
-        # name a word as the tape does no matter which chamber it stands in.
+    for spec in lvl.rooms:
+        room = _build_room(spec, lvl, rng, custom)
+        # The level-wide index of this room's first fill, so `slot_at` can
+        # name a word as the tape does no matter which room it stands in.
         room.fill_index0 = len(slots)
         slots.extend(room.fill_slots)
         finalize_par(room, par)
         rooms.append(room)
 
-    # The tape belongs to the LEVEL, not a chamber: one route walks all of them,
+    # The tape belongs to the LEVEL, not a room: one route walks all of them,
     # and the karaoke position travels with the player through the doors.
     try:
         rooms[0].answer = _tape.resolve_slots(lvl.solution, slots)
@@ -693,7 +699,7 @@ def build(lvl: Level, par: int | None = None, seed: int | None = None) -> Dungeo
     # The tape AS WRITTEN, kept so that saving the room back out writes the
     # references the author wrote rather than the one roll they happened to get.
     rooms[0].answer_source = lvl.solution
-    # Every chamber but the last is a door: stand on its exit and the next one
+    # Every room but the last is a door: stand on its exit and the next one
     # begins. Declared on the room rather than asked of the level, because the
     # game loop holds a room and has no way back to the file it came from.
     for room in rooms[:-1]:
@@ -705,25 +711,26 @@ def build(lvl: Level, par: int | None = None, seed: int | None = None) -> Dungeo
     return dungeon
 
 
-def _build_chamber(chamber: Chamber, lvl: Level, rng: random.Random,
-                   custom) -> Room:
-    """One chamber of a level → one Room. Everything level-wide is passed in."""
-    if len(chamber.cells) != chamber.rows:
+def _build_room(spec: Room, lvl: Level, rng: random.Random,
+                   custom) -> LiveRoom:
+    """One room of a level, as written, → one live Room. Everything level-wide
+    is passed in."""
+    if len(spec.cells) != spec.rows:
         raise LevelFormatError(
-            f'{chamber.where}.cells: {len(chamber.cells)} rows, {chamber.where}.rows says '
-            f'{chamber.rows}')
-    grid = [expand_row_mist(row, chamber.cols, i, chamber.where)
-            for i, row in enumerate(chamber.cells)]
+            f'{spec.where}.cells: {len(spec.cells)} rows, {spec.where}.rows says '
+            f'{spec.rows}')
+    grid = [expand_row_mist(row, spec.cols, i, spec.where)
+            for i, row in enumerate(spec.cells)]
     cells = [g[0] for g in grid]
     mist  = {(r, c) for r, (_, cols) in enumerate(grid) for c in cols}
 
-    room = Room(room_type=RoomType.ENTRY, rows=chamber.rows, cols=chamber.cols)
+    room = LiveRoom(room_type=RoomType.ENTRY, rows=spec.rows, cols=spec.cols)
     room.cells     = cells
     room.mist_cells = set(mist)
     room.fog_cells  = set(mist)      # mist is always a subset of the fog
     room.seed      = lvl.seed
-    room.spawn_pos = tuple(chamber.spawn)
-    room.exit_pos  = tuple(chamber.exit)
+    room.spawn_pos = tuple(spec.spawn)
+    room.exit_pos  = tuple(spec.exit)
     room.no_horse  = lvl.no_horse
 
     # Seals are built SHUT, whatever the grid says, and before anything else reads
@@ -733,8 +740,8 @@ def _build_chamber(chamber: Chamber, lvl: Level, rng: random.Random,
     # arrives. Shutting them here rather than after the fills also keeps a fill
     # from growing a word onto a door cell. The tick opens the door on turn one if
     # the text really does read true, so nothing legitimate is lost.
-    room.seals = tuple(chamber.seals)
-    for _s in chamber.seals:
+    room.seals = tuple(spec.seals)
+    for _s in spec.seals:
         for _r, _c in _s.opens:
             if 0 <= _r < room.rows and 0 <= _c < room.cols:
                 room.cells[_r][_c] = CellType.WALL
@@ -743,9 +750,9 @@ def _build_chamber(chamber: Chamber, lvl: Level, rng: random.Random,
                     symbols=tuple(r['symbols']) if not isinstance(r['symbols'], str)
                             else tuple(r['symbols']),
                     kind=str(r.get('kind', 'ancient')))
-            for r in chamber.char_runs]
+            for r in spec.char_runs]
     grown, slots = [], []
-    for f in chamber.fills:
+    for f in spec.fills:
         laid = _resolve_fill(f, room, rng, custom)
         slots.append([''.join(ru.symbols) for ru in laid])
         grown.extend(laid)
@@ -763,10 +770,10 @@ def _build_chamber(chamber: Chamber, lvl: Level, rng: random.Random,
     # runs into fresh objects, so any ownership pinned to an object identity
     # would evaporate on the first keystroke. `in_fill` asks the regions
     # instead, and a region is stable no matter how often the row is rebuilt.
-    room.fills = list(chamber.fills)
+    room.fills = list(spec.fills)
 
-    room.entities = [_make_entity(e, i, chamber.at('entities'))
-                     for i, e in enumerate(chamber.entities)]
+    room.entities = [_make_entity(e, i, spec.at('entities'))
+                     for i, e in enumerate(spec.entities)]
     if not any(e.kind == 'exit' for e in room.entities):
         room.entities.append(Entity(kind='exit', row=room.exit_pos[0],
                                     col=room.exit_pos[1]))
@@ -913,7 +920,7 @@ def dumps(lvl: Level) -> str:
         data['alternate'] = lvl.alternate
     if lvl.intro:
         data['intro'] = lvl.intro
-    data.update(_dump_content(lvl.chambers[0]))
+    data.update(_dump_content(lvl.rooms[0]))
     if lvl.then:
         data['then'] = [{'geometry': {'rows': h.rows, 'cols': h.cols,
                                       'cells': h.cells,
@@ -925,9 +932,9 @@ def dumps(lvl: Level) -> str:
     return json.dumps(data, indent=2, ensure_ascii=False) + '\n'
 
 
-def _dump_content(h: Chamber) -> dict:
-    """One chamber's content keys, empty ones left out. Shared by the level's
-    own block and every entry in `then`, so a chamber reads the same wherever
+def _dump_content(h: Room) -> dict:
+    """One room's content keys, empty ones left out. Shared by the level's
+    own block and every entry in `then`, so a room reads the same wherever
     it is."""
     data = {}
     if h.fills:
@@ -997,11 +1004,11 @@ def from_room(room, name: str, author: str = '', solution: str = '',
     Everything not derivable from the grid — the fills themselves, the author's
     vocabulary, the intro, the slug it stands in for — has to be passed in,
     because a Room has nowhere to remember it. `then` is the sharpest case: this
-    captures ONE room, and a level's later chambers are rooms nobody is standing
+    captures ONE room, and a level's later rooms are rooms nobody is standing
     in. They ride through untouched, and a caller that forgets to pass them
-    saves a two-chamber level as a one-chamber one.
+    saves a two-room level as a one-room one.
     """
-    h = chamber_from_room(room, fills=fills, seals=seals)
+    h = capture_room(room, fills=fills, seals=seals)
     return Level(
         name=name, author=author,
         seed=room.seed or 0 if seed is None else seed,
@@ -1021,13 +1028,13 @@ def from_room(room, name: str, author: str = '', solution: str = '',
     )
 
 
-def chamber_from_room(room, *, fills=None, seals=None,
-                      where: str = 'geometry') -> Chamber:
-    """Capture one live Room as one CHAMBER — the half of `from_room` that is
-    about a room rather than a level.
+def capture_room(room, *, fills=None, seals=None,
+                 where: str = 'geometry') -> Room:
+    """Capture one LIVE room as one room AS WRITTEN — the half of `from_room`
+    that is about a room rather than a level.
 
-    Split out because a level of several chambers is captured a room at a time:
-    `from_room` makes the first chamber and the level around it, and every room
+    Split out because a level of several rooms is captured a room at a time:
+    `from_room` makes the first room and the level around it, and every room
     after it comes through here into `then`.
     """
     if fills is None:
@@ -1049,7 +1056,7 @@ def chamber_from_room(room, *, fills=None, seals=None,
         for r, c in s.opens:
             if 0 <= r < room.rows and 0 <= c < room.cols:
                 grid[r][c] = CellType.WALL
-    return Chamber(
+    return Room(
         rows=room.rows, cols=room.cols,
         cells=[encode_row(row, _mist_by_row.get(r, ()))
                for r, row in enumerate(grid)],

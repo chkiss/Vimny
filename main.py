@@ -455,26 +455,37 @@ def _show_reliquary_scroll(term: Terminal, iw: int, game_h: int,
 
     blank = row(0, '')
 
-    T  = C_['title']
+    T  = _popup_fit(C_['title'], BOX_IW)     # never wider than its own box
     lT = (BOX_IW - len(T)) // 2
     rT = BOX_IW - len(T) - lT
     title = row(BOX_IW, ' ' * lT + hi + T + inn + ' ' * rT)
 
+    # The description column is DERIVED from the box, not a second magic number
+    # that would not follow it: the row is `    {key}{sep}{desc}{suf}"`, so what
+    # is left for the description is whatever the fixed parts do not take. A
+    # description too long for it is elided rather than sliced — the same rule
+    # the forge pickers follow.
+    _SEP, _SUF = '  ────>  ', 'lands in  '
+    _KEYW = max((len(r[0]) for r in C_['kv_rows']), default=1)
+    _DESCW = BOX_IW - (4 + _KEYW + len(_SEP) + len(_SUF) + 1)
+
+    def _desc_cell(desc: str) -> str:
+        return _popup_fit(desc, _DESCW).ljust(_DESCW)
+
     def kv_clear(key: str, desc: str) -> str:
-        d25     = desc.ljust(25)[:25]
-        sep     = '  ────>  '
-        suf     = 'lands in  '
+        d25     = _desc_cell(desc)
+        sep     = _SEP
+        suf     = _SUF
         sym     = '"'
         colored = ('    ' + hi + key + rst +
                    inn + body + sep + d25 + suf + rst +
                    inn + amber + sym + rst + inn)
-        return row(50, colored)
+        return row(4 + len(key) + len(sep) + len(d25) + len(suf) + 1, colored)
 
     def kv_smudged(key: str, desc: str) -> str:
-        sep    = '  ────>  '
-        suf    = 'lands in  '
-        sym    = '"'
-        d25    = desc.ljust(25)[:25]
+        sep    = _SEP
+        suf    = _SUF
+        d25    = _desc_cell(desc)
         text   = '    ' + key + sep + d25            # command stays under the wet edge
         solid  = 4 + len(key) + len(sep)
         chars, smudged = _water_stain(text, solid)   # same ink-run fade as the lines-based scrolls
@@ -485,8 +496,8 @@ def _show_reliquary_scroll(term: Terminal, iw: int, game_h: int,
                 painted += col
                 prev = col
             painted += ch
-        colored = painted + rst + inn + body + suf + rst + inn + amber + sym + rst + inn
-        return row(50, colored)
+        colored = painted + rst + inn + body + suf + rst + inn + amber + '"' + rst + inn
+        return row(4 + len(key) + len(sep) + len(d25) + len(suf) + 1, colored)
 
     p_text  = C_['p_text']
     p_plain = ' "' + p_text
@@ -942,8 +953,13 @@ def _pick_entity(term: Terminal, iw: int, game_h: int) -> str:
         first = 0 if len(rows) <= win else min(max(0, sel - win // 2),
                                                len(rows) - win)
         lines = [edge + '╔' + sep_h + '╗' + rst, row(0, '')]
-        lines.append(row(BOX_IW, head + ' ' + title
-                         + box_bg + ' ' * max(0, BOX_IW - len(title) - 1)))
+        # The title is FITTED like any other row. Unfitted it was the one string
+        # in the box that could not clip — it would have pushed the right border
+        # out instead, which reads as the box being broken rather than the text
+        # being long.
+        _t = _popup_fit(title, BOX_IW - 1)
+        lines.append(row(BOX_IW, head + ' ' + _t
+                         + box_bg + ' ' * max(0, BOX_IW - len(_t) - 1)))
         lines.append(row(0, ''))
         for i in range(first, min(len(rows), first + win)):
             text = _popup_fit(rows[i], BOX_IW)
@@ -1104,8 +1120,13 @@ def _pick_one(term: Terminal, iw: int, game_h: int,
         rows  = [f' {v:<{width}}{d}' for v, d in options]
         foot  = ' j/k move   ⏎ choose   Esc cancel'
         lines = [edge + '╔' + sep_h + '╗' + rst, row(0, '')]
-        lines.append(row(BOX_IW, head + ' ' + title
-                         + box_bg + ' ' * max(0, BOX_IW - len(title) - 1)))
+        # The title is FITTED like any other row. Unfitted it was the one string
+        # in the box that could not clip — it would have pushed the right border
+        # out instead, which reads as the box being broken rather than the text
+        # being long.
+        _t = _popup_fit(title, BOX_IW - 1)
+        lines.append(row(BOX_IW, head + ' ' + _t
+                         + box_bg + ' ' * max(0, BOX_IW - len(_t) - 1)))
         lines.append(row(0, ''))
         for i, text in enumerate(rows):
             text = _popup_fit(text, BOX_IW)
@@ -1172,8 +1193,13 @@ def _pick_many(term: Terminal, iw: int, game_h: int,
                                                len(rows) - win)
         foot  = ' j/k move   space toggle   ⏎ accept   Esc cancel'
         lines = [edge + '╔' + sep_h + '╗' + rst, row(0, '')]
-        lines.append(row(BOX_IW, head + ' ' + title
-                         + box_bg + ' ' * max(0, BOX_IW - len(title) - 1)))
+        # The title is FITTED like any other row. Unfitted it was the one string
+        # in the box that could not clip — it would have pushed the right border
+        # out instead, which reads as the box being broken rather than the text
+        # being long.
+        _t = _popup_fit(title, BOX_IW - 1)
+        lines.append(row(BOX_IW, head + ' ' + _t
+                         + box_bg + ' ' * max(0, BOX_IW - len(_t) - 1)))
         lines.append(row(0, ''))
         for i in range(first, min(len(rows), first + win)):
             text = _popup_fit(rows[i], BOX_IW)
@@ -5275,10 +5301,10 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
         except (ValueError, LF.LevelFormatError) as _exc:
             return str(_exc)
         dungeon = _built
-        # Stand the author back in the chamber they are editing. `build` always
+        # Stand the author back in the room they are editing. `build` always
         # opens on the first — that is where a PLAYER starts — but the forge
-        # shows whichever one `:chamber` last selected.
-        dungeon.current_room = min(_draft.chamber, len(dungeon.rooms) - 1)
+        # shows whichever one `:room` last selected.
+        dungeon.current_room = min(_draft.room_index, len(dungeon.rooms) - 1)
         room    = dungeon.room
         dungeon.name        = _draft.level.name
         dungeon.level_slug  = level
@@ -5295,12 +5321,12 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
             msg_pool.append(text)
             pool_ttl = _MSG_ROTATE_TTL   # live events pace faster than an intro
 
-    def _chamber_door() -> bool:
-        """The DECLARATIVE room change: a level of several chambers, in order.
+    def _room_door() -> bool:
+        """The DECLARATIVE room change: a level of several rooms, in order.
 
-        Standing on the exit of any chamber but the last opens the next one, so
+        Standing on the exit of any room but the last opens the next one, so
         that exit is a door and not the way out — which is why this is asked at
-        the win check itself rather than in the per-turn ticks. A chamber's exit
+        the win check itself rather than in the per-turn ticks. A room's exit
         is reached and the level ends on the same instant, and a rule that ran a
         moment later would be answering a level that had already been won.
 
@@ -5310,9 +5336,9 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
         nonlocal room
         if edit_mode:
             # Painting is not walking. An author who drags the cursor over the
-            # exit of the chamber they are building must not be carried into the
-            # next one — the forge can only edit the first, so that is a room
-            # they cannot get back out of.
+            # exit of the room they are building must not be carried into the
+            # next one — `:room` is how you move between them deliberately, and
+            # a room you arrived in by dragging is one you did not mean to open.
             return False
         if not (getattr(room, 'advance_on_exit', False)
                 and dungeon.current_room < len(dungeon.rooms) - 1):
@@ -5321,15 +5347,15 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
         dungeon.current_room += 1
         room = dungeon.room
         player.row, player.col = room.spawn_pos
-        # The tape is the LEVEL's, not the chamber's: one route walks them all,
+        # The tape is the LEVEL's, not the room's: one route walks them all,
         # so the karaoke sheet and how far along it the player is travel through
         # the door with them.
         room.answer, room.answer_pos, room.answer_diverged = tape_state
-        undo_stack.clear()                 # each chamber keeps its own past
+        undo_stack.clear()                 # each room keeps its own past
         redo_stack.clear()
         # Not narration of the door — the door is on screen. What is NOT is that
-        # the chamber behind you took its undo stack with it.
-        _push('The way closes behind you — that chamber is past mending.')
+        # the room behind you took its undo stack with it.
+        _push('The way closes behind you — that room is past mending.')
         return True
 
     def _content_ticks() -> None:
@@ -7017,67 +7043,71 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
                                       + '.')
 
                 elif (_draft is not None and edit_mode
-                      and (_rcmd.rstrip('?!') == 'chamber'
-                           or _rcmd.startswith('chamber '))):
-                    # A level is a DESCENT: walk the exit of one chamber and the
+                      and (_rcmd.rstrip('?!') == 'room'
+                           or _rcmd.startswith('room '))):
+                    # A level is a DESCENT: walk the exit of one room and the
                     # next begins. The forge shows ONE at a time — there is one
                     # cursor and one screen — so this is how an author moves
                     # between them, adds one, or drops one.
                     #
-                    # Chambers are numbered from ONE here and from zero in the
-                    # file (`then[0]` is the second chamber). The author's count
-                    # is the one they can see: `-- CHAMBER 2/3 --` on the status
-                    # line is the same 2 they type.
+                    # ROOM, not "chamber": a chamber is part of one map joined to
+                    # the rest by a hallway or a door, all inside a single grid.
+                    # These are separate grids, and they are what `dungeon.rooms`
+                    # has always held.
+                    #
+                    # Rooms are numbered from ONE here and from zero in the file
+                    # (`then[0]` is the second room), because the author's count
+                    # should be the one they can see.
                     _arg   = _rcmd.partition(' ')[2].strip()
-                    _total = len(_draft.level.chambers)
-                    _cur   = _draft.chamber
+                    _total = len(_draft.level.rooms)
+                    _cur   = _draft.room_index
                     if _rcmd.endswith('!') and not _arg:
                         # Drop the one on screen.
                         try:
-                            DRAFT.delete_chamber(_draft, _cur)
+                            DRAFT.delete_room(_draft, _cur)
                         except ValueError as _exc:
                             _push(str(_exc))
                         else:
                             _err = _forge_rebuild()
-                            _push(f'Chamber {_cur + 1} removed — '
-                                  f'{len(_draft.level.chambers)} left.'
+                            _push(f'Room {_cur + 1} removed — '
+                                  f'{len(_draft.level.rooms)} left.'
                                   if not _err else f'Refused — {_err}')
                     elif not _arg or _rcmd.endswith('?'):
-                        _push(f'Chamber {_cur + 1} of {_total}. '
-                              ':chamber <n> to move, :chamber new to add'
-                              + (', :chamber! to remove this one' if _cur else '')
+                        _push(f'Room {_cur + 1} of {_total}. '
+                              ':room <n> to move, :room new to add'
+                              + (', :room! to remove this one' if _cur else '')
                               + '.')
                     elif _arg == 'new':
                         DRAFT.sync(_draft, room)      # keep what is on screen
                         try:
-                            _new_i = DRAFT.add_chamber(_draft)
+                            _new_i = DRAFT.add_room(_draft)
                         except ValueError as _exc:
                             _push(str(_exc))
                         else:
-                            _was, _draft.chamber = _draft.chamber, _new_i
+                            _was, _draft.room_index = _draft.room_index, _new_i
                             _err = _forge_rebuild()
                             if _err:
-                                _draft.chamber = _was
+                                _draft.room_index = _was
                                 _draft.level.then.pop()
                                 _forge_rebuild()
                                 _push(f'Refused — {_err}')
                             else:
-                                _push(f'Chamber {_new_i + 1} of '
-                                      f'{len(_draft.level.chambers)} — a blank '
+                                _push(f'Room {_new_i + 1} of '
+                                      f'{len(_draft.level.rooms)} — a blank '
                                       'room. The one before it opens onto this.')
                     elif _arg.isdigit() and 1 <= int(_arg) <= _total:
                         DRAFT.sync(_draft, room)      # before we leave the room
-                        _draft.chamber = int(_arg) - 1
+                        _draft.room_index = int(_arg) - 1
                         _err = _forge_rebuild()
                         if _err:
-                            _draft.chamber = _cur
+                            _draft.room_index = _cur
                             _forge_rebuild()
                             _push(f'Refused — {_err}')
                         else:
                             player.row, player.col = room.spawn_pos
-                            _push(f'Chamber {_draft.chamber + 1} of {_total}.')
+                            _push(f'Room {_draft.room_index + 1} of {_total}.')
                     else:
-                        _push(f'No chamber {_arg!r} — there '
+                        _push(f'No room {_arg!r} — there '
                               f'{"is" if _total == 1 else "are"} {_total}.')
 
                 elif (_draft is not None and edit_mode
@@ -8337,7 +8367,7 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
                 # Win / exit check
                 if ent is None:
                     ent = room.entity_at(player.row, player.col)
-                if ent and ent.kind == 'exit' and _chamber_door():
+                if ent and ent.kind == 'exit' and _room_door():
                     ent = None                # that exit was a door, not the way out
                 if ent and ent.kind == 'exit' and not won:
                     won = True

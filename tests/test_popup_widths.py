@@ -103,6 +103,36 @@ def test_wrapping_elides_rather_than_dropping_the_tail_silently():
     assert len(lines) == 2 and lines[-1].endswith('…')
 
 
+def test_a_title_too_long_for_its_box_clips_rather_than_breaking_the_border():
+    """The title was the one string in the box that could NOT clip: it is padded
+    with `max(0, BOX_IW - len(title) - 1)`, so an over-long one padded by zero
+    and pushed the right border out. A broken frame reads as the box being
+    wrong; an ellipsis reads as the text being long."""
+    long_title = 'brazier — ' + 'set what you need ' * 6
+    assert len(long_title) > main.POPUP_IW
+    assert len(main._popup_fit(long_title, main.POPUP_IW - 1)) <= main.POPUP_IW - 1
+
+
+def test_the_reliquary_scroll_rows_all_come_out_the_same_width():
+    """Its description column used to be a second magic number (25) that would
+    not follow the box width. It is derived now, so this is the check that the
+    arithmetic still lands: every row of the box, one width."""
+    import contextlib
+    import io
+    import re
+
+    from blessed import Terminal
+    term = Terminal(force_styling=None)
+    buf = io.StringIO()
+    with contextlib.redirect_stdout(buf):
+        main._show_reliquary_scroll(term, 78, 36, known=set())
+    raw = re.sub(r'\x1b\[[0-9;?]*[a-zA-Z]', '', buf.getvalue())
+    bars = [i for i, ch in enumerate(raw) if ch == '║']
+    assert bars, 'the scroll drew no box at all'
+    spans = {bars[i + 1] - bars[i] for i in range(0, len(bars) - 1, 2)}
+    assert len(spans) == 1, f'ragged box: {sorted(spans)}'
+
+
 def test_the_chosen_summary_wraps_instead_of_losing_its_tail():
     """`:teaches` with eight tokens overran the box and silently truncated — so
     the author could not see the very thing they were picking."""

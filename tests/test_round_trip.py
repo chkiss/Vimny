@@ -77,15 +77,15 @@ KNOWN_GAPS: dict[str, tuple[tuple[str, ...], str]] = {
     'shelving_room':        (('fog', 'mist'), 'mist over floor, not water'),
     'refrain_vault':        (('fog', 'mist'), 'mist over floor, not water'),
 
-    # ── a chamber with no way out ────────────────────────────────────────────
+    # ── a room with no way out ───────────────────────────────────────────────
     # Several rooms are sayable since phase 4 (`then`), and the Sanctum's two
-    # chambers survive the trip. The Wardenverse does not: it is a room with
+    # rooms survive the trip. The Wardenverse does not: it is a room with
     # `exit_pos = None`, which you leave by killing the Warden in it rather than
-    # by walking anywhere, and the format cannot say "a chamber with no exit" —
-    # every chamber has one, because a door is how a chamber ends. That is the
+    # by walking anywhere, and the format cannot say "a room with no exit" —
+    # every room has one, because a door is how a room ends. That is the
     # same `:e wardenverse` machinery the port already excepts.
     'warden_pathfinder':    (('fog', 'ents', 'exit'),
-                             'the Wardenverse: a chamber with no exit, left by '
+                             'the Wardenverse: a room with no exit, left by '
                              'an event rather than by a door'),
     'grandmasters_sanctum': (('ents',), 'room 0 has no exit entity of its own '
                              'and the format synthesises one'),
@@ -120,12 +120,12 @@ def _lost(slug) -> tuple[str, ...]:
     dungeon = main._build_dungeon(slug, SEED)
     src = dungeon.rooms[0]
     # Every room, not just the one the player starts in: a level of several
-    # chambers is captured a room at a time, the first as the level's own
+    # rooms is captured a room at a time, the first as the level's own
     # geometry and the rest as `then`. A probe that read room 0 alone would
     # report a two-room level as whole while leaving half of it behind.
     lvl = F.from_room(src, entry['name'], solution=src.answer or '',
                       teaches=entry.get('teaches', ()),
-                      then=[F.chamber_from_room(r, where=f'then[{i}].geometry')
+                      then=[F.capture_room(r, where=f'then[{i}].geometry')
                             for i, r in enumerate(dungeon.rooms[1:])])
     rebuilt = F.build(F.loads(F.dumps(lvl)), par=src.par)
     lost = set()

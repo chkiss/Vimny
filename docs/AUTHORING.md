@@ -37,7 +37,7 @@ always have, plus the level's own properties:
 | `:entity [kind] [field=value …]` | place or retune the entity under the cursor (`:entity` alone opens the palette; `:entity?` reads it back; `:entity!` removes it) |
 | `:seal <text>` | arm a text-match door on the last VISUAL selection |
 | `:bolt` | make the cell you are standing on — or every wall cell of a `'<,'>` selection — open while that seal reads true |
-| `:chamber [n\|new]` | move between the level's chambers, or add one (`:chamber` alone says where you are; `:chamber!` removes the one you are in) |
+| `:room [n\|new]` | move between the level's rooms, or add one (`:room` alone says where you are; `:room!` removes the one you are in) |
 | `:name` `:author` `:teaches` `:requires` `:intro` `:alternate` `:vocab` | the metadata block |
 | `:meta` | what the draft currently claims |
 | `:canvas <rows>x<cols>` | grow (or trim) the ground the level is drawn on (`:canvas` alone says how big it is) |
@@ -531,10 +531,10 @@ the route — "count the words yourself, however many there are today" — Vimny
 cannot score that level. Par is one number, and a route that is four keys for
 one player and five for the next does not have one.
 
-### `then` — a level of more than one chamber
+### `then` — a level of more than one room
 
 Most levels are one room. A level that is a **descent** — a gallery, then the
-arena you are chased into — writes the chambers after the first in `then`:
+arena you are chased into — writes the rooms after the first in `then`:
 
 ```json
   "geometry": { "rows": 12, "cols": 60, "cells": ["..."],
@@ -548,49 +548,51 @@ arena you are chased into — writes the chambers after the first in `then`:
   ]
 ```
 
-Chambers are walked **in order, one way**. Stand on a chamber's exit and the
-next one begins where its own `spawn` says; only the LAST chamber's exit wins
-the level. To make a door conditional, put a seal on the exit cell — you cannot
-stand on stone, so nothing else is needed.
+Rooms are walked **in order, one way**. Stand on a room's exit and the next one
+begins where its own `spawn` says; only the LAST room's exit wins the level. To
+make a door conditional, put a seal on the exit cell — you cannot stand on
+stone, so nothing else is needed.
 
-("Chamber" and not "room": a `room` is the engine's single grid of cells, and
-the levels called *Halls* are levels. A chamber is one segment of a descent.)
+("Room" and not "chamber": a *chamber* is part of one map, joined to the rest of
+it by a hallway or a door, and you can walk to it without leaving the grid.
+These are separate grids. The levels called *Halls* are levels, so that word was
+never free either.)
 
-Each chamber carries its own `geometry`, `fill`, `seals`, `char_runs` and
+Each room carries its own `geometry`, `fill`, `seals`, `char_runs` and
 `entities`, and nothing else: the seed, the tape, what the level teaches and
-your `vocabulary` belong to the LEVEL. `then[0]` is the chamber after the
-first, not the first.
+your `vocabulary` belong to the LEVEL. `then[0]` is the room after the first,
+not the first.
 
-Three things follow from there being one level and several chambers:
+Three things follow from there being one level and several rooms:
 
 * **One tape.** `solution` is the whole descent, in order, with no notation for
   passing a door — walking onto the exit is what does it. Par is the whole
   route.
 * **Fills are numbered across the level.** `<fill0.3>` is the level's first
-  fill wherever it stands; if the first chamber has two fills, the first fill
-  in `then[0]` is `<fill2.…>`. `:fill?` counts the same way, so standing on a
-  word always gives you a reference you can paste into the tape.
-* **The undo stack does not follow you.** Each chamber keeps its own past; the
-  chamber behind you is past mending.
+  fill wherever it stands; if the first room has two fills, the first fill in
+  `then[0]` is `<fill2.…>`. `:fill?` counts the same way, so standing on a word
+  always gives you a reference you can paste into the tape.
+* **The undo stack does not follow you.** Each room keeps its own past; the room
+  behind you is past mending.
 
 #### Building one in the forge
 
-`:chamber new` appends a chamber and stands you in it, on the same blank canvas
-a new draft opens on. `:chamber 2` moves to the second, `:chamber` on its own
-says where you are, and `:chamber!` removes the one you are in.
+`:room new` appends a room and stands you in it, on the same blank canvas a new
+draft opens on. `:room 2` moves to the second, `:room` on its own says where you
+are, and `:room!` removes the one you are in.
 
-The forge shows **one chamber at a time** — there is one cursor and one screen —
-so `:chamber` is the whole of moving between them. What you paint is folded back
-into that chamber and no other: the level's name, tape, vocabulary and metadata
-are the LEVEL's, and the chambers you are not standing in ride through untouched.
+The forge shows **one room at a time** — there is one cursor and one screen — so
+`:room` is the whole of moving between them. What you paint is folded back into
+that room and no other: the level's name, tape, vocabulary and metadata are the
+LEVEL's, and the rooms you are not standing in ride through untouched.
 
-Which chamber you had open is **not saved**. It is a fact about your editing
-session, and a draft that reopened into chamber 4 because that is where its
-author left off would be a file that renders differently for the next reader.
+Which room you had open is **not saved**. It is a fact about your editing
+session, and a draft that reopened into room 4 because that is where its author
+left off would be a file that renders differently for the next reader.
 
-The first chamber cannot be removed: it is the level's own `geometry` and where
-the player spawns. A level may hold at most 8 chambers — a descent, not a
-dungeon crawl.
+The first room cannot be removed: it is the level's own `geometry` and where the
+player spawns. A level may hold at most 8 rooms — a descent, not a dungeon
+crawl.
 
 ### `no_horse`
 
