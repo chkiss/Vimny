@@ -33,6 +33,25 @@ from render.utils import inner_w as _inner_w
 from render.hint_bar import hint_text as _hint_text
 
 
+def _discovered(room: Room, r: int, c: int) -> bool:
+    """True if some open cell beside (r, c) has been revealed.
+
+    The shared answer to "could the player have seen this yet?", for the two
+    things that are drawn THROUGH fog: a gate's band, and mist. Both are
+    permanently fogged — a gate is a wall and mist is weather — so neither can
+    use the fog on its own cell to decide, and neither may be drawn from the
+    other side of a dungeon the player has not opened.
+    """
+    for dr, dc in ((-1, 0), (1, 0), (0, -1), (0, 1)):
+        nr, nc = r + dr, c + dc
+        if not (0 <= nr < room.rows and 0 <= nc < room.cols):
+            continue
+        if (room.cells[nr][nc] in (CellType.FLOOR, CellType.CORRIDOR, CellType.WATER)
+                and (nr, nc) not in room.fog_cells):
+            return True
+    return False
+
+
 def _seal_shown(room: Room, r: int, c: int) -> bool:
     """True if a registered gate at (r,c) should show its band.
 
@@ -42,16 +61,7 @@ def _seal_shown(room: Room, r: int, c: int) -> bool:
     A gate is DISCOVERED instead when some open cell beside it has been
     revealed: that is exactly when a player could have seen the stonework.
     """
-    if (r, c) not in room.sealed_cells:
-        return False
-    for dr, dc in ((-1, 0), (1, 0), (0, -1), (0, 1)):
-        nr, nc = r + dr, c + dc
-        if not (0 <= nr < room.rows and 0 <= nc < room.cols):
-            continue
-        if (room.cells[nr][nc] in (CellType.FLOOR, CellType.CORRIDOR, CellType.WATER)
-                and (nr, nc) not in room.fog_cells):
-            return True
-    return False
+    return (r, c) in room.sealed_cells and _discovered(room, r, c)
 
 
 def _is_vertical_door(room: Room, r: int, c: int, kind: str) -> bool:
@@ -604,16 +614,26 @@ def render_all(term: Terminal, dungeon: Dungeon, player: Player,
         # Fog?
         if (room_r, room_c) in room.fog_cells:
             if (room.cells[room_r][room_c] == CellType.WATER
-                    and (room_r, room_c) in room.mist_cells):
+                    and (room_r, room_c) in room.mist_cells
+                    and _discovered(room, room_r, room_c)):
                 # MIST on water reads as hazy water, not stone — the channel
                 # stays visibly a channel (scans still stop at the fog), but it
                 # must not read as OPEN water either, so it keeps water's '~' on
                 # its own lifted-grey background, and never animates.
                 # Plain-fogged water is DARK like any hidden cell: an
                 # unrevealed pool gives nothing away.
+                #
+                # …and NEITHER DOES AN UNDISCOVERED CHANNEL. Mist is permanently
+                # fogged by contract, so drawing it on that alone drew it
+                # everywhere at once — a seep threading a sealed vault told the
+                # player where every corridor was before a single door opened.
+                # It is discovered on the same rule a gate's band is
+                # (`_seal_shown`): when some open cell beside it has been
+                # revealed, which is exactly when you could have seen it.
                 return C.mist_bg() + C.mist_fg() + S.MIST + C.normal_fg()
             if ((room_r, room_c) not in room.mist_cells
-                    or room.char_run_at(room_r, room_c) is None):
+                    or room.char_run_at(room_r, room_c) is None
+                    or not _discovered(room, room_r, room_c)):
                 return wall_bg + ' ' + C.normal_fg()
             # MISTED FLOOR carrying a glyph: text across a chasm — readable in
             # full colour but never standable, searchable, or cuttable (the fog
