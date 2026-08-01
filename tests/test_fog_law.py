@@ -110,7 +110,7 @@ def test_a_downloaded_level_gets_the_same_law():
 #: plain and locked ones, and the seal doors and boss seals too, which is what
 #: the two keeps turn on.
 _DOOR_DARK = ('counting_crypts', 'goblin_gauntlet', 'lineheads',
-              'wardens_keep', 'warden_surveyor')
+              'wardens_keep', 'warden_surveyor', 'culling_ledger')
 
 
 @pytest.mark.parametrize('slug', _DOOR_DARK)

@@ -12820,9 +12820,14 @@ def build_dungeon_culling_ledger(seed: int) -> Dungeon:
     room.answer = ':set<Space>nu<CR> 2l x $ p :2,19v/that/d<Space>_<CR> $ p $'
 
     room.rebuild_indexes()
-    pocket = {(_CL_COR, c) for c in range(51, 55)}  # the dark exit pocket
-    room.fog_cells  = fog | pocket                  # EVERYTHING beyond door one
+    # EVERYTHING beyond door one is dark, and that is a rule about the DOORS —
+    # so the doors carry it (`_doors_block_sight`) rather than a list of cells.
+    # It fogs one cell the hand-built list did not: `_CL_GAP` (21, 12), the lone
+    # gap in the stone course. Dark at spawn is right — the gap is a thing to
+    # FIND once you are past door one, not a signpost read from the doorway
+    # (user, 2026-08-01).
     room.mist_cells = set()                         # sleeps dark; no mist yet
+    _doors_block_sight(room)
     dungeon.rooms        = [room]
     dungeon.current_room = 0
     return dungeon

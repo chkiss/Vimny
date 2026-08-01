@@ -4012,7 +4012,7 @@ _LEVEL_INTROS = {
     'warden_eternal': ('The Warden Eternal — six wardens you have already beaten wait in the dark, one behind each stone, and something older waits below them all. It has walked beside you the whole way, and blessed every door. Go down and meet it.', 70),
     'binders_reliquary': ('The Binder\'s Reliquary — still water splits the vault, too wide to step and too deep to wade. On the far shore a single word is legible, and beyond it, the binder\'s last work.', 70),
     'warden_scrivener':    ('The Warden Scrivener — he has copied these halls for an age and finished nothing. The great page waits, passage by passage, for a truer hand.', 70),
-    'warden_manifold':     ('The Warden Manifold — he stamps himself into the world. Light the four braziers; the gate will draw and the fog will part.', 70),
+    'warden_manifold':     ('The Warden Manifold — he does not meet you, he multiplies. Every copy stands as the last one stood, and the dark keeps his count for him. Only one of them can bleed.', 70),
     'warden_surveyor':     ('The Warden Surveyor — he keeps a long hall where the floor falls away between the words. Cross it word by word, over the void.', 60),
     'spellwrights_forge':  ('The Spellwright\'s Forge — three rhymes you know are carved here, and '
                             'each is wronged its own way: a duck lows like a cow, a mouse runs the '

@@ -69,7 +69,6 @@ KNOWN_GAPS: dict[str, tuple[tuple[str, ...], str]] = {
     # seed. Before adding a new fog exemption, check whether it is really this.
     'waypoint_sanctum':     (('fog',), 'unlit sanctum'),
     'operators_vault':      (('fog',), 'unlit vault'),
-    'culling_ledger':       (('fog',), 'unlit ledger hall'),
     'wet_ink':              (('fog',), 'unlit hall'),
     'warden_manifold':      (('fog',), 're-laid every turn by the manifold tick'),
     'warden_scrivener':     (('fog',), 're-laid every turn by the scrivener tick'),
