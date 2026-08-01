@@ -20,8 +20,8 @@
 
 Ten snaked corridors, each admitting exactly one cheapest d-variant (dw, db,
 de, dB, dE, dF?, dW, d0, d$, dd). Armored hp-2 guards make blade-to-blade x
-bloody while a d-cut removes them outright. A gated corridor opens when its guard
-group is wiped and the vault opens when every guard is down (both stateless +
+bloody while a d-cut removes them outright. A gated corridor's SEAL door opens when its
+guard group is wiped and the vault opens when every guard is down (both stateless +
 undo-safe in main._operators_vault_tick) — a door a jump cannot reach, because a
 jump kills nothing. C5's shaft is sealed on its row reading true, which is what
 refuses an over-wide cut; dd off the intended row collapses
@@ -135,7 +135,7 @@ def test_shaft_placement_forward_at_line_end_backward_off_line_start():
 
 def test_gates_are_edit_immune_uniquely_colored_and_no_keys_preplaced():
     room = _room()
-    gates = {(e.row, e.col): e for e in room.entities if e.kind == 'locked_door'}
+    gates = {(e.row, e.col): e for e in room.entities if e.kind == 'seal_door'}
     assert set(gates) == {(3, 18), (9, 20), (21, 45), (33, 17)}
     assert all(e.edit_immune for e in gates.values())
     assert gates[(3, 18)].tag == 'gold'
@@ -260,7 +260,7 @@ def test_c1_dw_is_exact_and_wider_cuts_shred_the_chest():
     p = Player(row=3, col=7)
     _cut(room, p, '$')                               # sloppy — chest dies
     assert not _chests(room, 3)
-    gate = next(e for e in room.entities if e.kind == 'locked_door' and e.row == 3)
+    gate = next(e for e in room.entities if e.kind == 'seal_door' and e.row == 3)
     assert gate.alive                                # edit_immune — cuts can't open it
 
 
@@ -417,7 +417,7 @@ def test_c10_dd_raises_the_ledge_and_a_second_dd_is_the_oubliette():
 # jumped to: a jump kills nothing.
 def _gates(room):
     return [(e.row, e.col, e.tag) for e in room.entities
-            if e.alive and e.kind == 'locked_door']
+            if e.alive and e.kind == 'seal_door']
 
 
 def test_a_gate_opens_when_its_group_falls_and_re_bars_after_undo():
@@ -433,7 +433,7 @@ def test_a_gate_opens_when_its_group_falls_and_re_bars_after_undo():
     # re-derived from who is alive rather than remembered.
     g1.alive = True
     gate = next(e for e in room.entities
-                if e.kind == 'locked_door' and e.tag == 'gold')
+                if e.kind == 'seal_door' and e.tag == 'gold')
     gate.alive = True
     room.rebuild_indexes()
     assert main._operators_vault_tick(room, player) == []
@@ -567,7 +567,7 @@ def test_answer_solves_the_vault(monkeypatch, seed):
     assert cap['budget'].spent == room.par            # solved in exactly par keystrokes
     assert room.rows == 34                            # exactly one line was cut away
     assert _guards(room) == []
-    assert not any(e.alive and e.kind == 'locked_door' for e in room.entities)
+    assert not any(e.alive and e.kind == 'seal_door' for e in room.entities)
     assert not any(e.alive and e.kind == 'floor_key' for e in room.entities)
     # Chests are LOOT, not a toll. Par used to be asserted to collect every one
     # of them, which made this level the only one of seven with a par and a
@@ -636,7 +636,7 @@ def test_deep_undo_unwinds_the_whole_solve(monkeypatch):
     assert room.rows == 35                           # the cut line is back
     assert len(_guards(room)) == 20                  # every guard restored
     assert sorted(e.tag for e in room.entities
-                  if e.alive and e.kind == 'locked_door') == ['', 'blue', 'gold', 'red']
+                  if e.alive and e.kind == 'seal_door') == ['', 'blue', 'gold', 'red']
     assert len([e for e in room.entities
                 if e.alive and e.kind == 'chest_scroll']) == 4
     assert not [e for e in room.entities if e.alive and e.kind == 'floor_key']

@@ -9619,7 +9619,11 @@ def build_dungeon_operators_vault(seed: int) -> Dungeon:
                                     ai='chase', ai_speed=1, tag=tag))
 
     def gate(r, c, color):
-        room.entities.append(Entity(kind='locked_door', row=r, col=c, tag=color,
+        # SEAL doors, not LOCKED ones. A locked door is a promise of a key, and
+        # since the gates started opening on a dead pack there is no key in this
+        # level to find — a player reading `locked` would be hunting for one.
+        # A seal is a door held by a condition, which is exactly what these are.
+        room.entities.append(Entity(kind='seal_door', row=r, col=c, tag=color,
                                     edit_immune=True))
 
     def chest(r, c):
@@ -9694,7 +9698,7 @@ def build_dungeon_operators_vault(seed: int) -> Dungeon:
     word(31, 4, plain(5)); goblin(31, 10); goblin(31, 16); goblin(31, 22)
     word(33, 7, plain(4)); word(33, 12, plain(4))
     # the vault: the door and the way out — the level's chests came earlier
-    room.entities.append(Entity(kind='locked_door', row=_OV_DOOR[0], col=_OV_DOOR[1],
+    room.entities.append(Entity(kind='seal_door', row=_OV_DOOR[0], col=_OV_DOOR[1],
                                 edit_immune=True))
     room.entities.append(Entity(kind='exit', row=33, col=19))
     # guard-group tag → gate color-tag (tags are unique; the key-drop tick in

@@ -2181,7 +2181,7 @@ def _operators_vault_tick(room, player) -> list:
     # Look doors up LIVE by their (unique) colour tag — undo replaces
     # room.entities with snapshot copies, so holding entity references here
     # would go stale after the first u.
-    doors = {e.tag: e for e in room._entity_by_kind.get('locked_door', []) if e.alive}
+    doors = {e.tag: e for e in room._entity_by_kind.get('seal_door', []) if e.alive}
 
     def _pack_alive(gtag):
         return any(e.alive and e.kind == 'goblin' and e.tag == gtag
