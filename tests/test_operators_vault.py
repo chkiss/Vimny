@@ -209,8 +209,12 @@ def test_oubliette_pockets_are_sealed_empty_floor():
 
 def test_par_and_budget():
     room = _room()
-    assert room.par == 92        # dd's Vim-true fnb landing saved a key (2026-07-12)
-    assert room.budget == math.ceil(room.par * 1.4) == 129
+    # 92 → 87 on 2026-08-01: `$` beats `2l` at the three gate approaches (a gate
+    # stops `$`, so the line end IS the door) and at both of the tail's counted
+    # steps. NOT at C5, where `$` is also cheaper and sails past the scroll
+    # chest in the gap — par collects every chest, so that one is not a route.
+    assert room.par == 87
+    assert room.budget == math.ceil(room.par * 1.4) == 122
     assert room.answer.strip()
     # travel discipline: counts stay single-digit (a human can count to 9),
     # and word motions appear only where they beat or tie the count move.

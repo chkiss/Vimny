@@ -9521,16 +9521,26 @@ _OV_VAULT_ROW  = 33                   # antechamber + vault: floor 5..19
 _OV_DOOR       = (33, 17)             # vault door (untagged); the EXIT is the prize
 _OV_KEY_DCOL   = 3                    # keys drop 3 cells before their door
 # answer keystrokes (operators written as separate single-key tokens: 'd w' = dw)
-_OV_ANSWER = ('w d w 7l x l x 2l p $ 3j '     # C1  → dw; chest + gold key + gate
+#: PAR IS THE OPTIMUM, and it was seven keys off. The route below is the
+#: cheapest known, driven on every seed: exit reached, unharmed, every guard
+#: cut, every door opened. It was 92 until 2026-08-01, when the travel tokens
+#: were golfed — `$` beats `2l` at the three gate approaches (a gate stops `$`,
+#: so the line end IS the door), `$` beats `4l` at C5's reflowed word, and both
+#: of the tail's counted steps are line ends too. Seven `l`-counts, seven keys.
+_OV_PAR = 87
+_OV_ANSWER = ('w d w 7l x l x $ p $ 3j '      # C1  → dw; chest + gold key + gate
               'd b h 3j '                     # C2  ← db lands by the shaft mouth
-              'd e w e x l x 2l p $ 3j '      # C3  → de; chest + blue key + gate
+              'd e w e x l x $ p $ 3j '       # C3  → de; chest + blue key + gate
               'd B h 3j '                     # C4  ← dB from the WORD head
               'd E e 4l x $ 3j '              # C5  → dE; e rides the reflowed word
+                                              # (NOT `$`: it is one key cheaper
+                                              # and sails past the scroll chest
+                                              # in the gap, which par collects)
               'd F ? 3j '                     # C6  ← dF? lands on the shaft mouth
-              'w d W e 7l x l x 2l p $ 3j '   # C7  → dW; chest + red key + gate
+              'w d W e 7l x l x $ p $ 3j '    # C7  → dW; chest + red key + gate
               'd 0 5l 3j '                    # C8  ← d0 sweep (dd = oubliette)
               'd $ $ 3j '                     # C9  → d$ sweep
-              'd d d $ l 2j 9l x 2l p 2l')    # C10 ← dd, ride down, d$, vault
+              'd d d $ l 2j 9l x $ p $')      # C10 ← dd, ride down, d$, vault
                                               # (dd lands Vim-true on the risen
                                               # ledge's FIRST NON-BLANK, col 4
                                               # — one l to the vault approach)
@@ -9709,9 +9719,9 @@ def build_dungeon_operators_vault(seed: int) -> Dungeon:
                 room.mist_cells.add((r, c))
     _doors_block_sight(room)
     room.fog_cells |= room.mist_cells      # mist is a SUBSET of fog by contract
-    room.par    = 92                              # dd's Vim-true fnb landing
+    room.par    = _OV_PAR                         # dd's Vim-true fnb landing
     room.answer = _OV_ANSWER
-    room.budget = math.ceil(92 * 1.4)
+    room.budget = math.ceil(_OV_PAR * 1.4)        # STANDARD
     # A d-operator teaching level: bare-w navigation must stay precise (text
     # words only), so opt out of the jump-to-entity word-stop behaviour.
     room.entity_word_stops = False
