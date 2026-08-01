@@ -189,6 +189,18 @@ def auto_fog_tick(room, player_r: int, player_c: int) -> None:
                            - (room.mist_cells or set()))
 
 
+def unhide_region(room, cells) -> None:
+    """Reveal a region a level laid with `_lay_dark`: lift the fog from its
+    floor and the veil from its walls in one call.
+
+    The two are different mechanisms on purpose (see `Room.veiled_cells`), but
+    a level that hid a hall hid all of it, and reveals it all at once. Keeping
+    the pairing here means a caller cannot lift one and forget the other."""
+    cells = set(cells)
+    room.fog_cells -= cells
+    room.veiled_cells -= cells
+
+
 def _reveal_from(room, player_r: int, player_c: int) -> None:
     """After a door opens, remove all cells now visible from player from fog_cells."""
     if not room.fog_cells:

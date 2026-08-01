@@ -637,8 +637,14 @@ def render_all(term: Terminal, dungeon: Dungeon, player: Player,
         if ent:
             return _ent_cell_str(ent, room, room_r, room_c, mode, floor_bg)
 
-        # Character run?
-        ru = room.char_run_at(room_r, room_c)
+        # A VEILED PLAQUE reads as the stone it is carved into — the glyph is
+        # there, it is simply not legible yet. Checked before the char-run so a
+        # veiled cell falls through to ordinary terrain rendering; the level's
+        # own tick lifts the veil (firelight, a ritual) by discarding the cell.
+        if (room_r, room_c) in getattr(room, 'veiled_cells', ()):
+            ru = None
+        else:
+            ru = room.char_run_at(room_r, room_c)
         if ru:
             idx = room_c - ru.col
             sym = ru.symbols[idx]

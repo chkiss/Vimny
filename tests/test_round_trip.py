@@ -67,11 +67,15 @@ KNOWN_GAPS: dict[str, tuple[tuple[str, ...], str]] = {
     # seals alike. `_doors_block_sight` says the rule instead (`Entity.opaque`),
     # the law derives the same cells, and the fog came out identical on every
     # seed. Before adding a new fog exemption, check whether it is really this.
+    #
+    # THREE MORE LEFT on 2026-08-01, and none of them was fog either: the Wet
+    # Ink, the Manifold and the Scrivener were hiding CARVED WALL CELLS, which
+    # the law's universe (`_FOGGABLE_CELLS`) cannot contain by definition. That
+    # is a puzzle handing out its clue in instalments, not a fact about what the
+    # eye can reach, so it moved to `Room.veiled_cells` — the same
+    # implementation under its own name. Their floors were derivable all along.
     'waypoint_sanctum':     (('fog',), 'unlit sanctum'),
     'operators_vault':      (('fog',), 'unlit vault'),
-    'wet_ink':              (('fog',), 'unlit hall'),
-    'warden_manifold':      (('fog',), 're-laid every turn by the manifold tick'),
-    'warden_scrivener':     (('fog',), 're-laid every turn by the scrivener tick'),
 
     # ── mist off the water ───────────────────────────────────────────────────
     # `encode_row` writes an M only where the cell is WATER, so mist in the file
@@ -127,6 +131,11 @@ def _snap(room) -> dict:
         # table has to name or the format has to close.
         'wrap':  (bool(getattr(room, 'wrap_buffer', False)),
                   int(getattr(room, 'wrap_width', 0) or 0)),
+        # VEILED plaques. Compared from the day the field existed: moving the
+        # wall-cell darkness out of `fog_cells` fixed three exemptions, and it
+        # would have been a cheat to fix them by putting the thing somewhere
+        # the probe was not looking.
+        'veiled': sorted(getattr(room, 'veiled_cells', ()) or ()),
     }
 
 

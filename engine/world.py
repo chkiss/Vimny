@@ -318,6 +318,22 @@ class Room:
     par: Optional[int]          = None
     seed: Optional[int]         = None
     fog_cells: set              = field(default_factory=set)  # (r,c) pairs not yet visible
+    #: VEILED PLAQUES — wall cells whose carved text is not readable yet.
+    #:
+    #: Deliberately NOT fog. Fog is the stone law: a physical fact about what
+    #: the eye can reach, derived from the walls, and its universe is the cells
+    #: you could stand in (`_FOGGABLE_CELLS`). A plaque hidden until the
+    #: firelight reaches it is not physics at all — it is a puzzle handing out
+    #: its clue in instalments, and it lives on WALL cells, which the law can
+    #: never speak about.
+    #:
+    #: Three levels used to say it by putting wall cells into `fog_cells`, and
+    #: every one of them then had to be excused from the fog audits and from the
+    #: round-trip probe — an exception per level for a mechanic they shared.
+    #: This is the same implementation (the renderer draws a veiled cell as bare
+    #: stone) under its own name, so neither rule has to make room for the
+    #: other. Reveal by discarding from this set, exactly as fog is lifted.
+    veiled_cells: set           = field(default_factory=set)
     mist_cells: set             = field(default_factory=set)  # PERMANENT scenic mist over water:
                                                               # a subset of fog_cells that reveal
                                                               # floods neither cross nor clear

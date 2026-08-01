@@ -27,6 +27,24 @@ from engine.motion import (_fog_unreachable, _cell_char, _is_word_char,
                            apply_stone_fog, _FOG_BLOCK_KINDS)
 from generation.room_gen import make_room, RUNE_CHAR as _RUNE_CHAR
 
+def _lay_dark(room, cells) -> None:
+    """Hide a whole region, each cell by the right mechanism.
+
+    A region a level wants dark is usually BOTH kinds of cell at once — the
+    floor of a sealed hall and the inscriptions on its walls. Those are two
+    different facts: the floor is fogged because the eye cannot reach it (the
+    stone law, derived), and the wall is veiled because its carving is not
+    legible yet (a puzzle, declared). Putting the walls in `fog_cells` is what
+    used to make these levels exceptions to every fog rule they touched.
+    """
+    from engine.motion import _FOGGABLE_CELLS as _FC
+    for (r, c) in cells:
+        if room.cells[r][c] in _FC:
+            room.fog_cells.add((r, c))
+        else:
+            room.veiled_cells.add((r, c))
+
+
 def _doors_block_sight(room) -> None:
     """Say a level's darkness with its DOORS, not with a list of cells.
 
@@ -6427,13 +6445,15 @@ def build_dungeon_wet_ink(seed: int) -> Dungeon:
     room.exit_pos  = _WI_EXIT
 
     room.rebuild_indexes()
-    # SCRIPTED fog on the plaque's WALL cells (the fog-audit only polices
-    # stone-hidden FLOOR): quarter k+1 (and the gap before it) is dark
-    # until brazier k burns.
+    # The plaque is read in instalments: quarter k+1 (and the gap before it)
+    # stays unreadable until brazier k burns. VEILED, not fogged — the text is
+    # carved into WALL cells, which the fog law has nothing to say about, and
+    # calling it fog cost this level an exemption from every fog audit for a
+    # mechanic that was never about what the eye can reach.
     room._wi_seg_fog = tuple(
         frozenset((_WI_LEDGE, _WI_PLQ_COL + 5 * k - 1 + i) for i in range(5))
         for k in (1, 2, 3))
-    room.fog_cells = set().union(*room._wi_seg_fog)
+    room.veiled_cells = set().union(*room._wi_seg_fog)
     room.par    = _WI_PAR
     room.budget = math.ceil(_WI_PAR * 1.4)
     room.answer = (f'i{ws[0]}<Esc> 2+ yl w P gi<Space>{ws[1]}<Esc> 2+ 2w P '
@@ -10327,9 +10347,9 @@ def build_dungeon_warden_manifold(seed: int) -> Dungeon:
         if (r, c) not in _WM_PODIUMS)
     room._wm_hall_fog   = hall_fog
     room._wm_pocket_fog = frozenset(_WM_POCKET)
-    room.fog_cells.update(_WM_PODIUMS)
-    room.fog_cells.update(hall_fog)
-    room.fog_cells.update(_WM_POCKET)
+    _lay_dark(room, _WM_PODIUMS)
+    _lay_dark(room, hall_fog)
+    _lay_dark(room, _WM_POCKET)
 
     def lay(row, col, text, kind):
         c = col
@@ -10381,6 +10401,14 @@ def build_dungeon_warden_manifold(seed: int) -> Dungeon:
     room._wm_word2, room._wm_warp = word2, warp_glyph
     room._wm_gate, room._wm_seal = _WM_GATE, _WM_SEAL
     room._wm_braziers = _WM_BRAZIERS
+    # Every shut stone that is really a DOOR, registered so the renderer bands
+    # it (`_seal_shown`). Without this the ritual gate and the final seal read
+    # as ordinary wall — the Cipher Cell, the Echo Vault and the Shelving Room
+    # all band theirs, so a player who has met those levels is entitled to
+    # read plain stone as plain stone. Discovery is still gated: a band only
+    # shows once some open cell beside it is un-fogged.
+    room.sealed_cells = {_WM_GATE, _WM_SEAL} | {
+        (pr + (1 if pr < _WM_AXIS else -1), pc) for (pr, pc) in _WM_PODIUMS}
 
     # The Warden: edit_immune (every operator parries), four x-windows of HP.
     # tag='manifold' exempts him from the stock warden auto-summon — pressure
@@ -12132,9 +12160,9 @@ def build_dungeon_warden_scrivener(seed: int) -> Dungeon:
         if (r, c) not in _WSC_ALCOVES and (r, c) not in _WSC_POCKET)
     room._wsc_hall_fog   = hall_fog
     room._wsc_pocket_fog = frozenset(_WSC_POCKET)
-    room.fog_cells.update(_WSC_ALCOVES)
-    room.fog_cells.update(hall_fog)
-    room.fog_cells.update(_WSC_POCKET)
+    _lay_dark(room, _WSC_ALCOVES)
+    _lay_dark(room, hall_fog)
+    _lay_dark(room, _WSC_POCKET)
 
     def lay(row, col, text, kind):
         c = col
@@ -12169,6 +12197,9 @@ def build_dungeon_warden_scrivener(seed: int) -> Dungeon:
     room._wsc_word2, room._wsc_rot2, room._wsc_rotmid = word2, rot2, mid
     room._wsc_threshold = threshold
     room._wsc_gate, room._wsc_seal = _WSC_GATE, _WSC_SEAL
+    # See the Manifold: every shut stone that is really a door, banded.
+    room.sealed_cells = {_WSC_GATE, _WSC_SEAL} | {
+        (ar + (1 if ar < _WSC_AXIS else -1), ac) for (ar, ac) in _WSC_ALCOVES}
 
     # The Scrivener: edit_immune (every operator parries), five x-windows.
     room.entities.append(Entity(kind='warden', row=_WSC_ALCOVES[0][0],

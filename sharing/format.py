@@ -149,6 +149,11 @@ class Room:
     #: segment walls are spaced so `gj`/`gk` clear exactly one at ANY width.
     wrap:       bool  = False
     wrap_width: int   = 0
+    #: VEILED plaques: wall cells whose carving is not legible yet. Declared
+    #: rather than derived, because unlike fog it is not a fact about the walls
+    #: — it is the level handing out its clue in instalments, and only the
+    #: author knows the instalments. Listed as [row, col] pairs.
+    veiled:     list  = field(default_factory=list)
     #: Where this room's keys live in the FILE. Carried on it so that every
     #: message about it — parser, validator, forge — names the place the author
     #: has to go and edit, rather than a room number they never wrote down.
@@ -176,6 +181,7 @@ class Level:
     exit:        tuple = (1, 2)
     wrap:        bool = False                         # see Room.wrap
     wrap_width:  int  = 0
+    veiled:      list = field(default_factory=list)   # see Room.veiled
     fills:       list = field(default_factory=list)   # list[Fill]
     seals:       list = field(default_factory=list)   # list[world.Seal]
     char_runs:   list = field(default_factory=list)   # explicit text
@@ -197,7 +203,7 @@ class Level:
         return [Room(rows=self.rows, cols=self.cols, cells=self.cells,
                      spawn=self.spawn, exit=self.exit,
                      wrap=self.wrap, wrap_width=self.wrap_width,
-                     fills=self.fills,
+                     veiled=self.veiled, fills=self.fills,
                      seals=self.seals, char_runs=self.char_runs,
                      entities=self.entities), *self.then]
 
@@ -235,8 +241,8 @@ def parse(data: dict) -> Level:
 
     unknown = set(data) - {'schema', 'name', 'author', 'seed', 'teaches',
                            'requires', 'no_horse', 'alternate', 'geometry',
-                           'fill', 'seals', 'char_runs', 'entities', 'then',
-                           'vocabulary', 'solution', 'intro'}
+                           'fill', 'seals', 'char_runs', 'entities', 'veiled',
+                           'then', 'vocabulary', 'solution', 'intro'}
     if unknown:
         # Refuse rather than ignore: a silently-dropped key is a level that
         # plays differently from the one its author tested.
@@ -261,6 +267,7 @@ def parse(data: dict) -> Level:
         exit=tuple(geo.get('exit', (1, 2))),
         wrap=bool(geo.get('wrap', False)),
         wrap_width=int(geo.get('wrap_width', 0)),
+        veiled=[tuple(v) for v in data.get('veiled', [])],
         fills=[_parse_fill(f, i) for i, f in enumerate(data.get('fill', []))],
         seals=[_parse_seal(s, i) for i, s in enumerate(data.get('seals', []))],
         char_runs=list(data.get('char_runs', [])),
@@ -405,7 +412,8 @@ def _parse_then(rooms) -> list:
         at = f'then[{i}]'
         if not isinstance(h, dict):
             raise LevelFormatError(f'{at}: must be an object')
-        unknown = set(h) - {'geometry', 'fill', 'seals', 'char_runs', 'entities'}
+        unknown = set(h) - {'geometry', 'fill', 'seals', 'char_runs',
+                            'entities', 'veiled'}
         if unknown:
             # Deliberately narrower than the top level: a room is geometry
             # and content, and everything else — the tape, the seed, what the
@@ -424,6 +432,7 @@ def _parse_then(rooms) -> list:
             exit=tuple(geo.get('exit', (1, 2))),
             wrap=bool(geo.get('wrap', False)),
             wrap_width=int(geo.get('wrap_width', 0)),
+            veiled=[tuple(v) for v in h.get('veiled', [])],
             fills=[_parse_fill(f, j, f'{at}.fill')
                    for j, f in enumerate(h.get('fill', []))],
             seals=[_parse_seal(s, j, f'{at}.seals')
@@ -535,7 +544,7 @@ def crop(lvl: Level) -> Level:
         lvl,
         rows=first.rows, cols=first.cols, cells=first.cells,
         spawn=first.spawn, exit=first.exit,
-        wrap=first.wrap, wrap_width=first.wrap_width,
+        wrap=first.wrap, wrap_width=first.wrap_width, veiled=first.veiled,
         fills=first.fills,
         seals=first.seals, char_runs=first.char_runs, entities=first.entities,
         then=rooms[1:],
@@ -753,6 +762,7 @@ def _build_room(spec: Room, lvl: Level, rng: random.Random,
     room.no_horse  = lvl.no_horse
     room.wrap_buffer = bool(spec.wrap)
     room.wrap_width  = int(spec.wrap_width)
+    room.veiled_cells = {(int(a), int(b)) for a, b in spec.veiled}
 
     # Seals are built SHUT, whatever the grid says, and before anything else reads
     # the grid. A `cells` grid is written by `from_room` while the level was being
@@ -971,6 +981,8 @@ def _dump_content(h: Room) -> dict:
     own block and every entry in `then`, so a room reads the same wherever
     it is."""
     data = {}
+    if h.veiled:
+        data['veiled'] = [list(v) for v in h.veiled]
     if h.fills:
         data['fill'] = [{'region': list(f.region), 'pool': f.pool,
                          'length': list(f.length), 'spacing': f.spacing,
@@ -1051,7 +1063,7 @@ def from_room(room, name: str, author: str = '', solution: str = '',
         alternate=alternate, intro=intro,
         rows=h.rows, cols=h.cols, cells=h.cells,
         spawn=h.spawn, exit=h.exit,
-        wrap=h.wrap, wrap_width=h.wrap_width,
+        wrap=h.wrap, wrap_width=h.wrap_width, veiled=h.veiled,
         fills=h.fills, seals=h.seals,
         char_runs=h.char_runs, entities=h.entities,
         then=list(then),
@@ -1098,6 +1110,7 @@ def capture_room(room, *, fills=None, seals=None,
         spawn=tuple(room.spawn_pos), exit=tuple(room.exit_pos or (1, 1)),
         wrap=bool(getattr(room, 'wrap_buffer', False)),
         wrap_width=int(getattr(room, 'wrap_width', 0) or 0),
+        veiled=sorted(getattr(room, 'veiled_cells', ()) or ()),
         fills=list(fills), seals=list(seals),
         char_runs=[{'row': ru.row, 'col': ru.col,
                     'symbols': list(ru.symbols), 'kind': ru.kind}

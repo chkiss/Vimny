@@ -232,9 +232,15 @@ def test_brazier_rows_are_reflow_safe(seed):
 def test_everything_past_the_gate_starts_fogged(seed):
     room = _room(seed)
     assert room.search_glyph_entities
-    assert room._wm_hall_fog <= room.fog_cells, "the grand hall reads as unknown"
-    assert set(_WM_PODIUMS) <= room.fog_cells, "every niche reads as stone"
-    assert set(_WM_POCKET) <= room.fog_cells, "the treasure pocket too"
+    # Hidden by BOTH mechanisms, each on the cells it is about: the floor of the
+    # hall is fogged (the eye cannot reach it past a shut gate) and its carved
+    # walls are veiled (the inscriptions are not legible yet). One region, two
+    # true statements — see `Room.veiled_cells`.
+    hidden = room.fog_cells | room.veiled_cells
+    assert room._wm_hall_fog <= hidden, "the grand hall reads as unknown"
+    assert set(_WM_PODIUMS) <= hidden, "every niche reads as stone"
+    assert set(_WM_POCKET) <= hidden, "the treasure pocket too"
+    assert not (room.fog_cells & room.veiled_cells), 'the two must not overlap'
 
 
 @pytest.mark.parametrize("seed", SEEDS)

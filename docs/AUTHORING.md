@@ -601,6 +601,24 @@ The first room cannot be removed: it is the level's own `geometry` and where the
 player spawns. A level may hold at most 8 rooms — a descent, not a dungeon
 crawl.
 
+### `veiled` — a plaque you cannot read yet
+
+Text carved into a wall can start **unreadable** and become readable later. List
+the cells:
+
+```json
+  "veiled": [[2, 11], [2, 12], [2, 13], [2, 14], [2, 15]]
+```
+
+A veiled cell draws as the bare stone it is carved into — the glyph is there,
+it is simply not legible. This is deliberately **not fog**. Fog is derived: it
+is what the eye cannot reach, and it only ever covers cells you could stand in.
+A veil is a puzzle giving out its clue in instalments, on wall cells, and only
+you know the instalments — so you declare it.
+
+The Wet Ink is the worked example: its inscription is four quarters, and
+quarter *k+1* stays veiled until brazier *k* burns.
+
 ### `wrap` — a room that is one long line
 
 A room may be a **wrap buffer**: one logical line, `rows: 1`, that `:set wrap`

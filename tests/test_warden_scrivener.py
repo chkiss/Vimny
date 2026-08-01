@@ -176,13 +176,16 @@ def test_the_page_sleeps_under_fog(seed):
     from engine.search import _match_positions
     assert _match_positions(room, 'W') == []
     assert _match_positions(room, _lie_verb(room)) == []
-    assert (_WSC_ALCOVES[0]) in room.fog_cells
-    assert set(_WSC_POCKET) <= room.fog_cells
+    # Fogged floor, veiled stone — one hidden hall said with the two mechanisms
+    # that are each true of their own cells (see `Room.veiled_cells`).
+    hidden = room.fog_cells | room.veiled_cells
+    assert (_WSC_ALCOVES[0]) in hidden
+    assert set(_WSC_POCKET) <= hidden
     # NOTHING in the hall pokes past the veil (a gloss tail once overflowed
     # the fog's east edge and showed at level open)
     for ru in room.char_runs:
         if ru.col >= 14:
-            assert all((ru.row, ru.col + k) in room.fog_cells
+            assert all((ru.row, ru.col + k) in hidden
                        for k in range(len(ru.symbols))), ru
 
 

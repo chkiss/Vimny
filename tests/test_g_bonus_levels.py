@@ -201,12 +201,14 @@ def test_wi_structure(seed):
         plq = next(ru for ru in room.char_runs
                    if ru.row == _WI_LEDGE and ru.col == _WI_PLQ_COL + 5 * k)
         assert ''.join(plq.symbols) == w
-    # quarter 1 clear, quarters 2-4 fogged (the firelight law)
+    # quarter 1 legible, quarters 2-4 VEILED (the firelight law). Veiled and not
+    # fogged: this is carved into WALL, and fog is about cells you could stand
+    # in — see `Room.veiled_cells`.
     for i in range(4):
-        assert (_WI_LEDGE, _WI_PLQ_COL + i) not in room.fog_cells
+        assert (_WI_LEDGE, _WI_PLQ_COL + i) not in room.veiled_cells
     for k in (1, 2, 3):
         for i in range(4):
-            assert (_WI_LEDGE, _WI_PLQ_COL + 5 * k + i) in room.fog_cells
+            assert (_WI_LEDGE, _WI_PLQ_COL + 5 * k + i) in room.veiled_cells
     # one standing flame, embers on every cold brazier
     src = room.char_run_at(*_WI_SOURCE)
     assert src is not None and src.symbols == (_QM_FLAME,)
@@ -249,7 +251,9 @@ def test_wi_cold_brazier_refuses_ahead_of_the_ink(seed, monkeypatch):
     room = d.rooms[0]
     b2 = room.char_run_at(*_WI_BRAZIERS[1])
     assert b2 is not None and b2.symbols == (_QM_EMBERS,)
-    assert room._wi_seg_fog[1] <= room.fog_cells
+    # VEILED, not fogged: the plaque is carved into WALL, which the fog law has
+    # nothing to say about — see `Room.veiled_cells`.
+    assert room._wi_seg_fog[1] <= room.veiled_cells
 
 
 @pytest.mark.parametrize("seed", SEEDS)
@@ -262,9 +266,10 @@ def test_wi_firelight_reveals_one_quarter(seed, monkeypatch):
     room = d.rooms[0]
     b1 = room.char_run_at(*_WI_BRAZIERS[0])
     assert b1 is not None and b1.symbols == (_QM_FLAME,)
-    assert not (room._wi_seg_fog[0] & room.fog_cells)
-    assert room._wi_seg_fog[1] <= room.fog_cells
-    assert room._wi_seg_fog[2] <= room.fog_cells
+    assert not (room._wi_seg_fog[0] & room.veiled_cells)
+    assert room._wi_seg_fog[1] <= room.veiled_cells
+    assert room._wi_seg_fog[2] <= room.veiled_cells
+    assert not room.fog_cells, 'the ledge is lit; nothing here is FOG'
 
 
 # ── shared audits ────────────────────────────────────────────────────────────

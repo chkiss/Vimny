@@ -52,7 +52,7 @@ from engine.world import (DROPPABLE, Entity, CellType, CharRun, Dungeon, Seal,
                           entity_letter, strike_disguise)
 from engine.motion import (apply_motion, _apply_esc, _reveal_from,
                            _first_non_blank_col, auto_fog_tick as _auto_fog_tick,
-                           enforce_fog_law as _enforce_fog_law)
+                           enforce_fog_law as _enforce_fog_law, unhide_region)
 from engine.text_object import compute_text_object, resolve_text_object, TextObjectType
 from engine.search import find_next as _search_next, word_under_cursor as _word_under_cursor
 from engine.warden_mega import mega_tick
@@ -3546,7 +3546,7 @@ def _warden_scrivener_tick(room, player, spent: int = 0) -> list:
         gate_open = room.cells[gr][gc] != CellType.WALL
         if written and not gate_open:
             room.cells[gr][gc] = CellType.FLOOR
-            room.fog_cells -= getattr(room, '_wsc_hall_fog', frozenset())
+            unhide_region(room, getattr(room, '_wsc_hall_fog', frozenset()))
             msgs.append('The threshold word stands in fresh ink — the gate '
                         'draws, and the fog of the great page parts!')
         elif not written and gate_open and (player.row, player.col) != (gr, gc):
@@ -3565,7 +3565,7 @@ def _warden_scrivener_tick(room, player, spent: int = 0) -> list:
         sr, sc = room._wsc_seal
         if room.cells[sr][sc] == CellType.WALL:
             room.cells[sr][sc] = CellType.FLOOR
-            room.fog_cells -= getattr(room, '_wsc_pocket_fog', frozenset())
+            unhide_region(room, getattr(room, '_wsc_pocket_fog', frozenset()))
             # silent: _on_kill announced the fall + the seal this same turn
         return msgs
 
@@ -3687,7 +3687,7 @@ def _warden_manifold_tick(room, player, spent: int = 0) -> list:
         gate_open = room.cells[gr][gc] != CellType.WALL
         if not unlit and not gate_open:
             room.cells[gr][gc] = CellType.FLOOR
-            room.fog_cells -= getattr(room, '_wm_hall_fog', frozenset())
+            unhide_region(room, getattr(room, '_wm_hall_fog', frozenset()))
             msgs.append('Five flames burn as one — the gate draws, and the '
                         'fog of the great hall parts!')
         elif unlit and gate_open and (player.row, player.col) != (gr, gc):
@@ -3708,7 +3708,7 @@ def _warden_manifold_tick(room, player, spent: int = 0) -> list:
         sr, sc = room._wm_seal
         if room.cells[sr][sc] == CellType.WALL:
             room.cells[sr][sc] = CellType.FLOOR
-            room.fog_cells -= getattr(room, '_wm_pocket_fog', frozenset())
+            unhide_region(room, getattr(room, '_wm_pocket_fog', frozenset()))
             # silent: _on_kill announced the fall + the seal this same turn
         return msgs
 
@@ -3949,8 +3949,8 @@ def _wet_ink_tick(room, player) -> list:
 
     # Firelight: brazier k reveals quarter k+1.
     for k, rc in enumerate(braziers, start=1):
-        if lit(*rc) and room.fog_cells & seg_fog[k - 1]:
-            room.fog_cells -= seg_fog[k - 1]
+        if lit(*rc) and room.veiled_cells & seg_fog[k - 1]:
+            unhide_region(room, seg_fog[k - 1])
             # Only the FIRST brazier gets a line. The reveal is on screen; after
             # one telling, the rule is learned and the render says the rest.
             if not getattr(room, '_qm_firelight_told', False):
