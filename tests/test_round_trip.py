@@ -74,8 +74,15 @@ KNOWN_GAPS: dict[str, tuple[tuple[str, ...], str]] = {
     # is a puzzle handing out its clue in instalments, not a fact about what the
     # eye can reach, so it moved to `Room.veiled_cells` — the same
     # implementation under its own name. Their floors were derivable all along.
-    'waypoint_sanctum':     (('fog',), 'unlit sanctum'),
-    'operators_vault':      (('fog',), 'unlit vault'),
+    # The Operator's Vault left too (2026-08-01): its 569 hand-fogged cells were
+    # covering ONE sightline — an unbroken misted seep down the west face, and
+    # mist does not stop the eye. Broken into corridor-row stubs, the whole
+    # vault derives. The last one standing hides ten cells of TEXT, which is a
+    # thing no geometry can say.
+    'waypoint_sanctum':     (('fog',), "the two `plugh` words are held dark so "
+                             "`?plugh` cannot find them from the spawn; `xyzzy` "
+                             "shares their pocket and MUST stay searchable, so "
+                             "no rule about walls or mist can separate them"),
 
     # ── mist off the water ───────────────────────────────────────────────────
     # `encode_row` writes an M only where the cell is WATER, so mist in the file

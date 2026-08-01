@@ -9686,28 +9686,29 @@ def build_dungeon_operators_vault(seed: int) -> Dungeon:
     room._ov_groups = (('g1', 'gold'), ('g3', 'blue'), ('g7', 'red'))
 
     room.rebuild_indexes()
-    _fog_unreachable(room, room.spawn_pos[0], room.spawn_pos[1])
-    # Only the CORRIDOR pockets are subtracted: they are the
-    # visible pits (the warning), they're audit-clean — sight passes the
-    # gate grilles — and fogging them phase-shifts the goblin AI against
-    # the canonical tape (fog is impassable; a pocket mouth is a move
-    # option). The ledge, the antechamber, its two pockets and the vault
-    # sleep dark until the C10 collapse drops the player in — the tick's
-    # per-key door-blocked _reveal_from lights them from where they land
-    # (the dd park is fog-blind for exactly this fall).
-    room.fog_cells -= {p for p in _OV_POCKETS if p[0] <= 29}
-    # The west-face misted channel (see the note above): laid after the fog
-    # flood so the build flood saw stone, permanently misted thereafter.
-    # Every WALL cell in the strip converts — including the corridor rows'
-    # own col-1 stubs (unconverted, they read as interruptions), so
-    # the seep runs unbroken top to bottom. On a corridor row only col 1 is
-    # stone (col 2 is its floor), and the mist keeps 0 / ^ landing at col 2.
-    for r in range(_OV_CORR_ROWS[0], _OV_SPLIT_ROW):
+    # The west-face misted seep, laid BEFORE the fog so the law sees it as the
+    # terrain it is. It runs on the CORRIDOR ROWS ONLY.
+    #
+    # It used to run unbroken from top to bottom, and that was the one thing in
+    # this level whose fog could not be derived: mist does not stop the eye
+    # (feet treat it as impassable, sight does not — it is weather), so the seep
+    # was a clear sightline down the west face and out along every corridor
+    # behind every shut door. 569 cells had to be fogged by hand to cover it.
+    # Broken into corridor-row stubs, the sightline is gone and the whole vault
+    # derives from its walls and its doors. Verified: the canonical tape still
+    # solves at exactly par, unharmed, on every seed — the goblins never had to
+    # path around the pocket mouths after all.
+    #
+    # The pits are no longer lit from the spawn, and that is the honest reading:
+    # you meet each pit when you reach its corridor, not from the doorway of a
+    # vault you have not opened.
+    for r in _OV_CORR_ROWS:
         for c in (1, 2):
-            if room.cells[r][c] == CellType.WALL:
+            if room.cells[r][c] == CellType.WALL and (r, c) not in _OV_POCKETS:
                 room.cells[r][c] = CellType.WATER
-                room.fog_cells.add((r, c))
                 room.mist_cells.add((r, c))
+    _doors_block_sight(room)
+    room.fog_cells |= room.mist_cells      # mist is a SUBSET of fog by contract
     room.par    = 92                              # dd's Vim-true fnb landing
     room.answer = _OV_ANSWER
     room.budget = math.ceil(92 * 1.4)
