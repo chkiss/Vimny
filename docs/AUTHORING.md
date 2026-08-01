@@ -594,6 +594,35 @@ The first room cannot be removed: it is the level's own `geometry` and where the
 player spawns. A level may hold at most 8 rooms — a descent, not a dungeon
 crawl.
 
+### `wrap` — a room that is one long line
+
+A room may be a **wrap buffer**: one logical line, `rows: 1`, that `:set wrap`
+folds across screen rows. Put it in that room's `geometry`:
+
+```json
+  "geometry": { "rows": 1, "cols": 720, "cells": ["..."],
+                "spawn": [0, 1], "exit": [0, 718], "wrap": true }
+```
+
+`wrap_width` pins the fold. Leave it out (or 0) and the fold is **reactive** —
+it folds to whatever the reader's terminal is, so the same line is a different
+number of display rows at 80 columns than at 189.
+
+A wrap buffer is the one room allowed to be a single row; every other room is
+3 rows or more. `wrap_width` without `wrap` is refused.
+
+Three things change inside one, and a puzzle built there has to want all three:
+
+* **`gj`/`gk` move by DISPLAY row** — one fold up or down — instead of falling
+  back to `j`/`k`.
+* **Horizontal motion still stops at walls.** A single-cell wall in the line is
+  a segment boundary: `$`, `w`, `e`, `f` and `{count}l` all stop there. That is
+  what makes a fold worth crossing. If you space the walls so that a fold is
+  always wider than one segment, `gj` clears exactly one wall at ANY terminal
+  width — which is how the Wardenverse stays solvable on every screen.
+* **The stone-fog law does not apply.** Sight would stop at the first segment
+  wall and fog almost the whole line; a buffer is read, not explored.
+
 ### `no_horse`
 
 `true` bars the companion, and with it the saddle registers.

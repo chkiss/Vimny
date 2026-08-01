@@ -127,8 +127,18 @@ def _check_room_bounds(h: F.Room, lvl: F.Level, rep: Report) -> None:
     `then[0].geometry` for the next — so an author with a five-room level is
     told which one to go and open.
     """
-    if not 3 <= h.rows <= F.MAX_ROWS:
+    # A WRAP BUFFER is one logical line, so it is the one room that may be a
+    # single row — the 3-row floor exists to stop a "room" with no interior, and
+    # a buffer has no interior to protect. It must be exactly one row: two rows
+    # of wrap is not a thing the renderer or `gj`/`gk` can mean.
+    if h.wrap:
+        if h.rows != 1:
+            rep.fail('bounds', f'{h.where}.wrap needs rows 1 (a wrap buffer is '
+                               f'ONE logical line), got {h.rows}')
+    elif not 3 <= h.rows <= F.MAX_ROWS:
         rep.fail('bounds', f'{h.where}.rows must be 3..{F.MAX_ROWS}, got {h.rows}')
+    if h.wrap_width and not h.wrap:
+        rep.fail('bounds', f'{h.where}.wrap_width means nothing without wrap')
     if not 3 <= h.cols <= F.MAX_COLS:
         rep.fail('bounds', f'{h.where}.cols must be 3..{F.MAX_COLS}, got {h.cols}')
 

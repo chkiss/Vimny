@@ -242,8 +242,24 @@ commit — a stale exemption is an audit passing vacuously.
 
 Also open:
 - **Multi-line `@` replay** — see Known bugs below. Fix when a level first wants it.
-- **Is the Wardenverse's reactive reflow generic or library-specific?** Decides
-  whether `warden_pathfinder` can port behind a `wrap_buffer` boolean.
+- ~~Is the Wardenverse's reactive reflow generic or library-specific?~~ —
+  **answered 2026-07-31: GENERIC.** Every consumer keys off two plain `Room`
+  fields with no slug anywhere (`motion.enforce_fog_law` exempts a wrap buffer,
+  `motion` gj/gk hops a display row, `renderer` folds at
+  `min(wrap_width or content_w, content_w)`, `world.normalize_row_word_kinds`
+  leaves its colours alone). The Library and the Wardenverse are one mechanism;
+  only `wrap_width` differs (pinned vs 0 = reactive). `wrap` / `wrap_width` are
+  now geometry keys, so `warden_pathfinder`'s second room ports. **The check
+  found the probe passing vacuously:** `_snap` never compared the flag, so the
+  Wardenverse round-tripped with `wrap_buffer` silently False and was reported
+  whole. Now compared — and saying `wrap` in the file healed
+  `archivists_library`'s `runs` gap for free, because a rebuilt buffer that had
+  lost the flag got its regions colour-merged on the way back in.
+- **Exits that are not doors — POST-LAUNCH (user, 2026-07-31).** The format says
+  a room ends at its exit cell. The Wardenverse ends by killing the Warden in
+  it (`exit_pos = None`), which is why `warden_pathfinder` still lists `exit`.
+  Non-conventional exit paths between rooms are wanted, but deliberately after
+  launch — do not design around this gap before then.
 - ~~The forge cannot BUILD a `then` room~~ — **closed 2026-07-31.**
   `draft.room_index` + `:room [n|new]` / `:room!`; `sync` folds the edited
   room into that slot alone. Which room is open is session state, never

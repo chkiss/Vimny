@@ -140,6 +140,15 @@ class Room:
     seals:     list  = field(default_factory=list)
     char_runs: list  = field(default_factory=list)
     entities:  list  = field(default_factory=list)
+    #: A WRAP BUFFER: one logical line that `:set wrap` folds across screen
+    #: rows. `wrap` turns it on (the room must be `rows: 1`); `wrap_width` pins
+    #: the fold, and 0 — the default — means REACTIVE: fold to whatever the
+    #: reader's terminal is, so the same line has a different number of display
+    #: rows at 80 columns than at 189. The Archivist's Library and the
+    #: Wardenverse are both this; the Wardenverse is the reactive one, and its
+    #: segment walls are spaced so `gj`/`gk` clear exactly one at ANY width.
+    wrap:       bool  = False
+    wrap_width: int   = 0
     #: Where this room's keys live in the FILE. Carried on it so that every
     #: message about it — parser, validator, forge — names the place the author
     #: has to go and edit, rather than a room number they never wrote down.
@@ -165,6 +174,8 @@ class Level:
     cells:       list = field(default_factory=list)   # list[str] of cell codes
     spawn:       tuple = (1, 1)
     exit:        tuple = (1, 2)
+    wrap:        bool = False                         # see Room.wrap
+    wrap_width:  int  = 0
     fills:       list = field(default_factory=list)   # list[Fill]
     seals:       list = field(default_factory=list)   # list[world.Seal]
     char_runs:   list = field(default_factory=list)   # explicit text
@@ -184,7 +195,9 @@ class Level:
         caring how many rooms there are.
         """
         return [Room(rows=self.rows, cols=self.cols, cells=self.cells,
-                     spawn=self.spawn, exit=self.exit, fills=self.fills,
+                     spawn=self.spawn, exit=self.exit,
+                     wrap=self.wrap, wrap_width=self.wrap_width,
+                     fills=self.fills,
                      seals=self.seals, char_runs=self.char_runs,
                      entities=self.entities), *self.then]
 
@@ -246,6 +259,8 @@ def parse(data: dict) -> Level:
         cells=list(geo.get('cells', [])),
         spawn=tuple(geo.get('spawn', (1, 1))),
         exit=tuple(geo.get('exit', (1, 2))),
+        wrap=bool(geo.get('wrap', False)),
+        wrap_width=int(geo.get('wrap_width', 0)),
         fills=[_parse_fill(f, i) for i, f in enumerate(data.get('fill', []))],
         seals=[_parse_seal(s, i) for i, s in enumerate(data.get('seals', []))],
         char_runs=list(data.get('char_runs', [])),
@@ -407,6 +422,8 @@ def _parse_then(rooms) -> list:
             cells=list(geo.get('cells', [])),
             spawn=tuple(geo.get('spawn', (1, 1))),
             exit=tuple(geo.get('exit', (1, 2))),
+            wrap=bool(geo.get('wrap', False)),
+            wrap_width=int(geo.get('wrap_width', 0)),
             fills=[_parse_fill(f, j, f'{at}.fill')
                    for j, f in enumerate(h.get('fill', []))],
             seals=[_parse_seal(s, j, f'{at}.seals')
@@ -517,7 +534,9 @@ def crop(lvl: Level) -> Level:
     return replace(
         lvl,
         rows=first.rows, cols=first.cols, cells=first.cells,
-        spawn=first.spawn, exit=first.exit, fills=first.fills,
+        spawn=first.spawn, exit=first.exit,
+        wrap=first.wrap, wrap_width=first.wrap_width,
+        fills=first.fills,
         seals=first.seals, char_runs=first.char_runs, entities=first.entities,
         then=rooms[1:],
     )
@@ -732,6 +751,8 @@ def _build_room(spec: Room, lvl: Level, rng: random.Random,
     room.spawn_pos = tuple(spec.spawn)
     room.exit_pos  = tuple(spec.exit)
     room.no_horse  = lvl.no_horse
+    room.wrap_buffer = bool(spec.wrap)
+    room.wrap_width  = int(spec.wrap_width)
 
     # Seals are built SHUT, whatever the grid says, and before anything else reads
     # the grid. A `cells` grid is written by `from_room` while the level was being
@@ -913,7 +934,8 @@ def dumps(lvl: Level) -> str:
         'requires': lvl.requires,
         'no_horse': lvl.no_horse,
         'geometry': {'rows': lvl.rows, 'cols': lvl.cols, 'cells': lvl.cells,
-                     'spawn': list(lvl.spawn), 'exit': list(lvl.exit)},
+                     'spawn': list(lvl.spawn), 'exit': list(lvl.exit),
+                     **_dump_wrap(lvl.rooms[0])},
         'solution': lvl.solution,
     }
     if lvl.alternate:
@@ -925,11 +947,23 @@ def dumps(lvl: Level) -> str:
         data['then'] = [{'geometry': {'rows': h.rows, 'cols': h.cols,
                                       'cells': h.cells,
                                       'spawn': list(h.spawn),
-                                      'exit': list(h.exit)},
+                                      'exit': list(h.exit),
+                                      **_dump_wrap(h)},
                          **_dump_content(h)} for h in lvl.then]
     if lvl.vocabulary:
         data['vocabulary'] = lvl.vocabulary
     return json.dumps(data, indent=2, ensure_ascii=False) + '\n'
+
+
+def _dump_wrap(h: Room) -> dict:
+    """The wrap keys, written only when they are not the default — so the
+    overwhelmingly common ordinary room carries no wrap machinery at all."""
+    out = {}
+    if h.wrap:
+        out['wrap'] = True
+    if h.wrap_width:
+        out['wrap_width'] = h.wrap_width
+    return out
 
 
 def _dump_content(h: Room) -> dict:
@@ -1017,6 +1051,7 @@ def from_room(room, name: str, author: str = '', solution: str = '',
         alternate=alternate, intro=intro,
         rows=h.rows, cols=h.cols, cells=h.cells,
         spawn=h.spawn, exit=h.exit,
+        wrap=h.wrap, wrap_width=h.wrap_width,
         fills=h.fills, seals=h.seals,
         char_runs=h.char_runs, entities=h.entities,
         then=list(then),
@@ -1061,6 +1096,8 @@ def capture_room(room, *, fills=None, seals=None,
         cells=[encode_row(row, _mist_by_row.get(r, ()))
                for r, row in enumerate(grid)],
         spawn=tuple(room.spawn_pos), exit=tuple(room.exit_pos or (1, 1)),
+        wrap=bool(getattr(room, 'wrap_buffer', False)),
+        wrap_width=int(getattr(room, 'wrap_width', 0) or 0),
         fills=list(fills), seals=list(seals),
         char_runs=[{'row': ru.row, 'col': ru.col,
                     'symbols': list(ru.symbols), 'kind': ru.kind}

@@ -91,7 +91,12 @@ KNOWN_GAPS: dict[str, tuple[tuple[str, ...], str]] = {
                              'and the format synthesises one'),
 
     # ── the rest ─────────────────────────────────────────────────────────────
-    'archivists_library':   (('ents', 'exit', 'runs'),
+    # `runs` HEALED 2026-07-31 when `wrap` entered the format. The rebuilt room
+    # used to come back with `wrap_buffer` False, and `normalize_row_word_kinds`
+    # skips a wrap buffer — so on the way back in, its regions were merged into
+    # one colour and the runs no longer matched. Saying `wrap` in the file fixed
+    # the colours for free.
+    'archivists_library':   (('ents', 'exit'),
                              'the one agreed exception: a wrap buffer whose text '
                              'is the level and whose exit is a reading position'),
     'dummy':                (('ents',), "the horse: a session entity, dropped by "
@@ -111,6 +116,14 @@ def _snap(room) -> dict:
         'mist':  sorted(room.mist_cells or ()),
         'fog':   sorted(room.fog_cells or ()),
         'seals': len(room.seals or ()),
+        # A WRAP BUFFER is a room you read rather than walk, and whether it
+        # wraps changes every motion in it — so it is something a player can
+        # tell apart, and the probe was blind to it until 2026-07-31. The
+        # Wardenverse came through this trip with `wrap_buffer` silently False,
+        # reported whole, and nothing failed. Compared here, that is a gap the
+        # table has to name or the format has to close.
+        'wrap':  (bool(getattr(room, 'wrap_buffer', False)),
+                  int(getattr(room, 'wrap_width', 0) or 0)),
     }
 
 
