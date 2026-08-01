@@ -21,7 +21,7 @@ from __future__ import annotations
 import heapq, math, os, random
 from collections import deque
 from engine.world import (Dungeon, Room, RoomType, CellType, CharRun, Entity,
-                          gate_row_seals)
+                          Seal, gate_row_seals)
 from engine.tape import ESC as _TAPE_ESC
 from engine.motion import (_fog_unreachable, _cell_char, _is_word_char,
                            apply_stone_fog, _FOG_BLOCK_KINDS)
@@ -9527,17 +9527,17 @@ _OV_KEY_DCOL   = 3                    # keys drop 3 cells before their door
 #: were golfed — `$` beats `2l` at the three gate approaches (a gate stops `$`,
 #: so the line end IS the door), `$` beats `4l` at C5's reflowed word, and both
 #: of the tail's counted steps are line ends too. Seven `l`-counts, seven keys.
-_OV_PAR = 73
+_OV_PAR = 69
 _OV_ANSWER = ('w d w 7l x $ 3j '              # C1  → dw; cut the guard, walk on
               'd b h 3j '                     # C2  ← db lands by the shaft mouth
               'd e w e x $ 3j '               # C3  → de
               'd B h 3j '                     # C4  ← dB from the WORD head
-              'd E e 4l x $ 3j '              # C5  → dE; e rides the reflowed word
-                                              # (NOT `$`: it is a key cheaper and
-                                              # sails past the scroll chest in
-                                              # the gap, leaving it STANDING —
-                                              # the one chest whose survival
-                                              # tells two routes apart)
+              'd E $ 3j '                     # C5  → dE, then straight to the
+                                              # shaft; the sealed way down is
+                                              # what forces the cut to be dE
+                                              # and not d$, so the scroll chest
+                                              # is loot the route may leave —
+                                              # as every other level's is
               'd F ? 3j '                     # C6  ← dF? lands on the shaft mouth
               'w d W e 7l x $ 3j '            # C7  → dW
               'd 0 5l 3j '                    # C8  ← d0 sweep (dd = oubliette)
@@ -9657,11 +9657,16 @@ def build_dungeon_operators_vault(seed: int) -> Dungeon:
     # db only reaches the trailing subword and misses the head guard.
     word(12, 8, mixed(5)); goblin(12, 8); goblin(12, 15)
     # C5 (row 15, →): dE — guard rides the token's tail (de crawls subword
-    # ends); the scroll chest in the gap punishes dW/d$; the far word reflows
-    # in as the path.
+    # ends). THE FAR WORD MUST SURVIVE: the shaft below is sealed and stands
+    # open only while row 15 reads exactly that word, so `dE` (which takes the
+    # junk token and stops) descends, while `d$` (which takes the junk AND the
+    # far word) seals the way down, and `de` (which crawls one subword) leaves
+    # junk behind. The wrong cut is not punished by lost loot — it is punished
+    # by a shut door, the same rule the packs and the gates now follow.
     word(15, 12, mixed(6)); goblin(15, 17)
     chest(15, 20)
-    word(15, 24, plain(4))
+    _ov_c5_keep = plain(4)
+    word(15, 24, _ov_c5_keep)
     # C6 (row 18, ←): dF? — the '?' bait sits ON the shaft mouth (col 26): the
     # cut sweeps the pack AND lands you on the way down. The decoy word blocks
     # a one-cast db (b stops there first).
@@ -9696,6 +9701,21 @@ def build_dungeon_operators_vault(seed: int) -> Dungeon:
     # main.py resolves the LIVE door by tag, so undo replacing room.entities
     # can never leave it holding a stale reference)
     room._ov_groups = (('g1', 'gold'), ('g3', 'blue'), ('g7', 'red'))
+
+    # C5's shaft, sealed on the row above reading its far word and nothing else.
+    # This is the level's answer to an OVER-wide cut, which nothing else here
+    # can catch: a guard defends against a cut that under-reaches (it survives),
+    # but every guard a `dE` kills a `d$` kills too. A door that wants the text
+    # INTACT is the mirror of that — it is the surviving word, not the surviving
+    # goblin, that is checked.
+    _c5_shaft = next((rc for rc in _OV_SHAFTS if rc[0] == 16), None)
+    if _c5_shaft is not None:
+        cells[_c5_shaft[0]][_c5_shaft[1]] = CellType.WALL
+        room.seals = (Seal(region=(15, 0, 15, C - 1), match=_ov_c5_keep,
+                           mode='exact', opens=(_c5_shaft,),
+                           message='The junk falls away and the word stands '
+                                   'clear — the shaft below grinds open!'),)
+        room.sealed_cells = {_c5_shaft}
 
     room.rebuild_indexes()
     # The west-face misted seep, laid BEFORE the fog so the law sees it as the

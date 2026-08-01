@@ -20,10 +20,11 @@
 
 Ten snaked corridors, each admitting exactly one cheapest d-variant (dw, db,
 de, dB, dE, dF?, dW, d0, d$, dd). Armored hp-2 guards make blade-to-blade x
-bloody while a d-cut removes them outright. Gated corridors drop their colored
-key when their guard group is wiped; the untagged vault key drops once every
-guard is down (both stateless + undo-safe in main._operators_vault_tick).
-Sloppy wide cuts shred the scroll chests; dd off the intended row collapses
+bloody while a d-cut removes them outright. A gated corridor opens when its guard
+group is wiped and the vault opens when every guard is down (both stateless +
+undo-safe in main._operators_vault_tick) — a door a jump cannot reach, because a
+jump kills nothing. C5's shaft is sealed on its row reading true, which is what
+refuses an over-wide cut; dd off the intended row collapses
 the corridor into a sealed oubliette pocket (only u climbs out). Travel after
 each cut rides the words left standing (w/e hops) — no big counted moves.
 Structure tests + a full executed solve through the real run_dungeon loop
@@ -121,7 +122,10 @@ def test_ten_corridors_with_armored_guards(seed):
 def test_shaft_placement_forward_at_line_end_backward_off_line_start():
     room = _room()
     for top, col in dg._OV_SHAFTS:
-        assert room.cells[top][col] == CellType.FLOOR
+        # …except C5's, which is SEALED: it stands stone until row 15 reads its
+        # far word alone, which is what makes `dE` the only cut that descends.
+        want = (CellType.WALL if top == 16 else CellType.FLOOR)
+        assert room.cells[top][col] == want, (top, col)
         assert room.cells[top + 1][col] == CellType.FLOOR
     fwd = [col for top, col in dg._OV_SHAFTS if top in (4, 10, 16, 22, 28)]
     bwd = [col for top, col in dg._OV_SHAFTS if top in (7, 13, 19, 25)]
@@ -209,7 +213,7 @@ def test_oubliette_pockets_are_sealed_empty_floor():
 
 def test_par_and_budget():
     room = _room()
-    # 92 → 73 on 2026-08-01, in three steps.
+    # 92 → 69 on 2026-08-01, in four steps.
     #   `$` beats `2l` at the three gate approaches (a gate stops `$`, so the
     #   line end IS the door) and at both of the tail's counted steps.
     #   The key economy went: a gate opens because its pack is DEAD, so the
@@ -217,10 +221,14 @@ def test_par_and_budget():
     #   And with the key gone, the `l x` that used to pick it up was hitting an
     #   empty cell — three free no-ops that made the static answer-cost audit
     #   read 79 against a driven 76. Removed; model and drive now agree at 73.
-    # NOT `$` at C5, which is a key cheaper and sails past the scroll chest,
-    # leaving it standing.
-    assert room.par == 73
-    assert room.budget == math.ceil(room.par * 1.4) == 103
+    #   And C5's chest stopped being the forcing device: its shaft is SEALED on
+    #   the row reading its far word, so `d$` (which takes that word too) cannot
+    #   descend. With the lesson forced by a shut door instead of by loot, the
+    #   route may travel with `$` and leave the chest standing — and the `e x $`
+    #   that used to ride the reflow and strike a guard `dE` had already killed
+    #   went with it.
+    assert room.par == 69
+    assert room.budget == math.ceil(room.par * 1.4) == 97
     assert room.answer.strip()
     # travel discipline: counts stay single-digit (a human can count to 9),
     # and word motions appear only where they beat or tie the count move.
@@ -561,8 +569,11 @@ def test_answer_solves_the_vault(monkeypatch, seed):
     assert _guards(room) == []
     assert not any(e.alive and e.kind == 'locked_door' for e in room.entities)
     assert not any(e.alive and e.kind == 'floor_key' for e in room.entities)
-    # par includes collecting every scroll chest — none is left behind
-    assert not [e for e in room.entities if e.alive and e.kind == 'chest_scroll']
+    # Chests are LOOT, not a toll. Par used to be asserted to collect every one
+    # of them, which made this level the only one of seven with a par and a
+    # chest that did (2026-08-01 audit) — and the assertion could not even tell
+    # a looted chest from one a cut destroyed. C5's chest is left standing by
+    # par now; what forces its lesson is the sealed shaft, not the loot.
 
 
 def test_blocked_dd_is_parried_loudly_and_costs_nothing(monkeypatch):
