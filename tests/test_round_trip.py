@@ -60,14 +60,13 @@ KNOWN_GAPS: dict[str, tuple[tuple[str, ...], str]] = {
     # has no way to ask for darkness where there is neither wall nor door. Mist
     # is the one other exception it can say, and mist rides on water.
     #
-    # THREE LEFT THIS TABLE on 2026-08-01. Their fog was never a darkness at
+    # FIVE LEFT THIS TABLE on 2026-08-01. Their fog was never a darkness at
     # all: `_fog_unreachable` floods by FEET, so what it laid was exactly
-    # "everything behind a shut door" — a rule, written down as its answer.
-    # `_doors_block_sight` says the rule instead (`Entity.opaque`), the law
-    # derives the same cells, and the fog came out identical on every seed.
-    # Before adding a new fog exemption, check whether it is really this.
-    'wardens_keep':         (('fog',), 'unlit keep'),
-    'warden_surveyor':      (('fog',), 'unlit keep'),
+    # "everything behind a shut door" — a rule, written down as its answer, and
+    # "door" there is `_FOG_BLOCK_KINDS`: plain, locked, seal doors and boss
+    # seals alike. `_doors_block_sight` says the rule instead (`Entity.opaque`),
+    # the law derives the same cells, and the fog came out identical on every
+    # seed. Before adding a new fog exemption, check whether it is really this.
     'waypoint_sanctum':     (('fog',), 'unlit sanctum'),
     'operators_vault':      (('fog',), 'unlit vault'),
     'culling_ledger':       (('fog',), 'unlit ledger hall'),

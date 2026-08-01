@@ -37,7 +37,7 @@ import pytest
 
 import main
 from content.levels import LEVELS
-from engine.motion import stone_law
+from engine.motion import stone_law, _FOG_BLOCK_KINDS
 from sharing import format as F
 
 SEED = 4242
@@ -106,8 +106,11 @@ def test_a_downloaded_level_gets_the_same_law():
 #: walls plus `opaque` doors (`dungeon_gen._doors_block_sight`, 2026-08-01).
 #: Their old `_fog_unreachable` flood blocked at every closed door, so what it
 #: laid was never a darkness at all — it was "everything behind a shut door",
-#: a rule written down as its own answer.
-_DOOR_DARK = ('counting_crypts', 'goblin_gauntlet', 'lineheads')
+#: a rule written down as its own answer. "Door" is `_FOG_BLOCK_KINDS`: the
+#: plain and locked ones, and the seal doors and boss seals too, which is what
+#: the two keeps turn on.
+_DOOR_DARK = ('counting_crypts', 'goblin_gauntlet', 'lineheads',
+              'wardens_keep', 'warden_surveyor')
 
 
 @pytest.mark.parametrize('slug', _DOOR_DARK)
@@ -126,7 +129,7 @@ def test_their_doors_are_what_stops_the_eye(slug):
     door — a grille you can look through — and the crypt would be lit."""
     for room in _rooms(slug):
         doors = [e for e in room.entities
-                 if e.kind in ('door', 'locked_door')]
+                 if e.kind in _FOG_BLOCK_KINDS]
         assert doors, f'{slug} has no doors to carry its darkness'
         assert all(e.opaque for e in doors), slug
 

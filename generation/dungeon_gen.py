@@ -24,14 +24,16 @@ from engine.world import (Dungeon, Room, RoomType, CellType, CharRun, Entity,
                           gate_row_seals)
 from engine.tape import ESC as _TAPE_ESC
 from engine.motion import (_fog_unreachable, _cell_char, _is_word_char,
-                           apply_stone_fog)
+                           apply_stone_fog, _FOG_BLOCK_KINDS)
 from generation.room_gen import make_room, RUNE_CHAR as _RUNE_CHAR
 
 def _doors_block_sight(room) -> None:
     """Say a level's darkness with its DOORS, not with a list of cells.
 
-    `_fog_unreachable` floods by FEET — every closed door stops it — so the fog
-    it lays is exactly "everything behind a shut door". That is a real rule, but
+    `_fog_unreachable` floods by FEET — every closed door stops it, and "door"
+    here is `_FOG_BLOCK_KINDS`: the plain and locked ones, and the seal doors and
+    boss seals too — so the fog it lays is exactly "everything behind a shut
+    door". That is a real rule, but
     it was written down as the resulting cells, and a level file has no way to
     say a set of cells is dark. `Entity.opaque` says the rule instead: this door
     is one the eye does not cross. The law then derives the same fog from the
@@ -48,7 +50,7 @@ def _doors_block_sight(room) -> None:
     parts — and a closed opaque door still stops the eye from either side.
     """
     for e in room.entities:
-        if e.kind in ('door', 'locked_door'):
+        if e.kind in _FOG_BLOCK_KINDS:
             e.opaque = True
     room.rebuild_indexes()          # the law asks `entity_at` for opacity
     apply_stone_fog(room)
@@ -2130,7 +2132,7 @@ def build_dungeon_wardens_keep(seed: int) -> Dungeon:
         Entity(kind='chest_scroll',    row=4, col=41),
     ]
     composite.rebuild_indexes()
-    _fog_unreachable(composite, 3, 0)
+    _doors_block_sight(composite)     # the keep is dark behind its seal + door
 
     composite.par    = None
     composite.budget = math.ceil(_par_wardens_keep() * 1.4)
@@ -2404,7 +2406,7 @@ def build_dungeon_warden_surveyor(seed: int) -> Dungeon:
     ]
 
     composite.rebuild_indexes()
-    _fog_unreachable(composite, _WS_SPAWN[0], _WS_SPAWN[1])
+    _doors_block_sight(composite)     # the keep is dark behind its seal + door
 
     composite.par    = None
     composite.budget = 200    # provisional; refine once the AI / par sim exists
