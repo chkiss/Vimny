@@ -27,6 +27,33 @@ from engine.motion import (_fog_unreachable, _cell_char, _is_word_char,
                            apply_stone_fog)
 from generation.room_gen import make_room, RUNE_CHAR as _RUNE_CHAR
 
+def _doors_block_sight(room) -> None:
+    """Say a level's darkness with its DOORS, not with a list of cells.
+
+    `_fog_unreachable` floods by FEET — every closed door stops it — so the fog
+    it lays is exactly "everything behind a shut door". That is a real rule, but
+    it was written down as the resulting cells, and a level file has no way to
+    say a set of cells is dark. `Entity.opaque` says the rule instead: this door
+    is one the eye does not cross. The law then derives the same fog from the
+    walls and the doors, which means the forge can round-trip it, a wall moved
+    in the editor takes the darkness with it, and there is nothing to re-run.
+
+    Only for levels where the two agree EXACTLY — checked cell for cell, per
+    seed. A level whose fog is a lit-radius or a scripted darkness is not this
+    rule and keeps its own fog list (see `tests/test_round_trip.py` KNOWN_GAPS).
+
+    One deliberate consequence: `apply_stone_fog` marks the room `auto_fog`, so
+    the pocket now lifts as sight crosses the opened door rather than waiting
+    for `_reveal_from` to be called at the unlock. Same moment, fewer moving
+    parts — and a closed opaque door still stops the eye from either side.
+    """
+    for e in room.entities:
+        if e.kind in ('door', 'locked_door'):
+            e.opaque = True
+    room.rebuild_indexes()          # the law asks `entity_at` for opacity
+    apply_stone_fog(room)
+
+
 _DIR_CHAR = {(-1, 0): 'k', (1, 0): 'j', (0, -1): 'h', (0, 1): 'l'}
 _DIRS = ((-1, 0), (1, 0), (0, -1), (0, 1))   # k j h l — the order every solver scans
 
@@ -838,7 +865,7 @@ def build_dungeon_counting_crypts(seed: int) -> Dungeon:
     composite.par, composite.answer = _par_counting_crypts(composite, door_cols, return_path=True)
     composite.budget = math.ceil(composite.par * 1.4)
 
-    _fog_unreachable(composite, composite.spawn_pos[0], composite.spawn_pos[1])
+    _doors_block_sight(composite)     # the crypt is dark BEHIND ITS DOORS
 
     dungeon.rooms    = [composite]
     dungeon.current_room = 0
@@ -2008,7 +2035,7 @@ def build_dungeon_goblin_gauntlet(seed: int) -> Dungeon:
     composite.answer = _answer_l5(corr_data, gobs17)
 
     composite.rebuild_indexes()
-    _fog_unreachable(composite, composite.spawn_pos[0], composite.spawn_pos[1])
+    _doors_block_sight(composite)     # each cell of the gauntlet is dark behind its door
 
     dungeon.rooms        = [composite]
     dungeon.current_room = 0
@@ -8336,7 +8363,7 @@ def build_dungeon_lineheads(seed: int) -> 'Dungeon':
     composite.char_runs = []   # no seed-varying runes; the layout is fixed
 
     composite.rebuild_indexes()
-    _fog_unreachable(composite, composite.spawn_pos[0], composite.spawn_pos[1])
+    _doors_block_sight(composite)     # the rooms past the locked doors sleep dark
 
     # ── Compute par via Dijkstra (key/door + line-jump model) ─────────────────
     par, path = _par_lineheads(composite, return_path=True)

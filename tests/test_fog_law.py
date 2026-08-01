@@ -101,6 +101,46 @@ def test_a_downloaded_level_gets_the_same_law():
     assert (1, 1) not in room.fog_cells, 'and the spawn is not'
 
 
+# ── darkness said with DOORS, not with a list of cells ───────────────────────
+#: Levels whose fog used to be a hand-laid list and is now derived from the
+#: walls plus `opaque` doors (`dungeon_gen._doors_block_sight`, 2026-08-01).
+#: Their old `_fog_unreachable` flood blocked at every closed door, so what it
+#: laid was never a darkness at all — it was "everything behind a shut door",
+#: a rule written down as its own answer.
+_DOOR_DARK = ('counting_crypts', 'goblin_gauntlet', 'lineheads')
+
+
+@pytest.mark.parametrize('slug', _DOOR_DARK)
+def test_door_dark_levels_fog_exactly_the_law(slug):
+    """DERIVED, not remembered. If one of these ever fogs more than the law
+    again, its fog has stopped being a consequence of its doors — and it owes
+    `tests/test_round_trip.py` a KNOWN_GAPS line, because the file cannot say
+    darkness that is neither wall nor door."""
+    for room in _rooms(slug):
+        assert set(room.fog_cells) == stone_law(room), slug
+
+
+@pytest.mark.parametrize('slug', _DOOR_DARK)
+def test_their_doors_are_what_stops_the_eye(slug):
+    """The rule itself. Without `opaque` the law would see straight through a
+    door — a grille you can look through — and the crypt would be lit."""
+    for room in _rooms(slug):
+        doors = [e for e in room.entities
+                 if e.kind in ('door', 'locked_door')]
+        assert doors, f'{slug} has no doors to carry its darkness'
+        assert all(e.opaque for e in doors), slug
+
+
+@pytest.mark.parametrize('slug', _DOOR_DARK)
+def test_the_darkness_is_real_and_not_a_no_op(slug):
+    """Guards the guard: if the doors stopped hiding anything, the two tests
+    above would both pass over an empty set and prove nothing."""
+    for room in _rooms(slug):
+        if room.fog_cells:
+            return
+    raise AssertionError(f'{slug} fogs nothing at all')
+
+
 def test_mist_survives_the_re_reveal():
     """Two fogs wear one field. Stone fog is ignorance and looking cures it;
     mist is weather and standing beside it does not. Before the law was applied

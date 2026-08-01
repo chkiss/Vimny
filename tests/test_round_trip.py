@@ -55,13 +55,18 @@ SLUGS = list(ENTRIES)
 KNOWN_GAPS: dict[str, tuple[tuple[str, ...], str]] = {
     # ── scripted fog ─────────────────────────────────────────────────────────
     # A level file's fog is DERIVED (the stone law: what the eye cannot reach
-    # from spawn). These levels fog MORE than the law — a dark crypt, a warden's
-    # unlit keep — and the file has no way to ask for darkness where there is no
-    # wall. Mist is the one exception it can say, and mist rides on water.
-    'counting_crypts':      (('fog',), 'unlit crypt: scripted fog over open floor'),
-    'goblin_gauntlet':      (('fog',), 'unlit hall'),
+    # from spawn, plus the doors an author marked `opaque`). These levels fog
+    # MORE than that — a lit radius, a darkness a tick re-lays — and the file
+    # has no way to ask for darkness where there is neither wall nor door. Mist
+    # is the one other exception it can say, and mist rides on water.
+    #
+    # THREE LEFT THIS TABLE on 2026-08-01. Their fog was never a darkness at
+    # all: `_fog_unreachable` floods by FEET, so what it laid was exactly
+    # "everything behind a shut door" — a rule, written down as its answer.
+    # `_doors_block_sight` says the rule instead (`Entity.opaque`), the law
+    # derives the same cells, and the fog came out identical on every seed.
+    # Before adding a new fog exemption, check whether it is really this.
     'wardens_keep':         (('fog',), 'unlit keep'),
-    'lineheads':            (('fog',), 'unlit hall'),
     'warden_surveyor':      (('fog',), 'unlit keep'),
     'waypoint_sanctum':     (('fog',), 'unlit sanctum'),
     'operators_vault':      (('fog',), 'unlit vault'),

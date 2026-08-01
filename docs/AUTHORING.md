@@ -283,6 +283,13 @@ far side stays dark, and only stepping PAST it opens the pocket beyond. For a
 door that both bars your feet and hides what is behind it, use an opaque
 `locked_door` — an opaque plain door fogs, but a player still walks onto it.
 
+Three shipped levels are built this way — the Counting Crypts, the Goblin
+Gauntlet and the Lineheads. Every one of them used to carry a hand-written list
+of dark cells, and every one of those lists turned out to be the same sentence:
+*everything behind a shut door*. Said with `opaque`, the fog is identical and
+the level round-trips through this format. If you find yourself listing dark
+cells, check first whether a door is what you actually mean.
+
 **Colours pair on `tag`.** A `floor_key` tagged `gold` opens a `locked_door`
 tagged `gold` and nothing else; an untagged door takes any key. Pick up a key
 with `x` — it goes into the unnamed register — and open the door by pasting it
