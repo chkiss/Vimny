@@ -9527,20 +9527,22 @@ _OV_KEY_DCOL   = 3                    # keys drop 3 cells before their door
 #: were golfed — `$` beats `2l` at the three gate approaches (a gate stops `$`,
 #: so the line end IS the door), `$` beats `4l` at C5's reflowed word, and both
 #: of the tail's counted steps are line ends too. Seven `l`-counts, seven keys.
-_OV_PAR = 87
-_OV_ANSWER = ('w d w 7l x l x $ p $ 3j '      # C1  → dw; chest + gold key + gate
+_OV_PAR = 73
+_OV_ANSWER = ('w d w 7l x $ 3j '              # C1  → dw; cut the guard, walk on
               'd b h 3j '                     # C2  ← db lands by the shaft mouth
-              'd e w e x l x $ p $ 3j '       # C3  → de; chest + blue key + gate
+              'd e w e x $ 3j '               # C3  → de
               'd B h 3j '                     # C4  ← dB from the WORD head
               'd E e 4l x $ 3j '              # C5  → dE; e rides the reflowed word
-                                              # (NOT `$`: it is one key cheaper
-                                              # and sails past the scroll chest
-                                              # in the gap, which par collects)
+                                              # (NOT `$`: it is a key cheaper and
+                                              # sails past the scroll chest in
+                                              # the gap, leaving it STANDING —
+                                              # the one chest whose survival
+                                              # tells two routes apart)
               'd F ? 3j '                     # C6  ← dF? lands on the shaft mouth
-              'w d W e 7l x l x $ p $ 3j '    # C7  → dW; chest + red key + gate
+              'w d W e 7l x $ 3j '            # C7  → dW
               'd 0 5l 3j '                    # C8  ← d0 sweep (dd = oubliette)
               'd $ $ 3j '                     # C9  → d$ sweep
-              'd d d $ l 2j 9l x $ p $')      # C10 ← dd, ride down, d$, vault
+              'd d d $ l 2j 9l x $')          # C10 ← dd, ride down, d$, vault
                                               # (dd lands Vim-true on the risen
                                               # ledge's FIRST NON-BLANK, col 4
                                               # — one l to the vault approach)

@@ -2155,47 +2155,53 @@ def _operators_vault_tick(room, player) -> list:
     # a fall may park INSIDE fog, and the flood must start somewhere.)
     room.fog_cells.discard((player.row, player.col))
     _reveal_from(room, player.row, player.col)
-    """The Operator's Vault key economy. STATELESS, hence undo-safe: undoing a
-    kill removes the dropped key and revives the guard, and re-killing re-drops
-    it; losing a held key to a later cut (the register is one slot) re-drops it
-    too. Two tiers:
+    """The Operator's Vault gates: A PACK HOLDS ITS OWN DOOR.
 
-    - Gated corridors: when a guard group ('g1'/'g3'/'g7') is wiped and its
-      gate still stands, the gate's colored key drops on the approach side
-      (room._ov_groups maps guard tag → gate color tag, set by the builder).
-    - The vault: when EVERY guard is down, the untagged vault key drops
-      beside the vault door. While guards remain, approaching the vault door
-      nudges the player back up instead.
+    It was a key economy — a guard group fell, its coloured key dropped by the
+    gate, and the player walked to it, `x`'d it up and `p`'d it into the door.
+    That was four keystrokes of errand per gate, and worse, it was errand a LINE
+    JUMP could do: `{n}G` reached the key as well as a walk could, so the
+    corridor's operator lesson was optional (2026-08-01 — `7G` skipped a whole
+    corridor, `4G` tied `db h`). A gate that opens because its pack is DEAD
+    cannot be jumped to, because a jump kills nothing. The defence is the
+    lesson itself.
+
+    STATELESS, hence undo-safe, which is the same property the key economy had
+    and for the same reason: the gate is re-derived from who is alive every
+    turn, so undoing a kill re-bars it and re-killing re-opens it. Two tiers:
+
+    - Gated corridors: when a guard group ('g1'/'g3'/'g7') is wiped, its gate
+      opens (`room._ov_groups` maps guard tag → gate colour tag, set by the
+      builder).
+    - The vault: it opens when EVERY guard in the level is down. While any
+      draws breath, approaching it says so.
 
     Returns banner messages for anything that just changed."""
     msgs = []
-    held = _held_key(player)
-    held_tag = held.get('tag', '') if held is not None else None
-    floor_tags = {e.tag for e in room._entity_by_kind.get('floor_key', []) if e.alive}
-    # Look doors up LIVE by their (unique) color tag — undo replaces
+    # Look doors up LIVE by their (unique) colour tag — undo replaces
     # room.entities with snapshot copies, so holding entity references here
     # would go stale after the first u.
     doors = {e.tag: e for e in room._entity_by_kind.get('locked_door', []) if e.alive}
 
-    def _key_missing(tag):
-        return tag not in floor_tags and held_tag != tag
+    def _pack_alive(gtag):
+        return any(e.alive and e.kind == 'goblin' and e.tag == gtag
+                   for e in room.entities)
 
     for gtag, door_tag in getattr(room, '_ov_groups', ()):
         gate = doors.get(door_tag)
-        if gate is None:
+        if gate is None or _pack_alive(gtag):
             continue
-        if any(e.alive and e.kind == 'goblin' and e.tag == gtag for e in room.entities):
-            continue
-        if _key_missing(door_tag) and _drop_key(room, gate.row,
-                                                gate.col - _dg._OV_KEY_DCOL, door_tag):
-            msgs.append(f'The guard falls — a {door_tag} key clatters down by the gate!  🗝')
+        room.kill_entity(gate)
+        room._on_entity_destroyed(gate)
+        msgs.append(f'The last of the {door_tag} guard falls — the gate grinds open!')
 
     door = doors.get('')
     if door is not None:
         guards_left = any(e.alive and e.kind == 'goblin' for e in room.entities)
         if not guards_left:
-            if _key_missing('') and _drop_key(room, door.row, door.col - _dg._OV_KEY_DCOL):
-                msgs.append('The last guard falls — the vault key clatters to the floor!  🗝')
+            room.kill_entity(door)
+            room._on_entity_destroyed(door)
+            msgs.append('The last guard falls — the vault door swings wide!')
         elif (abs(door.row - player.row) + abs(door.col - player.col) <= 2
                 and not getattr(room, '_ov_vault_hinted', False)):
             room._ov_vault_hinted = True

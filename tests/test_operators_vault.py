@@ -209,12 +209,18 @@ def test_oubliette_pockets_are_sealed_empty_floor():
 
 def test_par_and_budget():
     room = _room()
-    # 92 → 87 on 2026-08-01: `$` beats `2l` at the three gate approaches (a gate
-    # stops `$`, so the line end IS the door) and at both of the tail's counted
-    # steps. NOT at C5, where `$` is also cheaper and sails past the scroll
-    # chest in the gap — par collects every chest, so that one is not a route.
-    assert room.par == 87
-    assert room.budget == math.ceil(room.par * 1.4) == 122
+    # 92 → 73 on 2026-08-01, in three steps.
+    #   `$` beats `2l` at the three gate approaches (a gate stops `$`, so the
+    #   line end IS the door) and at both of the tail's counted steps.
+    #   The key economy went: a gate opens because its pack is DEAD, so the
+    #   walk to the dropped key and the `p` that opened the door are gone.
+    #   And with the key gone, the `l x` that used to pick it up was hitting an
+    #   empty cell — three free no-ops that made the static answer-cost audit
+    #   read 79 against a driven 76. Removed; model and drive now agree at 73.
+    # NOT `$` at C5, which is a key cheaper and sails past the scroll chest,
+    # leaving it standing.
+    assert room.par == 73
+    assert room.budget == math.ceil(room.par * 1.4) == 103
     assert room.answer.strip()
     # travel discipline: counts stay single-digit (a human can count to 9),
     # and word motions appear only where they beat or tie the count move.
@@ -395,37 +401,45 @@ def test_c10_dd_raises_the_ledge_and_a_second_dd_is_the_oubliette():
     assert _confined(room, p.row, p.col)
 
 
-# ── key drops: stateless, group-scoped, undo-safe ────────────────────────────
-def _keys(room):
+# ── the gates: a pack holds its own door. Stateless, group-scoped, undo-safe ──
+# It was a key economy until 2026-08-01 — a group fell, its coloured key
+# dropped, the player walked over and pasted it in. Four keystrokes of errand a
+# LINE JUMP could run as well as a walk could, which is what made the corridor's
+# operator lesson optional. A gate that opens because its pack is dead cannot be
+# jumped to: a jump kills nothing.
+def _gates(room):
     return [(e.row, e.col, e.tag) for e in room.entities
-            if e.alive and e.kind == 'floor_key']
+            if e.alive and e.kind == 'locked_door']
 
 
-def test_gate_key_drops_when_its_group_falls_and_redrops_after_undo():
+def test_a_gate_opens_when_its_group_falls_and_re_bars_after_undo():
     room = _room()
     player = Player(row=3, col=7)
+    assert (3, 18, 'gold') in _gates(room)
     g1 = next(e for e in room.entities if e.tag == 'g1')
     room.kill_entity(g1)
     assert main._operators_vault_tick(room, player)
-    assert _keys(room) == [(3, 15, 'gold')]
-    assert main._operators_vault_tick(room, player) == []     # no duplicate
-    # undo restores the guard and removes the key → quiet again
-    key = next(e for e in room.entities if e.kind == 'floor_key')
-    room.kill_entity(key)
+    assert (3, 18, 'gold') not in _gates(room)
+    assert main._operators_vault_tick(room, player) == []     # no second telling
+    # undo revives the guard: the gate must stand again, because the rule is
+    # re-derived from who is alive rather than remembered.
     g1.alive = True
+    gate = next(e for e in room.entities
+                if e.kind == 'locked_door' and e.tag == 'gold')
+    gate.alive = True
     room.rebuild_indexes()
     assert main._operators_vault_tick(room, player) == []
-    room.kill_entity(g1)                                       # re-kill → re-drop
+    assert (3, 18, 'gold') in _gates(room)
+    room.kill_entity(g1)                                       # re-kill → re-open
     assert main._operators_vault_tick(room, player)
-    assert _keys(room) == [(3, 15, 'gold')]
+    assert (3, 18, 'gold') not in _gates(room)
 
 
-def test_key_drop_survives_undo_replacing_the_entity_list():
+def test_the_gate_rule_survives_undo_replacing_the_entity_list():
     """Undo replaces room.entities with snapshot COPIES; the tick must resolve
     gates live (by tag), never through stale references."""
     room = _room()
     player = Player(row=3, col=7)
-    # simulate undo: replace every entity object with a same-state copy
     room.entities = [Entity(kind=e.kind, row=e.row, col=e.col, hp=e.hp,
                             alive=e.alive, max_hp=e.max_hp, ai=e.ai, tag=e.tag,
                             edit_immune=e.edit_immune) for e in room.entities]
@@ -433,42 +447,42 @@ def test_key_drop_survives_undo_replacing_the_entity_list():
     g1 = next(e for e in room.entities if e.tag == 'g1')
     room.kill_entity(g1)
     assert main._operators_vault_tick(room, player)
-    assert _keys(room) == [(3, 15, 'gold')]
+    assert (3, 18, 'gold') not in _gates(room)
 
 
-def test_held_key_suppresses_the_drop_and_a_clobbered_register_redrops():
+def test_one_pack_opens_only_its_own_gate():
+    """Group-scoped: cutting the gold guard must not open the blue or red gate,
+    or the corridors past them stop being lessons."""
     room = _room()
     player = Player(row=3, col=7)
-    g1 = next(e for e in room.entities if e.tag == 'g1')
-    room.kill_entity(g1)
-    # the player holds the gold key in the unnamed register → nothing to drop
-    main._reg_write(player, '"',
-                    entity_clip(Entity(kind='floor_key', row=3, col=15, tag='gold')),
-                    is_delete=True)
-    assert main._operators_vault_tick(room, player) == []
-    # …until a later cut clobbers the register — then the vault is forgiving
-    main._reg_write(player, '"',
-                    {'linewise': False,
-                     'rows': [{'width': 1, 'char_runs': [
-                         {'dcol': 0, 'symbols': ('x',), 'kind': 'ember'}]}]},
-                    is_delete=True)
-    assert main._operators_vault_tick(room, player)
-    assert _keys(room) == [(3, 15, 'gold')]
+    room.kill_entity(next(e for e in room.entities if e.tag == 'g1'))
+    main._operators_vault_tick(room, player)
+    tags = {t for _, _, t in _gates(room)}
+    assert 'gold' not in tags and {'blue', 'red'} <= tags
 
 
-def test_vault_key_drops_only_when_every_guard_is_down():
+def test_the_vault_opens_only_when_every_guard_is_down():
     room = _room()
     player = Player(row=30, col=2)
     guards = _guards(room)
     for g in guards[:-1]:
         room.kill_entity(g)
     main._operators_vault_tick(room, player)
-    assert all(t for _, _, t in _keys(room))         # gate keys maybe — no vault key
+    assert '' in {t for _, _, t in _gates(room)}      # the vault still stands
     room.kill_entity(guards[-1])                     # the last guard falls
     msgs = main._operators_vault_tick(room, player)
-    assert any('vault key' in m for m in msgs)
-    door = dg._OV_DOOR
-    assert (door[0], door[1] - 3, '') in _keys(room)
+    assert any('vault door' in m for m in msgs)
+    assert '' not in {t for _, _, t in _gates(room)}
+
+
+def test_no_key_is_dropped_any_more():
+    """The errand is gone entirely — nothing to walk to, nothing to paste."""
+    room = _room()
+    player = Player(row=3, col=7)
+    for g in _guards(room):
+        room.kill_entity(g)
+    main._operators_vault_tick(room, player)
+    assert not [e for e in room.entities if e.kind == 'floor_key' and e.alive]
 
 
 def test_vault_door_nudges_while_guards_remain():
@@ -476,7 +490,7 @@ def test_vault_door_nudges_while_guards_remain():
     player = Player(row=33, col=15)                  # at the door, too early
     msgs = main._operators_vault_tick(room, player)
     assert any('draws breath' in m for m in msgs)
-    assert _keys(room) == []
+    assert '' in {t for _, _, t in _gates(room)}      # and it is still shut
 
 
 # ── executed solve ───────────────────────────────────────────────────────────

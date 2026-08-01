@@ -45,8 +45,8 @@ import pytest
 import generation.dungeon_gen as dg
 from engine.motion import apply_motion
 from engine.player import Player
+from sharing.replay import replay_tape
 from tests import SEEDS
-from tests.test_operators_vault import _drive
 
 CORR = dg._OV_CORR_ROWS
 
@@ -101,38 +101,49 @@ def test_no_jump_from_the_spawn_reaches_a_lesson_you_have_not_opened(seed):
             raise AssertionError(f'a jump landed IN corridor row {r}')
 
 
-@pytest.mark.xfail(strict=True, reason=(
-    'KNOWN CHEESE, found 2026-08-01 and PRE-EXISTING (not from the fog rebuild '
-    '— measured against the old geometry, which leaked one MORE jump). After '
-    "corridor 1, `7G` lands in corridor 3 and corridor 2's `db` lesson is never "
-    'taught; `4G` lands at corridor 2 col 8, which is west of the shaft mouth '
-    '`db` exists to reach, for one key less. The per-key `_reveal_from` in the '
-    'tick lights the corridor AHEAD of the one the player walked into, and a '
-    'lit corridor is a legal landing. Un-xfail when the level defends it.'))
 @pytest.mark.parametrize('seed', SEEDS)
-def test_no_jump_at_any_stage_skips_the_next_lesson(monkeypatch, seed):
-    """THE STAGED AUDIT — the one that matters, because the danger is not at the
-    spawn. It is two corridors in, when a gate has opened and the reveal has run.
+def test_a_jump_that_skips_a_corridor_cannot_win(seed):
+    """THE ONE THAT MATTERS, and it is about OUTCOMES, not landings.
 
-    After solving k corridors the tape leaves the player in corridor k+1, so
-    corridors 1..k+1 are legitimately reachable. A jump that lands in corridor
-    k+2 or beyond has skipped a lesson outright.
+    An earlier version of this test asserted that no jump could LAND in a
+    corridor the player had not opened, and it failed: after corridor 1, `7G`
+    lands in corridor 3. That turned out to be the wrong question. Landing
+    there is harmless — what matters is whether you can finish from there.
+
+    Since 2026-08-01 a gate opens because its pack is DEAD, and the vault door
+    opens only when EVERY guard in the level is down. So a corridor you jumped
+    over is a corridor whose guards are still breathing, and the vault will not
+    yield. The jump still happens; it just does not pay.
     """
+    par = dg.build_dungeon_operators_vault(seed).rooms[0].answer
     segs = _segments()
-    for k in range(1, len(segs)):
+    for k in range(1, len(segs)):            # the tail has no `3j` to stand in
+        tape = ' '.join(t for s in segs[:k - 1] + [['3j']] + segs[k:] for t in s)
         d = dg.build_dungeon_operators_vault(seed)
-        prefix = [ch for seg in segs[:k] for tok in seg for ch in tok]
-        _state, cap = _drive(monkeypatch, d, prefix)
-        room, player = d.rooms[0], cap['player']
-        allowed = k + 1                      # the corridor they now stand in
-        for (r, c) in _landings(room, player):
-            if r not in CORR:
-                continue                     # a pit or a dead row is no shortcut
-            reached = CORR.index(r) + 1
-            assert reached <= allowed, (
-                f'seed {seed}: after {k} corridor(s), a jump from '
-                f'{(player.row, player.col)} landed in corridor {reached} '
-                f'at {(r, c)} — lesson {allowed + 1} was never taught')
+        res = replay_tape(d, 'operators_vault', tape)
+        alive = [e for r in d.rooms for e in r.entities
+                 if e.kind == 'goblin' and e.alive]
+        assert not res.won, (
+            f'seed {seed}: skipping corridor {k} still won — its lesson is '
+            f'optional ({len(alive)} guard(s) left alive)')
+    # …and the route that does the work wins, so the level is not merely hard.
+    d = dg.build_dungeon_operators_vault(seed)
+    assert replay_tape(d, 'operators_vault', par).won
+
+
+@pytest.mark.parametrize('seed', SEEDS)
+def test_the_vault_is_what_makes_every_pack_required(seed):
+    """The mechanism behind the test above, asserted directly: no guard may be
+    left alive in a winning run. This is what a teleport cannot do — a jump
+    kills nothing."""
+    d = dg.build_dungeon_operators_vault(seed)
+    room = d.rooms[0]
+    res = replay_tape(d, 'operators_vault', room.answer)
+    assert res.won
+    assert not [e for r in d.rooms for e in r.entities
+                if e.kind == 'goblin' and e.alive]
+    assert not [e for r in d.rooms for e in r.entities
+                if e.kind == 'locked_door' and e.alive]
 
 
 @pytest.mark.parametrize('seed', SEEDS)
