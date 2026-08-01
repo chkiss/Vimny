@@ -128,3 +128,68 @@ class TestMacrosAreRegisters:
         assert clip_to_keys(clip) == 'ce' + ESC
         syms = clip['rows'][0]['char_runs'][0]['symbols']
         assert '\x1b' not in syms and ''.join(syms) == 'ce^['
+
+
+# ── @ runs EVERY line of a register, not just the first ──────────────────────
+class TestMultiLineReplay:
+    """`clip_to_keys` read `rows[0]` and dropped the rest, so a multi-line
+    register HALF-RAN: the first line executed and the rest vanished with no
+    error. Latent until the stores were unified — now a register can hold `yy`
+    of a row of keystrokes, or a `qA` append across lines."""
+
+    def _rows(self, *lines):
+        from engine.registers import keys_to_clip
+        rows = []
+        for l in lines:
+            rows.extend(keys_to_clip(l)['rows'])
+        return rows
+
+    def test_one_charwise_row_is_unchanged(self):
+        """The common case — every recording is one line — must not move."""
+        from engine.registers import keys_to_clip, clip_to_keys
+        assert clip_to_keys(keys_to_clip('ddp')) == 'ddp'
+
+    def test_every_row_replays_joined_by_enter(self):
+        from engine.registers import clip_to_keys
+        from engine.macro import ENTER
+        clip = {'linewise': False, 'rows': self._rows('ddp', 'xp')}
+        assert clip_to_keys(clip) == 'ddp' + ENTER + 'xp'
+
+    def test_a_linewise_clip_ends_with_one_too(self):
+        """A linewise register ends with a newline in vim, so `yy@\"` on a line
+        holding an ex command runs it AND submits it — which is the whole point
+        of being able to execute text you yanked off the floor."""
+        from engine.registers import clip_to_keys
+        from engine.macro import ENTER
+        clip = {'linewise': True, 'rows': self._rows(':s/old/new/')}
+        assert clip_to_keys(clip) == ':s/old/new/' + ENTER
+
+    def test_a_charwise_clip_does_not(self):
+        from engine.registers import keys_to_clip, clip_to_keys
+        from engine.macro import ENTER
+        assert not clip_to_keys(keys_to_clip('dw')).endswith(ENTER)
+
+    def test_an_empty_register_still_replays_as_nothing(self):
+        from engine.registers import clip_to_keys
+        assert clip_to_keys({'linewise': True, 'rows': []}) == ''
+        assert clip_to_keys(None) == ''
+
+    def test_the_join_survives_caret_notation(self):
+        """The rows are stored with control chars as ^[ / ^M, and the ENTER put
+        BETWEEN them is a real one — the un-caret pass must not confuse them."""
+        from engine.registers import clip_to_keys
+        from engine.macro import ENTER, ESC
+        clip = {'linewise': False, 'rows': self._rows('ce' + ESC, 'j')}
+        assert clip_to_keys(clip) == 'ce' + ESC + ENTER + 'j'
+
+    def test_an_appended_recording_spanning_rows_replays_whole(self):
+        from engine.player import Player
+        from engine.registers import (record_register, read_register,
+                                      clip_to_keys, write_register)
+        from engine.macro import ENTER
+        p = Player()
+        # a linewise yank into "a, then qA appends a recording after it
+        write_register(p, 'a', {'linewise': True, 'rows': self._rows('jdd')})
+        record_register(p, 'A', 'xp')
+        played = clip_to_keys(read_register(p, 'a'))
+        assert 'jdd' in played and 'xp' in played and ENTER in played

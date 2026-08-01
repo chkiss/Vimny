@@ -241,7 +241,7 @@ commit — a stale exemption is an audit passing vacuously.
 | — | excepted, by agreement | `archivists_library`, warden combat AI, `screen_vault` |
 
 Also open:
-- **Multi-line `@` replay** — see Known bugs below. Fix when a level first wants it.
+- ~~Multi-line `@` replay~~ — **closed 2026-07-31**, see Known bugs below.
 - ~~Is the Wardenverse's reactive reflow generic or library-specific?~~ —
   **answered 2026-07-31: GENERIC.** Every consumer keys off two plain `Room`
   fields with no slug anywhere (`motion.enforce_fog_law` exempts a wrap buffer,
@@ -271,17 +271,8 @@ Also open:
   deliberately.** It was a standing open offer, never taken up; it stays.
 
 ## Known bugs
-- **`@` replays only the FIRST line of a multi-line register** (`registers.clip_to_keys`
-  reads `clip['rows'][0]`). Since macros and text share one register store
-  (unified 2026-07-25), a register can hold a linewise clip — `yy` a row of
-  keystrokes, or `qA`-append across lines — and vim would run all of it. Nothing
-  reaches it today: recordings are single-line and every level that uses `@`
-  yanks charwise, so it is a latent divergence rather than a live bug. It bites
-  the first time a level invites the player to yank lines and run them (a likely
-  Registry-wing move). Fix = join the rows in `clip_to_keys`; check what a
-  linewise clip's row separator should replay as before doing it.
-
-Previously known bugs (now fixed):
+None currently. Previously known bugs (now fixed):
+- `@` replayed only the FIRST line of a multi-line register (`registers.clip_to_keys` read `clip['rows'][0]`): fixed 2026-07-31 — every row is joined with ENTER, and a LINEWISE clip gets a trailing one, because a linewise register ends with a newline in vim (so `yy@"` on a line holding an ex command runs it *and* submits it). Latent since the macro/text stores were unified 2026-07-25: recordings are single-line, so nothing reached it, but a half-run macro fails silently — the first line executes and the rest vanish with no error. A single charwise row is byte-identical to before, which is what keeps every existing recording working (`tests/test_macro.py::TestMultiLineReplay`).
 - `30l` trailing-zero split: fixed in `vim_parser.py` via `(count and buf[i] == '0')` guard. The same bug later resurfaced in the operator grammar (`d10w` parsed as `d0`+`w`) and visual text-object counts (`v10iw`) — fixed 2026-06-09 with the same guard in `_operator_target` / `parse_visual_textobj`. A count typed before a `"` register (`2"add`) was also dropped; counts now multiply (`2"a3dd` = 6 lines, Vim-faithful).
 - `3j 59l 3k` void bypass: fixed — fog wall at door column blocks count motions past it.
 - `x` then `u` left the character deleted (a free delete): fixed — the cut snapshot is taken BEFORE `_ed_cut` mutates the row, so undo restores the cut character.

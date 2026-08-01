@@ -41,6 +41,9 @@ from __future__ import annotations
 # the control chars engine/macro.py normalises recordings to
 _CARET = {'\x1b': '^[', '\r': '^M', '\x7f': '^?'}
 _UNCARET = {v: k for k, v in _CARET.items()}
+#: The line break BETWEEN two rows of a register, played back as keys — the same
+#: char `engine.macro` records <Enter> as.
+_ENTER = '\r'
 
 
 def _append_clip(old, new):
@@ -86,12 +89,8 @@ def keys_to_clip(keys: str) -> dict:
                                      'kind': 'ancient'}] if syms else []}]}
 
 
-def clip_to_keys(clip) -> str:
-    """Read a register back as a keystroke string for `@`. Any register works —
-    text you yanked replays as keys, exactly as in vim."""
-    if not clip or not clip.get('rows'):
-        return ''
-    row = clip['rows'][0]
+def _row_to_text(row) -> str:
+    """One clip row, laid back out as the characters that stood in it."""
     cells = [' '] * row.get('width', 0)
     for rd in row.get('char_runs', ()):
         for i, sym in enumerate(rd['symbols']):
@@ -100,7 +99,30 @@ def clip_to_keys(clip) -> str:
                 cells.extend([' '] * (pos - len(cells) + 1))
             if pos >= 0:
                 cells[pos] = sym
-    text = ''.join(cells)
+    return ''.join(cells)
+
+
+def clip_to_keys(clip) -> str:
+    """Read a register back as a keystroke string for `@`. Any register works —
+    text you yanked replays as keys, exactly as in vim.
+
+    EVERY row, not just the first. A register can hold more than one line — `yy`
+    a row of keystrokes off the floor, `2yy` two of them, `qA` append across
+    lines — and vim runs all of it. Reading `rows[0]` alone silently executed
+    the first line and dropped the rest, which is worse than refusing: the macro
+    half-ran.
+
+    Rows are joined with ENTER, because that is what the line break between them
+    IS when the register is played as keys. A LINEWISE clip gets a trailing one
+    as well: a linewise register ends with a newline in vim, so `yy@"` on a line
+    holding `:s/old/new/` runs the command AND submits it, which is the whole
+    point of being able to execute text you yanked.
+    """
+    if not clip or not clip.get('rows'):
+        return ''
+    text = _ENTER.join(_row_to_text(r) for r in clip['rows'])
+    if clip.get('linewise'):
+        text += _ENTER
     for caret, ch in _UNCARET.items():
         text = text.replace(caret, ch)
     return text
