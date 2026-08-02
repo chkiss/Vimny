@@ -26,6 +26,7 @@ from engine.tape import ESC as _TAPE_ESC
 from engine.motion import (_fog_unreachable, _cell_char, _is_word_char,
                            apply_stone_fog, _FOG_BLOCK_KINDS)
 from generation.room_gen import make_room, RUNE_CHAR as _RUNE_CHAR
+from content import passwords as _passwords
 
 def _lay_dark(room, cells) -> None:
     """Hide a whole region, each cell by the right mechanism.
@@ -6486,23 +6487,39 @@ def build_dungeon_wet_ink(seed: int) -> Dungeon:
 # grant, not just the level's 'help' token).
 #
 # Reward room: par None (reliquaries are unstarred), generous fixed budget.
-_BND_ROWS, _BND_COLS = 7, 24
+_BND_ROWS, _BND_COLS = 7, 34
 _BND_AR          = 3                  # the action row: spawn, word, chest, exit
-_BND_WATER_COLS  = (12, 13)           # full-height channel; left 1..11, right 14..22
+_BND_WATER_COLS  = (12, 13)           # full-height channel; left 1..11, right 14..32
 _BND_SPAWN       = (3, 1)
-_BND_WORD_COL    = 15                 # pass-word cols 15..19 (len 5)
-_BND_CHEST       = (3, 21)
-_BND_EXIT        = (3, 22)
+#: The pass-word is RIGHT-ALIGNED on its shore: it always ENDS at this column,
+#: and a word of len n therefore starts at `_BND_WORD_END - n + 1`. The pool is
+#: the Operator's Vault's, whose words run from 5 glyphs to 15, and the far
+#: shore is sized for the longest — but the ROUTE must not change with the
+#: draw, and it is the word's END the route touches (`/{word}<CR>` lands on the
+#: head, `e` runs to the tail, then two steps to the lectern). Fixing the tail
+#: keeps `e 2l x l` exact for every seed; fixing the head would not.
+_BND_WORD_END    = 29                 # longest word (15) starts at col 15
+_BND_CHEST       = (3, 31)
+_BND_EXIT        = (3, 32)
 _BND_FRIEZE_ROWS = (1, 5)             # LEFT chamber only — the far shore is bare
 _BND_BUDGET      = 30
 
 
+def _bnd_word_col(word: str) -> int:
+    """First column of the right-aligned pass-word."""
+    return _BND_WORD_END - len(word) + 1
+
+
 def _bnd_draw_word(rng) -> str:
-    """The binder's pass-word: one len-5 vocab word."""
-    _load_vocab_tables()
-    pool = [w for w in _VOCAB_PLAIN_BY_LEN.get(5, ())
-            if w.isalpha() and w == w.lower()]
-    return rng.choice(pool)
+    """The binder's pass-word — one of the Operator's Vault's plain passwords.
+
+    The level's fiction is a pass-word legible across the water, and a word the
+    player half-recognises reads as one before anything explains it. `_OV_PLAIN`
+    is the pool of single tokens with no punctuation inside them, which is what
+    a `/{word}<CR>` search wants: any character motion or search takes the whole
+    of it. The phrase and leet pools are the Vault's own lesson and stay there.
+    """
+    return rng.choice(_OV_PLAIN)
 
 
 def build_dungeon_binders_reliquary(seed: int) -> Dungeon:
@@ -6523,7 +6540,8 @@ def build_dungeon_binders_reliquary(seed: int) -> Dungeon:
 
     # The pass-word on the far shore — the only text across the water, so
     # the crossing search is unambiguous. Friezes stay on the near shore.
-    room.char_runs.append(CharRun(_BND_AR, _BND_WORD_COL, tuple(word), 'ember'))
+    room.char_runs.append(
+        CharRun(_BND_AR, _bnd_word_col(word), tuple(word), 'ember'))
     _place_frieze_sym(room, rng, _BND_FRIEZE_ROWS, 1, _BND_WATER_COLS[0] - 1)
     room._bnd_word = word
 
@@ -9599,65 +9617,15 @@ _OV_ANSWER = ('d w $ p 3j '                   # C1  → dw, from the spawn, whic
                                               # ledge and the vault is below it
 
 
-#: The Operator's Vault's passwords, sorted by the only thing that matters —
-#: their SHAPE under vim's two word models.
-#:
-#: Every corridor's gate is a `fancy_door`: it opens for a register whose text
-#: reads its password and for nothing else, so the password's spelling IS the
-#: forcing device. Which motion takes it in one cut is decided by where the
-#: punctuation and the spaces fall:
-#:
-#:   _OV_PLAIN   one token, no punctuation. `w`/`e`/`b` and `W`/`E`/`B` agree
-#:               on it, so it serves the SMALL-word lessons — the big-word
-#:               twin is no cheaper and no dearer, and the guards decide the
-#:               rest.
-#:   _OV_SPLIT   one token with punctuation INSIDE it. This is where the two
-#:               models part company: `w` stops at the punctuation and takes a
-#:               fragment, `W` runs to the whitespace and takes the whole.
-#:               A door wanting the whole thing therefore cannot be opened by
-#:               the small-word motion at all. These are the leet spellings,
-#:               and the leet is not decoration — the `.` and `-` are the
-#:               entire mechanism.
-#:   _OV_QUERY   begins with `?`, for `dF?`. `dF?` cuts from the `?` up to the
-#:               cursor, so the mark has to LEAD the password, which is why
-#:               these read as challenges: the door is asking.
-#:   _OV_PHRASE  more than one word. No character motion takes a space, so only
-#:               a LINE motion (`0`, `$`, `dd`) can hand one of these over
-#:               whole.
-#:
-#: DIRECTION DOES NOT SORT THEM. A westward `db` cuts the same token an
-#: eastward `dw` does; what the direction decides is where the word is laid
-#: relative to the gate and whether the player opens it with `p` or `P`. So a
-#: password may serve either facing, and the shuffle below is free to move them.
-#:
-#: They are real passwords from other people's dungeons — Durin's door, the
-#: Fat Lady, Dumbledore's office, Colossal Cave, NetHack, Ali Baba, DOOM —
-#: because a password the player half-recognises is one they read as a password
-#: before anything explains it.
-#:
-#: EVERY ENTRY MUST BE A REAL ONE, and the rule is load-bearing rather than
-#: decorative. `abstinence and toffee` sat here until 2026-08-02 and was not
-#: from anywhere: it welded the Fat Lady's `Abstinence` onto Dumbledore's
-#: `Toffee Eclairs` and read, convincingly, like something half-remembered.
-#: That is the failure mode — an invented password is indistinguishable from a
-#: real one to whoever adds the next, so the pool drifts into pastiche and the
-#: recognition the whole idea rests on quietly stops being real. (`justice for
-#: all` went at the same time; it is a Metallica record, not a door.)
-#:
-#: A password also appears in ONE pool only. The leet spellings and the phrases
-#: were separately dealt `open sesame` / `0pen-sesame`, `fortuna major` /
-#: `f0rtuna-maj0r`, `pig snout` / `p1g.sn0ut` — the same door twice in one run,
-#: which reads as the level repeating itself rather than as two shapes.
-_OV_PLAIN = ('mellon', 'xyzzy', 'plugh', 'dissendium', 'wattlebird',
-             'balderdash', 'swordfish', 'iddqd', 'elbereth', 'shibboleth')
-_OV_SPLIT = ('c4put.dr4c0nis', 'f0rtuna-maj0r', 'p1g.sn0ut', 'sherbet-lem0n',
-             't0ffee.eclairs', 'scurvy-cur', 'lem0n.dr0p')
-_OV_QUERY = ('?wh0g0esthere', '?speakfr1end', '?fr1end0rfoe', '?whatw0rd')
-#: Durin's door; Ali Baba; the hymn NetHack engraves; and the Fat Lady and
-#: Dumbledore's office, which supply most of the real multi-word ones.
-_OV_PHRASE = ('speak friend and enter', 'open sesame', 'elbereth gilthoniel',
-              'mimbulus mimbletonia', 'banana fritters', 'cockroach cluster',
-              'fizzing whizbee', 'acid pops')
+#: The Vault's passwords, sorted by SHAPE — which motion can take one in a
+#: single cut. The words themselves live in `content/passwords.py`, because the
+#: forge offers them too: a door placed by hand should be able to want the same
+#: words the built levels want. Read that module's docstring before adding one;
+#: the rule that every entry be a REAL password is load-bearing, not flavour.
+_OV_PLAIN  = _passwords.PLAIN
+_OV_SPLIT  = _passwords.SPLIT
+_OV_QUERY  = _passwords.QUERY
+_OV_PHRASE = _passwords.PHRASE
 
 #: The first password is ALWAYS `password`. The level's whole model — that a
 #: door can want words instead of a key — has to be legible the first time it

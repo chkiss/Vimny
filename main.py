@@ -694,7 +694,7 @@ _ENTITY_CHOICES = {
                  + ('floor_key',) + tuple(f'chest_key:{c}' for c in _KEY_COLOURS)
                  + ('chest_key', 'chest_random', 'chest_scroll',
                     'heart_container', 'gold', 'dynamite'),
-    # 'scroll_id' is filled from SCROLL_CATALOG on demand — see _entity_choices.
+    # 'scroll_id' and 'password' are filled on demand — see _entity_choices.
 }
 
 #: What each offered value means, where the value alone does not say. Only the
@@ -715,17 +715,57 @@ _CHOICE_NOTES = {
 }
 
 
-def _entity_choices(kind: str, field: str):
+def _entity_choices(kind: str, field: str, custom=()):
     """The offered values for a field, or () when it is free-form (a number, a
     group id, a name only the author knows).
 
     `scroll_id` is read from the catalogue rather than listed, so a scroll added
     tomorrow is offered tomorrow — a hand-copied list would drift, and an id
-    that does not match one silently shows no scroll at all."""
+    that does not match one silently shows no scroll at all.
+
+    `custom` is the level's OWN word pool — its `:vocab` block, the same words
+    `:fill custom` lays on the floor. A door's password and the words in the
+    room it stands in are the same fiction, and an author who has already told
+    the level what its words are should not have to type one of them again by
+    hand at the one place it matters most."""
     if field == 'scroll_id':
         from content.scrolls import SCROLL_CATALOG
         return ('',) + tuple(s['id'] for s in SCROLL_CATALOG)
+    if field == 'password':
+        # The author's OWN words first, then the shipped pools. First because a
+        # level that has declared a vocabulary has declared what it is about,
+        # and its door should want one of ITS words — the shipped pools are the
+        # fallback for a level that never said. Phrases are offered with
+        # underscores because the picker hands its answer back as `:entity`
+        # text, which splits on whitespace — the same substitution an author
+        # would have to type, offered rather than explained. The free-text row
+        # below the list stays, because neither pool has to be the answer.
+        from content.passwords import POOLS
+        shipped = tuple(w for _name, words, _note in POOLS for w in words)
+        mine    = tuple(w for w in custom if w and w not in shipped)
+        return tuple(w.replace(' ', '_') for w in mine + shipped)
     return _ENTITY_CHOICES.get((kind, field), _ENTITY_CHOICES.get(field, ()))
+
+
+def _choice_note(field: str, value: str, custom=()) -> str:
+    """The note beside one offered value.
+
+    `password` is noted by POOL rather than by word: what an author needs to
+    know is not what `p1g.sn0ut` is a reference to but that its punctuation is
+    what makes it a `dW` lesson and not a `dw` one. The pool IS the note. A word
+    from the level's own `:vocab` is named as such, so the two sources never
+    read as one undifferentiated list."""
+    fixed = _CHOICE_NOTES.get((field, value), '')
+    if fixed or field != 'password':
+        return fixed
+    from content.passwords import POOLS
+    plain = value.replace('_', ' ')
+    for name, words, note in POOLS:
+        if plain in words:
+            return f'{name} — {note}'
+    if plain in tuple(custom):
+        return ":vocab — this level's own word"
+    return ''
 
 
 def _entity_field(ent, field: str, raw: str) -> str:
@@ -924,7 +964,7 @@ def _popup_wrap(text: str, width: int, limit: int = 3) -> list:
     return lines
 
 
-def _pick_entity(term: Terminal, iw: int, game_h: int) -> str:
+def _pick_entity(term: Terminal, iw: int, game_h: int, custom=()) -> str:
     """The palette, as two panes you walk with j/k. Returns the ARGUMENT TAIL of
     the `:entity` command it built — `'goblin tag=red drops=floor_key:red'` — or
     '' if the author backed out.
@@ -1029,14 +1069,14 @@ def _pick_entity(term: Terminal, iw: int, game_h: int) -> str:
         text field, because the narrow set is what the game paints, not what it
         permits, and an author pairing on `tag=vault_b` is doing nothing wrong.
         """
-        choices = _entity_choices(kind, field)
+        choices = _entity_choices(kind, field, custom)
         if not choices:
             return read_value(current)
         sel = choices.index(current) if current in choices else 0
         while True:
             rows, notes = [], []
             for v in choices:
-                note = _CHOICE_NOTES.get((field, v), '')
+                note = _choice_note(field, v, custom)
                 notes.append(note)
                 rows.append(f' {(v or "(none)"):<20}{note}')
             rows.append(' » type something else')
@@ -1482,8 +1522,13 @@ _SCROLL_DROPS = {
 
 def _unlock_animation(term: Terminal, room, player,
                       door_r: int, door_c: int, iw: int, game_h: int,
-                      key_color: str | None = None) -> None:
-    """Flash key icon at door position, then blank it — door + key both vanish."""
+                      key_color: str | None = None, icon: str | None = None) -> None:
+    """Flash key icon at door position, then blank it — door + key both vanish.
+
+    `icon` overrides the key glyph. A fancy door is opened by the same gesture
+    and deserves the same beat, but holding up a KEY at a door that never
+    wanted one is the one frame in the game that would contradict its own
+    mechanic — so it flashes what it did take: something typed."""
     vr_start = max(0, min(player.row - game_h // 2, room.rows - game_h))
     vc_start = max(0, min(player.col - iw    // 2,  room.cols - iw))
     scr_r = door_r - vr_start + 3
@@ -1493,7 +1538,8 @@ def _unlock_animation(term: Terminal, room, player,
     key_clr = key_color if key_color is not None else C.key_fg()
     rst  = term.normal
     fbg  = C.floor_bg()
-    print(term.move_yx(scr_r, scr_c) + fbg + key_clr + S.KEY + rst, end='', flush=True)
+    glyph = icon if icon is not None else S.KEY
+    print(term.move_yx(scr_r, scr_c) + fbg + key_clr + glyph + rst, end='', flush=True)
     time.sleep(0.35)
     print(term.move_yx(scr_r, scr_c) + fbg + '  ' + rst, end='', flush=True)
     time.sleep(0.08)
@@ -6624,7 +6670,10 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
                         _kind = ''
                         _via  = ''            # the line the picker composed
                         if _bare:
-                            _via  = _pick_entity(term, _iw(term), term.height - 8)
+                            _via  = _pick_entity(
+                                term, _iw(term), term.height - 8,
+                                custom=(_draft.level.vocabulary
+                                        if _draft is not None else ()))
                             _toks = _via.split()
                             if _toks:
                                 _kind, _toks = _toks[0], _toks[1:]
@@ -9116,7 +9165,8 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
                     redo_stack.clear()
                     _render(_pool_msg())
                     _unlock_animation(term, room, player, target.row, target.col,
-                                      _iw(term), term.height - 8, None)
+                                      _iw(term), term.height - 8, None,
+                                      icon=S.KEY_SPOKEN)
                     _kill_door_group(room, target.row, target.col, kind='fancy_door')
                     player.row, player.col = target.row, target.col
                     _reveal_from(room, player.row, player.col)
@@ -9124,14 +9174,14 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
                                  + _register_prefix_cost(action))
                     _push('The door hears the word and opens!')
                 elif held:
-                    # NAME BOTH SIDES. The password is not the secret — it is
-                    # written on the floor in front of the door, and the puzzle
-                    # is taking it in ONE cut, not learning it. So the refusal
-                    # says what was heard and what was wanted, which is how a
-                    # player learns that the door weighs the whole register and
-                    # that an over-wide cut brings too many words along. Hiding
-                    # it would only make the model unguessable.
-                    player.error = f'E: It hears "{held}" — the door wants "{target.password}"'
+                    # NAME WHAT WAS HEARD, NEVER WHAT WAS WANTED. Quoting the
+                    # register back is the whole diagnostic: the player sees
+                    # that the door weighed the entire cut, fragment or extra
+                    # words and all, which is the model. Quoting the PASSWORD
+                    # back would hand over the answer to any door whose word is
+                    # not lying in plain sight — a door across a room, or one
+                    # an author placed in the forge with a word of their own.
+                    player.error = f'E: It hears "{held}" — and does not budge'
                 else:
                     player.error = 'E: You hold no words to speak'
             elif _clip_is_fire(clip):

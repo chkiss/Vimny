@@ -21,7 +21,8 @@ from __future__ import annotations
 from collections import deque
 from engine.player import Player
 from engine.modes import Mode
-from engine.world import CellType, entity_letter, CARET_TRANSPARENT
+from engine.world import (CellType, entity_letter, CARET_TRANSPARENT,
+                          BLOCKING_KINDS)
 
 
 def _apply_esc(player: Player) -> None:
@@ -364,8 +365,7 @@ def _cross_water(room, r: int, c: int) -> bool:
         return False
     ent = room.entity_at(r, c)
     # Same blocker set as f/F/t/T (_SCAN_BLOCK): an unbroken seal_door stops $ / 0 / ^ too.
-    return ent is None or ent.kind not in ('locked_door', 'shield', 'seal_door',
-                                           'boss_seal', 'fancy_door')
+    return ent is None or ent.kind not in BLOCKING_KINDS
 
 
 _PAIRS_OPEN  = {'(': ')', '[': ']', '{': '}'}

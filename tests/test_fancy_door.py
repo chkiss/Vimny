@@ -174,6 +174,117 @@ def test_an_empty_password_is_refused():
     assert main._entity_field(door, 'password', '')
 
 
+# ── a shut door stops the CURSOR, not just the feet ─────────────────────────
+#
+# Every blocker in the game, not just this one: the hole was in the verbs that
+# WRITE a cell and step to the next, which asked the CELL and never the entity
+# standing on it. A door sits on ordinary floor, so a player could type — or
+# paste — their way straight through any lock in the game while `l` refused.
+
+_BLOCKERS = ('fancy_door', 'locked_door', 'seal_door', 'boss_seal', 'shield')
+
+
+def _blocked_room(kind):
+    room = Room(room_type=RoomType.ENTRY, rows=3, cols=20)
+    room.cells = [[CellType.FLOOR] * 20 for _ in range(3)]
+    for c in range(20):
+        room.cells[0][c] = room.cells[2][c] = CellType.WALL
+    room.add_entity(Entity(kind=kind, row=1, col=10, password='mellon'))
+    room.rebuild_indexes()
+    return room
+
+
+@pytest.mark.parametrize('kind', _BLOCKERS)
+@pytest.mark.parametrize('verb', ('insert', 'extend', 'replace_chars', 'overtype'))
+def test_no_writing_verb_walks_the_cursor_through_a_shut_door(kind, verb):
+    """i/a, A, r and R each write a cell and advance. None may advance ONTO a
+    blocker — `l` will not, and a cursor is a cursor."""
+    from engine.player import Player
+    from engine import insert as I
+    room = _blocked_room(kind)
+    p = Player(row=1, col=9)
+    {'insert':        lambda: I.insert_char(room, p, 'x'),
+     'extend':        lambda: I.insert_char_extend(room, p, 'x'),
+     'replace_chars': lambda: I.replace_chars(room, p, 'x', 3),
+     'overtype':      lambda: I.replace_overtype(room, p, 'x')}[verb]()
+    assert p.col == 9, f'{verb} stepped onto the {kind}'
+    assert room.char_run_at(1, 10) is None, f'{verb} wrote ON the {kind}'
+
+
+@pytest.mark.parametrize('kind', _BLOCKERS)
+@pytest.mark.parametrize('before', (False, True))
+def test_a_paste_neither_crosses_a_shut_door_nor_carries_the_cursor_over_it(kind, before):
+    """The worst of the two: op_paste lands the cursor on the LAST pasted cell,
+    so text laid across a door took the player with it — `5p` beside a gate
+    walked them into the corridor beyond. The clip is deliberately CLUSTERED
+    (two runs with a hole between them), because bounding each run on its own
+    still lets the run that BEGINS past the door land there."""
+    from engine.player import Player
+    from engine.operator import op_paste
+    room = _blocked_room(kind)
+    p = Player(row=1, col=9)
+    clip = {'linewise': False,
+            'rows': [{'width': 5,
+                      'char_runs': [{'dcol': 0, 'symbols': ('a', 'b'), 'kind': 'ancient'},
+                                    {'dcol': 3, 'symbols': ('c', 'd'), 'kind': 'ancient'}],
+                      'entities': []}]}
+    op_paste(room, p, clip, before, 1)
+    assert p.col < 10, f'the cursor rode the paste through the {kind}'
+    assert all(room.char_run_at(1, c) is None for c in range(10, 20)), \
+        f'the paste laid text at or past the {kind}'
+
+
+def test_the_forge_offers_the_shared_password_pools():
+    """An author placing a door by hand should be able to want the same words
+    the built levels want — and the phrases must arrive underscored, because
+    `:entity` splits its arguments on whitespace and the picker's answer is
+    `:entity` text."""
+    import main
+    from content.passwords import POOLS, ALL
+    offered = main._entity_choices('fancy_door', 'password')
+    assert offered                                  # not free-text-only
+    assert ' ' not in ''.join(offered)
+    assert set(offered) == {w.replace(' ', '_') for w in ALL}
+    # every offered word survives the trip back through the field setter
+    door = Entity(kind='fancy_door', row=1, col=1)
+    for v in offered:
+        assert main._entity_field(door, 'password', v) == ''
+        assert door.password in ALL
+    # and each is noted by the POOL it came from — the shape, not the reference
+    for name, words, _note in POOLS:
+        v = words[0].replace(' ', '_')
+        assert main._choice_note('password', v).startswith(f'{name} — ')
+
+
+def test_the_forge_offers_the_levels_own_vocab_words_first():
+    """An author's `:vocab` block is the level saying what its words are. The
+    door's password is the one place that matters most, so its own words come
+    FIRST, named as its own, with the shipped pools behind them."""
+    import main
+    from content.passwords import ALL
+    mine = ('shibboleth', 'grimoire', 'lantern')     # one of them shipped too
+    offered = main._entity_choices('fancy_door', 'password', mine)
+    assert offered[:2] == ('grimoire', 'lantern')    # ahead of the shipped pools
+    assert offered.count('shibboleth') == 1          # listed once, not twice
+    assert set(offered) >= {w.replace(' ', '_') for w in ALL}
+    assert main._choice_note('password', 'grimoire', mine) == \
+        ":vocab — this level's own word"
+    # a word in BOTH is noted by its shipped pool — the shape is the useful fact
+    assert main._choice_note('password', 'shibboleth', mine).startswith('plain — ')
+    # and with no vocabulary block, nothing changes
+    assert main._entity_choices('fancy_door', 'password', ()) == \
+        main._entity_choices('fancy_door', 'password')
+
+
+def test_a_fancy_door_is_not_drawn_as_a_padlock():
+    """It is a lock, in the lock colour — but a padlock sends a player hunting
+    for something to pick up, and there is nothing to pick up."""
+    import render.symbols as S
+    assert S.DOOR_SPOKEN not in (S.DOOR_LOCKED, S.DOOR_H, S.DOOR_V)
+    assert S.KEY_SPOKEN != S.KEY
+    assert len(S.DOOR_SPOKEN) == len(S.KEY_SPOKEN) == 1
+
+
 @pytest.mark.parametrize('spoken,opens', [
     ('p1g.sn0ut',  True),
     ('P1G.SN0UT',  True),      # the door hears words, not capitals

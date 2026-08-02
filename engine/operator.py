@@ -24,7 +24,8 @@ This is how Vimny stays Vim-faithful — `yy` yanks the whole line including the
 spaces between characters (bounded by stone walls), not just the character runs.
 """
 from __future__ import annotations
-from engine.world import CellType, CharRun, Entity, strike_disguise
+from engine.world import (CellType, CharRun, Entity, strike_disguise,
+                          blocked_by_entity)
 from engine.text_object import TextObjectType
 from engine.editor import _merge_adjacent_char_runs
 from engine.reflow import (
@@ -149,11 +150,19 @@ def _revive_from_tmpl(t: dict, row: int, col: int) -> Entity:
 
 def _place_entities(room, row: int, start_col: int, rclip: dict) -> bool:
     """Revive and place a captured row's entities at start_col + dcol, skipping
-    walls/occupied cells. Returns True if any entity was placed."""
+    walls/occupied cells and never reaching past a shut door. Returns True if
+    any entity was placed.
+
+    `is_passable` already refuses the door's OWN cell; the extra bound is that
+    nothing lands BEYOND it either, or a pasted creature would stand on the far
+    side of a lock and take the cursor with it (op_paste lands on the last
+    pasted cell, character or creature alike)."""
     placed = False
+    stop = next((c for c in range(start_col, room.cols)
+                 if blocked_by_entity(room, row, c)), room.cols)
     for ed in rclip.get('entities', ()):
         c = start_col + ed['dcol']
-        if 0 <= c < room.cols and room.is_passable(row, c) and not room.entity_at(row, c):
+        if c < stop and room.is_passable(row, c) and not room.entity_at(row, c):
             room.add_entity(_revive_from_tmpl(ed['tmpl'], row, c))
             placed = True
     return placed
@@ -248,18 +257,31 @@ def op_delete(room, player, text_obj, collapse: bool = False) -> dict:
 
 def _place_row(room, row: int, start_col: int, rclip: dict) -> int:
     """Lay a captured row's characters onto `row` starting at start_col + dcol,
-    clipping at walls/bounds. Returns the rightmost column written (or -1)."""
+    clipping at walls/bounds AND at shut doors. Returns the rightmost column
+    written (or -1).
+
+    A SHUT DOOR IS A WALL THAT OPENS. It stands on ordinary floor, so a paste
+    that only asked the CELL laid its text straight across one — and since the
+    cursor lands on the last pasted cell, the player rode the text through a
+    lock they never opened (`5p` beside a gate walked them into the corridor
+    beyond it). The push has always dropped a glyph shoved onto an entity into
+    the void; this is the same law read from the other side."""
     last = -1
+    # The bound is on the WHOLE placement, not per cluster: a clip cut from a
+    # row with gaps holds one run per cluster, and stopping each run at the door
+    # would still let the run that BEGINS past it land on the far side.
+    stop = next((c for c in range(start_col, room.cols)
+                 if blocked_by_entity(room, row, c)), room.cols)
     for rd in rclip['char_runs']:
         base = start_col + rd['dcol']
         syms = []
         c = base
         for sym in rd['symbols']:
-            if 0 <= c < room.cols and room.cells[row][c] in _PASTABLE:
+            if (0 <= c < stop and room.cells[row][c] in _PASTABLE):
                 syms.append(sym)
                 c += 1
             else:
-                break                       # stop this cluster at a wall/edge
+                break                       # stop this cluster at a wall/door/edge
         if syms:
             room.add_char_run(CharRun(row, base, tuple(syms), rd['kind']))
             last = base + len(syms) - 1
@@ -539,9 +561,13 @@ def op_paste(room, player, clip: dict, before: bool, count: int = 1) -> bool:
         _merge_adjacent_char_runs(room, player.row)
         if placed_any:                                      # cursor on the last pasted cell (Vim)
             last = base + total - 1
-            while last >= base and not (room.char_run_at(player.row, last)
-                                        or room.entity_at(player.row, last)):
-                last -= 1                                   # skip cells that got nothing (fell off the brink)
+            while last >= base and (blocked_by_entity(room, player.row, last)
+                                    or not (room.char_run_at(player.row, last)
+                                            or room.entity_at(player.row, last))):
+                last -= 1       # skip cells that got nothing (fell off the brink)
+                                # — and the shut door itself, which is an entity
+                                # the walk-back would otherwise read as "pasted"
+                                # and park the cursor inside the lock
             if last >= base:
                 player.col = last                           # land on the last pasted cell — character OR creature
     return placed_any

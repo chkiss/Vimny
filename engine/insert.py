@@ -24,7 +24,7 @@ cursor advances; Backspace removes the cell to the left. The grid is fixed, so
 "insert" is overwrite-and-advance (matching the admin editor), not text-shift.
 """
 from __future__ import annotations
-from engine.world import CellType, CharRun
+from engine.world import CellType, CharRun, blocked_by_entity
 from engine.motion import _first_non_blank_col, _leftmost_passable
 from engine.editor import _merge_adjacent_char_runs, _split_run_at
 from engine.reflow import is_ledge, open_gap, close_gap, extend_floor, _insert_blank_row
@@ -125,6 +125,14 @@ def insert_char(room, player, ch: str, kind: str = INSERT_KIND) -> bool:
     a word typed at the bank reclaims the flood cell by cell (The Inscription
     Halls' river). The mirror of `A` carving floor into walls.
 
+    A SHUT DOOR STOPS THE CURSOR, exactly as it stops `l`. The advance used to
+    test the CELL alone, and a door sits on ordinary floor — so typing at the
+    cell before one walked the cursor through it, and a player could append
+    their way past any lock in the game. Held at the door, each further
+    keystroke writes at the same cell and shoves its neighbour onto the door,
+    where `open_gap` has always dropped it into the void: typing at a lock costs
+    you the character, which is what typing at any other brink already costs.
+
     The `else` overwrite-in-place branch is a retired-overlay future hook,
     currently unreachable. Returns False if the cursor is on a wall."""
     r, c = player.row, player.col
@@ -142,7 +150,8 @@ def insert_char(room, player, ch: str, kind: str = INSERT_KIND) -> bool:
         _delete_at(room, r, c)                 # overwrite the cell in place
     room.add_char_run(CharRun(r, c, (ch,), kind))
     _merge_adjacent_char_runs(room, r)
-    if c + 1 < room.cols and room.cells[r][c + 1] in writable:
+    if (c + 1 < room.cols and room.cells[r][c + 1] in writable
+            and not blocked_by_entity(room, r, c + 1)):
         player.col += 1
     return True
 
@@ -155,8 +164,8 @@ def insert_char_extend(room, player, ch: str, kind: str = INSERT_KIND) -> bool:
     r, c = player.row, player.col
     if not extend_floor(room, r, c, ch, kind):
         return False
-    if c + 1 < room.cols:
-        player.col = c + 1
+    if c + 1 < room.cols and not blocked_by_entity(room, r, c + 1):
+        player.col = c + 1          # a shut door holds `A` too — see insert_char
     return True
 
 
@@ -173,8 +182,9 @@ def replace_chars(room, player, ch: str, count: int = 1) -> bool:
     last, changed = c, False
     for i in range(count):
         col = c + i
-        if col >= room.cols or room.cells[r][col] not in _PASTABLE:
-            break
+        if (col >= room.cols or room.cells[r][col] not in _PASTABLE
+                or blocked_by_entity(room, r, col)):
+            break                   # `3r-` stops at a shut door, like `3l` does
         _delete_at(room, r, col)
         room.add_char_run(CharRun(r, col, (ch,), INSERT_KIND))
         last, changed = col, True
@@ -188,14 +198,16 @@ def replace_overtype(room, player, ch: str):
     """R-mode keystroke: record the cell's original content, overwrite with `ch`,
     advance. Returns a restore record (col, original|None) or None if not pastable."""
     r, c = player.row, player.col
-    if c >= room.cols or room.cells[r][c] not in _PASTABLE:
+    if (c >= room.cols or room.cells[r][c] not in _PASTABLE
+            or blocked_by_entity(room, r, c)):
         return None
     rec = (c, _cell_rune(room, r, c))
     _delete_at(room, r, c)
     room.add_char_run(CharRun(r, c, (ch,), INSERT_KIND))
     _merge_adjacent_char_runs(room, r)
-    if c + 1 < room.cols and room.cells[r][c + 1] in _PASTABLE:
-        player.col += 1
+    if (c + 1 < room.cols and room.cells[r][c + 1] in _PASTABLE
+            and not blocked_by_entity(room, r, c + 1)):
+        player.col += 1             # R overtypes up TO a shut door, never onto it
     return rec
 
 

@@ -244,12 +244,12 @@ def _ent_cell_str(ent, room, r: int, c: int, mode, floor_bg: str) -> str:
     if ent.kind == 'seal_door':
         return floor_bg + C.door_fg() + S.DOOR_H + rst
     if ent.kind == 'fancy_door':
-        # Drawn as a LOCKED door, because that is what it is: shut until you
-        # paste the thing that opens it. The player already knows that glyph
-        # means "bring me the key" — a fancy door only differs in what the key
-        # is, and it says so itself when you try it with the wrong words.
-        sym = S.DOOR_V if _is_vertical_door(room, r, c, 'fancy_door') else S.DOOR_LOCKED
-        return floor_bg + C.locked_door_fg() + sym + rst
+        # Its OWN glyph, in the lock colour: it is a lock, and the colour says
+        # so, but the shape says the key is not a key. A padlock sends a player
+        # hunting for something to pick up; this one is a box you speak into.
+        # It keeps that glyph in both orientations — the shape is the door's
+        # identity here, and a vertical bar would only say "door" again.
+        return floor_bg + C.locked_door_fg() + S.DOOR_SPOKEN + rst
     if ent.kind == 'boss_seal':
         return floor_bg + C.locked_door_fg() + S.DOOR_LOCKED + rst
     if ent.kind == 'locked_door':

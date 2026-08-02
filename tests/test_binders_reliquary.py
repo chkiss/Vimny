@@ -26,13 +26,15 @@ from blessed.keyboard import Keystroke
 from blessed import Terminal
 
 import main
+import generation.dungeon_gen as dg
 from engine.world import CellType
 from content.levels import LEVELS
 from content.scrolls import SCROLL_CATALOG, RELIC_SCROLL_IDS
 from generation.dungeon_gen import (
     build_dungeon_binders_reliquary,
     _BND_ROWS, _BND_COLS, _BND_AR, _BND_WATER_COLS, _BND_SPAWN,
-    _BND_WORD_COL, _BND_CHEST, _BND_EXIT, _BND_BUDGET,
+    _BND_WORD_END, _bnd_word_col, _BND_CHEST, _BND_EXIT, _BND_BUDGET,
+    _OV_PLAIN,
 )
 from tests import SEEDS, cached_room
 from engine.tape import ENTER as TAPE_ENTER
@@ -124,9 +126,23 @@ def test_chest_and_exit_lie_beyond_the_word(seed):
     # the Codex is looted only after the pass-word crossing.
     room = _room(seed)
     word = room._bnd_word
-    assert _BND_WORD_COL > max(_BND_WATER_COLS)
-    assert _BND_CHEST[1] > _BND_WORD_COL + len(word) - 1
+    assert _bnd_word_col(word) > max(_BND_WATER_COLS)
+    assert _BND_CHEST[1] > _BND_WORD_END
     assert _BND_EXIT[1] > _BND_CHEST[1]
+
+
+def test_the_far_shore_holds_the_longest_password_in_the_pool():
+    # The shore is sized for the pool, not for the seeds that happen to be
+    # tested: the longest plain password must still start east of the water.
+    longest = max(_OV_PLAIN, key=len)
+    assert _bnd_word_col(longest) > max(_BND_WATER_COLS)
+
+
+@pytest.mark.parametrize("seed", SEEDS)
+def test_the_word_is_a_password_the_player_may_recognise(seed):
+    # The pass-word comes from the Operator's Vault's pool, not from generic
+    # vocabulary — the fiction is a password, so the word should read as one.
+    assert _room(seed)._bnd_word in _OV_PLAIN
 
 
 @pytest.mark.parametrize("seed", SEEDS)
@@ -135,7 +151,9 @@ def test_the_word_is_the_only_text_on_the_far_shore(seed):
     far = [ru for ru in room.char_runs if ru.col > max(_BND_WATER_COLS)]
     assert len(far) == 1
     ru = far[0]
-    assert (ru.row, ru.col) == (_BND_AR, _BND_WORD_COL)
+    assert (ru.row, ru.col) == (_BND_AR, _bnd_word_col(room._bnd_word))
+    # right-aligned: the tail is where the route expects it, whatever the draw
+    assert ru.col + len(ru.symbols) - 1 == _BND_WORD_END
     assert ''.join(ru.symbols) == room._bnd_word
     # ...and no near-shore frieze glyph is alphabetic (no false search bait).
     for fr in (r for r in room.char_runs if r is not ru):
@@ -225,6 +243,24 @@ def test_answer_tape_wins_at_par(seed, monkeypatch):
     result = _drive(dungeon, _answer_keys(dungeon.rooms[0]), monkeypatch)
     assert result['won']
     assert result['stars'] == 0                    # reliquaries are unstarred
+
+
+@pytest.mark.parametrize("word", _OV_PLAIN)
+def test_every_password_in_the_pool_is_playable(word, monkeypatch):
+    # The pool is mixed now — 5 glyphs to 15, and one of them ends in a digit.
+    # The route is written once (`/{word}<CR> e 2l x l`), so every draw has to
+    # walk it: the search must land, `e` must run to the tail, and the longest
+    # word must still leave the crossing inside the budget.
+    monkeypatch.setattr(dg, '_bnd_draw_word', lambda rng: word)
+    # A distinct seed per word: conftest's session build cache is keyed by the
+    # builder's arguments, so reusing one seed would hand back the first word's
+    # build and the patch would look as if it had never applied.
+    dungeon = build_dungeon_binders_reliquary(9000 + _OV_PLAIN.index(word))
+    room = dungeon.rooms[0]
+    assert room._bnd_word == word
+    result = _drive(dungeon, _answer_keys(room), monkeypatch)
+    assert result['won']
+    assert result['spent'] <= _BND_BUDGET
 
 
 def test_h_refuses_until_the_codex_is_in_hand(monkeypatch):

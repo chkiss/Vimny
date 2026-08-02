@@ -321,6 +321,22 @@ def entity_letter(ent) -> Optional[str]:
 CARET_TRANSPARENT = frozenset({'door', 'locked_door', 'seal_door', 'exit',
                                'entry_marker', 'boss_seal', 'horse', 'fancy_door'})
 
+#: Entities the cursor may not occupy. A shut door is a wall that can be opened,
+#: and everything that reads the map has to agree on that: feet (`is_passable`),
+#: the line scans (`_cross_water`, `_SCAN_BLOCK`), and — since 2026-08-02 — the
+#: cursor advance of every verb that WRITES a cell and steps to the next one
+#: (`i`/`a`/`A`/`r`/`R`). Those verbs used to check the CELL alone, and a door
+#: sits on ordinary floor, so typing at the cell before one walked the cursor
+#: straight through it while `l` refused. Named once here because a blocker that
+#: only some of the readers know about is a hole in every wall it stands in.
+BLOCKING_KINDS = ('locked_door', 'shield', 'seal_door', 'boss_seal', 'fancy_door')
+
+
+def blocked_by_entity(room, r: int, c: int) -> bool:
+    """Is (r, c) held by a live blocking entity?"""
+    ent = room.entity_at(r, c)
+    return ent is not None and ent.kind in BLOCKING_KINDS
+
 
 @dataclass
 class CharRun:
@@ -500,8 +516,7 @@ class Room:
         if (r, c) in getattr(self, 'torn', ()):    # floor torn away by the Warden (temporary)
             return False
         ent = self.entity_at(r, c)
-        return ent is None or ent.kind not in ('locked_door', 'shield', 'seal_door',
-                                               'boss_seal', 'fancy_door')
+        return ent is None or ent.kind not in BLOCKING_KINDS
 
     def first_standable_row(self) -> int:
         """Grid row of buffer line 1 — the first row with a FLOOR/CORRIDOR cell. The

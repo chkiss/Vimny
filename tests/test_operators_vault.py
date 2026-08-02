@@ -563,9 +563,12 @@ def test_a_gate_refuses_the_wrong_words(monkeypatch):
 
     assert state == {}
     assert [e for e in _gates(room) if e.row == 3]     # still standing
-    # the refusal names BOTH sides, which is what teaches that the door weighs
-    # the whole register rather than looking for its word somewhere inside it
-    assert 'the door wants' in (cap['player'].error or '')
+    # the refusal quotes the REGISTER back — that is what teaches that the door
+    # weighs the whole cut rather than looking for its word somewhere inside it
+    # — and never quotes the password, which would be handing over the answer
+    err = cap['player'].error or ''
+    assert 'It hears' in err and 'does not budge' in err
+    assert 'wants' not in err
 
 
 def test_blocked_dd_is_parried_loudly_and_costs_nothing(monkeypatch):
