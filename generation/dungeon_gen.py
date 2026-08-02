@@ -9506,46 +9506,197 @@ _OV_LCOL, _OV_RCOL = 2, 57            # corridor floor spans these columns
 # two-row connector shafts below corridors 1..9: (top_row, col). Forward (→)
 # corridors drop at the line end (col 57, one $ away); backward (←) ones drop
 # mid-line so 0 overshoots the mouth.
-_OV_SHAFTS = ((4, 57), (7, 7), (10, 57), (13, 7), (16, 57),
-              (19, 26), (22, 57), (25, 7), (28, 57))
-# the oubliette pockets: (row, col) — sealed 1-cell floor cells. Col 3 on every
-# first spacer row (catches a corridor dd), col 1 on every second spacer row
-# (catches a chained dd from inside the first pocket), plus the two under the
-# vault approach.
-_OV_POCKETS = tuple((r, 3) for r in (4, 7, 10, 13, 16, 19, 22, 25, 28)) + \
-              tuple((r, 1) for r in (5, 8, 11, 14, 17, 20, 23, 26, 29)) + \
+#   EVERY SHAFT SITS BEHIND A GATE, which is what keeps this level dark. The
+#   fog is derived, not listed (`_doors_block_sight` → `_fog_unreachable`
+#   floods by FEET and stops at shut doors), so a shaft the flood can reach is a
+#   corridor lit from the spawn and a `{n}G` that skips a lesson. Getting the
+#   shafts behind the doors is not free, because the level teaches `p` and not
+#   `P`: a gate can only be opened from the WEST, so it must always be east of
+#   the player, and the way DOWN must be east of the gate.
+#
+#   Forward (→) corridors get that for nothing — they end at the line end, so
+#   the gate goes at col 57 and the shaft directly beneath it.
+#
+#   Backward (←) corridors cannot: the cut carries the cursor west and there is
+#   no floor west of the line head to paste from. So a backward corridor keeps
+#   no gate of its own. It drops at col 2, and ITS gate stands one row down at
+#   col 3 — the first thing the next corridor meets, opened with the word the
+#   backward cut is still holding. The corridor below is dark until it is.
+_OV_SHAFTS = tuple((r + 1, 57 if i % 2 == 0 else 2)
+                   for i, r in enumerate(_OV_CORR_ROWS[:-1]))
+# the oubliette pockets: (row, col) — sealed 1-cell floor cells. Col 3 on a
+# first spacer row (catches a corridor dd), col 1 on the second (catches a
+# chained dd from inside the first), plus the two under the vault approach.
+#
+# Only under the FORWARD corridors. A backward corridor's shaft comes down at
+# col 2, one cell from where a pocket would sit, and a pit that touches the way
+# out is not a pit — it is an alcove. Those corridors are guarded instead by
+# what a `dd` puts in the register: the whole row, filler and all, which is not
+# a word any gate below will hear.
+_OV_POCKETS = tuple((r, 3) for r in (4, 10, 16, 22, 28)) + \
+              tuple((r, 1) for r in (5, 11, 17, 23, 29)) + \
               ((32, 3), (33, 1))
+#: THE SEEP — how C10's lesson is taught without being told.
+#:
+#: A hint used to fire on arrival at the overhang saying, in as many words, that
+#: `dd` cuts the floor out from under you. This replaces it with something to
+#: look at. A one-cell shelf hangs below corridor 8's gate column, and beneath
+#: THAT is water, sitting in C10's own line. Both are behind the gate, so they
+#: surface exactly when corridor 8's word is spoken — early enough to be
+#: remembered, far enough ahead to be a question rather than an instruction.
+#:
+#: What the player sees is a passage stopped by one line of water. What `dd` on
+#: the overhang does is take that line out, and the shelf then opens onto the
+#: ledge that rose into its place. The hint is that the two are the same line.
+_OV_SEEP_SHELF = (29, 3)              # the dry cell you can stand on…
+_OV_SEEP_WATER = (30, 3)              # …and the line of water under it, which
+                                      # is C10's floor line seen from above
 _OV_SPLIT_ROW  = 30                   # C10: floor 30..57 — a dead-end overhang
-_OV_LEDGE_ROW  = 31                   # the sealed ledge under it: floor 2..29
+_OV_LEDGE_ROW  = 31                   # the sealed ledge under it: floor 3..29
 _OV_VAULT_ROW  = 33                   # antechamber + vault: floor 5..19
 _OV_DOOR       = (33, 17)             # vault door (untagged); the EXIT is the prize
-_OV_KEY_DCOL   = 3                    # keys drop 3 cells before their door
 # answer keystrokes (operators written as separate single-key tokens: 'd w' = dw)
-#: PAR IS THE OPTIMUM, and it was seven keys off. The route below is the
-#: cheapest known, driven on every seed: exit reached, unharmed, every guard
-#: cut, every door opened. It was 92 until 2026-08-01, when the travel tokens
-#: were golfed — `$` beats `2l` at the three gate approaches (a gate stops `$`,
-#: so the line end IS the door), `$` beats `4l` at C5's reflowed word, and both
-#: of the tail's counted steps are line ends too. Seven `l`-counts, seven keys.
-_OV_PAR = 69
-_OV_ANSWER = ('w d w 7l x $ 3j '              # C1  → dw; cut the guard, walk on
-              'd b h 3j '                     # C2  ← db lands by the shaft mouth
-              'd e w e x $ 3j '               # C3  → de
-              'd B h 3j '                     # C4  ← dB from the WORD head
-              'd E $ 3j '                     # C5  → dE, then straight to the
-                                              # shaft; the sealed way down is
-                                              # what forces the cut to be dE
-                                              # and not d$, so the scroll chest
-                                              # is loot the route may leave —
-                                              # as every other level's is
-              'd F ? 3j '                     # C6  ← dF? lands on the shaft mouth
-              'w d W e 7l x $ 3j '            # C7  → dW
-              'd 0 5l 3j '                    # C8  ← d0 sweep (dd = oubliette)
-              'd $ $ 3j '                     # C9  → d$ sweep
-              'd d d $ l 2j 9l x $')          # C10 ← dd, ride down, d$, vault
-                                              # (dd lands Vim-true on the risen
-                                              # ledge's FIRST NON-BLANK, col 4
-                                              # — one l to the vault approach)
+#: PAR IS THE OPTIMUM. The route alternates, because the corridors do:
+#:
+#:   FORWARD (→): cut, `$` to the gate at the line end, `p`, and the shaft is
+#:     the cell you just stepped onto — `3j` and you are in the next corridor.
+#:   BACKWARD (←): the cut IS the approach, `0` takes you to the drop, and you
+#:     carry the word DOWN. The `p` that spends it is the first key of the next
+#:     corridor, opening the gate that was holding that corridor dark.
+#:
+#: So a `p` at the head of a line below is not travel — it is the previous
+#: lesson being paid for, one row late.
+#: ONE line jump is cheaper than walking, and only one. A `{n}G` lands on its
+#: row's first standable cell, which for a backward corridor's drop is exactly
+#: where `0 3j` was going anyway — so the jump replaces both keys wherever the
+#: count is a single digit. Line numbers run two below grid rows (the top wall
+#: is not a line), so the four drops are `7G`, `13G`, `19G`, `25G`, and only the
+#: first is short enough to beat the three keys it replaces. The other three tie
+#: at 3 and stay written as the walk, which is the honest reading: `0 3j` is
+#: what the corridor MEANS, and a tie is no reason to teach a jump instead.
+_OV_PAR = 62
+_OV_ANSWER = ('d w $ p 3j '                   # C1  → dw, from the spawn, which
+                                              # is the password's own head
+              'd b 7G '                       # C2  ← db, then ride down holding
+                                              # the word (7G = the drop, one key
+                                              # under `0 3j`)
+              'p d e $ p 3j '                 # C3  → speak C2's word, then de
+                                              # (you land on BLANK a cell short
+                                              # of the password, so w has
+                                              # nothing to take)
+              'd B 0 3j '                     # C4  ← dB over the split token
+              'p d E $ p 3j '                 # C5  → dE
+              'd F ? 0 3j '                   # C6  ← dF? back to the leading ?
+              'p l d W $ p 3j '               # C7  → dW; the l steps onto the
+                                              # password's head, which the gate
+                                              # cell itself cannot hold
+              'b d 0 3j '                     # C8  ← d0; b parks you on the far
+                                              # word, so dd — which would sweep
+                                              # it in — is no longer the same cut
+              'p d $ $ p 3j '                 # C9  → d$
+              'd d $ p 2j $')                 # C10 ← dd drops the floor line and
+                                              # rides down; the gate is on the
+                                              # ledge and the vault is below it
+
+
+#: The Operator's Vault's passwords, sorted by the only thing that matters —
+#: their SHAPE under vim's two word models.
+#:
+#: Every corridor's gate is a `fancy_door`: it opens for a register whose text
+#: reads its password and for nothing else, so the password's spelling IS the
+#: forcing device. Which motion takes it in one cut is decided by where the
+#: punctuation and the spaces fall:
+#:
+#:   _OV_PLAIN   one token, no punctuation. `w`/`e`/`b` and `W`/`E`/`B` agree
+#:               on it, so it serves the SMALL-word lessons — the big-word
+#:               twin is no cheaper and no dearer, and the guards decide the
+#:               rest.
+#:   _OV_SPLIT   one token with punctuation INSIDE it. This is where the two
+#:               models part company: `w` stops at the punctuation and takes a
+#:               fragment, `W` runs to the whitespace and takes the whole.
+#:               A door wanting the whole thing therefore cannot be opened by
+#:               the small-word motion at all. These are the leet spellings,
+#:               and the leet is not decoration — the `.` and `-` are the
+#:               entire mechanism.
+#:   _OV_QUERY   begins with `?`, for `dF?`. `dF?` cuts from the `?` up to the
+#:               cursor, so the mark has to LEAD the password, which is why
+#:               these read as challenges: the door is asking.
+#:   _OV_PHRASE  more than one word. No character motion takes a space, so only
+#:               a LINE motion (`0`, `$`, `dd`) can hand one of these over
+#:               whole.
+#:
+#: DIRECTION DOES NOT SORT THEM. A westward `db` cuts the same token an
+#: eastward `dw` does; what the direction decides is where the word is laid
+#: relative to the gate and whether the player opens it with `p` or `P`. So a
+#: password may serve either facing, and the shuffle below is free to move them.
+#:
+#: They are real passwords from other people's dungeons — Durin's door, the
+#: Fat Lady, Dumbledore's office, Colossal Cave, NetHack, Ali Baba, DOOM —
+#: because a password the player half-recognises is one they read as a password
+#: before anything explains it.
+#:
+#: EVERY ENTRY MUST BE A REAL ONE, and the rule is load-bearing rather than
+#: decorative. `abstinence and toffee` sat here until 2026-08-02 and was not
+#: from anywhere: it welded the Fat Lady's `Abstinence` onto Dumbledore's
+#: `Toffee Eclairs` and read, convincingly, like something half-remembered.
+#: That is the failure mode — an invented password is indistinguishable from a
+#: real one to whoever adds the next, so the pool drifts into pastiche and the
+#: recognition the whole idea rests on quietly stops being real. (`justice for
+#: all` went at the same time; it is a Metallica record, not a door.)
+#:
+#: A password also appears in ONE pool only. The leet spellings and the phrases
+#: were separately dealt `open sesame` / `0pen-sesame`, `fortuna major` /
+#: `f0rtuna-maj0r`, `pig snout` / `p1g.sn0ut` — the same door twice in one run,
+#: which reads as the level repeating itself rather than as two shapes.
+_OV_PLAIN = ('mellon', 'xyzzy', 'plugh', 'dissendium', 'wattlebird',
+             'balderdash', 'swordfish', 'iddqd', 'elbereth', 'shibboleth')
+_OV_SPLIT = ('c4put.dr4c0nis', 'f0rtuna-maj0r', 'p1g.sn0ut', 'sherbet-lem0n',
+             't0ffee.eclairs', 'scurvy-cur', 'lem0n.dr0p')
+_OV_QUERY = ('?wh0g0esthere', '?speakfr1end', '?fr1end0rfoe', '?whatw0rd')
+#: Durin's door; Ali Baba; the hymn NetHack engraves; and the Fat Lady and
+#: Dumbledore's office, which supply most of the real multi-word ones.
+_OV_PHRASE = ('speak friend and enter', 'open sesame', 'elbereth gilthoniel',
+              'mimbulus mimbletonia', 'banana fritters', 'cockroach cluster',
+              'fizzing whizbee', 'acid pops')
+
+#: The first password is ALWAYS `password`. The level's whole model — that a
+#: door can want words instead of a key — has to be legible the first time it
+#: is met, and nothing says "this is a password" like the word being it. The
+#: puzzle is not learning it (it is lying on the floor in front of the door);
+#: the puzzle is taking it in ONE cut. Pinning corridor 1 makes the RULE free
+#: so the CUT can be the lesson.
+_OV_FIRST = 'password'
+
+#: corridor -> the pool its lesson needs. Corridor 1 is pinned, so it is not
+#: drawn; everything else is shuffled within its shape, which keeps the seeds
+#: genuinely different without ever handing a corridor a password its own
+#: motion cannot take.
+_OV_SHAPES = {2: _OV_PLAIN, 3: _OV_PLAIN,
+              4: _OV_SPLIT, 5: _OV_SPLIT, 7: _OV_SPLIT,
+              6: _OV_QUERY,
+              8: _OV_PHRASE, 9: _OV_PHRASE, 10: _OV_PHRASE}
+
+
+def _ov_passwords(rng) -> dict:
+    """Deal this seed's passwords: corridor number -> the words that open it.
+
+    Shuffled WITHIN each shape and never across it. Drawing at random from one
+    big pool would eventually hand corridor 8 a single token — and a single
+    token is takeable by a character motion, which is exactly the cheap
+    substitution the doors exist to refuse. The shape is the lesson; only the
+    words rotate.
+
+    No password is used twice in a level. Two doors wanting the same words
+    would let one corridor's cut open another's gate, and a player who noticed
+    would be right to walk past the lesson in between.
+    """
+    out, used = {1: _OV_FIRST}, {_OV_FIRST}
+    for corridor in sorted(_OV_SHAPES):
+        pool = [w for w in _OV_SHAPES[corridor] if w not in used]
+        word = rng.choice(pool)
+        used.add(word)
+        out[corridor] = word
+    return out
 
 
 def _ov_pick(rng, table, length, used, pred=None):
@@ -9556,14 +9707,6 @@ def _ov_pick(rng, table, length, used, pred=None):
     tok = rng.choice(pool)
     used.add(tok)
     return tok
-
-
-def _ov_mixed_ok(tok: str) -> bool:
-    """A mixed token usable as an operator-lesson WORD: it must START on a word
-    character (B/W land on the token head) and break into subwords somewhere
-    inside (an internal non-word char), so the small-word motions w/b/e crawl
-    while W/B/E take the whole token."""
-    return _is_word_char(tok[0]) and any(not _is_word_char(c) for c in tok[1:-1])
 
 
 def _ov_plain_ok(tok: str) -> bool:
@@ -9587,7 +9730,15 @@ def build_dungeon_operators_vault(seed: int) -> Dungeon:
     for r in _OV_CORR_ROWS[:-1]:                  # corridors 1..9: full span
         floor(r, _OV_LCOL, _OV_RCOL)
     floor(_OV_SPLIT_ROW, 30, _OV_RCOL)            # C10: a dead-end overhang…
-    floor(_OV_LEDGE_ROW, _OV_LCOL, 29)            # …over the sealed vault ledge
+    floor(_OV_LEDGE_ROW, 3, 29)                   # …over the sealed vault ledge.
+                                                  # It reaches col 3 so that the
+                                                  # cell under the seep is FLOOR:
+                                                  # when `dd` takes the water's
+                                                  # line out, the ledge rises
+                                                  # into its place and the shelf
+                                                  # at (29,3) opens onto it. The
+                                                  # two halls are joined by the
+                                                  # cut, which is the lesson.
     for (top, col) in _OV_SHAFTS:                 # the connector shafts
         cells[top][col] = cells[top + 1][col] = CellType.FLOOR
     for (r, c) in _OV_POCKETS:                    # the oubliette pockets
@@ -9600,13 +9751,17 @@ def build_dungeon_operators_vault(seed: int) -> Dungeon:
     # corridor-by-corridor fog past the gates — and it bars the $ / f
     # scans as the stone did. Converted AFTER _fog_unreachable (below), so
     # the build flood sees stone here too.
-    cells[32][5] = CellType.FLOOR                 # ledge → antechamber drop
+    cells[_OV_SEEP_SHELF[0]][_OV_SEEP_SHELF[1]] = CellType.FLOOR   # see _OV_SEEP_*
+    cells[32][10] = CellType.FLOOR                # ledge → antechamber drop
+                                                  # (under C10's gate, so the
+                                                  # gate opening IS the way down)
     floor(_OV_VAULT_ROW, 5, 19)                   # antechamber + vault
 
     room = Room(room_type=RoomType.COMBAT, rows=R, cols=C)
     room.cells     = cells
     room.seed      = seed
-    room.spawn_pos = (3, _OV_LCOL)
+    room.spawn_pos = (3, _OV_LCOL)                # the line head, on C1's own
+                                                  # password: `dw` fires at once
     room.exit_pos  = (33, 19)
     room.char_runs = []
     room.entities  = []
@@ -9614,112 +9769,183 @@ def build_dungeon_operators_vault(seed: int) -> Dungeon:
     def word(r, c, text, kind='ember'):
         room.char_runs.append(CharRun(row=r, col=c, symbols=tuple(text), kind=kind))
 
-    def goblin(r, c, tag=''):
-        room.entities.append(Entity(kind='goblin', row=r, col=c, hp=2, max_hp=2,
-                                    ai='chase', ai_speed=1, tag=tag))
-
-    def gate(r, c, color):
-        # SEAL doors, not LOCKED ones. A locked door is a promise of a key, and
-        # since the gates started opening on a dead pack there is no key in this
-        # level to find — a player reading `locked` would be hunting for one.
-        # A seal is a door held by a condition, which is exactly what these are.
-        room.entities.append(Entity(kind='seal_door', row=r, col=c, tag=color,
-                                    edit_immune=True))
+    def phrase(r, c, text):
+        # A multi-word password, laid as one run per token with a real gap
+        # between them — the gaps are what stop every character motion, which
+        # is the only reason the line-motion corridors can teach anything.
+        for tok in text.split():
+            word(r, c, tok)
+            c += len(tok) + 1
 
     def chest(r, c):
         room.entities.append(Entity(kind='chest_scroll', row=r, col=c))
 
-    # All corridor text is drawn fresh from the vocabulary files each seed —
-    # only the LENGTHS are fixed (the whole layout keys off them), never the
-    # letters. Mixed tokens additionally need the lesson structure
-    # (_ov_mixed_ok: word-char head + an internal subword break).
+    def fancy(r, c, password):
+        # The corridor's gate. It opens for a register reading exactly its
+        # password and for nothing else, which is what makes the corridor's own
+        # motion the ONLY one that clears it: a narrower cut hands over a
+        # fragment, a wider one hands over the fragment plus whatever it swept
+        # up on the way. See Entity.password.
+        room.entities.append(Entity(kind='fancy_door', row=r, col=c,
+                                    password=password, edit_immune=True))
+
+    #: this seed's passwords, corridor number -> words (see _ov_passwords)
+    pw = _ov_passwords(rng)
+
+    # The FILLER words are drawn fresh from the vocabulary each seed — only
+    # their lengths are fixed, since the layout keys off those and the letters
+    # never matter. The mixed-token pick that used to lay this level's lesson
+    # words is gone: the words that carry a lesson are the PASSWORDS now, and
+    # those are hand-written pools chosen for their shape (see _OV_SHAPES).
     used: set = set()
 
     def plain(n):
         return _ov_pick(rng, _VOCAB_PLAIN_BY_LEN, n, used, _ov_plain_ok)
 
-    def mixed(n):
-        return _ov_pick(rng, _VOCAB_MIXED_BY_LEN, n, used, _ov_mixed_ok)
+    # ── THE CORRIDORS ────────────────────────────────────────────────────────
+    # Every one is the same three pieces:
+    #
+    #   the PASSWORD — the words the gate wants, and the ONLY thing the cut may
+    #     take. Its spelling is the lesson: a plain token reads the same under
+    #     both word models, a token with punctuation inside it splits them, and
+    #     a phrase is out of reach of every character motion. (See _OV_SHAPES.)
+    #   the FILLER — a word placed where a cut that reaches too far will sweep
+    #     it in. This is the half the old gauntlet could not build: a guard
+    #     punishes a cut that takes too LITTLE, because he survives it, but
+    #     every guard a `dw` kills a `d$` kills too, so nothing punished taking
+    #     too much. A door that reads the register does, and refuses two words
+    #     where it wanted one.
+    #   the GATE — a `fancy_door`, always EAST of the player, because the level
+    #     teaches `p` and not `P`. A forward corridor's gate is at its line end
+    #     (col 57) with the shaft directly beneath it. A backward corridor's is
+    #     one row DOWN at col 3, where the player lands after dropping at col 2,
+    #     and it is opened with the word that corridor's cut is still holding.
+    #     Either way the shaft is BEHIND a shut door, which is what keeps the
+    #     corridor below it dark (see _OV_SHAFTS).
+    #
+    # WHERE THE CURSOR ARRIVES IS PART OF THE PUZZLE. `dw` and `de` cut the same
+    # TEXT from the same start — they differ only by the trailing space, and the
+    # gate collapses whitespace (it must, or `dd`'s column padding would never
+    # match). So the two are told apart by the START CELL instead: the `de`/`dE`
+    # corridors drop the player on BLANK floor a cell short of the password, and
+    # from there `w`/`W` land on the password's head and cut nothing at all,
+    # while `e`/`E` still reach its end. The `dw`/`dW` corridors drop the player
+    # on the head, where the twin still ties — that one is irreducible, and it
+    # is vim being consistent rather than the lesson leaking.
+    #
+    # GLUE. A short token welded to the password with a full stop, where the
+    # small and big word models have to be prised apart on a password that is
+    # plain: `.xyz` on the tail makes `E`/`W` overshoot, `xyz.` on the head
+    # makes `B` overshoot. It reads as a rune-prefix and it is a spelling trick,
+    # but it is the same spelling trick the split passwords play for free.
 
-    # C1 (row 3, →): dw — guard in the gap; the chest riding the next word's
-    # 2nd char dies to any wider cut, and the gold gate parries dd.
-    word(3, 7, plain(3)); goblin(3, 11, tag='g1'); word(3, 13, plain(3))
-    chest(3, 14)
-    gate(3, 18, 'gold')                           # key drops at 15 when g1 falls
-    # C2 (row 6, ←): db — the word head is one step from the shaft mouth at
-    # col 7; d0 also kills the guard but lands at col 2, one key worse.
-    word(6, 8, plain(4)); goblin(6, 14)
-    # C3 (row 9, →): de — guard riding the word's last letter; the chest in the
-    # gap dies to d$, and dw cannot even fire (the gate blocks the w-scan, so w
-    # has no target). The filler word beyond the gate reflows in after the cut
-    # and becomes the w/e path to the loot.
-    word(9, 12, plain(3)); goblin(9, 14, tag='g3')
-    chest(9, 16)
-    gate(9, 20, 'blue')                           # key drops at 17 when g3 falls
-    word(9, 22, plain(3))
-    # C4 (row 12, ←): dB — one guard rides the token HEAD, one waits beyond:
-    # db only reaches the trailing subword and misses the head guard.
-    word(12, 8, mixed(5)); goblin(12, 8); goblin(12, 15)
-    # C5 (row 15, →): dE — guard rides the token's tail (de crawls subword
-    # ends). THE FAR WORD MUST SURVIVE: the shaft below is sealed and stands
-    # open only while row 15 reads exactly that word, so `dE` (which takes the
-    # junk token and stops) descends, while `d$` (which takes the junk AND the
-    # far word) seals the way down, and `de` (which crawls one subword) leaves
-    # junk behind. The wrong cut is not punished by lost loot — it is punished
-    # by a shut door, the same rule the packs and the gates now follow.
-    word(15, 12, mixed(6)); goblin(15, 17)
-    chest(15, 20)
-    _ov_c5_keep = plain(4)
-    word(15, 24, _ov_c5_keep)
-    # C6 (row 18, ←): dF? — the '?' bait sits ON the shaft mouth (col 26): the
-    # cut sweeps the pack AND lands you on the way down. The decoy word blocks
-    # a one-cast db (b stops there first).
-    word(18, 26, '?', kind='ancient')
-    goblin(18, 30); goblin(18, 36); goblin(18, 42)
-    word(18, 46, plain(3))
-    # C7 (row 21, →): dW — dE stops at the token's tail and misses the gap
-    # guard; the chest riding the next word dies to d$ ($ stops at the gate);
-    # the word beyond the gate reflows in as the w/e path to the loot.
-    word(21, 30, mixed(5)); goblin(21, 34, tag='g7'); goblin(21, 37, tag='g7')
-    word(21, 40, plain(5))
-    chest(21, 41)
-    gate(21, 45, 'red')                           # key drops at 42 when g7 falls
-    word(21, 47, plain(3))
-    # C8 (row 24, ←): d0 — sweep the pack; the guard AT the line head makes a
-    # one-cast db miss; dd collapses the row into the oubliette below.
-    goblin(24, 3); word(24, 10, plain(6)); goblin(24, 20); goblin(24, 29)
-    # C9 (row 27, →): d$ — no character beyond the last guard, so no find or
-    # word motion reaches all three.
-    word(27, 12, plain(3)); goblin(27, 20); word(27, 25, plain(3))
-    goblin(27, 30); goblin(27, 40)
-    # C10 (row 30, ←) + the ledge: the LAST pack paces the sealed ledge below
-    # the overhang; dd drops the floor line, d$ sweeps the risen pack. The
-    # antechamber words are the w-path to the dropped vault key.
-    word(31, 4, plain(5)); goblin(31, 10); goblin(31, 16); goblin(31, 22)
-    word(33, 7, plain(4)); word(33, 12, plain(4))
-    # the vault: the door and the way out — the level's chests came earlier
+    _GATE = 57                                    # a forward corridor's gate
+    _HEAD = _OV_LCOL                              # where `0` lands, and where a
+                                                  # backward corridor drops from
+    _LAND = _HEAD + 1                             # a backward corridor's gate,
+                                                  # one row down, one cell east
+                                                  # of where its drop lands you
+
+    # C1 (row 3, →, arriving on the spawn at the line head): dw. THE CORRIDOR
+    # THAT TEACHES THE MODEL, so its password is always the word `password` —
+    # the rule has to be free the first time it is met, so that the CUT can be
+    # the lesson. The spawn is the password's own head, so `dw` fires at once.
+    _p = pw[1]
+    word(3, _HEAD, _p + '.' + plain(3))           # tail glue: dE/dW overshoot it
+    word(3, _HEAD + len(_p) + 6, plain(3))        # filler: d$ / dd sweep it in
+    fancy(3, _GATE, _p)
+    # C2 (row 6, ←, arriving at col 57): db. THE BACKWARD PATTERN, and it is not
+    # C1 mirrored. The cut IS the approach — `db` carries the cursor from the
+    # line end back to the password's head — and there is no gate on this row at
+    # all: you drop at col 2 still HOLDING the word, and spend it on the door
+    # waiting at the head of the corridor below.
+    #
+    # That door is also what keeps this corridor's own descent honest: a word
+    # motion stops at a shut fancy door exactly as `$`/`0` do
+    # (`_next_glyph_cell` walks `is_passable`), and the fog flood stops there
+    # too, so the corridor below is dark until the word is spoken.
+    _p = pw[2]
+    word(6, _HEAD, plain(3))                      # filler: d0 / d^ sweep it in
+    word(6, 52 - len(_p), plain(3) + '.' + _p)    # head glue: dB overshoots it
+    # C3 (row 9, →, arriving at col 2, on C2's gate): de. The `p` that opens it
+    # is C2's lesson being paid for a row late; it leaves the player on col 3,
+    # one BLANK cell short of the password, which is what stops `w` — it lands
+    # on the head and cuts nothing, while `e` still reaches the end.
+    _p = pw[3]
+    fancy(9, _LAND, pw[2])
+    word(9, _HEAD + 3, _p + '.' + plain(3))
+    word(9, _HEAD + len(_p) + 9, plain(3))
+    fancy(9, _GATE, _p)
+    # C4 (row 12, ←): dB. The password is split, so `db` reaches only its
+    # trailing subword and hands the gate a fragment. No glue is needed here —
+    # the punctuation inside the password IS the glue.
+    _p = pw[4]
+    word(12, _HEAD, plain(3))
+    word(12, 57 - len(_p), _p)
+    # C5 (row 15, →, on C4's gate): dE
+    _p = pw[5]
+    fancy(15, _LAND, pw[4])
+    word(15, _HEAD + 3, _p)
+    word(15, _HEAD + len(_p) + 5, plain(3))
+    fancy(15, _GATE, _p)
+    # C6 (row 18, ←): dF?. The mark LEADS the password, because `dF?` cuts from
+    # the `?` up to the cursor — a trailing `?` would be found by the cut only
+    # after the words it was meant to carry.
+    _p = pw[6]
+    word(18, _HEAD, plain(3))
+    word(18, 52 - len(_p), plain(3) + '.' + _p)
+    # C7 (row 21, →, on C6's gate): dW. This is the one corridor that pays a
+    # step: `W` needs the cursor ON the password's head, and the head cannot be
+    # the gate's own cell, so `l` walks the one square between them.
+    _p = pw[7]
+    fancy(21, _LAND, pw[6])
+    word(21, _HEAD + 2, _p)
+    word(21, _HEAD + len(_p) + 4, plain(3))
+    fancy(21, _GATE, _p)
+    # C8 (row 24, ←): d0. On a line whose cursor sits at its END, `dd` and `d0`
+    # take the same text — so this corridor's approach is `b`, which parks the
+    # player on the far word instead of past it. With a word still east of the
+    # cursor, `dd` sweeps one too many and `d0` does not. `d^` stays a true
+    # twin: the phrase IS the line's first non-blank, and that is `0` and `^`
+    # being the same motion, not a hole in the lesson.
+    _p = pw[8]
+    phrase(24, _HEAD, _p)
+    word(24, 52, plain(3))                        # filler: dd sweeps it in, and
+                                                  # the `b` target on the way in
+    # C9 (row 27, →, on C8's gate): d$. The single rune at col 2 — the cell the
+    # drop lands on, WEST of the gate and so west of everything the cut can
+    # reach — is what separates `d$` from `dd`. It is one glyph because one
+    # glyph is all there is room for, and one is enough: `dd` takes it, `d$`
+    # cannot.
+    _p = pw[9]
+    fancy(27, _LAND, pw[8])
+    word(27, _HEAD, '#', kind='ancient')
+    phrase(27, _HEAD + 3, _p)
+    fancy(27, _GATE, _p)
+    # C10 (row 30, ←, arriving at col 57 — on the phrase's LAST character): dd.
+    # The password runs right up to the cursor so that `d0`, which stops one
+    # short of it, hands the gate a phrase with its final letter missing.
+    #
+    # The cut drops the floor line and the player rides down onto the ledge,
+    # landing Vim-true on its first non-blank. The gate is there, and the vault
+    # is below it — this is the last backward corridor, and like the others it
+    # carries its word one step further on before spending it.
+    _p = pw[10]
+    phrase(30, 58 - len(_p), _p)
+    # This word sets where `dd` lands, and it is laid at the seep's own column
+    # ON PURPOSE. Vim's linewise landing is the first non-blank of the line that
+    # took the deleted line's place ('startofline', default on) — so the cut
+    # drops the player onto exactly the cell the water was filling, directly
+    # under the shelf. The line you could not cross is the line you end up
+    # standing in, which is the whole lesson stated as a position rather than a
+    # sentence. Anywhere else and the landing is arbitrary.
+    word(_OV_LEDGE_ROW, _OV_SEEP_WATER[1], plain(3))
+    fancy(31, 10, _p)
+    chest(33, 7); chest(33, 12)                   # loot in the antechamber
+    # the vault: the door and the way out
     room.entities.append(Entity(kind='seal_door', row=_OV_DOOR[0], col=_OV_DOOR[1],
                                 edit_immune=True))
     room.entities.append(Entity(kind='exit', row=33, col=19))
-    # guard-group tag → gate color-tag (tags are unique; the key-drop tick in
-    # main.py resolves the LIVE door by tag, so undo replacing room.entities
-    # can never leave it holding a stale reference)
-    room._ov_groups = (('g1', 'gold'), ('g3', 'blue'), ('g7', 'red'))
-
-    # C5's shaft, sealed on the row above reading its far word and nothing else.
-    # This is the level's answer to an OVER-wide cut, which nothing else here
-    # can catch: a guard defends against a cut that under-reaches (it survives),
-    # but every guard a `dE` kills a `d$` kills too. A door that wants the text
-    # INTACT is the mirror of that — it is the surviving word, not the surviving
-    # goblin, that is checked.
-    _c5_shaft = next((rc for rc in _OV_SHAFTS if rc[0] == 16), None)
-    if _c5_shaft is not None:
-        cells[_c5_shaft[0]][_c5_shaft[1]] = CellType.WALL
-        room.seals = (Seal(region=(15, 0, 15, C - 1), match=_ov_c5_keep,
-                           mode='exact', opens=(_c5_shaft,),
-                           message='The junk falls away and the word stands '
-                                   'clear — the shaft below grinds open!'),)
-        room.sealed_cells = {_c5_shaft}
 
     room.rebuild_indexes()
     # The west-face misted seep, laid BEFORE the fog so the law sees it as the
@@ -9743,6 +9969,13 @@ def build_dungeon_operators_vault(seed: int) -> Dungeon:
             if room.cells[r][c] == CellType.WALL and (r, c) not in _OV_POCKETS:
                 room.cells[r][c] = CellType.WATER
                 room.mist_cells.add((r, c))
+    # …and the seep that teaches C10 (see _OV_SEEP_*). PLAIN water, deliberately
+    # NOT misted: mist is permanent haze that a reveal never clears (it is what
+    # stops the west channel laddering light past the gates), so a misted cell
+    # can never be the thing a player is meant to SEE. Ordinary water conducts
+    # the flood, surfaces with the shelf above it, and stops there — the ledge
+    # below stays dark because row 31's floor starts east of this column.
+    room.cells[_OV_SEEP_WATER[0]][_OV_SEEP_WATER[1]] = CellType.WATER
     _doors_block_sight(room)
     room.fog_cells |= room.mist_cells      # mist is a SUBSET of fog by contract
     room.par    = _OV_PAR                         # dd's Vim-true fnb landing

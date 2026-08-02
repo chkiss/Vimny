@@ -60,7 +60,8 @@ from engine.options import apply_set as _apply_set, parse_modifier as _parse_set
 from engine.macro import synth_key as _synth_key, record_char as _record_char
 from engine.jumplist import record_jump as _record_jump, jump_back as _jump_back, jump_forward as _jump_forward
 from engine.registers import (write_register as _reg_write, read_register as _reg_read,
-                              record_register as _reg_record, clip_to_keys as _reg_keys)
+                              record_register as _reg_record, clip_to_keys as _reg_keys,
+                              clip_to_text as _reg_text)
 from engine.visual import apply_visual, block_bounds, apply_visual_replace, in_selection
 from content.scrolls import (
     # Codex scroll content rendered by _show_scroll_by_id (_STD_SCROLLS map);
@@ -631,6 +632,12 @@ _ENTITY_PALETTE = {
                         'BLOCKS; stand beside it and p (east) / P (west) a '
                         'floor_key of the same tag',
                         ('tag', 'opaque', 'edit_immune')),
+    'fancy_door':      (dict(hp=1, alive=True),
+                        'BLOCKS; stand beside it and p (east) / P (west) a '
+                        'register whose TEXT reads its password — the key is '
+                        'words you cut off the floor. Spaces as _ '
+                        '(password=speak_friend_and_enter)',
+                        ('password', 'opaque', 'edit_immune')),
     'door':            (dict(hp=1, alive=True),
                         'does NOT block — stand on it and x; opaque=1 to darken '
                         'what is beyond', ('opaque',)),
@@ -658,7 +665,8 @@ _ENTITY_PALETTE = {
 #: has a reason to hand-set — offering them would only invite a level whose
 #: creatures start mid-stride.
 _ENTITY_SETTABLE = ('hp', 'max_hp', 'ai', 'ai_speed', 'tag', 'scroll_id',
-                    'swole', 'edit_immune', 'drops', 'group', 'opaque', 'lit')
+                    'swole', 'edit_immune', 'drops', 'group', 'opaque', 'lit',
+                    'password')
 _ENTITY_INT_FIELDS  = ('hp', 'max_hp', 'ai_speed')
 _ENTITY_BOOL_FIELDS = ('swole', 'edit_immune', 'opaque', 'lit')
 
@@ -735,6 +743,16 @@ def _entity_field(ent, field: str, raw: str) -> str:
         if raw.lower() not in ('true', 'false', '1', '0', 'yes', 'no'):
             return f'{field} wants true or false, got {raw!r}'
         setattr(ent, field, raw.lower() in ('true', '1', 'yes'))
+    elif field == 'password':
+        # `:entity` splits its arguments on whitespace, so a phrase password
+        # ('speak friend and enter' — the shape a line motion produces) could
+        # not be typed at all. Underscores stand in for the spaces. The door
+        # itself never sees an underscore: it is stored, shown and compared as
+        # the phrase, so what an author types and what a player must cut stay
+        # the same words.
+        if not raw:
+            return 'password wants the words that open the door'
+        ent.password = raw.replace('_', ' ')
     elif field == 'drops':
         if raw and canonical_kind(raw.partition(':')[0]) not in DROPPABLE:
             return (f'nothing drops {raw!r} — try '
@@ -2155,57 +2173,40 @@ def _operators_vault_tick(room, player) -> list:
     # a fall may park INSIDE fog, and the flood must start somewhere.)
     room.fog_cells.discard((player.row, player.col))
     _reveal_from(room, player.row, player.col)
-    """The Operator's Vault gates: A PACK HOLDS ITS OWN DOOR.
+    """The vault door: IT OPENS WHEN EVERY PASSWORD HAS BEEN SPOKEN.
 
-    It was a key economy — a guard group fell, its coloured key dropped by the
-    gate, and the player walked to it, `x`'d it up and `p`'d it into the door.
-    That was four keystrokes of errand per gate, and worse, it was errand a LINE
-    JUMP could do: `{n}G` reached the key as well as a walk could, so the
-    corridor's operator lesson was optional (2026-08-01 — `7G` skipped a whole
-    corridor, `4G` tied `db h`). A gate that opens because its pack is DEAD
-    cannot be jumped to, because a jump kills nothing. The defence is the
-    lesson itself.
+    The level used to be a combat gauntlet, and the vault opened on the last
+    guard falling. That was the wrong lock for what the corridors teach. A guard
+    can only punish a cut that reaches TOO LITTLE — he survives it — and every
+    guard a `dw` kills a `d$` kills too, so a pack could never punish a cut that
+    took too much. Half the corridors were beaten by the wrong operator for less
+    than par, and no arrangement of goblins was going to fix it.
 
-    STATELESS, hence undo-safe, which is the same property the key economy had
-    and for the same reason: the gate is re-derived from who is alive every
-    turn, so undoing a kill re-bars it and re-killing re-opens it. Two tiers:
+    A `fancy_door` is the whole lock in one entity: it opens for a register
+    reading exactly its password, so a narrow cut hands it a fragment and a wide
+    cut hands it the password plus whatever it swept up. Both are refused. With
+    that in place the guards had nothing left to do, and the vault's condition
+    follows the corridors: every gate in the level open.
 
-    - Gated corridors: when a guard group ('g1'/'g3'/'g7') is wiped, its gate
-      opens (`room._ov_groups` maps guard tag → gate colour tag, set by the
-      builder).
-    - The vault: it opens when EVERY guard in the level is down. While any
-      draws breath, approaching it says so.
-
+    STATELESS, hence undo-safe — the vault is re-derived from the doors every
+    turn, so undoing the last paste re-bars it and redoing it re-opens it.
     Returns banner messages for anything that just changed."""
     msgs = []
-    # Look doors up LIVE by their (unique) colour tag — undo replaces
-    # room.entities with snapshot copies, so holding entity references here
-    # would go stale after the first u.
-    doors = {e.tag: e for e in room._entity_by_kind.get('seal_door', []) if e.alive}
-
-    def _pack_alive(gtag):
-        return any(e.alive and e.kind == 'goblin' and e.tag == gtag
-                   for e in room.entities)
-
-    for gtag, door_tag in getattr(room, '_ov_groups', ()):
-        gate = doors.get(door_tag)
-        if gate is None or _pack_alive(gtag):
-            continue
-        room.kill_entity(gate)
-        room._on_entity_destroyed(gate)
-        msgs.append(f'The last of the {door_tag} guard falls — the gate grinds open!')
-
-    door = doors.get('')
+    # Looked up LIVE: undo replaces room.entities with snapshot copies, so a
+    # reference held across a turn would go stale after the first u.
+    door = next((e for e in room._entity_by_kind.get('seal_door', []) if e.alive),
+                None)
     if door is not None:
-        guards_left = any(e.alive and e.kind == 'goblin' for e in room.entities)
-        if not guards_left:
+        gates_left = any(e.alive
+                         for e in room._entity_by_kind.get('fancy_door', []))
+        if not gates_left:
             room.kill_entity(door)
             room._on_entity_destroyed(door)
-            msgs.append('The last guard falls — the vault door swings wide!')
+            msgs.append('The last word is spoken — the vault door swings wide!')
         elif (abs(door.row - player.row) + abs(door.col - player.col) <= 2
                 and not getattr(room, '_ov_vault_hinted', False)):
             room._ov_vault_hinted = True
-            msgs.append('The vault will not yield while a guard still draws breath above.')
+            msgs.append('The vault holds while a gate above still stands shut.')
     return msgs
 
 
@@ -9100,6 +9101,39 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
                 else:
                     _has_key = any(ed['tmpl'].get('kind') == 'floor_key' for ed in clip_entities)
                     player.error = 'E: Wrong key for this door' if _has_key else 'E: No key held'
+            elif target and target.kind == 'fancy_door':
+                # THE FANCY DOOR. Same gesture as a locked door — stand beside it
+                # and paste — but the key is words you cut out of the floor
+                # instead of an object you picked up off it. See Entity.password.
+                #
+                # The comparison is on the REGISTER, never on the cells in front
+                # of the door, so shoving the right word into the doorway with
+                # inserted spaces does nothing: a key lying next to a lock has
+                # never opened it either, and this is the same rule.
+                held = _reg_text(clip)
+                if held and held.lower() == target.password.lower():
+                    undo_stack.append(_snapshot(room, player, budget, ans=cmd_start_ans))
+                    redo_stack.clear()
+                    _render(_pool_msg())
+                    _unlock_animation(term, room, player, target.row, target.col,
+                                      _iw(term), term.height - 8, None)
+                    _kill_door_group(room, target.row, target.col, kind='fancy_door')
+                    player.row, player.col = target.row, target.col
+                    _reveal_from(room, player.row, player.col)
+                    budget.spend(_keystroke_cost(count, 'p', action.get('count_given', False))
+                                 + _register_prefix_cost(action))
+                    _push('The door hears the word and opens!')
+                elif held:
+                    # NAME BOTH SIDES. The password is not the secret — it is
+                    # written on the floor in front of the door, and the puzzle
+                    # is taking it in ONE cut, not learning it. So the refusal
+                    # says what was heard and what was wanted, which is how a
+                    # player learns that the door weighs the whole register and
+                    # that an over-wide cut brings too many words along. Hiding
+                    # it would only make the model unguessable.
+                    player.error = f'E: It hears "{held}" — the door wants "{target.password}"'
+                else:
+                    player.error = 'E: You hold no words to speak'
             elif _clip_is_fire(clip):
                 # Fire carried off a lit brazier. It LIGHTS a cold brazier and
                 # does nothing else: a brazier is too heavy to set down, so a fire
@@ -9599,12 +9633,13 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
             if level == 'operators_vault':
                 for _ov_msg in _operators_vault_tick(room, player):
                     _push(_ov_msg)
-                # the overhang hint — once, while the floor line is still uncut
-                if (room.rows == _dg._OV_ROWS and player.row == _dg._OV_SPLIT_ROW
-                        and not getattr(room, '_ov_hinted', False)):
-                    room._ov_hinted = True
-                    _push('A dead end — yet the last guards pace a sealed ledge below. '
-                          'This floor is one rotten line: dd cuts it out from under you.')
+                # There is deliberately NO overhang hint. One used to fire here
+                # — "…This floor is one rotten line: dd cuts it out from under
+                # you." — which is the answer said out loud at the one corridor
+                # whose lesson is hardest to see coming. The level shows it
+                # instead: a seep of water hangs at the foot of corridor 8's
+                # gate column, and the line it lies in is the line `dd` takes
+                # out. See _OV_SEEP in the builder.
 
             # The buffer-content gate ticks (Cipher Cell · Beacon Tiers · Echo
             # Vault · Warden Manifold · Inscription Halls · Change Annex/Extension ·

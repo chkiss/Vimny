@@ -19,16 +19,27 @@
 """The Operator's Vault — the first {operator}{motion} level (delete).
 
 Ten snaked corridors, each admitting exactly one cheapest d-variant (dw, db,
-de, dB, dE, dF?, dW, d0, d$, dd). Armored hp-2 guards make blade-to-blade x
-bloody while a d-cut removes them outright. A gated corridor's SEAL door opens when its
-guard group is wiped and the vault opens when every guard is down (both stateless +
-undo-safe in main._operators_vault_tick) — a door a jump cannot reach, because a
-jump kills nothing. C5's shaft is sealed on its row reading true, which is what
-refuses an over-wide cut; dd off the intended row collapses
-the corridor into a sealed oubliette pocket (only u climbs out). Travel after
-each cut rides the words left standing (w/e hops) — no big counted moves.
+de, dB, dE, dF?, dW, d0, d$, dd). Every corridor is held by a `fancy_door`: it
+opens for a register whose TEXT reads its password and for nothing else, so the
+cut has to land on exactly the right words — a fragment is refused and so is the
+password with a filler word swept in behind it. The vault at the bottom opens
+when all ten have been spoken (stateless and undo-safe, in
+`main._operators_vault_tick`), which is also what stops a player simply riding
+the shafts past the lessons: the shafts are open, but nothing down there is.
+
+REDESIGNED 2026-08-02, and the reason is worth keeping. This was a combat
+gauntlet — armored guards, packs holding coloured gates — and it could not be
+made to teach. A guard punishes only a cut that reaches too LITTLE, because he
+survives it; every guard a `dw` kills a `d$` kills too, so nothing in the level
+held the ceiling, and `tests/test_operators_vault_corridors.py` found half the
+corridors falling to the wrong operator for less than par. The password door is
+both bounds in one entity, so the guards had no job left and were removed.
+
 Structure tests + a full executed solve through the real run_dungeon loop
-(answer == par, no damage) + a deep-undo regression.
+(answer == par, unharmed) + a deep-undo regression. The per-corridor forcing
+audit lives in `test_operators_vault_corridors.py`; the passwords' spelling —
+which is what makes the motions differ at all — lives in
+`test_operators_vault_passwords.py`.
 """
 import math
 
@@ -41,10 +52,8 @@ import generation.dungeon_gen as dg
 from engine.world import CellType, Entity
 from engine.player import Player
 from engine.reflow import remove_row
-from engine.operator import op_delete, entity_clip, _cursor_to_line_start
-from engine.text_object import compute_text_object
+from engine.operator import _cursor_to_line_start
 from engine.command_guard import action_allowed
-from engine.motion import _is_word_char
 from content.levels import known_commands
 import render.colors as C
 from tests import SEEDS
@@ -54,37 +63,18 @@ def _room(seed=7, defog=False):
     room = dg.build_dungeon_operators_vault(seed).rooms[0]
     if defog:
         # Clear the revealable fog only — the west channel's MIST is
-        # permanent in play (reveal floods skip it), so tests keep it too:
-        # it is what bounds 0 / ^ at col 2 on the corridor rows.
+        # permanent in play (reveal floods skip it), so tests keep it too.
         room.fog_cells = set(room.mist_cells)
     return room
 
 
-def _guards(room, row=None):
-    return [e for e in room.entities if e.alive and e.kind == 'goblin'
-            and (row is None or e.row == row)]
+def _gates(room):
+    return [e for e in room.entities if e.alive and e.kind == 'fancy_door']
 
 
-def _chests(room, row):
-    return [e for e in room.entities
-            if e.alive and e.kind == 'chest_scroll' and e.row == row]
-
-
-def _cut(room, player, motion, target=None):
-    action = {'type': 'operator', 'op': 'd', 'motion': motion, 'count': 1}
-    if target is not None:
-        action['target'] = target
-    tobj = compute_text_object(player, action, room)
-    if tobj is None:
-        return False
-    op_delete(room, player, tobj, collapse=(motion == 'line'))
-    return True
-
-
-def _pocket_or_wall(room, r, c):
-    """A cell that confines: impassable, or another sealed oubliette pocket
-    (collapses can stack two pockets into a 2-cell chimney — still sealed)."""
-    return (not room.is_passable(r, c)) or room.cells[r][c] == CellType.FLOOR
+def _vault(room):
+    return next((e for e in room.entities
+                 if e.alive and e.kind == 'seal_door'), None)
 
 
 def _confined(room, r, c):
@@ -103,7 +93,7 @@ def _confined(room, r, c):
 
 # ── builder structure ────────────────────────────────────────────────────────
 @pytest.mark.parametrize('seed', SEEDS)
-def test_ten_corridors_with_armored_guards(seed):
+def test_ten_corridors_and_no_creature_in_any_of_them(seed):
     room = _room(seed)
     assert (room.rows, room.cols) == (35, 60)
     for r in dg._OV_CORR_ROWS[:-1]:                  # C1..C9 span the full width
@@ -111,49 +101,78 @@ def test_ten_corridors_with_armored_guards(seed):
     # C10 is a dead-end overhang above the sealed ledge
     assert room.cells[30][30] == CellType.FLOOR and room.cells[30][29] == CellType.WALL
     assert room.cells[31][29] == CellType.FLOOR and room.cells[31][30] == CellType.WALL
-    guards = _guards(room)
-    assert len(guards) == 20
-    assert all(e.hp == 2 and e.ai == 'chase' for e in guards)   # armored chasers
-    per_row = {r: len(_guards(room, r)) for r in dg._OV_CORR_ROWS[:-1]}
-    assert per_row == {3: 1, 6: 1, 9: 1, 12: 2, 15: 1, 18: 3, 21: 2, 24: 3, 27: 3}
-    assert len(_guards(room, 31)) == 3               # the last pack, on the ledge
+    # The gauntlet is gone. Not "fewer guards" — none, and no hearts to survive
+    # them with: what stands between the player and the vault is ten words.
+    assert not [e for e in room.entities if e.kind in ('goblin', 'warden')]
+    assert not [e for e in room.entities if e.kind == 'heart_container']
 
 
-def test_shaft_placement_forward_at_line_end_backward_off_line_start():
-    room = _room()
-    for top, col in dg._OV_SHAFTS:
-        # …except C5's, which is SEALED: it stands stone until row 15 reads its
-        # far word alone, which is what makes `dE` the only cut that descends.
-        want = (CellType.WALL if top == 16 else CellType.FLOOR)
-        assert room.cells[top][col] == want, (top, col)
-        assert room.cells[top + 1][col] == CellType.FLOOR
-    fwd = [col for top, col in dg._OV_SHAFTS if top in (4, 10, 16, 22, 28)]
-    bwd = [col for top, col in dg._OV_SHAFTS if top in (7, 13, 19, 25)]
-    assert all(col == 57 for col in fwd)             # forward exits: one $ away
-    assert all(2 < col < 57 for col in bwd)          # backward exits: 0 overshoots
+#: corridor row -> where the gate holding THAT corridor's password stands.
+#: A forward corridor keeps its own, at its line end. A backward one cannot —
+#: its cut ends at the line head with no floor west to paste from — so its gate
+#: waits one row down at col 3, and is opened with the word the cut is still
+#: holding when the player drops.
+_GATE_OF = {3: (3, 57), 6: (9, 3), 9: (9, 57), 12: (15, 3), 15: (15, 57),
+            18: (21, 3), 21: (21, 57), 24: (27, 3), 27: (27, 57), 30: (31, 10)}
 
 
-def test_gates_are_edit_immune_uniquely_colored_and_no_keys_preplaced():
-    room = _room()
-    gates = {(e.row, e.col): e for e in room.entities if e.kind == 'seal_door'}
-    assert set(gates) == {(3, 18), (9, 20), (21, 45), (33, 17)}
+@pytest.mark.parametrize('seed', SEEDS)
+def test_every_corridor_has_a_gate_and_they_are_all_different(seed):
+    """The paste direction fixes the geometry. This level teaches `p` and not
+    `P`, so a gate is always EAST of the player — which a forward corridor gets
+    for nothing and a backward corridor pays for by carrying its word one row
+    further on before spending it."""
+    room = _room(seed)
+    gates = {(e.row, e.col): e for e in _gates(room)}
+    assert set(gates) == set(_GATE_OF.values())
     assert all(e.edit_immune for e in gates.values())
-    assert gates[(3, 18)].tag == 'gold'
-    assert gates[(9, 20)].tag == 'blue'
-    assert gates[(21, 45)].tag == 'red'
-    assert gates[(33, 17)].tag == ''                 # the vault door — untagged
-    # every key DROPS from a kill; none is lying around to run past
-    assert not [e for e in room.entities if e.kind == 'floor_key']
-    assert room._ov_groups == (('g1', 'gold'), ('g3', 'blue'), ('g7', 'red'))
+    assert all(e.password for e in gates.values())
+    # ten different words: one corridor's cut must never open another's gate
+    assert len({e.password for e in gates.values()}) == 10
+
+
+def test_every_shaft_is_behind_a_shut_gate():
+    """THE REASON THE LEVEL IS DARK, and the constraint that shaped its whole
+    plan. The fog here is DERIVED — `_doors_block_sight` floods by feet and
+    stops at shut doors — so a shaft the flood can reach is a corridor lit from
+    the spawn and a `{n}G` that skips a lesson. Every shaft therefore has to
+    hang below a gate, with no other way in."""
+    room = _room()
+    assert dg._OV_SHAFTS == tuple((r + 1, 57 if i % 2 == 0 else 2)
+                                 for i, r in enumerate(dg._OV_CORR_ROWS[:-1]))
+    gate_cells = {(e.row, e.col) for e in _gates(room)}
+    for top, col in dg._OV_SHAFTS:
+        assert room.cells[top][col] == CellType.FLOOR, (top, col)
+        assert room.cells[top + 1][col] == CellType.FLOOR
+        # the only neighbour of the shaft's mouth on the corridor row above is
+        # the gate itself (forward), or the gate is the first thing on the row
+        # it lands on (backward)
+        above, below = (top - 1, col), (top + 2, col)
+        assert (above in gate_cells) or ((below[0], below[1] + 1) in gate_cells), \
+            f'shaft at {(top, col)} is reachable without opening anything'
+
+
+@pytest.mark.parametrize('seed', SEEDS)
+def test_only_the_first_corridor_is_lit_from_the_spawn(seed):
+    """What the gated shafts buy. Everything past corridor 1 sleeps dark, so a
+    line jump cannot land in a lesson that has not been opened — which is the
+    front geometry alone does not defend (see test_operators_vault_lessons)."""
+    room = _room(seed)
+    for r in dg._OV_CORR_ROWS:
+        floor = [c for c in range(2, 58) if room.cells[r][c] == CellType.FLOOR]
+        lit = [c for c in floor if (r, c) not in room.fog_cells]
+        if r == dg._OV_CORR_ROWS[0]:
+            assert lit == floor, 'corridor 1 must be visible — it is the tutorial'
+        else:
+            assert not lit, f'corridor row {r} is lit from the spawn'
 
 
 def test_corridor_loot_is_scroll_chests_and_no_treasure_hoard():
     room = _room()
     assert {(e.row, e.col) for e in room.entities if e.kind == 'chest_scroll'} == \
-        {(3, 14), (9, 16), (15, 20), (21, 41)}
-    # no hearts anywhere, and nothing behind the vault door but the way out —
-    # the lessons and the exit ARE the reward
-    assert not [e for e in room.entities if e.kind == 'heart_container']
+        {(33, 7), (33, 12)}
+    # nothing behind the vault door but the way out — the lessons and the exit
+    # ARE the reward
     behind = [e for e in room.entities
               if e.row == 33 and e.col > dg._OV_DOOR[1] and e.kind != 'exit']
     assert behind == []
@@ -164,8 +183,7 @@ def test_vault_is_sealed_and_fogged_until_arrival():
     # dark at build — the ledge, the walkway and the vault — and the tick's
     # per-key door-blocked _reveal_from lights it only when the collapse
     # drops the player in (the dd park is fog-blind for that fall). The
-    # corridor pockets stay visible: they are the warning, and sight passes
-    # the gate grilles.
+    # corridor pockets stay visible: they are the warning.
     room = _room()
     assert room.exit_pos == (33, 19)
     assert room.exit_pos in room.fog_cells           # the way out, dark
@@ -175,31 +193,109 @@ def test_vault_is_sealed_and_fogged_until_arrival():
 
 
 @pytest.mark.parametrize('seed', SEEDS)
-def test_corridor_text_is_drawn_from_the_vocab_per_seed(seed):
-    """Words are sampled from the vocabulary files: positions and lengths are
-    invariant (the layout and the answer key off them), the letters are not."""
-    expect = {(3, 7): 3, (3, 13): 3, (6, 8): 4, (9, 12): 3, (9, 22): 3,
-              (12, 8): 5, (15, 12): 6, (15, 24): 4, (18, 26): 1, (18, 46): 3,
-              (21, 30): 5, (21, 40): 5, (21, 47): 3, (24, 10): 6, (27, 12): 3,
-              (27, 25): 3, (31, 4): 5, (33, 7): 4, (33, 12): 4}
+def test_each_corridor_carries_its_own_password_and_a_filler(seed):
+    """The two pieces the forcing rests on, per corridor: the password the gate
+    wants, laid on the floor to be cut, and at least one OTHER word for a cut
+    that over-reaches to sweep in. A corridor that lost its filler would take
+    the password just as happily from a `d$`."""
     room = _room(seed)
-    got = {(ru.row, ru.col): ''.join(ru.symbols) for ru in room.char_runs}
-    assert {pos: len(w) for pos, w in got.items()} == expect
-    assert got[(18, 26)] == '?'                      # the find bait is fixed
-    # plain words are single WORDS (no internal subword breaks)…
-    mixed_at = {(12, 8), (15, 12), (21, 30)}
-    for pos, w in got.items():
-        if pos == (18, 26):
+    by_cell = {(e.row, e.col): e for e in _gates(room)}
+    for corridor, gate_cell in _GATE_OF.items():
+        password = by_cell[gate_cell].password
+        if corridor == 30:
+            # C10 is the exception, and has to be: its lesson IS "take the whole
+            # line", so a filler word would make the correct cut wrong. What
+            # holds its ceiling instead is where the phrase ENDS — flush against
+            # the cursor, so `d0` (which stops one short) hands the gate the
+            # phrase with its final letter missing.
+            end = max(ru.col + len(ru.symbols) - 1
+                      for ru in room.char_runs if ru.row == 30)
+            assert end == 57, 'C10 phrase no longer reaches the arrival column'
             continue
-        if pos in mixed_at:                          # …mixed tokens must break
-            assert _is_word_char(w[0])
-            assert any(not _is_word_char(c) for c in w[1:-1])
-        else:
-            assert all(_is_word_char(c) for c in w)
-    # and different seeds deal different words
-    other = {(ru.row, ru.col): ''.join(ru.symbols)
-             for ru in _room(seed + 1).char_runs}
-    assert got != other
+        # lay the row out by COLUMN, which is the only reading that can tell a
+        # filler from the glue welded onto the password: both are extra text,
+        # but only one of them is somewhere a cut can stop short of.
+        cells = {}
+        for ru in room.char_runs:
+            if ru.row == corridor:
+                for i, sym in enumerate(ru.symbols):
+                    cells[ru.col + i] = sym
+        line = ''.join(cells.get(c, ' ') for c in range(room.cols))
+        at = line.find(password)
+        assert at >= 0, (corridor, password, line.strip())
+        # something stands OUTSIDE the password's own columns, for a cut that
+        # over-reaches to sweep in
+        span = range(at, at + len(password))
+        assert any(c not in span for c in cells), \
+            f'corridor at row {corridor} has no filler word'
+
+
+def test_the_seep_shows_c10s_lesson_instead_of_saying_it():
+    """C10 used to be taught by a banner: "…This floor is one rotten line: dd
+    cuts it out from under you." That is the answer read aloud, at the one
+    corridor whose lesson is hardest to see coming.
+
+    The geometry says it instead. A shelf hangs below corridor 8's gate column
+    with WATER under it, and that water lies in C10's own floor line. Four
+    things have to hold for it to teach anything, and each is a separate way to
+    break it:"""
+    room = _room()
+    shelf, seep = dg._OV_SEEP_SHELF, dg._OV_SEEP_WATER
+
+    # 1. you can stand on the shelf, and the water stops you going further
+    assert room.cells[shelf[0]][shelf[1]] == CellType.FLOOR
+    assert room.cells[seep[0]][seep[1]] == CellType.WATER
+    assert not room.is_passable(*seep)
+
+    # 2. the water is NOT misted. Mist is permanent haze that a reveal never
+    #    clears — it is what stops the west channel laddering light past the
+    #    gates — so a misted cell can never be the thing a player is meant to
+    #    see. This one has to surface.
+    assert seep not in room.mist_cells
+
+    # 3. it is in C10's line, which is what makes `dd` the answer rather than a
+    #    guess: the row the water sits in is the row the cut takes out
+    assert seep[0] == dg._OV_SPLIT_ROW
+
+    # 4. and the cell beneath it is the ledge, so when that line goes the shelf
+    #    opens onto what rose into its place
+    assert room.cells[dg._OV_LEDGE_ROW][seep[1]] == CellType.FLOOR
+
+
+def test_the_seep_stays_dark_until_the_gate_above_it_opens():
+    """It must not be visible from the spawn (that is a spoiler two acts early)
+    and it must not light the vault when it does surface (that is the prize).
+    What it shows is hall and a door — somewhere to get to, and no way yet."""
+    room = _room()
+    assert dg._OV_SEEP_SHELF in room.fog_cells
+    assert dg._OV_SEEP_WATER in room.fog_cells
+
+    # the flood as it stands the moment corridor 8's gate opens. It has to be
+    # measured with the gate DEAD and from the cell the player is standing on:
+    # _flood_reachable stops at a live door without expanding through it, so
+    # flooding from the gate's own cell reaches exactly that cell and would
+    # report the seep hidden no matter what the geometry did.
+    from engine.motion import _flood_reachable
+    gate = next(e for e in _gates(room) if (e.row, e.col) == (27, 3))
+    room.kill_entity(gate)
+    room.rebuild_indexes()
+    lit = _flood_reachable(room, 27, 2)
+    assert dg._OV_SEEP_SHELF in lit and dg._OV_SEEP_WATER in lit
+    assert (33, 16) not in lit, 'the seep lights the vault walkway'
+    assert room.exit_pos not in lit, 'the seep lights the way out'
+
+
+def test_dd_on_the_overhang_joins_the_shelf_to_the_ledge():
+    """The payoff, driven: the cut that removes the water's line is the cut that
+    connects the two halls."""
+    room = _room(defog=True)
+    shelf, seep = dg._OV_SEEP_SHELF, dg._OV_SEEP_WATER
+    assert room.cells[seep[0]][seep[1]] == CellType.WATER      # blocked before
+    player = Player(row=dg._OV_SPLIT_ROW, col=57)
+    assert remove_row(room, dg._OV_SPLIT_ROW, player)
+    # the ledge has risen into the water's row, directly under the shelf
+    assert room.cells[shelf[0] + 1][shelf[1]] == CellType.FLOOR
+    assert room.is_passable(shelf[0] + 1, shelf[1])
 
 
 def test_oubliette_pockets_are_sealed_empty_floor():
@@ -211,28 +307,33 @@ def test_oubliette_pockets_are_sealed_empty_floor():
                        for ru in room.char_runs)
 
 
+def test_the_pockets_sit_only_under_the_forward_corridors():
+    """A backward corridor drops at col 2, one cell from where a pocket would
+    sit, and a pit that touches the way out is an alcove rather than a trap. So
+    the pits hang under the forward corridors only — and those rows carry a
+    gate, which parries `dd` outright, making the pit the answer to a `}` off
+    the wrong column rather than to a linewise cut."""
+    room = _room()
+    shaft_cols = {col for _, col in dg._OV_SHAFTS}
+    for r, c in dg._OV_POCKETS:
+        assert all(abs(c - sc) > 1 or room.cells[r][sc] != CellType.FLOOR
+                   for sc in shaft_cols), f'pocket {(r, c)} touches a shaft'
+
+
 def test_par_and_budget():
     room = _room()
-    # 92 → 69 on 2026-08-01, in four steps.
-    #   `$` beats `2l` at the three gate approaches (a gate stops `$`, so the
-    #   line end IS the door) and at both of the tail's counted steps.
-    #   The key economy went: a gate opens because its pack is DEAD, so the
-    #   walk to the dropped key and the `p` that opened the door are gone.
-    #   And with the key gone, the `l x` that used to pick it up was hitting an
-    #   empty cell — three free no-ops that made the static answer-cost audit
-    #   read 79 against a driven 76. Removed; model and drive now agree at 73.
-    #   And C5's chest stopped being the forcing device: its shaft is SEALED on
-    #   the row reading its far word, so `d$` (which takes that word too) cannot
-    #   descend. With the lesson forced by a shut door instead of by loot, the
-    #   route may travel with `$` and leave the chest standing — and the `e x $`
-    #   that used to ride the reflow and strike a guard `dE` had already killed
-    #   went with it.
-    assert room.par == 69
-    assert room.budget == math.ceil(room.par * 1.4) == 97
+    # 69 → 63 with the 2026-08-02 redesign, then 62 once the travel was golfed.
+    # The combat came out (no guard to strike, no key to fetch, no pack to
+    # finish) and the corridors alternate: a forward one pays `$ p 3j` into the
+    # gate at its line end, a backward one pays `0 3j` and hands its word to the
+    # door waiting a row below, where the `p` that opens it doubles as the first
+    # key of the next lesson. The last key went to `7G`, which lands on exactly
+    # the cell `0 3j` was walking to — the only one of the four drops whose line
+    # number is short enough to beat the walk.
+    assert room.par == 62
+    assert room.budget == math.ceil(room.par * 1.4) == 87
     assert room.answer.strip()
-    # travel discipline: counts stay single-digit (a human can count to 9),
-    # and word motions appear only where they beat or tie the count move.
-    # (a bare '0' is the line-start motion, not a count)
+    # travel discipline: counts stay single-digit (a human can count to 9)
     for tok in room.answer.split():
         if tok[0].isdigit() and len(tok) > 1:
             assert len(tok) == 2, f'multi-digit count in answer: {tok}'
@@ -250,103 +351,12 @@ def test_D_shorthand_locked_until_the_cipher_cell():
                                'count': 1}, known_commands('operators_vault'))
 
 
-# ── precision forces (span semantics per corridor) ───────────────────────────
-def test_c1_dw_is_exact_and_wider_cuts_shred_the_chest():
-    room = _room(defog=True)
-    p = Player(row=3, col=7)
-    _cut(room, p, 'w')                               # the lesson
-    assert _guards(room, 3) == [] and _chests(room, 3)
-    room = _room(defog=True)
-    p = Player(row=3, col=7)
-    _cut(room, p, '$')                               # sloppy — chest dies
-    assert not _chests(room, 3)
-    gate = next(e for e in room.entities if e.kind == 'seal_door' and e.row == 3)
-    assert gate.alive                                # edit_immune — cuts can't open it
-
-
-def test_c3_de_is_exact_dw_cannot_even_fire():
-    room = _room(defog=True)
-    p = Player(row=9, col=7)
-    _cut(room, p, 'e')                               # e from the gap → imp's tail
-    assert _guards(room, 9) == [] and _chests(room, 9)
-    room = _room(defog=True)
-    p = Player(row=9, col=12)
-    assert _cut(room, p, 'w') is False               # gate blocks the w-scan
-    room = _room(defog=True)
-    p = Player(row=9, col=7)
-    _cut(room, p, '$')
-    assert not _chests(room, 9)                      # sloppy — chest dies
-
-
-def test_c4_db_misses_the_head_guard_dB_sweeps_both():
-    room = _room(defog=True)
-    p = Player(row=12, col=57)
-    _cut(room, p, 'b')                               # only reaches the 'ps' subword
-    assert [(e.row, e.col) for e in _guards(room, 12)] == [(12, 8)]
-    room = _room(defog=True)
-    p = Player(row=12, col=57)
-    _cut(room, p, 'B')                               # from the WORD head
-    assert _guards(room, 12) == []
-    assert (p.row, p.col) == (12, 8)                 # lands a step from the shaft
-
-
-def test_c5_dE_is_exact_dW_shreds_the_chest():
-    room = _room(defog=True)
-    p = Player(row=15, col=7)
-    _cut(room, p, 'E')                               # E from the gap → token tail
-    assert _guards(room, 15) == [] and _chests(room, 15)
-    room = _room(defog=True)
-    p = Player(row=15, col=12)
-    _cut(room, p, 'W')                               # crosses the gap → eats the chest
-    assert not _chests(room, 15)
-
-
-def test_c6_dF_lands_on_the_shaft_mouth():
-    room = _room(defog=True)
-    p = Player(row=18, col=57)
-    _cut(room, p, 'F', target='?')
-    assert _guards(room, 18) == []
-    assert (p.row, p.col) == (18, 26)                # exactly the way down
-    room = _room(defog=True)
-    p = Player(row=18, col=57)
-    _cut(room, p, '0')                               # the sweep works but…
-    assert _guards(room, 18) == []
-    assert p.col == 2                                # …overshoots the mouth at 26
-
-
-def test_c7_dE_misses_the_gap_guard_dW_is_exact_d_dollar_shreds():
-    room = _room(defog=True)
-    p = Player(row=21, col=30)
-    _cut(room, p, 'E')
-    assert [(e.row, e.col) for e in _guards(room, 21)] == [(21, 37)]
-    room = _room(defog=True)
-    p = Player(row=21, col=30)
-    _cut(room, p, 'W')
-    assert _guards(room, 21) == [] and _chests(room, 21)
-    room = _room(defog=True)
-    p = Player(row=21, col=30)
-    _cut(room, p, '$')                               # $ stops at the gate, eats chest
-    assert not _chests(room, 21)
-
-
-def test_c8_db_misses_the_line_head_guard():
-    room = _room(defog=True)
-    p = Player(row=24, col=57)
-    _cut(room, p, 'b')                               # b stops at 'censer'
-    assert (24, 3) in [(e.row, e.col) for e in _guards(room, 24)]
-    room = _room(defog=True)
-    p = Player(row=24, col=57)
-    _cut(room, p, '0')
-    assert _guards(room, 24) == [] and p.col == 2
-
-
-def test_c9_no_find_reaches_the_whole_pack():
-    room = _room(defog=True)
-    deep = room.char_run_at(27, 27)                  # the row's deepest character
-    target = deep.symbols[27 - deep.col]
-    p = Player(row=27, col=7)
-    _cut(room, p, 'f', target=target)
-    assert {(e.row, e.col) for e in _guards(room, 27)} >= {(27, 30), (27, 40)}
+def test_the_westward_paste_is_not_taught_here():
+    """The constraint the whole layout is built around, asserted so that nobody
+    "fixes" a corridor by reaching for `P`: it is not in this level's hand."""
+    known = known_commands('operators_vault')
+    assert action_allowed({'type': 'paste', 'before': False, 'count': 1}, known)
+    assert not action_allowed({'type': 'paste', 'before': True, 'count': 1}, known)
 
 
 # ── paragraph motions cannot vault into the pockets or the vault ─────────────
@@ -363,142 +373,115 @@ def test_paragraph_jumps_respect_the_walls():
         return (p.row, p.col), moved
 
     assert jump((3, 2), '}') == ((3, 2), False)      # spawn: wall below
-    assert jump((3, 5), '}') == ((3, 5), False)      # no vault to (32,5)/walkway
-    assert jump((3, 57), '}') == ((3, 57), False)    # shaft fogged pre-gate
+    assert jump((3, 5), '}') == ((3, 5), False)      # no vault to (32,10)/walkway
     # standing directly above the visible pit IS a way in… and u the way out
     assert jump((3, 3), '}') == ((4, 3), True)
     assert jump((4, 3), '}') == ((4, 3), False)      # sealed below
     assert jump((4, 3), '{') == ((4, 3), False)      # sealed above
 
 
-# ── dd: parried on gate rows, oubliette everywhere else, REQUIRED at C10 ────
-def test_dd_is_parried_on_gate_rows():
+# ── dd: parried wherever a gate stands, and REQUIRED at C10 ─────────────────
+def test_dd_is_parried_on_the_forward_corridors_and_free_on_the_backward_ones():
+    """A gate is edit_immune, so it parries the linewise cut — which means the
+    forward corridors (gate at their own line end) refuse `dd` outright, and the
+    backward ones (whose gate waits a row below) do not.
+
+    That asymmetry is not a hole. What a `dd` on a backward corridor puts in the
+    register is the WHOLE row — the filler, the glue and the password together —
+    and no gate below will hear that. The cut is allowed; it just spends the
+    word the corridor was carrying."""
     room = _room(defog=True)
-    for r in (3, 9, 21):
-        assert remove_row(room, r, Player(row=r, col=30)) is False
+    for r in (3, 9, 15, 21, 27):
+        assert remove_row(room, r, Player(row=r, col=30)) is False, r
     assert room.rows == 35
+    for r in (6, 12, 18, 24):
+        fresh = _room(defog=True)
+        assert remove_row(fresh, r, Player(row=r, col=30)) is True, r
 
 
-def test_dd_elsewhere_collapses_into_a_sealed_oubliette():
-    room = _room(defog=True)
-    p = Player(row=6, col=30)
-    assert remove_row(room, 6, p)
-    _cursor_to_line_start(room, p, 6)
-    assert (p.row, p.col) == (6, 3)                  # the first-spacer pocket
-    assert _confined(room, p.row, p.col)
-    # a chained dd just falls one pocket deeper — still no way out but u
-    assert remove_row(room, p.row, p)
-    _cursor_to_line_start(room, p, p.row)
-    assert (p.row, p.col) == (6, 1)                  # the second-spacer pocket
-    assert _confined(room, p.row, p.col)
-
-
-def test_c10_dd_raises_the_ledge_and_a_second_dd_is_the_oubliette():
+def test_c10_dd_raises_the_ledge_and_a_second_dd_is_parried():
     room = _room(defog=True)
     p = Player(row=30, col=57)
     assert remove_row(room, 30, p)
     _cursor_to_line_start(room, p, 30)
-    assert (p.row, p.col) == (30, 4)                 # riding the risen ledge —
-    # Vim-true: dd parks on the ledge's first NON-BLANK (its word, col 4)
-    assert {(e.row, e.col) for e in _guards(room, 30)} == \
-        {(30, 10), (30, 16), (30, 22)}               # the last pack, now on your line
+    # VIM-TRUE, and aimed. `'startofline'` is on by default, so a linewise `d`
+    # lands on the first non-blank of the line that took the deleted one's
+    # place — never the column you cut from. You arrive at col 57 and leave from
+    # col 3, and that is Vim rather than a convenience.
+    #
+    # Which non-blank it is, is the level's choice, and the ledge's word is laid
+    # in the seep's own column so the answer is "the cell the water was filling".
+    # The line you could not cross is the line you now stand in.
+    assert (p.row, p.col) == (30, dg._OV_SEEP_WATER[1])
+    assert room.is_passable(*dg._OV_SEEP_SHELF), 'the shelf above is now open'
+    assert room.rows == 34
     assert room.exit_pos == (32, 19)                 # the vault slid up with the cut
-    assert remove_row(room, 30, p)                   # greed: cut the ledge too…
-    _cursor_to_line_start(room, p, 30)
-    assert (p.row, p.col) == (30, 3)                 # …and drop into the pocket
-    assert _confined(room, p.row, p.col)
+    # the ledge carries C10's own gate, so greed is refused rather than fatal
+    assert remove_row(room, 30, p) is False
 
 
-# ── the gates: a pack holds its own door. Stateless, group-scoped, undo-safe ──
-# It was a key economy until 2026-08-01 — a group fell, its coloured key
-# dropped, the player walked over and pasted it in. Four keystrokes of errand a
-# LINE JUMP could run as well as a walk could, which is what made the corridor's
-# operator lesson optional. A gate that opens because its pack is dead cannot be
-# jumped to: a jump kills nothing.
-def _gates(room):
-    return [(e.row, e.col, e.tag) for e in room.entities
-            if e.alive and e.kind == 'seal_door']
-
-
-def test_a_gate_opens_when_its_group_falls_and_re_bars_after_undo():
+# ── the vault: it opens when every password has been spoken ─────────────────
+def test_the_vault_opens_only_when_every_gate_is_open():
     room = _room()
-    player = Player(row=3, col=7)
-    assert (3, 18, 'gold') in _gates(room)
-    g1 = next(e for e in room.entities if e.tag == 'g1')
-    room.kill_entity(g1)
-    assert main._operators_vault_tick(room, player)
-    assert (3, 18, 'gold') not in _gates(room)
-    assert main._operators_vault_tick(room, player) == []     # no second telling
-    # undo revives the guard: the gate must stand again, because the rule is
-    # re-derived from who is alive rather than remembered.
-    g1.alive = True
-    gate = next(e for e in room.entities
-                if e.kind == 'seal_door' and e.tag == 'gold')
-    gate.alive = True
-    room.rebuild_indexes()
-    assert main._operators_vault_tick(room, player) == []
-    assert (3, 18, 'gold') in _gates(room)
-    room.kill_entity(g1)                                       # re-kill → re-open
-    assert main._operators_vault_tick(room, player)
-    assert (3, 18, 'gold') not in _gates(room)
-
-
-def test_the_gate_rule_survives_undo_replacing_the_entity_list():
-    """Undo replaces room.entities with snapshot COPIES; the tick must resolve
-    gates live (by tag), never through stale references."""
-    room = _room()
-    player = Player(row=3, col=7)
-    room.entities = [Entity(kind=e.kind, row=e.row, col=e.col, hp=e.hp,
-                            alive=e.alive, max_hp=e.max_hp, ai=e.ai, tag=e.tag,
-                            edit_immune=e.edit_immune) for e in room.entities]
-    room.rebuild_indexes()
-    g1 = next(e for e in room.entities if e.tag == 'g1')
-    room.kill_entity(g1)
-    assert main._operators_vault_tick(room, player)
-    assert (3, 18, 'gold') not in _gates(room)
-
-
-def test_one_pack_opens_only_its_own_gate():
-    """Group-scoped: cutting the gold guard must not open the blue or red gate,
-    or the corridors past them stop being lessons."""
-    room = _room()
-    player = Player(row=3, col=7)
-    room.kill_entity(next(e for e in room.entities if e.tag == 'g1'))
-    main._operators_vault_tick(room, player)
-    tags = {t for _, _, t in _gates(room)}
-    assert 'gold' not in tags and {'blue', 'red'} <= tags
-
-
-def test_the_vault_opens_only_when_every_guard_is_down():
-    room = _room()
-    player = Player(row=30, col=2)
-    guards = _guards(room)
-    for g in guards[:-1]:
+    player = Player(row=33, col=15)
+    gates = _gates(room)
+    for g in gates[:-1]:
         room.kill_entity(g)
     main._operators_vault_tick(room, player)
-    assert '' in {t for _, _, t in _gates(room)}      # the vault still stands
-    room.kill_entity(guards[-1])                     # the last guard falls
+    assert _vault(room) is not None                  # the vault still stands
+    room.kill_entity(gates[-1])                      # the last word is spoken
     msgs = main._operators_vault_tick(room, player)
     assert any('vault door' in m for m in msgs)
-    assert '' not in {t for _, _, t in _gates(room)}
+    assert _vault(room) is None
 
 
-def test_no_key_is_dropped_any_more():
-    """The errand is gone entirely — nothing to walk to, nothing to paste."""
+def test_the_vault_rule_is_stateless_so_undo_re_bars_it():
+    """The tick re-derives the vault from the gates every turn rather than
+    remembering, which is what makes it undo-safe: reviving a gate must shut the
+    vault again, and re-opening it must re-open the vault."""
     room = _room()
-    player = Player(row=3, col=7)
-    for g in _guards(room):
+    player = Player(row=3, col=7)                    # away from the vault, so the
+                                                     # approach nudge stays quiet
+    gates = _gates(room)
+    for g in gates:
         room.kill_entity(g)
-    main._operators_vault_tick(room, player)
-    assert not [e for e in room.entities if e.kind == 'floor_key' and e.alive]
+    assert main._operators_vault_tick(room, player)
+    assert _vault(room) is None
+    # undo: the gate and the vault come back as snapshot copies
+    for e in room.entities:
+        if e.kind in ('fancy_door', 'seal_door'):
+            e.alive = True
+    room.rebuild_indexes()
+    assert main._operators_vault_tick(room, player) == []
+    assert _vault(room) is not None
+    for g in _gates(room):
+        room.kill_entity(g)
+    assert main._operators_vault_tick(room, player)
+    assert _vault(room) is None
 
 
-def test_vault_door_nudges_while_guards_remain():
+def test_the_vault_rule_survives_undo_replacing_the_entity_list():
+    """Undo replaces room.entities with snapshot COPIES; the tick must resolve
+    the doors live, never through references held across a turn."""
+    room = _room()
+    player = Player(row=33, col=15)
+    room.entities = [Entity(kind=e.kind, row=e.row, col=e.col, hp=e.hp,
+                            alive=e.alive, max_hp=e.max_hp, ai=e.ai, tag=e.tag,
+                            password=e.password, edit_immune=e.edit_immune)
+                     for e in room.entities]
+    room.rebuild_indexes()
+    for g in _gates(room):
+        room.kill_entity(g)
+    assert main._operators_vault_tick(room, player)
+    assert _vault(room) is None
+
+
+def test_vault_door_nudges_while_a_gate_stands():
     room = _room()
     player = Player(row=33, col=15)                  # at the door, too early
     msgs = main._operators_vault_tick(room, player)
-    assert any('draws breath' in m for m in msgs)
-    assert '' in {t for _, _, t in _gates(room)}      # and it is still shut
+    assert any('gate above' in m for m in msgs)
+    assert _vault(room) is not None                  # and it is still shut
 
 
 # ── executed solve ───────────────────────────────────────────────────────────
@@ -554,33 +537,41 @@ def _drive(monkeypatch, d, keys):
 @pytest.mark.parametrize('seed', SEEDS)
 def test_answer_solves_the_vault(monkeypatch, seed):
     """Driving the answer through the real loop reaches the exit at exactly par,
-    unharmed, with every guard cut down, every door opened, and every scroll
-    chest collected along the way — for EVERY seed, since the lessons and the
-    travel key off word positions/lengths, never the sampled letters."""
+    unharmed, with every gate spoken open — for EVERY seed, since the lessons
+    and the travel key off word positions and lengths, never the letters the
+    seed happened to deal."""
     d = dg.build_dungeon_operators_vault(seed)
     room = d.rooms[0]
     keys = [ch for tok in room.answer.split() for ch in tok]
     state, cap = _drive(monkeypatch, d, keys)
 
     assert state['pos'] == room.exit_pos == (32, 19)  # the vault, one collapse later
-    assert state['hp'] == 6                           # unharmed — guards cut at range
-    assert cap['budget'].spent == room.par            # solved in exactly par keystrokes
+    assert state['hp'] == 6                           # nothing in here can hurt you
+    assert cap['budget'].spent == room.par            # solved in exactly par
     assert room.rows == 34                            # exactly one line was cut away
-    assert _guards(room) == []
-    assert not any(e.alive and e.kind == 'seal_door' for e in room.entities)
-    assert not any(e.alive and e.kind == 'floor_key' for e in room.entities)
-    # Chests are LOOT, not a toll. Par used to be asserted to collect every one
-    # of them, which made this level the only one of seven with a par and a
-    # chest that did (2026-08-01 audit) — and the assertion could not even tell
-    # a looted chest from one a cut destroyed. C5's chest is left standing by
-    # par now; what forces its lesson is the sealed shaft, not the loot.
+    assert _gates(room) == []
+    assert _vault(room) is None
+
+
+def test_a_gate_refuses_the_wrong_words(monkeypatch):
+    """The half the guards could never hold: a cut that reaches TOO FAR opens
+    nothing. `d$` on corridor 1 takes the password and the filler behind it, and
+    the gate — which reads the register, not the floor — says so and stays shut."""
+    d = dg.build_dungeon_operators_vault(7)
+    room = d.rooms[0]
+    state, cap = _drive(monkeypatch, d, list('d$$p'))
+
+    assert state == {}
+    assert [e for e in _gates(room) if e.row == 3]     # still standing
+    # the refusal names BOTH sides, which is what teaches that the door weighs
+    # the whole register rather than looking for its word somewhere inside it
+    assert 'the door wants' in (cap['player'].error or '')
 
 
 def test_blocked_dd_is_parried_loudly_and_costs_nothing(monkeypatch):
-    """Regression: dd on a gate row (display line 1 — the gold gate parries the
-    collapse) used to spend budget, clobber the register, leave a no-op undo
-    entry, and lie with 'Deleted.'. A parried cut must be free, side-effect
-    free, and SAY it was parried."""
+    """Regression: dd on a gated row used to spend budget, clobber the register,
+    leave a no-op undo entry, and lie with 'Deleted.'. A parried cut must be
+    free, side-effect free, and SAY it was parried."""
     d = dg.build_dungeon_operators_vault(7)
     room = d.rooms[0]
     state, cap = _drive(monkeypatch, d, list('ddu'))
@@ -621,25 +612,23 @@ def test_blocked_dd_on_a_one_line_buffer(monkeypatch):
 
 def test_deep_undo_unwinds_the_whole_solve(monkeypatch):
     """Regression for the undo report: unwinding the entire solve with u must
-    walk back step by step to the pristine 35-row dungeon — guards alive, gates
-    re-locked, chests restored, budget refunded — never jumping rows or leaving
-    the player walled in."""
+    walk back step by step to the pristine 35-row dungeon — every gate shut
+    again, chests restored, budget refunded — never jumping rows or leaving the
+    player walled in."""
     d = dg.build_dungeon_operators_vault(7)
     room = d.rooms[0]
     keys = [ch for tok in room.answer.split() for ch in tok]
     keys = keys[:-2]                                 # stop one step short of the exit
-    keys += list('u' * 160)
+    keys += list('u' * 200)
     state, cap = _drive(monkeypatch, d, keys)
 
     assert state == {}                               # never won, never crashed
     player = cap['player']
     assert room.rows == 35                           # the cut line is back
-    assert len(_guards(room)) == 20                  # every guard restored
-    assert sorted(e.tag for e in room.entities
-                  if e.alive and e.kind == 'seal_door') == ['', 'blue', 'gold', 'red']
+    assert len(_gates(room)) == 10                   # every gate shut again
+    assert _vault(room) is not None
     assert len([e for e in room.entities
-                if e.alive and e.kind == 'chest_scroll']) == 4
-    assert not [e for e in room.entities if e.alive and e.kind == 'floor_key']
+                if e.alive and e.kind == 'chest_scroll']) == 2
     assert cap['budget'].spent == 0                  # fully refunded
     assert (player.row, player.col) == room.spawn_pos
     assert room.is_passable(player.row, player.col)  # never parked inside a wall

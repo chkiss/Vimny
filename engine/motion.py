@@ -36,7 +36,7 @@ def move_player(player, dr, dc, room):
     return True
 
 
-_FOG_BLOCK_KINDS = ('door', 'locked_door', 'seal_door', 'boss_seal')
+_FOG_BLOCK_KINDS = ('door', 'locked_door', 'seal_door', 'boss_seal', 'fancy_door')
 _FOGGABLE_CELLS  = (CellType.FLOOR, CellType.CORRIDOR, CellType.WATER)
 
 
@@ -364,7 +364,8 @@ def _cross_water(room, r: int, c: int) -> bool:
         return False
     ent = room.entity_at(r, c)
     # Same blocker set as f/F/t/T (_SCAN_BLOCK): an unbroken seal_door stops $ / 0 / ^ too.
-    return ent is None or ent.kind not in ('locked_door', 'shield', 'seal_door', 'boss_seal')
+    return ent is None or ent.kind not in ('locked_door', 'shield', 'seal_door',
+                                           'boss_seal', 'fancy_door')
 
 
 _PAIRS_OPEN  = {'(': ')', '[': ']', '{': '}'}
@@ -673,9 +674,19 @@ def _apply_motion_impl(player, motion, count, room, target=None, count_given: bo
             cur = room.char_run_at(row, player.col)
             scan = (cur.col + len(cur.symbols)) if (cur and cur.kind != 'void') \
                 else player.col + 1
-            # Skip the REST of the current WORD from scan — even off a void/blank
-            # start: a cluster touching the cursor cell is the same WORD (no gap).
-            if (scan < room.cols and room.is_passable(row, scan)
+            # Skip the REST of the current WORD from scan — but ONLY when the
+            # cursor is on one. A cluster touching the cursor cell continues the
+            # cursor's WORD (no gap), so from a glyph it must be skipped; from
+            # BLANK FLOOR there is no current WORD at all, and the cluster at
+            # cursor+1 is the NEXT one. Vim from whitespace moves to the very
+            # next WORD however close it is — one blank away or five.
+            #
+            # Without the `cur is not None` guard this leapt a word whenever the
+            # cursor sat exactly ONE cell short of it (a two-cell gap behaved
+            # correctly, which is what made it hard to see). In the Operator's
+            # Vault that turned `dW` from a gate cell into a cut that swept the
+            # blank AND the password, opening a door the lesson meant to refuse.
+            if (cur is not None and scan < room.cols and room.is_passable(row, scan)
                     and _glyph_class(room, row, scan) is not None):
                 scan = _WORD_edge(room, row, scan, +1) + 1
             found = _next_cluster_stop(room, row, scan, +1)
@@ -950,7 +961,8 @@ def _apply_motion_impl(player, motion, count, room, target=None, count_given: bo
     return moved
 
 
-_SCAN_BLOCK = frozenset(('shield', 'locked_door', 'seal_door', 'boss_seal'))
+_SCAN_BLOCK = frozenset(('shield', 'locked_door', 'seal_door', 'boss_seal',
+                         'fancy_door'))
 
 
 def _apply_find(player, motion: str, target: str, room) -> bool:

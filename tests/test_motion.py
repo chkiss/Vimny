@@ -17,6 +17,8 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 
 """Tests for engine/motion.py: apply_motion, move_player, _cell_char, _fog_unreachable, _reveal_from."""
+import pytest
+
 from engine.world import Room, RoomType, CellType, Entity, CharRun
 from engine.player import Player
 from engine.motion import apply_motion, move_player, _fog_unreachable, _reveal_from, _cell_char
@@ -25,12 +27,12 @@ from engine.motion import apply_motion, move_player, _fog_unreachable, _reveal_f
 
 ROWS, COLS = 7, 24
 
-def _bare_room():
-    """7×24 room, walls on border, open floor inside. No runes or entities."""
-    room = Room(room_type=RoomType.ENTRY, rows=ROWS, cols=COLS)
+def _bare_room(cols=COLS):
+    """7×`cols` room, walls on border, open floor inside. No runes or entities."""
+    room = Room(room_type=RoomType.ENTRY, rows=ROWS, cols=cols)
     room.cells = [
-        [CellType.FLOOR if (0 < r < ROWS - 1 and 0 < c < COLS - 1) else CellType.WALL
-         for c in range(COLS)]
+        [CellType.FLOOR if (0 < r < ROWS - 1 and 0 < c < cols - 1) else CellType.WALL
+         for c in range(cols)]
         for r in range(ROWS)
     ]
     room.spawn_pos = (3, 1)
@@ -873,5 +875,71 @@ class TestWordMotionVoidStarts:
         p = _player(3, 2)
         assert apply_motion(p, 'W', 1, room) is False    # ○ in the gap stops W
         p2 = _player(3, 2)
-        apply_motion(p2, 'w', 1, room)
+        assert apply_motion(p2, 'w', 1, room)
         assert p2.col == 8                               # ...but w leaps over it
+
+
+class TestWordMotionBlankStarts:
+    """Starting on BLANK FLOOR, where there is no current WORD to skip.
+
+    The rule above — a cluster touching the cursor continues the cursor's WORD —
+    is right off a glyph and WRONG off blank floor, because blank floor is not
+    part of any word. Vim from whitespace moves to the very next WORD however
+    close it is. `W` applied the skip unconditionally, so a cursor sitting
+    exactly ONE cell short of a word leapt clean over it; a two-cell gap behaved
+    correctly, which is what kept this hidden. Found 2026-08-02 in the
+    Operator's Vault, where it let `dW` off a gate cell sweep the blank AND the
+    password into the register and open a door the lesson meant to refuse."""
+
+    CUR = 10                                     # the cursor's blank cell
+
+    def _forward_room(self, gap):
+        """near 'abc' starts `gap` cells right of the cursor; 'z' beyond it."""
+        room = _bare_room(cols=40)
+        near = self.CUR + gap
+        room.add_char_run(CharRun(row=3, col=near, symbols=('a', 'b', 'c'),
+                                  kind='ancient'))
+        room.add_char_run(CharRun(row=3, col=near + 5, symbols=('z',),
+                                  kind='ember'))
+        return room, near
+
+    def _backward_room(self, gap):
+        """near 'abc' ENDS `gap` cells left of the cursor; 'z' beyond it."""
+        room = _bare_room(cols=40)
+        near_start = self.CUR - gap - 2
+        room.add_char_run(CharRun(row=3, col=near_start, symbols=('a', 'b', 'c'),
+                                  kind='ancient'))
+        room.add_char_run(CharRun(row=3, col=near_start - 3, symbols=('z',),
+                                  kind='ember'))
+        return room, near_start
+
+    # The whole family is checked, not just the motion that broke. `W` was the
+    # only one that leapt, but nothing about the bug was specific to it — the
+    # unguarded skip was in reach of any scan that starts from the cursor cell,
+    # and a suite that only pinned `W` would let the next one through.
+    @pytest.mark.parametrize('gap', (1, 2, 3, 4, 5))
+    @pytest.mark.parametrize('motion,lands_on_end', [('w', False), ('W', False),
+                                                     ('e', True),  ('E', True)])
+    def test_forward_motions_from_blank_take_the_very_next_word(
+            self, motion, lands_on_end, gap):
+        """Distance must change how FAR you travel, never WHICH word you get."""
+        room, near = self._forward_room(gap)
+        want = near + 2 if lands_on_end else near
+        p = _player(3, self.CUR)
+        assert apply_motion(p, motion, 1, room)
+        assert p.col == want, (
+            f'{motion} from blank floor {gap} cell(s) short of the word landed '
+            f'on col {p.col}, not col {want} — it skipped to the word beyond')
+
+    @pytest.mark.parametrize('gap', (1, 2, 3, 4, 5))
+    @pytest.mark.parametrize('motion,lands_on_end', [('b', False), ('B', False),
+                                                     ('ge', True), ('gE', True)])
+    def test_backward_motions_from_blank_take_the_very_nearest_word(
+            self, motion, lands_on_end, gap):
+        room, near_start = self._backward_room(gap)
+        want = near_start + 2 if lands_on_end else near_start
+        p = _player(3, self.CUR)
+        assert apply_motion(p, motion, 1, room)
+        assert p.col == want, (
+            f'{motion} from blank floor {gap} cell(s) past the word landed on '
+            f'col {p.col}, not col {want} — it skipped to the word beyond')

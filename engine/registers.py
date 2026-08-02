@@ -102,6 +102,32 @@ def _row_to_text(row) -> str:
     return ''.join(cells)
 
 
+def clip_to_text(clip) -> str:
+    """Read a register back as the WORDS in it, for something that wants to
+    know what you are carrying rather than replay it.
+
+    This is the fancy door's reader. `clip_to_keys` is the wrong tool there: it
+    is faithful to keystrokes, so it preserves the column padding a linewise cut
+    drags along and encodes control characters as carets — a `dd` of a line
+    holding one phrase comes back as that phrase wearing forty spaces. A door
+    comparing that against its password would refuse every correct answer.
+
+    So: rows joined with a single space, every run of whitespace collapsed to
+    one, ends trimmed. What survives is what a reader would say the register
+    holds, which is the only thing a password check can honestly compare.
+
+    That collapsing is deliberately generous about WHITESPACE and about nothing
+    else. `dw` (which takes the trailing space) and `de` (which does not) hand
+    the door the same word, because the difference between them is not a
+    difference in what you cut — but a cut that swept in one extra word reads
+    as two words here, and no amount of trimming hides it. Whitespace is the
+    layout; the words are the answer.
+    """
+    if not clip or not clip.get('rows'):
+        return ''
+    return ' '.join(' '.join(_row_to_text(r).split()) for r in clip['rows']).strip()
+
+
 def clip_to_keys(clip) -> str:
     """Read a register back as a keystroke string for `@`. Any register works —
     text you yanked replays as keys, exactly as in vim.

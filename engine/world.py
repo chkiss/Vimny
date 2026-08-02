@@ -217,6 +217,31 @@ class Entity:
                             # author placing a brazier gets a lit one and every existing
                             # brazier entity stays lit. Meaningful only for kind='brazier';
                             # inert on anything else.
+    password:     str = ''  # kind='fancy_door' only: the words that open it. The door
+                            # is shut until you PASTE a register whose text reads
+                            # exactly this (see engine.registers.clip_to_text), so the
+                            # key to a fancy door is something you cut out of the floor
+                            # rather than something you find lying on it.
+                            #
+                            # It is the mirror of a guard, and the level design turns on
+                            # that. A guard punishes a cut that takes too LITTLE — it
+                            # survives, and it is still standing when you reach the exit.
+                            # Nothing punished a cut that took too MUCH, because every
+                            # creature a `dw` kills a `d$` kills too, which is how a
+                            # vault full of hand-placed guards still let `d$` clear six
+                            # of its ten lessons for less than par. A door that reads
+                            # what you are holding is the missing half: overshoot and
+                            # the register carries extra words, and extra words are not
+                            # the password. Between the two, exactly one motion fits.
+                            #
+                            # WHY THE REGISTER AND NOT THE FLOOR. The check is on the
+                            # clip, never on the cells in front of the door — so no
+                            # amount of inserting or deleting whitespace can shove the
+                            # right word into the doorway and call it opened. That is
+                            # the same rule a locked door already keeps (a key lying
+                            # NEXT to one has never opened it), which is what lets this
+                            # be taught as the familiar key-and-`p` model with a word
+                            # for a key, rather than as a new mechanism.
     dropped:      bool = False  # runtime only: this carrier has already left its drop.
                             # The drop tick recomputes from the roster each turn, which
                             # respawned a key the moment it left the world — picked up
@@ -294,7 +319,7 @@ def entity_letter(ent) -> Optional[str]:
 # on them). Every OTHER live entity (a foe, key, chest, heart…) counts as content
 # the caret lands on.
 CARET_TRANSPARENT = frozenset({'door', 'locked_door', 'seal_door', 'exit',
-                               'entry_marker', 'boss_seal', 'horse'})
+                               'entry_marker', 'boss_seal', 'horse', 'fancy_door'})
 
 
 @dataclass
@@ -475,7 +500,8 @@ class Room:
         if (r, c) in getattr(self, 'torn', ()):    # floor torn away by the Warden (temporary)
             return False
         ent = self.entity_at(r, c)
-        return ent is None or ent.kind not in ('locked_door', 'shield', 'seal_door', 'boss_seal')
+        return ent is None or ent.kind not in ('locked_door', 'shield', 'seal_door',
+                                               'boss_seal', 'fancy_door')
 
     def first_standable_row(self) -> int:
         """Grid row of buffer line 1 — the first row with a FLOOR/CORRIDOR cell. The
