@@ -201,7 +201,7 @@ def test_fuel_rule_blocks_flames_off_brazier():
     ('wywllllP', 'yw then P on hall floor'),
     ('wyelllp',  'ye then p on hall floor'),
     ('^y0$P',    '^ y0 $ P — y0 is exclusive: the clip is blanks, never the flame'),
-    ('wylw P4G9P'.replace(' ', ''), 'nine flames in a row at the beacon'),
+    ('wylw PG9P'.replace(' ', ''), 'nine flames in a row at the beacon'),
 ])
 def test_cheese_battery_spreads_no_flame(keys, label, monkeypatch):
     """The user-reported cheese attempts, key-for-key through run_dungeon:
@@ -264,7 +264,7 @@ def test_par_is_locked_and_answer_uses_the_lesson(seed):
 
 
 def test_walking_route_fits_the_budget():
-    """The par path rides 4G to the beacon row; the mortal walking route
+    """The par path rides G to the beacon row; the mortal walking route
     ($ down the shaft, B to the braziers) costs par+2 and must still fit."""
     room = _room(SEEDS[0])
     assert room.par + 2 <= room.budget

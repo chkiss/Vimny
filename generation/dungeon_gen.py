@@ -5746,7 +5746,7 @@ def build_dungeon_grandmasters_sanctum(seed: int) -> Dungeon:
 _HE_COLS  = 58
 _HE_TX    = 3                          # text head col in every hall
 _HE_GATE_COL = 2                       # the west gate cell in every band
-_HE_PAR    = 76                        # engine-measured: the full driven tape
+_HE_PAR    = 74                        # engine-measured: the full driven tape
 _HE_BUDGET = math.ceil(_HE_PAR * 1.4)  # STANDARD (par-is-the-optimum law)
 
 # The poem pool — all PD, all 10 lines. The intruders are deadpan one-word
@@ -5866,7 +5866,11 @@ def _he_build_chambers(rng):
         wrong = prov[(i - 1) % 4][1]
         pn_rows.append(((4, f'{stem} {wrong}', 'ancient'),))
         pn_done.append(f'{stem} {prov[i][1]}')
-    pn_tape = '$bvey 3j $bvep qck$bvepq 2@c 0 5j'
+    # `G` for the hop to the first panel, not `3j`: the halls below sleep under
+    # stone fog and a fogged row has no standable cell, so the buffer ends where
+    # the light does and `G` is one key to the frontier. Buffer-relative, unlike
+    # `L` — the tape means the same thing in every window (2026-08-02).
+    pn_tape = '$bvey G $bvep qck$bvepq 2@c 0 5j'
     chambers.append({'rows': tuple(pn_rows), 'done': tuple(pn_done),
                      'span': (2, 44), 'plaques': (), 'tape': pn_tape})
 
@@ -5876,7 +5880,7 @@ def _he_build_chambers(rng):
     stanzas = tuple(t for t in _RV_TRUE if t != _RV_LADY)
     rv_rows = tuple(((2, ln, 'ancient'),) for ln in (_RV_LADY,) + stanzas)
     rv_done = (_RV_LADY,) + _RV_TRUE
-    rv_tape = 'qdyy3jpq 3@d 2j'                   # ↓ into the goblin lair
+    rv_tape = 'qdyy3jpq 3@d G'                    # ↓ into the goblin lair (G: see above)
     # (linewise p lands the cursor at col 0 already — no 0 needed)
     chambers.append({'rows': rv_rows, 'done': rv_done,
                      'span': (2, 55), 'plaques': (), 'tape': rv_tape})
@@ -9590,35 +9594,41 @@ _OV_DOOR       = (33, 17)             # vault door (untagged); the EXIT is the p
 #:
 #: So a `p` at the head of a line below is not travel — it is the previous
 #: lesson being paid for, one row late.
-#: ONE line jump is cheaper than walking, and only one. A `{n}G` lands on its
-#: row's first standable cell, which for a backward corridor's drop is exactly
-#: where `0 3j` was going anyway — so the jump replaces both keys wherever the
-#: count is a single digit. Line numbers run two below grid rows (the top wall
-#: is not a line), so the four drops are `7G`, `13G`, `19G`, `25G`, and only the
-#: first is short enough to beat the three keys it replaces. The other three tie
-#: at 3 and stay written as the walk, which is the honest reading: `0 3j` is
-#: what the corridor MEANS, and a tie is no reason to teach a jump instead.
-_OV_PAR = 62
+#: EVERY BACKWARD DROP IS A BARE `G`, AND THE COUNT WAS ALWAYS A MISTAKE. This
+#: level's fog is DERIVED: everything past the shut gate ahead is dark, and a
+#: fogged cell is not standable — so as far as any line jump can tell, the
+#: BUFFER ENDS AT THE FRONTIER. `G` therefore means 'as far down as the light
+#: goes', which on a backward corridor is precisely the drop `0 3j` was walking
+#: to, for one key instead of three. It re-aims itself every time a gate opens,
+#: which is why one key serves all four drops and no count is needed.
+#:
+#: This was written as `0 3j` (and one `7G`) until 2026-08-02, on the reasoning
+#: that a counted jump only beats the walk when its count is a single digit —
+#: true, and beside the point, because the jump never needed a count at all.
+#: PAR IS THE OPTIMUM, so 62 was simply wrong; the route that exists is 55.
+#: `G` over `L` deliberately: `L` is viewport-relative and would make par a
+#: function of the player's terminal height, while `G` reads the buffer.
+_OV_PAR = 55
 _OV_ANSWER = ('d w $ p 3j '                   # C1  → dw, from the spawn, which
                                               # is the password's own head
-              'd b 7G '                       # C2  ← db, then ride down holding
-                                              # the word (7G = the drop, one key
-                                              # under `0 3j`)
+              'd b G '                        # C2  ← db, then ride down holding
+                                              # the word (G = the frontier, which
+                                              # IS the drop while the fog holds)
               'p d e $ p 3j '                 # C3  → speak C2's word, then de
                                               # (you land on BLANK a cell short
                                               # of the password, so w has
                                               # nothing to take)
-              'd B 0 3j '                     # C4  ← dB over the split token
+              'd B G '                        # C4  ← dB over the split token
               'p d E $ p 3j '                 # C5  → dE
-              'd F ? 0 3j '                   # C6  ← dF? back to the leading ?
+              'd F ? G '                      # C6  ← dF? back to the leading ?
               'p l d W $ p 3j '               # C7  → dW; the l steps onto the
                                               # password's head, which the gate
                                               # cell itself cannot hold
-              'b d 0 3j '                     # C8  ← d0; b parks you on the far
+              'b d 0 G '                      # C8  ← d0; b parks you on the far
                                               # word, so dd — which would sweep
                                               # it in — is no longer the same cut
               'p d $ $ p 3j '                 # C9  → d$
-              'd d $ p 2j $')                 # C10 ← dd drops the floor line and
+              'd d $ p G $')                  # C10 ← dd drops the floor line and
                                               # rides down; the gate is on the
                                               # ledge and the vault is below it
 
@@ -10155,7 +10165,12 @@ _QM_EXIT = (4, 32)                      # exit POCKET behind the seal — walled
 _QM_FLAME  = '🜂'                        # one width-1 glyph IS the flame (untypable,
                                         # so r/insert can never forge one)
 _QM_EMBERS = '…'                        # cold brazier: three dying embers, one cell
-_QM_PAR = 15                            # seed-invariant; tallied in the answer below
+_QM_PAR = 14                            # seed-invariant; tallied in the answer below
+#: The descent to the beacon row was `4G` until 2026-08-02, and `G` does it in
+#: one key. The hall's lower tiers sleep under stone fog, and a fogged row has
+#: no standable cell — so the BUFFER ends, as far as any line jump is concerned,
+#: exactly where the light does, and `G` is 'as far down as I can see'. Unlike
+#: `L` it is buffer-relative, so the tape means the same thing in every window.
 
 
 def build_dungeon_quartermaster(seed: int) -> Dungeon:
@@ -10239,7 +10254,7 @@ def build_dungeon_quartermaster(seed: int) -> Dungeon:
     #   k 0         (2)  → up to the seal row; 0 walks west onto the exit
     room.par    = _QM_PAR
     room.budget = math.ceil(_QM_PAR * 1.4)
-    room.answer = 'w y l w P 4G 3P y y p P k 0'
+    room.answer = 'w y l w P G 3P y y p P k 0'
 
     apply_stone_fog(room)                 # the exit pocket sleeps under fog
 

@@ -67,11 +67,14 @@ _JUMPS = ([('gg', 1, False), ('G', 1, False),
           + [('G', n, True) for n in range(1, 36)])
 
 
-#: What ends a corridor: `{n}j` down a shaft, or a `{n}G` that lands on the same
-#: cell for a key less. See the note in test_operators_vault_corridors.py — a
-#: splitter that only knew `{n}j` silently merged two corridors when the tape
-#: was golfed, and every stage after them was audited off by one.
-_DESCENT = re.compile(r'^\d+[jG]$')
+#: What ends a corridor: `{n}j` down a shaft, or a jump that lands on the same
+#: cell for a key less — `{n}G`, or (since the 2026-08-02 golf) a BARE `G`, which
+#: the derived fog aims at the frontier for one key. See the note in
+#: test_operators_vault_corridors.py — a splitter that only knew `{n}j` silently
+#: merged two corridors when the tape was golfed, and every stage after them was
+#: audited off by one. It happened AGAIN with bare `G`, which is why the pattern
+#: now allows the count to be absent and both files assert the segment count.
+_DESCENT = re.compile(r'^(\d+j|\d*G)$')
 
 
 def _segments():

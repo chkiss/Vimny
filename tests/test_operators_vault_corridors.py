@@ -99,7 +99,7 @@ _UNFORCED = {
 #: `7G`, the splitter did not recognise it, C2 and C3 merged into one segment,
 #: and every corridor after them was audited under the wrong number (the run
 #: reported "corridor 6 teaches dW", which is corridor 7's lesson).
-_DESCENT = re.compile(r'^\d+[jG]$')
+_DESCENT = re.compile(r'^(\d+j|\d*G)$')
 
 
 def _segments():

@@ -322,16 +322,21 @@ def test_the_pockets_sit_only_under_the_forward_corridors():
 
 def test_par_and_budget():
     room = _room()
-    # 69 → 63 with the 2026-08-02 redesign, then 62 once the travel was golfed.
-    # The combat came out (no guard to strike, no key to fetch, no pack to
-    # finish) and the corridors alternate: a forward one pays `$ p 3j` into the
-    # gate at its line end, a backward one pays `0 3j` and hands its word to the
-    # door waiting a row below, where the `p` that opens it doubles as the first
-    # key of the next lesson. The last key went to `7G`, which lands on exactly
-    # the cell `0 3j` was walking to — the only one of the four drops whose line
-    # number is short enough to beat the walk.
-    assert room.par == 62
-    assert room.budget == math.ceil(room.par * 1.4) == 87
+    # 69 → 63 with the 2026-08-02 redesign, then 62, then 55 the same day when
+    # the travel was golfed properly. The combat came out (no guard to strike,
+    # no key to fetch, no pack to finish) and the corridors alternate: a forward
+    # one pays `$ p 3j` into the gate at its line end, a backward one hands its
+    # word to the door waiting a row below, where the `p` that opens it doubles
+    # as the first key of the next lesson.
+    #
+    # EVERY backward drop is a bare `G`. The fog here is derived, so a fogged
+    # cell is not standable and the buffer ends at the frontier — `G` means 'as
+    # far down as the light goes', which IS the drop, and it re-aims itself each
+    # time a gate opens. 62 came from checking one drop and reasoning about the
+    # rest; par is the optimum, so the number that matters is the one a replay
+    # measures.
+    assert room.par == 55
+    assert room.budget == math.ceil(room.par * 1.4) == 77
     assert room.answer.strip()
     # travel discipline: counts stay single-digit (a human can count to 9)
     for tok in room.answer.split():
