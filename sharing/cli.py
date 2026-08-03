@@ -139,13 +139,17 @@ def _cmd_jumpgolf(args) -> int:
             continue
         mark = f'BEAT  {res.best} < par {res.par}' if res.beats_par else 'ok'
         if res.skipped_lesson:
-            mark += (f'   [{res.skipped_lesson} cheaper route(s) REFUSED — they '
-                     f'drop {"/".join(res.lesson)}: a cheese to close, not a par '
-                     f'to lower]')
+            cheap = min(s for _t, s in res.refused)
+            mark += (f'   [CHEESE: {res.skipped_lesson} measured route(s) win '
+                     f'cheaper (best {cheap}) by dropping {"/".join(res.lesson)} '
+                     f'— close it; par is right]')
         print(f'{slug:26} par {res.par:>3}  golfed {res.best:>3}   {mark}',
               flush=True)
         if res.beats_par:
             beaten.append(res)
+        if res.skipped_lesson and args.verbose:
+            for tape, spent in sorted(res.refused, key=lambda r: r[1])[:3]:
+                print(f'   cheese@{spent}: {tape}')
     if beaten:
         print()
         print('PAR IS THE OPTIMUM — each of these is a recorded par that is '

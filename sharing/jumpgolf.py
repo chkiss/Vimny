@@ -91,7 +91,33 @@ HEIGHTS = (25, 30, 41, 50, 60)
 #: Tokens that MOVE THE CURSOR TO ANOTHER ROW — the only ones a line jump
 #: rivals. Everything else in a tape is an edit, and a jump cannot stand in for
 #: an edit.
-TRAVEL = re.compile(r'^(\d*[jk+\-]|\d+G|gg|G|H|M|L|\d+_|0|\^)$')
+#:
+#: The first version listed only the counted walks and the jumps themselves, and
+#: that was the pattern's blind spot rather than its definition: a tape travels
+#: with whatever crosses rows, and eighteen shipped tapes travel with something
+#: this did not recognise. A motion no candidate is ever tried against is a
+#: motion no beat can be found behind (widened 2026-08-03).
+#:
+#:   {n}j {n}k {n}+ {n}- {n}_   the counted walks
+#:   {n}G gg G H M L            the jumps themselves
+#:   0 ^                        line heads — `0 3j` collapsed to `G` in the Vault
+#:   {n}{ {n}} {n}( {n})        paragraph and sentence, which cross rows
+#:   n N * #                    search repeats and the word hunt, which teleport
+#:   /… ?…                      a search, which lands anywhere in the buffer
+#:   `x 'x                      a mark jump
+#:
+#: NOT included: w b e W B E ge gE, and `%`. Those stay within their line in this
+#: engine (`%` is row-scoped and nesting-aware), so a LINE jump cannot stand in
+#: for one — and offering candidates that can only ever lose costs a full replay
+#: each to prove it.
+TRAVEL = re.compile(
+    r'^('
+    r'\d*[jk+\-]|\d+G|gg|G|H|M|L|\d*_|0|\^'          # walks, jumps, line heads
+    r'|\d*[{}()]'                                     # paragraph / sentence
+    r'|\d*[nN*#]'                                     # search repeats, word hunt
+    r'|[/?].*'                                        # a search
+    r'|[`\'].'                                        # a mark jump
+    r')$')
 
 #: Longest run of adjacent tokens a single jump may replace.
 MAX_COLLAPSE = 4
@@ -185,10 +211,13 @@ class Result:
     taught: tuple = ()
     #: The keystrokes this level exists to teach — see _LESSON_KEYS.
     lesson: tuple = ()
-    #: How many cheaper routes were REFUSED for dropping one of them. A nonzero
-    #: count is not noise: it means a shorter way exists that skips the lesson,
-    #: i.e. a cheese to close even though par is right.
+    #: How many MEASURED, genuinely cheaper winning routes were refused for
+    #: dropping one of them. A nonzero count is not noise: a shorter way exists
+    #: that skips the lesson, i.e. a cheese to close even though par is right.
     skipped_lesson: int = 0
+    #: Those routes, as (tape, spend) — a refusal is only actionable if you can
+    #: see the route it refers to.
+    refused: list = field(default_factory=list)
 
     @property
     def beats_par(self) -> bool:
@@ -277,14 +306,22 @@ def golf(slug: str, *, heights=HEIGHTS, jumps=JUMPS, max_collapse=MAX_COLLAPSE,
 
     def _try(trial, kind, at, was, now):
         nonlocal toks, best
-        if not _teaches_still(trial):
-            out.skipped_lesson += 1     # cheaper, and it skips the lesson
-            return False
+        # MEASURE FIRST, then judge. Checking the lesson before replaying is
+        # cheaper and reports a lie: it counts trials that were never shown to
+        # win, let alone to win cheaper, and calling those "cheaper routes
+        # refused" invents cheeses that do not exist. A refusal is only worth
+        # reporting when the route it refers to is real.
         got = _spend_everywhere(slug, builder, trial, known, heights, verify)
         # `<=` for deletions: a token whose removal costs nothing was doing
         # nothing, and dropping it is an improvement even at equal price.
         better = got is not None and (got < best or (kind == 'delete' and got <= best))
         if not better:
+            return False
+        if not _teaches_still(trial):
+            # A REAL cheaper route that skips the lesson: a cheese to close,
+            # not a par to lower. Counted, never taken.
+            out.skipped_lesson += 1
+            out.refused.append((' '.join(trial), got))
             return False
         step = Step(kind=kind, at=at, was=was, now=now, spent=got)
         out.steps.append(step)
