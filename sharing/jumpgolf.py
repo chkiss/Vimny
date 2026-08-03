@@ -116,6 +116,21 @@ _LESSON_KEYS = {
     # slug -> the keystrokes that ARE the lesson, if `commands` needs help
     'spellwrights_forge': ('&', ':s', ':g'),
     'wet_ink':            ('gi',),
+    # The Shelving Room advertises `:m :t :> :<` and writes them with ranges and
+    # counts fused in — `:6m3`, `:7t7`, `:8>` — so the advertised form is not a
+    # substring of its own tape and the rule had nothing to hold it to. The bare
+    # ex-command letters are; a stray `m` elsewhere in a tape would weaken this,
+    # which is the price of a check that reads text rather than intent.
+    'shelving_room':      ('m', 't', '>', '<'),
+}
+
+#: Levels with NO keystroke lesson, named so the absence is a decision.
+#: A level that reaches the acceptance rule with an empty key set accepts any
+#: cheaper route at all — which is fine when there is genuinely nothing to keep,
+#: and silent rot when there is. Being on this list is the difference.
+NO_LESSON_KEYS = {
+    'gauntlet': 'the closing gauntlet teaches nothing new — it is a revision of '
+                'everything, so no one key is the lesson to keep',
 }
 
 #: slug -> what must be TRUE of the finished room, beyond the tape's text.

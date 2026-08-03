@@ -1,0 +1,152 @@
+# Vimny — a Vim-teaching dungeon crawler.
+# Copyright (C) 2026 Chas Kissick
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see <https://www.gnu.org/licenses/>.
+#
+# SPDX-License-Identifier: GPL-3.0-or-later
+
+"""No shipped level may be beaten by a LINE JUMP its own tape does not take.
+
+PAR IS THE OPTIMUM — the cheapest route that exists. Six levels shipped with a
+par that was not, because the question was answered by reasoning instead of by
+replaying: The Operator's Vault recorded 62 on the argument that a counted jump
+only beats a walk when its count is a single digit (true, and beside the point —
+the jump never needed a count), and the route that existed was 55.
+
+This is that question asked automatically, so the next level cannot repeat it.
+The work is in `sharing/jumpgolf.py`; this module is the gate.
+
+WHY IT IS OPT-IN. A single level's golf replays its whole tape through the real
+game loop once per candidate per terminal height. Standalone that is ten minutes;
+UNDER PYTEST it is about one, because conftest's session build cache hands out
+copies instead of rebuilding each dungeon. One minute on top of a two-minute
+suite is still a half-again cost on every edit for a check that only moves when
+a tape or a par does — cheap enough for CI, too dear for the inner loop. Run it
+when tapes or par change:
+
+    VIMNY_JUMPGOLF=1 python3 -m pytest tests/test_par_is_the_optimum.py
+
+or, for the same answer with a nicer report:
+
+    python3 -m sharing jumpgolf
+
+The always-on tests below cost nothing and guard the GUARD — a rotted
+acceptance rule would let the sweep pass while checking nothing, which is the
+failure mode that matters when a check is this expensive to run.
+"""
+import os
+
+import pytest
+
+from sharing import jumpgolf as JG
+
+RUN = os.environ.get('VIMNY_JUMPGOLF') == '1'
+WHY = ('slow (a full tape replay per candidate per height); run with '
+       'VIMNY_JUMPGOLF=1, or `python3 -m sharing jumpgolf`')
+
+
+# ── the gate ────────────────────────────────────────────────────────────────
+
+@pytest.mark.skipif(not RUN, reason=WHY)
+@pytest.mark.parametrize('slug', JG.golfable_levels())
+def test_no_line_jump_beats_this_levels_par(slug):
+    """Parametrized per level so a failure NAMES the level and its cheaper tape
+    — a single assertion over the whole game would report the first offender and
+    hide the rest, and these have historically come in groups."""
+    res = JG.golf(slug)
+    if res.canonical is None or not res.taught:
+        pytest.skip('no jump taught yet, or the tape is not height-stable')
+    assert not res.beats_par, (
+        f'{slug}: par {res.par} but a jump route wins at {res.best} — '
+        f'par is the optimum, so the recorded value is simply wrong.\n'
+        f'  {res.tape}')
+
+
+@pytest.mark.skipif(not RUN, reason=WHY)
+@pytest.mark.parametrize('slug', sorted(JG._VERIFY))
+def test_the_state_check_actually_bites(slug):
+    """A `_VERIFY` predicate that is True of every room checks nothing. Assert
+    the shipped tape SATISFIES it (or the level's own par is unreachable) — the
+    predicate has to be a real property of a real solve."""
+    import generation.dungeon_gen as dg
+    res = JG.golf(slug)
+    assert res.canonical is not None, (
+        f'{slug}: its own tape fails the state check {JG._VERIFY[slug]!r} — '
+        f'the predicate is wrong, or par records a route nobody can walk')
+
+
+# ── guarding the guard (fast) ───────────────────────────────────────────────
+
+def test_every_golfable_level_has_a_lesson_to_keep():
+    """The acceptance rule is "a cheaper route counts only if the level still
+    teaches its lesson". A level whose lesson resolves to NO keys accepts any
+    route at all, so the rule silently stops applying there — which is how a
+    sweep passes while checking nothing."""
+    import generation.dungeon_gen as dg
+    from content.levels import LEVELS
+
+    from content.levels import known_commands
+
+    toothless = []
+    for slug in JG.golfable_levels():
+        if not any(j in known_commands(slug) for j in JG.JUMPS):
+            continue          # no jump taught yet — the rule cannot apply here
+        room = getattr(dg, f'build_dungeon_{slug}')(0).room
+        keys = tuple(k for k in JG.lesson_keys(slug) if k in room.answer)
+        if not keys and slug not in JG._VERIFY and slug not in JG.NO_LESSON_KEYS:
+            entry = next(l for l in LEVELS if l['slug'] == slug)
+            toothless.append((slug, entry['commands']))
+    # A level whose lesson genuinely is not a keystroke belongs in _VERIFY (a
+    # state check) or NO_LESSON_KEYS (a reasoned exemption) — never silently.
+    assert toothless == [], (
+        'these levels advertise commands their own tape never presses, so the '
+        'lesson-kept rule has nothing to hold them to: '
+        + ', '.join(f'{s} ({c})' for s, c in toothless))
+
+
+def test_the_verify_registry_names_real_levels():
+    """A `_VERIFY` entry keyed on a slug that no longer exists is a check that
+    quietly stopped running."""
+    known = set(JG.golfable_levels())
+    unknown = sorted(set(JG._VERIFY) - known)
+    assert unknown == [], f'_VERIFY names levels that are not golfable: {unknown}'
+
+
+def test_token_gating_is_enforced_when_proposing():
+    """The candidates offered to a level must be ones it has TAUGHT. An ungated
+    key is not a route — the game refuses it — and a sweep that proposed one
+    would be measuring a route no player can walk. G/gg arrive at curriculum
+    position 10 and H/M/L at 11, so the early levels must be offered nothing.
+
+    Read off `known_commands` rather than by running the golf: this test is in
+    the always-on set, and golf() replays."""
+    from content.levels import known_commands
+    for slug in ('first_cave', 'line_halls', 'counting_crypts'):
+        assert not any(j in known_commands(slug) for j in JG.JUMPS), \
+            f'{slug} sits before the jumps and must be offered none'
+    for slug in ('operators_vault', 'wet_ink', 'spellwrights_forge'):
+        known = known_commands(slug)
+        assert all(j in known for j in JG.JUMPS), \
+            f'{slug} should have every jump available by now'
+
+
+def test_travel_and_collapse_patterns_cover_the_written_tapes():
+    """The collapse pass only fires on runs of TRAVEL tokens, so a travel key
+    the pattern does not recognise is invisible to the whole sweep. Assert the
+    pattern actually matches the vertical keys the shipped tapes are written
+    with — this is the blind spot that let the first sweep miss `0 3j` -> `G`."""
+    for tok in ('3j', '2k', '2+', '2-', '4G', 'G', 'gg', 'H', 'M', 'L', '0', '^'):
+        assert JG.TRAVEL.match(tok), f'TRAVEL does not recognise {tok!r}'
+    for tok in ('dw', 'p', 'x', '$', 'qa', '@a', ':wq'):
+        assert not JG.TRAVEL.match(tok), f'TRAVEL wrongly claims {tok!r}'
