@@ -1461,6 +1461,82 @@ def _render_standard_scroll(term: Terminal, iw: int, game_h: int, content: dict,
     term.inkey()
 
 
+#: The admin notice, once per save. Signing in as `admin` unlocks every level,
+#: opens the forge, AND prints each level's solution across the screen as you
+#: play — and the last of those cannot be undone by turning it back off, because
+#: you have already read the answer.
+#:
+#: Deliberately NOT drawn as a scroll. Every other full-screen box in this game
+#: is parchment-and-amber, in the wizard's voice, and a player skims those for
+#: flavour — which is exactly the wrong reflex here. This one is plain,
+#: unstyled, and says "answers" in as many words. A warning that reads as
+#: atmosphere is a warning nobody heeds.
+_ADMIN_NOTICE = (
+    'ADMIN MODE',
+    '',
+    'You have signed in as `admin`. This unlocks every level,',
+    'opens the level forge, and shows the solution to each',
+    'puzzle as you play.',
+    '',
+    'It is meant for authoring and testing. If you came here to',
+    'PLAY Vimny, quit and start again under any other name — the',
+    'game will not be the same with the answers on screen.',
+)
+
+
+def _show_admin_notice(term: Terminal, iw: int, game_h: int) -> None:
+    """A plain, unmissable box shown once per save. Any key dismisses it."""
+    BOX_IW = 62; BOX_BW = BOX_IW + 4
+    box_bg = term.on_color_rgb(28, 6, 6)              # not parchment: a warning
+    edge   = box_bg + term.color_rgb(235, 90, 70) + term.bold
+    head   = term.color_rgb(255, 210, 120) + term.bold
+    body   = term.color_rgb(230, 210, 200)
+    rst    = term.normal
+    col_off = max(1, (iw + 2 - BOX_BW) // 2)
+
+    def row(vis, colored):
+        return (edge + '║ ' + rst + box_bg + colored +
+                box_bg + ' ' * max(0, BOX_IW - vis) + edge + ' ║' + rst)
+
+    sep_h = '═' * (BOX_IW + 2)
+    lines = [edge + '╔' + sep_h + '╗' + rst, row(0, '')]
+    for i, text in enumerate(_ADMIN_NOTICE):
+        if not text:
+            lines.append(row(0, ''))
+        elif i == 0:                                   # the title, centred
+            pad = (BOX_IW - len(text)) // 2
+            lines.append(row(BOX_IW, ' ' * pad + head + text
+                             + box_bg + ' ' * (BOX_IW - len(text) - pad)))
+        else:
+            lines.append(row(len(text), body + text))
+    AK  = '[ any key ]'
+    pad = (BOX_IW - len(AK)) // 2
+    lines += [row(0, ''),
+              row(BOX_IW, ' ' * pad + body + AK
+                  + box_bg + ' ' * (BOX_IW - len(AK) - pad)),
+              row(0, ''),
+              edge + '╚' + sep_h + '╝' + rst]
+
+    row_off = 3 + max(0, (game_h - len(lines)) // 2)
+    print(term.home + term.clear, end='')
+    for i, line in enumerate(lines):
+        print(term.move_yx(row_off + i, col_off) + line, end='', flush=True)
+    term.inkey()
+
+
+def maybe_admin_notice(term: Terminal, player, progress: dict) -> None:
+    """Show the admin notice if this save has not seen it, then remember.
+
+    Keyed on the SAVE, not on the session, so it fires once per player rather
+    than once per launch — and it is written down immediately, so a crash on the
+    way to the overworld does not turn "once" into "every time"."""
+    if player.name != 'admin' or progress.get('admin_notice_seen'):
+        return
+    _show_admin_notice(term, _iw(term), term.height - 8)
+    progress['admin_notice_seen'] = True
+    SM.save_progress(progress, player.name)
+
+
 def _show_catalog_scroll(term: Terminal, iw: int, game_h: int,
                          scroll_id: str, known: set | None = None) -> None:
     """Render any SCROLL_CATALOG scroll by id via the standard renderer — used
@@ -11040,6 +11116,7 @@ def main():
                 save_data = SM.load_for(player.name) or {}
                 progress  = SM.load_progress(save_data)
             # 'new': progress stays empty (fresh save already written in run_title)
+            maybe_admin_notice(term, player, progress)
 
         ow_cursor = None
         while True:
@@ -11069,6 +11146,10 @@ def main():
                             player.name = sel_name
                             save_data   = SM.load_for(player.name) or {}
                             progress    = SM.load_progress(save_data)
+                            # Switching saves is the OTHER way to become admin;
+                            # the notice belongs wherever the name changes, not
+                            # only on the title screen.
+                            maybe_admin_notice(term, player, progress)
                         aux = None
                     elif aux == 'scrolls':
                         result = run_scroll_library(term, player, progress)
