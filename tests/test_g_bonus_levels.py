@@ -179,10 +179,12 @@ def test_bw_star_finds_nothing(monkeypatch):
 def _wi_canon_keys(ws):
     """The canonical tape: write a quarter, carry fire (w hops the ember
     words, P lights in place), gi back — ×3. Typed spaces join the quarters
-    (the tape marks them <Space>)."""
-    return (_K('i') + _K(ws[0]) + [ESC] + _K('2+ylwP')
-            + _K('gi ') + _K(ws[1]) + [ESC] + _K('2+2wP')
-            + _K('gi ') + _K(ws[2]) + [ESC] + _K('2+3wP')
+    (the tape marks them <Space>). The descent is `M`, not `2+`: the gallery is
+    the middle of this room's five standable rows, so one key lands where two
+    did."""
+    return (_K('i') + _K(ws[0]) + [ESC] + _K('MylwP')
+            + _K('gi ') + _K(ws[1]) + [ESC] + _K('M2wP')
+            + _K('gi ') + _K(ws[2]) + [ESC] + _K('M3wP')
             + _K('gi ') + _K(ws[3]) + [ESC] + _K('G$'))
 
 
@@ -232,9 +234,11 @@ def test_wi_walk_back_rival_wins(seed, monkeypatch):
     # No gi: climb back (2-) and append at the seam (g_a) — costs more per rep.
     d = build_dungeon_wet_ink(seed)
     ws = d.rooms[0]._wi_words
-    keys = (_K('i') + _K(ws[0]) + [ESC] + _K('2+ylwP')
-            + _K('2-g_a ') + _K(ws[1]) + [ESC] + _K('2+2wP')
-            + _K('2-g_a ') + _K(ws[2]) + [ESC] + _K('2+3wP')
+    # The rival gets M for the descent too — a rival golfed worse than the
+    # canonical route proves nothing about gi.
+    keys = (_K('i') + _K(ws[0]) + [ESC] + _K('MylwP')
+            + _K('2-g_a ') + _K(ws[1]) + [ESC] + _K('M2wP')
+            + _K('2-g_a ') + _K(ws[2]) + [ESC] + _K('M3wP')
             + _K('2-g_a ') + _K(ws[3]) + [ESC] + _K('G$'))
     won, spent = _spent(d, 'wet_ink', keys, monkeypatch)
     assert won and _WI_PAR < spent <= d.rooms[0].budget

@@ -6373,8 +6373,14 @@ _WI_BRAZIERS = ((_WI_BRZ_ROW, 8), (_WI_BRZ_ROW, 13), (_WI_BRZ_ROW, 18))
 _WI_GATE   = 6
 _WI_BOLT   = 23
 _WI_EXIT   = (6, 24)
-_WI_PAR    = 42                       # i{w1} 2+ yl w P gi<Space>{w2} 2+ 2w P
-                                      # gi<Space>{w3} 2+ 3w P gi<Space>{w4} G $ (pinned)
+_WI_PAR    = 39                       # i{w1} M yl w P gi<Space>{w2} M 2w P
+                                      # gi<Space>{w3} M 3w P gi<Space>{w4} G $ (pinned)
+#: The descent was written `2+` until 2026-08-02, and `M` does it in one key.
+#: The gallery is the MIDDLE of this room's five standable rows (ledge 2, spine
+#: 3, gallery 4, spine 5, gate 6), so `M` lands on exactly the cell `2+` landed
+#: on — the source flame — from anywhere on the ledge, every time. PAR IS THE
+#: OPTIMUM: three descents at one key each instead of two is not a nicety, it is
+#: the route that exists, so 42 was simply the wrong number.
 
 # SENSE, NOT DECREE (the design law): the inscription is
 # a four-word saying the player knows whole — writing the first words, they
@@ -6457,8 +6463,8 @@ def build_dungeon_wet_ink(seed: int) -> Dungeon:
     room.veiled_cells = set().union(*room._wi_seg_fog)
     room.par    = _WI_PAR
     room.budget = math.ceil(_WI_PAR * 1.4)
-    room.answer = (f'i{ws[0]}<Esc> 2+ yl w P gi<Space>{ws[1]}<Esc> 2+ 2w P '
-                   f'gi<Space>{ws[2]}<Esc> 2+ 3w P gi<Space>{ws[3]}<Esc> G $')
+    room.answer = (f'i{ws[0]}<Esc> M yl w P gi<Space>{ws[1]}<Esc> M 2w P '
+                   f'gi<Space>{ws[2]}<Esc> M 3w P gi<Space>{ws[3]}<Esc> G $')
 
     dungeon = Dungeon(name='The Wet Ink', seed=seed)
     dungeon.rooms        = [room]
