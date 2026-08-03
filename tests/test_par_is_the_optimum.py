@@ -127,7 +127,8 @@ def test_every_golfable_level_has_a_lesson_to_keep():
         if not any(j in known_commands(slug) for j in JG.JUMPS):
             continue          # no jump taught yet — the rule cannot apply here
         room = getattr(dg, f'build_dungeon_{slug}')(0).room
-        keys = tuple(k for k in JG.lesson_keys(slug) if k in room.answer)
+        keys = tuple(k for k in JG.lesson_keys(slug)
+                     if JG._pressed(k, room.answer.split(' ')))
         if not keys and slug not in JG._VERIFY and slug not in JG.NO_LESSON_KEYS:
             entry = next(l for l in LEVELS if l['slug'] == slug)
             toothless.append((slug, entry['commands']))
@@ -137,6 +138,60 @@ def test_every_golfable_level_has_a_lesson_to_keep():
         'these levels advertise commands their own tape never presses, so the '
         'lesson-kept rule has nothing to hold them to: '
         + ', '.join(f'{s} ({c})' for s, c in toothless))
+
+
+def test_every_level_that_veils_text_is_in_the_state_registry():
+    """A level that HIDES readable content behind a mechanic cannot have its par
+    measured by the tape alone.
+
+    The Wet Ink is the case: its plaque's later quarters are veiled until the
+    brazier beneath each one burns, so a route that never carries fire is one
+    only a player who already knew the saying could walk. Par must assume the
+    player who does not — which is a property of the finished ROOM, invisible to
+    any reading of the keystrokes, hence `_VERIFY`.
+
+    Today wet_ink is the only level with `veiled_cells` and it is registered.
+    This is here so the next one cannot arrive unregistered and quietly have its
+    par measured against a route that reads text it should not be able to see.
+    (Plain `fog_cells` is darkness — unlit floor — not unreadable text, so it
+    does not trip this.)
+    """
+    import generation.dungeon_gen as dg
+    unregistered = []
+    for slug in JG.golfable_levels():
+        room = getattr(dg, f'build_dungeon_{slug}')(0).room
+        if getattr(room, 'veiled_cells', None) and slug not in JG._VERIFY:
+            unregistered.append(slug)
+    assert unregistered == [], (
+        'these levels veil text the route may depend on, but no _VERIFY '
+        'predicate says what a real solve must reveal: ' + ', '.join(unregistered))
+
+
+def test_heights_straddle_the_only_discontinuity():
+    """H/M/L flip from room-relative to viewport-relative at
+    `height == room.rows + 8` and are flat either side, so the sampled heights
+    must sit on both sides of that line — otherwise a beat living only in the
+    viewport-relative regime is invisible, which is what five arbitrary numbers
+    risked."""
+    import generation.dungeon_gen as dg
+    for slug in ('operators_vault', 'hall_of_echoes', 'stair_rail'):
+        room = getattr(dg, f'build_dungeon_{slug}')(0).room
+        flip = room.rows + 8
+        hs = JG.heights_for(room)
+        assert any(h < flip for h in hs), (slug, hs, flip)
+        assert any(h >= flip for h in hs), (slug, hs, flip)
+
+
+def test_ex_command_lessons_are_matched_as_ex_commands():
+    """`:m` must mean an ex command, not the letter m anywhere in the tape.
+
+    The Shelving Room writes its lessons with ranges fused in (`:6m3`), so the
+    check has to see through that — and held to the bare letter instead it saw
+    through everything, matching a typed word or a macro register name."""
+    real = ':set<Space>nu<CR> :6m3<CR> :6<<CR> :7t7<CR> :8><CR> $'.split(' ')
+    assert all(JG._pressed(k, real) for k in (':m', ':t', ':>', ':<'))
+    assert not JG._pressed(':d', real)
+    assert not JG._pressed(':m', ['imellon<Esc>', 'qm', '@m'])
 
 
 def test_the_verify_registry_names_real_levels():

@@ -90,10 +90,31 @@ from sharing.replay import replay_tape
 #: with one means the same thing in every window.
 JUMPS = ('G', 'gg', 'H', 'M', 'L')
 
-#: Terminal heights a real player might have. The game area is `height - 8`,
-#: and H/M/L go viewport-relative once the room is taller than that, so the
-#: spread has to straddle the rooms (8..36 rows) rather than sample one end.
+#: Terminal heights a real player might have — the FALLBACK, when no room is in
+#: hand to derive better ones from.
 HEIGHTS = (25, 30, 41, 50, 60)
+
+#: The smallest terminal worth pretending about, and a comfortably large one.
+MIN_HEIGHT, MAX_HEIGHT = 20, 60
+
+
+def heights_for(room) -> tuple:
+    """The terminal heights that can actually tell this room apart.
+
+    Sampling five arbitrary numbers was a guess, and a guess is exactly what a
+    tool built to replace reasoning should not contain: a beat living only at
+    height 22 was invisible, and nothing said so.
+
+    There is only ONE discontinuity to find. The game area is `height - 8`, and
+    `H`/`M`/`L` are viewport-relative precisely while `room.rows > game_h`
+    (`engine/motion.py`) — so behaviour flips at `height == room.rows + 8` and is
+    flat either side of it. Straddling that boundary, plus the extremes, covers
+    every height a player can have. It is also FEWER replays than the fixed five
+    for most rooms, so the honest version is the cheap one.
+    """
+    flip = room.rows + 8
+    picks = {MIN_HEIGHT, MAX_HEIGHT, flip - 1, flip, flip + 1}
+    return tuple(sorted(h for h in picks if MIN_HEIGHT <= h <= MAX_HEIGHT))
 
 #: Tokens that MOVE THE CURSOR TO ANOTHER ROW — the only ones a line jump
 #: rivals. Everything else in a tape is an edit, and a jump cannot stand in for
@@ -170,10 +191,12 @@ _LESSON_KEYS = {
     'wet_ink':            ('gi',),
     # The Shelving Room advertises `:m :t :> :<` and writes them with ranges and
     # counts fused in — `:6m3`, `:7t7`, `:8>` — so the advertised form is not a
-    # substring of its own tape and the rule had nothing to hold it to. The bare
-    # ex-command letters are; a stray `m` elsewhere in a tape would weaken this,
-    # which is the price of a check that reads text rather than intent.
-    'shelving_room':      ('m', 't', '>', '<'),
+    # substring of its own tape. Written as EX KEYS (leading `:`), which are
+    # matched against ex-command TOKENS rather than against the flattened tape:
+    # see `_pressed`. Held to the bare letters instead, `m` matched any `m`
+    # anywhere — in a typed word, in a macro register — and the rule was
+    # decorative.
+    'shelving_room':      (':m', ':t', ':>', ':<'),
 }
 
 #: Levels with NO keystroke lesson, named so the absence is a decision.
@@ -196,6 +219,26 @@ NO_LESSON_KEYS = {
 _VERIFY = {
     'wet_ink': lambda room: not room.veiled_cells,
 }
+
+
+def _pressed(key: str, toks) -> bool:
+    """Does this tape press `key`?
+
+    An EX KEY (`:m`) is matched against ex-command TOKENS — the token must start
+    with `:` and carry the letter — because ex commands are written with ranges
+    and counts fused in (`:6m3` is `:m`), and matching the bare letter against
+    the whole tape instead makes the check meaningless: `m` appears in typed
+    words, in macro register names, in half the vocabulary.
+
+    Everything else is a plain substring of the tape, which is loose but honest
+    for single keystrokes that carry counts and operators around them (`3e`,
+    `d}`). The looseness is a safety net's looseness: this decides whether a
+    CHEAPER route may be accepted, so a false positive costs a wrong par and a
+    false negative costs only a refusal that gets reported.
+    """
+    if key.startswith(':') and len(key) > 1:
+        return any(t.startswith(':') and key[1:] in t for t in toks)
+    return key in ' '.join(toks)
 
 
 def lesson_keys(slug: str) -> tuple:
@@ -332,7 +375,7 @@ def distinct_seeds(slug: str, seeds) -> list:
     return out
 
 
-def golf(slug: str, *, seed: int = 0, heights=HEIGHTS, jumps=JUMPS,
+def golf(slug: str, *, seed: int = 0, heights=None, jumps=JUMPS,
          max_collapse=MAX_COLLAPSE, strip=False, beam=BEAM, slack=SLACK,
          max_evals=MAX_EVALS, log=None) -> Result:
     """Golf one shipped level's tape down to a fixed point.
@@ -348,6 +391,8 @@ def golf(slug: str, *, seed: int = 0, heights=HEIGHTS, jumps=JUMPS,
     if builder is None:
         raise ValueError(f'no such level: {slug}')
     room  = builder(seed).room
+    # Derived from THIS room unless the caller insists — see heights_for().
+    heights = heights or heights_for(room)
     known = known_commands(slug)
     # TOKEN GATING, at the point of proposal. The level has to have taught it.
     cands = tuple(j for j in jumps if j in known)
@@ -363,13 +408,13 @@ def golf(slug: str, *, seed: int = 0, heights=HEIGHTS, jumps=JUMPS,
     # only `+` and `-`, so demanding `_` would reject every route for dropping a
     # key the level never demonstrates. The rule is "still teaches its lesson",
     # and the canonical tape is the definition of what it teaches.
-    keys = tuple(k for k in lesson_keys(slug) if k in room.answer)
+    keys = tuple(k for k in lesson_keys(slug)
+                 if _pressed(k, room.answer.split(' ')))
     out.lesson = keys
 
     def _teaches_still(trial):
         """Does this tape still press the keys the level exists to teach?"""
-        flat = ' '.join(trial)
-        return all(k in flat for k in keys)
+        return all(_pressed(k, trial) for k in keys)
 
     toks = room.answer.split(' ')
     best = _spend_everywhere(slug, builder, toks, known, heights, verify, seed)
