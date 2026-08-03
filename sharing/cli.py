@@ -138,6 +138,10 @@ def _cmd_jumpgolf(args) -> int:
                   f'G/gg arrive at level 10, H/M/L at 11')
             continue
         mark = f'BEAT  {res.best} < par {res.par}' if res.beats_par else 'ok'
+        if res.skipped_lesson:
+            mark += (f'   [{res.skipped_lesson} cheaper route(s) REFUSED — they '
+                     f'drop {"/".join(res.lesson)}: a cheese to close, not a par '
+                     f'to lower]')
         print(f'{slug:26} par {res.par:>3}  golfed {res.best:>3}   {mark}',
               flush=True)
         if res.beats_par:

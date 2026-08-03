@@ -5630,8 +5630,22 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
         mended = getattr(room, '_forge_mended', None) or []
         # The WHOLE phrase must appear (substring tolerates the line's leading indent); a
         # one-letter mangle ('the od gods…') or a half-mended /g-less ward can never match.
-        if not all(any(m in t for t in texts) for m in mended):
-            return                                    # a line is unmended, mangled, or wrecked
+        #
+        # ONE LINE CANNOT ANSWER TWO DEMANDS. Chamber B's verses are 'the mouse
+        # ran up the clock' and 'the mouse ran up the clock again' — the first is
+        # a SUBSTRING of the second, so a bare `any()` let the mended second
+        # verse satisfy both and the first verse never had to be touched at all.
+        # That is what made `&` skippable on the level whose whole job is
+        # `:s` / `&` / `:g` (found by `sharing jumpgolf`, closed 2026-08-03).
+        # Each demand must claim its OWN line: longest first, because a longer
+        # phrase can only be housed by the longer line, and letting it choose
+        # first is what leaves the right line for the shorter one.
+        unclaimed = list(texts)
+        for m in sorted(mended, key=len, reverse=True):
+            hit = next((i for i, t in enumerate(unclaimed) if m in t), None)
+            if hit is None:
+                return                                # a line is unmended, mangled, or wrecked
+            unclaimed.pop(hit)
         purge = getattr(room, '_forge_purge', 'curse')
         if any(purge in t for t in texts):
             return                                    # a purge line still stands

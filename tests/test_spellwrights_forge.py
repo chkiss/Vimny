@@ -187,6 +187,28 @@ def test_chamber_B_ampersand_is_the_par_route():
     assert res['won'] and res['stars'] == 1, res
 
 
+def test_one_line_cannot_answer_two_of_the_seals_demands():
+    """Chamber B's first verse is a SUBSTRING of its second — 'the mouse ran up
+    the clock' inside 'the mouse ran up the clock again'. The seal used to ask
+    only whether ANY line contained each mended text, so mending the second
+    verse satisfied both demands and the first verse never had to be touched.
+
+    That made `&` skippable on the level whose whole job is `:s` / `&` / `:g`:
+    `M` instead of `8G` landed the cursor past the first verse and the level
+    still opened, two keys under par. Found by `sharing jumpgolf`, which refuses
+    to lower a par for a route that drops the lesson.
+    """
+    d = dg.build_dungeon_spellwrights_forge(1)
+    keys = (list(':%s/moo/quack/g') + ['\r']
+            + list('M') + list(':s/down/up/') + ['\r']    # lands past verse one
+            + list('jj&')
+            + list(':g/krzzt/d') + ['\r'] + list('6G$')
+            + list(':wq') + ['\r'])
+    res, _ = _run('spellwrights_forge', keys, dungeon=d)
+    assert not res['won'], 'the seal opened with Chamber B half-mended'
+    assert not _seal_open(d.room)
+
+
 def test_chamber_C_strikes_the_static_and_keeps_the_rhyme():
     # :g/krzzt/d sweeps every line of static at once; the famous 2-liner
     # between them must survive (a blanket delete would lose it and bar the seal).

@@ -6033,8 +6033,13 @@ _SR_EXIT    = (24, 16)                # the FINAL SEAL, in the stone west of the
 _SR_BOLT_COLS = (21, 20, 19, 18, 17)  # cols, in canonical mend order
 _SR_UNDERCROFT = 25                   # bare row — G undershoots the gate to here
 _SR_CHEST   = (25, 34)                # unassigned scroll chest → the relic pool
-_SR_PAR     = 15                      # x 2- x 2- x 6+ x 2+ x 4+ ({n}_ only ever
+_SR_PAR     = 14                      # x 2- x H x 6+ x 2+ x 4+ ({n}_ only ever
                                       # TIES {n-1}+ — the tape takes the +)
+#: The SECOND `2-` is `H`. Climbing to the topmost line of the screen is one key
+#: where counting back two is two, and it held at every terminal height from 25
+#: to 60 when measured — `H` is viewport-relative in a 26-row room, so that
+#: measurement is what licenses it, not the reasoning (2026-08-03). Both `+` and
+#: `-` are still pressed, so the rail still teaches the rail.
 
 
 def _sr_draw_words(rng) -> tuple:
@@ -6094,7 +6099,7 @@ def build_dungeon_stair_rail(seed: int) -> Dungeon:
     apply_stone_fog(room)
     room.par    = _SR_PAR
     room.budget = math.ceil(_SR_PAR * 1.4)  # STANDARD: the k^/j^-walk wins at 1★
-    room.answer = 'x 2- x 2- x 6+ x 2+ x 4+'
+    room.answer = 'x 2- x H x 6+ x 2+ x 4+'
 
     dungeon = Dungeon(name='The Stair Rail', seed=seed)
     dungeon.rooms        = [room]
@@ -12163,9 +12168,15 @@ _IS_VERBS = ('bind', 'ward', 'mend', 'keep', 'cast', 'hew')
 # bolts to the seal:  >} · 4j · <} · 4j · =} · G$  = 12 keys.
 # The manual-mason rival (no `=`): 3>> banks + per-row >>/<</dot through the
 # rite ≈ 30 — 2.5x par, so it does not fit the standard budget.
-_IS_PAR    = 12
+_IS_PAR    = 11
 _IS_BUDGET = math.ceil(_IS_PAR * 1.4)   # STANDARD (par-is-the-optimum law)
-_IS_ANSWER = '>} 4j <} 4j =} G$'
+#: The SECOND hop is `M`, the first stays `4j`. The sanctum is 21 rows and the
+#: game area is usually smaller, so `M` is viewport-relative here — and it was
+#: measured winning at the same cost at every terminal height from 25 to 60,
+#: which is the only reason it is allowed to stand in a par (2026-08-03). The
+#: lesson survives it: `>}`, `<}` and `=}` are all still pressed, which is the
+#: rule a golfed tape has to pass before its par is lowered.
+_IS_ANSWER = '>} 4j <} M =} G$'
 
 
 def build_dungeon_indentation_sanctum(seed: int) -> Dungeon:

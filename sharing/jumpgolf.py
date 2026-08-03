@@ -96,6 +96,54 @@ TRAVEL = re.compile(r'^(\d*[jk+\-]|\d+G|gg|G|H|M|L|\d+_|0|\^)$')
 #: Longest run of adjacent tokens a single jump may replace.
 MAX_COLLAPSE = 4
 
+#: THE ACCEPTANCE RULE: a shorter route is a par fix only if THE LEVEL STILL
+#: TEACHES ITS LESSON. A route that wins by skipping the thing the level exists
+#: to teach is a cheese to close, not a number to lower — and the two are easy
+#: to confuse, because both look like "the tape got cheaper".
+#:
+#: For most levels the lesson is a keystroke, so the check is textual: every
+#: key in the curriculum's `commands` string must survive in the golfed tape.
+#: `spellwrights_forge` is the case that motivated it — `M` there lands
+#: somewhere that makes `&` unnecessary, and the level whose whole job is
+#: `:s` / `&` / `:g` would have had its par lowered to bless a route that never
+#: presses `&`.
+#:
+#: Some lessons are STATE, not keystrokes, and no reading of the tape can see
+#: them. `_VERIFY` is for those: a predicate on the finished room, checked after
+#: the replay (the loop mutates the dungeon we hand it, so the room we kept a
+#: reference to is the played one).
+_LESSON_KEYS = {
+    # slug -> the keystrokes that ARE the lesson, if `commands` needs help
+    'spellwrights_forge': ('&', ':s', ':g'),
+    'wet_ink':            ('gi',),
+}
+
+#: slug -> what must be TRUE of the finished room, beyond the tape's text.
+#:
+#: `wet_ink`: par must assume a player who does NOT already recognise the
+#: saying. The plaque's second, third and fourth quarters are veiled until the
+#: brazier beneath each one burns, so a route that never carries fire is a
+#: route only someone who knew the words could walk. The fire being SKIPPABLE
+#: is fine — that is the level rewarding recognition — but it cannot be what
+#: par is measured against, or par would be the cost of already knowing.
+_VERIFY = {
+    'wet_ink': lambda room: not room.veiled_cells,
+}
+
+
+def lesson_keys(slug: str) -> tuple:
+    """The keystrokes that must survive in a golfed tape for it to count."""
+    from content.levels import LEVELS
+    if slug in _LESSON_KEYS:
+        return _LESSON_KEYS[slug]
+    entry = next((l for l in LEVELS if l['slug'] == slug), {})
+    # `commands` is the overworld's keystroke string — '>{m} <{m} =' — so the
+    # placeholders come out and what is left is what the player actually types.
+    raw = entry.get('commands', '')
+    for junk in ('{m}', '{n}', '{char}', '///'):
+        raw = raw.replace(junk, ' ')
+    return tuple(k for k in raw.split() if k)
+
 
 @dataclass
 class Step:
@@ -120,6 +168,12 @@ class Result:
     #: introduces G/gg at position 10 and H/M/L at 11, so eight shipped levels
     #: have no jump to golf with and are silently, correctly, unimprovable.
     taught: tuple = ()
+    #: The keystrokes this level exists to teach — see _LESSON_KEYS.
+    lesson: tuple = ()
+    #: How many cheaper routes were REFUSED for dropping one of them. A nonzero
+    #: count is not noise: it means a shorter way exists that skips the lesson,
+    #: i.e. a cheese to close even though par is right.
+    skipped_lesson: int = 0
 
     @property
     def beats_par(self) -> bool:
@@ -127,15 +181,22 @@ class Result:
                 and self.best < self.par)
 
 
-def _spend_at(slug, builder, toks, known, height):
-    """Replay at ONE terminal height. None if the tape does not win."""
+def _spend_at(slug, builder, toks, known, height, verify=None):
+    """Replay at ONE terminal height. None if the tape does not win, or wins
+    without leaving the room in the state the lesson requires."""
+    dungeon = builder(0)
     with mock.patch.object(blessed.Terminal, 'height',
                            property(lambda self, _h=height: _h)):
-        res = replay_tape(builder(0), slug, ' '.join(toks), known=known)
-    return res.spent if res.won else None
+        res = replay_tape(dungeon, slug, ' '.join(toks), known=known)
+    if not res.won:
+        return None
+    # The loop MUTATES the dungeon it is handed, so this is the played room.
+    if verify is not None and not verify(dungeon.rooms[0]):
+        return None
+    return res.spent
 
 
-def _spend_everywhere(slug, builder, toks, known, heights):
+def _spend_everywhere(slug, builder, toks, known, heights, verify=None):
     """The cost of a tape, but only if it wins at EVERY height and costs the
     same at each. A route whose price depends on the window is not a route this
     tool will recommend: par has to mean one number.
@@ -143,11 +204,11 @@ def _spend_everywhere(slug, builder, toks, known, heights):
     The cheap height is tried first as a filter — most candidates die there,
     and each replay is a full run of the game loop.
     """
-    first = _spend_at(slug, builder, toks, known, heights[0])
+    first = _spend_at(slug, builder, toks, known, heights[0], verify)
     if first is None:
         return None
     for h in heights[1:]:
-        if _spend_at(slug, builder, toks, known, h) != first:
+        if _spend_at(slug, builder, toks, known, h, verify) != first:
             return None
     return first
 
@@ -175,8 +236,23 @@ def golf(slug: str, *, heights=HEIGHTS, jumps=JUMPS, max_collapse=MAX_COLLAPSE,
     if not room.answer:
         return out
 
+    verify = _VERIFY.get(slug)
+    # Only the lesson keys THE SHIPPED TAPE ACTUALLY PRESSES. A level's
+    # `commands` string is what the overworld advertises, and it can be wider
+    # than its own answer: The Stair Rail advertises `+ - _` and its tape uses
+    # only `+` and `-`, so demanding `_` would reject every route for dropping a
+    # key the level never demonstrates. The rule is "still teaches its lesson",
+    # and the canonical tape is the definition of what it teaches.
+    keys = tuple(k for k in lesson_keys(slug) if k in room.answer)
+    out.lesson = keys
+
+    def _teaches_still(trial):
+        """Does this tape still press the keys the level exists to teach?"""
+        flat = ' '.join(trial)
+        return all(k in flat for k in keys)
+
     toks = room.answer.split(' ')
-    best = _spend_everywhere(slug, builder, toks, known, heights)
+    best = _spend_everywhere(slug, builder, toks, known, heights, verify)
     out.canonical = out.best = best
     if best is None:                       # the shipped tape is height-sensitive
         return out                         # or does not win — not this tool's job
@@ -186,7 +262,10 @@ def golf(slug: str, *, heights=HEIGHTS, jumps=JUMPS, max_collapse=MAX_COLLAPSE,
 
     def _try(trial, kind, at, was, now):
         nonlocal toks, best
-        got = _spend_everywhere(slug, builder, trial, known, heights)
+        if not _teaches_still(trial):
+            out.skipped_lesson += 1     # cheaper, and it skips the lesson
+            return False
+        got = _spend_everywhere(slug, builder, trial, known, heights, verify)
         # `<=` for deletions: a token whose removal costs nothing was doing
         # nothing, and dropping it is an improvement even at equal price.
         better = got is not None and (got < best or (kind == 'delete' and got <= best))

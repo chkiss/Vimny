@@ -52,7 +52,7 @@ _SPAWN = (_SR_STEP_ROWS[_SR_SPAWN_IDX], _SR_STEP_COLS[_SR_SPAWN_IDX])
 # two steps above, descend with + to the two below, then a counted + drops
 # straight onto the exit at the gate's first non-blank ({n}_ only ever TIES
 # {n-1}+, so the tape takes the +).
-CANON = 'x2-x2-x6+x2+x4+'
+CANON = 'x2-xHx6+x2+x4+'
 
 # The k/j-walker: every step pays k/j + ^ where the rail pays -/+, and the
 # drop is walked with a counted j plus the caret. (The {nn}G route ties this
@@ -104,7 +104,7 @@ def test_par_answer_budget(seed):
     room = _room(seed)
     assert room.par == _SR_PAR
     assert room.budget == math.ceil(_SR_PAR * 1.4)
-    assert room.answer == 'x 2- x 2- x 6+ x 2+ x 4+'
+    assert room.answer == 'x 2- x H x 6+ x 2+ x 4+'
 
 
 @pytest.mark.parametrize("seed", SEEDS)
@@ -194,7 +194,7 @@ def test_undo_rebars_an_open_bolt(monkeypatch):
 def test_each_mend_carves_the_corridor_east_to_west(monkeypatch):
     # Following the canonical route, every x extends the stone-cut corridor
     # one contiguous cell further west toward the seal.
-    legs = ['x', 'x2-x', 'x2-x2-x', 'x2-x2-x6+x', 'x2-x2-x6+x2+x']
+    legs = ['x', 'x2-x', 'x2-xHx', 'x2-xHx6+x', 'x2-xHx6+x2+x']
     for n, tape in enumerate(legs, start=1):
         d = build_dungeon_stair_rail(0)
         _drive(d, _K(tape), monkeypatch, finish=':q!\r')

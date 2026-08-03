@@ -15,7 +15,7 @@ faithfully as a playable trap. Three bays, one verb each:
 Laws asserted below:
   - the law function is what the door check calls (solver == judge);
   - `=` mis-razes ungoverned verse and the bolt stays shut;
-  - the canonical `>} 4j <} 4j =} G$` wins par-perfect (12);
+  - the canonical `>} 4j <} M =} G$` wins par-perfect (11);
   - the manual-mason route (no `=`) WINS at 1 star under the hand-set
     budget — forcing by PAR, not an unwinnable wall;
   - uniform `>{m}`/`<{m}` strokes cannot satisfy the scattered rite;
@@ -64,9 +64,9 @@ def _bolt(i):
 
 
 # The canonical route: each bay is one paragraph stroke (the blank courses
-# bound them); the open floor lets 4j hop bay to bay. 12 keys.
+# bound them); the open floor lets 4j hop bay to bay; M takes the second hop. 11 keys.
 def _canon_keys():
-    return _K('>}4j<}4j=}') + _K('G$')
+    return _K('>}4j<}M=}') + _K('G$')
 
 
 # The manual-mason rival: no `=` anywhere — count-linewise banks, then the
@@ -264,7 +264,7 @@ def test_uniform_strokes_cannot_satisfy_the_rite(monkeypatch):
     for stroke in ('>}', '<}'):
         dungeon = build_dungeon_indentation_sanctum(SEEDS[0])
         room = dungeon.rooms[0]
-        _drive(dungeon, _K('>}4j<}4j') + _K(stroke) + _K('l'),
+        _drive(dungeon, _K('>}4j<}M') + _K(stroke) + _K('l'),
                monkeypatch, finish=':q!\r')
         assert room.cells[_bolt(2)[0]][_bolt(2)[1]] == CellType.WALL, stroke
 
@@ -302,13 +302,13 @@ def test_manual_mason_route_wins_at_one_star(seed, monkeypatch):
 def test_undo_rebars_bolt_and_seal(monkeypatch):
     dungeon = build_dungeon_indentation_sanctum(SEEDS[0])
     room = dungeon.rooms[0]
-    _drive(dungeon, _K('>}4j<}4j=}') + _K('l'), monkeypatch, finish=':q!\r')
+    _drive(dungeon, _K('>}4j<}M=}') + _K('l'), monkeypatch, finish=':q!\r')
     assert room.cells[_bolt(2)[0]][_bolt(2)[1]] == CellType.FLOOR
     assert room.cells[_IS_EXIT[0]][_IS_EXIT[1]] == CellType.FLOOR, "the seal parted"
 
     dungeon = build_dungeon_indentation_sanctum(SEEDS[0])
     room = dungeon.rooms[0]
-    _drive(dungeon, _K('>}4j<}4j=}') + _K('luu'), monkeypatch, finish=':q!\r')
+    _drive(dungeon, _K('>}4j<}M=}') + _K('luu'), monkeypatch, finish=':q!\r')
     assert room.cells[_bolt(2)[0]][_bolt(2)[1]] == CellType.WALL, "re-bars"
     assert room.cells[_IS_EXIT[0]][_IS_EXIT[1]] == CellType.WALL, "the seal returns"
 
