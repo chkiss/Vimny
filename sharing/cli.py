@@ -123,20 +123,28 @@ def _cmd_jumpgolf(args) -> int:
     from sharing import jumpgolf as JG
 
     slugs = args.slugs or JG.golfable_levels()
+    seeds = [int(s) for s in args.seeds.split(',')] if args.seeds else [0]
+    # Cover every distinct LAYOUT rather than every seed: most levels vary only
+    # in vocabulary, and a seed that rebuilds the same room golfs to the same
+    # answer. Same coverage, a third less work.
+    pairs = [(slug, seed) for slug in slugs
+             for seed in (JG.distinct_seeds(slug, seeds) if len(seeds) > 1
+                          else seeds)]
     beaten = []
-    for slug in slugs:
+    for slug, seed in pairs:
         def _log(step, _s=slug):
             print(f'   {step.kind:<9} {step.was!r} @{step.at} -> {step.now!r}'
                   f'  = {step.spent}', flush=True)
         kw = dict(beam=JG.DEEP_BEAM, slack=JG.DEEP_SLACK) if args.deep else {}
-        res = JG.golf(slug, strip=args.strip, log=_log if args.verbose else None,
-                      **kw)
+        res = JG.golf(slug, seed=seed, strip=args.strip,
+                      log=_log if args.verbose else None, **kw)
+        label = f'{slug}[{seed}]' if len(seeds) > 1 else slug
         if res.canonical is None:
-            print(f'{slug:26} — its own tape does not win at every height, or '
+            print(f'{label:26} — its own tape does not win at every height, or '
                   f'does not win at all: nothing to compare against')
             continue
         if not res.taught:
-            print(f'{slug:26} par {res.par:>3}  no jump taught yet — '
+            print(f'{label:26} par {res.par:>3}  no jump taught yet — '
                   f'G/gg arrive at level 10, H/M/L at 11')
             continue
         mark = f'BEAT  {res.best} < par {res.par}' if res.beats_par else 'ok'
@@ -147,7 +155,7 @@ def _cmd_jumpgolf(args) -> int:
                      f'— close it; par is right]')
         if res.exhausted:
             mark += f'   [search hit its {res.evaluated}-tape budget — not exhaustive]'
-        print(f'{slug:26} par {res.par:>3}  golfed {res.best:>3}   {mark}',
+        print(f'{label:26} par {res.par:>3}  golfed {res.best:>3}   {mark}',
               flush=True)
         if res.beats_par:
             beaten.append(res)
@@ -159,7 +167,7 @@ def _cmd_jumpgolf(args) -> int:
         print('PAR IS THE OPTIMUM — each of these is a recorded par that is '
               'simply wrong, not a high score:')
         for res in beaten:
-            print(f'  {res.slug}: {res.par} -> {res.best}')
+            print(f'  {res.slug}[seed {res.seed}]: {res.par} -> {res.best}')
             print(f'     {res.tape}')
     return 3 if beaten else 0
 
@@ -261,6 +269,10 @@ def main(argv=None) -> int:
     p.add_argument('slugs', nargs='*', help='default: every shipped level')
     p.add_argument('-v', '--verbose', action='store_true',
                    help='show each accepted improvement as it is found')
+    p.add_argument('--seeds',
+                   help='comma-separated seeds to golf (default 0). Levels are '
+                        'deduplicated by LAYOUT, so seeds that rebuild the same '
+                        'room are only golfed once')
     p.add_argument('--deep', action='store_true',
                    help='beam search with plateau moves and one-key detours — '
                         'finds wins that need two edits, neither paying alone')

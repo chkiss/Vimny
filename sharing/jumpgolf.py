@@ -202,6 +202,9 @@ class Result:
     par: int | None
     canonical: int | None          # what the shipped tape actually spends
     best: int | None
+    #: Which build this was golfed against — a level whose layout varies by seed
+    #: has a different route per seed, so a result without one is ambiguous.
+    seed: int = 0
     tape: str = ''
     steps: list = field(default_factory=list)
     #: Jumps this level has TAUGHT. Empty is the ordinary state of the first ten
@@ -231,10 +234,10 @@ class Result:
                 and self.best < self.par)
 
 
-def _spend_at(slug, builder, toks, known, height, verify=None):
+def _spend_at(slug, builder, toks, known, height, verify=None, seed=0):
     """Replay at ONE terminal height. None if the tape does not win, or wins
     without leaving the room in the state the lesson requires."""
-    dungeon = builder(0)
+    dungeon = builder(seed)
     with mock.patch.object(blessed.Terminal, 'height',
                            property(lambda self, _h=height: _h)):
         res = replay_tape(dungeon, slug, ' '.join(toks), known=known)
@@ -246,7 +249,7 @@ def _spend_at(slug, builder, toks, known, height, verify=None):
     return res.spent
 
 
-def _spend_everywhere(slug, builder, toks, known, heights, verify=None):
+def _spend_everywhere(slug, builder, toks, known, heights, verify=None, seed=0):
     """The cost of a tape, but only if it wins at EVERY height and costs the
     same at each. A route whose price depends on the window is not a route this
     tool will recommend: par has to mean one number.
@@ -254,11 +257,11 @@ def _spend_everywhere(slug, builder, toks, known, heights, verify=None):
     The cheap height is tried first as a filter — most candidates die there,
     and each replay is a full run of the game loop.
     """
-    first = _spend_at(slug, builder, toks, known, heights[0], verify)
+    first = _spend_at(slug, builder, toks, known, heights[0], verify, seed)
     if first is None:
         return None
     for h in heights[1:]:
-        if _spend_at(slug, builder, toks, known, h, verify) != first:
+        if _spend_at(slug, builder, toks, known, h, verify, seed) != first:
             return None
     return first
 
@@ -270,9 +273,42 @@ BEAM, SLACK, MAX_EVALS = 1, 0, 4000
 DEEP_BEAM, DEEP_SLACK = 4, 1
 
 
-def golf(slug: str, *, heights=HEIGHTS, jumps=JUMPS, max_collapse=MAX_COLLAPSE,
-         strip=False, beam=BEAM, slack=SLACK, max_evals=MAX_EVALS,
-         log=None) -> Result:
+def layout_fingerprint(slug: str, seed: int) -> tuple:
+    """What a golf result actually depends on: the tape, the grid, and the text.
+
+    Most levels are seed-INVARIANT — the seed picks vocabulary at most, and many
+    do not consult it at all — so golfing all five of the repo's seeds would
+    replay the same search five times over. This is what lets the sweep cover
+    every distinct layout instead of every seed, which is the same coverage for
+    a fraction of the cost.
+
+    Note that a level whose seed only swaps WORDS still fingerprints as
+    different, because the tape carries those words: `/vault<CR>` is not
+    `/cellar<CR>`, and a route's cost can turn on a word's length.
+    """
+    import generation.dungeon_gen as dg
+    room = getattr(dg, f'build_dungeon_{slug}')(seed).room
+    grid = tuple(tuple(c.value if hasattr(c, 'value') else c for c in row)
+                 for row in room.cells)
+    runs = tuple(sorted((ru.row, ru.col, ''.join(ru.symbols))
+                        for ru in room.char_runs))
+    return (room.answer, room.par, grid, runs)
+
+
+def distinct_seeds(slug: str, seeds) -> list:
+    """The subset of `seeds` that give this level genuinely different layouts."""
+    out, seen = [], set()
+    for s in seeds:
+        fp = layout_fingerprint(slug, s)
+        if fp not in seen:
+            seen.add(fp)
+            out.append(s)
+    return out
+
+
+def golf(slug: str, *, seed: int = 0, heights=HEIGHTS, jumps=JUMPS,
+         max_collapse=MAX_COLLAPSE, strip=False, beam=BEAM, slack=SLACK,
+         max_evals=MAX_EVALS, log=None) -> Result:
     """Golf one shipped level's tape down to a fixed point.
 
     `strip=True` lets the deletion pass drop ANY token, not just dead travel —
@@ -285,12 +321,12 @@ def golf(slug: str, *, heights=HEIGHTS, jumps=JUMPS, max_collapse=MAX_COLLAPSE,
     builder = getattr(dg, f'build_dungeon_{slug}', None)
     if builder is None:
         raise ValueError(f'no such level: {slug}')
-    room  = builder(0).room
+    room  = builder(seed).room
     known = known_commands(slug)
     # TOKEN GATING, at the point of proposal. The level has to have taught it.
     cands = tuple(j for j in jumps if j in known)
     out   = Result(slug=slug, par=room.par, canonical=None, best=None,
-                   taught=cands)
+                   taught=cands, seed=seed)
     if not room.answer:
         return out
 
@@ -310,7 +346,7 @@ def golf(slug: str, *, heights=HEIGHTS, jumps=JUMPS, max_collapse=MAX_COLLAPSE,
         return all(k in flat for k in keys)
 
     toks = room.answer.split(' ')
-    best = _spend_everywhere(slug, builder, toks, known, heights, verify)
+    best = _spend_everywhere(slug, builder, toks, known, heights, verify, seed)
     out.canonical = out.best = best
     if best is None:                       # the shipped tape is height-sensitive
         return out                         # or does not win — not this tool's job
@@ -327,7 +363,7 @@ def golf(slug: str, *, heights=HEIGHTS, jumps=JUMPS, max_collapse=MAX_COLLAPSE,
         key = ' '.join(trial)
         if key not in memo:
             memo[key] = _spend_everywhere(slug, builder, trial, known,
-                                          heights, verify)
+                                          heights, verify, seed)
         return memo[key]
 
     def _successors(state):

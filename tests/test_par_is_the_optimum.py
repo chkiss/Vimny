@@ -51,26 +51,50 @@ import pytest
 
 from sharing import jumpgolf as JG
 
-RUN = os.environ.get('VIMNY_JUMPGOLF') == '1'
+RUN = os.environ.get('VIMNY_JUMPGOLF') in ('1', 'seeds')
 WHY = ('slow (a full tape replay per candidate per height); run with '
        'VIMNY_JUMPGOLF=1, or `python3 -m sharing jumpgolf`')
+
+#: SEED COVERAGE. `VIMNY_JUMPGOLF=1` golfs one build per level; `=seeds` golfs
+#: every DISTINCT LAYOUT across the repo's seeds. The distinction matters
+#: because most levels vary by seed — they pick different vocabulary, and the
+#: tape carries those words, so `/vault<CR>` is not `/cellar<CR>` and a route's
+#: cost can turn on a word's length. Only two thirds of the seed/level pairs are
+#: genuinely different builds, so deduplicating by layout buys the same coverage
+#: for a third less work.
+if os.environ.get('VIMNY_JUMPGOLF') == 'seeds':
+    from tests import SEEDS as _REPO_SEEDS
+    SEEDS_TO_GOLF = [0] + list(_REPO_SEEDS)
+else:
+    SEEDS_TO_GOLF = [0]
+
+
+def _cases():
+    """(slug, seed) for every distinct layout under test."""
+    out = []
+    for slug in JG.golfable_levels():
+        seeds = (JG.distinct_seeds(slug, SEEDS_TO_GOLF)
+                 if len(SEEDS_TO_GOLF) > 1 else SEEDS_TO_GOLF)
+        out += [(slug, s) for s in seeds]
+    return out
 
 
 # ── the gate ────────────────────────────────────────────────────────────────
 
 @pytest.mark.skipif(not RUN, reason=WHY)
-@pytest.mark.parametrize('slug', JG.golfable_levels())
-def test_no_line_jump_beats_this_levels_par(slug):
-    """Parametrized per level so a failure NAMES the level and its cheaper tape
-    — a single assertion over the whole game would report the first offender and
-    hide the rest, and these have historically come in groups."""
-    res = JG.golf(slug)
+@pytest.mark.parametrize('slug,seed', _cases() if RUN else [('_', 0)])
+def test_no_line_jump_beats_this_levels_par(slug, seed):
+    """Parametrized per level (and per distinct layout) so a failure NAMES the
+    level and its cheaper tape — a single assertion over the whole game would
+    report the first offender and hide the rest, and these have historically
+    come in groups."""
+    res = JG.golf(slug, seed=seed)
     if res.canonical is None or not res.taught:
         pytest.skip('no jump taught yet, or the tape is not height-stable')
     assert not res.beats_par, (
-        f'{slug}: par {res.par} but a jump route wins at {res.best} — '
-        f'par is the optimum, so the recorded value is simply wrong.\n'
-        f'  {res.tape}')
+        f'{slug}[seed {seed}]: par {res.par} but a jump route wins at '
+        f'{res.best} — par is the optimum, so the recorded value is simply '
+        f'wrong.\n  {res.tape}')
 
 
 @pytest.mark.skipif(not RUN, reason=WHY)
