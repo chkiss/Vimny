@@ -271,7 +271,7 @@ def test_dot_cannot_mend_a_varied_run(monkeypatch):
 
 
 def test_A_carve_cannot_bypass_the_seal(monkeypatch):
-    """Anti-cheese (found 2026-07-12): `A` is known here and builds floor east,
+    """Anti-cheese: `A` is known here and builds floor east,
     so a player could carve along the throat row and drop past the bolts — and
     row-global `A` used to vault the shut bolts outright. The exit is now the
     FINAL SEAL (stone until every plaque reads true) and `A` is segment-bounded,

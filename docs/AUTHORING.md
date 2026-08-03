@@ -49,7 +49,7 @@ always have, plus the level's own properties:
 | `:e` / `:e!` | re-read the draft from disk, re-rolling its fills (`:e!` to discard unsaved work) |
 
 Every metadata command reads as well as writes, the way `:set` does: `:author
-Chas` sets it, `:author?` (or a bare `:author`) asks what it is now, and
+Normand` sets it, `:author?` (or a bare `:author`) asks what it is now, and
 `:author!` clears it. Clearing takes the explicit `!` because a mistyped query
 should not throw away the thing it was asking about.
 

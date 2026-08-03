@@ -304,9 +304,9 @@ def test_a_fill_survives_a_save_and_reopen(tmp_path, monkeypatch):
 
 def test_the_metadata_commands_reach_the_level():
     d = DRAFT.new('Probe', rows=8, cols=30)
-    _forge_session(d, ':author Chas\r:teaches w b e\r:requires h j k l\r'
+    _forge_session(d, ':author Normand\r:teaches w b e\r:requires h j k l\r'
                       ':intro Salt on the stair.\r:w\r:q!\r')
-    assert d.level.author == 'Chas'
+    assert d.level.author == 'Normand'
     assert d.level.teaches == ['w', 'b', 'e']
     assert d.level.requires == ['h', 'j', 'k', 'l']
     assert d.level.intro == 'Salt on the stair.'
@@ -391,7 +391,7 @@ def test_a_rehearsal_never_writes_to_the_players_save(monkeypatch):
 def test_reloading_inside_a_run_reloads_the_level_being_played():
     """`:e` means START THIS AGAIN. The slug the forge was opened from is not
     this level — reloading it dropped the author into the First Cave, with their
-    draft nowhere on screen (reported 2026-07-27)."""
+    draft nowhere on screen."""
     import main
     d = _playable_draft()
     curriculum, rebuilt = [], []
@@ -714,16 +714,16 @@ def test_metadata_can_be_read_back():
     """`:field?` asks, the way `:set opt?` does. An authoring UI needs the read
     half more than most — you cannot correct what you cannot see."""
     d = DRAFT.new('Probe', rows=8, cols=30)
-    res = _forge_session(d, ':author Chas\r:author?\r:q!\r')
-    assert d.level.author == 'Chas'
+    res = _forge_session(d, ':author Normand\r:author?\r:q!\r')
+    assert d.level.author == 'Normand'
 
 
 def test_a_bare_metadata_command_asks_instead_of_clearing():
     """It used to CLEAR, so a mistyped query silently threw away the thing it
     was asking about. Destroying now takes the explicit `!`."""
     d = DRAFT.new('Probe', rows=8, cols=30)
-    _forge_session(d, ':author Chas\r:author\r:q!\r')
-    assert d.level.author == 'Chas'
+    _forge_session(d, ':author Normand\r:author\r:q!\r')
+    assert d.level.author == 'Normand'
     _forge_session(d, ':author!\r:q!\r')
     assert d.level.author == ''
 

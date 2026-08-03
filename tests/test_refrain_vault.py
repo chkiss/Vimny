@@ -186,7 +186,7 @@ def test_wide_ranged_repeat_wrecks_the_middle(monkeypatch):
 
 
 def test_ranged_substitute_longhand_wins_one_star(monkeypatch):
-    # The user-probed road: two full ranged :s, no repeat family — lawful,
+    # The longhand road: two full ranged :s, no repeat family — lawful,
     # well over par 41, inside budget 60 (the second :s parks at the reprise,
     # so the tour needs a 9k walk back to verse one's end first).
     d = _fresh(0)

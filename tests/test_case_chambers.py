@@ -325,7 +325,7 @@ def test_guu_and_gUU_both_fail_the_inverted_finale(monkeypatch):
 
 
 def test_A_carve_cannot_bypass_the_seal(monkeypatch):
-    """Anti-cheese (found 2026-07-12): `A` is known here and builds floor east.
+    """Anti-cheese: `A` is known here and builds floor east.
     The exit is the FINAL SEAL (stone until every plaque reads true) and `A` is
     segment-bounded, so neither the throat-carve nor the gate-row A wins."""
     dungeon = build_dungeon_case_chambers(SEEDS[0])

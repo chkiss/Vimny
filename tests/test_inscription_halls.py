@@ -124,7 +124,7 @@ def test_dimensions_anchors_and_the_river(seed):
 
 
 def test_river_truly_meanders():
-    """The user's spec: no straight vertical borders — the river drifts a
+    """No straight vertical borders — the river drifts a
     net 4 columns west, one column at a time (contiguous, always 4 wide)."""
     los = [_ih_river_lo(r) for r in range(1, _IH_ROWS - 1)]
     assert los[0] - los[-1] == 4, "net drift of four columns west"

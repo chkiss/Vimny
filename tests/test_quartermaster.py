@@ -204,7 +204,7 @@ def test_fuel_rule_blocks_flames_off_brazier():
     ('wylw PG9P'.replace(' ', ''), 'nine flames in a row at the beacon'),
 ])
 def test_cheese_battery_spreads_no_flame(keys, label, monkeypatch):
-    """The user-reported cheese attempts, key-for-key through run_dungeon:
+    """The known cheese attempts, key-for-key through run_dungeon:
     none of them may put a flame anywhere beyond the source/legit braziers."""
     dungeon = build_dungeon_quartermaster(SEEDS[0])
     ks = [Keystroke(ch) for ch in keys]
@@ -375,7 +375,7 @@ def test_seal_needs_three_tiers_and_the_whole_chain(seed):
 # Full answer playthrough (canonical tape → run_dungeon → 2-star win) is covered
 # for every seed by the universal test_answer_paths.py::test_answer_path_actually_wins.
 # (test_cheese_battery_spreads_no_flame above still drives run_dungeon for the
-# user-reported cheese routes — that negative forcing is NOT covered universally.)
+# known cheese routes — that negative forcing is NOT covered universally.)
 
 
 def test_hint_bar_surfaces_the_linewise_yy():
