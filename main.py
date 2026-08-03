@@ -21,6 +21,7 @@
 from __future__ import annotations
 import random, time, argparse, re
 from collections import deque
+from pathlib import Path
 from blessed import Terminal
 import render.colors as C
 from render.renderer import render_all
@@ -32,6 +33,7 @@ from sharing.library import build_shelved, list_levels as community_levels
 from sharing import remote as REMOTE
 import sharing.draft as DRAFT
 import sharing.format as LF
+import sharing.submit as SUBMIT
 from sharing.vocab import (POOLS as _VOCAB_POOLS, LINE_POOLS as _VOCAB_LINE_POOLS,
                            min_saying_width as _min_saying_width)
 from engine.vimregex import compile_vim as _vre_compile
@@ -1484,13 +1486,21 @@ _ADMIN_NOTICE = (
 )
 
 
-def _show_admin_notice(term: Terminal, iw: int, game_h: int) -> None:
-    """A plain, unmissable box shown once per save. Any key dismisses it."""
+def _plain_box(term: Terminal, iw: int, game_h: int, texts, *,
+               bg, edge_rgb, head_rgb, body_rgb, footer: str) -> str:
+    """Draw a plain, centred, unstyled box and wait for one key; return it.
+
+    Deliberately shares no chrome with the parchment scrolls. The two things
+    drawn this way — the admin warning and the submission page — are the game
+    speaking as a program rather than as a wizard, and both are decisions the
+    player must actually read before making. `texts[0]` is centred as a title;
+    an empty string is a blank line.
+    """
     BOX_IW = 62; BOX_BW = BOX_IW + 4
-    box_bg = term.on_color_rgb(28, 6, 6)              # not parchment: a warning
-    edge   = box_bg + term.color_rgb(235, 90, 70) + term.bold
-    head   = term.color_rgb(255, 210, 120) + term.bold
-    body   = term.color_rgb(230, 210, 200)
+    box_bg = term.on_color_rgb(*bg)
+    edge   = box_bg + term.color_rgb(*edge_rgb) + term.bold
+    head   = term.color_rgb(*head_rgb) + term.bold
+    body   = term.color_rgb(*body_rgb)
     rst    = term.normal
     col_off = max(1, (iw + 2 - BOX_BW) // 2)
 
@@ -1500,7 +1510,8 @@ def _show_admin_notice(term: Terminal, iw: int, game_h: int) -> None:
 
     sep_h = '═' * (BOX_IW + 2)
     lines = [edge + '╔' + sep_h + '╗' + rst, row(0, '')]
-    for i, text in enumerate(_ADMIN_NOTICE):
+    for i, text in enumerate(texts):
+        text = text[:BOX_IW]
         if not text:
             lines.append(row(0, ''))
         elif i == 0:                                   # the title, centred
@@ -1509,11 +1520,10 @@ def _show_admin_notice(term: Terminal, iw: int, game_h: int) -> None:
                              + box_bg + ' ' * (BOX_IW - len(text) - pad)))
         else:
             lines.append(row(len(text), body + text))
-    AK  = '[ any key ]'
-    pad = (BOX_IW - len(AK)) // 2
+    pad = (BOX_IW - len(footer)) // 2
     lines += [row(0, ''),
-              row(BOX_IW, ' ' * pad + body + AK
-                  + box_bg + ' ' * (BOX_IW - len(AK) - pad)),
+              row(BOX_IW, ' ' * pad + body + footer
+                  + box_bg + ' ' * (BOX_IW - len(footer) - pad)),
               row(0, ''),
               edge + '╚' + sep_h + '╝' + rst]
 
@@ -1521,7 +1531,15 @@ def _show_admin_notice(term: Terminal, iw: int, game_h: int) -> None:
     print(term.home + term.clear, end='')
     for i, line in enumerate(lines):
         print(term.move_yx(row_off + i, col_off) + line, end='', flush=True)
-    term.inkey()
+    return term.inkey()
+
+
+def _show_admin_notice(term: Terminal, iw: int, game_h: int) -> None:
+    """A plain, unmissable box shown once per save. Any key dismisses it."""
+    _plain_box(term, iw, game_h, _ADMIN_NOTICE,
+               bg=(28, 6, 6),                         # not parchment: a warning
+               edge_rgb=(235, 90, 70), head_rgb=(255, 210, 120),
+               body_rgb=(230, 210, 200), footer='[ any key ]')
 
 
 def maybe_admin_notice(term: Terminal, player, progress: dict) -> None:
@@ -1535,6 +1553,96 @@ def maybe_admin_notice(term: Terminal, player, progress: dict) -> None:
     _show_admin_notice(term, _iw(term), term.height - 8)
     progress['admin_notice_seen'] = True
     SM.save_progress(progress, player.name)
+
+
+def submission_dir():
+    """Where `:submit` leaves the link and the file it points at.
+
+    The link is thousands of characters — far too long to read off a terminal,
+    and unselectable once wrapped — so it is written down rather than printed.
+    The `.json` beside it is the fallback for a level too big to ride inside a
+    URL: open the (unfilled) form and paste the file in.
+    """
+    return SM.SAVE_DIR / 'submit'
+
+
+def prepare_submission(level, slug: str):
+    """Build the link and write both files. Returns `(url, prefilled, url_path)`.
+
+    Nothing here talks to the network — it composes a URL and touches the disk.
+    Opening it is a separate, confirmed step, so an author who types `:submit`
+    to see what it says has not yet sent anything anywhere.
+    """
+    url, prefilled = SUBMIT.build_url(level, slug)
+    out = submission_dir()
+    out.mkdir(parents=True, exist_ok=True)
+    url_path = out / f'{slug}.url'
+    url_path.write_text(url + '\n', encoding='utf-8')
+    (out / f'{slug}.json').write_text(LF.dumps(level), encoding='utf-8')
+    return url, prefilled, url_path
+
+
+def _tilde(path) -> str:
+    """`~/.Vimny/…` rather than a home directory nobody needs to read."""
+    try:
+        return '~/' + str(Path(path).relative_to(Path.home()))
+    except ValueError:
+        return str(path)
+
+
+def run_submit(term: Terminal, iw: int, game_h: int, level, slug: str,
+               report, opener=None) -> str:
+    """Show the submission page and, only on `o`, open the link. Returns a
+    one-line result for the forge's message bar.
+
+    Opening a browser is the one outward-facing thing the forge does, so it is
+    behind an explicit keypress and a screen that says where the level is going
+    and under whose name. `opener` is `webbrowser.open` — injected so a test can
+    prove the link is right without a browser appearing.
+    """
+    try:
+        url, prefilled, url_path = prepare_submission(level, slug)
+    except OSError as exc:
+        return f'Could not write the submission: {exc}'
+    if opener is None:
+        import webbrowser
+        opener = webbrowser.open
+
+    texts = [
+        'SUBMIT A LEVEL',
+        '',
+        f'{level.name[:52]}  —  par {report.par}, budget {report.budget}',
+        f'by {level.author}',
+        '',
+        f'This opens a "new file" form on github.com/{SUBMIT.repo()}',
+        f'at {SUBMIT.file_path(slug)}, ready to become a pull request.',
+        'GitHub makes the fork and the branch; you sign in and',
+        'press the button, so the level arrives under your name.',
+        '',
+        'Vimny sends nothing itself and holds no account of yours.',
+        '',
+    ]
+    if prefilled:
+        texts.append('The form arrives already filled in.')
+    else:
+        # Honest about the one thing that can degrade, and what to do about it.
+        texts.append('This level is too long to carry in a link, so the form')
+        texts.append('opens EMPTY. Paste the file saved beside the link:')
+    texts.append(f'  {_tilde(url_path)}')
+
+    key = _plain_box(term, iw, game_h, texts,
+                     bg=(8, 20, 28), edge_rgb=(110, 180, 220),
+                     head_rgb=(255, 210, 120), body_rgb=(210, 225, 235),
+                     footer='[ o ] open in browser   [ any other key ] not now')
+    if str(key).lower() != 'o':
+        return f'Not sent. The link is saved at {_tilde(url_path)}'
+    try:
+        opened = opener(url)
+    except Exception as exc:                      # noqa: BLE001 — any browser fault
+        return f'Could not open a browser ({exc}) — the link is at {_tilde(url_path)}'
+    if opened is False:
+        return f'No browser to open — the link is at {_tilde(url_path)}'
+    return 'Opened GitHub. Sign in, review it, and press Propose new file.'
 
 
 def _show_catalog_scroll(term: Terminal, iw: int, game_h: int,
@@ -7453,6 +7561,32 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
                         DRAFT.save(_draft)
                         _push(f'Published to {_dest.name} — par {_rep.par}, '
                               f'budget {_rep.budget}. It is on the shelf.')
+
+                elif _draft is not None and cmd == 'submit':
+                    # Same gate as `:publish` — the forge only opens for the
+                    # admin, and the validator has to have replayed the tape to
+                    # a win before anything leaves this machine. A level that
+                    # does not validate is one a stranger cannot finish, and a
+                    # pull request is a person's time.
+                    DRAFT.sync(_draft, room)
+                    _rep = _draft.report()
+                    if not _rep.ok:
+                        for _e in _rep.errors[:3]:
+                            _push(_e)
+                        _push('Not shippable yet — nothing submitted.')
+                    elif not _draft.level.author.strip():
+                        # Never guessed from the save name. The byline goes in a
+                        # public repo under whatever the author wants to be
+                        # called there, which is theirs to decide and nobody
+                        # else's to assume.
+                        _push('Set a byline first: :author <name> — it is how '
+                              'you will be credited.')
+                    else:
+                        for _w in _rep.warnings[:2]:
+                            _push(_warn_display(_w))
+                        _push(run_submit(term, _iw(term), term.height - 8,
+                                         _draft.level,
+                                         SUBMIT.submit_slug(_draft.level), _rep))
 
                 elif cmd in ('noh', 'nohl', 'nohls', 'nohlsearch'):
                     # :noh — clear the search highlight until the next search.

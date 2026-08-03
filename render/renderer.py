@@ -488,7 +488,8 @@ def render_all(term: Terminal, dungeon: Dungeon, player: Player,
                      'v then :fill <pool> [lo-hi]  :fill! drop  '
                      'v then :seal <text>  :bolt door  '
                      ':name/:author/:teaches/:requires/:intro  '
-                     ':canvas WxH  :play test  :record tape  :check  :publish  :w save')
+                     ':canvas WxH  :play test  :record tape  :check  :publish  '
+                     ':submit PR  :w save')
     elif 'editor' in known:
         # Kinds and paints are NOT enumerated here: both lists outgrew the bar,
         # and both commands answer for themselves when typed bare.

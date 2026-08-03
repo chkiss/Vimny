@@ -79,7 +79,9 @@ code: the `sharing/` package. The load-bearing decisions held: a level is
 **declarative data, never code**; par comes from replaying an author-supplied
 karaoke tape, which doubles as the solvability proof; the budget is computed,
 never author-set. Levels live in `~/.Vimny/levels/` and appear in the overworld
-under `community/`. There is no network code in the game and there must not be.
+under `community/`. Nothing touches the network unbidden — the two things that
+reach out (`:e remote` to browse the shelf, `:submit` to open a prefilled pull
+request in your browser) are both a command the player typed.
 
 The same replayer audits the shipped curriculum (`python3 -m sharing audit`) and
 found a real par bug on its first run — The Spellwright's Forge, par 45 for a

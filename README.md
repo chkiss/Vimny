@@ -372,6 +372,7 @@ sharing/                 Levels as DATA — the authoring/sharing pipeline
   replay.py              Replay a keystroke tape through the real game loop
   jumpgolf.py            Does a line jump beat a tape's travel? (par audit)
   remote.py              The one place Vimny makes a network request
+  submit.py              :submit — a prefilled pull request link for your browser
   cli.py                 python3 -m sharing — validate / audit / export / …
 save/
   save_manager.py        Progress I/O, layout save
@@ -433,7 +434,9 @@ Two things worth knowing before you install a level someone else wrote:
   shelf** — type `:e remote` in the overworld and Vimny fetches a public index
   of community levels over HTTPS so you can browse and install them. Nothing
   else in the game makes a network request, and a level you already have on
-  your shelf never triggers one. Vimny does not moderate what a level file says.
+  your shelf never triggers one. (`:submit`, in the level forge, hands a link
+  to your browser — Vimny composes the URL but never opens the connection, and
+  holds no account of yours.) Vimny does not moderate what a level file says.
 
 A community level's par comes from replaying the author's own solution, so it is
 labelled *author's par* — the cost of a route that definitely works, not a

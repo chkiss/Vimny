@@ -18,13 +18,18 @@
 
 """The player's shelf of community levels: `~/.Vimny/levels/`.
 
-**There is no network code here, and there must never be.** A player downloads
-a level file by whatever means they like and drops it in the directory; the game
-reads a directory and nothing else. An in-game fetcher would buy one saved
-manual step at the price of a privacy surface, an outage dependency, and a
-second trust boundary. Together with "a level is data, never code"
-(`sharing/format.py`), that keeps the whole security story short enough to state
-in the README: Vimny reads files you put there, and runs none of them.
+**There is no network code here, and there must never be.** This module reads a
+directory and nothing else: a player drops a level file in, and the game finds
+it. Nothing is fetched at startup, in the background, or on a timer.
+
+The network lives one module away and only ever at the player's word.
+`sharing/remote.py` fetches the community shelf when they ask for it (`:e
+remote`), and `sharing/submit.py` builds a link for their browser to open —
+neither one runs unbidden, and both hand what they get back to the same
+`validate()` a hand-dropped file goes through. Keeping them separate is what
+keeps the security story short enough to state in the README: together with "a
+level is data, never code" (`sharing/format.py`), Vimny reads files you put
+there or asked for, and runs none of them.
 
 Every level is validated on LOAD, not merely when it was submitted, so a
 hand-edited file gets the same scrutiny as a reviewed one.

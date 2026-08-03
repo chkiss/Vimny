@@ -45,6 +45,7 @@ always have, plus the level's own properties:
 | `:record` | **play the level; the keys you press become the tape** |
 | `:check` | run the validator and report par, budget and warnings |
 | `:publish` | validate, then put it on the shelf in `~/.Vimny/levels/` |
+| `:submit` | validate, then open a prefilled pull request against the community repo |
 | `:w` / `:wq` | save the draft |
 | `:e` / `:e!` | re-read the draft from disk, re-rolling its fills (`:e!` to discard unsaved work) |
 
@@ -730,7 +731,16 @@ Those submissions are welcome too — they just have to be playable.
 
 Community levels live at
 **[github.com/chkiss/vimny-levels](https://github.com/chkiss/vimny-levels)**.
-Open a pull request there with your `.json` file. The repo runs the same
+Open a pull request there with your `.json` file. From inside the forge,
+**`:submit`** does the tedious half for you: it validates the draft, refuses
+until `:author` names the byline you want to be credited under, and then opens
+GitHub's "new file" form already filled in with your level at the right path.
+GitHub makes the fork, the branch and the pull request, signed in as you —
+Vimny holds no account of yours and sends nothing itself. (A level too long to
+fit in a link opens the form empty; the file is saved next to the link in
+`~/.Vimny/submit/` for you to paste.)
+
+The repo runs the same
 validator you have been running (`python3 -m sharing validate mylevel.json`) plus
 a replay of your recorded solution, so a level that passes locally passes there —
 and one that does not tells you which rule it broke rather than being turned away.
@@ -745,6 +755,7 @@ overworld lists what is on it.
   in the background, or on a timer — no phone-home, no telemetry, no update
   check. The exception is `:e remote`, which fetches the shelf's index over
   HTTPS so you can browse and install; everything else reads
-  `~/.Vimny/levels/`.
+  `~/.Vimny/levels/`. `:submit` is not an exception — it composes a URL and
+  hands it to your browser; Vimny itself never opens the connection.
 - **No review.** A level file can contain any text its author put there, and the
   game does not moderate it.
