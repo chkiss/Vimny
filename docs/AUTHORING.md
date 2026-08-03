@@ -726,10 +726,25 @@ None of the above applies if you are not trying to replace anything. Leave
 whatever it likes, in any order, to a player who already knows what they know.
 Those submissions are welcome too — they just have to be playable.
 
+## Where to send it
+
+Community levels live at
+**[github.com/chkiss/vimny-levels](https://github.com/chkiss/vimny-levels)**.
+Open a pull request there with your `.json` file. The repo runs the same
+validator you have been running (`python3 -m sharing validate mylevel.json`) plus
+a replay of your recorded solution, so a level that passes locally passes there —
+and one that does not tells you which rule it broke rather than being turned away.
+
+Players install from that shelf without leaving the game: `:e remote` in the
+overworld lists what is on it.
+
 ## What Vimny will not do
 
 - **No code.** A level is data. Nothing in the file is ever executed.
-- **No network.** The game reads `~/.Vimny/levels/`. It does not fetch, phone
-  home, or check for updates. You bring files by whatever means you like.
+- **No network, with one exception you ask for.** Nothing is fetched at startup,
+  in the background, or on a timer — no phone-home, no telemetry, no update
+  check. The exception is `:e remote`, which fetches the shelf's index over
+  HTTPS so you can browse and install; everything else reads
+  `~/.Vimny/levels/`.
 - **No review.** A level file can contain any text its author put there, and the
   game does not moderate it.

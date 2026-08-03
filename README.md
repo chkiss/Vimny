@@ -311,36 +311,73 @@ commands are deliberately out of scope:
 ## Project layout
 
 ```
-main.py                  Game loop, run_dungeon / run_overworld, apply_motion
+main.py                  Game loop, run_dungeon / run_overworld, the forge
 engine/
-  world.py               Room, Dungeon, Entity, CharRun, CellType
+  world.py               Room, Dungeon, Entity, CharRun, CellType, Seal
   player.py              Player dataclass
   vim_parser.py          Keystroke → action dict
-  motion.py              apply_motion, move_player
+  command_guard.py       action_allowed — what the curriculum has taught yet
+  motion.py              apply_motion, move_player, the fog laws
+  operator.py            d y c p and friends — operator + text object
+  text_object.py         iw aw i( a" ip … — the spans an operator acts on
+  insert.py              i a I A o O s S, INSERT-mode editing
   reflow.py              Reflow editing primitives (insert/delete/join/ledge-build)
+  visual.py              v V <C-v> — the selections
   search.py              / ? n N * # — Vim-regex search, matched per line
   substitute.py          :s :g :v & — ex substitute & global
+  registers.py           named/unnamed registers, clip ↔ text
+  macro.py               q @ — record and replay
+  jumplist.py            <C-o> <C-i> — where you have been
+  tape.py                The keystroke-tape notation (<Space> <CR> <Esc> <C-v>)
   budget.py              Budget tracking
 generation/
-  dungeon_gen.py         build_dungeon_<slug> per level, Dijkstra par solvers
+  dungeon_gen.py         build_dungeon_<slug> per level, par solvers
 content/
   levels.py              Level definitions (slug identity), known_commands(slug)
+  scrolls.py             Scroll text + the scroll catalogue
+  passwords.py           The password pools a fancy_door opens for
 render/
   renderer.py            Read-only dungeon view (no mutation)
   overworld.py           Read-only netrw overworld buffer
+  title.py               Title screen and name prompt
+  scroll_library.py      The scrolls you have collected
+  remote_shelf.py        Browse the remote level shelf
+  symbols.py             Every glyph the game draws, with width fallbacks
   hint_bar.py            Hint-bar text (reads vim_commands.md)
   vim_commands.md        Hint-bar text source (token → keys/desc)
+sharing/                 Levels as DATA — the authoring/sharing pipeline
+  format.py              The level file format: parse, build, export
+  validate.py            Every rule a level file must satisfy
+  draft.py               The forge's in-progress level
+  replay.py              Replay a keystroke tape through the real game loop
+  jumpgolf.py            Does a line jump beat a tape's travel? (par audit)
+  remote.py              The one place Vimny makes a network request
+  cli.py                 python3 -m sharing — validate / audit / export / …
 save/
   save_manager.py        Progress I/O, layout save
 tests/                   pytest test suite
+docs/ARCHITECTURE.md     The canonical reference: architecture, laws, conventions
+docs/AUTHORING.md        Writing a level, in the forge or in an editor
 SPEC.md                  Design vision, UI spec, forward-looking notes
 LEVELS_PLAN.md           Design rubric + the levels not yet built
 ```
 
-## Community levels
+## Writing your own levels
 
-Levels can be written as plain JSON files and shared. Drop one in
-`~/.Vimny/levels/` and it shows up in the overworld under `community/`.
+There are two ways in, and they produce the same thing — a level is a plain JSON
+file either way.
+
+**In the game — the forge.** An authoring bench in the overworld under `forge/`,
+where a level is built by playing it: paint the room, place the text and the
+doors, then `:record` walks your own solution and captures it as the level's
+answer. The par comes from replaying that recording, so a level cannot ship
+claiming a route nobody has walked. The forge is **admin-only** — sign in with
+the player name `admin` to reach it. Be warned that the same name also unlocks
+every level and shows you each puzzle's solution as you play, so use a separate
+save for authoring rather than the one you are playing on.
+
+**In a text editor.** The format is documented, so you never have to use the
+forge:
 
 ```
 python3 -m sharing export rune_halls mylevel.json   # start from a working level
@@ -348,14 +385,29 @@ python3 -m sharing validate mylevel.json            # check it
 python3 -m sharing install  mylevel.json            # put it on your shelf
 ```
 
+Either way, drop the file in `~/.Vimny/levels/` and it shows up in the overworld
+under `community/`.
+
+**The shelf.** Community levels live at
+**[github.com/chkiss/vimny-levels](https://github.com/chkiss/vimny-levels)** —
+type `:e remote` in the overworld to browse what's there and install any of them
+without leaving the game. To add yours, open a pull request against that repo
+with your level file; it is checked by the same validator you can run yourself
+(`python3 -m sharing validate mylevel.json`), so if it passes locally it will
+pass there.
+
 Two things worth knowing before you install a level someone else wrote:
 
 - **A level is data, never code.** Vimny reads the file and builds a room from
   it. Nothing in it is ever executed — that is what makes it safe to play,
   rather than anyone having vetted it.
-- **The game never goes online.** It reads a folder on your machine. Files get
-  there however you like; Vimny never fetches, phones home, or checks for
-  updates, and it does not moderate what a level file says.
+- **Vimny goes online only when you ask it to, in one place.** Nothing is
+  fetched at startup, in the background, or on a timer: there is no phone-home,
+  no telemetry, and no update check. The single exception is the **remote
+  shelf** — type `:e remote` in the overworld and Vimny fetches a public index
+  of community levels over HTTPS so you can browse and install them. Nothing
+  else in the game makes a network request, and a level you already have on
+  your shelf never triggers one. Vimny does not moderate what a level file says.
 
 A community level's par comes from replaying the author's own solution, so it is
 labelled *author's par* — the cost of a route that definitely works, not a
@@ -368,7 +420,6 @@ Full guide: [docs/AUTHORING.md](docs/AUTHORING.md).
 
 - **The Registry** — a bonus wing on the register family: the delete ring (`"0`, `"1`–`"9`), the small-delete register (`"-`), the read-only registers (`":` `".` `"%` `"#`), the expression register (`"=`), the system clipboard (`"*` `"+`), the black hole (`"_`), the search register (`"/`), and a boss to close it out. The first two levels are in.
 - **Folds** — `zf` / `za` and a level built around them.
-- **Level creation** — a documented path for writing and sharing your own dungeons, so the curriculum isn't limited to the ones shipped here.
 - **Insert-mode editing** — `<C-w>`, `<C-u>` and friends: the keys that make insert mode more than typing.
 - **Windows, tabs and buffers** — Vimny is one buffer per dungeon today; multi-buffer play is on the roadmap.
 
@@ -378,7 +429,10 @@ Full guide: [docs/AUTHORING.md](docs/AUTHORING.md).
 - **Efficiency is enforced by par and budget.** The keystroke budget makes Vim's core value proposition central, and the par encourages the player to strive for perfect execution efficiency.
 - **Everything is a buffer.** Dungeons are files; the overworld is a directory; `:w`, `:q`, `:e` are real mechanics.
 
-See `LEVELS_PLAN.md` for what's planned next and `SPEC.md` for design vision & UI.
+See [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) if you want to work on the
+engine — it is the canonical reference for the architecture, the laws the levels
+are held to, and the conventions. `LEVELS_PLAN.md` is what's planned next, and
+`SPEC.md` the design vision & UI.
 
 ## License
 
