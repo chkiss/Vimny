@@ -335,9 +335,72 @@ def _spend_everywhere(slug, builder, toks, known, heights, verify=None, seed=0):
     return first
 
 
-#: Search shape. beam=1 / slack=0 is greedy hill-climbing — fast, and blind to
-#: any win that needs two edits neither of which pays alone.
+#: Search shape. beam=1 / slack=0 is the narrow setting: one tape alive, and
+#: only ties admitted alongside improvements. Blind to any win that has to be
+#: reached through a step that costs MORE than where it started.
 BEAM, SLACK, MAX_EVALS = 1, 0, 4000
+
+
+def beam_search(*, start, start_cost, successors, measure, keep=None,
+                on_reject=None, beam=BEAM, slack=SLACK, max_evals=MAX_EVALS,
+                budget_used=None, log=None):
+    """Bounded beam search over states, cheapest wins. Returns
+    `(best_state, best_cost, parent_map, evaluated, hit_cap)`.
+
+    Deliberately knows NOTHING about tapes: `successors` yields
+    `(state, kind, at, was, now)` and `measure` returns a cost or None for
+    "invalid". That is not decoration — it is what makes the search testable.
+    A search whose only exercise is the corpus it was written for can only ever
+    demonstrate that it found nothing, which is indistinguishable from being
+    broken. Given a cost landscape with a KNOWN answer, it can be shown to find
+    it (see tests/test_jumpgolf_search.py).
+
+    `beam` is how many states stay alive; `slack` how much dearer than the best
+    a state may be and still be explored. slack=0 admits ties — plateau moves,
+    which get you across flat ground. slack>0 admits genuine detours, which is
+    the only way to reach a win whose first step costs something.
+
+    `keep(state)` vetoes a state on grounds other than cost (here: it must still
+    teach the lesson); `on_reject(state, cost)` sees the ones it vetoed, because
+    a cheaper route you refused is worth reporting.
+    """
+    best_state, best = list(start), start_cost
+    frontier = [(start_cost, list(start))]
+    seen     = {tuple(start)}
+    parent   = {}
+    used     = budget_used or (lambda: len(seen))
+
+    while frontier and used() < max_evals:
+        nxt = []
+        for _cost, state in frontier:
+            for trial, kind, at, was, now in successors(state):
+                if used() >= max_evals:
+                    break
+                key = tuple(trial)
+                if key in seen:
+                    continue
+                seen.add(key)
+                got = measure(trial)
+                if got is None:
+                    continue                  # invalid: not a route at all
+                if keep is not None and not keep(trial):
+                    if on_reject is not None:
+                        on_reject(trial, got)
+                    continue
+                step = Step(kind=kind, at=at, was=was, now=now, spent=got)
+                parent[' '.join(trial)] = (' '.join(state), step)
+                if got < best:
+                    best, best_state = got, list(trial)
+                    if log:
+                        log(step)
+                # Admit ties and, with slack, small detours — the whole point of
+                # not being greedy.
+                if got <= best + slack:
+                    nxt.append((got, list(trial)))
+        nxt.sort(key=lambda p: p[0])
+        frontier = nxt[:beam]
+
+    return best_state, best, parent, used(), used() >= max_evals
 #: What `--deep` uses. Four tapes alive, detours of up to one key admitted.
 DEEP_BEAM, DEEP_SLACK = 4, 1
 
@@ -462,61 +525,20 @@ def golf(slug: str, *, seed: int = 0, heights=None, jumps=JUMPS,
                 # an EDIT being droppable is a different question — see --strip
                 yield state[:i] + state[i + 1:], 'delete', i, tok, ''
 
-    # ── the search ──────────────────────────────────────────────────────────
-    #
-    # Greedy hill-climbing (beam=1, slack=0) is the default and reproduces what
-    # this tool has always done. It has one blind spot, and it is not a small
-    # one: it takes the FIRST improvement it finds and never looks at a tape
-    # that is not immediately cheaper, so a win that needs two edits — where
-    # neither edit pays on its own — is invisible to it. `0 3j` -> `G` was only
-    # ever caught because the first edit happened to leave the second key dead.
-    #
-    # `beam` keeps the K cheapest tapes alive instead of one; `slack` admits
-    # tapes up to K keys DEARER than the best so far, which is what lets a
-    # two-edit win be assembled through a step that pays nothing. slack=0 still
-    # admits ties, i.e. plateau moves, which is the cheap half of the same idea.
-    # `max_evals` bounds the whole thing: this is a search over tapes, and the
-    # measurement is a full replay, so it needs a ceiling rather than a promise.
-    best_toks = list(toks)
-    frontier  = [(best, list(toks))]
-    seen      = {' '.join(toks)}
-    parent    = {}                       # tape -> (parent tape, Step)
+    def _reject(trial, got):
+        """A cheaper winning route that drops the lesson: recorded, never taken."""
+        if got < best:
+            out.skipped_lesson += 1
+            out.refused.append((' '.join(trial), got))
 
-    while frontier and len(memo) < max_evals:
-        nxt = []
-        for _cost, state in frontier:
-            for trial, kind, at, was, now in _successors(state):
-                if len(memo) >= max_evals:
-                    break
-                key = ' '.join(trial)
-                if key in seen:
-                    continue
-                seen.add(key)
-                got = _measure(trial)
-                if got is None:
-                    continue             # does not win, or is height-sensitive
-                if not _teaches_still(trial):
-                    if got < best:
-                        # A REAL cheaper route that skips the lesson: a cheese
-                        # to close, not a par to lower. Counted, never walked.
-                        out.skipped_lesson += 1
-                        out.refused.append((key, got))
-                    continue
-                parent[key] = (' '.join(state),
-                               Step(kind=kind, at=at, was=was, now=now, spent=got))
-                if got < best:
-                    best, best_toks = got, list(trial)
-                    if log:
-                        log(parent[key][1])
-                # Admit ties and, with slack, small detours — that is the whole
-                # point of not being greedy.
-                if got <= best + slack:
-                    nxt.append((got, list(trial)))
-        nxt.sort(key=lambda p: p[0])
-        frontier = nxt[:beam]
+    best_toks, best, parent, evaluated, hit_cap = beam_search(
+        start=list(toks), start_cost=best, successors=_successors,
+        measure=_measure, keep=_teaches_still, on_reject=_reject,
+        beam=beam, slack=slack, max_evals=max_evals,
+        budget_used=lambda: len(memo), log=log)
 
-    out.evaluated = len(memo)
-    out.exhausted = len(memo) >= max_evals
+    out.evaluated = evaluated
+    out.exhausted = hit_cap
     toks = best_toks
     # Walk the parent chain back so `steps` describes how the winner was built,
     # not the order the search happened to visit things in.
