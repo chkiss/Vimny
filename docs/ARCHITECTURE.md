@@ -73,6 +73,54 @@ Two things follow that are easy to get wrong:
   exit), and a macro's recording should start at the *earliest* repeating
   opportunity — including the leading motion in the body, not before it.
 
+**Do not golf it by eye — `python3 -m sharing jumpgolf` (2026-08-03).** Six
+levels shipped a par that was not the optimum, every one of them because the
+question was answered by reasoning: The Operator's Vault recorded 62 on the
+argument that a counted jump only beats a walk when its count is a single digit
+— true, and beside the point, because the jump never needed a count. The route
+that existed was 55. The tool substitutes jumps for travel tokens, **collapses**
+runs of them (`0 3j` → `G`), deletes dead travel, and replays the whole tape
+through the real game loop for each candidate. Fixed this way: `wet_ink` 42→39,
+`quartermaster` 15→14, `hall_of_echoes` 76→74, `operators_vault` 62→55,
+`indentation_sanctum` 12→11, `stair_rail` 15→14. Five rules the tool is held to,
+each of which was a bug first:
+  - **Token gating is absolute.** Candidates are filtered against
+    `known_commands(slug)` *and* the same set is handed to the replay. `G`/`gg`
+    enter at curriculum position 10 and `H`/`M`/`L` at 11 — a level before that
+    is correctly unimprovable, not unaudited, and the report must say which.
+  - **A beat must hold at every terminal height.** `H`/`M`/`L` are
+    viewport-relative while `room.rows > game_h`, so behaviour flips at
+    `height == rows + 8`; `heights_for()` straddles exactly that line rather
+    than sampling arbitrary numbers. Par must not become a function of the
+    player's window. **`G`/`gg` read the buffer and are stable — usually the
+    better answer for that reason alone**, and in a fogged level `G` means "as
+    far down as the light goes", which is why one keyless jump serves four
+    different drops in the Vault.
+  - **A cheaper route counts only if the level still teaches its lesson.**
+    Otherwise it is a **cheese to close, not a par to lower** — the distinction
+    that kept `spellwrights_forge` at 44 (its `M` route skipped `&` on the level
+    whose whole job is `:s`/`&`/`:g`; the seal was fixed instead). Some lessons
+    are STATE, not keystrokes: `_VERIFY` holds `wet_ink`, whose par must assume
+    a player who cannot read the saying until the braziers burn.
+  - **Measure first, judge second.** Checking the lesson before replaying
+    counted trials never shown to win and reported 86 imaginary cheeses.
+  - **Say when the search stopped early.** A "no beat found" that hit its
+    evaluation budget must not read like an exhaustive one.
+
+  `tests/test_par_is_the_optimum.py` is the standing gate (opt-in:
+  `VIMNY_JUMPGOLF=1`, or `=seeds` for every distinct layout across the repo's
+  seeds — deduplicated by `layout_fingerprint`, since 49 levels × 6 seeds is only
+  196 genuinely different builds). Its always-on tests guard the *guard*, which
+  is what matters for a check run rarely — they found the lesson rule already
+  rotted into a no-op on `shelving_room`. `tests/test_jumpgolf_search.py` is the
+  positive control: the search is exercised against a cost landscape with a known
+  answer, because "found nothing" and "cannot find anything" print the same. It
+  showed that beam WIDTH and slack are needed together — slack alone loses the
+  ridge to a tie-decoy. Solvers are covered from the other side by
+  `tests/test_par_solvers_model_the_jumps.py`: a solver may not model a jump its
+  level has not taught (a par no player can reach), and must model the buffer
+  jumps it has (`_line_jump_moves`).
+
 ### FORCE BY GEOMETRY, NOT BY SURVIVAL
 
 A level forces its lesson by making the puzzle *want* the new command — capacity,
