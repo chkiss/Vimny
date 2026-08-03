@@ -117,6 +117,37 @@ def _cmd_golf(args) -> int:
     return 0
 
 
+def _cmd_jumpgolf(args) -> int:
+    """Ask every level whether a LINE JUMP beats the travel its tape is written
+    with. See sharing/jumpgolf.py — the answer is measured, never reasoned."""
+    from sharing import jumpgolf as JG
+
+    slugs = args.slugs or JG.golfable_levels()
+    beaten = []
+    for slug in slugs:
+        def _log(step, _s=slug):
+            print(f'   {step.kind:<9} {step.was!r} @{step.at} -> {step.now!r}'
+                  f'  = {step.spent}', flush=True)
+        res = JG.golf(slug, strip=args.strip, log=_log if args.verbose else None)
+        if res.canonical is None:
+            print(f'{slug:26} — skipped: its own tape does not win at every '
+                  f'height (or does not win at all)')
+            continue
+        mark = f'BEAT  {res.best} < par {res.par}' if res.beats_par else 'ok'
+        print(f'{slug:26} par {res.par:>3}  golfed {res.best:>3}   {mark}',
+              flush=True)
+        if res.beats_par:
+            beaten.append(res)
+    if beaten:
+        print()
+        print('PAR IS THE OPTIMUM — each of these is a recorded par that is '
+              'simply wrong, not a high score:')
+        for res in beaten:
+            print(f'  {res.slug}: {res.par} -> {res.best}')
+            print(f'     {res.tape}')
+    return 3 if beaten else 0
+
+
 def _cmd_audit(args) -> int:
     """Every shipped level's own tape against its own par."""
     import generation.dungeon_gen as dg
@@ -208,6 +239,16 @@ def main(argv=None) -> int:
     g.add_argument('--tape-file')
     p.add_argument('--seed', type=int, default=42)
     p.set_defaults(fn=_cmd_golf)
+
+    p = sub.add_parser('jumpgolf',
+                       help='does a line jump beat the travel a tape is written with?')
+    p.add_argument('slugs', nargs='*', help='default: every shipped level')
+    p.add_argument('-v', '--verbose', action='store_true',
+                   help='show each accepted improvement as it is found')
+    p.add_argument('--strip', action='store_true',
+                   help="also drop non-travel keys — asks 'is this level's own "
+                        "work optional?', which is a design question, not a par one")
+    p.set_defaults(fn=_cmd_jumpgolf)
 
     p = sub.add_parser('audit', help="check every shipped level's own recorded route")
     p.add_argument('--seed', type=int, default=42)
