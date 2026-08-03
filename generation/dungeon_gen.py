@@ -24,7 +24,8 @@ from engine.world import (Dungeon, Room, RoomType, CellType, CharRun, Entity,
                           Seal, gate_row_seals)
 from engine.tape import ESC as _TAPE_ESC
 from engine.motion import (_fog_unreachable, _cell_char, _is_word_char,
-                           apply_stone_fog, _FOG_BLOCK_KINDS)
+                           apply_stone_fog, _FOG_BLOCK_KINDS,
+                           _first_non_blank_col)
 from generation.room_gen import make_room, RUNE_CHAR as _RUNE_CHAR
 from content import passwords as _passwords
 
@@ -665,6 +666,56 @@ def _tile_line_hall(rng, row: int, c0: int, c1: int, first_non_void: bool = True
         prev_len = width
         c += width + 1
     return runs
+
+
+def _line_jump_moves(composite, ok, r: int, c: int):
+    """The LINE JUMPS a par solver must model: `gg`, `G`, `{n}G`.
+
+    NOT named `_par_*`: everything with that prefix in this module is ONE
+    LEVEL'S solver, and anything enumerating them (a scan, a reader, the next
+    person adding a level) should not have to know that one of them is a shared
+    helper wearing the same prefix.
+
+    Yields `(row, col, cost, label)` for every line the cursor can reach in one
+    jump, landing where the engine lands — the row's first character, or its
+    first standable cell if the row carries no text (`apply_motion`'s
+    `_first_non_blank_col`). `ok(row, col)` is the CALLER's passability, so a
+    solver that models a shut door keeps modelling it: a jump onto a line whose
+    landing cell is behind that door is not a move.
+
+    WHY NO `H` / `M` / `L`. Those are viewport-relative whenever the room is
+    taller than the game area (Vim-faithful), so a par derived from one would be
+    a par only some terminal sizes could hit — and par has to mean one number.
+    `G`/`gg`/`{n}G` read the BUFFER and are the same in every window, so they are
+    what a solver may safely assume. The screen jumps are covered from the other
+    end, by measurement: `sharing/jumpgolf.py` replays every tape at heights 25
+    through 60 and only reports a beat that holds at all of them, which is how
+    The Indentation Sanctum's `M` and The Stair Rail's `H` were found. Derived
+    where derivation is sound, measured where it is not.
+
+    Line N is grid row `first_standable_row() + N - 1` (the bordering walls are
+    not lines), and a count costs its digits plus the key.
+    """
+    base  = composite.first_standable_row()
+    lines = []
+    for row in range(base, composite.rows):
+        col = _first_non_blank_col(composite, row)
+        if col is not None and ok(row, col):
+            lines.append((row, col))
+    if not lines:
+        return
+    for i, (row, col) in enumerate(lines, start=1):
+        if (row, col) == (r, c):
+            continue
+        n = row - base + 1                      # the LINE number, not the index
+        yield row, col, len(str(n)) + 1, f'{n}G'
+    # The countless forms, which are what a golfed tape actually reaches for.
+    first_row, first_col = lines[0]
+    if (first_row, first_col) != (r, c):
+        yield first_row, first_col, 2, 'gg'
+    last_row, last_col = lines[-1]
+    if (last_row, last_col) != (r, c):
+        yield last_row, last_col, 1, 'G'
 
 
 def _bfs_par_line(composite, return_path: bool = False,
@@ -7373,6 +7424,12 @@ def _par_bracket_vaults(composite, use_percent: bool = True, return_path: bool =
                 lbl2 = key if n == 1 else f'{n}{key}'
                 _push((r, nc2, hk, do), mc2, lbl2)
 
+        # gg / G / {n}G — the line jumps. Modelled with the solver's own door
+        # state, so a jump whose landing sits behind the shut door is no move.
+        for jr, jc, jcost, jlbl in _line_jump_moves(
+                composite, lambda rr, cc: _ok(rr, cc, do), r, c):
+            _push((jr, jc, hk, do), jcost, jlbl)
+
         # $: rightmost passable+ok col in same row (stops at a closed door)
         best_col = None
         for cc in range(c + 1, COLS):
@@ -8153,6 +8210,11 @@ def _par_runic_archives(composite, return_path=False,
                 lbl2 = _key if n == 1 else f'{n}{_key}'
                 _try((nr2, nc2, hk, do), mc2, lbl2)
 
+        # gg / G / {n}G — the line jumps, under this solver's own door state
+        for jr, jc, jcost, jlbl in _line_jump_moves(
+                composite, lambda rr, cc: _ok(rr, cc, do), r, c):
+            _try((jr, jc, hk, do), jcost, jlbl)
+
         # $: scan right to last passable cell
         end_c = None
         for tc in range(c + 1, COLS):
@@ -8626,6 +8688,11 @@ def _par_sentence_corridor(composite, return_path=False, no_close=False, no_open
                 mc2  = 1 if n == 1 else len(str(n)) + 1
                 lbl2 = _key if n == 1 else f'{n}{_key}'
                 _try((nr2, nc2, hk, do), mc2, lbl2)
+
+        # gg / G / {n}G — the line jumps, under this solver's own door state
+        for jr, jc, jcost, jlbl in _line_jump_moves(
+                composite, lambda rr, cc: _ok(rr, cc, do), r, c):
+            _try((jr, jc, hk, do), jcost, jlbl)
 
         # $: scan right to the last passable cell
         end_c = None
