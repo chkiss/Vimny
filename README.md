@@ -1,6 +1,14 @@
 # Vimny
 
-A TUI dungeon crawler that teaches Vim through play. The dungeons are text buffers and every puzzle is solved with Vim commands. Hitting the "par" means you fully learned the lesson.
+**A roguelike where the dungeons are text buffers and every puzzle is solved with real Vim commands.**
+
+The floor is made of characters. Walls are the ends of lines. A door opens for
+the word you cut out of the floor and carried there. You are not pressing keys
+that *stand for* Vim — `dw` deletes a word here because `dw` deletes a word.
+
+Every room has a **keystroke budget** you must finish inside, and a **par** — the
+cheapest route that exists. Finishing wins the room; finishing *at par* means you
+found the way a fluent Vim user would have.
 
 ```
 ┌──────────────────────────────────────────────────────────────────────────────┐
@@ -21,39 +29,12 @@ A TUI dungeon crawler that teaches Vim through play. The dungeons are text buffe
 └──────────────────────────────────────────────────────────────────────────────┘
 ```
 
-## Requirements
-
-- Python 3.9+
-- `blessed` library
-- A terminal **at least 80 columns** wide (the supported minimum). The playfield
-  grows with the window up to **189 columns** (the overworld and The Archivist's
-  Library use the extra width); beyond that it stops widening.
-
-Linux and macOS are the supported platforms. Windows is untested — the game no
-longer *refuses* to start there, but `blessed`'s Windows support is partial and
-the terminal handling has not been verified.
-
-## Running
-
-From a checkout:
-
-```bash
-pip install blessed
-python main.py
-```
-
-Or install it:
-
-```bash
-pip install .
-vimny
-```
-
-Player progress is saved automatically to `~/.Vimny/saves/<player>.json` (one file per player).
-
 ## How it works
 
-Each dungeon is a text buffer. The floor is made of **characters, words, and spaces** — you navigate with real Vim commands and must reach the exit within a **keystroke budget**. Editing reflows the line exactly as Vim does: insert/delete/paste shift content along the row, and anything shoved past a wall or void rune falls into the void.
+The map is not a picture of a buffer — it *is* one, and it behaves like one.
+Editing reflows the line exactly as Vim does: insert, delete or paste and the
+rest of the row shifts along, and whatever gets shoved past a wall falls into
+the void. Cut a word out of the floor and the floor closes up behind it.
 
 | Dungeon concept          | Vim concept |
 |--------------------------|-------------|
@@ -74,9 +55,43 @@ Each dungeon is a text buffer. The floor is made of **characters, words, and spa
 - **Water** — impassable on foot; you have to jump over it.
 - **Fogged water** — impassable on foot *and* opaque, so a blind jump like `$` won't clear it. You have to aim at a character you can see.
 
+## Play it
+
+Linux and macOS. Python 3.9+, and a terminal at least 80 columns wide.
+
+```bash
+pip install blessed
+python main.py
+```
+
+Or `pip install .` and run `vimny`. Progress saves to
+`~/.Vimny/saves/<player>.json`, one file per player.
+
+<details>
+<summary>Terminal size and Windows</summary>
+
+The playfield grows with the window up to **189 columns** — the overworld and
+The Archivist's Library use the extra width — and stops widening beyond that.
+80 columns is the supported minimum.
+
+Windows is untested.
+
+</details>
+
 ## Levels
 
-The main game sequence is complete — every level below is playable.
+Sixty levels, and the main sequence is complete — every one is playable. The
+curriculum runs from `hjkl` through motions and counts, operators and text
+objects, visual mode, search and macros, registers, marks and jumps, folds and
+windows, to Ex commands (`:s`, `:g`) — with boss levels that make you use the
+lot at once, and a bonus wing for the corners of Vim that don't fit a straight
+line.
+
+Each level teaches one thing and is built so that thing is the *cheapest* way
+through, not merely the intended one.
+
+<details>
+<summary>The full curriculum — all 60 levels</summary>
 
 <!-- BEGIN GENERATED LEVELS TABLE -->
 | # | Name | Commands |
@@ -141,6 +156,8 @@ The main game sequence is complete — every level below is playable.
 | R1 | The Unnamed Hold | `""  y  p` |
 | R2 | The Named Vault | `"ay  "by  "aP  "bP` |
 <!-- END GENERATED LEVELS TABLE -->
+
+</details>
 
 ## Commands
 
@@ -308,7 +325,10 @@ commands are deliberately out of scope:
 - **NORMAL-mode `Enter`** — a duplicate of `+`, which the Stair Rail
   already teaches.
 
-## Project layout
+## Working on Vimny
+
+<details>
+<summary>Project layout</summary>
 
 ```
 main.py                  Game loop, run_dungeon / run_overworld, the forge
@@ -361,6 +381,12 @@ docs/AUTHORING.md        Writing a level, in the forge or in an editor
 SPEC.md                  Design vision, UI spec, forward-looking notes
 LEVELS_PLAN.md           Design rubric + the levels not yet built
 ```
+
+</details>
+
+Run the tests with `python3 -m pytest`, and
+`python3 -m sharing audit` to check every level's par against a replay of its
+own solution.
 
 ## Writing your own levels
 
