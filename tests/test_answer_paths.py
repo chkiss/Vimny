@@ -93,6 +93,12 @@ def _token_ks_cost(token: str) -> int:
         return len(m.group(1)) + 1
     if len(token) == 3 and token[0] in 'dyc' and token[1] in 'ia':
         return 3      # operator + text object ('dip', 'das', 'yi('): three keys
+    if len(token) == 3 and token[0] in 'dyc' and token[1] in 'fFtT':
+        # operator + a CHARACTER-SEARCH motion ('dF?', 'ct,', 'yf)'): three keys,
+        # the last being the target character. Unreachable while a tape wrote
+        # this as `d F ?` — three runs of 1 — which is exactly why the grouping
+        # convention and this cost model have to agree (tests/test_tape_grouping.py).
+        return 3
     if len(token) == 2 and token[0] in 'dyc':
         # operator + a one-char motion / doubled operator ('dw','ye','d$','cb',
         # 'dd','yy'): TWO keys — the operator key AND the motion key both spend

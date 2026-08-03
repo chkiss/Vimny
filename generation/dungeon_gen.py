@@ -9681,26 +9681,26 @@ _OV_DOOR       = (33, 17)             # vault door (untagged); the EXIT is the p
 #: `G` over `L` deliberately: `L` is viewport-relative and would make par a
 #: function of the player's terminal height, while `G` reads the buffer.
 _OV_PAR = 55
-_OV_ANSWER = ('d w $ p 3j '                   # C1  → dw, from the spawn, which
+_OV_ANSWER = ('dw $ p 3j '                    # C1  → dw, from the spawn, which
                                               # is the password's own head
-              'd b G '                        # C2  ← db, then ride down holding
+              'db G '                         # C2  ← db, then ride down holding
                                               # the word (G = the frontier, which
                                               # IS the drop while the fog holds)
-              'p d e $ p 3j '                 # C3  → speak C2's word, then de
+              'p de $ p 3j '                  # C3  → speak C2's word, then de
                                               # (you land on BLANK a cell short
                                               # of the password, so w has
                                               # nothing to take)
-              'd B G '                        # C4  ← dB over the split token
-              'p d E $ p 3j '                 # C5  → dE
-              'd F ? G '                      # C6  ← dF? back to the leading ?
-              'p l d W $ p 3j '               # C7  → dW; the l steps onto the
+              'dB G '                         # C4  ← dB over the split token
+              'p dE $ p 3j '                  # C5  → dE
+              'dF? G '                        # C6  ← dF? back to the leading ?
+              'p l dW $ p 3j '                # C7  → dW; the l steps onto the
                                               # password's head, which the gate
                                               # cell itself cannot hold
-              'b d 0 G '                      # C8  ← d0; b parks you on the far
+              'b d0 G '                       # C8  ← d0; b parks you on the far
                                               # word, so dd — which would sweep
                                               # it in — is no longer the same cut
-              'p d $ $ p 3j '                 # C9  → d$
-              'd d $ p G $')                  # C10 ← dd drops the floor line and
+              'p d$ $ p 3j '                  # C9  → d$
+              'dd $ p G $')                   # C10 ← dd drops the floor line and
                                               # rides down; the gate is on the
                                               # ledge and the vault is below it
 
@@ -10326,7 +10326,7 @@ def build_dungeon_quartermaster(seed: int) -> Dungeon:
     #   k 0         (2)  → up to the seal row; 0 walks west onto the exit
     room.par    = _QM_PAR
     room.budget = math.ceil(_QM_PAR * 1.4)
-    room.answer = 'w y l w P G 3P y y p P k 0'
+    room.answer = 'w yl w P G 3P yy p P k 0'
 
     apply_stone_fog(room)                 # the exit pocket sleeps under fog
 

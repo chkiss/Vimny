@@ -79,17 +79,17 @@ from tests import SEEDS
 #: Every operator+motion pair the player holds by this level. `d^` is in here
 #: because leaving it out is exactly how three of these corridors shipped
 #: broken — an audit is only as good as its worst-remembered motion.
-_ALTS = ('d w', 'd W', 'd e', 'd E', 'd b', 'd B',
-         'd 0', 'd ^', 'd $', 'd d', 'd F ?', 'd f ?')
+_ALTS = ('dw', 'dW', 'de', 'dE', 'db', 'dB',
+         'd0', 'd^', 'd$', 'dd', 'dF?', 'df?')
 
 #: corridor number -> the motions that tie its lesson at par. Every entry here
 #: is one of the three irreducible ties described above; there is no entry that
 #: a better layout could remove, and anything NEW appearing here is a bug in the
 #: level, not a line to add.
 _UNFORCED = {
-    1: {'d e'},          # e reaches exactly as far as w, from the word's head
-    7: {'d E'},          # the same tie, one word model up
-    8: {'d ^'},          # the phrase is the line's first non-blank
+    1: {'de'},           # e reaches exactly as far as w, from the word's head
+    7: {'dE'},           # the same tie, one word model up
+    8: {'d^'},           # the phrase is the line's first non-blank
 }
 
 
@@ -120,12 +120,15 @@ def _segments():
 
 
 def _cut_span(seg):
-    """Locate the `d {motion}` inside a segment as (index, token count).
-    `dF?`/`df?` are three tokens; everything else is two."""
+    """Locate the `d{motion}` inside a segment as (index, token count).
+
+    One token now, always: the tape groups an operator with what it acts on
+    (tests/test_tape_grouping.py), so `dF?` is a single run exactly as `dw` is.
+    It was `d F ?` — three runs — until 2026-08-03, which is why this used to
+    have to count them."""
     for i, t in enumerate(seg):
-        if t == 'd':
-            wide = i + 1 < len(seg) and seg[i + 1] in ('F', 'f', 'T', 't')
-            return i, (3 if wide else 2)
+        if len(t) >= 2 and t[0] == 'd':
+            return i, 1
     raise AssertionError(f'no cut in segment {seg!r} — the tape changed shape')
 
 

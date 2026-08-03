@@ -250,8 +250,8 @@ def test_flame_and_embers_are_untypable():
 @pytest.mark.parametrize("seed", SEEDS)
 def test_par_is_locked_and_answer_uses_the_lesson(seed):
     """par is seed-invariant (fixed geometry); the par path yanks the flame
-    (y l), pastes before twice (the hall brazier + the count-paste 3P), and
-    raises the beacon with y y + p P (below then above — the P leaves the
+    (yl), pastes before twice (the hall brazier + the count-paste 3P), and
+    raises the beacon with yy + p P (below then above — the P leaves the
     cursor one row under the seal row, saving the second k of the old p p
     route; player-found golf 2026-07-18). (Answer cost == par and the
     budget formula: covered by the universal tests.)"""
@@ -260,7 +260,10 @@ def test_par_is_locked_and_answer_uses_the_lesson(seed):
     toks = room.answer.split()
     assert '3P' in toks, "the beacon fill is ONE count-paste"
     assert toks.count('P') == 2 and toks.count('p') == 1
-    assert toks.count('y') == 3, "one yl + one yy on the par path"
+    # One run each, the operator grouped with what it takes — `y l` / `y y`
+    # until 2026-08-03 (tests/test_tape_grouping.py).
+    assert toks.count('yl') == 1 and toks.count('yy') == 1, \
+        "one yl + one yy on the par path"
 
 
 def test_walking_route_fits_the_budget():
