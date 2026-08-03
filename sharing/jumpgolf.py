@@ -115,6 +115,11 @@ class Result:
     best: int | None
     tape: str = ''
     steps: list = field(default_factory=list)
+    #: Jumps this level has TAUGHT. Empty is the ordinary state of the first ten
+    #: levels, not a failure — and it must not be reported as one. The curriculum
+    #: introduces G/gg at position 10 and H/M/L at 11, so eight shipped levels
+    #: have no jump to golf with and are silently, correctly, unimprovable.
+    taught: tuple = ()
 
     @property
     def beats_par(self) -> bool:
@@ -165,8 +170,9 @@ def golf(slug: str, *, heights=HEIGHTS, jumps=JUMPS, max_collapse=MAX_COLLAPSE,
     known = known_commands(slug)
     # TOKEN GATING, at the point of proposal. The level has to have taught it.
     cands = tuple(j for j in jumps if j in known)
-    out   = Result(slug=slug, par=room.par, canonical=None, best=None)
-    if not room.answer or not cands:
+    out   = Result(slug=slug, par=room.par, canonical=None, best=None,
+                   taught=cands)
+    if not room.answer:
         return out
 
     toks = room.answer.split(' ')
@@ -175,6 +181,8 @@ def golf(slug: str, *, heights=HEIGHTS, jumps=JUMPS, max_collapse=MAX_COLLAPSE,
     if best is None:                       # the shipped tape is height-sensitive
         return out                         # or does not win — not this tool's job
     out.tape = ' '.join(toks)
+    if not cands:
+        return out                 # nothing taught to golf WITH — see Result.taught
 
     def _try(trial, kind, at, was, now):
         nonlocal toks, best

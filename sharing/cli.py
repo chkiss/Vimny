@@ -130,8 +130,12 @@ def _cmd_jumpgolf(args) -> int:
                   f'  = {step.spent}', flush=True)
         res = JG.golf(slug, strip=args.strip, log=_log if args.verbose else None)
         if res.canonical is None:
-            print(f'{slug:26} — skipped: its own tape does not win at every '
-                  f'height (or does not win at all)')
+            print(f'{slug:26} — its own tape does not win at every height, or '
+                  f'does not win at all: nothing to compare against')
+            continue
+        if not res.taught:
+            print(f'{slug:26} par {res.par:>3}  no jump taught yet — '
+                  f'G/gg arrive at level 10, H/M/L at 11')
             continue
         mark = f'BEAT  {res.best} < par {res.par}' if res.beats_par else 'ok'
         print(f'{slug:26} par {res.par:>3}  golfed {res.best:>3}   {mark}',
