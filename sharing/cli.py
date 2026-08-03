@@ -128,7 +128,9 @@ def _cmd_jumpgolf(args) -> int:
         def _log(step, _s=slug):
             print(f'   {step.kind:<9} {step.was!r} @{step.at} -> {step.now!r}'
                   f'  = {step.spent}', flush=True)
-        res = JG.golf(slug, strip=args.strip, log=_log if args.verbose else None)
+        kw = dict(beam=JG.DEEP_BEAM, slack=JG.DEEP_SLACK) if args.deep else {}
+        res = JG.golf(slug, strip=args.strip, log=_log if args.verbose else None,
+                      **kw)
         if res.canonical is None:
             print(f'{slug:26} — its own tape does not win at every height, or '
                   f'does not win at all: nothing to compare against')
@@ -143,6 +145,8 @@ def _cmd_jumpgolf(args) -> int:
             mark += (f'   [CHEESE: {res.skipped_lesson} measured route(s) win '
                      f'cheaper (best {cheap}) by dropping {"/".join(res.lesson)} '
                      f'— close it; par is right]')
+        if res.exhausted:
+            mark += f'   [search hit its {res.evaluated}-tape budget — not exhaustive]'
         print(f'{slug:26} par {res.par:>3}  golfed {res.best:>3}   {mark}',
               flush=True)
         if res.beats_par:
@@ -257,6 +261,9 @@ def main(argv=None) -> int:
     p.add_argument('slugs', nargs='*', help='default: every shipped level')
     p.add_argument('-v', '--verbose', action='store_true',
                    help='show each accepted improvement as it is found')
+    p.add_argument('--deep', action='store_true',
+                   help='beam search with plateau moves and one-key detours — '
+                        'finds wins that need two edits, neither paying alone')
     p.add_argument('--strip', action='store_true',
                    help="also drop non-travel keys — asks 'is this level's own "
                         "work optional?', which is a design question, not a par one")

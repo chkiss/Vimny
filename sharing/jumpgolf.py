@@ -218,6 +218,12 @@ class Result:
     #: Those routes, as (tape, spend) — a refusal is only actionable if you can
     #: see the route it refers to.
     refused: list = field(default_factory=list)
+    #: How many distinct tapes were measured, and whether the search stopped
+    #: because it ran out of tapes or ran out of budget. An exhausted search is
+    #: a "no beat found" that has NOT looked everywhere, and saying so is the
+    #: difference between a result and a reassurance.
+    evaluated: int = 0
+    exhausted: bool = False
 
     @property
     def beats_par(self) -> bool:
@@ -257,8 +263,16 @@ def _spend_everywhere(slug, builder, toks, known, heights, verify=None):
     return first
 
 
+#: Search shape. beam=1 / slack=0 is greedy hill-climbing — fast, and blind to
+#: any win that needs two edits neither of which pays alone.
+BEAM, SLACK, MAX_EVALS = 1, 0, 4000
+#: What `--deep` uses. Four tapes alive, detours of up to one key admitted.
+DEEP_BEAM, DEEP_SLACK = 4, 1
+
+
 def golf(slug: str, *, heights=HEIGHTS, jumps=JUMPS, max_collapse=MAX_COLLAPSE,
-         strip=False, log=None) -> Result:
+         strip=False, beam=BEAM, slack=SLACK, max_evals=MAX_EVALS,
+         log=None) -> Result:
     """Golf one shipped level's tape down to a fixed point.
 
     `strip=True` lets the deletion pass drop ANY token, not just dead travel —
@@ -304,73 +318,103 @@ def golf(slug: str, *, heights=HEIGHTS, jumps=JUMPS, max_collapse=MAX_COLLAPSE,
     if not cands:
         return out                 # nothing taught to golf WITH — see Result.taught
 
-    def _try(trial, kind, at, was, now):
-        nonlocal toks, best
-        # MEASURE FIRST, then judge. Checking the lesson before replaying is
-        # cheaper and reports a lie: it counts trials that were never shown to
-        # win, let alone to win cheaper, and calling those "cheaper routes
-        # refused" invents cheeses that do not exist. A refusal is only worth
-        # reporting when the route it refers to is real.
-        got = _spend_everywhere(slug, builder, trial, known, heights, verify)
-        # `<=` for deletions: a token whose removal costs nothing was doing
-        # nothing, and dropping it is an improvement even at equal price.
-        better = got is not None and (got < best or (kind == 'delete' and got <= best))
-        if not better:
-            return False
-        if not _teaches_still(trial):
-            # A REAL cheaper route that skips the lesson: a cheese to close,
-            # not a par to lower. Counted, never taken.
-            out.skipped_lesson += 1
-            out.refused.append((' '.join(trial), got))
-            return False
-        step = Step(kind=kind, at=at, was=was, now=now, spent=got)
-        out.steps.append(step)
-        if log:
-            log(step)
-        toks, best = trial, got
-        return True
+    memo = {' '.join(toks): best}
 
-    changed = True
-    while changed:
-        changed = False
-        # ── 1. substitute: one travel token → one jump ──────────────────────
-        for i, tok in enumerate(toks):
+    def _measure(trial):
+        """Cost of a candidate tape, cached. The cache is what makes a beam
+        affordable: different search paths reach the same tape constantly, and
+        each measurement is a full replay at every height."""
+        key = ' '.join(trial)
+        if key not in memo:
+            memo[key] = _spend_everywhere(slug, builder, trial, known,
+                                          heights, verify)
+        return memo[key]
+
+    def _successors(state):
+        """Every one-edit neighbour of a tape: substitute, collapse, delete."""
+        for i, tok in enumerate(state):
             if not TRAVEL.match(tok):
                 continue
             for c in cands:
-                if c == tok:
-                    continue
-                if _try(toks[:i] + [c] + toks[i + 1:], 'sub', i, tok, c):
-                    changed = True
-                    break
-            if changed:
-                break
-        if changed:
-            continue
-        # ── 2. collapse: a RUN of travel tokens → one jump ──────────────────
+                if c != tok:
+                    yield state[:i] + [c] + state[i + 1:], 'sub', i, tok, c
         for n in range(2, max_collapse + 1):
-            for i in range(len(toks) - n + 1):
-                run = toks[i:i + n]
+            for i in range(len(state) - n + 1):
+                run = state[i:i + n]
                 if not all(TRAVEL.match(t) for t in run):
                     continue
                 for c in cands:
-                    if _try(toks[:i] + [c] + toks[i + n:], 'collapse', i,
-                            ' '.join(run), c):
-                        changed = True
-                        break
-                if changed:
+                    yield (state[:i] + [c] + state[i + n:], 'collapse', i,
+                           ' '.join(run), c)
+        for i, tok in enumerate(state):
+            if strip or TRAVEL.match(tok):
+                # an EDIT being droppable is a different question — see --strip
+                yield state[:i] + state[i + 1:], 'delete', i, tok, ''
+
+    # ── the search ──────────────────────────────────────────────────────────
+    #
+    # Greedy hill-climbing (beam=1, slack=0) is the default and reproduces what
+    # this tool has always done. It has one blind spot, and it is not a small
+    # one: it takes the FIRST improvement it finds and never looks at a tape
+    # that is not immediately cheaper, so a win that needs two edits — where
+    # neither edit pays on its own — is invisible to it. `0 3j` -> `G` was only
+    # ever caught because the first edit happened to leave the second key dead.
+    #
+    # `beam` keeps the K cheapest tapes alive instead of one; `slack` admits
+    # tapes up to K keys DEARER than the best so far, which is what lets a
+    # two-edit win be assembled through a step that pays nothing. slack=0 still
+    # admits ties, i.e. plateau moves, which is the cheap half of the same idea.
+    # `max_evals` bounds the whole thing: this is a search over tapes, and the
+    # measurement is a full replay, so it needs a ceiling rather than a promise.
+    best_toks = list(toks)
+    frontier  = [(best, list(toks))]
+    seen      = {' '.join(toks)}
+    parent    = {}                       # tape -> (parent tape, Step)
+
+    while frontier and len(memo) < max_evals:
+        nxt = []
+        for _cost, state in frontier:
+            for trial, kind, at, was, now in _successors(state):
+                if len(memo) >= max_evals:
                     break
-            if changed:
-                break
-        if changed:
-            continue
-        # ── 3. delete: was that key doing anything at all? ──────────────────
-        for i, tok in enumerate(toks):
-            if not strip and not TRAVEL.match(tok):
-                continue        # an EDIT being droppable is a different question
-            if _try(toks[:i] + toks[i + 1:], 'delete', i, tok, ''):
-                changed = True
-                break
+                key = ' '.join(trial)
+                if key in seen:
+                    continue
+                seen.add(key)
+                got = _measure(trial)
+                if got is None:
+                    continue             # does not win, or is height-sensitive
+                if not _teaches_still(trial):
+                    if got < best:
+                        # A REAL cheaper route that skips the lesson: a cheese
+                        # to close, not a par to lower. Counted, never walked.
+                        out.skipped_lesson += 1
+                        out.refused.append((key, got))
+                    continue
+                parent[key] = (' '.join(state),
+                               Step(kind=kind, at=at, was=was, now=now, spent=got))
+                if got < best:
+                    best, best_toks = got, list(trial)
+                    if log:
+                        log(parent[key][1])
+                # Admit ties and, with slack, small detours — that is the whole
+                # point of not being greedy.
+                if got <= best + slack:
+                    nxt.append((got, list(trial)))
+        nxt.sort(key=lambda p: p[0])
+        frontier = nxt[:beam]
+
+    out.evaluated = len(memo)
+    out.exhausted = len(memo) >= max_evals
+    toks = best_toks
+    # Walk the parent chain back so `steps` describes how the winner was built,
+    # not the order the search happened to visit things in.
+    chain, cur = [], ' '.join(best_toks)
+    while cur in parent:
+        prev, step = parent[cur]
+        chain.append(step)
+        cur = prev
+    out.steps = list(reversed(chain))
 
     out.best = best
     out.tape = ' '.join(toks)
