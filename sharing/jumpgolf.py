@@ -28,7 +28,14 @@ drop and reasoned about the other three, and the route that exists was 55.
 Three passes, applied to a level's own tape until nothing more improves:
 
   SUBSTITUTE  one token → one jump.  `4G` → `G`.
-  COLLAPSE    a run of 2..4 adjacent tokens → one jump.  `0 3j` → `G`.
+  COLLAPSE    a run of adjacent TRAVEL tokens → one jump.  `0 3j` → `G`.
+              The run may be as long as the tape has; see MAX_COLLAPSE. What
+              it may NOT do is span an edit: `0 x 3j` is not collapsible to
+              `G x`, because that does not shorten the travel — it REORDERS the
+              cut relative to it, which is a different route rather than a
+              cheaper spelling of this one, and whether it works depends on
+              what `x` was standing on. Multi-edit routes are the beam's job
+              (see `beam`/`slack`), not the collapse pass's.
               This pass is why the module exists. A substitute-only sweep
               found the `operators_vault` drops by accident — swapping the
               `0` left the `3j` dead, and the deletion pass swept it up — and
@@ -119,8 +126,27 @@ TRAVEL = re.compile(
     r'|[`\'].'                                        # a mark jump
     r')$')
 
-#: Longest run of adjacent tokens a single jump may replace.
-MAX_COLLAPSE = 4
+#: Longest run of adjacent travel tokens a single jump may replace.
+#:
+#: `None` means "as long as this tape's longest contiguous travel run", which is
+#: the only honest value: a run longer than that does not exist, so the bound
+#: costs nothing and can never be the reason a beat was missed. It was 4 —
+#: a magic number that happened not to bite, because the only shipped tape with
+#: a longer run is The Line Halls (6), which sits before any jump is taught and
+#: is therefore never golfed at all. A limit that is not currently binding is
+#: still a trap: the next level with a five-token walk and a jump in its
+#: curriculum would have been silently under-searched, and nothing would have
+#: said so (2026-08-03).
+MAX_COLLAPSE = None
+
+
+def longest_travel_run(toks) -> int:
+    """The longest stretch of consecutive TRAVEL tokens in a tape."""
+    run = best = 0
+    for t in toks:
+        run = run + 1 if TRAVEL.match(t) else 0
+        best = max(best, run)
+    return best
 
 #: THE ACCEPTANCE RULE: a shorter route is a par fix only if THE LEVEL STILL
 #: TEACHES ITS LESSON. A route that wins by skipping the thing the level exists
@@ -374,7 +400,11 @@ def golf(slug: str, *, seed: int = 0, heights=HEIGHTS, jumps=JUMPS,
             for c in cands:
                 if c != tok:
                     yield state[:i] + [c] + state[i + 1:], 'sub', i, tok, c
-        for n in range(2, max_collapse + 1):
+        # Bound by the tape, not by a constant: runs longer than this state's
+        # longest travel stretch do not exist, so raising the ceiling to it adds
+        # only REAL candidates and never a wasted replay.
+        limit = max_collapse if max_collapse is not None else longest_travel_run(state)
+        for n in range(2, limit + 1):
             for i in range(len(state) - n + 1):
                 run = state[i:i + n]
                 if not all(TRAVEL.match(t) for t in run):
