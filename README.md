@@ -27,9 +27,9 @@ Editing reflows the line exactly as Vim does: insert, delete or paste and the re
 
 **Keystroke budget**: Every puzzle room displays a budget. Reaching the exit within it completes the room. The par is the minimum possible keystrokes using the level's taught commands — hitting par earns a second star. `u` (undo) returns budget; you can backtrack freely.
 
-> **Note — `u` undoes motions, which Vim's does not.** In Vim, undo is for *changes*: it will not walk your cursor back from a `4j`. In Vimny it will, refunding the keystrokes with it. This is a deliberate break with faithfulness, and the only one in the movement keys — a game that charges you for every keypress has to let you take a wrong turn back, or exploring a room becomes something you pay for and learners stop trying things. Everything `u` does to *edits* is Vim's behaviour, undo stack and all.
+> **Note — `u` undoes motions, which Vim's does not.** In Vim, undo is for *changes*: it will not walk your cursor back from a `4j`. In Vimny it will, refunding the keystrokes with it. This is a deliberate break, made so that a wrong turn is not something you pay for. Everything `u` does to *edits* is Vim's behaviour, undo stack and all.
 
-> **Note — par is not the absolute minimum on search levels.** On levels that use search (`/`, `?`), par is computed assuming you type the **full search term** the level highlights (e.g. `/cipher<CR>`). Because a search pattern only needs enough characters to land uniquely on the target, an expert can type a shorter prefix (e.g. `/cip<CR>`) and finish *under* par. This is intentional; par matches playing all puzzles all the way through, but if you can search a partial term or guess the answer to a puzzle without playing it out, you may be able to beat par on some levels.
+> **Note — par is not the absolute minimum on search levels.** On levels that use search (`/`, `?`), par is computed assuming you type the **full search term** the level highlights (e.g. `/cipher<CR>`). Because a search pattern only needs enough characters to land uniquely on the target, an expert can type a shorter prefix (e.g. `/cip<CR>`) and finish *under* par. This is intentional: par assumes you play the puzzle out rather than guess its answer.
 
 **Terrain**: Levels use terrain to make a particular Vim command the *only* good answer, rather than merely the intended one.
 
@@ -45,21 +45,21 @@ Requirements are just Linux or macOS, Python 3.9+, and a terminal at least 80 co
 uvx vimny
 ```
 
-That needs nothing installed but [uv](https://docs.astral.sh/uv/), which will fetch Python itself if you haven't got one. Or, if you'd rather it stayed on your machine:
+Requires [uv](https://docs.astral.sh/uv/), which fetches its own Python.
 
 ```bash
-pipx install vimny          # or: pip install vimny
+pip install vimny
 vimny
 ```
 
-Both work the same on Linux and macOS.
+Requires [pip](https://pip.pypa.io/) and Python 3.9+.
 
 Progress saves to `~/.Vimny/saves/<player>.json`, one file per player.
 
 <details>
 <summary>Playing from a clone</summary>
 
-If you want to read or change the code, skip the packaged install:
+To read or change the code, skip the packaged install:
 
 ```bash
 git clone --depth 1 https://github.com/chkiss/Vimny.git
@@ -68,8 +68,7 @@ pip install blessed
 python3 main.py
 ```
 
-`--depth 1` is worth it — the full history is 13 MB against a 2 MB working tree.
-(You'll want the whole history if you intend to send a pull request.)
+`--depth 1` skips 13 MB of history. Drop it if you intend to send a pull request.
 
 </details>
 
@@ -80,10 +79,9 @@ The playfield grows with the window up to **189 columns** — the overworld and
 The Archivist's Library use the extra width — and stops widening beyond that.
 80 columns is the supported minimum.
 
-Windows is untested rather than unsupported: Vimny reaches the console through
-blessed and jinxed, which ought to work in Windows Terminal, but nobody has
-confirmed it. `pip install vimny` is the thing to try, and an
-[issue](https://github.com/chkiss/Vimny/issues) either way would be welcome.
+Vimny reaches the console through blessed and jinxed, which ought to work in
+Windows Terminal (untested). Try `pip install vimny` and submit an
+[issue](https://github.com/chkiss/Vimny/issues) if that leads to an error.
 
 </details>
 
@@ -310,7 +308,7 @@ Vimny aims for Vim-faithfulness in everything it *does* implement, but some comm
 - **Scrolling & viewport** — `zz` `zt` `zb` `<C-d>` `<C-u>` `<C-f>` `<C-b>` `<C-e>` `<C-y>`: dungeons fit the screen; there is no viewport-scroll model (`H`/`M`/`L` are the only screen-relative commands).
 - **`U` (vi's line-undo)** — `u` and the redo scroll (`<C-r>`) cover the undo story; a third undo channel would complicate it for a key modern Vim users rarely reach for.
 - **Window/tab/buffer management** — Vimny is a single buffer by design; each dungeon *is* the file. On the roadmap, not in the curriculum.
-- **Insert-mode editing keys** — `<C-w>`, `<C-u>`, `<C-o>`, `<C-r>{reg}` are implemented and can be found as scrolls, but no level *teaches* them. They are priced to be free (`<C-w>` and `<C-u>` cost nothing; `<C-r>` charges per pasted character, exactly what typing the text would cost), so no puzzle can force them at par — which is what a Vimny level does. Pricing them by keystroke instead would make a register paste cheaper than typing and hand every text-entry level a shortcut, so they stay free flourishes rather than curriculum.
+- **Insert-mode editing keys** — `<C-w>`, `<C-u>`, `<C-o>`, `<C-r>{reg}` are implemented and can be found as scrolls, but no level *teaches* them. They are priced to be free (`<C-w>` and `<C-u>` cost nothing; `<C-r>` charges per pasted character, exactly what typing the text would cost), so no puzzle can force them at par. Pricing them by keystroke would make a register paste cheaper than typing and hand every text-entry level a shortcut.
 - **Completion, plugins, ex-mode scripting** — out of scope.
 - **NORMAL-mode `Enter`** — a duplicate of `+`, which the Stair Rail
   already teaches.
@@ -387,7 +385,7 @@ Run the tests with `python3 -m pytest`, and `python3 -m vimny.sharing audit` to 
 
 There are two ways in, and they produce the same thing — a level is a plain JSON file either way.
 
-**In the game — the forge.** An authoring bench in the overworld under `forge/`, where a level is built by playing it: paint the room, place the text and the doors, then `:record` walks your own solution and captures it as the level's answer. The par comes from replaying that recording, so a level cannot ship claiming a route nobody has walked. The forge is **admin-only** — sign in with the player name `admin` to reach it. Be warned that the same name also unlocks every level and shows you each puzzle's solution as you play, so use a separate save for authoring rather than the one you are playing on.
+**In the game — the forge.** An authoring bench in the overworld under `forge/`, where a level is built by playing it: paint the room, place the text and the doors, then `:record` walks your own solution and captures it as the level's answer. The par comes from replaying that recording, so a level cannot ship claiming a route nobody has walked. The forge is **admin-only** — sign in with the player name `admin` to reach it. That name also unlocks every level and reveals each puzzle's solution, so use a separate save for authoring.
 
 **In a text editor.** The format is documented, so you never have to use the forge:
 
