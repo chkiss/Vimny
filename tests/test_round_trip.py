@@ -43,8 +43,8 @@ from __future__ import annotations
 import pytest
 
 import main
-import sharing.format as F
-from content.levels import LEVELS
+import vimny.sharing.format as F
+from vimny.content.levels import LEVELS
 
 SEED = 4242
 ENTRIES = {e['slug']: e for e in LEVELS}

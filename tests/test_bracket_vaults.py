@@ -32,8 +32,8 @@ Optimal path (par=10):  % j x j % 2j $ p l
 Without %: par_no_% = None (the water band is uncrossable by hand).
 """
 import pytest
-from engine.world import CellType
-from generation.dungeon_gen import (
+from vimny.engine.world import CellType
+from vimny.generation.dungeon_gen import (
     build_dungeon_bracket_vaults,
     _par_bracket_vaults,
     _BRACKET_VAULTS_ROWS, _BRACKET_VAULTS_COLS, _BRACKET_VAULTS_CORR_ROWS,
@@ -138,7 +138,7 @@ def test_exit_entity_at_exit_pos(seed):
 def test_key_and_door_gate_the_exit(seed):
     """Exactly one floor_key (at KEY_POS) and one locked_door (at DOOR_POS, one cell left of
     the exit) must gate the exit — the mechanism that makes par the true minimum."""
-    from generation.dungeon_gen import _BRACKET_VAULTS_KEY_POS, _BRACKET_VAULTS_DOOR_POS
+    from vimny.generation.dungeon_gen import _BRACKET_VAULTS_KEY_POS, _BRACKET_VAULTS_DOOR_POS
     d = build_dungeon_bracket_vaults(seed)
     room = d.rooms[0]
     keys  = [e for e in room.entities if e.kind == 'floor_key']
@@ -284,7 +284,7 @@ def test_room_dimensions():
 def test_moat_and_decoy_goblin_pit(seed):
     """Below the snake: a full-water moat (row 6) seals off a decoy corridor (row 7)
     that holds goblins — so G/L land there, not on the (interior) exit row."""
-    from generation.dungeon_gen import (_BRACKET_VAULTS_MOAT_ROW, _BRACKET_VAULTS_DECOY_ROW,
+    from vimny.generation.dungeon_gen import (_BRACKET_VAULTS_MOAT_ROW, _BRACKET_VAULTS_DECOY_ROW,
                                         _BRACKET_VAULTS_DECOY_GOBLINS)
     d = build_dungeon_bracket_vaults(seed)
     room = d.rooms[0]

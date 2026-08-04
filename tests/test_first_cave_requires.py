@@ -19,7 +19,7 @@
 """Prove every hjkl direction is required to complete the First Cave."""
 from collections import deque
 import pytest
-from generation.dungeon_gen import build_dungeon_first_cave
+from vimny.generation.dungeon_gen import build_dungeon_first_cave
 
 from tests import SEEDS
 DELTA = {'h': (0, -1), 'j': (1, 0), 'k': (-1, 0), 'l': (0, 1)}

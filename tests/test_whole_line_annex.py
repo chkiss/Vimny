@@ -37,12 +37,12 @@ from blessed.keyboard import Keystroke
 from blessed import Terminal
 
 import main
-from engine.motion import apply_motion
-from engine.tape import ESC as TAPE_ESC
-from engine.player import Player
-from engine.world import CellType
-from content.levels import known_commands
-from generation.dungeon_gen import (
+from vimny.engine.motion import apply_motion
+from vimny.engine.tape import ESC as TAPE_ESC
+from vimny.engine.player import Player
+from vimny.engine.world import CellType
+from vimny.content.levels import known_commands
+from vimny.generation.dungeon_gen import (
     build_dungeon_whole_line_annex, _wla_pick, _wla_route, _wla_answer,
     _WLA_VERB, _WLA_DOORS,
     _WLA_ROWS, _WLA_COLS, _WLA_COL_S, _WLA_LBL_COL, _WLA_LBL_END,
@@ -444,7 +444,7 @@ def test_answer_is_the_real_keystroke_tape(seed):
     """room.answer is the printable keystrokes of the canonical route, so the
     admin answer-sheet tracks it keystroke for keystroke. Plain spaces are
     display separators; a step that TYPES text is sealed with Esc, written <Esc>
-    (engine/tape.py), because a replayer cannot infer it the way a reader can.
+    (vimny/engine/tape.py), because a replayer cannot infer it the way a reader can.
     No typed value contains a space."""
     room = _room(seed)
     expected = ''.join(keys + typed + (TAPE_ESC if typed else '')

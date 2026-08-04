@@ -20,9 +20,9 @@
 
 Personality defined in agents/bug_testers.md.
 """
-from engine.world import Room, RoomType, CellType, CharRun
-from engine.player import Player
-from engine.motion import apply_motion, move_player
+from vimny.engine.world import Room, RoomType, CellType, CharRun
+from vimny.engine.player import Player
+from vimny.engine.motion import apply_motion, move_player
 
 
 def _bare_room(rows=7, cols=30):

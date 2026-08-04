@@ -23,49 +23,49 @@ import random, time, argparse, re
 from collections import deque
 from pathlib import Path
 from blessed import Terminal
-import render.colors as C
-from render.renderer import render_all
-import render.symbols as S
-from render.utils import inner_w as _iw
-from render.overworld import (render_overworld, build_lines, default_cursor,
+import vimny.render.colors as C
+from vimny.render.renderer import render_all
+import vimny.render.symbols as S
+from vimny.render.utils import inner_w as _iw
+from vimny.render.overworld import (render_overworld, build_lines, default_cursor,
                               line_search_text)
-from sharing.library import build_shelved, list_levels as community_levels
-from sharing import remote as REMOTE
-import sharing.draft as DRAFT
-import sharing.format as LF
-import sharing.submit as SUBMIT
-from sharing.vocab import (POOLS as _VOCAB_POOLS, LINE_POOLS as _VOCAB_LINE_POOLS,
+from vimny.sharing.library import build_shelved, list_levels as community_levels
+from vimny.sharing import remote as REMOTE
+import vimny.sharing.draft as DRAFT
+import vimny.sharing.format as LF
+import vimny.sharing.submit as SUBMIT
+from vimny.sharing.vocab import (POOLS as _VOCAB_POOLS, LINE_POOLS as _VOCAB_LINE_POOLS,
                            min_saying_width as _min_saying_width)
-from engine.vimregex import compile_vim as _vre_compile
-from render.title import render_title, render_save_select, select_quote, select_quote_by_name, select_next_lesson_quote, next_lesson_quote_entry, format_quote, MENU_ITEMS as _TITLE_MENU, NAME_MAX as _NAME_MAX
-from render.wizard_blessing import run_wizard_blessing
-from engine.player import Player
-from engine.modes import Mode
-from engine.tape import (ESC as _TAPE_ESC, ENTER as _TAPE_ENTER,
+from vimny.engine.vimregex import compile_vim as _vre_compile
+from vimny.render.title import render_title, render_save_select, select_quote, select_quote_by_name, select_next_lesson_quote, next_lesson_quote_entry, format_quote, MENU_ITEMS as _TITLE_MENU, NAME_MAX as _NAME_MAX
+from vimny.render.wizard_blessing import run_wizard_blessing
+from vimny.engine.player import Player
+from vimny.engine.modes import Mode
+from vimny.engine.tape import (ESC as _TAPE_ESC, ENTER as _TAPE_ENTER,
                          SPACE as _TAPE_SPACE, CTRL_V as _TAPE_CTRL_V,
                          from_keystroke as _tape_key)
-from engine.budget import Budget
-from engine.vim_parser import parse, parse_visual_textobj
-from engine.command_guard import (action_allowed as _action_allowed_raw,
+from vimny.engine.budget import Budget
+from vimny.engine.vim_parser import parse, parse_visual_textobj
+from vimny.engine.command_guard import (action_allowed as _action_allowed_raw,
                                   guard_message as _guard_message_raw,
                                   _MOTION_GUARD as _MOTION_GUARD_TABLE)
-from engine.world import (DROPPABLE, Entity, CellType, CharRun, Dungeon, Seal,
+from vimny.engine.world import (DROPPABLE, Entity, CellType, CharRun, Dungeon, Seal,
                           SEAL_OPENED, canonical_kind, clone_entity,
                           entity_letter, strike_disguise)
-from engine.motion import (apply_motion, _apply_esc, _reveal_from,
+from vimny.engine.motion import (apply_motion, _apply_esc, _reveal_from,
                            _first_non_blank_col, auto_fog_tick as _auto_fog_tick,
                            enforce_fog_law as _enforce_fog_law, unhide_region)
-from engine.text_object import compute_text_object, resolve_text_object, TextObjectType
-from engine.search import find_next as _search_next, word_under_cursor as _word_under_cursor
-from engine.warden_mega import mega_tick
-from engine.options import apply_set as _apply_set, parse_modifier as _parse_set_mod
-from engine.macro import synth_key as _synth_key, record_char as _record_char
-from engine.jumplist import record_jump as _record_jump, jump_back as _jump_back, jump_forward as _jump_forward
-from engine.registers import (write_register as _reg_write, read_register as _reg_read,
+from vimny.engine.text_object import compute_text_object, resolve_text_object, TextObjectType
+from vimny.engine.search import find_next as _search_next, word_under_cursor as _word_under_cursor
+from vimny.engine.warden_mega import mega_tick
+from vimny.engine.options import apply_set as _apply_set, parse_modifier as _parse_set_mod
+from vimny.engine.macro import synth_key as _synth_key, record_char as _record_char
+from vimny.engine.jumplist import record_jump as _record_jump, jump_back as _jump_back, jump_forward as _jump_forward
+from vimny.engine.registers import (write_register as _reg_write, read_register as _reg_read,
                               record_register as _reg_record, clip_to_keys as _reg_keys,
                               clip_to_text as _reg_text)
-from engine.visual import apply_visual, block_bounds, apply_visual_replace, in_selection
-from content.scrolls import (
+from vimny.engine.visual import apply_visual, block_bounds, apply_visual_replace, in_selection
+from vimny.content.scrolls import (
     # Codex scroll content rendered by _show_scroll_by_id (_STD_SCROLLS map);
     # every other catalogue scroll renders via _show_catalog_scroll.
     RELIQUARY_SCROLL, WARDEN_LEAP_SCROLL, WARDEN_SIGHT_SCROLL, SURVEYORS_PATH_SCROLL,
@@ -76,25 +76,25 @@ from content.scrolls import (
 )
 
 _JUMP_MOTIONS = frozenset({'G', 'gg', '%', '{', '}', '(', ')'})
-from engine.operator import op_delete, op_yank, op_paste, op_case, op_join, case_char, case_entities, apply_indent, apply_equalize, law_column, INDENT_WIDTH, entity_clip
-from engine.reflow import is_ledge, close_gap, void_col, _insert_blank_row, remove_row, split_line_down
-from engine import substitute as _subst
-from engine.insert import (
+from vimny.engine.operator import op_delete, op_yank, op_paste, op_case, op_join, case_char, case_entities, apply_indent, apply_equalize, law_column, INDENT_WIDTH, entity_clip
+from vimny.engine.reflow import is_ledge, close_gap, void_col, _insert_blank_row, remove_row, split_line_down
+from vimny.engine import substitute as _subst
+from vimny.engine.insert import (
     begin_insert, insert_char, insert_char_extend, insert_backspace,
     insert_delete_word_back, insert_delete_to_start,
     replace_chars, replace_overtype, replace_restore,
 )
-from engine.editor import (
+from vimny.engine.editor import (
     _merge_adjacent_char_runs, _split_run_at, _ed_cut, _ed_snapshot, _ed_restore, _ed_paint,
     PAINT_KINDS,
     _ed_paste, _ed_row_items, _ed_clear_row, _ed_range_items, _ed_delete_range,
     _clip_desc, _serialize_room, _deserialize_room, in_fill as _in_fill,
     slot_at as _slot_at,
 )
-import generation.dungeon_gen as _dg
-from generation.room_gen import RUNE_CHAR as _RUNE_CHAR
-from content.levels import LEVELS, is_unlocked, level_type, known_commands as _known_commands
-import save.save_manager as SM
+import vimny.generation.dungeon_gen as _dg
+from vimny.generation.room_gen import RUNE_CHAR as _RUNE_CHAR
+from vimny.content.levels import LEVELS, is_unlocked, level_type, known_commands as _known_commands
+import vimny.save.save_manager as SM
 
 
 _WATER_SETTLE_SECS = 60   # stop animating water after this many idle seconds
@@ -377,7 +377,7 @@ def _known_from_progress(progress: dict) -> set:
 def _record_blessing_seen(progress: dict, player_name: str, name: str) -> None:
     """Bind a just-recited blessing into progress['blessings_seen'] so it appears
     in the scroll library's blessings/ subtree and the Codex blessings fold."""
-    from content.blessings import blessing_id_for_name
+    from vimny.content.blessings import blessing_id_for_name
     bid = blessing_id_for_name(name)
     if not bid:
         return
@@ -674,7 +674,7 @@ _ENTITY_BOOL_FIELDS = ('swole', 'edit_immune', 'opaque', 'lit')
 
 #: The COLOURS the renderer actually paints on a key or a lock. Tag pairing is
 #: pure string equality, so `tag=orange` pairs perfectly well — it just draws in
-#: the default brass, because there is no orange in `render/colors.py`. That gap
+#: the default brass, because there is no orange in `vimny/render/colors.py`. That gap
 #: is invisible from inside the game (you get a key; it is simply the wrong
 #: colour), which is exactly why the picker names the three it knows.
 _KEY_COLOURS = ('gold', 'red', 'blue')
@@ -731,7 +731,7 @@ def _entity_choices(kind: str, field: str, custom=()):
     the level what its words are should not have to type one of them again by
     hand at the one place it matters most."""
     if field == 'scroll_id':
-        from content.scrolls import SCROLL_CATALOG
+        from vimny.content.scrolls import SCROLL_CATALOG
         return ('',) + tuple(s['id'] for s in SCROLL_CATALOG)
     if field == 'password':
         # The author's OWN words first, then the shipped pools. First because a
@@ -742,7 +742,7 @@ def _entity_choices(kind: str, field: str, custom=()):
         # text, which splits on whitespace — the same substitution an author
         # would have to type, offered rather than explained. The free-text row
         # below the list stays, because neither pool has to be the answer.
-        from content.passwords import POOLS
+        from vimny.content.passwords import POOLS
         shipped = tuple(w for _name, words, _note in POOLS for w in words)
         mine    = tuple(w for w in custom if w and w not in shipped)
         return tuple(w.replace(' ', '_') for w in mine + shipped)
@@ -760,7 +760,7 @@ def _choice_note(field: str, value: str, custom=()) -> str:
     fixed = _CHOICE_NOTES.get((field, value), '')
     if fixed or field != 'password':
         return fixed
-    from content.passwords import POOLS
+    from vimny.content.passwords import POOLS
     plain = value.replace('_', ' ')
     for name, words, note in POOLS:
         if plain in words:
@@ -1304,7 +1304,7 @@ def _pick_many(term: Terminal, iw: int, game_h: int,
 #: from the same table the hint bar is built from, so the picker cannot drift
 #: from what the keys actually do.
 def _teachable_tokens() -> list:
-    from render.hint_bar import CMD as _CMD
+    from vimny.render.hint_bar import CMD as _CMD
     out, seen = [], set()
     for _lv in LEVELS:
         for _t in _lv.get('teaches', ()):
@@ -1650,7 +1650,7 @@ def _show_catalog_scroll(term: Terminal, iw: int, game_h: int,
     """Render any SCROLL_CATALOG scroll by id via the standard renderer — used
     for the relic (randomly dropped) scrolls, which all use the 'lines'
     format."""
-    from content.scrolls import SCROLL_CATALOG
+    from vimny.content.scrolls import SCROLL_CATALOG
     for s in SCROLL_CATALOG:
         if s['id'] == scroll_id:
             _render_standard_scroll(term, iw, game_h, s['content'], known)
@@ -1680,7 +1680,7 @@ def _show_scroll_by_id(term: Terminal, iw: int, game_h: int,
     elif sid in _STD_SCROLLS:
         _render_standard_scroll(term, iw, game_h, _STD_SCROLLS[sid], known)
     elif sid.startswith('blessing_'):
-        from content.blessings import blessing_scroll_content
+        from vimny.content.blessings import blessing_scroll_content
         _bc = blessing_scroll_content(sid)
         if _bc is not None:
             _render_standard_scroll(term, iw, game_h, _bc, known)
@@ -1935,7 +1935,7 @@ def _void_screen_xy(term, room, player, r, c):
 def _play_void_falls(term, dungeon, room, player):
     """Animate any characters the last reflow shoved over a ledge into the void.
 
-    Reads room._last_void_falls (populated by engine/reflow.py), queues the drop
+    Reads room._last_void_falls (populated by vimny/engine/reflow.py), queues the drop
     at each fallen cell, then clears the list. Returns True if anything fell."""
     falls = getattr(room, '_last_void_falls', None)
     if not falls:
@@ -2234,7 +2234,7 @@ def _calc_stars(won: bool, budget: Budget, room, player, level: str = '') -> int
 
 
 def _build_dungeon(slug: str, seed: int, game_h: int = 33, admin: bool = False):
-    # Builders are named by slug (content/levels.py): build_dungeon_<slug>.
+    # Builders are named by slug (vimny/content/levels.py): build_dungeon_<slug>.
     builder = getattr(_dg, f'build_dungeon_{slug}', _dg.build_dungeon_first_cave)
     if slug == 'screen_vault':
         # The Screen Vault: only solve the (admin-only) answer path when admin —
@@ -3046,7 +3046,7 @@ def _paragraph_enclosure_tick(room, player) -> list:
         tops = [e for e in flames if e.row == min(f.row for f in flames)]
         if len(tops) == 1:
             r0, c0 = tops[0].row, tops[0].col
-            from generation.dungeon_gen import _PE_SIGIL
+            from vimny.generation.dungeon_gen import _PE_SIGIL
             sigil = ({(e.row, e.col) for e in flames}
                      == {(r0 + dr, c0 + dc) for dr, dc in _PE_SIGIL})
     all_true = sigil and not legion
@@ -5113,7 +5113,7 @@ def _horse_blocked(level: str, room) -> bool:
 def _place_first_cave_horse(room) -> None:
     """Stand the wizard's horse (♞) on an empty floor cell near the entry — a
     post-game Easter egg. No-op if one is already there or no free cell exists."""
-    from engine.world import CellType
+    from vimny.engine.world import CellType
     if any(e.kind == 'horse' for e in room.entities):
         return
     sr, sc = room.spawn_pos
@@ -5863,7 +5863,7 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
         exit_row = room.exit_pos[0]
         for r in range(room.rows - 2, exit_row, -1):
             if any(room.cells[r][c] == CellType.FLOOR for c in range(room.cols)):
-                from engine.reflow import remove_row as _rm_row
+                from vimny.engine.reflow import remove_row as _rm_row
                 if _rm_row(room, r, player):
                     if player.row >= r:
                         player.row = exit_row
@@ -7667,9 +7667,9 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
                           and player_name != 'admin'):
                         _push('You carry no codex to open.')
                     else:
-                        from engine.codex import CodexPane, scroll_sections
-                        from content.scrolls import SCROLL_CATALOG, RELIC_SCROLL_IDS
-                        from content.blessings import blessing_sections
+                        from vimny.engine.codex import CodexPane, scroll_sections
+                        from vimny.content.scrolls import SCROLL_CATALOG, RELIC_SCROLL_IDS
+                        from vimny.content.blessings import blessing_sections
                         _extras = progress.get('extras', [])
                         _codex_cat  = [s for s in SCROLL_CATALOG if s['id'] not in RELIC_SCROLL_IDS]
                         _relic_cat  = [s for s in SCROLL_CATALOG if s['id'] in RELIC_SCROLL_IDS]
@@ -7863,7 +7863,7 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
             if key.name == 'KEY_ESCAPE':
                 # Karaoke: the tape marks Esc `<Esc>`. It used to be omitted (a
                 # player following the sheet can infer that typing ends), but an
-                # omitted key cannot be REPLAYED — see engine/tape.py. Esc spends
+                # omitted key cannot be REPLAYED — see vimny/engine/tape.py. Esc spends
                 # no budget, so writing it changes no level's par.
                 if player_name == 'admin' and room.answer:
                     _advance_answer(_TAPE_ESC)
@@ -10054,7 +10054,7 @@ def run_scroll_library(term: Terminal, player: Player, progress: dict) -> str | 
             'parent' → go up to ~/.vimny/ parent view
             'saves'  → open character select
     """
-    from render.scroll_library import (render_scroll_library, library_rows,
+    from vimny.render.scroll_library import (render_scroll_library, library_rows,
                                         row_label, row_section_key)
 
     _rows = library_rows()
@@ -10156,7 +10156,7 @@ def run_colors(term: Terminal, player: Player) -> None:
     Admin-only, so every motion is ungated — but it drives the same shared
     NetrwNav engine as the overworld and scroll library, so gg/G/{n}G, H/M/L,
     {/}, w, /-search, counts and the rest all work over the colour list."""
-    from render.color_palette import (render_color_palette, palette_rows,
+    from vimny.render.color_palette import (render_color_palette, palette_rows,
                                        row_label, row_section_key)
 
     _rows = palette_rows()
@@ -10212,7 +10212,7 @@ def run_parent_dir(term: Terminal, player: Player, progress: dict) -> str | None
             'saves'    → open character select
             'colors'   → open color palette (admin only)
     """
-    from render.parent_dir import render_parent_dir, entries_for
+    from vimny.render.parent_dir import render_parent_dir, entries_for
 
     entries = entries_for(player)
     _PD_COMPLETIONS = ['saves/', 'scrolls/', 'world/'] + (
@@ -10290,7 +10290,7 @@ def run_remote_shelf(term: Terminal, player: Player, progress: dict) -> None:
     Returns None — always back to the overworld, which re-lists `community/` so
     a freshly installed level appears at once.
     """
-    from render.remote_shelf import render_remote_shelf
+    from vimny.render.remote_shelf import render_remote_shelf
 
     entries: list = []
     status         = 'fetching the shelf…'

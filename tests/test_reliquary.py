@@ -25,11 +25,11 @@ primitives, frieze placement, and per-seed randomization.
 import pytest
 from collections import deque
 
-import generation.dungeon_gen as dg
+import vimny.generation.dungeon_gen as dg
 from main import _check_seal_broken
-from engine.editor import _ed_cut
-from engine.reflow import close_gap, is_ledge
-from engine.world import CellType
+from vimny.engine.editor import _ed_cut
+from vimny.engine.reflow import close_gap, is_ledge
+from vimny.engine.world import CellType
 from tests import SEEDS
 
 

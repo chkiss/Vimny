@@ -26,8 +26,8 @@ from blessed.keyboard import Keystroke
 from blessed import Terminal
 
 import main
-from engine.world import CellType
-from generation.dungeon_gen import (
+from vimny.engine.world import CellType
+from vimny.generation.dungeon_gen import (
     build_dungeon_sentence_enclosure, _se_sentence,
     _SE_ROWS, _SE_COLS, _SE_SPINE, _SE_SHAFT_SEPS, _SE_THROAT,
     _SE_GATE, _SE_BOLTS, _SE_EXIT, _SE_PAR, _SE_TEXT0, _SE_SPAWN,

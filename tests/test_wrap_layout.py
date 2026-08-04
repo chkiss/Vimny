@@ -25,13 +25,13 @@ wrap states without error and that the gate leaves ordinary rooms on the nowrap 
 import pytest
 from blessed import Terminal
 
-import render.colors as C
-import render.symbols as S
-from render.renderer import (wrap_total_rows, wrap_scroll_start, wrap_room_col,
+import vimny.render.colors as C
+import vimny.render.symbols as S
+from vimny.render.renderer import (wrap_total_rows, wrap_scroll_start, wrap_room_col,
                              render_all)
-from engine.world import Dungeon, Room, RoomType, CellType
-from engine.player import Player
-from engine.budget import Budget
+from vimny.engine.world import Dungeon, Room, RoomType, CellType
+from vimny.engine.player import Player
+from vimny.engine.budget import Budget
 
 
 @pytest.fixture

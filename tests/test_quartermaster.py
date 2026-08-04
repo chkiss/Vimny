@@ -49,12 +49,12 @@ from blessed.keyboard import Keystroke
 from blessed import Terminal
 
 import main
-import engine.operator as op
-from engine.motion import apply_motion
-from engine.player import Player
-from engine.world import CellType
-from content.levels import known_commands
-from generation.dungeon_gen import (
+import vimny.engine.operator as op
+from vimny.engine.motion import apply_motion
+from vimny.engine.player import Player
+from vimny.engine.world import CellType
+from vimny.content.levels import known_commands
+from vimny.generation.dungeon_gen import (
     build_dungeon_quartermaster,
     _QM_ROWS, _QM_COLS, _QM_HALL_ROW, _QM_SPAWN, _QM_SOURCE, _QM_PED1,
     _QM_BOLT_COLS, _QM_BRAZIER_ROW, _QM_BRAZIER_COLS,
@@ -144,7 +144,7 @@ def test_exit_unreachable_until_the_seal_draws(seed):
     room.cells[_QM_EXIT[0]][_QM_SEAL_COL] = CellType.FLOOR   # the seal draws open
     for bc in _QM_BOLT_COLS:
         room.cells[_QM_HALL_ROW][bc] = CellType.FLOOR
-    from engine.motion import auto_fog_tick
+    from vimny.engine.motion import auto_fog_tick
     auto_fog_tick(room, *room.spawn_pos)     # sight crosses the opened doors
     seen = _bfs(room)
     assert room.exit_pos in seen
@@ -343,8 +343,8 @@ def test_seal_needs_three_tiers_and_the_whole_chain(seed):
     """The seal draws open only while the beacon burns in three tiers AND the
     depot chain burns — checked through REAL row inserts. A jump into the
     beacon row that skipped the hall brazier leaves the seal shut."""
-    from engine.reflow import _insert_blank_row
-    from engine.world import CharRun
+    from vimny.engine.reflow import _insert_blank_row
+    from vimny.engine.world import CharRun
     room = build_dungeon_quartermaster(seed).rooms[0]        # private (mutating)
     p = Player(row=_QM_BRAZIER_ROW, col=_QM_BRAZIER_COLS[0])
 
@@ -384,7 +384,7 @@ def test_seal_needs_three_tiers_and_the_whole_chain(seed):
 def test_hint_bar_surfaces_the_linewise_yy():
     # Learning 'y' unlocks the linewise yy as well as y{m}; the bar bundles yy into the
     # y keys cell (like c{m}  cc) so yank-line is never gated-in-but-invisible.
-    from render.hint_bar import hint_text
+    from vimny.render.hint_bar import hint_text
     bar = hint_text(known_commands('quartermaster'), 'quartermaster')
     assert 'y{m}' in bar and 'yy' in bar
     assert 'P' in bar

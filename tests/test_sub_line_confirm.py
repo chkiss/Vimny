@@ -21,8 +21,8 @@ state machine (y / n / q / a / l). These pin the answer-flow behaviour so the
 shared-core refactor of _sub_line / _sub_line_confirm can't regress it.
 
 The function works on plain (text, kinds) and a compiled pattern — no Room."""
-from engine.substitute import _sub_line_confirm, _sub_line
-from engine.vimregex import compile_sub
+from vimny.engine.substitute import _sub_line_confirm, _sub_line
+from vimny.engine.vimregex import compile_sub
 
 
 def _answers(seq):

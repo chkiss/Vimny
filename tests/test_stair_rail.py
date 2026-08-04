@@ -29,8 +29,8 @@ from blessed.keyboard import Keystroke
 from blessed import Terminal
 
 import main
-from engine.world import CellType
-from generation.dungeon_gen import (
+from vimny.engine.world import CellType
+from vimny.generation.dungeon_gen import (
     build_dungeon_stair_rail,
     _SR_ROWS, _SR_COLS, _SR_STEP_ROWS, _SR_STEP_COLS, _SR_SPAWN_IDX, _SR_GATE,
     _SR_BOLT_COLS, _SR_EXIT, _SR_UNDERCROFT, _SR_CHEST, _SR_PAR,

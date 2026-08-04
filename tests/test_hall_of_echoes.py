@@ -36,8 +36,8 @@ from blessed.keyboard import Keystroke
 from blessed import Terminal
 
 import main
-from engine.world import CellType
-from generation.dungeon_gen import (
+from vimny.engine.world import CellType
+from vimny.generation.dungeon_gen import (
     build_dungeon_hall_of_echoes,
     _HE_COLS, _HE_TX, _HE_GATE_COL, _HE_PAR, _HE_BUDGET, _HE_POEMS,
     _HE_WARP, _he_build_chambers,
@@ -138,7 +138,7 @@ def test_poem_pool_shape():
 
 @pytest.mark.parametrize("seed", SEEDS)
 def test_poem_run_lays_intruder_plus_true_line(seed):
-    from engine import substitute as S
+    from vimny.engine import substitute as S
     d = build_dungeon_hall_of_echoes(seed)
     room = d.rooms[0]
     _name, lines, intr = next(p for p in _HE_POEMS if p[0] == room._he_poem)
@@ -304,11 +304,11 @@ def test_recording_indicator_shows_and_clears(monkeypatch):
     """While a macro records, the statusline appends Vim's `recording @a`
     showmode indicator; it clears the moment the stop-q lands."""
     import contextlib, io
-    import render.colors as Cx
-    import render.symbols as Sx
-    from render.renderer import render_all as _render_all   # the real one (main's may be stubbed)
-    from engine.budget import Budget
-    from engine.player import Player
+    import vimny.render.colors as Cx
+    import vimny.render.symbols as Sx
+    from vimny.render.renderer import render_all as _render_all   # the real one (main's may be stubbed)
+    from vimny.engine.budget import Budget
+    from vimny.engine.player import Player
     term = Terminal()
     monkeypatch.setattr(Terminal, 'height', property(lambda self: 30))
     Cx.init(term)
@@ -354,6 +354,6 @@ def test_recording_flows_to_render_while_recording(monkeypatch):
 # ── curriculum ────────────────────────────────────────────────────────────────
 
 def test_curriculum_entry():
-    from content.levels import _BY_SLUG
+    from vimny.content.levels import _BY_SLUG
     lv = _BY_SLUG['hall_of_echoes']
     assert lv['teaches'] == ['q', '@', 'reg_named']

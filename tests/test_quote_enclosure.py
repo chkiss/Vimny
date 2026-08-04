@@ -26,15 +26,15 @@ from blessed.keyboard import Keystroke
 from blessed import Terminal
 
 import main
-from engine.world import CellType
-from generation.dungeon_gen import (
+from vimny.engine.world import CellType
+from vimny.generation.dungeon_gen import (
     build_dungeon_quote_enclosure,
     _QE_ROWS, _QE_COLS, _QE_SPINE, _QE_SHAFT_SEPS, _QE_THROAT,
     _QE_GATE, _QE_BOLTS, _QE_EXIT, _QE_PAR, _QE_ANCHOR, _QE_SHAPE,
     _QE_TEXT_MIN, _QE_BAY_E,
     _QE_C1_ROWS, _QE_C2_ROWS, _QE_C3_ROWS, _QE_C4_ROWS, _QE_C5_ROWS,
 )
-from content import proverbs as pv
+from vimny.content import proverbs as pv
 from tests import SEEDS, cached_room, door_targets
 
 ESC = Keystroke('\x1b', name='KEY_ESCAPE')

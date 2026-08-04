@@ -22,17 +22,17 @@ Inserting pushes content right and shoves overflow past a fixed brink (wall/void
 deleting pulls the tail left. `is_ledge` is always True, so a row reflows whether or
 not it carries a void rune — the regression tests at the bottom pin that down.
 """
-from engine.world import Room, RoomType, CellType, CharRun, Entity
-from engine.player import Player
-from engine.reflow import (
+from vimny.engine.world import Room, RoomType, CellType, CharRun, Entity
+from vimny.engine.player import Player
+from vimny.engine.reflow import (
     is_ledge, void_col, open_gap, close_gap, remove_row, extend_floor, _insert_blank_row,
     carve_floor, _double_cols, _MAX_COLS, split_line_down, _first_floor_col, _lands_on_floor,
     _blank_line_span,
 )
-from engine.insert import begin_insert
-from engine.insert import insert_char
-from engine.operator import op_delete
-from engine.text_object import TextObject, TextObjectType
+from vimny.engine.insert import begin_insert
+from vimny.engine.insert import insert_char
+from vimny.engine.operator import op_delete
+from vimny.engine.text_object import TextObject, TextObjectType
 
 
 def _room(letters='abcd', start=5, void_start=9, void_n=5, cols=15, ledge=True):

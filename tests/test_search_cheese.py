@@ -31,9 +31,9 @@ from collections import deque
 
 import pytest
 
-import generation.dungeon_gen as dg
-from content.levels import LEVELS, known_commands
-from engine.world import CellType, entity_letter
+import vimny.generation.dungeon_gen as dg
+from vimny.content.levels import LEVELS, known_commands
+from vimny.engine.world import CellType, entity_letter
 from tests import SEEDS
 
 

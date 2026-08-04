@@ -35,7 +35,7 @@ a run that CANNOT be a whole command on its own is the defect.
 """
 import pytest
 
-from content.levels import LEVELS
+from vimny.content.levels import LEVELS
 import main
 
 #: Tokens that can never stand alone as a command. An operator wants a target,

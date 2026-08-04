@@ -35,15 +35,15 @@ import re
 import pytest
 from blessed import Terminal
 
-from engine.player import Player
-from render.overworld import render_overworld
-from render.utils import inner_w
+from vimny.engine.player import Player
+from vimny.render.overworld import render_overworld
+from vimny.render.utils import inner_w
 
 _GUTTER = 4          # render.overworld's GW when line numbers are on
 
 
 def _draw(term, name, **kw):
-    import render.colors as C
+    import vimny.render.colors as C
     C.init(term)                       # the palette reads the live terminal
     player = Player()
     player.name = name

@@ -24,7 +24,7 @@ with raw=''.  The old guard `raw in 'vV'` is True for '' (empty string is a subs
 of everything), and `{...}[raw or '\\x16']` then defaulted to Ctrl-v → block mode.
 `_visual_mode_toggle` must return None for every sequence key."""
 import pytest
-from engine.modes import Mode
+from vimny.engine.modes import Mode
 from main import _visual_mode_toggle
 
 

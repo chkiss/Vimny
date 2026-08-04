@@ -16,14 +16,14 @@
 #
 # SPDX-License-Identifier: GPL-3.0-or-later
 
-"""Block A — :set option grammar (engine/options.py).
+"""Block A — :set option grammar (vimny/engine/options.py).
 
 Covers the plain/no forms (existing behaviour) plus the new toggle (!),
 invert (inv), reset (&) and query (?) forms over the collapsed tri-state
 number_mode ('none'|'number'|'relativenumber')."""
 import pytest
 
-from engine.options import apply_set, parse_modifier
+from vimny.engine.options import apply_set, parse_modifier
 
 
 # ── plain on / off (the pre-existing behaviour) ────────────────────────────

@@ -20,9 +20,9 @@
 (a key, a goblin) sitting on bare floor — so `w` replaces `2l` to reach a key.
 Operators (dw/de/cw) stay entity-blind (pure text words), and an entity standing
 ON text stays part of that word, never its own stop."""
-from engine.world import Room, RoomType, CellType, CharRun, Entity
-from engine.player import Player
-from engine.motion import apply_motion
+from vimny.engine.world import Room, RoomType, CellType, CharRun, Entity
+from vimny.engine.player import Player
+from vimny.engine.motion import apply_motion
 
 
 def _room():

@@ -30,9 +30,9 @@ from __future__ import annotations
 import pytest
 
 import main
-import sharing.format as F
-from engine.player import Player
-from engine.world import CellType, Seal, gate_row_seals
+import vimny.sharing.format as F
+from vimny.engine.player import Player
+from vimny.engine.world import CellType, Seal, gate_row_seals
 
 
 def _room(seals, texts=(), rows=6, cols=20):
@@ -57,7 +57,7 @@ def _tick(room, at=(1, 1)):
 
 
 def _write(room, r, text, col=1):
-    from engine.world import CharRun
+    from vimny.engine.world import CharRun
     room.char_runs = [ru for ru in room.char_runs if ru.row != r]
     if text:
         room.char_runs.append(CharRun(r, col, tuple(text), 'ancient'))

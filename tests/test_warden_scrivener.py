@@ -23,9 +23,9 @@ from blessed.keyboard import Keystroke
 from blessed import Terminal
 
 import main
-from engine.world import CellType
-from content.levels import known_commands
-from generation.dungeon_gen import (
+from vimny.engine.world import CellType
+from vimny.content.levels import known_commands
+from vimny.generation.dungeon_gen import (
     build_dungeon_warden_scrivener,
     _WSC_ROWS, _WSC_COLS, _WSC_BUDGET, _WSC_ALCOVES, _WSC_SIDES,
     _WSC_SEAL, _WSC_EXIT, _WSC_POCKET, _WSC_GATE, _WSC_W1, _WSC_W2_WINDOW,
@@ -173,7 +173,7 @@ def test_the_page_sleeps_under_fog(seed):
     """Before the threshold, the hall (glosses included) is fogged: /W finds
     nothing, no jump enters, the lie is unsearchable."""
     room = build_dungeon_warden_scrivener(seed).rooms[0]
-    from engine.search import _match_positions
+    from vimny.engine.search import _match_positions
     assert _match_positions(room, 'W') == []
     assert _match_positions(room, _lie_verb(room)) == []
     # Fogged floor, veiled stone — one hidden hall said with the two mechanisms

@@ -33,7 +33,7 @@ def cached_dungeon(builder_name: str, seed: int):
     answer cost — all read the same build. NEVER mutate a cached room (no
     apply_motion / editing / kill_entity); a test that simulates play must call
     its builder directly for a private copy."""
-    import generation.dungeon_gen as _dg
+    import vimny.generation.dungeon_gen as _dg
     return getattr(_dg, builder_name)(seed)
 
 

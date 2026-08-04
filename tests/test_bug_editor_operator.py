@@ -18,13 +18,13 @@
 
 """The Editor Operator — hammers the edit-mode d/y/c operator primitives.
 
-Personality defined in agents/bug_testers.md. Exercises engine/editor.py's range
+Personality defined in agents/bug_testers.md. Exercises vimny/engine/editor.py's range
 helpers directly (no Terminal): the cut/range/clear/snapshot paths behind dw, d$,
 dd, yy, cw in :edit mode, plus the merge-after-cut and undo-restore invariants.
 """
-from engine.world import Room, RoomType, CellType, CharRun, Entity
-from engine.player import Player
-from engine.editor import (
+from vimny.engine.world import Room, RoomType, CellType, CharRun, Entity
+from vimny.engine.player import Player
+from vimny.engine.editor import (
     _ed_cut, _ed_range_items, _ed_delete_range, _ed_clear_row, _ed_row_items,
     _ed_snapshot, _ed_restore, _merge_adjacent_char_runs,
 )

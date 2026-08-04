@@ -28,7 +28,7 @@ the cost-vs-par test (test_answer_paths) could not catch it because the tape's
 cost was correct; only an end-to-end replay reveals the lost win.
 """
 import pytest
-from generation.dungeon_gen import build_dungeon_goblin_gauntlet as _build
+from vimny.generation.dungeon_gen import build_dungeon_goblin_gauntlet as _build
 from tests import SEEDS
 
 # the goblin glyph (engine.world entity_letter / render._REG_ENTITY): fg targets it

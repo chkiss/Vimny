@@ -10,9 +10,9 @@ near the entry, blocks nothing, and the cursor passes through him (he is not a
 puzzle piece). His glyph is the chess knight ♞ (→ 'h' on 2-wide terminals)."""
 import pytest
 
-from generation.dungeon_gen import build_dungeon_first_cave
-from engine.world import CARET_TRANSPARENT
-from engine.player import Player
+from vimny.generation.dungeon_gen import build_dungeon_first_cave
+from vimny.engine.world import CARET_TRANSPARENT
+from vimny.engine.player import Player
 from main import _place_first_cave_horse, _enemy_tick, _manhattan
 from tests import SEEDS
 
@@ -145,10 +145,10 @@ def test_horse_blocked_on_bosses_and_combat():
 
 def test_companion_glyph_rides_the_status_bar(capsys):
     from blessed import Terminal
-    from engine.budget import Budget
-    from render import symbols as S
-    from render import colors as C
-    from render.renderer import render_all
+    from vimny.engine.budget import Budget
+    from vimny.render import symbols as S
+    from vimny.render import colors as C
+    from vimny.render.renderer import render_all
     term = Terminal()
     C.init(term); S.init(term)
     d = build_dungeon_first_cave(SEEDS[0])
@@ -159,7 +159,7 @@ def test_companion_glyph_rides_the_status_bar(capsys):
 
 
 def test_saddle_registers_ride_with_the_horse():
-    from engine.command_guard import action_allowed, is_saddle_register
+    from vimny.engine.command_guard import action_allowed, is_saddle_register
     # the saddle registers: digits + symbols; NOT "" and NOT the named/macro a-z.
     assert is_saddle_register('0') and is_saddle_register('_') and is_saddle_register('/')
     assert not is_saddle_register('"')          # unnamed — own gate

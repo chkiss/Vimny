@@ -31,13 +31,13 @@ Rules enforced here:
 The dummy dungeon is an admin sandbox and is intentionally excluded.
 """
 import pytest
-import generation.dungeon_gen as dg
-from generation.dungeon_gen import (
+import vimny.generation.dungeon_gen as dg
+from vimny.generation.dungeon_gen import (
     build_dungeon_first_cave, build_dungeon_line_halls, build_dungeon_counting_crypts,
     build_dungeon_rune_halls, build_dungeon_character_cataracts,
 )
 
-from content.levels import LEVELS
+from vimny.content.levels import LEVELS
 from tests import SEEDS
 
 _BUILDERS = {

@@ -6,9 +6,9 @@ wrote. Drop a file in `~/.Vimny/levels/` and it turns up in the overworld under
 `community/`.
 
 ```
-python3 -m sharing validate mylevel.json     # check it
-python3 -m sharing install  mylevel.json     # put it on your shelf
-python3 -m sharing list                      # what's installed
+python3 -m vimny.sharing validate mylevel.json     # check it
+python3 -m vimny.sharing install  mylevel.json     # put it on your shelf
+python3 -m vimny.sharing list                      # what's installed
 ```
 
 ## The forge — writing one without leaving the game
@@ -148,7 +148,7 @@ anything.
 The fastest way to see the format is to export one of the shipped levels:
 
 ```
-python3 -m sharing export rune_halls mylevel.json
+python3 -m vimny.sharing export rune_halls mylevel.json
 ```
 
 That writes a real, valid, playable level file. Change it and re-validate.
@@ -333,8 +333,8 @@ once, then `l@:l@@l@@`.
 
 **`edit_immune` makes an entity survive editing.** It is a field on the entity
 (`warden` and `locked_door` offer it), and it does two things: a `d` that would
-sweep the entity's cell passes over it (`engine/operator.py`), and a `dd`/`J`
-that would collapse its whole row refuses to (`engine/reflow.py`). It is the
+sweep the entity's cell passes over it (`vimny/engine/operator.py`), and a `dd`/`J`
+that would collapse its whole row refuses to (`vimny/engine/reflow.py`). It is the
 "boss parries the blade" ward: a Warden so marked twists out of a visual cut
 ("only a precise `x` can land on him"), which is what stops a boss fight from
 being won with `dG`. It is also how a level anchors a row it cannot afford to
@@ -678,7 +678,7 @@ Every shipped par claims a solver found the cheapest route. If you find a
 shorter one, that claim is wrong, and your tape is the proof:
 
 ```
-python3 -m sharing golf spellwrights_forge --tape ':%s/moo/quack/g<CR> 8G ...'
+python3 -m vimny.sharing golf spellwrights_forge --tape ':%s/moo/quack/g<CR> 8G ...'
 ```
 
 A confirmed beat is a **bug report against that level's solver**, not a high
@@ -741,7 +741,7 @@ fit in a link opens the form empty; the file is saved next to the link in
 `~/.Vimny/submit/` for you to paste.)
 
 The repo runs the same
-validator you have been running (`python3 -m sharing validate mylevel.json`) plus
+validator you have been running (`python3 -m vimny.sharing validate mylevel.json`) plus
 a replay of your recorded solution, so a level that passes locally passes there —
 and one that does not tells you which rule it broke rather than being turned away.
 

@@ -25,7 +25,7 @@ only beats a walk when its count is a single digit (true, and beside the point �
 the jump never needed a count), and the route that existed was 55.
 
 This is that question asked automatically, so the next level cannot repeat it.
-The work is in `sharing/jumpgolf.py`; this module is the gate.
+The work is in `vimny/sharing/jumpgolf.py`; this module is the gate.
 
 WHY IT IS OPT-IN. A single level's golf replays its whole tape through the real
 game loop once per candidate per terminal height. Standalone that is ten minutes;
@@ -49,7 +49,7 @@ import os
 
 import pytest
 
-from sharing import jumpgolf as JG
+from vimny.sharing import jumpgolf as JG
 
 RUN = os.environ.get('VIMNY_JUMPGOLF') in ('1', 'seeds')
 WHY = ('slow (a full tape replay per candidate per height); run with '
@@ -103,7 +103,7 @@ def test_the_state_check_actually_bites(slug):
     """A `_VERIFY` predicate that is True of every room checks nothing. Assert
     the shipped tape SATISFIES it (or the level's own par is unreachable) — the
     predicate has to be a real property of a real solve."""
-    import generation.dungeon_gen as dg
+    import vimny.generation.dungeon_gen as dg
     res = JG.golf(slug)
     assert res.canonical is not None, (
         f'{slug}: its own tape fails the state check {JG._VERIFY[slug]!r} — '
@@ -117,10 +117,10 @@ def test_every_golfable_level_has_a_lesson_to_keep():
     teaches its lesson". A level whose lesson resolves to NO keys accepts any
     route at all, so the rule silently stops applying there — which is how a
     sweep passes while checking nothing."""
-    import generation.dungeon_gen as dg
-    from content.levels import LEVELS
+    import vimny.generation.dungeon_gen as dg
+    from vimny.content.levels import LEVELS
 
-    from content.levels import known_commands
+    from vimny.content.levels import known_commands
 
     toothless = []
     for slug in JG.golfable_levels():
@@ -156,7 +156,7 @@ def test_every_level_that_veils_text_is_in_the_state_registry():
     (Plain `fog_cells` is darkness — unlit floor — not unreadable text, so it
     does not trip this.)
     """
-    import generation.dungeon_gen as dg
+    import vimny.generation.dungeon_gen as dg
     unregistered = []
     for slug in JG.golfable_levels():
         room = getattr(dg, f'build_dungeon_{slug}')(0).room
@@ -173,7 +173,7 @@ def test_heights_straddle_the_only_discontinuity():
     must sit on both sides of that line — otherwise a beat living only in the
     viewport-relative regime is invisible, which is what five arbitrary numbers
     risked."""
-    import generation.dungeon_gen as dg
+    import vimny.generation.dungeon_gen as dg
     for slug in ('operators_vault', 'hall_of_echoes', 'stair_rail'):
         room = getattr(dg, f'build_dungeon_{slug}')(0).room
         flip = room.rows + 8
@@ -210,7 +210,7 @@ def test_token_gating_is_enforced_when_proposing():
 
     Read off `known_commands` rather than by running the golf: this test is in
     the always-on set, and golf() replays."""
-    from content.levels import known_commands
+    from vimny.content.levels import known_commands
     for slug in ('first_cave', 'line_halls', 'counting_crypts'):
         assert not any(j in known_commands(slug) for j in JG.JUMPS), \
             f'{slug} sits before the jumps and must be offered none'

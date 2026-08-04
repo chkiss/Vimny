@@ -23,8 +23,8 @@ motion, that is exactly how many budget points it costs.  len(keystrokes) is the
 ground truth — it is literally how many keys were on the keyboard.
 """
 import pytest
-from engine.vim_parser import parse
-from engine.modes import Mode
+from vimny.engine.vim_parser import parse
+from vimny.engine.modes import Mode
 from main import _keystroke_cost
 
 # Each entry is a raw keystroke string whose len() is the expected cost.

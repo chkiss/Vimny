@@ -26,10 +26,10 @@ Parametrised pairs test BOTH sides of each guard:
   - allowed when it is present
 """
 import pytest
-from engine.vim_parser import parse
-from engine.modes import Mode
-from engine.command_guard import action_allowed
-from content.levels import known_commands
+from vimny.engine.vim_parser import parse
+from vimny.engine.modes import Mode
+from vimny.engine.command_guard import action_allowed
+from vimny.content.levels import known_commands
 
 # These guard tests address levels by their (legacy) display number; resolve
 # each to a slug so the gating contract is checked by identity, not by number.

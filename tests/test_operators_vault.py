@@ -48,14 +48,14 @@ from blessed import Terminal
 from blessed.keyboard import Keystroke
 
 import main
-import generation.dungeon_gen as dg
-from engine.world import CellType, Entity
-from engine.player import Player
-from engine.reflow import remove_row
-from engine.operator import _cursor_to_line_start
-from engine.command_guard import action_allowed
-from content.levels import known_commands
-import render.colors as C
+import vimny.generation.dungeon_gen as dg
+from vimny.engine.world import CellType, Entity
+from vimny.engine.player import Player
+from vimny.engine.reflow import remove_row
+from vimny.engine.operator import _cursor_to_line_start
+from vimny.engine.command_guard import action_allowed
+from vimny.content.levels import known_commands
+import vimny.render.colors as C
 from tests import SEEDS
 
 
@@ -275,7 +275,7 @@ def test_the_seep_stays_dark_until_the_gate_above_it_opens():
     # _flood_reachable stops at a live door without expanding through it, so
     # flooding from the gate's own cell reaches exactly that cell and would
     # report the seep hidden no matter what the geometry did.
-    from engine.motion import _flood_reachable
+    from vimny.engine.motion import _flood_reachable
     gate = next(e for e in _gates(room) if (e.row, e.col) == (27, 3))
     room.kill_entity(gate)
     room.rebuild_indexes()
@@ -369,7 +369,7 @@ def test_paragraph_jumps_respect_the_walls():
     """}/{ land only in a segment holding the player's own column (engine
     rule) — so they can't teleport sideways into the sealed pockets, ladder
     down the spacer rows, or reach the vault walkway from above."""
-    from engine.motion import apply_motion
+    from vimny.engine.motion import apply_motion
 
     room = _room()                                   # fog intact = real play
     def jump(start, motion):
@@ -600,7 +600,7 @@ def test_blocked_dd_is_parried_loudly_and_costs_nothing(monkeypatch):
 def test_blocked_dd_on_a_one_line_buffer(monkeypatch):
     """The structural twin: a single-row buffer (the wardenverse shape) refuses
     dd — the dungeon can't go to zero lines — with its own message."""
-    from engine.world import Room, RoomType, CellType, Dungeon
+    from vimny.engine.world import Room, RoomType, CellType, Dungeon
 
     room = Room(room_type=RoomType.ENTRY, rows=1, cols=8)
     room.cells = [[CellType.WALL] + [CellType.FLOOR] * 6 + [CellType.WALL]]
@@ -645,6 +645,6 @@ def test_deep_undo_unwinds_the_whole_solve(monkeypatch):
 def test_hint_bar_surfaces_the_linewise_dd():
     # Learning 'd' unlocks the linewise dd as well as d{m}; the bar bundles dd into the
     # d keys cell (like c{m}  cc) so delete-line is never gated-in-but-invisible.
-    from render.hint_bar import hint_text
+    from vimny.render.hint_bar import hint_text
     bar = hint_text(known_commands('operators_vault'), 'operators_vault')
     assert 'd{m}' in bar and 'dd' in bar

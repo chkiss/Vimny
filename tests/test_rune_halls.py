@@ -18,7 +18,7 @@
 
 """The Rune Halls: dungeon correctness tests."""
 import pytest
-from generation.dungeon_gen import build_dungeon_rune_halls, _dijkstra_par_wbe
+from vimny.generation.dungeon_gen import build_dungeon_rune_halls, _dijkstra_par_wbe
 
 from tests import SEEDS
 

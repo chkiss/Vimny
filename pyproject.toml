@@ -10,7 +10,7 @@ readme          = "README.md"
 requires-python = ">=3.9"
 license         = { text = "GPL-3.0-or-later" }
 authors         = [{ name = "Chas Kissick" }]
-keywords        = ["vim", "game", "roguelike", "tui", "teaching"]
+keywords        = ["vim", "game", "dungeon-crawler", "tui", "teaching"]
 dependencies    = ["blessed"]
 
 classifiers = [
@@ -30,12 +30,20 @@ vimny = "main:main"
 # Vimny runs from a checkout (`python main.py`); the package list is here so an
 # install is possible and `pip install .` does something sensible rather than
 # failing. `main` is a top-level module, not a package, hence py-modules.
-packages   = ["engine", "generation", "content", "render", "save", "art"]
+#
+# Everything importable lives under the one `vimny` package. It used to be eight
+# top-level packages — `engine`, `save`, `render` and friends — which meant an
+# install scattered those names across site-packages, where any of them could
+# collide with somebody else's.
+packages   = [
+    "vimny", "vimny.engine", "vimny.generation", "vimny.content",
+    "vimny.render", "vimny.save", "vimny.art", "vimny.sharing",
+]
 py-modules = ["main"]
 
 [tool.setuptools.package-data]
-render = ["*.md"]
-art    = ["*.txt"]
+"vimny.render" = ["*.md"]
+"vimny.art"    = ["*.txt"]
 
 [tool.vulture]
 # Dead-code detection.  Install once:  python -m pip install vulture
@@ -45,7 +53,7 @@ art    = ["*.txt"]
 # slug dispatch).  The ignore_names globs below suppress those known false
 # positives so a clean run means a *real* dead-code finding.  See the
 # "Dead-code detection" note in docs/ARCHITECTURE.md.
-paths = ["engine", "generation", "content", "render", "main.py"]
+paths = ["vimny/engine", "vimny/generation", "vimny/content", "vimny/render", "main.py"]
 min_confidence = 60
 ignore_names = [
     "build_dungeon_*",   # resolved via getattr(module, f'build_dungeon_{slug}')

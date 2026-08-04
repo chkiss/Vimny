@@ -24,8 +24,8 @@ from blessed.keyboard import Keystroke
 from blessed import Terminal
 
 import main
-from engine.world import CellType
-from generation.dungeon_gen import (
+from vimny.engine.world import CellType
+from vimny.generation.dungeon_gen import (
     build_dungeon_grandmasters_sanctum,
     _GMS_ROWS0, _GMS_COLS0, _GMS_SPINE, _GMS_BAYS, _GMS_PARA, _GMS_GATE, _GMS_TEXT0,
     _GMS_BOLTS, _GMS_SEAL, _GMS_TRANSIT, _GMS_WATCH, _GMS_BUDGET,
@@ -335,8 +335,8 @@ def test_dG_is_parried_at_the_gate(monkeypatch):
 @pytest.mark.parametrize("seed", SEEDS)
 def test_arena_search_finds_the_grandmaster(seed):
     # The Warden is always W — Scrivener, Pathfinder, Grandmaster alike.
-    from engine.search import find_next
-    from engine.player import Player
+    from vimny.engine.search import find_next
+    from vimny.engine.player import Player
     d, _gallery, arena = _rooms(seed)
     p = Player()
     p.row, p.col = arena.spawn_pos

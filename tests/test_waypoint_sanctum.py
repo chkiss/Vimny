@@ -31,18 +31,18 @@ decor varies by seed.
 """
 import pytest
 
-from generation.dungeon_gen import (
+from vimny.generation.dungeon_gen import (
     build_dungeon_waypoint_sanctum as _build,
     _WP_PAR, _WP_ANSWER, _WP_KEYWORD, _WP_SCROLL, _WP_SPAWN,
     _WP_LOCK, _WP_EXIT, _WP_KEY, _WP_KEY_WORD_POS, _WP_DECOY_POS, _WP_CROW,
     _WP_DANGER_ROWS, _WP_WORD2, _WP_W2_POCKET1, _WP_W2_POCKET2,
     _WP_W2_DECOYS, _WP_PKT1_SPAN, _WP_PKT2_SPAN,
 )
-from engine.world import CellType
-from engine.player import Player
-from engine.motion import apply_motion, _first_non_blank_col
-from engine.search import find_next
-from engine.tape import ENTER as TAPE_ENTER
+from vimny.engine.world import CellType
+from vimny.engine.player import Player
+from vimny.engine.motion import apply_motion, _first_non_blank_col
+from vimny.engine.search import find_next
+from vimny.engine.tape import ENTER as TAPE_ENTER
 
 SEEDS = [1, 42, 999, 12345, 2 ** 20 + 7]
 
@@ -333,8 +333,8 @@ def test_driven_canonical_wins_at_par(monkeypatch):
     import main
     from blessed import Terminal
     from blessed.keyboard import Keystroke
-    import render.colors as C
-    import render.symbols as S
+    import vimny.render.colors as C
+    import vimny.render.symbols as S
     C.init(Terminal())
     S.init(Terminal())
     d = _build(42)
@@ -367,7 +367,7 @@ def test_nook_ledger_and_the_pinned_second_stride():
     Second Stride — guaranteed here, BEFORE the editing act, instead of
     floating in the random relic pool); the rest pull random relics."""
     import main
-    from content.scrolls import RELIC_SCROLL_IDS
+    from vimny.content.scrolls import RELIC_SCROLL_IDS
     room = _room(42)
     nook = next(e for e in room.entities
                 if e.kind == 'chest_scroll' and (e.row, e.col) == _WP_SCROLL)
@@ -382,10 +382,10 @@ def test_set_number_renders_a_line_gutter(capsys):
     """player.number_mode toggles a dungeon line-number gutter; default 'none'
     leaves the frame ungutted.  In relativenumber the cursor's own line reads 0."""
     from blessed import Terminal
-    import render.colors as C
-    import render.symbols as S
-    from render.renderer import render_all
-    from engine.budget import Budget
+    import vimny.render.colors as C
+    import vimny.render.symbols as S
+    from vimny.render.renderer import render_all
+    from vimny.engine.budget import Budget
     t = Terminal(); C.init(t); S.init(t)
     d = _build(42)
     p = Player(row=_WP_CROW, col=_WP_SPAWN[1])
@@ -413,8 +413,8 @@ def test_hint_bar_surfaces_the_whole_mark_family():
     # The one 'mark' gate unlocks set (m{a}) AND both jumps (`{a} '{a}) — but only the
     # m{a} row carries the token, so the bar must expand the family (like / → ? n N) or
     # the player can set a mark yet never see how to jump back to it.
-    from render.hint_bar import hint_text
-    from content.levels import known_commands
+    from vimny.render.hint_bar import hint_text
+    from vimny.content.levels import known_commands
     bar = hint_text(known_commands('waypoint_sanctum'), 'waypoint_sanctum')
     assert 'm{a}' in bar
     assert '`{a}' in bar and "'{a}" in bar             # both jump-to-mark keys shown

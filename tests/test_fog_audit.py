@@ -25,8 +25,8 @@ import re
 
 import pytest
 
-import generation.dungeon_gen as dg
-from engine.motion import _vision_flood, _FOGGABLE_CELLS
+import vimny.generation.dungeon_gen as dg
+from vimny.engine.motion import _vision_flood, _FOGGABLE_CELLS
 from tests import SEEDS, cached_room
 
 # Levels with SCRIPTED fog choreography that manages its own reveals — the

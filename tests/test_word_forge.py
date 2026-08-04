@@ -18,7 +18,7 @@
 
 """The WORD Forge: dungeon correctness tests."""
 import pytest
-from generation.dungeon_gen import build_dungeon_word_forge, _dijkstra_par_WBE, _WORD_FORGE_UNTYPABLE_PUNCT
+from vimny.generation.dungeon_gen import build_dungeon_word_forge, _dijkstra_par_WBE, _WORD_FORGE_UNTYPABLE_PUNCT
 
 from tests import SEEDS
 
@@ -169,7 +169,7 @@ def test_void_guard_at_C2_left_end(seed):
 def test_descent_walls_force_W_on_C1(seed):
     """RT1 descent walls at (3,54)/(3,55) leave col 53 as the only C1→C2 turn.
     W lands at col 53 (start of the W4 WORD); E lands at col 54 (into a wall)."""
-    from engine.world import CellType
+    from vimny.engine.world import CellType
     d = build_dungeon_word_forge(seed)
     room = d.rooms[0]
     assert room.cells[3][54] == CellType.WALL, f"seed={seed}: (3,54) should be wall"

@@ -20,13 +20,13 @@
 
 Personality defined in agents/bug_testers.md.
 """
-from engine.vim_parser import parse
-from engine.modes import Mode
-from engine.world import Room, RoomType, CellType, Entity
-from engine.player import Player
-from engine.command_guard import action_allowed
-from engine.operator import entity_clip
-from engine.registers import write_register, read_register
+from vimny.engine.vim_parser import parse
+from vimny.engine.modes import Mode
+from vimny.engine.world import Room, RoomType, CellType, Entity
+from vimny.engine.player import Player
+from vimny.engine.command_guard import action_allowed
+from vimny.engine.operator import entity_clip
+from vimny.engine.registers import write_register, read_register
 
 
 def _bare_room(rows=7, cols=30):

@@ -40,11 +40,11 @@ Why an action can be missed
 Required dict fields (all produced by _snapshot() in main.py)
   row, col, spent, entities, fog_cells
 """
-from engine.world import Room, Entity, CellType, RoomType
-from engine.player import Player
-from engine.budget import Budget
-from engine.operator import entity_clip
-from engine.registers import write_register, read_register
+from vimny.engine.world import Room, Entity, CellType, RoomType
+from vimny.engine.player import Player
+from vimny.engine.budget import Budget
+from vimny.engine.operator import entity_clip
+from vimny.engine.registers import write_register, read_register
 
 
 # ── Fixtures ──────────────────────────────────────────────────────────────────
@@ -398,7 +398,7 @@ def test_cols_round_trip_after_buffer_double():
     """A's ledge-build can DOUBLE room.cols; undo must restore the old width.
     Snapshot/restore now carry 'cols' alongside 'rows' so the cells grid and
     room.cols stay in sync after an undo."""
-    from engine.reflow import extend_floor
+    from vimny.engine.reflow import extend_floor
     room = _corridor(rows=4, cols=8)
     player = Player(row=1, col=0)
     budget = Budget(total=10)

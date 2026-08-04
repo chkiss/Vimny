@@ -30,15 +30,15 @@ from blessed.keyboard import Keystroke
 from blessed import Terminal
 
 import main
-from engine.world import CellType
-from engine import substitute as S
-from generation.dungeon_gen import (
+from vimny.engine.world import CellType
+from vimny.engine import substitute as S
+from vimny.generation.dungeon_gen import (
     build_dungeon_refrain_vault,
     _RV_ROWS, _RV_COLS, _RV_BAND, _RV_WTR, _RV_SONG, _RV_CORRUPT,
     _RV_SEAL_ROW, _RV_SEAL_COL, _RV_EXIT_COL, _RV_TRUE, _RV_PAR, _RV_BUDGET,
 )
 from tests import SEEDS, cached_room
-from engine.tape import to_keys
+from vimny.engine.tape import to_keys
 
 ENTER = Keystroke('\r', code=343, name='KEY_ENTER')
 
@@ -54,7 +54,7 @@ def _fresh(seed=0):
 def _K(s):
     """Keystroke string → keys. `to_keys` is the ONE converter: tokens like
     `<CR>` and `<Space>` are several glyphs but one keystroke, so they can
-    only be matched whole (engine/tape.py). `separators=False`: this is a
+    only be matched whole (vimny/engine/tape.py). `separators=False`: this is a
     hand-written keystroke string, not a tape, so a space in it is a space the
     player types (`:6s/^  //`), never display spacing."""
     return to_keys(s, separators=False)
@@ -119,7 +119,7 @@ def test_the_song_stands_written_wrong(seed):
 
 @pytest.mark.parametrize("seed", SEEDS)
 def test_chasm_is_misted_sightlined_and_unwalkable(seed):
-    from engine.motion import _vision_flood
+    from vimny.engine.motion import _vision_flood
     r = _room(seed)
     visible = _vision_flood(r, *r.spawn_pos)
     for row in (1, 2):
@@ -207,7 +207,7 @@ def test_copied_chasm_slab_cannot_serve(monkeypatch):
 # ── curriculum ────────────────────────────────────────────────────────────────
 
 def test_curriculum_entry():
-    from content.levels import _BY_SLUG, known_commands
+    from vimny.content.levels import _BY_SLUG, known_commands
     lv = _BY_SLUG['refrain_vault']
     assert lv['display'] == '42'
     assert lv['teaches'] == []                     # the ex_range kit + & family

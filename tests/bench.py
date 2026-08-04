@@ -42,15 +42,15 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-import render.colors as C
-from generation.dungeon_gen import (
+import vimny.render.colors as C
+from vimny.generation.dungeon_gen import (
     build_dungeon_first_cave, build_dungeon_line_halls, build_dungeon_counting_crypts, build_dungeon_rune_halls,
     build_dungeon_dummy,
 )
-from engine.player import Player
-from engine.budget import Budget
-from engine.motion import apply_motion
-from engine.editor import _ed_snapshot, _ed_restore
+from vimny.engine.player import Player
+from vimny.engine.budget import Budget
+from vimny.engine.motion import apply_motion
+from vimny.engine.editor import _ed_snapshot, _ed_restore
 
 SEED = 42
 _COL_W = 52          # label column width in output
@@ -238,7 +238,7 @@ bench_us("rebuild_indexes  dummy", lambda: r_dummy.rebuild_indexes())
 
 _section("7. Full render_all frame  (stdout → /dev/null)")
 
-from render.renderer import render_all
+from vimny.render.renderer import render_all
 
 budget_crypts = Budget(r_crypts.budget or 20)
 budget_halls  = Budget(r_halls.budget or 20)

@@ -35,9 +35,9 @@ taught/incentivized rather than infinitely forced.
 """
 import math
 import pytest
-from engine.world import CellType
-from engine.motion import _sentence_starts_all
-from generation.dungeon_gen import (
+from vimny.engine.world import CellType
+from vimny.engine.motion import _sentence_starts_all
+from vimny.generation.dungeon_gen import (
     build_dungeon_sentence_corridor,
     _par_sentence_corridor,
     _SENTENCE_CORRIDOR_ROWS, _SENTENCE_CORRIDOR_COLS, _SENTENCE_CORRIDOR_ENTRY, _SENTENCE_CORRIDOR_EXIT,

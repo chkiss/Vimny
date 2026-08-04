@@ -36,7 +36,7 @@ current best is ever explored. Slack is what crosses it.
 """
 import pytest
 
-from sharing import jumpgolf as JG
+from vimny.sharing import jumpgolf as JG
 
 
 # ── a landscape with a ridge ────────────────────────────────────────────────

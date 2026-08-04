@@ -38,10 +38,10 @@ import json
 
 import pytest
 
-import generation.dungeon_gen as dg
-from content.levels import known_commands
-from sharing import format as F
-from sharing import library, remote
+import vimny.generation.dungeon_gen as dg
+from vimny.content.levels import known_commands
+from vimny.sharing import format as F
+from vimny.sharing import library, remote
 
 SEED = 42
 

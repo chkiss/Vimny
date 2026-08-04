@@ -16,12 +16,12 @@
 #
 # SPDX-License-Identifier: GPL-3.0-or-later
 
-"""Blocks B–F — Vim-magic regex translation (engine/vimregex.py) and its use
-in engine/search.py. Verifies the atoms the scrolls teach, plus backward
+"""Blocks B–F — Vim-magic regex translation (vimny/engine/vimregex.py) and its use
+in vimny/engine/search.py. Verifies the atoms the scrolls teach, plus backward
 compatibility: a plain word still behaves like a literal substring search."""
-from engine.vimregex import compile_vim
-from engine.search import _match_positions, find_next, match_cells
-from engine.world import Room, CharRun, RoomType, CellType
+from vimny.engine.vimregex import compile_vim
+from vimny.engine.search import _match_positions, find_next, match_cells
+from vimny.engine.world import Room, CharRun, RoomType, CellType
 
 
 def _first(pattern, s):

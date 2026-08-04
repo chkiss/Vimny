@@ -16,8 +16,8 @@
 #
 # SPDX-License-Identifier: GPL-3.0-or-later
 
-"""Tests for engine/budget.py — spend (frozen), remaining, is_over."""
-from engine.budget import Budget
+"""Tests for vimny/engine/budget.py — spend (frozen), remaining, is_over."""
+from vimny.engine.budget import Budget
 
 
 class TestFrozen:

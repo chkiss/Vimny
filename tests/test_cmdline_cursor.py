@@ -8,13 +8,13 @@ from blessed.keyboard import Keystroke
 from blessed import Terminal
 
 import main
-import render.colors as C
-import render.symbols as S
-from render.renderer import render_all, _cmdline_with_cursor
-from engine.budget import Budget
-from engine.player import Player
-from engine.modes import Mode
-from generation.dungeon_gen import build_dungeon_hall_of_echoes
+import vimny.render.colors as C
+import vimny.render.symbols as S
+from vimny.render.renderer import render_all, _cmdline_with_cursor
+from vimny.engine.budget import Budget
+from vimny.engine.player import Player
+from vimny.engine.modes import Mode
+from vimny.generation.dungeon_gen import build_dungeon_hall_of_echoes
 
 
 def _key(name, ch='\x1b'):

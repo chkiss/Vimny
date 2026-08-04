@@ -36,9 +36,9 @@ from __future__ import annotations
 import pytest
 
 import main
-from content.levels import LEVELS
-from engine.motion import stone_law, _FOG_BLOCK_KINDS
-from sharing import format as F
+from vimny.content.levels import LEVELS
+from vimny.engine.motion import stone_law, _FOG_BLOCK_KINDS
+from vimny.sharing import format as F
 
 SEED = 4242
 SLUGS = [e['slug'] for e in LEVELS]
@@ -148,7 +148,7 @@ def test_mist_survives_the_re_reveal():
     """Two fogs wear one field. Stone fog is ignorance and looking cures it;
     mist is weather and standing beside it does not. Before the law was applied
     to level files, nothing auto-revealed and the distinction never came up."""
-    from engine.motion import auto_fog_tick
+    from vimny.engine.motion import auto_fog_tick
     lvl = F.Level(name='Haze', seed=7, rows=5, cols=12,
                   cells=['12W', 'W10FW', 'W3F4M3FW', 'W10FW', '12W'],
                   spawn=(1, 1), exit=(3, 10))

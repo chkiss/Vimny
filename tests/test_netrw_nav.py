@@ -9,7 +9,7 @@ navigation (gg/G/{n}G, {/}, w, /-search, counts) is proven once, independent of
 either screen's chrome."""
 from blessed.keyboard import Keystroke
 
-from engine.player import Player
+from vimny.engine.player import Player
 from main import NetrwNav
 
 
@@ -125,9 +125,9 @@ def test_gating_blocks_G_when_not_learned():
 def test_colors_buffer_navigates_via_the_shared_engine():
     # the colors screen exposes the same row/label/section interface, so the
     # engine drives it identically (G to the end, /-search to a colour).
-    import render.colors as C
+    import vimny.render.colors as C
     from blessed import Terminal
-    from render.color_palette import palette_rows, row_label, row_section_key
+    from vimny.render.color_palette import palette_rows, row_label, row_section_key
     C._term = Terminal(force_styling=True)
 
     rows = palette_rows()

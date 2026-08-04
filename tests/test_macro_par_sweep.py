@@ -24,8 +24,8 @@ The sweep itself:
 """
 import pytest
 
-import generation.dungeon_gen as dg
-from content.levels import LEVELS, known_commands
+import vimny.generation.dungeon_gen as dg
+from vimny.content.levels import LEVELS, known_commands
 from tests import SEEDS
 
 # Every level a player reaches at or after macros are taught, in curriculum order.

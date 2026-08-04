@@ -34,9 +34,9 @@ from blessed import Terminal
 from blessed.keyboard import Keystroke
 
 import main
-import generation.dungeon_gen as dg
-import engine.substitute as S
-from engine.tape import to_keys
+import vimny.generation.dungeon_gen as dg
+import vimny.engine.substitute as S
+from vimny.engine.tape import to_keys
 
 
 def _ks(c, name=None):
@@ -225,7 +225,7 @@ def test_sanctum_scroll_chest_present_and_survives_the_sweep():
     # The reward that balances the empty sanctum: an unassigned chest (→ a
     # random relic scroll) at row 10, last column — ABOVE every falling row,
     # so :g/krzzt/d never collapses it out of the buffer.
-    from engine.world import CellType
+    from vimny.engine.world import CellType
     d = dg.build_dungeon_spellwrights_forge(1)
     room = d.room
     chest = [e for e in room.entities if e.kind == 'chest_scroll']
@@ -270,8 +270,8 @@ def test_par_is_what_the_engine_actually_charges():
     measured it, because this level is excluded outright from
     tests/test_answer_paths.py. Replay the canonical tape and let the budget
     say what it costs."""
-    from sharing.replay import replay_tape
-    from content.levels import known_commands
+    from vimny.sharing.replay import replay_tape
+    from vimny.content.levels import known_commands
     r = dg.build_dungeon_spellwrights_forge(1).room
     res = replay_tape(dg.build_dungeon_spellwrights_forge(1),
                       'spellwrights_forge', r.answer,
@@ -285,8 +285,8 @@ def test_hint_bar_surfaces_the_whole_subst_family():
     # The one 'subst' gate unlocks :s, :%s//g, :g/pat/d and & — but only the :s row
     # carries the token, so the bar must expand the family (like / → ? n N) or the
     # :g/pat/d global delete the falling lines NEED would be gated-in yet invisible.
-    from render.hint_bar import hint_text
-    from content.levels import known_commands
+    from vimny.render.hint_bar import hint_text
+    from vimny.content.levels import known_commands
     bar = hint_text(known_commands('spellwrights_forge'), 'spellwrights_forge')
     assert ':g/pat/d' in bar       # the global delete is shown...
     assert 'global delete' in bar  # ...with its function named
@@ -296,7 +296,7 @@ def test_hint_bar_surfaces_the_whole_subst_family():
 # ── gating: :s is refused before the Forge teaches it ────────────────────────
 def test_substitute_gated_before_forge(monkeypatch):
     # On an early level a non-admin player has not learned 'subst'; :s is refused.
-    from engine.world import Dungeon, Room, RoomType, CharRun, CellType
+    from vimny.engine.world import Dungeon, Room, RoomType, CharRun, CellType
     d = Dungeon(name='t', seed=1)
     r = Room(room_type=RoomType.ENTRY, rows=1, cols=20)
     r.cells = [[CellType.FLOOR] * 20]

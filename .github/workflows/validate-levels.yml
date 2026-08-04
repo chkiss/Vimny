@@ -39,9 +39,9 @@ jobs:
 
       - name: Validate
         if: steps.changed.outputs.files != ''
-        run: python3 -m sharing validate ${{ steps.changed.outputs.files }}
+        run: python3 -m vimny.sharing validate ${{ steps.changed.outputs.files }}
 
-  # Par-improvement submissions (see blueprints/level_sharing.md §1a). A tape
+  # Par-improvement submissions (see docs/blueprints/level_sharing.md §1a). A tape
   # that finishes a SHIPPED level under its recorded par has falsified that
   # level's solver, and the replay carries its own reproduction. Exit code 3
   # means "confirmed beat" — a solver bug report, never a score.
@@ -55,4 +55,4 @@ jobs:
       - name: Install
         run: pip install blessed
       - name: Replay every shipped tape against its own par
-        run: python3 -m sharing audit
+        run: python3 -m vimny.sharing audit

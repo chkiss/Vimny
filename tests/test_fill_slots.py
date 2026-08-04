@@ -37,10 +37,10 @@ from __future__ import annotations
 
 import pytest
 
-from engine import tape as T
-from engine.editor import slot_at
-from sharing import format as F
-from sharing.validate import validate
+from vimny.engine import tape as T
+from vimny.engine.editor import slot_at
+from vimny.sharing import format as F
+from vimny.sharing.validate import validate
 
 
 def _level(solution: str, **kw) -> F.Level:

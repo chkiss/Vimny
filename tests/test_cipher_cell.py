@@ -37,12 +37,12 @@ All four doors run through main._cipher_cell_tick — stateless and undo-safe
 from collections import deque
 
 import main
-from engine.insert import replace_chars
-from engine.motion import _is_word_char
-from engine.player import Player
-from engine.world import CellType
-from content.levels import known_commands
-from generation.dungeon_gen import (
+from vimny.engine.insert import replace_chars
+from vimny.engine.motion import _is_word_char
+from vimny.engine.player import Player
+from vimny.engine.world import CellType
+from vimny.content.levels import known_commands
+from vimny.generation.dungeon_gen import (
     build_dungeon_cipher_cell,
     _CC_ROWS, _CC_COLS, _CC_ROW, _CC_PLAQUE_ROW,
     _CC_SPAWN, _CC_EXIT, _CC_BOLT_A, _CC_BOLT_B, _CC_BOLT_C, _CC_BOLT_D,
@@ -202,7 +202,7 @@ def test_exit_reachable_once_gates_open(seed):
     room = build_dungeon_cipher_cell(seed).rooms[0]          # private (mutating)
     for pos in (_CC_BOLT_A, _CC_BOLT_B, _CC_BOLT_C, _CC_BOLT_D):
         room.cells[pos[0]][pos[1]] = CellType.FLOOR
-    from engine.motion import auto_fog_tick
+    from vimny.engine.motion import auto_fog_tick
     auto_fog_tick(room, *room.spawn_pos)     # sight crosses the opened gates
     seen, q = {room.spawn_pos}, deque([room.spawn_pos])
     while q:

@@ -39,7 +39,7 @@ def _row_widths(rows, width):
 def test_the_box_fits_the_narrowest_terminal_the_game_supports():
     """80 columns is the floor (`render.utils.inner_w`). The box is BOX_IW + 4
     including its borders and must sit INSIDE the game frame, not on top of it."""
-    from render.utils import inner_w
+    from vimny.render.utils import inner_w
 
     class _T:
         width = 80

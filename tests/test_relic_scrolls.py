@@ -21,7 +21,7 @@ not-yet-discovered scroll from this pool. Verifies catalog integrity and the
 picker's no-repeat / exhaustion behaviour."""
 import random
 
-from content.scrolls import SCROLL_CATALOG, RELIC_SCROLL_IDS, pick_relic_scroll
+from vimny.content.scrolls import SCROLL_CATALOG, RELIC_SCROLL_IDS, pick_relic_scroll
 
 _CATALOG_IDS = {s['id'] for s in SCROLL_CATALOG}
 
@@ -38,7 +38,7 @@ def test_archivist_reward_scrolls_are_renderable():
     # Regression: the Archivist's two reward scrolls crashed the codex (no dispatch
     # entry). They must be in the catalogue with standard 'lines' content so the
     # codex's standard-renderer fallback can show them.
-    from content.scrolls import DISPLAY_LINE_SCROLL, EDIT_BY_NAME_SCROLL
+    from vimny.content.scrolls import DISPLAY_LINE_SCROLL, EDIT_BY_NAME_SCROLL
     by_id = {s['id']: s for s in SCROLL_CATALOG}
     assert by_id['display_move']['content'] is DISPLAY_LINE_SCROLL
     assert by_id['edit_name']['content'] is EDIT_BY_NAME_SCROLL
@@ -50,7 +50,7 @@ def test_pick_skips_discovered():
     assert pick_relic_scroll(discovered, known=['mark']) == RELIC_SCROLL_IDS[-1]
 
 def test_prereq_relics_wait_for_their_token():
-    from content.scrolls import _RELIC_PREREQ
+    from vimny.content.scrolls import _RELIC_PREREQ
     assert _RELIC_PREREQ['jump_back'] == 'mark'
     assert _RELIC_PREREQ['line_addr'] == 'G'
     # Before the prerequisite is learned, a gated relic never drops...
@@ -86,7 +86,7 @@ def test_every_scroll_line_fits_the_box():
     """The standard renderer's box is 54 visible columns; a cmd row costs
     indent(2) + key_w + arrow(9) + desc, where key_w is the scroll's longest
     key. Regression for The Lit Trail spilling past the parchment borders."""
-    import content.scrolls as S
+    import vimny.content.scrolls as S
 
     BOX_IW, sep, ind = 54, '  ────>  ', '  '
     for nm in dir(S):

@@ -22,8 +22,8 @@ from blessed import Terminal
 from blessed.keyboard import Keystroke
 
 import main
-import engine.substitute as S
-from engine.world import Dungeon, Room, RoomType, CharRun, CellType
+import vimny.engine.substitute as S
+from vimny.engine.world import Dungeon, Room, RoomType, CharRun, CellType
 
 
 def _ks(c, name=None):

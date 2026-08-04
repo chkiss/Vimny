@@ -26,9 +26,9 @@ from blessed.keyboard import Keystroke
 from blessed import Terminal
 
 import main
-from engine.world import CellType
-from content.levels import known_commands
-from generation.dungeon_gen import (
+from vimny.engine.world import CellType
+from vimny.content.levels import known_commands
+from vimny.generation.dungeon_gen import (
     build_dungeon_selection_halls,
     _SH_ROWS, _SH_COLS, _SH_SPINE, _SH_SHAFT, _SH_SHAFT_SEPS, _SH_THROAT,
     _SH_GATE, _SH_BOLT0, _SH_EXIT, _SH_PAR,

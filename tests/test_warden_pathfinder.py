@@ -28,17 +28,17 @@ only by normal-mode ``x``. When a delete span covers it, the rest of the span
 still dies, the boss stands, and ``player.last_parry`` is set so the UI can fire
 "The Warden's shield defended him from your cut!".
 
-This file IS the as-built spec for L17.1; see engine/visual.py and engine/warden_mega.py.
+This file IS the as-built spec for L17.1; see vimny/engine/visual.py and vimny/engine/warden_mega.py.
 """
 import random
 
-import generation.dungeon_gen as dg
-from engine.world import Room, RoomType, Entity, CellType, CharRun
-from engine.player import Player
-from engine.modes import Mode
-from engine.visual import apply_visual
-from engine.search import match_cells
-from engine import warden_mega as MEGA
+import vimny.generation.dungeon_gen as dg
+from vimny.engine.world import Room, RoomType, Entity, CellType, CharRun
+from vimny.engine.player import Player
+from vimny.engine.modes import Mode
+from vimny.engine.visual import apply_visual
+from vimny.engine.search import match_cells
+from vimny.engine import warden_mega as MEGA
 
 
 def _room(immune: bool) -> Room:
@@ -171,8 +171,8 @@ def test_fW_finds_warden_standing_on_text():
     """fW must find the Warden even when he stands ON char-run text (the
     wardenverse): the glyph the renderer draws on top wins over the text beneath,
     so _cell_char returns 'W'. Regression — text used to mask the glyph."""
-    from engine.motion import _cell_char, _apply_find
-    from engine.player import Player
+    from vimny.engine.motion import _cell_char, _apply_find
+    from vimny.engine.player import Player
     rows, cols = 1, 20
     cells = [[CellType.FLOOR] * cols]
     room = Room(room_type=RoomType.BOSS, rows=rows, cols=cols, cells=cells)
@@ -316,7 +316,7 @@ def test_warden_position_varies_and_stays_valid():
 # ── builder: the two-room dungeon is wired (Act 1 arena + Act 2 wardenverse) ──
 
 def test_builder_makes_a_two_room_dungeon():
-    from generation.dungeon_gen import build_dungeon_warden_pathfinder as build
+    from vimny.generation.dungeon_gen import build_dungeon_warden_pathfinder as build
     d = build(7)
     assert len(d.rooms) == 2 and d.current_room == 0
     arena, verse = d.rooms
@@ -359,7 +359,7 @@ def test_verse_collapse_unmasks_all_echoes():
     """When the verse Warden is defeated and the wardenverse collapses, all remaining
     echoes in the arena are automatically revealed (tag='' hp=1) for cleanup. This
     replaces the old two-hit-per-echo pattern now that visual mode isn't available."""
-    from engine.player import Player
+    from vimny.engine.player import Player
 
     d = dg.build_dungeon_warden_pathfinder(7)
     arena = d.rooms[0]
@@ -387,9 +387,9 @@ def test_verse_collapse_unmasks_all_echoes():
 def test_caret_lands_on_key_not_passable_door():
     """^ stops on a notable entity (a dropped key) but treats floor-like passage
     markers (a door you stand on) as blank — regression for the post-collapse key."""
-    from engine.player import Player
-    from engine.motion import apply_motion
-    from engine.world import Entity
+    from vimny.engine.player import Player
+    from vimny.engine.motion import apply_motion
+    from vimny.engine.world import Entity
     arena = dg.build_dungeon_warden_pathfinder(7).rooms[0]
     for e in arena.entities:                              # post-collapse: foes cleared
         if e.kind in ('goblin', 'warden', 'shield'):

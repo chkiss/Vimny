@@ -25,10 +25,10 @@ from blessed.keyboard import Keystroke
 from blessed import Terminal
 
 import main
-from engine.world import CellType
-from content.levels import known_commands
-from content import proverbs as pv
-from generation.dungeon_gen import (
+from vimny.engine.world import CellType
+from vimny.content.levels import known_commands
+from vimny.content import proverbs as pv
+from vimny.generation.dungeon_gen import (
     build_dungeon_bracket_enclosure,
     _BE_ROWS, _BE_COLS, _BE_SPINE, _BE_SHAFT_SEPS, _BE_THROAT,
     _BE_GATE, _BE_BOLT0, _BE_EXIT, _BE_PAR, _BE_TEXT_MIN, _BE_BAY_E,

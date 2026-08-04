@@ -32,15 +32,15 @@ from blessed.keyboard import Keystroke
 from blessed import Terminal
 
 import main
-from engine.world import CellType
-from engine import substitute as S
-from generation.dungeon_gen import (
+from vimny.engine.world import CellType
+from vimny.engine import substitute as S
+from vimny.generation.dungeon_gen import (
     build_dungeon_shelving_room,
     _SHR_ROWS, _SHR_COLS, _SHR_TX, _SHR_BAND, _SHR_WTR, _SHR_GAL,
     _SHR_SEAL_COL, _SHR_EXIT_COL, _SHR_BOLT_COLS, _SHR_CALLS, _SHR_INIT,
     _SHR_PAR, _SHR_BUDGET,
 )
-from engine.tape import to_keys
+from vimny.engine.tape import to_keys
 from tests import SEEDS, cached_room
 
 ENTER = Keystroke('\r', code=343, name='KEY_ENTER')
@@ -57,14 +57,14 @@ def _fresh(seed=0):
 def _K(s):
     """Keystroke string → keys. `to_keys` is the ONE converter: tokens like
     `<CR>` and `<Space>` are several glyphs but one keystroke, so they can
-    only be matched whole (engine/tape.py). `separators=False`: this is a
+    only be matched whole (vimny/engine/tape.py). `separators=False`: this is a
     hand-written keystroke string, not a tape, so a space in it is a space the
     player types (`:6s/^  //`), never display spacing."""
     return to_keys(s, separators=False)
 
 
 def _tape_keys(answer):
-    """room.answer → keystrokes, via the one shared translator (engine/tape.py)."""
+    """room.answer → keystrokes, via the one shared translator (vimny/engine/tape.py)."""
     return to_keys(answer)
 
 
@@ -145,7 +145,7 @@ def test_the_round_is_misfiled_but_known_by_heart(seed):
 
 @pytest.mark.parametrize("seed", SEEDS)
 def test_shelf_is_misted_sightlined_and_unwalkable(seed):
-    from engine.motion import _vision_flood
+    from vimny.engine.motion import _vision_flood
     r = _room(seed)
     visible = _vision_flood(r, *r.spawn_pos)
     for row in range(1, 8):
@@ -270,7 +270,7 @@ def test_scorched_shelf_never_opens_the_seal(monkeypatch):
 # ── curriculum ────────────────────────────────────────────────────────────────
 
 def test_curriculum_entry():
-    from content.levels import _BY_SLUG, known_commands
+    from vimny.content.levels import _BY_SLUG, known_commands
     lv = _BY_SLUG['shelving_room']
     assert lv['display'] == '41'
     assert lv['teaches'] == []                     # the ex_range kit, second lesson

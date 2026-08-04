@@ -24,7 +24,7 @@ Once `budget.remaining <= 0` the dungeon loop refuses every budget-costing actio
 reads keystrokes interactively, so we test the rule it delegates to
 (`_budget_exhausted_blocks`) plus the `Budget.remaining` threshold it gates on."""
 import pytest
-from engine.budget import Budget
+from vimny.engine.budget import Budget
 from main import _budget_exhausted_blocks
 
 

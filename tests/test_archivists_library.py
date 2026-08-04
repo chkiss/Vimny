@@ -26,7 +26,7 @@ from blessed.keyboard import Keystroke
 from blessed import Terminal
 
 import main
-import generation.dungeon_gen as dg
+import vimny.generation.dungeon_gen as dg
 
 
 def _ks(ch, name=None):
@@ -70,7 +70,7 @@ def test_is_a_completion_only_level():
 def test_archivist_is_findable_by_f():
     # The Archivist paces the hall (ai='wander') and fA must find him just like fg/fW
     # finds a goblin/Warden — his glyph wins over the library art under him.
-    from engine.motion import _cell_char
+    from vimny.engine.motion import _cell_char
     d = _dungeon()
     dg._lib_layout(d.room, 72)
     arch = next(e for e in d.room.entities if e.kind == 'archivist')

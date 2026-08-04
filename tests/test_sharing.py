@@ -27,13 +27,13 @@ import math
 
 import pytest
 
-import generation.dungeon_gen as dg
-from content.levels import known_commands
-from engine.world import CellType
-from sharing import format as F
-from sharing import library, vocab
-from sharing.replay import replay_tape, tape_to_keys
-from sharing.validate import validate
+import vimny.generation.dungeon_gen as dg
+from vimny.content.levels import known_commands
+from vimny.engine.world import CellType
+from vimny.sharing import format as F
+from vimny.sharing import library, vocab
+from vimny.sharing.replay import replay_tape, tape_to_keys
+from vimny.sharing.validate import validate
 
 SEED = 42
 
@@ -346,7 +346,7 @@ def test_a_broken_level_is_listed_with_its_reason_not_hidden(tmp_path, monkeypat
 
 
 def test_community_slugs_cannot_collide_with_shipped_ones(tmp_path, monkeypatch):
-    from content.levels import LEVELS
+    from vimny.content.levels import LEVELS
     monkeypatch.setattr(library, 'LEVELS_DIR', tmp_path)
     (tmp_path / 'rune_halls.json').write_text(
         F.dumps(_shipped_as_level('rune_halls')), encoding='utf-8')
@@ -373,8 +373,8 @@ def _shelf_in(tmp_path, monkeypatch, name='The Salt Stair'):
 
 
 def test_community_levels_appear_in_the_overworld_buffer(tmp_path, monkeypatch):
-    from content.levels import LEVELS
-    from render.overworld import build_lines, line_search_text
+    from vimny.content.levels import LEVELS
+    from vimny.render.overworld import build_lines, line_search_text
     shelf = _shelf_in(tmp_path, monkeypatch)
     lines = build_lines(LEVELS[:2], [], shelf)
     assert [ln['type'] for ln in lines[-2:]] == ['subhdr', 'community']
@@ -385,8 +385,8 @@ def test_community_levels_appear_in_the_overworld_buffer(tmp_path, monkeypatch):
 
 def test_the_wing_sits_after_the_curriculum(tmp_path, monkeypatch):
     """Extra content, not part of the designed sequence."""
-    from content.levels import LEVELS
-    from render.overworld import build_lines
+    from vimny.content.levels import LEVELS
+    from vimny.render.overworld import build_lines
     shelf = _shelf_in(tmp_path, monkeypatch)
     lines = build_lines(LEVELS[:3], [], shelf)
     last_level = max(i for i, ln in enumerate(lines) if ln['type'] == 'level')

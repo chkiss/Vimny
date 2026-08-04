@@ -23,11 +23,11 @@ import pytest
 from blessed import Terminal
 from blessed.keyboard import Keystroke
 
-import engine.tape as T
-import sharing.draft as DRAFT
-import sharing.format as F
-from engine.editor import _ed_cut, _ed_paint, in_fill
-from engine.world import CellType
+import vimny.engine.tape as T
+import vimny.sharing.draft as DRAFT
+import vimny.sharing.format as F
+from vimny.engine.editor import _ed_cut, _ed_paint, in_fill
+from vimny.engine.world import CellType
 
 
 # ── A tiny level: walk four cells east onto the exit ──────────────────────────
@@ -60,7 +60,7 @@ def _record_take(lvl: F.Level, tape: str, player_name: str = 'Normand') -> tuple
     level. Returns `(recorded_tape, result)`.
     """
     import main
-    from sharing.replay import _headless
+    from vimny.sharing.replay import _headless
 
     term  = Terminal(force_styling=False)
     keys  = T.to_keys(tape, term) + [Keystroke(ch) for ch in ':wq\r']
@@ -73,7 +73,7 @@ def _record_take(lvl: F.Level, tape: str, player_name: str = 'Normand') -> tuple
         return keys[state['n'] - 1]
 
     term.inkey = _inkey
-    import render.colors as colors
+    import vimny.render.colors as colors
     colors.init(term)
 
     rec = {'tape': [], 'error': ''}
@@ -97,7 +97,7 @@ def _forge_session(draft, script: str, player_name: str = 'admin', dungeon=None,
     have eaten are simply left on the floor. `tally['read'] == tally['total']`
     is the assertion that the second loop really took them."""
     import main
-    from sharing.replay import _headless
+    from vimny.sharing.replay import _headless
 
     term = Terminal(force_styling=False)
     keys = T.to_keys(script, term, separators=False)
@@ -110,7 +110,7 @@ def _forge_session(draft, script: str, player_name: str = 'admin', dungeon=None,
         return keys[state['n'] - 1]
 
     term.inkey = _inkey
-    import render.colors as colors
+    import vimny.render.colors as colors
     colors.init(term)
     with _headless(main):
         result = main.run_dungeon(term, 'community', {}, player_name=player_name,
@@ -381,7 +381,7 @@ def test_a_rehearsal_that_loses_is_not_an_error():
 def test_a_rehearsal_never_writes_to_the_players_save(monkeypatch):
     """Same guard a take has: a rehearsal runs under the AUTHOR's own name, so
     an unguarded write would overwrite their real save."""
-    import save.save_manager as SM
+    import vimny.save.save_manager as SM
     calls = []
     monkeypatch.setattr(SM, 'save_progress', lambda data, who: calls.append(who))
     _rehearse(_playable_draft(), 'llll:wq\r')
@@ -471,7 +471,7 @@ def test_a_take_that_never_reaches_the_exit_is_not_a_win():
 def test_a_recording_take_never_writes_to_the_players_save(monkeypatch):
     """A take runs under the author's own name — an unguarded progress write
     would overwrite their real save with the forge's throwaway dict."""
-    import save.save_manager as SM
+    import vimny.save.save_manager as SM
     calls = []
     monkeypatch.setattr(SM, 'save_progress', lambda d, who: calls.append(who))
     _record_take(_tiny(), 'llll')
@@ -584,7 +584,7 @@ def test_a_fill_region_refuses_edits():
 
 
 def test_a_range_delete_sweeping_a_fill_leaves_it_standing():
-    from engine.editor import _ed_delete_range
+    from vimny.engine.editor import _ed_delete_range
     room = _filled_room()
     grown = len([ru for ru in room.char_runs if ru.row == 2])
     _ed_delete_range(room, 1, 0, 3, 9)
@@ -594,7 +594,7 @@ def test_a_range_delete_sweeping_a_fill_leaves_it_standing():
 def test_a_room_that_was_never_built_from_a_level_is_never_locked():
     """`in_fill` is duck-typed on `room.fills`, so every shipped level — whose
     rooms a generator built and which has no such attribute — is untouched."""
-    from engine.world import Room, RoomType
+    from vimny.engine.world import Room, RoomType
     room = Room(room_type=RoomType.ENTRY, rows=5, cols=10)
     assert not hasattr(room, 'fills')
     assert in_fill(room, 2, 2) is None
@@ -639,7 +639,7 @@ def test_the_companion_horse_is_never_written_into_a_level():
     shipped horse re-fires the first-meeting naming PROMPT, which eats the keys
     after it, so the trailing `:wq` of a recorded tape is swallowed and a level
     that plays perfectly reports itself unsolvable."""
-    from engine.world import Entity
+    from vimny.engine.world import Entity
     d = DRAFT.new('Stable', rows=8, cols=30)
     room = d.build().room
     room.entities.append(Entity(kind='horse', row=2, col=2, tag='Shadowfax'))
@@ -650,7 +650,7 @@ def test_the_companion_horse_is_never_written_into_a_level():
 def test_a_level_carrying_a_horse_swallows_its_own_tape():
     """Why the rule above exists, stated as the failure it caused. Pin it so the
     horse cannot come back through some other door."""
-    from sharing.replay import replay_tape
+    from vimny.sharing.replay import replay_tape
     lvl = _tiny()
     lvl.entities = [{'at': [1, 2], 'kind': 'horse', 'tag': ''}]
     res = replay_tape(F.build(lvl), 'community', lvl.solution,
@@ -779,7 +779,7 @@ def test_a_pool_missing_a_length_reaches_for_the_nearest_one():
     """The old fallback was the 1-character table, which reads sensible and is
     not: `plain` has no 1-character words at all, so `:fill plain 1-2` raised
     "pool is empty" about the game's own stock vocabulary."""
-    from sharing import vocab
+    from vimny.sharing import vocab
     import random
     rng = random.Random(1)
     assert len(vocab.words('plain', 1, rng)) == 3     # nearest length plain has
@@ -790,7 +790,7 @@ def test_an_empty_vocabulary_still_says_so_plainly():
     """The nearest-length fallback must not paper over the one case that really
     is the author's mistake: naming `custom` with no words behind it."""
     import random
-    from sharing import vocab
+    from vimny.sharing import vocab
     with pytest.raises(ValueError, match='declares no `vocabulary` block'):
         vocab.words('custom', 4, random.Random(1), {})
 
@@ -808,7 +808,7 @@ def _room_with(*ents, rows=5, cols=12):
 
 
 def _player_at(row, col):
-    from engine.player import Player
+    from vimny.engine.player import Player
     return Player(row=row, col=col)
 
 
@@ -859,7 +859,7 @@ def test_a_creature_cannot_drop_a_creature():
     """`drops` is the one field that CREATES an entity at runtime, so it is the
     one field a downloaded file could use to hatch something nobody counted."""
     import main
-    from sharing import validate as V
+    from vimny.sharing import validate as V
     room = _room_with({'kind': 'goblin', 'at': [1, 3], 'drops': 'warden'})
     room.kill_entity(room.entity_at(1, 3))
     main._drop_tick(room, _player_at(1, 1))
@@ -934,7 +934,7 @@ def test_the_picker_offers_only_colours_the_game_paints():
     brass and nothing anywhere says why. The list is where that silent gap
     becomes visible."""
     import main
-    from render import renderer
+    from vimny.render import renderer
 
     offered = [c for c in main._entity_choices('floor_key', 'tag') if c]
     assert offered == list(main._KEY_COLOURS)
@@ -963,7 +963,7 @@ def test_the_offered_scroll_ids_are_the_real_catalogue():
     shows no scroll at all, silently, and a hand-written list drifts the moment
     a scroll is added."""
     import main
-    from content.scrolls import SCROLL_CATALOG
+    from vimny.content.scrolls import SCROLL_CATALOG
 
     offered = main._entity_choices('chest_scroll', 'scroll_id')
     assert offered[0] == ''          # unassigned → the relic pool
@@ -975,7 +975,7 @@ def test_a_red_chest_yields_a_red_key():
     pairing an author set on the chest dissolved at the moment of looting and
     the red door it was cut for never opened."""
     import main
-    from engine.world import Entity
+    from vimny.engine.world import Entity
     room = _room_with({'kind': 'chest_key', 'at': [1, 3], 'tag': 'red'})
     chest = room.entity_at(1, 3)
     assert main._chest_loot('chest_key') == 'key'
@@ -991,8 +991,8 @@ def test_a_file_written_before_the_rename_still_loads():
     Both load paths, because they are separate code: the community format and
     the editor's own save. Nothing writes the old name back out, so a file heals
     itself the next time it is saved."""
-    from engine.editor import _deserialize_room, _serialize_room
-    from engine.world import Room, RoomType, Entity, canonical_kind
+    from vimny.engine.editor import _deserialize_room, _serialize_room
+    from vimny.engine.world import Room, RoomType, Entity, canonical_kind
 
     lvl = _tiny()
     lvl.entities = [{'kind': 'chest', 'at': [1, 3]},
@@ -1002,7 +1002,7 @@ def test_a_file_written_before_the_rename_still_loads():
     # `drops` names a kind too, so it renames with it — and the validator has to
     # agree with the parser or the file is refused for a rename nobody made
     assert room.entity_at(2, 3).drops == 'chest_random:red'
-    from sharing import validate as V
+    from vimny.sharing import validate as V
     assert not [e for e in V.validate(lvl).errors if 'drops' in e]
 
     room = Room(room_type=RoomType.ENTRY, rows=4, cols=8)
@@ -1019,7 +1019,7 @@ def test_the_wanderer_chases_but_never_strikes():
     that here because it is a claim about the ENGINE made in a menu, and the two
     can drift apart silently."""
     import main
-    from engine.world import Entity
+    from vimny.engine.world import Entity
     room = _room_with()
     pre  = dict(main._ENTITY_PALETTE['wanderer'][0])
     w    = Entity(kind='wanderer', row=1, col=5, **pre)
@@ -1184,7 +1184,7 @@ def test_a_seal_reads_only_walkable_stone():
 
 
 def test_a_door_cannot_be_part_of_the_text_that_opens_it():
-    from sharing import validate as V
+    from vimny.sharing import validate as V
     lvl = _sealed(opens=((1, 3),))               # inside region (1,1)-(1,6)
     rep = V.validate(lvl)
     assert not rep.ok and any('inside' in e for e in rep.errors)
@@ -1282,7 +1282,7 @@ def test_the_colon_register_holds_the_bare_command_like_vim():
     """Vim's `:` register holds `entity goblin` — the text, without the colon or
     the <CR>. Those go back on at replay, so the register stays something you
     could read or paste rather than a keystroke soup."""
-    from engine.registers import record_register, read_register, clip_to_keys
+    from vimny.engine.registers import record_register, read_register, clip_to_keys
 
     class _P:
         registers = {}
@@ -1384,7 +1384,7 @@ def test_a_line_pool_lays_whole_sayings():
     """A proverb is a sentence. Taken apart into a bag of words by length it is
     word salad wearing a proverb's vocabulary — and for `misquotes`, whose whole
     point is one wrong word to spot and mend, there is nothing left to mend."""
-    from sharing import vocab
+    from vimny.sharing import vocab
     lvl = _sized(rows=8, cols=60,
                  cells=['60W'] + ['W58FW'] * 6 + ['60W'],
                  fills=[F.Fill(region=(2, 1, 5, 58), pool='proverbs',
@@ -1446,7 +1446,7 @@ def test_a_route_that_reads_its_own_scenery_is_refused():
     The level here puts its exit exactly where a word happened to start, and
     the route is `w` — word-hop onto it. That is a route reading its own
     scenery: at any other arrangement the eighth word begins somewhere else."""
-    from sharing.validate import validate
+    from vimny.sharing.validate import validate
 
     def _lvl(exit_col, tape):
         return _sized(rows=5, cols=60, seed=7,
@@ -1526,7 +1526,7 @@ def test_an_opaque_door_fogs_everything_behind_it():
 def test_opening_an_opaque_door_is_what_lifts_its_fog():
     """No scripted fog and nothing stored: kill the door and the law itself
     says the room beyond is visible."""
-    from engine.motion import stone_law
+    from vimny.engine.motion import stone_law
     room = F.build(_corridor(
         entities=[{'kind': 'door', 'at': [1, 5], 'opaque': True}])).room
     room.kill_entity(room.entity_at(1, 5))
@@ -1538,7 +1538,7 @@ def test_standing_on_a_closed_opaque_door_does_not_see_past_it():
     is walkable, so the player can stand ON a closed opaque one — and a closed
     door is closed from either side. The eye reaching the door from its own cell
     must stop there too, or the far side lights up the moment you touch it."""
-    from engine.motion import auto_fog_tick
+    from vimny.engine.motion import auto_fog_tick
     room = F.build(_corridor(
         entities=[{'kind': 'door', 'at': [1, 5], 'opaque': True}])).room
     assert (1, 6) in room.fog_cells and (1, 10) in room.fog_cells
@@ -1552,7 +1552,7 @@ def test_stepping_past_an_opaque_door_is_what_opens_the_pocket():
     """The other half of the same rule: once you are PAST the door, on plain
     floor, sight floods the pocket normally (there is no second door to stop it),
     and the door behind you — opaque or not — never re-fogs what you already saw."""
-    from engine.motion import auto_fog_tick
+    from vimny.engine.motion import auto_fog_tick
     room = F.build(_corridor(
         entities=[{'kind': 'door', 'at': [1, 5], 'opaque': True}])).room
     auto_fog_tick(room, 1, 6)                     # stand one cell past the door
@@ -1586,7 +1586,7 @@ def test_a_locked_door_in_a_level_that_never_taught_paste_is_flagged():
     lvl = _corridor(entities=[{'kind': 'locked_door', 'at': [1, 5]},
                               {'kind': 'floor_key', 'at': [1, 3]}],
                     spawn=(1, 1), exit=(1, 2), solution='l')
-    from sharing.validate import validate
+    from vimny.sharing.validate import validate
     rep = validate(lvl)
     op = [w for w in rep.warnings if '[operable]' in w]
     assert op == ['[operable] a locked_door at 1,5, but no p or P is taught — '
@@ -1597,7 +1597,7 @@ def test_declaring_the_paste_takes_the_warning_away():
     lvl = _corridor(entities=[{'kind': 'locked_door', 'at': [1, 5]},
                               {'kind': 'floor_key', 'at': [1, 3]}],
                     spawn=(1, 1), exit=(1, 2), solution='l', requires=['p'])
-    from sharing.validate import validate
+    from vimny.sharing.validate import validate
     assert not [w for w in validate(lvl).warnings if '[operable]' in w]
 
 

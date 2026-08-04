@@ -16,10 +16,10 @@
 #
 # SPDX-License-Identifier: GPL-3.0-or-later
 
-"""Tests for engine/vim_parser.py — two-char sequences, operators, standalone commands."""
+"""Tests for vimny/engine/vim_parser.py — two-char sequences, operators, standalone commands."""
 import pytest
-from engine.vim_parser import parse
-from engine.modes import Mode
+from vimny.engine.vim_parser import parse
+from vimny.engine.modes import Mode
 
 
 # ── Incomplete sequences → None ───────────────────────────────────────────────
@@ -545,11 +545,11 @@ class TestTrailingZeroCounts:
         assert action['motion'] == 'w' and action['motion_count'] == 100
 
     def test_visual_textobj_count_with_zero(self):
-        from engine.vim_parser import parse_visual_textobj
+        from vimny.engine.vim_parser import parse_visual_textobj
         assert parse_visual_textobj('10iw') == ('object', 'iw', 10, True)
 
     def test_visual_textobj_bare_zero_not_a_count(self):
-        from engine.vim_parser import parse_visual_textobj
+        from vimny.engine.vim_parser import parse_visual_textobj
         assert parse_visual_textobj('0iw') is None   # '0' alone is the 0 motion
 
 

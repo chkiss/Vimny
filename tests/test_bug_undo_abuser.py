@@ -20,9 +20,9 @@
 
 Personality defined in agents/bug_testers.md.
 """
-from engine.world import Room, RoomType, CellType, Entity
-from engine.player import Player
-from engine.budget import Budget
+from vimny.engine.world import Room, RoomType, CellType, Entity
+from vimny.engine.player import Player
+from vimny.engine.budget import Budget
 from main import _pop_history_step, _snapshot
 
 

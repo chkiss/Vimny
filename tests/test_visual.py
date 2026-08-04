@@ -16,13 +16,13 @@
 #
 # SPDX-License-Identifier: GPL-3.0-or-later
 
-"""Tests for Block D2 — engine/visual.py: selection span, highlight membership,
+"""Tests for Block D2 — vimny/engine/visual.py: selection span, highlight membership,
 and operator application (charwise / linewise / block)."""
-from engine.world import Room, RoomType, CellType, CharRun
-from engine.player import Player
-from engine.modes import Mode
-from engine.text_object import TextObjectType
-from engine.visual import visual_span, in_selection, apply_visual
+from vimny.engine.world import Room, RoomType, CellType, CharRun
+from vimny.engine.player import Player
+from vimny.engine.modes import Mode
+from vimny.engine.text_object import TextObjectType
+from vimny.engine.visual import visual_span, in_selection, apply_visual
 
 ROWS, COLS = 7, 24
 

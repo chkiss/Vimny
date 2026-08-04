@@ -8,12 +8,12 @@
 Covers the blessing catalogue, its scroll/codex renderings, the scroll
 library's blessings/ subtree gating, and the CodexPane nested-fold model that
 groups codex/relics/blessings under top-level folds."""
-import content.blessings as B
-from content.blessings import (BLESSING_CATALOG, blessing_by_id,
+import vimny.content.blessings as B
+from vimny.content.blessings import (BLESSING_CATALOG, blessing_by_id,
                                blessing_id_for_name, blessing_scroll_content,
                                blessing_sections)
-from engine.codex import CodexPane
-from render.scroll_library import library_rows, _viewport_top
+from vimny.engine.codex import CodexPane
+from vimny.render.scroll_library import library_rows, _viewport_top
 
 
 # ── catalogue ────────────────────────────────────────────────────────────────

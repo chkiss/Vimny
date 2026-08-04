@@ -28,8 +28,8 @@ import pytest
 from blessed import Terminal
 from blessed.keyboard import Keystroke
 import main
-from engine.tape import ESC as _TAPE_ESC, ENTER as _TAPE_ENTER, to_keys
-import generation.dungeon_gen as _dg
+from vimny.engine.tape import ESC as _TAPE_ESC, ENTER as _TAPE_ENTER, to_keys
+import vimny.generation.dungeon_gen as _dg
 from tests import cached_room
 
 SEEDS = [0, 1, 42, 999, 2**20 + 7]   # answer-path set: includes seed 0 by design; differs from tests.SEEDS
@@ -37,7 +37,7 @@ SEEDS = [0, 1, 42, 999, 2**20 + 7]   # answer-path set: includes seed 0 by desig
 _COUNT_RE = re.compile(r'^\d+[hjkl]$')   # e.g. '44l', '3j', '2h'
 
 # ── General keystroke-cost model ──────────────────────────────────────────────
-# Matches engine/main.py _keystroke_cost and the Dijkstra cost model:
+# Matches vimny/engine/main.py _keystroke_cost and the Dijkstra cost model:
 #   count=1 → 1 ks; count=N → len(str(N))+1 ks.
 #   ge/gE add +1 base: 2 ks for n=1, len(str(n))+2 for n>1.
 
@@ -348,10 +348,10 @@ def _drive_to_win(builder, seed):
     dungeon = builder(seed)
     slug = builder.__name__[len('build_dungeon_'):]
     tape = dungeon.rooms[0].answer.replace(' ', '')          # spaces are visual separators
-    keys = to_keys(tape)          # one shared translator: <Space> <CR> <Esc> <C-v> (engine/tape.py)
+    keys = to_keys(tape)          # one shared translator: <Space> <CR> <Esc> <C-v> (vimny/engine/tape.py)
     keys += [Keystroke(c) for c in ':wq\r']                  # :wq returns the real win/stars
     term = Terminal(force_styling=False)
-    import render.colors as _colors
+    import vimny.render.colors as _colors
     _colors.init(term)                                       # combat/key colour paths touch color_rgb()
     state = {'n': 0}
     def _inkey(*a, **k):

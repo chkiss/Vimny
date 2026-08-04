@@ -30,9 +30,9 @@ discovers later that the first one lost its text.
 """
 import pytest
 
-from engine.world import CharRun
-from sharing import draft as D
-from sharing import format as F
+from vimny.engine.world import CharRun
+from vimny.sharing import draft as D
+from vimny.sharing import format as F
 
 
 def _draft(name='Two Rooms'):

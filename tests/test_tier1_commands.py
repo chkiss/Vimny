@@ -27,11 +27,11 @@ from blessed.keyboard import Keystroke
 from blessed import Terminal
 
 import main
-from engine.vim_parser import parse
-from engine.modes import Mode
-from engine.command_guard import action_allowed
-from engine.world import CellType
-from generation.dungeon_gen import (build_dungeon_selection_halls,
+from vimny.engine.vim_parser import parse
+from vimny.engine.modes import Mode
+from vimny.engine.command_guard import action_allowed
+from vimny.engine.world import CellType
+from vimny.generation.dungeon_gen import (build_dungeon_selection_halls,
                                     _SH_SPINE, _SH_CASE_ROWS, _SH_STRIPE_ROWS)
 
 ESC = Keystroke('\x1b', name='KEY_ESCAPE')
@@ -193,7 +193,7 @@ def test_ZZ_wins_like_wq_with_the_relic(monkeypatch):
 
 
 def test_sealed_departure_is_in_the_relic_pool():
-    from content.scrolls import RELIC_SCROLL_IDS, SCROLL_CATALOG
+    from vimny.content.scrolls import RELIC_SCROLL_IDS, SCROLL_CATALOG
     assert 'ZZ' in RELIC_SCROLL_IDS
     entry = next(s for s in SCROLL_CATALOG if s['id'] == 'ZZ')
     assert entry['title'] == 'The Sealed Departure'

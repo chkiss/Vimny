@@ -18,7 +18,7 @@
 
 """All levels must have exactly one entrance and one exit entity."""
 import pytest
-from generation.dungeon_gen import (
+from vimny.generation.dungeon_gen import (
     build_dungeon_first_cave, build_dungeon_line_halls, build_dungeon_counting_crypts,
     build_dungeon_rune_halls, build_dungeon_character_cataracts,
 )

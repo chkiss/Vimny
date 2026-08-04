@@ -26,7 +26,7 @@ The M row is filled with vocab, so M lands on its leftmost rune and the player
 must then $ to reach the M key at the right edge — i.e. "M $", not just "M".
 """
 import pytest
-from generation.dungeon_gen import (
+from vimny.generation.dungeon_gen import (
     _screen_vault_key_rows,
     _SCREEN_VAULT_COLS, _SCREEN_VAULT_DEFAULT_GAME_H,
     _SCREEN_VAULT_H_KEY_COL, _SCREEN_VAULT_M_KEY_COL, _SCREEN_VAULT_L_KEY_COL,

@@ -17,7 +17,7 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 
 """Phase 2: spatial index correctness — entity_at / char_run_at and all mutation helpers."""
-from engine.world import Room, RoomType, CellType, Entity, CharRun
+from vimny.engine.world import Room, RoomType, CellType, Entity, CharRun
 
 
 def _make_room(rows=7, cols=16):

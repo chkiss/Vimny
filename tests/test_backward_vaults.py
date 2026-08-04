@@ -18,8 +18,8 @@
 
 """The Backward Vaults: dungeon correctness tests."""
 import pytest
-from engine.world import CellType
-from generation.dungeon_gen import (
+from vimny.engine.world import CellType
+from vimny.generation.dungeon_gen import (
     build_dungeon_backward_vaults,
     _par_backward_vaults,
     _BACKWARD_VAULTS_CORR_ROWS, _BACKWARD_VAULTS_TURN_SPANS,

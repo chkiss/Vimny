@@ -27,10 +27,10 @@ import importlib
 
 MODULES = [
     'main',
-    'engine.vim_parser',
-    'render.title',
-    'render.overworld',
-    'generation.dungeon_gen',
+    'vimny.engine.vim_parser',
+    'vimny.render.title',
+    'vimny.render.overworld',
+    'vimny.generation.dungeon_gen',
 ]
 
 

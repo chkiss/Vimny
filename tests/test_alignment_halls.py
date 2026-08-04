@@ -26,12 +26,12 @@ from blessed.keyboard import Keystroke
 from blessed import Terminal
 
 import main
-from engine.motion import apply_motion
-from engine.operator import apply_indent, INDENT_WIDTH
-from engine.player import Player
-from engine.world import CellType
-from content.levels import known_commands
-from generation.dungeon_gen import (
+from vimny.engine.motion import apply_motion
+from vimny.engine.operator import apply_indent, INDENT_WIDTH
+from vimny.engine.player import Player
+from vimny.engine.world import CellType
+from vimny.content.levels import known_commands
+from vimny.generation.dungeon_gen import (
     build_dungeon_alignment_halls,
     _AH_ROWS, _AH_COLS, _AH_PAR, _AH_LESSONS, _AH_LESSON_ROWS,
     _AH_COL_S, _AH_PLQ_COL, _AH_GATE_ROW, _AH_GATE_COL0, _AH_REGISTER,

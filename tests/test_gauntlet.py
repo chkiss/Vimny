@@ -31,8 +31,8 @@ from blessed.keyboard import Keystroke
 from blessed import Terminal
 
 import main
-from engine.world import CellType
-from generation.dungeon_gen import (
+from vimny.engine.world import CellType
+from vimny.generation.dungeon_gen import (
     build_dungeon_gauntlet,
     _GNT_ROWS, _GNT_COLS, _GNT_SPINE, _GNT_R_E, _GNT_R_BW, _GNT_R_PCT,
     _GNT_R_BLK,
@@ -41,7 +41,7 @@ from generation.dungeon_gen import (
     _GNT_R_NOOK, _GNT_R_GATE, _GNT_P1_COLS, _GNT_P2_COLS, _GNT_NOOK_COLS,
     _GNT_BOLT0, _GNT_EXIT, _GNT_CATCH, _GNT_PAR, _GNT_BUDGET,
 )
-from engine.tape import ESC as TAPE_ESC, to_keys
+from vimny.engine.tape import ESC as TAPE_ESC, to_keys
 from tests import SEEDS, cached_room
 
 ESC = Keystroke('\x1b', code=361, name='KEY_ESCAPE')
@@ -55,14 +55,14 @@ def _room(seed=0):
 def _K(s):
     """Keystroke string → keys. `to_keys` is the ONE converter: tokens like
     `<CR>` and `<Space>` are several glyphs but one keystroke, so they can
-    only be matched whole (engine/tape.py). `separators=False`: this is a
+    only be matched whole (vimny/engine/tape.py). `separators=False`: this is a
     hand-written keystroke string, not a tape, so a space in it is a space the
     player types (`:6s/^  //`), never display spacing."""
     return to_keys(s, separators=False)
 
 
 def _tape_keys(answer):
-    """room.answer → keystrokes, via the one shared translator (engine/tape.py).
+    """room.answer → keystrokes, via the one shared translator (vimny/engine/tape.py).
 
     This used to guess where the Esc keys went, from a table of insert-verb
     prefixes. The tape writes Esc as <Esc> now, so there is nothing to guess."""
@@ -168,8 +168,8 @@ def test_pockets_and_gate_are_walk_proof(seed):
 def test_plus_lands_on_the_cit_tag(seed):
     # + steps from the gU gallery down onto the cit row's first non-blank —
     # the tag's '<' — wherever the gallery left the cursor.
-    from engine.motion import apply_motion, _first_non_blank_col
-    from engine.player import Player
+    from vimny.engine.motion import apply_motion, _first_non_blank_col
+    from vimny.engine.player import Player
     room = _room(seed)
     p = Player()
     p.row, p.col = _GNT_R_P3, 45
@@ -208,7 +208,7 @@ def test_channels_are_misted_water(seed):
         for c in range(_GNT_SPINE + 1, lo):
             assert room.cells[r][c] == CellType.WATER
             assert (r, c) in room.fog_cells and (r, c) in room.mist_cells
-    from generation.dungeon_gen import _GNT_R_WTR
+    from vimny.generation.dungeon_gen import _GNT_R_WTR
     for c in range(_GNT_SPINE, 63):                      # the shelf's band
         assert room.cells[_GNT_R_WTR][c] == CellType.WATER
         assert (_GNT_R_WTR, c) in room.mist_cells
@@ -223,9 +223,9 @@ def test_islands_are_search_only(seed):
     # Water bars feet (the BFS test), the mist bars the line scans, and the
     # spine ◆ catches every fnb jump ({n}G / + / -) — only a search lands
     # on an island; the search itself remains a lawful landing.
-    from engine.motion import apply_motion, _first_non_blank_col
-    from engine.player import Player
-    from engine.search import find_next
+    from vimny.engine.motion import apply_motion, _first_non_blank_col
+    from vimny.engine.player import Player
+    from vimny.engine.search import find_next
     room = _room(seed)
     isl1 = set(range(_GNT_P1_COLS[0], _GNT_P1_COLS[1] + 1))
     for motion in ('$', 'w', 'e', 'W', 'E'):
@@ -468,7 +468,7 @@ def test_first_door_opens_and_undo_rebars(monkeypatch):
 # ── curriculum ────────────────────────────────────────────────────────────────
 
 def test_curriculum_entry():
-    from content.levels import _BY_SLUG, known_commands
+    from vimny.content.levels import _BY_SLUG, known_commands
     lv = _BY_SLUG['gauntlet']
     assert lv['display'] == '48'
     assert lv['teaches'] == []                     # an exam introduces nothing

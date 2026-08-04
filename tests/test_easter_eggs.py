@@ -22,9 +22,9 @@ from blessed.keyboard import Keystroke
 from blessed import Terminal
 
 import main
-import generation.dungeon_gen as dg
-from engine.player import Player
-from engine.world import entity_letter
+import vimny.generation.dungeon_gen as dg
+from vimny.engine.player import Player
+from vimny.engine.world import entity_letter
 
 
 def _room_and_master():
@@ -113,7 +113,7 @@ def test_gold_becomes_a_pickup_coin():
 def _drive_x_on(kind, tag, keys_before, monkeypatch, hp=1, swole=False, progress=None):
     """Place a single creature at spawn+1 in a cleared arena, run `keys_before`
     then :q!, and return (room, player, messages)."""
-    from engine.world import Entity
+    from vimny.engine.world import Entity
     d = dg.build_dungeon_warden_eternal(0)
     r = d.rooms[0]
     for e in list(r.entities):
@@ -160,7 +160,7 @@ def test_x_an_elf_drops_gold(monkeypatch):
 def test_hound_bites_once_per_turn():
     # a big Hound (attack 3, triple SPEED) must deal 3 to a foe per turn, not 9 —
     # movement is fast, biting is once.
-    from engine.world import Room, RoomType, CellType, Entity
+    from vimny.engine.world import Room, RoomType, CellType, Entity
     r = Room(room_type=RoomType.ENTRY, rows=3, cols=20)
     r.cells = [[CellType.FLOOR] * 20 for _ in range(3)]
     p = Player(row=1, col=1)
@@ -183,7 +183,7 @@ def test_x_loots_the_hat(monkeypatch):
 
 
 def test_elf_trade_accepts_on_y_and_debits_gold(monkeypatch):
-    from engine.world import Entity
+    from vimny.engine.world import Entity
     d = dg.build_dungeon_warden_eternal(0)
     r = d.rooms[0]
     for e in list(r.entities):                        # clear the board
@@ -218,7 +218,7 @@ def test_elf_trade_accepts_on_y_and_debits_gold(monkeypatch):
 
 # ── the g<->G rule lives in ONE place (case_entities) for every case command ──
 def test_case_ops_are_the_single_source_of_the_swelled_glyph():
-    from engine.operator import case_entities
+    from vimny.engine.operator import case_entities
     r, p = _room_and_master()
     cells = [(e.row, e.col) for e in r.entities
              if e.kind == 'goblin' and e.tag == 'horde'][:3]
@@ -232,8 +232,8 @@ def test_case_ops_are_the_single_source_of_the_swelled_glyph():
 
 
 def test_case_rule_is_uniform_across_goblin_dog_cat():
-    from engine.world import Entity
-    from engine.operator import case_entities
+    from vimny.engine.world import Entity
+    from vimny.engine.operator import case_entities
     r, _ = _room_and_master()
     dog = Entity(kind='ally', tag='dog', row=2, col=2, hp=2, max_hp=2)
     cat = Entity(kind='critter', tag='cat', row=2, col=4, hp=1, max_hp=1)
@@ -259,7 +259,7 @@ def test_demon_sees_everywhere_and_swole_sees_double():
 
 # ── the dog fights on your side ───────────────────────────────────────────────
 def test_dog_is_an_ally_that_mauls_the_nearest_foe():
-    from engine.world import Entity
+    from vimny.engine.world import Entity
     r, p = _room_and_master()
     for e in list(r.entities):                       # clear the board of goblins
         if e.kind == 'goblin':
@@ -297,7 +297,7 @@ def test_uppercase_creature_letters_make_the_swelled_form():
 
 
 def test_swelling_an_ally_keeps_it_yours():
-    from engine.world import Entity
+    from vimny.engine.world import Entity
     d = dg.build_dungeon_warden_eternal(0)
     r = d.rooms[0]
     dog = Entity(kind='ally', tag='dog', row=r.spawn_pos[0], col=r.spawn_pos[1],

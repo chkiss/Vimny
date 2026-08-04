@@ -29,8 +29,8 @@ from urllib.parse import parse_qs, urlparse
 import pytest
 
 import main
-import sharing.format as F
-import sharing.submit as SUBMIT
+import vimny.sharing.format as F
+import vimny.sharing.submit as SUBMIT
 
 
 def _level(name='The Hollow Vault', author='Ren'):
@@ -111,7 +111,7 @@ def test_the_repo_can_be_pointed_at_a_fork(monkeypatch):
 
 
 def test_the_slug_matches_the_one_publish_would_use():
-    from save.save_manager import _slug
+    from vimny.save.save_manager import _slug
     name = 'The Hollow Vault'
     assert SUBMIT.submit_slug(_level(name=name)) == _slug(name) == 'the_hollow_vault'
 

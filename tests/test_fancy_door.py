@@ -43,9 +43,9 @@ level solvable by an edit that has nothing to do with its lesson.
 """
 import pytest
 
-from engine.registers import clip_to_text
-from engine.world import Entity, Room, RoomType, CellType, CARET_TRANSPARENT
-from engine.motion import _FOG_BLOCK_KINDS, _SCAN_BLOCK
+from vimny.engine.registers import clip_to_text
+from vimny.engine.world import Entity, Room, RoomType, CellType, CARET_TRANSPARENT
+from vimny.engine.motion import _FOG_BLOCK_KINDS, _SCAN_BLOCK
 
 
 def _clip(*lines, linewise=False, width=40):
@@ -135,14 +135,14 @@ def test_the_password_survives_a_clone():
     """`clone_entity` is how every snapshot and paste copies an entity — a
     field that drops out of a copy is a door that forgets its password the
     first time the player presses `u`."""
-    from engine.world import clone_entity
+    from vimny.engine.world import clone_entity
     door = _room_with_door().entity_at(2, 10)
     assert clone_entity(door).password == 'p1g.sn0ut'
 
 
 def test_the_password_round_trips_through_a_saved_level():
     """The forge can place one, so a shared level has to carry it."""
-    from engine.editor import _ENTITY_FIELDS
+    from vimny.engine.editor import _ENTITY_FIELDS
     assert 'password' in _ENTITY_FIELDS
 
 
@@ -199,8 +199,8 @@ def _blocked_room(kind):
 def test_no_writing_verb_walks_the_cursor_through_a_shut_door(kind, verb):
     """i/a, A, r and R each write a cell and advance. None may advance ONTO a
     blocker — `l` will not, and a cursor is a cursor."""
-    from engine.player import Player
-    from engine import insert as I
+    from vimny.engine.player import Player
+    from vimny.engine import insert as I
     room = _blocked_room(kind)
     p = Player(row=1, col=9)
     {'insert':        lambda: I.insert_char(room, p, 'x'),
@@ -219,8 +219,8 @@ def test_a_paste_neither_crosses_a_shut_door_nor_carries_the_cursor_over_it(kind
     walked them into the corridor beyond. The clip is deliberately CLUSTERED
     (two runs with a hole between them), because bounding each run on its own
     still lets the run that BEGINS past the door land there."""
-    from engine.player import Player
-    from engine.operator import op_paste
+    from vimny.engine.player import Player
+    from vimny.engine.operator import op_paste
     room = _blocked_room(kind)
     p = Player(row=1, col=9)
     clip = {'linewise': False,
@@ -240,7 +240,7 @@ def test_the_forge_offers_the_shared_password_pools():
     `:entity` splits its arguments on whitespace and the picker's answer is
     `:entity` text."""
     import main
-    from content.passwords import POOLS, ALL
+    from vimny.content.passwords import POOLS, ALL
     offered = main._entity_choices('fancy_door', 'password')
     assert offered                                  # not free-text-only
     assert ' ' not in ''.join(offered)
@@ -261,7 +261,7 @@ def test_the_forge_offers_the_levels_own_vocab_words_first():
     door's password is the one place that matters most, so its own words come
     FIRST, named as its own, with the shipped pools behind them."""
     import main
-    from content.passwords import ALL
+    from vimny.content.passwords import ALL
     mine = ('shibboleth', 'grimoire', 'lantern')     # one of them shipped too
     offered = main._entity_choices('fancy_door', 'password', mine)
     assert offered[:2] == ('grimoire', 'lantern')    # ahead of the shipped pools
@@ -279,7 +279,7 @@ def test_the_forge_offers_the_levels_own_vocab_words_first():
 def test_a_fancy_door_is_not_drawn_as_a_padlock():
     """It is a lock, in the lock colour — but a padlock sends a player hunting
     for something to pick up, and there is nothing to pick up."""
-    import render.symbols as S
+    import vimny.render.symbols as S
     assert S.DOOR_SPOKEN not in (S.DOOR_LOCKED, S.DOOR_H, S.DOOR_V)
     assert S.KEY_SPOKEN != S.KEY
     assert len(S.DOOR_SPOKEN) == len(S.KEY_SPOKEN) == 1

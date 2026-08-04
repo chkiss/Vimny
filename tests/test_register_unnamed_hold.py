@@ -10,17 +10,17 @@ GAP (a saying missing its last word) — ALL reachable from the start, so the la
 tempts the ruinous order yank -> daw -> paste: the daw overwrites "" with the junk,
 so P lays the junk and the gap stays false.  The fix is to reorder (yank+paste
 first, then daw) or re-yank; nothing is walled off, so the sting only costs a retry.
-See blueprints/registry_wing.md and dungeon_gen.build_dungeon_register_unnamed_hold."""
+See docs/blueprints/registry_wing.md and dungeon_gen.build_dungeon_register_unnamed_hold."""
 import math
 import pytest
 from blessed.keyboard import Keystroke
 from blessed import Terminal
 
 import main
-from engine.world import CellType
-from engine.motion import _vision_flood, _FOGGABLE_CELLS
-from content.levels import LEVELS, is_unlocked, _BY_SLUG
-from generation.dungeon_gen import (build_dungeon_register_unnamed_hold as _build,
+from vimny.engine.world import CellType
+from vimny.engine.motion import _vision_flood, _FOGGABLE_CELLS
+from vimny.content.levels import LEVELS, is_unlocked, _BY_SLUG
+from vimny.generation.dungeon_gen import (build_dungeon_register_unnamed_hold as _build,
                                     _R1_PAR, _R1_GATE, _R1_SPINE, _R1_EXIT,
                                     _R1_ROW_QUARRY, _R1_ROW_DAW, _R1_ROW_GAP)
 from tests import SEEDS

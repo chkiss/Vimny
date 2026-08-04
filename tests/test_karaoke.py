@@ -33,10 +33,10 @@ from blessed import Terminal
 from blessed.keyboard import Keystroke
 
 import main
-from engine.tape import to_keys
-import generation.dungeon_gen as dg
-import generation.dungeon_gen as dg
-from engine.tape import literal_spans, ESC, ENTER, CTRL_V, SPACE
+from vimny.engine.tape import to_keys
+import vimny.generation.dungeon_gen as dg
+import vimny.generation.dungeon_gen as dg
+from vimny.engine.tape import literal_spans, ESC, ENTER, CTRL_V, SPACE
 
 
 @pytest.fixture(autouse=True)
@@ -52,13 +52,13 @@ def _no_anim(monkeypatch):
 
 
 def _replay(tape):
-    """Karaoke tape → raw keystrokes, via the one shared translator (engine/tape.py)."""
+    """Karaoke tape → raw keystrokes, via the one shared translator (vimny/engine/tape.py)."""
     return to_keys(tape)
 
 
 def _drive_admin(slug, dungeon):
     term = Terminal(force_styling=False)
-    import render.colors as _colors
+    import vimny.render.colors as _colors
     _colors.init(term)                       # key/chest colour paths touch color_rgb()
     keys = _replay(dungeon.room.answer) + [Keystroke(c) for c in ':q!\r']
     it = iter(keys)

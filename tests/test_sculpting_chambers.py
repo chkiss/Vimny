@@ -24,11 +24,11 @@ from blessed.keyboard import Keystroke
 from blessed import Terminal
 
 import main
-from engine.motion import apply_motion
-from engine.player import Player
-from engine.world import CellType
-from content.levels import known_commands
-from generation.dungeon_gen import (
+from vimny.engine.motion import apply_motion
+from vimny.engine.player import Player
+from vimny.engine.world import CellType
+from vimny.content.levels import known_commands
+from vimny.generation.dungeon_gen import (
     build_dungeon_sculpting_chambers,
     _SC_ROWS, _SC_COLS, _SC_PAR, _SC_TARGET, _SC_BAND, _SC_LINES, _SC_COMPLETIONS,
     _SC_I_ROW, _SC_A_ROW, _SC_WCOL, _SC_PLQ, _SC_EXIT_COL, _SC_EXIT_ROW0,

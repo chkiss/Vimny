@@ -35,11 +35,11 @@ exact hint-bar fragment (CMD renders each entry as 'keys:desc'); a bundled cell 
 'd{m}  dd:delete' still contains the fragment 'dd:delete' as a substring.
 """
 import pytest
-from engine.vim_parser import parse
-from engine.modes import Mode
-from engine.command_guard import action_allowed
-from content.levels import LEVELS, known_commands, level_type
-from render.hint_bar import hint_text
+from vimny.engine.vim_parser import parse
+from vimny.engine.modes import Mode
+from vimny.engine.command_guard import action_allowed
+from vimny.content.levels import LEVELS, known_commands, level_type
+from vimny.render.hint_bar import hint_text
 
 
 def _act(keys: str) -> dict:
@@ -121,7 +121,7 @@ def test_deferred_commands_are_neither_usable_nor_shown_early(slug, blocked):
 
 
 # ── Two-row wrapping: long cheat sheets flow onto a second row, never overflow ──
-from render.renderer import _wrap_cheatsheet
+from vimny.render.renderer import _wrap_cheatsheet
 
 
 def test_wrap_short_stays_one_row():
@@ -158,12 +158,12 @@ def test_two_row_hint_steals_one_game_row_so_the_frame_still_fits():
     the game area gives up exactly one row."""
     import io, contextlib
     from blessed import Terminal
-    import render.colors as C, render.symbols as S
-    from render.renderer import render_all
-    from generation.dungeon_gen import (build_dungeon_first_cave,
+    import vimny.render.colors as C, vimny.render.symbols as S
+    from vimny.render.renderer import render_all
+    from vimny.generation.dungeon_gen import (build_dungeon_first_cave,
                                          build_dungeon_warden_scrivener)
-    from engine.player import Player
-    from engine.budget import Budget
+    from vimny.engine.player import Player
+    from vimny.engine.budget import Budget
 
     term = Terminal(force_styling=True); C.init(term); S.init(term)
 

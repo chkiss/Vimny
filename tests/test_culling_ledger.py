@@ -35,18 +35,18 @@ from blessed.keyboard import Keystroke
 from blessed import Terminal
 
 import main
-from engine.world import CellType
-from engine import substitute as S
-from generation.dungeon_gen import (
+from vimny.engine.world import CellType
+from vimny.engine import substitute as S
+from vimny.generation.dungeon_gen import (
     build_dungeon_culling_ledger,
     _CL_ROWS, _CL_COLS, _CL_CATCH, _CL_TX, _CL_SEP, _CL_WALL, _CL_GAP,
     _CL_COR, _CL_KEYCH, _CL_DOOR1, _CL_SEALDOOR, _CL_DOOR2, _CL_BRZ_COL,
     _CL_EXIT, _CL_KEEP_ROWS, _CL_BLIGHT_I, _CL_BLIGHT_II, _CL_JUNK_III,
     _CL_SACRED_III, _CL_GAPS, _CL_PAR, _CL_BUDGET,
 )
-from content.levels import LEVELS, known_commands
+from vimny.content.levels import LEVELS, known_commands
 from tests import SEEDS, cached_room
-from engine.tape import to_keys
+from vimny.engine.tape import to_keys
 
 ENTER = Keystroke('\r', code=343, name='KEY_ENTER')
 
@@ -62,7 +62,7 @@ def _fresh(seed=0):
 def _K(s):
     """Keystroke string → keys. `to_keys` is the ONE converter: tokens like
     `<CR>` and `<Space>` are several glyphs but one keystroke, so they can
-    only be matched whole (engine/tape.py). `separators=False`: this is a
+    only be matched whole (vimny/engine/tape.py). `separators=False`: this is a
     hand-written keystroke string, not a tape, so a space in it is a space the
     player types (`:6s/^  //`), never display spacing."""
     return to_keys(s, separators=False)
@@ -181,8 +181,8 @@ def test_ledger_starts_dark_and_keeps_are_ordered(seed):
 
 @pytest.mark.parametrize("seed", SEEDS)
 def test_no_jump_can_land_on_a_ledger_row(seed):
-    from engine.motion import apply_motion
-    from engine.player import Player
+    from vimny.engine.motion import apply_motion
+    from vimny.engine.player import Player
     r = _room(seed)
     for row in range(0, _CL_SEP + 1):
         assert not any(r.is_passable(row, c) for c in range(r.cols))
@@ -216,7 +216,7 @@ def test_blind_cull_is_refused():
     # The ledger is dark: ranged deletes are refused until the mist parts.
     d = _fresh(0)
     r = d.rooms[0]
-    from engine.player import Player
+    from vimny.engine.player import Player
     p = Player(name='t')
     p.row, p.col = r.spawn_pos
     handled, msg, _ns, nl = S.run_ex('2d', r, p)
@@ -356,7 +356,7 @@ def test_blind_global_cull_is_refused():
     # dark, the wide :v is refused outright — nothing culled, no light.
     d = _fresh(0)
     r = d.rooms[0]
-    from engine.player import Player
+    from vimny.engine.player import Player
     p = Player(name='t')
     p.row, p.col = r.spawn_pos
     handled, msg, _ns, nl = S.run_ex('2,19v/that/d _', r, p)

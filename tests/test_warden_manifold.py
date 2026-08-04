@@ -61,12 +61,12 @@ from blessed.keyboard import Keystroke
 from blessed import Terminal
 
 import main
-from engine.motion import apply_motion
-from engine.player import Player
-from engine.search import match_cells, find_next
-from engine.world import CellType, Entity
-from content.levels import known_commands
-from generation.dungeon_gen import (
+from vimny.engine.motion import apply_motion
+from vimny.engine.player import Player
+from vimny.engine.search import match_cells, find_next
+from vimny.engine.world import CellType, Entity
+from vimny.content.levels import known_commands
+from vimny.generation.dungeon_gen import (
     build_dungeon_warden_manifold,
     _WM_ROWS, _WM_COLS, _WM_AXIS, _WM_SPAWN, _WM_FLAME, _WM_BRAZIERS,
     _WM_GATE, _WM_PODIUMS, _WM_WARD1, _WM_WARD1_POSTS, _WM_WARD1_WORDS,
@@ -324,11 +324,11 @@ def test_flame_paste_blocked_off_brazier():
 def test_operators_parry_on_the_warden(seed):
     """edit_immune: a dd aimed at his row is REFUSED and he survives any
     charwise sweep."""
-    from engine.reflow import remove_row
+    from vimny.engine.reflow import remove_row
     room = build_dungeon_warden_manifold(seed).rooms[0]      # private (mutating)
     w = _warden(room)
     assert not remove_row(room, w.row), "his row must refuse the collapse"
-    from engine.operator import _delete_cols
+    from vimny.engine.operator import _delete_cols
     _delete_cols(room, w.row, 0, room.cols - 1)
     assert _warden(room) is not None, "a charwise sweep must parry too"
 

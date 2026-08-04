@@ -28,9 +28,9 @@ from blessed import Terminal
 from blessed.keyboard import Keystroke
 
 import main
-import generation.dungeon_gen as dg
-from engine.world import CellType
-from engine.player import Player
+import vimny.generation.dungeon_gen as dg
+from vimny.engine.world import CellType
+from vimny.engine.player import Player
 from tests import SEEDS
 
 

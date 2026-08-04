@@ -16,16 +16,16 @@
 #
 # SPDX-License-Identifier: GPL-3.0-or-later
 
-"""Tests for Block A (engine/text_object.py) and Block B (engine/operator.py):
+"""Tests for Block A (vimny/engine/text_object.py) and Block B (vimny/engine/operator.py):
 the delete/yank operator system over the 2D grid, including the rule that
 linewise yank/delete includes the spaces between runes (bounded by walls)."""
 import pytest
-from engine.world import Room, RoomType, CellType, CharRun
-from engine.player import Player
-from engine.text_object import (
+from vimny.engine.world import Room, RoomType, CellType, CharRun
+from vimny.engine.player import Player
+from vimny.engine.text_object import (
     TextObject, TextObjectType, classify, compute_text_object,
 )
-from engine.operator import (
+from vimny.engine.operator import (
     line_extent, op_yank, op_delete, op_paste, op_case, op_join, case_char,
     apply_indent, INDENT_WIDTH,
 )
@@ -468,7 +468,7 @@ class TestCaseOperators:
         assert _syms(room, 3, 2) == 'ABC'
 
     def test_gUiw_via_textobj(self):
-        from engine.text_object import resolve_text_object
+        from vimny.engine.text_object import resolve_text_object
         room = _room()
         room.add_char_run(CharRun(3, 2, ('a', 'b', 'c'), 'ancient'))
         p = _player(3, 3)
@@ -745,7 +745,7 @@ class TestJoin:
         assert room.rows == before
 
     def test_J_refuses_past_the_edge_of_the_world(self):
-        from engine.reflow import _MAX_COLS
+        from vimny.engine.reflow import _MAX_COLS
         room = Room(room_type=RoomType.PUZZLE, rows=5, cols=_MAX_COLS)
         room.cells = [[CellType.FLOOR if (0 < r < 4 and 0 < c < _MAX_COLS - 1) else CellType.WALL
                        for c in range(_MAX_COLS)] for r in range(5)]

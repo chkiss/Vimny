@@ -26,9 +26,9 @@ The warden's combat AI is tested separately once it lands.
 import pytest
 from collections import deque
 
-import generation.dungeon_gen as dg
-from engine.world import CellType
-from engine.motion import _sentence_starts, _bracket_at
+import vimny.generation.dungeon_gen as dg
+from vimny.engine.world import CellType
+from vimny.engine.motion import _sentence_starts, _bracket_at
 from tests import SEEDS
 
 
@@ -187,8 +187,8 @@ def test_interior_route_to_warden_and_exit(seed):
 def test_leap_in_drown_out(seed):
     """^ from the opened seal-door leaps the moat onto the first char; 0/$ on a
     combat row land in the water (drown)."""
-    from engine.player import Player
-    from engine.motion import apply_motion
+    from vimny.engine.player import Player
+    from vimny.engine.motion import apply_motion
     room = _room(seed)
     room.fog_cells.clear()                       # as if the seal-door were opened
     p = Player(); p.row, p.col = dg._WS_SEAL_DOOR
@@ -219,7 +219,7 @@ def test_hazards_vary_across_seeds():
 # ── Phase-1 attack helpers (the warden's v-sweep) ─────────────────────────────
 
 import main
-from engine.player import Player
+from vimny.engine.player import Player
 
 
 @pytest.mark.parametrize("seed", SEEDS)
@@ -283,8 +283,8 @@ def test_erase_row_clears_only_the_span(seed):
 # ── Hint bar / command gating on a boss level ─────────────────────────────────
 
 def test_boss_hint_shows_the_act_not_the_next_command():
-    from content.levels import act_commands
-    from render.hint_bar import hint_text, _format
+    from vimny.content.levels import act_commands
+    from vimny.render.hint_bar import hint_text, _format
     acts = act_commands('warden_surveyor')
     # the whole of act 2, in curriculum order; none of act 1's basics
     assert acts == ['W', 'B', 'E', 'ge', 'gE', 'G', 'gg', 'H', 'M', 'L', '%', '{', '}', '(', ')']
@@ -318,8 +318,8 @@ def test_phase2_regen_restores_eaten_verse(seed):
 @pytest.mark.parametrize("seed", SEEDS)
 def test_paragraph_jumps_cannot_escape_the_hall(seed):
     """}/{ must stay within the moat-bounded hall, not vault into the entry/treasure."""
-    from engine.player import Player
-    from engine.motion import apply_motion
+    from vimny.engine.player import Player
+    from vimny.engine.motion import apply_motion
     room = _room(seed)
     room.fog_cells.clear()
     lo_r, hi_r = dg._WS_INNER_TOP, dg._WS_INNER_BOT
@@ -335,8 +335,8 @@ def test_paragraph_jumps_cannot_escape_the_hall(seed):
 def test_shield_does_not_block_paragraph_jump_to_leftmost():
     """A shield blocks stepping, not a } jump: } reaches the leftmost blank,
     crossing the shield, but the moat still bounds the segment."""
-    from engine.world import Entity
-    from engine.motion import _segment_left
+    from vimny.engine.world import Entity
+    from vimny.engine.motion import _segment_left
     room = _room(42)
     room.fog_cells.clear()
     blank = next(r for r in range(dg._WS_INNER_TOP, dg._WS_INNER_BOT + 1)
@@ -349,7 +349,7 @@ def test_shield_does_not_block_paragraph_jump_to_leftmost():
 
 def test_phase2_block_threat_is_the_ctrlv_rectangle():
     """Phase 2 frames the Ctrl-v rectangle between warden and player."""
-    from engine.visual import block_bounds
+    from vimny.engine.visual import block_bounds
     assert block_bounds((10, 30), (14, 40)) == (10, 14, 30, 40)
     assert block_bounds((14, 40), (10, 30)) == (10, 14, 30, 40)   # order-independent
 
@@ -360,7 +360,7 @@ def test_surveyor_previews_the_search_act():
     reveals. Visual Mode moved later in the curriculum (it is unforceable before
     operators exist), so the surveyor no longer gates the literal 'visual' token —
     'search' is an act-marker id, like the other bosses' 'd_op' / 'text_obj'."""
-    from content.levels import LEVELS
+    from vimny.content.levels import LEVELS
     sid = main._SCROLL_DROPS['warden_surveyor'][0]
     assert sid == 'search' and sid in main._STD_SCROLLS
     idx = next(i for i, lv in enumerate(LEVELS) if lv['slug'] == 'warden_surveyor')

@@ -20,8 +20,8 @@
 
 Personality defined in agents/bug_testers.md.
 """
-from engine.world import Room, RoomType, CellType, Entity
-from engine.player import Player
+from vimny.engine.world import Room, RoomType, CellType, Entity
+from vimny.engine.player import Player
 from main import (
     _enemy_tick,
     _remove_warden_shields, _on_kill, _spawn_goblin,

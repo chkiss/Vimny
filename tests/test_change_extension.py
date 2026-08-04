@@ -42,12 +42,12 @@ from blessed.keyboard import Keystroke
 from blessed import Terminal
 
 import main
-from engine.motion import apply_motion
-from engine.tape import ESC as TAPE_ESC
-from engine.player import Player
-from engine.world import CellType
-from content.levels import known_commands
-from generation.dungeon_gen import (
+from vimny.engine.motion import apply_motion
+from vimny.engine.tape import ESC as TAPE_ESC
+from vimny.engine.player import Player
+from vimny.engine.world import CellType
+from vimny.content.levels import known_commands
+from vimny.generation.dungeon_gen import (
     build_dungeon_change_extension, _ce_pick, _ce_route, _ce_answer,
     _whole_line_dissimilar,
     _CE_ROWS, _CE_COLS, _CE_COL_S, _CE_LBL_COL, _CE_LBL_END, _CE_PLQ_COL,
@@ -467,7 +467,7 @@ def test_answer_is_the_real_keystroke_tape(seed):
     """room.answer is the printable keystrokes of the canonical route, so the
     admin answer-sheet tracks it keystroke for keystroke. Plain spaces are
     display separators; a step that TYPES text is sealed with Esc, written <Esc>
-    (engine/tape.py), because a replayer cannot infer it the way a reader can.
+    (vimny/engine/tape.py), because a replayer cannot infer it the way a reader can.
     No typed value contains a space."""
     room = _room(seed)
     expected = ''.join(keys + typed + (TAPE_ESC if typed else '')
@@ -508,8 +508,8 @@ def test_y_paste_bumps_and_realigns_the_stem_plaque(monkeypatch):
     """The Sculpting glitter, ported to the paste: a row inserted at the echo's
     landing bumps the stem plaque down one, and the tick's re-align slides it
     back to the echo row and flags it for the twinkle (room._sc_twinkle)."""
-    from engine.player import Player
-    from engine.reflow import _insert_blank_row
+    from vimny.engine.player import Player
+    from vimny.engine.reflow import _insert_blank_row
     dungeon = build_dungeon_change_extension(SEEDS[0])
     room = dungeon.rooms[0]
     p = Player(row=_CE_Y_ROW, col=_CE_Y_COL0)

@@ -16,10 +16,10 @@
 #
 # SPDX-License-Identifier: GPL-3.0-or-later
 
-"""Tests for engine/editor.py: snapshot/restore, cut/paste, merge, range ops."""
-from engine.world import Room, RoomType, CellType, Entity, CharRun
-from engine.player import Player
-from engine.editor import (
+"""Tests for vimny/engine/editor.py: snapshot/restore, cut/paste, merge, range ops."""
+from vimny.engine.world import Room, RoomType, CellType, Entity, CharRun
+from vimny.engine.player import Player
+from vimny.engine.editor import (
     _merge_adjacent_char_runs,
     _ed_cut, _ed_snapshot, _ed_restore, _ed_paint, PAINT_KINDS,
     _ed_paste, _ed_clear_row,
@@ -293,7 +293,7 @@ class TestEdPaint:
         """A channel under haze is still a channel. Mist is separated from open
         water by its background and by never animating — not by wearing a
         different glyph, which read as rubble."""
-        from render import symbols as S
+        from vimny.render import symbols as S
         assert S.MIST == '~'
 
     def test_paint_leaves_the_text_standing(self):

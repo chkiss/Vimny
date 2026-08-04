@@ -25,9 +25,9 @@ from blessed.keyboard import Keystroke
 from blessed import Terminal
 
 import main
-from engine.world import CellType
-from content.levels import LEVELS, is_unlocked, _BY_SLUG
-from generation.dungeon_gen import (build_dungeon_register_named_vault as _build,
+from vimny.engine.world import CellType
+from vimny.content.levels import LEVELS, is_unlocked, _BY_SLUG
+from vimny.generation.dungeon_gen import (build_dungeon_register_named_vault as _build,
                                     _R2_PAR, _R2_SPINE, _R2_GATE, _R2_EXIT,
                                     _R2_QUARRY_ROWS, _R2_BAY_ROWS, _R2_JUNK,
                                     _R2_SAYINGS, _R2_QUARRY_WORDS, _R2_STUBS,

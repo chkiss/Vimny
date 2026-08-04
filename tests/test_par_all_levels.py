@@ -35,7 +35,7 @@ The Goblin Gauntlet par is checked against a hand-written reference
 """
 import math
 import pytest
-from generation.dungeon_gen import (
+from vimny.generation.dungeon_gen import (
     _par_wardens_keep,
     _bfs_par, _bfs_par_line,
     _dijkstra_par_wbe, _dijkstra_par_ftFT,

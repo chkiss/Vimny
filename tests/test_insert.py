@@ -16,11 +16,11 @@
 #
 # SPDX-License-Identifier: GPL-3.0-or-later
 
-"""Tests for Block G — engine/insert.py: insert-entry positioning (i a I A o O s S),
+"""Tests for Block G — vimny/engine/insert.py: insert-entry positioning (i a I A o O s S),
 INSERT typing/backspace, and blank-row insertion bookkeeping."""
-from engine.world import Room, RoomType, CellType, CharRun, Entity
-from engine.player import Player
-from engine.insert import (
+from vimny.engine.world import Room, RoomType, CellType, CharRun, Entity
+from vimny.engine.player import Player
+from vimny.engine.insert import (
     begin_insert, insert_char, insert_char_extend, insert_backspace,
     _insert_blank_row,
     replace_chars, replace_overtype, replace_restore,
@@ -138,7 +138,7 @@ class TestAppendExtend:
         assert p.col == 5                                          # cursor held
 
     def test_A_extend_stops_at_the_edge_of_the_world(self):
-        from engine.reflow import _MAX_COLS
+        from vimny.engine.reflow import _MAX_COLS
         room = Room(room_type=RoomType.ENTRY, rows=3, cols=_MAX_COLS)
         room.cells = [[CellType.FLOOR if (0 < r < 2 and 0 < c < _MAX_COLS - 1) else CellType.WALL
                        for c in range(_MAX_COLS)] for r in range(3)]
@@ -336,7 +336,7 @@ def test_A_in_goblin_gauntlet_row1_lands_at_line_end():
     """Regression: A on a sparse corridor row goes to the line END (the corridor
     edge), not just past the lone rune. The Goblin Gauntlet (58 cols) row-1
     corridor ends at col 56, so A lands at col 57."""
-    from generation.dungeon_gen import build_dungeon_goblin_gauntlet
+    from vimny.generation.dungeon_gen import build_dungeon_goblin_gauntlet
     room = build_dungeon_goblin_gauntlet(42).rooms[0]
     p = _player(1, 10)
     begin_insert(room, p, 'A')

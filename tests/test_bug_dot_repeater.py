@@ -20,10 +20,10 @@
 
 Personality defined in agents/bug_testers.md.
 """
-from engine.vim_parser import parse
-from engine.modes import Mode
-from engine.player import Player
-from engine.command_guard import action_allowed, guard_message
+from vimny.engine.vim_parser import parse
+from vimny.engine.modes import Mode
+from vimny.engine.player import Player
+from vimny.engine.command_guard import action_allowed, guard_message
 
 
 # ── Parser ────────────────────────────────────────────────────────────────────
@@ -175,8 +175,8 @@ def test_last_change_not_cleared_by_motion():
 
     # Simulate motion: the game loop only calls apply_motion() and does NOT
     # touch player.last_change. Test the contract directly.
-    from engine.world import Room, RoomType, CellType
-    from engine.motion import apply_motion
+    from vimny.engine.world import Room, RoomType, CellType
+    from vimny.engine.motion import apply_motion
     room = Room(room_type=RoomType.ENTRY, rows=5, cols=20)
     room.cells = [
         [CellType.FLOOR if (0 < r < 4 and 0 < c < 19) else CellType.WALL

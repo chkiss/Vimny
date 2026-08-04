@@ -16,12 +16,12 @@
 #
 # SPDX-License-Identifier: GPL-3.0-or-later
 
-"""Engine tests for :s / :g / :v and the & repeats (engine/substitute.py), driven
+"""Engine tests for :s / :g / :v and the & repeats (vimny/engine/substitute.py), driven
 directly on hand-built rooms (no full game loop). The line model: a row's text is
 its non-void glyphs with gaps as spaces, wall-bounded."""
-from engine.world import Room, RoomType, CharRun, CellType
-from engine.player import Player
-import engine.substitute as S
+from vimny.engine.world import Room, RoomType, CharRun, CellType
+from vimny.engine.player import Player
+import vimny.engine.substitute as S
 
 
 def _room(lines, cols=None):
@@ -236,7 +236,7 @@ def test_replacement_newline_splits_line():
     inserted = []
 
     def insert_row(at):
-        from engine.reflow import _insert_blank_row
+        from vimny.engine.reflow import _insert_blank_row
         _insert_blank_row(r, at + 1, at)
         inserted.append(at)
 

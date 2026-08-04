@@ -16,11 +16,11 @@
 #
 # SPDX-License-Identifier: GPL-3.0-or-later
 
-"""Tests for Block F search — engine/search.py: substring matching over clusters,
+"""Tests for Block F search — vimny/engine/search.py: substring matching over clusters,
 forward/backward with wraparound, match-column landing, word-under-cursor."""
-from engine.world import Room, RoomType, CellType, CharRun
-from engine.player import Player
-from engine.search import find_next, word_under_cursor, _match_positions
+from vimny.engine.world import Room, RoomType, CellType, CharRun
+from vimny.engine.player import Player
+from vimny.engine.search import find_next, word_under_cursor, _match_positions
 
 ROWS, COLS = 7, 24
 

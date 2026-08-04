@@ -19,7 +19,7 @@
 """The Counting Crypts: dungeon correctness tests."""
 import heapq
 import pytest
-from generation.dungeon_gen import (
+from vimny.generation.dungeon_gen import (
     build_dungeon_counting_crypts, _dijkstra_par_count, _par_counting_crypts, _COUNTING_CRYPTS_PLAN,
 )
 
@@ -178,8 +178,8 @@ def test_3j_59l_3k_does_not_beat_par():
     beyond the first door stop 59l short, so the player cannot reach the
     exit via this sequence.
     """
-    from engine.motion import apply_motion
-    from engine.player import Player
+    from vimny.engine.motion import apply_motion
+    from vimny.engine.player import Player
 
     d = build_dungeon_counting_crypts(1)
     room = d.room
@@ -203,8 +203,8 @@ def test_count_with_trailing_zero_not_split_at_zero():
     it is always part of the count.  Fixed: vim_parser allows '0' inside the
     count-accumulation loop when count is non-empty via `(count and buf[i]=='0')`.
     """
-    from engine.vim_parser import parse
-    from engine.modes import Mode
+    from vimny.engine.vim_parser import parse
+    from vimny.engine.modes import Mode
 
     action, remaining = parse('30l', Mode.NORMAL)
     assert action == {'type': 'motion', 'motion': 'l', 'count': 30, 'count_given': True}, (

@@ -31,9 +31,9 @@ from pathlib import Path
 import pytest
 from blessed import Terminal
 
-import render.colors as C
-import render.symbols as S
-from render.overworld import (_scroll_offset, build_lines, default_cursor,
+import vimny.render.colors as C
+import vimny.render.symbols as S
+from vimny.render.overworld import (_scroll_offset, build_lines, default_cursor,
                               render_overworld)
 
 
@@ -120,10 +120,10 @@ def test_a_shelf_levels_command_list_sits_in_the_curriculum_column(term):
     question — what does this level ask of me — and it is read by comparing
     DOWN it. A shelf row that trailed its own name put that answer on no axis
     at all."""
-    from engine.player import Player
-    from sharing.format import Level
-    from sharing.library import Shelved
-    from content.levels import LEVELS
+    from vimny.engine.player import Player
+    from vimny.sharing.format import Level
+    from vimny.sharing.library import Shelved
+    from vimny.content.levels import LEVELS
 
     lvl   = Level(name='Maze of Ana', author='Ana',
                   requires=['w', 'b'], teaches=['f', 't'])
@@ -153,9 +153,9 @@ def test_search_matches_the_label_the_renderer_draws(term):
     The single-source law in that function's docstring: search matches what is
     DRAWN. Now that "by Ana" is part of the name column, `/Ana` has to find it,
     or `/` lies about the screen."""
-    from sharing.format import Level
-    from sharing.library import Shelved
-    from render.overworld import line_search_text
+    from vimny.sharing.format import Level
+    from vimny.sharing.library import Shelved
+    from vimny.render.overworld import line_search_text
 
     lvl = Level(name='Maze of Ana', author='Ana')
     ln  = {'type': 'community',
@@ -171,10 +171,10 @@ def test_a_long_shelf_name_drops_the_column_rather_than_overrunning_it(term):
     """When the name eats the column, the row keeps the name and the badge and
     drops the list — a half-written `requires` is a false claim about what the
     level needs, and worse than saying nothing."""
-    from engine.player import Player
-    from sharing.format import Level
-    from sharing.library import Shelved
-    from content.levels import LEVELS
+    from vimny.engine.player import Player
+    from vimny.sharing.format import Level
+    from vimny.sharing.library import Shelved
+    from vimny.content.levels import LEVELS
 
     lvl   = Level(name='A' * 90, author='Ana', requires=['w'], teaches=['f'])
     rep   = types.SimpleNamespace(par=12, budget=17, ok=True)

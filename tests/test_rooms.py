@@ -45,10 +45,10 @@ from __future__ import annotations
 
 import pytest
 
-from sharing import draft as DRAFT
-from sharing import format as F
-from sharing.replay import replay_tape
-from sharing.validate import validate
+from vimny.sharing import draft as DRAFT
+from vimny.sharing import format as F
+from vimny.sharing.replay import replay_tape
+from vimny.sharing.validate import validate
 
 
 def _room(rows=6, cols=20, spawn=(1, 1), exit=(4, 1), **kw) -> F.Room:
@@ -165,7 +165,7 @@ def test_a_tape_counts_fills_across_the_rooms():
 def test_a_room_reports_its_own_fills_by_the_levels_numbering():
     """What `:fill?` answers with. A room that counted from zero would hand
     the author a reference naming a different fill in the file."""
-    from engine.editor import slot_at
+    from vimny.engine.editor import slot_at
     d = F.build(_filled('l'))
     assert d.rooms[0].fill_index0 == 0
     assert d.rooms[1].fill_index0 == 1

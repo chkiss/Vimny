@@ -16,13 +16,13 @@
 #
 # SPDX-License-Identifier: GPL-3.0-or-later
 
-"""The Codex pane (engine/codex.py): folds, motion over visible rows,
+"""The Codex pane (vimny/engine/codex.py): folds, motion over visible rows,
 search that opens the containing fold, and the :h landing."""
 from blessed.keyboard import Keystroke
 
 import main
-from engine.codex import CodexPane, scroll_sections
-from content.scrolls import SCROLL_CATALOG
+from vimny.engine.codex import CodexPane, scroll_sections
+from vimny.content.scrolls import SCROLL_CATALOG
 
 
 def _pane():

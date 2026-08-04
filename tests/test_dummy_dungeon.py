@@ -29,9 +29,9 @@ When you add a new CellType, entity kind, or rune kind:
   3. If it is an obstacle type (impassable, admin-removable), add it to CUTTABLE_TYPES.
 """
 import pytest
-from engine.world import CellType
-from engine.editor import _ed_cut, _ed_paint, _ed_paste, PAINT_KINDS
-from generation.dungeon_gen import build_dungeon_dummy
+from vimny.engine.world import CellType
+from vimny.engine.editor import _ed_cut, _ed_paint, _ed_paste, PAINT_KINDS
+from vimny.generation.dungeon_gen import build_dungeon_dummy
 
 SEED = 42
 
@@ -213,7 +213,7 @@ def test_jailed_specimens_are_visible():
 def test_jail_doors_draw_vertical():
     """A jail's stone runs above and below the DOOR as well as the cell, so the
     door reads as the north-south door it is instead of lying on its side."""
-    from render.renderer import _is_vertical_door
+    from vimny.render.renderer import _is_vertical_door
     room = build_dungeon_dummy(SEED).room
     doors = [e for e in room.entities
              if e.alive and e.kind == 'door' and e.row in JAIL_ROWS]
@@ -301,7 +301,7 @@ def test_paint_can_reach_every_cell_type():
     missing = sorted(set(CellType) - reachable, key=lambda x: x.name)
     assert not missing, (
         f"no :paint kind lays down {[ct.name for ct in missing]} — "
-        "add them to PAINT_KINDS in engine/editor.py"
+        "add them to PAINT_KINDS in vimny/engine/editor.py"
     )
 
 

@@ -17,8 +17,8 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 
 """Tests for combat / enemy-tick behaviour in main.py."""
-from engine.world import Room, RoomType, CellType, Entity
-from engine.player import Player
+from vimny.engine.world import Room, RoomType, CellType, Entity
+from vimny.engine.player import Player
 from main import (_enemy_tick, _do_warden_move, _on_kill, _remove_warden_shields,
                   _drop_tick)
 
@@ -291,7 +291,7 @@ def test_reviving_a_carrier_lets_it_drop_again():
     """Undo-safety of the `dropped` mark: it rides the entity through the
     `clone_entity` snapshot, so a revived carrier (undo of its kill) has a clear
     slate and re-killing drops afresh — the drop is never permanently spent."""
-    from engine.world import clone_entity
+    from vimny.engine.world import clone_entity
     room   = _bare_room()
     player = Player(row=3, col=1)
     gob    = Entity(kind='goblin', row=3, col=10, drops='floor_key')

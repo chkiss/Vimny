@@ -72,8 +72,8 @@ import re
 
 import pytest
 
-import generation.dungeon_gen as dg
-from sharing.replay import replay_tape
+import vimny.generation.dungeon_gen as dg
+from vimny.sharing.replay import replay_tape
 from tests import SEEDS
 
 #: Every operator+motion pair the player holds by this level. `d^` is in here

@@ -26,9 +26,9 @@ from blessed.keyboard import Keystroke
 from blessed import Terminal
 
 import main
-from engine.world import CellType
-from content import proverbs as pv
-from generation.dungeon_gen import (
+from vimny.engine.world import CellType
+from vimny.content import proverbs as pv
+from vimny.generation.dungeon_gen import (
     build_dungeon_brace_square_enclosure,
     _BSQ_ROWS, _BSQ_COLS, _BSQ_SPINE, _BSQ_SHAFT_SEPS, _BSQ_THROAT,
     _BSQ_GATE, _BSQ_BOLTS, _BSQ_EXIT, _BSQ_PAR, _BSQ_TEXT_MIN,

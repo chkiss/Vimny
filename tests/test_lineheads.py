@@ -26,8 +26,8 @@ bottom of a 2-wide left shaft, so the solve rides G/gg/{n}G up and down to fetch
 a key, open a door, and repeat.  The layout is seed-independent.
 """
 import pytest
-from engine.world import CellType
-from generation.dungeon_gen import (
+from vimny.engine.world import CellType
+from vimny.generation.dungeon_gen import (
     build_dungeon_lineheads,
     _par_lineheads,
     _LINEHEADS_ROWS, _LINEHEADS_COLS,

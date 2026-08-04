@@ -23,11 +23,11 @@ from blessed.keyboard import Keystroke
 from blessed import Terminal
 
 import main
-from engine.motion import apply_motion
-from engine.player import Player
-from engine.world import CellType
-from content.levels import known_commands
-from generation.dungeon_gen import (
+from vimny.engine.motion import apply_motion
+from vimny.engine.player import Player
+from vimny.engine.world import CellType
+from vimny.content.levels import known_commands
+from vimny.generation.dungeon_gen import (
     build_dungeon_joiners_gate,
     _JG_ROWS, _JG_COLS, _JG_PAR, _JG_LESSONS, _JG_STACK_TOPS,
     _JG_COL_S, _JG_LBL_COL, _JG_PLQ_COL, _JG_GATE_ROW, _JG_GATE_COL0,

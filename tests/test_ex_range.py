@@ -17,13 +17,13 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 
 """Engine tests for the ex-range family — :[range]d y m t > < j
-(engine/substitute.py run_ex_range), driven directly on hand-built rooms.
+(vimny/engine/substitute.py run_ex_range), driven directly on hand-built rooms.
 Same harness as test_substitute.py: no border walls, every non-space char an
 'ancient' glyph, a row's text is its glyphs with gaps as spaces."""
-from engine.world import Room, RoomType, CharRun, CellType, Entity
-from engine.player import Player
-from engine.operator import INDENT_WIDTH
-import engine.substitute as S
+from vimny.engine.world import Room, RoomType, CharRun, CellType, Entity
+from vimny.engine.player import Player
+from vimny.engine.operator import INDENT_WIDTH
+import vimny.engine.substitute as S
 
 
 def _room(lines, cols=None):

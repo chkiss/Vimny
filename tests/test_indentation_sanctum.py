@@ -30,12 +30,12 @@ from blessed.keyboard import Keystroke
 from blessed import Terminal
 
 import main
-from engine.motion import apply_motion
-from engine.operator import law_column, INDENT_WIDTH
-from engine.player import Player
-from engine.world import CellType
-from content.levels import known_commands
-from generation.dungeon_gen import (
+from vimny.engine.motion import apply_motion
+from vimny.engine.operator import law_column, INDENT_WIDTH
+from vimny.engine.player import Player
+from vimny.engine.world import CellType
+from vimny.content.levels import known_commands
+from vimny.generation.dungeon_gen import (
     build_dungeon_indentation_sanctum,
     _IS_ROWS, _IS_COLS, _IS_PAR, _IS_BUDGET, _IS_ANSWER, _IS_RITE,
     _IS_COL_S, _IS_PLQ_COL, _IS_REGISTER, _IS_G1_ROWS, _IS_G2_ROWS,
@@ -335,7 +335,7 @@ def test_curriculum_teaches_equals_keeps_indent_and_paragraphs():
 def test_equals_is_gated_before_this_level(monkeypatch):
     """A player without the '=' token cannot equalize (the ungated-= trap the
     curriculum audit caught: teaches was [] and would have shipped it free)."""
-    from engine.command_guard import action_allowed
+    from vimny.engine.command_guard import action_allowed
     action = {'type': 'operator', 'op': '=', 'motion': 'line', 'count': 1}
     assert not action_allowed(action, known_commands('alignment_halls'))
     assert action_allowed(action, known_commands('indentation_sanctum'))

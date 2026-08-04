@@ -33,8 +33,8 @@ Optimal path (par=7):  { x } } $ p $
                 } → (9,1)  } → (15,1).  $ → (15,42).  p unlocks door.  $ → exit.
 """
 import pytest
-from engine.world import CellType
-from generation.dungeon_gen import (
+from vimny.engine.world import CellType
+from vimny.generation.dungeon_gen import (
     _par_runic_archives,
     _RUNIC_ARCHIVES_ROWS, _RUNIC_ARCHIVES_COLS,
     _RUNIC_ARCHIVES_EXIT,

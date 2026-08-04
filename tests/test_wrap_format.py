@@ -36,8 +36,8 @@ import json
 import pytest
 
 import main
-from sharing import format as F
-from sharing.validate import validate
+from vimny.sharing import format as F
+from vimny.sharing.validate import validate
 
 SEED = 42
 

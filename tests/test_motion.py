@@ -16,12 +16,12 @@
 #
 # SPDX-License-Identifier: GPL-3.0-or-later
 
-"""Tests for engine/motion.py: apply_motion, move_player, _cell_char, _fog_unreachable, _reveal_from."""
+"""Tests for vimny/engine/motion.py: apply_motion, move_player, _cell_char, _fog_unreachable, _reveal_from."""
 import pytest
 
-from engine.world import Room, RoomType, CellType, Entity, CharRun
-from engine.player import Player
-from engine.motion import apply_motion, move_player, _fog_unreachable, _reveal_from, _cell_char
+from vimny.engine.world import Room, RoomType, CellType, Entity, CharRun
+from vimny.engine.player import Player
+from vimny.engine.motion import apply_motion, move_player, _fog_unreachable, _reveal_from, _cell_char
 
 # ── Shared room fixtures ──────────────────────────────────────────────────────
 
@@ -802,7 +802,7 @@ class TestApplyMotionDoor:
 
 class TestVimWordClasses:
     def test_game_symbols_are_punctuation_like_in_vim(self):
-        from engine.motion import _is_word_char
+        from vimny.engine.motion import _is_word_char
         for sym in '♠☠†°§·⌘∞♯⚙⛧☘‽¶⁂≈♂⚀♝':
             assert not _is_word_char(sym), f'{sym!r} must be punctuation (vim utf_class)'
         for wc in 'a9_éÿ×':

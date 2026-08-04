@@ -18,9 +18,9 @@
 
 """Tests for Block K — resolve_text_object: word, brackets (nesting), quotes,
 angle, paragraph, and sentence objects over the 2D grid. Tags (it/at) deferred."""
-from engine.world import Room, RoomType, CellType, CharRun
-from engine.player import Player
-from engine.text_object import resolve_text_object, TextObjectType
+from vimny.engine.world import Room, RoomType, CellType, CharRun
+from vimny.engine.player import Player
+from vimny.engine.text_object import resolve_text_object, TextObjectType
 
 ROWS, COLS = 7, 28
 
@@ -213,7 +213,7 @@ class TestSentence:
     def test_decimal_point_does_not_end_a_sentence(self):
         """A '.' followed by a digit (e.g. '17.3') is not a sentence end — `)`
         must skip it and land on the space after the real terminator."""
-        from engine.motion import _sentence_starts, apply_motion
+        from vimny.engine.motion import _sentence_starts, apply_motion
         room = _room()
         _chars(room, 3, 1, 'a 17.3 b. X')   # cols 1..11; '.' at col 5 (decimal), col 9 (real)
         starts = _sentence_starts(room, 3)

@@ -27,7 +27,7 @@ from blessed import Terminal
 from blessed.keyboard import Keystroke
 
 import main
-from engine.world import Dungeon, Room, RoomType, CharRun, CellType, Entity
+from vimny.engine.world import Dungeon, Room, RoomType, CharRun, CellType, Entity
 
 
 def _ks(c, name=None):

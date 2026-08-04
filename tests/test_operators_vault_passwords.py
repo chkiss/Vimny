@@ -39,10 +39,10 @@ import random
 
 import pytest
 
-import generation.dungeon_gen as dg
-from engine.motion import apply_motion
-from engine.player import Player
-from engine.world import CharRun, Room, RoomType, CellType
+import vimny.generation.dungeon_gen as dg
+from vimny.engine.motion import apply_motion
+from vimny.engine.player import Player
+from vimny.engine.world import CharRun, Room, RoomType, CellType
 from tests import SEEDS
 
 _START = 2          # where a test word is laid

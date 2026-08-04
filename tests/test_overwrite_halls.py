@@ -25,11 +25,11 @@ from blessed.keyboard import Keystroke
 from blessed import Terminal
 
 import main
-from engine.motion import apply_motion
-from engine.player import Player
-from engine.world import CellType
-from content.levels import known_commands
-from generation.dungeon_gen import (
+from vimny.engine.motion import apply_motion
+from vimny.engine.player import Player
+from vimny.engine.world import CellType
+from vimny.content.levels import known_commands
+from vimny.generation.dungeon_gen import (
     build_dungeon_overwrite_halls,
     _OH_ROWS, _OH_COLS, _OH_PAR, _OH_SAVING, _OH_LESSONS, _OH_LESSON_ROWS,
     _OH_COL_S, _OH_LBL_COL, _OH_PLQ_COL, _OH_GATE_ROW, _OH_GATE_COL0,

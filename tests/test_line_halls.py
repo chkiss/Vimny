@@ -36,8 +36,8 @@ hall randomize per seed (kinds, lengths, positions), so the structural anchors
 that drive the forcing stay fixed while the decoration varies.
 """
 import pytest
-from engine.world import CellType
-from generation.dungeon_gen import (
+from vimny.engine.world import CellType
+from vimny.generation.dungeon_gen import (
     build_dungeon_line_halls, _bfs_par_line,
     _LINE_HALLS_ROWS, _LINE_HALLS_COLS, _LINE_HALLS_LEFT, _LINE_HALLS_RIGHT,
     _LINE_HALLS_A_ROW, _LINE_HALLS_B_ROW, _LINE_HALLS_C_ROW,

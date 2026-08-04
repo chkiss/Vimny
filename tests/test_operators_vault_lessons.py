@@ -50,11 +50,11 @@ import re
 
 import pytest
 
-import generation.dungeon_gen as dg
-from engine.motion import apply_motion
-from engine.player import Player
-from engine.world import CellType
-from sharing.replay import replay_tape
+import vimny.generation.dungeon_gen as dg
+from vimny.engine.motion import apply_motion
+from vimny.engine.player import Player
+from vimny.engine.world import CellType
+from vimny.sharing.replay import replay_tape
 from tests import SEEDS
 
 CORR = dg._OV_CORR_ROWS

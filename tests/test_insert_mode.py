@@ -23,9 +23,9 @@ Covers: i/a/o/I/A/O → INSERT, v → VISUAL, V → VISUAL LINE,
         and that the parser ignores keypresses in INSERT mode.
 """
 import pytest
-from engine.vim_parser import parse
-from engine.modes import Mode
-from engine.player import Player
+from vimny.engine.vim_parser import parse
+from vimny.engine.modes import Mode
+from vimny.engine.player import Player
 
 
 # ── Parser: mode-entry keys in NORMAL mode ───────────────────────────────────
@@ -84,7 +84,7 @@ def test_parser_returns_none_in_non_normal_modes(mode):
 
 # ── ESC mode exit via _apply_esc helper ──────────────────────────────────────
 
-from engine.motion import _apply_esc  # noqa: E402  (import after engine imports)
+from vimny.engine.motion import _apply_esc  # noqa: E402  (import after engine imports)
 
 
 @pytest.mark.parametrize("start_mode", [

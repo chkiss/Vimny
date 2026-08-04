@@ -29,7 +29,7 @@ from blessed.keyboard import Keystroke
 from blessed import Terminal
 
 import main
-from engine.world import Dungeon, Room, RoomType, CellType, CharRun, Entity
+from vimny.engine.world import Dungeon, Room, RoomType, CellType, CharRun, Entity
 
 
 def _ks(ch, name=None):

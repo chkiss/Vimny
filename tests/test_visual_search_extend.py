@@ -25,8 +25,8 @@ from blessed.keyboard import Keystroke
 from blessed import Terminal
 
 import main
-from engine.world import Dungeon, Room, RoomType, CellType, CharRun
-from engine.modes import Mode
+from vimny.engine.world import Dungeon, Room, RoomType, CellType, CharRun
+from vimny.engine.modes import Mode
 
 
 def _ks(ch, name=None):

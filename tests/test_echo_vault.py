@@ -39,11 +39,11 @@ from blessed.keyboard import Keystroke
 from blessed import Terminal
 
 import main
-from engine.motion import apply_motion, _is_word_char
-from engine.player import Player
-from engine.world import CellType
-from content.levels import known_commands
-from generation.dungeon_gen import (
+from vimny.engine.motion import apply_motion, _is_word_char
+from vimny.engine.player import Player
+from vimny.engine.world import CellType
+from vimny.content.levels import known_commands
+from vimny.generation.dungeon_gen import (
     build_dungeon_echo_vault,
     _EV_ROWS, _EV_COLS, _EV_ROW, _EV_PLAQUE_ROW, _EV_SPAWN, _EV_EXIT,
     _EV_SEG1_COL, _EV_SEG2_COL, _EV_SEG3_COL,
@@ -218,7 +218,7 @@ def test_exit_reachable_once_bolts_open(seed):
     assert assert_unreached not in seen, "the exit is sealed as built"
     for pos in (_EV_BOLT_A, _EV_BOLT_B, _EV_BOLT_C):
         room.cells[pos[0]][pos[1]] = CellType.FLOOR
-    from engine.motion import auto_fog_tick
+    from vimny.engine.motion import auto_fog_tick
     auto_fog_tick(room, *room.spawn_pos)     # sight crosses the opened bolts
     seen, q = {room.spawn_pos}, deque([room.spawn_pos])
     while q:
@@ -235,7 +235,7 @@ def test_exit_reachable_once_bolts_open(seed):
 
 @pytest.mark.parametrize("seed", SEEDS)
 def test_tick_bolt_follows_the_mend_both_ways(seed):
-    from engine.insert import replace_chars
+    from vimny.engine.insert import replace_chars
     room = build_dungeon_echo_vault(seed).rooms[0]           # private (mutating)
     p1, _p2, _p3 = _plaques(room)
     l1 = p1[_EV_WARPS1[0]]

@@ -26,18 +26,18 @@ from blessed.keyboard import Keystroke
 from blessed import Terminal
 
 import main
-import generation.dungeon_gen as dg
-from engine.world import CellType
-from content.levels import LEVELS
-from content.scrolls import SCROLL_CATALOG, RELIC_SCROLL_IDS
-from generation.dungeon_gen import (
+import vimny.generation.dungeon_gen as dg
+from vimny.engine.world import CellType
+from vimny.content.levels import LEVELS
+from vimny.content.scrolls import SCROLL_CATALOG, RELIC_SCROLL_IDS
+from vimny.generation.dungeon_gen import (
     build_dungeon_binders_reliquary,
     _BND_ROWS, _BND_COLS, _BND_AR, _BND_WATER_COLS, _BND_SPAWN,
     _BND_WORD_END, _bnd_word_col, _BND_CHEST, _BND_EXIT, _BND_BUDGET,
     _OV_PLAIN,
 )
 from tests import SEEDS, cached_room
-from engine.tape import ENTER as TAPE_ENTER
+from vimny.engine.tape import ENTER as TAPE_ENTER
 
 ENTER = Keystroke('\r', name='KEY_ENTER')
 

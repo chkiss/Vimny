@@ -51,11 +51,11 @@ from blessed.keyboard import Keystroke
 from blessed import Terminal
 
 import main
-from engine.motion import apply_motion
-from engine.player import Player
-from engine.world import CellType
-from content.levels import known_commands
-from generation.dungeon_gen import (
+from vimny.engine.motion import apply_motion
+from vimny.engine.player import Player
+from vimny.engine.world import CellType
+from vimny.content.levels import known_commands
+from vimny.generation.dungeon_gen import (
     build_dungeon_inscription_halls, _ih_pick, _ih_river_lo, _ih_bank,
     _IH_ROWS, _IH_COLS, _IH_RIVER_W, _IH_LESSON_ROWS, _IH_PLAQUE_ROWS,
     _IH_GAPS, _IH_I_HEAD, _IH_A_WEST, _IH_SPLITS, _IH_FORD_ROW,
@@ -64,7 +64,7 @@ from generation.dungeon_gen import (
 import pytest
 import random
 
-from engine import tape
+from vimny.engine import tape
 from tests import SEEDS, cached_room
 
 _FLOORS = (CellType.FLOOR, CellType.CORRIDOR)
@@ -79,7 +79,7 @@ def _room(seed):
 def _keys(answer: str, extra: str = '') -> list:
     """room.answer → real keystrokes.
 
-    The tape writes Esc as `<Esc>` (engine/tape.py), so there is nothing to infer
+    The tape writes Esc as `<Esc>` (vimny/engine/tape.py), so there is nothing to infer
     and nothing to guess at: `to_keys` is the one converter. This used to sniff
     insert tokens (`t[0] in 'ia' and t[1:].isalpha()`) and append an Esc of its
     own — which silently stopped matching once the tape carried `<Esc>` itself, and
@@ -306,7 +306,7 @@ def test_search_skips_the_walled_plaques(seed):
     """/word, with the word standing only on the plaque (a wall band), finds
     nothing — a match you cannot stand on is not a landing. Fragments on the
     floor stay searchable."""
-    from engine.search import find_next
+    from vimny.engine.search import find_next
     room = _room(seed)
     p = Player(row=room.spawn_pos[0], col=room.spawn_pos[1])
     for word, _gate in room._ih_bolts:
@@ -430,6 +430,6 @@ def test_curriculum_guard():
 def test_hint_bar_surfaces_append():
     # 'insert' gates both i and a (and o/O/I/A); without family expansion only i shows
     # and append is gated-in-but-invisible.
-    from render.hint_bar import hint_text
+    from vimny.render.hint_bar import hint_text
     bar = hint_text(known_commands('inscription_halls'), 'inscription_halls')
     assert 'i:insert' in bar and 'a:append' in bar

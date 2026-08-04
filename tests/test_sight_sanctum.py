@@ -25,13 +25,13 @@ from blessed.keyboard import Keystroke
 from blessed import Terminal
 
 import main
-from engine.command_guard import action_allowed
-from engine.vim_parser import parse
-from engine.modes import Mode
-from engine.world import CellType
-from engine.search import _match_positions
-from content.levels import known_commands
-from generation.dungeon_gen import (
+from vimny.engine.command_guard import action_allowed
+from vimny.engine.vim_parser import parse
+from vimny.engine.modes import Mode
+from vimny.engine.world import CellType
+from vimny.engine.search import _match_positions
+from vimny.content.levels import known_commands
+from vimny.generation.dungeon_gen import (
     build_dungeon_sight_sanctum,
     _SS_ROWS, _SS_COLS, _SS_SPINE, _SS_BAY_W, _SS_BAY_E, _SS_SPAWN,
     _SS_GATE, _SS_BOLT0, _SS_EXIT, _SS_PAR, _ss_answer,
@@ -190,7 +190,7 @@ def test_light_shaft_pierces_separators_but_not_the_throat(seed):
     """The sight-line: one floor cell at the anchor column through each bay
     separator (the {n}j hops ride it) — but the throat row stays spine-only,
     so the gate row is reachable only along the spine (teleport audit)."""
-    from generation.dungeon_gen import _SS_SHAFT, _SS_THROAT
+    from vimny.generation.dungeon_gen import _SS_SHAFT, _SS_THROAT
     room = _room(seed)
     for r in (6, 10, 13):
         assert room.cells[r][_SS_SHAFT] == CellType.FLOOR
@@ -215,7 +215,7 @@ def test_seal_initial_is_pristine_level_wide(seed):
     room = _room(seed)
     _a, _b, x = _letters(room)
     positions = _match_positions(room, x)
-    from generation.dungeon_gen import _SS_TAIL0
+    from vimny.generation.dungeon_gen import _SS_TAIL0
     # every floor match lives inside the tail itself (the initial may recur
     # within its own text — /{x}<CR> still lands on the head), none elsewhere
     assert positions and positions[0] == (16, _SS_TAIL0), (x, positions)
@@ -248,7 +248,7 @@ def test_curriculum_teaches_visual_and_visual_op():
 def test_word_draw_constraints_hold_across_many_seeds():
     """The vocabulary lint, 300 seeds: every draw builds; the seal initial is
     floor-unique (one /{x} landing); every door target is distinct."""
-    from generation.dungeon_gen import _SS_TAIL0
+    from vimny.generation.dungeon_gen import _SS_TAIL0
     for seed in range(300):
         room = build_dungeon_sight_sanctum(seed).rooms[0]
         _a, _b, x = _letters(room)

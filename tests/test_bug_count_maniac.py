@@ -20,11 +20,11 @@
 
 Personality defined in agents/bug_testers.md.
 """
-from engine.vim_parser import parse
-from engine.modes import Mode
-from engine.world import Room, RoomType, CellType
-from engine.player import Player
-from engine.motion import apply_motion
+from vimny.engine.vim_parser import parse
+from vimny.engine.modes import Mode
+from vimny.engine.world import Room, RoomType, CellType
+from vimny.engine.player import Player
+from vimny.engine.motion import apply_motion
 from main import _keystroke_cost
 
 

@@ -16,9 +16,9 @@
 #
 # SPDX-License-Identifier: GPL-3.0-or-later
 
-"""Tests for Block J — engine/jumplist.py: record/back/forward navigation."""
-from engine.player import Player
-from engine.jumplist import record_jump, jump_back, jump_forward, _CAP
+"""Tests for Block J — vimny/engine/jumplist.py: record/back/forward navigation."""
+from vimny.engine.player import Player
+from vimny.engine.jumplist import record_jump, jump_back, jump_forward, _CAP
 
 
 def _p(row=0, col=0):

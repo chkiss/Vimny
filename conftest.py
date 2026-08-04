@@ -49,10 +49,10 @@ def pytest_configure(config):
     """Install the build cache before any test module imports the builders.
 
     Runs after sys.path is set up and before collection, so test modules that do
-    ``from generation.dungeon_gen import build_dungeon_x`` bind to the wrapped
+    ``from vimny.generation.dungeon_gen import build_dungeon_x`` bind to the wrapped
     version.
     """
-    import generation.dungeon_gen as dg
+    import vimny.generation.dungeon_gen as dg
 
     for name in dir(dg):
         if not name.startswith('build_dungeon_'):

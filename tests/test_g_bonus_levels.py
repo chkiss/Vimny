@@ -26,8 +26,8 @@ from blessed.keyboard import Keystroke
 from blessed import Terminal
 
 import main
-from engine.world import CellType
-from generation.dungeon_gen import (
+from vimny.engine.world import CellType
+from vimny.generation.dungeon_gen import (
     build_dungeon_buried_word, _BW_BAYS, _BW_GATE, _BW_BOLTS, _BW_EXIT,
     _BW_PAR, _BW_STAND, _BW_SPINE,
     build_dungeon_wet_ink, _WI_LEDGE, _WI_PLQ_COL, _WI_SOURCE, _WI_BRAZIERS,
@@ -193,7 +193,7 @@ def test_wi_structure(seed):
     room = cached_room('build_dungeon_wet_ink', seed)
     ws = room._wi_words
     full = ' '.join(ws)
-    from generation.dungeon_gen import _WI_PHRASES
+    from vimny.generation.dungeon_gen import _WI_PHRASES
     assert ws in _WI_PHRASES and len(ws) == 4
     assert sum(len(w) for w in ws) == 14, "pool-invariant typed cost"
     assert door_targets(room)[0] == (full,)

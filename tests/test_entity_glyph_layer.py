@@ -27,14 +27,14 @@ single map so a future edit to one can't silently desync the others.
 """
 import pytest
 
-from engine.world import (Room, RoomType, Entity, CellType, CharRun,
+from vimny.engine.world import (Room, RoomType, Entity, CellType, CharRun,
                           entity_letter, CARET_TRANSPARENT)
-from engine.modes import Mode
-from engine.motion import _cell_char, _apply_find
-from engine.player import Player
-from engine.search import _line_string, match_cells
-from render.renderer import _ent_cell_str
-import render.colors as C
+from vimny.engine.modes import Mode
+from vimny.engine.motion import _cell_char, _apply_find
+from vimny.engine.player import Player
+from vimny.engine.search import _line_string, match_cells
+from vimny.render.renderer import _ent_cell_str
+import vimny.render.colors as C
 
 
 @pytest.fixture(autouse=True)

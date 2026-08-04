@@ -22,9 +22,9 @@ respawn live and hostile — all through one Vim register (player.registers['"']
 The cut/paste wiring lives in run_dungeon's keystroke loop, so these tests target
 the engine-reachable contract it leans on: entity_clip + op_paste (the creature
 round-trip) and _clip_from_cut_chars (the letter round-trip)."""
-from engine.world import Room, RoomType, CellType, Entity, CharRun
-from engine.player import Player
-from engine.operator import entity_clip, op_paste
+from vimny.engine.world import Room, RoomType, CellType, Entity, CharRun
+from vimny.engine.player import Player
+from vimny.engine.operator import entity_clip, op_paste
 from main import _clip_from_cut_chars, _enemy_tick, _PASTE_SPAWN_MSG
 
 ROWS, COLS = 7, 30

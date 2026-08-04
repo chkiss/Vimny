@@ -25,9 +25,9 @@ from blessed.keyboard import Keystroke
 from blessed import Terminal
 
 import main
-from engine.player import Player
-from render.overworld import build_lines, default_cursor, line_search_text
-from content.levels import LEVELS, key_for_slug
+from vimny.engine.player import Player
+from vimny.render.overworld import build_lines, default_cursor, line_search_text
+from vimny.content.levels import LEVELS, key_for_slug
 
 ALL_TOKENS = ['/', 'mark', 'jump', 'line_addr', 'count', 'G', '{', '}']
 

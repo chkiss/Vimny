@@ -16,10 +16,10 @@
 #
 # SPDX-License-Identifier: GPL-3.0-or-later
 
-"""Tests for Block L — engine/registers.py: named registers, "0 last-yank,
+"""Tests for Block L — vimny/engine/registers.py: named registers, "0 last-yank,
 "_ black hole, and "A append."""
-from engine.player import Player
-from engine.registers import write_register, read_register, _append_clip
+from vimny.engine.player import Player
+from vimny.engine.registers import write_register, read_register, _append_clip
 
 
 def _clip(*chars, kind='ancient'):

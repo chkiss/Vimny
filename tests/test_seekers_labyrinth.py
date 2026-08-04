@@ -28,18 +28,18 @@ which seals the RED key; the RED key opens the RED door at the very end, beside
 import os
 import pytest
 
-from generation.dungeon_gen import (
+from vimny.generation.dungeon_gen import (
     build_dungeon_seekers_labyrinth as _build,
     _par_seekers_labyrinth as _par,
     _SEEKERS_PAR, _SEEKERS_ANSWER, _SEEKERS_WORD, _SEEKERS_DOORWORD,
     _SEEKERS_SPAWN, _SEEKERS_GOLD_KEY, _SEEKERS_GOLD_DOOR,
     _SEEKERS_RED_KEY, _SEEKERS_RED_DOOR, _SEEKERS_EXIT,
 )
-from engine.world import CellType
-from engine.player import Player
-from engine.motion import apply_motion
-from engine.search import find_next, word_under_cursor, match_cells
-from engine.tape import ENTER as TAPE_ENTER
+from vimny.engine.world import CellType
+from vimny.engine.player import Player
+from vimny.engine.motion import apply_motion
+from vimny.engine.search import find_next, word_under_cursor, match_cells
+from vimny.engine.tape import ENTER as TAPE_ENTER
 
 SEEDS = [1, 42, 999, 12345, 2 ** 20 + 7]
 
@@ -67,7 +67,7 @@ def _only_passable_neighbour(room, r, c):
 
 # ── vocab sourcing ──────────────────────────────────────────────────────────
 def _load_vocab(fname):
-    path = os.path.join(os.path.dirname(__file__), '..', 'art', fname)
+    path = os.path.join(os.path.dirname(__file__), '..', 'vimny', 'art', fname)
     out = set()
     with open(path, encoding='utf-8') as fh:
         for raw in fh:

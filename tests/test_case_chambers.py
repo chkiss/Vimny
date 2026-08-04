@@ -32,11 +32,11 @@ from blessed.keyboard import Keystroke
 from blessed import Terminal
 
 import main
-from engine.motion import apply_motion
-from engine.player import Player
-from engine.world import CellType
-from content.levels import known_commands
-from generation.dungeon_gen import (
+from vimny.engine.motion import apply_motion
+from vimny.engine.player import Player
+from vimny.engine.world import CellType
+from vimny.content.levels import known_commands
+from vimny.generation.dungeon_gen import (
     build_dungeon_case_chambers,
     _CASE_ROWS, _CASE_COLS, _CASE_PAR, _CASE_LESSONS, _CASE_LESSON_ROWS,
     _CASE_COL_S, _CASE_LBL_COL, _CASE_PLQ_COL, _CASE_GATE_ROW, _CASE_GATE_COL0,

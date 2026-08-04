@@ -27,9 +27,9 @@ from blessed.keyboard import Keystroke
 from blessed import Terminal
 
 import main
-from engine.world import CellType
-from engine.text_object import resolve_text_object
-from generation.dungeon_gen import (
+from vimny.engine.world import CellType
+from vimny.engine.text_object import resolve_text_object
+from vimny.generation.dungeon_gen import (
     build_dungeon_paragraph_enclosure,
     _PE_ROWS, _PE_COLS, _PE_SPAWN, _PE_P1, _PE_B1, _PE_P2, _PE_GUARD,
     _PE_B2, _PE_GATE, _PE_EXIT, _PE_PAR, _PE_SIGIL, _PE_BRAZIERS,

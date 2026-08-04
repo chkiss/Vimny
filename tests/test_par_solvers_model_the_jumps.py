@@ -32,7 +32,7 @@ Two failures, opposite directions, both real:
 `H`/`M`/`L` are deliberately NOT modelled anywhere except The Screen Vault,
 which teaches them: they are viewport-relative in a room taller than the game
 area, so a par derived from one would be a par only some window sizes could hit.
-They are covered from the other end by measurement — `sharing/jumpgolf.py`
+They are covered from the other end by measurement — `vimny/sharing/jumpgolf.py`
 replays every tape at heights 25..60 and reports only beats that hold at all of
 them. Derived where derivation is sound, measured where it is not.
 
@@ -46,7 +46,7 @@ from pathlib import Path
 
 import pytest
 
-from content.levels import LEVELS, known_commands
+from vimny.content.levels import LEVELS, known_commands
 
 JUMPS  = ('gg', 'G', 'H', 'M', 'L')
 #: Buffer-relative, so a solver may assume them — see the module docstring.
@@ -58,7 +58,8 @@ HELPER = '_line_jump_moves'
 #: model — the number is pinned by the level's own driven playthrough instead.
 _HAND_PINNED = {'spellwrights_forge'}
 
-SRC  = Path(__file__).resolve().parent.parent / 'generation' / 'dungeon_gen.py'
+SRC  = (Path(__file__).resolve().parent.parent
+        / 'vimny' / 'generation' / 'dungeon_gen.py')
 TEXT = SRC.read_text()
 TREE = ast.parse(TEXT)
 SLUGS = {l['slug'] for l in LEVELS}
