@@ -1,3 +1,4 @@
+#!/usr/bin/env python3
 # Vimny — a Vim-teaching dungeon crawler.
 # Copyright (C) 2026 Chas Kissick
 #
@@ -16,7 +17,7 @@
 #
 # SPDX-License-Identifier: GPL-3.0-or-later
 
-"""`python3 main.py` — the documented way to play, and nothing more.
+"""`./main.py` or `python3 main.py` — the way to play from a checkout.
 
 The game itself is `vimny/game.py`. This file exists so that running Vimny
 from a checkout stays one obvious command, while an INSTALL adds only the
