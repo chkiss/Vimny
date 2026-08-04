@@ -37,7 +37,7 @@ Why an action can be missed
   Add new entries here whenever a new action calls room.kill_entity() outside
   edit mode, so the test guards against the omission.
 
-Required dict fields (all produced by _snapshot() in main.py)
+Required dict fields (all produced by _snapshot() in vimny/game.py)
   row, col, spent, entities, fog_cells
 """
 from vimny.engine.world import Room, Entity, CellType, RoomType
@@ -58,13 +58,13 @@ def _corridor(rows=5, cols=12):
 
 
 def _snap(room):
-    """Deep-copy of room.entities — matches the snapshot format used in main.py."""
+    """Deep-copy of room.entities — matches the snapshot format used in vimny/game.py."""
     return [Entity(kind=e.kind, row=e.row, col=e.col, hp=e.hp, alive=e.alive)
             for e in room.entities]
 
 
 def _apply_undo(item, room, player, budget):
-    """Apply one undo item, mirroring main.py's undo branch."""
+    """Apply one undo item, mirroring vimny/game.py's undo branch."""
     if isinstance(item, dict):
         player.row, player.col = item['row'], item['col']
         budget.spent = item['spent']
@@ -112,7 +112,7 @@ def test_chest_key_adds_floor_key_to_register():
     room.add_entity(chest)
     player = Player(row=2, col=5)
 
-    # Simulate what main.py does on chest_key loot
+    # Simulate what vimny/game.py does on chest_key loot
     write_register(player, '"',
                    entity_clip(Entity(kind='floor_key', row=chest.row, col=chest.col)),
                    is_delete=True)
@@ -294,9 +294,9 @@ def test_all_entity_mutations_undoable():
 # ── Fumble: undo while carrying a key drops it (penalty, NOT a normal undo) ───
 
 def _undo_or_fumble(room, player, budget, undo_stack):
-    """Mirror main.py's undo branch: the undo HAPPENS, and if a key is carried it
+    """Mirror vimny/game.py's undo branch: the undo HAPPENS, and if a key is carried it
     drops at the pre-undo spot (dropped after the undo so a restore can't wipe it)."""
-    from main import _held_key, _drop_key
+    from vimny.game import _held_key, _drop_key
     held = _held_key(player)
     spot = (player.row, player.col)
     done = False
@@ -327,7 +327,7 @@ def test_undo_while_holding_key_drops_it_and_still_undoes():
     assert result == 'fumble'
     dropped = room.entity_at(2, 5)                      # key left at the pre-undo spot
     assert dropped is not None and dropped.kind == 'floor_key' and dropped.tag == 'red'
-    from main import _held_key
+    from vimny.game import _held_key
     assert _held_key(player) is None, "register must no longer carry the key"
     assert (player.row, player.col) == (2, 0), "the undo must have run (snapped back)"
     assert budget.spent == 0, "the undo must have reverted the budget"
@@ -352,7 +352,7 @@ def test_undo_without_a_key_is_normal():
 def test_combat_x_undo_revives_hp_and_refunds_the_key():
     """A combat strike pushes its own snapshot: u revives the foe's HP, refunds
     exactly the strike's keystroke, and a redo re-lands it (no free hits)."""
-    from main import _snapshot, _pop_history_step
+    from vimny.game import _snapshot, _pop_history_step
     room = _corridor()
     warden = Entity(kind='warden', row=2, col=5, hp=5, max_hp=5)
     room.add_entity(warden)
@@ -376,7 +376,7 @@ def test_combat_x_undo_revives_hp_and_refunds_the_key():
 
 def test_shield_x_undo_restores_shield():
     """x on a shield pushes a snapshot so u puts the shield back."""
-    from main import _snapshot, _pop_history_step
+    from vimny.game import _snapshot, _pop_history_step
     room = _corridor()
     shield = Entity(kind='shield', row=2, col=6)
     room.add_entity(shield)

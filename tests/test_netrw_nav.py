@@ -10,7 +10,7 @@ either screen's chrome."""
 from blessed.keyboard import Keystroke
 
 from vimny.engine.player import Player
-from main import NetrwNav
+from vimny.game import NetrwNav
 
 
 def _K(s):

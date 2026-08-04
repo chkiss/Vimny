@@ -25,7 +25,7 @@ script (which name to :w at which manuscript) rather than hard-coding the order.
 from blessed.keyboard import Keystroke
 from blessed import Terminal
 
-import main
+import vimny.game as main
 import vimny.generation.dungeon_gen as dg
 
 

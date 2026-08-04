@@ -32,7 +32,7 @@ import pytest
 from blessed import Terminal
 from blessed.keyboard import Keystroke
 
-import main
+import vimny.game as main
 from vimny.engine.tape import to_keys
 import vimny.generation.dungeon_gen as dg
 import vimny.generation.dungeon_gen as dg

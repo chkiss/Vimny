@@ -16,7 +16,7 @@
 #
 # SPDX-License-Identifier: GPL-3.0-or-later
 
-"""Scroll content — strings and line-kind specs consumed by main.py render functions.
+"""Scroll content — strings and line-kind specs consumed by vimny/game.py render functions.
 
 Line-kind tuples used in 'lines' lists:
   ('blank',)

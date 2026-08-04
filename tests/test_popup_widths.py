@@ -28,7 +28,7 @@ Two rules, both asserted here. Every picker uses `POPUP_IW`, so they cannot
 drift apart again. And no row is ever hard-sliced: `_popup_fit` cuts at a word
 boundary and says so, with the full text under the cursor in the detail pane.
 """
-import main
+import vimny.game as main
 
 
 def _row_widths(rows, width):

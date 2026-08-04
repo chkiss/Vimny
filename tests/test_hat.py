@@ -23,7 +23,7 @@ prove the master may cast any spell anywhere."""
 from blessed.keyboard import Keystroke
 from blessed import Terminal
 
-import main
+import vimny.game as main
 
 
 def _ks(ch):

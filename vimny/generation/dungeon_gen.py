@@ -1489,7 +1489,7 @@ def build_dungeon_reliquary(seed: int) -> Dungeon:
 
     No par challenge (par=None, reward room).  x is *forced*: the dividing
     wall blocks the sanctum until the seal CharRun on the action row is fully
-    cut, which main.py's _check_seal_broken detects, opening composite.seal_door.
+    cut, which vimny/game.py's _check_seal_broken detects, opening composite.seal_door.
     """
     rng = random.Random(seed)
     dungeon = Dungeon(name='The Reliquary', seed=seed)
@@ -2224,7 +2224,7 @@ def build_dungeon_wardens_keep(seed: int) -> Dungeon:
 # clear warden row guarantee a hazard-free route to the warden and the exit.
 #
 # NOTE (phase a — static arena): the two-phase visual/teleport warden AI is
-# wired in main.py next. Here the warden is a plain 5-HP boss tagged 'surveyor'
+# wired in vimny/game.py next. Here the warden is a plain 5-HP boss tagged 'surveyor'
 # so it neither chases nor summons goblins.
 
 _SURVEYOR_CORPUS: list[list[str]] = [
@@ -2847,7 +2847,7 @@ def _par_backward_vaults(composite, return_path: bool = False):
     """Minimum-keystroke Dijkstra for The Backward Vaults:
     hjkl + $ ^ 0 + w b e + W B E (count) + ge gE (count).
 
-    State = (row, col).  Cost model follows _keystroke_cost in main.py:
+    State = (row, col).  Cost model follows _keystroke_cost in vimny/game.py:
       count=1 → 1 ks; count=n → len(str(n))+1 ks.
       ge/gE each add +1 base (cost 2 for n=1, len(str(n))+2 for n>1).
     W/B/E treat adjacent clusters as one WORD; for this dungeon's gap-separated
@@ -8777,7 +8777,7 @@ def build_dungeon_sentence_corridor(seed: int) -> 'Dungeon':
     # reached S3's start in ONE key, undercutting `3(` (the cheese: `4) $ x { $ p l`
     # = 8). This strip is the topmost passable row, so `{`/`}` resolve onto it —
     # but it is paved with VOID runes: landing costs a heart and bounces you back
-    # (main.py), so a cheeser reaching for `{` is punished and gains nothing,
+    # (vimny/game.py), so a cheeser reaching for `{` is punished and gains nothing,
     # leaving `(` the shortest backtrack and par at 9. The par solver and the
     # cheese audit both refuse to land on void, so par stays the true minimum.
     # Spans only S1 (a dead-end stub off the spawn) ⇒ no wall-gap bypass.
@@ -9410,7 +9410,7 @@ def build_dungeon_refrain_vault(seed: int) -> Dungeon:
 # ── The Warden Pathfinder (Act III boss) ─────────────────────────────────────
 # Two rooms: the Arena (room 0) and the Wardenverse (room 1, a single-line wrap
 # buffer). Act 1 plays out in the Arena; when the Warden's shields fall he flees
-# and the player follows with `:e wardenverse` (handled in main.py). See
+# and the player follows with `:e wardenverse` (handled in vimny/game.py). See
 # vimny/engine/warden_mega.py and tests/test_warden_pathfinder.py (the as-built spec).
 _PF_ROWS, _PF_COLS   = 24, 78
 _PF_MAIN_ROW         = 12
@@ -9538,7 +9538,7 @@ def build_dungeon_warden_pathfinder(seed: int) -> Dungeon:
     # The Warden runs the wrapped line; he's chased down (gj/gk) and stilled with :set nowrap.
     verse.entities.append(Entity(kind='warden', row=0, col=VC - 6, hp=3, max_hp=3,
                                  ai='', tag='verse', edit_immune=True))
-    verse.exit_pos = None                    # no exit here — his death collapses the verse (main.py)
+    verse.exit_pos = None                    # no exit here — his death collapses the verse (vimny/game.py)
     verse.rebuild_indexes()
     verse.par    = None
     verse.budget = 160

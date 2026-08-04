@@ -319,7 +319,7 @@ tape notation for Esc, and it is the next thing to build here.
 
 1. Make custom layouts **playable at all**. Today the launcher hardcodes slug
    `first_cave`, forces edit mode on entry, and falls back to `Budget(20)` because
-   there is no par (`main.py:8590-8598`). Nothing else can be tested until a
+   there is no par (`vimny/game.py:8590-8598`). Nothing else can be tested until a
    layout can be played as itself.
 2. Extend serialization to capture entity attributes, fog/mist, seed, teaches, and
    the tape (`vimny/engine/editor.py:273`).

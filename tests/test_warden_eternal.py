@@ -27,7 +27,7 @@ import pytest
 from blessed import Terminal
 from blessed.keyboard import Keystroke
 
-import main
+import vimny.game as main
 import vimny.generation.dungeon_gen as dg
 from vimny.engine.world import CellType
 from vimny.engine.player import Player

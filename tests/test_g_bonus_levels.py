@@ -25,7 +25,7 @@ import pytest
 from blessed.keyboard import Keystroke
 from blessed import Terminal
 
-import main
+import vimny.game as main
 from vimny.engine.world import CellType
 from vimny.generation.dungeon_gen import (
     build_dungeon_buried_word, _BW_BAYS, _BW_GATE, _BW_BOLTS, _BW_EXIT,

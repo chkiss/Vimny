@@ -25,7 +25,7 @@
 # suite, all producing the identical seed-independent answer). We memoize each
 # builder per call-args and hand back a deepcopy (~0.003s, ~700x cheaper than
 # rebuilding) so tests can still mutate their dungeon freely. Test-only:
-# production (main.py) imports the unwrapped module.
+# production (vimny/game.py) imports the unwrapped module.
 import copy
 import functools
 

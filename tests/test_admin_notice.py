@@ -29,7 +29,7 @@ out on the first run, which is the only run that matters.
 """
 import pytest
 
-import main
+import vimny.game as main
 
 
 class _FakeTerm:
@@ -128,7 +128,7 @@ def test_a_second_save_gets_its_own_notice(term):
 
 @pytest.mark.parametrize('name', ['Normand', 'Admin', 'ADMIN', 'admin2', ''])
 def test_no_notice_for_anyone_else(term, name):
-    """The gate is the exact name the privilege check uses (`main.py`'s
+    """The gate is the exact name the privilege check uses (`vimny/game.py`'s
     `player_name == 'admin'`). If these ever diverge, one of them is wrong."""
     progress = {}
     main.maybe_admin_notice(term, _P(name), progress)

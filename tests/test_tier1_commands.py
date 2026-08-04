@@ -26,7 +26,7 @@ import pytest
 from blessed.keyboard import Keystroke
 from blessed import Terminal
 
-import main
+import vimny.game as main
 from vimny.engine.vim_parser import parse
 from vimny.engine.modes import Mode
 from vimny.engine.command_guard import action_allowed

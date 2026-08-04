@@ -269,7 +269,7 @@ def strike_disguise(ent) -> bool:
     than removed: the disguise sloughs off (→ a plain 'g' that `/W` no longer
     finds) and it survives the hit. Returns True if the caller should remove the
     entity, False if it only lost its disguise and lives on. Mirrors the x-combat
-    reveal in main.py so an AoE and a single x cost the same: hit to unmask, hit
+    reveal in vimny/game.py so an AoE and a single x cost the same: hit to unmask, hit
     to kill."""
     if ent.kind == 'goblin' and ent.tag == 'echo':
         ent.tag = ''

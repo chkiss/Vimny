@@ -80,7 +80,7 @@ def _load_vocab(fname):
 _VOCAB = _load_vocab('vocab_plain.txt') | _load_vocab('vocab_mixed.txt')
 
 
-# ── answer simulator (mirrors main.py keystroke costs + key/door mechanics) ──
+# ── answer simulator (mirrors vimny/game.py keystroke costs + key/door mechanics) ──
 def _simulate(answer, room):
     """Run a space-separated answer through the real engine.  Tracks the unnamed
     register's key colour and the two coloured doors.  Returns

@@ -57,7 +57,7 @@ def test_build_lines_with_customs_marks_last():
 
 
 def test_ow_section_jumps_between_sections():
-    from main import _ow_section
+    from vimny.game import _ow_section
     lines = build_lines(_levels(3), [{'layout_name': 'a'}])
     # sections start at 0 (comments), 6 (dirs ../), 8 (levels), 11 (custom subhdr)
     assert _ow_section(lines, 9, -1) == 8                   # up to the levels section top

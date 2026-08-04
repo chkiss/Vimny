@@ -22,7 +22,7 @@ fight, so the laws asserted below are mostly about that:
 from blessed.keyboard import Keystroke
 from blessed import Terminal
 
-import main
+import vimny.game as main
 from vimny.engine.world import CellType
 from vimny.content.levels import known_commands
 from vimny.generation.dungeon_gen import (

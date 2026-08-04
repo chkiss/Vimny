@@ -25,7 +25,7 @@ round-trip) and _clip_from_cut_chars (the letter round-trip)."""
 from vimny.engine.world import Room, RoomType, CellType, Entity, CharRun
 from vimny.engine.player import Player
 from vimny.engine.operator import entity_clip, op_paste
-from main import _clip_from_cut_chars, _enemy_tick, _PASTE_SPAWN_MSG
+from vimny.game import _clip_from_cut_chars, _enemy_tick, _PASTE_SPAWN_MSG
 
 ROWS, COLS = 7, 30
 

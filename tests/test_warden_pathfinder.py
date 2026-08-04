@@ -343,7 +343,7 @@ def test_builder_makes_a_two_room_dungeon():
     assert any(e.kind == 'heart_container' for e in arena.entities)
 
     # Wardenverse (Act 2): ONE long line that wraps REACTIVELY (no fixed fold), immune
-    # Warden, and NO exit — his death collapses the verse (handled in main.py).
+    # Warden, and NO exit — his death collapses the verse (handled in vimny/game.py).
     assert verse.wrap_buffer and verse.rows == 1
     assert getattr(verse, 'wrap_width', 0) == 0         # reactive (folds to the live terminal width)
     assert verse.cols >= 600                            # long enough to fold many times even at 189 cols
@@ -371,7 +371,7 @@ def test_verse_collapse_unmasks_all_echoes():
     assert all(e.tag == 'echo' and e.hp == 1 for e in echoes)
 
     # Simulate the verse collapse by calling the unmask logic directly
-    # (this is what happens in main.py when the verse Warden dies)
+    # (this is what happens in vimny/game.py when the verse Warden dies)
     for e in arena.entities:
         if e.kind == 'goblin' and e.tag == 'echo' and e.alive:
             e.tag = ''       # no longer disguised as 'W'

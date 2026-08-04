@@ -7,7 +7,7 @@ import pytest
 from blessed.keyboard import Keystroke
 from blessed import Terminal
 
-import main
+import vimny.game as main
 import vimny.render.colors as C
 import vimny.render.symbols as S
 from vimny.render.renderer import render_all, _cmdline_with_cursor

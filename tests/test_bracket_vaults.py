@@ -310,7 +310,7 @@ def test_teleport_cheese_no_longer_wins(path):
     (so it can't reach the snake OR the key at (2,54)); and the locked door means reaching
     the exit cell without the key is impossible. So none of these routes may complete it.
     """
-    import main
+    import vimny.game as main
     from blessed import Terminal
     from blessed.keyboard import Keystroke
     for fn in ('render_all', '_win_animation', '_fireworks_animation', '_starfield_victory',

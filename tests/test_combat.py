@@ -16,10 +16,10 @@
 #
 # SPDX-License-Identifier: GPL-3.0-or-later
 
-"""Tests for combat / enemy-tick behaviour in main.py."""
+"""Tests for combat / enemy-tick behaviour in vimny/game.py."""
 from vimny.engine.world import Room, RoomType, CellType, Entity
 from vimny.engine.player import Player
-from main import (_enemy_tick, _do_warden_move, _on_kill, _remove_warden_shields,
+from vimny.game import (_enemy_tick, _do_warden_move, _on_kill, _remove_warden_shields,
                   _drop_tick)
 
 ROWS, COLS = 7, 30

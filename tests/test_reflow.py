@@ -237,7 +237,7 @@ def test_insert_reflows_even_without_explicit_ledge_marking():
 def test_insert_never_overwrites_a_void_rune():
     """Bugfix: typing must not erode the painted void. The glyph at the last
     editable cell is shoved over the brink (falls); the chasm stays intact and the
-    cursor advances ONTO the brink — main.py then falls the player in."""
+    cursor advances ONTO the brink — vimny/game.py then falls the player in."""
     room = _room()                              # abcd at 5-8, void at 9-13
     p    = Player(row=1, col=8)                 # the last editable cell
     insert_char(room, p, 'Z')                   # Z lands at 8; old 'd' → 9 → falls

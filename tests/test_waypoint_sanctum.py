@@ -56,7 +56,7 @@ def _positions(room, word):
                   if ''.join(ru.symbols) == word)
 
 
-# ── answer simulator (marks + search + chest + key + lock; main.py costs) ────
+# ── answer simulator (marks + search + chest + key + lock; vimny/game.py costs) ────
 def _simulate(answer, room):
     """Run a space-separated answer; returns (pos, spent, reached_exit, got_scroll)."""
     p = Player(row=room.spawn_pos[0], col=room.spawn_pos[1])
@@ -330,7 +330,7 @@ def test_driven_canonical_wins_at_par(monkeypatch):
     """The REAL main loop end to end: the ? leg, the tick's plugh reveal,
     the # fetch, the mark home. (The simulator mimics the tick; this one
     proves it.)"""
-    import main
+    import vimny.game as main
     from blessed import Terminal
     from blessed.keyboard import Keystroke
     import vimny.render.colors as C
@@ -366,7 +366,7 @@ def test_nook_ledger_and_the_pinned_second_stride():
     Among the row-9 vault chests, exactly ONE is pinned to 'redo' (The
     Second Stride — guaranteed here, BEFORE the editing act, instead of
     floating in the random relic pool); the rest pull random relics."""
-    import main
+    import vimny.game as main
     from vimny.content.scrolls import RELIC_SCROLL_IDS
     room = _room(42)
     nook = next(e for e in room.entities

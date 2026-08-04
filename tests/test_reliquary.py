@@ -26,7 +26,7 @@ import pytest
 from collections import deque
 
 import vimny.generation.dungeon_gen as dg
-from main import _check_seal_broken
+from vimny.game import _check_seal_broken
 from vimny.engine.editor import _ed_cut
 from vimny.engine.reflow import close_gap, is_ledge
 from vimny.engine.world import CellType

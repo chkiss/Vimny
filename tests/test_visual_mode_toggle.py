@@ -25,7 +25,7 @@ of everything), and `{...}[raw or '\\x16']` then defaulted to Ctrl-v → block m
 `_visual_mode_toggle` must return None for every sequence key."""
 import pytest
 from vimny.engine.modes import Mode
-from main import _visual_mode_toggle
+from vimny.game import _visual_mode_toggle
 
 
 def test_v_V_ctrlv_switch_to_their_modes():

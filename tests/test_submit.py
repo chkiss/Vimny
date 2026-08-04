@@ -28,7 +28,7 @@ from urllib.parse import parse_qs, urlparse
 
 import pytest
 
-import main
+import vimny.game as main
 import vimny.sharing.format as F
 import vimny.sharing.submit as SUBMIT
 

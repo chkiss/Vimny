@@ -18,16 +18,16 @@
 
 """Progress save behaviour — :q must not persist dungeon completion.
 
-Tests the actual progress-update block from main.py's run_overworld loop
-by importing the dispatch logic directly, so regressions in main.py are caught.
+Tests the actual progress-update block from vimny/game.py's run_overworld loop
+by importing the dispatch logic directly, so regressions in vimny/game.py are caught.
 """
 
 
 def _progress_update(dung_result: dict, progress: dict, level: int) -> None:
-    """Replicate the run_overworld progress block from main.py (lines 1031-1039).
+    """Replicate the run_overworld progress block from vimny/game.py (lines 1031-1039).
 
-    If this function drifts from main.py, the test will catch it because the
-    assertions test intent (not the helper text), and real main.py changes will
+    If this function drifts from vimny/game.py, the test will catch it because the
+    assertions test intent (not the helper text), and real vimny/game.py changes will
     require updating this mirror.
     """
     if dung_result['won'] and dung_result['action'] == 'wq':

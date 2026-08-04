@@ -20,7 +20,7 @@
 search that opens the containing fold, and the :h landing."""
 from blessed.keyboard import Keystroke
 
-import main
+import vimny.game as main
 from vimny.engine.codex import CodexPane, scroll_sections
 from vimny.content.scrolls import SCROLL_CATALOG
 

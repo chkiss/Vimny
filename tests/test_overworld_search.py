@@ -24,7 +24,7 @@ import pytest
 from blessed.keyboard import Keystroke
 from blessed import Terminal
 
-import main
+import vimny.game as main
 from vimny.engine.player import Player
 from vimny.render.overworld import build_lines, default_cursor, line_search_text
 from vimny.content.levels import LEVELS, key_for_slug

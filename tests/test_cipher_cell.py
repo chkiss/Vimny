@@ -36,7 +36,7 @@ All four doors run through main._cipher_cell_tick — stateless and undo-safe
 """
 from collections import deque
 
-import main
+import vimny.game as main
 from vimny.engine.insert import replace_chars
 from vimny.engine.motion import _is_word_char
 from vimny.engine.player import Player

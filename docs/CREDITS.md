@@ -5,7 +5,7 @@ record — if you build a credits screen, source it from here.
 
 ## Latin mottos — victory banners
 
-The victory banners (`main.py`: `_fireworks_animation` and `_starfield_victory`)
+The victory banners (`vimny/game.py`: `_fireworks_animation` and `_starfield_victory`)
 use Latin mottos:
 
 - **VIM PROMOVET INSITAM** — shown on a par-perfect (non-boss) finish.

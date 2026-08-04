@@ -48,7 +48,7 @@ from collections import deque
 from blessed.keyboard import Keystroke
 from blessed import Terminal
 
-import main
+import vimny.game as main
 import vimny.engine.operator as op
 from vimny.engine.motion import apply_motion
 from vimny.engine.player import Player

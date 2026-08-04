@@ -35,7 +35,7 @@ from __future__ import annotations
 
 import pytest
 
-import main
+import vimny.game as main
 from vimny.content.levels import LEVELS
 from vimny.engine.motion import stone_law, _FOG_BLOCK_KINDS
 from vimny.sharing import format as F

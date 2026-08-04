@@ -24,7 +24,7 @@ from collections import deque
 from blessed.keyboard import Keystroke
 from blessed import Terminal
 
-import main
+import vimny.game as main
 from vimny.engine.motion import apply_motion
 from vimny.engine.player import Player
 from vimny.engine.world import CellType

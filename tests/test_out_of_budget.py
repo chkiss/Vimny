@@ -25,7 +25,7 @@ reads keystrokes interactively, so we test the rule it delegates to
 (`_budget_exhausted_blocks`) plus the `Budget.remaining` threshold it gates on."""
 import pytest
 from vimny.engine.budget import Budget
-from main import _budget_exhausted_blocks
+from vimny.game import _budget_exhausted_blocks
 
 
 # ── the recovery / exit actions that stay allowed when out of budget ─────────────

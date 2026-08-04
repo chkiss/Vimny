@@ -29,7 +29,7 @@ import random
 from types import SimpleNamespace
 
 from vimny.engine.world import CellType, Entity, Room, RoomType
-from main import (
+from vimny.game import (
     _do_warden_move,
     _enemy_tick,
     _reposition_warden_shield,

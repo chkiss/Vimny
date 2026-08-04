@@ -35,7 +35,7 @@ import json
 
 import pytest
 
-import main
+import vimny.game as main
 from vimny.sharing import format as F
 from vimny.sharing.validate import validate
 

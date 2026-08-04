@@ -149,7 +149,7 @@ def test_the_password_round_trips_through_a_saved_level():
 # ── the forge ──────────────────────────────────────────────────────────────
 
 def test_the_forge_can_place_one():
-    import main
+    import vimny.game as main
     assert 'fancy_door' in main._ENTITY_PALETTE
     assert 'password' in main._ENTITY_PALETTE['fancy_door'][2]
     assert 'password' in main._ENTITY_SETTABLE
@@ -160,7 +160,7 @@ def test_underscores_in_a_typed_password_become_spaces():
     produces — could not otherwise be typed at all. The door stores the phrase,
     never the underscores, so what the author types and what the player must
     cut are the same words."""
-    import main
+    import vimny.game as main
     door = Entity(kind='fancy_door', row=1, col=1)
     assert main._entity_field(door, 'password', 'speak_friend_and_enter') == ''
     assert door.password == 'speak friend and enter'
@@ -169,7 +169,7 @@ def test_underscores_in_a_typed_password_become_spaces():
 def test_an_empty_password_is_refused():
     """A fancy door with no password is a door nothing opens. Better to
     complain in the forge than to ship a level with a dead end in it."""
-    import main
+    import vimny.game as main
     door = Entity(kind='fancy_door', row=1, col=1)
     assert main._entity_field(door, 'password', '')
 
@@ -239,7 +239,7 @@ def test_the_forge_offers_the_shared_password_pools():
     the built levels want — and the phrases must arrive underscored, because
     `:entity` splits its arguments on whitespace and the picker's answer is
     `:entity` text."""
-    import main
+    import vimny.game as main
     from vimny.content.passwords import POOLS, ALL
     offered = main._entity_choices('fancy_door', 'password')
     assert offered                                  # not free-text-only
@@ -260,7 +260,7 @@ def test_the_forge_offers_the_levels_own_vocab_words_first():
     """An author's `:vocab` block is the level saying what its words are. The
     door's password is the one place that matters most, so its own words come
     FIRST, named as its own, with the shipped pools behind them."""
-    import main
+    import vimny.game as main
     from vimny.content.passwords import ALL
     mine = ('shibboleth', 'grimoire', 'lantern')     # one of them shipped too
     offered = main._entity_choices('fancy_door', 'password', mine)

@@ -23,7 +23,7 @@ Personality defined in agents/bug_testers.md.
 from vimny.engine.world import Room, RoomType, CellType, Entity, CharRun
 from vimny.engine.player import Player
 from vimny.engine.motion import apply_motion
-from main import _keystroke_cost
+from vimny.game import _keystroke_cost
 
 
 def _bare_room(rows=7, cols=30):

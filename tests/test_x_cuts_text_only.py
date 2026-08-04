@@ -28,7 +28,7 @@ Driven through the real run_dungeon keystroke loop on tiny hand-built rooms."""
 from blessed.keyboard import Keystroke
 from blessed import Terminal
 
-import main
+import vimny.game as main
 from vimny.engine.world import Dungeon, Room, RoomType, CellType, CharRun, Entity
 
 

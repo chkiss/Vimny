@@ -16,7 +16,7 @@ import pytest
 from blessed.keyboard import Keystroke
 from blessed import Terminal
 
-import main
+import vimny.game as main
 from vimny.engine.world import CellType
 from vimny.engine.motion import _vision_flood, _FOGGABLE_CELLS
 from vimny.content.levels import LEVELS, is_unlocked, _BY_SLUG

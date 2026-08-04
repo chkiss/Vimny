@@ -61,7 +61,7 @@ REPLAY_TERM_HEIGHT = 33 + 8
 # swallow a tape keystroke and desync everything after it.
 _SILENCED = (
     'render_all',
-    # Every `_*_animation` in main.py. They write escape sequences straight to
+    # Every `_*_animation` in vimny/game.py. They write escape sequences straight to
     # stdout rather than through render_all, so silencing the renderer alone
     # still leaves a replay spraying cursor moves over the caller's output.
     '_unlock_animation', '_sc_twinkle_animation', '_explosion_animation',
@@ -137,7 +137,7 @@ def replay_tape(dungeon, slug: str, tape: str, *,
     is reported as an error rather than raised, because the validator's job is to
     tell an author WHICH rule they broke.
     """
-    import main
+    import vimny.game as main
 
     term = Terminal(force_styling=False)
     keys  = tape_to_keys(tape, term)

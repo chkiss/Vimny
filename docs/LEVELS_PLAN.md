@@ -54,7 +54,7 @@ Blueprint: `docs/blueprints/bonus_wing.md` — The Cartographer's Table, `zf`.
 
 ### Insert-mode editing
 `<C-w>`, `<C-u>`, `<C-o>`, `<C-r>{reg}` — the keys that make insert mode more
-than typing. **All four are already implemented** (`main.py`, `vimny/engine/insert.py`)
+than typing. **All four are already implemented** (`vimny/game.py`, `vimny/engine/insert.py`)
 and reachable as the `ins_edit` / `ins_paste` relic scrolls. What is missing is a
 level, and the obstacle is the cost model, not the geometry:
 

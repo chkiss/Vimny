@@ -36,7 +36,7 @@ a run that CANNOT be a whole command on its own is the defect.
 import pytest
 
 from vimny.content.levels import LEVELS
-import main
+import vimny.game as main
 
 #: Tokens that can never stand alone as a command. An operator wants a target,
 #: `f`/`F`/`t`/`T`/`r` want a character, `"`/`@` want a register.

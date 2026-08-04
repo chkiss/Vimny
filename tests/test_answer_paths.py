@@ -27,7 +27,7 @@ import re
 import pytest
 from blessed import Terminal
 from blessed.keyboard import Keystroke
-import main
+import vimny.game as main
 from vimny.engine.tape import ESC as _TAPE_ESC, ENTER as _TAPE_ENTER, to_keys
 import vimny.generation.dungeon_gen as _dg
 from tests import cached_room
@@ -50,7 +50,7 @@ _MACRO_RE = re.compile(r'q[a-z]?|\d*@[a-z@]')   # 'qa', 'q', '4@a', '@@'
 def _token_ks_cost(token: str) -> int:
     """Keystroke cost of a single answer token.
 
-    Matches _keystroke_cost in main.py:
+    Matches _keystroke_cost in vimny/game.py:
       - plain single key (j, ^, $, x, …): 1
       - count-N + motion (4j, 63l, 9e): len(str(N)) + 1
       - g-prefix 2-key (ge, gE, gg): base 2; with count N: len(str(N)) + 2
@@ -69,11 +69,11 @@ def _token_ks_cost(token: str) -> int:
         return 2 + _token_ks_cost(token[2:])
     if token and token[0] in '/?' and token.endswith(_TAPE_ENTER):
         # search: /pat<CR> or ?pat<CR> — '/' charged + len(pat) chars, closing
-        # <CR> free = len(pat)+1 (main.py). Slice by the TOKEN's length, not by
+        # <CR> free = len(pat)+1 (vimny/game.py). Slice by the TOKEN's length, not by
         # one character: <CR> is four glyphs standing for a single keystroke.
         return len(token[1:-len(_TAPE_ENTER)]) + 1
     if len(token) == 2 and token[0] in "m'`" and token[1].isalpha():
-        return 2          # marks: m{a} set, '{a}/`{a} jump — two keys each (main.py)
+        return 2          # marks: m{a} set, '{a}/`{a} jump — two keys each (vimny/game.py)
     m = _GE_RE.match(token)
     if m:
         n_str = m.group(1)
@@ -286,7 +286,7 @@ def test_budget_is_ceil_par_times_1_4(builder, seed):
 # canonical tape key-for-key through the real engine and asserts a par-perfect
 # 2-star win, across every answer-path seed.
 
-# game_h = term.height - 8 (main.py's motion call); the dungeons are built for the
+# game_h = term.height - 8 (vimny/game.py's motion call); the dungeons are built for the
 # default game height of 33 (dungeon_gen._SCREEN_VAULT_DEFAULT_GAME_H), so the
 # Screen Vault's viewport-relative H/M/L land on their keys only at height 41.
 _REPLAY_TERM_HEIGHT = 33 + 8

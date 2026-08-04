@@ -59,7 +59,7 @@ def _record_take(lvl: F.Level, tape: str, player_name: str = 'Normand') -> tuple
     would put the forge's scaffolding in the path that judges every shipped
     level. Returns `(recorded_tape, result)`.
     """
-    import main
+    import vimny.game as main
     from vimny.sharing.replay import _headless
 
     term  = Terminal(force_styling=False)
@@ -96,7 +96,7 @@ def _forge_session(draft, script: str, player_name: str = 'admin', dungeon=None,
     otherwise: the session ends either way, and the keys the inner run should
     have eaten are simply left on the floor. `tally['read'] == tally['total']`
     is the assertion that the second loop really took them."""
-    import main
+    import vimny.game as main
     from vimny.sharing.replay import _headless
 
     term = Terminal(force_styling=False)
@@ -392,7 +392,7 @@ def test_reloading_inside_a_run_reloads_the_level_being_played():
     """`:e` means START THIS AGAIN. The slug the forge was opened from is not
     this level — reloading it dropped the author into the First Cave, with their
     draft nowhere on screen."""
-    import main
+    import vimny.game as main
     d = _playable_draft()
     curriculum, rebuilt = [], []
     real_slug, real_draft = main._build_dungeon, DRAFT.Draft.build
@@ -816,7 +816,7 @@ def test_a_single_creature_drops_what_it_carries():
     """`drops` is a field on the creature, not a rule about goblins — the game
     had this twice before (a `level == 'goblin_gauntlet'` branch and the vault's
     tick) and could express it in a level file zero times."""
-    import main
+    import vimny.game as main
     room = _room_with({'kind': 'goblin', 'at': [1, 3], 'drops': 'floor_key:gold'})
     gob  = room.entity_at(1, 3)
     assert not main._drop_tick(room, _player_at(1, 1))      # alive: nothing yet
@@ -827,7 +827,7 @@ def test_a_single_creature_drops_what_it_carries():
 
 
 def test_the_drop_waits_for_the_last_of_a_group():
-    import main
+    import vimny.game as main
     room = _room_with({'kind': 'goblin', 'at': [1, 3], 'group': 'patrol',
                        'drops': 'floor_key'},
                       {'kind': 'goblin', 'at': [1, 5], 'group': 'patrol',
@@ -847,7 +847,7 @@ def test_the_drop_waits_for_the_last_of_a_group():
 def test_the_drop_is_a_reading_not_an_event():
     """The whole reason it is a tick: it may run any number of times and must
     say the same thing, because that is what makes undo safe."""
-    import main
+    import vimny.game as main
     room = _room_with({'kind': 'goblin', 'at': [1, 3], 'drops': 'floor_key'})
     room.kill_entity(room.entity_at(1, 3))
     for _ in range(4):
@@ -858,7 +858,7 @@ def test_the_drop_is_a_reading_not_an_event():
 def test_a_creature_cannot_drop_a_creature():
     """`drops` is the one field that CREATES an entity at runtime, so it is the
     one field a downloaded file could use to hatch something nobody counted."""
-    import main
+    import vimny.game as main
     from vimny.sharing import validate as V
     room = _room_with({'kind': 'goblin', 'at': [1, 3], 'drops': 'warden'})
     room.kill_entity(room.entity_at(1, 3))
@@ -916,7 +916,7 @@ def test_the_picker_builds_a_red_key_not_just_a_default_one():
     floor_key, Enter chooses it, Enter opens `tag`, jj picks red off the colour
     list, and the last row places it. A picker that could only place the DEFAULT
     of each kind would leave `:entity floor_key tag=red` as the only route."""
-    import main
+    import vimny.game as main
     d = DRAFT.new('Probe', rows=8, cols=30)
     _forge_session(d, 'jl:entity\rjjj\r\rjj\rj\r:w\r:q!\r')
     key = [e for e in d.level.entities if e['kind'] == 'floor_key']
@@ -933,7 +933,7 @@ def test_the_picker_offers_only_colours_the_game_paints():
     equality — but the renderer knows three colours, so an orange key comes out
     brass and nothing anywhere says why. The list is where that silent gap
     becomes visible."""
-    import main
+    import vimny.game as main
     from vimny.render import renderer
 
     offered = [c for c in main._entity_choices('floor_key', 'tag') if c]
@@ -962,7 +962,7 @@ def test_the_offered_scroll_ids_are_the_real_catalogue():
     """Read from SCROLL_CATALOG, not hand-copied: an id that matches no scroll
     shows no scroll at all, silently, and a hand-written list drifts the moment
     a scroll is added."""
-    import main
+    import vimny.game as main
     from vimny.content.scrolls import SCROLL_CATALOG
 
     offered = main._entity_choices('chest_scroll', 'scroll_id')
@@ -974,7 +974,7 @@ def test_a_red_chest_yields_a_red_key():
     """A `chest_key` carries its tag onto the key it gives up. Without this the
     pairing an author set on the chest dissolved at the moment of looting and
     the red door it was cut for never opened."""
-    import main
+    import vimny.game as main
     from vimny.engine.world import Entity
     room = _room_with({'kind': 'chest_key', 'at': [1, 3], 'tag': 'red'})
     chest = room.entity_at(1, 3)
@@ -1018,7 +1018,7 @@ def test_the_wanderer_chases_but_never_strikes():
     """The palette calls it a half-speed chaser that does no damage — pinning
     that here because it is a claim about the ENGINE made in a menu, and the two
     can drift apart silently."""
-    import main
+    import vimny.game as main
     from vimny.engine.world import Entity
     room = _room_with()
     pre  = dict(main._ENTITY_PALETTE['wanderer'][0])
@@ -1046,7 +1046,7 @@ def _sealed(match='open sesame', mode='exact', opens=((2, 8),), text='open sesam
 
 
 def test_a_seal_stands_open_exactly_while_its_region_reads_true():
-    import main
+    import vimny.game as main
     room = F.build(_sealed()).room
     p = _player_at(3, 1)
     main._seal_tick(room, p)
@@ -1062,7 +1062,7 @@ def test_a_brazier_seal_opens_only_while_every_brazier_burns():
     """The generalized brazier win: a mode="braziers" seal holds its bolt shut
     until every brazier standing in its region is LIT. Snuffing one darkens it
     (it is not carried off) so the bolt re-bars — the run is lost until relit."""
-    import main
+    import vimny.game as main
     lvl = _tiny()
     lvl.rows, lvl.cols = 5, 16
     lvl.cells = ['16W', 'W14FW', 'W14FW', 'W14FW', '16W']
@@ -1122,7 +1122,7 @@ def test_a_brazier_seal_wants_a_region_and_refuses_text():
 
 
 def test_exact_means_exact_and_contains_is_opt_in():
-    import main
+    import vimny.game as main
     p = _player_at(3, 1)
     near = F.build(_sealed(match='sesame', text='open sesame')).room
     main._seal_tick(near, p)
@@ -1152,7 +1152,7 @@ def test_a_seal_ships_shut_however_the_grid_was_saved():
 
 
 def test_a_seal_never_walls_the_player_in():
-    import main
+    import vimny.game as main
     room = F.build(_sealed()).room
     main._seal_tick(room, _player_at(3, 1))
     room.remove_char_run(room.char_run_at(1, 1))
@@ -1165,7 +1165,7 @@ def test_a_seal_reads_only_walkable_stone():
     because the target word is usually on a plaque set into the wall beside the
     door — and a scan that read the wall would find the door opened by its own
     label."""
-    import main
+    import vimny.game as main
     lvl = _sealed(text='')
     lvl.cells = ['16W', '16W', 'W14FW', 'W14FW', '16W']   # row 1 is solid stone
     lvl.char_runs = [{'row': 1, 'col': 1, 'symbols': list('open sesame'),
@@ -1607,7 +1607,7 @@ def test_a_rehearsal_carries_the_operable_warning_in_as_the_banner(monkeypatch):
     you first WALK the level, so the warning rides IN as the opening banner of
     the played level — where the author is standing in the very room it names —
     shortened and tagless. The rehearsal still opens (advice, not a refusal)."""
-    import main
+    import vimny.game as main
     lvl = _corridor(entities=[{'kind': 'locked_door', 'at': [1, 5]},
                               {'kind': 'floor_key', 'at': [1, 3]}],
                     spawn=(1, 1), exit=(1, 2), solution='l')
@@ -1628,7 +1628,7 @@ def test_a_rehearsal_carries_the_operable_warning_in_as_the_banner(monkeypatch):
 def test_paint_says_where_doors_actually_come_from():
     """`Unknown paint: door` beside a palette with no door in it reads as 'this
     game has no doors'."""
-    import main
+    import vimny.game as main
     assert ':entity door' in main._paint_complaint('door')
     assert ':paint wood' in main._paint_complaint('door')
     assert 'Unknown paint' in main._paint_complaint('marble')

@@ -13,7 +13,7 @@ import pytest
 from vimny.generation.dungeon_gen import build_dungeon_first_cave
 from vimny.engine.world import CARET_TRANSPARENT
 from vimny.engine.player import Player
-from main import _place_first_cave_horse, _enemy_tick, _manhattan
+from vimny.game import _place_first_cave_horse, _enemy_tick, _manhattan
 from tests import SEEDS
 
 
@@ -116,7 +116,7 @@ def _feed(term, monkeypatch, keys):
 def test_naming_prompt_returns_typed_name(monkeypatch):
     from blessed import Terminal
     from blessed.keyboard import Keystroke
-    import main
+    import vimny.game as main
     term = Terminal()
     keys = [Keystroke(c) for c in 'Artax'] + [Keystroke('\r')]
     _feed(term, monkeypatch, keys)
@@ -126,7 +126,7 @@ def test_naming_prompt_returns_typed_name(monkeypatch):
 def test_naming_prompt_esc_leaves_him_nameless(monkeypatch):
     from blessed import Terminal
     from blessed.keyboard import Keystroke
-    import main
+    import vimny.game as main
     term = Terminal()
     esc = Keystroke('\x1b', code=361, name='KEY_ESCAPE')
     _feed(term, monkeypatch, [esc])
@@ -134,7 +134,7 @@ def test_naming_prompt_esc_leaves_him_nameless(monkeypatch):
 
 
 def test_horse_blocked_on_bosses_and_combat():
-    import main
+    import vimny.game as main
     room = build_dungeon_first_cave(SEEDS[0]).room
     assert main._horse_blocked('wardens_keep', room)      # boss
     assert main._horse_blocked('goblin_gauntlet', room)   # combat crush

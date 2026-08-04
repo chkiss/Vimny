@@ -25,7 +25,7 @@ import pytest
 from blessed.keyboard import Keystroke
 from blessed import Terminal
 
-import main
+import vimny.game as main
 import vimny.generation.dungeon_gen as dg
 from vimny.engine.world import CellType
 from vimny.content.levels import LEVELS

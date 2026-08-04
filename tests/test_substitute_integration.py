@@ -21,7 +21,7 @@ flag, :v / :g! inversion, and budget. Driven on plain custom rooms (admin player
 from blessed import Terminal
 from blessed.keyboard import Keystroke
 
-import main
+import vimny.game as main
 import vimny.engine.substitute as S
 from vimny.engine.world import Dungeon, Room, RoomType, CharRun, CellType
 

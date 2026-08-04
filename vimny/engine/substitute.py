@@ -25,7 +25,7 @@ wall-bounded text of a row: its non-void glyphs in place, gaps read as spaces
 exactly like every other edit. Void runes and water are terrain: read as spaces
 and left untouched (:s/:g levels are built without them in the worked lines).
 
-Public surface (the only thing main.py needs):
+Public surface (the only thing vimny/game.py needs):
     run_ex(cmd, room, player, *, confirm=None, insert_row=None, delete_row=None)
         -> (handled: bool, message: str|None, n_subs: int, n_lines: int)
 

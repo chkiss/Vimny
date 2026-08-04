@@ -33,7 +33,7 @@ import pytest
 from blessed import Terminal
 from blessed.keyboard import Keystroke
 
-import main
+import vimny.game as main
 import vimny.generation.dungeon_gen as dg
 import vimny.engine.substitute as S
 from vimny.engine.tape import to_keys

@@ -25,7 +25,7 @@ append must go through _cmd_append, which silently drops sequence keys.
 """
 import pytest
 from unittest.mock import MagicMock
-from main import _cmd_append
+from vimny.game import _cmd_append
 
 
 # ── helpers ───────────────────────────────────────────────────────────────────

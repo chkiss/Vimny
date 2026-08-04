@@ -24,22 +24,23 @@ classifiers = [
 ]
 
 [project.scripts]
-vimny = "main:main"
+vimny = "vimny.game:main"
 
 [tool.setuptools]
 # Vimny runs from a checkout (`python main.py`); the package list is here so an
 # install is possible and `pip install .` does something sensible rather than
-# failing. `main` is a top-level module, not a package, hence py-modules.
+# failing.
 #
-# Everything importable lives under the one `vimny` package. It used to be eight
-# top-level packages — `engine`, `save`, `render` and friends — which meant an
-# install scattered those names across site-packages, where any of them could
-# collide with somebody else's.
+# AN INSTALL CLAIMS EXACTLY ONE NAME: `vimny`. It used to claim nine — eight
+# top-level packages (`engine`, `save`, `render` and friends) plus, via
+# py-modules, a bare module called `main`, which is about the worst name in the
+# language to squat. The game loop is `vimny/game.py` now; the root `main.py`
+# is a launcher that is deliberately NOT packaged, so `python3 main.py` still
+# works from a checkout without that name ever reaching site-packages.
 packages   = [
     "vimny", "vimny.engine", "vimny.generation", "vimny.content",
     "vimny.render", "vimny.save", "vimny.art", "vimny.sharing",
 ]
-py-modules = ["main"]
 
 [tool.setuptools.package-data]
 "vimny.render" = ["*.md"]
@@ -53,7 +54,7 @@ py-modules = ["main"]
 # slug dispatch).  The ignore_names globs below suppress those known false
 # positives so a clean run means a *real* dead-code finding.  See the
 # "Dead-code detection" note in docs/ARCHITECTURE.md.
-paths = ["vimny/engine", "vimny/generation", "vimny/content", "vimny/render", "main.py"]
+paths = ["vimny/engine", "vimny/generation", "vimny/content", "vimny/render", "vimny/game.py"]
 min_confidence = 60
 ignore_names = [
     "build_dungeon_*",   # resolved via getattr(module, f'build_dungeon_{slug}')

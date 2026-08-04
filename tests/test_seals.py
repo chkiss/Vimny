@@ -29,7 +29,7 @@ from __future__ import annotations
 
 import pytest
 
-import main
+import vimny.game as main
 import vimny.sharing.format as F
 from vimny.engine.player import Player
 from vimny.engine.world import CellType, Seal, gate_row_seals

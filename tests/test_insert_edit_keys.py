@@ -20,11 +20,11 @@
 
 Engine-level coverage for <C-w> (delete word back) and <C-u> (delete to line
 start) via engine.insert, plus the clip→text flattening that backs <C-r>
-register paste in main.py."""
+register paste in vimny/game.py."""
 from vimny.engine.world import Room, RoomType, CellType, CharRun
 from vimny.engine.player import Player
 from vimny.engine.insert import insert_delete_word_back, insert_delete_to_start
-from main import _clip_to_text
+from vimny.game import _clip_to_text
 
 ROWS, COLS = 7, 24
 

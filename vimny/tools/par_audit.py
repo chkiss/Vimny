@@ -47,7 +47,7 @@ from vimny.engine.player import Player
 from vimny.engine.motion import apply_motion
 from vimny.content.levels import LEVELS, known_commands
 import vimny.generation.dungeon_gen as dg
-import main  # for _keystroke_cost
+import vimny.game as main  # for _keystroke_cost
 
 
 # motion tokens that are themselves the motion name

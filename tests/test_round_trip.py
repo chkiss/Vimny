@@ -42,7 +42,7 @@ from __future__ import annotations
 
 import pytest
 
-import main
+import vimny.game as main
 import vimny.sharing.format as F
 from vimny.content.levels import LEVELS
 

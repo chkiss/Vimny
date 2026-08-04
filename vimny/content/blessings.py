@@ -30,7 +30,7 @@ the poem's ``introduces_slug`` names the level it is recited before, which we
 turn into the ``dropped_by`` provenance line shown in the library.
 
 This module is the single source of truth for the blessing catalogue; both the
-renderer and ``main.py``'s seen-tracking read from it. It loads the same
+renderer and ``vimny/game.py``'s seen-tracking read from it. It loads the same
 generated corpus as ``render.title`` rather than re-declaring the poems."""
 from __future__ import annotations
 

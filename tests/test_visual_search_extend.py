@@ -24,7 +24,7 @@ render_all patched to snapshot (mode, cursor, anchor) every frame."""
 from blessed.keyboard import Keystroke
 from blessed import Terminal
 
-import main
+import vimny.game as main
 from vimny.engine.world import Dungeon, Room, RoomType, CellType, CharRun
 from vimny.engine.modes import Mode
 

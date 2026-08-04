@@ -27,6 +27,8 @@ Editing reflows the line exactly as Vim does: insert, delete or paste and the re
 
 **Keystroke budget**: Every puzzle room displays a budget. Reaching the exit within it completes the room. The par is the minimum possible keystrokes using the level's taught commands — hitting par earns a second star. `u` (undo) returns budget; you can backtrack freely.
 
+> **Note — `u` undoes motions, which Vim's does not.** In Vim, undo is for *changes*: it will not walk your cursor back from a `4j`. In Vimny it will, refunding the keystrokes with it. This is a deliberate break with faithfulness, and the only one in the movement keys — a game that charges you for every keypress has to let you take a wrong turn back, or exploring a room becomes something you pay for and learners stop trying things. Everything `u` does to *edits* is Vim's behaviour, undo stack and all.
+
 > **Note — par is not the absolute minimum on search levels.** On levels that use search (`/`, `?`), par is computed assuming you type the **full search term** the level highlights (e.g. `/cipher<CR>`). Because a search pattern only needs enough characters to land uniquely on the target, an expert can type a shorter prefix (e.g. `/cip<CR>`) and finish *under* par. This is intentional; par matches playing all puzzles all the way through, but if you can search a partial term or guess the answer to a puzzle without playing it out, you may be able to beat par on some levels.
 
 **Terrain**: Levels use terrain to make a particular Vim command the *only* good answer, rather than merely the intended one.
@@ -290,8 +292,9 @@ Vimny aims for Vim-faithfulness in everything it *does* implement, but some comm
 <summary>Project layout</summary>
 
 ```
-main.py                    Game loop, run_dungeon / run_overworld, the forge
+main.py                    Launcher — `python3 main.py` and nothing else
 vimny/                     Everything importable lives under one package
+  game.py                  Game loop, run_dungeon / run_overworld, the forge
   engine/
     world.py               Room, Dungeon, Entity, CharRun, CellType, Seal
     player.py              Player dataclass

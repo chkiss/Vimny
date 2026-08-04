@@ -218,7 +218,7 @@ def test_hazards_vary_across_seeds():
 
 # ── Phase-1 attack helpers (the warden's v-sweep) ─────────────────────────────
 
-import main
+import vimny.game as main
 from vimny.engine.player import Player
 
 

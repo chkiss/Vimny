@@ -184,7 +184,7 @@ def test_jailed_hostiles_cannot_escape():
     """A jail is stone on three sides and a door on the fourth. `_steppable`
     refuses any cell holding an entity, so the door itself is the bar — the
     occupant can never cross it. Deleting the door releases it, by design."""
-    from main import _greedy_step_toward
+    from vimny.game import _greedy_step_toward
 
     class _P:
         row, col = 0, 0

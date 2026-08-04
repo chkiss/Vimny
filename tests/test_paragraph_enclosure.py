@@ -26,7 +26,7 @@ import pytest
 from blessed.keyboard import Keystroke
 from blessed import Terminal
 
-import main
+import vimny.game as main
 from vimny.engine.world import CellType
 from vimny.engine.text_object import resolve_text_object
 from vimny.generation.dungeon_gen import (

@@ -21,7 +21,7 @@
 from blessed.keyboard import Keystroke
 from blessed import Terminal
 
-import main
+import vimny.game as main
 import vimny.generation.dungeon_gen as dg
 from vimny.engine.player import Player
 from vimny.engine.world import entity_letter
@@ -304,7 +304,7 @@ def test_swelling_an_ally_keeps_it_yours():
                  hp=2, max_hp=2, ai='hunt', ai_speed=1)
     r.entities.append(dog)
     r.rebuild_indexes()
-    import main as _m
+    import vimny.game as _m
     from blessed import Terminal
     _m_render = _m.render_all
     Terminal.height = property(lambda self: 41)

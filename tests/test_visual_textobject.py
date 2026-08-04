@@ -24,7 +24,7 @@ import pytest
 from blessed.keyboard import Keystroke
 from blessed import Terminal
 
-import main
+import vimny.game as main
 from vimny.engine.vim_parser import parse_visual_textobj as pv
 from vimny.engine.world import Dungeon, Room, RoomType, CellType, CharRun
 from vimny.engine.modes import Mode
