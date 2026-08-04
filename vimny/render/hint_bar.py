@@ -18,10 +18,14 @@
 
 """Hint bar text, driven by vim_commands.md.
 
-CMD is parsed once at import from the markdown table.
+CMD is parsed once at import from the markdown table.  hint_text() shows the
+current level's own `teaches` (or, for a community level, the set it declares),
+so the bar names the lesson of the room the player is standing in.
+
 HINT_TIERS is built by diffing known_commands() between consecutive curriculum
-levels — no token lists are hardcoded.  hint_text() walks the list newest-first
-and returns the first tier whose sentinel is in the player's known_commands.
+levels — no token lists are hardcoded.  It is the fallback, for a slug with no
+lesson to read: hint_text() walks it newest-first and returns the first tier
+whose sentinel is in the player's known_commands.
 """
 from __future__ import annotations
 import pathlib
@@ -112,17 +116,35 @@ def _format(tokens) -> str:
     return ('  '.join(parts) + _SUFFIX) if parts else _DEFAULT
 
 
-def hint_text(known: list, slug: str | None = None) -> str:
-    """Return hint bar text for the given known_commands list.
+def hint_text(known: list, slug: str | None = None,
+              teaches: list | None = None) -> str:
+    """Return hint bar text for the level being played.
 
-    On a boss level the bar lists the WHOLE act the boss caps (so the player is
-    nudged to wield every command they've learned), never the next-act command
-    the boss merely previews. Elsewhere it shows the newest tier the player owns.
+    The bar shows THIS LEVEL'S lesson — its own `teaches` — plus `:w`/`:q` and
+    whatever family keys that lesson unlocks.  It deliberately does NOT show the
+    newest tier the *player* owns: that is a property of the save file, not the
+    room, so it painted every level of a replay with the same line.
+
+    `teaches` overrides the curriculum lookup, for a level that has no
+    curriculum position and declares its own set (community levels, forge
+    drafts).  On a boss — which introduces nothing — the bar lists the whole act
+    the boss caps, so the player is nudged to wield everything the act taught,
+    never the next act's command the boss merely previews.  The newest-tier walk
+    survives only as the fallback for a slug nothing else can answer for.
     """
+    if teaches:
+        text = _format(teaches)
+        if text != _DEFAULT:
+            return text
     if slug is not None:
-        from vimny.content.levels import level_type, act_commands  # noqa: PLC0415
-        if level_type(slug) == 'boss':
-            return _format(act_commands(slug))
+        from vimny.content.levels import act_commands, teaches_for_slug  # noqa: PLC0415
+        # A level that introduces nothing — a boss, or a revision level — is
+        # revising its act, so the bar lists the act.
+        tokens = teaches_for_slug(slug) or act_commands(slug)
+        if tokens:
+            text = _format(tokens)
+            if text != _DEFAULT:
+                return text
     for sentinel, tokens in _HINT_TIERS:
         if sentinel in known:
             return _format(tokens)

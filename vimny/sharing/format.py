@@ -736,6 +736,10 @@ def build(lvl: Level, par: int | None = None, seed: int | None = None) -> Dungeo
     dungeon = Dungeon(name=lvl.name, seed=lvl.seed)
     dungeon.rooms        = rooms
     dungeon.current_room = 0
+    # What this level TEACHES, for the hint bar. A community level has no
+    # curriculum position, so the bar cannot look its lesson up by slug — the
+    # declaration in the file is the only answer there is.
+    dungeon.level_teaches = list(lvl.teaches)
     return dungeon
 
 

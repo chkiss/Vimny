@@ -496,7 +496,8 @@ def render_all(term: Terminal, dungeon: Dungeon, player: Player,
         _hint_raw = (':paint <kind>  :rune ancient|verdant|void|ember  '
                      ':entity <kind>  :save <name>  :wq write+quit')
     else:
-        _hint_raw = _hint_text(known, getattr(dungeon, 'level_slug', None))
+        _hint_raw = _hint_text(known, getattr(dungeon, 'level_slug', None),
+                               getattr(dungeon, 'level_teaches', None))
     if 'admin' in known:
         _hint_raw += '  :e refresh'
     hint_lines = _wrap_cheatsheet(_hint_raw, iw, max_rows=2)

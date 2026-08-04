@@ -182,6 +182,15 @@ def act_commands(slug: str) -> list:
     return cmds
 
 
+def teaches_for_slug(slug: str) -> list:
+    """The tokens THIS level introduces — its own `teaches`, not the cumulative
+    set. The hint bar shows the lesson of the room the player is standing in, so
+    it needs the level, not the curriculum up to the level. Empty for a boss, a
+    revision level, or a slug the curriculum has never heard of (a community
+    level, which declares its own)."""
+    return list((_BY_SLUG.get(slug) or {}).get('teaches', ()))
+
+
 def level_type(slug: str) -> str:
     """Returns 'dungeon' (default), 'boss', or 'reliquary'."""
     return (_BY_SLUG.get(slug) or {}).get('type', 'dungeon')
