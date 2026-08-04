@@ -371,7 +371,7 @@ vimny/                     Everything importable lives under one package
   art/                     Wizard art, poems, the word pools
   tools/                   Offline audits (cheese, par)
 tests/                     pytest test suite
-packaging/                 Release runbook, Homebrew formula, Scoop manifest
+packaging/                 Release runbook (PyPI)
 docs/ARCHITECTURE.md       The canonical reference: architecture, laws, conventions
 docs/AUTHORING.md          Writing a level, in the forge or in an editor
 docs/SPEC.md               Design vision, UI spec, forward-looking notes
