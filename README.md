@@ -82,9 +82,8 @@ The Archivist's Library use the extra width — and stops widening beyond that.
 
 Windows is untested rather than unsupported: Vimny reaches the console through
 blessed and jinxed, which ought to work in Windows Terminal, but nobody has
-confirmed it. There's a [Scoop](https://scoop.sh) manifest in `packaging/` if
-you'd like to be the one who finds out — `scoop install chkiss/vimny`. Please
-[open an issue](https://github.com/chkiss/Vimny/issues) either way.
+confirmed it. `pip install vimny` is the thing to try, and an
+[issue](https://github.com/chkiss/Vimny/issues) either way would be welcome.
 
 </details>
 

@@ -3,21 +3,19 @@
 Vimny's install story, and how to cut a release. Nothing in here is needed to
 *play* the game or to work on it — this directory exists for shipping.
 
-**The shipping install path is PyPI**, and it covers Linux and macOS equally:
-`uvx vimny`, or `pipx install vimny`. uv fetches its own Python, so neither
+**PyPI is the shipping install path** and covers Linux and macOS equally:
+`uvx vimny` or `pipx install vimny`. uv fetches its own Python, so neither
 platform needs one preinstalled.
 
-The other two manifests are written but **not live, and neither has ever been
-run** — no tap repo, no bucket repo, and no Mac or Windows machine here to test
-on. They are kept as a running start, not as a supported path.
+The other two manifests are written but **not live** — neither target repo
+exists, and neither has been built.
 
 | File | Would go | Status |
 |---|---|---|
-| `homebrew/vimny.rb` | `chkiss/homebrew-tap` → `Formula/vimny.rb` | Hashes verified, build never run. macOS is already covered by `uvx`, so a tap adds familiarity and nothing more. |
-| `scoop/vimny.json` | `chkiss/scoop-bucket` → `bucket/vimny.json` | Valid JSON, launcher shim checked. Windows itself is untested. |
+| `homebrew/vimny.rb` | `chkiss/homebrew-tap` → `Formula/vimny.rb` | Hashes verified, build never run |
+| `scoop/vimny.json` | `chkiss/scoop-bucket` → `bucket/vimny.json` | Valid JSON, shim checked; Windows untested |
 
-Don't advertise either in the README until someone has actually installed
-through it.
+Don't advertise either until an install through it has actually worked.
 
 ## Why no macOS .app / Windows .exe
 
