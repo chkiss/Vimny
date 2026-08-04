@@ -15,10 +15,8 @@ class Vimny < Formula
 
   desc "Dungeon crawler that teaches Vim through play"
   homepage "https://github.com/chkiss/Vimny"
-  # TODO(release): fill both in from PyPI once `vimny` is published — see
-  # packaging/README.md. Until then this formula cannot be installed.
-  url "https://files.pythonhosted.org/packages/source/v/vimny/vimny-1.0.0.tar.gz"
-  sha256 "0000000000000000000000000000000000000000000000000000000000000000"
+  url "https://files.pythonhosted.org/packages/c1/8e/cb8cbff8710b2ab8727fab00a8196b46791354640b4b344eebe08ed3b1b2/vimny-1.0.0.tar.gz"
+  sha256 "3bf835c0ff0c03fe29567cd92675be3ed18fa186581b0e0fde667c4a5796b8f2"
   license "GPL-3.0-or-later"
 
   depends_on "python@3.12"

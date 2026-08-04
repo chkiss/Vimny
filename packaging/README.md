@@ -59,9 +59,8 @@ non-terminal users, the answer is a browser-playable demo, not a bundle.
    PyPI does not permit re-uploading a version. If a release is bad, bump the
    version and publish again; you cannot overwrite.
 
-4. **Refresh the Homebrew formula.** Take the new `url` and `sha256` from
-   PyPI — the two `TODO(release)` lines in `homebrew/vimny.rb` are the only
-   placeholders, and they must be filled before the formula installs at all:
+4. **Refresh the Homebrew formula.** Take the new `url` and `sha256` from PyPI
+   and update them at the top of `homebrew/vimny.rb`:
    ```bash
    python3 - <<'PY'
    import json, urllib.request
