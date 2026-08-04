@@ -52,11 +52,7 @@ pipx install vimny          # or: pip install vimny
 vimny
 ```
 
-On macOS and Linux, Homebrew works too, and doesn't need Python at all:
-
-```bash
-brew install chkiss/tap/vimny
-```
+Both work the same on Linux and macOS.
 
 Progress saves to `~/.Vimny/saves/<player>.json`, one file per player.
 

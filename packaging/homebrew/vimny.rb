@@ -1,14 +1,19 @@
 # Homebrew formula for Vimny.
 #
-# This file does not live here to be used from here — Homebrew reads formulae
-# out of a TAP repository. Copy it to `homebrew-tap/Formula/vimny.rb` in a repo
-# named `chkiss/homebrew-tap` and users get:
+# UNUSED AND UNVERIFIED. There is no `chkiss/homebrew-tap`, and this formula has
+# never been built — the maintainer has neither a Mac nor Homebrew. It is kept
+# because it is written and the hashes are checked, so it is a running start for
+# anyone who wants to maintain a tap. Do not advertise it until someone has
+# actually run `brew install --build-from-source` and `brew test` against it.
 #
-#     brew install chkiss/tap/vimny
+# macOS does not need this. `uvx vimny` works there, and uv fetches its own
+# Python, so the one thing a tap would add — not needing Python preinstalled —
+# is already covered.
 #
-# Why a tap rather than a signed .app: brew builds on the user's machine, so
-# there is no Developer ID, no notarization, and no Gatekeeper prompt. See
-# packaging/README.md for the release runbook and how to refresh the hashes.
+# To use it: copy to `Formula/vimny.rb` in a repo named `chkiss/homebrew-tap`
+# (both names are load-bearing; Homebrew derives `chkiss/tap` from them). Then
+# `brew install chkiss/tap/vimny`. Refresh the url/sha256 after every release —
+# see packaging/README.md.
 
 class Vimny < Formula
   include Language::Python::Virtualenv
