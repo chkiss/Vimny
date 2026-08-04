@@ -42,12 +42,40 @@ Editing reflows the line exactly as Vim does: insert, delete or paste and the re
 Requirements are just Linux or macOS, Python 3.9+, and a terminal at least 80 columns wide. Windows is untested.
 
 ```bash
-pip install blessed
-python main.py
+uvx vimny
 ```
 
-Or `pip install .` and run `vimny`. Progress saves to
-`~/.Vimny/saves/<player>.json`, one file per player.
+That needs nothing installed but [uv](https://docs.astral.sh/uv/), which will fetch Python itself if you haven't got one. Or, if you'd rather it stayed on your machine:
+
+```bash
+pipx install vimny          # or: pip install vimny
+vimny
+```
+
+On macOS and Linux, Homebrew works too, and doesn't need Python at all:
+
+```bash
+brew install chkiss/tap/vimny
+```
+
+Progress saves to `~/.Vimny/saves/<player>.json`, one file per player.
+
+<details>
+<summary>Playing from a clone</summary>
+
+If you want to read or change the code, skip the packaged install:
+
+```bash
+git clone --depth 1 https://github.com/chkiss/Vimny.git
+cd Vimny
+pip install blessed
+python3 main.py
+```
+
+`--depth 1` is worth it — the full history is 13 MB against a 2 MB working tree.
+(You'll want the whole history if you intend to send a pull request.)
+
+</details>
 
 <details>
 <summary>Terminal size and Windows</summary>
@@ -55,6 +83,12 @@ Or `pip install .` and run `vimny`. Progress saves to
 The playfield grows with the window up to **189 columns** — the overworld and
 The Archivist's Library use the extra width — and stops widening beyond that.
 80 columns is the supported minimum.
+
+Windows is untested rather than unsupported: Vimny reaches the console through
+blessed and jinxed, which ought to work in Windows Terminal, but nobody has
+confirmed it. There's a [Scoop](https://scoop.sh) manifest in `packaging/` if
+you'd like to be the one who finds out — `scoop install chkiss/vimny`. Please
+[open an issue](https://github.com/chkiss/Vimny/issues) either way.
 
 </details>
 
@@ -342,6 +376,7 @@ vimny/                     Everything importable lives under one package
   art/                     Wizard art, poems, the word pools
   tools/                   Offline audits (cheese, par)
 tests/                     pytest test suite
+packaging/                 Release runbook, Homebrew formula, Scoop manifest
 docs/ARCHITECTURE.md       The canonical reference: architecture, laws, conventions
 docs/AUTHORING.md          Writing a level, in the forge or in an editor
 docs/SPEC.md               Design vision, UI spec, forward-looking notes

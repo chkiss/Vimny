@@ -11,6 +11,9 @@ requires-python = ">=3.9"
 license         = { text = "GPL-3.0-or-later" }
 authors         = [{ name = "Chas Kissick" }]
 keywords        = ["vim", "game", "dungeon-crawler", "tui", "teaching"]
+# Don't pin wcwidth<0.8 to save its ~5 MB of Unicode tables: blessed 1.45+
+# requires wcwidth>=0.8.1, so the pin silently freezes blessed at 1.44 and
+# forfeits its terminal-compatibility fixes. See packaging/README.md.
 dependencies    = ["blessed"]
 
 classifiers = [
@@ -21,7 +24,15 @@ classifiers = [
     "Programming Language :: Python :: 3",
     "Topic :: Games/Entertainment :: Puzzle Games",
     "Topic :: Education",
+    "Operating System :: POSIX :: Linux",
+    "Operating System :: MacOS :: MacOS X",
 ]
+
+[project.urls]
+Homepage      = "https://github.com/chkiss/Vimny"
+Repository    = "https://github.com/chkiss/Vimny"
+Issues        = "https://github.com/chkiss/Vimny/issues"
+"Level shelf" = "https://github.com/chkiss/vimny-levels"
 
 [project.scripts]
 vimny = "vimny.game:main"

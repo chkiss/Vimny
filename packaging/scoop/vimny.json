@@ -1,0 +1,51 @@
+{
+    "version": "1.0.0",
+    "description": "A dungeon crawler that teaches Vim through play (WINDOWS SUPPORT IS UNTESTED)",
+    "homepage": "https://github.com/chkiss/Vimny",
+    "license": "GPL-3.0-or-later",
+    "notes": [
+        "Windows support is UNTESTED. Vimny is developed on Linux and macOS.",
+        "blessed talks to the Windows console through jinxed, so it is expected",
+        "to work in Windows Terminal, but nobody has confirmed it. If it renders",
+        "wrong, please open an issue: https://github.com/chkiss/Vimny/issues",
+        "",
+        "Use Windows Terminal, not the legacy conhost console: Vimny needs a",
+        "window at least 80 columns wide and 24-bit colour."
+    ],
+    "depends": "python",
+    "suggest": {
+        "Terminal": "extras/windows-terminal"
+    },
+    "installer": {
+        "script": [
+            "python -m pip install --upgrade --target \"$dir\\lib\" vimny==$version"
+        ]
+    },
+    "uninstaller": {
+        "script": [
+            "if (Test-Path \"$dir\\lib\") { Remove-Item -Recurse -Force \"$dir\\lib\" }"
+        ]
+    },
+    "env_add_path": "bin",
+    "bin": [
+        [
+            "bin\\vimny.cmd",
+            "vimny"
+        ]
+    ],
+    "pre_install": [
+        "New-Item -ItemType Directory -Force -Path \"$dir\\bin\" | Out-Null",
+        "Set-Content -Path \"$dir\\bin\\vimny.cmd\" -Value \"@echo off`r`nset PYTHONPATH=%~dp0..\\lib`r`npython -m vimny.game %*\""
+    ],
+    "checkver": {
+        "url": "https://pypi.org/pypi/vimny/json",
+        "jsonpath": "$.info.version"
+    },
+    "autoupdate": {
+        "installer": {
+            "script": [
+                "python -m pip install --upgrade --target \"$dir\\lib\" vimny==$version"
+            ]
+        }
+    }
+}

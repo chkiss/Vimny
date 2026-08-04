@@ -1,0 +1,28 @@
+# What goes into the source distribution (`python3 -m build --sdist`).
+#
+# The WHEEL is governed by [tool.setuptools] in pyproject.toml and contains only
+# the `vimny` package. This file governs the sdist, which by default sweeps in a
+# good deal more — the test suite, the promo GIF, agent notes — none of which a
+# person installing the game needs to download.
+#
+# Keep the launcher and the licence: `main.py` is how you play from an unpacked
+# tarball, and the GPL requires the licence text to travel with the source.
+
+include LICENSE
+include README.md
+include main.py
+
+recursive-include vimny *.py *.md *.txt
+
+# Development-only — present in the repo, absent from the sdist.
+prune tests
+prune docs
+prune agents
+prune .github
+exclude conftest.py
+exclude CLAUDE.md
+exclude LEVELS_PLAN.md
+exclude SPEC.md
+
+global-exclude *.pyc *.pyo .DS_Store
+global-exclude __pycache__
