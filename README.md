@@ -6,24 +6,9 @@ The floor is made of characters. Walls are the ends of lines. A door opens for t
 
 Every room has a **keystroke budget** to enforce efficiency, and a **par** — the cheapest route that exists. Finishing wins the room; finishing *at par* means you found the way a fluent Vim user would have and fully learned the lesson taught at each dungeon.
 
-```
-┌──────────────────────────────────────────────────────────────────────────────┐
-│  ♥♥♥♥♥░░░░░  The WORD Forge           -- NORMAL --   Budget: 14   Par: 10    │
-├──────────────────────────────────────────────────────────────────────────────┤
-│     0         1         2         3         4         5                      │
-│     |123456789|123456789|123456789|123456789|123456789|1                     │
-│  1 ████████████████████████████████████████████████████████                  │
-│  2 █  @  result=func  (a,b)+val  x=y*2               fn  ██                  │
-│  3 ██████████████████████████████████████████████████████░░                  │
-│  4 ██░░ go  x+=y*2  int[]  main()                        ██                  │
-│  5 ██░░██████████████████████████████████████████████████░░                  │
-│  6 ████████████████████████████████████████████████████████                  │
-│  7 █  if  res  val           output=data[n]._key         ◉█                  │
-│  8 ████████████████████████████████████████████████████████                  │
-├──────────────────────────────────────────────────────────────────────────────┤
-│  W:next-WORD  B:prev-WORD  E:end-WORD  w:next-word  b:prev-word  e:end-word  │
-└──────────────────────────────────────────────────────────────────────────────┘
-```
+![A terminal playing The Character Cataracts. The dungeon floor is written text — "Most files you encounter will be scribed in letters so you can jump quite easily to anything you can type!" — split by rivers of water. The cursor hops from character to character with f, F, t and T, aims at the wrong letter, presses u to snap back (and watches the keystroke count go down again), then reaches the exit at 21 keystrokes against a par of 19.](docs/media/character-cataracts.gif)
+
+*The Character Cataracts, the fourth level. `f`/`F`/`t`/`T` jump to a character you can see; the water is impassable, so you aim rather than walk. This run misfires once, takes it back with `u`, and clears the room at 21 against a par of 19 — a win, but only one of the two stars.*
 
 ## How it works
 
