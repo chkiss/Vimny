@@ -39,7 +39,7 @@ Editing reflows the line exactly as Vim does: insert, delete or paste and the re
 
 ## Play it
 
-Requirements are just Python 3.9+ and a terminal at least 80 columns wide. Linux, macOS and Windows.
+Requirements are just Python 3.9+ and a terminal at least 80 columns wide — on Linux, macOS, or Windows Terminal. The playfield grows with the window up to 189 columns, which the overworld and The Archivist's Library use, and stops widening there.
 
 ```bash
 uvx vimny
@@ -54,7 +54,7 @@ vimny
 
 Requires [pip](https://pip.pypa.io/) and Python 3.9+.
 
-Progress saves to `~/.Vimny/saves/<player>.json`, one file per player.
+Progress saves to `~/.Vimny/saves/<player>.json` (`%USERPROFILE%\.Vimny\saves\` on Windows), one file per player.
 
 <details>
 <summary>Playing from a clone</summary>
@@ -81,18 +81,6 @@ py -m vimny
 
 `py main.py` works too. `--depth 1` skips 13 MB of history — drop it if you
 intend to send a pull request.
-
-</details>
-
-<details>
-<summary>Terminal size and Windows</summary>
-
-The playfield grows with the window up to **189 columns** — the overworld and
-The Archivist's Library use the extra width — and stops widening beyond that.
-80 columns is the supported minimum.
-
-On Windows, use Windows Terminal, and read `~/` above as
-`%USERPROFILE%\` — saves land in `%USERPROFILE%\.Vimny\saves\`.
 
 </details>
 
