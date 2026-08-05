@@ -39,7 +39,7 @@ Editing reflows the line exactly as Vim does: insert, delete or paste and the re
 
 ## Play it
 
-Requirements are just Linux or macOS, Python 3.9+, and a terminal at least 80 columns wide. Windows is untested.
+Requirements are just Python 3.9+ and a terminal at least 80 columns wide. Linux, macOS and Windows.
 
 ```bash
 uvx vimny
@@ -59,16 +59,28 @@ Progress saves to `~/.Vimny/saves/<player>.json`, one file per player.
 <details>
 <summary>Playing from a clone</summary>
 
-To read or change the code, skip the packaged install:
+To read or change the code, skip the packaged install.
+
+**Linux / macOS**
 
 ```bash
 git clone --depth 1 https://github.com/chkiss/Vimny.git
 cd Vimny
-pip install blessed
+python3 -m pip install blessed
 python3 main.py
 ```
 
-`--depth 1` skips 13 MB of history. Drop it if you intend to send a pull request.
+**Windows** (in Windows Terminal)
+
+```powershell
+git clone --depth 1 https://github.com/chkiss/Vimny.git
+cd Vimny
+py -m pip install blessed
+py -m vimny
+```
+
+`py main.py` works too. `--depth 1` skips 13 MB of history — drop it if you
+intend to send a pull request.
 
 </details>
 
@@ -79,9 +91,8 @@ The playfield grows with the window up to **189 columns** — the overworld and
 The Archivist's Library use the extra width — and stops widening beyond that.
 80 columns is the supported minimum.
 
-Vimny reaches the console through blessed and jinxed, which ought to work in
-Windows Terminal (untested). Try `pip install vimny` and submit an
-[issue](https://github.com/chkiss/Vimny/issues) if that leads to an error.
+On Windows, use Windows Terminal, and read `~/` above as
+`%USERPROFILE%\` — saves land in `%USERPROFILE%\.Vimny\saves\`.
 
 </details>
 
@@ -321,6 +332,7 @@ Vimny aims for Vim-faithfulness in everything it *does* implement, but some comm
 ```
 main.py                    Launcher — `python3 main.py` and nothing else
 vimny/                     Everything importable lives under one package
+  __main__.py              The same launcher, for `python3 -m vimny`
   game.py                  Game loop, run_dungeon / run_overworld, the forge
   engine/
     world.py               Room, Dungeon, Entity, CharRun, CellType, Seal

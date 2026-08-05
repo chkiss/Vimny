@@ -11223,7 +11223,10 @@ def run_overworld(term: Terminal, player: Player, progress: dict,
 # ── Main ───────────────────────────────────────────────────────────────────────
 
 def main():
-    ap = argparse.ArgumentParser(description='Vimny — Vim dungeon crawler')
+    # prog is pinned: argparse otherwise names whichever file was invoked, so
+    # `-m vimny` advertises itself as `__main__.py`.
+    ap = argparse.ArgumentParser(prog='vimny',
+                                 description='Vimny — Vim dungeon crawler')
     ap.add_argument('--level', type=str, default=None,
                     choices=[lv['slug'] for lv in LEVELS],
                     help='skip overworld and start at this level slug (debug)')

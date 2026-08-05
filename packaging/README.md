@@ -2,31 +2,8 @@
 
 How Vimny is released. Nothing here is needed to play the game or work on it.
 
-**PyPI is the only distribution channel**, and it covers Linux and macOS
-equally: `uvx vimny`, or `pipx install vimny`. uv fetches its own Python, so
-neither platform needs one preinstalled.
-
-A Homebrew tap and a Scoop bucket were written and then dropped: both install
-*from* PyPI, so neither reaches a user that `uvx` doesn't, and both add a
-per-release chore plus a build that has to be verified on a machine we don't
-have. If someone wants to maintain a tap, `git log -- packaging/` has the
-formula with working hashes.
-
-## Why no macOS .app / Windows .exe
-
-A frozen bundle (PyInstaller and friends) is the obvious "one-click" answer and
-the wrong one here:
-
-- Vimny is a **TUI**. A `.app` cannot render it — the bundle's only job would be
-  to shell out to Terminal.app, with no control over the 80-column minimum and
-  none of the user's shell configuration.
-- An unsigned bundle on Apple Silicon does not warn, it **refuses**. Clearing
-  that needs an Apple Developer account (~$99/yr) plus notarization in CI.
-- The audience for a double-clickable icon is people who avoid terminals, who
-  are not the people learning Vim.
-
-If the goal is ever to reach genuinely non-terminal users, the answer is a
-browser-playable demo, not a bundle.
+PyPI is the only channel: `uvx vimny`, `pipx install vimny`, or `pip install
+vimny`. Linux, macOS and Windows.
 
 ## Release runbook
 
@@ -38,30 +15,30 @@ browser-playable demo, not a bundle.
    python3 -m build
    python3 -m twine check dist/*
    ```
-   The sdist should be ~660 KB with no `tests/`, `docs/` or `agents/`
-   (`MANIFEST.in` prunes them), and the wheel should claim exactly one
-   top-level name: `vimny`.
+   Expect an sdist of ~660 KB with no `tests/`, `docs/` or `agents/`
+   (`MANIFEST.in` prunes them), and a wheel claiming one top-level name:
+   `vimny`.
 
 3. **Tag and push.** `.github/workflows/release.yml` builds, runs the suite,
-   checks the tag against `pyproject.toml`, and only then publishes:
+   checks the tag against `pyproject.toml`, then publishes:
    ```bash
    git tag v1.2.3 && git push origin v1.2.3
    ```
-   No API token exists: the workflow uses PyPI Trusted Publishing, so GitHub
-   mints a short-lived credential per run.
 
-   **PyPI never permits re-uploading a version.** A bad release is fixed by
-   bumping the version, not by overwriting.
-
-4. **Confirm** the install a stranger would do:
+4. **Confirm.**
    ```bash
    uvx vimny
    ```
 
+**PyPI never permits re-uploading a version.** Fix a bad release by bumping the
+version.
+
 ## Trusted publishing
 
-Configured once at <https://pypi.org/manage/account/publishing/>. All five
-fields must match exactly or the credential mint fails:
+The workflow authenticates by OIDC — no API token exists anywhere in this repo
+or its settings. Registered once at
+<https://pypi.org/manage/account/publishing/>; all five fields must match or the
+credential mint fails:
 
 | Field | Value |
 |---|---|
@@ -77,17 +54,28 @@ fields must match exactly or the credential mint fails:
   the publish job.
 - **`File already exists`** — bump the version and tag again.
 
-## Don't pin wcwidth
+## Constraints
 
-An install is ~12 MB, over half of it `wcwidth`'s Unicode tables. `wcwidth<0.8`
-cuts that to ~5.2 MB with a green suite — but blessed 1.45+ requires
-`wcwidth>=0.8.1`, so the pin backtracks blessed to 1.44 and freezes it there,
-trading terminal-compatibility fixes for disk. It also saves only ~215 KB of
-*download*; the rest is bytecode built locally. Tried, reverted, not worth it.
+- **Don't pin `wcwidth<0.8`.** It cuts the ~12 MB install to ~5.2 MB, but
+  blessed 1.45+ requires `wcwidth>=0.8.1`, so the pin freezes blessed at 1.44.
+  Saves only ~215 KB of download; the rest is locally-built bytecode.
+- **Keep the GitHub Actions current.** They are pinned by major version and go
+  stale when GitHub retires a Node runtime; a stale action fails the release.
 
 ## Windows
 
-**Untested.** blessed reaches the Windows console through `jinxed`, so Vimny is
-expected to work in Windows Terminal, but no one has confirmed it. `pip install
-vimny` is the path to try. Treat the first Windows bug report as new
-information, not a regression.
+Confirmed working by a player, 2026-08-05. `pip install vimny` then `vimny`;
+from a clone, `py main.py` or `py -m vimny`.
+
+CI does not build on Windows and nobody develops there, so it rests on one
+report.
+
+## Not doing
+
+- **Homebrew tap / Scoop bucket** — written and dropped. Both install from
+  PyPI, so neither reaches anyone `uvx` doesn't. `git log -- packaging/` has the
+  formula with working hashes.
+- **Frozen `.app` / `.exe`** (PyInstaller and friends) — a bundle can't render a
+  TUI; it would only shell out to a terminal it doesn't control. Signing for
+  Apple Silicon also needs a $99/yr developer account. For non-terminal users
+  the answer is a browser build, not a bundle.
