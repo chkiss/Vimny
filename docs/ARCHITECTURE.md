@@ -33,6 +33,8 @@ Admin features: `:edit` enters editor mode on any dungeon; `:save <name>` writes
 | `vimny/art/vocab_plain.txt` | Vocabulary source: typable-only tokens, each a SINGLE w-word (no internal word-class break — enforced by `_gen_runes.py` verify); use for non-word-boundary levels |
 | `vimny/art/vocab_mixed.txt` | Vocabulary source: tokens with an untypable symbol and/or an internal `w`/`b`/`e` break (typable punctuation like `:`/`^` breaks too — `:map` lives here). The untypable symbols are all PUNCTUATION in vim, so symbol-adjacent-to-letter breaks the word, while an adjacent symbol run is one punctuation word. Use for levels teaching small-word vs WORD |
 | `vimny/art/_gen_runes.py` | Generator for both vocab files — edit this, not the txt files directly |
+| `vimny/web_terminal.py` | The browser build's blessed stand-in — `install(io)` registers it under blessed's own name in `sys.modules`. See `web/README.md` |
+| `web/` | The browser build: Pyodide in a Web Worker, xterm.js on the page. `./web/build.sh` then `./web/serve.py` |
 
 ## Rune scatter (generation)
 - **Glyph source of truth**: `vimny/generation/room_gen.RUNE_CHAR` (kind → glyph); `dungeon_gen` imports it as `_RUNE_CHAR`. Rune run length is normalized to **1.._RUNE_MAX_LEN (=7) for every kind** via `_make_rune_syms`.
@@ -267,6 +269,7 @@ The per-level `_par_<slug>` solvers compute each dungeon's minimum-keystroke par
 - File I/O tests: `monkeypatch.setattr('save.save_manager.SAVES_DIR', tmp_path)` to avoid touching `~/.Vimny`.
 - Motion/editor tests: build a minimal `Room` fixture with `rebuild_indexes()` rather than using a full dungeon.
 - Key files: `tests/test_counting_crypts.py` (template for level tests), `vimny/engine/motion.py` and `vimny/engine/editor.py` (source for motion/editor tests).
+- **Browser-build tests run in a SUBPROCESS.** `web_terminal.install()` swaps `blessed` in `sys.modules`, and `vimny.game` binds `Terminal` at import — so the swap only takes in a process where nothing has imported the real blessed yet. `tests/test_web_terminal.py` unit-tests the shim in-process and shells out to `tests/_web_smoke.py` (underscore = not collected) for the end-to-end play-a-level check. The browser half is `web/test/smoke.mjs`, which is NOT part of the pytest suite: it needs node and a Chromium.
 - **The dummy dungeon is a coverage invariant, not a level.** `build_dungeon_dummy` is a labelled showroom (west) plus a blank editing yard (east), and `tests/test_dummy_dungeon.py` asserts it holds ONE specimen of every `CellType`, every entity kind, every rune kind, and every glyph-CHANGING entity tag — guarded in both directions, so a new kind fails the suite until it is both placed and declared. Tags that only change behaviour (the warden ranks) are deliberately excluded: they all paint the same `W`. Two structural facts the layout depends on: label text lives in WALL cells (uncuttable, skipped by the floor text scans, so a stray `dd` cannot wipe a sign), and cols 1-3 are a floor SPINE without which those stone label rows would split the showroom into disconnected strips. Jails are stone on three sides with a `door` on the fourth — `apply_stone_fog` sees past a door so the specimen is on display, and `_steppable` refuses any cell holding an entity so the occupant can never cross it; the cage holds for exactly the reason the fog clears.
 
 ## Licensing

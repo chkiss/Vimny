@@ -9,3 +9,9 @@ dist/
 CLAUDE.md
 agents/
 *.swp
+
+# Browser build: other people's release artifacts (~17 MB) plus the wheel
+# build.sh makes. Reproduced by `./web/build.sh`, so nothing here is worth
+# committing.
+web/vendor/
+web/node_modules/

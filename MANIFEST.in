@@ -19,6 +19,7 @@ prune tests
 prune docs
 prune agents
 prune .github
+prune web
 exclude conftest.py
 exclude CLAUDE.md
 exclude LEVELS_PLAN.md
