@@ -89,10 +89,24 @@ async function boot(base, wheels, saved) {
   }
 
   status('Starting…');
-  const bootPy = await (await fetch(`${base}py/boot.py`)).text();
+  bootSource = await (await fetch(`${base}py/boot.py`)).text();
   self.postMessage({ type: 'ready' });
+  await runGame();
+}
+
+// `:q` RETURNS from main() — it does not kill anything. On a terminal that
+// hands you back your shell; here it would leave a blank page that looks like a
+// crash, so the page is told, and can offer to start again.
+//
+// Restarting re-runs boot.py in this same interpreter, which is why boot.py has
+// to be idempotent: a second Pyodide boot would be another 6 seconds and
+// another 9 MB of parsing for something the player experiences as "play again".
+let bootSource = '';
+
+async function runGame() {
   try {
-    await self.pyodide.runPythonAsync(bootPy);
+    await self.pyodide.runPythonAsync(bootSource);
+    self.postMessage({ type: 'exited' });
   } catch (err) {
     self.postMessage({ type: 'error', data: String(err) });
   }
@@ -100,6 +114,12 @@ async function boot(base, wheels, saved) {
 
 self.onmessage = (event) => {
   const msg = event.data;
+  // Only reachable once the game has returned: while it runs this thread is
+  // parked in Atomics.wait and messages simply queue.
+  if (msg.type === 'restart') {
+    runGame();
+    return;
+  }
   if (msg.type !== 'init') return;
   ctrl = new Int32Array(msg.ctrl);
   geom = new Int32Array(msg.geom);

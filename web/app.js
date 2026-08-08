@@ -7,6 +7,16 @@ const KEY_CAPACITY = 4096;            // UTF-16 code units in flight at once
 const CTRL_FLAG = 0, CTRL_LEN = 1, CTRL_DATA = 2;
 const SAVE_KEY = 'vimny:saves';       // the whole ~/.Vimny tree, as JSON
 
+// What the game needs to draw itself. 80 columns is its documented minimum;
+// 45 ROWS is the title screen's — measured, not guessed: at 45 the menu
+// (`:e saves/`, `:enew`, `quit`) is on screen and at 42 it is not, because the
+// logo and the wizard fill the terminal and the menu falls off the bottom. A
+// browser window is much shorter than a full-screen terminal — a 1366x768
+// laptop is about 35 rows — so without this a first-time visitor gets a title
+// screen with nothing to select.
+const MIN_ROWS = 45, MIN_COLS = 80;
+const MAX_FONT = 15, MIN_FONT = 8;
+
 const el = (id) => document.getElementById(id);
 
 function fail(message, detail) {
@@ -54,12 +64,31 @@ async function start() {
   const ctrl = new Int32Array(ctrlBuf);
   const geom = new Int32Array(geomBuf);
 
-  const publishSize = () => {
+  // Shrink the type until the game fits, rather than cropping the game. Only
+  // if even MIN_FONT cannot manage it do we fall back to telling the player.
+  const fitToGame = () => {
+    let size = MAX_FONT;
+    for (;;) {
+      term.options.fontSize = size;
+      fit.fit();
+      if ((term.rows >= MIN_ROWS && term.cols >= MIN_COLS) || size <= MIN_FONT) break;
+      size -= 1;
+    }
     Atomics.store(geom, 0, term.rows);
     Atomics.store(geom, 1, term.cols);
-    el('too-narrow').hidden = term.cols >= 80;
+
+    const short = [];
+    if (term.cols < MIN_COLS) short.push(`${MIN_COLS} columns`);
+    if (term.rows < MIN_ROWS) short.push(`${MIN_ROWS} rows`);
+    const banner = el('too-narrow');
+    banner.hidden = short.length === 0;
+    if (short.length) {
+      banner.textContent =
+        `Window is too small — Vimny needs ${short.join(' and ')} ` +
+        `(this one is ${term.cols}x${term.rows}). Try a bigger window or zooming out.`;
+    }
   };
-  publishSize();
+  fitToGame();
 
   // Keystrokes queue here whenever the shared slot is still full — the worker
   // may be mid-frame. Dropping them instead would eat input from anyone typing
@@ -119,6 +148,11 @@ async function start() {
           console.warn('[vimny] could not save:', err);   // private mode, or full
         }
         break;
+      case 'exited':
+        // `:q` returns from main() rather than killing anything. Say so —
+        // an untouched black rectangle reads as a crash.
+        el('exited').hidden = false;
+        break;
       case 'warn':   console.warn('[vimny]', msg.data); break;
       case 'error':
         fail('Vimny stopped.', msg.data);
@@ -144,6 +178,13 @@ async function start() {
     saved,
   });
 
-  window.addEventListener('resize', () => { fit.fit(); publishSize(); });
+  el('play-again').addEventListener('click', () => {
+    el('exited').hidden = true;
+    term.reset();                     // the quit cleared the alt screen
+    worker.postMessage({ type: 'restart' });
+    term.focus();
+  });
+
+  window.addEventListener('resize', fitToGame);
   el('terminal').addEventListener('click', () => term.focus());
 }

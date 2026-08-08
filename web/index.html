@@ -39,6 +39,13 @@
   @keyframes spin { to { transform: rotate(360deg); } }
   @media (prefers-reduced-motion: reduce) { .spinner { animation: none; } }
   .hint { font-size: .8rem; color: #6c6c84; max-width: 34rem; }
+  #exited-title { font-size: 1.1rem; }
+  #play-again {
+    justify-self: center; font: inherit; font-size: .85rem;
+    padding: .4rem 1.1rem; border: 1px solid #3a3a52; border-radius: 3px;
+    background: #16162a; color: #c8c8d4; cursor: pointer;
+  }
+  #play-again:hover { background: #20203a; border-color: #55557a; }
   #failure-message { color: #d88; }
   #failure-detail  { font-family: monospace; font-size: .75rem; color: #887; max-width: 46rem; }
   #too-narrow {
@@ -66,6 +73,12 @@
     <p class="hint">Vimny runs entirely in this tab — Python compiled to
        WebAssembly. The first load fetches about 9 MB and is cached afterwards.
        Nothing is uploaded; your progress is saved in this browser.</p>
+  </div>
+
+  <div class="overlay" id="exited" hidden>
+    <div id="exited-title">You quit Vimny.</div>
+    <p class="hint">Your progress is saved in this browser.</p>
+    <button id="play-again" type="button">Play again</button>
   </div>
 
   <div class="overlay" id="failure" hidden>

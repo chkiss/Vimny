@@ -32,6 +32,7 @@ import vimny.render.symbols as S
 import vimny.render.netrw_chrome as NC
 from vimny.content.levels import is_unlocked, level_type, key_for_slug
 from vimny.render.utils import inner_w as _iw, subtree_lines, tree_glyph
+import vimny.features as FEAT
 
 
 def build_lines(levels: list, custom_layouts: list, community: list = (),
@@ -52,7 +53,10 @@ def build_lines(levels: list, custom_layouts: list, community: list = (),
     lines += subtree_lines('custom/', custom_layouts, 'custom', 'layout')
     lines += subtree_lines('community/', list(community), 'community', 'shelf')
     # forge/ is last: it is the only section that is not something to PLAY.
-    lines += subtree_lines('forge/', list(drafts), 'draft', 'draft')
+    # A build without the forge does not list it at all — an empty directory
+    # that refuses to open is worse than no directory.
+    if FEAT.FORGE:
+        lines += subtree_lines('forge/', list(drafts), 'draft', 'draft')
     return lines
 
 

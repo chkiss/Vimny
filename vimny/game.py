@@ -95,6 +95,7 @@ import vimny.generation.dungeon_gen as _dg
 from vimny.generation.room_gen import RUNE_CHAR as _RUNE_CHAR
 from vimny.content.levels import LEVELS, is_unlocked, level_type, known_commands as _known_commands
 import vimny.save.save_manager as SM
+import vimny.features as FEAT
 
 
 _WATER_SETTLE_SECS = 60   # stop animating water after this many idle seconds
@@ -11177,7 +11178,9 @@ def run_overworld(term: Terminal, player: Player, progress: dict,
         if raw == '-':
             return _done({'action': 'parent_view', 'cursor': nav.cursor})
         elif raw == '%':                               # netrw new file — a new draft
-            if player.name == 'admin':
+            if not FEAT.FORGE:
+                player.error = FEAT.message('compose levels')
+            elif player.name == 'admin':
                 renaming, naming_new = '', True
             else:
                 player.error = 'Only the admin can forge new levels.'

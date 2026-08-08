@@ -75,13 +75,41 @@ computing is on the player's machine, however many players there are.
 ## Testing
 
 ```bash
-python3 -m pytest tests/test_web_terminal.py     # the shim, no browser needed
-npm i puppeteer-core && node web/test/smoke.mjs  # the real thing, headless Chromium
-node web/test/probe.mjs                          # geometry diagnostics
+python3 -m pytest tests/test_web_terminal.py       # the shim, no browser needed
+npm i puppeteer-core
+node web/test/smoke.mjs                            # does the game work
+node web/test/lifecycle.mjs                        # what happens at the edges
+node web/test/probe.mjs                            # geometry diagnostics
 ```
 
-`smoke.mjs` starts its own server, plays through the title screen into The
-First Cave, types at it, and checks the save survives a reload.
+`smoke.mjs` plays through the title screen into The First Cave, types at it, and
+checks the save survives a reload. `lifecycle.mjs` covers what a terminal player
+cannot do: quit and restart, reload mid-game, a second tab, a hidden tab,
+resizing to a laptop and to something impossible. Both start their own server.
+
+## Deliberately not in the browser build
+
+Turned off in `web/py/boot.py` via `vimny/features.py`, because each would
+otherwise fail in a way that reads as a bug rather than a boundary:
+
+- **The forge.** Authoring ends in `:submit`, which needs a browser tab Vimny
+  cannot open from a worker and writes a file into a virtual filesystem the
+  author cannot reach. `forge/` is not listed, and `%` says
+  *"Not in the browser build — `pip install vimny` to compose levels."*
+- **The community shelf.** Its HTTPS fetch dies on `RuntimeError: TLS not
+  supported in this environment` — WebAssembly Python has no TLS. The shelf
+  browser already displays a one-line reason when it has nothing, so `boot.py`
+  gives it that sentence rather than teaching the overworld a new refusal.
+  Curated levels can be served from this origin later, when there are some.
+
+## Window size
+
+The game needs **80x45 characters**. 80 columns is documented; 45 rows is the
+title screen's requirement — measured, not guessed: at 45 the menu is on screen
+and at 42 it is not, because the logo and the wizard push it off the bottom. A
+browser window is far shorter than a full-screen terminal (a 1366x768 laptop is
+about 35 rows at 15px), so `app.js` shrinks the font until the game fits and
+only warns if even 8px cannot manage it.
 
 ## Web vs the terminal build
 
@@ -122,4 +150,9 @@ the shim in plain CPython: `python3 -m pytest tests/test_web_terminal.py`.
 - **Saves are per-browser**, in `localStorage`, and a player clearing site data
   clears their progress. There is no account and nothing leaves the machine.
 - **First load is ~9 MB** (about a second on fibre, ~6 s on 10 Mbps), cached
-  afterwards.
+  afterwards. A restart after `:q` re-runs `boot.py` in the same interpreter and
+  takes ~0.3 s.
+- **No service worker**, so an offline reload depends on the HTTP cache rather
+  than on anything deliberate. Not offline-first.
+- **Mobile has no keyboard.** The game is unplayable on a phone; nothing warns
+  about that yet.
