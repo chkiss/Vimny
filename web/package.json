@@ -1,0 +1,23 @@
+{
+  "name": "vimny-web",
+  "version": "1.0.0",
+  "description": "Vimny in the browser: the same vimny wheel compiled to WebAssembly (Pyodide), drawing into xterm.js.",
+  "main": "app.js",
+  "directories": {
+    "test": "test"
+  },
+  "scripts": {
+    "test": "node test/smoke.mjs"
+  },
+  "keywords": [
+    "vim",
+    "game",
+    "pyodide",
+    "terminal"
+  ],
+  "author": "Chas Kissick",
+  "license": "GPL-3.0-or-later",
+  "dependencies": {
+    "puppeteer-core": "^25.5.0"
+  }
+}
