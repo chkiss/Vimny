@@ -83,11 +83,39 @@ node web/test/probe.mjs                          # geometry diagnostics
 `smoke.mjs` starts its own server, plays through the title screen into The
 First Cave, types at it, and checks the save survives a reload.
 
+## Web vs the terminal build
+
+The browser build runs the **same `vimny` wheel** — Pyodide executes the
+identical game logic, level builders, pars, and command curriculum as the
+terminal version, so a level you cannot clear here, you could not clear there
+either. The only differences live at the input and persistence boundary:
+
+- **Gameplay is identical.** Every `term.*` call the game makes — truecolor,
+  alt-screen, cursor hiding, geometry — is implemented in `web_terminal.py`, so
+  there is no gameplay gap between the two builds.
+- **`<C-w>` was the one real input delta.** The terminal version receives
+  Ctrl-W freely; the browser did not, until `app.js` began intercepting the
+  keydown (above). All other control keys — `<C-v>`, `<C-r>`, `<C-d>`,
+  `<C-u>`, `<C-o>`, `<C-f>`/`<C-b>` — come through in both.
+- **Saves are per-browser, not on disk.** The terminal build writes real files
+  to `~/.Vimny/saves/*.json`. The web build writes to the Pyodide FS, which the
+  worker mirrors to `localStorage['vimny:saves']`. The save schema is the same,
+  but a player clearing site data loses progress, and there is no cross-device
+  sync.
+- **First load is ~9 MB** of Pyodide/wasm (cached afterwards) — a one-time web
+  tax the terminal build does not pay.
+
+To exercise the port end-to-end without a browser, drive the real game through
+the shim in plain CPython: `python3 -m pytest tests/test_web_terminal.py`.
+
 ## Known limitations
 
-- **`<C-w>` never arrives.** Chrome will not let a page intercept it. It is an
-  insert-mode convenience that no level requires, and everything else —
-  `<C-v>`, `<C-r>`, `<C-d>` — comes through.
+- **`<C-w>` is intercepted.** Chrome will not let xterm.js see Ctrl-W (it closes
+  the tab), so `app.js` catches the keydown, `preventDefault`s it, and feeds the
+  game the byte it expects (`\x17`). That enables insert-mode `<C-w>` (delete
+  word back) and `<C-r><C-w>` (insert word under cursor) — both optional relic
+  scrolls, required by no level. It is only active once the game is up; on the
+  loading or failure overlay Ctrl-W reverts to its browser default.
 - **Fonts are the browser's.** Vimny picks glyphs by measured width, so a font
   without the box-drawing or rune characters degrades rather than breaks, but
   it will not look like the terminal build.

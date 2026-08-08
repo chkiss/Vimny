@@ -82,6 +82,21 @@ async function start() {
   term.onData((data) => { pending += data; flush(); });
   setInterval(flush, 16);          // drains whatever the worker was too busy to take
 
+  // Ctrl-W is reserved by the browser to close the tab, so xterm.js never
+  // receives it and the game sees nothing. Intercept it at the keydown level,
+  // stop the default, and hand the game the byte it expects ('\x17') — that is
+  // insert-mode <C-w> (delete word back) and <C-r><C-w> (insert word under
+  // cursor). Only act once the game is up; never swallow Ctrl-W on the failure
+  // or loading overlays.
+  window.addEventListener('keydown', (e) => {
+    if (!e.ctrlKey || e.altKey || e.metaKey) return;
+    if (e.key !== 'w' && e.key !== 'W' && e.code !== 'KeyW') return;
+    if (!el('loading').hidden || !el('failure').hidden) return;
+    e.preventDefault();
+    pending += '\x17';
+    flush();
+  });
+
   const worker = new Worker('worker.js', { type: 'module' });
   worker.onmessage = ({ data: msg }) => {
     if (msg.type !== 'out') console.debug('[vimny]', msg.type, msg.data ?? '');
