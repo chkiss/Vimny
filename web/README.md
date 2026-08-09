@@ -17,6 +17,7 @@ once the page loads, everything happens in the tab.
 | `web/worker.js` | Runs Pyodide in a Web Worker. Owns the blocking read. |
 | `web/py/boot.py` | Binds the shim to the page and starts the game. |
 | `web/app.js` | The page: xterm.js, the keyboard, and storage. |
+| `web/subset_fonts.py` | Cuts three fonts down to the characters Vimny draws. |
 | `web/serve.py` | Dev server with the two headers this needs. |
 
 Three things make it work, and each is the answer to a problem that has no
@@ -62,30 +63,46 @@ location / {
     add_header Cross-Origin-Opener-Policy   same-origin;
     add_header Cross-Origin-Embedder-Policy require-corp;
 
-    # The wasm is 9 MB and the stdlib 2.5 MB. Compress once, cache hard —
-    # the filenames are version-stamped by build.sh's manifest.
+    # The wasm is 9 MB and the stdlib 2.5 MB. Compress once, cache hard.
     gzip_static on;
-    types { application/wasm wasm; }
+    types { application/wasm wasm; font/woff2 woff2; }
 }
 ```
 
 Server load is a rounding error: it serves static files and nothing else. The
 computing is on the player's machine, however many players there are.
 
+One caching caveat: the font subsets are not version-stamped, and they change
+whenever a rune joins the game. Either serve `vendor/fonts/` with a short
+max-age, or purge it on deploy.
+
 ## Testing
 
 ```bash
 python3 -m pytest tests/test_web_terminal.py       # the shim, no browser needed
-npm i puppeteer-core
-node web/test/smoke.mjs                            # does the game work
-node web/test/lifecycle.mjs                        # what happens at the edges
-node web/test/probe.mjs                            # geometry diagnostics
+cd web && npm i
+node test/smoke.mjs                                # does the game work
+node test/lifecycle.mjs                            # what happens at the edges
+node test/saves.mjs                                # progress in and out, ?level=, mobile
+DISPLAY=:0 node test/keys.mjs                      # control keys, in a real window
+node test/probe.mjs                                # geometry diagnostics
 ```
 
-`smoke.mjs` plays through the title screen into The First Cave, types at it, and
-checks the save survives a reload. `lifecycle.mjs` covers what a terminal player
-cannot do: quit and restart, reload mid-game, a second tab, a hidden tab,
-resizing to a laptop and to something impossible. Both start their own server.
+Each starts its own server on its own port, so they can run at once.
+
+- `smoke.mjs` plays through the title screen into The First Cave, types at it,
+  and checks the save survives a reload.
+- `lifecycle.mjs` covers what a terminal player cannot do: quit and restart,
+  reload mid-game, a second tab, a hidden tab, resizing to a laptop and to
+  something impossible.
+- `saves.mjs` covers what a browser player has instead of a home directory:
+  export, import, an import that is not a save, a browser that refuses to
+  store, `?level=`, and a phone.
+- `keys.mjs` **needs a display and opens a visible window**, and that is the
+  whole point. Headless Chrome enforces none of the browser's own keyboard
+  shortcuts — no tab to close on Ctrl-W, no find bar on Ctrl-F — so it will
+  cheerfully report that all eight control keys work and be unable to tell you
+  which mechanism made that true. Run headless, it skips itself.
 
 ## Deliberately not in the browser build
 
@@ -111,6 +128,31 @@ browser window is far shorter than a full-screen terminal (a 1366x768 laptop is
 about 35 rows at 15px), so `app.js` shrinks the font until the game fits and
 only warns if even 8px cannot manage it.
 
+## Fonts
+
+Vimny's dungeons are built out of runes from the chess, card, dice, planetary
+and alchemical blocks — `vimny/art/vocab_mixed.txt` is the vocabulary, and a
+missing glyph is a puzzle with a hole in it. A terminal player has a font they
+chose; a visitor gets whatever their browser calls "monospace", which very often
+does not cover those.
+
+So `build.sh` subsets and ships the three faces it takes to cover the 259
+non-ASCII characters in the package, each cut to only what the one before it
+could not supply:
+
+| Face | Source | Glyphs | Size |
+|---|---|---|---|
+| Vimny Mono | DejaVu Sans Mono | 316 | 32 KB |
+| Vimny Runes | Symbola (public domain) | 35 | 4 KB |
+| Vimny Extra | DejaVu Sans | 3 | 4 KB |
+
+The last three are Canadian Syllabics, and exist because of `ᕕ( ᐛ )ᕗ`. Symbola
+carries what DejaVu has no glyph for at all, which is mostly pentagrams,
+trigrams and alchemical fire — 134 uses of `⛧` alone.
+
+`subset_fonts.py` prints anything no bundled font covers, so adding a rune that
+nothing can draw is a build-time complaint rather than a tofu box in a dungeon.
+
 ## Web vs the terminal build
 
 The browser build runs the **same `vimny` wheel** — Pyodide executes the
@@ -121,15 +163,17 @@ either. The only differences live at the input and persistence boundary:
 - **Gameplay is identical.** Every `term.*` call the game makes — truecolor,
   alt-screen, cursor hiding, geometry — is implemented in `web_terminal.py`, so
   there is no gameplay gap between the two builds.
-- **`<C-w>` was the one real input delta.** The terminal version receives
-  Ctrl-W freely; the browser did not, until `app.js` began intercepting the
-  keydown (above). All other control keys — `<C-v>`, `<C-r>`, `<C-d>`,
-  `<C-u>`, `<C-o>`, `<C-f>`/`<C-b>` — come through in both.
+- **Every control key arrives.** `<C-v>`, `<C-r>`, `<C-o>`, `<C-u>`, `<C-d>`,
+  `<C-f>`, `<C-b>` and `<C-w>` all reach the game in a real Chrome window, even
+  though the browser would rather reload, view source, bookmark, find, or close
+  the tab. xterm.js cancels its own shortcut and emits the byte; nothing here
+  intercepts anything. `web/test/keys.mjs` presses all eight.
 - **Saves are per-browser, not on disk.** The terminal build writes real files
   to `~/.Vimny/saves/*.json`. The web build writes to the Pyodide FS, which the
   worker mirrors to `localStorage['vimny:saves']`. The save schema is the same,
-  but a player clearing site data loses progress, and there is no cross-device
-  sync.
+  so **Export save** hands back a file you could drop into `~/.Vimny` — but
+  there is no account and no cross-device sync, and clearing site data without
+  exporting first ends a run.
 - **First load is ~9 MB** of Pyodide/wasm (cached afterwards) — a one-time web
   tax the terminal build does not pay.
 
@@ -138,21 +182,27 @@ the shim in plain CPython: `python3 -m pytest tests/test_web_terminal.py`.
 
 ## Known limitations
 
-- **`<C-w>` is intercepted.** Chrome will not let xterm.js see Ctrl-W (it closes
-  the tab), so `app.js` catches the keydown, `preventDefault`s it, and feeds the
-  game the byte it expects (`\x17`). That enables insert-mode `<C-w>` (delete
-  word back) and `<C-r><C-w>` (insert word under cursor) — both optional relic
-  scrolls, required by no level. It is only active once the game is up; on the
-  loading or failure overlay Ctrl-W reverts to its browser default.
-- **Fonts are the browser's.** Vimny picks glyphs by measured width, so a font
-  without the box-drawing or rune characters degrades rather than breaks, but
-  it will not look like the terminal build.
+- **Ctrl-W closes the tab on any overlay.** While the game has focus xterm.js
+  cancels it; on the loading, failure or quit overlay it does not, so Ctrl-W is
+  the browser's again. That is the right way round — a page you could not close
+  would be worse — but it means Ctrl-W during the 6-second boot ends the visit.
 - **Saves are per-browser**, in `localStorage`, and a player clearing site data
-  clears their progress. There is no account and nothing leaves the machine.
+  clears their progress unless they exported it. There is no account and
+  nothing leaves the machine.
 - **First load is ~9 MB** (about a second on fibre, ~6 s on 10 Mbps), cached
   afterwards. A restart after `:q` re-runs `boot.py` in the same interpreter and
   takes ~0.3 s.
 - **No service worker**, so an offline reload depends on the HTTP cache rather
   than on anything deliberate. Not offline-first.
-- **Mobile has no keyboard.** The game is unplayable on a phone; nothing warns
-  about that yet.
+- **Mobile is turned away, not supported.** A touch device with no fine pointer
+  is told it needs a keyboard before any WebAssembly is fetched — 9 MB over a
+  phone connection for a game that cannot be played is worse than a refusal.
+  "Load it anyway" is there for the tablet with a keyboard attached that guessed
+  wrong.
+
+## URL options
+
+`?level=<slug>` is the desktop build's `--level` debug flag: it skips the title
+screen and starts there, wizard's poem and all. `boot.py` checks the slug
+against the curriculum and says so on the page if it is not one, rather than
+letting argparse exit into a black rectangle.

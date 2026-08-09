@@ -48,6 +48,7 @@ if _FIRST_RUN:
 # Imported AFTER install(), which is the whole trick: `game` binds `Terminal`
 # from `blessed` at import time, and by now `blessed` is the shim.
 import vimny.features as FEAT             # noqa: E402
+from vimny.content.levels import LEVELS   # noqa: E402
 import vimny.save.save_manager as SM      # noqa: E402
 import vimny.sharing.remote as REMOTE     # noqa: E402
 from vimny.game import main               # noqa: E402
@@ -104,5 +105,23 @@ if _FIRST_RUN:
         if hasattr(SM, _name):
             setattr(SM, _name, _persist(getattr(SM, _name)))
 
-sys.argv = ['vimny']
+def _argv() -> list:
+    """`?level=<slug>` — the desktop build's `--level` debug flag.
+
+    Checked here rather than left to argparse: an unknown slug there is a
+    SystemExit with its complaint on a stderr nobody can see, which the page
+    would report as "Vimny stopped". A bad slug is a typo, not a crash, so say
+    so on the page and start the game normally.
+    """
+    slug = str(getattr(js, 'vimnyLevel', '') or '')
+    if not slug:
+        return ['vimny']
+    if slug in {lv['slug'] for lv in LEVELS}:
+        return ['vimny', '--level', slug]
+    js.vimnyNotice(f'No level is called “{slug}” — starting from the title '
+                   f'screen instead.')
+    return ['vimny']
+
+
+sys.argv = _argv()
 main()      # returns on `:q` — the worker tells the page, which offers a restart

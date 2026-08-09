@@ -137,6 +137,15 @@ try {
   })()`);
   check('renders truecolor', coloured);
 
+  // The bundled subsets, not whatever the visitor calls "monospace". Vimny's
+  // runes come out of the chess, dice, planetary and alchemical blocks, and a
+  // font without them draws the puzzle as tofu.
+  const fonts = await page.evaluate(
+    `[document.fonts.check('15px "Vimny Mono"'),
+      document.fonts.check('15px "Vimny Runes"'),
+      window.vimny.term.options.fontFamily.startsWith('"Vimny Mono"')]`);
+  check('uses the bundled font subsets', fonts.every(Boolean), JSON.stringify(fonts));
+
   await page.screenshot({ path: '/tmp/vimny-web-level.png' });
 
   // Saves must survive a reload — that is the IndexedDB mount doing its job.

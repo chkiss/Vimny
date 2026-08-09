@@ -17,6 +17,12 @@ const SAVE_KEY = 'vimny:saves';       // the whole ~/.Vimny tree, as JSON
 const MIN_ROWS = 45, MIN_COLS = 80;
 const MAX_FONT = 15, MIN_FONT = 8;
 
+// Vimny's own subset of DejaVu Sans Mono, with Symbola behind it for the ~35
+// runes DejaVu has no glyph for. Without these the runes and box-drawing are
+// whatever the visitor happens to have installed. See web/subset_fonts.py.
+const FONT_STACK = '"Vimny Mono", "Vimny Runes", "Vimny Extra", ' +
+                   '"DejaVu Sans Mono", "Cascadia Mono", "Menlo", monospace';
+
 const el = (id) => document.getElementById(id);
 
 function fail(message, detail) {
@@ -26,6 +32,119 @@ function fail(message, detail) {
   el('failure-detail').textContent = detail || '';
 }
 
+// A dismissable line for things the page knows and the game cannot say: storage
+// refused a save, `?level=` named nothing, an import landed.
+function notice(text) {
+  el('notice-text').textContent = text;
+  el('notice').hidden = false;
+}
+el('notice-dismiss').addEventListener('click', () => { el('notice').hidden = true; });
+
+// ── Storage ──────────────────────────────────────────────────────────────────
+// Everything the player has done lives in one localStorage key, and there are
+// two ordinary ways to have none: private browsing, and a full quota. Both used
+// to fail into console.warn, which is to say silently — an hour of play thrown
+// away without a word.
+
+let storageBroken = false;            // said once, not once per save
+
+function storageWorks() {
+  try {
+    localStorage.setItem('vimny:probe', '1');
+    localStorage.removeItem('vimny:probe');
+    return true;
+  } catch (err) {
+    return false;
+  }
+}
+
+function readSaves() {
+  try {
+    return localStorage.getItem(SAVE_KEY) || '{}';
+  } catch (err) {
+    return '{}';
+  }
+}
+
+function writeSaves(json) {
+  try {
+    localStorage.setItem(SAVE_KEY, json);
+    return true;
+  } catch (err) {
+    console.warn('[vimny] could not save:', err);
+    if (!storageBroken) {
+      storageBroken = true;
+      notice('This browser will not store your progress — private mode, or ' +
+             'storage is full. You can still play, but nothing is being kept. ' +
+             'Export save downloads what you have so far.');
+    }
+    return false;
+  }
+}
+
+// ── Save export / import ─────────────────────────────────────────────────────
+// The only copy of a browser player's progress is in this origin's
+// localStorage: clearing site data ends it, and it does not follow them to
+// another machine. So let them take it out and put it back — the file is the
+// same {path: contents} tree the worker sends, and the same JSON the terminal
+// build writes to ~/.Vimny.
+
+function exportSave() {
+  const json = readSaves();
+  if (json === '{}') { notice('Nothing to export yet — no progress is stored.'); return; }
+  const stamp = new Date().toISOString().slice(0, 10);
+  const url = URL.createObjectURL(new Blob([json], { type: 'application/json' }));
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `vimny-save-${stamp}.json`;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+// A save file is {absolute path: file contents}. Anything else — an array, a
+// nested object, a JPEG someone renamed — gets refused here rather than
+// half-written into the Pyodide filesystem where it would surface as a Python
+// traceback.
+function validSaveTree(data) {
+  if (!data || typeof data !== 'object' || Array.isArray(data)) return false;
+  const paths = Object.keys(data);
+  if (!paths.length) return false;
+  return paths.every((p) => typeof data[p] === 'string' && p.includes('.Vimny'));
+}
+
+async function importSave(file) {
+  let data;
+  try {
+    data = JSON.parse(await file.text());
+  } catch (err) {
+    notice(`That file is not a Vimny save — ${err.message}.`);
+    return;
+  }
+  if (!validSaveTree(data)) {
+    notice('That file is not a Vimny save: it should be the JSON that ' +
+           '“Export save” produces.');
+    return;
+  }
+  const names = Object.keys(data).length;
+  if (!confirm(`Replace this browser's progress with ${names} file(s) from ` +
+               `${file.name}?\n\nWhatever is stored here now will be lost.`)) return;
+  if (!writeSaves(JSON.stringify(data))) return;
+  // Reload rather than hot-swapping: the worker restores the save tree into the
+  // Pyodide filesystem at boot, and while the game runs it is parked in
+  // Atomics.wait and cannot be told anything.
+  location.reload();
+}
+
+el('export-save').addEventListener('click', exportSave);
+el('import-save').addEventListener('click', () => el('import-file').click());
+el('import-file').addEventListener('change', (e) => {
+  const file = e.target.files[0];
+  e.target.value = '';               // so re-picking the same file fires again
+  if (file) importSave(file);
+});
+
+// ── Gate ─────────────────────────────────────────────────────────────────────
+
 if (!window.crossOriginIsolated) {
   // SharedArrayBuffer is gated on COOP/COEP. Without it the worker cannot block
   // on input, and the whole design falls over — so say so plainly rather than
@@ -33,15 +152,45 @@ if (!window.crossOriginIsolated) {
   fail('This page is not cross-origin isolated.',
        'Vimny needs the COOP and COEP headers to use SharedArrayBuffer. ' +
        'Serve it with web/serve.py, or set those headers on your host.');
+} else if (!hasKeyboard()) {
+  // Say so BEFORE fetching 9 MB of WebAssembly over what is probably a phone
+  // connection. A tablet with a keyboard attached reports fine pointers, so
+  // this asks about the pointer rather than the screen width.
+  el('loading').hidden = true;
+  el('no-keyboard').hidden = false;
+  el('play-anyway').addEventListener('click', () => {
+    el('no-keyboard').hidden = true;
+    el('loading').hidden = false;
+    start();
+  });
 } else {
   start();
+}
+
+function hasKeyboard() {
+  if (!window.matchMedia) return true;
+  const coarse = matchMedia('(any-pointer: coarse)').matches;
+  const fine   = matchMedia('(any-pointer: fine)').matches;
+  const hover  = matchMedia('(any-hover: hover)').matches;
+  return !coarse || fine || hover;
 }
 
 async function start() {
   const manifest = await (await fetch('vendor/manifest.json')).json();
 
+  // The game's own fonts have to be measured before xterm.js sizes a cell off
+  // them, or the first fit() runs against the fallback and every row is wrong.
+  if (document.fonts) {
+    try {
+      await Promise.all([document.fonts.load('15px "Vimny Mono"'),
+                         document.fonts.load('15px "Vimny Runes"')]);
+    } catch (err) {
+      console.warn('[vimny] bundled fonts unavailable:', err);
+    }
+  }
+
   const term = new Terminal({
-    fontFamily: '"DejaVu Sans Mono", "Cascadia Mono", "Menlo", monospace',
+    fontFamily: FONT_STACK,
     fontSize: 15,
     cursorBlink: false,
     // The game draws its own cursor as `@`; a second one blinking over the
@@ -57,7 +206,13 @@ async function start() {
   fit.fit();
   // The handle the smoke test reads the screen through, and the one to reach
   // for in a console when something looks wrong.
-  window.vimny = { term, fit };
+  window.vimny = { term, fit, sent: '' };
+
+  if (!storageWorks()) {
+    notice('This browser will not store your progress — private mode, or ' +
+           'storage is full. You can play, but nothing will be kept when you ' +
+           'close the tab.');
+  }
 
   const ctrlBuf = new SharedArrayBuffer(4 * (CTRL_DATA + KEY_CAPACITY));
   const geomBuf = new SharedArrayBuffer(8);
@@ -103,6 +258,7 @@ async function start() {
     for (let i = 0; i < batch.length; i++) {
       Atomics.store(ctrl, CTRL_DATA + i, batch.charCodeAt(i));
     }
+    window.vimny.sent += batch;      // what the game actually received; web/test/keys.mjs
     Atomics.store(ctrl, CTRL_LEN, batch.length);
     Atomics.store(ctrl, CTRL_FLAG, 1);
     Atomics.notify(ctrl, CTRL_FLAG);
@@ -111,20 +267,13 @@ async function start() {
   term.onData((data) => { pending += data; flush(); });
   setInterval(flush, 16);          // drains whatever the worker was too busy to take
 
-  // Ctrl-W is reserved by the browser to close the tab, so xterm.js never
-  // receives it and the game sees nothing. Intercept it at the keydown level,
-  // stop the default, and hand the game the byte it expects ('\x17') — that is
-  // insert-mode <C-w> (delete word back) and <C-r><C-w> (insert word under
-  // cursor). Only act once the game is up; never swallow Ctrl-W on the failure
-  // or loading overlays.
-  window.addEventListener('keydown', (e) => {
-    if (!e.ctrlKey || e.altKey || e.metaKey) return;
-    if (e.key !== 'w' && e.key !== 'W' && e.code !== 'KeyW') return;
-    if (!el('loading').hidden || !el('failure').hidden) return;
-    e.preventDefault();
-    pending += '\x17';
-    flush();
-  });
+  // Control keys are xterm.js's business, and it is better at it than a hand-
+  // rolled keydown handler: it cancels the browser's own shortcut and emits the
+  // byte, for every combination the game reads — including Ctrl-W, which closes
+  // the tab everywhere else. It also stops propagation, so a window-level
+  // listener never sees these at all. web/test/keys.mjs presses all eight in a
+  // real browser window; headless Chrome enforces none of the shortcuts and so
+  // cannot answer the question.
 
   const worker = new Worker('worker.js', { type: 'module' });
   worker.onmessage = ({ data: msg }) => {
@@ -142,17 +291,14 @@ async function start() {
       case 'persist':
         // The worker cannot store anything itself — see worker.js. Saves are a
         // few KB of JSON, well inside localStorage's budget.
-        try {
-          localStorage.setItem(SAVE_KEY, msg.data);
-        } catch (err) {
-          console.warn('[vimny] could not save:', err);   // private mode, or full
-        }
+        writeSaves(msg.data);
         break;
       case 'exited':
         // `:q` returns from main() rather than killing anything. Say so —
         // an untouched black rectangle reads as a crash.
         el('exited').hidden = false;
         break;
+      case 'notice': notice(msg.data); break;
       case 'warn':   console.warn('[vimny]', msg.data); break;
       case 'error':
         fail('Vimny stopped.', msg.data);
@@ -164,7 +310,7 @@ async function start() {
 
   let saved = {};
   try {
-    saved = JSON.parse(localStorage.getItem(SAVE_KEY) || '{}');
+    saved = JSON.parse(readSaves());
   } catch (err) {
     console.warn('[vimny] stored saves unreadable, starting fresh:', err);
   }
@@ -176,6 +322,10 @@ async function start() {
     ctrl: ctrlBuf,
     geom: geomBuf,
     saved,
+    // The desktop build's `--level <slug>` debug flag, as a query parameter.
+    // boot.py checks the slug against the curriculum and says so if it is not
+    // one, rather than letting argparse exit into a blank screen.
+    level: new URLSearchParams(location.search).get('level'),
   });
 
   el('play-again').addEventListener('click', () => {

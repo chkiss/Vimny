@@ -12,6 +12,8 @@ set -euo pipefail
 PYODIDE_VERSION="314.0.4"
 XTERM_VERSION="6.0.0"
 FIT_VERSION="0.11.0"
+DEJAVU_VERSION="2.37"
+SYMBOLA_FILE="Symbola-13.otf"
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 VENDOR="$ROOT/web/vendor"
@@ -52,6 +54,33 @@ fetch_npm () {           # fetch_npm <package> <version> <file> <dest>
 fetch_npm "@xterm/xterm"      "$XTERM_VERSION" "lib/xterm.js"          "$VENDOR/xterm/xterm.js"
 fetch_npm "@xterm/xterm"      "$XTERM_VERSION" "css/xterm.css"         "$VENDOR/xterm/xterm.css"
 fetch_npm "@xterm/addon-fit"  "$FIT_VERSION"   "lib/addon-fit.js"      "$VENDOR/xterm/addon-fit.js"
+
+# ── Fonts ─────────────────────────────────────────────────────────────────────
+# Vimny's dungeons are built out of runes from the chess, card, dice, planetary
+# and alchemical blocks. A terminal player has a font they chose; a visitor gets
+# whatever their browser calls "monospace", which mostly does not cover those.
+# So subset the three faces it takes to cover the game and ship them.
+FONTS="$VENDOR/fonts"
+FONT_SRC="$VENDOR/font-src"
+if [ ! -f "$FONTS/fonts.css" ]; then
+  mkdir -p "$FONT_SRC"
+  echo "→ dejavu $DEJAVU_VERSION"
+  curl -fsSL -o "$TMP/dejavu.zip" \
+    "https://github.com/dejavu-fonts/dejavu-fonts/releases/download/version_${DEJAVU_VERSION//./_}/dejavu-fonts-ttf-${DEJAVU_VERSION}.zip"
+  unzip -qo "$TMP/dejavu.zip" -d "$TMP"
+  cp "$TMP/dejavu-fonts-ttf-${DEJAVU_VERSION}/ttf/DejaVuSansMono.ttf" \
+     "$TMP/dejavu-fonts-ttf-${DEJAVU_VERSION}/ttf/DejaVuSans.ttf" "$FONT_SRC/"
+
+  echo "→ symbola $SYMBOLA_FILE"
+  curl -fsSL -o "$FONT_SRC/Symbola.otf" \
+    "https://github.com/ChiefMikeK/ttf-symbola/raw/master/$SYMBOLA_FILE"
+
+  echo "→ subsetting"
+  python3 "$ROOT/web/subset_fonts.py" "$FONT_SRC" "$FONTS"
+  rm -rf "$FONT_SRC"          # 12 MB of sources for ~40 KB of output
+else
+  echo "→ fonts (cached)"
+fi
 
 # ── Wheels ────────────────────────────────────────────────────────────────────
 # Vimny itself, plus wcwidth (pure Python, and the only thing the shim's

@@ -29,6 +29,7 @@ class Handler(http.server.SimpleHTTPRequestHandler):
         '.js':   'text/javascript',
         '.json': 'application/json',
         '.whl':  'application/octet-stream',
+        '.woff2': 'font/woff2',
     }
 
     def end_headers(self):

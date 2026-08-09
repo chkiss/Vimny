@@ -65,6 +65,15 @@ self.vimnyPersist = function (json) {
   self.postMessage({ type: 'persist', data: json });
 };
 
+// A line for the page's notice bar. The game has its own message area, but it
+// is inside the alt screen and knows nothing about query parameters or storage.
+self.vimnyNotice = function (text) {
+  self.postMessage({ type: 'notice', data: text });
+};
+
+// The `?level=<slug>` parameter, or ''. boot.py validates it.
+self.vimnyLevel = '';
+
 const status = (text) => self.postMessage({ type: 'status', data: text });
 
 // ── Boot ─────────────────────────────────────────────────────────────────────
@@ -124,6 +133,7 @@ self.onmessage = (event) => {
   ctrl = new Int32Array(msg.ctrl);
   geom = new Int32Array(msg.geom);
   idle = new Int32Array(new SharedArrayBuffer(4));
+  self.vimnyLevel = msg.level || '';
   boot(msg.base, msg.wheels, msg.saved).catch((err) =>
     self.postMessage({ type: 'error', data: String(err) }));
 };
