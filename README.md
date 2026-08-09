@@ -41,6 +41,8 @@ Editing reflows the line exactly as Vim does: insert, delete or paste and the re
 
 Requirements are just Python 3.9+ and a terminal at least 80 columns wide — on Linux, macOS, or Windows Terminal. The playfield grows with the window up to 189 columns, which the overworld and The Archivist's Library use, and stops widening there.
 
+Any monospace font works, though a few runes (`⛧ ⛤ ⚞ ⚌ ☶`) live outside most of them and will show as boxes unless your system can fall back to something like [Symbola](https://dn-works.com/ufas/) or Noto Sans Symbols 2. A box is still a perfectly good thing to aim `w` at, so nothing breaks either way.
+
 ```bash
 uvx vimny
 ```
