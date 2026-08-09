@@ -153,6 +153,17 @@ trigrams and alchemical fire — 134 uses of `⛧` alone.
 `subset_fonts.py` prints anything no bundled font covers, so adding a rune that
 nothing can draw is a build-time complaint rather than a tofu box in a dungeon.
 
+**Why not one font?** Nothing installed here covers all 354 characters, and the
+one thing that does — GNU Unifont, which spans the whole BMP — is a 16-pixel
+bitmap design that draws 105 of them double-width, so the grid would come apart
+wherever a rune landed. The two fallback faces are proportional, which is its
+own version of that problem: Symbola draws a pentagram a full em wide against
+DejaVu Sans Mono's 0.602 em cell, and a terminal emulator draws at the cell
+origin regardless, so the glyph paints over its neighbour. `subset_fonts.py`
+measures both faces and emits a `size-adjust` that shrinks each fallback until
+its widest glyph fits the cell. The runes come out a little smaller than the
+text around them. That is the price of them being in the right column.
+
 ## Web vs the terminal build
 
 The browser build runs the **same `vimny` wheel** — Pyodide executes the
@@ -206,3 +217,14 @@ the shim in plain CPython: `python3 -m pytest tests/test_web_terminal.py`.
 screen and starts there, wizard's poem and all. `boot.py` checks the slug
 against the curriculum and says so on the page if it is not one, rather than
 letting argparse exit into a black rectangle.
+
+**A preview is read-only, and has to be.** `--level` skips the title screen, so
+nobody was asked who is playing: the game runs as the default Normand with
+empty progress, and on `:wq` it would write that emptiness over whatever
+`normand.json` held. On a desktop that flag is typed by the person who owns the
+save directory. A URL is not — it can be handed to anyone. So `boot.py` lets
+the game write to the Pyodide filesystem as usual, and posts none of it to the
+page, which is where localStorage lives. The player is told on arrival.
+
+That is also the shape a "featured community level" link wants: play it, no
+account, nothing touched.

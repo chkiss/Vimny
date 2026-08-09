@@ -89,12 +89,46 @@ def _persist(fn):
 
     The page owns storage: this thread blocks inside the game loop and never
     returns to its event loop, so it cannot run an async storage API itself.
+
+    Except in a `?level=` preview, which writes nothing back. See `_level()`.
     """
     def wrapped(*args, **kwargs):
         result = fn(*args, **kwargs)
-        js.vimnyPersist(_snapshot())
+        if not PREVIEW:
+            js.vimnyPersist(_snapshot())
         return result
     return wrapped
+
+
+def _level() -> str:
+    """The validated `?level=<slug>`, or ''.
+
+    Checked here rather than left to argparse: an unknown slug there is a
+    SystemExit with its complaint on a stderr nobody can see, which the page
+    would report as "Vimny stopped". A bad slug is a typo, not a crash.
+    """
+    slug = str(getattr(js, 'vimnyLevel', '') or '')
+    if not slug:
+        return ''
+    if slug in {lv['slug'] for lv in LEVELS}:
+        return slug
+    js.vimnyNotice(f'No level is called “{slug}” — starting from the title '
+                   f'screen instead.')
+    return ''
+
+
+# A `?level=` link never asks who is playing: `--level` skips the title screen,
+# so there is no name and no save behind it, and the game plays as the default
+# Normand with empty progress. On a desktop that is a debug flag typed by the
+# person who owns the save directory. A URL is not — it can be handed to
+# anyone, and finishing the level would then write empty progress over whatever
+# `normand.json` already held. So a preview is READ-ONLY: the game still writes
+# to the Pyodide filesystem and behaves normally for the session, but nothing
+# reaches the page, and so nothing reaches localStorage.
+PREVIEW = _level()
+if PREVIEW:
+    js.vimnyNotice(f'Previewing “{PREVIEW}”. Nothing you do here is saved — '
+                   f'open Vimny without ?level= to play for keeps.')
 
 
 if _FIRST_RUN:
@@ -105,23 +139,5 @@ if _FIRST_RUN:
         if hasattr(SM, _name):
             setattr(SM, _name, _persist(getattr(SM, _name)))
 
-def _argv() -> list:
-    """`?level=<slug>` — the desktop build's `--level` debug flag.
-
-    Checked here rather than left to argparse: an unknown slug there is a
-    SystemExit with its complaint on a stderr nobody can see, which the page
-    would report as "Vimny stopped". A bad slug is a typo, not a crash, so say
-    so on the page and start the game normally.
-    """
-    slug = str(getattr(js, 'vimnyLevel', '') or '')
-    if not slug:
-        return ['vimny']
-    if slug in {lv['slug'] for lv in LEVELS}:
-        return ['vimny', '--level', slug]
-    js.vimnyNotice(f'No level is called “{slug}” — starting from the title '
-                   f'screen instead.')
-    return ['vimny']
-
-
-sys.argv = _argv()
+sys.argv = ['vimny', '--level', PREVIEW] if PREVIEW else ['vimny']
 main()      # returns on `:q` — the worker tells the page, which offers a restart

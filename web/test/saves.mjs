@@ -160,6 +160,8 @@ try {
     await page.setViewport({ width: 1200, height: 800 });
     await page.goto(`http://localhost:${PORT}/?level=first_cave`,
                     { waitUntil: 'domcontentloaded' });
+    await page.waitForFunction('window.vimny !== undefined', { timeout: 30000 });
+    await page.evaluate('localStorage.clear()');   // the import block left one behind
     // Straight past the title screen to the wizard's poem for that level, then
     // into the level itself — whose hint bar names what it teaches.
     const poem = await booted(page, 'press any key');
@@ -168,6 +170,19 @@ try {
       await page.keyboard.press('Space');
       check('and lands in that level',
             await booted(page, 'h:left'), 'the first cave never drew');
+
+      // A ?level= link never asks who is playing, so it plays as the default
+      // Normand with empty progress. If that wrote anything back, handing
+      // someone a preview link would overwrite whatever they had.
+      check('and says nothing will be saved',
+            /Nothing you do here is saved/.test(await notice(page)),
+            `notice was ${JSON.stringify(await notice(page))}`);
+      await page.keyboard.type(':w');
+      await page.keyboard.press('Enter');
+      await sleep(1500);
+      check('and a preview really does not write',
+            await page.evaluate(`localStorage.getItem('vimny:saves')`) === null,
+            'a preview wrote to storage');
     }
     await page.close();
   }
