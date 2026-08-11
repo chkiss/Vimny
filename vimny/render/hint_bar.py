@@ -99,11 +99,15 @@ _DEFAULT = 'h/j/k/l:move cursor  :w write (save)  :q quit  :q! quit without savi
 # 'mark' gates set (m) AND both jumps (` ') — without expansion only m{a} shows and
 # the player can't see how to return to a mark.  'insert' gates a (append) alongside
 # i; the linewise operator forms dd/yy bundle into the d/y keys cell in vim_commands.md
-# (mirroring c{m}  cc), so they need no family entry.
+# (mirroring c{m}  cc), so they need no family entry.  '@' gates @@ (replay the last
+# macro) as well as @{a}: same action, whose register the executor resolves to
+# `macro_last` — so it worked from the day the Hall of Echoes shipped and the bar
+# had never once said so.
 _FAMILY = {'/':      ['/', '?{pat}', 'n', 'N'],
            'subst':  ['subst', ':%s//g', ':g/pat/d', '&'],
            'mark':   ['mark', '`{a}', "'{a}"],
-           'insert': ['insert', 'a']}
+           'insert': ['insert', 'a'],
+           '@':      ['@', '@@']}
 
 
 def _format(tokens) -> str:

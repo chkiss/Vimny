@@ -18,6 +18,7 @@ once the page loads, everything happens in the tab.
 | `web/py/boot.py` | Binds the shim to the page and starts the game. |
 | `web/app.js` | The page: xterm.js, the keyboard, and storage. |
 | `web/subset_fonts.py` | Cuts three fonts down to the characters Vimny draws. |
+| `web/sw.js` | Service worker: makes the second visit work with no network. |
 | `web/serve.py` | Dev server with the two headers this needs. |
 
 Three things make it work, and each is the answer to a problem that has no
@@ -203,13 +204,34 @@ the shim in plain CPython: `python3 -m pytest tests/test_web_terminal.py`.
 - **First load is ~9 MB** (about a second on fibre, ~6 s on 10 Mbps), cached
   afterwards. A restart after `:q` re-runs `boot.py` in the same interpreter and
   takes ~0.3 s.
-- **No service worker**, so an offline reload depends on the HTTP cache rather
-  than on anything deliberate. Not offline-first.
 - **Mobile is turned away, not supported.** A touch device with no fine pointer
   is told it needs a keyboard before any WebAssembly is fetched — 9 MB over a
   phone connection for a game that cannot be played is worse than a refusal.
   "Load it anyway" is there for the tablet with a keyboard attached that guessed
   wrong.
+
+## Offline
+
+Vimny computes in the tab and saves in the browser, so needing a server to
+*start* was the odd part. After one visit it does not: `sw.js` caches the 9 MB,
+and a reload with the network unplugged boots to the title screen — verified in
+`lifecycle.mjs`, not assumed.
+
+Two strategies, split by what the file is. `vendor/` is **cache-first** — 9 MB
+that only changes when `build.sh` runs, and revalidating it would throw away
+the whole point. Everything else is **network-first with a cache fallback**:
+`index.html`, `app.js`, `worker.js` and `py/boot.py` are small and are what
+actually gets edited, and a stale one of those against a fresh wheel is a
+wasted afternoon.
+
+Freshness across builds is a whole-cache swap, not per-file cleverness:
+`build.sh` stamps `manifest.json` with a build id, the page hands it to the
+worker, and any cache under a different id is deleted. A rebuild costs one
+refetch of everything, which beats reasoning about half-stale mixtures.
+
+While developing, `serve.py` sends `no-store` and the app shell is
+network-first, so edits land on reload. If a service worker ever does get in
+your way: DevTools → Application → Service Workers → Unregister.
 
 ## URL options
 

@@ -68,6 +68,7 @@ _GATED = [
     ('S',  'S:substitute line'), ('C', 'C:change to end'),
     ('I',  'I:insert at start'), ('A', 'A:append at end'),
     ('o',  'o:new line below'), ('O', 'O:new line above'),
+    ('qa', 'q{a}:record macro'), ('@a', '@{a}:play macro'), ('@@', '@@:repeat macro'),
 ]
 
 

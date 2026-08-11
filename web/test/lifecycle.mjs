@@ -147,13 +147,25 @@ try {
   check('the game redraws at the new width', wide.split('\n').some((l) => l.includes('│')),
         'no frame after resize');
 
-  // ── Offline reload ──────────────────────────────────────────────────────
-  // Everything is served from one origin with no service worker, so a reload
-  // with the network down is a broken page — worth knowing, not necessarily
-  // worth fixing.
+  // ── Offline ─────────────────────────────────────────────────────────────
+  // The game computes in the tab and saves in the browser, so needing a server
+  // to start was the odd part. Kill the network and it should still boot — not
+  // because the HTTP cache happens to have held on to 9 MB, but because sw.js
+  // put it somewhere deliberate.
+  await page.evaluate('navigator.serviceWorker.ready');
+  await sleep(3000);                       // let the shell precache settle
+  check('a service worker is controlling the page',
+        await page.evaluate('navigator.serviceWorker.controller !== null'));
+
   await page.setOfflineMode(true);
-  const offline = await page.reload({ waitUntil: 'domcontentloaded' }).then(() => true).catch(() => false);
-  console.log(`   (reload while offline succeeded: ${offline} — no service worker)`);
+  const reloaded = await page.reload({ waitUntil: 'domcontentloaded' })
+                             .then(() => true).catch(() => false);
+  check('the page loads with the network down', reloaded);
+  if (reloaded) {
+    // booted() throws if it never arrives, so reaching the next line IS the pass.
+    await booted(page);
+    check('and the game boots offline, all 9 MB of it', true);
+  }
   await page.setOfflineMode(false);
 } catch (err) {
   console.log(` FAIL  ${err.message}`);

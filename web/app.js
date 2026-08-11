@@ -175,8 +175,23 @@ function hasKeyboard() {
   return !coarse || fine || hover;
 }
 
+// Vimny does all its computing in the tab and keeps its saves in this browser,
+// so needing a server to START is the odd part. After one visit it does not.
+// The build id keys the cache: see sw.js.
+async function installWorker(build) {
+  if (!('serviceWorker' in navigator)) return;
+  try {
+    const reg = await navigator.serviceWorker.register('sw.js');
+    await navigator.serviceWorker.ready;
+    (reg.active || navigator.serviceWorker.controller)?.postMessage({ type: 'build', build });
+  } catch (err) {
+    console.warn('[vimny] no offline cache:', err);   // plays fine, just online-only
+  }
+}
+
 async function start() {
   const manifest = await (await fetch('vendor/manifest.json')).json();
+  installWorker(manifest.build || 'dev');   // not awaited: the game need not wait
 
   // The game's own fonts have to be measured before xterm.js sizes a cell off
   // them, or the first fit() runs against the fallback and every row is wrong.

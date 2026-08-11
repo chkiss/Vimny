@@ -93,10 +93,14 @@ rm -f "$WHEELS"/*.whl
 echo "→ wcwidth wheel"
 python3 -m pip download wcwidth --no-deps --only-binary=:all: -q -d "$WHEELS"
 
+# The `build` id is what the service worker keys its cache on: a new one throws
+# the old cache away wholesale, so a rebuild can never leave a visitor running
+# yesterday's boot.py against today's wheel.
 cat > "$VENDOR/manifest.json" <<EOF
 {
   "pyodide": "$PYODIDE_VERSION",
   "xterm": "$XTERM_VERSION",
+  "build": "$(date -u +%Y%m%dT%H%M%SZ)",
   "wheels": [$(cd "$WHEELS" && ls *.whl | sed 's/.*/"&"/' | paste -sd,)]
 }
 EOF
