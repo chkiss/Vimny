@@ -38,6 +38,28 @@ def block_bounds(anchor, cursor):
     return min(ar, cr), max(ar, cr), min(ac, cc), max(ac, cc)
 
 
+def swap_ends(anchor, cursor, vmode, corner: bool = False):
+    """`o` / `O` — move the cursor to the other end of the selection.
+
+    Returns the new `(anchor, cursor)`.
+
+    `o` trades the two ends outright, in every visual mode. `O` does the same
+    EXCEPT in block mode, where it swaps only the columns: the cursor stays on
+    its own row and crosses to the other side of the rectangle, which is what
+    makes it worth having — it is the only way to widen a block from the edge
+    you did not start on without leaving visual mode.
+
+    This is selection SHAPING and nothing more. Every operator reads the span
+    through `block_bounds` / `visual_span`, both of which take min and max of
+    the two ends, so no arrangement of the same two corners can change what an
+    operator does. That is what `test_visual_corner_swap.py` pins, and it is
+    why the verb can be handed out without re-auditing a single par.
+    """
+    if corner and vmode == Mode.VISUAL_BLOCK:
+        return (anchor[0], cursor[1]), (cursor[0], anchor[1])
+    return cursor, anchor
+
+
 def visual_span(anchor, cursor, vmode, room) -> TextObject:
     """TextObject for a charwise/linewise selection (not block)."""
     ar, ac = anchor

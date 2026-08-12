@@ -64,7 +64,8 @@ from vimny.engine.jumplist import record_jump as _record_jump, jump_back as _jum
 from vimny.engine.registers import (write_register as _reg_write, read_register as _reg_read,
                               record_register as _reg_record, clip_to_keys as _reg_keys,
                               clip_to_text as _reg_text)
-from vimny.engine.visual import apply_visual, block_bounds, apply_visual_replace, in_selection
+from vimny.engine.visual import (apply_visual, block_bounds, apply_visual_replace,
+                                 in_selection, swap_ends as _swap_ends)
 from vimny.content.scrolls import (
     # Codex scroll content rendered by _show_scroll_by_id (_STD_SCROLLS map);
     # every other catalogue scroll renders via _show_catalog_scroll.
@@ -8151,24 +8152,12 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
                 _render(message)
                 continue
             # Single-key visual commands (only when not mid multi-key motion)
-            if not key_buf and raw == 'o':                 # swap ends
-                player.row, player.col = anchor
-                player.visual_anchor = cursor
-                _render(message)
-                continue
-            if not key_buf and raw == 'O':
-                # O — in BLOCK mode swap the horizontal corners (stay on the
-                # same row, cursor to the other side of the rectangle); in
-                # charwise/linewise it is o (Vim-true). Selection shaping
-                # only — every op reads min/max bounds, so this can never
-                # change what an operator does (no cheese surface).
-                if vmode == Mode.VISUAL_BLOCK:
-                    _oc = anchor[1]
-                    player.visual_anchor = (anchor[0], player.col)
-                    player.col = _oc
-                else:
-                    player.row, player.col = anchor
-                    player.visual_anchor = cursor
+            if not key_buf and raw in ('o', 'O'):          # swap ends / corners
+                # Both live in engine/visual.swap_ends: selection shaping is
+                # that module's job, and a rule kept in the key loop is a rule
+                # no unit test can reach.
+                player.visual_anchor, (player.row, player.col) = _swap_ends(
+                    anchor, cursor, vmode, corner=(raw == 'O'))
                 _render(message)
                 continue
             want = _visual_mode_toggle(raw, str(key)) if not key_buf else None
