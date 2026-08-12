@@ -165,7 +165,9 @@ def test_saddle_registers_ride_with_the_horse():
     assert not is_saddle_register('"')          # unnamed — own gate
     assert not is_saddle_register('a')           # named / macro — own gate
     assert not is_saddle_register('A')           # append to a named register
-    known = {'reg_named', 'y', 'p', 'd'}
+    # reg_numbered is the ring's OWN lesson (The Delete Ring) and is separate from
+    # the saddle gate tested here — hold it, so what this asserts is the horse.
+    known = {'reg_named', 'reg_numbered', 'y', 'p', 'd'}
     numbered = {'type': 'paste', 'register': '0'}
     # horse present → allowed; horse absent → blocked (saddle stays with him)
     assert action_allowed(numbered, known, horse_present=True)

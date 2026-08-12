@@ -254,12 +254,23 @@ def test_indent_gated_on_token(keys, op):
     assert action_allowed(action, ['h', 'j', op], edit_mode=False)
 
 
-@pytest.mark.parametrize("keys", ['"ayy', '"ap', '"0p', '"_dw'])
+# The numbered ring is deliberately NOT here — it has its own token, because
+# reg_named is already in hand by the time the registry wing opens. See
+# tests/test_register_ring.py::TestTheGate.
+@pytest.mark.parametrize("keys", ['"ayy', '"ap', '"_dw'])
 def test_named_register_gated_on_reg_named(keys):
     action = _parse(keys)
     base = ['h', 'd', 'y', 'w', 'p', 'P', 'register']  # operator/motion/paste tokens, no reg_named
     assert not action_allowed(action, base, edit_mode=False)
     assert action_allowed(action, base + ['reg_named'], edit_mode=False)
+
+
+@pytest.mark.parametrize("keys", ['"0p', '"1p', '"2yy'])
+def test_numbered_register_gated_on_reg_numbered(keys):
+    action = _parse(keys)
+    base = ['h', 'd', 'y', 'w', 'p', 'P', 'register', 'reg_named']
+    assert not action_allowed(action, base, edit_mode=False)
+    assert action_allowed(action, base + ['reg_numbered'], edit_mode=False)
 
 
 @pytest.mark.parametrize("keys", ['\x0f', '\t'])

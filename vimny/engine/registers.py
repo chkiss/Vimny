@@ -16,12 +16,16 @@
 #
 # SPDX-License-Identifier: GPL-3.0-or-later
 
-"""Block L — named registers ("a-"z, "0, "_, append "A-"Z).
+"""Block L — named registers ("a-"z, the numbered ring "0-"9, "_, append "A-"Z).
 
 Routes yank/delete clips into the register store and reads them back, following
 vim's rules: a yank with no register fills the unnamed `"` and the yank register
 `"0`; a delete fills `"` but not `"0`; an explicit `"a` fills `a` and `"`; an
 uppercase `"A` appends to `a`; `"_` is the black hole (writes vanish).
+
+A LINEWISE delete also pushes the numbered ring (`"1`→`"2`→…, oldest off the end
+at `"9`), which is what lets a cut be recovered after later cuts have overwritten
+the unnamed register — the lesson of The Delete Ring.
 
 MACROS LIVE IN THE SAME REGISTERS.  There is no separate macro store: `qa`
 records into register `a` (clobbering whatever text was there), `@a` replays
@@ -60,11 +64,36 @@ def _append_clip(old, new):
     return {'linewise': False, 'rows': [{'width': w + b['width'], 'char_runs': runes}]}
 
 
+RING = 9          # "1 .. "9 — the numbered delete ring
+
+
+def _push_ring(regs, clip) -> None:
+    """Shift the delete ring: "1→"2→…→"9, "9 falls off the end, `clip` becomes "1.
+
+    Vim pushes the ring for LINEWISE deletes only; a charwise cut smaller than a
+    line goes to the small-delete register "- instead (The Small Cut, level III of
+    the registry wing — until that ships, small deletes simply leave the ring
+    alone, which is the vim-true half of the behaviour).
+    """
+    for n in range(RING, 1, -1):
+        older = regs.get(str(n - 1))
+        if older is None:
+            regs.pop(str(n), None)
+        else:
+            regs[str(n)] = older
+    regs['1'] = clip
+
+
 def write_register(player, reg: str, clip, is_delete: bool = False) -> None:
     """Store `clip` into register `reg` per vim rules. `reg` of '"'/None = unnamed."""
     if clip is None or reg == '_':            # black hole / nothing to store
         return
     regs = player.registers
+    # The ring records what you THREW AWAY, so it fills on any linewise delete —
+    # including one aimed at a named register ("add pushes the ring AND fills "a).
+    # This is the whole reason "1p can retrieve a cut that "" has long since lost.
+    if is_delete and clip.get('linewise'):
+        _push_ring(regs, clip)
     if reg and reg.isalpha() and reg.isupper():     # "A — append to "a
         low = reg.lower()
         regs[low] = _append_clip(regs.get(low), clip)

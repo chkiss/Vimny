@@ -46,6 +46,16 @@ _MOTION_GUARD: dict[str, str] = {
 }
 
 
+def _register_token(reg) -> str:
+    """The lesson token that grants register `reg`.
+
+    The numbered ring ("0-"9) is the Delete Ring's own lesson; every other named
+    register still rides on reg_named. The remaining symbol registers ("- "_ "/ …)
+    keep reg_named for now AND stay behind the horse gate — each gets its own token
+    when its level in the registry wing ships (docs/blueprints/registry_wing.md)."""
+    return 'reg_numbered' if (reg or '').isdigit() else 'reg_named'
+
+
 def is_saddle_register(reg) -> bool:
     """True for the registers that ride in the horse's saddle — the numbered,
     small-delete, black-hole, search, read-only, expression and selection
@@ -78,9 +88,12 @@ def action_allowed(action: dict, known: list | set, edit_mode: bool = False,
     if 'admin' in known_set:
         return True
 
-    # Using an explicit (non-unnamed) register requires learning named registers.
+    # Using an explicit (non-unnamed) register requires learning named registers —
+    # EXCEPT the numbered ring, which is its own lesson (The Delete Ring). Everyone
+    # who reaches the registry wing already holds reg_named, so folding "0-"9 into
+    # that token would hand the ring out before the level that teaches it.
     reg = action.get('register')
-    if reg is not None and reg != '"' and 'reg_named' not in known_set:
+    if reg is not None and reg != '"' and _register_token(reg) not in known_set:
         return False
     # The saddle registers ride with the horse — blocked when he isn't here.
     if is_saddle_register(reg) and not horse_present:
@@ -199,7 +212,7 @@ def guard_message(action: dict, known: list | set = (),
     """Human-readable reason why action_allowed returned False."""
     t = action['type']
     reg = action.get('register')
-    if reg is not None and reg != '"' and 'reg_named' not in set(known):
+    if reg is not None and reg != '"' and _register_token(reg) not in set(known):
         return f"You haven't learned the \"{reg} register yet."
     if is_saddle_register(reg) and not horse_present:
         return f"The \"{reg} register rides in the horse's saddle — he isn't here."
