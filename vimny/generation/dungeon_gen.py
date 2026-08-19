@@ -431,20 +431,36 @@ _COUNTING_CRYPTS_PLAN = [
 ]
 
 
-def _dijkstra_par_count(composite) -> int | None:
+def _dijkstra_par_count(composite, allow_counts: bool = True) -> int | None:
     """Minimum keystroke cost entry→exit using count prefix.
 
     Cost model: 1 for a single step; len(str(n))+1 for a count-n move.
     Void rune cells are passable (CellType.FLOOR); a count motion passes
     through them and only the final landing cell triggers damage — matching
     engine behaviour in apply_motion.  Only true walls stop the search.
+
+    ``allow_counts=False`` caps every move at one cell, for a level whose
+    command set does not include the count prefix. Without the cap the bound
+    is a route that level cannot legally play, which is worse than no bound:
+    it is unreachable by construction and can never be met.
+
+    That mode also refuses to land on a void rune. The pass-through licence
+    above belongs to the count motion; a single step has no cells to pass
+    through, so every cell it crosses is a landing cell and costs HP. A step
+    route over a rune is not a route a clean run can take, so counting it
+    would put the bound back below anything playable.
     """
     entry = composite.spawn_pos
     goal  = composite.exit_pos
-    max_n = max(composite.rows, composite.cols)
+    max_n = max(composite.rows, composite.cols) if allow_counts else 1
+
+    def _landable(nr, nc):                       # passable, and not a void rune
+        ru = composite.char_run_at(nr, nc)
+        return composite.is_passable(nr, nc) and not (ru and ru.kind == 'void')
 
     def neighbors(node):
-        return _count_moves(composite.is_passable, node[0], node[1], max_n)
+        return _count_moves(composite.is_passable, node[0], node[1], max_n,
+                            landable=None if allow_counts else _landable)
 
     cost, _prev, _end = _dijkstra(entry, lambda node: node == goal, neighbors)
     return cost

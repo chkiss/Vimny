@@ -501,20 +501,30 @@ def _check_golf(lvl: F.Level, rep: Report) -> None:
     object — but it catches the common beginner error: an author who never
     learned the shortcut their own level is supposed to be teaching. A warning,
     never a rejection, because a deliberately scenic route is the author's call.
+
+    The bound is held to the same command set as the tape. A level that does
+    not teach the count prefix cannot be golfed with one, and measuring it
+    against a counted route reports a par no legal play can reach: an hjkl
+    tutorial across a wide room would be told forever that it is 46 keystrokes
+    too slow, and the only ways to satisfy it are to require a command the
+    level does not teach or to shrink the room.
     """
     from vimny.generation.dungeon_gen import _dijkstra_par_count
+    counts = 'count' in set(lvl.known)
     try:
         # Every room has to be crossed spawn to exit, so the walk across each
         # one adds up: the sum is still a LOWER bound on the whole descent, and
         # measuring only the first would compare a room against a level.
-        per_room = [_dijkstra_par_count(r) for r in F.build(lvl).rooms]
+        per_room = [_dijkstra_par_count(r, allow_counts=counts)
+                    for r in F.build(lvl).rooms]
         lower = (None if any(x is None for x in per_room)
                  else sum(per_room))
     except Exception:                              # noqa: BLE001 — advisory only
         return
     if lower is not None and rep.par is not None and lower < rep.par:
+        how = 'plain movement' if counts else 'single-step movement'
         rep.warn('golf',
-                 f'plain movement alone reaches the exit in {lower} keystrokes, '
+                 f'{how} alone reaches the exit in {lower} keystrokes, '
                  f"but your tape spends {rep.par}. Par is the CHEAPEST route that "
                  f'exists, so this level would ship with a loose par — and a '
                  f'player who finds the shorter route gets two stars for ignoring '
