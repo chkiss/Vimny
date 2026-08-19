@@ -4,11 +4,11 @@
 
 The floor is made of characters. Walls are the ends of lines. A door opens for the word you cut out of the floor and carried there.
 
-Every room has a **keystroke budget** to enforce efficiency, and a **par** — the cheapest route that exists. Finishing wins the room; finishing *at par* means you found the way a fluent Vim user would have and fully learned the lesson taught at each dungeon.
+Every room has a **keystroke budget** to enforce efficiency, and a **par**: the cheapest route that exists. Finishing wins the room; finishing *at par* means you found the way a fluent Vim user would have and fully learned the lesson taught at each dungeon.
 
-![A terminal playing The Character Cataracts. The dungeon floor is written text — "Most files you encounter will be scribed in letters so you can jump quite easily to anything you can type!" — split by rivers of water. The cursor hops from character to character with f, F, t and T, aims at the wrong letter, presses u to snap back (and watches the keystroke count go down again), then reaches the exit at 21 keystrokes against a par of 19.](docs/media/character-cataracts.gif)
+![A terminal playing The Character Cataracts. The dungeon floor is written text, "Most files you encounter will be scribed in letters so you can jump quite easily to anything you can type!", split by rivers of water. The cursor hops from character to character with f, F, t and T, aims at the wrong letter, presses u to snap back (and watches the keystroke count go down again), then reaches the exit at 21 keystrokes against a par of 19.](docs/media/character-cataracts.gif)
 
-*The Character Cataracts, the fourth level. `f`/`F`/`t`/`T` jump to a character you can see; the water is impassable, so you aim rather than walk. This run misfires once, takes it back with `u`, and clears the room at 21 against a par of 19 — a win, but only one of the two stars.*
+*The Character Cataracts, the fourth level. `f`/`F`/`t`/`T` jump to a character you can see; the water is impassable, so you aim rather than walk. This run misfires once, takes it back with `u`, and clears the room at 21 against a par of 19: a win, but only one of the two stars.*
 
 ## How it works
 
@@ -25,21 +25,21 @@ Editing reflows the line exactly as Vim does: insert, delete or paste and the re
 | Room wall                | End of line |
 | Dungeon                  | File        |
 
-**Keystroke budget**: Every puzzle room displays a budget. Reaching the exit within it completes the room. The par is the minimum possible keystrokes using the level's taught commands — hitting par earns a second star. `u` (undo) returns budget; you can backtrack freely.
+**Keystroke budget**: Every puzzle room displays a budget. Reaching the exit within it completes the room. The par is the minimum possible keystrokes using the level's taught commands, and hitting par earns a second star. `u` (undo) returns budget; you can backtrack freely.
 
-> **Note — `u` undoes motions, which Vim's does not.** In Vim, undo is for *changes*: it will not walk your cursor back from a `4j`. In Vimny it will, refunding the keystrokes with it. This is a deliberate break, made so that a wrong turn is not something you pay for. Everything `u` does to *edits* is Vim's behaviour, undo stack and all.
+> **Note: `u` undoes motions, which Vim's does not.** In Vim, undo is for *changes*: it will not walk your cursor back from a `4j`. In Vimny it will, refunding the keystrokes with it. This is a deliberate break, made so that a wrong turn is not something you pay for. Everything `u` does to *edits* is Vim's behaviour, undo stack and all.
 
-> **Note — par is not the absolute minimum on search levels.** On levels that use search (`/`, `?`), par is computed assuming you type the **full search term** the level highlights (e.g. `/cipher<CR>`). Because a search pattern only needs enough characters to land uniquely on the target, an expert can type a shorter prefix (e.g. `/cip<CR>`) and finish *under* par. This is intentional: par assumes you play the puzzle out rather than guess its answer.
+> **Note: par is not the absolute minimum on search levels.** On levels that use search (`/`, `?`), par is computed assuming you type the **full search term** the level highlights (e.g. `/cipher<CR>`). Because a search pattern only needs enough characters to land uniquely on the target, an expert can type a shorter prefix (e.g. `/cip<CR>`) and finish *under* par. This is intentional: par assumes you play the puzzle out rather than guess its answer.
 
 **Terrain**: Levels use terrain to make a particular Vim command the *only* good answer, rather than merely the intended one.
 
-- **Void runes** — holes in the floor. Landing on one costs 1 HP, but count motions pass *through* them silently: only the final landing cell bites. So a void rune bars stepping, never jumping.
-- **Water** — impassable on foot; you have to jump over it.
-- **Fogged water** — impassable on foot *and* obscures your vision, so a blind jump like `$` won't clear it. You have to aim at a character you can see.
+- **Void runes**: holes in the floor. Landing on one costs 1 HP, but count motions pass *through* them silently: only the final landing cell bites. So a void rune bars stepping, never jumping.
+- **Water**: impassable on foot; you have to jump over it.
+- **Fogged water**: impassable on foot *and* obscures your vision, so a blind jump like `$` won't clear it. You have to aim at a character you can see.
 
 ## Play it
 
-Requirements are just Python 3.9+ and a terminal at least 80 columns wide — on Linux, macOS, or Windows Terminal. The playfield grows with the window up to 189 columns, which the overworld and The Archivist's Library use, and stops widening there.
+Requirements are just Python 3.9+ and a terminal at least 80 columns wide, on Linux, macOS, or Windows Terminal. The playfield grows with the window up to 189 columns, which the overworld and The Archivist's Library use, and stops widening there.
 
 Any monospace font works, though a few runes (`⛧ ⛤ ⚞ ⚌ ☶`) live outside most of them and will show as boxes unless your system can fall back to something like [Symbola](https://dn-works.com/ufas/) or Noto Sans Symbols 2. A box is still a perfectly good thing to aim `w` at, so nothing breaks either way.
 
@@ -81,19 +81,19 @@ py -m pip install blessed
 py -m vimny
 ```
 
-`py main.py` works too. `--depth 1` skips 13 MB of history — drop it if you
+`py main.py` works too. `--depth 1` skips 13 MB of history: drop it if you
 intend to send a pull request.
 
 </details>
 
 ## Levels
 
-The main sequence of sixty levels is complete. The curriculum runs from `hjkl` through motions and counts, operators and text objects, visual mode, search and macros, registers, marks and jumps, to Ex commands (`:s`, `:g`) — with boss levels that make you use the lot at once, and a bonus wing for the corners of Vim that don't fit a straight line.
+The main sequence of sixty levels is complete. The curriculum runs from `hjkl` through motions and counts, operators and text objects, visual mode, search and macros, registers, marks and jumps, to Ex commands (`:s`, `:g`), with boss levels that make you use the lot at once, and a bonus wing for the corners of Vim that don't fit a straight line.
 
 Each level teaches one thing and is built so that thing is the *cheapest* way through, not merely the intended one.
 
 <details>
-<summary>The full curriculum — all 60 levels</summary>
+<summary>The full curriculum: all 60 levels</summary>
 
 <!-- BEGIN GENERATED LEVELS TABLE -->
 | # | Name | Commands |
@@ -153,7 +153,7 @@ Each level teaches one thing and is built so that thing is the *cheapest* way th
 | 45 | The Buried Word | `g* n` |
 | 46 | The Wet Ink | `gi` |
 | 47 | The Hall of Echoes | `q @ "` |
-| 48 | The Gauntlet | — |
+| 48 | The Gauntlet | (none) |
 | 48.1 | The Warden Eternal | (boss) |
 | R1 | The Unnamed Hold | `""  y  p` |
 | R2 | The Named Vault | `"ay  "by  "aP  "bP` |
@@ -306,12 +306,12 @@ The full command reference (also the hint-bar source) is `vimny/render/vim_comma
 
 Vimny aims for Vim-faithfulness in everything it *does* implement, but some commands are deliberately out of scope:
 
-- **Scrolling & viewport** — `zz` `zt` `zb` `<C-d>` `<C-u>` `<C-f>` `<C-b>` `<C-e>` `<C-y>`: dungeons fit the screen; there is no viewport-scroll model (`H`/`M`/`L` are the only screen-relative commands).
-- **`U` (vi's line-undo)** — `u` and the redo scroll (`<C-r>`) cover the undo story; a third undo channel would complicate it for a key modern Vim users rarely reach for.
-- **Window/tab/buffer management** — Vimny is a single buffer by design; each dungeon *is* the file. On the roadmap, not in the curriculum.
-- **Insert-mode editing keys** — `<C-w>`, `<C-u>`, `<C-o>`, `<C-r>{reg}` are implemented and can be found as scrolls, but no level *teaches* them. They are priced to be free (`<C-w>` and `<C-u>` cost nothing; `<C-r>` charges per pasted character, exactly what typing the text would cost), so no puzzle can force them at par. Pricing them by keystroke would make a register paste cheaper than typing and hand every text-entry level a shortcut.
-- **Completion, plugins, ex-mode scripting** — out of scope.
-- **NORMAL-mode `Enter`** — a duplicate of `+`, which the Stair Rail
+- **Scrolling & viewport**: `zz` `zt` `zb` `<C-d>` `<C-u>` `<C-f>` `<C-b>` `<C-e>` `<C-y>`: dungeons fit the screen; there is no viewport-scroll model (`H`/`M`/`L` are the only screen-relative commands).
+- **`U` (vi's line-undo)**: `u` and the redo scroll (`<C-r>`) cover the undo story; a third undo channel would complicate it for a key modern Vim users rarely reach for.
+- **Window/tab/buffer management**: Vimny is a single buffer by design; each dungeon *is* the file. On the roadmap, not in the curriculum.
+- **Insert-mode editing keys**: `<C-w>`, `<C-u>`, `<C-o>`, `<C-r>{reg}` are implemented and can be found as scrolls, but no level *teaches* them. They are priced to be free (`<C-w>` and `<C-u>` cost nothing; `<C-r>` charges per pasted character, exactly what typing the text would cost), so no puzzle can force them at par. Pricing them by keystroke would make a register paste cheaper than typing and hand every text-entry level a shortcut.
+- **Completion, plugins, ex-mode scripting**: out of scope.
+- **NORMAL-mode `Enter`**: a duplicate of `+`, which the Stair Rail
   already teaches.
 
 ## Working on Vimny
@@ -320,7 +320,7 @@ Vimny aims for Vim-faithfulness in everything it *does* implement, but some comm
 <summary>Project layout</summary>
 
 ```
-main.py                    Launcher — `python3 main.py` and nothing else
+main.py                    Launcher: `python3 main.py` and nothing else
 vimny/                     Everything importable lives under one package
   __main__.py              The same launcher, for `python3 -m vimny`
   game.py                  Game loop, run_dungeon / run_overworld, the forge
@@ -328,18 +328,18 @@ vimny/                     Everything importable lives under one package
     world.py               Room, Dungeon, Entity, CharRun, CellType, Seal
     player.py              Player dataclass
     vim_parser.py          Keystroke → action dict
-    command_guard.py       action_allowed — what the curriculum has taught yet
+    command_guard.py       action_allowed: what the curriculum has taught yet
     motion.py              apply_motion, move_player, the fog laws
-    operator.py            d y c p and friends — operator + text object
-    text_object.py         iw aw i( a" ip … — the spans an operator acts on
+    operator.py            d y c p and friends: operator + text object
+    text_object.py         iw aw i( a" ip …: the spans an operator acts on
     insert.py              i a I A o O s S, INSERT-mode editing
     reflow.py              Reflow editing primitives (insert/delete/join/ledge-build)
-    visual.py              v V <C-v> — the selections
-    search.py              / ? n N * # — Vim-regex search, matched per line
-    substitute.py          :s :g :v & — ex substitute & global
+    visual.py              v V <C-v>: the selections
+    search.py              / ? n N * #: Vim-regex search, matched per line
+    substitute.py          :s :g :v &: ex substitute & global
     registers.py           named/unnamed registers, clip ↔ text
-    macro.py               q @ — record and replay
-    jumplist.py            <C-o> <C-i> — where you have been
+    macro.py               q @: record and replay
+    jumplist.py            <C-o> <C-i>: where you have been
     tape.py                The keystroke-tape notation (<Space> <CR> <Esc> <C-v>)
     budget.py              Budget tracking
   generation/
@@ -357,15 +357,15 @@ vimny/                     Everything importable lives under one package
     symbols.py             Every glyph the game draws, with width fallbacks
     hint_bar.py            Hint-bar text (reads vim_commands.md)
     vim_commands.md        Hint-bar text source (token → keys/desc)
-  sharing/                 Levels as DATA — the authoring/sharing pipeline
+  sharing/                 Levels as DATA: the authoring/sharing pipeline
     format.py              The level file format: parse, build, export
     validate.py            Every rule a level file must satisfy
     draft.py               The forge's in-progress level
     replay.py              Replay a keystroke tape through the real game loop
     jumpgolf.py            Does a line jump beat a tape's travel? (par audit)
     remote.py              The one place Vimny makes a network request
-    submit.py              :submit — a prefilled pull request link for your browser
-    cli.py                 python3 -m vimny.sharing — validate / audit / export / …
+    submit.py              :submit: a prefilled pull request link for your browser
+    cli.py                 python3 -m vimny.sharing: validate / audit / export / …
   save/
     save_manager.py        Progress I/O, layout save
   art/                     Wizard art, poems, the word pools
@@ -385,9 +385,9 @@ Run the tests with `python3 -m pytest`, and `python3 -m vimny.sharing audit` to 
 
 ## Writing your own levels
 
-There are two ways in, and they produce the same thing — a level is a plain JSON file either way.
+There are two ways in, and they produce the same thing: a level is a plain JSON file either way.
 
-**In the game — the forge.** An authoring bench in the overworld under `forge/`, where a level is built by playing it: paint the room, place the text and the doors, then `:record` walks your own solution and captures it as the level's answer. The par comes from replaying that recording, so a level cannot ship claiming a route nobody has walked. The forge is **admin-only** — sign in with the player name `admin` to reach it. That name also unlocks every level and reveals each puzzle's solution, so use a separate save for authoring.
+**In the game, the forge.** An authoring bench in the overworld under `forge/`, where a level is built by playing it: paint the room, place the text and the doors, then `:record` walks your own solution and captures it as the level's answer. The par comes from replaying that recording, so a level cannot ship claiming a route nobody has walked. The forge is **admin-only**: sign in with the player name `admin` to reach it. That name also unlocks every level and reveals each puzzle's solution, so use a separate save for authoring.
 
 **In a text editor.** The format is documented, so you never have to use the forge:
 
@@ -399,23 +399,23 @@ python3 -m vimny.sharing install  mylevel.json            # put it on your shelf
 
 Either way, drop the file in `~/.Vimny/levels/` and it shows up in the overworld under `community/`.
 
-**The shelf.** Community levels live at **[github.com/chkiss/vimny-levels](https://github.com/chkiss/vimny-levels)** — type `:e remote` in the overworld to browse what's there and install any of them without leaving the game. To add yours, open a pull request against that repo with your level file; it is checked by the same validator you can run yourself (`python3 -m vimny.sharing validate mylevel.json`), so if it passes locally it will pass there.
+**The shelf.** Community levels live at **[github.com/chkiss/vimny-levels](https://github.com/chkiss/vimny-levels)**: type `:e remote` in the overworld to browse what's there and install any of them without leaving the game. To add yours, open a pull request against that repo with your level file; it is checked by the same validator you can run yourself (`python3 -m vimny.sharing validate mylevel.json`), so if it passes locally it will pass there.
 
 Two things worth knowing before you install a level someone else wrote:
 
-- **A level is data, not code.** Vimny reads the file and builds a room from it. Nothing in it is ever executed — that is what makes it safe to play, rather than anyone having vetted it.
-- **Vimny goes online only when you ask it to, in one place.** Nothing is fetched at startup, in the background, or on a timer: there is no phone-home, no telemetry, and no update check. The single exception is the **remote shelf** — type `:e remote` in the overworld and Vimny fetches a public index of community levels over HTTPS so you can browse and install them.
+- **A level is data, not code.** Vimny reads the file and builds a room from it. Nothing in it is ever executed, which is what makes it safe to play, rather than anyone having vetted it.
+- **Vimny goes online only when you ask it to, in one place.** Nothing is fetched at startup, in the background, or on a timer: there is no phone-home, no telemetry, and no update check. The single exception is the **remote shelf**: type `:e remote` in the overworld and Vimny fetches a public index of community levels over HTTPS so you can browse and install them.
 
-A community level's par comes from replaying the author's own solution, so it is labelled *author's par* — the cost of a route that definitely works, not a promise that no shorter one exists. Nobody gets to type in their own par or budget.
+A community level's par comes from replaying the author's own solution, so it is labelled *author's par*: the cost of a route that definitely works, not a promise that no shorter one exists. Nobody gets to type in their own par or budget.
 
 Full guide: [docs/AUTHORING.md](docs/AUTHORING.md).
 
 ## Upcoming features
 
-- **The Registry** — a bonus wing on the register family. The yank register (`"0`) and the black hole (`"_`) already work; still to come are the delete ring (`"1`–`"9`), the small-delete register (`"-`), the read-only registers (`":` `".` `"%` `"#`), the expression register (`"=`), the system clipboard (`"*` `"+`), the search register (`"/`), and a boss to close it out. The first two levels are in.
-- **Folds** — `za` opens and shuts a section of the codex (`:h`), but nothing folds the dungeon itself. `zf` and a level built around it are the work.
-- **Windows, tabs and buffers** — Vimny is one buffer per dungeon today; multi-buffer play is on the roadmap.
-- **Alternate levels** — a community level may already declare itself a replacement for a shipped one, and the validator holds it to that slug's exact lesson. Nothing offers the swap to a player yet.
+- **The Registry**: a bonus wing on the register family. The yank register (`"0`) and the black hole (`"_`) already work; still to come are the delete ring (`"1`–`"9`), the small-delete register (`"-`), the read-only registers (`":` `".` `"%` `"#`), the expression register (`"=`), the system clipboard (`"*` `"+`), the search register (`"/`), and a boss to close it out. The first two levels are in.
+- **Folds**: `za` opens and shuts a section of the codex (`:h`), but nothing folds the dungeon itself. `zf` and a level built around it are the work.
+- **Windows, tabs and buffers**: Vimny is one buffer per dungeon today; multi-buffer play is on the roadmap.
+- **Alternate levels**: a community level may already declare itself a replacement for a shipped one, and the validator holds it to that slug's exact lesson. Nothing offers the swap to a player yet.
 
 ## Design principles
 
@@ -423,8 +423,8 @@ Full guide: [docs/AUTHORING.md](docs/AUTHORING.md).
 - **Efficiency is enforced by par and budget.** The keystroke budget makes Vim's core value proposition central, and the par encourages the player to strive for perfect execution efficiency.
 - **Everything is a buffer.** Dungeons are files; the overworld is a directory; `:w`, `:q`, `:e` are real mechanics.
 
-See [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) if you want to work on the engine — it is the canonical reference for the architecture, the laws the levels are held to, and the conventions. `docs/LEVELS_PLAN.md` is what's planned next, and `docs/SPEC.md` the design vision & UI.
+See [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) if you want to work on the engine: it is the canonical reference for the architecture, the laws the levels are held to, and the conventions. `docs/LEVELS_PLAN.md` is what's planned next, and `docs/SPEC.md` the design vision & UI.
 
 ## License
 
-Vimny is free software, licensed under the **GNU General Public License v3.0** — see [`LICENSE`](LICENSE) for the full text.
+Vimny is free software, licensed under the **GNU General Public License v3.0**: see [`LICENSE`](LICENSE) for the full text.

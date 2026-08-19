@@ -54,7 +54,7 @@ def _level_cmds_cell(lv: dict) -> str:
     cmds = lv.get('commands', '')
     if cmds:
         return _code(cmds)
-    return {'boss': '(boss)', 'reliquary': '(bonus)'}.get(lv.get('type', ''), '—')
+    return {'boss': '(boss)', 'reliquary': '(bonus)'}.get(lv.get('type', ''), '(none)')
 
 
 def _readme_levels_table() -> str:
