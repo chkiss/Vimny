@@ -1357,40 +1357,38 @@ def build_dungeon_character_cataracts(seed: int) -> Dungeon:
       C4 rows 10-11 right→left  T!  dynamite at col 1 (F! would explode)
       C5 rows 13-14 left→right  w/b/e character navigation + exit
     """
+    from vimny.engine.editor import _CELL_CODE
+    from vimny.sharing.format import Level as _Level, build as _fmt_build
     ROWS, COLS = _CHARACTER_CATARACTS_TOTAL_ROWS, _CHARACTER_CATARACTS_TOTAL_COLS
     rng     = random.Random(seed)
-    dungeon = Dungeon(name='The Character Cataracts', seed=seed)
 
-    cells = [[CellType.WALL] * COLS for _ in range(ROWS)]
-    composite = Room(room_type=RoomType.ENTRY, rows=ROWS, cols=COLS)
-    composite.cells = cells
-    composite.seed  = seed
+    grid = [[CellType.WALL] * COLS for _ in range(ROWS)]
 
     # ── Carve corridors (2 rows each) ─────────────────────────────────────────
     for row_top in _CHARACTER_CATARACTS_CORR_TOP_ROWS:
         for c in range(_CHARACTER_CATARACTS_CORR_LEFT, _CHARACTER_CATARACTS_CORR_RIGHT + 1):
-            cells[row_top][c]     = CellType.CORRIDOR
-            cells[row_top + 1][c] = CellType.CORRIDOR
+            grid[row_top][c]     = CellType.CORRIDOR
+            grid[row_top + 1][c] = CellType.CORRIDOR
 
     # ── Carve turn rooms ──────────────────────────────────────────────────────
     for r0, r1, ca, cb in _CHARACTER_CATARACTS_TURN_SPANS:
         c0, c1 = min(ca, cb), max(ca, cb)
         for row in range(r0, r1 + 1):
             for col in range(c0, c1 + 1):
-                cells[row][col] = CellType.CORRIDOR
+                grid[row][col] = CellType.CORRIDOR
 
     # Floor cells widening the turn-room middle rows (matches saved reference layout)
     for r, c in ((3, 67), (3, 68),           # RT1 middle
                  (6, 1),  (6, 3), (6, 4),    # LT1 middle
                  (7, 17), (8, 17),            # C3 Zone A/water boundary
                  (9, 67), (9, 68)):           # RT2 middle
-        cells[r][c] = CellType.FLOOR
+        grid[r][c] = CellType.FLOOR
 
     # ── Water pools ───────────────────────────────────────────────────────────
     for rows, cs, ce in _CHARACTER_CATARACTS_WATER_SPANS:
         for r in rows:
             for c in range(cs, ce + 1):
-                cells[r][c] = CellType.WATER
+                grid[r][c] = CellType.WATER
 
     # ── Fixed text character runs (visible f/F/t/T targets) ───────────────────
     # Text chars are individual characters; _cell_char returns each char so
@@ -1418,9 +1416,17 @@ def build_dungeon_character_cataracts(seed: int) -> Dungeon:
         Entity(kind='dynamite', row=11, col=1),
         Entity(kind='exit',  row=13, col=65),
     ]
-    composite.entities = list(_fixed)
-    composite.spawn_pos    = (1, 1)
-    composite.exit_pos = (13, 65)
+
+    def _project(runs) -> '_Level':
+        return _Level(
+            name='The Character Cataracts', seed=seed,
+            rows=ROWS, cols=COLS,
+            cells=[''.join(_CELL_CODE[c] for c in row) for row in grid],
+            spawn=(1, 1), exit=(13, 65),
+            char_runs=[{'row': ru.row, 'col': ru.col,
+                        'symbols': ''.join(ru.symbols), 'kind': ru.kind}
+                       for ru in runs],
+            entities=[{'kind': e.kind, 'at': [e.row, e.col]} for e in _fixed])
 
     # ── Blocked cells: water + text/anchor characters + fixed entities ────────
     _bl: set = {(e.row, e.col) for e in _fixed}
@@ -1433,35 +1439,38 @@ def build_dungeon_character_cataracts(seed: int) -> Dungeon:
             _bl.add((ru.row, ru.col + i))
     blocked = frozenset(_bl)
 
+    # A scratch room for the zone placer to mutate.
+    scratch = Room(room_type=RoomType.ENTRY, rows=ROWS, cols=COLS)
+    scratch.cells = grid
+
+    dungeon = None
     for _attempt in range(20):
-        composite.char_runs = list(_text_runes)
+        scratch.char_runs = list(_text_runes)
         rng2 = random.Random(rng.randint(0, 2**31))
 
         # Fill all corridor zones with standard characters
-        _cataracts_place_zone(composite, rng2, (1, 2),    2,  13, blocked=blocked)  # C1 Zone A
-        _cataracts_place_zone(composite, rng2, (1, 2),   38,  68, blocked=blocked)  # C1 Zone B
-        _cataracts_place_zone(composite, rng2, (4,),      2,  28, blocked=blocked)  # C2 row 4 Zone A
-        _cataracts_place_zone(composite, rng2, (4, 5),   52,  68, blocked=blocked)  # C2 Zone B
-        _cataracts_place_zone(composite, rng2, (8,),      2,  16, blocked=blocked)  # C3 row 8 Zone A
-        _cataracts_place_zone(composite, rng2, (8,),     32,  70, blocked=blocked)  # C3 row 8 Zone B
-        _cataracts_place_zone(composite, rng2, (10, 11),  2,  24, blocked=blocked)  # C4 Zone A
-        _cataracts_place_zone(composite, rng2, (10, 11), 52,  68, blocked=blocked)  # C4 Zone B
+        _cataracts_place_zone(scratch, rng2, (1, 2),    2,  13, blocked=blocked)  # C1 Zone A
+        _cataracts_place_zone(scratch, rng2, (1, 2),   38,  68, blocked=blocked)  # C1 Zone B
+        _cataracts_place_zone(scratch, rng2, (4,),      2,  28, blocked=blocked)  # C2 row 4 Zone A
+        _cataracts_place_zone(scratch, rng2, (4, 5),   52,  68, blocked=blocked)  # C2 Zone B
+        _cataracts_place_zone(scratch, rng2, (8,),      2,  16, blocked=blocked)  # C3 row 8 Zone A
+        _cataracts_place_zone(scratch, rng2, (8,),     32,  70, blocked=blocked)  # C3 row 8 Zone B
+        _cataracts_place_zone(scratch, rng2, (10, 11),  2,  24, blocked=blocked)  # C4 Zone A
+        _cataracts_place_zone(scratch, rng2, (10, 11), 52,  68, blocked=blocked)  # C4 Zone B
         # C5: dense character corridor for w/b/e practice; chest at col 20, exit anchor at col 64-65
-        _cataracts_place_zone(composite, rng2, (13, 14),  2,  63, blocked=blocked)
+        _cataracts_place_zone(scratch, rng2, (13, 14),  2,  63, blocked=blocked)
 
-        composite.rebuild_indexes()
-        par, path = _dijkstra_par_ftFT(composite, return_path=True)
+        dungeon = _fmt_build(_project(scratch.char_runs))
+        par, path = _dijkstra_par_ftFT(dungeon.rooms[0], return_path=True)
         if par is not None:
             break
     else:
         par, path = 80, ''
 
-    composite.par    = par
-    composite.budget = math.ceil(par * 1.4)
-    composite.answer = path
-
-    dungeon.rooms        = [composite]
-    dungeon.current_room = 0
+    room = dungeon.rooms[0]
+    room.par    = par
+    room.budget = math.ceil(par * 1.4)
+    room.answer = path
     return dungeon
 
 
