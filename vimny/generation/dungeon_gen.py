@@ -13321,11 +13321,11 @@ _CL_JUNK = (                               # scattered through stanza III
 
 
 def build_dungeon_culling_ledger(seed: int) -> Dungeon:
-    dungeon = Dungeon(name='The Culling Ledger', seed=seed)
+    from vimny.engine.editor import _CELL_CODE
+    from vimny.sharing.format import Level as _Level, build as _fmt_build
     R, C, TX = _CL_ROWS, _CL_COLS, _CL_TX
 
     cells = [[CellType.WALL] * C for _ in range(R)]
-    fog:  set = set()                              # DARK until door one opens
     for r in list(_CL_KEEP_ROWS) + [_CL_BLIGHT_I] + list(_CL_BLIGHT_II) \
              + list(_CL_JUNK_III) + list(_CL_SACRED_III):
         cells[r][_CL_CATCH] = CellType.FLOOR       # the ○ marker's floor cell
@@ -13336,83 +13336,72 @@ def build_dungeon_culling_ledger(seed: int) -> Dungeon:
     for r in list(_CL_GAPS) + [_CL_SEP]:
         for c in range(2, 54):
             cells[r][c] = CellType.WATER
-            fog.add((r, c))                        # DARK water until door one
     cells[_CL_GAP[0]][_CL_GAP[1]] = CellType.FLOOR   # the one gap in the stone
     for c in range(2, 55):
         cells[_CL_COR][c] = CellType.FLOOR         # the corridor, door two's own
-        if c > _CL_DOOR1[1]:                       # cell (the ENTITY bars it —
-            fog.add((_CL_COR, c))                  # floor beneath, so an opened
-                                                   # door is walkable), pocket;
-                                                   # dark east of door one
+                                                    # cell (the ENTITY bars it —
+                                                    # floor beneath, so an opened
+                                                    # door is walkable)
 
-    room = Room(room_type=RoomType.ENTRY, rows=R, cols=C)
-    room.cells     = cells
-    room.seed      = seed
-    room.spawn_pos = (_CL_COR, 2)
-    room.exit_pos  = _CL_EXIT
-    room.char_runs = []
-
-    def carve(r, text, kind):
+    def carve(runs, r, text, kind):
         """Lay a ledger line: the ○ marker, then the words — floor cells that
-        start DARK (fog only; _ledger_check adds the mist when door one
-        opens). Standable by no one either way: every jump ferry fails."""
-        room.char_runs.append(CharRun(r, _CL_CATCH, ('○',), 'void'))
-        fog.add((r, _CL_CATCH))
+        start DARK (the doors' opacity; _ledger_check adds the mist when door
+        one opens). Standable by no one either way: every jump ferry fails."""
+        runs.append({'row': r, 'col': _CL_CATCH, 'symbols': '○', 'kind': 'void'})
         col = TX
         for wd in text.split(' '):
-            room.char_runs.append(CharRun(r, col, tuple(wd), kind))
+            runs.append({'row': r, 'col': col, 'symbols': wd, 'kind': kind})
             for c in range(col, col + len(wd)):
                 cells[r][c] = CellType.FLOOR
-                fog.add((r, c))
             col += len(wd) + 1
         if kind == 'verdant':                      # a lit brazier keeps the line
-            room.char_runs.append(CharRun(r, _CL_BRZ_COL, (_QM_FLAME,), 'flame'))
+            runs.append({'row': r, 'col': _CL_BRZ_COL, 'symbols': _QM_FLAME,
+                         'kind': 'flame'})
             cells[r][_CL_BRZ_COL] = CellType.FLOOR
-            fog.add((r, _CL_BRZ_COL))
 
+    runs: list = []
     for i, r in enumerate(_CL_KEEP_ROWS):          # the chain's head: dog,
-        carve(r, _CL_KEEPS[i], 'verdant')          # worried, killed
-    carve(_CL_BLIGHT_I, _CL_BLIGHT_I_LINE, 'ember')
+        carve(runs, r, _CL_KEEPS[i], 'verdant')    # worried, killed
+    carve(runs, _CL_BLIGHT_I, _CL_BLIGHT_I_LINE, 'ember')
     for i, r in enumerate(_CL_BLIGHT_II):          # all of Miss Muffet, whole
-        carve(r, _CL_BLOCK[i], 'ember')
+        carve(runs, r, _CL_BLOCK[i], 'ember')
     third = {r: ('verdant', _CL_KEEPS[3 + i])      # the chain's tail: every
              for i, r in enumerate(_CL_SACRED_III)}  # line bears "that"
     for i, r in enumerate(_CL_JUNK_III):
         third[r] = ('ember', _CL_JUNK[i])
     for r in sorted(third):
         kind, t = third[r]
-        carve(r, t, kind)
+        carve(runs, r, t, kind)
 
     # The cold brazier on the corridor — the finale lights it.
-    room.char_runs.append(CharRun(_CL_COR, _CL_BRZ_COL, (_QM_EMBERS,), 'pedestal'))
+    runs.append({'row': _CL_COR, 'col': _CL_BRZ_COL,
+                 'symbols': _QM_EMBERS, 'kind': 'pedestal'})
 
-    room.entities = [
-        Entity(kind='exit',        row=_CL_EXIT[0],  col=_CL_EXIT[1]),
-        Entity(kind='chest_scroll', row=_CL_CHEST[0], col=_CL_CHEST[1]),
-        Entity(kind='chest_key',   row=_CL_KEYCH[0], col=_CL_KEYCH[1]),
-        Entity(kind='locked_door', row=_CL_DOOR1[0], col=_CL_DOOR1[1]),
-        # The boss door: one cell east of the cold brazier, dark until lit.
-        Entity(kind='seal_door',   row=_CL_SEALDOOR[0], col=_CL_SEALDOOR[1]),
-        Entity(kind='locked_door', row=_CL_DOOR2[0], col=_CL_DOOR2[1]),
-    ]
+    level = _Level(
+        name='The Culling Ledger', seed=seed,
+        rows=R, cols=C,
+        cells=[''.join(_CELL_CODE[c] for c in row) for row in cells],
+        spawn=(_CL_COR, 2),
+        exit=_CL_EXIT,
+        char_runs=runs,
+        entities=[
+            {'kind': 'exit',         'at': [_CL_EXIT[0], _CL_EXIT[1]]},
+            {'kind': 'chest_scroll', 'at': [_CL_CHEST[0], _CL_CHEST[1]]},
+            {'kind': 'chest_key',    'at': [_CL_KEYCH[0], _CL_KEYCH[1]]},
+            {'kind': 'locked_door',  'at': [_CL_DOOR1[0], _CL_DOOR1[1]],
+             'opaque': True},
+            # The boss door: one cell east of the cold brazier, dark until lit.
+            {'kind': 'seal_door',    'at': [_CL_SEALDOOR[0], _CL_SEALDOOR[1]],
+             'opaque': True},
+            {'kind': 'locked_door',  'at': [_CL_DOOR2[0], _CL_DOOR2[1]],
+             'opaque': True},
+        ],
+        solution=':set<Space>nu<CR> 2l x $ p :2,19v/that/d<Space>_<CR> $ p $')
+
+    dungeon = _fmt_build(level, par=_CL_PAR)
+    room = dungeon.rooms[0]
     room._ledger_keeps = _CL_KEEPS                 # the chain, in order
     room._ledger_lit = False                       # the corridor brazier, cold
-
-    room.par    = _CL_PAR
-    room.budget = math.ceil(_CL_PAR * 1.4)   # STANDARD (par-is-the-optimum law)
-    room.answer = ':set<Space>nu<CR> 2l x $ p :2,19v/that/d<Space>_<CR> $ p $'
-
-    room.rebuild_indexes()
-    # EVERYTHING beyond door one is dark, and that is a rule about the DOORS —
-    # so the doors carry it (`_doors_block_sight`) rather than a list of cells.
-    # It fogs one cell the hand-built list did not: `_CL_GAP` (21, 12), the lone
-    # gap in the stone course. Dark at spawn is right — the gap is a thing to
-    # FIND once you are past door one, not a signpost read from the doorway
-    # (user, 2026-08-01).
-    room.mist_cells = set()                         # sleeps dark; no mist yet
-    _doors_block_sight(room)
-    dungeon.rooms        = [room]
-    dungeon.current_room = 0
     return dungeon
 
 
