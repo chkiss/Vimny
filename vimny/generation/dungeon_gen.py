@@ -1654,18 +1654,19 @@ def build_dungeon_dummy(seed: int) -> Dungeon:
     loot 12/13, keys 15/16, doors 18/19, fixtures 21/22, terrain 24-26/27,
     runes 29/30. Every specimen that can move is jailed.
     """
+    from vimny.engine.editor import _CELL_CODE
+    from vimny.sharing.format import Level as _Level, build as _fmt_build
     ROWS, COLS = _DUMMY_ROWS, _DUMMY_COLS
-    dungeon = Dungeon(name='Dummy Dungeon', seed=seed)
-    cells   = [[CellType.WALL] * COLS for _ in range(ROWS)]
+    grid   = [[CellType.WALL] * COLS for _ in range(ROWS)]
 
     for r in range(1, ROWS - 1):                     # one open slab; the bands
         for c in range(1, COLS - 1):                 # carve their stone back in
-            cells[r][c] = CellType.FLOOR
+            grid[r][c] = CellType.FLOOR
     for r in range(1, ROWS - 1):
-        cells[r][_DUMMY_DIV_W] = CellType.WALL
-        cells[r][_DUMMY_DIV_E] = CellType.WALL
-    cells[_DUMMY_YARD][_DUMMY_DIV_W] = CellType.FLOOR
-    cells[_DUMMY_YARD][_DUMMY_DIV_E] = CellType.FLOOR
+        grid[r][_DUMMY_DIV_W] = CellType.WALL
+        grid[r][_DUMMY_DIV_E] = CellType.WALL
+    grid[_DUMMY_YARD][_DUMMY_DIV_W] = CellType.FLOOR
+    grid[_DUMMY_YARD][_DUMMY_DIV_E] = CellType.FLOOR
 
     ents:   list = []
     chars:  list = []
@@ -1682,7 +1683,7 @@ def build_dungeon_dummy(seed: int) -> Dungeon:
         it was allotted and does whatever that specimen needs.
         """
         for c in range(_DUMMY_C0, _DUMMY_C1 + 1):
-            cells[label_row][c] = CellType.WALL
+            grid[label_row][c] = CellType.WALL
         c = _DUMMY_C0
         for label, place in items:
             width = max(len(label), 3) + 2
@@ -1694,7 +1695,8 @@ def build_dungeon_dummy(seed: int) -> Dungeon:
             c += width
 
     def _at(row: int, **kw):
-        return lambda c: ents.append(Entity(row=row, col=c, **kw))
+        kind = kw.pop('kind')
+        return lambda c: ents.append({'kind': kind, 'at': [row, c], **kw})
 
     def _jail(row: int, **kw):
         """A specimen cell: stone on three sides, a door on the fourth.
@@ -1713,27 +1715,28 @@ def build_dungeon_dummy(seed: int) -> Dungeon:
         The stone runs above and below the DOOR as well as the cell, which is
         what makes `_is_vertical_door` draw it as the north-south door it is.
         """
+        kind = kw.pop('kind')
         def place(c):
             for cc in (c, c + 1):
-                cells[row - 1][cc] = CellType.WALL
-                cells[row + 1][cc] = CellType.WALL
-            cells[row][c - 1] = CellType.WALL
-            ents.append(Entity(row=row, col=c, **kw))
-            ents.append(Entity(kind='door', row=row, col=c + 1))
+                grid[row - 1][cc] = CellType.WALL
+                grid[row + 1][cc] = CellType.WALL
+            grid[row][c - 1] = CellType.WALL
+            ents.append({'kind': kind, 'at': [row, c], **kw})
+            ents.append({'kind': 'door', 'at': [row, c + 1]})
         return place
 
     def _patch(rows: range, ct: CellType):
         def place(c):
             for r in rows:
                 for cc in range(c, c + 3):
-                    cells[r][cc] = ct
+                    grid[r][cc] = ct
         return place
 
     def _misted(rows: range):
         def place(c):
             for r in rows:
                 for cc in range(c, c + 3):
-                    cells[r][cc] = CellType.WATER
+                    grid[r][cc] = CellType.WATER
                     mist.add((r, cc))
         return place
 
@@ -1743,8 +1746,8 @@ def build_dungeon_dummy(seed: int) -> Dungeon:
         def place(c):
             for r in rows:
                 for cc in range(c, c + 3):
-                    cells[r][cc] = CellType.WALL
-            cells[rows.start + 1][c + 1] = CellType.FLOOR
+                    grid[r][cc] = CellType.WALL
+            grid[rows.start + 1][c + 1] = CellType.FLOOR
         return place
 
     def _rune(row: int, sym: str, kind: str):
@@ -1754,13 +1757,13 @@ def build_dungeon_dummy(seed: int) -> Dungeon:
     def _gate(row: int):
         """A registered gate: banded stone (╬) some level draws back."""
         def place(c):
-            cells[row][c] = CellType.WALL
+            grid[row][c] = CellType.WALL
             sealed.add((row, c))
         return place
 
     def _entry(row: int):
         def place(c):
-            ents.append(Entity(kind='entry_marker', row=row, col=c))
+            ents.append({'kind': 'entry_marker', 'at': [row, c]})
             spawn.append((row, c))
         return place
 
@@ -1856,11 +1859,12 @@ def build_dungeon_dummy(seed: int) -> Dungeon:
     # why they no longer share a room with the exhibits.
     # WATER WAVE: shove 'WAVE' into the puddle; the wave rolls right and sweeps
     # away what it reaches — the goblin drowns, the key is lost.
-    cells[20][84] = CellType.WATER
-    cells[20][85] = CellType.WATER
+    grid[20][84] = CellType.WATER
+    grid[20][85] = CellType.WATER
     chars.append(CharRun(row=20, col=80, symbols=tuple('WAVE'), kind='verdant'))
-    ents.append(Entity(kind='goblin',    row=20, col=86, hp=1, max_hp=1, ai=''))
-    ents.append(Entity(kind='floor_key', row=20, col=87))
+    ents.append({'kind': 'goblin',    'at': [20, 86], 'hp': 1, 'max_hp': 1,
+                 'ai': ''})
+    ents.append({'kind': 'floor_key', 'at': [20, 87]})
     # VOID MARGIN: the ○ brink sits on floor, so the cursor can step onto it and
     # FALL IN; glyphs shoved past the brink tumble into the void.
     chars.append(CharRun(row=22, col=78, symbols=tuple('GLYPHS'), kind='ancient'))
@@ -1871,36 +1875,39 @@ def build_dungeon_dummy(seed: int) -> Dungeon:
     # Wing labels, in stone — leaving cols 94-96 open so the wing stays walkable
     # from the yard doorway below.
     for c in range(76, 94):
-        cells[26][c] = CellType.WALL
+        grid[26][c] = CellType.WALL
     chars.append(CharRun(row=26, col=76, symbols=tuple('wave'), kind='ancient'))
     chars.append(CharRun(row=26, col=82, symbols=tuple('void'), kind='ancient'))
     chars.append(CharRun(row=26, col=88, symbols=tuple('edge'), kind='ancient'))
 
     # ── The east divider's lock is itself the plain `locked_door` exhibit, and
     # the scratchpad beyond it is deliberately empty — nothing to disturb.
-    ents.append(Entity(kind='locked_door', row=_DUMMY_YARD, col=_DUMMY_DIV_E))
-    ents.append(Entity(kind='exit',        row=16,          col=COLS - 3))
+    ents.append({'kind': 'locked_door', 'at': [_DUMMY_YARD, _DUMMY_DIV_E]})
+    ents.append({'kind': 'exit',        'at': [16, COLS - 3]})
 
-    composite = Room(room_type=RoomType.ENTRY, rows=ROWS, cols=COLS)
-    composite.cells     = cells
-    composite.seed      = seed
-    composite.spawn_pos = spawn[0]
-    composite.exit_pos  = (16, COLS - 3)
-    composite.entities  = ents
-    composite.char_runs = chars
+    level = _Level(
+        name='Dummy Dungeon', seed=seed,
+        rows=ROWS, cols=COLS,
+        cells=[''.join(_CELL_CODE[c] for c in row) for row in grid],
+        spawn=spawn[0], exit=(16, COLS - 3),
+        char_runs=[{'row': ru.row, 'col': ru.col,
+                    'symbols': ''.join(ru.symbols), 'kind': ru.kind}
+                   for ru in chars],
+        entities=ents)
 
-    composite.par            = None
-    composite.budget         = 99999
-    composite.passable_walls = False
-    composite.rebuild_indexes()
-    # Stone fog, not reachability fog: a door is a grille you can see through,
-    # so every jailed specimen is on display while still being caged.
-    apply_stone_fog(composite)
-    composite.sealed_cells = sealed
-    composite.mist_cells   = set(mist)      # permanent haze: reveals skip it
-    composite.fog_cells   |= mist           # mist is a SUBSET of fog by contract
-    dungeon.rooms        = [composite]
-    dungeon.current_room = 0
+    dungeon = _fmt_build(level)
+    room = dungeon.rooms[0]
+    room.par            = None
+    room.budget         = 99999
+    room.passable_walls = False
+    # Stone fog, not the derived law: a door is a grille you can see through,
+    # so every jailed specimen is on display while still being caged. build()'s
+    # reachability fog disagrees here by design, so it is discarded first.
+    room.fog_cells = set()
+    apply_stone_fog(room)
+    room.sealed_cells = sealed
+    room.mist_cells   = set(mist)           # permanent haze: reveals skip it
+    room.fog_cells   |= mist                # mist is a SUBSET of fog by contract
     return dungeon
 
 
