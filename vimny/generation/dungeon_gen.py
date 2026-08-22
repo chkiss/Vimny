@@ -11398,6 +11398,8 @@ def build_dungeon_whole_line_annex(seed: int) -> Dungeon:
     lessons = _wla_pick(rng)
 
     R, C = _WLA_ROWS, _WLA_COLS
+    from vimny.engine.editor import _CELL_CODE
+    from vimny.sharing.format import Level as _Level, build as _fmt_build
     cells = [[CellType.WALL] * C for _ in range(R)]
     for r in _WLA_LESSON_ROWS:                       # the open lesson block (label floor)
         for c in range(_WLA_COL_S, _WLA_LBL_END + 1):
@@ -11418,13 +11420,7 @@ def build_dungeon_whole_line_annex(seed: int) -> Dungeon:
     # first standable cell (jumps land on the spine) and `$` stops at the first
     # shut bolt (engine `_cross_water`). It opens honestly, bolt by bolt.
 
-    room = Room(room_type=RoomType.ENTRY, rows=R, cols=C)
-    room.cells = cells
-    room.seed  = seed
-
-    def lay(row, col, text, kind):
-        room.char_runs.append(CharRun(row, col, tuple(text), kind))
-
+    runs: list = []
     doors = []
     for i, lesson in enumerate(lessons):
         lrow = _WLA_LESSON_ROWS[i]
@@ -11436,7 +11432,7 @@ def build_dungeon_whole_line_annex(seed: int) -> Dungeon:
         # end (the L24 C-door fix). `e` still halts at inner punctuation.
         col = _WLA_LBL_COL
         for w in lesson['label'].split(' '):
-            lay(lrow, col, w, 'ancient')
+            runs.append({'row': lrow, 'col': col, 'symbols': w, 'kind': 'ancient'})
             col += len(w) + 1
         # The saying's PREFIX, carved in the west stone right-aligned to end
         # two cols shy of the spine — the sense that replaces the old decree
@@ -11445,31 +11441,25 @@ def build_dungeon_whole_line_annex(seed: int) -> Dungeon:
         if lesson['prefix']:
             pcol = _WLA_COL_S - 1 - len(lesson['prefix'])
             for w in lesson['prefix'].split(' '):
-                lay(lrow, pcol, w, 'verdant')
+                runs.append({'row': lrow, 'col': pcol,
+                             'symbols': w, 'kind': 'verdant'})
                 pcol += len(w) + 1
         doors.append((lesson['target'], (_WLA_GATE_ROW, _WLA_GATE_COL0 + i)))
-    room.seals        = _label_gate(doors, _WLA_EXIT)
-    room._wla_lessons = tuple(lessons)
 
-    room.entities.append(Entity(kind='exit', row=_WLA_EXIT[0], col=_WLA_EXIT[1],
-                                edit_immune=True))
-    room.spawn_pos = (_WLA_LESSON_ROWS[0], _WLA_LBL_COL)       # on lesson 1's wrong word
-    room.exit_pos  = _WLA_EXIT
+    level = _Level(
+        name='The Change Annex', seed=seed,
+        rows=R, cols=C,
+        cells=[''.join(_CELL_CODE[c] for c in row) for row in cells],
+        spawn=(_WLA_LESSON_ROWS[0], _WLA_LBL_COL),   # on lesson 1's wrong word
+        exit=_WLA_EXIT,
+        char_runs=runs,
+        seals=list(_label_gate(doors, _WLA_EXIT)),
+        entities=[{'kind': 'exit', 'at': [_WLA_EXIT[0], _WLA_EXIT[1]],
+                   'edit_immune': True}],
+        solution=_wla_answer(lessons))     # the real keystroke tape (karaoke)
 
-    room.rebuild_indexes()
-    room.par    = _WLA_PAR
-    # The lesson is forced by PAR, not by the budget (a sub-optimal solve still
-    # WINS, it just misses two stars): `cE` is the only tool that is both correct
-    # (on a mixed door `ce` stops at the punctuation) AND par-optimal (`{n}s`
-    # overpays the 2-digit count), so an all-`s` solve lands one key over par per
-    # 2-digit door. The budget stays generous (par + TRIGGERS − 1) — enough to bar
-    # only the truly-old d/x + i route (par + TRIGGERS). See the playthrough tests.
-    room.budget = math.ceil(_WLA_PAR * 1.4)  # STANDARD (par-is-the-optimum law)
-    room.answer = _wla_answer(lessons)     # the real keystroke tape (karaoke)
-
-    dungeon = Dungeon(name='The Change Annex', seed=seed)
-    dungeon.rooms        = [room]
-    dungeon.current_room = 0
+    dungeon = _fmt_build(level, par=_WLA_PAR)
+    dungeon.rooms[0]._wla_lessons = tuple(lessons)
     return dungeon
 
 
