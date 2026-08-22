@@ -10534,6 +10534,8 @@ def build_dungeon_quartermaster(seed: int) -> Dungeon:
     stateless and undo-safe.
     """
     R, C = _QM_ROWS, _QM_COLS
+    from vimny.engine.editor import _CELL_CODE
+    from vimny.sharing.format import Level as _Level, build as _fmt_build
     cells = [[CellType.WALL] * C for _ in range(R)]
     for c in range(_QM_HALL_LO, _QM_HALL_HI + 1):
         cells[_QM_HALL_ROW][c] = CellType.FLOOR
@@ -10547,20 +10549,25 @@ def build_dungeon_quartermaster(seed: int) -> Dungeon:
     cells[_QM_HALL_ROW][_QM_BOLT_COLS[1]] = CellType.WALL
     cells[_QM_EXIT[0]][_QM_SEAL_COL] = CellType.WALL
 
-    room = Room(room_type=RoomType.ENTRY, rows=R, cols=C)
-    room.cells = cells
-    room.seed  = seed
-
-    room.char_runs.append(CharRun(*_QM_SOURCE, (_QM_FLAME,), 'flame'))
+    runs: list = []
+    runs.append({'row': _QM_SOURCE[0], 'col': _QM_SOURCE[1],
+                 'symbols': _QM_FLAME, 'kind': 'flame'})
     for (r, c) in (_QM_PED1, *((_QM_BRAZIER_ROW, c) for c in _QM_BRAZIER_COLS)):
-        room.char_runs.append(CharRun(r, c, (_QM_EMBERS,), 'pedestal'))
+        runs.append({'row': r, 'col': c, 'symbols': _QM_EMBERS, 'kind': 'pedestal'})
 
-    # The exit must not be deletable from under the level (nor its row
-    # dd-collapsible — immunity parries that, per the L18 refused-collapse rule).
-    room.entities.append(Entity(kind='exit', row=_QM_EXIT[0], col=_QM_EXIT[1],
-                                edit_immune=True))
-    room.spawn_pos = _QM_SPAWN
-    room.exit_pos  = _QM_EXIT
+    level = _Level(
+        name='The Beacon Tiers', seed=seed,
+        rows=R, cols=C,
+        cells=[''.join(_CELL_CODE[c] for c in row) for row in cells],
+        spawn=_QM_SPAWN,
+        exit=_QM_EXIT,
+        char_runs=runs,
+        entities=[{'kind': 'exit', 'at': [_QM_EXIT[0], _QM_EXIT[1]],
+                   'edit_immune': True}],   # nor its row dd-collapsible
+        solution='w yl w P G 3P yy p P k 0')
+
+    dungeon = _fmt_build(level, par=_QM_PAR)
+    room = dungeon.rooms[0]
     # Anchors read by main._quartermaster_tick (stored coordinates, the Cipher
     # Cell convention — a self-inflicted dd/linewise shift above them desyncs
     # the doors until u, which is the established recoverable failure mode).
@@ -10568,29 +10575,6 @@ def build_dungeon_quartermaster(seed: int) -> Dungeon:
     room._qm_bolt_cols = _QM_BOLT_COLS
     room._qm_braziers  = tuple((_QM_BRAZIER_ROW, c) for c in _QM_BRAZIER_COLS)
     room._qm_seal_col  = _QM_SEAL_COL
-
-    room.rebuild_indexes()
-    # Par tally (fixed geometry, so this holds for every seed):
-    #   w y l       (3)  → step to the flame; lift it (nothing is cut)
-    #   w P         (2)  → hall brazier: paste lights it; bolt B grinds back
-    #   4G          (2)  → line 4: land on the first cold beacon brazier
-    #   3P          (2)  → one count-paste fills all three (3p leaves the left cold)
-    #   y y p P     (4)  → yank the beacon row; one tier below, one ABOVE the
-    #                      copy — three tiers burn at rows 4/5/6 and the P
-    #                      leaves the cursor ONE row under the seal row (the
-    #                      exit row never shifts: p's insert is below it, P's
-    #                      is below it too). The p p route pays an extra k
-    #                      to climb back.
-    #   k 0         (2)  → up to the seal row; 0 walks west onto the exit
-    room.par    = _QM_PAR
-    room.budget = math.ceil(_QM_PAR * 1.4)
-    room.answer = 'w yl w P G 3P yy p P k 0'
-
-    apply_stone_fog(room)                 # the exit pocket sleeps under fog
-
-    dungeon = Dungeon(name='The Beacon Tiers', seed=seed)
-    dungeon.rooms        = [room]
-    dungeon.current_room = 0
     return dungeon
 
 
