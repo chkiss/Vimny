@@ -10096,17 +10096,17 @@ def build_dungeon_operators_vault(seed: int) -> Dungeon:
                                                   # gate opening IS the way down)
     floor(_OV_VAULT_ROW, 5, 19)                   # antechamber + vault
 
-    room = Room(room_type=RoomType.COMBAT, rows=R, cols=C)
-    room.cells     = cells
-    room.seed      = seed
-    room.spawn_pos = (3, _OV_LCOL)                # the line head, on C1's own
+    from vimny.engine.editor import _CELL_CODE
+    from vimny.sharing import format as _fmt
+    from vimny.sharing.format import Level as _Level, build as _fmt_build
+    spawn_pos = (3, _OV_LCOL)                     # the line head, on C1's own
                                                   # password: `dw` fires at once
-    room.exit_pos  = (33, 19)
-    room.char_runs = []
-    room.entities  = []
+    exit_pos  = (33, 19)
+    runs:   list = []
+    entities: list = []
 
     def word(r, c, text, kind='ember'):
-        room.char_runs.append(CharRun(row=r, col=c, symbols=tuple(text), kind=kind))
+        runs.append({'row': r, 'col': c, 'symbols': text, 'kind': kind})
 
     def phrase(r, c, text):
         # A multi-word password, laid as one run per token with a real gap
@@ -10117,7 +10117,7 @@ def build_dungeon_operators_vault(seed: int) -> Dungeon:
             c += len(tok) + 1
 
     def chest(r, c):
-        room.entities.append(Entity(kind='chest_scroll', row=r, col=c))
+        entities.append({'kind': 'chest_scroll', 'at': [r, c]})
 
     def fancy(r, c, password):
         # The corridor's gate. It opens for a register reading exactly its
@@ -10125,8 +10125,9 @@ def build_dungeon_operators_vault(seed: int) -> Dungeon:
         # motion the ONLY one that clears it: a narrower cut hands over a
         # fragment, a wider one hands over the fragment plus whatever it swept
         # up on the way. See Entity.password.
-        room.entities.append(Entity(kind='fancy_door', row=r, col=c,
-                                    password=password, edit_immune=True))
+        entities.append({'kind': 'fancy_door', 'at': [r, c],
+                         'password': password, 'edit_immune': True,
+                         'opaque': True})
 
     #: this seed's passwords, corridor number -> words (see _ov_passwords)
     pw = _ov_passwords(rng)
@@ -10282,11 +10283,10 @@ def build_dungeon_operators_vault(seed: int) -> Dungeon:
     fancy(31, 10, _p)
     chest(33, 7); chest(33, 12)                   # loot in the antechamber
     # the vault: the door and the way out
-    room.entities.append(Entity(kind='seal_door', row=_OV_DOOR[0], col=_OV_DOOR[1],
-                                edit_immune=True))
-    room.entities.append(Entity(kind='exit', row=33, col=19))
+    entities.append({'kind': 'seal_door', 'at': [_OV_DOOR[0], _OV_DOOR[1]],
+                     'edit_immune': True, 'opaque': True})
+    entities.append({'kind': 'exit', 'at': [33, 19]})
 
-    room.rebuild_indexes()
     # The west-face misted seep, laid BEFORE the fog so the law sees it as the
     # terrain it is. It runs on the CORRIDOR ROWS ONLY.
     #
@@ -10303,30 +10303,38 @@ def build_dungeon_operators_vault(seed: int) -> Dungeon:
     # The pits are no longer lit from the spawn, and that is the honest reading:
     # you meet each pit when you reach its corridor, not from the doorway of a
     # vault you have not opened.
+    mist: set = set()
     for r in _OV_CORR_ROWS:
         for c in (1, 2):
-            if room.cells[r][c] == CellType.WALL and (r, c) not in _OV_POCKETS:
-                room.cells[r][c] = CellType.WATER
-                room.mist_cells.add((r, c))
+            if cells[r][c] == CellType.WALL and (r, c) not in _OV_POCKETS:
+                cells[r][c] = CellType.WATER
+                mist.add((r, c))
     # …and the seep that teaches C10 (see _OV_SEEP_*). PLAIN water, deliberately
     # NOT misted: mist is permanent haze that a reveal never clears (it is what
     # stops the west channel laddering light past the gates), so a misted cell
     # can never be the thing a player is meant to SEE. Ordinary water conducts
     # the flood, surfaces with the shelf above it, and stops there — the ledge
     # below stays dark because row 31's floor starts east of this column.
-    room.cells[_OV_SEEP_WATER[0]][_OV_SEEP_WATER[1]] = CellType.WATER
-    _doors_block_sight(room)
-    room.fog_cells |= room.mist_cells      # mist is a SUBSET of fog by contract
-    room.par    = _OV_PAR                         # dd's Vim-true fnb landing
-    room.answer = _OV_ANSWER
-    room.budget = math.ceil(_OV_PAR * 1.4)        # STANDARD
+    cells[_OV_SEEP_WATER[0]][_OV_SEEP_WATER[1]] = CellType.WATER
+
+    def encode(r):
+        return ''.join(_fmt._MIST_CODE if (r, c) in mist else _CELL_CODE[ct]
+                       for c, ct in enumerate(cells[r]))
+
+    level = _Level(
+        name="The Operator's Vault", seed=seed,
+        rows=R, cols=C,
+        cells=[encode(r) for r in range(R)],
+        spawn=spawn_pos, exit=exit_pos,
+        char_runs=runs,
+        entities=entities,
+        solution=_OV_ANSWER)                      # dd's Vim-true fnb landing
+
+    dungeon = _fmt_build(level, par=_OV_PAR)
+    room = dungeon.rooms[0]
     # A d-operator teaching level: bare-w navigation must stay precise (text
     # words only), so opt out of the jump-to-entity word-stop behaviour.
     room.entity_word_stops = False
-
-    dungeon = Dungeon(name="The Operator's Vault", seed=seed)
-    dungeon.rooms        = [room]
-    dungeon.current_room = 0
     return dungeon
 
 
