@@ -9474,7 +9474,8 @@ def _par_spellwrights_forge():
 
 
 def build_dungeon_spellwrights_forge(seed: int) -> Dungeon:
-    dungeon = Dungeon(name="The Spellwright's Forge", seed=seed)
+    from vimny.engine.editor import _CELL_CODE
+    from vimny.sharing.format import Level as _Level, build as _fmt_build
     ROWS, COLS, W = _FORGE_ROWS, _FORGE_COLS, _FORGE_DIV
 
     cells = [[CellType.WALL] * COLS for _ in range(ROWS)]
@@ -9485,28 +9486,39 @@ def build_dungeon_spellwrights_forge(seed: int) -> Dungeon:
             cells[r][c] = CellType.FLOOR
     # col W is wall top-to-bottom except the seal door, which opens once the rites are true.
 
-    room = Room(room_type=RoomType.ENTRY, rows=ROWS, cols=COLS)
-    room.cells     = cells
-    room.seed      = seed
-    room.spawn_pos = (_FORGE_DOOR, 1)
-    room.exit_pos  = (_FORGE_DOOR, COLS - 2)
-    room.char_runs = []
-    for r, txt in _FORGE_A_WARDS:                 # Chamber A — corrupted ember wards
-        _forge_text(room, r, 2, txt, 'ember')
-    for r, txt in _FORGE_B_CORRUPT:               # Chamber B — corrupt verses (mend pale→pure)
-        _forge_text(room, r, 2, txt, 'ember')
-    _forge_text(room, _FORGE_B_KEEP[0], 2, _FORGE_B_KEEP[1], 'verdant')   # the TRUE pale ward
-    for r, txt in _FORGE_C_CURSED:                # Chamber C — cursed lines (delete)
-        _forge_text(room, r, 2, txt, 'ember')
-    for r, txt in _FORGE_C_KEEP:                  # the sacred lines (keep)
-        _forge_text(room, r, 2, txt, 'verdant')
+    def forge_text(runs, row, col, text, kind):
+        for i, ch in enumerate(text):
+            if ch != ' ':
+                runs.append({'row': row, 'col': col + i, 'symbols': ch,
+                             'kind': kind})
 
-    room.entities = [
-        Entity(kind='exit',         row=_FORGE_DOOR, col=COLS - 2),
-        # The sanctum's reward: an unassigned chest → a random relic scroll.
-        # ABOVE every cursed row, so :g/krzzt/d never collapses it.
-        Entity(kind='chest_scroll', row=_FORGE_CHEST[0], col=_FORGE_CHEST[1]),
-    ]
+    runs: list = []
+    for r, txt in _FORGE_A_WARDS:                 # Chamber A — corrupted ember wards
+        forge_text(runs, r, 2, txt, 'ember')
+    for r, txt in _FORGE_B_CORRUPT:               # Chamber B — corrupt verses (mend pale→pure)
+        forge_text(runs, r, 2, txt, 'ember')
+    forge_text(runs, _FORGE_B_KEEP[0], 2, _FORGE_B_KEEP[1], 'verdant')   # the TRUE pale ward
+    for r, txt in _FORGE_C_CURSED:                # Chamber C — cursed lines (delete)
+        forge_text(runs, r, 2, txt, 'ember')
+    for r, txt in _FORGE_C_KEEP:                  # the sacred lines (keep)
+        forge_text(runs, r, 2, txt, 'verdant')
+
+    level = _Level(
+        name="The Spellwright's Forge", seed=seed,
+        rows=ROWS, cols=COLS,
+        cells=[''.join(_CELL_CODE[c] for c in row) for row in cells],
+        spawn=(_FORGE_DOOR, 1),
+        exit=(_FORGE_DOOR, COLS - 2),
+        char_runs=runs,
+        entities=[
+            {'kind': 'exit', 'at': [_FORGE_DOOR, COLS - 2]},
+            # The sanctum's reward: an unassigned chest → a random relic scroll.
+            # ABOVE every cursed row, so :g/krzzt/d never collapses it.
+            {'kind': 'chest_scroll', 'at': [_FORGE_CHEST[0], _FORGE_CHEST[1]]},
+        ])
+
+    dungeon = _fmt_build(level)
+    room = dungeon.rooms[0]
     # The seal: the divider cell on the corridor row.  main._forge_check opens it once the
     # incantations RING TRUE — every line that should REMAIN must read its exact text
     # (Chamber A mended old→new with /g, Chamber B's two verses mended pale→pure, B's TRUE
@@ -9532,11 +9544,6 @@ def build_dungeon_spellwrights_forge(seed: int) -> Dungeon:
     room.par    = par
     room.budget = max(math.ceil(par * 1.4), 60)  # generous; the rites are exploratory
     room.answer = ans
-
-    room.rebuild_indexes()
-    apply_stone_fog(room)                 # sealed pockets sleep under fog
-    dungeon.rooms        = [room]
-    dungeon.current_room = 0
     return dungeon
 
 
