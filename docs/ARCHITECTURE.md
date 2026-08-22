@@ -287,7 +287,7 @@ The per-level `_par_<slug>` solvers compute each dungeon's minimum-keystroke par
 
 ## Open work
 The agreed six-phase **port** — one materialiser instead of two, so the forge is
-complete by construction rather than by assurance. Phases 0–4 landed, and the
+complete by construction rather than by assurance. Phases 0–5 landed, and the
 round-trip probe is now FULLY lossless: `KNOWN_GAPS` in `tests/test_round_trip.py`
 is empty (68/68 passing, checked 2026-08-21) — every shipped level rebuilds from
 its own file giving nothing back. Landing a format-affecting change still means
@@ -297,7 +297,7 @@ exemption is an audit passing vacuously.
 | # | Work | Buys |
 |---|---|---|
 | 0–4 | ✅ done (`5d07dcd`, `9cb7678`, `6a5bdb8`, 3 commits, `0ebb392`+`3ae5436`) | round-trip probe; derived fog; `Seal` generalised over 17 slugs; slot refs + forge affordances; rooms (`then`) |
-| 5 | `paste(level, into, at)` | `hall_of_echoes`; the forge gains level import |
+| 5 | ✅ done — `paste(level, into, at)` in `vimny/sharing/format.py`, tested by `tests/test_paste.py` (16 tests incl. a driven two-chamber macro gauntlet composed only from pasted fragments) | `hall_of_echoes`; the forge gains level import |
 | 6 | Builders return `Level`, level by level | one materialiser — **must answer for engine-only `Seal.message`** (an author-supplied banner is a text channel into another player's screen, so it is deliberately not in the file format; a shipped level rebuilt from its own file falls back to generic wording) |
 | — | excepted, by agreement | `archivists_library`, warden combat AI, `screen_vault` |
 

@@ -668,6 +668,121 @@ def resize(lvl: Level, rows: int, cols: int) -> Level:
     return replace(lvl, rows=rows, cols=cols, cells=out)
 
 
+def paste(level: Level, into: Level, at: tuple) -> Level:
+    """Stamp a single-room level onto another level's canvas.
+
+    The fragment's top-left cell lands on `at = (row, col)`. Everything
+    positional moves with it — the cells (and the mist encoded inside them),
+    fills, seals, char runs, entities and veiled plaques — and the host keeps
+    its own name, spawn, exit, seed and curriculum identity. A fragment is
+    geometry and content, no doors: its `spawn`/`exit` are ignored, because
+    where you come in and where you leave are decisions about the WHOLE map,
+    which is exactly what hall-of-echoes-style composition wants. The host's
+    fills are numbered before the fragment's (`all_fills` order), so tape
+    references to the HOST's fills keep meaning what they meant; references to
+    the fragment's own fills would move anyway — a paste rewrites coordinates,
+    and a solution recorded against the fragment's canvas stops playing at the
+    offset. The host level writes its own tape.
+
+    Refusals, all naming their field:
+      * a fragment with `then` rooms — stacking descents is not an operation;
+      * either side a wrap buffer — one folded logical line does not compose
+        onto a grid, and a reactive fold's geometry is reader-dependent;
+      * the footprint off the canvas — resize the host first, explicitly;
+      * any destination cell that is not untouched stone — paste stamps stone
+        onto stone only, so an import can never silently overwrite somebody's
+        floor (the rule resize set: refuse rather than drop).
+
+    The fragment's border ring is walls like any room's, so a legal paste
+    welds it seamlessly into the surrounding bands.
+    """
+    src = level.rooms[0]
+    dst = into.rooms[0]
+    if level.then:
+        raise LevelFormatError(
+            f'paste: a fragment must be one room — this level carries '
+            f'{len(level.then)} `then` room(s), and stacking descents is '
+            f'not an operation')
+    if src.wrap or src.wrap_width:
+        raise LevelFormatError(
+            'paste: the fragment is a wrap buffer — one folded logical line '
+            'does not compose onto a grid')
+    if dst.wrap or dst.wrap_width:
+        raise LevelFormatError(
+            'into: the host is a wrap buffer — paste composes plain grids only')
+
+    dr, dc = int(at[0]), int(at[1])
+    if dr < 0 or dc < 0:
+        raise LevelFormatError(
+            f'at: ({dr}, {dc}) — negative offsets have no meaning for a '
+            f'top-left landing point')
+    if dr + src.rows > dst.rows or dc + src.cols > dst.cols:
+        raise LevelFormatError(
+            f'at: a {src.rows}x{src.cols} fragment at ({dr}, {dc}) reaches '
+            f'row {dr + src.rows - 1}, column {dc + src.cols - 1}, past the '
+            f'host canvas of {dst.rows}x{dst.cols} — resize(into, …) first')
+
+    grid = [expand_row_mist(row, dst.cols, i, dst.where)
+            for i, row in enumerate(dst.cells)]
+    frag = [expand_row_mist(row, src.cols, i, src.where)
+            for i, row in enumerate(src.cells)]
+    for r in range(dr, dr + src.rows):
+        dcells = grid[r][0]
+        for c in range(dc, dc + src.cols):
+            if dcells[c] is not CellType.WALL:
+                raise LevelFormatError(
+                    f'at: ({dr}, {dc}) would land on floor already at row '
+                    f'{r}, column {c} — paste stamps stone onto stone only')
+
+    out = []
+    for r, (dcells, dmist) in enumerate(grid):
+        if dr <= r < dr + src.rows:
+            row = list(dcells)
+            fr, fmist = frag[r - dr]
+            row[dc:dc + src.cols] = fr
+            # Host mist outside the footprint keeps its column; the
+            # footprint's mist comes from the fragment, offset in.
+            mist = {c for c in dmist if not (dc <= c < dc + src.cols)}
+            mist |= {c + dc for c in fmist}
+            out.append(encode_row(row, mist))
+        else:
+            out.append(dst.cells[r])
+
+    def _mv(pos):
+        return (int(pos[0]) + dr, int(pos[1]) + dc)
+
+    fills = list(dst.fills) + [
+        replace(f, region=(f.region[0] + dr, f.region[1] + dc,
+                           f.region[2] + dr, f.region[3] + dc))
+        for f in src.fills]
+    seals = list(dst.seals) + [
+        replace(s,
+                opens=tuple(_mv(c) for c in s.opens),
+                region=((s.region[0] + dr, s.region[1] + dc,
+                         s.region[2] + dr, s.region[3] + dc)
+                        if s.region else ()))
+        for s in src.seals]
+    char_runs = list(dst.char_runs) + [
+        {**ru, 'row': int(ru['row']) + dr, 'col': int(ru['col']) + dc}
+        for ru in src.char_runs]
+    entities = list(dst.entities) + [
+        {**e, 'at': list(_mv(e['at']))} for e in src.entities]
+    veiled = ([tuple(v) for v in into.veiled] +
+              [(int(v[0]) + dr, int(v[1]) + dc) for v in src.veiled])
+    # A fragment whose fills draw on its OWN vocabulary brings those words:
+    # without the union its fills resolve against a pool that does not exist.
+    vocabulary = list(into.vocabulary)
+    seen = set(vocabulary)
+    for w in level.vocabulary:
+        if w not in seen:
+            seen.add(w)
+            vocabulary.append(w)
+
+    return replace(into, cells=out, fills=fills, seals=seals,
+                   char_runs=char_runs, entities=entities, veiled=veiled,
+                   vocabulary=vocabulary)
+
+
 def _content_extent(h: Room) -> tuple[int, int] | None:
     """The furthest row and column of the room anything at all occupies —
     floor, text, an entity, a fill, a seal, the spawn or the exit."""
