@@ -298,7 +298,8 @@ exemption is an audit passing vacuously.
 |---|---|---|
 | 0–4 | ✅ done (`5d07dcd`, `9cb7678`, `6a5bdb8`, 3 commits, `0ebb392`+`3ae5436`) | round-trip probe; derived fog; `Seal` generalised over 17 slugs; slot refs + forge affordances; rooms (`then`) |
 | 5 | ✅ done — `paste(level, into, at)` in `vimny/sharing/format.py`, tested by `tests/test_paste.py` (16 tests incl. a driven two-chamber macro gauntlet composed only from pasted fragments) | `hall_of_echoes`; the forge gains level import |
-| 6 | Builders return `Level`, level by level | one materialiser — **must answer for engine-only `Seal.message`** (an author-supplied banner is a text channel into another player's screen, so it is deliberately not in the file format; a shipped level rebuilt from its own file falls back to generic wording) |
+| 6 | **wave 1 under way** — 11 levels converted (2026-08-22): bracket, brace_square, quote, tag, sentence, paragraph, word enclosures; register_unnamed_hold, register_named_vault; sight_sanctum, selection_halls. Each emits a `Level` in file vocabulary and calls `format.build()`, proven identical to the hand-stamped builder across 24 seeds by an A/B harness (`/tmp` scratch, per-level). `_seal_banners` in `dungeon_gen.py` is the standing answer for engine-only `Seal.message`: banners are re-applied post-build, never format data | one materialiser, family by family |
+| — | wave-1 remainder: counting_crypts, line_halls, rune_halls, first_cave, character_cataracts, reliquary, word_forge, wet_ink, buried_word, stair_rail, g_sanctum, binders_reliquary, seekers_labyrinth, backward_vaults, bracket_vaults, grandmasters_sanctum, hall_of_echoes, dummy | |
 | — | excepted, by agreement | `archivists_library`, warden combat AI, `screen_vault` |
 
 Also open:
