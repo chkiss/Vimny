@@ -31,7 +31,7 @@ import vimny.render.colors as C
 import vimny.render.symbols as S
 import vimny.render.netrw_chrome as NC
 from vimny.content.levels import is_unlocked, level_type, key_for_slug
-from vimny.render.utils import inner_w as _iw, subtree_lines, tree_glyph
+from vimny.render.utils import inner_w as _iw, subtree_lines, tree_glyph, print_size_notice
 import vimny.features as FEAT
 
 
@@ -148,6 +148,8 @@ def render_overworld(term: Terminal, player: Player, progress: dict,
                      deleting: bool = False, renaming: str | None = None,
                      naming_new: bool = False,
                      scroll_offset: int = 0, col: int = 0) -> tuple[int, int, int]:
+    if print_size_notice(term):
+        return 0, 0, 0
     """Render the overworld; returns (scroll_offset, cursor_y, cursor_x) so the
     caller can place the live cursor. ``number_mode`` ∈ {'number','relativenumber','none'}."""
     iw  = _iw(term)

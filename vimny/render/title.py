@@ -25,7 +25,7 @@ from blessed import Terminal
 import vimny.render.colors as C
 import vimny.render.symbols as S
 from vimny.content.levels import LEVELS
-from vimny.render.utils import inner_w as _iw
+from vimny.render.utils import inner_w as _iw, print_size_notice
 
 NAME_MAX     = 20   # max adventurer name length
 _BOX_INNER_W = 48   # inner width of the wizard's quote box
@@ -290,6 +290,8 @@ def _render_frame(term: Terminal, iw: int, content: list[str],
     # Bottom border
     out.append(border_h(S.BOX_BL, S.BOX_BR))
 
+    if print_size_notice(term):
+        return
     print(term.home + '\n'.join(out), end='', flush=True)
 
 

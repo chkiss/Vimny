@@ -30,7 +30,7 @@ import vimny.render.symbols as S
 import vimny.render.netrw_chrome as NC
 from vimny.content.scrolls import SCROLL_CATALOG, RELIC_SCROLL_IDS
 from vimny.content.blessings import BLESSING_CATALOG
-from vimny.render.utils import inner_w as _iw, subtree_lines, tree_glyph
+from vimny.render.utils import inner_w as _iw, subtree_lines, tree_glyph, print_size_notice
 
 # Subtree labels (netrw directory style). Change these strings to rename
 # the categories everywhere.
@@ -221,5 +221,7 @@ def render_scroll_library(
                                     cmd_line, cmd_prefix))
     out.append(NC.border_h(iw, bfg, rst, S.BOX_BL, S.BOX_BR))
 
+    if print_size_notice(term):
+        return scroll_offset
     print(term.home + term.clear + '\n'.join(out), end='', flush=True)
     return scroll_offset

@@ -30,7 +30,7 @@ from vimny.engine.player import Player
 import vimny.render.colors as C
 import vimny.render.symbols as S
 import vimny.render.netrw_chrome as NC
-from vimny.render.utils import inner_w as _iw
+from vimny.render.utils import inner_w as _iw, print_size_notice
 
 
 def render_remote_shelf(
@@ -117,4 +117,6 @@ def render_remote_shelf(
     out.append(NC.bottom_statusline(iw, bfg, rst, sl_label, cursor_row, total, cmd_line))
     out.append(NC.border_h(iw, bfg, rst, S.BOX_BL, S.BOX_BR))
 
+    if print_size_notice(term):
+        return
     print(term.home + term.clear + '\n'.join(out), end='', flush=True)
