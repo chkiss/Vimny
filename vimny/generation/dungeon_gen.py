@@ -3227,33 +3227,31 @@ def build_dungeon_backward_vaults(seed: int) -> Dungeon:
     ge is structurally forced at C4 (b lands at wall in row 8, ge costs same as gE).
     gE is structurally forced at C6 — gE j (2+1=3 ks) beats 2ge j (3+1=4 ks).
     """
-    dungeon   = Dungeon(name='The Backward Vaults', seed=seed)
+    from vimny.engine.editor import _CELL_CODE
+    from vimny.sharing.format import Level as _Level, build as _fmt_build
     ROWS, COLS = _BACKWARD_VAULTS_TOTAL_ROWS, _BACKWARD_VAULTS_TOTAL_COLS
 
-    cells = [[CellType.WALL] * COLS for _ in range(ROWS)]
-    composite = Room(rows=ROWS, cols=COLS, room_type=RoomType.ENTRY)
-    composite.cells = cells
-    composite.seed  = seed
+    grid = [[CellType.WALL] * COLS for _ in range(ROWS)]
 
     # ── Carve corridors ───────────────────────────────────────────────────────
     for r in _BACKWARD_VAULTS_CORR_ROWS:
         for c in range(_BACKWARD_VAULTS_CORR_LEFT, _BACKWARD_VAULTS_CORR_RIGHT + 1):
-            cells[r][c] = CellType.CORRIDOR
+            grid[r][c] = CellType.CORRIDOR
 
     # ── Carve turn spans ──────────────────────────────────────────────────────
     for r0, r1, c0, c1 in _BACKWARD_VAULTS_TURN_SPANS:
         for r in range(r0, r1 + 1):
             for c in range(c0, c1 + 1):
-                cells[r][c] = CellType.CORRIDOR
+                grid[r][c] = CellType.CORRIDOR
 
     # ── Narrow-turn guard walls ────────────────────────────────────────────────
     # RT1 (rows 1-3, cols 36-38): block col 38 at row 2 so $ from C1 cannot
     # descend through the turn's far column — player must use 4e to land at
     # col 36 before descending.
-    cells[2][38] = CellType.WALL
+    grid[2][38] = CellType.WALL
     # LT1 (rows 3-5, cols 1-3): block col 1 at row 4 so 0 from C2 cannot
     # descend at the turn's near column — player must use ^ to land at col 2.
-    cells[4][1]  = CellType.WALL
+    grid[4][1]  = CellType.WALL
 
     # ── Character runs (seed-varying) ──────────────────────────────────────────
     _load_vocab_tables()
@@ -3270,17 +3268,17 @@ def build_dungeon_backward_vaults(seed: int) -> Dungeon:
     def _mixed_word(n: int) -> str:
         return rng.choice(mixed.get(n) or mixed[1])
 
-    runes: list = []
+    runs: list = []
 
     # C1 (row 1) — e-teaching: four 3-char clusters, individual characters
     for col, kind in ((5,'ancient'), (13,'verdant'), (22,'ember'), (34,'ancient')):
-        runes.append(CharRun(row=1, col=col,
-                                  symbols=(_sym(), _sym(), _sym()), kind=kind))
+        runs.append({'row': 1, 'col': col, 'symbols': _sym() + _sym() + _sym(),
+                     'kind': kind})
 
     # C2 (row 3) — b-teaching: four 3-char clusters, individual characters
     for col, kind in ((2,'ember'), (13,'verdant'), (21,'ancient'), (29,'ember')):
-        runes.append(CharRun(row=3, col=col,
-                                  symbols=(_sym(), _sym(), _sym()), kind=kind))
+        runs.append({'row': 3, 'col': col, 'symbols': _sym() + _sym() + _sym(),
+                     'kind': kind})
 
     # C3 (row 5) — decorative plain words (cols 4-35, safe of LT1/RT2 turns)
     c3c = 4
@@ -3288,9 +3286,8 @@ def build_dungeon_backward_vaults(seed: int) -> Dungeon:
         length = rng.randint(3, min(6, 35 - c3c + 1))
         if length < 3:
             break
-        runes.append(CharRun(row=5, col=c3c,
-                                  symbols=tuple(_plain_word(length)),
-                                  kind=rng.choice(('ancient','verdant','ember'))))
+        runs.append({'row': 5, 'col': c3c, 'symbols': _plain_word(length),
+                     'kind': rng.choice(('ancient','verdant','ember'))})
         c3c += length + rng.randint(1, 3)
 
     # C4 (row 7) — ge anchor: 4-char ALL-WC plain word at col 2 (end=5 lands in LT2 gap).
@@ -3299,9 +3296,8 @@ def build_dungeon_backward_vaults(seed: int) -> Dungeon:
     # A mixed anchor (e.g. 'win⚑') would let b land at col 5 in 1 ks, beating gE.
     _c4_pool = [w for w in (plain.get(4) or plain[3])
                 if all(c.isalpha() or c.isdigit() or c == '_' for c in w)]
-    runes.append(CharRun(row=7, col=2,
-                              symbols=tuple(rng.choice(_c4_pool or ['proc'])),
-                              kind='ancient'))
+    runs.append({'row': 7, 'col': 2,
+                 'symbols': rng.choice(_c4_pool or ['proc']), 'kind': 'ancient'})
 
     # C5 (row 9) — decorative mixed words (cols 7-36, safe of LT2/RT3 turns)
     c5c = 7
@@ -3309,9 +3305,8 @@ def build_dungeon_backward_vaults(seed: int) -> Dungeon:
         length = rng.randint(3, min(6, 36 - c5c + 1))
         if length < 3:
             break
-        runes.append(CharRun(row=9, col=c5c,
-                                  symbols=tuple(_mixed_word(length)),
-                                  kind=rng.choice(('ancient','verdant','ember'))))
+        runs.append({'row': 9, 'col': c5c, 'symbols': _mixed_word(length),
+                     'kind': rng.choice(('ancient','verdant','ember'))})
         c5c += length + rng.randint(1, 3)
 
     # C6 (row 11) — gE lesson: one WORD hop beats counting h
@@ -3332,41 +3327,42 @@ def build_dungeon_backward_vaults(seed: int) -> Dungeon:
     # Cols 2-16: seed-randomized mixed filler.
     _kinds3 = ('ancient', 'verdant', 'ember')
     _bb_kind = rng.choice(_kinds3)
-    runes.append(CharRun(row=11, col=21,
-                             symbols=tuple('b4¶♯∘m3†'), kind=_bb_kind))  # A: cols 21-28
-    runes.append(CharRun(row=11, col=29,
-                             symbols=('!', '='), kind=_bb_kind))          # S: cols 29-30
-    runes.append(CharRun(row=11, col=31,
-                             symbols=tuple('b3♯3m∘†♯'), kind=_bb_kind))  # B: cols 31-38
+    runs.append({'row': 11, 'col': 21, 'symbols': 'b4¶♯∘m3†',
+                 'kind': _bb_kind})                                   # A: cols 21-28
+    runs.append({'row': 11, 'col': 29, 'symbols': '!=',
+                 'kind': _bb_kind})                                   # S: cols 29-30
+    runs.append({'row': 11, 'col': 31, 'symbols': 'b3♯3m∘†♯',
+                 'kind': _bb_kind})                                   # B: cols 31-38
 
     # Anchor: 2-char cluster ending at col 19; col 20 always empty
-    runes.append(CharRun(row=11, col=18,
-                             symbols=(_sym(), _sym()), kind=rng.choice(_kinds3)))
+    runs.append({'row': 11, 'col': 18, 'symbols': _sym() + _sym(),
+                 'kind': rng.choice(_kinds3)})
 
     # Seed-randomized mixed filler in cols 2-16
     _c6c = 2
     while _c6c <= 16:
         _flen = rng.randint(1, max(1, min(3, 17 - _c6c)))
-        runes.append(CharRun(row=11, col=_c6c,
-                                 symbols=tuple(_sym() for _ in range(_flen)),
-                                 kind=rng.choice(_kinds3)))
+        runs.append({'row': 11, 'col': _c6c,
+                     'symbols': ''.join(_sym() for _ in range(_flen)),
+                     'kind': rng.choice(_kinds3)})
         _c6c += _flen + rng.randint(1, 2)
 
-    composite.char_runs = runes
+    level = _Level(
+        name='The Backward Vaults', seed=seed,
+        rows=ROWS, cols=COLS,
+        cells=[''.join(_CELL_CODE[c] for c in row) for row in grid],
+        spawn=(1, 1), exit=(12, 19),
+        char_runs=runs,
+        entities=[{'kind': 'exit', 'at': [12, 19]}])
 
-    composite.spawn_pos    = (1, 1)
-    composite.exit_pos = (12, 19)
-    composite.entities = [Entity(kind='exit', row=12, col=19)]
-
-    composite.rebuild_indexes()
-    par, path = _par_backward_vaults(composite, return_path=True)
+    dungeon = _fmt_build(level)
+    room = dungeon.rooms[0]
+    par, path = _par_backward_vaults(room, return_path=True)
     if par is None:
         par, path = 20, '4E 2j ^ 2j $ 2j ge 2j $ 2j gE j'
-    composite.par    = par
-    composite.budget = math.ceil(par * 1.4)
-    composite.answer = path
-    dungeon.rooms        = [composite]
-    dungeon.current_room = 0
+    room.par    = par
+    room.budget = math.ceil(par * 1.4)
+    room.answer = path
     return dungeon
 
 
