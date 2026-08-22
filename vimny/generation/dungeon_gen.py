@@ -8762,14 +8762,11 @@ def build_dungeon_runic_archives(seed: int) -> 'Dungeon':
 
     Optimal path (par=7):  { x } } $ p $   (spawn (9,20), a blank row)
     """
-    dungeon   = Dungeon(name='The Runic Archives', seed=seed)
+    from vimny.engine.editor import _CELL_CODE
+    from vimny.sharing.format import Level as _Level, build as _fmt_build
     ROWS, COLS = _RUNIC_ARCHIVES_ROWS, _RUNIC_ARCHIVES_COLS
 
     cells = [[CellType.WALL] * COLS for _ in range(ROWS)]
-    composite = Room(rows=ROWS, cols=COLS, room_type=RoomType.ENTRY)
-    composite.cells = cells
-    composite.seed  = seed
-
     # Main area: rows 1–20, cols 1–42
     for r in range(1, 21):
         for c in range(1, 43):
@@ -8801,7 +8798,8 @@ def build_dungeon_runic_archives(seed: int) -> 'Dungeon':
                 w = len(syms)
                 if (c + w - 1 <= col_end
                         and not any(sk in range(c, c + w) for sk in skip_cols)):
-                    runes.append(CharRun(row=row, col=c, symbols=syms, kind=kind))
+                    runes.append({'row': row, 'col': c,
+                                  'symbols': ''.join(syms), 'kind': kind})
                     c += w + rng.randint(2, 3)
                     first = False
                     continue
@@ -8818,29 +8816,33 @@ def build_dungeon_runic_archives(seed: int) -> 'Dungeon':
     for r in (16, 18):
         _fill_row(r)
 
-    runes.append(CharRun(row=_RUNIC_ARCHIVES_VOID_POS[0], col=_RUNIC_ARCHIVES_VOID_POS[1],
-                             symbols=('○',), kind='void'))
-    composite.char_runs = runes
+    runes.append({'row': _RUNIC_ARCHIVES_VOID_POS[0],
+                  'col': _RUNIC_ARCHIVES_VOID_POS[1],
+                  'symbols': '○', 'kind': 'void'})
 
-    composite.spawn_pos   = _RUNIC_ARCHIVES_ENTRY
-    composite.exit_pos = _RUNIC_ARCHIVES_EXIT
-    composite.entities = [
-        Entity(kind='floor_key',   row=_RUNIC_ARCHIVES_KEY_POS[0],  col=_RUNIC_ARCHIVES_KEY_POS[1]),
-        Entity(kind='locked_door', row=_RUNIC_ARCHIVES_DOOR_POS[0], col=_RUNIC_ARCHIVES_DOOR_POS[1]),
-        Entity(kind='exit',        row=_RUNIC_ARCHIVES_EXIT[0],     col=_RUNIC_ARCHIVES_EXIT[1]),
-    ]
+    level = _Level(
+        name='The Runic Archives', seed=seed,
+        rows=ROWS, cols=COLS,
+        cells=[''.join(_CELL_CODE[c] for c in row) for row in cells],
+        spawn=_RUNIC_ARCHIVES_ENTRY, exit=_RUNIC_ARCHIVES_EXIT,
+        char_runs=runes,
+        entities=[
+            {'kind': 'floor_key',   'at': [_RUNIC_ARCHIVES_KEY_POS[0],
+                                           _RUNIC_ARCHIVES_KEY_POS[1]]},
+            {'kind': 'locked_door', 'at': [_RUNIC_ARCHIVES_DOOR_POS[0],
+                                           _RUNIC_ARCHIVES_DOOR_POS[1]]},
+            {'kind': 'exit',        'at': [_RUNIC_ARCHIVES_EXIT[0],
+                                           _RUNIC_ARCHIVES_EXIT[1]]},
+        ])
 
-    composite.rebuild_indexes()
-
-    par, path = _par_runic_archives(composite, return_path=True)
+    dungeon = _fmt_build(level)
+    room = dungeon.rooms[0]
+    par, path = _par_runic_archives(room, return_path=True)
     if par is None:
         par, path = _RUNIC_ARCHIVES_PAR, _RUNIC_ARCHIVES_ANSWER
-    composite.par    = par
-    composite.budget = math.ceil(par * 1.4)
-    composite.answer = path
-
-    dungeon.rooms        = [composite]
-    dungeon.current_room = 0
+    room.par    = par
+    room.budget = math.ceil(par * 1.4)
+    room.answer = path
     return dungeon
 
 
