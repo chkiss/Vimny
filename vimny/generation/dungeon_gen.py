@@ -5531,70 +5531,66 @@ def _pe_draw_words(rng) -> dict:
 def build_dungeon_paragraph_enclosure(seed: int) -> Dungeon:
     """The Paragraph Enclosure (slug `paragraph_enclosure`): ip ap — the
     blank-row-bounded block under your hand, from anywhere inside it."""
+    from vimny.engine.editor import _CELL_CODE
+    from vimny.sharing.format import Level as _Level, build as _fmt_build
     rng = random.Random(seed)
     words = _pe_draw_words(rng)
 
     R, C = _PE_ROWS, _PE_COLS
-    cells = [[CellType.WALL] * C for _ in range(R)]
+    grid = [[CellType.WALL] * C for _ in range(R)]
     for r in range(1, _PE_GATE):                         # the hall: full-width
         for c in range(1, C - 2):
-            cells[r][c] = CellType.FLOOR
+            grid[r][c] = CellType.FLOOR
     # The watch-gap's west end is walled: `}` from the west aisle refuses a
     # walled column (it never skips ahead), so V}d from the second canto's
     # top row cannot grab exactly canto+gap for 3 keys and tie par — the
     # visual route must first pay its way east onto the verse.
     for c in range(1, _PE_GUARD_COLS[0] - 2):
-        cells[_PE_GUARD][c] = CellType.WALL
+        grid[_PE_GUARD][c] = CellType.WALL
     for c in range(1, _PE_EXIT[1]):                      # gate row: aisle to the seal
-        cells[_PE_GATE][c] = CellType.FLOOR
+        grid[_PE_GATE][c] = CellType.FLOOR
     # _PE_EXIT itself stays WALL — the seal; plain stone until the measure holds.
 
-    room = Room(room_type=RoomType.ENTRY, rows=R, cols=C)
-    room.cells = cells
-    room.seed  = seed
-
+    runs: list = []
     for r, parts in words.items():                       # the cantos' verses
         col = _PE_TEXT0
         for w in parts:                                  # per-word runs (the
-            room.char_runs.append(CharRun(r, col, tuple(w), 'ancient'))
+            runs.append({'row': r, 'col': col, 'symbols': w,
+                         'kind': 'ancient'})
             col += len(w) + 1                            # space-glyph law)
     # The gate plaque (floor runes): names the measure, and — being char runs —
     # keeps the gate row non-blank so dap's blank-run extension stops here.
     col = _PE_TEXT0
     for part in ('sign', 'and', 'seal'):
-        room.char_runs.append(CharRun(_PE_GATE, col, tuple(part), 'verdant'))
+        runs.append({'row': _PE_GATE, 'col': col, 'symbols': part,
+                     'kind': 'verdant'})
         col += len(part) + 1
-    room._pe_words = words
 
-    room.entities.append(Entity(kind='exit', row=_PE_EXIT[0], col=_PE_EXIT[1],
-                                edit_immune=True))
+    entities = [{'kind': 'exit', 'at': [_PE_EXIT[0], _PE_EXIT[1]],
+                 'edit_immune': True}]
     # The sigil's flames — NOT edit_immune: a cut through a flame's row
     # succeeds and extinguishes it (the hole in the sigil shows the player
     # exactly which row should have survived); undo relights it.
     for br, bc in _PE_BRAZIERS:
-        room.entities.append(Entity(kind='brazier', row=br, col=bc,
-                                    hp=1, max_hp=1, ai=''))
+        entities.append({'kind': 'brazier', 'at': [br, bc], 'hp': 1, 'max_hp': 1})
     for lo, hi in (_PE_P1, _PE_P2):                      # one sentinel per verse row
         for r in range(lo, hi + 1):
-            room.entities.append(Entity(kind='goblin', row=r,
-                                        col=rng.randint(*_PE_GOB_COLS),
-                                        hp=1, max_hp=1, ai=''))
+            entities.append({'kind': 'goblin', 'at': [r, rng.randint(*_PE_GOB_COLS)],
+                             'hp': 1, 'max_hp': 1})
     for gc in _PE_GUARD_COLS:                            # the watch-gap: no runes
-        room.entities.append(Entity(kind='goblin', row=_PE_GUARD, col=gc,
-                                    hp=1, max_hp=1, ai=''))
+        entities.append({'kind': 'goblin', 'at': [_PE_GUARD, gc],
+                         'hp': 1, 'max_hp': 1})
 
-    room.spawn_pos = _PE_SPAWN
-    room.exit_pos  = _PE_EXIT
+    level = _Level(
+        name='The Paragraph Enclosure', seed=seed,
+        rows=R, cols=C,
+        cells=[''.join(_CELL_CODE[c] for c in row) for row in grid],
+        spawn=_PE_SPAWN, exit=_PE_EXIT,
+        char_runs=runs, entities=entities,
+        solution='j dip j dap $')
 
-    room.rebuild_indexes()
-    apply_stone_fog(room)                 # the sealed exit pocket sleeps under fog
-    room.par    = _PE_PAR
-    room.budget = math.ceil(_PE_PAR * 1.4)  # STANDARD: the counted-cut route wins at 1★
-    room.answer = 'j dip j dap $'
-
-    dungeon = Dungeon(name='The Paragraph Enclosure', seed=seed)
-    dungeon.rooms        = [room]
-    dungeon.current_room = 0
+    dungeon = _fmt_build(level, par=_PE_PAR)
+    dungeon.rooms[0]._pe_words = words
     return dungeon
 
 
