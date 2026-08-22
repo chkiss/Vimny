@@ -555,16 +555,20 @@ def _par_counting_crypts(composite, door_cols: list, return_path: bool = False):
 
 
 def build_dungeon_first_cave(seed: int) -> Dungeon:
+    from vimny.engine.editor import _CELL_CODE
+    from vimny.sharing.format import Level as _Level, build as _fmt_build
     rng = random.Random(seed)
-    dungeon = Dungeon(name='The First Cave', seed=seed)
     CORRIDOR_LEN = 4
 
     plan = LEVEL_0_PLAN
     total_cols = sum(c for _, _, c in plan) + CORRIDOR_LEN * (len(plan) - 1)
     total_rows = max(r for _, r, _ in plan)
 
-    # Build unified cell grid
+    # A scratch room for the placement/carving helpers to mutate; the Level is
+    # projected from it once the floor settles.
+    scratch = Room(room_type=RoomType.ENTRY, rows=total_rows, cols=total_cols)
     cells = [[CellType.WALL] * total_cols for _ in range(total_rows)]
+    scratch.cells = cells
 
     col_offset = 0
     offsets = []
@@ -592,15 +596,6 @@ def build_dungeon_first_cave(seed: int) -> Dungeon:
             cells[mid][c]     = CellType.CORRIDOR
             cells[mid - 1][c] = CellType.CORRIDOR
 
-    # Build a single composite room representing the dungeon floor
-    composite = Room(room_type=RoomType.ENTRY, rows=total_rows, cols=total_cols)
-    composite.cells = cells
-    composite.seed  = seed
-
-    # Entry: top-left interior of Room 0 → forces the player to use j (down)
-    # to reach the corridor, and k (up) to reach the exit.
-    composite.spawn_pos = (1, 2)
-
     # Exit: top-left interior of Room 2 (col offsets[-1]+1).
     # Player arrives at corridor rows 4-5 at the left edge of Room 2 and must
     # go UP (k) — but void guards at rows 2-3 block the straight-up path,
@@ -608,14 +603,17 @@ def build_dungeon_first_cave(seed: int) -> Dungeon:
     # This guarantees all four of h/j/k/l are required on every seed.
     exit_col_offset = offsets[-1]
     ex_c = exit_col_offset + 1   # = 47, leftmost interior col of Room 2
-    composite.exit_pos = (1, ex_c)
-    composite.entities.append(Entity(kind='exit', row=1, col=ex_c))
+
+    # Entry: top-left interior of Room 0 → forces the player to use j (down)
+    # to reach the corridor, and k (up) to reach the exit.
+    # The placer reads these to keep runes off the endpoints.
+    scratch.spawn_pos = (1, 2)
+    scratch.exit_pos  = (1, ex_c)
 
     # Greedily fill all three rooms (void runes included), then guarantee a route.
-    composite.char_runs.clear()
     rune_rng = random.Random(rng.randint(0, 2**31))
     for i, (_, room_rows, room_cols) in enumerate(plan):
-        _place_runes_in_room(composite, rune_rng, offsets[i],
+        _place_runes_in_room(scratch, rune_rng, offsets[i],
                              room_rows, room_cols, total_rows)
 
     # Hard-coded void guards: block (2, ex_c) and (3, ex_c) so the player cannot
@@ -623,19 +621,19 @@ def build_dungeon_first_cave(seed: int) -> Dungeon:
     # Room 2, up to row 1, then press h to reach the exit.  Remove any random
     # character that would shadow these hard-coded voids.
     for void_row in (2, 3):
-        composite.char_runs = [
-            ru for ru in composite.char_runs
+        scratch.char_runs = [
+            ru for ru in scratch.char_runs
             if not (ru.row == void_row
                     and ru.col <= ex_c < ru.col + len(ru.symbols))
         ]
-    composite.char_runs.append(CharRun(row=2, col=ex_c, symbols=('○',), kind='void'))
-    composite.char_runs.append(CharRun(row=3, col=ex_c, symbols=('○',), kind='void'))
+    scratch.char_runs.append(CharRun(row=2, col=ex_c, symbols=('○',), kind='void'))
+    scratch.char_runs.append(CharRun(row=3, col=ex_c, symbols=('○',), kind='void'))
 
     # Never leave a void rune sitting on the entry or exit itself.
-    entry_r, entry_c = composite.spawn_pos
-    exit_r,  exit_c  = composite.exit_pos
-    composite.char_runs = [
-        ru for ru in composite.char_runs
+    entry_r, entry_c = (1, 2)
+    exit_r,  exit_c  = (1, ex_c)
+    scratch.char_runs = [
+        ru for ru in scratch.char_runs
         if ru.kind != 'void' or not any(
             (ru.row == r and ru.col <= c < ru.col + len(ru.symbols))
             for r, c in ((entry_r, entry_c), (exit_r, exit_c))
@@ -645,20 +643,28 @@ def build_dungeon_first_cave(seed: int) -> Dungeon:
     # The greedy fill packs the cave with void; clear void off one floor route to
     # the exit (steered around the row-2/3 guards so the forced detour survives),
     # guaranteeing the level is solvable.
-    _carve_void_path(composite, protected={(2, ex_c), (3, ex_c)})
+    _carve_void_path(scratch, protected={(2, ex_c), (3, ex_c)})
 
-    par, path = _bfs_par(composite, return_path=True)
+    level = _Level(
+        name='The First Cave', seed=seed,
+        rows=total_rows, cols=total_cols,
+        cells=[''.join(_CELL_CODE[c] for c in row) for row in cells],
+        spawn=(1, 2), exit=(1, ex_c),
+        char_runs=[{'row': ru.row, 'col': ru.col,
+                    'symbols': ''.join(ru.symbols), 'kind': ru.kind}
+                   for ru in scratch.char_runs],
+        entities=[{'kind': 'exit', 'at': [1, ex_c]}])
+
+    dungeon = _fmt_build(level)
+    room = dungeon.rooms[0]
+    par, path = _bfs_par(room, return_path=True)
     if par is None:
         par, path = 100, ''
 
     # Budget: ceil(par × 1.4) per spec formula.
-    composite.par    = par
-    composite.budget = math.ceil(par * 1.4)
-    composite.answer = path
-
-    composite.rebuild_indexes()
-    dungeon.rooms = [composite]
-    dungeon.current_room = 0
+    room.par    = par
+    room.budget = math.ceil(par * 1.4)
+    room.answer = path
     return dungeon
 
 
