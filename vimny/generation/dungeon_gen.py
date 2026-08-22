@@ -12352,6 +12352,8 @@ def build_dungeon_alignment_halls(seed: int) -> Dungeon:
     check is exact-text-at-exact-column; the exit is the final seal. See the
     section header for the forcing."""
     R, C = _AH_ROWS, _AH_COLS
+    from vimny.engine.editor import _CELL_CODE
+    from vimny.sharing.format import Level as _Level, build as _fmt_build
     cells = [[CellType.WALL] * C for _ in range(R)]
     for r in _AH_LESSON_ROWS:                            # the open block
         for c in range(_AH_COL_S, _AH_FLOOR_END + 1):
@@ -12361,42 +12363,39 @@ def build_dungeon_alignment_halls(seed: int) -> Dungeon:
     # bolts AND the exit stay WALL — the tick opens the bolts per seated word
     # and parts the FINAL SEAL when all five stand on the register.
 
-    room = Room(room_type=RoomType.ENTRY, rows=R, cols=C)
-    room.cells = cells
-    room.seed  = seed
-
-    def lay(r, c, text, kind):
-        room.char_runs.append(CharRun(r, c, tuple(text), kind))
-
+    runs: list = []
     for br in _AH_BAND_ROWS:                             # the plumb line marks
-        lay(br, _AH_REGISTER, '│', 'verdant')
+        runs.append({'row': br, 'col': _AH_REGISTER, 'symbols': '│',
+                     'kind': 'verdant'})
 
     doors = []
     lessons = []
     for i, (kind, target, wrong, offset) in enumerate(_AH_LESSONS):
         lrow = _AH_LESSON_ROWS[i]
-        lay(lrow, _AH_REGISTER + offset, wrong, 'ancient')   # mis-set (mis-cased) word
-        lay(lrow, _AH_PLQ_COL, target, 'verdant')            # the true form, west wall
+        runs.append({'row': lrow, 'col': _AH_REGISTER + offset,
+                     'symbols': wrong, 'kind': 'ancient'})   # mis-set (mis-cased) word
+        runs.append({'row': lrow, 'col': _AH_PLQ_COL, 'symbols': target,
+                     'kind': 'verdant'})                     # the true form, west wall
         doors.append((target, _AH_GATE_COL0 + i))
         lessons.append({'kind': kind, 'target': target, 'wrong': wrong,
                         'offset': offset, 'row': lrow})
+
+    level = _Level(
+        name='The Alignment Halls', seed=seed,
+        rows=R, cols=C,
+        cells=[''.join(_CELL_CODE[c] for c in row) for row in cells],
+        spawn=(_AH_LESSON_ROWS[0], _AH_COL_S),               # on row one, at the spine
+        exit=_AH_EXIT,
+        char_runs=runs,
+        entities=[{'kind': 'exit', 'at': [_AH_EXIT[0], _AH_EXIT[1]],
+                   'edit_immune': True}],
+        solution=_AH_ANSWER)
+
+    dungeon = _fmt_build(level, par=_AH_PAR)
+    room = dungeon.rooms[0]
     room._ah_doors        = tuple(doors)
     room._ah_register_col = _AH_REGISTER
     room._ah_lessons      = tuple(lessons)
-
-    room.entities.append(Entity(kind='exit', row=_AH_EXIT[0], col=_AH_EXIT[1],
-                                edit_immune=True))
-    room.spawn_pos = (_AH_LESSON_ROWS[0], _AH_COL_S)     # on row one, at the spine
-    room.exit_pos  = _AH_EXIT
-
-    room.rebuild_indexes()
-    room.par    = _AH_PAR
-    room.budget = math.ceil(_AH_PAR * 1.4)   # STANDARD: R-retype wins at 1 star inside it
-    room.answer = _AH_ANSWER
-
-    dungeon = Dungeon(name='The Alignment Halls', seed=seed)
-    dungeon.rooms        = [room]
-    dungeon.current_room = 0
     return dungeon
 
 
