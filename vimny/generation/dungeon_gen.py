@@ -1243,15 +1243,16 @@ def build_dungeon_rune_halls(seed: int) -> Dungeon:
     Void clusters at each turn-room middle row block straight j/k traversal,
     forcing count-j to skip them — reinforcing the level-2 count motion.
     """
+    from vimny.engine.editor import _CELL_CODE
+    from vimny.sharing.format import Level as _Level, build as _fmt_build
     rng     = random.Random(seed)
-    dungeon = Dungeon(name='The Rune Halls', seed=seed)
 
-    cells = [[CellType.WALL] * _RUNE_HALLS_TOTAL_COLS for _ in range(_RUNE_HALLS_TOTAL_ROWS)]
-
-    composite = Room(room_type=RoomType.ENTRY,
-                     rows=_RUNE_HALLS_TOTAL_ROWS, cols=_RUNE_HALLS_TOTAL_COLS)
-    composite.cells = cells
-    composite.seed  = seed
+    # A scratch room for the corridor carver to mutate; the Level is projected
+    # from it each attempt.
+    scratch = Room(room_type=RoomType.ENTRY,
+                   rows=_RUNE_HALLS_TOTAL_ROWS, cols=_RUNE_HALLS_TOTAL_COLS)
+    grid = [[CellType.WALL] * _RUNE_HALLS_TOTAL_COLS for _ in range(_RUNE_HALLS_TOTAL_ROWS)]
+    scratch.cells = grid
 
     # ── Carve turn rooms ──────────────────────────────────────────────────────
     turn_spans = [
@@ -1264,7 +1265,7 @@ def build_dungeon_rune_halls(seed: int) -> Dungeon:
         c0, c1 = sorted((ca, cb))  # handles ca > cb safely
         for row in range(r0, r1 + 1):
             for col in range(c0, c1 + 1):
-                cells[row][col] = CellType.CORRIDOR
+                grid[row][col] = CellType.CORRIDOR
 
     # ── Hard-coded characters (deterministic; placed before random fill) ──────
     # All positions are fixed regardless of seed.  Placing them first in the
@@ -1295,32 +1296,38 @@ def build_dungeon_rune_halls(seed: int) -> Dungeon:
         for c in range(ru.col, ru.col + len(ru.symbols))
     )
 
-    composite.spawn_pos    = (1, 1)
-    composite.exit_pos = (13, 44)
-    composite.entities = [Entity(kind='exit', row=13, col=44)]
+    def _project(runs) -> '_Level':
+        return _Level(
+            name='The Rune Halls', seed=seed,
+            rows=_RUNE_HALLS_TOTAL_ROWS, cols=_RUNE_HALLS_TOTAL_COLS,
+            cells=[''.join(_CELL_CODE[c] for c in row) for row in grid],
+            spawn=(1, 1), exit=(13, 44),
+            char_runs=[{'row': ru.row, 'col': ru.col,
+                        'symbols': ''.join(ru.symbols), 'kind': ru.kind}
+                       for ru in runs],
+            entities=[{'kind': 'exit', 'at': [13, 44]}])
 
     # ── Carve and populate character corridors (up to 20 attempts for valid par) ──
+    dungeon = None
     for _attempt in range(20):
         # Hard-coded runes first so char_run_at() always finds them before random ones
-        composite.char_runs = list(_rune_halls_hardcoded)
+        scratch.char_runs = list(_rune_halls_hardcoded)
         rune_rng = random.Random(rng.randint(0, 2**31))
 
         for row_top in _RUNE_HALLS_CORR_TOP_ROWS:
-            _make_rune_corridor(composite, rune_rng, row_top, blocked=blocked)
+            _make_rune_corridor(scratch, rune_rng, row_top, blocked=blocked)
 
-        composite.rebuild_indexes()
-        par, path = _dijkstra_par_wbe(composite, return_path=True)
+        dungeon = _fmt_build(_project(scratch.char_runs))
+        par, path = _dijkstra_par_wbe(dungeon.rooms[0], return_path=True)
         if par is not None:
             break
     else:
         par, path = 80, ''
 
-    composite.par    = par
-    composite.budget = math.ceil(par * 1.4)
-    composite.answer = path
-
-    dungeon.rooms        = [composite]
-    dungeon.current_room = 0
+    room = dungeon.rooms[0]
+    room.par    = par
+    room.budget = math.ceil(par * 1.4)
+    room.answer = path
     return dungeon
 
 
