@@ -6161,18 +6161,21 @@ def _he_poem_chamber(poem) -> dict:
             'plaques': (), 'tape': 'qa daw j q 9@a 0 2j', 'poem': _name}
 
 
-def _he_gauntlet_map(chambers, seed) -> Room:
+def _he_gauntlet_map(chambers, seed) -> 'Dungeon':
     """The replica chambers on ONE tall map (the viewport scrolls): runs of
     text rows split by stone bands, a west gate in each band that grinds
     open as its chamber reads true (sight floods down to the next), and the
     exit in the last band, demanding EVERY chamber true. The poem hall is the
     first run (top of the map); a chamber's plaques (the Echo Vault's true
     readings) sit wall-embedded in the stone band directly above its run."""
+    from vimny.engine.editor import _CELL_CODE
+    from vimny.sharing.format import Level as _Level, build as _fmt_build
     chain = tuple((ch['done'], None, ch.get('combat', False)) for ch in chambers)
     ROWS = 2 + sum(len(ch['rows']) for ch in chambers) + len(chambers)
     C = _HE_COLS
-    cells = [[CellType.WALL] * C for _ in range(ROWS)]
-    room = Room(room_type=RoomType.ENTRY, rows=ROWS, cols=C)
+    grid = [[CellType.WALL] * C for _ in range(ROWS)]
+    runs: list = []
+    ents: list = []
     r = 2                                           # 0 border, 1 first band
     for ch in chambers:
         lo, hi = ch['span']
@@ -6180,33 +6183,40 @@ def _he_gauntlet_map(chambers, seed) -> Room:
         last_row = r
         for row in ch['rows']:
             for c in range(lo, hi + 1):
-                cells[r][c] = CellType.FLOOR
+                grid[r][c] = CellType.FLOOR
             for col, text, kind in row:
                 for piece_col, piece in _he_pieces(col, text):
-                    room.char_runs.append(CharRun(r, piece_col, tuple(piece), kind))
+                    runs.append({'row': r, 'col': piece_col, 'symbols': piece,
+                                 'kind': kind})
             last_row = r
             r += 1
         for gc in ch.get('goblins', ()):            # the lair's stationary foes
-            room.entities.append(Entity(kind='goblin', row=last_row, col=gc,
-                                        hp=1, max_hp=1, ai=''))
+            ents.append({'kind': 'goblin', 'at': [last_row, gc],
+                         'hp': 1, 'max_hp': 1, 'ai': ''})
         # a chamber's plaques: the true readings, sealed in the stone band
         # above its run (wall cells — uncuttable, off the floor scans).
         for col, text, kind in ch.get('plaques', ()):
             for piece_col, piece in _he_pieces(col, text):
-                room.char_runs.append(CharRun(start - 1, piece_col, tuple(piece), kind))
+                runs.append({'row': start - 1, 'col': piece_col,
+                             'symbols': piece, 'kind': kind})
         r += 1                                      # the stone band (gate shut)
-    room.cells = cells
-    room.seed  = seed
+
+    level = _Level(
+        name='The Hall of Echoes', seed=seed,
+        rows=ROWS, cols=C,
+        cells=[''.join(_CELL_CODE[c] for c in row) for row in grid],
+        spawn=(2, _HE_TX),                          # the poem run's head
+        exit=(ROWS - 1, _HE_GATE_COL),              # in the last band
+        char_runs=runs,
+        entities=ents + [{'kind': 'exit',
+                          'at': [ROWS - 1, _HE_GATE_COL], 'edit_immune': True}])
+
+    dungeon = _fmt_build(level)
+    room = dungeon.rooms[0]
     room._heg_chain = chain
     room._he_poem  = chambers[0].get('poem')        # the poem hall's rhyme name
-    room.spawn_pos = (2, _HE_TX)                     # the poem run's head
-    room.exit_pos  = (ROWS - 1, _HE_GATE_COL)       # in the last band
-    room.entities.append(Entity(kind='exit', row=ROWS - 1, col=_HE_GATE_COL,
-                                edit_immune=True))
-    room.rebuild_indexes()
-    apply_stone_fog(room)
     room.answer = ' '.join(ch['tape'] for ch in chambers)
-    return room
+    return dungeon
 
 
 def _he_pieces(col, text):
@@ -6228,13 +6238,10 @@ def build_dungeon_hall_of_echoes(seed: int) -> Dungeon:
     # the poem hall is the FIRST run of ONE tall map — the descent never
     # leaves it (rooms 2+ must continue the same map, not a new one)
     chambers = [_he_poem_chamber(poem)] + _he_build_chambers(rng)
-    room = _he_gauntlet_map(chambers, seed)
+    dungeon = _he_gauntlet_map(chambers, seed)
+    room = dungeon.rooms[0]
     room.par    = _HE_PAR
     room.budget = math.ceil(_HE_PAR * 1.4)   # STANDARD (par-is-the-optimum law)
-
-    dungeon = Dungeon(name='The Hall of Echoes', seed=seed)
-    dungeon.rooms        = [room]
-    dungeon.current_room = 0
     return dungeon
 
 
