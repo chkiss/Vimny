@@ -33,14 +33,22 @@ def _home() -> Path:
     for var in ('SUDO_USER', 'DOAS_USER'):
         user = os.environ.get(var)
         if user and user != 'root' and pwd is not None:
-            return Path(pwd.getpwnam(user).pw_dir)
-    home = Path.home()
-    if home == Path('/root'):
+            try:
+                return Path(pwd.getpwnam(user).pw_dir)
+            except KeyError:
+                break          # env names an unknown user — fall through to our own home
+    return Path.home()
+
+
+def _guard_writable_home() -> None:
+    """Refuse to WRITE under /root — called by the write paths, never at
+    import, so a root shell gets a clean message instead of every entry
+    point dying before main()."""
+    if _home() == Path('/root'):
         raise RuntimeError(
             'Vimny refuses to write save files to /root/. '
             'Run as a non-root user or via sudo from a normal account.'
         )
-    return home
 
 SAVE_DIR    = _home() / '.Vimny'
 SAVES_DIR   = SAVE_DIR / 'saves'
@@ -59,20 +67,49 @@ def _path(player_name: str) -> Path:
     return SAVES_DIR / f'{_slug(player_name)}.json'
 
 
+# ── Atomic write + backup-recovery reads ───────────────────────────────────────
+# Every save/layout/scroll/draft byte reaches disk through here: write a tmp
+# sibling, keep a `.bak` of the last good file, then rename over the target.
+# A crash mid-write can therefore lose at most the newest change — never the
+# whole player — and the readers below fall back to the `.bak`.
+
+def atomic_write(path: Path, text: str) -> None:
+    _guard_writable_home()
+    path.parent.mkdir(parents=True, exist_ok=True)
+    tmp = path.with_name(path.name + '.tmp')
+    tmp.write_text(text, encoding='utf-8')
+    if path.exists():
+        try:
+            bak = path.with_name(path.name + '.bak')
+            bak.write_bytes(path.read_bytes())
+        except OSError:
+            pass                              # best-effort backup — never block the save
+    os.replace(tmp, path)
+
+
+def _read_json_or_bak(p: Path):
+    """(data, error): read JSON at p, falling back to its `.bak`. Returns
+    (None, reason) when both are gone or unreadable."""
+    for cand in (p, p.with_name(p.name + '.bak')):
+        try:
+            with open(cand, encoding='utf-8') as f:
+                return json.load(f), ''
+        except FileNotFoundError:
+            continue
+        except (json.JSONDecodeError, UnicodeDecodeError, OSError):
+            continue
+    return None, 'could not read this file'
+
+
 # ── Per-player save I/O ────────────────────────────────────────────────────────
 
 def save_for(player_name: str, data: dict) -> None:
-    SAVES_DIR.mkdir(parents=True, exist_ok=True)
-    with open(_path(player_name), 'w', encoding='utf-8') as f:
-        json.dump(data, f, indent=2)
+    atomic_write(_path(player_name), json.dumps(data, indent=2))
 
 
 def load_for(player_name: str) -> Optional[dict]:
-    p = _path(player_name)
-    if not p.exists():
-        return None
-    with open(p, encoding='utf-8') as f:
-        return json.load(f)
+    data, _err = _read_json_or_bak(_path(player_name))
+    return data
 
 
 def touch_loaded(player_name: str) -> None:
@@ -89,15 +126,19 @@ def list_saves() -> list[dict]:
 
     Saves loaded since this ordering was introduced carry a 'last_loaded'
     epoch timestamp; older saves fall back to their file mtime.
-    """
+
+    A save neither the file nor its `.bak` can answer is LISTED rather than
+    skipped, marked '_corrupt' — a player who cannot see their adventurer
+    cannot even ask what happened to them."""
     if not SAVES_DIR.exists():
         return []
     loaded: list[tuple[float, dict]] = []
-    for p in SAVES_DIR.glob('*.json'):
-        try:
-            with open(p, encoding='utf-8') as f:
-                data = json.load(f)
-        except (json.JSONDecodeError, OSError):
+    for p in sorted(SAVES_DIR.glob('*.json')):
+        data, err = _read_json_or_bak(p)
+        if data is None:
+            loaded.append((p.stat().st_mtime if p.exists() else 0.0,
+                           {'player_name': p.stem.replace('_', ' ').title(),
+                            '_corrupt': err}))
             continue
         sort_key = data.get('last_loaded')
         if sort_key is None:
@@ -172,27 +213,24 @@ def delete_save(player_name: str) -> bool:
 # ── Layout I/O (admin level-design tool) ──────────────────────────────────────
 
 def list_layouts() -> list[dict]:
-    """All saved layouts sorted alphabetically by layout_name."""
+    """All saved layouts sorted alphabetically by layout_name. Unreadable
+    layouts are skipped — there is no UI channel to show them here."""
     if not LAYOUTS_DIR.exists():
         return []
     result = []
-    for p in LAYOUTS_DIR.glob('*.json'):
-        try:
-            with open(p, encoding='utf-8') as f:
-                result.append(json.load(f))
-        except (json.JSONDecodeError, OSError):
-            pass
+    for p in sorted(LAYOUTS_DIR.glob('*.json')):
+        data, _err = _read_json_or_bak(p)
+        if data is not None and isinstance(data, dict):
+            result.append(data)
     result.sort(key=lambda d: d.get('layout_name', '').lower())
     return result
 
 
 def save_layout(name: str, data: dict) -> Path:
     """Write a serialised Room dict to ~/.Vimny/layouts/<slug>.json."""
-    LAYOUTS_DIR.mkdir(parents=True, exist_ok=True)
     path = LAYOUTS_DIR / f'{_slug(name)}.json'
     payload = {'layout_name': name, **data}
-    with open(path, 'w', encoding='utf-8') as f:
-        json.dump(payload, f, indent=2)
+    atomic_write(path, json.dumps(payload, indent=2))
     return path
 
 
@@ -211,12 +249,12 @@ def rename_layout(old_name: str, new_name: str) -> bool:
     src = LAYOUTS_DIR / f'{_slug(old_name)}.json'
     if not new_name or not src.exists():
         return False
-    with open(src, encoding='utf-8') as f:
-        data = json.load(f)
+    data, _err = _read_json_or_bak(src)
+    if data is None:
+        return False
     data['layout_name'] = new_name
     dst = LAYOUTS_DIR / f'{_slug(new_name)}.json'
-    with open(dst, 'w', encoding='utf-8') as f:
-        json.dump(data, f, indent=2)
+    atomic_write(dst, json.dumps(data, indent=2))
     if dst != src:
         src.unlink()
     return True
@@ -226,8 +264,6 @@ def rename_layout(old_name: str, new_name: str) -> bool:
 
 def save_scroll_text(title: str, text: str) -> Path:
     """Write full unsmudged scroll text to ~/.Vimny/scrolls/<slug>.txt."""
-    SCROLLS_DIR.mkdir(parents=True, exist_ok=True)
     path = SCROLLS_DIR / f'{_slug(title)}.txt'
-    with open(path, 'w', encoding='utf-8') as f:
-        f.write(text)
+    atomic_write(path, text)
     return path

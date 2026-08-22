@@ -33,6 +33,7 @@ to list, one more to install the one the player picked.
 from __future__ import annotations
 
 import json
+import re
 import tempfile
 import urllib.error
 import urllib.request
@@ -56,6 +57,9 @@ def base_url() -> str:
 
 _TIMEOUT = 10          # seconds — a hung fetch must never freeze the overworld
 _MAX_BYTES = 512 * 1024  # a level file is a few KB; anything this big is wrong
+# A slug becomes a filename (`{slug}.json`) on BOTH the temp write and the
+# shelf, so the manifest never gets to say `../../crontabs/x`.
+_SLUG_RE = re.compile(r'[A-Za-z0-9_-]+')
 
 
 @dataclass
@@ -112,10 +116,13 @@ def fetch_manifest() -> tuple[list[RemoteEntry], str]:
     entries = []
     for r in rows:
         try:
+            slug = str(r['slug'])
+            if not _SLUG_RE.fullmatch(slug):
+                continue    # a slug is a filename — anything path-like is refused with the other bad rows
             entries.append(RemoteEntry(
                 name=str(r.get('name', r.get('slug', '?'))),
                 author=str(r.get('author', '') or ''),
-                slug=str(r['slug']),
+                slug=slug,
                 teaches=list(r.get('teaches', [])),
                 path=str(r.get('path', '')),
             ))
@@ -132,6 +139,10 @@ def install_entry(entry: RemoteEntry) -> Shelved:
     The download goes to a temp file that `install` then validates and copies:
     a level that fails validation never reaches `~/.Vimny/levels/`, so a broken
     or truncated download cannot leave a dead entry on the shelf."""
+    # Belt to fetch_manifest's brace: this entry may have come from anywhere.
+    if not _SLUG_RE.fullmatch(entry.slug):
+        return Shelved(path=Path(entry.filename),
+                       error='that level has an unusable slug — not installing')
     try:
         raw = _get(entry.url)
     except Exception as exc:                       # noqa: BLE001

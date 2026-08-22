@@ -39,12 +39,11 @@ from __future__ import annotations
 
 import json
 import random
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from pathlib import Path
 
-from vimny.engine.editor import _CELL_CODE
 from vimny.engine.world import CellType
-from vimny.save.save_manager import DRAFTS_DIR, _slug
+from vimny.save.save_manager import DRAFTS_DIR, _slug, atomic_write
 from vimny.sharing import format as F
 from vimny.sharing.library import LEVELS_DIR
 from vimny.sharing.validate import Report, validate
@@ -222,15 +221,45 @@ def delete_room(draft: Draft, index: int) -> None:
 
 # ── Disk ──────────────────────────────────────────────────────────────────────
 
+class DraftNameCollision(FileExistsError):
+    """Two different names slug to the same file ('a b' and 'a_b' are both
+    'a_b.json'). Saving would silently replace an unrelated draft/publish."""
+
+
+def _collision_name(dest: Path, name: str) -> str | None:
+    """The name of whoever holds ``dest`` when that holder is a DIFFERENT
+    level (or the file is unreadable — refuse rather than clobber what we
+    cannot inspect). A same-name occupant is this level's own earlier
+    publication and may be overwritten."""
+    if not dest.exists():
+        return None
+    try:
+        other = F.loads(dest.read_text(encoding='utf-8'))
+    except (OSError, json.JSONDecodeError, F.LevelFormatError,
+            TypeError, ValueError, KeyError, AttributeError):
+        return dest.stem
+    return other.name if other.name != name else None
+
+
 def _path(name: str) -> Path:
     return DRAFTS_DIR / f'{_slug(name)}.json'
 
 
 def save(draft: Draft) -> Path:
-    """Write the draft out. Renaming a level renames its file with it."""
+    """Write the draft out. Renaming a level renames its file with it.
+
+    Raises DraftNameCollision when the rename would land on an existing draft
+    file — 'a b' and 'a_b' slug identically, and an author who renames onto
+    another draft must hear about it, not quietly destroy it."""
     DRAFTS_DIR.mkdir(parents=True, exist_ok=True)
     dest = _path(draft.level.name)
-    dest.write_text(F.dumps(draft.level), encoding='utf-8')
+    if dest != draft.path and dest.exists():
+        other = _collision_name(dest, draft.level.name)
+        raise DraftNameCollision(
+            f'"{draft.level.name}" would overwrite '
+            + (f'"{other}"' if other else 'an unreadable draft')
+            + f' ({dest.name}) — pick another name')
+    atomic_write(dest, F.dumps(draft.level))
     if draft.path != dest and draft.path.exists():
         draft.path.unlink()
     draft.path = dest
@@ -284,5 +313,10 @@ def publish(draft: Draft) -> tuple:
         rep = crop_rep
     LEVELS_DIR.mkdir(parents=True, exist_ok=True)
     dest = LEVELS_DIR / f'{_slug(draft.level.name)}.json'
-    dest.write_text(F.dumps(shipped), encoding='utf-8')
+    other = _collision_name(dest, draft.level.name)
+    if other is not None:
+        raise DraftNameCollision(
+            f'the shelf already holds "{other}" at {dest.name} — '
+            f'rename this level to publish it')
+    atomic_write(dest, F.dumps(shipped))
     return dest, rep

@@ -557,13 +557,12 @@ def golf(slug: str, *, seed: int = 0, heights=None, jumps=JUMPS,
 def golfable_levels() -> list:
     """Every shipped level this tool can ask the question of."""
     import vimny.generation.dungeon_gen as dg
-    from vimny.content.levels import LEVELS
-    from vimny.sharing.cli import _NO_SINGLE_TAPE
+    from vimny.content.levels import LEVELS, NO_SINGLE_TAPE
 
     out = []
     for lv in LEVELS:
         slug = lv['slug']
-        if slug in _NO_SINGLE_TAPE:
+        if slug in NO_SINGLE_TAPE:
             continue
         builder = getattr(dg, f'build_dungeon_{slug}', None)
         if builder is None:

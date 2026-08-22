@@ -21,7 +21,7 @@ from __future__ import annotations
 import heapq, math, os, random
 from collections import deque
 from vimny.engine.world import (Dungeon, Room, RoomType, CellType, CharRun, Entity,
-                          Seal, gate_row_seals)
+                          gate_row_seals)
 from vimny.engine.tape import ESC as _TAPE_ESC
 from vimny.engine.motion import (_fog_unreachable, _cell_char, _is_word_char,
                            apply_stone_fog, _FOG_BLOCK_KINDS,
@@ -2840,6 +2840,14 @@ def _load_vocab_tables() -> None:
 
     _VOCAB_PLAIN_BY_LEN = _parse('vocab_plain.txt')
     _VOCAB_MIXED_BY_LEN = _parse('vocab_mixed.txt')
+
+
+def vocab_table(pool: str) -> dict:
+    """'plain' | 'mixed' → the by-length word table, loaded from art/ on first
+    ask. The public door for other modules (sharing.vocab) — they must not
+    reach for the private tables or drive the loader themselves."""
+    _load_vocab_tables()
+    return _VOCAB_PLAIN_BY_LEN if pool == 'plain' else _VOCAB_MIXED_BY_LEN
 
 
 # ── The Backward Vaults layout constants ──────────────────────────────────────────────────
@@ -5762,7 +5770,6 @@ def build_dungeon_grandmasters_sanctum(seed: int) -> Dungeon:
                          'guard': (r, min(_GMS_A_SEAL_COL - 1, c + len(text) + 1))})
     arena._gm_lecterns = lecterns
     arena._gm_seal_col = _GMS_A_SEAL_COL
-    arena._gm_last_shear = 0
 
     arena.entities  = [
         Entity(kind='warden', row=_GMS_A_BOSS[0], col=_GMS_A_BOSS[1],
@@ -11106,19 +11113,6 @@ def _whole_line_dissimilar(wrong: str, right: str) -> bool:
     return (wrong[0] != right[0] and wrong[-1] != right[-1]
             and sum(a != b for a, b in zip(wrong, right)) >= 4)
 
-
-def _draw_whole_line_pair(stream):
-    """(wrong, right) drawn from the DISTINCT word stream, redrawing `right` until
-    the pair is `_whole_line_dissimilar`. Falls back to the last candidate if the
-    stream runs dry (only the tiny hardcoded pool — never hit by the real vocab),
-    so generation always terminates."""
-    wrong = next(stream)
-    right = next(stream)
-    while not _whole_line_dissimilar(wrong, right):
-        try:
-            right = next(stream)
-        except StopIteration:
-            break
     return wrong, right
 
 

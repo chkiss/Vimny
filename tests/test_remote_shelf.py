@@ -114,6 +114,30 @@ def test_a_bad_row_is_skipped_and_the_rest_survive(monkeypatch):
     assert not err and [e.slug for e in entries] == ['good']
 
 
+def test_a_path_like_slug_is_refused_at_the_manifest(monkeypatch):
+    """A slug is a shelf label, never a path: '..' and separators are refused
+    at listing time, before any download can be aimed with them."""
+    _serve(monkeypatch, {'index.json': _manifest([
+        {'name': 'Evil', 'slug': '../../crontabs/evil', 'path': 'e.json'},
+        {'name': 'Fine', 'slug': 'fine_level', 'path': 'f.json'},
+    ])})
+    entries, err = remote.fetch_manifest()
+    assert err == ''
+    assert [e.slug for e in entries] == ['fine_level']
+
+
+def test_install_entry_refuses_an_unusable_slug(tmp_path, monkeypatch):
+    # defense in depth: even an entry that never passed the manifest filter
+    # cannot aim the download (no network touched — the guard fires first)
+    monkeypatch.setattr(library, 'LEVELS_DIR', tmp_path)
+    entry = remote.RemoteEntry(name='Evil', author='x', slug='../evil',
+                               path='evil.json')
+    result = remote.install_entry(entry)
+    assert not result.ok
+    assert 'slug' in result.error.lower()
+    assert list(tmp_path.iterdir()) == []
+
+
 @pytest.mark.parametrize('payload, expected', [
     (b'{not json', 'malformed'),
     (json.dumps({'nope': 1}).encode(), 'malformed'),

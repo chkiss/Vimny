@@ -74,6 +74,19 @@ def test_row_that_does_not_fill_the_width_is_refused():
     assert 'expands to 3 cells, expected 10' in str(exc.value)
 
 
+def test_rle_run_that_overruns_the_width_is_refused_before_expanding():
+    # a hostile run count must fail fast, not allocate toward a billion cells
+    with pytest.raises(F.LevelFormatError):
+        F.expand_row_mist('W99999999F', 10, 0)
+
+
+def test_type_confused_json_is_a_named_format_error():
+    # a top-level list (or any wrong-shaped JSON) is author error to report,
+    # not an AttributeError traceback
+    with pytest.raises(F.LevelFormatError):
+        F.loads('[1, 2, 3]')
+
+
 def test_unknown_top_level_key_is_refused_not_ignored():
     """A silently dropped key is a level that plays differently from the one
     its author tested."""

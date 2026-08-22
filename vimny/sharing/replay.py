@@ -40,7 +40,7 @@ bound on par, never an optimum. Community levels must say "author's par".
 from __future__ import annotations
 
 import contextlib
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 
 from blessed import Terminal
 from blessed.keyboard import Keystroke

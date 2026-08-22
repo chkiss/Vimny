@@ -36,7 +36,6 @@ hand-edited file gets the same scrutiny as a reviewed one.
 """
 from __future__ import annotations
 
-import json
 import random
 from dataclasses import dataclass
 from pathlib import Path
@@ -46,6 +45,8 @@ from vimny.sharing import format as F
 from vimny.sharing.validate import Report, validate
 
 LEVELS_DIR = SAVE_DIR / 'levels'
+
+_MAX_BYTES = 512 * 1024   # same cap sharing.remote applies to downloads — a level file is never larger
 
 
 @dataclass
@@ -71,10 +72,6 @@ class Shelved:
         return f'community/{self.path.stem}'
 
 
-def levels_dir() -> Path:
-    return LEVELS_DIR
-
-
 def list_levels() -> list[Shelved]:
     """Every `*.json` on the shelf, validated, sorted by name.
 
@@ -92,9 +89,23 @@ def list_levels() -> list[Shelved]:
 
 def load_level(path: Path) -> Shelved:
     try:
-        text = path.read_text(encoding='utf-8')
+        raw = path.read_bytes()
     except OSError as exc:
         return Shelved(path=path, error=f'could not read the file: {exc}')
+    if len(raw) > _MAX_BYTES:
+        return Shelved(path=path,
+                       error='that file is suspiciously large — refusing to load it')
+    try:
+        text = raw.decode('utf-8')
+    except UnicodeDecodeError:
+        return Shelved(path=path, error='that file is not UTF-8 text')
+    return _from_text(path, text)
+
+
+def _from_text(path: Path, text: str) -> Shelved:
+    """Parse + validate text already in hand. `loads` funnels every
+    type-confusion to LevelFormatError; this catch is the belt to that brace,
+    so one broken shelf file can never take down the whole listing."""
     try:
         lvl = F.loads(text)
     except F.LevelFormatError as exc:
@@ -123,12 +134,25 @@ def build_shelved(shelf: Shelved):
 
 def install(path: Path) -> Shelved:
     """Copy a level file onto the shelf, validating before it lands there."""
-    shelf = load_level(path)
+    try:
+        raw = path.read_bytes()
+    except OSError as exc:
+        return Shelved(path=path, error=f'could not read the file: {exc}')
+    if len(raw) > _MAX_BYTES:
+        return Shelved(path=path,
+                       error='that file is suspiciously large — not installing')
+    try:
+        text = raw.decode('utf-8')
+    except UnicodeDecodeError:
+        return Shelved(path=path, error='that file is not UTF-8 text')
+    shelf = _from_text(path, text)
     if not shelf.ok:
         return shelf
     LEVELS_DIR.mkdir(parents=True, exist_ok=True)
     dest = LEVELS_DIR / path.name
-    dest.write_text(path.read_text(encoding='utf-8'), encoding='utf-8')
+    # Write the SAME bytes that were validated — re-reading the source could
+    # pick up a change between the two reads.
+    dest.write_text(text, encoding='utf-8')
     return load_level(dest)
 
 

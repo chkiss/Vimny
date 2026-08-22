@@ -28,6 +28,7 @@ re-queries colour state mid-frame)."""
 from __future__ import annotations
 import vimny.render.colors as C
 import vimny.render.symbols as S
+from vimny.render.utils import heart_counts as _hc, hearts_plain, hearts_colored
 
 
 def border_h(iw, bfg, rst, left, right, fill=S.BOX_H):
@@ -41,18 +42,16 @@ def empty_row(iw, bfg, rst):
 
 
 def status_bar(iw, bfg, rst, player, label, companion=''):
-    """Top status bar: 'Vimny  ⌨ <name>   ♥♥♥ ♞   -- LABEL --', `label` centred.
+    """Top status bar: 'Vimny  ⌨ <name>   ♥♥♡░ ♞   -- LABEL --', `label` centred.
     The horse icon appears when the player has named the wizard's horse."""
-    full_h       = player.hp // 2
-    empty_h      = player.max_hp // 2 - full_h
-    hearts_plain = S.HEART_FULL * full_h + S.HEART_EMPTY * empty_h
-    hearts_col   = ((C.heart_full()  + S.HEART_FULL  + rst) * full_h +
-                    (C.heart_empty() + S.HEART_EMPTY + rst) * empty_h)
+    full_h, half_h, empty_h = _hc(player.hp, player.max_hp)
+    hearts_plain_s = hearts_plain(full_h, half_h, empty_h)
+    hearts_col     = hearts_colored(full_h, half_h, empty_h, rst)
     # Companion horse: his glyph rides beside your hearts (matches dungeon status bar)
     horse_plain  = f' {S.HORSE}' if companion else ''
     horse_col    = (C.horse_fg() + S.HORSE + rst) if companion else ''
     name_tag     = '⌨  <' + player.name + '>'
-    left_cols    = len('Vimny  ') + len(name_tag) + 1 + len('  ') + len(hearts_plain) + len(horse_plain) + len('  ')
+    left_cols    = len('Vimny  ') + len(name_tag) + 1 + len('  ') + len(hearts_plain_s) + len(horse_plain) + len('  ')
     lbl_start    = (iw - len(label)) // 2
     mid_gap      = max(1, lbl_start - left_cols)
     right_pad    = max(0, iw - left_cols - mid_gap - len(label))

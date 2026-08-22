@@ -42,24 +42,10 @@ from pathlib import Path
 from vimny.sharing import format as F
 from vimny.sharing.library import export, install, list_levels, load_level
 from vimny.sharing.replay import replay_tape
-from vimny.sharing.validate import validate
 
 
-# Levels no single tape can replay end to end. The Grandmaster's Sanctum is TWO
-# rooms, and the arena deliberately has no karaoke (shear six strands in any
-# order — there is no fixed route), so its gallery tape cannot finish a level
-# that does not end in the gallery. Printed, never dropped.
-#
-# It used to hold 21 entries — every level whose tape contained an insert verb —
-# because the notation omitted Esc and the keys after one were typed into the
-# buffer instead of executed. Writing <Esc> (vimny/engine/tape.py) closed that, and
-# re-probing showed 5 of the 21 had never needed to be here at all: the list was
-# copied from `_REPLAY_OWN_TEST` in tests/test_answer_paths.py, which is about
-# answer COST tokenisation rather than replayability. Over-skipping is how a
-# level passes an audit vacuously, so nothing joins this set unprobed.
-_NO_SINGLE_TAPE = {
-    'grandmasters_sanctum',
-}
+# Back-compat alias: the canonical list lives in the curriculum data module.
+from vimny.content.levels import NO_SINGLE_TAPE as _NO_SINGLE_TAPE
 
 
 def _cmd_validate(args) -> int:
@@ -92,7 +78,7 @@ def _cmd_golf(args) -> int:
     if builder is None:
         print(f'no such level: {args.slug}', file=sys.stderr)
         return 2
-    tape = args.tape if args.tape else Path(args.tape_file).read_text().strip()
+    tape = args.tape if args.tape else Path(args.tape_file).read_text(encoding='utf-8').strip()
     par  = builder(args.seed).room.par
     res  = replay_tape(builder(args.seed), args.slug, tape,
                        known=known_commands(args.slug))

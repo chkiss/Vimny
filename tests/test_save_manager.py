@@ -100,13 +100,38 @@ class TestListSaves:
         names = {s['player_name'] for s in list_saves()}
         assert names == {'Alice', 'Bob'}
 
-    def test_skips_invalid_json(self, tmp_path, monkeypatch):
+    def test_lists_invalid_json_with_a_marker(self, tmp_path, monkeypatch):
+        # A save neither the file nor its .bak can answer is LISTED with
+        # '_corrupt' — an adventurer who silently vanishes from the list is a
+        # player who cannot even ask what happened to them.
         monkeypatch.setattr('vimny.save.save_manager.SAVES_DIR', tmp_path)
         (tmp_path / 'broken.json').write_text('not json')
         save_for('Alice', {'player_name': 'Alice'})
         results = list_saves()
-        assert len(results) == 1
-        assert results[0]['player_name'] == 'Alice'
+        assert {s['player_name'] for s in results} == {'Alice', 'Broken'}
+        broken = next(s for s in results if s['player_name'] == 'Broken')
+        assert broken.get('_corrupt')
+
+    def test_load_falls_back_to_bak(self, tmp_path, monkeypatch):
+        monkeypatch.setattr('vimny.save.save_manager.SAVES_DIR', tmp_path)
+        save_for('Alice', {'player_name': 'Alice', 'v': 1})
+        p = tmp_path / 'alice.json'
+        bak = tmp_path / 'alice.json.bak'
+        bak.write_text(p.read_text(encoding='utf-8'), encoding='utf-8')
+        p.write_text('{truncated', encoding='utf-8')       # crash mid-write
+        assert load_for('Alice') == {'player_name': 'Alice', 'v': 1}
+
+    def test_save_keeps_a_bak_of_the_last_good_file(self, tmp_path, monkeypatch):
+        monkeypatch.setattr('vimny.save.save_manager.SAVES_DIR', tmp_path)
+        save_for('Alice', {'v': 1})
+        save_for('Alice', {'v': 2})
+        assert (tmp_path / 'alice.json.bak').exists()
+
+    def test_atomic_write_leaves_no_tmp_behind(self, tmp_path, monkeypatch):
+        monkeypatch.setattr('vimny.save.save_manager.SAVES_DIR', tmp_path)
+        save_for('Alice', {'v': 1})
+        assert not (tmp_path / 'alice.json.tmp').exists()
+        assert load_for('Alice') == {'v': 1}
 
     def test_orders_by_last_loaded_newest_first(self, tmp_path, monkeypatch):
         monkeypatch.setattr('vimny.save.save_manager.SAVES_DIR', tmp_path)

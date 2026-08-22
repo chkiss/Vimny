@@ -135,8 +135,7 @@ def _shipped_table(pool: str) -> dict:
         # The vocab files are the builders' own source; import lazily so this
         # module does not drag the whole generation package into a validator.
         from vimny.generation import dungeon_gen as dg
-        dg._load_vocab_tables()
-        table = dg._VOCAB_PLAIN_BY_LEN if pool == 'plain' else dg._VOCAB_MIXED_BY_LEN
+        table = dg.vocab_table(pool)
     elif pool == 'proverbs':
         table = by_length([w for saying in proverbs.PLAIN for w in saying])
     else:                                   # misquotes — the wrong words only

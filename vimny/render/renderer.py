@@ -29,7 +29,8 @@ from vimny.engine.budget import Budget
 from vimny.engine import tape as _tape
 import vimny.render.colors as C
 import vimny.render.symbols as S
-from vimny.render.utils import inner_w as _inner_w
+from vimny.render.utils import (inner_w as _inner_w, heart_counts, hearts_plain,
+                                hearts_colored, print_size_notice)
 from vimny.render.hint_bar import hint_text as _hint_text
 
 
@@ -399,6 +400,8 @@ def render_all(term: Terminal, dungeon: Dungeon, player: Player,
                attack_pos: tuple | None = None, attack_sym: str = '',
                heart_flash: bool = False, recording: str = '',
                companion: str = ''):
+    if print_size_notice(term):
+        return
     room   = dungeon.room
     iw     = _inner_w(term)
     output = []
@@ -414,18 +417,13 @@ def render_all(term: Terminal, dungeon: Dungeon, player: Player,
     output.append(border_h(S.BOX_TL, S.BOX_TR))
 
     # ── Row 1: status bar ─────────────────────────────────────────────────
-    full_h  = player.hp // 2
-    half_h  = player.hp % 2
-    empty_h = player.max_hp // 2 - full_h - half_h
+    full_h, half_h, empty_h = heart_counts(player.hp, player.max_hp)
     if heart_flash:
-        gold   = term.color_rgb(255, 210, 0)
-        hp_str  = (gold + S.HEART_FULL  + rst) * full_h
-        hp_str += (gold + S.HEART_HALF  + rst) * half_h
-        hp_str += (gold + S.HEART_EMPTY + rst) * empty_h
+        gold = term.color_rgb(255, 210, 0)     # every heart flashes at once
+        hp_str = hearts_colored(full_h, half_h, empty_h, rst,
+                                full_c=gold, half_c=gold, empty_c=gold)
     else:
-        hp_str  = (C.heart_full()  + S.HEART_FULL  + rst) * full_h
-        hp_str += (C.heart_half()  + S.HEART_HALF  + rst) * half_h
-        hp_str += (C.heart_empty() + S.HEART_EMPTY + rst) * empty_h
+        hp_str = hearts_colored(full_h, half_h, empty_h, rst)
 
     # Companion horse: his glyph rides beside your hearts once you've named him.
     horse_plain = f' {S.HORSE}' if companion else ''
@@ -464,7 +462,7 @@ def render_all(term: Terminal, dungeon: Dungeon, player: Player,
 
     dname = dungeon.name[:30]      # 30 fits the longest names (Brace & Square
                                    # Enclosure = 28, Grandmaster's Sanctum = 25)
-    status_plain = f'  {"♥"*full_h}{"♡"*half_h}{"░"*empty_h}{horse_plain}  {dname}  {ml}  Keys:{spent:2d} Budget:{budget.total:2d}  Par:{room.par or "-"}{gold_plain}'
+    status_plain = f'  {hearts_plain(full_h, half_h, empty_h)}{horse_plain}  {dname}  {ml}  Keys:{spent:2d} Budget:{budget.total:2d}  Par:{room.par or "-"}{gold_plain}'
     padding = max(0, iw - len(status_plain))
     status_line = (bfg + S.BOX_V + rst +
                    f'  {hp_str}' + (horse_s and ' ' + horse_s) + '  ' +

@@ -448,6 +448,11 @@ def loads(text: str) -> Level:
         return parse(json.loads(text))
     except json.JSONDecodeError as exc:
         raise LevelFormatError(f'not valid JSON: {exc}') from None
+    except (TypeError, ValueError, KeyError, AttributeError) as exc:
+        # Valid JSON, wrong shape (a string where a list belongs, a float seed,
+        # `spawn` with two entries…) must reach every caller as the named error
+        # — one malformed file may never take down a whole shelf listing.
+        raise LevelFormatError(f'malformed level file: {exc}') from None
 
 
 # ── Cell grids ────────────────────────────────────────────────────────────────
@@ -473,6 +478,11 @@ def expand_row_mist(row: str, cols: int, lineno: int,
         pos = m.end()
         count = int(m.group(1)) if m.group(1) else 1
         code  = m.group(2)
+        if len(out) + count > cols:
+            # Bail BEFORE expanding: an unbounded count (`W999999999F`) would
+            # allocate first and only then fail the length check below.
+            raise LevelFormatError(
+                f'{where}.cells[{lineno}]: run of {count} {code!r} runs past {cols} columns')
         if code == _MIST_CODE:
             mist.extend(range(len(out), len(out) + count))
             out.extend([CellType.WATER] * count)

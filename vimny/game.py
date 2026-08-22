@@ -19,7 +19,7 @@
 
 """Vimny — entry point and main game loop."""
 from __future__ import annotations
-import random, time, argparse, re
+import random, time, argparse, re, sys
 from collections import deque
 from pathlib import Path
 from blessed import Terminal
@@ -77,7 +77,7 @@ from vimny.content.scrolls import (
 )
 
 _JUMP_MOTIONS = frozenset({'G', 'gg', '%', '{', '}', '(', ')'})
-from vimny.engine.operator import op_delete, op_yank, op_paste, op_case, op_join, case_char, case_entities, apply_indent, apply_equalize, law_column, INDENT_WIDTH, entity_clip
+from vimny.engine.operator import op_delete, op_yank, op_paste, op_case, op_join, case_char, apply_indent, apply_equalize, law_column, INDENT_WIDTH, entity_clip
 from vimny.engine.reflow import is_ledge, close_gap, void_col, _insert_blank_row, remove_row, split_line_down
 from vimny.engine import substitute as _subst
 from vimny.engine.insert import (
@@ -2374,6 +2374,13 @@ def _manhattan(r1, c1, r2, c2) -> int:
     return abs(r1 - r2) + abs(c1 - c2)
 
 
+def _hearts_note(hp: int, remaining: bool = True) -> str:
+    """'(2½ ♥ remaining)' — the damage report every hazard appends. One source
+    of truth so the five hazard messages can't drift apart (they did once)."""
+    h, hh = hp // 2, '½' if hp % 2 else ''
+    return f'({h}{hh} ♥{" remaining" if remaining else ""})'
+
+
 def _kill_door_group(room, row: int, col: int, kind: str = 'door') -> None:
     """Kill the entity at (row, col) and all contiguous adjacent entities of the same kind.
 
@@ -3171,7 +3178,6 @@ def _grandmasters_arena_tick(room, player) -> list:
             room.move_entity(gm, far[0], far[1])
             if crowded:
                 msgs.append('You reach for him — and he slips into another strand.')
-    room._gm_last_shear = count
 
     if count >= len(lecterns):                     # the unmaking
         room.kill_entity(gm)
@@ -3666,7 +3672,7 @@ def _wm_bolt_cell(room, warden) -> tuple:
     return (warden.row + side, warden.col)
 
 
-def _wm_pressure(room, player, ward_no: int) -> list:
+def _wm_pressure(room, player) -> list:
     """Pressure hook — deliberately empty at ship. Candidates (decide after
     the framework plays): goblin trickle between wards, echo aggression
     during edit wards, the Pathfinder's mega. Returns banner messages."""
@@ -3842,7 +3848,7 @@ def _warden_scrivener_tick(room, player, spent: int = 0) -> list:
                                        max_hp=1, ai='', tag='chorus'))
         msgs.append('The quill SCREAMS across the page — he re-manifests '
                     'and stamps an unfinished passage!')
-        msgs.extend(_wm_pressure(room, player, ward + 1))
+        msgs.extend(_wm_pressure(room, player))
     elif _wsc_ward_broken(room, ward):
         # Ward 2's window: the solve arms a timer; dawdle past it and the
         # mends re-rot, the bolt re-bars, his fog re-laid.
@@ -3985,7 +3991,7 @@ def _warden_manifold_tick(room, player, spent: int = 0) -> list:
                                    max_hp=1, ai='', tag=tag, shade=i % 8))
         msgs.append(('The press SLAMS — he re-manifests across the hall '
                      'and stamps a new ward!'))
-        msgs.extend(_wm_pressure(room, player, ward + 1))
+        msgs.extend(_wm_pressure(room, player))
     elif _wm_ward_broken(room, ward):
         # Ward 2's window: the solve arms a timer; dawdle past it (without
         # standing in the niche, one keystroke from the strike) and the
@@ -4334,15 +4340,6 @@ def _arrow_key(e) -> str:
     if e.kind == 'goblin' and e.tag in ('demon', 'zombie'):
         return e.tag
     return 'goblin'
-
-
-def _is_hostile_creature(e) -> bool:
-    """Egg creatures that ATTACK the player: demons, zombies, big cats."""
-    if e.kind == 'goblin' and e.tag in ('demon', 'zombie'):
-        return True
-    if e.kind == 'critter' and e.swole:          # a big Cat is aggressive
-        return True
-    return False
 
 
 def _creature_name(glyph: str) -> str:
@@ -4857,7 +4854,19 @@ def _bite_ally(room, ent) -> list:
     return msgs
 
 
+_TICK_KINDS = frozenset(('ally', 'horse', 'critter', 'archivist',
+                         'warden', 'goblin'))
+
+
 def _enemy_tick(room, player) -> list:
+    # Early-out for rooms where nothing can act: the per-entity branches cover
+    # exactly these kinds plus any entity with its own ai (a wandering elf,
+    # a summoned chorus). The Pathfinder's mega is ROOM-level state, though —
+    # it must tick even in an empty room, so it vetoes the short-circuit.
+    if not getattr(room, 'mega', None) and not any(
+            e.alive and (e.kind in _TICK_KINDS or e.ai)
+            for e in room.entities):
+        return []
     msgs = []
     for ent in list(room.entities):
         if not ent.alive:
@@ -5390,8 +5399,7 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
             player.take_damage(dmg)
         if player.is_dead:
             return 'You set off a dynamite charge!  GAME OVER  (:e to reload)', 2
-        h, hh = player.hp // 2, '½' if player.hp % 2 else ''
-        return f'BOOM! Dynamite!  ({h}{hh} ♥ remaining)', 30
+        return f'BOOM! Dynamite!  {_hearts_note(player.hp)}', 30
 
     # ── The Warden Surveyor's two-phase visual attack (Phase 1) ───────────────
     def _surveyor_warden():
@@ -5449,8 +5457,7 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
             if player.is_dead:
                 message, msg_ttl = 'The Warden erases you!  GAME OVER  (:e to reload)', 2
             else:
-                h, hh = player.hp // 2, '½' if player.hp % 2 else ''
-                message, msg_ttl = f"The Warden's selection erases you!  ({h}{hh} ♥)", 30
+                message, msg_ttl = f"The Warden's selection erases you!  {_hearts_note(player.hp, remaining=False)}", 30
 
     def _surveyor_tick():
         warden = _surveyor_warden()
@@ -6322,14 +6329,6 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
     while True:
         if level == 'archivists_library':
             _lib_sync()                          # re-tighten the frame on terminal resize
-        elif level == 'spellwrights_forge':
-            _forge_check()                       # open the sanctum seal once the rites are true
-        elif level == 'culling_ledger':
-            _ledger_check()                      # open the seal once the ledger reads true
-        elif level == 'shelving_room':
-            _shelving_tick()                     # re-mist, bolts, seal check
-        elif level == 'refrain_vault':
-            _refrain_tick()                      # re-mist the chasm, seal check
         # Macro playback: drain queued keystrokes before reading the terminal.
         if macro_pending:
             macro_run_keys += 1
@@ -6398,6 +6397,19 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
         player.error = ''   # clear any statusline error on the next keypress
         room._ward_flash = set()   # a shield-flash lives for one action only
         room._atk_arrows = []      # attack-direction arrows live for one action only
+
+        # Content seals re-read the buffer once per KEYPRESS, not per idle poll:
+        # these ticks scan every row and column, and idling on a finished ledger
+        # used to burn CPU ten times a second. A key arrived, so an action may
+        # have changed what the seals read.
+        if level == 'spellwrights_forge':
+            _forge_check()                       # open the sanctum seal once the rites are true
+        elif level == 'culling_ledger':
+            _ledger_check()                      # open the seal once the ledger reads true
+        elif level == 'shelving_room':
+            _shelving_tick()                     # re-mist, bolts, seal check
+        elif level == 'refrain_vault':
+            _refrain_tick()                      # re-mist the chasm, seal check
 
         # ── The elf's shitty trade (from :s/g/e/) awaits a y/n ────────────────
         # Only y/n resolve it; every other key (x to attack the elf, a step away)
@@ -6580,7 +6592,10 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
 
                 elif cmd == 'w' and _draft is not None:
                     DRAFT.sync(_draft, room)
-                    _push(f'Draft saved: {DRAFT.save(_draft).name}')
+                    try:
+                        _push(f'Draft saved: {DRAFT.save(_draft).name}')
+                    except DRAFT.DraftNameCollision as exc:
+                        _push(str(exc))
 
                 elif cmd == 'w':
                     if edit_mode and player_name == 'admin':
@@ -6604,7 +6619,10 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
                 elif cmd == 'wq':
                     if _draft is not None:
                         DRAFT.sync(_draft, room)
-                        DRAFT.save(_draft)
+                        try:
+                            DRAFT.save(_draft)
+                        except DRAFT.DraftNameCollision as exc:
+                            _push(str(exc))
                     elif edit_mode and player_name == 'admin':
                         path = SM.save_layout(dungeon.name, _serialize_room(room))
                         _push(f'Layout saved: {path.name}')
@@ -7544,7 +7562,10 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
                             # last build), and the tape is worth less than the
                             # warning, so say so and keep it for inspection.
                             _push(f'Take kept, but it does not replay: {_rep.errors[0]}')
-                    DRAFT.save(_draft)
+                    try:
+                        DRAFT.save(_draft)
+                    except DRAFT.DraftNameCollision as exc:
+                        _push(str(exc))
                     _forge_rebuild()
 
                 elif _draft is not None and cmd in ('check', 'publish'):
@@ -7559,10 +7580,14 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
                     elif cmd == 'check':
                         _push(f'Valid — par {_rep.par}, budget {_rep.budget}.')
                     else:
-                        _dest, _ = DRAFT.publish(_draft)
-                        DRAFT.save(_draft)
-                        _push(f'Published to {_dest.name} — par {_rep.par}, '
-                              f'budget {_rep.budget}. It is on the shelf.')
+                        try:
+                            _dest = DRAFT.publish(_draft)[0]
+                            DRAFT.save(_draft)
+                        except DRAFT.DraftNameCollision as exc:
+                            _push(str(exc))
+                        else:
+                            _push(f'Published to {_dest.name} — par {_rep.par}, '
+                                  f'budget {_rep.budget}. It is on the shelf.')
 
                 elif _draft is not None and cmd == 'submit':
                     # Same gate as `:publish` — the forge only opens for the
@@ -8051,8 +8076,7 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
                             if player.is_dead:
                                 message = '** GAME OVER ** Type  :e  to re-load the dungeon.'; msg_ttl = 2
                             else:
-                                h, hh = player.hp // 2, '½' if player.hp % 2 else ''
-                                message = f'You typed yourself off the ledge!  ({h}{hh} ♥ remaining)'; msg_ttl = 25
+                                message = f'You typed yourself off the ledge!  {_hearts_note(player.hp)}'; msg_ttl = 25
             _render(message)
             continue
 
@@ -8570,8 +8594,7 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
                         message = '** GAME OVER ** Type  :e  to re-load the dungeon.'
                         msg_ttl = 2
                     else:
-                        h, hh = player.hp // 2, '½' if player.hp % 2 else ''
-                        message = f'You fell into the void!  ({h}{hh} ♥ remaining)'
+                        message = f'You fell into the void!  {_hearts_note(player.hp)}'
                         msg_ttl = 25
                     _render(message)
                     continue
@@ -8587,8 +8610,7 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
                         message = '** GAME OVER ** Type  :e  to re-load the dungeon.'
                         msg_ttl = 2
                     else:
-                        h, hh = player.hp // 2, '½' if player.hp % 2 else ''
-                        message = f'You drowned!  ({h}{hh} ♥ remaining)'
+                        message = f'You drowned!  {_hearts_note(player.hp)}'
                         msg_ttl = 25
                     _render(message)
                     continue
@@ -11214,7 +11236,21 @@ def run_overworld(term: Terminal, player: Player, progress: dict,
 
 # ── Main ───────────────────────────────────────────────────────────────────────
 
+def _ensure_utf8_stdout():
+    # Glyph-heavy frames need a UTF-8 stdout: on a C-locale box (3.9-3.14,
+    # locale coercion unavailable or disabled) the default codec is ASCII and
+    # the first dungeon glyph would raise UnicodeEncodeError mid-frame.
+    # Mojibake on a truly non-UTF-8 terminal beats a crash.
+    for stream in (sys.stdout, sys.stderr):
+        if getattr(stream, 'encoding', '').lower().replace('-', '') != 'utf8':
+            try:
+                stream.reconfigure(encoding='utf-8')
+            except Exception:
+                pass
+
+
 def main():
+    _ensure_utf8_stdout()
     # prog is pinned: argparse otherwise names whichever file was invoked, so
     # `-m vimny` advertises itself as `__main__.py`.
     ap = argparse.ArgumentParser(prog='vimny',
@@ -11332,7 +11368,11 @@ def main():
                 dungeon = Dungeon(name=layout.get('layout_name', 'Custom'), seed=0)
                 dungeon.rooms        = [room]
                 dungeon.current_room = 0
-                run_dungeon(term, 'first_cave', progress, player.name,
+                # An inert slug, exactly like the forge's 'community': a custom
+                # layout has no curriculum position, so nothing may key progress,
+                # scroll drops or first_cave's gating against a shipped level's
+                # name. known_commands('custom') is the full union — admin context.
+                run_dungeon(term, 'custom', progress, player.name,
                             _dungeon=dungeon, _start_edit=True)
                 continue
 

@@ -45,6 +45,26 @@ Not yet gated (no token): :e :set (archivist), :s/// (spellwright), = (indent).
 from __future__ import annotations
 import re
 
+# Levels no single tape can replay end to end. The Grandmaster's Sanctum is TWO
+# rooms, and the arena deliberately has no karaoke (shear six strands in any
+# order — there is no fixed route), so its gallery tape cannot finish a level
+# that does not end in the gallery. Printed, never dropped.
+#
+# It used to hold 21 entries — every level whose tape contained an insert verb —
+# because the notation omitted Esc and the keys after one were typed into the
+# buffer instead of executed. Writing <Esc> (vimny/engine/tape.py) closed that, and
+# re-probing showed 5 of the 21 had never needed to be here at all: the list was
+# copied from `_REPLAY_OWN_TEST` in tests/test_answer_paths.py, which is about
+# answer COST tokenisation rather than replayability. Over-skipping is how a
+# level passes an audit vacuously, so nothing joins this set unprobed.
+#
+# Lives HERE (the curriculum data module) rather than in whichever tool needs
+# it: both `sharing.cli` (par audit printing) and `sharing.jumpgolf` (golfing)
+# consume it, and a tool-private copy would let the two drift.
+NO_SINGLE_TAPE = {
+    'grandmasters_sanctum',
+}
+
 LEVELS = [
     {'display': '0',    'slug': 'first_cave',            'name': 'The First Cave',             'commands': 'h j k l u :w :q :q!', 'teaches': ['h', 'j', 'k', 'l']},
     {'display': '1',    'slug': 'line_halls',            'name': 'The Line Halls',             'commands': '^ $ 0', 'teaches': ['^', '$', '0']},
