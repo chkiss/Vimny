@@ -11842,6 +11842,8 @@ def build_dungeon_sculpting_chambers(seed: int) -> Dungeon:
     word. When the poem reads true, line for line, the vault door (a gated
     cell south of the last line) unseals. See the section header."""
     R, C = _SC_ROWS, _SC_COLS
+    from vimny.engine.editor import _CELL_CODE
+    from vimny.sharing.format import Level as _Level, build as _fmt_build
     cells = [[CellType.WALL] * C for _ in range(R)]
 
     def floor(r, c0, c1):
@@ -11856,41 +11858,36 @@ def build_dungeon_sculpting_chambers(seed: int) -> Dungeon:
     # longest line). The vault door is a step SOUTH of the last line; A (an
     # east-builder) can never back-door it.
 
-    room = Room(room_type=RoomType.ENTRY, rows=R, cols=C)
-    room.cells = cells
-    room.seed  = seed
-
-    def lay(r, c, text, kind):
-        room.char_runs.append(CharRun(r, c, tuple(text), kind))
-
-    lay(ir, _SC_WCOL, _SC_I_GIVEN, 'ancient')     # line 2's surviving tail
-    lay(ar, _SC_WCOL, _SC_A_GIVEN, 'ancient')     # line 3's surviving head
+    runs: list = []
+    runs.append({'row': ir, 'col': _SC_WCOL, 'symbols': _SC_I_GIVEN,
+                 'kind': 'ancient'})              # line 2's surviving tail
+    runs.append({'row': ar, 'col': _SC_WCOL, 'symbols': _SC_A_GIVEN,
+                 'kind': 'ancient'})              # line 3's surviving head
     # The plaques, in the WEST wall: each line's FIRST WORD (confirmation,
     # not decree — the player knows the song). The tick keeps every plaque
     # ALIGNED with its line as o/O insert rows (_sculpting_chambers_tick).
     for k, word in enumerate(_SC_TARGET):
-        lay(ar + (k - _SC_ANCHOR_IDX), _SC_PLQ, word, 'verdant')
+        runs.append({'row': ar + (k - _SC_ANCHOR_IDX), 'col': _SC_PLQ,
+                     'symbols': word, 'kind': 'verdant'})
 
+    exit_pos = (_SC_EXIT_ROW0, _SC_EXIT_COL)
+    level = _Level(
+        name='The Sculpting Chambers', seed=seed,
+        rows=R, cols=C,
+        cells=[''.join(_CELL_CODE[c] for c in row) for row in cells],
+        spawn=(ir, _SC_WCOL),                    # on the surviving tail
+        exit=exit_pos,                           # stays WALL until the poem reads true
+        char_runs=runs,
+        entities=[{'kind': 'exit', 'at': [exit_pos[0], exit_pos[1]],
+                   'edit_immune': True}],
+        solution=_SC_ANSWER)
+
+    dungeon = _fmt_build(level, par=_SC_PAR)
+    room = dungeon.rooms[0]
     room._sc_target = _SC_TARGET
-    room._sc_lines  = _SC_COMPLETIONS         # the FLOOR reads the completions (plaque holds the head)
+    room._sc_lines  = _SC_COMPLETIONS     # the FLOOR reads the completions (plaque holds the head)
     room._sc_anchor = _SC_ANCHOR_IDX
     room._sc_band   = _SC_BAND
-
-    # The door: a step SOUTH of the last line. It stays WALL until the whole
-    # poem reads true.
-    exit_pos = (_SC_EXIT_ROW0, _SC_EXIT_COL)
-    room.entities.append(Entity(kind='exit', row=exit_pos[0], col=exit_pos[1], edit_immune=True))
-    room.spawn_pos = (ir, _SC_WCOL)               # on the surviving tail
-    room.exit_pos  = exit_pos
-
-    room.rebuild_indexes()
-    room.par    = _SC_PAR
-    room.budget = math.ceil(_SC_PAR * 1.4)
-    room.answer = _SC_ANSWER
-
-    dungeon = Dungeon(name='The Sculpting Chambers', seed=seed)
-    dungeon.rooms        = [room]
-    dungeon.current_room = 0
     return dungeon
 
 
