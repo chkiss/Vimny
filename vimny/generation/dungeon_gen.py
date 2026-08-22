@@ -11124,6 +11124,8 @@ def build_dungeon_inscription_halls(seed: int) -> Dungeon:
     lessons = _ih_pick(rng)
 
     R, C = _IH_ROWS, _IH_COLS
+    from vimny.engine.editor import _CELL_CODE
+    from vimny.sharing.format import Level as _Level, build as _fmt_build
     cells = [[CellType.WALL] * C for _ in range(R)]
     for r in range(1, 14):                                   # the meandering river
         for c in range(_ih_river_lo(r), _ih_river_lo(r) + _IH_RIVER_W):
@@ -11139,12 +11141,10 @@ def build_dungeon_inscription_halls(seed: int) -> Dungeon:
     cells[_IH_EXIT[0]][_IH_EXIT[1]] = CellType.FLOOR         # beyond the five walls
     # the five exit walls stay WALL at build (the tick opens one per word)
 
-    room = Room(room_type=RoomType.ENTRY, rows=R, cols=C)
-    room.cells = cells
-    room.seed  = seed
+    runs: list = []
 
     def lay(row, col, text, kind):
-        room.char_runs.append(CharRun(row, col, tuple(text), kind))
+        runs.append({'row': row, 'col': col, 'symbols': text, 'kind': kind})
 
     # Plaques (the familiar sealed band, verdant in the wall) + fragments,
     # and the five exit walls: the bridge-word takes the westmost seal; the
@@ -11166,40 +11166,38 @@ def build_dungeon_inscription_halls(seed: int) -> Dungeon:
     lay(R - 1, _ih_river_lo(_IH_FORD_ROW) - len(_IH_FORD_FRAG),
         _IH_FORD_WORD, 'verdant')                            # ford plaque, south border
 
+    m = [m_ for (_w, m_, _f) in lessons]
+    level = _Level(
+        name='The Inscription Halls', seed=seed,
+        rows=R, cols=C,
+        cells=[''.join(_CELL_CODE[c] for c in row) for row in cells],
+        spawn=(_IH_LESSON_ROWS[0], _ih_bank(_IH_LESSON_ROWS[0])),
+        exit=_IH_EXIT,
+        char_runs=runs,
+        entities=[{'kind': 'exit', 'at': [_IH_EXIT[0], _IH_EXIT[1]],
+                   'edit_immune': True}],
+        # Canonical answer — the sentence-hop route (drives the par; insert
+        # tokens 'i…'/'a…' cost 1 + len(text), Esc spends nothing; ( ) e $ cost
+        # 1 each — see tests/test_answer_paths). Gate ticks fire ON the insert
+        # Esc, so the seals stand open before the first NORMAL key — a single $
+        # sails the whole corridor onto the exit (no second $ is needed):
+        #   A: ( i{2}        = 1+3
+        #   B: ) e a{1}      = 1+1+2
+        #   C: ) i{1}        = 1+2
+        #   D: ) e a{2}      = 1+1+3
+        #   ford: ) e agate $ = 1+1+5+1   → total 24
+        solution=(f'( i{m[0]}<Esc> '
+                  f') e a{m[1]}<Esc> '
+                  f') i{m[2]}<Esc> '
+                  f') e a{m[3]}<Esc> '
+                  f') e agate<Esc> $'))
+
+    dungeon = _fmt_build(level, par=_IH_PAR)
+    room = dungeon.rooms[0]
     room._ih_bolts = tuple(bolts)
     # Band the five shut exit walls as stonework. Registered at build: the seal
     # coordinates are fixed for the level's lifetime.
     room.sealed_cells = {cell for _word, cell in bolts}
-
-    room.entities.append(Entity(kind='exit', row=_IH_EXIT[0], col=_IH_EXIT[1],
-                                edit_immune=True))
-    room.spawn_pos = (_IH_LESSON_ROWS[0], _ih_bank(_IH_LESSON_ROWS[0]))
-    room.exit_pos  = _IH_EXIT
-
-    room.rebuild_indexes()
-    room.par    = _IH_PAR
-    room.budget = math.ceil(_IH_PAR * 1.4)
-    # Canonical answer — the sentence-hop route (drives the par; insert
-    # tokens 'i…'/'a…' cost 1 + len(text), Esc spends nothing; ( ) e $ cost
-    # 1 each — see tests/test_answer_paths). Gate ticks fire ON the insert
-    # Esc, so the seals stand open before the first NORMAL key — a single $
-    # sails the whole corridor onto the exit (no second $ is needed):
-    #   A: ( i{2}        = 1+3
-    #   B: ) e a{1}      = 1+1+2
-    #   C: ) i{1}        = 1+2
-    #   D: ) e a{2}      = 1+1+3
-    #   ford: ) e agate $ = 1+1+5+1   → total 24
-    m = [m_ for (_w, m_, _f) in lessons]
-    room.answer = (f'( i{m[0]}<Esc> '
-                   f') e a{m[1]}<Esc> '
-                   f') i{m[2]}<Esc> '
-                   f') e a{m[3]}<Esc> '
-                   f') e agate<Esc> $')
-
-    apply_stone_fog(room)                 # sealed pockets sleep under fog
-    dungeon = Dungeon(name='The Inscription Halls', seed=seed)
-    dungeon.rooms        = [room]
-    dungeon.current_room = 0
     return dungeon
 
 
