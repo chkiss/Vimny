@@ -4923,28 +4923,28 @@ def build_dungeon_quote_enclosure(seed: int) -> Dungeon:
     Sense, not decree: proverb bays; the da" rows tear the junk out and
     the pristine saying itself is the door's reading."""
     from vimny.content.proverbs import prefix_len, text_of
+    from vimny.engine.editor import _CELL_CODE
+    from vimny.sharing.format import Level as _Level, _parse_seal, build as _fmt_build
     rng = random.Random(seed)
     texts = _qe_draw_texts(rng)
 
     R, C = _QE_ROWS, _QE_COLS
-    cells = [[CellType.WALL] * C for _ in range(R)]
+    grid = [[CellType.WALL] * C for _ in range(R)]
     for r in range(2, _QE_GATE + 1):                     # the spine
-        cells[r][_QE_SPINE] = CellType.FLOOR
+        grid[r][_QE_SPINE] = CellType.FLOOR
     lesson_rows = (_QE_C1_ROWS + _QE_C2_ROWS + _QE_C3_ROWS
                    + _QE_C4_ROWS + _QE_C5_ROWS)
     for r in lesson_rows:                                # the bays
         for c in range(_QE_BAY_W, _QE_BAY_E + 1):
-            cells[r][c] = CellType.FLOOR
+            grid[r][c] = CellType.FLOOR
     for r, c in _QE_SHAFT_SEPS:                          # the light shafts —
-        cells[r][c] = CellType.FLOOR                     # NOT the throat row
+        grid[r][c] = CellType.FLOOR                     # NOT the throat row
 
-    room = Room(room_type=RoomType.ENTRY, rows=R, cols=C)
-    room.cells = cells
-    room.seed  = seed
+    runs: list = []
 
     def lay(r, col, words_seq):
         for w in words_seq:
-            room.char_runs.append(CharRun(r, col, tuple(w), 'ancient'))
+            runs.append({'row': r, 'col': col, 'symbols': w, 'kind': 'ancient'})
             col += len(w) + 1
 
     truths = {}                                          # row -> (prefix, suffix)
@@ -4953,15 +4953,16 @@ def build_dungeon_quote_enclosure(seed: int) -> Dungeon:
                else f'{q}{junk}{q}')
         t0 = _QE_ANCHOR - (prefix_len(words, k) + 1)
         lay(r, t0, words[:k])
-        room.char_runs.append(CharRun(r, _QE_ANCHOR, tuple(fit), 'ancient'))
+        runs.append({'row': r, 'col': _QE_ANCHOR, 'symbols': fit,
+                     'kind': 'ancient'})
         lay(r, _QE_ANCHOR + len(fit) + 1, words[k:])
         truths[r] = (text_of(words[:k]), text_of(words[k:]))
     cures = {}
     for r, (words, idx, cure) in zip(_QE_C2_ROWS, texts['misquotes']):
         t0 = _QE_ANCHOR - (prefix_len(words, idx) + 1)
         lay(r, t0, words[:idx])
-        room.char_runs.append(CharRun(r, _QE_ANCHOR,
-                                      tuple(f'"{words[idx]}"'), 'ancient'))
+        runs.append({'row': r, 'col': _QE_ANCHOR,
+                     'symbols': f'"{words[idx]}"', 'kind': 'ancient'})
         tail = words[idx + 1:]
         if tail:
             lay(r, _QE_ANCHOR + len(words[idx]) + 3, tail)
@@ -4978,25 +4979,35 @@ def build_dungeon_quote_enclosure(seed: int) -> Dungeon:
              (c3, _QE_BOLTS['c3']), (c4, _QE_BOLTS['c4']),
              (c5, _QE_BOLTS['c5']))
 
-    room.seals = _chamber_gate(doors, _QE_EXIT)
-    room._qe_texts = texts
+    seals = []
+    for i, (targets, bolt_col) in enumerate(doors):
+        seals.append(_parse_seal({
+            'scope': 'anyrow', 'mode': 'exact', 'anchor': 'exit_row',
+            'match': [str(t) for t in targets],
+            'opens': [[_QE_EXIT[0], bolt_col]],
+        }, i))
+    seals.append(_parse_seal({
+        'anchor': 'exit_row',
+        'requires': list(range(len(seals))),
+        'opens': [list(_QE_EXIT)],
+    }, len(seals)))
+
     ca, cb = (cures[r][0] for r in _QE_C2_ROWS)
+    level = _Level(
+        name='The Quote Enclosure', seed=seed,
+        rows=R, cols=C,
+        cells=[''.join(_CELL_CODE[c] for c in row) for row in grid],
+        spawn=(2, _QE_SPINE), exit=_QE_EXIT,
+        char_runs=runs, seals=seals,
+        entities=[{'kind': 'exit', 'at': [_QE_EXIT[0], _QE_EXIT[1]],
+                   'edit_immune': True}],
+        solution=(f'j di" j . 2j ci" {ca}<Esc> j ci" {cb}<Esc> '
+                  f"2j di' j . 2j da\" j da' "
+                  f'2j w di" G $'))
 
-    room.entities.append(Entity(kind='exit', row=_QE_EXIT[0], col=_QE_EXIT[1],
-                                edit_immune=True))
-    room.spawn_pos = (2, _QE_SPINE)
-    room.exit_pos  = _QE_EXIT
-
-    room.rebuild_indexes()
-    room.par    = _QE_PAR
-    room.budget = math.ceil(_QE_PAR * 1.4)  # STANDARD: the walk-in route wins at 1★
-    room.answer = (f'j di" j . 2j ci" {ca}<Esc> j ci" {cb}<Esc> '
-                   f"2j di' j . 2j da\" j da' "
-                   f'2j w di" G $')
-
-    dungeon = Dungeon(name='The Quote Enclosure', seed=seed)
-    dungeon.rooms        = [room]
-    dungeon.current_room = 0
+    dungeon = _fmt_build(level, par=_QE_PAR)
+    _seal_banners(dungeon)
+    dungeon.rooms[0]._qe_texts = texts
     return dungeon
 
 
