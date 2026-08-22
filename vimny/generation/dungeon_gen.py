@@ -9603,7 +9603,8 @@ _RV_BUDGET = 60    # generous: the double ranged-:s longhand (~52) wins 1★
 
 
 def build_dungeon_refrain_vault(seed: int) -> Dungeon:
-    dungeon = Dungeon(name='The Refrain Vault', seed=seed)
+    from vimny.engine.editor import _CELL_CODE
+    from vimny.sharing.format import Level as _Level, build as _fmt_build
     R, C = _RV_ROWS, _RV_COLS
 
     cells = [[CellType.WALL] * C for _ in range(R)]
@@ -9624,45 +9625,43 @@ def build_dungeon_refrain_vault(seed: int) -> Dungeon:
         cells[_RV_SEAL_ROW][col] = CellType.FLOOR  # the sealed exit pocket
     # (_RV_SEAL_ROW, _RV_SEAL_COL) stays WALL until _refrain_tick opens it.
 
-    room = Room(room_type=RoomType.ENTRY, rows=R, cols=C)
-    room.cells     = cells
-    room.seed      = seed
-    room.spawn_pos = (5, 2)                        # the double "falling up" line
-    room.exit_pos  = (_RV_SEAL_ROW, _RV_EXIT_COL)
-    room.char_runs = []
-
-    def lay(r, col, text, kind):
+    def lay(runs, r, col, text, kind):
         for wd in text.split(' '):
-            room.char_runs.append(CharRun(r, col, tuple(wd), kind))
+            runs.append({'row': r, 'col': col, 'symbols': wd, 'kind': kind})
             col += len(wd) + 1
 
-    lay(1, _RV_CTX, 'my fair', 'ancient')          # the torn refrain — the ONLY
-    lay(2, _RV_CTX, 'lady.', 'ancient')            # "my fair lady." anywhere
+    runs: list = []
+    lay(runs, 1, _RV_CTX, 'my fair', 'ancient')    # the torn refrain — the ONLY
+    lay(runs, 2, _RV_CTX, 'lady.', 'ancient')      # "my fair lady." anywhere
     carved = [t for t in _RV_TRUE if t != _RV_LADY]
     for i, true_line in enumerate(carved):         # the carved song, rows 4..15
         r = _RV_SONG[0] + i
         writ = true_line.replace('down', 'up') if r in _RV_CORRUPT else true_line
-        lay(r, _RV_TX, writ, 'ember' if r in _RV_CORRUPT else 'verdant')
+        lay(runs, r, _RV_TX, writ, 'ember' if r in _RV_CORRUPT else 'verdant')
 
-    room.entities = [
-        Entity(kind='exit',         row=_RV_SEAL_ROW, col=_RV_EXIT_COL),
-        Entity(kind='chest_scroll', row=_RV_SEAL_ROW, col=_RV_CHEST_COL),
-    ]
+    level = _Level(
+        name='The Refrain Vault', seed=seed,
+        rows=R, cols=C,
+        cells=[''.join(_CELL_CODE[c] for c in row) for row in cells],
+        spawn=(5, 2),                              # the double "falling up" line
+        exit=(_RV_SEAL_ROW, _RV_EXIT_COL),
+        char_runs=runs,
+        entities=[{'kind': 'exit', 'at': [_RV_SEAL_ROW, _RV_EXIT_COL]},
+                  {'kind': 'chest_scroll', 'at': [_RV_SEAL_ROW, _RV_CHEST_COL]}],
+        solution=(':set<Space>nu<CR> :13,15s/up/down/g<CR> :4,6&&<CR> '
+                  ':1j|1y<CR> p 3j p 3j p 3j p j $'))
+
+    dungeon = _fmt_build(level, par=_RV_PAR)
+    room = dungeon.rooms[0]
     room._rv_true     = _RV_TRUE
     room._rv_seal_col = _RV_SEAL_COL
-
-    room.par    = _RV_PAR
-    room.budget = math.ceil(_RV_PAR * 1.4)   # STANDARD (par-is-the-optimum law)
-    room.answer = (':set<Space>nu<CR> :13,15s/up/down/g<CR> :4,6&&<CR> '
-                   ':1j|1y<CR> p 3j p 3j p 3j p j $')
-
-    room.rebuild_indexes()
+    # The haze lies over FLOOR (the torn chasm) as well as the water course,
+    # and the level file can only say mist on water — so the designed haze and
+    # its pocket are laid here, over whatever the stone law derived.
     pocket = {(_RV_SEAL_ROW, col)
               for col in range(_RV_SEAL_COL + 1, _RV_EXIT_COL + 1)}
     room.fog_cells  = set(mist) | pocket
     room.mist_cells = set(mist)
-    dungeon.rooms        = [room]
-    dungeon.current_room = 0
     return dungeon
 
 
