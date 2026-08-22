@@ -815,24 +815,17 @@ def build_dungeon_line_halls(seed: int) -> Dungeon:
     passed over by the line jumps — or right of the exit; every cell a motion
     lands on is safe.
     """
-    dungeon = Dungeon(name='The Line Halls', seed=seed)
+    from vimny.engine.editor import _CELL_CODE
+    from vimny.sharing.format import Level as _Level, build as _fmt_build
     ROWS, COLS = _LINE_HALLS_ROWS, _LINE_HALLS_COLS
     L, R = _LINE_HALLS_LEFT, _LINE_HALLS_RIGHT
 
-    cells = [[CellType.WALL] * COLS for _ in range(ROWS)]
+    grid = [[CellType.WALL] * COLS for _ in range(ROWS)]
     for hall_row in (_LINE_HALLS_A_ROW, _LINE_HALLS_B_ROW, _LINE_HALLS_C_ROW):
         for c in range(L, R + 1):
-            cells[hall_row][c] = CellType.FLOOR
+            grid[hall_row][c] = CellType.FLOOR
     for (dr, dc) in _LINE_HALLS_DOORS:          # one-cell doorways through the wall rows
-        cells[dr][dc] = CellType.CORRIDOR
-
-    composite = Room(room_type=RoomType.ENTRY, rows=ROWS, cols=COLS)
-    composite.cells     = cells
-    composite.seed      = seed
-    composite.spawn_pos = _LINE_HALLS_SPAWN
-    composite.exit_pos  = _LINE_HALLS_EXIT
-    composite.entities.append(
-        Entity(kind='exit', row=_LINE_HALLS_EXIT[0], col=_LINE_HALLS_EXIT[1]))
+        grid[dr][dc] = CellType.CORRIDOR
 
     # ── Carved runes (random per seed, like the other levels) ───────────────────
     # The structural anchors (indents, the col-10 ^ target, the unmarked exit, the
@@ -841,24 +834,38 @@ def build_dungeon_line_halls(seed: int) -> Dungeon:
     rng = random.Random(seed)
     runs: list = []
     # Hall A: packed; col 1 is the spawn and cols R-1..R the doorway approach (left blank).
-    runs += _tile_line_hall(rng, _LINE_HALLS_A_ROW, L + 1, R - 2)
+    runs += [{'row': ru.row, 'col': ru.col, 'symbols': ''.join(ru.symbols),
+              'kind': ru.kind} for ru in _tile_line_hall(rng, _LINE_HALLS_A_ROW, L + 1, R - 2)]
     # Hall B: cols 1..8 blank, so 0 reaches the bare margin while ^ stops at col 9.
-    runs += _tile_line_hall(rng, _LINE_HALLS_B_ROW, _LINE_HALLS_B_FIRST_RUNE_COL, R - 2)
+    runs += [{'row': ru.row, 'col': ru.col, 'symbols': ''.join(ru.symbols),
+              'kind': ru.kind} for ru in _tile_line_hall(rng, _LINE_HALLS_B_ROW, _LINE_HALLS_B_FIRST_RUNE_COL, R - 2)]
     # Hall C: one single-cell non-void rune just left of the exit (the ^ target),
     # then a field of runes to its right so $ overshoots.  The exit cell stays unmarked.
     fr_r, fr_c = _LINE_HALLS_C_FIRST_RUNE
     fr_kind = rng.choice(_WORD_RUNE_KINDS)
-    runs.append(CharRun(row=fr_r, col=fr_c, symbols=(_RUNE_CHAR[fr_kind],), kind=fr_kind))
-    runs += _tile_line_hall(rng, _LINE_HALLS_C_ROW, _LINE_HALLS_EXIT[1] + 2, R - 2)
-    composite.char_runs = runs
+    runs.append({'row': fr_r, 'col': fr_c, 'symbols': _RUNE_CHAR[fr_kind],
+                 'kind': fr_kind})
+    runs += [{'row': ru.row, 'col': ru.col, 'symbols': ''.join(ru.symbols),
+              'kind': ru.kind} for ru in _tile_line_hall(rng, _LINE_HALLS_C_ROW, _LINE_HALLS_EXIT[1] + 2, R - 2)]
 
-    composite.rebuild_indexes()
-    par, path = _bfs_par_line(composite, return_path=True)
-    composite.par    = par
-    composite.budget = math.ceil(par * 1.4)
-    composite.answer = path
-    dungeon.rooms        = [composite]
-    dungeon.current_room = 0
+    level = _Level(
+        name='The Line Halls', seed=seed,
+        rows=ROWS, cols=COLS,
+        cells=[''.join(_CELL_CODE[c] for c in row) for row in grid],
+        spawn=_LINE_HALLS_SPAWN, exit=_LINE_HALLS_EXIT,
+        char_runs=runs,
+        entities=[{'kind': 'exit', 'at': [_LINE_HALLS_EXIT[0],
+                                          _LINE_HALLS_EXIT[1]]}])
+
+    dungeon = _fmt_build(level)
+    room = dungeon.rooms[0]
+    # Par is SOLVED, not declared: the cheapest walk the BFS proves, and the
+    # tape is that walk. (build() cannot know it yet; this is the derived-par
+    # path, not an author-set one.)
+    par, path = _bfs_par_line(room, return_path=True)
+    room.par    = par
+    room.budget = math.ceil(par * 1.4)
+    room.answer = path
     return dungeon
 
 
