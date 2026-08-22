@@ -9001,21 +9001,19 @@ def build_dungeon_sentence_corridor(seed: int) -> 'Dungeon':
     cannot be infinitely forced (gg/{n}G + ) substitutes within budget); it is
     the strongly-incentivized partner while ) carries the mandatory lesson.
     """
-    dungeon = Dungeon(name='The Sentence Corridor', seed=seed)
+    from vimny.engine.editor import _CELL_CODE
+    from vimny.sharing import format as _fmt
+    from vimny.sharing.format import Level as _Level, build as _fmt_build
     ROWS, COLS = _SENTENCE_CORRIDOR_ROWS, _SENTENCE_CORRIDOR_COLS
 
     cells = [[CellType.WALL] * COLS for _ in range(ROWS)]
-    composite = Room(rows=ROWS, cols=COLS, room_type=RoomType.ENTRY)
-    composite.cells = cells
-    composite.seed  = seed
 
     # ── Sentence rows (row 2 stays all-wall: the stone separator) ─────────────
     runes: list = []
     for (r, c, text) in _SENTENCE_CORRIDOR_SENTENCES:
         for i in range(len(text)):
             cells[r][c + i] = CellType.CORRIDOR
-        runes.append(CharRun(row=r, col=c, symbols=tuple(text), kind='ember'))
-    composite.char_runs = runes
+        runes.append({'row': r, 'col': c, 'symbols': text, 'kind': 'ember'})
 
     # ── Door / exit / key cells (passable floor; the door blocks via entity) ──
     dr, dc = _SENTENCE_CORRIDOR_DOOR_POS
@@ -9041,8 +9039,8 @@ def build_dungeon_sentence_corridor(seed: int) -> 'Dungeon':
     _s1_r, _s1_c, _s1_text = _SENTENCE_CORRIDOR_SENTENCES[0]
     for c in range(_s1_c, _s1_c + 3):
         cells[0][c] = CellType.CORRIDOR
-    runes.append(CharRun(row=0, col=_s1_c,
-                         symbols=tuple(_RUNE_CHAR['void'] * 3), kind='void'))
+    runes.append({'row': 0, 'col': _s1_c,
+                  'symbols': _RUNE_CHAR['void'] * 3, 'kind': 'void'})
 
     # ── Waterworks: the inter-sentence gaps and the row-2
     # separator are MISTED WATER, not stone — every sentence is visible from
@@ -9061,25 +9059,29 @@ def build_dungeon_sentence_corridor(seed: int) -> 'Dungeon':
         if cells[2][c] == CellType.WALL:
             cells[2][c] = CellType.WATER
             mist.add((2, c))
-    composite.fog_cells  = set(mist)
-    composite.mist_cells = set(mist)              # permanent: reveals skip it
 
-    composite.spawn_pos = _SENTENCE_CORRIDOR_ENTRY
-    composite.exit_pos  = _SENTENCE_CORRIDOR_EXIT
-    composite.entities = [
-        Entity(kind='exit',        row=er, col=ec),
-        Entity(kind='locked_door', row=dr, col=dc),
-        Entity(kind='floor_key',   row=kr, col=kc),
-    ]
-    composite.rebuild_indexes()
+    def encode(r):
+        return ''.join(_fmt._MIST_CODE if (r, c) in mist else _CELL_CODE[ct]
+                       for c, ct in enumerate(cells[r]))
 
-    cost, answer = _par_sentence_corridor(composite, return_path=True)
-    composite.par    = cost
-    composite.budget = math.ceil(cost * 1.4)
-    composite.answer = answer
+    level = _Level(
+        name='The Sentence Corridor', seed=seed,
+        rows=ROWS, cols=COLS,
+        cells=[encode(r) for r in range(ROWS)],
+        spawn=_SENTENCE_CORRIDOR_ENTRY, exit=_SENTENCE_CORRIDOR_EXIT,
+        char_runs=runes,
+        entities=[
+            {'kind': 'exit',        'at': [er, ec]},
+            {'kind': 'locked_door', 'at': [dr, dc]},
+            {'kind': 'floor_key',   'at': [kr, kc]},
+        ])
 
-    dungeon.rooms        = [composite]
-    dungeon.current_room = 0
+    dungeon = _fmt_build(level)
+    room = dungeon.rooms[0]
+    cost, answer = _par_sentence_corridor(room, return_path=True)
+    room.par    = cost
+    room.budget = math.ceil(cost * 1.4)
+    room.answer = answer
     return dungeon
 
 
