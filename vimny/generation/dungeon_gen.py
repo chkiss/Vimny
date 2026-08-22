@@ -5817,59 +5817,61 @@ def _gms_bay_specs(w) -> list:
 def build_dungeon_grandmasters_sanctum(seed: int) -> Dungeon:
     """The Grandmaster's Sanctum (slug `grandmasters_sanctum`): the act
     boss — every text object, asked properly, then the man himself."""
+    from vimny.engine.editor import _CELL_CODE
+    from vimny.sharing.format import Level as _Level, build as _fmt_build
     rng = random.Random(seed)
     words = _gms_draw_words(rng)
     specs = _gms_bay_specs(words)
 
     # ── Room 0: the proving gallery ─────────────────────────────────────────
     R, C = _GMS_ROWS0, _GMS_COLS0
-    cells = [[CellType.WALL] * C for _ in range(R)]
+    grid = [[CellType.WALL] * C for _ in range(R)]
     for r in range(1, _GMS_GATE + 1):                    # the spine
-        cells[r][_GMS_SPINE] = CellType.FLOOR
+        grid[r][_GMS_SPINE] = CellType.FLOOR
     # Bays AND their separator rows are full-width floor (the ops chain
     # bay-to-bay straight down, SE's shaft trick generalised); only the
     # THROAT is spine-only, so no east column can drop past the bolts.
     for r in range(2, _GMS_THROAT):
         for c in range(_GMS_SPINE, 52):
-            cells[r][c] = CellType.FLOOR
+            grid[r][c] = CellType.FLOOR
     for c in range(_GMS_SPINE, _GMS_WATCH[1] + 1):       # gate row + pocket
-        cells[_GMS_GATE][c] = CellType.FLOOR
+        grid[_GMS_GATE][c] = CellType.FLOOR
     for dc in _GMS_BOLTS:                                # the seven bolts
-        cells[_GMS_GATE][dc] = CellType.WALL
-    cells[_GMS_GATE][_GMS_SEAL] = CellType.WALL          # the final seal
+        grid[_GMS_GATE][dc] = CellType.WALL
+    grid[_GMS_GATE][_GMS_SEAL] = CellType.WALL          # the final seal
 
-    gallery = Room(room_type=RoomType.ENTRY, rows=R, cols=C)
-    gallery.cells = cells
-    gallery.seed  = seed
-
+    runs: list = []
+    ent: list = []
     doors = []
     for bay_i, (text, target) in enumerate(specs):
         row = _GMS_BAYS[bay_i]
         col = _GMS_TEXT0                                 # the floor text
         for part in text.split(' '):
             if part:
-                gallery.char_runs.append(CharRun(row, col, tuple(part), 'ancient'))
+                runs.append({'row': row, 'col': col, 'symbols': part,
+                             'kind': 'ancient'})
             col += len(part) + 1
         col = _GMS_PLQ_COL                               # the west plaque = the target
         for part in target.split(' '):
             if part:
-                gallery.char_runs.append(CharRun(row, col, tuple(part), 'verdant'))
+                runs.append({'row': row, 'col': col, 'symbols': part,
+                             'kind': 'verdant'})
             col += len(part) + 1
         doors.append((target, _GMS_BOLTS[bay_i]))
     doors.append((None, _GMS_BOLTS[6]))                  # the legion bolt (goblins)
-    gallery._gms_doors = tuple(doors)
 
     for pr_i, r in enumerate(_GMS_PARA):                 # the legion bay's canto
         a, b = words['p_rows'][pr_i]
-        gallery.char_runs.append(CharRun(r, _GMS_TEXT0, tuple(a), 'ancient'))
-        gallery.char_runs.append(CharRun(r, _GMS_TEXT0 + len(a) + 1, tuple(b), 'ancient'))
+        runs.append({'row': r, 'col': _GMS_TEXT0, 'symbols': a, 'kind': 'ancient'})
+        runs.append({'row': r, 'col': _GMS_TEXT0 + len(a) + 1, 'symbols': b,
+                     'kind': 'ancient'})
         for gc in (40, 46):
-            gallery.entities.append(Entity(kind='goblin', row=r, col=gc,
-                                           hp=1, max_hp=1, ai=''))
+            ent.append({'kind': 'goblin', 'at': [r, gc],
+                        'hp': 1, 'max_hp': 1, 'ai': ''})
     col = _GMS_PLQ_COL                                   # gate-row plaque: keeps the
     for part in ('the', 'last', 'gate'):                 # gate row non-blank (stops
-        gallery.char_runs.append(                        # dap's blank-run extension)
-            CharRun(_GMS_GATE, col, tuple(part), 'verdant'))
+        runs.append({'row': _GMS_GATE, 'col': col,       # dap's blank-run extension)
+                     'symbols': part, 'kind': 'verdant'})
         col += len(part) + 1
 
     # The threshold stone: a single ◆ on the spine cell of the gate row.
@@ -5877,66 +5879,30 @@ def build_dungeon_grandmasters_sanctum(seed: int) -> Dungeon:
     # gate row's first non-blank, so G (and any linewise park) lands at the
     # head of the row, west of the bolts; only $ (or walking) rides the
     # opened gate east past the transit cell.
-    gallery.char_runs.append(CharRun(_GMS_GATE, _GMS_SPINE, ('◆',), 'ancient'))
+    runs.append({'row': _GMS_GATE, 'col': _GMS_SPINE, 'symbols': '◆',
+                 'kind': 'ancient'})
 
     # The Grandmaster watches from the gate pocket. edit_immune: he anchors
     # the gate row against dG, and he is not to be killed through a wall.
-    gallery.entities.append(Entity(kind='warden', row=_GMS_WATCH[0],
-                                   col=_GMS_WATCH[1], hp=5, max_hp=5,
-                                   ai='', tag='grandmaster', edit_immune=True))
+    ent.append({'kind': 'warden', 'at': [_GMS_WATCH[0], _GMS_WATCH[1]],
+                'hp': 5, 'max_hp': 5, 'ai': '', 'tag': 'grandmaster',
+                'edit_immune': True})
 
-    gallery.spawn_pos = (1, _GMS_SPINE)
-    gallery.exit_pos  = _GMS_TRANSIT          # NO exit entity: stepping here descends
-    gallery._gms_words = words
-    gallery.rebuild_indexes()
-    apply_stone_fog(gallery)
-    gallery.par    = None
-    gallery.budget = _GMS_BUDGET
-    gallery.answer = ''                        # set below once words are drawn
+    gallery_level = _Level(
+        name="The Grandmaster's Sanctum", seed=seed,
+        rows=R, cols=C,
+        cells=[''.join(_CELL_CODE[c] for c in row) for row in grid],
+        spawn=(1, _GMS_SPINE), exit=_GMS_TRANSIT,   # NO exit entity: stepping here descends
+        char_runs=runs, entities=ent,
+        solution=("2j w w diw 2j ci\" {words['q_cure']}<Esc> 2j da[ "
+                  "2j cis {words['s_cure']}.<Esc> 2j dit 2j ci{{ {words['b_cure']}<Esc> "
+                  "2j dap $"))
 
-    # ── Room 1: The Unmaking (the arena) ─────────────────────────────────────
-    AR, AC = _GMS_A_ROWS, _GMS_A_COLS
-    acells = [[CellType.WALL] * AC for _ in range(AR)]
-    for r in range(1, AR - 1):
-        for c in range(1, _GMS_A_SEAL_COL):              # the open hall
-            acells[r][c] = CellType.FLOOR
-    for r in range(1, AR - 1):                           # the sanctum pocket,
-        for c in range(_GMS_A_SEAL_COL + 1, AC - 1):     # walled off by the seal
-            acells[r][c] = CellType.FLOOR
-    # the seal column is WALL top to bottom (opens at 0 HP); punch the throat
-    # so the pocket is a real room behind it, reachable only when he is unmade.
-
-    arena = Room(room_type=RoomType.BOSS, rows=AR, cols=AC)
-    arena.cells     = acells
-    arena.seed      = seed
-    arena.spawn_pos = _GMS_A_SPAWN
-    arena.exit_pos  = _GMS_A_EXIT
-
-    lecterns = []
-    for r, c, text, obj, cur, gone, keep in _GMS_A_LECTERNS:
-        _forge_text(arena, r, c, text, 'ember')          # ember = corrupt/bound
-        # the guard cell: two east of the strand's tail, so the Grandmaster
-        # recoils AWAY from the player's approach without ever sitting on the
-        # text he protects (the player must reach the structure to shear it).
-        lecterns.append({'row': r, 'col': c, 'obj': obj, 'cursor': (r, cur),
-                         'gone': gone, 'keep': keep,
-                         'guard': (r, min(_GMS_A_SEAL_COL - 1, c + len(text) + 1))})
-    arena._gm_lecterns = lecterns
-    arena._gm_seal_col = _GMS_A_SEAL_COL
-
-    arena.entities  = [
-        Entity(kind='warden', row=_GMS_A_BOSS[0], col=_GMS_A_BOSS[1],
-               hp=6, max_hp=6, ai='', tag='grandmaster', edit_immune=True),
-        Entity(kind='exit', row=_GMS_A_EXIT[0], col=_GMS_A_EXIT[1]),
-        Entity(kind='heart_container', row=_GMS_A_HEART[0], col=_GMS_A_HEART[1]),
-        Entity(kind='chest_scroll', row=_GMS_A_CHEST[0], col=_GMS_A_CHEST[1]),
-    ]
-    arena.search_glyph_entities = True   # /W finds the Grandmaster — the
-    arena.rebuild_indexes()              # Pathfinder/Manifold search parity
-    arena.par    = None
-    arena.budget = _GMS_A_BUDGET         # very large — the chase is unsequenced
-    arena.answer = ''                     # no karaoke: the fight has no fixed route
-
+    dungeon = _fmt_build(gallery_level)
+    gallery = dungeon.rooms[0]
+    # NO exit entity on the gallery: the transit cell is a stair, not a door —
+    # stepping here descends. build() derives an exit from Level.exit; drop it.
+    gallery.entities = [e for e in gallery.entities if e.kind != 'exit']
     # The driven canonical (see tests): the ops chain bay to bay straight
     # down; the dap's linewise park leaves the cursor at the head of the
     # gate row, and $ rides the opened gate east past the transit cell —
@@ -5945,12 +5911,67 @@ def build_dungeon_grandmasters_sanctum(seed: int) -> Dungeon:
     gallery.answer = (f"2j w w diw 2j ci\" {words['q_cure']}<Esc> 2j da[ "
                       f"2j cis {words['s_cure']}.<Esc> 2j dit 2j ci{{ {words['b_cure']}<Esc> "
                       f"2j dap $")
-    # The arena (The Unmaking) has NO karaoke — shear the six strands in any
-    # order; the Grandmaster starts inside one and slips to another whenever
-    # you close on him. The seal opens when the last strand parts.
+    gallery._gms_doors = tuple(doors)
+    gallery._gms_words = words
+    gallery.par    = None
+    gallery.budget = _GMS_BUDGET
 
-    dungeon = Dungeon(name="The Grandmaster's Sanctum", seed=seed)
-    dungeon.rooms        = [gallery, arena]
+    # ── Room 1: The Unmaking (the arena) ─────────────────────────────────────
+    AR, AC = _GMS_A_ROWS, _GMS_A_COLS
+    agrid = [[CellType.WALL] * AC for _ in range(AR)]
+    for r in range(1, AR - 1):
+        for c in range(1, _GMS_A_SEAL_COL):              # the open hall
+            agrid[r][c] = CellType.FLOOR
+    for r in range(1, AR - 1):                           # the sanctum pocket,
+        for c in range(_GMS_A_SEAL_COL + 1, AC - 1):     # walled off by the seal
+            agrid[r][c] = CellType.FLOOR
+    # the seal column is WALL top to bottom (opens at 0 HP); punch the throat
+    # so the pocket is a real room behind it, reachable only when he is unmade.
+
+    aruns: list = []
+    lecterns = []
+    scratch = Room(room_type=RoomType.ENTRY, rows=AR, cols=AC)
+    scratch.cells     = agrid
+    scratch.char_runs = []
+    for r, c, text, obj, cur, gone, keep in _GMS_A_LECTERNS:
+        _forge_text(scratch, r, c, text, 'ember')        # ember = corrupt/bound
+        # the guard cell: two east of the strand's tail, so the Grandmaster
+        # recoils AWAY from the player's approach without ever sitting on the
+        # text he protects (the player must reach the structure to shear it).
+        lecterns.append({'row': r, 'col': c, 'obj': obj, 'cursor': (r, cur),
+                         'gone': gone, 'keep': keep,
+                         'guard': (r, min(_GMS_A_SEAL_COL - 1, c + len(text) + 1))})
+    aruns += [{'row': ru.row, 'col': ru.col, 'symbols': ''.join(ru.symbols),
+               'kind': ru.kind} for ru in scratch.char_runs]
+
+    arena_level = _Level(
+        name='The Unmaking', seed=seed,
+        rows=AR, cols=AC,
+        cells=[''.join(_CELL_CODE[c] for c in row) for row in agrid],
+        spawn=_GMS_A_SPAWN, exit=_GMS_A_EXIT,
+        char_runs=aruns,
+        entities=[
+            {'kind': 'warden', 'at': [_GMS_A_BOSS[0], _GMS_A_BOSS[1]],
+             'hp': 6, 'max_hp': 6, 'ai': '', 'tag': 'grandmaster',
+             'edit_immune': True},
+            {'kind': 'exit', 'at': [_GMS_A_EXIT[0], _GMS_A_EXIT[1]]},
+            {'kind': 'heart_container',
+             'at': [_GMS_A_HEART[0], _GMS_A_HEART[1]]},
+            {'kind': 'chest_scroll',
+             'at': [_GMS_A_CHEST[0], _GMS_A_CHEST[1]]},
+        ])
+
+    arena_room = _fmt_build(arena_level).rooms[0]
+    arena_room.room_type = RoomType.BOSS
+    arena_room._gm_lecterns = lecterns
+    arena_room._gm_seal_col = _GMS_A_SEAL_COL
+    arena_room.search_glyph_entities = True   # /W finds the Grandmaster — the
+                                              # Pathfinder/Manifold search parity
+    arena_room.par    = None
+    arena_room.budget = _GMS_A_BUDGET         # very large — the chase is unsequenced
+    arena_room.answer = ''                    # no karaoke: the fight has no fixed route
+
+    dungeon.rooms        = [gallery, arena_room]
     dungeon.current_room = 0
     return dungeon
 
