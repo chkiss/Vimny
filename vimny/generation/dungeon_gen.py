@@ -11965,6 +11965,8 @@ def build_dungeon_overwrite_halls(seed: int) -> Dungeon:
     them without clobbering the correct prefix/suffix; STITCH doors have one wrong
     cell where `r` still rules. See the section header for the forcing."""
     R, C = _OH_ROWS, _OH_COLS
+    from vimny.engine.editor import _CELL_CODE
+    from vimny.sharing.format import Level as _Level, build as _fmt_build
     cells = [[CellType.WALL] * C for _ in range(R)]
     for r in _OH_LESSON_ROWS:                        # the open corridor block
         for c in range(_OH_COL_S, _OH_LBL_END + 1):
@@ -11977,43 +11979,37 @@ def build_dungeon_overwrite_halls(seed: int) -> Dungeon:
     # the bolt cells (gate row, between spine and exit) stay WALL; the tick opens
     # each when its corridor reads true.
 
-    room = Room(room_type=RoomType.ENTRY, rows=R, cols=C)
-    room.cells = cells
-    room.seed  = seed
-
-    def lay(r, c, text, kind):
-        room.char_runs.append(CharRun(r, c, tuple(text), kind))
-
+    runs: list = []
     doors = []
     lessons = []
     for i, (kind, prefix, target, wrong) in enumerate(_OH_LESSONS):
         lrow = _OH_LESSON_ROWS[i]
-        lay(lrow, _OH_LBL_COL, wrong, 'ancient')             # the WRONG word, on the floor
+        runs.append({'row': lrow, 'col': _OH_LBL_COL, 'symbols': wrong,
+                     'kind': 'ancient'})                     # the WRONG word, on the floor
         # the saying's carved prefix, right-aligned in the west stone (the
         # sense that replaces the decree plaque)
         pcol = _OH_COL_S - 1 - len(prefix)
         for w in prefix.split(' '):
-            lay(lrow, pcol, w, 'verdant')
+            runs.append({'row': lrow, 'col': pcol, 'symbols': w, 'kind': 'verdant'})
             pcol += len(w) + 1
         doors.append((target, (_OH_GATE_ROW, _OH_GATE_COL0 + i)))
         lessons.append({'kind': kind, 'prefix': prefix, 'target': target,
                         'wrong': wrong, 'row': lrow})
-    room.seals         = _label_gate(doors, _OH_EXIT)
-    room._oh_lessons   = tuple(lessons)
 
-    room.entities.append(Entity(kind='exit', row=_OH_EXIT[0], col=_OH_EXIT[1],
-                                edit_immune=True))
-    room.spawn_pos = (_OH_LESSON_ROWS[0], _OH_COL_S)         # on corridor 1, at the spine
-    room.exit_pos  = _OH_EXIT
+    level = _Level(
+        name='The Overwrite Halls', seed=seed,
+        rows=R, cols=C,
+        cells=[''.join(_CELL_CODE[c] for c in row) for row in cells],
+        spawn=(_OH_LESSON_ROWS[0], _OH_COL_S),           # on corridor 1, at the spine
+        exit=_OH_EXIT,
+        char_runs=runs,
+        seals=list(_label_gate(doors, _OH_EXIT)),
+        entities=[{'kind': 'exit', 'at': [_OH_EXIT[0], _OH_EXIT[1]],
+                   'edit_immune': True}],
+        solution=_OH_ANSWER)
 
-    room.rebuild_indexes()
-    room.par    = _OH_PAR
-    room.budget = math.ceil(_OH_PAR * 1.4)   # STANDARD (par-is-the-optimum law)
-    room.answer = _OH_ANSWER
-
-    dungeon = Dungeon(name='The Overwrite Halls', seed=seed)
-    dungeon.rooms        = [room]
-    dungeon.current_room = 0
+    dungeon = _fmt_build(level, par=_OH_PAR)
+    dungeon.rooms[0]._oh_lessons = tuple(lessons)
     return dungeon
 
 
