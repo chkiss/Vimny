@@ -6795,29 +6795,51 @@ def _bnd_draw_word(rng) -> str:
 
 def build_dungeon_binders_reliquary(seed: int) -> Dungeon:
     """The Binder's Reliquary (slug `binders_reliquary`): the Codex (:h)."""
+    from vimny.engine.editor import _CELL_CODE
+    from vimny.sharing.format import Level as _Level, build as _fmt_build
     rng = random.Random(seed)
     word = _bnd_draw_word(rng)
 
     R, C = _BND_ROWS, _BND_COLS
-    cells = [[CellType.WALL] * C for _ in range(R)]
+    grid = [[CellType.WALL] * C for _ in range(R)]
     for r in range(1, R - 1):
         for c in range(1, C - 1):
-            cells[r][c] = (CellType.WATER if c in _BND_WATER_COLS
-                           else CellType.FLOOR)
-
-    room = Room(room_type=RoomType.ENTRY, rows=R, cols=C)
-    room.cells = cells
-    room.seed  = seed
+            grid[r][c] = (CellType.WATER if c in _BND_WATER_COLS
+                          else CellType.FLOOR)
 
     # The pass-word on the far shore — the only text across the water, so
     # the crossing search is unambiguous. Friezes stay on the near shore.
-    room.char_runs.append(
-        CharRun(_BND_AR, _bnd_word_col(word), tuple(word), 'ember'))
-    _place_frieze_sym(room, rng, _BND_FRIEZE_ROWS, 1, _BND_WATER_COLS[0] - 1)
+    runs = [{'row': _BND_AR, 'col': _bnd_word_col(word), 'symbols': word,
+             'kind': 'ember'}]
+    scratch = Room(room_type=RoomType.ENTRY, rows=R, cols=C)
+    scratch.cells     = grid
+    scratch.char_runs = []
+    _place_frieze_sym(scratch, rng, _BND_FRIEZE_ROWS, 1, _BND_WATER_COLS[0] - 1)
+    runs += [{'row': ru.row, 'col': ru.col, 'symbols': ''.join(ru.symbols),
+              'kind': ru.kind} for ru in scratch.char_runs]
+
+    level = _Level(
+        name="The Binder's Reliquary", seed=seed,
+        rows=R, cols=C,
+        cells=[''.join(_CELL_CODE[c] for c in row) for row in grid],
+        spawn=_BND_SPAWN, exit=_BND_EXIT,
+        char_runs=runs,
+        entities=[{'kind': 'chest_scroll',
+                   'at': [_BND_CHEST[0], _BND_CHEST[1]],
+                   'scroll_id': 'readers_key'},
+                  {'kind': 'exit', 'at': [_BND_EXIT[0], _BND_EXIT[1]],
+                   'edit_immune': True}],
+        # /{word}<CR> lands on the word's first glyph; e to its end, step to the
+        # lectern, loot, step out. (Enter is free; '/' + the word are charged.)
+        solution=f'/{word}<CR> e 2l x l')
+
+    dungeon = _fmt_build(level)
+    room = dungeon.rooms[0]
     room._bnd_word = word
 
     # Mist on the water: permanent fog over the channel only. The far shore
-    # stays visible and searchable; the scans stop at the bank.
+    # stays visible and searchable; the scans stop at the bank. A designed
+    # darkness, not a derived one — re-attached after the build.
     room.fog_cells  = {(r, c) for r in range(1, R - 1) for c in _BND_WATER_COLS}
     room.mist_cells = set(room.fog_cells)         # permanent: reveals skip it
 
@@ -6831,25 +6853,9 @@ def build_dungeon_binders_reliquary(seed: int) -> Dungeon:
          ''],
     ),)
 
-    room.entities = [
-        Entity(kind='chest_scroll', row=_BND_CHEST[0], col=_BND_CHEST[1],
-               scroll_id='readers_key'),
-        Entity(kind='exit', row=_BND_EXIT[0], col=_BND_EXIT[1],
-               edit_immune=True),
-    ]
-    room.spawn_pos = _BND_SPAWN
-    room.exit_pos  = _BND_EXIT
-
-    room.rebuild_indexes()
-    room.par    = None                            # reward room, like the first
+    # reward room, like the first
+    room.par    = None
     room.budget = _BND_BUDGET
-    # /{word}<CR> lands on the word's first glyph; e to its end, step to the
-    # lectern, loot, step out. (Enter is free; '/' + the word are charged.)
-    room.answer = f'/{word}<CR> e 2l x l'
-
-    dungeon = Dungeon(name="The Binder's Reliquary", seed=seed)
-    dungeon.rooms        = [room]
-    dungeon.current_room = 0
     return dungeon
 
 
