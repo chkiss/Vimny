@@ -4331,21 +4331,21 @@ def _r2_saying_for(row: int) -> int:
 def build_dungeon_register_named_vault(seed: int) -> Dungeon:
     """The Register II — The Named Vault ("a / "b).  See the section header."""
     from vimny.content.proverbs import text_of
+    from vimny.engine.editor import _CELL_CODE
+    from vimny.sharing.format import Level as _Level, build as _fmt_build
     R, C = _R2_ROWS, _R2_COLS
-    cells = [[CellType.WALL] * C for _ in range(R)]
+    grid = [[CellType.WALL] * C for _ in range(R)]
     for r in range(2, _R2_GATE + 1):                     # the spine
-        cells[r][_R2_SPINE] = CellType.FLOOR
+        grid[r][_R2_SPINE] = CellType.FLOOR
     for r in (*_R2_QUARRY_ROWS, *_R2_BAY_ROWS):          # every bay, fully open
         for c in range(_R2_BAY_W, _R2_BAY_E + 1):
-            cells[r][c] = CellType.FLOOR
+            grid[r][c] = CellType.FLOOR
 
-    room = Room(room_type=RoomType.ENTRY, rows=R, cols=C)
-    room.cells = cells
-    room.seed  = seed
+    runs: list = []
 
     def lay(r, col, words_seq):
         for w in words_seq:
-            room.char_runs.append(CharRun(r, col, tuple(w), 'ancient'))
+            runs.append({'row': r, 'col': col, 'symbols': w, 'kind': 'ancient'})
             col += len(w) + 1
 
     for qrow, word in zip(_R2_QUARRY_ROWS, _R2_QUARRY_WORDS):
@@ -4353,17 +4353,9 @@ def build_dungeon_register_named_vault(seed: int) -> Dungeon:
     for brow in _R2_BAY_ROWS:
         lay(brow, _R2_TEXTCOL, _R2_STUBS[_r2_saying_for(brow)])
 
-    room._r2_targets = {r: text_of(_R2_SAYINGS[_r2_saying_for(r)])
-                        for r in _R2_BAY_ROWS}
+    targets = {r: text_of(_R2_SAYINGS[_r2_saying_for(r)])
+               for r in _R2_BAY_ROWS}
 
-    room.entities.append(Entity(kind='exit', row=_R2_EXIT[0], col=_R2_EXIT[1],
-                                edit_immune=True))
-    room.spawn_pos = _R2_SPAWN
-    room.exit_pos  = _R2_EXIT
-
-    room.rebuild_indexes()
-    room.par    = _R2_PAR
-    room.budget = math.ceil(_R2_PAR * 1.4)              # STANDARD
     # PAR IS THE MACRO ROUTE, because the macro route is the optimum and par may
     # never be a lie: quarry both words, then record ONE PAIR of bays (the bays
     # alternate, so the pair is the repeating unit) starting at the earliest
@@ -4375,15 +4367,24 @@ def build_dungeon_register_named_vault(seed: int) -> Dungeon:
     _bay = lambda r: '$ b diw "%sP' % 'ab'[_r2_saying_for(r)]
     # (`ye` leaves the cursor at the START of the yank, so the second quarry row
     #  needs no `w` — dropping it keeps the tape honest against the audit.)
-    room.answer = ' '.join(['j w "aye j "bye qq',
-                            'j ' + _bay(_R2_BAY_ROWS[0]),
-                            'j ' + _bay(_R2_BAY_ROWS[1]),
-                            'q 2@q G l'])
+    solution = ' '.join(['j w "aye j "bye qq',
+                         'j ' + _bay(_R2_BAY_ROWS[0]),
+                         'j ' + _bay(_R2_BAY_ROWS[1]),
+                         'q 2@q G l'])
+
+    level = _Level(
+        name='The Named Vault', seed=seed,
+        rows=R, cols=C,
+        cells=[''.join(_CELL_CODE[c] for c in row) for row in grid],
+        spawn=_R2_SPAWN, exit=_R2_EXIT,
+        char_runs=runs,
+        entities=[{'kind': 'exit', 'at': [_R2_EXIT[0], _R2_EXIT[1]],
+                   'edit_immune': True}],
+        solution=solution)
     # NO fog and NO gates: the room is open from the spawn so the rhythm shows.
 
-    dungeon = Dungeon(name='The Named Vault', seed=seed)
-    dungeon.rooms        = [room]
-    dungeon.current_room = 0
+    dungeon = _fmt_build(level, par=_R2_PAR)
+    dungeon.rooms[0]._r2_targets = targets
     return dungeon
 
 
