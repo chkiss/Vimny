@@ -10672,22 +10672,23 @@ def build_dungeon_echo_vault(seed: int) -> Dungeon:
         return ''.join(out)
 
     R, C = _EV_ROWS, _EV_COLS
+    from vimny.engine.editor import _CELL_CODE
+    from vimny.sharing.format import Level as _Level, build as _fmt_build
     cells = [[CellType.WALL] * C for _ in range(R)]
     for c in range(_EV_FLOOR_LO, _EV_FLOOR_HI + 1):
         cells[_EV_ROW][c] = CellType.CORRIDOR
     for (br, bc) in (_EV_BOLT_A, _EV_BOLT_B, _EV_BOLT_C):
         cells[br][bc] = CellType.WALL              # the bolts start shut
 
-    room = Room(room_type=RoomType.ENTRY, rows=R, cols=C)
-    room.cells = cells
-    room.seed  = seed
+    runs: list = []
 
     def lay(row, col, text, kind):
         """Place `text` at (row, col); spaces become gaps between separate runs."""
         c = col
         for piece in text.split(' '):
             if piece:
-                room.char_runs.append(CharRun(row, c, tuple(piece), kind))
+                runs.append({'row': row, 'col': c,
+                             'symbols': piece, 'kind': kind})
             c += len(piece) + 1
 
     for col, true, lock in (
@@ -10699,42 +10700,34 @@ def build_dungeon_echo_vault(seed: int) -> Dungeon:
         lay(_EV_PLAQUE_ROW, col, true, 'verdant')
         lay(_EV_ROW, col, lock, 'ancient')
 
-    # The exit is edit-immune: a careless D sweeps toward its cell, and the
-    # way out must not be deletable (nor the row dd-collapsible).
-    room.entities.append(Entity(kind='exit', row=_EV_EXIT[0], col=_EV_EXIT[1],
-                                edit_immune=True))
-    room.spawn_pos = _EV_SPAWN
-    room.exit_pos  = _EV_EXIT
-
     # Bolt specs read by main._echo_vault_tick (stateless, undo-safe): each is
     # (row, c0, target, bolt_pos) — the bolt stands open while the lock row's
     # text over [c0, c0+len(target)) READS AS the plaque.
-    room._ev_bolts = [
+    ev_bolts = [
         (_EV_ROW, _EV_SEG1_COL, phrase1, _EV_BOLT_A),
         (_EV_ROW, _EV_SEG2_COL, phrase2, _EV_BOLT_B),
         (_EV_ROW, _EV_SEG3_COL, phrase3, _EV_BOLT_C),
     ]
+
+    level = _Level(
+        name='The Echo Vault', seed=seed,
+        rows=R, cols=C,
+        cells=[''.join(_CELL_CODE[c] for c in row) for row in cells],
+        spawn=_EV_SPAWN, exit=_EV_EXIT,
+        char_runs=runs,
+        entities=[{'kind': 'exit', 'at': [_EV_EXIT[0], _EV_EXIT[1]],
+                   'edit_immune': True}],   # a careless D must not delete the way
+                                            # out (nor the row dd-collapsible)
+        solution=(f'w w r{l1} w w . w w . w w . '
+                  f'w w r{l2} w w . '
+                  f'w w r{digit} w w 3. $'))
+
+    dungeon = _fmt_build(level, par=_EV_PAR)
+    room = dungeon.rooms[0]
+    room._ev_bolts = ev_bolts
     # Band the shut bolts as stonework. Registered at build: the bolt cells are
     # fixed for the level's lifetime (no row shifts here).
-    room.sealed_cells = {pos for _r, _c0, _t, pos in room._ev_bolts}
-
-    room.rebuild_indexes()
-    # Par tally (fixed phrase geometry, so this holds for every seed; every
-    # mend MERGES its word, so each hop to the next warp is exactly w w):
-    #   w w r⟨e⟩  w w .  w w .  w w . (13) → mend one 'e'; the echo takes three
-    #   w w r⟨u⟩  w w .               (7)  → a new stroke re-primes the echo
-    #   w w r⟨d⟩  w w 3.              (8)  → the lone digit primes; 3. the triple
-    #   $                             (1)  → walk out through the drawn seal
-    room.par    = _EV_PAR
-    room.budget = math.ceil(_EV_PAR * 1.4)
-    room.answer = (f'w w r{l1} w w . w w . w w . '
-                   f'w w r{l2} w w . '
-                   f'w w r{digit} w w 3. $')
-
-    apply_stone_fog(room)                 # sealed pockets sleep under fog
-    dungeon = Dungeon(name='The Echo Vault', seed=seed)
-    dungeon.rooms        = [room]
-    dungeon.current_room = 0
+    room.sealed_cells = {pos for _r, _c0, _t, pos in ev_bolts}
     return dungeon
 
 
