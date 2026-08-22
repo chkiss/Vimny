@@ -63,9 +63,6 @@ def canonical_kind(kind: str) -> str:
     return _KIND_ALIASES.get(kind, kind)
 
 
-SEAL_MODES  = ('exact', 'contains', 'braziers')
-SEAL_SCOPES = ('region', 'anyrow')
-
 #: The banner a seal shows when it grinds back, if it names no other.
 SEAL_OPENED = 'The words read true — a bolt grinds back!'
 
@@ -452,7 +449,12 @@ class Room:
 
     def remove_entity(self, e: Entity) -> None:
         self.entities.remove(e)
-        self._entity_map.pop((e.row, e.col), None)
+        # Only clear the index slot if THIS entity owns it: two live entities
+        # can share a cell (paste-backs spawn onto occupied cells), and the
+        # slot belongs to whichever add_entity saw last — popping unconditionally
+        # would orphan the survivor from every entity_at() reader.
+        if self._entity_map.get((e.row, e.col)) is e:
+            self._entity_map.pop((e.row, e.col), None)
         _kl = self._entity_by_kind.get(e.kind)
         if _kl:
             try:
@@ -462,7 +464,8 @@ class Room:
 
     def kill_entity(self, e: Entity) -> None:
         """Set alive=False and remove from the spatial index."""
-        self._entity_map.pop((e.row, e.col), None)
+        if self._entity_map.get((e.row, e.col)) is e:   # see remove_entity — stacked entities share a slot
+            self._entity_map.pop((e.row, e.col), None)
         e.alive = False
 
     def _on_entity_destroyed(self, e: Entity) -> None:

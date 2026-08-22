@@ -64,7 +64,12 @@ def begin_insert(room, player, variant: str, count: int = 1) -> None:
     if variant == 'i':
         return
     if variant == 'a':
-        if player.col + 1 < room.cols:
+        # Same writable boundary insert_char itself enforces (walls refuse the
+        # write): stepping onto stone would strand the cursor somewhere every
+        # keystroke is swallowed with no feedback. Doors are NOT a bound here —
+        # they stand on writable floor, and typing at them is the designed brink.
+        if (player.col + 1 < room.cols
+                and room.cells[r][player.col + 1] in (*_PASTABLE, CellType.WATER)):
             player.col += 1
         return
     if variant == 'I':

@@ -45,7 +45,7 @@ Supported, matching Vim:
 from __future__ import annotations
 import re
 
-from vimny.engine.world import CellType, CharRun
+from vimny.engine.world import CellType, CharRun, clone_entity
 from vimny.engine.vimregex import compile_sub
 
 _WALLS = (CellType.WALL, CellType.WOOD_WALL)
@@ -709,19 +709,27 @@ def _rows_parried(room, lo: int, hi: int) -> bool:
 
 
 def _snapshot_rows(room, lo: int, hi: int) -> list:
-    """Full structural copies of rows lo..hi: cells, glyphs, fog/mist columns.
+    """Full structural copies of rows lo..hi: cells, glyphs, fog/mist columns,
+    and the row's live non-immune creatures (cloned; landmarks excluded — an
+    exit/entry marker's position side effects must not fire twice).
     :m/:t are ROW SURGERY, not a reflow paste — a fogged (misted-chasm) line
     moves with its terrain and its mist, so it arrives exactly as it stood
     (a reflow capture would read a fogged row as empty: line_extent is
-    passability-based by design)."""
+    passability-based by design). edit_immune occupants are left out on both
+    axes: their row parries :m outright, and :t must not mint a boss copy."""
     snap = []
     for r in range(lo, hi + 1):
+        riders = [clone_entity(e, fresh_uid=True)
+                  for e in room.entities
+                  if e.alive and not e.edit_immune and e.row == r
+                  and e.kind not in ('exit', 'entry_marker')]
         snap.append((
             [room.cells[r][c] for c in range(room.cols)],
             [(ru.col, tuple(ru.symbols), ru.kind)
              for ru in room._char_runs_by_row.get(r, [])],
             {c for (fr, c) in room.fog_cells if fr == r},
             {c for (fr, c) in room.mist_cells if fr == r},
+            riders,
         ))
     return snap
 
@@ -735,7 +743,7 @@ def _lay_rows_below(room, player, snap: list, dest: int) -> int:
     carry it would be a free ferry onto any island in the game. Precedent:
     run_global's :g//d already keeps the player in place."""
     from vimny.engine.reflow import _shift_rows
-    from vimny.engine.world import CellType as _CT, CharRun as _CR
+    from vimny.engine.world import CellType as _CT, CharRun as _CR, clone_entity as _clone
     n = len(snap)
     at = max(0, dest + 1)
     for _ in range(n):
@@ -744,12 +752,14 @@ def _lay_rows_below(room, player, snap: list, dest: int) -> int:
     _shift_rows(room, player, lambda r: r >= at, +n)
     if at <= player.row:
         player.row = min(player.row + n, room.rows - 1)
-    for k, (cells_row, runs, fogc, mistc) in enumerate(snap):
+    for k, (cells_row, runs, fogc, mistc, riders) in enumerate(snap):
         room.cells[at + k] = list(cells_row)
         for (col, syms, kind) in runs:
             room.char_runs.append(_CR(at + k, col, syms, kind))
         room.fog_cells  |= {(at + k, c) for c in fogc}
         room.mist_cells |= {(at + k, c) for c in mistc}
+        for e in riders:
+            room.add_entity(_clone(e, row=at + k))   # fresh uid already minted at snapshot
     room.rebuild_indexes()
     return n
 

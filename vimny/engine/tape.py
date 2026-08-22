@@ -360,3 +360,4 @@ def keystroke_cost(tape: str) -> int:
         if tok not in FREE:
             n += 1
     return n
+

@@ -70,6 +70,21 @@ class TestEntryPositioning:
         begin_insert(room, p, 'a')
         assert p.col == 6
 
+    def test_a_does_not_step_onto_stone(self):
+        # lowercase a merely ADVANCES; parked on a wall, every keystroke is
+        # swallowed in silence (A is the lone ledge-builder — see below).
+        room = _room(); p = _player(3, 5)
+        room.cells[3][6] = CellType.WALL
+        begin_insert(room, p, 'a')
+        assert (p.row, p.col) == (3, 5)
+
+    def test_a_may_step_onto_water(self):
+        # water is writable surface, so the advance stands on it
+        room = _room(); p = _player(3, 5)
+        room.cells[3][6] = CellType.WATER
+        begin_insert(room, p, 'a')
+        assert p.col == 6
+
     def test_I_jumps_to_first_non_blank(self):
         room = _room()
         room.add_char_run(CharRun(3, 8, ('x',), 'ancient'))

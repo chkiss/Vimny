@@ -27,7 +27,7 @@ from vimny.engine.text_object import (
 )
 from vimny.engine.operator import (
     line_extent, op_yank, op_delete, op_paste, op_case, op_join, case_char,
-    apply_indent, INDENT_WIDTH,
+    apply_indent, law_column, INDENT_WIDTH,
 )
 
 
@@ -757,3 +757,18 @@ class TestJoin:
         assert op_join(room, p, gap=True, count=1) is False               # would build past the world's edge
         assert room._last_build_blocked == 'edge'
         assert room.rows == before                                        # nothing collapsed
+
+
+class TestLawColumn:
+    def test_whitespace_only_verse_does_not_crash_the_law(self):
+        # a row whose only glyphs are spaces has a line extent but no words;
+        # the law must answer, not raise (IndexError before the guard)
+        room = _room()
+        room.add_char_run(CharRun(3, 5, (' ', ' ', ' '), 'ancient'))
+        room.rebuild_indexes()
+        col = law_column(room, 3)
+        assert col is None or isinstance(col, int)
+
+    def test_bare_floor_row_answers_the_law(self):
+        room = _room()                      # no glyphs at all
+        assert law_column(room, 3) is None or isinstance(law_column(room, 3), int)

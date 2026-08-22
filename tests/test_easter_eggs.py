@@ -151,10 +151,47 @@ def test_x_a_cat_purrs(monkeypatch):
 
 
 def test_x_an_elf_drops_gold(monkeypatch):
-    # a 1-HP elf felled in one x leaves a coin behind
-    r, elf, msgs = _drive_x_on('elf', 'elf', ['l', 'x'], monkeypatch, hp=1)
+    # a 1-HP elf felled in one x leaves a coin behind — but x strikes your own
+    # cell, so the coin drops where you stand, and a coin underfoot pockets
+    # itself that same turn (the pickup reads the spatial index, which the
+    # stacked-entity fix made truthful; before the fix the stale index hid the
+    # coin from the pocketing).
+    progress = {'has_hat': True, 'hat_worn': True}
+    r, elf, msgs = _drive_x_on('elf', 'elf', ['l', 'x'], monkeypatch,
+                               hp=1, progress=progress)
     assert not elf.alive
-    assert any(e.kind == 'gold' and e.alive for e in r.entities)
+    # the coin dropped where you stand pockets itself that same turn — the
+    # pickup reads the spatial index, which the stacked-entity fix made
+    # truthful (before it the stale index hid the coin from the pocketing)
+    assert progress.get('gold') == 1
+    assert any('drops its coins' in m for m in msgs)
+    assert progress.get('gold') == 1
+
+
+def test_a_coin_you_never_stand_on_stays_put(monkeypatch):
+    # gold on the floor is not swept away by turns passing: it waits,
+    # findable through the spatial index, until someone steps on it
+    from vimny.engine.world import Entity as _E
+    d = dg.build_dungeon_warden_eternal(0)
+    room = d.rooms[0]
+    for e in list(room.entities):
+        if e.kind in ('goblin', 'warden'):
+            e.alive = False
+    room.entities = [e for e in room.entities if e.kind not in ('goblin', 'warden')]
+    sr, sc = room.spawn_pos
+    coin = _E(kind='gold', row=sr, col=sc + 5)
+    room.entities.append(coin)
+    room.rebuild_indexes()
+    term = Terminal()
+    it = iter([Keystroke(k) for k in ['l', 'h']] + [Keystroke(c) for c in ':q!\r'])
+    monkeypatch.setattr(term, 'inkey', lambda *a, **k: next(it, Keystroke('')))
+    monkeypatch.setattr(main, 'render_all', lambda *a, **k: None)
+    monkeypatch.setattr(main.time, 'sleep', lambda *a, **k: None)
+    monkeypatch.setattr(main.SM, 'save_progress', lambda *a, **k: None)
+    main.run_dungeon(term, 'warden_eternal', {'has_hat': True, 'hat_worn': True},
+                     player_name='Hero', _dungeon=d)
+    assert coin.alive
+    assert room.entity_at(coin.row, coin.col) is coin
 
 
 def test_hound_bites_once_per_turn():

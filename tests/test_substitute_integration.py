@@ -23,7 +23,7 @@ from blessed.keyboard import Keystroke
 
 import vimny.game as main
 import vimny.engine.substitute as S
-from vimny.engine.world import Dungeon, Room, RoomType, CharRun, CellType
+from vimny.engine.world import Dungeon, Entity, Room, RoomType, CharRun, CellType
 
 
 def _ks(c, name=None):
@@ -100,3 +100,51 @@ def test_global_substitute_end_to_end():
     d = _dungeon(['a x', 'b y', 'a z'])
     lines, _ = _run(d, list(':g/a/s/ /-/') + ['\r'] + list(':q!') + ['\r'])
     assert lines == ['a-x', 'b y', 'a-z']
+
+
+# ── :m / :t carry their creatures ─────────────────────────────────────────────
+
+def _with_gold_on_row0(d, col=1):
+    g = Entity(kind='gold', row=0, col=col)
+    d.room.entities.append(g)
+    d.room.rebuild_indexes()
+    return g
+
+
+def test_moved_line_takes_its_creature_along():
+    # the coin is part of the line: row surgery moves it with its text
+    d = _dungeon(['aaaa', 'bbbb'])
+    _with_gold_on_row0(d)
+    # :1m2 — move line 1 below line 2 (dest inside the range would be E134)
+    lines, _ = _run(d, list(':1m2') + ['\r'] + list(':q!') + ['\r'])
+    assert lines == ['bbbb', 'aaaa']
+    golds = [e for e in d.room.entities if e.kind == 'gold' and e.alive]
+    assert len(golds) == 1
+    assert (golds[0].row, golds[0].col) == (1, 1)
+
+
+def test_copied_line_mints_a_fresh_creature_not_the_same_one():
+    # :t duplicates: both rows hold a live coin, distinct objects
+    d = _dungeon(['aaaa'])
+    _with_gold_on_row0(d)
+    lines, _ = _run(d, list(':t0') + ['\r'] + list(':q!') + ['\r'])
+    assert lines == ['aaaa', 'aaaa']
+    golds = [e for e in d.room.entities if e.kind == 'gold' and e.alive]
+    assert len(golds) == 2
+    assert {(g.row, g.col) for g in golds} == {(0, 1), (1, 1)}
+    assert golds[0] is not golds[1]
+
+
+def test_snapshot_excludes_landmarks_and_edit_immune_occupants():
+    # exits never fire twice; an edit_immune occupant must not be minted
+    # into a copy (:t must not clone the boss)
+    from vimny.engine.substitute import _snapshot_rows
+    d = _dungeon(['xxxx'])
+    r = d.room
+    r.entities.append(Entity(kind='gold', row=0, col=0))
+    r.entities.append(Entity(kind='warden', row=0, col=2, edit_immune=True))
+    r.entities.append(Entity(kind='exit', row=0, col=3))
+    r.rebuild_indexes()
+    snap = _snapshot_rows(r, 0, 0)
+    riders = snap[0][4]
+    assert [e.kind for e in riders] == ['gold']

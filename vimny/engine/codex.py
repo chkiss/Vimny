@@ -30,7 +30,7 @@ law elsewhere can be perturbed by anything done here.
 """
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 
 
 @dataclass
@@ -88,14 +88,6 @@ class CodexPane:
         self.message = ''
 
     # ── folds ────────────────────────────────────────────────────────────────
-
-    def _section_at(self, line: int) -> _Section | None:
-        """The innermost fold containing `line` (deepest start<=line<end)."""
-        best = None
-        for s in self.sections:
-            if s.start <= line < s.end and (best is None or s.depth > best.depth):
-                best = s
-        return best
 
     def _header_at(self, line: int) -> _Section | None:
         """The fold whose header row IS `line` (the deepest such, if two share)."""

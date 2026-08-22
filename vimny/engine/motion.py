@@ -393,17 +393,8 @@ def _segment_left(room, row: int, col: int):
         return None
     c = col
     while c - 1 >= 0 and _floor(c - 1):
-        c -= 1
+            c -= 1
     return c
-
-
-def _rightmost_passable(room, row: int):
-    """Last passable column on a row, or None if the row has none — the end of the
-    line (the corridor / ledge edge), used by `A` to append at the line's end."""
-    for c in range(room.cols - 1, -1, -1):
-        if room.is_passable(row, c):
-            return c
-    return None
 
 
 def _caret_stop(room, row: int, c: int) -> bool:

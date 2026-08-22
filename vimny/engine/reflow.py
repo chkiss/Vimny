@@ -326,6 +326,18 @@ def _shift_rows(room, player, moves, delta: int) -> None:
             if moves(r):
                 player.marks[nm] = (r + delta, c)
         player.jump_list = [((r + delta) if moves(r) else r, c) for (r, c) in player.jump_list]
+        # `'< `>` are real marks in Vim — the last selection rides row shifts
+        # like any mark, or :'<'>/gv act on rows that no longer hold it.
+        for attr in ('last_visual_anchor', 'last_visual_cursor'):
+            pos = getattr(player, attr, None)
+            if pos is not None and moves(pos[0]):
+                setattr(player, attr, (pos[0] + delta, pos[1]))
+    if room.wood_damage:                      # position-keyed state slides with its rows
+        room.wood_damage = {((r + delta) if moves(r) else r, c): v
+                            for (r, c), v in room.wood_damage.items()}
+    torn = getattr(room, 'torn', None)        # warden_mega's temporary floor tears
+    if torn:
+        room.torn = {((r + delta) if moves(r) else r, c) for (r, c) in torn}
 
 
 def _blank_line_span(room, row: int, col: int):

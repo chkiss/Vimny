@@ -196,3 +196,34 @@ class TestRuneMutationHelpers:
         room.add_char_run(ru2)
         assert room.char_run_at(2, 5) is ru1
         assert room.char_run_at(3, 5) is ru2
+
+
+class TestStackedEntities:
+    """Two creatures may share a cell for a breath (a coin dropped where an
+    elf fell). The index must answer for the one that is really on top and
+    keep the survivor findable when the other dies."""
+
+    def test_top_of_stack_wins(self):
+        room = _make_room()
+        elf = Entity(kind='elf', row=2, col=5)
+        coin = Entity(kind='gold', row=2, col=5)
+        room.add_entity(elf)
+        room.add_entity(coin)
+        assert room.entity_at(2, 5) is coin
+
+    def test_killing_one_leaves_the_other_findable(self):
+        room = _make_room()
+        elf = Entity(kind='elf', row=2, col=5)
+        coin = Entity(kind='gold', row=2, col=5)
+        room.add_entity(elf)
+        room.add_entity(coin)
+        room.kill_entity(elf)               # elf died; the coin stays
+        assert coin.alive
+        assert room.entity_at(2, 5) is coin
+
+    def test_removing_the_last_one_empties_the_cell(self):
+        room = _make_room()
+        e = Entity(kind='gold', row=2, col=5)
+        room.add_entity(e)
+        room.remove_entity(e)
+        assert room.entity_at(2, 5) is None

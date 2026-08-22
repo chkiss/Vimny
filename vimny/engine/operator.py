@@ -386,7 +386,8 @@ def law_column(room, row: int):
     for r in range(top, row + 1):
         _, text = _floor_tokens(room, r)
         stripped = text.strip()
-        if stripped.split()[0] == 'end':
+        words = stripped.split()
+        if words and words[0] == 'end':               # space-only text has floor tokens but no words
             depth = max(depth - 1, 0)
         if r == row:
             return base + INDENT_WIDTH * depth
