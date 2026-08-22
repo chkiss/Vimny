@@ -3653,59 +3653,69 @@ def build_dungeon_sight_sanctum(seed: int) -> Dungeon:
     guard words kill the linewise toggle); the Seal chamber forces the
     search-extended selection on the level's one pristine letter. Vocabulary
     is drawn per seed; slot lengths are fixed. See the section header."""
+    from vimny.engine.editor import _CELL_CODE
+    from vimny.sharing.format import Level as _Level, _parse_seal, build as _fmt_build
     rng = random.Random(seed)
     words = _ss_draw_words(rng)
     chambers = _ss_chambers(words)
 
     R, C = _SS_ROWS, _SS_COLS
-    cells = [[CellType.WALL] * C for _ in range(R)]
+    grid = [[CellType.WALL] * C for _ in range(R)]
     for r in range(2, _SS_GATE + 1):                     # the spine
-        cells[r][_SS_SPINE] = CellType.FLOOR
+        grid[r][_SS_SPINE] = CellType.FLOOR
     for _name, rows, _runs, _targets in chambers:        # the bays
         for r in rows:
             for c in range(_SS_BAY_W, _SS_BAY_E + 1):
-                cells[r][c] = CellType.FLOOR
+                grid[r][c] = CellType.FLOOR
     for r in _SS_SHAFT_ROWS:                             # the light shaft —
-        cells[r][_SS_SHAFT] = CellType.FLOOR             # NOT the throat row:
+        grid[r][_SS_SHAFT] = CellType.FLOOR             # NOT the throat row:
     # the gate row is still reachable only along the spine (teleport audit)
     # gate row: spine only — bolts and the exit STAY WALL (the FINAL SEAL);
     # the tick floors each bolt as its chamber reads true, the seal last.
+    grid[_SS_SPAWN[0]][_SS_SPAWN[1]] = CellType.FLOOR   # the drop-in
 
-    room = Room(room_type=RoomType.ENTRY, rows=R, cols=C)
-    room.cells = cells
-    room.seed  = seed
-
+    runs: list = []
     doors = []
-    for i, (_name, _rows, runs, targets) in enumerate(chambers):
-        for rr, cc, text in runs:
+    for i, (_name, _rows, ch_runs, targets) in enumerate(chambers):
+        for rr, cc, text in ch_runs:
             # one run per word — a literal space glyph is a punctuation
             # "word" and would break w/e and the strip
             col = cc
             for part in text.split(' '):
                 if part:
-                    room.char_runs.append(CharRun(rr, col, tuple(part),
-                                                  'ancient'))
+                    runs.append({'row': rr, 'col': col, 'symbols': part,
+                                 'kind': 'ancient'})
                 col += len(part) + 1
         doors.append((targets, _SS_BOLT0 + i))
-    room.seals = _chamber_gate(doors, _SS_EXIT)
-    room._ss_words = words
+
+    seals = []
+    for i, (targets, bolt_col) in enumerate(doors):
+        seals.append(_parse_seal({
+            'scope': 'anyrow', 'mode': 'exact', 'anchor': 'exit_row',
+            'match': [str(t) for t in targets],
+            'opens': [[_SS_EXIT[0], bolt_col]],
+        }, i))
+    seals.append(_parse_seal({
+        'anchor': 'exit_row',
+        'requires': list(range(len(seals))),
+        'opens': [list(_SS_EXIT)],
+    }, len(seals)))
+
+    level = _Level(
+        name='The Sight Sanctum', seed=seed,
+        rows=R, cols=C,
+        cells=[''.join(_CELL_CODE[c] for c in row) for row in grid],
+        spawn=_SS_SPAWN, exit=_SS_EXIT,
+        char_runs=runs, seals=seals,
+        entities=[{'kind': 'exit', 'at': [_SS_EXIT[0], _SS_EXIT[1]],
+                   'edit_immune': True}],
+        solution=_ss_answer(words))
     # no lintel: floating carved words over the spawn read as a locked door
     # — the credo lives in the intro hint instead
 
-    cells[_SS_SPAWN[0]][_SS_SPAWN[1]] = CellType.FLOOR   # the drop-in
-    room.entities.append(Entity(kind='exit', row=_SS_EXIT[0], col=_SS_EXIT[1],
-                                edit_immune=True))
-    room.spawn_pos = _SS_SPAWN
-    room.exit_pos  = _SS_EXIT
-
-    room.rebuild_indexes()
-    room.par    = _SS_PAR
-    room.budget = math.ceil(_SS_PAR * 1.4)   # STANDARD: the piecewise route wins at 1★
-    room.answer = _ss_answer(words)
-
-    dungeon = Dungeon(name='The Sight Sanctum', seed=seed)
-    dungeon.rooms        = [room]
-    dungeon.current_room = 0
+    dungeon = _fmt_build(level, par=_SS_PAR)
+    _seal_banners(dungeon)
+    dungeon.rooms[0]._ss_words = words
     return dungeon
 
 
