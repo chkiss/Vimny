@@ -5355,6 +5355,8 @@ def build_dungeon_sentence_enclosure(seed: int) -> Dungeon:
     """The Sentence Enclosure (slug `sentence_enclosure`): is as — the
     sentence under your hand, from anywhere inside it. Sense, not decree:
     the sentences are sayings the player knows whole."""
+    from vimny.engine.editor import _CELL_CODE
+    from vimny.sharing.format import Level as _Level, _parse_seal, build as _fmt_build
     rng = random.Random(seed)
     texts = _se_draw_texts(rng)
     e_c1a, e_c1b, e_c2a, e_c2b, e_c5 = texts['east']
@@ -5391,20 +5393,17 @@ def build_dungeon_sentence_enclosure(seed: int) -> Dungeon:
              ((tgt[_SE_C5_ROWS[0]],), _SE_BOLTS['c5']))
 
     R, C = _SE_ROWS, _SE_COLS
-    cells = [[CellType.WALL] * C for _ in range(R)]
+    grid = [[CellType.WALL] * C for _ in range(R)]
     for r in range(2, _SE_GATE + 1):                     # the spine
-        cells[r][_SE_SPINE] = CellType.FLOOR
+        grid[r][_SE_SPINE] = CellType.FLOOR
     for r in rows:                                       # the bays
         for c in range(_SE_BAY_W, _SE_BAY_E + 1):
-            cells[r][c] = CellType.FLOOR
+            grid[r][c] = CellType.FLOOR
     for r, c in _SE_SHAFT_SEPS:                          # the light shafts —
-        cells[r][c] = CellType.FLOOR                     # NOT the throat row
-    cells[_SE_SPAWN[0]][_SE_SPAWN[1]] = CellType.FLOOR   # the drop-in
+        grid[r][c] = CellType.FLOOR                     # NOT the throat row
+    grid[_SE_SPAWN[0]][_SE_SPAWN[1]] = CellType.FLOOR   # the drop-in
 
-    room = Room(room_type=RoomType.ENTRY, rows=R, cols=C)
-    room.cells = cells
-    room.seed  = seed
-
+    runs: list = []
     for r, (text, t0) in rows.items():
         # Space-free runs with bare-floor gaps (the space-glyph law: a
         # literal space glyph is a punctuation 'word' and breaks w / the
@@ -5412,27 +5411,40 @@ def build_dungeon_sentence_enclosure(seed: int) -> Dungeon:
         col = t0
         for part in text.split(' '):
             if part:
-                room.char_runs.append(CharRun(r, col, tuple(part), 'ancient'))
+                runs.append({'row': r, 'col': col, 'symbols': part,
+                             'kind': 'ancient'})
             col += len(part) + 1
-    room.seals = _chamber_gate(doors, _SE_EXIT)
+
+    seals = []
+    for i, (targets, bolt_col) in enumerate(doors):
+        seals.append(_parse_seal({
+            'scope': 'anyrow', 'mode': 'exact', 'anchor': 'exit_row',
+            'match': [str(t) for t in targets],
+            'opens': [[_SE_EXIT[0], bolt_col]],
+        }, i))
+    seals.append(_parse_seal({
+        'anchor': 'exit_row',
+        'requires': list(range(len(seals))),
+        'opens': [list(_SE_EXIT)],
+    }, len(seals)))
+
+    ca, cb = (fix[1] for fix in _SE_C3_FIX)
+    level = _Level(
+        name='The Sentence Enclosure', seed=seed,
+        rows=R, cols=C,
+        cells=[''.join(_CELL_CODE[c] for c in row) for row in grid],
+        spawn=_SE_SPAWN, exit=_SE_EXIT,
+        char_runs=runs, seals=seals,
+        entities=[{'kind': 'exit', 'at': [_SE_EXIT[0], _SE_EXIT[1]],
+                   'edit_immune': True}],
+        solution=(f'j dis j . 2j das j . 2j cis {ca}.<Esc> j cis {cb}.<Esc> '
+                  f'2j das 2j . . G $'))
+
+    dungeon = _fmt_build(level, par=_SE_PAR)
+    _seal_banners(dungeon)
+    room = dungeon.rooms[0]
     room._se_texts = texts
     room._se_rows = rows
-
-    room.entities.append(Entity(kind='exit', row=_SE_EXIT[0], col=_SE_EXIT[1],
-                                edit_immune=True))
-    room.spawn_pos = _SE_SPAWN
-    room.exit_pos  = _SE_EXIT
-
-    room.rebuild_indexes()
-    room.par    = _SE_PAR
-    room.budget = math.ceil(_SE_PAR * 1.4)  # STANDARD: the edge-hunting route wins at 1★
-    ca, cb = (fix[1] for fix in _SE_C3_FIX)
-    room.answer = (f'j dis j . 2j das j . 2j cis {ca}.<Esc> j cis {cb}.<Esc> '
-                   f'2j das 2j . . G $')
-
-    dungeon = Dungeon(name='The Sentence Enclosure', seed=seed)
-    dungeon.rooms        = [room]
-    dungeon.current_room = 0
     return dungeon
 
 
