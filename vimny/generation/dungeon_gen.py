@@ -5131,28 +5131,28 @@ def build_dungeon_tag_enclosure(seed: int) -> Dungeon:
     and the innermost answers. Sense, not decree: proverb bays; the
     elements case junk stones or the saying's miswritten key word."""
     from vimny.content.proverbs import prefix_len, text_of
+    from vimny.engine.editor import _CELL_CODE
+    from vimny.sharing.format import Level as _Level, _parse_seal, build as _fmt_build
     rng = random.Random(seed)
     texts = _te_draw_texts(rng)
 
     R, C = _TE_ROWS, _TE_COLS
-    cells = [[CellType.WALL] * C for _ in range(R)]
+    grid = [[CellType.WALL] * C for _ in range(R)]
     for r in range(2, _TE_GATE + 1):                     # the spine
-        cells[r][_TE_SPINE] = CellType.FLOOR
+        grid[r][_TE_SPINE] = CellType.FLOOR
     lesson_rows = (_TE_C1_ROWS + _TE_C2_ROWS + _TE_C3_ROWS
                    + _TE_C4_ROWS + _TE_C5_ROWS)
     for r in lesson_rows:                                # the bays
         for c in range(_TE_BAY_W, _TE_BAY_E + 1):
-            cells[r][c] = CellType.FLOOR
+            grid[r][c] = CellType.FLOOR
     for r, c in _TE_SHAFT_SEPS:                          # the light shafts —
-        cells[r][c] = CellType.FLOOR                     # NOT the throat row
+        grid[r][c] = CellType.FLOOR                     # NOT the throat row
 
-    room = Room(room_type=RoomType.ENTRY, rows=R, cols=C)
-    room.cells = cells
-    room.seed  = seed
+    runs: list = []
 
     def lay(r, col, words_seq):
         for w in words_seq:
-            room.char_runs.append(CharRun(r, col, tuple(w), 'ancient'))
+            runs.append({'row': r, 'col': col, 'symbols': w, 'kind': 'ancient'})
             col += len(w) + 1
 
     doors_targets = {k: [] for k in ('c1', 'c2', 'c3', 'c4', 'c5')}
@@ -5181,7 +5181,8 @@ def build_dungeon_tag_enclosure(seed: int) -> Dungeon:
                 doors_targets['c3'].append(f'{pre}  {suf}')
         t0 = anchor - (prefix_len(words, k) + 1)
         lay(r, t0, words[:k])
-        room.char_runs.append(CharRun(r, anchor, tuple(fit), 'ancient'))
+        runs.append({'row': r, 'col': anchor, 'symbols': fit,
+                     'kind': 'ancient'})
         lay(r, anchor + len(fit) + 1, words[k:])
     cures = []
     for r, name, (words, idx, cure) in zip(_TE_C2_ROWS, texts['c2_names'],
@@ -5189,7 +5190,8 @@ def build_dungeon_tag_enclosure(seed: int) -> Dungeon:
         t0 = _TE_ANCHOR - (prefix_len(words, idx) + 1)
         lay(r, t0, words[:idx])
         fit = f'<{name}>{words[idx]}</{name}>'
-        room.char_runs.append(CharRun(r, _TE_ANCHOR, tuple(fit), 'ancient'))
+        runs.append({'row': r, 'col': _TE_ANCHOR, 'symbols': fit,
+                     'kind': 'ancient'})
         tail = words[idx + 1:]
         if tail:
             lay(r, _TE_ANCHOR + len(fit) + 1, tail)
@@ -5200,24 +5202,34 @@ def build_dungeon_tag_enclosure(seed: int) -> Dungeon:
     doors = tuple((tuple(doors_targets[k]), _TE_BOLTS[k])
                   for k in ('c1', 'c2', 'c3', 'c4', 'c5'))
 
-    room.seals = _chamber_gate(doors, _TE_EXIT)
-    room._te_texts = texts
+    seals = []
+    for i, (targets, bolt_col) in enumerate(doors):
+        seals.append(_parse_seal({
+            'scope': 'anyrow', 'mode': 'exact', 'anchor': 'exit_row',
+            'match': [str(t) for t in targets],
+            'opens': [[_TE_EXIT[0], bolt_col]],
+        }, i))
+    seals.append(_parse_seal({
+        'anchor': 'exit_row',
+        'requires': list(range(len(seals))),
+        'opens': [list(_TE_EXIT)],
+    }, len(seals)))
 
-    room.entities.append(Entity(kind='exit', row=_TE_EXIT[0], col=_TE_EXIT[1],
-                                edit_immune=True))
-    room.spawn_pos = (2, _TE_SPINE)
-    room.exit_pos  = _TE_EXIT
-
-    room.rebuild_indexes()
-    room.par    = _TE_PAR
-    room.budget = math.ceil(_TE_PAR * 1.4)  # STANDARD: the walk-in route wins at 1★
     ca, cb = cures
-    room.answer = (f'j f> dit j . 2j cit {ca}<Esc> j cit {cb}<Esc> '
-                   f'2j dat j . 2j dit j dat 2j f< dit G $')
+    level = _Level(
+        name='The Tag Enclosure', seed=seed,
+        rows=R, cols=C,
+        cells=[''.join(_CELL_CODE[c] for c in row) for row in grid],
+        spawn=(2, _TE_SPINE), exit=_TE_EXIT,
+        char_runs=runs, seals=seals,
+        entities=[{'kind': 'exit', 'at': [_TE_EXIT[0], _TE_EXIT[1]],
+                   'edit_immune': True}],
+        solution=(f'j f> dit j . 2j cit {ca}<Esc> j cit {cb}<Esc> '
+                  f'2j dat j . 2j dit j dat 2j f< dit G $'))
 
-    dungeon = Dungeon(name='The Tag Enclosure', seed=seed)
-    dungeon.rooms        = [room]
-    dungeon.current_room = 0
+    dungeon = _fmt_build(level, par=_TE_PAR)
+    _seal_banners(dungeon)
+    dungeon.rooms[0]._te_texts = texts
     return dungeon
 
 
