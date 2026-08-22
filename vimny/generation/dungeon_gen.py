@@ -102,6 +102,24 @@ def _chamber_gate(doors, exit_pos):
         final_message='Every chamber reads true — the final seal parts!')
 
 
+def _seal_banners(dungeon,
+                  bolt="The chamber's words read true — the bolt grinds back!",
+                  final='Every chamber reads true — the final seal parts!'):
+    """Re-apply the gate banners to a format-built room.
+
+    `Seal.message` is deliberately not file-format data — an author-supplied
+    banner is a text channel onto another player's screen — so a room built by
+    `format.build()` carries seals whose banner fell back to the generic
+    SEAL_OPENED wording. The shipped chassis gates hand their banners back
+    here, post-materialisation, which is the whole answer Phase 6 owes the
+    open-work table on engine-only seal messages."""
+    from dataclasses import replace as _dc_replace
+    room = dungeon.rooms[0]
+    *bolts, last = room.seals
+    room.seals = (tuple(_dc_replace(s, message=bolt) for s in bolts)
+                  + (_dc_replace(last, message=final),))
+
+
 def _label_gate(doors, exit_pos):
     """Bolts that want a word written SOMEWHERE — the Change Annex family (seven).
 
@@ -4467,7 +4485,6 @@ def build_dungeon_bracket_enclosure(seed: int) -> Dungeon:
     Sense, not decree: proverb bays. di( pries the junk stone and keeps the
     husk, ci( recuts the miscut gem to the word everyone knows, da( tears
     the whole fitting out. See the section header for the forcing."""
-    from dataclasses import replace as _dc_replace
     from vimny.content.proverbs import prefix_len, text_of
     from vimny.engine.editor import _CELL_CODE
     from vimny.sharing.format import Level as _Level, _parse_seal, build as _fmt_build
@@ -4552,11 +4569,7 @@ def build_dungeon_bracket_enclosure(seed: int) -> Dungeon:
     dungeon = _fmt_build(level, par=_BE_PAR)
 
     room = dungeon.rooms[0]
-    room.seals = tuple(
-        _dc_replace(s, message="The chamber's words read true — the bolt grinds back!")
-        for s in room.seals[:-1]) + (
-        _dc_replace(room.seals[-1],
-                    message='Every chamber reads true — the final seal parts!'),)
+    _seal_banners(dungeon)
     room._be_texts = texts
     return dungeon
 
@@ -4695,29 +4708,29 @@ def build_dungeon_brace_square_enclosure(seed: int) -> Dungeon:
     i[ a[ i{ a{ — choose the object; in the nest, choose the DEPTH.
     Sense, not decree: proverb bays wearing bracketed asides."""
     from vimny.content.proverbs import prefix_len, text_of
+    from vimny.engine.editor import _CELL_CODE
+    from vimny.sharing.format import Level as _Level, _parse_seal, build as _fmt_build
     rng = random.Random(seed)
     texts = _bsq_draw_texts(rng)
 
     R, C = _BSQ_ROWS, _BSQ_COLS
-    cells = [[CellType.WALL] * C for _ in range(R)]
+    grid = [[CellType.WALL] * C for _ in range(R)]
     for r in range(2, _BSQ_GATE + 1):                    # the spine
-        cells[r][_BSQ_SPINE] = CellType.FLOOR
+        grid[r][_BSQ_SPINE] = CellType.FLOOR
     lesson_rows = (_BSQ_C1_ROWS + _BSQ_C2_ROWS + _BSQ_C3_ROWS
                    + _BSQ_C4_ROWS + _BSQ_C5_ROWS)
     for r in lesson_rows:                                # the bays (the nest
         w = _BSQ_NEST_W if r in _BSQ_C4_ROWS else _BSQ_BAY_W   # rows keep west
         for c in range(w, _BSQ_BAY_E + 1):               # stone for their tags)
-            cells[r][c] = CellType.FLOOR
+            grid[r][c] = CellType.FLOOR
     for r, c in _BSQ_SHAFT_SEPS:                         # the light shafts —
-        cells[r][c] = CellType.FLOOR                     # NOT the throat row
+        grid[r][c] = CellType.FLOOR                     # NOT the throat row
 
-    room = Room(room_type=RoomType.ENTRY, rows=R, cols=C)
-    room.cells = cells
-    room.seed  = seed
+    runs: list = []
 
     def lay(r, col, words_seq, colour='ancient'):
         for w in words_seq:
-            room.char_runs.append(CharRun(r, col, tuple(w), colour))
+            runs.append({'row': r, 'col': col, 'symbols': w, 'kind': colour})
             col += len(w) + 1
 
     truths = {}                                          # row -> (prefix, suffix)
@@ -4725,23 +4738,23 @@ def build_dungeon_brace_square_enclosure(seed: int) -> Dungeon:
         close = ']' if delim == '[' else '}'
         t0 = oc - (prefix_len(words, k) + 1)
         lay(r, t0, words[:k])
-        room.char_runs.append(CharRun(r, oc, tuple(f'{delim}{junk}{close}'),
-                                      'ancient'))
+        runs.append({'row': r, 'col': oc, 'symbols': f'{delim}{junk}{close}',
+                     'kind': 'ancient'})
         lay(r, oc + len(junk) + 3, words[k:])
         truths[r] = (text_of(words[:k]), text_of(words[k:]))
     for (r, words, k, junk, flank, oc) in texts['nests']:
         t0 = oc - (prefix_len(words, k) + 1)
         lay(r, t0, words[:k])
-        room.char_runs.append(CharRun(r, oc, tuple(f'[{{{junk}}} {flank}]'),
-                                      'ancient'))
+        runs.append({'row': r, 'col': oc, 'symbols': f'[{{{junk}}} {flank}]',
+                     'kind': 'ancient'})
         lay(r, oc + 12, words[k:])
         truths[r] = (text_of(words[:k]), text_of(words[k:]))
     cures = {}
     for (r, oc), (words, idx, cure) in zip(_BSQ_C2_SLOTS, texts['misquotes']):
         t0 = oc - (prefix_len(words, idx) + 1)
         lay(r, t0, words[:idx])
-        room.char_runs.append(CharRun(r, oc, tuple(f'[{words[idx]}]'),
-                                      'ancient'))
+        runs.append({'row': r, 'col': oc, 'symbols': f'[{words[idx]}]',
+                     'kind': 'ancient'})
         tail = words[idx + 1:]
         if tail:
             lay(r, oc + len(words[idx]) + 3, tail)
@@ -4766,24 +4779,36 @@ def build_dungeon_brace_square_enclosure(seed: int) -> Dungeon:
     lay(12, _BSQ_PLQ_COL, ('braces',), 'ember')
     lay(13, _BSQ_PLQ_COL, ('square',), 'pedestal')
 
-    room.seals = _chamber_gate(doors, _BSQ_EXIT)
-    room._bsq_texts = texts
+    # The chamber gate in FILE vocabulary — six bolts then the final seal,
+    # validated exactly as an author's file would be.
+    seals = []
+    for i, (targets, bolt_col) in enumerate(doors):
+        seals.append(_parse_seal({
+            'scope': 'anyrow', 'mode': 'exact', 'anchor': 'exit_row',
+            'match': [str(t) for t in targets],
+            'opens': [[_BSQ_EXIT[0], bolt_col]],
+        }, i))
+    seals.append(_parse_seal({
+        'anchor': 'exit_row',
+        'requires': list(range(len(seals))),
+        'opens': [list(_BSQ_EXIT)],
+    }, len(seals)))
 
-    room.entities.append(Entity(kind='exit', row=_BSQ_EXIT[0], col=_BSQ_EXIT[1],
-                                edit_immune=True))
-    room.spawn_pos = (2, _BSQ_SPINE)
-    room.exit_pos  = _BSQ_EXIT
-
-    room.rebuild_indexes()
-    room.par    = _BSQ_PAR
-    room.budget = math.ceil(_BSQ_PAR * 1.4)  # STANDARD: the piecewise route wins at 1★
     ca, cb = (cures[r][0] for r in _BSQ_C2_ROWS)
-    room.answer = (f'j % di[ j . 2j ci[ {ca}<Esc> j ci[ {cb}<Esc> '
-                   f'2j di{{ j . 2j di{{ j di[ 2j da{{ G $')
+    level = _Level(
+        name='The Brace & Square Enclosure', seed=seed,
+        rows=R, cols=C,
+        cells=[''.join(_CELL_CODE[c] for c in row) for row in grid],
+        spawn=(2, _BSQ_SPINE), exit=_BSQ_EXIT,
+        char_runs=runs, seals=seals,
+        entities=[{'kind': 'exit', 'at': [_BSQ_EXIT[0], _BSQ_EXIT[1]],
+                   'edit_immune': True}],
+        solution=(f'j % di[ j . 2j ci[ {ca}<Esc> j ci[ {cb}<Esc> '
+                  f'2j di{{ j . 2j di{{ j di[ 2j da{{ G $'))
 
-    dungeon = Dungeon(name='The Brace & Square Enclosure', seed=seed)
-    dungeon.rooms        = [room]
-    dungeon.current_room = 0
+    dungeon = _fmt_build(level, par=_BSQ_PAR)
+    _seal_banners(dungeon)
+    dungeon.rooms[0]._bsq_texts = texts
     return dungeon
 
 
