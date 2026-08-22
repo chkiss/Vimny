@@ -6284,53 +6284,62 @@ def _sr_draw_words(rng) -> tuple:
 def build_dungeon_stair_rail(seed: int) -> Dungeon:
     """The Stair Rail (slug `stair_rail`): + - _ — climb and drop, landing
     on the word, not beside it."""
+    from vimny.engine.editor import _CELL_CODE
+    from vimny.sharing.format import Level as _Level, _parse_seal, build as _fmt_build
     rng = random.Random(seed)
     words = _sr_draw_words(rng)
 
     R, C = _SR_ROWS, _SR_COLS
-    cells = [[CellType.WALL] * C for _ in range(R)]
+    grid = [[CellType.WALL] * C for _ in range(R)]
     # the whole shaft is contiguous floor (rows 2..17) so -/+ can traverse
     # the blank rows between steps; the steps' words sit on rows 2,4,6,8,10.
     for r in range(_SR_STEP_ROWS[0], _SR_UNDERCROFT + 1):
         for c in range(_SR_WEST, _SR_EAST):
-            cells[r][c] = CellType.FLOOR
+            grid[r][c] = CellType.FLOOR
     # The corridor cells (_SR_BOLT_COLS) and the seal are west of the valley
     # and already stone — each mend carves its cell; the tick floors them.
 
-    room = Room(room_type=RoomType.ENTRY, rows=R, cols=C)
-    room.cells = cells
-    room.seed  = seed
-
-    doors = []
+    runs = []
+    seals = []
     mend_order = (2, 1, 0, 3, 4)          # S3 (spawn) → S2 → S1 → S4 → S5
     for k, r in enumerate(_SR_STEP_ROWS):
         col = _SR_STEP_COLS[k]
-        room.char_runs.append(CharRun(r, col, tuple('◆' + words[k]), 'ember'))
-        room.char_runs.append(CharRun(r, _SR_PLQ_COL, tuple(words[k]), 'verdant'))
+        runs.append({'row': r, 'col': col, 'symbols': '◆' + words[k],
+                     'kind': 'ember'})
+        runs.append({'row': r, 'col': _SR_PLQ_COL, 'symbols': words[k],
+                     'kind': 'verdant'})
         # each mended step carves its own corridor cell, east→west along
         # the canonical route (any other order carves the same passage)
-        doors.append(((words[k],), _SR_BOLT_COLS[mend_order.index(k)]))
-    room.seals = _chamber_gate(doors, _SR_EXIT)
-    room._sr_words = words
+        seals.append(_parse_seal({
+            'scope': 'anyrow', 'mode': 'exact', 'anchor': 'exit_row',
+            'match': [words[k]],
+            'opens': [[_SR_EXIT[0], _SR_BOLT_COLS[mend_order.index(k)]]],
+        }, k))
+    seals.append(_parse_seal({
+        'anchor': 'exit_row',
+        'requires': list(range(len(seals))),
+        'opens': [list(_SR_EXIT)],
+    }, len(seals)))
 
-    room.entities.append(Entity(kind='exit', row=_SR_EXIT[0], col=_SR_EXIT[1],
-                                edit_immune=True))
-    # chest_SCROLL, not chest_random: the reward here is a relic scroll (an
-    # unassigned scroll chest draws from the relic pool), and a random chest
-    # rolled that intent away four times in five.
-    room.entities.append(Entity(kind='chest_scroll', row=_SR_CHEST[0], col=_SR_CHEST[1]))
-    room.spawn_pos = (_SR_STEP_ROWS[_SR_SPAWN_IDX], _SR_STEP_COLS[_SR_SPAWN_IDX])
-    room.exit_pos  = _SR_EXIT
+    level = _Level(
+        name='The Stair Rail', seed=seed,
+        rows=R, cols=C,
+        cells=[''.join(_CELL_CODE[c] for c in row) for row in grid],
+        spawn=(_SR_STEP_ROWS[_SR_SPAWN_IDX], _SR_STEP_COLS[_SR_SPAWN_IDX]),
+        exit=_SR_EXIT,
+        char_runs=runs, seals=seals,
+        entities=[{'kind': 'exit', 'at': [_SR_EXIT[0], _SR_EXIT[1]],
+                   'edit_immune': True},
+                  # chest_SCROLL, not chest_random: the reward here is a relic scroll (an
+                  # unassigned scroll chest draws from the relic pool), and a random chest
+                  # rolled that intent away four times in five.
+                  {'kind': 'chest_scroll',
+                   'at': [_SR_CHEST[0], _SR_CHEST[1]]}],
+        solution='x 2- x H x 6+ x 2+ x 4+')
 
-    room.rebuild_indexes()
-    apply_stone_fog(room)
-    room.par    = _SR_PAR
-    room.budget = math.ceil(_SR_PAR * 1.4)  # STANDARD: the k^/j^-walk wins at 1★
-    room.answer = 'x 2- x H x 6+ x 2+ x 4+'
-
-    dungeon = Dungeon(name='The Stair Rail', seed=seed)
-    dungeon.rooms        = [room]
-    dungeon.current_room = 0
+    dungeon = _fmt_build(level, par=_SR_PAR)   # STANDARD: the k^/j^-walk wins at 1★
+    _seal_banners(dungeon)
+    dungeon.rooms[0]._sr_words = words
     return dungeon
 
 
