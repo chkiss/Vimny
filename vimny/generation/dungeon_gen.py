@@ -12488,6 +12488,8 @@ def build_dungeon_indentation_sanctum(seed: int) -> Dungeon:
     See the section header for the forcing."""
     rng = random.Random(seed)
     R, C = _IS_ROWS, _IS_COLS
+    from vimny.engine.editor import _CELL_CODE
+    from vimny.sharing.format import Level as _Level, build as _fmt_build
     cells = [[CellType.WALL] * C for _ in range(R)]
     hall_rows = _IS_G1_ROWS + _IS_G2_ROWS + _IS_RITE_ROWS + _IS_BLANK_ROWS
     for r in hall_rows:                                  # one open hall
@@ -12497,24 +12499,21 @@ def build_dungeon_indentation_sanctum(seed: int) -> Dungeon:
     cells[_IS_GATE_ROW][_IS_COL_S]   = CellType.FLOOR    # the spine reaches the gate
     # bolts AND the exit stay WALL — the tick opens them; the exit is the seal.
 
-    room = Room(room_type=RoomType.ENTRY, rows=R, cols=C)
-    room.cells = cells
-    room.seed  = seed
-
-    def lay(r, c, text, kind):
+    def lay(runs, r, c, text, kind):
         col = c
-        for part in text.split(' '):                     # separate CharRuns per word
+        for part in text.split(' '):                     # separate runs per word
             if part:
-                room.char_runs.append(CharRun(r, col, tuple(part), kind))
+                runs.append({'row': r, 'col': col, 'symbols': part, 'kind': kind})
             col += len(part) + 1
 
+    runs: list = []
     # THE LINTEL — the law is not a passing tip but a carving that presides
     # over the whole playthrough: two lines in the top
     # wall bands, laid so the plumb │ falls exactly through the word-gap at
     # the register column ("the law is │ posted").
-    lay(0, 6, 'in these halls', 'verdant')
-    lay(1, 6, 'the law is posted', 'verdant')            # gap lands at col 16
-    lay(1, _IS_REGISTER, '│', 'verdant')                 # the plumb line, carved above
+    lay(runs, 0, 6, 'in these halls', 'verdant')
+    lay(runs, 1, 6, 'the law is posted', 'verdant')      # gap lands at col 16
+    lay(runs, 1, _IS_REGISTER, '│', 'verdant')           # the plumb line, carved above
     # THE RITE'S OWN HEADING: the galleries wear their true word on the west
     # wall, but the rite block wears none, so without this nothing on screen
     # would say the block below is CODE — and `=` is the tool
@@ -12522,7 +12521,7 @@ def build_dungeon_indentation_sanctum(seed: int) -> Dungeon:
     # plaques are literal words the floor must match, so a plaque reading "the
     # code" invites the player to go and write those words. A tag reads as a
     # label ABOUT the block, which is what it is. It names no key.
-    lay(_IS_BLANK_ROWS[1], _IS_PLQ_COL, '<code>', 'verdant')
+    lay(runs, _IS_BLANK_ROWS[1], _IS_PLQ_COL, '<code>', 'verdant')
 
     nouns = rng.sample(_IS_NOUNS, 6 + sum(t.count('{n}') for t, _ in _IS_RITE))
     verbs = rng.sample(_IS_VERBS, sum(t.count('{v}') for t, _ in _IS_RITE))
@@ -12531,8 +12530,8 @@ def build_dungeon_indentation_sanctum(seed: int) -> Dungeon:
 
     for rows, words, off in ((_IS_G1_ROWS, g1_words, -2), (_IS_G2_ROWS, g2_words, +2)):
         for r, w in zip(rows, words):
-            lay(r, _IS_REGISTER + off, w, 'ancient')     # the mis-set noun
-            lay(r, _IS_PLQ_COL, w, 'verdant')            # its plaque, west wall
+            lay(runs, r, _IS_REGISTER + off, w, 'ancient')   # the mis-set noun
+            lay(runs, r, _IS_PLQ_COL, w, 'verdant')          # its plaque, west wall
 
     rite_texts = []
     for (template, col), r in zip(_IS_RITE, _IS_RITE_ROWS):
@@ -12541,28 +12540,27 @@ def build_dungeon_indentation_sanctum(seed: int) -> Dungeon:
             text = text.replace('{v}', next(slot_v), 1)
         while '{n}' in text:
             text = text.replace('{n}', next(slot_n), 1)
-        lay(r, col, text, 'ancient')
+        lay(runs, r, col, text, 'ancient')
         rite_texts.append(text)
 
+    level = _Level(
+        name='The Indentation Sanctum', seed=seed,
+        rows=R, cols=C,
+        cells=[''.join(_CELL_CODE[c] for c in row) for row in cells],
+        spawn=(_IS_G1_ROWS[0], _IS_COL_S),               # atop gallery one
+        exit=_IS_EXIT,
+        char_runs=runs,
+        entities=[{'kind': 'exit', 'at': [_IS_EXIT[0], _IS_EXIT[1]],
+                   'edit_immune': True}],
+        solution=_IS_ANSWER)
+
+    dungeon = _fmt_build(level, par=_IS_PAR)
+    room = dungeon.rooms[0]
     room._is_g1_words    = tuple(g1_words)
     room._is_g2_words    = tuple(g2_words)
     room._is_rite_texts  = tuple(rite_texts)
     room._is_register    = _IS_REGISTER
     room._is_bolts       = tuple(_IS_GATE_COL0 + i for i in range(_IS_TRIGGERS))
-
-    room.entities.append(Entity(kind='exit', row=_IS_EXIT[0], col=_IS_EXIT[1],
-                                edit_immune=True))
-    room.spawn_pos = (_IS_G1_ROWS[0], _IS_COL_S)         # atop gallery one
-    room.exit_pos  = _IS_EXIT
-
-    room.rebuild_indexes()
-    room.par    = _IS_PAR
-    room.budget = math.ceil(_IS_PAR * 1.4)   # STANDARD (par-is-the-optimum law)
-    room.answer = _IS_ANSWER
-
-    dungeon = Dungeon(name='The Indentation Sanctum', seed=seed)
-    dungeon.rooms        = [room]
-    dungeon.current_room = 0
     return dungeon
 
 
