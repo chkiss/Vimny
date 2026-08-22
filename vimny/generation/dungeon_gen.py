@@ -6647,51 +6647,68 @@ def build_dungeon_wet_ink(seed: int) -> Dungeon:
     flame once the quarter BEFORE it is written on the ledge (the fuel
     gate, _wet_ink_tick), so the scribe must leave the page and return
     to it, three times over."""
+    from vimny.engine.editor import _CELL_CODE
+    from vimny.sharing.format import Level as _Level, _parse_seal, build as _fmt_build
     rng = random.Random(seed)
     ws = _wi_draw_words(rng)
     full = ' '.join(ws)
 
     R, C = _WI_ROWS, _WI_COLS
-    cells = [[CellType.WALL] * C for _ in range(R)]
+    grid = [[CellType.WALL] * C for _ in range(R)]
     for c in range(_WI_SPINE, 47):                       # the writing ledge
-        cells[_WI_LEDGE][c] = CellType.FLOOR
+        grid[_WI_LEDGE][c] = CellType.FLOOR
     for r in range(_WI_LEDGE, _WI_GATE + 1):             # the spine, down
-        cells[r][_WI_SPINE] = CellType.FLOOR
+        grid[r][_WI_SPINE] = CellType.FLOOR
     for c in range(_WI_SOURCE[1], _WI_SPINE):            # the brazier gallery
-        cells[_WI_BRZ_ROW][c] = CellType.FLOOR
+        grid[_WI_BRZ_ROW][c] = CellType.FLOOR
     for c in range(_WI_SPINE, _WI_EXIT[1]):              # gate row + the bolt
-        cells[_WI_GATE][c] = CellType.FLOOR
-    cells[_WI_GATE][_WI_BOLT] = CellType.WALL
+        grid[_WI_GATE][c] = CellType.FLOOR
+    grid[_WI_GATE][_WI_BOLT] = CellType.WALL
     # _WI_EXIT itself stays WALL — the final seal.
-
-    room = Room(room_type=RoomType.ENTRY, rows=R, cols=C)
-    room.cells = cells
-    room.seed  = seed
 
     # The plaque (west wall of the ledge): the WHOLE inscription, laid at
     # build as one run per quarter (a wall-gap column between them reads
     # as the space); quarters 2-4 are fogged and revealed by firelight.
-    for k, w in enumerate(ws):
-        room.char_runs.append(CharRun(_WI_LEDGE, _WI_PLQ_COL + 5 * k,
-                                      tuple(w), 'verdant'))
+    runs = [{'row': _WI_LEDGE, 'col': _WI_PLQ_COL + 5 * k, 'symbols': w,
+             'kind': 'verdant'} for k, w in enumerate(ws)]
     # The source flame, and embers on every cold brazier.
-    room.char_runs.append(CharRun(*_WI_SOURCE, (_QM_FLAME,), 'flame'))
+    runs.append({'row': _WI_SOURCE[0], 'col': _WI_SOURCE[1],
+                 'symbols': _QM_FLAME, 'kind': 'flame'})
     for (br, bc) in _WI_BRAZIERS:
-        room.char_runs.append(CharRun(br, bc, (_QM_EMBERS,), 'pedestal'))
-    room.seals = _chamber_gate((((full,), _WI_BOLT),), _WI_EXIT)  # the full inscription
+        runs.append({'row': br, 'col': bc,
+                     'symbols': _QM_EMBERS, 'kind': 'pedestal'})
+
+    seals = [_parse_seal({
+        'scope': 'anyrow', 'mode': 'exact', 'anchor': 'exit_row',
+        'match': [full],
+        'opens': [[_WI_EXIT[0], _WI_BOLT]],
+    }, 0)]
+    seals.append(_parse_seal({
+        'anchor': 'exit_row',
+        'requires': list(range(len(seals))),
+        'opens': [list(_WI_EXIT)],
+    }, len(seals)))
+
+    level = _Level(
+        name='The Wet Ink', seed=seed,
+        rows=R, cols=C,
+        cells=[''.join(_CELL_CODE[c] for c in row) for row in grid],
+        spawn=(_WI_LEDGE, _WI_INK0), exit=_WI_EXIT,
+        char_runs=runs, seals=seals,
+        entities=[{'kind': 'exit', 'at': [_WI_EXIT[0], _WI_EXIT[1]],
+                   'edit_immune': True}],
+        solution=(f'i{ws[0]}<Esc> M yl w P gi<Space>{ws[1]}<Esc> M 2w P '
+                  f'gi<Space>{ws[2]}<Esc> M 3w P gi<Space>{ws[3]}<Esc> G $'))
+
+    dungeon = _fmt_build(level, par=_WI_PAR)
+    _seal_banners(dungeon)
+    room = dungeon.rooms[0]
     room._wi_words = ws
     # The fuel gate starts source-only; _wet_ink_tick widens it as the
     # quarters are written (read by _flame_paste_blocked).
     room._qm_chain = (_WI_SOURCE,)
     room._flame_block_msg = ('The flame gutters out — only a brazier whose '
                              'quarter is written will hold it.')
-
-    room.entities.append(Entity(kind='exit', row=_WI_EXIT[0], col=_WI_EXIT[1],
-                                edit_immune=True))
-    room.spawn_pos = (_WI_LEDGE, _WI_INK0)
-    room.exit_pos  = _WI_EXIT
-
-    room.rebuild_indexes()
     # The plaque is read in instalments: quarter k+1 (and the gap before it)
     # stays unreadable until brazier k burns. VEILED, not fogged — the text is
     # carved into WALL cells, which the fog law has nothing to say about, and
@@ -6701,14 +6718,6 @@ def build_dungeon_wet_ink(seed: int) -> Dungeon:
         frozenset((_WI_LEDGE, _WI_PLQ_COL + 5 * k - 1 + i) for i in range(5))
         for k in (1, 2, 3))
     room.veiled_cells = set().union(*room._wi_seg_fog)
-    room.par    = _WI_PAR
-    room.budget = math.ceil(_WI_PAR * 1.4)
-    room.answer = (f'i{ws[0]}<Esc> M yl w P gi<Space>{ws[1]}<Esc> M 2w P '
-                   f'gi<Space>{ws[2]}<Esc> M 3w P gi<Space>{ws[3]}<Esc> G $')
-
-    dungeon = Dungeon(name='The Wet Ink', seed=seed)
-    dungeon.rooms        = [room]
-    dungeon.current_room = 0
     return dungeon
 
 
