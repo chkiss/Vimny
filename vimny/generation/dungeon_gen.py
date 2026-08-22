@@ -7717,13 +7717,11 @@ def build_dungeon_bracket_vaults(seed: int) -> Dungeon:
     Without %: par_no_% = None (the water band is uncrossable by hand).
     Layout is deterministic; seed only colors the bracket/word characters.
     """
-    dungeon   = Dungeon(name='The Bracket Vaults', seed=seed)
+    from vimny.engine.editor import _CELL_CODE
+    from vimny.sharing.format import Level as _Level, build as _fmt_build
     ROWS, COLS = _BRACKET_VAULTS_ROWS, _BRACKET_VAULTS_COLS
 
-    cells = [[CellType.WALL] * COLS for _ in range(ROWS)]
-    composite = Room(rows=ROWS, cols=COLS, room_type=RoomType.ENTRY)
-    composite.cells = cells
-    composite.seed  = seed
+    grid = [[CellType.WALL] * COLS for _ in range(ROWS)]
 
     OPN = _BRACKET_VAULTS_BRACKET_OPEN   # 4
     CLS = _BRACKET_VAULTS_BRACKET_CLOSE  # 54
@@ -7732,13 +7730,13 @@ def build_dungeon_bracket_vaults(seed: int) -> Dungeon:
     # ── Carve corridors ───────────────────────────────────────────────────────
     for r in _BRACKET_VAULTS_CORR_ROWS:
         for c in range(1, COLS - 1):
-            cells[r][c] = CellType.CORRIDOR
+            grid[r][c] = CellType.CORRIDOR
 
     # ── Carve turns ───────────────────────────────────────────────────────────
     # Right turn: col CLS rows 1-3 (the j-path down from C1 to C2)
-    cells[2][CLS] = CellType.CORRIDOR
+    grid[2][CLS] = CellType.CORRIDOR
     # Left turn: col OPN rows 3-5 (the j-path down from C2 to C3)
-    cells[4][OPN] = CellType.CORRIDOR
+    grid[4][OPN] = CellType.CORRIDOR
 
     # ── Water in the gap and middle rows ──────────────────────────────────────
     # Rows 2 and 4: water everywhere except the single CORRIDOR turn cells.
@@ -7746,12 +7744,12 @@ def build_dungeon_bracket_vaults(seed: int) -> Dungeon:
     # % scans through water (not a WALL/WOOD_WALL) to reach the matching bracket;
     # manual h/l are blocked because is_passable returns False for WATER.
     for c in range(1, COLS - 1):
-        if cells[2][c] != CellType.CORRIDOR:
-            cells[2][c] = CellType.WATER
-        if cells[4][c] != CellType.CORRIDOR:
-            cells[4][c] = CellType.WATER
+        if grid[2][c] != CellType.CORRIDOR:
+            grid[2][c] = CellType.WATER
+        if grid[4][c] != CellType.CORRIDOR:
+            grid[4][c] = CellType.WATER
         if c != OPN and c != CLS:
-            cells[3][c] = CellType.WATER
+            grid[3][c] = CellType.WATER
 
     # ── Moat + decoy goblin pit (anti-teleport) ───────────────────────────────
     # The exit sits on row 5, which used to be the LAST line — so G (last line) and
@@ -7761,8 +7759,8 @@ def build_dungeon_bracket_vaults(seed: int) -> Dungeon:
     # The real exit on row 5 is interior and unreachable by any teleport.
     MOAT, DECOY = _BRACKET_VAULTS_MOAT_ROW, _BRACKET_VAULTS_DECOY_ROW
     for c in range(1, COLS - 1):
-        cells[MOAT][c]  = CellType.WATER
-        cells[DECOY][c] = CellType.CORRIDOR
+        grid[MOAT][c]  = CellType.WATER
+        grid[DECOY][c] = CellType.CORRIDOR
 
     # Anti-teleport pockets on EVERY snake row (2-5): a CORRIDOR cell at col 1 (holding an
     # unmatched ) — see below) plus a stone WALL at col 2. A {N}G goto-line teleport onto
@@ -7771,8 +7769,8 @@ def build_dungeon_bracket_vaults(seed: int) -> Dungeon:
     # reach the snake proper. Row 1 needs no pocket: its first-non-blank IS the snake's start
     # ( at col 4, and finishing from there already costs more than par.
     for br in (2, 3, 4, 5):
-        cells[br][1] = CellType.CORRIDOR
-        cells[br][2] = CellType.WALL
+        grid[br][1] = CellType.CORRIDOR
+        grid[br][2] = CellType.WALL
 
     # ── Place bracket CharRuns ────────────────────────────────────────────
     # Single-char CharRun at each bracket position so _bracket_at() in
@@ -7782,16 +7780,18 @@ def build_dungeon_bracket_vaults(seed: int) -> Dungeon:
     rng = random.Random(seed)
     _kinds = ('ancient', 'verdant', 'ember')
 
-    runes: list[CharRun] = []
+    runs: list = []
     for row in _BRACKET_VAULTS_CORR_ROWS:
         kind_open  = rng.choice(_kinds)
         kind_close = rng.choice(_kinds)
         close_col  = EXC if row == 5 else CLS
-        runes.append(CharRun(row=row, col=OPN, symbols=('(',), kind=kind_open))
-        runes.append(CharRun(row=row, col=close_col, symbols=(')',), kind=kind_close))
+        runs.append({'row': row, 'col': OPN, 'symbols': '(', 'kind': kind_open})
+        runs.append({'row': row, 'col': close_col, 'symbols': ')', 'kind': kind_close})
     # Decorative brackets on the decoy row (so it reads like the rest; they lead nowhere).
-    runes.append(CharRun(row=DECOY, col=OPN, symbols=('(',), kind=rng.choice(_kinds)))
-    runes.append(CharRun(row=DECOY, col=CLS, symbols=(')',), kind=rng.choice(_kinds)))
+    runs.append({'row': DECOY, 'col': OPN, 'symbols': '(',
+                 'kind': rng.choice(_kinds)})
+    runs.append({'row': DECOY, 'col': CLS, 'symbols': ')',
+                 'kind': rng.choice(_kinds)})
 
     # Random vocab words between the brackets on rows 1 & 5 — one CharRun per word with a
     # single-column gap between, exactly filling ( ... ) with no space against either
@@ -7803,7 +7803,8 @@ def build_dungeon_bracket_vaults(seed: int) -> Dungeon:
         width     = close_col - first_col           # cols first_col .. close_col-1
         wc = first_col
         for w in _bracket_vaults_fill_words(rng, width, _BRACKET_VAULTS_WORDS_MIN):
-            runes.append(CharRun(row=wrow, col=wc, symbols=tuple(w), kind=rng.choice(_kinds)))
+            runs.append({'row': wrow, 'col': wc, 'symbols': w,
+                         'kind': rng.choice(_kinds)})
             wc += len(w) + 1
 
     # Lone unmatched ) in each snake row's col-1 pocket (rows 2-5): it is that row's
@@ -7811,40 +7812,40 @@ def build_dungeon_bracket_vaults(seed: int) -> Dungeon:
     # the col-0 wall and finds no match; the col-2 WALL blocks l/w/e/f/$/% rightward — so the
     # teleport is trapped in the pocket with no route to the snake or the exit.
     for br in (2, 3, 4, 5):
-        runes.append(CharRun(row=br, col=1, symbols=(')',), kind=rng.choice(_kinds)))
+        runs.append({'row': br, 'col': 1, 'symbols': ')',
+                     'kind': rng.choice(_kinds)})
 
-    composite.char_runs = runes
+    level = _Level(
+        name='The Bracket Vaults', seed=seed,
+        rows=ROWS, cols=COLS,
+        cells=[''.join(_CELL_CODE[c] for c in row) for row in grid],
+        spawn=_BRACKET_VAULTS_ENTRY, exit=_BRACKET_VAULTS_EXIT_POS,
+        char_runs=runs,
+        entities=[
+            {'kind': 'exit',
+             'at': [_BRACKET_VAULTS_EXIT_POS[0], _BRACKET_VAULTS_EXIT_POS[1]]},
+            # Floor key on the row-2 turn cell + locked door guarding the exit: the exit can't be
+            # reached by simply landing on it (a {N}G teleport is trapped in a col-1 pocket anyway),
+            # and the key sits where only the snake reaches it. Pick up with x, unlock with p.
+            {'kind': 'floor_key',
+             'at': [_BRACKET_VAULTS_KEY_POS[0], _BRACKET_VAULTS_KEY_POS[1]]},
+            {'kind': 'locked_door',
+             'at': [_BRACKET_VAULTS_DOOR_POS[0], _BRACKET_VAULTS_DOOR_POS[1]]},
+            # Goblins guarding the decoy pit — they punish a teleport-cheese (G/L) and can't
+            # cross the moat to the snake.
+            *[{'kind': 'goblin', 'at': [DECOY, gc], 'max_hp': 1, 'ai': 'chase'}
+              for gc in _BRACKET_VAULTS_DECOY_GOBLINS],
+        ])
 
-    # ── Entry and exit ────────────────────────────────────────────────────────
-    composite.spawn_pos    = _BRACKET_VAULTS_ENTRY
-    composite.exit_pos = _BRACKET_VAULTS_EXIT_POS
-    composite.entities = [Entity(kind='exit',
-                                 row=_BRACKET_VAULTS_EXIT_POS[0], col=_BRACKET_VAULTS_EXIT_POS[1])]
-    # Floor key on the row-2 turn cell + locked door guarding the exit: the exit can't be
-    # reached by simply landing on it (a {N}G teleport is trapped in a col-1 pocket anyway),
-    # and the key sits where only the snake reaches it. Pick up with x, unlock with p.
-    composite.entities.append(Entity(kind='floor_key',
-                                     row=_BRACKET_VAULTS_KEY_POS[0], col=_BRACKET_VAULTS_KEY_POS[1]))
-    composite.entities.append(Entity(kind='locked_door',
-                                     row=_BRACKET_VAULTS_DOOR_POS[0], col=_BRACKET_VAULTS_DOOR_POS[1]))
-    # Goblins guarding the decoy pit — they punish a teleport-cheese (G/L) and can't
-    # cross the moat to the snake.
-    for gc in _BRACKET_VAULTS_DECOY_GOBLINS:
-        composite.entities.append(Entity(kind='goblin', row=DECOY, col=gc, max_hp=1, ai='chase'))
-
-    composite.rebuild_indexes()
-
-    par, path = _par_bracket_vaults(composite, use_percent=True, return_path=True)
+    dungeon = _fmt_build(level)
+    room = dungeon.rooms[0]
+    par, path = _par_bracket_vaults(room, use_percent=True, return_path=True)
     if par is None:
         par, path = _BRACKET_VAULTS_PAR, _BRACKET_VAULTS_ANSWER
-    composite.par    = par
-    composite.budget = math.ceil(par * 1.4)
-    composite.answer = path
-
-    dungeon.rooms        = [composite]
-    dungeon.current_room = 0
+    room.par    = par
+    room.budget = math.ceil(par * 1.4)
+    room.answer = path
     return dungeon
-
 
 # ── H/M/L: The Screen Vault (3 colored keys) ────────────────────────
 # Viewport-filling dungeon teaching H (viewport-top), M (viewport-middle), and
