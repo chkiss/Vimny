@@ -4467,41 +4467,45 @@ def build_dungeon_bracket_enclosure(seed: int) -> Dungeon:
     Sense, not decree: proverb bays. di( pries the junk stone and keeps the
     husk, ci( recuts the miscut gem to the word everyone knows, da( tears
     the whole fitting out. See the section header for the forcing."""
+    from dataclasses import replace as _dc_replace
     from vimny.content.proverbs import prefix_len, text_of
+    from vimny.engine.editor import _CELL_CODE
+    from vimny.sharing.format import Level as _Level, _parse_seal, build as _fmt_build
+
     rng = random.Random(seed)
     texts = _be_draw_texts(rng)
 
     R, C = _BE_ROWS, _BE_COLS
-    cells = [[CellType.WALL] * C for _ in range(R)]
+    grid = [[CellType.WALL] * C for _ in range(R)]
     for r in range(2, _BE_GATE + 1):                     # the spine
-        cells[r][_BE_SPINE] = CellType.FLOOR
+        grid[r][_BE_SPINE] = CellType.FLOOR
     for r in _BE_C1_ROWS + _BE_C2_ROWS + _BE_C3_ROWS:   # the bays
         for c in range(_BE_BAY_W, _BE_BAY_E + 1):
-            cells[r][c] = CellType.FLOOR
+            grid[r][c] = CellType.FLOOR
     for r, c in _BE_SHAFT_SEPS:                          # the light shafts —
-        cells[r][c] = CellType.FLOOR                     # NOT the throat row
+        grid[r][c] = CellType.FLOOR                     # NOT the throat row
 
-    room = Room(room_type=RoomType.ENTRY, rows=R, cols=C)
-    room.cells = cells
-    room.seed  = seed
+    runs: list = []
 
     def lay(r, col, words_seq):
         for w in words_seq:
-            room.char_runs.append(CharRun(r, col, tuple(w), 'ancient'))
+            runs.append({'row': r, 'col': col, 'symbols': w, 'kind': 'ancient'})
             col += len(w) + 1
 
     truths = {}                                          # row -> (prefix, suffix)
     for (r, words, k, junk, fit) in texts['intruders']:
         t0 = fit - (prefix_len(words, k) + 1)
         lay(r, t0, words[:k])
-        room.char_runs.append(CharRun(r, fit, tuple(f'({junk})'), 'ancient'))
+        runs.append({'row': r, 'col': fit, 'symbols': f'({junk})',
+                     'kind': 'ancient'})
         lay(r, fit + len(junk) + 3, words[k:])
         truths[r] = (text_of(words[:k]), text_of(words[k:]))
     cures = {}
     for (r, fit), (words, idx, cure) in zip(_BE_C2_SLOTS, texts['misquotes']):
         t0 = fit - (prefix_len(words, idx) + 1)
         lay(r, t0, words[:idx])
-        room.char_runs.append(CharRun(r, fit, tuple(f'({words[idx]})'), 'ancient'))
+        runs.append({'row': r, 'col': fit, 'symbols': f'({words[idx]})',
+                     'kind': 'ancient'})
         tail = words[idx + 1:]
         if tail:
             lay(r, fit + len(words[idx]) + 3, tail)
@@ -4514,28 +4518,46 @@ def build_dungeon_bracket_enclosure(seed: int) -> Dungeon:
     c3 = tuple(f'{truths[r][0]}  {truths[r][1]}' for r in _BE_C3_ROWS)
     chambers = (c1, c2, c3)
 
-    room.seals = _chamber_gate(tuple((tgt, _BE_BOLT0 + i)
-                                     for i, tgt in enumerate(chambers)), _BE_EXIT)
-    room._be_texts = texts
+    # The chamber gate, said in FILE vocabulary and validated like an author's:
+    # three anyrow exact bolts on the gate row, then the final seal requiring
+    # them all — the same shapes `gate_row_seals` builds.
+    seals = []
+    for i, targets in enumerate(chambers):
+        seals.append(_parse_seal({
+            'scope': 'anyrow', 'mode': 'exact', 'anchor': 'exit_row',
+            'match': [str(t) for t in targets],
+            'opens': [[_BE_EXIT[0], _BE_BOLT0 + i]],
+        }, i))
+    seals.append(_parse_seal({
+        'anchor': 'exit_row',
+        'requires': list(range(len(seals))),
+        'opens': [list(_BE_EXIT)],
+    }, len(seals)))
 
-    room.entities.append(Entity(kind='exit', row=_BE_EXIT[0], col=_BE_EXIT[1],
-                                edit_immune=True))
-    room.spawn_pos = (2, _BE_SPINE)
-    room.exit_pos  = _BE_EXIT
-
-    room.rebuild_indexes()
-    room.par    = _BE_PAR
-    room.budget = math.ceil(_BE_PAR * 1.4)   # STANDARD: the piecewise route wins at 1★
     ca, cb = (cures[r][0] for r in _BE_C2_ROWS)
-    # nav golf (known shortcut): % from the spine scans to the first
-    # '(' and jumps to its MATCH — j % lands ON the ')' and di( resolves
-    # from the delimiter. Two keys under the w-walk, whatever the prefix.
-    room.answer = (f'j % di( j . j . 2j ci( {ca}<Esc> j ci( {cb}<Esc> '
-                   f'2j da( j . G $')
+    level = _Level(
+        name='The Bracket Enclosure', seed=seed,
+        rows=R, cols=C,
+        cells=[''.join(_CELL_CODE[c] for c in row) for row in grid],
+        spawn=(2, _BE_SPINE), exit=_BE_EXIT,
+        char_runs=runs, seals=seals,
+        entities=[{'kind': 'exit', 'at': [_BE_EXIT[0], _BE_EXIT[1]],
+                   'edit_immune': True}],
+        # nav golf (known shortcut): % from the spine scans to the first
+        # '(' and jumps to its MATCH — j % lands ON the ')' and di( resolves
+        # from the delimiter. Two keys under the w-walk, whatever the prefix.
+        solution=(f'j % di( j . j . 2j ci( {ca}<Esc> j ci( {cb}<Esc> '
+                  f'2j da( j . G $'))
 
-    dungeon = Dungeon(name='The Bracket Enclosure', seed=seed)
-    dungeon.rooms        = [room]
-    dungeon.current_room = 0
+    dungeon = _fmt_build(level, par=_BE_PAR)
+
+    room = dungeon.rooms[0]
+    room.seals = tuple(
+        _dc_replace(s, message="The chamber's words read true — the bolt grinds back!")
+        for s in room.seals[:-1]) + (
+        _dc_replace(room.seals[-1],
+                    message='Every chamber reads true — the final seal parts!'),)
+    room._be_texts = texts
     return dungeon
 
 
