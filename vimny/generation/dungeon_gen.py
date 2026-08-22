@@ -4093,30 +4093,30 @@ def build_dungeon_word_enclosure(seed: int) -> Dungeon:
     (the misquote everyone can mend), and the daw seam (diw leaves the
     scar). See the section header for the forcing."""
     from vimny.content.proverbs import prefix_len, text_of
+    from vimny.engine.editor import _CELL_CODE
+    from vimny.sharing.format import Level as _Level, _parse_seal, build as _fmt_build
     rng = random.Random(seed)
     texts = _we_draw_texts(rng)
 
     R, C = _WE_ROWS, _WE_COLS
-    cells = [[CellType.WALL] * C for _ in range(R)]
+    grid = [[CellType.WALL] * C for _ in range(R)]
     for r in range(2, _WE_GATE + 1):                     # the spine
-        cells[r][_WE_SPINE] = CellType.FLOOR
+        grid[r][_WE_SPINE] = CellType.FLOOR
     all_rows = (_WE_C1_ROWS + _WE_C2_ROWS + _WE_C3_ROWS
                 + _WE_C4_ROWS + _WE_C5_ROWS)
     for r in all_rows:                                   # the bays
         for c in range(_WE_BAY_W, _WE_BAY_E + 1):
-            cells[r][c] = CellType.FLOOR
+            grid[r][c] = CellType.FLOOR
     for r, c in _WE_SHAFT_SEPS:                          # the light shafts —
-        cells[r][c] = CellType.FLOOR                     # NOT the throat row
-    cells[_WE_SPAWN[0]][_WE_SPAWN[1]] = CellType.FLOOR   # the drop-in
+        grid[r][c] = CellType.FLOOR                     # NOT the throat row
+    grid[_WE_SPAWN[0]][_WE_SPAWN[1]] = CellType.FLOOR   # the drop-in
 
-    room = Room(room_type=RoomType.ENTRY, rows=R, cols=C)
-    room.cells = cells
-    room.seed  = seed
+    runs: list = []
 
     def lay(r, col, words_seq):
-        """One CharRun per word, bare-floor gaps (the space-glyph law)."""
+        """One run per word, bare-floor gaps (the space-glyph law)."""
         for w in words_seq:
-            room.char_runs.append(CharRun(r, col, tuple(w), 'ancient'))
+            runs.append({'row': r, 'col': col, 'symbols': w, 'kind': 'ancient'})
             col += len(w) + 1
 
     # intruder rows: prefix right-aligned west of the slot, junk AT it
@@ -4144,25 +4144,34 @@ def build_dungeon_word_enclosure(seed: int) -> Dungeon:
     c5 = tuple(f'{truths[r][0]} {truths[r][1]}' for r in _WE_C5_ROWS)   # seam
     chambers = (c1, c2, c3, c4, c5)
 
-    room.seals = _chamber_gate(tuple((tgt, _WE_BOLT0 + i)
-                                     for i, tgt in enumerate(chambers)), _WE_EXIT)
-    room._we_texts = texts
+    seals = []
+    for i, targets in enumerate(chambers):
+        seals.append(_parse_seal({
+            'scope': 'anyrow', 'mode': 'exact', 'anchor': 'exit_row',
+            'match': [str(t) for t in targets],
+            'opens': [[_WE_EXIT[0], _WE_BOLT0 + i]],
+        }, i))
+    seals.append(_parse_seal({
+        'anchor': 'exit_row',
+        'requires': list(range(len(seals))),
+        'opens': [list(_WE_EXIT)],
+    }, len(seals)))
 
-    room.entities.append(Entity(kind='exit', row=_WE_EXIT[0], col=_WE_EXIT[1],
-                                edit_immune=True))
-    room.spawn_pos = _WE_SPAWN
-    room.exit_pos  = _WE_EXIT
-
-    room.rebuild_indexes()
-    room.par    = _WE_PAR
-    room.budget = math.ceil(_WE_PAR * 1.4)   # STANDARD: the piecewise route wins at 1★
     ca, cb = (cures[r][0] for r in _WE_C2_ROWS)
-    room.answer = (f'j diw j . j . 2j ciw {ca}<Esc> j ciw {cb}<Esc> '
-                   f'2j daw j . 2j diW j . l 2j daW j . G $')
+    level = _Level(
+        name='The Word Enclosure', seed=seed,
+        rows=R, cols=C,
+        cells=[''.join(_CELL_CODE[c] for c in row) for row in grid],
+        spawn=_WE_SPAWN, exit=_WE_EXIT,
+        char_runs=runs, seals=seals,
+        entities=[{'kind': 'exit', 'at': [_WE_EXIT[0], _WE_EXIT[1]],
+                   'edit_immune': True}],
+        solution=(f'j diw j . j . 2j ciw {ca}<Esc> j ciw {cb}<Esc> '
+                  f'2j daw j . 2j diW j . l 2j daW j . G $'))
 
-    dungeon = Dungeon(name='The Word Enclosure', seed=seed)
-    dungeon.rooms        = [room]
-    dungeon.current_room = 0
+    dungeon = _fmt_build(level, par=_WE_PAR)
+    _seal_banners(dungeon)
+    dungeon.rooms[0]._we_texts = texts
     return dungeon
 
 
