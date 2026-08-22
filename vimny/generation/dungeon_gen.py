@@ -887,8 +887,9 @@ def build_dungeon_counting_crypts(seed: int) -> Dungeon:
     Budget is computed with keystroke-cost Dijkstra so count is genuinely
     more efficient than single-step: 5j costs 2 keystrokes, jjjjj costs 5.
     """
+    from vimny.engine.editor import _CELL_CODE
+    from vimny.sharing.format import Level as _Level, build as _fmt_build
     rng = random.Random(seed)
-    dungeon = Dungeon(name='The Counting Crypts', seed=seed)
     CORRIDOR_LEN = 4
 
     plan = _COUNTING_CRYPTS_PLAN
@@ -920,18 +921,14 @@ def build_dungeon_counting_crypts(seed: int) -> Dungeon:
             cells[mid][c]     = CellType.CORRIDOR
             cells[mid - 1][c] = CellType.CORRIDOR
 
-    composite = Room(room_type=RoomType.ENTRY, rows=total_rows, cols=total_cols)
-    composite.cells = cells
-    composite.seed  = seed
-
-    # Entry near top-left of Room 0 — player must navigate down+right to corridor
-    composite.spawn_pos = (2, 2)
-
-    # Exit near top-left interior of Room 2 — arrives via corridor then goes up
+    # Entry near top-left of Room 0 — player must navigate down+right to corridor.
+    # Exit near top-left interior of Room 2 — arrives via corridor then goes up.
+    # The placer reads these to keep runes off the endpoints.
     ex_c = offsets[-1] + 1   # = 61
-    ex_r = 2
-    composite.exit_pos = (ex_r, ex_c)
-    composite.entities.append(Entity(kind='exit', row=ex_r, col=ex_c))
+    scratch = Room(room_type=RoomType.ENTRY, rows=total_rows, cols=total_cols)
+    scratch.cells     = cells
+    scratch.spawn_pos = (2, 2)
+    scratch.exit_pos  = (2, ex_c)
 
     # Void wall in puzzle room: rows 2-(total_rows-3) at horizontal midpoint.
     # Gaps at row 1 and row (total_rows-2) are the only safe crossings.
@@ -942,26 +939,38 @@ def build_dungeon_counting_crypts(seed: int) -> Dungeon:
     ]
 
     # Decorative characters in entry and exit rooms; retry if any void blocks path.
+    dungeon = None
     for _ in range(20):
-        composite.char_runs = list(void_wall)
+        scratch.char_runs = list(void_wall)
         rune_rng = random.Random(rng.randint(0, 2**31))
-        _place_runes_in_room(composite, rune_rng, offsets[0],
+        _place_runes_in_room(scratch, rune_rng, offsets[0],
                               plan[0][1], plan[0][2], total_rows, _WORD_RUNE_KINDS)
-        _place_runes_in_room(composite, rune_rng, offsets[2],
+        _place_runes_in_room(scratch, rune_rng, offsets[2],
                               plan[2][1], plan[2][2], total_rows, _WORD_RUNE_KINDS)
 
         # Never place a void rune on the entry or exit cell itself
-        entry_r, entry_c = composite.spawn_pos
-        exit_r,  exit_c  = composite.exit_pos
-        composite.char_runs = [
-            ru for ru in composite.char_runs
+        entry_r, entry_c = scratch.spawn_pos
+        exit_r,  exit_c  = scratch.exit_pos
+        scratch.char_runs = [
+            ru for ru in scratch.char_runs
             if ru.kind != 'void' or not any(
                 ru.row == r and ru.col <= c < ru.col + len(ru.symbols)
                 for r, c in ((entry_r, entry_c), (exit_r, exit_c))
             )
         ]
 
-        nav_par = _dijkstra_par_count(composite)
+        level = _Level(
+            name='The Counting Crypts', seed=seed,
+            rows=total_rows, cols=total_cols,
+            cells=[''.join(_CELL_CODE[c] for c in row) for row in cells],
+            spawn=(2, 2), exit=(2, ex_c),
+            char_runs=[{'row': ru.row, 'col': ru.col,
+                        'symbols': ''.join(ru.symbols), 'kind': ru.kind}
+                       for ru in scratch.char_runs],
+            entities=[{'kind': 'exit', 'at': [2, ex_c]}])
+
+        dungeon = _fmt_build(level)
+        nav_par = _dijkstra_par_count(dungeon.rooms[0])
         if nav_par is not None:
             break
     else:
@@ -974,20 +983,18 @@ def build_dungeon_counting_crypts(seed: int) -> Dungeon:
         offsets[0] + plan[0][2] - 1,   # col 19: Room 0 / corridor 1 boundary
         offsets[1] + plan[1][2] - 1,   # col 55: Room 1 / corridor 2 boundary
     ]
+    room = dungeon.rooms[0]
     for dc in door_cols:
         for row in (mid - 1, mid):
-            composite.entities.append(Entity(kind='door', row=row, col=dc))
+            room.entities.append(Entity(kind='door', row=row, col=dc))
 
     # Full par: state-space Dijkstra with all Counting Crypts commands and door states.
     # Accounts for door-blocking (breaking $ into segments) and x keystrokes.
-    composite.rebuild_indexes()
-    composite.par, composite.answer = _par_counting_crypts(composite, door_cols, return_path=True)
-    composite.budget = math.ceil(composite.par * 1.4)
+    room.rebuild_indexes()
+    room.par, room.answer = _par_counting_crypts(room, door_cols, return_path=True)
+    room.budget = math.ceil(room.par * 1.4)
 
-    _doors_block_sight(composite)     # the crypt is dark BEHIND ITS DOORS
-
-    dungeon.rooms    = [composite]
-    dungeon.current_room = 0
+    _doors_block_sight(room)          # the crypt is dark BEHIND ITS DOORS
     return dungeon
 
 
