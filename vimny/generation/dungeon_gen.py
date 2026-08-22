@@ -13041,15 +13041,18 @@ def build_dungeon_gauntlet(seed: int) -> Dungeon:
         cells[_GNT_R_GATE][_GNT_BOLT0 + i] = CellType.WALL
     cells[_GNT_EXIT[0]][_GNT_EXIT[1]] = CellType.WALL   # the FINAL SEAL
 
-    room = Room(room_type=RoomType.ENTRY, rows=R, cols=C)
-    room.cells = cells
-    room.seed  = seed
+    from vimny.engine.editor import _CELL_CODE
+    from vimny.sharing import format as _fmt
+    from vimny.sharing.format import Level as _Level, build as _fmt_build
+
+    runs: list = []
 
     def lay(r, c, text, kind='ancient'):
         col = c
         for part in text.split(' '):
             if part:
-                room.char_runs.append(CharRun(r, col, tuple(part), kind))
+                runs.append({'row': r, 'col': col,
+                             'symbols': part, 'kind': kind})
             col += len(part) + 1
 
     doors = []                     # (kind, target, bolt_col) — see _gauntlet_tick
@@ -13121,9 +13124,10 @@ def build_dungeon_gauntlet(seed: int) -> Dungeon:
     # fills both (the # trip). Each setting is a TWO-blank gap: the paste
     # shoves the tail east, turning ' <Space>' into ' word ' — so the finished
     # line reads with single spaces and IS its plaque.
-    room.char_runs.append(CharRun(_GNT_R_Y1, TX, tuple(w['u1s']), 'ancient'))
-    room.char_runs.append(CharRun(_GNT_R_Y1, TX + 5, tuple(w['ymid']),
-                                  'ancient'))
+    runs.append({'row': _GNT_R_Y1, 'col': TX,
+                 'symbols': w['u1s'], 'kind': 'ancient'})
+    runs.append({'row': _GNT_R_Y1, 'col': TX + 5,
+                 'symbols': w['ymid'], 'kind': 'ancient'})
     door('sub', f"{w['u1s']} {w['ywd']} {w['ymid']} {w['ywd']}")
     # r19 · Y-door: the line must stand TWICE (Y p — the dup door).
     _yline = f"{w['yl1']} {w['yl2']} {w['yl3']}"
@@ -13142,8 +13146,10 @@ def build_dungeon_gauntlet(seed: int) -> Dungeon:
     # bolts — the GMS lesson) and the catch ◆ east of the seal ($ lands
     # there; h steps back onto the frame).
     lay(_GNT_R_NOOK, _GNT_NOOK_COLS[0], w['u1s'])
-    room.char_runs.append(CharRun(_GNT_R_GATE, SP + 1, ('◆',), 'ancient'))
-    room.char_runs.append(CharRun(_GNT_R_GATE, _GNT_CATCH, ('◆',), 'ancient'))
+    runs.append({'row': _GNT_R_GATE, 'col': SP + 1,
+                 'symbols': '◆', 'kind': 'ancient'})
+    runs.append({'row': _GNT_R_GATE, 'col': _GNT_CATCH,
+                 'symbols': '◆', 'kind': 'ancient'})
     # Threshold ◆ on every search-band row's spine cell (the shelf, both
     # pockets, the gU gallery): {n}G / H / gg / + / - land on a row's
     # FIRST NON-BLANK, which would otherwise be the row's text — a
@@ -13151,7 +13157,7 @@ def build_dungeon_gauntlet(seed: int) -> Dungeon:
     # a one-cell ledge with water east (w stops at the bank); search
     # remains the only useful door.
     for pr in (_GNT_R_BLK, _GNT_R_P1, _GNT_R_P2, _GNT_R_P3):
-        room.char_runs.append(CharRun(pr, SP, ('◆',), 'ancient'))
+        runs.append({'row': pr, 'col': SP, 'symbols': '◆', 'kind': 'ancient'})
 
     # West-wall plaques: each door's FULL true reading on its own row (the
     # law — a partial cure word would make the player guess the rest).
@@ -13189,34 +13195,36 @@ def build_dungeon_gauntlet(seed: int) -> Dungeon:
     # out of true; _gauntlet_tick re-rights them to the yline-anchored
     # goal rows (the sculpting re-align, with its twinkle) so the wall
     # always paints the goal and the player edits until the columns agree.
-    room._gnt_band = (_yline, w['ow1'], w['ow2'], w['u1s'])
+    gnt_band = (_yline, w['ow1'], w['ow2'], w['u1s'])
     for pr, ptext in ((_GNT_R_YL, _yline), (_GNT_R_YL + 1, _yline),
                       (_GNT_R_YL + 2, w['ow1']), (_GNT_R_YL + 3, w['ow2']),
                       (_GNT_R_YL + 5, w['u1s'])):
         lay(pr, _GNT_PLQ_COL, ptext, 'verdant')
 
+    def encode(r):
+        return ''.join(_fmt._MIST_CODE if (r, c) in mist else _CELL_CODE[ct]
+                       for c, ct in enumerate(cells[r]))
+
+    level = _Level(
+        name='The Gauntlet', seed=seed,
+        rows=R, cols=C,
+        cells=[encode(r) for r in range(R)],
+        spawn=(_GNT_R_BW, SP),                     # k opens the exam (row above)
+        exit=_GNT_EXIT,
+        char_runs=runs,
+        entities=[{'kind': 'exit', 'at': [_GNT_EXIT[0], _GNT_EXIT[1]],
+                   'edit_immune': True}],
+        solution=(
+            f"k 3e x j b x b x j % l x j ( x "
+            f"/{w['s1']}<CR> 2e r{w['rcure'][5]} n w ~ ~ w * 3b gU3e "
+            f"+ cit{w['tc']}<Esc> << j dw j w D j C{w['ccure']}<Esc> j S{w['sword']}<Esc> "
+            f"j b # w yiw N qb e l p q w @b j Y p "
+            f"o{w['ow1']}<Esc> o{w['ow2']}<Esc> G $ h"))
+
+    dungeon = _fmt_build(level, par=_GNT_PAR)
+    room = dungeon.rooms[0]
+    room._gnt_band = gnt_band
     room._gnt_doors = tuple(doors)
-    room.entities.append(Entity(kind='exit', row=_GNT_EXIT[0], col=_GNT_EXIT[1],
-                                edit_immune=True))
-    room.spawn_pos = (_GNT_R_BW, SP)               # k opens the exam (row above)
-    room.exit_pos  = _GNT_EXIT
-
-    room.rebuild_indexes()
-    room.fog_cells  = set(mist)                    # mist on every channel…
-    room.mist_cells = set(mist)                    # …permanent: reveals skip it
-    room.par    = _GNT_PAR
-    room.budget = math.ceil(_GNT_PAR * 1.4)  # STANDARD (par-is-the-optimum law)
-    # The canonical tape (karaoke): every typed token is a single drawn word.
-    room.answer = (
-        f"k 3e x j b x b x j % l x j ( x "
-        f"/{w['s1']}<CR> 2e r{w['rcure'][5]} n w ~ ~ w * 3b gU3e "
-        f"+ cit{w['tc']}<Esc> << j dw j w D j C{w['ccure']}<Esc> j S{w['sword']}<Esc> "
-        f"j b # w yiw N qb e l p q w @b j Y p "
-        f"o{w['ow1']}<Esc> o{w['ow2']}<Esc> G $ h")
-
-    dungeon = Dungeon(name='The Gauntlet', seed=seed)
-    dungeon.rooms        = [room]
-    dungeon.current_room = 0
     return dungeon
 
 
