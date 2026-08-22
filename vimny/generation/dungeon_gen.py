@@ -8698,14 +8698,11 @@ def build_dungeon_lineheads(seed: int) -> 'Dungeon':
 
     Par/answer are computed by _par_lineheads (colored key/door + line-jump model).
     """
-    dungeon = Dungeon(name='The Lineheads', seed=seed)
+    from vimny.engine.editor import _CELL_CODE
+    from vimny.sharing.format import Level as _Level, build as _fmt_build
     ROWS, COLS = _LINEHEADS_ROWS, _LINEHEADS_COLS
 
     cells = [[CellType.WALL] * COLS for _ in range(ROWS)]
-    composite = Room(rows=ROWS, cols=COLS, room_type=RoomType.ENTRY)
-    composite.cells = cells
-    composite.seed  = seed
-
     # ── Carve the fixed layout (see _LINEHEADS_PASSABLE above) ──────────────────────
     for row, passable_cols in _LINEHEADS_PASSABLE.items():
         for c in passable_cols:
@@ -8715,34 +8712,38 @@ def build_dungeon_lineheads(seed: int) -> 'Dungeon':
     # Doors are a fixed color sequence (left=gold, right=red); the key colors are
     # shuffled per seed, so which shaft-key opens which door — and the order you
     # ride the shaft to fetch them — varies.
-    composite.spawn_pos   = _LINEHEADS_ENTRY
-    composite.exit_pos = _LINEHEADS_EXIT
     rng = random.Random(seed)
     door_colors = list(_LINEHEADS_COLORS)                            # door0=(1,3)=gold, door1=(1,6)=red
     key_colors  = list(_LINEHEADS_COLORS); rng.shuffle(key_colors)   # key0=(4,1), key1=(14,2)
     inv_for_color = {col: ki + 1 for ki, col in enumerate(key_colors)}
-    composite._lgg_door_key = [inv_for_color[dc] for dc in door_colors]
-    entities = [Entity(kind='exit', row=_LINEHEADS_EXIT[0], col=_LINEHEADS_EXIT[1])]
+    lgg_door_key = [inv_for_color[dc] for dc in door_colors]
+    entities = [{'kind': 'exit',
+                 'at': [_LINEHEADS_EXIT[0], _LINEHEADS_EXIT[1]]}]
     for ki, (kr, kc) in enumerate(_LINEHEADS_KEYS):
-        entities.append(Entity(kind='floor_key', row=kr, col=kc, tag=key_colors[ki]))
+        entities.append({'kind': 'floor_key', 'at': [kr, kc], 'tag': key_colors[ki]})
     for di, (dr, dc) in enumerate(_LINEHEADS_DOORS):
-        entities.append(Entity(kind='locked_door', row=dr, col=dc, tag=door_colors[di]))
-    composite.entities = entities
-    composite.char_runs = []   # no seed-varying runes; the layout is fixed
+        entities.append({'kind': 'locked_door', 'at': [dr, dc],
+                         'tag': door_colors[di], 'opaque': True})
 
-    composite.rebuild_indexes()
-    _doors_block_sight(composite)     # the rooms past the locked doors sleep dark
+    level = _Level(
+        name='The Lineheads', seed=seed,
+        rows=ROWS, cols=COLS,
+        cells=[''.join(_CELL_CODE[c] for c in row) for row in cells],
+        spawn=_LINEHEADS_ENTRY, exit=_LINEHEADS_EXIT,
+        char_runs=[],                       # no seed-varying runes; layout fixed
+        entities=entities)
+
+    dungeon = _fmt_build(level)
+    room = dungeon.rooms[0]
+    room._lgg_door_key = lgg_door_key
 
     # ── Compute par via Dijkstra (key/door + line-jump model) ─────────────────
-    par, path = _par_lineheads(composite, return_path=True)
+    par, path = _par_lineheads(room, return_path=True)
     if par is None:                      # fixed map — should always solve
         raise RuntimeError('The Lineheads is unsolvable — check layout')
-    composite.par    = par
-    composite.budget = math.ceil(par * 1.4)
-    composite.answer = path
-
-    dungeon.rooms        = [composite]
-    dungeon.current_room = 0
+    room.par    = par
+    room.budget = math.ceil(par * 1.4)
+    room.answer = path
     return dungeon
 
 
