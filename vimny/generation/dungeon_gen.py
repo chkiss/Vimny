@@ -13481,7 +13481,8 @@ _SHR_BUDGET = 40                     # generous: the movers invite exploration
 
 
 def build_dungeon_shelving_room(seed: int) -> Dungeon:
-    dungeon = Dungeon(name='The Shelving Room', seed=seed)
+    from vimny.engine.editor import _CELL_CODE
+    from vimny.sharing.format import Level as _Level, build as _fmt_build
     R, C = _SHR_ROWS, _SHR_COLS
     targets = [(' ' * _SHR_INDENTS[i]) + _SHR_CALLS[i // 2] for i in range(8)]
 
@@ -13502,42 +13503,40 @@ def build_dungeon_shelving_room(seed: int) -> Dungeon:
         cells[_SHR_GAL][c] = CellType.WALL
     # (_SHR_GAL, _SHR_SEAL_COL) stays WALL until _shelving_tick opens it.
 
-    room = Room(room_type=RoomType.ENTRY, rows=R, cols=C)
-    room.cells     = cells
-    room.seed      = seed
-    room.spawn_pos = (_SHR_GAL, _SHR_TX - 1)       # under the shelf's west edge
-    room.exit_pos  = (_SHR_GAL, _SHR_EXIT_COL)
-    room.char_runs = []
-
-    def lay(r, col, text, kind):
+    def lay(runs, r, col, text, kind):
         for wd in text.split(' '):
-            room.char_runs.append(CharRun(r, col, tuple(wd), kind))
+            runs.append({'row': r, 'col': col, 'symbols': wd, 'kind': kind})
             col += len(wd) + 1
 
+    runs: list = []
     for r, (text, ind) in enumerate(_SHR_INIT, start=1):   # the misfiled round
-        lay(r, _SHR_TX + ind, text, 'ancient')
+        lay(runs, r, _SHR_TX + ind, text, 'ancient')
 
-    room.entities = [
-        Entity(kind='exit',         row=_SHR_GAL, col=_SHR_EXIT_COL),
-        Entity(kind='chest_scroll', row=_SHR_GAL, col=_SHR_CHEST_COL),
-    ]
-    room._shr_targets = tuple(targets)
+    level = _Level(
+        name='The Shelving Room', seed=seed,
+        rows=R, cols=C,
+        cells=[''.join(_CELL_CODE[c] for c in row) for row in cells],
+        spawn=(_SHR_GAL, _SHR_TX - 1),             # under the shelf's west edge
+        exit=(_SHR_GAL, _SHR_EXIT_COL),
+        char_runs=runs,
+        entities=[{'kind': 'exit', 'at': [_SHR_GAL, _SHR_EXIT_COL]},
+                  {'kind': 'chest_scroll', 'at': [_SHR_GAL, _SHR_CHEST_COL]}],
+        solution=':set<Space>nu<CR> :6m3<CR> :6<<CR> :7t7<CR> :8><CR> $')
+
+    dungeon = _fmt_build(level, par=_SHR_PAR)
+    room = dungeon.rooms[0]
+    room._shr_targets  = tuple(targets)
     room._shr_seal_col = _SHR_SEAL_COL
     # Band the shut gallery bolts + seal as stonework. Registered at build: the
     # gallery row and its bolt columns are fixed for the level's lifetime.
     room.sealed_cells = {(_SHR_GAL, c)
                          for c in (*_SHR_BOLT_COLS, _SHR_SEAL_COL)}
-
-    room.par    = _SHR_PAR
-    room.budget = math.ceil(_SHR_PAR * 1.4)  # STANDARD (par-is-the-optimum law)
-    room.answer = ':set<Space>nu<CR> :6m3<CR> :6<<CR> :7t7<CR> :8><CR> $'
-
-    room.rebuild_indexes()
+    # The haze lies over FLOOR (the shelf band) as well as the water course,
+    # and the level file can only say mist on water — so the designed haze and
+    # its pocket are laid here, over whatever the stone law derived.
     pocket = {(_SHR_GAL, c) for c in range(_SHR_SEAL_COL + 1, _SHR_EXIT_COL + 1)}
     room.fog_cells  = set(mist) | pocket
     room.mist_cells = set(mist)
-    dungeon.rooms        = [room]
-    dungeon.current_room = 0
     return dungeon
 
 
