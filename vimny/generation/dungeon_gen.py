@@ -12228,6 +12228,8 @@ def build_dungeon_joiners_gate(seed: int) -> Dungeon:
     fused plaques take gJ, and the four-row finale takes 4J — the count form
     at the count where it first beats repeated J. See the section header."""
     R, C = _JG_ROWS, _JG_COLS
+    from vimny.engine.editor import _CELL_CODE
+    from vimny.sharing.format import Level as _Level, build as _fmt_build
     cells = [[CellType.WALL] * C for _ in range(R)]
     stack_rows = []
     for top, (kind, target, split) in zip(_JG_STACK_TOPS, _JG_LESSONS):
@@ -12240,41 +12242,37 @@ def build_dungeon_joiners_gate(seed: int) -> Dungeon:
     # bolts AND the exit stay WALL — the tick opens the bolts per plaque and
     # parts the FINAL SEAL when all four read true.
 
-    room = Room(room_type=RoomType.ENTRY, rows=R, cols=C)
-    room.cells = cells
-    room.seed  = seed
-
-    def lay(r, c, text, kind):
+    def lay(runs, r, c, text, kind):
         col = c
-        for part in text.split(' '):                     # separate CharRuns per word
+        for part in text.split(' '):                     # separate runs per word
             if part:
-                room.char_runs.append(CharRun(r, col, tuple(part), kind))
+                runs.append({'row': r, 'col': col, 'symbols': part, 'kind': kind})
             col += len(part) + 1
 
+    runs: list = []
     doors = []
     lessons = []
     for i, (top, (kind, target, split)) in enumerate(zip(_JG_STACK_TOPS, _JG_LESSONS)):
         for k, word in enumerate(split):
-            lay(top + k, _JG_LBL_COL, word, 'ancient')   # the split words, stacked
-        lay(top, _JG_PLQ_COL, target, 'verdant')         # the true line, west-wall plaque
+            lay(runs, top + k, _JG_LBL_COL, word, 'ancient')   # the split words, stacked
+        lay(runs, top, _JG_PLQ_COL, target, 'verdant')         # the true line, west wall
         doors.append((target, (_JG_GATE_ROW, _JG_GATE_COL0 + i)))
         lessons.append({'kind': kind, 'target': target, 'split': split, 'top': top})
-    room.seals       = _label_gate(doors, _JG_EXIT)
-    room._jg_lessons = tuple(lessons)
 
-    room.entities.append(Entity(kind='exit', row=_JG_EXIT[0], col=_JG_EXIT[1],
-                                edit_immune=True))       # join-proof: remove_row refuses
-    room.spawn_pos = (_JG_STACK_TOPS[0], _JG_COL_S)      # atop stack 1, at the spine
-    room.exit_pos  = _JG_EXIT
+    level = _Level(
+        name="The Joiner's Gate", seed=seed,
+        rows=R, cols=C,
+        cells=[''.join(_CELL_CODE[c] for c in row) for row in cells],
+        spawn=(_JG_STACK_TOPS[0], _JG_COL_S),          # atop stack 1, at the spine
+        exit=_JG_EXIT,
+        char_runs=runs,
+        seals=list(_label_gate(doors, _JG_EXIT)),
+        entities=[{'kind': 'exit', 'at': [_JG_EXIT[0], _JG_EXIT[1]],
+                   'edit_immune': True}],              # join-proof: remove_row refuses
+        solution=_JG_ANSWER)
 
-    room.rebuild_indexes()
-    room.par    = _JG_PAR
-    room.budget = math.ceil(_JG_PAR * 1.4)       # STANDARD: the hand-written rival is ~4x
-    room.answer = _JG_ANSWER
-
-    dungeon = Dungeon(name="The Joiner's Gate", seed=seed)
-    dungeon.rooms        = [room]
-    dungeon.current_room = 0
+    dungeon = _fmt_build(level, par=_JG_PAR)
+    dungeon.rooms[0]._jg_lessons = tuple(lessons)
     return dungeon
 
 
