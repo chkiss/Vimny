@@ -11068,8 +11068,9 @@ _IH_SPLITS = (2, 1, 1, 2)               # missing-letter counts (FIXED — par i
 _IH_FORD_ROW = 13                       # 'river' at 33..37, tail on the bank
 _IH_FORD_FRAG, _IH_FORD_WORD = 'river', 'rivergate'
 # Five stone walls stacked before the exit, east of the ford: each written
-# word grinds ONE open. The bridge-word owns the WESTMOST (42) — typed water
-# is always crushed against stone, never slid into an opened corridor.
+# word grinds ONE open. Lesson words own the walls WEST→EAST in walking
+# order — descending the jetties unbars the corridor out ahead of you; the
+# bridge-word completes the road at the EASTMOST (46).
 _IH_SEALS = ((13, 42), (13, 43), (13, 44), (13, 45), (13, 46))
 _IH_EXIT  = (13, 47)                    # beyond all five walls
 _IH_PAR   = 24                          # the ( / ) / e sentence-hop route (below);
@@ -11136,9 +11137,10 @@ def build_dungeon_inscription_halls(seed: int) -> Dungeon:
     tail, a writes past you onto the flood (ink displaces it), i physically
     cannot. The ford (row 13): 'river' + a + 'gate' → 'rivergate' bridges
     the water. FIVE stone walls stack east of the ford before the exit; each
-    word written whole grinds one open (main._inscription_halls_tick) — the
-    bridge-word owns the westmost, so typed water always crushes against
-    stone. The ford plaque is carved in the south border.
+    word written whole grinds one open — plain `Seal` gates (`mode='contains'`
+    over floor text, the label-gate chassis), lesson words west→east in
+    walking order and the bridge-word eastmost, with the final seal holding
+    the exit stone until all five read true.
 
     The par route hops jetties with ( / ) / e (sentence jumps, embraced —
     they only optimize travel; every word must still be written). Scarcity
@@ -11171,10 +11173,10 @@ def build_dungeon_inscription_halls(seed: int) -> Dungeon:
         runs.append({'row': row, 'col': col, 'symbols': text, 'kind': kind})
 
     # Plaques (the familiar sealed band, verdant in the wall) + fragments,
-    # and the five exit walls: the bridge-word takes the westmost seal; the
-    # lesson words take the rest in order.
+    # and the five exit walls: each lesson word owns its wall in walking
+    # order (westmost first); the bridge-word completes the road.
     walls = list(_IH_SEALS)
-    bolts = [(_IH_FORD_WORD, walls[0])]
+    doors = []
     for i, (word, missing, frag) in enumerate(lessons):
         lrow, prow = _IH_LESSON_ROWS[i], _IH_PLAQUE_ROWS[i]
         if i in (0, 2):                                      # i: head missing
@@ -11184,11 +11186,12 @@ def build_dungeon_inscription_halls(seed: int) -> Dungeon:
             span_lo = _ih_river_lo(lrow) - len(frag)
             lay(prow, span_lo, word, 'verdant')
             lay(lrow, span_lo, frag, 'ancient')
-        bolts.append((word, walls[i + 1]))
+        doors.append((word, walls[i][1]))
     lay(_IH_FORD_ROW, _ih_river_lo(_IH_FORD_ROW) - len(_IH_FORD_FRAG),
         _IH_FORD_FRAG, 'ancient')                            # 'river' at 33..37
     lay(R - 1, _ih_river_lo(_IH_FORD_ROW) - len(_IH_FORD_FRAG),
         _IH_FORD_WORD, 'verdant')                            # ford plaque, south border
+    doors.append((_IH_FORD_WORD, walls[4][1]))
 
     m = [m_ for (_w, m_, _f) in lessons]
     level = _Level(
@@ -11200,6 +11203,10 @@ def build_dungeon_inscription_halls(seed: int) -> Dungeon:
         char_runs=runs,
         entities=[{'kind': 'exit', 'at': [_IH_EXIT[0], _IH_EXIT[1]],
                    'edit_immune': True}],
+        seals=list(gate_row_seals(
+            doors, _IH_EXIT, mode='contains',
+            bolt_message='The word stands whole — beyond the river, a wall grinds open!',
+            final_message='Every word reads true — the way out of the Halls stands open!')),
         # Canonical answer — the sentence-hop route (drives the par; insert
         # tokens 'i…'/'a…' cost 1 + len(text), Esc spends nothing; ( ) e $ cost
         # 1 each — see tests/test_answer_paths). Gate ticks fire ON the insert
@@ -11217,11 +11224,10 @@ def build_dungeon_inscription_halls(seed: int) -> Dungeon:
                   f') e agate<Esc> $'))
 
     dungeon = _fmt_build(level, par=_IH_PAR)
-    room = dungeon.rooms[0]
-    room._ih_bolts = tuple(bolts)
-    # Band the five shut exit walls as stonework. Registered at build: the seal
-    # coordinates are fixed for the level's lifetime.
-    room.sealed_cells = {cell for _word, cell in bolts}
+    # `Seal.message` is not file-format data; hand the banners back.
+    _seal_banners(dungeon,
+                  bolt='The word stands whole — beyond the river, a wall grinds open!',
+                  final='Every word reads true — the way out of the Halls stands open!')
     return dungeon
 
 

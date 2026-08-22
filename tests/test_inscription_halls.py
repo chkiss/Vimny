@@ -36,8 +36,9 @@ Forcing (both hard, by geometry):
       suffix. INK DISPLACES THE FLOOD: each typed letter pushes that row's
       water back a cell (spilled over the east wall and lost).
 The ford finale: 'river' + a + 'gate' types a bridge clean across — the word
-IS the crossing. The bridge-word owns the WESTMOST exit wall, so typed water
-always crushes against stone, never slides into an opened corridor.
+IS the crossing. Lesson words own the exit walls west→east in walking order
+(descending the jetties unbars the corridor out ahead of you); the bridge-word
+owns the EASTMOST, completing the road.
 
 Scarcity (the Echo Vault discipline, pinned below): the missing letters
 exist nowhere cuttable, so x+p can never impersonate the verbs. Esc spends
@@ -185,21 +186,28 @@ def test_walls_start_shut_despite_the_plaques(seed):
     dungeon = build_dungeon_inscription_halls(seed)
     room = dungeon.rooms[0]
     p = Player(row=room.spawn_pos[0], col=room.spawn_pos[1])
-    main._inscription_halls_tick(room, p)
+    main._seal_tick(room, p)
     for (r, c) in _IH_SEALS:
         assert room.cells[r][c] == CellType.WALL
 
 
 @pytest.mark.parametrize("seed", SEEDS)
-def test_five_walls_one_per_word_bridge_word_westmost(seed):
+def test_five_seals_one_per_word_bridge_word_eastmost(seed):
     room = _room(seed)
-    assert len(room._ih_bolts) == 5
-    words = [w for (w, _cell) in room._ih_bolts]
-    cells = [cell for (_w, cell) in room._ih_bolts]
+    bolts = room.seals[:5]
+    words = [s.match[0] for s in bolts]
+    cells = [tuple(c) for s in bolts for c in s.opens]
     assert sorted(cells) == sorted(_IH_SEALS)
-    assert room._ih_bolts[0] == (_IH_FORD_WORD, _IH_SEALS[0]), \
-        "the bridge-word owns the WESTMOST wall (typed water crushes on it)"
     assert len(set(words)) == 5
+    assert words[-1] == _IH_FORD_WORD, \
+        "the bridge-word completes the road at the EASTMOST wall"
+    lessons = _ih_pick(random.Random(seed))
+    assert words[:-1] == [w for (w, _m, _f) in lessons], \
+        "lesson walls unbar west→east in walking order"
+    final = room.seals[5]
+    assert not final.match and final.requires == (0, 1, 2, 3, 4), \
+        "the exit is the final seal — stone until every word reads true"
+    assert final.opens == (_IH_EXIT,)
 
 
 # ── scarcity: typing is the only source ───────────────────────────────────────
@@ -309,7 +317,7 @@ def test_search_skips_the_walled_plaques(seed):
     from vimny.engine.search import find_next
     room = _room(seed)
     p = Player(row=room.spawn_pos[0], col=room.spawn_pos[1])
-    for word, _gate in room._ih_bolts:
+    for word in (s.match[0] for s in room.seals if s.match):
         if word == _IH_FORD_WORD:
             continue
         assert find_next(room, p, word, True) is None, \
@@ -330,11 +338,13 @@ def test_bridging_early_cannot_win(seed, monkeypatch):
             + [Keystroke(ch) for ch in 'lllllll'])
     res = _drive(dungeon, keys, monkeypatch)
     assert not res['won'], "the bridge alone must never win"
-    assert room.cells[_IH_SEALS[0][0]][_IH_SEALS[0][1]] == CellType.FLOOR, \
-        "the bridge-word honestly opens its OWN wall"
-    for (r, c) in _IH_SEALS[1:]:
+    assert room.cells[_IH_SEALS[4][0]][_IH_SEALS[4][1]] == CellType.FLOOR, \
+        "the bridge-word honestly opens its OWN wall (eastmost)"
+    for (r, c) in _IH_SEALS[:4]:
         assert room.cells[r][c] == CellType.WALL, \
             "the lesson walls hold until their words are written"
+    assert room.cells[_IH_EXIT[0]][_IH_EXIT[1]] == CellType.WALL, \
+        "the final seal holds the exit stone"
 
 
 # ── the lessons, driven for real ──────────────────────────────────────────────
@@ -350,7 +360,7 @@ def test_full_playthrough_wins_par_perfect(seed, monkeypatch):
     lo = _ih_river_lo(_IH_FORD_ROW)
     assert all(room.cells[_IH_FORD_ROW][c] != CellType.WATER
                for c in range(lo, lo + _IH_RIVER_W))
-    assert _IH_FORD_WORD in main._ih_floor_text(room, _IH_FORD_ROW)
+    assert _IH_FORD_WORD in main._wla_floor_text(room, _IH_FORD_ROW)
     for (r, c) in _IH_SEALS:
         assert room.cells[r][c] == CellType.FLOOR, "all five walls open"
 
@@ -382,7 +392,7 @@ def test_garbage_never_opens_the_walls(seed, monkeypatch):
     _drive(dungeon, keys, monkeypatch)
     for (r, c) in _IH_SEALS:
         assert room.cells[r][c] == CellType.WALL
-    assert _IH_FORD_WORD not in main._ih_floor_text(room, _IH_FORD_ROW)
+    assert _IH_FORD_WORD not in main._wla_floor_text(room, _IH_FORD_ROW)
 
 
 @pytest.mark.parametrize("seed", SEEDS)
@@ -394,7 +404,7 @@ def test_undo_rebars_the_wall(seed, monkeypatch):
     toks = room.answer.split()
     lesson_a = ' '.join(toks[:2])                     # '( i{..}'
     _drive(dungeon, _keys(lesson_a, extra='l'), monkeypatch)
-    word, (br, bc) = room._ih_bolts[1]                # lesson A's wall
+    br, bc = tuple(room.seals[0].opens[0])            # lesson A's wall
     assert room.cells[br][bc] == CellType.FLOOR, "written whole — wall open"
 
     dungeon = build_dungeon_inscription_halls(seed)
@@ -402,7 +412,7 @@ def test_undo_rebars_the_wall(seed, monkeypatch):
     # u pops the 'l' movement first; the SECOND u pops the whole insert
     # session (one snapshot at entry) and unwrites the word.
     _drive(dungeon, _keys(lesson_a, extra='luul'), monkeypatch)
-    word, (br, bc) = room._ih_bolts[1]
+    br, bc = tuple(room.seals[0].opens[0])
     assert room.cells[br][bc] == CellType.WALL, "undone — the wall re-bars"
 
 

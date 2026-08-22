@@ -2514,48 +2514,6 @@ def _wm_row_text(room, r: int) -> str:
     return ''.join(line)
 
 
-def _ih_floor_text(room, r: int) -> str:
-    """Row r's text restricted to FLOOR/CORRIDOR cells — the Inscription
-    Halls' completion scans must NOT read the plaques (verdant words set in
-    wall cells, including the south-border ford plaque), only what stands
-    written on walkable stone."""
-    line = [' '] * room.cols
-    for ru in room._char_runs_by_row.get(r, []):
-        for k, sym in enumerate(ru.symbols):
-            c = ru.col + k
-            if 0 <= c < room.cols and room.cells[r][c] in _WM_FLOORS:
-                line[c] = sym
-    return ''.join(line)
-
-
-def _inscription_halls_tick(room, player) -> list:
-    """The five exit walls — the plaque rule, fourth member (Cipher mended,
-    Beacon copied, Echo repeated, the Halls AUTHOR): each wall in the stack
-    east of the ford stands open while ITS word reads WHOLE somewhere on
-    the floor (the bridge-word owns the westmost — typed water crushes
-    against it, never slides into an opened corridor). Five walls in series
-    = nothing wins unfinished, however the player travels (sentence-hops
-    between jetties are embraced). Whole-row substring scans on floor text
-    only (shift-proof; plaques live in walls and never count). STATELESS,
-    hence undo-safe (the vault-tick principle): undoing an inscription
-    re-bars its wall."""
-    msgs = []
-    floor_rows = [_ih_floor_text(room, r) for r in range(room.rows)]
-
-    def written(word):
-        return any(word in t for t in floor_rows)
-
-    for word, (gr, gc) in getattr(room, '_ih_bolts', ()):
-        is_open = room.cells[gr][gc] != CellType.WALL
-        if written(word) and not is_open:
-            room.cells[gr][gc] = CellType.FLOOR
-            msgs.append('The word stands whole — beyond the river, '
-                        'a wall grinds open!')
-        elif not written(word) and is_open and (player.row, player.col) != (gr, gc):
-            room.cells[gr][gc] = CellType.WALL     # undone — the wall re-bars
-    return msgs
-
-
 def _drop_spec(ent) -> tuple:
     """`drops` parsed: ('floor_key', 'gold') from 'floor_key:gold'. ('', '') if
     the field is empty or names something outside `world.DROPPABLE` — the runtime
@@ -2731,11 +2689,15 @@ def _seal_tick(room, player) -> list:
         for (r, c) in _seal_cells(room, seal):
             if not (0 <= r < room.rows and 0 <= c < room.cols):
                 continue
-            is_open = room.cells[r][c] != CellType.WALL
-            if true_now and not is_open:
+            if true_now and room.cells[r][c] != CellType.FLOOR:
+                # A bolt that reads true HOLDS its cell as walkable stone,
+                # whatever drifted onto it — the Inscription Halls' river can
+                # slide through an opened gate row while its last word is
+                # still being typed; an open door is floor, not a pond.
                 room.cells[r][c] = CellType.FLOOR
                 opened = True          # ONE banner per seal, however wide the door
-            elif not true_now and is_open and (player.row, player.col) != (r, c):
+            elif not true_now and room.cells[r][c] != CellType.WALL \
+                    and (player.row, player.col) != (r, c):
                 # Never re-wall the cell the player is standing in: the annex
                 # doors have carried this guard since they were written, because
                 # sealing someone inside stone is not a puzzle, it is a crash.
@@ -5632,9 +5594,6 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
                 _push(_m)
         if level == 'warden_scrivener':
             for _m in _warden_scrivener_tick(room, player, budget.spent):
-                _push(_m)
-        if level == 'inscription_halls':
-            for _m in _inscription_halls_tick(room, player):
                 _push(_m)
         if level == 'change_extension':
             _ce_y_plaque_tick(room, player)
