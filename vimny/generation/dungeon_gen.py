@@ -11660,6 +11660,8 @@ def build_dungeon_change_extension(seed: int) -> Dungeon:
     lessons = _ce_pick(rng)
 
     R, C = _CE_ROWS, _CE_COLS
+    from vimny.engine.editor import _CELL_CODE
+    from vimny.sharing.format import Level as _Level, build as _fmt_build
     cells = [[CellType.WALL] * C for _ in range(R)]
     for r in _CE_LESSON_ROWS:                        # the open lesson block (label floor)
         for c in range(_CE_COL_S, _CE_LBL_END + 1):
@@ -11676,13 +11678,7 @@ def build_dungeon_change_extension(seed: int) -> Dungeon:
     # at the spine, so no east column drops onto the exit; the exit is never a
     # row's first standable cell and `$` stops at the first shut bolt.
 
-    room = Room(room_type=RoomType.ENTRY, rows=R, cols=C)
-    room.cells = cells
-    room.seed  = seed
-
-    def lay(row, col, text, kind):
-        room.char_runs.append(CharRun(row, col, tuple(text), kind))
-
+    runs: list = []
     doors = []
     for i, lesson in enumerate(lessons):
         lrow = _CE_LESSON_ROWS[i]
@@ -11694,21 +11690,24 @@ def build_dungeon_change_extension(seed: int) -> Dungeon:
         # context. A real floor gap is genuine whitespace.
         col = _CE_LBL_COL
         for word in lesson['label'].split(' '):
-            lay(lrow, col, word, 'ancient')
+            runs.append({'row': lrow, 'col': col,
+                         'symbols': word, 'kind': 'ancient'})
             col += len(word) + 1
         # The saying's PREFIX, carved in the west stone (the sense that
         # replaces the decree plaque) — right-aligned, two cols shy of the
         # spine; uncuttable, off the floor scans.
         pcol = _CE_COL_S - 1 - len(lesson['prefix'])
         for word in lesson['prefix'].split(' '):
-            lay(lrow, pcol, word, 'verdant')
+            runs.append({'row': lrow, 'col': pcol,
+                         'symbols': word, 'kind': 'verdant'})
             pcol += len(word) + 1
         doors.append((lesson['target'], (_CE_GATE_ROW, _CE_GATE_COL0 + i)))
     # The Y hall: the two-ending saying's FIRST half, one word wrong, on its
     # own wide floor row. Two bolts, one per half read true.
     col = _CE_Y_COL0
     for word in _CE_Y_LAID.split(' '):
-        lay(_CE_Y_ROW, col, word, 'ancient')
+        runs.append({'row': _CE_Y_ROW, 'col': col,
+                     'symbols': word, 'kind': 'ancient'})
         col += len(word) + 1
     doors.append((_CE_Y_T1, (_CE_GATE_ROW, _CE_GATE_COL0 + _CE_TRIGGERS)))
     doors.append((_CE_Y_T2, (_CE_GATE_ROW, _CE_GATE_COL0 + _CE_TRIGGERS + 1)))
@@ -11722,30 +11721,26 @@ def build_dungeon_change_extension(seed: int) -> Dungeon:
     # off the floor scans — it never feeds a bolt.
     pcol = 1
     for word in _CE_Y_STEM.split(' '):
-        lay(_CE_Y_ROW + 1, pcol, word, 'verdant')
+        runs.append({'row': _CE_Y_ROW + 1, 'col': pcol,
+                     'symbols': word, 'kind': 'verdant'})
         pcol += len(word) + 1
-    # The doors are the Annex's own chassis, said as seals.
-    room.seals        = _label_gate(doors, _CE_EXIT)
-    room._ce_y_stump  = 'fool me once'     # anchors the echo-plaque re-align (the Y row)
+
+    level = _Level(
+        name='The Change Extension', seed=seed,
+        rows=R, cols=C,
+        cells=[''.join(_CELL_CODE[c] for c in row) for row in cells],
+        spawn=(_CE_LESSON_ROWS[0], _CE_LBL_COL),     # on door 1's wrong word
+        exit=_CE_EXIT,
+        char_runs=runs,
+        seals=list(_label_gate(doors, _CE_EXIT)),    # the Annex chassis, as seals
+        entities=[{'kind': 'exit', 'at': [_CE_EXIT[0], _CE_EXIT[1]],
+                   'edit_immune': True}],
+        solution=_ce_answer(lessons))      # the real keystroke tape (karaoke)
+
+    dungeon = _fmt_build(level, par=_CE_PAR)
+    room = dungeon.rooms[0]
+    room._ce_y_stump  = 'fool me once'   # anchors the echo-plaque re-align (the Y row)
     room._ce_lessons  = tuple(lessons)
-
-    room.entities.append(Entity(kind='exit', row=_CE_EXIT[0], col=_CE_EXIT[1],
-                                edit_immune=True))
-    room.spawn_pos = (_CE_LESSON_ROWS[0], _CE_LBL_COL)         # on door 1's wrong word
-    room.exit_pos  = _CE_EXIT
-
-    room.rebuild_indexes()
-    room.par    = _CE_PAR
-    # TIGHT margin (S2 by volume): the all-old route swaps S→cc and C→c$ (+1 key
-    # each over the shorthand) and retypes the Y echo with o (+_CE_Y_SAVING);
-    # a margin of one less makes that route overshoot by one while the S/C/Y
-    # route clears at par. Pinned by tests/test_change_extension.py.
-    room.budget = math.ceil(_CE_PAR * 1.4)   # STANDARD (par-is-the-optimum law)
-    room.answer = _ce_answer(lessons)      # the real keystroke tape (karaoke)
-
-    dungeon = Dungeon(name='The Change Extension', seed=seed)
-    dungeon.rooms        = [room]
-    dungeon.current_room = 0
     return dungeon
 
 
