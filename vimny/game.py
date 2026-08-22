@@ -2477,33 +2477,6 @@ def _cipher_cell_tick(room, player) -> list:
     return msgs
 
 
-def _echo_vault_tick(room, player) -> list:
-    """The Echo Vault doors — the Cipher Cell rule, third member of the plaque
-    family: a bolt stands open exactly while its span of the lock row READS AS
-    ITS PLAQUE. STATELESS, hence undo-safe (the vault-tick principle): every
-    bolt is recomputed from the text each turn. Returns banner messages for
-    anything that just changed."""
-    msgs = []
-
-    def _text_at(row, c0, n):
-        out = []
-        for c in range(c0, c0 + n):
-            ru = room.char_run_at(row, c)
-            out.append(ru.symbols[c - ru.col] if ru else ' ')
-        return ''.join(out)
-
-    for (row, c0, target, pos) in getattr(room, '_ev_bolts', ()):
-        br, bc = pos
-        open_ = _text_at(row, c0, len(target)) == target
-        cur_open = room.cells[br][bc] != CellType.WALL
-        if open_ and not cur_open:
-            room.cells[br][bc] = CellType.FLOOR
-            msgs.append('The span is mended true — the bolt grinds back!')
-        elif not open_ and cur_open and (player.row, player.col) != (br, bc):
-            room.cells[br][bc] = CellType.WALL     # undo restored the blight — re-bar
-    return msgs
-
-
 def _wm_row_text(room, r: int) -> str:
     """The full text of row r (spaces where no character sits)."""
     line = [' '] * room.cols
@@ -5585,9 +5558,6 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
                 _push(_m)
         if level == 'quartermaster':
             for _m in _quartermaster_tick(room, player):
-                _push(_m)
-        if level == 'echo_vault':
-            for _m in _echo_vault_tick(room, player):
                 _push(_m)
         if level == 'warden_manifold':
             for _m in _warden_manifold_tick(room, player, budget.spent):

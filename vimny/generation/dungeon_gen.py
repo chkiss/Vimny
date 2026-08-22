@@ -21,7 +21,7 @@ from __future__ import annotations
 import heapq, math, os, random
 from collections import deque
 from vimny.engine.world import (Dungeon, Room, RoomType, CellType, CharRun, Entity,
-                          gate_row_seals)
+                          Seal, gate_row_seals)
 from vimny.engine.tape import ESC as _TAPE_ESC
 from vimny.engine.motion import (_fog_unreachable, _cell_char, _is_word_char,
                            apply_stone_fog, _FOG_BLOCK_KINDS,
@@ -10647,7 +10647,8 @@ def build_dungeon_echo_vault(seed: int) -> Dungeon:
     down every span — the same warped rune, over and over. Mend it once with
     r; press . and the echo mends the next. ONE visible rule, the plaque
     family's third member: each span's bolt stands open while the lock row
-    READS AS ITS PLAQUE (main._echo_vault_tick — stateless, undo-safe).
+    READS AS ITS PLAQUE — plain `Seal` gates (`scope='region'`, `mode='exact'`;
+    stateless, undo-safe).
 
     Why . is forced: the warp glyphs are UNTYPABLE (punctuation class), so
     f/t/F/T and / can never target them; any cut (x, count-x, d{m}, D) only
@@ -10717,14 +10718,19 @@ def build_dungeon_echo_vault(seed: int) -> Dungeon:
         lay(_EV_PLAQUE_ROW, col, true, 'verdant')
         lay(_EV_ROW, col, lock, 'ancient')
 
-    # Bolt specs read by main._echo_vault_tick (stateless, undo-safe): each is
-    # (row, c0, target, bolt_pos) — the bolt stands open while the lock row's
-    # text over [c0, c0+len(target)) READS AS the plaque.
-    ev_bolts = [
-        (_EV_ROW, _EV_SEG1_COL, phrase1, _EV_BOLT_A),
-        (_EV_ROW, _EV_SEG2_COL, phrase2, _EV_BOLT_B),
-        (_EV_ROW, _EV_SEG3_COL, phrase3, _EV_BOLT_C),
-    ]
+    # The three bolts, as the format's own Seals: each stands open while the
+    # lock row's text over its plaque span READS AS the plaque. The spans are
+    # fixed columns on the single gauntlet row (no anchor — nothing here
+    # survives a row shift anyway), and the region reader's whitespace
+    # collapsing reads the one-cell gaps between a phrase's runs as the same
+    # single spaces the bespoke slice used to.
+    seals = [Seal(region=(_EV_ROW, c0, _EV_ROW, c0 + len(true) - 1),
+                  match=(true,), mode='exact', scope='region',
+                  opens=((br, bc),))
+              for (c0, true), (br, bc) in zip(
+                  ((_EV_SEG1_COL, phrase1), (_EV_SEG2_COL, phrase2),
+                   (_EV_SEG3_COL, phrase3)),
+                  (_EV_BOLT_A, _EV_BOLT_B, _EV_BOLT_C))]
 
     level = _Level(
         name='The Echo Vault', seed=seed,
@@ -10735,16 +10741,17 @@ def build_dungeon_echo_vault(seed: int) -> Dungeon:
         entities=[{'kind': 'exit', 'at': [_EV_EXIT[0], _EV_EXIT[1]],
                    'edit_immune': True}],   # a careless D must not delete the way
                                             # out (nor the row dd-collapsible)
+        seals=seals,
         solution=(f'w w r{l1} w w . w w . w w . '
                   f'w w r{l2} w w . '
                   f'w w r{digit} w w 3. $'))
 
     dungeon = _fmt_build(level, par=_EV_PAR)
     room = dungeon.rooms[0]
-    room._ev_bolts = ev_bolts
-    # Band the shut bolts as stonework. Registered at build: the bolt cells are
-    # fixed for the level's lifetime (no row shifts here).
-    room.sealed_cells = {pos for _r, _c0, _t, pos in ev_bolts}
+    # `Seal.message` is not file-format data; hand the banner back.
+    from dataclasses import replace as _dc_replace
+    room.seals = tuple(_dc_replace(s, message='The span is mended true — the bolt grinds back!')
+                       for s in room.seals)
     return dungeon
 
 

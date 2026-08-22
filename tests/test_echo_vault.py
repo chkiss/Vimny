@@ -20,7 +20,8 @@
 
 Teaching goal: . (dot — repeat the last change), echoed off r. ONE visible
 rule, the plaque family's third member: each span's bolt stands open while
-the lock row READS AS ITS PLAQUE (main._echo_vault_tick, stateless/undo-safe).
+the lock row READS AS ITS PLAQUE (plain `Seal` gates, region/exact —
+stateless/undo-safe).
 
 Why . is forced: the warp glyphs are UNTYPABLE (punctuation class) so
 f/t/F/T and / can never target them; any cut only breaks the plaque match
@@ -243,19 +244,19 @@ def test_tick_bolt_follows_the_mend_both_ways(seed):
     glyph = _cell(room, _EV_ROW, warp_cols[0])
     p = Player(row=_EV_ROW, col=warp_cols[0])
 
-    main._echo_vault_tick(room, p)
+    main._seal_tick(room, p)
     assert room.cells[_EV_BOLT_A[0]][_EV_BOLT_A[1]] == CellType.WALL
 
     for c in warp_cols:                                      # mend all three
         p.col = c
         replace_chars(room, p, l1)
-    msgs = main._echo_vault_tick(room, p)
+    msgs = main._seal_tick(room, p)
     assert room.cells[_EV_BOLT_A[0]][_EV_BOLT_A[1]] == CellType.FLOOR
     assert any('bolt' in m for m in msgs)
 
     p.col = warp_cols[1]
     replace_chars(room, p, glyph)                            # undo restored a warp
-    main._echo_vault_tick(room, p)
+    main._seal_tick(room, p)
     assert room.cells[_EV_BOLT_A[0]][_EV_BOLT_A[1]] == CellType.WALL   # re-barred
 
 
