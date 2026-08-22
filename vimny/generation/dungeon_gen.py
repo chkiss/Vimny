@@ -1561,58 +1561,61 @@ def build_dungeon_reliquary(seed: int) -> Dungeon:
     wall blocks the sanctum until the seal CharRun on the action row is fully
     cut, which vimny/game.py's _check_seal_broken detects, opening composite.seal_door.
     """
+    from vimny.engine.editor import _CELL_CODE
+    from vimny.sharing.format import Level as _Level, build as _fmt_build
     rng = random.Random(seed)
-    dungeon = Dungeon(name='The Reliquary', seed=seed)
     ROWS, COLS = _RELIQUARY_ROWS, _RELIQUARY_COLS
     W, ar = _RELIQUARY_WALL_COL, _RELIQUARY_ACTION_ROW
 
-    cells = [[CellType.WALL] * COLS for _ in range(ROWS)]
+    grid = [[CellType.WALL] * COLS for _ in range(ROWS)]
     # Two floor chambers (rows 1..ROWS-2) split by the dividing wall at col W.
     for r in range(1, ROWS - 1):
         for c in range(1, W):
-            cells[r][c] = CellType.FLOOR          # left approach chamber
+            grid[r][c] = CellType.FLOOR          # left approach chamber
         for c in range(W + 1, COLS - 1):
-            cells[r][c] = CellType.FLOOR          # right sanctum
+            grid[r][c] = CellType.FLOOR          # right sanctum
     # col W stays WALL top-to-bottom; the doorway at (ar, W) opens on seal-break.
-
-    composite = Room(room_type=RoomType.ENTRY, rows=ROWS, cols=COLS)
-    composite.cells     = cells
-    composite.seed      = seed
-    composite.spawn_pos = _RELIQUARY_SPAWN
-    composite.exit_pos  = _RELIQUARY_EXIT
-    composite.seal_door = (ar, W)                 # opened by _check_seal_broken
-
-    composite.entities = [
-        Entity(kind='chest_scroll', row=_RELIQUARY_CHEST[0], col=_RELIQUARY_CHEST[1]),
-        Entity(kind='exit',         row=_RELIQUARY_EXIT[0],  col=_RELIQUARY_EXIT[1]),
-    ]
 
     # The seal: a Latin ward-word in ember, right-aligned against the dividing
     # wall on the action row — the ONLY CharRun on that row (so its absence
     # signals a broken seal).
     word     = rng.choice(_RELIQUARY_SEAL_WORDS)
     seal_col = W - len(word)
-    composite.char_runs = [
-        CharRun(row=ar, col=seal_col, symbols=tuple(word), kind='ember'),
-    ]
+    runs     = [{'row': ar, 'col': seal_col, 'symbols': word, 'kind': 'ember'}]
     # Ornamental friezes (randomized per seed) line both chambers — never the
     # action row, so they can't be mistaken for the seal.
-    _place_frieze_sym(composite, rng, _RELIQUARY_FRIEZE_ROWS, 1, W - 1)  # approach
+    scratch = Room(room_type=RoomType.ENTRY, rows=ROWS, cols=COLS)
+    scratch.cells     = grid
+    scratch.char_runs = []
+    _place_frieze_sym(scratch, rng, _RELIQUARY_FRIEZE_ROWS, 1, W - 1)  # approach
     for fr in _RELIQUARY_FRIEZE_ROWS:
-        _place_frieze(composite, rng, fr, W + 1, COLS - 2)     # right sanctum
+        _place_frieze(scratch, rng, fr, W + 1, COLS - 2)     # right sanctum
+    runs += [{'row': ru.row, 'col': ru.col, 'symbols': ''.join(ru.symbols),
+              'kind': ru.kind} for ru in scratch.char_runs]
 
-    composite.par    = None
-    composite.budget = 35
-    composite.answer = _reliquary_answer(word)
+    level = _Level(
+        name='The Reliquary', seed=seed,
+        rows=ROWS, cols=COLS,
+        cells=[''.join(_CELL_CODE[c] for c in row) for row in grid],
+        spawn=_RELIQUARY_SPAWN, exit=_RELIQUARY_EXIT,
+        char_runs=runs,
+        entities=[{'kind': 'chest_scroll',
+                   'at': [_RELIQUARY_CHEST[0], _RELIQUARY_CHEST[1]]},
+                  {'kind': 'exit',
+                   'at': [_RELIQUARY_EXIT[0], _RELIQUARY_EXIT[1]]}],
+        solution=_reliquary_answer(word))
 
+    dungeon = _fmt_build(level)
+    room = dungeon.rooms[0]
+    # Reward room: no par challenge — a fixed tight budget instead. The warded
+    # doorway and its fog are engine mechanics, re-attached post-build.
+    room.par        = None
+    room.budget     = 35
+    room.seal_door  = (ar, W)
     # The sanctum sleeps under fog until the seal breaks (a bare divider hides
     # nothing — the relic and exit must not be visible from spawn).
     # Standard reachability fog; _check_seal_broken lifts it with the ward.
-    _fog_unreachable(composite, *composite.spawn_pos)
-
-    composite.rebuild_indexes()
-    dungeon.rooms        = [composite]
-    dungeon.current_room = 0
+    _fog_unreachable(room, *room.spawn_pos)
     return dungeon
 
 
