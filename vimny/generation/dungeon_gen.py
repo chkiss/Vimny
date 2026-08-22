@@ -3383,45 +3383,38 @@ def build_dungeon_word_forge(seed: int) -> Dungeon:
     Spaced character runs in filler zones: w ≡ W (both stop cluster-by-cluster).
     Budget is computed using the W/B/E-optimal path; w/b/e-only far exceeds it.
     """
+    from vimny.engine.editor import _CELL_CODE
+    from vimny.sharing.format import Level as _Level, build as _fmt_build
     _load_vocab_tables()
     rng     = random.Random(seed)
     # Pick 4 distinct untypable chars: first two → W4 anchor, last two → B1 anchor.
     _four   = rng.sample(_WORD_FORGE_UNTYPABLE_PUNCT, 4)
     _anchor_W = ''.join(_four[:2])   # W4 at (1, 53-54)
     _anchor_B = ''.join(_four[2:])   # B1 at (4,  3-4)
-    dungeon = Dungeon(name='The WORD Forge', seed=seed)
     ROWS, COLS = _WORD_FORGE_TOTAL_ROWS, _WORD_FORGE_TOTAL_COLS
 
-    cells = [[CellType.WALL] * COLS for _ in range(ROWS)]
-    composite = Room(room_type=RoomType.ENTRY, rows=ROWS, cols=COLS)
-    composite.cells = cells
-    composite.seed  = seed
+    grid = [[CellType.WALL] * COLS for _ in range(ROWS)]
 
     # ── Carve corridors (2 rows each) ─────────────────────────────────────────
     for row_top in _WORD_FORGE_CORR_TOP_ROWS:
         for c in range(_WORD_FORGE_CORR_LEFT, _WORD_FORGE_CORR_RIGHT + 1):
-            cells[row_top][c]     = CellType.CORRIDOR
-            cells[row_top + 1][c] = CellType.CORRIDOR
+            grid[row_top][c]     = CellType.CORRIDOR
+            grid[row_top + 1][c] = CellType.CORRIDOR
 
     # ── Carve turn rooms ─────────────────────────────────────────────────────
     for r0, r1, c0, c1 in _WORD_FORGE_TURN_SPANS:
         for row in range(r0, r1 + 1):
             for col in range(c0, c1 + 1):
-                cells[row][col] = CellType.CORRIDOR
+                grid[row][col] = CellType.CORRIDOR
 
     # ── Guard walls (replace the old void guards) ─────────────────────────────
     # RT1: wall the right two descent columns so the C1→C2 turn only exists at
     # col 53 — exactly where W lands (E lands at col 54, into a wall). Forces W.
-    cells[3][54] = CellType.WALL
-    cells[3][55] = CellType.WALL
+    grid[3][54] = CellType.WALL
+    grid[3][55] = CellType.WALL
     # LT1: wall the col-1 descent so 0/^ to col 1 can't drop into C3; the turn
     # routes through col 3 where B lands. Forces B over 0/^.
-    cells[6][1] = CellType.WALL
-
-    # ── Entry and exit ────────────────────────────────────────────────────────
-    composite.spawn_pos    = (1, 1)
-    composite.exit_pos = (7, 51)   # last char of C3 code group "output=data[n]._key"
-    composite.entities = [Entity(kind='exit', row=7, col=51)]
+    grid[6][1] = CellType.WALL
 
     # ── Hardcoded code-text clusters ──────────────────────────────────────────
     _hardcoded: list[CharRun] = []
@@ -3437,6 +3430,17 @@ def build_dungeon_word_forge(seed: int) -> Dungeon:
     _hardcoded.append(CharRun(row=4, col=1, symbols=('○',), kind='void'))
     _hardcoded.append(CharRun(row=5, col=1, symbols=('○',), kind='void'))
 
+    def _project(runs) -> '_Level':
+        return _Level(
+            name='The WORD Forge', seed=seed,
+            rows=ROWS, cols=COLS,
+            cells=[''.join(_CELL_CODE[c] for c in row) for row in grid],
+            spawn=(1, 1), exit=(7, 51),
+            char_runs=[{'row': ru.row, 'col': ru.col,
+                        'symbols': ''.join(ru.symbols), 'kind': ru.kind}
+                       for ru in runs],
+            entities=[{'kind': 'exit', 'at': [7, 51]}])
+
     # ── Blocked cell set (code text + exit — filler must not overlap) ──────────
     _bl: set = {(7, 51)}
     for ru in _hardcoded:
@@ -3444,39 +3448,44 @@ def build_dungeon_word_forge(seed: int) -> Dungeon:
             _bl.add((ru.row, ru.col + i))
     blocked = frozenset(_bl)
 
+    # A scratch room for the row filler to mutate.
+    scratch = Room(room_type=RoomType.ENTRY, rows=ROWS, cols=COLS)
+    scratch.cells     = grid
+    scratch.spawn_pos = (1, 1)
+    scratch.exit_pos  = (7, 51)
+
     # ── Random filler character runs (secondary rows only; primary rows fixed) ──
+    dungeon = None
     for _attempt in range(20):
-        composite.char_runs = list(_hardcoded)
+        scratch.char_runs = list(_hardcoded)
         rng2 = random.Random(rng.randint(0, 2**31))
 
-        _l7_fill_row(composite, rng2, 2,  3, 52, density=0.45, blocked=blocked, word_tbl=_VOCAB_MIXED_BY_LEN)  # C1r2 baseline
-        _l7_fill_row(composite, rng2, 5,  3, 52, density=0.45, blocked=blocked, word_tbl=_VOCAB_MIXED_BY_LEN)  # C2r5 baseline
-        _l7_fill_row(composite, rng2, 8,  3, 52, density=0.45, blocked=blocked, word_tbl=_VOCAB_MIXED_BY_LEN)  # C3r8 baseline
+        _l7_fill_row(scratch, rng2, 2,  3, 52, density=0.45, blocked=blocked, word_tbl=_VOCAB_MIXED_BY_LEN)  # C1r2 baseline
+        _l7_fill_row(scratch, rng2, 5,  3, 52, density=0.45, blocked=blocked, word_tbl=_VOCAB_MIXED_BY_LEN)  # C2r5 baseline
+        _l7_fill_row(scratch, rng2, 8,  3, 52, density=0.45, blocked=blocked, word_tbl=_VOCAB_MIXED_BY_LEN)  # C3r8 baseline
 
         # Protect entry and exit from void runes
-        entry_r, entry_c = composite.spawn_pos
-        exit_r,  exit_c  = composite.exit_pos
-        composite.char_runs = [
-            ru for ru in composite.char_runs
+        entry_r, entry_c = scratch.spawn_pos
+        exit_r,  exit_c  = scratch.exit_pos
+        scratch.char_runs = [
+            ru for ru in scratch.char_runs
             if ru.kind != 'void' or not any(
                 ru.row == rr and ru.col <= cc < ru.col + len(ru.symbols)
                 for rr, cc in ((entry_r, entry_c), (exit_r, exit_c))
             )
         ]
 
-        composite.rebuild_indexes()
-        par, path = _dijkstra_par_WBE(composite, return_path=True)
+        dungeon = _fmt_build(_project(scratch.char_runs))
+        par, path = _dijkstra_par_WBE(dungeon.rooms[0], return_path=True)
         if par is not None:
             break
     else:
         par, path = 40, ''
 
-    composite.par    = par
-    composite.budget = math.ceil(par * 1.4)
-    composite.answer = path
-
-    dungeon.rooms        = [composite]
-    dungeon.current_room = 0
+    room = dungeon.rooms[0]
+    room.par    = par
+    room.budget = math.ceil(par * 1.4)
+    room.answer = path
     return dungeon
 
 
