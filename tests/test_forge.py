@@ -1711,3 +1711,45 @@ def test_an_unknown_paint_names_the_ones_that_exist():
     _forge_session(d, 'jll:paint lava\r:w\r:q!\r')
     row = F.expand_row(d.level.cells[2], d.level.cols, 2)
     assert row[3] == CellType.FLOOR      # nothing guessed at, nothing painted
+
+
+# ── name collisions refuse with a message, not a clobber ─────────────────────
+
+def test_renaming_a_draft_onto_another_drafts_file_is_refused(monkeypatch, tmp_path):
+    # 'a b' and 'a_b' slug identically: an author renaming onto an existing
+    # draft must hear about it, not quietly destroy it
+    monkeypatch.setattr(DRAFT, 'DRAFTS_DIR', tmp_path)
+    holder = DRAFT.new('a b')
+    DRAFT.save(holder)
+    mover = DRAFT.new('zz')
+    DRAFT.save(mover)
+    mover.level.name = 'a b'                       # rename onto the occupied slug
+    with pytest.raises(DRAFT.DraftNameCollision):
+        DRAFT.save(mover)
+    assert DRAFT.load(tmp_path / 'a_b.json').level.name == 'a b'   # unharmed
+    assert (tmp_path / 'zz.json').exists()                         # mover intact
+
+
+def test_re_saving_under_the_same_name_is_not_a_collision(monkeypatch, tmp_path):
+    monkeypatch.setattr(DRAFT, 'DRAFTS_DIR', tmp_path)
+    d = DRAFT.new('Plain', rows=5, cols=10)
+    first = DRAFT.save(d)
+    second = DRAFT.save(d)
+    assert first == second
+
+
+def test_publishing_over_a_foreign_shelf_file_is_refused(monkeypatch, tmp_path):
+    monkeypatch.setattr(DRAFT, 'LEVELS_DIR', tmp_path)
+    d = _playable_draft()
+    dest = tmp_path / f'{DRAFT._slug(d.level.name)}.json'
+    dest.write_text('{"name": "Someone Else"}', encoding='utf-8')
+    with pytest.raises(DRAFT.DraftNameCollision):
+        DRAFT.publish(d)
+
+
+def test_republishing_your_own_level_updates_it_in_place(monkeypatch, tmp_path):
+    monkeypatch.setattr(DRAFT, 'LEVELS_DIR', tmp_path)
+    d = _playable_draft()
+    first, rep = DRAFT.publish(d)
+    again, _ = DRAFT.publish(d)                    # same name: iterate freely
+    assert first == again and rep.ok

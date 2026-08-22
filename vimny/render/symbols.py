@@ -57,7 +57,7 @@ HORSE        = '♞'   # the wizard's horse (post-game, in the First Cave); → 
 
 def init(term) -> None:
     """Replace wide glyphs with single-width fallbacks when the terminal renders them as 2 columns."""
-    global DOOR_LOCKED, SHIELD, HAT, HORSE, DOOR_SPOKEN, KEY_SPOKEN
+    global DOOR_LOCKED, SHIELD, HAT, HORSE, DOOR_SPOKEN, KEY_SPOKEN, KEY, CHEST
     if term.length(DOOR_LOCKED) != 1:
         DOOR_LOCKED = '⊡'
     if term.length(DOOR_SPOKEN) != 1:
@@ -70,6 +70,10 @@ def init(term) -> None:
         HAT = '^'
     if term.length(HORSE) != 1:
         HORSE = 'h'
+    if term.length(KEY) != 1:
+        KEY = '⚷'     # the key glyph is an emoji on many fonts — 2 columns there
+    if term.length(CHEST) != 1:
+        CHEST = '▣'   # same treatment for the chest: a narrow box, not a wide shape
 
 BOX_TL = '┌'; BOX_TR = '┐'; BOX_BL = '└'; BOX_BR = '┘'
 BOX_H  = '─'; BOX_V  = '│'

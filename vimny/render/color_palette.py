@@ -29,7 +29,7 @@ from blessed import Terminal
 from vimny.engine.player import Player
 import vimny.render.colors as C
 import vimny.render.symbols as S
-from vimny.render.utils import inner_w as _iw
+from vimny.render.utils import inner_w as _iw, heart_counts as _hc, print_size_notice
 
 _SWATCH = '███████'
 _SW = 7   # swatch visible width
@@ -250,10 +250,11 @@ def render_color_palette(
     out.append(border_h(S.BOX_TL, S.BOX_TR))
 
     # ── Status bar ────────────────────────────────────────────────────────────
-    full_h       = player.hp // 2
-    empty_h      = player.max_hp // 2 - full_h
-    hearts_plain = S.HEART_FULL * full_h + S.HEART_EMPTY * empty_h
+    full_h, half_h, empty_h = _hc(player.hp, player.max_hp)
+    hearts_plain = (S.HEART_FULL * full_h + S.HEART_HALF * half_h
+                    + S.HEART_EMPTY * empty_h)
     hearts_col   = ((C.heart_full()  + S.HEART_FULL  + rst) * full_h +
+                    (C.heart_half()  + S.HEART_HALF  + rst) * half_h +
                     (C.heart_empty() + S.HEART_EMPTY + rst) * empty_h)
     sl_label     = '-- OVERWORLD --'
     name_tag     = '⌨  <' + player.name + '>'
@@ -340,5 +341,7 @@ def render_color_palette(
     # ── Bottom border ─────────────────────────────────────────────────────────
     out.append(border_h(S.BOX_BL, S.BOX_BR))
 
+    if print_size_notice(term):
+        return scroll_offset
     print(term.home + term.clear + '\n'.join(out), end='', flush=True)
     return scroll_offset
