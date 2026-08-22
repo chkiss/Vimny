@@ -6406,30 +6406,29 @@ def _gs_words() -> dict:
 def build_dungeon_g_sanctum(seed: int) -> Dungeon:
     """The Last Reach (slug `g_sanctum`): the g-family — the last glyph,
     named in one reach."""
+    from vimny.engine.editor import _CELL_CODE
+    from vimny.sharing.format import Level as _Level, _parse_seal, build as _fmt_build
     words = _gs_words()
 
     R, C = _GS_ROWS, _GS_COLS
-    cells = [[CellType.WALL] * C for _ in range(R)]
+    grid = [[CellType.WALL] * C for _ in range(R)]
     for r in range(1, _GS_GATE + 1):                     # the spine
-        cells[r][_GS_SPINE] = CellType.FLOOR
+        grid[r][_GS_SPINE] = CellType.FLOOR
     for r in _GS_BAYS:                                   # the verse rows
         for c in range(_GS_SPINE, _GS_POOL[1] + 1):
-            cells[r][c] = CellType.FLOOR
+            grid[r][c] = CellType.FLOOR
         for c in _GS_POOL:                               # the flood at the brink
-            cells[r][c] = CellType.WATER
+            grid[r][c] = CellType.WATER
     # The gate row runs from the spine WEST to the seal at column 0; the bolts
     # sit between them (one per verse), and the exit (col 0) is the final seal.
     for c in range(0, _GS_SPINE + 1):
-        cells[_GS_GATE][c] = CellType.FLOOR
+        grid[_GS_GATE][c] = CellType.FLOOR
     for dc in _GS_BOLTS.values():
-        cells[_GS_GATE][dc] = CellType.WALL
-    cells[_GS_EXIT[0]][_GS_EXIT[1]] = CellType.WALL      # the final seal (chassis-standard)
+        grid[_GS_GATE][dc] = CellType.WALL
+    grid[_GS_EXIT[0]][_GS_EXIT[1]] = CellType.WALL      # the final seal (chassis-standard)
 
-    room = Room(room_type=RoomType.ENTRY, rows=R, cols=C)
-    room.cells = cells
-    room.seed  = seed
-
-    doors = []
+    runs = []
+    seals = []
     for i, r in enumerate(_GS_BAYS):
         verse = words['rows'][i]
         col = _GS_TEXT0                                  # LEFT-ALIGNED (no indent)
@@ -6437,34 +6436,42 @@ def build_dungeon_g_sanctum(seed: int) -> Dungeon:
             # the last word wears its CORRUPT spelling (last letter wrong);
             # g_ lands on that letter and r{fix} mends it.
             text = words['corrupts'][i] if k == len(verse) - 1 else part
-            room.char_runs.append(CharRun(r, col, tuple(text), 'ancient'))
+            runs.append({'row': r, 'col': col, 'symbols': text,
+                         'kind': 'ancient'})
             col += len(part) + 1
         # No plaque: the saying is known by heart — the true tail (and its
         # last letter) IS the memory. Substring door on the true tail.
-        doors.append((words['tails'][i], (_GS_GATE, _GS_BOLTS[r])))
-    room.seals = _label_gate(doors, _GS_EXIT)
-    room._gs_words = words
+        seals.append(_parse_seal({
+            'scope': 'anyrow', 'mode': 'contains', 'anchor': 'exit_row',
+            'match': [words['tails'][i]],
+            'opens': [[_GS_GATE, _GS_BOLTS[r]]],
+        }, i))
+    seals.append(_parse_seal({
+        'anchor': 'exit_row',
+        'requires': list(range(len(seals))),
+        'opens': [list(_GS_EXIT)],
+    }, len(seals)))
 
-    room.entities.append(Entity(kind='exit', row=_GS_EXIT[0], col=_GS_EXIT[1],
-                                edit_immune=True))
-    room.spawn_pos = (1, _GS_SPINE)
-    room.exit_pos  = _GS_EXIT
-
-    room.rebuild_indexes()
-    apply_stone_fog(room)
-    room.par    = _GS_PAR
-    room.budget = math.ceil(_GS_PAR * 1.4)  # STANDARD: the counted-e walk wins at 1★
     f = words['fixes']
-    # g_ reaches each tail (east), r mends; the FIRST verse is reached by j, the
-    # rest by + (down to the next head). After the last mend every bolt is open,
-    # so G drops to the gate row and lands on its first standable cell — the
-    # seal at column 0 — winning in one key.
-    steps = [f'j g_ r{f[0]}'] + [f'+ g_ r{fx}' for fx in f[1:]]
-    room.answer = ' '.join(steps) + ' G'
+    level = _Level(
+        name='The Last Reach', seed=seed,
+        rows=R, cols=C,
+        cells=[''.join(_CELL_CODE[c] for c in row) for row in grid],
+        spawn=(1, _GS_SPINE), exit=_GS_EXIT,
+        char_runs=runs, seals=seals,
+        entities=[{'kind': 'exit', 'at': [_GS_EXIT[0], _GS_EXIT[1]],
+                   'edit_immune': True}],
+        # g_ reaches each tail (east), r mends; the FIRST verse is reached by j, the
+        # rest by + (down to the next head). After the last mend every bolt is open,
+        # so G drops to the gate row and lands on its first standable cell — the
+        # seal at column 0 — winning in one key.
+        solution=' '.join([f'j g_ r{f[0]}'] + [f'+ g_ r{fx}' for fx in f[1:]]) + ' G')
 
-    dungeon = Dungeon(name='The Last Reach', seed=seed)
-    dungeon.rooms        = [room]
-    dungeon.current_room = 0
+    dungeon = _fmt_build(level, par=_GS_PAR)   # STANDARD: the counted-e walk wins at 1★
+    _seal_banners(dungeon,
+                  bolt='The label reads true — the bolt grinds back!',
+                  final='Every label reads true — the final seal parts!')
+    dungeon.rooms[0]._gs_words = words
     return dungeon
 
 
