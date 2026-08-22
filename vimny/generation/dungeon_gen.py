@@ -4222,21 +4222,21 @@ _R1_PAR = 16                          # the optimal driven tape below (register 
 def build_dungeon_register_unnamed_hold(seed: int) -> Dungeon:
     """The Register I — The Unnamed Hold ("").  See the section header."""
     from vimny.content.proverbs import text_of
+    from vimny.engine.editor import _CELL_CODE
+    from vimny.sharing.format import Level as _Level, build as _fmt_build
     R, C = _R1_ROWS, _R1_COLS
-    cells = [[CellType.WALL] * C for _ in range(R)]
+    grid = [[CellType.WALL] * C for _ in range(R)]
     for r in range(2, _R1_GATE + 1):                     # the spine (fully open)
-        cells[r][_R1_SPINE] = CellType.FLOOR
+        grid[r][_R1_SPINE] = CellType.FLOOR
     for r in (_R1_ROW_QUARRY, _R1_ROW_DAW, _R1_ROW_GAP):  # the three bays
         for c in range(_R1_BAY_W, _R1_BAY_E + 1):
-            cells[r][c] = CellType.FLOOR
+            grid[r][c] = CellType.FLOOR
 
-    room = Room(room_type=RoomType.ENTRY, rows=R, cols=C)
-    room.cells = cells
-    room.seed  = seed
+    runs: list = []
 
     def lay(r, col, words_seq):
         for w in words_seq:
-            room.char_runs.append(CharRun(r, col, tuple(w), 'ancient'))
+            runs.append({'row': r, 'col': col, 'symbols': w, 'kind': 'ancient'})
             col += len(w) + 1
 
     # Quarry — the lone word (met first).
@@ -4255,28 +4255,26 @@ def build_dungeon_register_unnamed_hold(seed: int) -> Dungeon:
     gap_start = col
     gap_target = text_of(_R1_GAP_HEAD + (_R1_QUARRY_WORD,))
 
+    level = _Level(
+        name='The Unnamed Hold', seed=seed,
+        rows=R, cols=C,
+        cells=[''.join(_CELL_CODE[c] for c in row) for row in grid],
+        spawn=_R1_SPAWN, exit=_R1_EXIT,
+        char_runs=runs,
+        entities=[{'kind': 'exit', 'at': [_R1_EXIT[0], _R1_EXIT[1]],
+                   'edit_immune': True}],
+        # The optimal tape (adversarially found): ye grabs the quarry WITH its leading
+        # space in one stroke (from the spine col, e jumps to the word end), fo p lays
+        # it just past "to" in the gap — all while "" is clean — THEN climb back (- k)
+        # and cut the intruder with dw, and G l to the seal. Yank+paste first dodges
+        # the clobber; doing it last (dw before the yank) also wins, one key dearer.
+        solution='j ye 4j fo p - k fq dw G l')
+
+    dungeon = _fmt_build(level, par=_R1_PAR)
+    room = dungeon.rooms[0]
     room._r1_daw_target = daw_target
     room._r1_gap_target = gap_target
     room._r1_gap        = (_R1_ROW_GAP, gap_start)       # read by the test/tape
-
-    room.entities.append(Entity(kind='exit', row=_R1_EXIT[0], col=_R1_EXIT[1],
-                                edit_immune=True))
-    room.spawn_pos = _R1_SPAWN
-    room.exit_pos  = _R1_EXIT
-
-    room.rebuild_indexes()
-    room.par    = _R1_PAR
-    room.budget = math.ceil(_R1_PAR * 1.4)
-    # The optimal tape (adversarially found): ye grabs the quarry WITH its leading
-    # space in one stroke (from the spine col, e jumps to the word end), fo p lays
-    # it just past "to" in the gap — all while "" is clean — THEN climb back (- k)
-    # and cut the intruder with dw, and G l to the seal. Yank+paste first dodges
-    # the clobber; doing it last (dw before the yank) also wins, one key dearer.
-    room.answer = ('j ye 4j fo p - k fq dw G l')
-
-    dungeon = Dungeon(name='The Unnamed Hold', seed=seed)
-    dungeon.rooms        = [room]
-    dungeon.current_room = 0
     return dungeon
 
 
