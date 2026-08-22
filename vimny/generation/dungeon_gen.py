@@ -7275,8 +7275,9 @@ def build_dungeon_waypoint_sanctum(seed: int) -> 'Dungeon':
     so both are deferred until there is broader play data."""
     rng = random.Random(seed)
     R, C = _WP_ROWS, _WP_COLS
-    dungeon = Dungeon(name='The Waypoint Sanctum', seed=seed)
-    composite = Room(rows=R, cols=C, room_type=RoomType.ENTRY)
+    from vimny.engine.editor import _CELL_CODE
+    from vimny.sharing import format as _fmt
+    from vimny.sharing.format import Level as _Level, build as _fmt_build
     cells = [[CellType.WALL] * C for _ in range(R)]
 
     def carve(r, c):
@@ -7359,18 +7360,12 @@ def build_dungeon_waypoint_sanctum(seed: int) -> 'Dungeon':
             cells[r][X - 1] = CellType.WALL              # (stone flanks; the treasure
             cells[r][X + 1] = CellType.WALL              # shows THROUGH the door — a
         cells[10][X] = CellType.WALL                     # grille, per the stone-fog law)
-        entities += [Entity(kind='locked_door', row=7, col=X, tag='blue'),
-                     Entity(kind=kind, row=9, col=X, scroll_id=sid)]
+        entities += [{'kind': 'locked_door', 'at': [7, X], 'tag': 'blue'},
+                     {'kind': kind, 'at': [9, X], 'scroll_id': sid}]
         vault_cells |= {(7, X), (8, X), (9, X)}
     for c in range(1, C - 1):
         if cells[7][c] == CellType.WALL:
             moat(7, c)                            # the lower seal, flooded too
-    composite.cells = cells
-    composite.seed = seed
-    composite.fog_cells  = set(mist)              # mist on every converted pool
-    composite.mist_cells = set(mist)              # …permanent: reveals skip it
-    # (the plugh fog is added below, once the runs exist — NOT mist: the
-    # tick lifts it, and mist_cells would make the reveal skip it)
 
     # Reserved cells (no prose decor / no goblins): key, both magic words +
     # their decoys, the two pocket interiors, vaults.
@@ -7389,12 +7384,14 @@ def build_dungeon_waypoint_sanctum(seed: int) -> 'Dungeon':
     reserved |= set(goblins)
 
     # Key word (real vocab token) + forward decoys.
-    char_runs = [CharRun(row=_WP_KEY_WORD_POS[0], col=_WP_KEY_WORD_POS[1],
-                         symbols=tuple(_WP_KEYWORD), kind='ember')]
+    char_runs = [{'row': _WP_KEY_WORD_POS[0], 'col': _WP_KEY_WORD_POS[1],
+                  'symbols': _WP_KEYWORD, 'kind': 'ember'}]
     for (dr, dc) in _WP_DECOY_POS:
-        char_runs.append(CharRun(row=dr, col=dc, symbols=tuple(_WP_KEYWORD), kind='ember'))
+        char_runs.append({'row': dr, 'col': dc,
+                          'symbols': _WP_KEYWORD, 'kind': 'ember'})
     for (dr, dc) in (_WP_W2_POCKET1, _WP_W2_POCKET2, *_WP_W2_DECOYS):
-        char_runs.append(CharRun(row=dr, col=dc, symbols=tuple(_WP_WORD2), kind='ember'))
+        char_runs.append({'row': dr, 'col': dc,
+                          'symbols': _WP_WORD2, 'kind': 'ember'})
     # BOTH sanctum plughs sleep under SCRIPTED fog (the Wet Ink pattern):
     # a fogged word is unsearchable — by EVERY search uniformly, # included
     # — so ?plugh from the spawn finds nothing (with only the stone fogged,
@@ -7431,34 +7428,58 @@ def build_dungeon_waypoint_sanctum(seed: int) -> 'Dungeon':
             if lengths and span >= 3:
                 L = rng.choice(lengths)
                 word = pool[L][rng.randrange(len(pool[L]))]
-                char_runs.append(CharRun(row=r, col=c, symbols=tuple(word),
-                                         kind=rng.choice(('ancient', 'verdant', 'ember'))))
+                char_runs.append({'row': r, 'col': c, 'symbols': word,
+                                  'kind': rng.choice(('ancient', 'verdant', 'ember'))})
                 c += L + 1
             else:
                 c += span + 1
 
-    composite.char_runs = char_runs
-    composite.fog_cells |= _plugh_fog
-    composite._wp_plugh_fog = _plugh_fog
-    composite.spawn_pos = _WP_SPAWN
-    composite.exit_pos  = _WP_EXIT
+    # BOTH sanctum plughs sleep under SCRIPTED fog (the Wet Ink pattern):
+    # a fogged word is unsearchable — by EVERY search uniformly, # included
+    # — so ?plugh from the spawn finds nothing (with only the stone fogged,
+    # a visible pocket-2 twin would be a 15-key skip straight to the key).
+    # The level tick wakes the pair the moment the ?
+    # leg lands in pocket 1; # then reaches the freshly-lit twin. The
+    # forward DECOYS stay unfogged: they are the *-pricing, and a backward
+    # search from the spawn never sees them.
+    _plugh_fog = {(r, c + i)
+                  for (r, c) in (_WP_W2_POCKET1, _WP_W2_POCKET2)
+                  for i in range(len(_WP_WORD2))}
+
     entities += [
-        Entity(kind='chest_scroll', row=_WP_SCROLL[0],      col=_WP_SCROLL[1], scroll_id='setnum'),
-        Entity(kind='locked_door',  row=_WP_SCROLL_DOOR[0], col=_WP_SCROLL_DOOR[1], tag='blue'),
-        Entity(kind='locked_door',  row=_WP_LOCK[0],        col=_WP_LOCK[1],        tag='gold'),
-        Entity(kind='exit',         row=_WP_EXIT[0],        col=_WP_EXIT[1]),
-        Entity(kind='floor_key',    row=_WP_KEY[0],         col=_WP_KEY[1],         tag='gold'),
+        {'kind': 'chest_scroll', 'at': [_WP_SCROLL[0], _WP_SCROLL[1]],
+         'scroll_id': 'setnum'},
+        {'kind': 'locked_door',  'at': [_WP_SCROLL_DOOR[0],
+                                        _WP_SCROLL_DOOR[1]], 'tag': 'blue'},
+        {'kind': 'locked_door',  'at': [_WP_LOCK[0], _WP_LOCK[1]],
+         'tag': 'gold'},
+        {'kind': 'exit',         'at': [_WP_EXIT[0], _WP_EXIT[1]]},
+        {'kind': 'floor_key',    'at': [_WP_KEY[0], _WP_KEY[1]],
+         'tag': 'gold'},
     ]
     for (gr, gc) in goblins:
-        entities.append(Entity(kind='goblin', row=gr, col=gc, max_hp=1, ai='chase'))
-    composite.entities = entities
-    composite.par    = _WP_PAR
-    composite.budget = math.ceil(_WP_PAR * 1.4)
-    composite.answer = _WP_ANSWER
+        entities.append({'kind': 'goblin', 'at': [gr, gc],
+                         'max_hp': 1, 'ai': 'chase'})
 
-    composite.rebuild_indexes()
-    dungeon.rooms        = [composite]
-    dungeon.current_room = 0
+    def encode(r):
+        return ''.join(_fmt._MIST_CODE if (r, c) in mist else _CELL_CODE[ct]
+                       for c, ct in enumerate(cells[r]))
+
+    level = _Level(
+        name='The Waypoint Sanctum', seed=seed,
+        rows=R, cols=C,
+        cells=[encode(r) for r in range(R)],
+        spawn=_WP_SPAWN, exit=_WP_EXIT,
+        char_runs=char_runs,
+        entities=entities,
+        solution=_WP_ANSWER)
+
+    dungeon = _fmt_build(level, par=_WP_PAR)
+    room = dungeon.rooms[0]
+    # Scripted plugh fog (the Wet Ink pattern) — NOT mist: the tick lifts it,
+    # and mist_cells would make the reveal skip it.
+    room.fog_cells |= _plugh_fog
+    room._wp_plugh_fog = _plugh_fog
     return dungeon
 
 
