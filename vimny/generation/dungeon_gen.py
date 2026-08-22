@@ -1958,8 +1958,7 @@ def _l5_place_near_runes(runes: list, rng, row: int,
             continue
         word = rng.choice(choices)
         kind = rng.choice(kinds)
-        runes.append(CharRun(row=row, col=c,
-                                 symbols=tuple(word), kind=kind))
+        runes.append({'row': row, 'col': c, 'symbols': word, 'kind': kind})
         for i in range(len(word)):
             occupied.add(c + i)
         placed += 1
@@ -2071,7 +2070,8 @@ def build_dungeon_goblin_gauntlet(seed: int) -> Dungeon:
     _load_vocab_tables()
     _mixed = _VOCAB_MIXED_BY_LEN
     rng     = random.Random(seed)
-    dungeon = Dungeon(name='The Goblin Gauntlet', seed=seed)
+    from vimny.engine.editor import _CELL_CODE
+    from vimny.sharing.format import Level as _Level, build as _fmt_build
 
     cells = [[CellType.WALL] * _GOBLIN_GAUNTLET_COLS for _ in range(_GOBLIN_GAUNTLET_ROWS)]
 
@@ -2094,12 +2094,6 @@ def build_dungeon_goblin_gauntlet(seed: int) -> Dungeon:
     for row in _GOBLIN_GAUNTLET_LEFT_CONN_ROWS:
         for c in _GOBLIN_GAUNTLET_LC_COLS:
             cells[row][c] = CellType.FLOOR
-
-    composite = Room(room_type=RoomType.ENTRY, rows=_GOBLIN_GAUNTLET_ROWS, cols=_GOBLIN_GAUNTLET_COLS)
-    composite.cells    = cells
-    composite.seed     = seed
-    composite.spawn_pos    = (1, 1)
-    composite.exit_pos = (18, 56)
 
     entities: list = []                       # (no entry_marker — spawn_pos suffices)
     runes:    list = []
@@ -2131,8 +2125,8 @@ def build_dungeon_goblin_gauntlet(seed: int) -> Dungeon:
                                         right_to_left=True)
 
         for gc in gobs:
-            entities.append(Entity(kind='goblin', row=row, col=gc,
-                                   hp=1, max_hp=1, ai='chase', ai_speed=2))
+            entities.append({'kind': 'goblin', 'at': [row, gc],
+                             'hp': 1, 'max_hp': 1, 'ai': 'chase', 'ai_speed': 2})
 
         # Decorative near-side characters (non-void)
         if right_going:
@@ -2154,10 +2148,10 @@ def build_dungeon_goblin_gauntlet(seed: int) -> Dungeon:
     # Connector doors
     for row in _GOBLIN_GAUNTLET_RIGHT_CONN_ROWS:
         for c in _GOBLIN_GAUNTLET_RC_COLS:
-            entities.append(Entity(kind='door', row=row, col=c))
+            entities.append({'kind': 'door', 'at': [row, c], 'opaque': True})
     for row in _GOBLIN_GAUNTLET_LEFT_CONN_ROWS:
         for c in _GOBLIN_GAUNTLET_LC_COLS:
-            entities.append(Entity(kind='door', row=row, col=c))
+            entities.append({'kind': 'door', 'at': [row, c], 'opaque': True})
 
     # Final section goblins (rows 17, no water)
     n17   = rng.randint(3, 6)
@@ -2170,28 +2164,27 @@ def build_dungeon_goblin_gauntlet(seed: int) -> Dungeon:
         gobs17.append(c)
         c += space // n17 + rng.randint(-1, 2)
     for gc in gobs17:
-        entities.append(Entity(kind='goblin', row=17, col=gc,
-                               hp=1, max_hp=1, ai='chase', ai_speed=2))
+        entities.append({'kind': 'goblin', 'at': [17, gc],
+                         'hp': 1, 'max_hp': 1, 'ai': 'chase', 'ai_speed': 2})
 
     # Gate doors at col 53 (rows 17 and 18) + exit
-    entities.append(Entity(kind='locked_door', row=17, col=53))
-    entities.append(Entity(kind='locked_door', row=18, col=53))
-    entities.append(Entity(kind='exit', row=18, col=56))
-
-    composite.entities = entities
-    composite.char_runs    = runes
+    entities.append({'kind': 'locked_door', 'at': [17, 53], 'opaque': True})
+    entities.append({'kind': 'locked_door', 'at': [18, 53], 'opaque': True})
+    entities.append({'kind': 'exit', 'at': [18, 56]})
 
     par = _par_goblin_gauntlet(corr_data, gobs17)
-    composite.par    = par
-    composite.budget = math.ceil(par * 1.4)
-    composite.answer = _answer_l5(corr_data, gobs17)
 
-    composite.rebuild_indexes()
-    _doors_block_sight(composite)     # each cell of the gauntlet is dark behind its door
+    level = _Level(
+        name='The Goblin Gauntlet', seed=seed,
+        rows=_GOBLIN_GAUNTLET_ROWS, cols=_GOBLIN_GAUNTLET_COLS,
+        cells=[''.join(_CELL_CODE[c] for c in row) for row in cells],
+        spawn=(1, 1), exit=(18, 56),
+        char_runs=runes,
+        entities=entities,
+        solution=_answer_l5(corr_data, gobs17))
 
-    dungeon.rooms        = [composite]
-    dungeon.current_room = 0
-    return dungeon
+    dungeon = _fmt_build(level, par=par)   # each cell of the gauntlet is dark
+    return dungeon                          # behind its door (the opaque doors)
 
 
 # ── The Warden's Keep ─────────────────────────────────────────────
