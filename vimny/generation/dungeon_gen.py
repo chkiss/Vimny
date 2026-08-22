@@ -3866,6 +3866,8 @@ def build_dungeon_selection_halls(seed: int) -> Dungeon:
     Six chambers — the case trio (V's honest price win, the g-prefix tax),
     then the block stripe, rectangle, and insert (<C-v>'s ops with no
     normal-mode form at all). See the section header for the full forcing."""
+    from vimny.engine.editor import _CELL_CODE
+    from vimny.sharing.format import Level as _Level, _parse_seal, build as _fmt_build
     rng = random.Random(seed)
     words = _sh_draw_words(rng)
     up6, lo6, fl6 = words['case']
@@ -3920,41 +3922,43 @@ def build_dungeon_selection_halls(seed: int) -> Dungeon:
     chambers.append((_SH_PANEL_ROWS, tuple(runs), tuple(targets_p)))
 
     R, C = _SH_ROWS, _SH_COLS
-    cells = [[CellType.WALL] * C for _ in range(R)]
+    grid = [[CellType.WALL] * C for _ in range(R)]
     for r in range(2, _SH_GATE + 1):                     # the spine
-        cells[r][_SH_SPINE] = CellType.FLOOR
+        grid[r][_SH_SPINE] = CellType.FLOOR
     for rows, _runs, _targets in chambers:               # the bays
         bay_e = _SH_PANEL_BAY_E if rows == _SH_PANEL_ROWS else _SH_BAY_E
         for r in rows:
             for c in range(_SH_BAY_W, bay_e + 1):
-                cells[r][c] = CellType.FLOOR
+                grid[r][c] = CellType.FLOOR
     for r in _SH_SHAFT_SEPS:                             # the light shaft —
-        cells[r][_SH_SHAFT] = CellType.FLOOR             # NOT the throat row
+        grid[r][_SH_SHAFT] = CellType.FLOOR             # NOT the throat row
 
-    room = Room(room_type=RoomType.ENTRY, rows=R, cols=C)
-    room.cells = cells
-    room.seed  = seed
-
+    runs: list = []
     doors = []
-    for i, (rows, runs, targets) in enumerate(chambers):
-        for rr, cc, text in runs:
-            room.char_runs.append(CharRun(rr, cc, tuple(text), 'ancient'))
+    for i, (rows, ch_runs, targets) in enumerate(chambers):
+        for rr, cc, text in ch_runs:
+            runs.append({'row': rr, 'col': cc, 'symbols': text,
+                         'kind': 'ancient'})
         doors.append((targets, _SH_BOLT0 + i))
         if rows == _SH_PANEL_ROWS:
             continue                                     # proverb-style: no plaque
         for pr, ptext in zip(rows, targets):             # full true readings
-            room.char_runs.append(CharRun(pr, _SH_PLQ_COL, tuple(ptext), 'verdant'))
-    room.seals = _chamber_gate(doors, _SH_EXIT)
-    room._sh_words = words
+            runs.append({'row': pr, 'col': _SH_PLQ_COL, 'symbols': ptext,
+                         'kind': 'verdant'})
 
-    room.entities.append(Entity(kind='exit', row=_SH_EXIT[0], col=_SH_EXIT[1],
-                                edit_immune=True))
-    room.spawn_pos = (2, _SH_SPINE)
-    room.exit_pos  = _SH_EXIT
+    seals = []
+    for i, (targets, bolt_col) in enumerate(doors):
+        seals.append(_parse_seal({
+            'scope': 'anyrow', 'mode': 'exact', 'anchor': 'exit_row',
+            'match': [str(t) for t in targets],
+            'opens': [[_SH_EXIT[0], bolt_col]],
+        }, i))
+    seals.append(_parse_seal({
+        'anchor': 'exit_row',
+        'requires': list(range(len(seals))),
+        'opens': [list(_SH_EXIT)],
+    }, len(seals)))
 
-    room.rebuild_indexes()
-    room.par    = _SH_PAR
-    room.budget = math.ceil(_SH_PAR * 1.4)   # STANDARD (par-is-the-optimum law)
     # endings are rotated one frame; the visual-paste swap (…$bvep…) rotates
     # them home for one key each, but the old-only route must RETYPE all four
     # correct endings (ce{word}) — and the longest proverb endings push that
@@ -3963,12 +3967,21 @@ def build_dungeon_selection_halls(seed: int) -> Dungeon:
     # 1★ law; 1.4·par would make the old route unwinnable). <C-v> shows on the
     # tape as <C-v> (load-bearing, unlike Esc; the tracker eats both chars at once)
     sl = words['stamp_letter']
-    room.answer = (f'j VU 2j Vu 2j V~ 2j <C-v>2jld 4j <C-v>2j3l~ 4j <C-v>2jI{letter}<Esc> '
-                   f'4j <C-v>2jr{sl} 4j $bvey 3j $bvep k$bvep k$bvep k$bvep G $')
+    level = _Level(
+        name='The Selection Halls', seed=seed,
+        rows=R, cols=C,
+        cells=[''.join(_CELL_CODE[c] for c in row) for row in grid],
+        spawn=(2, _SH_SPINE), exit=_SH_EXIT,
+        char_runs=runs, seals=seals,
+        entities=[{'kind': 'exit', 'at': [_SH_EXIT[0], _SH_EXIT[1]],
+                   'edit_immune': True}],
+        solution=(f'j VU 2j Vu 2j V~ 2j <C-v>2jld 4j <C-v>2j3l~ 4j '
+                  f'<C-v>2jI{letter}<Esc> '
+                  f'4j <C-v>2jr{sl} 4j $bvey 3j $bvep k$bvep k$bvep k$bvep G $'))
 
-    dungeon = Dungeon(name='The Selection Halls', seed=seed)
-    dungeon.rooms        = [room]
-    dungeon.current_room = 0
+    dungeon = _fmt_build(level, par=_SH_PAR)
+    _seal_banners(dungeon)
+    dungeon.rooms[0]._sh_words = words
     return dungeon
 
 
