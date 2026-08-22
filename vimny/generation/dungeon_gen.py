@@ -12105,6 +12105,8 @@ def build_dungeon_case_chambers(seed: int) -> Dungeon:
     doubled guu; the finale's fully-inverted MIXED-case line yields only to g~~.
     See the section header for the full forcing."""
     R, C = _CASE_ROWS, _CASE_COLS
+    from vimny.engine.editor import _CELL_CODE
+    from vimny.sharing.format import Level as _Level, build as _fmt_build
     cells = [[CellType.WALL] * C for _ in range(R)]
     for i, (kind, target, wrong) in enumerate(_CASE_LESSONS):
         r = _CASE_LESSON_ROWS[i]
@@ -12118,43 +12120,39 @@ def build_dungeon_case_chambers(seed: int) -> Dungeon:
     # the bolt cells (gate row, between spine and exit) stay WALL; the tick opens
     # each when its corridor's case reads true.
 
-    room = Room(room_type=RoomType.ENTRY, rows=R, cols=C)
-    room.cells = cells
-    room.seed  = seed
-
-    def lay(r, c, text, kind):
+    def lay(runs, r, c, text, kind):
         # split on spaces — a literal space glyph is a punctuation "word" (the
         # Change Extension gotcha); the floor scan reconstructs the gap.
         col = c
         for part in text.split(' '):
             if part:
-                room.char_runs.append(CharRun(r, col, tuple(part), kind))
+                runs.append({'row': r, 'col': col, 'symbols': part, 'kind': kind})
             col += len(part) + 1
 
+    runs: list = []
     doors = []
     lessons = []
     for i, (kind, target, wrong) in enumerate(_CASE_LESSONS):
         lrow = _CASE_LESSON_ROWS[i]
-        lay(lrow, _CASE_LBL_COL, wrong, 'ancient')             # the mis-cased word, on the floor
-        lay(lrow, _CASE_PLQ_COL, target, 'verdant')            # the true form, the WEST-wall plaque
+        lay(runs, lrow, _CASE_LBL_COL, wrong, 'ancient')       # the mis-cased word, on the floor
+        lay(runs, lrow, _CASE_PLQ_COL, target, 'verdant')      # the true form, the WEST-wall plaque
         doors.append((target, (_CASE_GATE_ROW, _CASE_GATE_COL0 + i)))
         lessons.append({'kind': kind, 'target': target, 'wrong': wrong, 'row': lrow})
-    room.seals       = _label_gate(doors, _CASE_EXIT)
-    room._cc_lessons = tuple(lessons)
 
-    room.entities.append(Entity(kind='exit', row=_CASE_EXIT[0], col=_CASE_EXIT[1],
-                                edit_immune=True))
-    room.spawn_pos = (_CASE_LESSON_ROWS[0], _CASE_COL_S)         # on corridor 1, at the spine
-    room.exit_pos  = _CASE_EXIT
+    level = _Level(
+        name='The Case Chambers', seed=seed,
+        rows=R, cols=C,
+        cells=[''.join(_CELL_CODE[c] for c in row) for row in cells],
+        spawn=(_CASE_LESSON_ROWS[0], _CASE_COL_S),     # on corridor 1, at the spine
+        exit=_CASE_EXIT,
+        char_runs=runs,
+        seals=list(_label_gate(doors, _CASE_EXIT)),
+        entities=[{'kind': 'exit', 'at': [_CASE_EXIT[0], _CASE_EXIT[1]],
+                   'edit_immune': True}],
+        solution=_CASE_ANSWER)
 
-    room.rebuild_indexes()
-    room.par    = _CASE_PAR
-    room.budget = math.ceil(_CASE_PAR * 1.4)       # STANDARD: volume alone bars the r-chain/retype
-    room.answer = _CASE_ANSWER
-
-    dungeon = Dungeon(name='The Case Chambers', seed=seed)
-    dungeon.rooms        = [room]
-    dungeon.current_room = 0
+    dungeon = _fmt_build(level, par=_CASE_PAR)
+    dungeon.rooms[0]._cc_lessons = tuple(lessons)
     return dungeon
 
 
