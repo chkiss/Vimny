@@ -6961,31 +6961,32 @@ def _seekers_decor_pool(rng) -> dict:
 
 def build_dungeon_seekers_labyrinth(seed: int) -> 'Dungeon':
     """Search: The Seekers' Labyrinth. See module comment above for the design."""
+    from vimny.engine.editor import _CELL_CODE
+    from vimny.sharing.format import Level as _Level, build as _fmt_build
     rng = random.Random(seed)
     ROWS, COLS = len(_SEEKERS_MAZE), len(_SEEKERS_MAZE[0])
-    dungeon   = Dungeon(name="The Seekers' Labyrinth", seed=seed)
-    composite = Room(rows=ROWS, cols=COLS, room_type=RoomType.ENTRY)
-    composite.cells = [
+    grid = [
         [CellType.CORRIDOR if _SEEKERS_MAZE[r][c] == '.' else CellType.WALL
          for c in range(COLS)]
         for r in range(ROWS)
     ]
-    composite.seed = seed
 
     # ── Reserved cells: the path-critical words + the five entities ───────────
     reserved: set = {_SEEKERS_GOLD_KEY, _SEEKERS_GOLD_DOOR, _SEEKERS_RED_KEY,
                      _SEEKERS_RED_DOOR, _SEEKERS_EXIT}
     char_runs: list = []
     for (r, c) in _SEEKERS_WORD_POS:
-        char_runs.append(CharRun(row=r, col=c, symbols=tuple(_SEEKERS_WORD), kind='ember'))
+        char_runs.append({'row': r, 'col': c, 'symbols': _SEEKERS_WORD,
+                          'kind': 'ember'})
         reserved |= {(r, c + i) for i in range(len(_SEEKERS_WORD))}
     dr, dc = _SEEKERS_DOORWORD_POS
-    char_runs.append(CharRun(row=dr, col=dc, symbols=tuple(_SEEKERS_DOORWORD), kind='ember'))
+    char_runs.append({'row': dr, 'col': dc, 'symbols': _SEEKERS_DOORWORD,
+                      'kind': 'ember'})
     reserved |= {(dr, dc + i) for i in range(len(_SEEKERS_DOORWORD))}
 
     # ── Decor: fill the OTHER runs with vocab tokens (scenery + search fodder) ─
     pool = _seekers_decor_pool(rng)
-    for (r, s, e) in _seekers_runs(composite.cells):
+    for (r, s, e) in _seekers_runs(grid):
         if any((r, c) in reserved for c in range(s, e + 1)):
             continue                      # leave path-word / entity runs untouched
         c = s
@@ -6996,28 +6997,31 @@ def build_dungeon_seekers_labyrinth(seed: int) -> 'Dungeon':
                 break
             L = rng.choice(lengths)
             word = pool[L][rng.randrange(len(pool[L]))]
-            char_runs.append(CharRun(row=r, col=c, symbols=tuple(word),
-                                     kind=rng.choice(('ancient', 'verdant', 'ember'))))
+            char_runs.append({'row': r, 'col': c, 'symbols': word,
+                              'kind': rng.choice(('ancient', 'verdant', 'ember'))})
             c += L + 1                     # one-cell gap between words
 
-    composite.char_runs = char_runs
-    composite.spawn_pos = _SEEKERS_SPAWN
-    composite.exit_pos  = _SEEKERS_EXIT
-    composite.entities  = [
-        Entity(kind='floor_key',   row=_SEEKERS_GOLD_KEY[0],  col=_SEEKERS_GOLD_KEY[1],  tag='gold'),
-        Entity(kind='locked_door', row=_SEEKERS_GOLD_DOOR[0], col=_SEEKERS_GOLD_DOOR[1], tag='gold'),
-        Entity(kind='floor_key',   row=_SEEKERS_RED_KEY[0],   col=_SEEKERS_RED_KEY[1],   tag='red'),
-        Entity(kind='locked_door', row=_SEEKERS_RED_DOOR[0],  col=_SEEKERS_RED_DOOR[1],  tag='red'),
-        Entity(kind='exit',        row=_SEEKERS_EXIT[0],      col=_SEEKERS_EXIT[1]),
-    ]
-    composite.par    = _SEEKERS_PAR
-    composite.budget = math.ceil(_SEEKERS_PAR * 1.4)
-    composite.answer = _SEEKERS_ANSWER
+    level = _Level(
+        name="The Seekers' Labyrinth", seed=seed,
+        rows=ROWS, cols=COLS,
+        cells=[''.join(_CELL_CODE[c] for c in row) for row in grid],
+        spawn=_SEEKERS_SPAWN, exit=_SEEKERS_EXIT,
+        char_runs=char_runs,
+        entities=[
+            {'kind': 'floor_key',   'at': [_SEEKERS_GOLD_KEY[0],
+                                           _SEEKERS_GOLD_KEY[1]],   'tag': 'gold'},
+            {'kind': 'locked_door', 'at': [_SEEKERS_GOLD_DOOR[0],
+                                           _SEEKERS_GOLD_DOOR[1]],  'tag': 'gold'},
+            {'kind': 'floor_key',   'at': [_SEEKERS_RED_KEY[0],
+                                           _SEEKERS_RED_KEY[1]],    'tag': 'red'},
+            {'kind': 'locked_door', 'at': [_SEEKERS_RED_DOOR[0],
+                                           _SEEKERS_RED_DOOR[1]],   'tag': 'red'},
+            {'kind': 'exit',        'at': [_SEEKERS_EXIT[0],
+                                           _SEEKERS_EXIT[1]]},
+        ],
+        solution=_SEEKERS_ANSWER)
 
-    composite.rebuild_indexes()
-    dungeon.rooms        = [composite]
-    dungeon.current_room = 0
-    return dungeon
+    return _fmt_build(level, par=_SEEKERS_PAR)
 
 
 # Motions available to the player on this level, for the par solver's foot phase.
