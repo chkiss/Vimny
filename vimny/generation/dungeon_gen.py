@@ -10393,22 +10393,23 @@ def build_dungeon_cipher_cell(seed: int) -> Dungeon:
         return ''.join(out[:n])
 
     R, C = _CC_ROWS, _CC_COLS
+    from vimny.engine.editor import _CELL_CODE
+    from vimny.sharing.format import Level as _Level, build as _fmt_build
     cells = [[CellType.WALL] * C for _ in range(R)]
     for c in range(_CC_FLOOR_LO, _CC_FLOOR_HI + 1):
         cells[_CC_ROW][c] = CellType.CORRIDOR
     for (br, bc) in (_CC_BOLT_A, _CC_BOLT_B, _CC_BOLT_C, _CC_BOLT_D):
         cells[br][bc] = CellType.WALL              # the bolts start shut
 
-    room = Room(room_type=RoomType.ENTRY, rows=R, cols=C)
-    room.cells = cells
-    room.seed  = seed
+    runs: list = []
 
     def lay(row, col, text, kind):
         """Place `text` at (row, col); spaces become gaps between separate runs."""
         c = col
         for piece in text.split(' '):
             if piece:
-                room.char_runs.append(CharRun(row, c, tuple(piece), kind))
+                runs.append({'row': row, 'col': c,
+                             'symbols': piece, 'kind': kind})
             c += len(piece) + 1
 
     # Plaques: every span's TRUE state, sealed in the wall band (visible,
@@ -10427,14 +10428,6 @@ def build_dungeon_cipher_cell(seed: int) -> Dungeon:
     for (lo, hi) in (_CC_ROT1, _CC_ROT2):
         lay(_CC_ROW, lo, rot_text(hi - lo + 1), 'ember')
 
-    # The exit is edit-immune: the final D's span sweeps over its cell, and the
-    # way out must not be deletable (nor the row dd-collapsible — immunity
-    # parries that too, per the L18 refused-collapse rule).
-    room.entities.append(Entity(kind='exit', row=_CC_EXIT[0], col=_CC_EXIT[1],
-                                edit_immune=True))
-    room.spawn_pos = _CC_SPAWN
-    room.exit_pos  = _CC_EXIT
-
     # Bolt specs read by main._cipher_cell_tick (stateless, undo-safe): each is
     # (row, c0, target, bolt_pos) — the bolt stands open while the lock row's
     # text over [c0, c0+len(target)) READS AS the target, i.e. as the plaque
@@ -10442,32 +10435,32 @@ def build_dungeon_cipher_cell(seed: int) -> Dungeon:
     def span_target(word, span):
         lo, hi = span
         return word + ' ' * (hi - lo + 1 - len(word))
-    room._cc_bolts = [
+    cc_bolts = [
         (_CC_ROW, _CC_CIPHER_A_COL, word_a, _CC_BOLT_A),
         (_CC_ROW, _CC_SPAN1[0], span_target(word_1, _CC_SPAN1), _CC_BOLT_B),
         (_CC_ROW, _CC_CIPHER_B_COL, word_b, _CC_BOLT_C),
         (_CC_ROW, _CC_SPAN2[0], span_target(word_2, _CC_SPAN2), _CC_BOLT_D),
     ]
+
+    level = _Level(
+        name='The Cipher Cell', seed=seed,
+        rows=R, cols=C,
+        cells=[''.join(_CELL_CODE[c] for c in row) for row in cells],
+        spawn=_CC_SPAWN, exit=_CC_EXIT,
+        char_runs=runs,
+        entities=[{'kind': 'exit', 'at': [_CC_EXIT[0], _CC_EXIT[1]],
+                   'edit_immune': True}],   # the final D's span sweeps its cell —
+                                            # the way out must not be deletable
+                                            # (nor the row dd-collapsible)
+        solution=(f'w w r{word_a[_CC_WARP_A]} w w D '
+                  f'w w 2r{word_b[warp_b]} w w D $'))
+
+    dungeon = _fmt_build(level, par=_CC_PAR)
+    room = dungeon.rooms[0]
+    room._cc_bolts = cc_bolts
     # Band the shut bolts as stonework. Registered at build: the level has no
     # row-shifting edits, so the bolt cells are fixed for its lifetime.
-    room.sealed_cells = {pos for _r, _c0, _t, pos in room._cc_bolts}
-
-    room.rebuild_indexes()
-    # Par tally (combo shapes identical, so this holds for every seed):
-    #   w w r?   (4)  → mend cipher A, bolt A grinds back
-    #   w w D    (3)  → to the rot past the plain word; shear it; bolt B opens
-    #   w w 2r?  (5)  → double-mend cipher B, bolt C opens
-    #   w w D    (3)  → shear rot 2; bolt D opens
-    #   $        (1)  → walk out
-    room.par    = _CC_PAR
-    room.budget = math.ceil(_CC_PAR * 1.4)
-    room.answer = (f'w w r{word_a[_CC_WARP_A]} w w D '
-                   f'w w 2r{word_b[warp_b]} w w D $')
-
-    apply_stone_fog(room)                 # sealed pockets sleep under fog
-    dungeon = Dungeon(name='The Cipher Cell', seed=seed)
-    dungeon.rooms        = [room]
-    dungeon.current_room = 0
+    room.sealed_cells = {pos for _r, _c0, _t, pos in cc_bolts}
     return dungeon
 
 
