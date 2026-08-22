@@ -2237,6 +2237,8 @@ def _par_wardens_keep() -> int:
 
 def build_dungeon_wardens_keep(seed: int) -> Dungeon:
     ROWS, COLS = _WARDENS_KEEP_ROWS, _WARDENS_KEEP_COLS
+    from vimny.engine.editor import _CELL_CODE
+    from vimny.sharing.format import Level as _Level, build as _fmt_build
     cells = [[CellType.WALL] * COLS for _ in range(ROWS)]
 
     # Row 3: full open passage (col 43 stays wall = right border)
@@ -2266,30 +2268,28 @@ def build_dungeon_wardens_keep(seed: int) -> Dungeon:
             else:
                 cells[row][c] = CellType.FLOOR
 
-    composite = Room(room_type=RoomType.COMBAT, rows=ROWS, cols=COLS)
-    composite.cells    = cells
-    composite.seed     = seed
-    composite.spawn_pos    = (3, 0)
-    composite.exit_pos = (3, 39)
-    composite.entities = [
-        Entity(kind='seal_door',       row=3, col=16),
-        Entity(kind='shield',          row=3, col=26),
-        Entity(kind='warden',          row=3, col=27, hp=5, max_hp=5, ai='',
-               summon_timer=0),
-        Entity(kind='locked_door',     row=3, col=38),   # opened with the key the Warden drops
-        Entity(kind='exit',            row=3, col=39),
-        Entity(kind='heart_container', row=2, col=41),
-        Entity(kind='chest_scroll',    row=4, col=41),
-    ]
-    composite.rebuild_indexes()
-    _doors_block_sight(composite)     # the keep is dark behind its seal + door
+    level = _Level(
+        name="The Warden's Keep", seed=seed,
+        rows=ROWS, cols=COLS,
+        cells=[''.join(_CELL_CODE[c] for c in row) for row in cells],
+        spawn=(3, 0),
+        exit=(3, 39),
+        entities=[
+            {'kind': 'seal_door', 'at': [3, 16], 'opaque': True},
+            {'kind': 'shield', 'at': [3, 26]},
+            {'kind': 'warden', 'at': [3, 27], 'hp': 5, 'max_hp': 5,
+             'ai': '', 'summon_timer': 0},
+            {'kind': 'locked_door', 'at': [3, 38], 'opaque': True},
+            # opened with the key the Warden drops
+            {'kind': 'exit', 'at': [3, 39]},
+            {'kind': 'heart_container', 'at': [2, 41]},
+            {'kind': 'chest_scroll', 'at': [4, 41]},
+        ])
 
-    composite.par    = None
-    composite.budget = math.ceil(_par_wardens_keep() * 1.4)
-
-    dungeon = Dungeon(name="The Warden's Keep", seed=seed)
-    dungeon.rooms        = [composite]
-    dungeon.current_room = 0
+    dungeon = _fmt_build(level)
+    room = dungeon.rooms[0]
+    room.par    = None
+    room.budget = math.ceil(_par_wardens_keep() * 1.4)
     return dungeon
 
 
