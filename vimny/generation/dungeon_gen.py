@@ -6526,30 +6526,29 @@ def _bw_verse_data() -> dict:
 def build_dungeon_buried_word(seed: int) -> Dungeon:
     """The Buried Word (slug `buried_word`, bonus): g* — the word hunted
     inside other words."""
+    from vimny.engine.editor import _CELL_CODE
+    from vimny.sharing.format import Level as _Level, _parse_seal, build as _fmt_build
     words = _bw_verse_data()
     w = words['word']
 
     R, C = _BW_ROWS, _BW_COLS
-    cells = [[CellType.WALL] * C for _ in range(R)]
+    grid = [[CellType.WALL] * C for _ in range(R)]
     for r in range(1, _BW_GATE + 1):                     # the spine
-        cells[r][_BW_SPINE] = CellType.FLOOR
+        grid[r][_BW_SPINE] = CellType.FLOOR
     for c in range(_BW_SPINE, 32):                       # the standing ledge
-        cells[1][c] = CellType.FLOOR
+        grid[1][c] = CellType.FLOOR
     for r in _BW_BAYS:                                   # the echo rows
         for c in range(_BW_SPINE, 52):
-            cells[r][c] = CellType.FLOOR
+            grid[r][c] = CellType.FLOOR
     for c in range(_BW_SPINE, _BW_EXIT[1]):              # gate row + bolts
-        cells[_BW_GATE][c] = CellType.FLOOR
+        grid[_BW_GATE][c] = CellType.FLOOR
     for dc in _BW_BOLTS.values():
-        cells[_BW_GATE][dc] = CellType.WALL
+        grid[_BW_GATE][dc] = CellType.WALL
     # _BW_EXIT itself stays WALL — the final seal (chassis-standard).
 
-    room = Room(room_type=RoomType.ENTRY, rows=R, cols=C)
-    room.cells = cells
-    room.seed  = seed
-
-    room.char_runs.append(CharRun(*_BW_STAND, tuple(w), 'verdant'))
-    doors = []
+    runs = [{'row': _BW_STAND[0], 'col': _BW_STAND[1], 'symbols': w,
+             'kind': 'verdant'}]
+    seals = []
     for i, r in enumerate(_BW_BAYS):
         host = words['hosts'][i]                          # the true real word
         line = words['corrupt_lines'][i]                  # verse line, host corrupt
@@ -6561,35 +6560,40 @@ def build_dungeon_buried_word(seed: int) -> Dungeon:
         for word in line.split(' '):
             if word:
                 kind = 'ember' if off <= hidx < off + len(word) else 'ancient'
-                room.char_runs.append(CharRun(r, col + off, tuple(word), kind))
+                runs.append({'row': r, 'col': col + off, 'symbols': word,
+                             'kind': kind})
             off += len(word) + 1
         # No plaque: the verse's sense names the true word.
-        doors.append((host, (_BW_GATE, _BW_BOLTS[r])))
-    room.seals = _label_gate(doors, _BW_EXIT)
-    room._bw_words = words
+        seals.append(_parse_seal({
+            'scope': 'anyrow', 'mode': 'contains', 'anchor': 'exit_row',
+            'match': [host],
+            'opens': [[_BW_GATE, _BW_BOLTS[r]]],
+        }, i))
+    seals.append(_parse_seal({
+        'anchor': 'exit_row',
+        'requires': list(range(len(seals))),
+        'opens': [list(_BW_EXIT)],
+    }, len(seals)))
 
-    room.entities.append(Entity(kind='exit', row=_BW_EXIT[0], col=_BW_EXIT[1],
-                                edit_immune=True))
-    # Spawn WEST of the standing word: so 'one' reads
-    # clear at the hall's mouth instead of hidden under the cursor — the
-    # player walks onto it, then g* hunts the buried echoes.
-    room.spawn_pos = (_BW_STAND[0], _BW_SPINE)
-    room.exit_pos  = _BW_EXIT
+    level = _Level(
+        name='The Buried Word', seed=seed,
+        rows=R, cols=C,
+        cells=[''.join(_CELL_CODE[c] for c in row) for row in grid],
+        spawn=(_BW_STAND[0], _BW_SPINE), exit=_BW_EXIT,
+        char_runs=runs, seals=seals,
+        entities=[{'kind': 'exit', 'at': [_BW_EXIT[0], _BW_EXIT[1]],
+                   'edit_immune': True}],
+        # {n}l walks east onto 'one'; then g* takes it. r mends in place (no shift),
+        # so l steps back onto the word before n — else n re-finds THIS line's word
+        # (one cell ahead now). g*/n do the hunting across the staggered lines.
+        solution=(f'{_BW_STAND[1] - _BW_SPINE}l g* h r{words["fixes"][0]} '
+                  f'l n h r{words["fixes"][1]} l n h r{words["fixes"][2]} G $'))
 
-    room.rebuild_indexes()
-    apply_stone_fog(room)
-    room.par    = _BW_PAR
-    room.budget = math.ceil(_BW_PAR * 1.4)
-    # {n}l walks east onto 'one'; then g* takes it. r mends in place (no shift),
-    # so l steps back onto the word before n — else n re-finds THIS line's word
-    # (one cell ahead now). g*/n do the hunting across the staggered lines.
-    f = words['fixes']
-    walk = _BW_STAND[1] - _BW_SPINE
-    room.answer = f'{walk}l g* h r{f[0]} l n h r{f[1]} l n h r{f[2]} G $'
-
-    dungeon = Dungeon(name='The Buried Word', seed=seed)
-    dungeon.rooms        = [room]
-    dungeon.current_room = 0
+    dungeon = _fmt_build(level, par=_BW_PAR)
+    _seal_banners(dungeon,
+                  bolt='The label reads true — the bolt grinds back!',
+                  final='Every label reads true — the final seal parts!')
+    dungeon.rooms[0]._bw_words = words
     return dungeon
 
 
