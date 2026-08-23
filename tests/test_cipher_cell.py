@@ -31,7 +31,8 @@ nowhere reachable, so x+p can transplant nothing. D is SOFT-forced (lineheads
 precedent): par assumes D; the d$ route costs par+2 and still fits the ×1.4
 budget but loses the 2-star.
 
-All four doors run through main._cipher_cell_tick — stateless and undo-safe
+All four doors are plain `Seal` gates (region/exact) — stateless and
+undo-safe
 (the vault-tick principle): every bolt is recomputed from the text each turn.
 """
 from collections import deque
@@ -225,21 +226,21 @@ def test_tick_bolt_follows_the_cipher_both_ways(seed):
     glyph = room.char_run_at(_CC_ROW, warp_col).symbols[0]   # the warped rune
     p = Player(row=_CC_ROW, col=warp_col)
 
-    main._cipher_cell_tick(room, p)
+    main._seal_tick(room, p)
     assert room.cells[_CC_BOLT_A[0]][_CC_BOLT_A[1]] == CellType.WALL   # still corrupt
 
     replace_chars(room, p, word_a[_CC_WARP_A])               # the r fix
-    msgs = main._cipher_cell_tick(room, p)
+    msgs = main._seal_tick(room, p)
     assert room.cells[_CC_BOLT_A[0]][_CC_BOLT_A[1]] == CellType.FLOOR
     assert any('bolt' in m for m in msgs)
 
     p.col = warp_col
     replace_chars(room, p, glyph)                            # undo restored the rot
-    main._cipher_cell_tick(room, p)
+    main._seal_tick(room, p)
     assert room.cells[_CC_BOLT_A[0]][_CC_BOLT_A[1]] == CellType.WALL   # re-barred
 
     replace_chars(room, p, word_a[_CC_WARP_A])               # re-fix re-opens
-    main._cipher_cell_tick(room, p)
+    main._seal_tick(room, p)
     assert room.cells[_CC_BOLT_A[0]][_CC_BOLT_A[1]] == CellType.FLOOR
 
 
@@ -253,16 +254,16 @@ def _shear(room, row, lo, hi):
 def test_tick_jammed_doors_track_their_rot(seed):
     room = build_dungeon_cipher_cell(seed).rooms[0]          # private (mutating)
     p = Player(row=_CC_ROW, col=2)
-    main._cipher_cell_tick(room, p)
+    main._seal_tick(room, p)
     assert room.cells[_CC_BOLT_B[0]][_CC_BOLT_B[1]] == CellType.WALL
     assert room.cells[_CC_BOLT_D[0]][_CC_BOLT_D[1]] == CellType.WALL
     _shear(room, _CC_ROW, *_CC_ROT1)                         # the D shear (word kept)
-    msgs = main._cipher_cell_tick(room, p)
+    msgs = main._seal_tick(room, p)
     assert room.cells[_CC_BOLT_B[0]][_CC_BOLT_B[1]] == CellType.FLOOR
     assert any('plaque' in m for m in msgs)
     assert room.cells[_CC_BOLT_D[0]][_CC_BOLT_D[1]] == CellType.WALL   # rot 2 untouched
     _shear(room, _CC_ROW, *_CC_ROT2)
-    main._cipher_cell_tick(room, p)
+    main._seal_tick(room, p)
     assert room.cells[_CC_BOLT_D[0]][_CC_BOLT_D[1]] == CellType.FLOOR
 
 
@@ -274,7 +275,7 @@ def test_shearing_the_word_itself_keeps_the_bolt_shut(seed):
     room = build_dungeon_cipher_cell(seed).rooms[0]          # private (mutating)
     p = Player(row=_CC_ROW, col=2)
     _shear(room, _CC_ROW, _CC_WORD1_COL, _CC_SPAN1[1])       # word_1 + rot, all gone
-    main._cipher_cell_tick(room, p)
+    main._seal_tick(room, p)
     assert room.cells[_CC_BOLT_B[0]][_CC_BOLT_B[1]] == CellType.WALL
 
 

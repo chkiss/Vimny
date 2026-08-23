@@ -424,3 +424,26 @@ def test_the_format_never_executes_anything():
         src = inspect.getsource(mod)
         for danger in ('eval(', 'exec(', '__import__(', 'pickle', 'subprocess'):
             assert danger not in src, f'{mod.__name__} reaches for {danger}'
+
+
+def test_an_empty_opens_seal_is_a_pure_predicate():
+    """A seal with `match` but no `opens` reads the buffer and stands nowhere —
+    other seals reach it by index through `requires` (the Named Vault's bays).
+    The nothing-to-read guard still refuses a seal that neither reads nor opens.
+    """
+    spec = {'schema': 1, 'name': 't', 'seed': 1,
+            'geometry': {'rows': 4, 'cols': 8,
+                         'cells': ['W' * 8] * 4, 'spawn': [1, 1], 'exit': [2, 2]},
+            'seals': [{'match': 'abba', 'region': [1, 0, 1, 7]},
+                      {'requires': [0], 'opens': [2, 2]}]}
+    lvl = F.parse(spec)
+    assert lvl.seals[0].opens == ()          # parsed, not rejected
+    data = json.loads(F.dumps(lvl))
+    assert data['seals'][0]['opens'] == []
+    back = F.loads(F.dumps(lvl))
+    assert back.seals[0] == lvl.seals[0]
+    with pytest.raises(F.LevelFormatError, match='nothing to read'):
+        F.parse({'schema': 1, 'name': 't', 'seed': 1, 'geometry':
+                 {'rows': 4, 'cols': 8, 'cells': ['W' * 8] * 4,
+                  'spawn': [1, 1], 'exit': [2, 2]},
+                 'seals': [{'opens': []}]})

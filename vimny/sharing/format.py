@@ -379,15 +379,19 @@ def _parse_seal(s: dict, i: int, at: str = 'seals') -> Seal:
     if anchor not in ('', 'exit_row'):
         raise LevelFormatError(f'{at}[{i}].anchor: must be "" or "exit_row", '
                                f'got {anchor!r}')
-    opens = s.get('opens')
+    opens = s.get('opens') or []
     # A single [row, col] is allowed and is by far the common case: most doors
     # are one cell, and making an author write [[9, 40]] to say so is a papercut
     # they meet on their first seal.
     if (isinstance(opens, (list, tuple)) and len(opens) == 2
             and all(isinstance(v, int) for v in opens)):
         opens = [opens]
-    if not (isinstance(opens, (list, tuple)) and opens):
+    if not isinstance(opens, (list, tuple)):
         raise LevelFormatError(f'{at}[{i}].opens: must be [row, col] or a list of them')
+    # An EMPTY `opens` is a pure predicate — something to read, no cell to
+    # stand open. Legal because the nothing-to-read guard above already ran:
+    # this seal has a `match` or names earlier seals through `requires`, so it
+    # is a reading other seals reach by index, not a door someone mistyped.
     if len(opens) > MAX_SEAL_CELLS:
         raise LevelFormatError(f'{at}[{i}].opens: at most {MAX_SEAL_CELLS} cells')
     cells = []

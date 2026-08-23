@@ -179,7 +179,8 @@ def test_the_two_sayings_alternate_and_share_no_quarry_word():
 
 def test_each_bay_wants_exactly_one_word():
     room = _build(0).room
-    for r, target in room._r2_targets.items():
+    for k, r in enumerate(_R2_BAY_ROWS):
+        target = room.seals[k].match[0]               # the bay's predicate seal
         stub = main._wla_floor_text(room, r).strip()
         assert stub == ' '.join(_R2_STUBS[_r2_saying_for(r)])
         missing = [w for w in _R2_QUARRY_WORDS if w in target.split()]

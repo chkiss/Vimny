@@ -2449,34 +2449,6 @@ def _operators_vault_tick(room, player) -> list:
     return msgs
 
 
-def _cipher_cell_tick(room, player) -> list:
-    """The Cipher Cell doors — ONE rule: a bolt stands open exactly while its
-    span of the lock row READS AS ITS PLAQUE (the word, then blank where the
-    plaque is blank). STATELESS, hence undo-safe (the vault-tick principle):
-    every bolt is recomputed from the text each turn, so undoing a mend or a
-    shear re-bars the door and redoing the work re-opens it. Returns banner
-    messages for anything that just changed."""
-    msgs = []
-
-    def _text_at(row, c0, n):
-        out = []
-        for c in range(c0, c0 + n):
-            ru = room.char_run_at(row, c)
-            out.append(ru.symbols[c - ru.col] if ru else ' ')
-        return ''.join(out)
-
-    for (row, c0, target, pos) in getattr(room, '_cc_bolts', ()):
-        br, bc = pos
-        open_ = _text_at(row, c0, len(target)) == target
-        cur_open = room.cells[br][bc] != CellType.WALL
-        if open_ and not cur_open:
-            room.cells[br][bc] = CellType.FLOOR
-            msgs.append('The row reads as the plaque — the bolt grinds back!')
-        elif not open_ and cur_open and (player.row, player.col) != (br, bc):
-            room.cells[br][bc] = CellType.WALL     # undo restored the rot — re-bar
-    return msgs
-
-
 def _wm_row_text(room, r: int) -> str:
     """The full text of row r (spaces where no character sits)."""
     line = [' '] * room.cols
@@ -2861,45 +2833,6 @@ def _codex_feed(player, key):
         pane.search('', backward=True)
     elif k == ':':
         pane.cmd_input = ''
-
-
-def _register_unnamed_hold_tick(room, player) -> list:
-    """The Register I exit seal — parts once BOTH the daw bay and the paste bay
-    read their true sayings.  Stateless + undo-aware (texts are re-read each
-    tick); the seal never closes under the player's own feet."""
-    texts = {_wla_floor_text(room, r).strip() for r in range(room.rows)}
-    ok = room._r1_daw_target in texts and room._r1_gap_target in texts
-    er, ec = room.exit_pos
-    # Band the shut seal as stonework; derived here because exit_pos rides shifts.
-    room.sealed_cells = {(er, ec)}
-    seal_open = room.cells[er][ec] != CellType.WALL
-    msgs = []
-    if ok and not seal_open:
-        room.cells[er][ec] = CellType.FLOOR
-        msgs.append('Both sayings read true — the seal parts.')
-    elif not ok and seal_open and (player.row, player.col) != (er, ec):
-        room.cells[er][ec] = CellType.WALL
-    return msgs
-
-
-def _register_named_vault_tick(room, player) -> list:
-    """The Register II seal.  There are no gates — the vault is open from the
-    spawn — so the ONLY door is the exit seal, and it parts once every bay reads
-    its saying whole.  Stateless + undo-aware; it never shuts under the player's
-    own feet."""
-    msgs = []
-    ok = all(_wla_floor_text(room, r).strip() == t
-             for r, t in room._r2_targets.items())
-    er, ec = room.exit_pos
-    # Band the shut seal as stonework; derived here because exit_pos rides shifts.
-    room.sealed_cells = {(er, ec)}
-    seal_open = room.cells[er][ec] != CellType.WALL
-    if ok and not seal_open:
-        room.cells[er][ec] = CellType.FLOOR
-        msgs.append('Every saying reads true — the seal parts.')
-    elif not ok and seal_open and (player.row, player.col) != (er, ec):
-        room.cells[er][ec] = CellType.WALL
-    return msgs
 
 
 def _hall_of_echoes_tick(room, player) -> list:
@@ -5553,9 +5486,6 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
             _push(_m)
         for _m in _seal_tick(room, player):
             _push(_m)
-        if level == 'cipher_cell':
-            for _m in _cipher_cell_tick(room, player):
-                _push(_m)
         if level == 'quartermaster':
             for _m in _quartermaster_tick(room, player):
                 _push(_m)
@@ -5576,12 +5506,6 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
                 _push(_m)
         if level == 'indentation_sanctum':
             for _m in _indentation_sanctum_tick(room, player):
-                _push(_m)
-        if level == 'register_unnamed_hold':
-            for _m in _register_unnamed_hold_tick(room, player):
-                _push(_m)
-        if level == 'register_named_vault':
-            for _m in _register_named_vault_tick(room, player):
                 _push(_m)
         if level == 'hall_of_echoes':
             for _m in _hall_of_echoes_tick(room, player):  # per-room south seal

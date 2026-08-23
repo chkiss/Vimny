@@ -4330,6 +4330,13 @@ def build_dungeon_register_unnamed_hold(seed: int) -> Dungeon:
         char_runs=runs,
         entities=[{'kind': 'exit', 'at': [_R1_EXIT[0], _R1_EXIT[1]],
                    'edit_immune': True}],
+        # The exit seal, as the format's own law: it parts while BOTH sayings
+        # read true as whole rows somewhere on the floor — anyrow/exact, whose
+        # multi-target match IS the conjunction. anchor='exit_row' rides the
+        # row shifts.
+        seals=[Seal(match=(daw_target, gap_target), scope='anyrow',
+                    mode='exact', anchor='exit_row', opens=(_R1_EXIT,),
+                    message='Both sayings read true — the seal parts.')],
         # The optimal tape (adversarially found): ye grabs the quarry WITH its leading
         # space in one stroke (from the spine col, e jumps to the word end), fo p lays
         # it just past "to" in the gap — all while "" is clean — THEN climb back (- k)
@@ -4339,9 +4346,7 @@ def build_dungeon_register_unnamed_hold(seed: int) -> Dungeon:
 
     dungeon = _fmt_build(level, par=_R1_PAR)
     room = dungeon.rooms[0]
-    room._r1_daw_target = daw_target
-    room._r1_gap_target = gap_target
-    room._r1_gap        = (_R1_ROW_GAP, gap_start)       # read by the test/tape
+    room._r1_gap = (_R1_ROW_GAP, gap_start)              # read by the test/tape
     return dungeon
 
 
@@ -4447,11 +4452,19 @@ def build_dungeon_register_named_vault(seed: int) -> Dungeon:
         char_runs=runs,
         entities=[{'kind': 'exit', 'at': [_R2_EXIT[0], _R2_EXIT[1]],
                    'edit_immune': True}],
+        # The six bays as pure predicate Seals (empty `opens` — they only
+        # READ), each true while its whole row reads its saying; the exit is
+        # the final seal requiring every one. The tick's conjunction, said
+        # as data.
+        seals=([Seal(region=(r, 0, r, C - 1), match=(targets[r],),
+                     mode='exact', scope='region')
+                for r in _R2_BAY_ROWS]
+               + [Seal(opens=(_R2_EXIT,), anchor='exit_row',
+                       requires=tuple(range(len(_R2_BAY_ROWS))),
+                       message='Every saying reads true — the seal parts.')]),
         solution=solution)
-    # NO fog and NO gates: the room is open from the spawn so the rhythm shows.
 
     dungeon = _fmt_build(level, par=_R2_PAR)
-    dungeon.rooms[0]._r2_targets = targets
     return dungeon
 
 
@@ -10387,8 +10400,8 @@ def build_dungeon_cipher_cell(seed: int) -> Dungeon:
     place with r) and rot-text sprawling where the plaque is blank (shear it to
     the wall with D). Geometry is fixed; the seed picks the word combo, the
     warp glyph and the rot soup, so par is seed-invariant and locked at
-    _CC_PAR while the answer's letters track the combo. All four doors run
-    through main._cipher_cell_tick — stateless and undo-safe.
+    _CC_PAR while the answer's letters track the combo. All four doors are
+    plain `Seal` gates (region/exact — stateless and undo-safe).
     """
     rng = random.Random(seed)
     word_a, word_1, word_b, word_2 = rng.choice(_CC_COMBOS)
@@ -10452,19 +10465,23 @@ def build_dungeon_cipher_cell(seed: int) -> Dungeon:
     for (lo, hi) in (_CC_ROT1, _CC_ROT2):
         lay(_CC_ROW, lo, rot_text(hi - lo + 1), 'ember')
 
-    # Bolt specs read by main._cipher_cell_tick (stateless, undo-safe): each is
-    # (row, c0, target, bolt_pos) — the bolt stands open while the lock row's
-    # text over [c0, c0+len(target)) READS AS the target, i.e. as the plaque
-    # (the word, then blank where the plaque is blank).
+    # The four bolts, as the format's own Seals — the echo-vault shape: each
+    # stands open while the lock row's text over its span READS AS the plaque
+    # (`scope='region', mode='exact'`; stateless, undo-safe). The blank-tailed
+    # spans read identically under the region reader's whitespace collapse,
+    # and this verb set (r/D) cannot put leading or double blanks in a span.
     def span_target(word, span):
         lo, hi = span
         return word + ' ' * (hi - lo + 1 - len(word))
-    cc_bolts = [
-        (_CC_ROW, _CC_CIPHER_A_COL, word_a, _CC_BOLT_A),
-        (_CC_ROW, _CC_SPAN1[0], span_target(word_1, _CC_SPAN1), _CC_BOLT_B),
-        (_CC_ROW, _CC_CIPHER_B_COL, word_b, _CC_BOLT_C),
-        (_CC_ROW, _CC_SPAN2[0], span_target(word_2, _CC_SPAN2), _CC_BOLT_D),
-    ]
+    cc_seals = [Seal(region=(_CC_ROW, c0, _CC_ROW, c0 + len(target) - 1),
+                     match=(target,), mode='exact', scope='region',
+                     opens=((br, bc),))
+                for c0, target, (br, bc) in (
+                    (_CC_CIPHER_A_COL, word_a, _CC_BOLT_A),
+                    (_CC_SPAN1[0], span_target(word_1, _CC_SPAN1), _CC_BOLT_B),
+                    (_CC_CIPHER_B_COL, word_b, _CC_BOLT_C),
+                    (_CC_SPAN2[0], span_target(word_2, _CC_SPAN2), _CC_BOLT_D),
+                )]
 
     level = _Level(
         name='The Cipher Cell', seed=seed,
@@ -10476,15 +10493,17 @@ def build_dungeon_cipher_cell(seed: int) -> Dungeon:
                    'edit_immune': True}],   # the final D's span sweeps its cell —
                                             # the way out must not be deletable
                                             # (nor the row dd-collapsible)
+        seals=cc_seals,
         solution=(f'w w r{word_a[_CC_WARP_A]} w w D '
                   f'w w 2r{word_b[warp_b]} w w D $'))
 
     dungeon = _fmt_build(level, par=_CC_PAR)
     room = dungeon.rooms[0]
-    room._cc_bolts = cc_bolts
-    # Band the shut bolts as stonework. Registered at build: the level has no
-    # row-shifting edits, so the bolt cells are fixed for its lifetime.
-    room.sealed_cells = {pos for _r, _c0, _t, pos in cc_bolts}
+    # `Seal.message` is not file-format data; hand the banner back.
+    from dataclasses import replace as _dc_replace
+    room.seals = tuple(_dc_replace(
+        s, message='The row reads as the plaque — the bolt grinds back!')
+        for s in room.seals)
     return dungeon
 
 
