@@ -190,13 +190,18 @@ def test_the_statusline_shows_yanked_gaps_not_a_squish():
     both the p machinery and <C-r>'s _clip_to_text honor them); only the
     read-only statusline view squished. It now rebuilds each row with its
     gaps as spaces before truncating."""
+    from blessed import Terminal
+    import vimny.render.colors as C
+    C.init(Terminal(force_styling=True))   # headless terminals drop styling
     from vimny.render.renderer import _clip_to_items, _reg_display
     clip = {'linewise': True, 'rows': [{'width': 7, 'char_runs': [
         {'dcol': 0, 'symbols': ('m', 'y'), 'kind': 'ancient'},
         {'dcol': 3, 'symbols': ('f', 'a', 'i', 'r'), 'kind': 'ancient'},
     ]}]}
+    import re
     text, vis = _reg_display(_clip_to_items(clip))
-    assert text.startswith('my fair'), text
+    plain = re.sub(r'\x1b\[[0-9;]*m', '', text)   # drop styling, keep glyphs
+    assert plain.startswith('my fair'), plain
     assert vis == 7
 
 
@@ -205,12 +210,38 @@ def test_the_statusline_preview_carries_sixteen_glyphs():
     window, not a statusline strip), so its truncation is a UI budget, not a
     law — doubled 2026-08-23 when the gap fix made real words readable in it.
     Sixteen glyphs carry whole; seventeen show fifteen plus an ellipsis."""
+    from blessed import Terminal
+    import vimny.render.colors as C
+    C.init(Terminal(force_styling=True))   # headless terminals drop styling
     from vimny.render.renderer import _reg_display
+    import re
+    plain_of = lambda s: re.sub(r'\x1b\[[0-9;]*m', '', s)
     items = [{'type': 'rune', 'rune': CharRun(0, 0, tuple('abcdefghijklmnopq'), 'ancient')}]
     text, vis = _reg_display(items)
-    stripped = text.rstrip('…')
-    assert text.endswith('…') and len(stripped) == 15 and vis == 16
+    plain = plain_of(text)
+    assert plain.endswith('…') and len(plain.rstrip('…')) == 15 and vis == 16
     # At the boundary exactly: sixteen glyphs fit whole, no ellipsis.
     items = [{'type': 'rune', 'rune': CharRun(0, 0, tuple('abcdefghijklmnop'), 'ancient')}]
     text, vis = _reg_display(items)
-    assert text == 'abcdefghijklmnop' and vis == 16
+    assert plain_of(text) == 'abcdefghijklmnop' and vis == 16
+
+
+def test_the_statusline_preview_sits_on_floor_not_wall():
+    """REGRESSION 2026-08-23 (playtest): the preview's word gaps read as
+    WALL-black, because statusline_bg is literally wall_bg (12,12,20) and the
+    glyphs drew with no background of their own — held text looked like
+    carving on stone. It now paints floor slate under itself and hands the
+    bar's fill back at the end."""
+    import vimny.render.colors as C
+    from blessed import Terminal
+    import vimny.render.colors as C
+    C.init(Terminal(force_styling=True))   # headless terminals drop styling
+    from vimny.render.renderer import _clip_to_items, _reg_display
+    clip = {'linewise': True, 'rows': [{'width': 7, 'char_runs': [
+        {'dcol': 0, 'symbols': ('m', 'y'), 'kind': 'ancient'},
+        {'dcol': 3, 'symbols': ('f', 'a', 'i', 'r'), 'kind': 'ancient'},
+    ]}]}
+    text, vis = _reg_display(_clip_to_items(clip))
+    assert text.startswith(C.floor_bg()), 'the preview must carry floor slate'
+    assert text.endswith(C.statusline_bg()), 'and hand the bar its fill back'
+    assert vis == 7

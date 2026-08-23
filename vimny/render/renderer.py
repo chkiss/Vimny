@@ -206,17 +206,22 @@ def _reg_display(items: list) -> tuple[str, int]:
     truncated = len(syms) > 16
     display   = syms[:15] if truncated else syms
 
+    # Held text sits on FLOOR slate, not the bar's fill — statusline_bg is
+    # deliberately wall-black ("matches wall"), and a register preview drawn
+    # on it read as carving on stone once its word gaps rendered. The bar's
+    # own background is restored after, so the filler stays uniform.
+    floor = C.floor_bg()
     parts: list[str] = []
     for sym, col_fn in display:
         if col_fn is not None:
-            parts.append(col_fn() + sym + C.key_fg())
+            parts.append(floor + col_fn() + sym + C.key_fg())
         else:
-            parts.append(sym)
+            parts.append(floor + sym)
     if truncated:
-        parts.append('…')
+        parts.append(floor + '…')
 
     vis = len(display) + (1 if truncated else 0)
-    return ''.join(parts), vis
+    return ''.join(parts) + C.statusline_bg(), vis
 
 
 _ARROW_DIRS = {(1, 0): '↓', (-1, 0): '↑', (0, 1): '→', (0, -1): '←'}
