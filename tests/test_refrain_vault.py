@@ -239,3 +239,27 @@ def test_the_chasm_lines_are_readable_through_the_mist(
     frame = capsys.readouterr().out
     assert ''.join(chasm.symbols) in frame, \
         'the yank-source line must render on frame one, discovered or not'
+
+
+@pytest.mark.parametrize("seed", SEEDS)
+def test_misted_text_wears_the_haze(seed, monkeypatch, capsys):
+    """The chasm verse renders legible through the mist (see the test above),
+    but legibility alone made it look like ORDINARY floor text — nothing told
+    the eye this is weather you cannot walk, search, or cut. Hazed glyphs now
+    wear mist_bg, the same lifted grey a discovered channel wears."""
+    dungeon = build_dungeon_refrain_vault(seed)
+    monkeypatch.setattr(main.time, 'sleep', lambda *a, **k: None)
+    monkeypatch.setattr(Terminal, 'height', property(lambda self: 45))
+    monkeypatch.setattr(Terminal, 'width', property(lambda self: 120))
+    term = Terminal()
+    import vimny.render.colors as C
+    C.init(Terminal(force_styling=True))   # real escapes, not headless blanks
+    it = iter(_K(':wq\r'))
+    monkeypatch.setattr(term, 'inkey', lambda *a, **k: next(it, Keystroke('')))
+    main.run_dungeon(term, 'refrain_vault', {}, player_name='Scribe',
+                     _dungeon=dungeon)
+    frame = capsys.readouterr().out
+    # The first chasm glyph ('m' of 'my', row 1 col 8) must carry mist slate.
+    hazed = (C.mist_bg() + C.rune_ancient() + 'm' + C.normal_fg())
+    assert hazed in frame, 'the chasm verse must render wearing the haze'
+

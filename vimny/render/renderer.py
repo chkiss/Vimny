@@ -636,6 +636,7 @@ def render_all(term: Terminal, dungeon: Dungeon, player: Player,
             return wall_bg + C.hint_fg() + '·' + C.normal_fg()
 
         # Fog?
+        hazy = False
         if (room_r, room_c) in room.fog_cells:
             if (room.cells[room_r][room_c] == CellType.WATER
                     and (room_r, room_c) in room.mist_cells
@@ -666,6 +667,7 @@ def render_all(term: Terminal, dungeon: Dungeon, player: Player,
             # touch no open floor at all until the player edits them. Bare
             # misted cells keep the discovery gate above — that one hides the
             # channel's SHAPE, which is the leak that rule exists to prevent.
+            hazy = True                  # and it WEARS the haze: mist_bg below
             # Fall through to the ordinary char-run rendering.
 
         # Attack-direction arrows (room._atk_arrows): every attacker — goblin,
@@ -714,6 +716,11 @@ def render_all(term: Terminal, dungeon: Dungeon, player: Player,
                 glyph_bg = C.water_bg()
             else:
                 glyph_bg = floor_bg
+            if hazy:
+                # Weather over the writing: the same lifted-grey a discovered
+                # channel wears, so text under mist reads as hazed at a glance
+                # — you can read it, and you can also tell you cannot WALK it.
+                glyph_bg = C.mist_bg()
             return glyph_bg + rfg + sym + C.normal_fg()
 
         # Cell type
