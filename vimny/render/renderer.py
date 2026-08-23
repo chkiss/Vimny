@@ -640,12 +640,16 @@ def render_all(term: Terminal, dungeon: Dungeon, player: Player,
                 # revealed, which is exactly when you could have seen it.
                 return C.mist_bg() + C.mist_fg() + S.MIST + C.normal_fg()
             if ((room_r, room_c) not in room.mist_cells
-                    or room.char_run_at(room_r, room_c) is None
-                    or not _discovered(room, room_r, room_c)):
+                    or room.char_run_at(room_r, room_c) is None):
                 return wall_bg + ' ' + C.normal_fg()
             # MISTED FLOOR carrying a glyph: text across a chasm — readable in
             # full colour but never standable, searchable, or cuttable (the fog
             # bars feet and match-landings; only ranged ex commands reach it).
+            # The haze hides TERRAIN, never WRITING: a verse needs no one to
+            # stand beside it to be read, and the Shelving Room's shelf lines
+            # touch no open floor at all until the player edits them. Bare
+            # misted cells keep the discovery gate above — that one hides the
+            # channel's SHAPE, which is the leak that rule exists to prevent.
             # Fall through to the ordinary char-run rendering.
 
         # Attack-direction arrows (room._atk_arrows): every attacker — goblin,

@@ -213,3 +213,29 @@ def test_curriculum_entry():
     assert lv['teaches'] == []                     # the ex_range kit + & family
     known = set(known_commands('refrain_vault'))
     assert 'ex_range' in known and 'subst' in known
+
+
+@pytest.mark.parametrize("seed", SEEDS)
+def test_the_chasm_lines_are_readable_through_the_mist(
+        seed, monkeypatch, capsys):
+    """The refrain's twin of the Shelving fix (2026-08-23): the torn chasm's
+    lines — including the one `:1j|1y` yanks — border only walls and the
+    misted water course, so no open cell ever discovers them. The haze hides
+    TERRAIN, never WRITING: ink renders on frame one, discovered or not."""
+    dungeon = build_dungeon_refrain_vault(seed)
+    room = dungeon.rooms[0]
+    chasm = next(ru for ru in room.char_runs if ru.row == 2)
+    assert (chasm.row, chasm.col) in room.mist_cells, 'precondition: under mist'
+    monkeypatch.setattr(main.time, 'sleep', lambda *a, **k: None)
+    monkeypatch.setattr(Terminal, 'height', property(lambda self: 45))
+    monkeypatch.setattr(Terminal, 'width', property(lambda self: 120))
+    term = Terminal()
+    import vimny.render.colors as _C
+    _C.init(term)                       # the real renderer paints this frame
+    it = iter(_K(':wq\r'))
+    monkeypatch.setattr(term, 'inkey', lambda *a, **k: next(it, Keystroke('')))
+    main.run_dungeon(term, 'refrain_vault', {}, player_name='Scribe',
+                     _dungeon=dungeon)
+    frame = capsys.readouterr().out
+    assert ''.join(chasm.symbols) in frame, \
+        'the yank-source line must render on frame one, discovered or not'

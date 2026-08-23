@@ -275,3 +275,32 @@ def test_curriculum_entry():
     assert lv['display'] == '41'
     assert lv['teaches'] == []                     # the ex_range kit, second lesson
     assert 'ex_range' in set(known_commands('shelving_room'))
+
+
+@pytest.mark.parametrize("seed", SEEDS)
+def test_the_shelf_lines_are_readable_through_the_mist(
+        seed, monkeypatch, capsys):
+    """REGRESSION 2026-08-23: a misted floor cell carrying text rendered only
+    once _discovered() — some OPEN revealed cell beside it — and most shelf
+    lines touch no open floor at all until the player edits them, so six of
+    eight verses shipped invisible: the par route manipulated lines the player
+    could never see. The law now reads: the haze hides TERRAIN, never
+    WRITING. Bare channels keep the discovery gate (that gate hides the
+    channel's shape); ink shows through the weather."""
+    dungeon = build_dungeon_shelving_room(seed)
+    room = dungeon.rooms[0]
+    line1 = next(ru for ru in room.char_runs if ru.row == 1)
+    assert (line1.row, line1.col) in room.mist_cells, 'precondition: under mist'
+    monkeypatch.setattr(main.time, 'sleep', lambda *a, **k: None)
+    monkeypatch.setattr(Terminal, 'height', property(lambda self: 45))
+    monkeypatch.setattr(Terminal, 'width', property(lambda self: 120))
+    term = Terminal()
+    import vimny.render.colors as _C
+    _C.init(term)                       # the real renderer paints this frame
+    it = iter(_K(':wq\r'))
+    monkeypatch.setattr(term, 'inkey', lambda *a, **k: next(it, Keystroke('')))
+    main.run_dungeon(term, 'shelving_room', {}, player_name='Scribe',
+                     _dungeon=dungeon)
+    frame = capsys.readouterr().out
+    assert ''.join(line1.symbols) in frame, \
+        'the first shelf verse must render on frame one, discovered or not'
