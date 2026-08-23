@@ -180,3 +180,21 @@ def test_paste_allowed_for_admin():
     known = ['admin']
 
     assert action_allowed(action, known)
+
+
+def test_the_statusline_shows_yanked_gaps_not_a_squish():
+    """REGRESSION 2026-08-23 (playtest): yanking the Refrain's chasm verse
+    (`:1j|1y`) showed `myfairl…` in the register statusline — the display
+    adapter concatenated each run's symbols and dropped the blank floor
+    BETWEEN words. Paste was never wrong (clips keep `dcol` offsets, and
+    both the p machinery and <C-r>'s _clip_to_text honor them); only the
+    read-only statusline view squished. It now rebuilds each row with its
+    gaps as spaces before truncating."""
+    from vimny.render.renderer import _clip_to_items, _reg_display
+    clip = {'linewise': True, 'rows': [{'width': 7, 'char_runs': [
+        {'dcol': 0, 'symbols': ('m', 'y'), 'kind': 'ancient'},
+        {'dcol': 3, 'symbols': ('f', 'a', 'i', 'r'), 'kind': 'ancient'},
+    ]}]}
+    text, vis = _reg_display(_clip_to_items(clip))
+    assert text.startswith('my fair'), text
+    assert vis == 7

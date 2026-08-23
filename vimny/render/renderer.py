@@ -151,13 +151,24 @@ _REG_ENTITY: dict[str, tuple[str, object]] = {
 
 
 def _clip_to_items(clip) -> list:
-    """Adapt the unnamed-register clip to _reg_display items (read-only view)."""
+    """Adapt the unnamed-register clip to _reg_display items (read-only view).
+
+    A row's runs sit at their `dcol` offsets, and the gaps between them are
+    real blank floor — a yanked chasm verse must read `my fair …` in the
+    statusline, not `myfair…` (same reconstruction _clip_to_text does for
+    <C-r>; the display just never got it)."""
     if not clip:
         return []
     items: list = []
     for rw in clip.get('rows', []):
-        for rd in rw.get('char_runs', []):
-            items.append({'type': 'rune', 'rune': CharRun(0, 0, rd['symbols'], rd['kind'])})
+        text, kind, col = '', None, 0
+        for rd in sorted(rw.get('char_runs', []), key=lambda d: d['dcol']):
+            text += ' ' * max(0, rd['dcol'] - col)
+            text += ''.join(rd['symbols'])
+            col = rd['dcol'] + len(rd['symbols'])
+            kind = kind or rd.get('kind', 'ancient')
+        if text:
+            items.append({'type': 'rune', 'rune': CharRun(0, 0, tuple(text), kind)})
         for ed in rw.get('entities', []):
             t = ed['tmpl']
             items.append({'type': 'entity',
