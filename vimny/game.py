@@ -7095,29 +7095,34 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
                               'VISUAL selection it reads that region; with no '
                               'selection, ANY floor row.')
                     else:
+                        # Grammar, in the order the usage line prints:
+                        # [xN] [@col] [*]<text>. Flags first, then the glob
+                        # star, then the words. A leading `\` quotes the rest,
+                        # so a password may begin flag-shaped ('\\x2 mark it'
+                        # reads the words, not a count).
                         _mode = 'exact'
-                        if _txt.startswith('*'):
-                            _mode, _txt = 'contains', _txt[1:].strip()
-                        elif _txt.startswith('\\*'):
-                            _txt = _txt[1:]
-                        # Optional flags, either order, before the text:
-                        #   xN — N DISTINCT floor rows must read true (the Y p
-                        #        door: the source verse is not a proof)
-                        #   @C — a reading row's first glyph sits at column C
-                        #        (the << door: the margin IS the test)
                         _times, _head = 1, -1
-                        while True:
-                            _m = re.match(r'x(\d+)(?=\s|$)', _txt)
-                            if _m:
-                                _times = max(1, int(_m.group(1)))
-                                _txt = _txt[_m.end():].lstrip()
-                                continue
-                            _m = re.match(r'@(\d+)(?=\s|$)', _txt)
-                            if _m:
-                                _head = int(_m.group(1))
-                                _txt = _txt[_m.end():].lstrip()
-                                continue
-                            break
+                        if _txt.startswith('\\'):
+                            _txt = _txt[1:]
+                        else:
+                            #   xN — N DISTINCT floor rows must read true (the
+                            #        Y p door: the source verse is not a proof)
+                            #   @C — a reading row's first glyph sits at column
+                            #        C (the << door: the margin IS the test)
+                            while True:
+                                _m = re.match(r'x(\d+)(?=\s|$)', _txt)
+                                if _m:
+                                    _times = max(1, int(_m.group(1)))
+                                    _txt = _txt[_m.end():].lstrip()
+                                    continue
+                                _m = re.match(r'@(\d+)(?=\s|$)', _txt)
+                                if _m:
+                                    _head = int(_m.group(1))
+                                    _txt = _txt[_m.end():].lstrip()
+                                    continue
+                                break
+                            if _txt.startswith('*'):
+                                _mode, _txt = 'contains', _txt[1:].strip()
                         _txt = _txt.strip()
                         if not _txt:
                             _push('Armed nothing — after any x/@ flags, :seal '
@@ -7135,9 +7140,16 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
                                   + ('' if _head < 0
                                      else f', first glyph at column {_head}')
                                   + ' — stand on the door and :bolt.')
-                        elif _head >= 0:
-                            _push('@col needs the whole-floor form — a region '
-                                  'seal strips its lines, so it has no margin.')
+                        elif _head >= 0 or _times > 1:
+                            # A region seal reads its rectangle as ONE
+                            # collapsed page: there is no margin to name, and
+                            # one page standing twice is still one page. Both
+                            # flags are refused where their meaning dies —
+                            # never accepted as silent no-ops.
+                            _push('@col and xN need the whole-floor form — a '
+                                  'region seal reads its rectangle as one '
+                                  'collapsed page: no margin to name, no row '
+                                  'to count.')
                         else:
                             if player.last_visual_mode == Mode.VISUAL_LINE:
                                 _c1, _c2 = 0, room.cols - 1   # V means the whole row

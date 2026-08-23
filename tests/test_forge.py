@@ -1810,11 +1810,26 @@ def test_seal_flags_count_rows_and_name_a_margin():
 
 def test_the_at_flag_needs_the_whole_floor_form():
     """A region seal strips its lines before comparing, so a margin there is a
-    promise about whitespace the format throws away — refuse it at the arm,
-    while the author can still retype."""
+    promise about whitespace the format throws away; a count beside one region
+    is one page standing twice. Both flags are REFUSED with a selection, never
+    accepted as silent no-ops."""
     d = DRAFT.new('Probe', rows=8, cols=30)
-    _forge_session(d, 'vll:seal @4 word\r:bolt\r:q!\r')
+    _forge_session(d, 'vll:seal @4 word\r:bolt\r'
+                      'vll:seal x3 word\r:bolt\r:q!\r')
     assert not d.level.seals
+
+
+def test_flags_come_before_the_star_and_a_backslash_quotes_the_rest():
+    """The usage line prints [xN] [@col] [*]<text>, and the parser now obeys
+    its own printout: `*x2 v` is a CONTAINS reading of the words 'x2 v', not a
+    doubled glob. A leading backslash opts the whole tail out of flag parsing,
+    so a password may begin flag-shaped."""
+    d = DRAFT.new('Probe', rows=8, cols=30)
+    _forge_session(d, ':seal *x2 verse\r:bolt\r'
+                      'j:seal \\x2 mark it\r:bolt\r:w\r:q!\r')
+    loose, quoted = d.level.seals[0], d.level.seals[1]
+    assert (loose.mode, loose.match) == ('contains', ('x2 verse',))
+    assert (quoted.mode, quoted.match) == ('exact', ('x2 mark it',))
 
 
 def test_the_final_bolt_wants_every_proof():
