@@ -304,3 +304,37 @@ def test_the_shelf_lines_are_readable_through_the_mist(
     frame = capsys.readouterr().out
     assert ''.join(line1.symbols) in frame, \
         'the first shelf verse must render on frame one, discovered or not'
+
+
+@pytest.mark.parametrize("seed", SEEDS)
+def test_one_open_bolt_never_unblinds_the_pocket(seed):
+    """REGRESSION 2026-08-23 (playtest): the four bolts open STATELESSLY as
+    their misfiling is mended — and the first open bolt gave the reveal flood
+    a sightline straight down the gallery, unveiling the chest and exit past
+    the three still-shut bolts. G/gg then teleported the player east across
+    stone to the chest, because a fogged cell is impassable and the pocket's
+    fog had lifted. The pocket is now MIST as well as fog: weather does not
+    lift because a gap opened somewhere on its row, so no jump or scan can
+    land there until the tick unveils it at seal-open."""
+    r = _room(seed)
+    gal = 9
+    pocket = [(gal, c) for c in range(62, 71)]
+    assert all((gal, c) in r.mist_cells for (gal, c) in pocket), \
+        'precondition: the pocket rides the mist'
+    # One bolt grinds back — exactly what the stateless tick does.
+    from vimny.engine.world import CellType
+    from vimny.engine import motion
+    r.cells[gal][57] = CellType.FLOOR
+    motion.auto_fog_tick(r, *r.spawn_pos)
+    assert all((gal, c) in r.fog_cells for (gal, c) in pocket), \
+        'an open bolt must not unveil the pocket past the shut ones'
+    assert all((gal, c) in r.mist_cells for (gal, c) in pocket)
+    # Every jump/scan stays west of the pocket; the one OPEN bolt is itself
+    # lawful footing ($ parks there), but nothing beyond it is reachable.
+    from vimny.engine.player import Player
+    p = Player(row=r.spawn_pos[0], col=r.spawn_pos[1])
+    for keys in ('G', 'gg', '$', 'W'):
+        p.row, p.col = r.spawn_pos
+        for k in keys:
+            motion.apply_motion(p, k, 1, r)
+        assert p.col <= 57, f'{keys!r} landed at col {p.col}, past the bolts'

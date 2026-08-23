@@ -5766,8 +5766,10 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
         sc = room._shr_seal_col
         if room.cells[gal][sc] == CellType.WALL:
             room.cells[gal][sc] = CellType.FLOOR
-        room.fog_cells = {(fr, fc) for (fr, fc) in room.fog_cells
-                          if not (fr == gal and fc > sc)}   # unveil the pocket
+        _unveil = {(fr, fc) for (fr, fc) in room.fog_cells
+                   if fr == gal and fc > sc}
+        room.fog_cells -= _unveil                  # unveil the pocket —
+        room.mist_cells -= _unveil                 # its haze lifts with it
         room._shr_seal_col = None
         _push('The round sings in order, echo under call. The way opens!')
 

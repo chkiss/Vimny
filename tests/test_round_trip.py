@@ -89,11 +89,9 @@ KNOWN_GAPS: dict[str, tuple[tuple[str, ...], str]] = {
     # which the M cell code (water-bound) could not say. The format learned a
     # top-level/room `mist` list — the same named-layer move as `veiled` — and
     # both builders now ride it; inline `M` remains water shorthand, unioned
-    # with the list on parse. What does NOT heal is the shelving room's sealed
-    # POCKET: it sits behind a bolt the scripted tick opens, so no file-visible
-    # fact marks it dark, and the builder keeps laying that one fog by hand.
-    'shelving_room':        (('fog',), 'the pocket behind the scripted '
-                             'gallery seal is fogged by position'),
+    # with the list on parse. The shelving POCKET rides the mist too (its
+    # darkness is weather until the scripted tick unveils it at seal-open),
+    # so that level healed outright — 56 of 60.
 
     # ── a room with no way out ───────────────────────────────────────────────
     # Several rooms are sayable since phase 4 (`then`), and the Sanctum's two
@@ -199,12 +197,12 @@ def test_no_exemption_is_stale(slug):
 
 
 def test_the_gap_is_a_number_that_only_goes_down():
-    """The headline. 55 of 60 shipped levels survive the trip whole.
+    """The headline. 56 of 60 shipped levels survive the trip whole.
 
     If this fails downward, something regressed. If it fails upward, a phase of
     the port landed — raise the floor in the same commit so it cannot slide
     back.
     """
     lossless = [s for s in SLUGS if s not in KNOWN_GAPS]
-    assert len(lossless) >= 55, (
+    assert len(lossless) >= 56, (
         f'only {len(lossless)}/{len(SLUGS)} levels round-trip losslessly')

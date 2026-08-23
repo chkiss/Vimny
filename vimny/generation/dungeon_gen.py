@@ -13589,11 +13589,13 @@ def build_dungeon_shelving_room(seed: int) -> Dungeon:
         name='The Shelving Room', seed=seed,
         rows=R, cols=C,
         cells=[''.join(_CELL_CODE[c] for c in row) for row in cells],
-        mist=sorted(mist),                         # haze over floor AND water,
-        spawn=(_SHR_GAL, _SHR_TX - 1),             # said in the file since the
-        exit=(_SHR_GAL, _SHR_EXIT_COL),            # format learned the layer
-        char_runs=runs,
-        entities=[{'kind': 'exit', 'at': [_SHR_GAL, _SHR_EXIT_COL]},
+        mist=sorted(mist | {(_SHR_GAL, c)
+                            for c in range(_SHR_SEAL_COL + 1,
+                                           _SHR_EXIT_COL + 1)}),
+        spawn=(_SHR_GAL, _SHR_TX - 1),             # the sealed POCKET rides the
+        exit=(_SHR_GAL, _SHR_EXIT_COL),            # mist too: its darkness is
+        char_runs=runs,                            # weather, not ignorance — one
+        entities=[{'kind': 'exit', 'at': [_SHR_GAL, _SHR_EXIT_COL]},   # bolt
                   {'kind': 'chest_scroll', 'at': [_SHR_GAL, _SHR_CHEST_COL]}],
         solution=':set<Space>nu<CR> :6m3<CR> :6<<CR> :7t7<CR> :8><CR> $')
 
@@ -13605,10 +13607,10 @@ def build_dungeon_shelving_room(seed: int) -> Dungeon:
     # gallery row and its bolt columns are fixed for the level's lifetime.
     room.sealed_cells = {(_SHR_GAL, c)
                          for c in (*_SHR_BOLT_COLS, _SHR_SEAL_COL)}
-    # The mist rides the file now; what stays a pin is the FOG arrangement:
-    # the pocket behind the seal is hidden by position, not weather, and the
-    # level wants exactly this darkness — no more, no less — than the stone
-    # law would derive.
+    # The mist (shelf band, water course, AND the sealed pocket) rides the
+    # file; what stays a pin is the FOG arrangement: the pocket is hidden by
+    # position behind a seal the scripted tick opens, and the level wants
+    # exactly this darkness — no more, no less — than the stone law derives.
     pocket = {(_SHR_GAL, c) for c in range(_SHR_SEAL_COL + 1, _SHR_EXIT_COL + 1)}
     room.fog_cells = set(room.mist_cells) | pocket
     return dungeon
