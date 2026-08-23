@@ -315,7 +315,7 @@ def _parse_seal(s: dict, i: int, at: str = 'seals') -> Seal:
     if not isinstance(s, dict):
         raise LevelFormatError(f'{at}[{i}]: must be an object')
     unknown = set(s) - {'region', 'match', 'opens', 'mode', 'scope',
-                        'requires', 'anchor', 'head'}
+                        'requires', 'anchor', 'head', 'at'}
     if unknown:
         raise LevelFormatError(f'{at}[{i}]: unknown key(s) {sorted(unknown)}')
     scope = str(s.get('scope', 'region'))
@@ -408,6 +408,23 @@ def _parse_seal(s: dict, i: int, at: str = 'seals') -> Seal:
         raise LevelFormatError(f'{at}[{i}].head: needs scope="anyrow" — a '
                                f'region seal strips its lines, so it cannot '
                                f'check a margin')
+    # `at` is the PIN law: the target's first glyph stands exactly at this
+    # column, whatever sits west of it. Sibling of `head`, opposite verdict on
+    # the row's west end — one seal naming both would promise two margins, so
+    # it is refused rather than resolved.
+    pin = s.get('at', -1)
+    if pin is None:
+        pin = -1
+    if not isinstance(pin, int) or isinstance(pin, bool) or pin < -1:
+        raise LevelFormatError(f'{at}[{i}].at: must be a column number '
+                               f'(>= 0) pinning where the target must stand')
+    if pin >= 0 and head >= 0:
+        raise LevelFormatError(f'{at}[{i}].at: a seal may name a margin '
+                               f'(`head`) or a pin (`at`), not both')
+    if pin >= 0 and scope != 'anyrow':
+        raise LevelFormatError(f'{at}[{i}].at: needs scope="anyrow" — a region '
+                               f'seal reads its rectangle as one collapsed '
+                               f'page, with no columns left to pin')
     opens = s.get('opens') or []
     # A single [row, col] is allowed and is by far the common case: most doors
     # are one cell, and making an author write [[9, 40]] to say so is a papercut
@@ -429,7 +446,8 @@ def _parse_seal(s: dict, i: int, at: str = 'seals') -> Seal:
             raise LevelFormatError(f'{at}[{i}].opens[{j}]: must be [row, col]')
         cells.append((int(cell[0]), int(cell[1])))
     return Seal(region=region, match=tuple(match), opens=tuple(cells), mode=mode,
-                scope=scope, requires=tuple(requires), anchor=anchor, head=head)
+                scope=scope, requires=tuple(requires), anchor=anchor,
+                head=head, at=pin)
 
 
 def _parse_then(rooms) -> list:
@@ -1168,6 +1186,8 @@ def _dump_content(h: Room) -> dict:
                 d['anchor'] = s.anchor
             if s.head >= 0:
                 d['head'] = s.head
+            if s.at >= 0:
+                d['at'] = s.at
             out.append(d)
         data['seals'] = out
     if h.char_runs:

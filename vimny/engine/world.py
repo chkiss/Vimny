@@ -131,6 +131,10 @@ class Seal:
     head:     int   = -1   # anyrow only: a matched row's first glyph must sit
                            # exactly at this column (the left-align law). -1 =
                            # any margin. The Gauntlet's cit door needs its <<.
+    at:       int   = -1   # anyrow only: the PIN law — the target stands with
+                           # its first glyph exactly at this column, whatever
+                           # sits west of it (the plumb-line family: Alignment
+                           # Halls' register). -1 = unpinned.
 
     def __post_init__(self):
         if isinstance(self.match, str):
@@ -144,9 +148,11 @@ class Seal:
         object.__setattr__(self, 'opens', tuple(tuple(c) for c in self.opens))
         object.__setattr__(self, 'requires', tuple(int(i) for i in self.requires))
 
-
 def gate_row_seals(doors, exit_pos, *, mode: str = 'exact',
-                   bolt_message: str = '', final_message: str = '',
+                   head: int = -1,
+                   at: int = -1,
+                   bolt_message: str = '',
+                   final_message: str = '',
                    final: bool = True) -> tuple:
     """The chassis, as seals: a row of bolts, then the exit behind all of them.
 
@@ -154,14 +160,17 @@ def gate_row_seals(doors, exit_pos, *, mode: str = 'exact',
     open while every one of `targets` reads true somewhere on the floor. The
     gate row is not passed because it is not a fact: it is `exit_pos[0]`,
     re-read each turn (`anchor='exit_row'`), so a `dd` above the gate slides the
-    bolts and the exit together.
+    bolts and the exit together. `head` names the left-align margin every
+    reading row must start at; `at` pins the target's first glyph to a column
+    with no margin law (the plumb-line family). -1 leaves each out.
 
     The final seal is the exit itself, requiring every bolt — stone until the
     whole level reads true, because since `A`/`o`/`O` a player can BUILD floor
     toward an unguarded exit and geometry alone no longer contains anything.
     """
     seals = [Seal(match=targets, opens=((exit_pos[0], col),), mode=mode,
-                  scope='anyrow', anchor='exit_row', message=bolt_message)
+                  scope='anyrow', head=head, at=at, anchor='exit_row',
+                  message=bolt_message)
              for targets, col in doors]
     if final:
         seals.append(Seal(opens=(tuple(exit_pos),), anchor='exit_row',

@@ -12401,7 +12401,10 @@ def build_dungeon_alignment_halls(seed: int) -> Dungeon:
         runs.append({'row': br, 'col': _AH_REGISTER, 'symbols': '│',
                      'kind': 'verdant'})
 
-    doors = []
+    # The five bolts + final seal ride the file as Seals — the Alignment rule
+    # is the target's first glyph ON the register line, whatever sits west of
+    # it: `at`, the pin law (i+junk shoving a word onto the plumb is a legal
+    # route — the slice never saw west of the pin).
     lessons = []
     for i, (kind, target, wrong, offset) in enumerate(_AH_LESSONS):
         lrow = _AH_LESSON_ROWS[i]
@@ -12409,9 +12412,14 @@ def build_dungeon_alignment_halls(seed: int) -> Dungeon:
                      'symbols': wrong, 'kind': 'ancient'})   # mis-set (mis-cased) word
         runs.append({'row': lrow, 'col': _AH_PLQ_COL, 'symbols': target,
                      'kind': 'verdant'})                     # the true form, west wall
-        doors.append((target, _AH_GATE_COL0 + i))
         lessons.append({'kind': kind, 'target': target, 'wrong': wrong,
                         'offset': offset, 'row': lrow})
+    seals = gate_row_seals(
+        [(target, _AH_GATE_COL0 + i) for i, (kind, target, wrong, offset)
+         in enumerate(_AH_LESSONS)],
+        _AH_EXIT, mode='exact', at=_AH_REGISTER,
+        bolt_message='The word sits true on the line — the bolt grinds back!',
+        final_message='Every word stands on the register — the final seal parts!')
 
     level = _Level(
         name='The Alignment Halls', seed=seed,
@@ -12419,16 +12427,18 @@ def build_dungeon_alignment_halls(seed: int) -> Dungeon:
         cells=[''.join(_CELL_CODE[c] for c in row) for row in cells],
         spawn=(_AH_LESSON_ROWS[0], _AH_COL_S),               # on row one, at the spine
         exit=_AH_EXIT,
-        char_runs=runs,
+        char_runs=runs, seals=seals,
         entities=[{'kind': 'exit', 'at': [_AH_EXIT[0], _AH_EXIT[1]],
                    'edit_immune': True}],
         solution=_AH_ANSWER)
 
     dungeon = _fmt_build(level, par=_AH_PAR)
     room = dungeon.rooms[0]
-    room._ah_doors        = tuple(doors)
     room._ah_register_col = _AH_REGISTER
     room._ah_lessons      = tuple(lessons)
+    _seal_banners(dungeon,
+                  bolt='The word sits true on the line — the bolt grinds back!',
+                  final='Every word stands on the register — the final seal parts!')
     return dungeon
 
 

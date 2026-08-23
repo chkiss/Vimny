@@ -195,6 +195,36 @@ def test_head_applies_to_contains_too():
     assert room.cells[3][10] == CellType.WALL
 
 
+# ── at: the plumb line ────────────────────────────────────────────────────────
+
+def test_a_pinned_target_ignores_what_sits_west_of_it():
+    """The Alignment Halls' law: the target's first glyph stands exactly ON
+    the register column — and whatever sits WEST of the pin is invisible.
+    Insert-junk shoving the word onto its plumb is a legal route; a margin
+    law would have called it false."""
+    seal = Seal(match='lintel', scope='anyrow', at=3, opens=((3, 10),))
+    room = _room([seal], texts=[(1, 'xxlintel')])       # junk fills cols 1-2;
+    _tick(room)                                          # the word lands on 3
+    assert room.cells[3][10] == CellType.FLOOR
+    _write(room, 1, 'lintel')                           # slid west off the pin
+    _tick(room)
+    assert room.cells[3][10] == CellType.WALL
+    _write(room, 1, '      lintel')                     # east of it too
+    _tick(room)
+    assert room.cells[3][10] == CellType.WALL
+
+
+def test_a_pin_is_not_a_margin():
+    """The sibling laws disagree on purpose: a PINNED row may carry text west
+    of the column; a HEADED row must start there. One word, two doors."""
+    pinned = Seal(match='word', scope='anyrow', at=6, opens=((3, 10),))
+    headed = Seal(match='word', scope='anyrow', head=6, opens=((4, 10),))
+    room = _room([pinned, headed], texts=[(1, 'xx   word')])   # word lands at 6
+    _tick(room)
+    assert room.cells[3][10] == CellType.FLOOR, 'the pin sees only the column'
+    assert room.cells[4][10] == CellType.WALL, 'the margin demands the start'
+
+
 # ── requires: the final seal ──────────────────────────────────────────────────
 
 def test_the_final_seal_waits_for_every_bolt():

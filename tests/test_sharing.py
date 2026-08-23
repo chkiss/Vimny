@@ -497,3 +497,35 @@ def test_a_seals_head_round_trips_and_is_refused_where_margins_do_not_exist():
         with pytest.raises(F.LevelFormatError, match='column'):
             F.parse({**spec, 'seals': [{'scope': 'anyrow', 'match': 'verse',
                                         'head': bad, 'opens': [2, 2]}]})
+
+
+def test_a_seals_pin_round_trips_and_refuses_to_share_a_seal_with_a_margin():
+    """`at` is the pin law in a file: the target's first glyph stands exactly
+    at that column, whatever sits west of it — the plumb-line family. It is
+    `head`'s sibling with the opposite verdict on the row's west end, so one
+    seal may not name both: two margins is a promise nobody can keep."""
+    geo = {'rows': 4, 'cols': 8, 'cells': ['W' * 8] * 4,
+           'spawn': [1, 1], 'exit': [2, 2]}
+    spec = {'schema': 1, 'name': 't', 'seed': 1, 'geometry': geo,
+            'seals': [{'scope': 'anyrow', 'match': 'verse', 'at': 3,
+                       'opens': [2, 2]}]}
+    lvl = F.parse(spec)
+    assert lvl.seals[0].at == 3
+    back = F.loads(F.dumps(lvl))
+    assert back.seals[0] == lvl.seals[0]
+    assert json.loads(F.dumps(lvl))['seals'][0]['at'] == 3
+    plain = F.parse({**spec, 'seals': [{'scope': 'anyrow', 'match': 'verse',
+                                        'opens': [2, 2]}]})
+    assert json.loads(F.dumps(plain))['seals'][0] == {
+        'opens': [[2, 2]], 'mode': 'exact', 'match': 'verse', 'scope': 'anyrow'}
+    with pytest.raises(F.LevelFormatError, match='not both'):
+        F.parse({**spec, 'seals': [{'scope': 'anyrow', 'match': 'verse',
+                                    'head': 2, 'at': 5, 'opens': [2, 2]}]})
+    for bad in (-2, 'y', False, 2.5):
+        with pytest.raises(F.LevelFormatError, match='column'):
+            F.parse({**spec, 'seals': [{'scope': 'anyrow', 'match': 'verse',
+                                        'at': bad, 'opens': [2, 2]}]})
+    with pytest.raises(F.LevelFormatError, match='anyrow'):
+        F.parse({**spec, 'seals': [{'match': 'verse', 'at': 3,
+                                    'region': [1, 1, 1, 5],
+                                    'opens': [2, 2]}]})

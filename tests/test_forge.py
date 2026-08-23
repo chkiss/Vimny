@@ -1832,6 +1832,18 @@ def test_flags_come_before_the_star_and_a_backslash_quotes_the_rest():
     assert (quoted.mode, quoted.match) == ('exact', ('x2 mark it',))
 
 
+def test_the_pipe_flag_pins_the_target_to_a_plumb_column():
+    """`|col` is the pin law in the forge: the target's first glyph stands AT
+    that column, west of it invisible — and @ with | on one seal is refused,
+    because one wants the row to start there and the other only the target."""
+    d = DRAFT.new('Probe', rows=8, cols=30)
+    _forge_session(d, ':seal |16 lintel\r:bolt\r'
+                      'j:seal @4 |9 verse\r:bolt\r:q!\r')
+    s = d.level.seals[0]
+    assert (s.at, s.head, s.match) == (16, -1, ('lintel',))
+    assert len(d.level.seals) == 1, 'margin plus pin is refused at the arm'
+
+
 def test_the_final_bolt_wants_every_proof():
     """`:final` is the Gauntlet's last door as a gesture: one command bolts
     the exit behind every seal already in the level, in file order."""

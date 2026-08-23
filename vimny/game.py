@@ -2564,11 +2564,23 @@ def _seal_region_text(room, seal) -> str:
 
 
 def _seal_row_reads_true(seal, target, raw) -> bool:
-    """Does ONE raw floor row satisfy ONE anyrow target under this seal's mode
-    and margin? `head` (>= 0) is the left-align law: the row's first glyph must
-    sit exactly at that column, not merely the row read true."""
-    if seal.head >= 0 and len(raw) - len(raw.lstrip()) != seal.head:
-        return False
+    """Does ONE raw floor row satisfy ONE anyrow target? Three readings:
+
+      at    — the PIN law: the target's first glyph stands exactly at this
+              column, and whatever sits WEST of it is invisible (the plumb-
+              line family — i+junk shoving a word onto the register is a
+              legal route, because junk never moved the word off its pin).
+      head  — the MARGIN law: the row's first glyph sits exactly at this
+              column; exact then wants the whole row there, contains the
+              phrase east of it (the left-align law — the << door).
+      none  — plain exact / contains over the whole raw row."""
+    if seal.at >= 0:
+        return raw[seal.at:seal.at + len(target)] == target
+    if seal.head >= 0:
+        if len(raw) - len(raw.lstrip()) != seal.head:
+            return False
+        return raw.strip() == target if seal.mode == 'exact' \
+            else target in raw[seal.head:]
     return (target in raw) if seal.mode == 'contains' else (raw.strip() == target)
 
 
@@ -2754,46 +2766,6 @@ def _ce_realign_y_plaque(room) -> list:
         room.char_runs.append(CharRun(want, ru.col, ru.symbols, ru.kind))
     room.rebuild_indexes()
     return moved
-
-
-def _alignment_halls_tick(room, player) -> list:
-    """The Alignment Halls bolts — the plaque rule at a COLUMN: a bolt stands
-    open exactly while its word reads TRUE-CASED with its first letter ON the
-    register line (exact text at the exact column, on ANY floor row — so the
-    check is shift-, case- and o/O-proof; the │ plumb glyphs in the wall bands
-    mark the column). Two-sided by construction: an over-shifted word reads
-    false again and the bolt re-bars. STATELESS + FINAL SEAL, the hardened-
-    chassis pattern (see `world.gate_row_seals` — the Alignment Halls read a
-    COLUMN, which is the one thing a seal still cannot say)."""
-    msgs = []
-    reg = room._ah_register_col
-    floor_rows = [_wla_floor_text(room, r) for r in range(room.rows)]
-
-    def seated(target):
-        return any(t[reg:reg + len(target)] == target for t in floor_rows)
-
-    gr = room.exit_pos[0]
-    # Band the live gate cells so shut bolts read as stonework, not blank wall.
-    # Recomputed here rather than at build time because `gr` rides the row shifts.
-    room.sealed_cells = {(gr, dc) for _t, dc in getattr(room, '_ah_doors', ())}
-    room.sealed_cells.add(room.exit_pos)
-    all_true = True
-    for target, dc in getattr(room, '_ah_doors', ()):
-        is_open = room.cells[gr][dc] != CellType.WALL
-        if seated(target) and not is_open:
-            room.cells[gr][dc] = CellType.FLOOR
-            msgs.append('The word sits true on the line — the bolt grinds back!')
-        elif not seated(target) and is_open and (player.row, player.col) != (gr, dc):
-            room.cells[gr][dc] = CellType.WALL     # slid off / re-rotted — re-bars
-        all_true = all_true and seated(target)
-    er, ec = room.exit_pos
-    seal_open = room.cells[er][ec] != CellType.WALL
-    if all_true and not seal_open:
-        room.cells[er][ec] = CellType.FLOOR
-        msgs.append('Every word stands on the register — the final seal parts!')
-    elif not all_true and seal_open and (player.row, player.col) != (er, ec):
-        room.cells[er][ec] = CellType.WALL         # undone — the seal returns
-    return msgs
 
 
 def _codex_feed(player, key):
@@ -5452,9 +5424,6 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
             if _tw:                       # the plaque followed the paste: glitter
                 _sc_twinkle_animation(term, room, player, _tw, _iw(term), term.height - 8)
                 room._sc_twinkle = []
-        if level == 'alignment_halls':
-            for _m in _alignment_halls_tick(room, player):
-                _push(_m)
         if level == 'indentation_sanctum':
             for _m in _indentation_sanctum_tick(room, player):
                 _push(_m)
@@ -7034,6 +7003,7 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
                             f'{s.match!r} @ ' + ' '.join(f'{r},{c}' for r, c in s.opens)
                             + _suffix.get(s.mode, f' ({s.mode})')
                             + (f', col{s.head}' if s.head >= 0 else '')
+                            + (f', pin{s.at}' if s.at >= 0 else '')
                             + (f' ← after {len(s.requires)}' if s.requires else '')
                             for s in _ss) or 'No seals in this level.')
                     elif _rcmd.rstrip('?!') == 'seal' and _rcmd.endswith('!'):
@@ -7048,17 +7018,17 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
                             _forge_rebuild()
                             _push(f'Seal removed — {len(_ss)} condition(s) gone.')
                     elif not _txt:
-                        _push('Usage: :seal [xN] [@col] [*]<text> — over a '
-                              'VISUAL selection it reads that region; with no '
+                        _push('Usage: :seal [xN] [@col] [|col] [*]<text> — over '
+                              'a VISUAL selection it reads that region; with no '
                               'selection, ANY floor row.')
                     else:
                         # Grammar, in the order the usage line prints:
-                        # [xN] [@col] [*]<text>. Flags first, then the glob
-                        # star, then the words. A leading `\` quotes the rest,
-                        # so a password may begin flag-shaped ('\\x2 mark it'
-                        # reads the words, not a count).
+                        # [xN] [@col] [|col] [*]<text>. Flags first, then the
+                        # glob star, then the words. A leading `\` quotes the
+                        # rest, so a password may begin flag-shaped ('\\x2 mark
+                        # it' reads the words, not a count).
                         _mode = 'exact'
-                        _times, _head = 1, -1
+                        _times, _head, _pin = 1, -1, -1
                         if _txt.startswith('\\'):
                             _txt = _txt[1:]
                         else:
@@ -7066,6 +7036,10 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
                             #        Y p door: the source verse is not a proof)
                             #   @C — a reading row's first glyph sits at column
                             #        C (the << door: the margin IS the test)
+                            #   |C  — the target stands with its first glyph AT
+                            #        column C, west of it invisible (the plumb-
+                            #        line doors: i+junk shoving the word onto
+                            #        the line is a legal route)
                             while True:
                                 _m = re.match(r'x(\d+)(?=\s|$)', _txt)
                                 if _m:
@@ -7077,36 +7051,46 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
                                     _head = int(_m.group(1))
                                     _txt = _txt[_m.end():].lstrip()
                                     continue
+                                _m = re.match(r'\|(\d+)(?=\s|$)', _txt)
+                                if _m:
+                                    _pin = int(_m.group(1))
+                                    _txt = _txt[_m.end():].lstrip()
+                                    continue
                                 break
                             if _txt.startswith('*'):
                                 _mode, _txt = 'contains', _txt[1:].strip()
                         _txt = _txt.strip()
                         if not _txt:
-                            _push('Armed nothing — after any x/@ flags, :seal '
+                            _push('Armed nothing — after any x/@/| flags, :seal '
                                   'still needs the text itself.')
+                        elif _head >= 0 and _pin >= 0:
+                            _push('A seal may name a margin (@) or a pin (|), '
+                                  'not both — one wants the row to START there, '
+                                  'the other only the target.')
                         elif _a is None or _b is None:
                             # No selection: the whole floor is the page. This
                             # is how every exact-chassis door reads — floor
                             # rows only, never plaques, and row-agnostic
                             # because dd, J, o and p all shift rows.
                             _draft._pending_seal = ((), (_txt,) * _times,
-                                                    _mode, _head)
+                                                    _mode, _head, _pin)
                             _push('Seal armed on ANY floor row'
                                   + ('' if _times == 1
                                      else f' — on {_times} of them at once')
                                   + ('' if _head < 0
                                      else f', first glyph at column {_head}')
+                                  + ('' if _pin < 0
+                                     else f', pinned to column {_pin}')
                                   + ' — stand on the door and :bolt.')
-                        elif _head >= 0 or _times > 1:
+                        elif _head >= 0 or _pin >= 0 or _times > 1:
                             # A region seal reads its rectangle as ONE
-                            # collapsed page: there is no margin to name, and
-                            # one page standing twice is still one page. Both
-                            # flags are refused where their meaning dies —
-                            # never accepted as silent no-ops.
-                            _push('@col and xN need the whole-floor form — a '
-                                  'region seal reads its rectangle as one '
-                                  'collapsed page: no margin to name, no row '
-                                  'to count.')
+                            # collapsed page: no margin to name, no column to
+                            # pin, and one page standing twice is still one
+                            # page. Refused where the meaning dies — never a
+                            # silent no-op.
+                            _push('@col, |col and xN need the whole-floor form '
+                                  '— a region seal reads its rectangle as one '
+                                  'collapsed page.')
                         else:
                             if player.last_visual_mode == Mode.VISUAL_LINE:
                                 _c1, _c2 = 0, room.cols - 1   # V means the whole row
@@ -7114,7 +7098,7 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
                                 _c1, _c2 = min(_a[1], _b[1]), max(_a[1], _b[1])
                             _draft._pending_seal = (
                                 (min(_a[0], _b[0]), _c1, max(_a[0], _b[0]), _c2),
-                                (_txt,) * _times, _mode, _head)
+                                (_txt,) * _times, _mode, _head, _pin)
                             _push(f'Seal armed on rows {min(_a[0], _b[0])}-'
                                   f'{max(_a[0], _b[0])}, cols {_c1}-{_c2} — '
                                   f'stand on the door and :bolt.')
@@ -7160,7 +7144,8 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
                             _push('No entities are placed yet — :entity puts '
                                   'something on the floor for :gone to name.')
                         else:
-                            _draft._pending_seal = ((), tuple(_want), 'gone', -1)
+                            _draft._pending_seal = ((), tuple(_want), 'gone',
+                                                    -1, -1)
                             _push('Legion armed — no '
                                   + ' nor '.join(_want)
                                   + ' may stand. Stand on the door and :bolt.')
@@ -7212,7 +7197,7 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
                     elif not _want:
                         _push('Nothing in that selection to bolt.')
                     else:
-                        _reg, _txt, _mode, _head = _pend
+                        _reg, _txt, _mode, _head, _pin = _pend
                         # A text seal's pending carries the target tuple (one
                         # entry per required reading); a gone seal's carries
                         # the kind tuple as-is.
@@ -7242,15 +7227,16 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
                         else:
                             DRAFT.sync(_draft, room)
                             _old = [s for s in _draft.level.seals
-                                    if (s.region, s.match, s.mode, s.scope, s.head)
-                                    == (_reg, _mtch, _mode, _scope, _head)]
+                                    if (s.region, s.match, s.mode, s.scope,
+                                        s.head, s.at)
+                                    == (_reg, _mtch, _mode, _scope, _head, _pin)]
                             _cells = tuple(_old[0].opens) if _old else ()
                             if _old:
                                 _draft.level.seals.remove(_old[0])
                             _add = tuple(c for c in _want if c not in _cells)
                             _new = Seal(region=_reg, match=_mtch, mode=_mode,
                                         scope=_scope, opens=_cells + _add,
-                                        head=_head)
+                                        head=_head, at=_pin)
                             _draft.level.seals.append(_new)
                             _err = _forge_rebuild()
                             if _err:
@@ -7266,6 +7252,8 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
                                     _extra += f' — on {len(_mtch)} distinct rows'
                                 if _head >= 0:
                                     _extra += f', first glyph at column {_head}'
+                                if _pin >= 0:
+                                    _extra += f', pinned to column {_pin}'
                                 _push(f'Bolted: {len(_new.opens)} cell(s) open while '
                                       + ('that region reads ' if _reg
                                          else 'some floor row reads ')
