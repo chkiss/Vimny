@@ -5377,6 +5377,9 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
             # next one — `:room` is how you move between them deliberately, and
             # a room you arrived in by dragging is one you did not mean to open.
             return False
+        _exit = getattr(room, 'exit_pos', None)
+        if _exit is None or (player.row, player.col) != tuple(_exit):
+            return False
         if not (getattr(room, 'advance_on_exit', False)
                 and dungeon.current_room < len(dungeon.rooms) - 1):
             return False
@@ -8604,9 +8607,16 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
                 # Win / exit check
                 if ent is None:
                     ent = room.entity_at(player.row, player.col)
-                if ent and ent.kind == 'exit' and _room_door():
-                    ent = None                # that exit was a door, not the way out
-                if ent and ent.kind == 'exit' and not won:
+                if _room_door():
+                    # The door is the POSITION, not the marker: a transit room
+                    # carries no exit entity at all (the format synthesises one
+                    # only on the last room), so standing on its exit_pos must
+                    # advance on its own. If a door entity does sit here (an
+                    # older file, or an author who placed one), it is eaten —
+                    # that exit was a door, not the way out.
+                    if ent and ent.kind == 'exit':
+                        ent = None
+                elif ent and ent.kind == 'exit' and not won:
                     won = True
                     _render('')
                     iw  = _iw(term)

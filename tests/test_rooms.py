@@ -116,6 +116,25 @@ def test_every_room_but_the_last_is_a_door():
     assert [getattr(r, 'advance_on_exit', False) for r in rooms] == [True, True, False]
 
 
+def test_only_the_last_room_wears_the_exit_marker():
+    """The marker ENTITY belongs to the way out alone. Earlier rooms are
+    doors, and a door is the POSITION — standing on exit_pos advances whether
+    or not anything is drawn there. A synthesised portal on a transit room
+    lied twice: it drew the win-door over a stair (the Grandmaster's gallery
+    had to strip it by hand), and it was a cuttable entity anchoring exit_pos,
+    so one dd on the threshold could free the door out from under itself."""
+    rooms = F.build(_level('l', rooms=3)).rooms
+    assert [any(e.kind == 'exit' for e in r.entities) for r in rooms] \
+        == [False, False, True]
+    # A room whose FILE names its own exit entity keeps it — explicit beats
+    # derived, and build() never second-guesses an author's marker.
+    marked = _level('jjj', rooms=3)
+    marked.then[0].entities = [{'kind': 'exit', 'at': list(marked.then[0].exit)}]
+    rooms = F.build(marked).rooms
+    assert [any(e.kind == 'exit' for e in r.entities) for r in rooms] \
+        == [False, True, True]
+
+
 def test_the_exit_of_a_middle_room_does_not_win_the_level():
     """The whole point of the flag. A room's exit entity would otherwise end
     the level on the first door, which is a two-room level that is really

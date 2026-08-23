@@ -98,11 +98,13 @@ KNOWN_GAPS: dict[str, tuple[tuple[str, ...], str]] = {
     # by walking anywhere, and the format cannot say "a room with no exit" —
     # every room has one, because a door is how a room ends. That is the
     # same `:e wardenverse` machinery the port already excepts.
+    #
+    # `grandmasters_sanctum` HEALED 2026-08-23 when the exit marker became the
+    # last room's alone (build no longer synthesises one onto a transit room,
+    # and the engine's door law asks the POSITION, not the marker).
     'warden_pathfinder':    (('fog', 'ents', 'exit'),
                              'the Wardenverse: a room with no exit, left by '
                              'an event rather than by a door'),
-    'grandmasters_sanctum': (('ents',), 'room 0 has no exit entity of its own '
-                             'and the format synthesises one'),
 
     # ── the rest ─────────────────────────────────────────────────────────────
     # `runs` HEALED 2026-07-31 when `wrap` entered the format. The rebuilt room

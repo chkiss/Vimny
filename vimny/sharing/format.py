@@ -893,6 +893,18 @@ def build(lvl: Level, par: int | None = None, seed: int | None = None) -> Dungeo
         slots.extend(room.fill_slots)
         finalize_par(room, par)
         rooms.append(room)
+    # The exit MARKER is the last room's alone: earlier rooms are doors, and a
+    # door is a POSITION (standing on exit_pos advances), not an entity. A
+    # synthesised marker on a transit room drew the win-portal over the stair,
+    # and could be cut away by a text op to free exit_pos out from under the
+    # door. A room whose file names its own exit entity keeps it — explicit
+    # beats derived — and the last room is given one when it has none.
+    if rooms:
+        last = rooms[-1]
+        if not any(e.kind == 'exit' for e in last.entities):
+            last.entities.append(Entity(kind='exit', row=last.exit_pos[0],
+                                        col=last.exit_pos[1]))
+            last.rebuild_indexes()      # the room indexed its entities already
 
     # The tape belongs to the LEVEL, not a room: one route walks all of them,
     # and the karaoke position travels with the player through the doors.
@@ -985,9 +997,9 @@ def _build_room(spec: Room, lvl: Level, rng: random.Random,
 
     room.entities = [_make_entity(e, i, spec.at('entities'))
                      for i, e in enumerate(spec.entities)]
-    if not any(e.kind == 'exit' for e in room.entities):
-        room.entities.append(Entity(kind='exit', row=room.exit_pos[0],
-                                    col=room.exit_pos[1]))
+    # The derived exit marker is NOT added here — see build(), which gives it
+    # to the last room alone once every room exists. A transit room's stair is
+    # bare: no portal drawn, nothing for a cut to destroy.
 
     # The fog law, after the seals are shut and not before: a shut seal is a
     # wall, and the pocket behind it is exactly what the eye cannot reach. Fog

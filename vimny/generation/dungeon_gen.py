@@ -5941,7 +5941,9 @@ def build_dungeon_grandmasters_sanctum(seed: int) -> Dungeon:
     dungeon = _fmt_build(gallery_level)
     gallery = dungeon.rooms[0]
     # NO exit entity on the gallery: the transit cell is a stair, not a door —
-    # stepping here descends. build() derives an exit from Level.exit; drop it.
+    # stepping here descends. build() gives the derived marker to the last
+    # room alone, but this room is built as its OWN one-room level (the two
+    # are stitched below), so the strip stays honest here.
     gallery.entities = [e for e in gallery.entities if e.kind != 'exit']
     # The driven canonical (see tests): the ops chain bay to bay straight
     # down; the dap's linewise park leaves the cursor at the head of the
