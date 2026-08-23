@@ -203,8 +203,8 @@ def _reg_display(items: list) -> tuple[str, int]:
                    CellType.WOOD_WALL: '░'}.get(item['cell_type'], ' ')
             syms.append((sym, None))
 
-    truncated = len(syms) > 8
-    display   = syms[:7] if truncated else syms
+    truncated = len(syms) > 16
+    display   = syms[:15] if truncated else syms
 
     parts: list[str] = []
     for sym, col_fn in display:

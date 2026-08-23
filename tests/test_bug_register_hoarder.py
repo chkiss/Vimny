@@ -22,7 +22,7 @@ Personality defined in agents/bug_testers.md.
 """
 from vimny.engine.vim_parser import parse
 from vimny.engine.modes import Mode
-from vimny.engine.world import Room, RoomType, CellType, Entity
+from vimny.engine.world import Room, RoomType, CellType, Entity, CharRun
 from vimny.engine.player import Player
 from vimny.engine.command_guard import action_allowed
 from vimny.engine.operator import entity_clip
@@ -198,3 +198,19 @@ def test_the_statusline_shows_yanked_gaps_not_a_squish():
     text, vis = _reg_display(_clip_to_items(clip))
     assert text.startswith('my fair'), text
     assert vis == 7
+
+
+def test_the_statusline_preview_carries_sixteen_glyphs():
+    """The register preview is Vimny's own widget (Vim's :registers is a
+    window, not a statusline strip), so its truncation is a UI budget, not a
+    law — doubled 2026-08-23 when the gap fix made real words readable in it.
+    Sixteen glyphs carry whole; seventeen show fifteen plus an ellipsis."""
+    from vimny.render.renderer import _reg_display
+    items = [{'type': 'rune', 'rune': CharRun(0, 0, tuple('abcdefghijklmnopq'), 'ancient')}]
+    text, vis = _reg_display(items)
+    stripped = text.rstrip('…')
+    assert text.endswith('…') and len(stripped) == 15 and vis == 16
+    # At the boundary exactly: sixteen glyphs fit whole, no ellipsis.
+    items = [{'type': 'rune', 'rune': CharRun(0, 0, tuple('abcdefghijklmnop'), 'ancient')}]
+    text, vis = _reg_display(items)
+    assert text == 'abcdefghijklmnop' and vis == 16
