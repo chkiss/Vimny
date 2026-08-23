@@ -102,15 +102,25 @@ def _swap(answer, old, new):
 def test_dimensions_doors_and_gate(seed):
     room = _room(seed)
     assert (room.rows, room.cols) == (_GNT_ROWS, _GNT_COLS)
-    assert len(room._gnt_doors) == 18
-    assert [dc for _, _, dc in room._gnt_doors] == list(range(_GNT_BOLT0,
-                                                             _GNT_BOLT0 + 18))
+    bolts = room.seals[:-1]
+    assert len(bolts) == 18
+    assert [s.opens[0][1] for s in bolts] == list(range(_GNT_BOLT0,
+                                                        _GNT_BOLT0 + 18))
     gr = _GNT_R_GATE
-    for _, _, dc in room._gnt_doors:
-        assert room.cells[gr][dc] == CellType.WALL          # bolts barred
+    for s in bolts:
+        assert room.cells[gr][s.opens[0][1]] == CellType.WALL   # bolts barred
     assert room.cells[_GNT_EXIT[0]][_GNT_EXIT[1]] == CellType.WALL   # the seal
     assert room.exit_pos == _GNT_EXIT
     assert room.spawn_pos == (_GNT_R_BW, _GNT_SPINE)
+
+
+def _gnt_kind(seal):
+    """Which of the tick's four door shapes this Seal says."""
+    if len(seal.match) == 2:
+        return 'dup'                     # the same verse twice: distinct rows
+    if seal.head >= 0:
+        return 'col'
+    return 'sub' if seal.mode == 'contains' else 'row'
 
 
 @pytest.mark.parametrize("seed", SEEDS)
@@ -118,7 +128,8 @@ def test_no_target_is_already_true(seed):
     room = _room(seed)
     floor_rows = [main._wla_floor_text(room, r) for r in range(room.rows)]
     stripped = [t.strip() for t in floor_rows]
-    for kind, target, _dc in room._gnt_doors:
+    for s in room.seals[:-1]:
+        kind, target = _gnt_kind(s), s.match[0]
         if kind == 'sub':
             assert not any(target in t for t in floor_rows), target
         elif kind == 'row':
@@ -261,7 +272,7 @@ def test_plaques_read_the_full_targets(seed):
                         if ru.row == r and ru.kind == 'verdant'
                         and ru.col < _GNT_SPINE)
 
-    targets = [t for _k, t, _dc in room._gnt_doors]
+    targets = [s.match[0] for s in room.seals[:-1]]
     # every plaque is its row's WHOLE finished line, navigation words
     # included: door targets read verbatim on (or as the tail of) their
     # row's plaque.
@@ -323,8 +334,8 @@ def test_canonical_run_wins_at_par(seed, monkeypatch):
     assert result['won'] and result['stars'] == 2
     room = d.rooms[0]
     gr = room.exit_pos[0]
-    assert all(room.cells[gr][dc] != CellType.WALL
-               for _, _, dc in room._gnt_doors)
+    assert all(room.cells[gr][s.opens[0][1]] != CellType.WALL
+               for s in room.seals[:-1])
 
 
 def test_par_boundary_is_exact(monkeypatch):

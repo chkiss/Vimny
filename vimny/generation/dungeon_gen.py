@@ -13113,10 +13113,28 @@ def build_dungeon_gauntlet(seed: int) -> Dungeon:
                              'symbols': part, 'kind': kind})
             col += len(part) + 1
 
-    doors = []                     # (kind, target, bolt_col) — see _gauntlet_tick
+    # The sixteen-plus-two bolts ride the file as Seals — the same shapes the
+    # forge arms (see _gauntlet_tick's history): sub → contains-anyrow, row →
+    # exact-anyrow, dup → the SAME target twice (distinct-row law: one verse
+    # is the source, not a proof), col → head=_GNT_TX (the left-align law).
+    # Every bolt anchors to the exit row, so o/O/Y-p drag bolts and exit home
+    # together. Messages are engine-only and re-attach post-build.
+    seals = []
+    _bolt_msg = 'A proof holds — a bolt grinds back!'
 
     def door(kind, target):
-        doors.append((kind, target, _GNT_BOLT0 + len(doors)))
+        col = _GNT_BOLT0 + len(seals)
+        common = dict(scope='anyrow', anchor='exit_row',
+                      opens=((_GNT_EXIT[0], col),))
+        if kind == 'sub':
+            seals.append(Seal(match=target, mode='contains', **common))
+        elif kind == 'row':
+            seals.append(Seal(match=target, mode='exact', **common))
+        elif kind == 'dup':
+            seals.append(Seal(match=(target, target), mode='exact', **common))
+        else:                                    # 'col' — the margin IS part
+            seals.append(Seal(match=target, mode='exact', head=_GNT_TX,
+                              **common))
 
     # r1 · e-door: t3 wears an extra letter (the shared initial) at its tail.
     lay(_GNT_R_E, TX, f"{w['t1']} {w['t2']} {w['t3'][:4]}{w['lam1']} {w['t4']}")
@@ -13199,6 +13217,11 @@ def build_dungeon_gauntlet(seed: int) -> Dungeon:
     # off-TX reads false.
     door('col', w['ow1'])
     door('col', w['ow2'])
+    # The FINAL SEAL: the exit itself, behind every bolt (stone until the
+    # whole exam reads true).
+    seals.append(Seal(anchor='exit_row', opens=(_GNT_EXIT,),
+                      requires=tuple(range(len(seals))),
+                      message='Sixteen proofs stand together — the last seal parts!'))
     # the nook island: the U1 forward decoy (a wrapping * lands here and
     # loses to # by one). r23 · the gate: threshold ◆ (G parks west of the
     # bolts — the GMS lesson) and the catch ◆ east of the seal ($ lands
@@ -13269,7 +13292,7 @@ def build_dungeon_gauntlet(seed: int) -> Dungeon:
         cells=[encode(r) for r in range(R)],
         spawn=(_GNT_R_BW, SP),                     # k opens the exam (row above)
         exit=_GNT_EXIT,
-        char_runs=runs,
+        char_runs=runs, seals=seals,
         entities=[{'kind': 'exit', 'at': [_GNT_EXIT[0], _GNT_EXIT[1]],
                    'edit_immune': True}],
         solution=(
@@ -13282,7 +13305,8 @@ def build_dungeon_gauntlet(seed: int) -> Dungeon:
     dungeon = _fmt_build(level, par=_GNT_PAR)
     room = dungeon.rooms[0]
     room._gnt_band = gnt_band
-    room._gnt_doors = tuple(doors)
+    _seal_banners(dungeon, bolt=_bolt_msg,
+                  final='Sixteen proofs stand together — the last seal parts!')
     return dungeon
 
 

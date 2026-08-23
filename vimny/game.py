@@ -3142,64 +3142,21 @@ def _warden_eternal_tick(room, player) -> list:
 
 
 def _gauntlet_tick(room, player) -> list:
-    """The Gauntlet's sixteen bolts + FINAL SEAL — the Annex chassis widened
-    to three door kinds (room._gnt_doors = (kind, target, bolt_col)):
-      'sub' — target reads as a substring of some floor row (the Annex rule);
-      'row' — some floor row, stripped, IS the target exactly (deletion
-              doors: their post-fix text is a prefix of the pre-fix text, so
-              substring matching would open them unfixed);
-      'dup' — the target line stands on TWO floor rows (the Y p door: its
-              source row alone must not count);
-      'col' — the target IS some floor row's stripped text AND that row
-              heads exactly at TX (the left-align law made diegetic: the
-              cit door needs its << home; a verse authored off-column
-              reads false).
-    Stateless, two-sided, row-agnostic; gate row derived from exit_pos each
-    tick (rides _shift_rows — o/O/linewise-p all insert real rows here)."""
-    msgs = []
+    """The Gauntlet's goal-column band — the one thing here that is not a
+    reading of the buffer but a rearrangement of it. Every DOOR is a file
+    riding `Seal` now (`_seal_tick`): sub → contains-anyrow, row →
+    exact-anyrow, dup → the target twice (distinct-row law), col → head=TX,
+    and the exit behind them all via `requires`.
+
+    What remains: the west wall paints the FINISHED manuscript relative to
+    the yanked line — that line TWICE, the O verse two below its head, the o
+    verse five below. Row inserts (Y-p / O / o) shift the wall plaques with
+    the world; this re-rights them to the goal rows — the sculpting
+    re-align, with its twinkle (room._sc_twinkle is read by the render loop)."""
+    msgs: list = []
     floor_rows = [_wla_floor_text(room, r) for r in range(room.rows)]
     stripped = [t.strip() for t in floor_rows]
 
-    def held(kind, target):
-        if kind == 'sub':
-            return any(target in t for t in floor_rows)
-        if kind == 'row':
-            return target in stripped
-        if kind == 'col':
-            return any(t.strip() == target
-                       and len(t) - len(t.lstrip()) == _dg._GNT_TX
-                       for t in floor_rows)
-        return sum(1 for t in stripped if t == target) >= 2      # 'dup'
-
-    gr = room.exit_pos[0]
-    # Band the live bolts + final seal as stonework. Derived here rather than at
-    # build time because `gr` rides the row inserts (Y-p / O / o).
-    room.sealed_cells = {(gr, dc) for _k, _t, dc in getattr(room, '_gnt_doors', ())}
-    room.sealed_cells.add(room.exit_pos)
-    all_true = True
-    for kind, target, dc in getattr(room, '_gnt_doors', ()):
-        ok = held(kind, target)
-        is_open = room.cells[gr][dc] != CellType.WALL
-        if ok and not is_open:
-            room.cells[gr][dc] = CellType.FLOOR
-            msgs.append('A proof holds — a bolt grinds back!')
-        elif not ok and is_open and (player.row, player.col) != (gr, dc):
-            room.cells[gr][dc] = CellType.WALL       # undone — the bolt re-bars
-        all_true = all_true and ok
-    er, ec = room.exit_pos
-    seal_open = room.cells[er][ec] != CellType.WALL
-    if all_true and not seal_open:
-        room.cells[er][ec] = CellType.FLOOR
-        msgs.append('Sixteen proofs stand together — the last seal parts!')
-    elif not all_true and seal_open and (player.row, player.col) != (er, ec):
-        room.cells[er][ec] = CellType.WALL           # undone — the seal returns
-
-    # ── the goal column (the Y/O/o band) ─────────────────────────────────
-    # The west wall paints the FINISHED manuscript relative to the yanked
-    # line: that line TWICE, the O verse two below its head, the o verse
-    # five below. Row inserts (Y-p / O / o) shift the wall plaques with the
-    # world; this re-rights them to the goal rows — the sculpting re-align,
-    # with its twinkle (room._sc_twinkle is read by the render loop).
     band = getattr(room, '_gnt_band', None)
     if band:
         yline, ow1, ow2, nkw = band
