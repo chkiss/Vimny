@@ -96,7 +96,10 @@ class Seal:
 
     `mode` — HOW to compare. `exact` against the whole (stripped) text, which is
     what prices a level whose kept words must SURVIVE the strike; `contains` for
-    the looser substring rule the label doors use.
+    the looser substring rule the label doors use. Two modes read no text at
+    all: `braziers` opens while every brazier in its region burns, and `gone`
+    names ENTITY KINDS in `match` and opens while no live entity of any named
+    kind stands anywhere in the room — the legion rule.
 
     `match` — a tuple of targets, ALL of which must read true. One door, several
     words: a chamber holds its bolt only while every one of its sayings still

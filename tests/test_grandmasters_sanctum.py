@@ -137,7 +137,7 @@ def test_the_grandmaster_watches_from_the_pocket(seed):
 def test_doors_read_the_computed_targets(seed):
     # The plaque (west wall) IS the door target, laid from the same string.
     room = _gallery(seed)
-    for i, (target, _dc) in enumerate(room._gms_doors[:6]):
+    for i, seal in enumerate(room.seals[:6]):
         row = _GMS_BAYS[i]
         cells = {}
         for ru in room.char_runs:
@@ -146,16 +146,42 @@ def test_doors_read_the_computed_targets(seed):
                     cells[ru.col + k] = s
         lo, hi = min(cells), max(cells)
         plaque = ''.join(cells.get(c, ' ') for c in range(lo, hi + 1))
-        assert plaque == target
-    assert room._gms_doors[6][0] is None      # the legion bolt
+        assert plaque == seal.match[0]
+    legion = room.seals[6]
+    assert legion.mode == 'gone' and legion.match == ('goblin',)
+    assert legion.opens == () or legion.anchor == 'exit_row'   # the bolt cell
 
 
 @pytest.mark.parametrize("seed", SEEDS)
 def test_targets_are_not_already_true(seed):
     room = _gallery(seed)
     texts = {main._wla_floor_text(room, r).strip() for r in range(room.rows)}
-    for target, _dc in room._gms_doors[:6]:
-        assert target not in texts
+    for seal in room.seals[:6]:
+        assert seal.match[0] not in texts
+
+
+@pytest.mark.parametrize("seed", SEEDS)
+def test_the_legion_bolt_reads_the_goblins(seed):
+    # mode='gone': the bolt opens the turn no live goblin draws breath, and
+    # re-bars the moment one stands again (`u` restores a slain one).
+    from vimny.engine.player import Player
+    from vimny.engine.world import Entity
+    room = _gallery(seed)
+    gr, dc = _GMS_GATE, _GMS_BOLTS[6]
+    player = Player(row=1, col=_GMS_SPINE)
+    goblins = [e for e in room.entities if e.kind == 'goblin']
+    assert len(goblins) == 2 * len(_GMS_PARA)
+    assert room.cells[gr][dc] == CellType.WALL          # barred while they stand
+    main._seal_tick(room, player)
+    assert room.cells[gr][dc] == CellType.WALL
+    for e in goblins:
+        e.alive = False
+    msgs = main._seal_tick(room, player)
+    assert room.cells[gr][dc] == CellType.FLOOR
+    assert "The last goblin falls!" in msgs[0]
+    goblins[0].alive = True                             # u restores a slain goblin
+    main._seal_tick(room, player)
+    assert room.cells[gr][dc] == CellType.WALL          # undone — the bolt re-bars
 
 
 @pytest.mark.parametrize("seed", SEEDS)

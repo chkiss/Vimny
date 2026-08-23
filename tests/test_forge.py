@@ -1753,3 +1753,36 @@ def test_republishing_your_own_level_updates_it_in_place(monkeypatch, tmp_path):
     first, rep = DRAFT.publish(d)
     again, _ = DRAFT.publish(d)                    # same name: iterate freely
     assert first == again and rep.ok
+
+
+def test_the_forge_arms_a_gone_seal_by_kind():
+    """`:gone goblin` needs no selection — extinction reads the whole room —
+    and any kind the room holds can be named. The bolt then works as always."""
+    d = DRAFT.new('Probe', rows=8, cols=30)
+    _forge_session(d, 'jjllll:entity goblin\r'
+                      'kk:gone goblin\r:bolt\r:w\r:q!\r')
+    assert len(d.level.seals) == 1
+    s = d.level.seals[0]
+    assert (s.mode, s.match, s.region) == ('gone', ('goblin',), ())
+    assert s.opens
+
+
+def test_a_gone_seal_may_name_a_group_of_mixed_kinds():
+    """A GROUP (`group=patrol`) dies as one, so naming it arms one condition
+    over every kind marching under it — mixed kinds, one named banner."""
+    d = DRAFT.new('Probe', rows=8, cols=30)
+    _forge_session(d, 'jjllll:entity goblin group=patrol\r'
+                      'jllll:entity warden group=patrol\r'
+                      'kk:gone patrol\r:bolt\r:w\r:q!\r')
+    s = d.level.seals[0]
+    assert s.mode == 'gone'
+    assert set(s.match) == {'goblin', 'warden'}
+    assert s.region == ()
+
+
+def test_a_gone_seal_refuses_a_kind_nothing_answers_to():
+    """A bolt naming an absent kind would stand open the moment it was built.
+    The forge refuses while the author can still see the floor."""
+    d = DRAFT.new('Probe', rows=8, cols=30)
+    _forge_session(d, ':gone dragon\r:bolt\r:w\r:q!\r')
+    assert not [s for s in d.level.seals if s.mode == 'gone']

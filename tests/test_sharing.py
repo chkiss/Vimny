@@ -447,3 +447,22 @@ def test_an_empty_opens_seal_is_a_pure_predicate():
                  {'rows': 4, 'cols': 8, 'cells': ['W' * 8] * 4,
                   'spawn': [1, 1], 'exit': [2, 2]},
                  'seals': [{'opens': []}]})
+
+
+def test_a_gone_seal_names_kinds_not_text():
+    """mode='gone' is the legion rule in a file: `match` names ENTITY KINDS and
+    the seal opens while none of them stands alive. It reads the whole room,
+    so a region is refused — and so is a gone seal that names nothing."""
+    geo = {'rows': 4, 'cols': 8, 'cells': ['W' * 8] * 4,
+           'spawn': [1, 1], 'exit': [2, 2]}
+    spec = {'schema': 1, 'name': 't', 'seed': 1, 'geometry': geo,
+            'seals': [{'mode': 'gone', 'match': 'goblin', 'opens': [2, 2]}]}
+    lvl = F.parse(spec)
+    assert lvl.seals[0].mode == 'gone' and lvl.seals[0].match == ('goblin',)
+    back = F.loads(F.dumps(lvl))
+    assert back.seals[0] == lvl.seals[0]
+    with pytest.raises(F.LevelFormatError, match='names'):
+        F.parse({**spec, 'seals': [{'mode': 'gone'}]})
+    with pytest.raises(F.LevelFormatError, match='whole room'):
+        F.parse({**spec, 'seals': [{'mode': 'gone', 'match': 'goblin',
+                                    'region': [0, 0, 1, 1]}]})

@@ -5711,6 +5711,17 @@ _GMS_THROAT  = 18                      # … and the spine-only throat (also bla
 _GMS_GATE    = 19
 _GMS_BOLTS   = (23, 24, 25, 26, 27, 28, 29)
 _GMS_SEAL    = 30                      # stone until every proof is made
+_GMS_APPRAISALS = (                    # one cold line per bolt, on the turn it opens
+    "'The word, taken clean.' A bolt draws back.",
+    "'You carried past the empty marks without a stroke.' A bolt draws back.",
+    "'The fitting, torn whole from its setting.' A bolt draws back.",
+    "'A verse cut mid-breath, and made true.' A bolt draws back.",
+    "'You asked the case its name, and kept the case.' A bolt draws back.",
+    "'You read the metal, not the shape.' A bolt draws back.",
+    "The last goblin falls!",
+)
+_GMS_FINAL_LINE = ('The stone parts — and the Grandmaster regards you. '
+                   '"Then come. The floor will speak for you."')
 _GMS_TRANSIT = (19, 31)                # exit_pos: stepping here (or past) descends
 _GMS_WATCH   = (19, 32)                # where the Grandmaster stands
 _GMS_BUDGET  = 160                     # hand-set, generous (gallery + arena melee)
@@ -5855,7 +5866,6 @@ def build_dungeon_grandmasters_sanctum(seed: int) -> Dungeon:
 
     runs: list = []
     ent: list = []
-    doors = []
     for bay_i, (text, target) in enumerate(specs):
         row = _GMS_BAYS[bay_i]
         col = _GMS_TEXT0                                 # the floor text
@@ -5870,9 +5880,6 @@ def build_dungeon_grandmasters_sanctum(seed: int) -> Dungeon:
                 runs.append({'row': row, 'col': col, 'symbols': part,
                              'kind': 'verdant'})
             col += len(part) + 1
-        doors.append((target, _GMS_BOLTS[bay_i]))
-    doors.append((None, _GMS_BOLTS[6]))                  # the legion bolt (goblins)
-
     for pr_i, r in enumerate(_GMS_PARA):                 # the legion bay's canto
         a, b = words['p_rows'][pr_i]
         runs.append({'row': r, 'col': _GMS_TEXT0, 'symbols': a, 'kind': 'ancient'})
@@ -5901,12 +5908,32 @@ def build_dungeon_grandmasters_sanctum(seed: int) -> Dungeon:
                 'hp': 5, 'max_hp': 5, 'ai': '', 'tag': 'grandmaster',
                 'edit_immune': True})
 
+    # The seven bolts + final seal, said as data. Six text bolts read their
+    # bay's computed target anywhere on any row (raw strip equality — the
+    # double-space hole diw leaves must NOT collapse, or daw would read true
+    # too). The seventh is the legion bolt: a mode='gone' seal naming the
+    # goblin kind, open only while no live goblin draws breath. All ride the
+    # gate row via anchor='exit_row' so the paragraph bay's collapse cannot
+    # strand them.
+    seals = []
+    for bay_i, (_text, target) in enumerate(specs):
+        seals.append(Seal(match=(target,), scope='anyrow', mode='exact',
+                          anchor='exit_row',
+                          opens=((_GMS_GATE, _GMS_BOLTS[bay_i]),),
+                          message=_GMS_APPRAISALS[bay_i]))
+    seals.append(Seal(mode='gone', match=('goblin',), anchor='exit_row',
+                      opens=((_GMS_GATE, _GMS_BOLTS[6]),),
+                      message=_GMS_APPRAISALS[6]))
+    seals.append(Seal(anchor='exit_row', requires=tuple(range(7)),
+                      opens=((_GMS_GATE, _GMS_SEAL),),
+                      message=_GMS_FINAL_LINE))
+
     gallery_level = _Level(
         name="The Grandmaster's Sanctum", seed=seed,
         rows=R, cols=C,
         cells=[''.join(_CELL_CODE[c] for c in row) for row in grid],
         spawn=(1, _GMS_SPINE), exit=_GMS_TRANSIT,   # NO exit entity: stepping here descends
-        char_runs=runs, entities=ent,
+        char_runs=runs, entities=ent, seals=seals,
         solution=("2j w w diw 2j ci\" {words['q_cure']}<Esc> 2j da[ "
                   "2j cis {words['s_cure']}.<Esc> 2j dit 2j ci{{ {words['b_cure']}<Esc> "
                   "2j dap $"))
@@ -5924,7 +5951,6 @@ def build_dungeon_grandmasters_sanctum(seed: int) -> Dungeon:
     gallery.answer = (f"2j w w diw 2j ci\" {words['q_cure']}<Esc> 2j da[ "
                       f"2j cis {words['s_cure']}.<Esc> 2j dit 2j ci{{ {words['b_cure']}<Esc> "
                       f"2j dap $")
-    gallery._gms_doors = tuple(doors)
     gallery._gms_words = words
     gallery.par    = None
     gallery.budget = _GMS_BUDGET

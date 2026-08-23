@@ -300,7 +300,7 @@ def _parse_fill(f: dict, i: int, at: str = 'fill') -> Fill:
                 kind=str(f.get('kind', 'ancient')))
 
 
-_SEAL_MODES  = ('exact', 'contains', 'braziers')
+_SEAL_MODES  = ('exact', 'contains', 'braziers', 'gone')
 _SEAL_SCOPES = ('region', 'anyrow')
 
 
@@ -343,6 +343,20 @@ def _parse_seal(s: dict, i: int, at: str = 'seals') -> Seal:
                                    f'[r1, c1, r2, c2] naming the braziers to light')
         region = tuple(int(x) for x in region)
         match = []
+    elif mode == 'gone':
+        # A `gone` seal reads no TEXT either: its `match` names ENTITY KINDS,
+        # and it stands open while no live entity of any named kind remains —
+        # the legion rule ("no goblin draws breath"). It reads the whole room,
+        # so, like braziers, it refuses the axis it does not use — here
+        # `region`.
+        if not match:
+            raise LevelFormatError(f'{at}[{i}].match: a mode="gone" seal names '
+                                   f'the entity kind(s) that must be gone, '
+                                   f'e.g. "goblin"')
+        if region is not None:
+            raise LevelFormatError(f'{at}[{i}].region: a mode="gone" seal reads '
+                                   f'the whole room — leave `region` empty')
+        region = ()
     elif scope == 'region' and match:
         if not (isinstance(region, (list, tuple)) and len(region) == 4):
             raise LevelFormatError(f'{at}[{i}].region: must be [r1, c1, r2, c2]')

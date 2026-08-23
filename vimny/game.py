@@ -2594,6 +2594,15 @@ def _seal_reads_true(room, seal, truths=(), rows=None) -> bool:
         if not brz or not all(e.lit for e in brz):
             return False
         return all(truths[i] for i in seal.requires if i < len(truths))
+    if seal.mode == 'gone':
+        # The legion gate: open only while NO live entity of a named kind
+        # stands anywhere in the room. Like the brazier gate it reads the
+        # ENTITY layer, not the buffer — and like every seal it is recomputed
+        # each turn, so `u` restoring a slain goblin re-bars the bolt.
+        for kind in seal.match:
+            if any(e.alive for e in room._entity_by_kind.get(kind, ())):
+                return False
+        return all(truths[i] for i in seal.requires if i < len(truths))
     if rows is None:
         rows = [_wla_floor_text(room, r) for r in range(room.rows)]
     if not all(_seal_target_reads_true(room, seal, t, rows) for t in seal.match):
@@ -2938,57 +2947,6 @@ def _paragraph_enclosure_tick(room, player) -> list:
                     'sign — the seal parts!')
     elif not all_true and seal_open and (player.row, player.col) != (er, ec):
         room.cells[er][ec] = CellType.WALL         # undone — the seal returns
-    return msgs
-
-
-_GMS_APPRAISALS = (
-    "'The word, taken clean.' A bolt draws back.",
-    "'You carried past the empty marks without a stroke.' A bolt draws back.",
-    "'The fitting, torn whole from its setting.' A bolt draws back.",
-    "'A verse cut mid-breath, and made true.' A bolt draws back.",
-    "'You asked the case its name, and kept the case.' A bolt draws back.",
-    "'You read the metal, not the shape.' A bolt draws back.",
-    "'And the legion, put away entire.' The last bolt draws back.",
-)
-
-
-def _grandmasters_gallery_tick(room, player) -> list:
-    """The Grandmaster's proving gallery — seven bolts on the exact-text
-    chassis: six text doors (targets on the west plaques) + the legion bolt
-    (the paragraph bay's goblins must fall). The Grandmaster voices one
-    line of cold appraisal per bolt that opens. Stateless, two-sided,
-    row-agnostic; the gate row derives from exit_pos so the paragraph
-    bay's collapse cannot strand the bolts. The final seal is stone until
-    every proof is made."""
-    msgs = []
-    texts = {_wla_floor_text(room, r).strip() for r in range(room.rows)}
-    gr = room.exit_pos[0]
-    # Band the live bolts + final seal as stonework. Derived here rather than at
-    # build time because `gr` rides the paragraph bay's collapses.
-    room.sealed_cells = {(gr, dc) for _t, dc in getattr(room, '_gms_doors', ())}
-    room.sealed_cells.add((gr, room.exit_pos[1] - 1))
-    all_true = True
-    for i, (target, dc) in enumerate(getattr(room, '_gms_doors', ())):
-        if target is None:                       # the legion bolt
-            held = not any(e.alive
-                           for e in room._entity_by_kind.get('goblin', []))
-        else:
-            held = target in texts
-        is_open = room.cells[gr][dc] != CellType.WALL
-        if held and not is_open:
-            room.cells[gr][dc] = CellType.FLOOR
-            msgs.append(_GMS_APPRAISALS[i])
-        elif not held and is_open and (player.row, player.col) != (gr, dc):
-            room.cells[gr][dc] = CellType.WALL   # undone — the bolt re-bars
-        all_true = all_true and held
-    sc = room.exit_pos[1] - 1
-    seal_open = room.cells[gr][sc] != CellType.WALL
-    if all_true and not seal_open:
-        room.cells[gr][sc] = CellType.FLOOR
-        msgs.append('The stone parts — and the Grandmaster regards you. '
-                    '"Then come. The floor will speak for you."')
-    elif not all_true and seal_open and (player.row, player.col) != (gr, sc):
-        room.cells[gr][sc] = CellType.WALL       # undone — the seal returns
     return msgs
 
 
@@ -5550,8 +5508,6 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
                 _sc_twinkle_animation(term, room, player, _tw, _iw(term), term.height - 8)
                 room._sc_twinkle = []
         if level == 'grandmasters_sanctum' and dungeon.current_room == 0:
-            for _m in _grandmasters_gallery_tick(room, player):
-                _push(_m)
             # The descent needs the SEAL OPEN, not just the position: a
             # jump (G on the collapsed gate row) can park the player past
             # a barred seal — standing beyond stone is lawful, passing
@@ -7079,9 +7035,11 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
                     _txt = _rcmd[5:].strip()
                     if _rcmd.rstrip('?!') == 'seal' and _rcmd.endswith('?'):
                         _ss = list(getattr(room, 'seals', ()))
+                        _suffix = {'exact': '', 'contains': ' (contains)',
+                                   'braziers': ' (braziers)', 'gone': ' (gone)'}
                         _push('; '.join(
                             f'{s.match!r} @ ' + ' '.join(f'{r},{c}' for r, c in s.opens)
-                            + ('' if s.mode == 'exact' else ' (contains)')
+                            + _suffix.get(s.mode, f' ({s.mode})')
                             for s in _ss) or 'No seals in this level.')
                     elif _rcmd.rstrip('?!') == 'seal' and _rcmd.endswith('!'):
                         _ss = [s for s in getattr(room, 'seals', ())
@@ -7116,6 +7074,52 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
                               f'{max(_a[0], _b[0])}, cols {_c1}-{_c2} — '
                               f'stand on the door and :bolt.')
 
+                elif _draft is not None and edit_mode and (
+                        _rcmd.rstrip('?!') == 'gone'
+                        or _rcmd.startswith('gone ')):
+                    # `:gone <kind|group> [more...]` arms the LEGION condition:
+                    # the bolt stands open while NO live entity of a named kind
+                    # stands anywhere in the room. No selection is read — this
+                    # condition has no region; extinction is a whole-room fact,
+                    # which is what makes `u`-restoring a slain goblin re-bar
+                    # the door. A name may also be a GROUP (`:entity goblin
+                    # group=patrol`): a patrol dies as one, so naming it arms
+                    # one condition over every kind marching in it — mixed
+                    # kinds, one named banner.
+                    _names = [w for w in _rcmd[5:].split() if w != '?']
+                    _kinds = sorted({e.kind for e in room.entities})
+                    _groups = sorted({e.group for e in room.entities if e.group})
+                    if _rcmd.endswith('?') or not _names:
+                        _push(':gone <kind|group> [more...] arms "none of these '
+                              'still stands"; :bolt then arms the door itself. '
+                              'Here now — kinds: ' + (', '.join(_kinds) or '(none)')
+                              + '; groups: ' + (', '.join(_groups) or '(none)') + '.')
+                    else:
+                        _want, _bad = [], []
+                        for _n in _names:
+                            if _n in _kinds:
+                                if _n not in _want:
+                                    _want.append(_n)
+                            elif _n in _groups:
+                                for _e in room.entities:
+                                    if _e.group == _n and _e.kind not in _want:
+                                        _want.append(_e.kind)
+                            else:
+                                _bad.append(_n)
+                        if _bad:
+                            _push('Nothing here is called ' + ', '.join(_bad)
+                                  + ' — a bolt naming it would stand open at '
+                                  'once. Kinds: ' + (', '.join(_kinds) or '(none)')
+                                  + '; groups: ' + (', '.join(_groups) or '(none)') + '.')
+                        elif not _want:
+                            _push('No entities are placed yet — :entity puts '
+                                  'something on the floor for :gone to name.')
+                        else:
+                            _draft._pending_seal = ((), tuple(_want), 'gone')
+                            _push('Legion armed — no '
+                                  + ' nor '.join(_want)
+                                  + ' may stand. Stand on the door and :bolt.')
+
                 elif _draft is not None and edit_mode and _rcmd == 'bolt':
                     # Attach cells to the armed seal. The cursor cell on its own,
                     # or — with the `'<,'>` range — every cell of the selection,
@@ -7127,14 +7131,20 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
                     _want = (_bolt_cells(room, player) if _vrange
                              else [(player.row, player.col)])
                     if _pend is None:
-                        _push('Nothing armed — :seal <text> over a selection first.')
+                        _push('Nothing armed — :seal <text> over a selection, '
+                              'or :gone <kind>, first.')
                     elif not _want:
                         _push('Nothing in that selection to bolt.')
                     else:
                         _reg, _txt, _mode = _pend
-                        _r1, _c1, _r2, _c2 = _reg
-                        _inside = [(r, c) for r, c in _want
-                                   if _r1 <= r <= _r2 and _c1 <= c <= _c2]
+                        # A text seal's pending carries the bare string (Seal
+                        # wraps it); a gone seal's carries the kind tuple as-is.
+                        _mtch = _txt if isinstance(_txt, tuple) else (_txt,)
+                        _inside = []
+                        if _reg:
+                            _r1, _c1, _r2, _c2 = _reg
+                            _inside = [(r, c) for r, c in _want
+                                       if _r1 <= r <= _r2 and _c1 <= c <= _c2]
                         if _inside:
                             # See the validator: a door inside its own condition
                             # opens, becomes walkable, gets written on, and then
@@ -7151,7 +7161,7 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
                             DRAFT.sync(_draft, room)
                             _old = [s for s in _draft.level.seals
                                     if (s.region, s.match, s.mode)
-                                    == (_reg, (_txt,), _mode)]
+                                    == (_reg, _mtch, _mode)]
                             _cells = tuple(_old[0].opens) if _old else ()
                             if _old:
                                 _draft.level.seals.remove(_old[0])
@@ -7163,6 +7173,10 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
                             if _err:
                                 _draft.level.seals.remove(_new)
                                 _push(f'Bolt refused — {_err}')
+                            elif _mode == 'gone':
+                                _push(f'Bolted: {len(_new.opens)} cell(s) open '
+                                      f'while no ' + ' nor '.join(_mtch)
+                                      + ' stands.')
                             else:
                                 _push(f'Bolted: {len(_new.opens)} cell(s) open while '
                                       f'that region reads {_txt!r}'

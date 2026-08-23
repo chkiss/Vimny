@@ -220,3 +220,52 @@ def test_every_chassis_level_is_bolts_then_a_final_seal(slug):
     # and every one of them starts shut, so nothing is walkable on turn zero
     assert all(room.cells[r][c] == CellType.WALL
                for s in room.seals for (r, c) in s.opens)
+
+
+def _spawn_kind(room, kind, r=2, c=5):
+    from vimny.engine.world import Entity
+    e = Entity(kind, r, c)
+    room.entities.append(e)
+    room.rebuild_indexes()
+    return e
+
+
+def test_a_gone_seal_opens_when_the_kind_is_extinct():
+    # The legion rule: no live goblin anywhere, and the bolt stands open;
+    # one survivor re-bars it (`u` restores a slain one).
+    room = _room([Seal(mode='gone', match='goblin', opens=((3, 10),))])
+    gob = _spawn_kind(room, 'goblin')
+    assert room.cells[3][10] == CellType.WALL
+    _tick(room)
+    assert room.cells[3][10] == CellType.WALL
+    gob.alive = False
+    assert _tick(room)
+    assert room.cells[3][10] == CellType.FLOOR
+    gob.alive = True
+    _tick(room)
+    assert room.cells[3][10] == CellType.WALL
+
+
+def test_a_gone_seal_reads_every_kind_it_names():
+    # Several kinds in one match: ALL must be gone — a seal, not several.
+    room = _room([Seal(mode='gone', match=('goblin', 'bat'), opens=((3, 10),))])
+    gob = _spawn_kind(room, 'goblin')
+    bat = _spawn_kind(room, 'bat', c=7)
+    bat.alive = False
+    _tick(room)
+    assert room.cells[3][10] == CellType.WALL      # the goblin still stands
+    gob.alive = False
+    _tick(room)
+    assert room.cells[3][10] == CellType.FLOOR     # both gone
+
+
+def test_a_gone_seal_ignores_other_kinds_and_corpses():
+    # A dead goblin is not a standing goblin; a live WARDEN is none of its
+    # business. The read is by kind, never by count of the living.
+    room = _room([Seal(mode='gone', match='goblin', opens=((3, 10),))])
+    gob = _spawn_kind(room, 'goblin')
+    warden = _spawn_kind(room, 'warden', c=9)
+    gob.alive = False
+    _tick(room)
+    assert room.cells[3][10] == CellType.FLOOR
+    assert warden.alive
