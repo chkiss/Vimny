@@ -199,12 +199,12 @@ def test_no_exemption_is_stale(slug):
 
 
 def test_the_gap_is_a_number_that_only_goes_down():
-    """The headline. 43 of 60 shipped levels already survive the trip whole.
+    """The headline. 55 of 60 shipped levels survive the trip whole.
 
     If this fails downward, something regressed. If it fails upward, a phase of
     the port landed — raise the floor in the same commit so it cannot slide
     back.
     """
     lossless = [s for s in SLUGS if s not in KNOWN_GAPS]
-    assert len(lossless) >= 43, (
+    assert len(lossless) >= 55, (
         f'only {len(lossless)}/{len(SLUGS)} levels round-trip losslessly')
