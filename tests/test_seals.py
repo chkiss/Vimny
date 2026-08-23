@@ -135,6 +135,66 @@ def test_a_door_may_want_more_than_one_saying():
     assert room.cells[3][10] == CellType.WALL
 
 
+def test_a_doubled_target_counts_rows_not_copies():
+    """The Gauntlet's Y p door: the source verse already reads true before you
+    touch anything, so `match=(verse, verse)` must mean TWO rows stand proof —
+    one verse satisfying both targets would be one proof counted twice."""
+    seal = Seal(match=('echo', 'echo'), scope='anyrow', opens=((3, 10),))
+    room = _room([seal], texts=[(1, 'echo')])
+    _tick(room)
+    assert room.cells[3][10] == CellType.WALL, \
+        'the source row alone must not open a duplication door'
+    _write(room, 3, 'echo')                 # Y p: the copy lands below
+    _tick(room)
+    assert room.cells[3][10] == CellType.FLOOR
+    _write(room, 3, '')                     # u takes the paste back
+    _tick(room)
+    assert room.cells[3][10] == CellType.WALL
+
+
+def test_two_unlike_targets_may_share_their_reading_row():
+    """Distinctness only bites when targets are ALIKE. Two different words can
+    never be proven by one row anyway (a stripped row equals at most one of
+    them), so the law costs unlike pairs nothing — this pins that."""
+    seal = Seal(match=('alpha', 'beta'), scope='anyrow', opens=((3, 10),))
+    room = _room([seal], texts=[(1, 'alpha')])
+    _write(room, 2, 'beta')
+    _tick(room)
+    assert room.cells[3][10] == CellType.FLOOR
+
+
+# ── head: the left-align law ──────────────────────────────────────────────────
+
+def test_a_headed_seal_demands_its_margin():
+    """The Gauntlet's << door: the verse reads true wherever it stands, and
+    every reader deliberately ignores margins — so the margin itself is the
+    only thing that can keep the door shut until the player aligns it. The
+    head counts from column 0 of the raw floor row."""
+    seal = Seal(match='<< home', scope='anyrow', head=5, opens=((3, 10),))
+    room = _room([seal], texts=[(1, '    << home')])   # four blanks + col 1
+    _tick(room)
+    assert room.cells[3][10] == CellType.FLOOR
+    _write(room, 1, '<< home')              # dedented past its margin
+    _tick(room)
+    assert room.cells[3][10] == CellType.WALL
+    _write(room, 1, '  << home')            # still short of column 5
+    _tick(room)
+    assert room.cells[3][10] == CellType.WALL
+
+
+def test_head_applies_to_contains_too():
+    """A margin on a loose reading: the phrase may grow rightward but must
+    still BEGIN where the seal says."""
+    seal = Seal(match='ember', scope='anyrow', mode='contains', head=7,
+                opens=((3, 10),))
+    room = _room([seal], texts=[(1, '      ember and ash')])
+    _tick(room)
+    assert room.cells[3][10] == CellType.FLOOR
+    _write(room, 1, 'the ember falls')
+    _tick(room)
+    assert room.cells[3][10] == CellType.WALL
+
+
 # ── requires: the final seal ──────────────────────────────────────────────────
 
 def test_the_final_seal_waits_for_every_bolt():

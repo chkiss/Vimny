@@ -315,7 +315,7 @@ def _parse_seal(s: dict, i: int, at: str = 'seals') -> Seal:
     if not isinstance(s, dict):
         raise LevelFormatError(f'{at}[{i}]: must be an object')
     unknown = set(s) - {'region', 'match', 'opens', 'mode', 'scope',
-                        'requires', 'anchor'}
+                        'requires', 'anchor', 'head'}
     if unknown:
         raise LevelFormatError(f'{at}[{i}]: unknown key(s) {sorted(unknown)}')
     scope = str(s.get('scope', 'region'))
@@ -393,6 +393,21 @@ def _parse_seal(s: dict, i: int, at: str = 'seals') -> Seal:
     if anchor not in ('', 'exit_row'):
         raise LevelFormatError(f'{at}[{i}].anchor: must be "" or "exit_row", '
                                f'got {anchor!r}')
+    # `head` is the left-align law made declarative: under anyrow scope, a
+    # matched row's first glyph must sit exactly at this column. It names a
+    # MARGIN, and only the row reader has one — the region reader strips each
+    # line before comparing, so a head beside region would be a promise about
+    # whitespace the format then throws away.
+    head = s.get('head', -1)
+    if head is None:
+        head = -1
+    if not isinstance(head, int) or isinstance(head, bool) or head < -1:
+        raise LevelFormatError(f'{at}[{i}].head: must be a column number '
+                               f'(>= 0) naming where matched rows must start')
+    if head >= 0 and scope != 'anyrow':
+        raise LevelFormatError(f'{at}[{i}].head: needs scope="anyrow" — a '
+                               f'region seal strips its lines, so it cannot '
+                               f'check a margin')
     opens = s.get('opens') or []
     # A single [row, col] is allowed and is by far the common case: most doors
     # are one cell, and making an author write [[9, 40]] to say so is a papercut
@@ -414,7 +429,7 @@ def _parse_seal(s: dict, i: int, at: str = 'seals') -> Seal:
             raise LevelFormatError(f'{at}[{i}].opens[{j}]: must be [row, col]')
         cells.append((int(cell[0]), int(cell[1])))
     return Seal(region=region, match=tuple(match), opens=tuple(cells), mode=mode,
-                scope=scope, requires=tuple(requires), anchor=anchor)
+                scope=scope, requires=tuple(requires), anchor=anchor, head=head)
 
 
 def _parse_then(rooms) -> list:
@@ -1151,6 +1166,8 @@ def _dump_content(h: Room) -> dict:
                 d['requires'] = list(s.requires)
             if s.anchor:
                 d['anchor'] = s.anchor
+            if s.head >= 0:
+                d['head'] = s.head
             out.append(d)
         data['seals'] = out
     if h.char_runs:

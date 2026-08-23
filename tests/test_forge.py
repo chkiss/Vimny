@@ -1786,3 +1786,53 @@ def test_a_gone_seal_refuses_a_kind_nothing_answers_to():
     d = DRAFT.new('Probe', rows=8, cols=30)
     _forge_session(d, ':gone dragon\r:bolt\r:w\r:q!\r')
     assert not [s for s in d.level.seals if s.mode == 'gone']
+
+
+def test_a_seal_without_a_selection_reads_any_floor_row():
+    """The Gauntlet chassis in the forge: no VISUAL selection means the whole
+    floor is the page — some row, wherever dd / J / o / p leave it — never a
+    pinned rectangle, and never the plaques."""
+    d = DRAFT.new('Probe', rows=8, cols=30)
+    _forge_session(d, ':seal open sesame\r:bolt\r:w\r:q!\r')
+    s = d.level.seals[0]
+    assert (s.scope, s.region, s.match, s.head) == \
+        ('anyrow', (), ('open sesame',), -1)
+
+
+def test_seal_flags_count_rows_and_name_a_margin():
+    """xN duplicates the target into N readings — distinct rows by law — and
+    @col sets the left-align head. Both reach the Seal untouched."""
+    d = DRAFT.new('Probe', rows=8, cols=30)
+    _forge_session(d, ':seal x2 @5 verse\r:bolt\r:w\r:q!\r')
+    s = d.level.seals[0]
+    assert (s.scope, s.match, s.head) == ('anyrow', ('verse', 'verse'), 5)
+
+
+def test_the_at_flag_needs_the_whole_floor_form():
+    """A region seal strips its lines before comparing, so a margin there is a
+    promise about whitespace the format throws away — refuse it at the arm,
+    while the author can still retype."""
+    d = DRAFT.new('Probe', rows=8, cols=30)
+    _forge_session(d, 'vll:seal @4 word\r:bolt\r:q!\r')
+    assert not d.level.seals
+
+
+def test_the_final_bolt_wants_every_proof():
+    """`:final` is the Gauntlet's last door as a gesture: one command bolts
+    the exit behind every seal already in the level, in file order."""
+    d = DRAFT.new('Probe', rows=8, cols=30)
+    _forge_session(d, ':seal alpha\r:bolt\r'
+                      'j:seal beta\rlll:bolt\r'
+                      'jjjj:final\r:w\r:q!\r')
+    assert [s.match for s in d.level.seals[:2]] == [('alpha',), ('beta',)]
+    fin = d.level.seals[2]
+    assert (fin.requires, fin.match, fin.opens) == ((0, 1), (), ((6, 4),))
+
+
+def test_two_doors_cannot_share_one_stone():
+    """A final bolted onto a cell some other seal already holds would give one
+    stone two conditions — the same refusal :bolt aims at a seal's own region,
+    said from the other side."""
+    d = DRAFT.new('Probe', rows=8, cols=30)
+    _forge_session(d, ':seal alpha\r:bolt\r:final\r:q!\r')
+    assert len(d.level.seals) == 1

@@ -2563,17 +2563,42 @@ def _seal_region_text(room, seal) -> str:
     return ' '.join(' '.join(t.split()) for t in out).strip()
 
 
-def _seal_target_reads_true(room, seal, target, rows) -> bool:
-    """Does ONE of a seal's targets read true right now?"""
-    if seal.scope == 'anyrow':
-        # Row-agnostic on purpose: charwise edits do not shift rows, but `dd`,
-        # `J`, `o` and `p` all do, and a door that named a row number would be
-        # undone by the first line removed above it.
-        return (any(target in t for t in rows) if seal.mode == 'contains'
-                else any(t.strip() == target for t in rows))
-    want = ' '.join(target.split())
-    have = _seal_region_text(room, seal)
-    return (want in have) if seal.mode == 'contains' else (have == want)
+def _seal_row_reads_true(seal, target, raw) -> bool:
+    """Does ONE raw floor row satisfy ONE anyrow target under this seal's mode
+    and margin? `head` (>= 0) is the left-align law: the row's first glyph must
+    sit exactly at that column, not merely the row read true."""
+    if seal.head >= 0 and len(raw) - len(raw.lstrip()) != seal.head:
+        return False
+    return (target in raw) if seal.mode == 'contains' else (raw.strip() == target)
+
+
+def _seal_anyrow_reads(seal, rows) -> bool:
+    """EVERY of a seal's targets reads true — each on its OWN row.
+
+    The distinctness is the point, not a technicality: a door wanting a verse
+    on TWO rows (the Gauntlet's Y p proof) is match=(verse, verse) — one verse
+    satisfying both targets would be one proof counted twice. Different words
+    can never share a row anyway, so single-target and unlike-target seals
+    read exactly as they always did."""
+    if not seal.match:
+        return True          # pure conjunction; only its requires speaks
+    cand = [[i for i, raw in enumerate(rows)
+             if _seal_row_reads_true(seal, t, raw)] for t in seal.match]
+    # A system of distinct representatives: assign targets to rows so no two
+    # share. Kuhn's algorithm — k targets against room.rows candidates, tiny.
+    taken = {}                                       # row index -> target index
+
+    def augment(i, seen):
+        for r in cand[i]:
+            if r in seen:
+                continue
+            seen.add(r)
+            if r not in taken or augment(taken[r], seen):
+                taken[r] = i
+                return True
+        return False
+
+    return all(augment(i, set()) for i in range(len(cand)))
 
 
 def _braziers_in(room, region) -> list:
@@ -2605,8 +2630,19 @@ def _seal_reads_true(room, seal, truths=(), rows=None) -> bool:
         return all(truths[i] for i in seal.requires if i < len(truths))
     if rows is None:
         rows = [_wla_floor_text(room, r) for r in range(room.rows)]
-    if not all(_seal_target_reads_true(room, seal, t, rows) for t in seal.match):
-        return False
+    # Row-agnostic on purpose: charwise edits do not shift rows, but `dd`,
+    # `J`, `o` and `p` all do, and a door that named a row number would be
+    # undone by the first line removed above it.
+    if seal.scope == 'anyrow':
+        if not _seal_anyrow_reads(seal, rows):
+            return False
+    else:
+        for t in seal.match:
+            want = ' '.join(t.split())
+            have = _seal_region_text(room, seal)
+            ok = (want in have) if seal.mode == 'contains' else (have == want)
+            if not ok:
+                return False
     return all(truths[i] for i in seal.requires if i < len(truths))
 
 
@@ -7040,6 +7076,8 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
                         _push('; '.join(
                             f'{s.match!r} @ ' + ' '.join(f'{r},{c}' for r, c in s.opens)
                             + _suffix.get(s.mode, f' ({s.mode})')
+                            + (f', col{s.head}' if s.head >= 0 else '')
+                            + (f' ← after {len(s.requires)}' if s.requires else '')
                             for s in _ss) or 'No seals in this level.')
                     elif _rcmd.rstrip('?!') == 'seal' and _rcmd.endswith('!'):
                         _ss = [s for s in getattr(room, 'seals', ())
@@ -7053,26 +7091,64 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
                             _forge_rebuild()
                             _push(f'Seal removed — {len(_ss)} condition(s) gone.')
                     elif not _txt:
-                        _push('Select the region in VISUAL, then '
-                              ':seal <the text it must read>.')
-                    elif _a is None or _b is None:
-                        _push('Select the region in VISUAL first, then :seal <text>.')
+                        _push('Usage: :seal [xN] [@col] [*]<text> — over a '
+                              'VISUAL selection it reads that region; with no '
+                              'selection, ANY floor row.')
                     else:
                         _mode = 'exact'
                         if _txt.startswith('*'):
                             _mode, _txt = 'contains', _txt[1:].strip()
                         elif _txt.startswith('\\*'):
                             _txt = _txt[1:]
-                        if player.last_visual_mode == Mode.VISUAL_LINE:
-                            _c1, _c2 = 0, room.cols - 1   # V means the whole row
+                        # Optional flags, either order, before the text:
+                        #   xN — N DISTINCT floor rows must read true (the Y p
+                        #        door: the source verse is not a proof)
+                        #   @C — a reading row's first glyph sits at column C
+                        #        (the << door: the margin IS the test)
+                        _times, _head = 1, -1
+                        while True:
+                            _m = re.match(r'x(\d+)(?=\s|$)', _txt)
+                            if _m:
+                                _times = max(1, int(_m.group(1)))
+                                _txt = _txt[_m.end():].lstrip()
+                                continue
+                            _m = re.match(r'@(\d+)(?=\s|$)', _txt)
+                            if _m:
+                                _head = int(_m.group(1))
+                                _txt = _txt[_m.end():].lstrip()
+                                continue
+                            break
+                        _txt = _txt.strip()
+                        if not _txt:
+                            _push('Armed nothing — after any x/@ flags, :seal '
+                                  'still needs the text itself.')
+                        elif _a is None or _b is None:
+                            # No selection: the whole floor is the page. This
+                            # is how every exact-chassis door reads — floor
+                            # rows only, never plaques, and row-agnostic
+                            # because dd, J, o and p all shift rows.
+                            _draft._pending_seal = ((), (_txt,) * _times,
+                                                    _mode, _head)
+                            _push('Seal armed on ANY floor row'
+                                  + ('' if _times == 1
+                                     else f' — on {_times} of them at once')
+                                  + ('' if _head < 0
+                                     else f', first glyph at column {_head}')
+                                  + ' — stand on the door and :bolt.')
+                        elif _head >= 0:
+                            _push('@col needs the whole-floor form — a region '
+                                  'seal strips its lines, so it has no margin.')
                         else:
-                            _c1, _c2 = min(_a[1], _b[1]), max(_a[1], _b[1])
-                        _draft._pending_seal = (
-                            (min(_a[0], _b[0]), _c1, max(_a[0], _b[0]), _c2),
-                            _txt, _mode)
-                        _push(f'Seal armed on rows {min(_a[0], _b[0])}-'
-                              f'{max(_a[0], _b[0])}, cols {_c1}-{_c2} — '
-                              f'stand on the door and :bolt.')
+                            if player.last_visual_mode == Mode.VISUAL_LINE:
+                                _c1, _c2 = 0, room.cols - 1   # V means the whole row
+                            else:
+                                _c1, _c2 = min(_a[1], _b[1]), max(_a[1], _b[1])
+                            _draft._pending_seal = (
+                                (min(_a[0], _b[0]), _c1, max(_a[0], _b[0]), _c2),
+                                (_txt,) * _times, _mode, _head)
+                            _push(f'Seal armed on rows {min(_a[0], _b[0])}-'
+                                  f'{max(_a[0], _b[0])}, cols {_c1}-{_c2} — '
+                                  f'stand on the door and :bolt.')
 
                 elif _draft is not None and edit_mode and (
                         _rcmd.rstrip('?!') == 'gone'
@@ -7115,10 +7191,41 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
                             _push('No entities are placed yet — :entity puts '
                                   'something on the floor for :gone to name.')
                         else:
-                            _draft._pending_seal = ((), tuple(_want), 'gone')
+                            _draft._pending_seal = ((), tuple(_want), 'gone', -1)
                             _push('Legion armed — no '
                                   + ' nor '.join(_want)
                                   + ' may stand. Stand on the door and :bolt.')
+
+                elif _draft is not None and edit_mode and _rcmd.rstrip('?!') == 'final':
+                    # THE FINAL SEAL — the Gauntlet's last door, made into a
+                    # gesture. Individual bolts open one proof at a time; the
+                    # way out wants ALL of them. Stand on the final door and
+                    # `:final`: it bolts this cell behind every seal already in
+                    # the level, in file order. (:seal! on this cell removes it
+                    # again, like any other bolt.)
+                    #
+                    # The cell-sharing refusal is the same rule :bolt enforces
+                    # against a seal's own region, said from the other side:
+                    # two doors cannot share one stone.
+                    _cell = (player.row, player.col)
+                    _n = len(_draft.level.seals)
+                    if not _n:
+                        _push('Nothing to require yet — arm the bolts first '
+                              '(:seal/:gone, then :bolt).')
+                    elif any(_cell in s.opens for s in _draft.level.seals):
+                        _push('A seal already bolts this cell — two doors '
+                              'cannot share one stone.')
+                    else:
+                        DRAFT.sync(_draft, room)
+                        _new = Seal(requires=tuple(range(_n)), opens=(_cell,))
+                        _draft.level.seals.append(_new)
+                        _err = _forge_rebuild()
+                        if _err:
+                            _draft.level.seals.remove(_new)
+                            _push(f'Final refused — {_err}')
+                        else:
+                            _push(f'The final seal stands: this door wants '
+                                  f'all {_n} bolt(s) open first.')
 
                 elif _draft is not None and edit_mode and _rcmd == 'bolt':
                     # Attach cells to the armed seal. The cursor cell on its own,
@@ -7136,10 +7243,16 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
                     elif not _want:
                         _push('Nothing in that selection to bolt.')
                     else:
-                        _reg, _txt, _mode = _pend
-                        # A text seal's pending carries the bare string (Seal
-                        # wraps it); a gone seal's carries the kind tuple as-is.
+                        _reg, _txt, _mode, _head = _pend
+                        # A text seal's pending carries the target tuple (one
+                        # entry per required reading); a gone seal's carries
+                        # the kind tuple as-is.
                         _mtch = _txt if isinstance(_txt, tuple) else (_txt,)
+                        # An empty region means a WHOLE-FLOOR door — the
+                        # anyrow scope, which reads floor rows wherever they
+                        # now stand instead of pinning a rectangle of stone.
+                        _scope = ('gone' if _mode == 'gone'
+                                  else 'anyrow' if not _reg else 'region')
                         _inside = []
                         if _reg:
                             _r1, _c1, _r2, _c2 = _reg
@@ -7160,14 +7273,15 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
                         else:
                             DRAFT.sync(_draft, room)
                             _old = [s for s in _draft.level.seals
-                                    if (s.region, s.match, s.mode)
-                                    == (_reg, _mtch, _mode)]
+                                    if (s.region, s.match, s.mode, s.scope, s.head)
+                                    == (_reg, _mtch, _mode, _scope, _head)]
                             _cells = tuple(_old[0].opens) if _old else ()
                             if _old:
                                 _draft.level.seals.remove(_old[0])
                             _add = tuple(c for c in _want if c not in _cells)
-                            _new = Seal(region=_reg, match=_txt, mode=_mode,
-                                        opens=_cells + _add)
+                            _new = Seal(region=_reg, match=_mtch, mode=_mode,
+                                        scope=_scope, opens=_cells + _add,
+                                        head=_head)
                             _draft.level.seals.append(_new)
                             _err = _forge_rebuild()
                             if _err:
@@ -7178,10 +7292,17 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
                                       f'while no ' + ' nor '.join(_mtch)
                                       + ' stands.')
                             else:
+                                _extra = ''
+                                if len(_mtch) > 1 and not _reg:
+                                    _extra += f' — on {len(_mtch)} distinct rows'
+                                if _head >= 0:
+                                    _extra += f', first glyph at column {_head}'
                                 _push(f'Bolted: {len(_new.opens)} cell(s) open while '
-                                      f'that region reads {_txt!r}'
+                                      + ('that region reads ' if _reg
+                                         else 'some floor row reads ')
+                                      + repr(_mtch[0])
                                       + ('' if _mode == 'exact' else ' (anywhere in it)')
-                                      + '.')
+                                      + _extra + '.')
 
                 elif (_draft is not None and edit_mode
                       and (_rcmd.rstrip('?!') == 'room'

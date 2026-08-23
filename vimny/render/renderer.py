@@ -484,7 +484,8 @@ def render_all(term: Terminal, dungeon: Dungeon, player: Player,
         # so those lead, and `:record` is named where it cannot be missed.
         _hint_raw = (':paint <kind>  :rune <kind>  :entity <kind>  :spawn/:exit here  '
                      'v then :fill <pool> [lo-hi]  :fill! drop  '
-                     'v then :seal <text>  :bolt door  :gone <kind>  '
+                     'v then :seal [x2|@4] <text>  :bolt door  :gone <kind>  '
+                     ':final all-bolts door  '
                      ':name/:author/:teaches/:requires/:intro  '
                      ':canvas WxH  :play test  :record tape  :check  :publish  '
                      ':submit PR  :w save')

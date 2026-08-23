@@ -466,3 +466,34 @@ def test_a_gone_seal_names_kinds_not_text():
     with pytest.raises(F.LevelFormatError, match='whole room'):
         F.parse({**spec, 'seals': [{'mode': 'gone', 'match': 'goblin',
                                     'region': [0, 0, 1, 1]}]})
+
+
+def test_a_seals_head_round_trips_and_is_refused_where_margins_do_not_exist():
+    """`head` is the left-align law in a file: under anyrow scope a matched
+    row's first glyph must sit at that exact column. It rides along any mode,
+    but only the row reader has a margin — the region reader strips its lines
+    before comparing, so a head beside region is refused, and so is any value
+    that is not a column number."""
+    geo = {'rows': 4, 'cols': 8, 'cells': ['W' * 8] * 4,
+           'spawn': [1, 1], 'exit': [2, 2]}
+    spec = {'schema': 1, 'name': 't', 'seed': 1, 'geometry': geo,
+            'seals': [{'scope': 'anyrow', 'match': 'verse', 'head': 4,
+                       'opens': [2, 2]}]}
+    lvl = F.parse(spec)
+    assert lvl.seals[0].head == 4 and lvl.seals[0].scope == 'anyrow'
+    back = F.loads(F.dumps(lvl))
+    assert back.seals[0] == lvl.seals[0]
+    assert json.loads(F.dumps(lvl))['seals'][0]['head'] == 4
+    # Absent head stays invisible on disk — the four-line seal stays four lines.
+    plain = F.parse({**spec, 'seals': [{'scope': 'anyrow', 'match': 'verse',
+                                        'opens': [2, 2]}]})
+    assert json.loads(F.dumps(plain))['seals'][0] == {
+        'opens': [[2, 2]], 'mode': 'exact', 'match': 'verse', 'scope': 'anyrow'}
+    with pytest.raises(F.LevelFormatError, match='anyrow'):
+        F.parse({**spec, 'seals': [{'match': 'verse', 'head': 4,
+                                    'opens': [2, 2],
+                                    'region': [1, 1, 1, 5]}]})
+    for bad in (-3, 'x', True, 1.5):
+        with pytest.raises(F.LevelFormatError, match='column'):
+            F.parse({**spec, 'seals': [{'scope': 'anyrow', 'match': 'verse',
+                                        'head': bad, 'opens': [2, 2]}]})
