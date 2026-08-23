@@ -154,6 +154,13 @@ class Room:
     #: — it is the level handing out its clue in instalments, and only the
     #: author knows the instalments. Listed as [row, col] pairs.
     veiled:     list  = field(default_factory=list)
+    #: MIST off the water: permanent scenic haze over terrain that is not a
+    #: river cell. The `M` cell code says mist-on-WATER inline; this list says
+    #: the rest — [row, col] pairs, unioned with whatever the `M`s said, so an
+    #: author may write haze either way and a captured room writes back exactly
+    #: what it carried. (Walls want `veiled`, not mist: mist is weather over
+    #: ground, veiling is a carving not legible yet.)
+    mist:       list  = field(default_factory=list)
     #: Where this room's keys live in the FILE. Carried on it so that every
     #: message about it — parser, validator, forge — names the place the author
     #: has to go and edit, rather than a room number they never wrote down.
@@ -182,6 +189,7 @@ class Level:
     wrap:        bool = False                         # see Room.wrap
     wrap_width:  int  = 0
     veiled:      list = field(default_factory=list)   # see Room.veiled
+    mist:        list = field(default_factory=list)   # see Room.mist
     fills:       list = field(default_factory=list)   # list[Fill]
     seals:       list = field(default_factory=list)   # list[world.Seal]
     char_runs:   list = field(default_factory=list)   # explicit text
@@ -203,7 +211,7 @@ class Level:
         return [Room(rows=self.rows, cols=self.cols, cells=self.cells,
                      spawn=self.spawn, exit=self.exit,
                      wrap=self.wrap, wrap_width=self.wrap_width,
-                     veiled=self.veiled, fills=self.fills,
+                     veiled=self.veiled, mist=self.mist, fills=self.fills,
                      seals=self.seals, char_runs=self.char_runs,
                      entities=self.entities), *self.then]
 
@@ -242,6 +250,7 @@ def parse(data: dict) -> Level:
     unknown = set(data) - {'schema', 'name', 'author', 'seed', 'teaches',
                            'requires', 'no_horse', 'alternate', 'geometry',
                            'fill', 'seals', 'char_runs', 'entities', 'veiled',
+                           'mist',
                            'then', 'vocabulary', 'solution', 'intro'}
     if unknown:
         # Refuse rather than ignore: a silently-dropped key is a level that
@@ -267,7 +276,8 @@ def parse(data: dict) -> Level:
         exit=tuple(geo.get('exit', (1, 2))),
         wrap=bool(geo.get('wrap', False)),
         wrap_width=int(geo.get('wrap_width', 0)),
-        veiled=[tuple(v) for v in data.get('veiled', [])],
+        veiled=_parse_cells_list(data.get('veiled', []), 'veiled', 'veiled'),
+        mist=_parse_cells_list(data.get('mist', []), 'mist', 'mist'),
         fills=[_parse_fill(f, i) for i, f in enumerate(data.get('fill', []))],
         seals=[_parse_seal(s, i) for i, s in enumerate(data.get('seals', []))],
         char_runs=list(data.get('char_runs', [])),
@@ -450,6 +460,23 @@ def _parse_seal(s: dict, i: int, at: str = 'seals') -> Seal:
                 head=head, at=pin)
 
 
+def _parse_cells_list(pairs, at: str, what: str) -> list:
+    """A room-level coordinate layer (`veiled`, `mist`): a list of [row, col]
+    pairs. Refused rather than coerced — a silently-dropped cell is a level
+    that plays differently from the one its author tested."""
+    if not isinstance(pairs, (list, tuple)):
+        raise LevelFormatError(f'{at}: must be a list of [row, col] pairs')
+    out = []
+    for i, v in enumerate(pairs):
+        if not (isinstance(v, (list, tuple)) and len(v) == 2
+                and all(isinstance(x, int) and not isinstance(x, bool)
+                        for x in v)):
+            raise LevelFormatError(
+                f'{at}[{i}]: must be a [row, col] pair of integers')
+        out.append(tuple(v))
+    return out
+
+
 def _parse_then(rooms) -> list:
     """The `then` list → rooms 2..n. Every message names `then[i].{key}`."""
     if not isinstance(rooms, (list, tuple)):
@@ -464,7 +491,7 @@ def _parse_then(rooms) -> list:
         if not isinstance(h, dict):
             raise LevelFormatError(f'{at}: must be an object')
         unknown = set(h) - {'geometry', 'fill', 'seals', 'char_runs',
-                            'entities', 'veiled'}
+                            'entities', 'veiled', 'mist'}
         if unknown:
             # Deliberately narrower than the top level: a room is geometry
             # and content, and everything else — the tape, the seed, what the
@@ -483,7 +510,8 @@ def _parse_then(rooms) -> list:
             exit=tuple(geo.get('exit', (1, 2))),
             wrap=bool(geo.get('wrap', False)),
             wrap_width=int(geo.get('wrap_width', 0)),
-            veiled=[tuple(v) for v in h.get('veiled', [])],
+            veiled=_parse_cells_list(h.get('veiled', []), f'{at}.veiled', 'veiled'),
+            mist=_parse_cells_list(h.get('mist', []), f'{at}.mist', 'mist'),
             fills=[_parse_fill(f, j, f'{at}.fill')
                    for j, f in enumerate(h.get('fill', []))],
             seals=[_parse_seal(s, j, f'{at}.seals')
@@ -606,6 +634,7 @@ def crop(lvl: Level) -> Level:
         rows=first.rows, cols=first.cols, cells=first.cells,
         spawn=first.spawn, exit=first.exit,
         wrap=first.wrap, wrap_width=first.wrap_width, veiled=first.veiled,
+        mist=first.mist,
         fills=first.fills,
         seals=first.seals, char_runs=first.char_runs, entities=first.entities,
         then=rooms[1:],
@@ -820,6 +849,8 @@ def paste(level: Level, into: Level, at: tuple) -> Level:
         {**e, 'at': list(_mv(e['at']))} for e in src.entities]
     veiled = ([tuple(v) for v in into.veiled] +
               [(int(v[0]) + dr, int(v[1]) + dc) for v in src.veiled])
+    mist = ([tuple(v) for v in into.mist] +
+            [(int(v[0]) + dr, int(v[1]) + dc) for v in src.mist])
     # A fragment whose fills draw on its OWN vocabulary brings those words:
     # without the union its fills resolve against a pool that does not exist.
     vocabulary = list(into.vocabulary)
@@ -831,7 +862,7 @@ def paste(level: Level, into: Level, at: tuple) -> Level:
 
     return replace(into, cells=out, fills=fills, seals=seals,
                    char_runs=char_runs, entities=entities, veiled=veiled,
-                   vocabulary=vocabulary)
+                   mist=mist, vocabulary=vocabulary)
 
 
 def _content_extent(h: Room) -> tuple[int, int] | None:
@@ -943,6 +974,10 @@ def _build_room(spec: Room, lvl: Level, rng: random.Random,
             for i, row in enumerate(spec.cells)]
     cells = [g[0] for g in grid]
     mist  = {(r, c) for r, (_, cols) in enumerate(grid) for c in cols}
+    # Mist said as a coordinate list unions with whatever the `M` codes said:
+    # inline M is water shorthand, the list is every other terrain. Both are
+    # the author's haze; neither overrides the other.
+    mist |= {(int(a), int(b)) for a, b in getattr(spec, 'mist', ())}
 
     room = LiveRoom(room_type=RoomType.ENTRY, rows=spec.rows, cols=spec.cols)
     room.cells     = cells
@@ -1175,6 +1210,8 @@ def _dump_content(h: Room) -> dict:
     data = {}
     if h.veiled:
         data['veiled'] = [list(v) for v in h.veiled]
+    if h.mist:
+        data['mist'] = [list(v) for v in h.mist]
     if h.fills:
         data['fill'] = [{'region': list(f.region), 'pool': f.pool,
                          'length': list(f.length), 'spacing': f.spacing,
@@ -1259,7 +1296,7 @@ def from_room(room, name: str, author: str = '', solution: str = '',
         alternate=alternate, intro=intro,
         rows=h.rows, cols=h.cols, cells=h.cells,
         spawn=h.spawn, exit=h.exit,
-        wrap=h.wrap, wrap_width=h.wrap_width, veiled=h.veiled,
+        wrap=h.wrap, wrap_width=h.wrap_width, veiled=h.veiled, mist=h.mist,
         fills=h.fills, seals=h.seals,
         char_runs=h.char_runs, entities=h.entities,
         then=list(then),
@@ -1294,7 +1331,10 @@ def capture_room(room, *, fills=None, seals=None,
     grid = [list(row) for row in room.cells]
     _mist_by_row = {}
     for r, c in getattr(room, 'mist_cells', ()):
-        _mist_by_row.setdefault(r, set()).add(c)
+        if room.cells[r][c] != CellType.WATER:      # water rides the M code
+            _mist_by_row.setdefault('list', []).append((r, c))
+        else:
+            _mist_by_row.setdefault(r, set()).add(c)
     for s in seals:
         for r, c in s.opens:
             if 0 <= r < room.rows and 0 <= c < room.cols:
@@ -1307,6 +1347,7 @@ def capture_room(room, *, fills=None, seals=None,
         wrap=bool(getattr(room, 'wrap_buffer', False)),
         wrap_width=int(getattr(room, 'wrap_width', 0) or 0),
         veiled=sorted(getattr(room, 'veiled_cells', ()) or ()),
+        mist=sorted(_mist_by_row.get('list', ())),
         fills=list(fills), seals=list(seals),
         char_runs=[{'row': ru.row, 'col': ru.col,
                     'symbols': list(ru.symbols), 'kind': ru.kind}

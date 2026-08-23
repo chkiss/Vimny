@@ -529,3 +529,39 @@ def test_a_seals_pin_round_trips_and_refuses_to_share_a_seal_with_a_margin():
         F.parse({**spec, 'seals': [{'match': 'verse', 'at': 3,
                                     'region': [1, 1, 1, 5],
                                     'opens': [2, 2]}]})
+
+
+def test_mist_off_the_water_rides_the_file_and_unions_with_inline_m():
+    """Mist was a property of WATER because the `M` code said it inline; the
+    Shelving Room and the Refrain Vault haze plain floor, so the format
+    learned the layer under its own name — `mist`, a list of [row, col]
+    pairs, the same move `veiled` made. Inline `M` stays water shorthand and
+    the two sayings union: an author may write haze either way, and a
+    captured room writes floor-haze into the list while water keeps riding
+    the compact code."""
+    geo = {'rows': 4, 'cols': 6,
+           'cells': ['WWWWWW', 'W3MFW', 'WFFFFW', 'WWWWWW'],
+           'spawn': [1, 1], 'exit': [2, 4]}
+    spec = {'schema': 1, 'name': 't', 'seed': 1, 'geometry': geo,
+            'mist': [[2, 1], [2, 3]]}
+    lvl = F.parse(spec)
+    room = F.build(lvl).rooms[0]
+    assert sorted(room.mist_cells) == [(1, 1), (1, 2), (1, 3), (2, 1), (2, 3)]
+    assert sorted(room.fog_cells) == sorted(room.mist_cells), \
+        'mist is always a subset of the fog'
+    # Round trip: floor mist rides the list, water mist stays in the M code,
+    # and the rebuilt room carries exactly what went in.
+    back = F.loads(F.dumps(F.from_room(room, 't')))
+    assert sorted(F.build(back).rooms[0].mist_cells) == sorted(room.mist_cells)
+    file = json.loads(F.dumps(back))
+    assert sorted(map(tuple, file['mist'])) == [(2, 1), (2, 3)]
+    assert 'M' in file['geometry']['cells'][1], 'water keeps its shorthand'
+    # A room of several says it per room, like any content key.
+    two = {**spec, 'then': [{'geometry': dict(geo, spawn=[1, 1], exit=[2, 4]),
+                             'mist': [[1, 5]]}]}
+    parsed = F.parse(two)
+    assert parsed.then[0].mist == [(1, 5)]
+    # Junk is refused at parse, not silently dropped.
+    for bad in ([[1]], [[1, 2, 3]], ['x'], 'no'):
+        with pytest.raises(Exception):
+            F.parse({**spec, 'mist': bad})

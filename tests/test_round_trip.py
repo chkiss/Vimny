@@ -85,11 +85,15 @@ KNOWN_GAPS: dict[str, tuple[tuple[str, ...], str]] = {
                              "no rule about walls or mist can separate them"),
 
     # ── mist off the water ───────────────────────────────────────────────────
-    # `encode_row` writes an M only where the cell is WATER, so mist in the file
-    # is a property of water rather than a layer over any terrain. These two
-    # haze plain floor.
-    'shelving_room':        (('fog', 'mist'), 'mist over floor, not water'),
-    'refrain_vault':        (('fog', 'mist'), 'mist over floor, not water'),
+    # HEALED 2026-08-23: `shelving_room` and `refrain_vault` haze plain floor,
+    # which the M cell code (water-bound) could not say. The format learned a
+    # top-level/room `mist` list — the same named-layer move as `veiled` — and
+    # both builders now ride it; inline `M` remains water shorthand, unioned
+    # with the list on parse. What does NOT heal is the shelving room's sealed
+    # POCKET: it sits behind a bolt the scripted tick opens, so no file-visible
+    # fact marks it dark, and the builder keeps laying that one fog by hand.
+    'shelving_room':        (('fog',), 'the pocket behind the scripted '
+                             'gallery seal is fogged by position'),
 
     # ── a room with no way out ───────────────────────────────────────────────
     # Several rooms are sayable since phase 4 (`then`), and the Sanctum's two
