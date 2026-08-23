@@ -131,7 +131,7 @@ def _snap(room) -> dict:
         'runs':  sorted((r.row, r.col, ''.join(r.symbols), r.kind)
                         for r in room.char_runs),
         'ents':  sorted((e.kind, e.row, e.col) for e in room.entities),
-        'mist':  sorted(room.mist_cells or ()),
+        'underwater':  sorted(room.underwater_cells or ()),
         'fog':   sorted(room.fog_cells or ()),
         'seals': len(room.seals or ()),
         # A WRAP BUFFER is a room you read rather than walk, and whether it

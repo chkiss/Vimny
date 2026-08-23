@@ -1671,7 +1671,7 @@ def build_dungeon_dummy(seed: int) -> Dungeon:
     ents:   list = []
     chars:  list = []
     sealed: set  = set()
-    mist:   set  = set()
+    underwater: set = set()
     spawn:  list = []
 
     def _band(label_row: int, items) -> None:
@@ -1732,12 +1732,12 @@ def build_dungeon_dummy(seed: int) -> Dungeon:
                     grid[r][cc] = ct
         return place
 
-    def _misted(rows: range):
+    def _sunken(rows: range):
         def place(c):
             for r in rows:
                 for cc in range(c, c + 3):
                     grid[r][cc] = CellType.WATER
-                    mist.add((r, cc))
+                    underwater.add((r, cc))
         return place
 
     def _fogbox(rows: range):
@@ -1842,7 +1842,7 @@ def build_dungeon_dummy(seed: int) -> Dungeon:
         ('stone',    _patch(range(24, 27), CellType.WALL)),
         ('timber',   _patch(range(24, 27), CellType.WOOD_WALL)),
         ('water',    _patch(range(24, 27), CellType.WATER)),
-        ('mist',     _misted(range(24, 27))),
+        ('underwater', _sunken(range(24, 27))),
         ('fogbox',   _fogbox(range(24, 27))),
     ])
 
@@ -1906,8 +1906,8 @@ def build_dungeon_dummy(seed: int) -> Dungeon:
     room.fog_cells = set()
     apply_stone_fog(room)
     room.sealed_cells = sealed
-    room.mist_cells   = set(mist)           # permanent haze: reveals skip it
-    room.fog_cells   |= mist                # mist is a SUBSET of fog by contract
+    room.underwater_cells   = set(underwater)       # permanent haze: reveals skip it
+    room.fog_cells   |= underwater           # water is a SUBSET of fog by contract
     return dungeon
 
 
@@ -6910,7 +6910,7 @@ def build_dungeon_binders_reliquary(seed: int) -> Dungeon:
     # stays visible and searchable; the scans stop at the bank. A designed
     # darkness, not a derived one — re-attached after the build.
     room.fog_cells  = {(r, c) for r in range(1, R - 1) for c in _BND_WATER_COLS}
-    room.mist_cells = set(room.fog_cells)         # permanent: reveals skip it
+    room.underwater_cells = set(room.fog_cells)         # permanent: reveals skip it
 
     # The Codex's own first page, bound in at the water's edge.
     room._codex_extra = ((
@@ -7274,7 +7274,7 @@ _WP_DECOY_POS    = [(11, 12), (13, 24), (15, 34)]  # forward decoys (open danger
 # the ? leg lands you in the xyzzy pocket, where plugh wakes
 # from a SCRIPTED fog (fogged text is unsearchable, so ?plugh from spawn
 # finds nothing — the fresh-word law); its backward twin sits in a second
-# misted pocket holding the gold key, its forward decoys price out * (a
+# sunken pocket holding the gold key, its forward decoys price out * (a
 # * N N walk pays 3 where # pays 1), and the xyzzy register keeps n
 # useless. Standing on plugh, # is the one-key way to the key.
 _WP_WORD2        = 'plugh'
@@ -7329,13 +7329,13 @@ def build_dungeon_waypoint_sanctum(seed: int) -> 'Dungeon':
     # (Waterworks: the pocket ring, the sanctum seals
     # and the vault boxes are MISTED WATER, not stone — everything is
     # visible, per the stone-fog law, while walking / scans stay barred:
-    # water blocks feet, the mist on it blocks $ / 0 / ^ / f scans, and
+    # water blocks feet, the water on it blocks $ / 0 / ^ / f scans, and
     # { } skip flooded rows exactly as they skipped the walls.)
-    mist: set = set()
+    underwater: set = set()
 
     def moat(r, c):
         cells[r][c] = CellType.WATER
-        mist.add((r, c))
+        underwater.add((r, c))
 
     _pkt_lo = _WP_PKT1_SPAN[0] - 1                            # left bank (col 28)
     _pkt_hi = _WP_PKT1_SPAN[1] + 1                            # right bank (col 41)
@@ -7344,7 +7344,7 @@ def build_dungeon_waypoint_sanctum(seed: int) -> 'Dungeon':
     moat(2, _pkt_lo)                                         # left bank
     moat(2, _pkt_hi)                                         # right bank
     # Pocket 2 — the # pocket: the gold key + plugh's backward twin, ringed
-    # the same way (misted water: visible per the stone-fog law, searchable,
+    # the same way (sunken water: visible per the stone-fog law, searchable,
     # foot-proof). It sits WEST of pocket 1 so the twin is strictly behind.
     _p2_lo, _p2_hi = _WP_PKT2_SPAN[0] - 1, _WP_PKT2_SPAN[1] + 1
     for c in range(_p2_lo, _p2_hi + 1):
@@ -7496,7 +7496,7 @@ def build_dungeon_waypoint_sanctum(seed: int) -> 'Dungeon':
                          'max_hp': 1, 'ai': 'chase'})
 
     def encode(r):
-        return ''.join(_fmt._MIST_CODE if (r, c) in mist else _CELL_CODE[ct]
+        return ''.join(_fmt._UNDERWATER_CODE if (r, c) in underwater else _CELL_CODE[ct]
                        for c, ct in enumerate(cells[r]))
 
     level = _Level(
@@ -7510,8 +7510,8 @@ def build_dungeon_waypoint_sanctum(seed: int) -> 'Dungeon':
 
     dungeon = _fmt_build(level, par=_WP_PAR)
     room = dungeon.rooms[0]
-    # Scripted plugh fog (the Wet Ink pattern) — NOT mist: the tick lifts it,
-    # and mist_cells would make the reveal skip it.
+    # Scripted plugh fog (the Wet Ink pattern) — NOT underwater: the tick lifts it,
+    # and underwater_cells would make the reveal skip it.
     room.fog_cells |= _plugh_fog
     room._wp_plugh_fog = _plugh_fog
     return dungeon
@@ -9100,23 +9100,23 @@ def build_dungeon_sentence_corridor(seed: int) -> 'Dungeon':
     # ── Waterworks: the inter-sentence gaps and the row-2
     # separator are MISTED WATER, not stone — every sentence is visible from
     # spawn (the stone-fog law) while the physics hold: water bars feet, and
-    # the mist stops $ / f at each sentence's end exactly as the stone gap
+    # the water stops $ / f at each sentence's end exactly as the stone gap
     # did (the par route's `$ → key` depends on that bound). Word motions
     # never cross water; ) ( land on sentence starts as before.
-    mist: set = set()
+    underwater: set = set()
     for r in (1, 3):
         span = [c for c in range(COLS) if cells[r][c] != CellType.WALL]
         for c in range(min(span), max(span) + 1):
             if cells[r][c] == CellType.WALL:
                 cells[r][c] = CellType.WATER
-                mist.add((r, c))
+                underwater.add((r, c))
     for c in range(1, COLS - 1):
         if cells[2][c] == CellType.WALL:
             cells[2][c] = CellType.WATER
-            mist.add((2, c))
+            underwater.add((2, c))
 
     def encode(r):
-        return ''.join(_fmt._MIST_CODE if (r, c) in mist else _CELL_CODE[ct]
+        return ''.join(_fmt._UNDERWATER_CODE if (r, c) in underwater else _CELL_CODE[ct]
                        for c, ct in enumerate(cells[r]))
 
     level = _Level(
@@ -9615,12 +9615,12 @@ def build_dungeon_spellwrights_forge(seed: int) -> Dungeon:
 # sparing the middle. So: one full :s/up/down/g on the double line you wake
 # at, then RANGED :&& over each falling verse while the /g is fresh (a
 # plain & resets the remembered flags, Vim-faithful). Above the water the
-# torn final line lies in the mist — "my fair" / "lady." — :1j mends it,
+# torn final line lies sunken — "my fair" / "lady." — :1j mends it,
 # :1y carries it, p lays it where the reprise goes without one (a :t of
-# the chasm line arrives still misted: text off the floor never serves).
+# the chasm line arrives still sunken: text off the floor never serves).
 _RV_ROWS, _RV_COLS = 18, 60
 _RV_CTX  = 8                          # chasm band head col
-_RV_BAND = (8, 42)                    # misted torn-line band, rows 1-2
+_RV_BAND = (8, 42)                    # sunken torn-line band, rows 1-2
 _RV_WTR  = 3                          # the water course (sight-line)
 _RV_TX   = 2                          # song text head col (= the line start:
                                       # everything left-aligned, so a pasted
@@ -9667,14 +9667,14 @@ def build_dungeon_refrain_vault(seed: int) -> Dungeon:
     R, C = _RV_ROWS, _RV_COLS
 
     cells = [[CellType.WALL] * C for _ in range(R)]
-    mist: set = set()
+    underwater: set = set()
     for r in (1, 2):                               # the torn-line chasm
         for col in range(*_RV_BAND):
             cells[r][col] = CellType.FLOOR
-            mist.add((r, col))
+            underwater.add((r, col))
     for col in range(_RV_CTX, C - 3):              # the water course (sight)
         cells[_RV_WTR][col] = CellType.WATER
-        mist.add((_RV_WTR, col))
+        underwater.add((_RV_WTR, col))
     for r in range(_RV_SONG[0], _RV_SONG[1] + 1):
         for col in range(2, _RV_SEAL_COL):
             cells[r][col] = CellType.FLOOR         # the workroom
@@ -9702,7 +9702,7 @@ def build_dungeon_refrain_vault(seed: int) -> Dungeon:
         name='The Refrain Vault', seed=seed,
         rows=R, cols=C,
         cells=[''.join(_CELL_CODE[c] for c in row) for row in cells],
-        mist=sorted(mist),                         # haze over floor AND water,
+        underwater=sorted(underwater),                   # haze over floor AND water,
         spawn=(5, 2),                              # said in the file since the
         exit=(_RV_SEAL_ROW, _RV_EXIT_COL),         # format learned the layer
         char_runs=runs,
@@ -9715,13 +9715,13 @@ def build_dungeon_refrain_vault(seed: int) -> Dungeon:
     room = dungeon.rooms[0]
     room._rv_true     = _RV_TRUE
     room._rv_seal_col = _RV_SEAL_COL
-    # The mist rides the file now; what stays a pin is the FOG arrangement:
+    # The water rides the file now; what stays a pin is the FOG arrangement:
     # the pocket behind the seal is hidden by position, not weather, and the
     # level wants exactly this darkness — no more, no less — than the stone
     # law would derive.
     pocket = {(_RV_SEAL_ROW, col)
               for col in range(_RV_SEAL_COL + 1, _RV_EXIT_COL + 1)}
-    room.fog_cells = set(room.mist_cells) | pocket
+    room.fog_cells = set(room.underwater_cells) | pocket
     return dungeon
 
 
@@ -10117,10 +10117,10 @@ def build_dungeon_operators_vault(seed: int) -> Dungeon:
         cells[top][col] = cells[top + 1][col] = CellType.FLOOR
     for (r, c) in _OV_POCKETS:                    # the oubliette pockets
         cells[r][c] = CellType.FLOOR
-    # A misted channel runs the whole west face: cols
+    # A sunken channel runs the whole west face: cols
     # 1-2 of every spacer row are WATER under MIST, one continuous seep
     # linking the pools so the col-1 oubliettes are seen ACROSS WATER, not
-    # through stone. The mist matters twice: fogged water conducts no
+    # through stone. The water matters twice: fogged water conducts no
     # reveal flood (engine law), so the channel cannot ladder this level's
     # corridor-by-corridor fog past the gates — and it bars the $ / f
     # scans as the stone did. Converted AFTER _fog_unreachable (below), so
@@ -10322,11 +10322,11 @@ def build_dungeon_operators_vault(seed: int) -> Dungeon:
                      'edit_immune': True, 'opaque': True})
     entities.append({'kind': 'exit', 'at': [33, 19]})
 
-    # The west-face misted seep, laid BEFORE the fog so the law sees it as the
+    # The west-face sunken seep, laid BEFORE the fog so the law sees it as the
     # terrain it is. It runs on the CORRIDOR ROWS ONLY.
     #
     # It used to run unbroken from top to bottom, and that was the one thing in
-    # this level whose fog could not be derived: mist does not stop the eye
+    # this level whose fog could not be derived: water does not stop the eye
     # (feet treat it as impassable, sight does not — it is weather), so the seep
     # was a clear sightline down the west face and out along every corridor
     # behind every shut door. 569 cells had to be fogged by hand to cover it.
@@ -10338,22 +10338,22 @@ def build_dungeon_operators_vault(seed: int) -> Dungeon:
     # The pits are no longer lit from the spawn, and that is the honest reading:
     # you meet each pit when you reach its corridor, not from the doorway of a
     # vault you have not opened.
-    mist: set = set()
+    underwater: set = set()
     for r in _OV_CORR_ROWS:
         for c in (1, 2):
             if cells[r][c] == CellType.WALL and (r, c) not in _OV_POCKETS:
                 cells[r][c] = CellType.WATER
-                mist.add((r, c))
+                underwater.add((r, c))
     # …and the seep that teaches C10 (see _OV_SEEP_*). PLAIN water, deliberately
-    # NOT misted: mist is permanent haze that a reveal never clears (it is what
-    # stops the west channel laddering light past the gates), so a misted cell
+    # NOT sunken: underwater ground is permanent haze that a reveal never clears (it is what
+    # stops the west channel laddering light past the gates), so a sunken cell
     # can never be the thing a player is meant to SEE. Ordinary water conducts
     # the flood, surfaces with the shelf above it, and stops there — the ledge
     # below stays dark because row 31's floor starts east of this column.
     cells[_OV_SEEP_WATER[0]][_OV_SEEP_WATER[1]] = CellType.WATER
 
     def encode(r):
-        return ''.join(_fmt._MIST_CODE if (r, c) in mist else _CELL_CODE[ct]
+        return ''.join(_fmt._UNDERWATER_CODE if (r, c) in underwater else _CELL_CODE[ct]
                        for c, ct in enumerate(cells[r]))
 
     level = _Level(
@@ -12865,7 +12865,7 @@ def build_dungeon_warden_scrivener(seed: int) -> Dungeon:
 # THE POCKET ISLANDS (the search band's forcing): P1 and P2 are floor islands
 # in MISTED WATER with no walking access at all — the only way in or out is
 # a search jump (Vim-true: a text jump crosses any terrain). Water bars
-# feet, the permanent mist bars the $ / 0 / ^ / f scans, and a spine ◆ on
+# feet, the permanent water bars the $ / 0 / ^ / f scans, and a spine ◆ on
 # each pocket row catches {n}G (fnb would otherwise be the island text).
 # Everything stays VISIBLE per the stone-fog law — no fog-audit opt-out.
 # The motion rival is infinite; / n * # are forced absolutely.
@@ -12916,7 +12916,7 @@ _GNT_TX    = 26                     # text column 0 for most rows
 _GNT_PLQ_COL = 1                    # west-wall plaques (cols 1..22 — wide enough
                                     # for every door's FULL reading; see below)
 # The SEARCH SHELF (row 1) hangs above the exam behind a full band of
-# misted water (row 2): the yank word and the # twin live there, walkable
+# sunken water (row 2): the yank word and the # twin live there, walkable
 # by nothing — a search jump is the only door (the early-stroll yank died
 # with the shelf; the return N prices out every fnb-jump ferry).
 _GNT_R_BLK, _GNT_R_WTR = 1, 2                     # the shelf + its water band
@@ -12930,9 +12930,9 @@ _GNT_R_NOOK = 21                                  # the decoy's SOUTHERN ISLAND 
                                                   # its text heads at TX (the
                                                   # left-align law) with no walk-in
 _GNT_R_GATE = 23
-_GNT_P1_COLS = (26, 35)             # floor island in misted water (search-only;
+_GNT_P1_COLS = (26, 35)             # floor island in sunken water (search-only;
 _GNT_P2_COLS = (26, 39)             # text at TX — the left-align law — with a
-                                    # one-cell misted gap east of the spine ◆)
+                                    # one-cell sunken gap east of the spine ◆)
 _GNT_NOOK_COLS = (26, 28)           # decoy nook island (a search LANDING)
 _GNT_BOLT0 = 27                     # 18 bolts, cols 27..44
 _GNT_EXIT  = (_GNT_R_GATE, 46)      # the FINAL SEAL — stone until every proof holds
@@ -13079,16 +13079,16 @@ def build_dungeon_gauntlet(seed: int) -> Dungeon:
     floor(_GNT_R_GATE, SP, _GNT_CATCH)
     # THE WATERWORKS (stone-fog law, the waypoint pattern): the pockets and
     # the nook sit in MISTED WATER, not stone — everything stays VISIBLE
-    # (the vision flood crosses water; mist renders as haze), while the
-    # islands stay search-only: water bars feet, the mist on it bars the
+    # (the vision flood crosses water; underwater renders as haze), while the
+    # islands stay search-only: water bars feet, the water on it bars the
     # $ / 0 / ^ / f scans, } { skip flooded rows, and a match starting on
-    # water is no landing. Mist is permanent (mist_cells — reveals skip it).
-    mist: set = set()
+    # water is no landing. Mist is permanent (underwater_cells — reveals skip it).
+    underwater: set = set()
 
     def moat(r, c0, c1):
         for c in range(c0, c1 + 1):
             cells[r][c] = CellType.WATER
-            mist.add((r, c))
+            underwater.add((r, c))
 
     moat(_GNT_R_WTR, SP, 62)                        # the shelf's water band
     moat(_GNT_R_BLK, SP + 1, SP + 1)                # the shelf threshold's gap
@@ -13296,7 +13296,7 @@ def build_dungeon_gauntlet(seed: int) -> Dungeon:
         lay(pr, _GNT_PLQ_COL, ptext, 'verdant')
 
     def encode(r):
-        return ''.join(_fmt._MIST_CODE if (r, c) in mist else _CELL_CODE[ct]
+        return ''.join(_fmt._UNDERWATER_CODE if (r, c) in underwater else _CELL_CODE[ct]
                        for c, ct in enumerate(cells[r]))
 
     level = _Level(
@@ -13326,8 +13326,8 @@ def build_dungeon_gauntlet(seed: int) -> Dungeon:
 # ── The Culling Ledger (display 40) — the ex-range family's first lesson ─────
 # A stone ledger carved into the far face of a chasm: the player walks a
 # reading gallery at the bottom and can NEVER stand on a ledger row — the
-# text sits on MISTED floor (fog_cells ∩ mist_cells: readable in full colour
-# through the renderer's carved-through-mist branch, but fog bars feet,
+# text sits on MISTED floor (fog_cells ∩ underwater_cells: readable in full colour
+# through the renderer's carved-through-water branch, but fog bars feet,
 # match-landings, and cuts). Not one cell on a ledger row is passable, so
 # every jump ferry ({n}G / G / H / M) simply FAILS — nothing to land on —
 # and the ○ marker at each row's west lip is scenery: the chasm's warning.
@@ -13340,14 +13340,14 @@ def build_dungeon_gauntlet(seed: int) -> Dungeon:
 # lives in the unnamed register (engine law), a :d clobbers it, and there
 # is only one key — so every register-writing cull must go to the black
 # hole (:d _, :v//d _; :g//d is Vim-faithfully register-writing too). The
-# ledger starts DARK (fog without mist): the UNSEEN-LINE LAW bars culling
+# ledger starts DARK (fog without water): the UNSEEN-LINE LAW bars culling
 # it blind, so the key must be fetched and door one opened FIRST, which
-# parts the mist (adds mist to the fogged ledger — readable, still
+# parts the water (adds water to the fogged ledger — readable, still
 # unwalkable). Verdant lines each carry a lit brazier at col 30; a cold
 # one waits on the corridor: when the ledger reads true, the corridor
 # brazier catches their fire and its light unveils the exit pocket (the
 # second locked door still wants the key — mind what you cut). A key
-# pasted onto the floor is swept away by the mist (no stashing it past
+# pasted onto the floor is swept away by the water (no stashing it past
 # the culls). Blank residue rows are ignored by the check — the
 # :s-blanking longhand stays a lawful 1★ route; forcing is by PAR.
 _CL_ROWS, _CL_COLS = 24, 56
@@ -13443,7 +13443,7 @@ def build_dungeon_culling_ledger(seed: int) -> Dungeon:
 
     def carve(runs, r, text, kind):
         """Lay a ledger line: the ○ marker, then the words — floor cells that
-        start DARK (the doors' opacity; _ledger_check adds the mist when door
+        start DARK (the doors' opacity; _ledger_check adds the water when door
         one opens). Standable by no one either way: every jump ferry fails."""
         runs.append({'row': r, 'col': _CL_CATCH, 'symbols': '○', 'kind': 'void'})
         col = TX
@@ -13512,13 +13512,13 @@ def build_dungeon_culling_ledger(seed: int) -> Dungeon:
 # show the convention. Each mended misfiling grinds back its own gallery
 # bolt, IN ANY ORDER (`_SHR_BOLT_COLS`, main's _shelving_tick conditions);
 # the seal parts when the whole round reads true, indent included. No cell
-# on a shelf row is passable (misted floor band), so the only movers are
+# on a shelf row is passable (underwater floor band), so the only movers are
 # the ranged ex commands: :m reorders, :t shelves the missing copy, :> :<
-# set the depth. A fresh :t/:m row is born unfogged — the tick re-mists
+# set the depth. A fresh :t/:m row is born unfogged — the tick re-submerges
 # ANY bare shelf floor each turn (the chasm law is stateless).
 _SHR_ROWS, _SHR_COLS = 11, 72
 _SHR_TX   = 30                       # shelf floor band head col
-_SHR_BAND = (30, 66)                 # the misted floor band on every shelf row
+_SHR_BAND = (30, 66)                 # the sunken floor band on every shelf row
 _SHR_WTR  = 8                        # the water course (sight-line + line 8's home)
 _SHR_GAL  = 9                        # the reading gallery
 _SHR_SEAL_COL  = 61
@@ -13560,14 +13560,14 @@ def build_dungeon_shelving_room(seed: int) -> Dungeon:
     targets = [(' ' * _SHR_INDENTS[i]) + _SHR_CALLS[i // 2] for i in range(8)]
 
     cells = [[CellType.WALL] * C for _ in range(R)]
-    mist: set = set()
+    underwater: set = set()
     for r in range(1, 8):                          # the shelf band
         for c in range(*_SHR_BAND):
             cells[r][c] = CellType.FLOOR
-            mist.add((r, c))
+            underwater.add((r, c))
     for c in range(_SHR_TX, _SHR_BAND[1] + 1):     # the water course (sight-line;
         cells[_SHR_WTR][c] = CellType.WATER        # cols west stay WALL so the
-        mist.add((_SHR_WTR, c))                    # 8th plaque line sits in stone)
+        underwater.add((_SHR_WTR, c))                    # 8th plaque line sits in stone)
     for c in range(_SHR_TX - 1, _SHR_SEAL_COL):
         cells[_SHR_GAL][c] = CellType.FLOOR        # the reading gallery (west of
     for c in range(_SHR_SEAL_COL + 1, _SHR_EXIT_COL + 1):    # the band is stone —
@@ -13589,11 +13589,11 @@ def build_dungeon_shelving_room(seed: int) -> Dungeon:
         name='The Shelving Room', seed=seed,
         rows=R, cols=C,
         cells=[''.join(_CELL_CODE[c] for c in row) for row in cells],
-        mist=sorted(mist | {(_SHR_GAL, c)
+        underwater=sorted(underwater | {(_SHR_GAL, c)
                             for c in range(_SHR_SEAL_COL + 1,
                                            _SHR_EXIT_COL + 1)}),
         spawn=(_SHR_GAL, _SHR_TX - 1),             # the sealed POCKET rides the
-        exit=(_SHR_GAL, _SHR_EXIT_COL),            # mist too: its darkness is
+        exit=(_SHR_GAL, _SHR_EXIT_COL),            # water too: its darkness is
         char_runs=runs,                            # weather, not ignorance — one
         entities=[{'kind': 'exit', 'at': [_SHR_GAL, _SHR_EXIT_COL]},   # bolt
                   {'kind': 'chest_scroll', 'at': [_SHR_GAL, _SHR_CHEST_COL]}],
@@ -13607,12 +13607,12 @@ def build_dungeon_shelving_room(seed: int) -> Dungeon:
     # gallery row and its bolt columns are fixed for the level's lifetime.
     room.sealed_cells = {(_SHR_GAL, c)
                          for c in (*_SHR_BOLT_COLS, _SHR_SEAL_COL)}
-    # The mist (shelf band, water course, AND the sealed pocket) rides the
+    # The water (shelf band, water course, AND the sealed pocket) rides the
     # file; what stays a pin is the FOG arrangement: the pocket is hidden by
     # position behind a seal the scripted tick opens, and the level wants
     # exactly this darkness — no more, no less — than the stone law derives.
     pocket = {(_SHR_GAL, c) for c in range(_SHR_SEAL_COL + 1, _SHR_EXIT_COL + 1)}
-    room.fog_cells = set(room.mist_cells) | pocket
+    room.fog_cells = set(room.underwater_cells) | pocket
     return dungeon
 
 

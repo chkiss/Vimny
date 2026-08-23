@@ -38,8 +38,9 @@ def _discovered(room: Room, r: int, c: int) -> bool:
     """True if some open cell beside (r, c) has been revealed.
 
     The shared answer to "could the player have seen this yet?", for the two
-    things that are drawn THROUGH fog: a gate's band, and mist. Both are
-    permanently fogged — a gate is a wall and mist is weather — so neither can
+    things that are drawn THROUGH fog: a gate's band, and underwater ground.
+    Both are permanently fogged — a gate is a wall and sunken ground is
+    drowned — so neither can
     use the fog on its own cell to decide, and neither may be drawn from the
     other side of a dungeon the player has not opened.
     """
@@ -639,7 +640,7 @@ def render_all(term: Terminal, dungeon: Dungeon, player: Player,
         hazy = False
         if (room_r, room_c) in room.fog_cells:
             if (room.cells[room_r][room_c] == CellType.WATER
-                    and (room_r, room_c) in room.mist_cells
+                    and (room_r, room_c) in room.underwater_cells
                     and _discovered(room, room_r, room_c)):
                 # MIST on water reads as hazy water, not stone — the channel
                 # stays visibly a channel (scans still stop at the fog), but it
@@ -655,19 +656,26 @@ def render_all(term: Terminal, dungeon: Dungeon, player: Player,
                 # It is discovered on the same rule a gate's band is
                 # (`_seal_shown`): when some open cell beside it has been
                 # revealed, which is exactly when you could have seen it.
-                return C.mist_bg() + C.mist_fg() + S.MIST + C.normal_fg()
-            if ((room_r, room_c) not in room.mist_cells
-                    or room.char_run_at(room_r, room_c) is None):
+                return C.underwater_bg() + C.underwater_fg() + S.MIST + C.normal_fg()
+            if ((room_r, room_c) not in room.underwater_cells):
                 return wall_bg + ' ' + C.normal_fg()
-            # MISTED FLOOR carrying a glyph: text across a chasm — readable in
-            # full colour but never standable, searchable, or cuttable (the fog
-            # bars feet and match-landings; only ranged ex commands reach it).
-            # The haze hides TERRAIN, never WRITING: a verse needs no one to
-            # stand beside it to be read, and the Shelving Room's shelf lines
-            # touch no open floor at all until the player edits them. Bare
-            # misted cells keep the discovery gate above — that one hides the
-            # channel's SHAPE, which is the leak that rule exists to prevent.
-            hazy = True                  # and it WEARS the haze: mist_bg below
+            # Haze covers a row's INK EXTENT — first glyph through last — so
+            # the space between "my" and "fair" reads as water under the
+            # verse, not as a wall hole punched in the middle of it. Beyond
+            # the ink, bare sunken bank stays dark: that discovery gate hides
+            # the channel's SHAPE, which is the leak it exists to prevent.
+            _row_runs = room._char_runs_by_row.get(room_r) or ()
+            if _row_runs:
+                _lo = min(rr.col for rr in _row_runs)
+                _hi = max(rr.col + len(rr.symbols) - 1 for rr in _row_runs)
+                if _lo <= room_c <= _hi:
+                    hazy = True
+                    if room.char_run_at(room_r, room_c) is None:
+                        # a word gap inside the verse: haze, no glyph
+                        return C.underwater_bg() + ' ' + C.normal_fg()
+                    # Fall through: the glyph renders below wearing the haze.
+            if not hazy:
+                return wall_bg + ' ' + C.normal_fg()
             # Fall through to the ordinary char-run rendering.
 
         # Attack-direction arrows (room._atk_arrows): every attacker — goblin,
@@ -717,10 +725,10 @@ def render_all(term: Terminal, dungeon: Dungeon, player: Player,
             else:
                 glyph_bg = floor_bg
             if hazy:
-                # Weather over the writing: the same lifted-grey a discovered
-                # channel wears, so text under mist reads as hazed at a glance
+                # Water over the writing: the same lifted-grey a discovered
+                # channel wears, so sunken text reads as submerged at a glance
                 # — you can read it, and you can also tell you cannot WALK it.
-                glyph_bg = C.mist_bg()
+                glyph_bg = C.underwater_bg()
             return glyph_bg + rfg + sym + C.normal_fg()
 
         # Cell type

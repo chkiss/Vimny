@@ -387,10 +387,12 @@ class Room:
     #: stone) under its own name, so neither rule has to make room for the
     #: other. Reveal by discarding from this set, exactly as fog is lifted.
     veiled_cells: set           = field(default_factory=set)
-    mist_cells: set             = field(default_factory=set)  # PERMANENT scenic mist over water:
-                                                              # a subset of fog_cells that reveal
-                                                              # floods neither cross nor clear
-                                                              # (immutable per level — no snapshot)
+    #: UNDERWATER cells — permanent, impassable, search-opaque ground that a
+    #: reveal flood neither crosses nor clears (immutable per level — no
+    #: snapshot). The look is sunken blue-grey haze; the terrain beneath may
+    #: be water (the `M` code) or floor (a drowned band, a torn chasm).
+    #: Called "mist" until 2026-08-23; the name now says what it plays like.
+    underwater_cells: set       = field(default_factory=set)  # subset of fog_cells
     seals: tuple                = ()     # Seal objects — declarative text-match doors.
                                          # Empty for every shipped level today; the
                                          # five hardcoded families keep their own ticks

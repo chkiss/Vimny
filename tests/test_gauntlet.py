@@ -218,11 +218,11 @@ def test_channels_are_misted_water(seed):
                   (_GNT_R_NOOK, _GNT_NOOK_COLS[0])):
         for c in range(_GNT_SPINE + 1, lo):
             assert room.cells[r][c] == CellType.WATER
-            assert (r, c) in room.fog_cells and (r, c) in room.mist_cells
+            assert (r, c) in room.fog_cells and (r, c) in room.underwater_cells
     from vimny.generation.dungeon_gen import _GNT_R_WTR
     for c in range(_GNT_SPINE, 63):                      # the shelf's band
         assert room.cells[_GNT_R_WTR][c] == CellType.WATER
-        assert (_GNT_R_WTR, c) in room.mist_cells
+        assert (_GNT_R_WTR, c) in room.underwater_cells
     for c in range(_GNT_P1_COLS[0], _GNT_P1_COLS[1] + 1):
         assert (_GNT_R_P1, c) not in room.fog_cells
     for c in range(_GNT_P2_COLS[0], _GNT_P2_COLS[1] + 1):

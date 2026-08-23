@@ -164,11 +164,11 @@ def test_ledger_starts_dark_and_keeps_are_ordered(seed):
             for i in range(len(ru.symbols)):
                 cell = (row, ru.col + i)
                 assert cell in r.fog_cells
-                assert cell not in r.mist_cells    # DARK until door one opens
+                assert cell not in r.underwater_cells    # DARK until door one opens
                 assert not r.is_passable(*cell)
     for row in list(_CL_GAPS) + [_CL_SEP]:         # the water sleeps dark too
         for c in range(2, 54):
-            assert (row, c) in r.fog_cells and (row, c) not in r.mist_cells
+            assert (row, c) in r.fog_cells and (row, c) not in r.underwater_cells
     for c in range(_CL_DOOR1[1] + 1, 50):          # and the corridor past door one
         assert (_CL_COR, c) in r.fog_cells
     # THE HOUSE THAT JACK BUILT: every stanza-III keep bears the chain-word
@@ -246,9 +246,9 @@ def test_door_one_parts_the_mist(monkeypatch):
             if ru.kind == 'void':
                 continue
             cell = (row, ru.col)
-            assert cell in r.fog_cells and cell in r.mist_cells
+            assert cell in r.fog_cells and cell in r.underwater_cells
             assert not r.is_passable(*cell)
-    assert (_CL_SEP, 20) in r.mist_cells           # the water shows, hazy
+    assert (_CL_SEP, 20) in r.underwater_cells           # the water shows, hazy
     assert (_CL_COR, _CL_BRZ_COL) not in r.fog_cells   # the cold brazier, lit
     assert (_CL_COR, 45) in r.fog_cells            # past the boss door: dark
     assert any(e.kind == 'seal_door' and e.alive for e in r.entities)

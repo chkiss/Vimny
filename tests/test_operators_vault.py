@@ -64,7 +64,7 @@ def _room(seed=7, defog=False):
     if defog:
         # Clear the revealable fog only — the west channel's MIST is
         # permanent in play (reveal floods skip it), so tests keep it too.
-        room.fog_cells = set(room.mist_cells)
+        room.fog_cells = set(room.underwater_cells)
     return room
 
 
@@ -251,7 +251,7 @@ def test_the_seep_shows_c10s_lesson_instead_of_saying_it():
     #    clears — it is what stops the west channel laddering light past the
     #    gates — so a misted cell can never be the thing a player is meant to
     #    see. This one has to surface.
-    assert seep not in room.mist_cells
+    assert seep not in room.underwater_cells
 
     # 3. it is in C10's line, which is what makes `dd` the answer rather than a
     #    guess: the row the water sits in is the row the cut takes out

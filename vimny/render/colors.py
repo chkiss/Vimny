@@ -169,15 +169,19 @@ def cmd_cursor_fg(): return _rgb(12, 12, 20)          # dark glyph under the blo
 def water_bg():              return _obg(5, 15, 55)        # deep data-stream blue
 def water_fg(r, g, b):       return _rgb(r, g, b)
 
-# Misted water. It is water, and it keeps water's '~' — a channel under haze is
-# still a channel, and a shade glyph made it read as rubble. What separates it
-# from open water is the BACKGROUND (lifted out of the deep blue, greyed, as fog
-# does to everything it sits on) and the stillness: open water animates through
-# four frames on a 24.8-second cycle, mist never moves. Drawing them apart on the
-# foreground alone was the earlier mistake — the water animation rests on a dim
-# frame for 8 of those seconds, and there the two exhibits read as one cell.
-def mist_bg():               return _obg(22, 34, 58)       # channel under haze — lifted, greyed
-def mist_fg():               return _rgb(95, 135, 190)        # water blue, drained by the vapour
+# Underwater ground. It is water (or drowned floor), and where it is water it
+# keeps water's '~' — a channel under haze is still a channel, and a shade glyph
+# made it read as rubble. What separates it from open water is the BACKGROUND
+# (lifted out of the deep blue, greyed, as fog does to everything it sits on)
+# and the stillness: open water animates through four frames on a 24.8-second
+# cycle, sunken ground never moves. Drawing them apart on the foreground alone
+# was the earlier mistake — the water animation rests on a dim frame for 8 of
+# those seconds, and there the two exhibits read as one cell.
+def underwater_bg():         return _obg(22, 34, 58)       # ground under haze — lifted, greyed
+def underwater_fg():         return _rgb(95, 135, 190)      # water blue, drained by the vapour
+
+def mist_bg():               return underwater_bg()          # historical name (pre 2026-08-23)
+def mist_fg():               return underwater_fg()          # historical name
 
 def wood_wall_bg():          return _obg(80, 45, 14)       # dark timber, warm intruder
 def wood_wall_damaged_bg():  return _obg(48, 24, 5)        # charred, near-void

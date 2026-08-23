@@ -153,7 +153,7 @@ def test_the_probe_now_compares_the_flag():
         cells = [[]]
         spawn_pos = exit_pos = (0, 0)
         char_runs = entities = ()
-        mist_cells = fog_cells = seals = ()
+        underwater_cells = fog_cells = seals = ()
         wrap_buffer, wrap_width = True, 0
     snap = RT._snap(_Fake())
     assert 'wrap' in snap and snap['wrap'] == (True, 0)

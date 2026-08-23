@@ -77,7 +77,7 @@ def test_row_that_does_not_fill_the_width_is_refused():
 def test_rle_run_that_overruns_the_width_is_refused_before_expanding():
     # a hostile run count must fail fast, not allocate toward a billion cells
     with pytest.raises(F.LevelFormatError):
-        F.expand_row_mist('W99999999F', 10, 0)
+        F.expand_row_underwater('W99999999F', 10, 0)
 
 
 def test_type_confused_json_is_a_named_format_error():
@@ -531,37 +531,61 @@ def test_a_seals_pin_round_trips_and_refuses_to_share_a_seal_with_a_margin():
                                     'opens': [2, 2]}]})
 
 
-def test_mist_off_the_water_rides_the_file_and_unions_with_inline_m():
-    """Mist was a property of WATER because the `M` code said it inline; the
-    Shelving Room and the Refrain Vault haze plain floor, so the format
-    learned the layer under its own name — `mist`, a list of [row, col]
-    pairs, the same move `veiled` made. Inline `M` stays water shorthand and
-    the two sayings union: an author may write haze either way, and a
-    captured room writes floor-haze into the list while water keeps riding
-    the compact code."""
+def test_underwater_off_the_water_rides_the_file_and_unions_with_inline_m():
+    """Underwater ground was a property of WATER because the `M` code said it
+    inline; the Shelving Room and the Refrain Vault sink plain floor, so the
+    format learned the layer under its own name — `underwater`, a list of
+    [row, col] pairs, the same move `veiled` made. Inline `M` stays water
+    shorthand and the two sayings union: an author may write it either way,
+    and a captured room writes floor-haze into the list while water keeps
+    riding the compact code. (The key was `mist` until 2026-08-23.)"""
     geo = {'rows': 4, 'cols': 6,
            'cells': ['WWWWWW', 'W3MFW', 'WFFFFW', 'WWWWWW'],
            'spawn': [1, 1], 'exit': [2, 4]}
     spec = {'schema': 1, 'name': 't', 'seed': 1, 'geometry': geo,
-            'mist': [[2, 1], [2, 3]]}
+            'underwater': [[2, 1], [2, 3]]}
     lvl = F.parse(spec)
     room = F.build(lvl).rooms[0]
-    assert sorted(room.mist_cells) == [(1, 1), (1, 2), (1, 3), (2, 1), (2, 3)]
-    assert sorted(room.fog_cells) == sorted(room.mist_cells), \
+    assert sorted(room.underwater_cells) == [(1, 1), (1, 2), (1, 3), (2, 1), (2, 3)]
+    assert sorted(room.fog_cells) == sorted(room.underwater_cells), \
         'mist is always a subset of the fog'
     # Round trip: floor mist rides the list, water mist stays in the M code,
     # and the rebuilt room carries exactly what went in.
     back = F.loads(F.dumps(F.from_room(room, 't')))
-    assert sorted(F.build(back).rooms[0].mist_cells) == sorted(room.mist_cells)
+    assert sorted(F.build(back).rooms[0].underwater_cells) == sorted(room.underwater_cells)
     file = json.loads(F.dumps(back))
-    assert sorted(map(tuple, file['mist'])) == [(2, 1), (2, 3)]
+    assert sorted(map(tuple, file['underwater'])) == [(2, 1), (2, 3)]
     assert 'M' in file['geometry']['cells'][1], 'water keeps its shorthand'
     # A room of several says it per room, like any content key.
     two = {**spec, 'then': [{'geometry': dict(geo, spawn=[1, 1], exit=[2, 4]),
-                             'mist': [[1, 5]]}]}
+                             'underwater': [[1, 5]]}]}
     parsed = F.parse(two)
-    assert parsed.then[0].mist == [(1, 5)]
+    assert parsed.then[0].underwater == [(1, 5)]
     # Junk is refused at parse, not silently dropped.
     for bad in ([[1]], [[1, 2, 3]], ['x'], 'no'):
         with pytest.raises(Exception):
-            F.parse({**spec, 'mist': bad})
+            F.parse({**spec, 'underwater': bad})
+
+
+def test_the_legacy_mist_key_still_loads_and_dumps_as_underwater():
+    """A format never orphans its own files: every level written before
+    2026-08-23 says `mist`, and both names read — unioned when a file says
+    both. What Vimny WRITES is the canonical new name, so generation two of
+    any file speaks today's language."""
+    geo = {'rows': 4, 'cols': 6,
+           'cells': ['WWWWWW', 'W3MFW', 'WFFFFW', 'WWWWWW'],
+           'spawn': [1, 1], 'exit': [2, 4]}
+    legacy = {'schema': 1, 'name': 't', 'seed': 1, 'geometry': geo,
+              'mist': [[2, 1], [2, 3]]}
+    modern = {**legacy, 'mist': None}
+    del modern['mist']
+    modern['underwater'] = legacy['mist']
+    both = {**modern, 'mist': [[3, 1]]}
+    for spec, want in ((legacy, [(2, 1), (2, 3)]),
+                       (modern, [(2, 1), (2, 3)]),
+                       (both,   [(2, 1), (2, 3), (3, 1)])):
+        lvl = F.parse(spec)
+        assert sorted(map(tuple, lvl.underwater)) == want
+    # What we write is always the new name.
+    file = json.loads(F.dumps(F.parse(legacy)))
+    assert 'underwater' in file and 'mist' not in file

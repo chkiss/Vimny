@@ -297,7 +297,7 @@ def test_unseen_rows_refuse_ranged_commands():
     for cmd in ('1d', '1y', '1m3', '1t3', '1,2j', '1>'):
         handled, msg, _ns, nl = S.run_ex(cmd, r, p)
         assert handled and nl == 0 and 'dark' in msg, cmd
-    r.mist_cells = {(0, 0), (0, 1)}                # mist parts: seen through haze
+    r.underwater_cells = {(0, 0), (0, 1)}                # mist parts: seen through haze
     handled, _msg, _ns, nl = S.run_ex('1y', r, p)
     assert handled and nl == 1
 

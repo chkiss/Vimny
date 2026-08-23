@@ -127,7 +127,7 @@ def test_chasm_is_misted_sightlined_and_unwalkable(seed):
         for ru in r._char_runs_by_row.get(row, []):
             for i in range(len(ru.symbols)):
                 cell = (row, ru.col + i)
-                assert cell in r.fog_cells and cell in r.mist_cells
+                assert cell in r.fog_cells and cell in r.underwater_cells
                 assert cell in visible                   # the stone law, earned
 
 
@@ -225,7 +225,7 @@ def test_the_chasm_lines_are_readable_through_the_mist(
     dungeon = build_dungeon_refrain_vault(seed)
     room = dungeon.rooms[0]
     chasm = next(ru for ru in room.char_runs if ru.row == 2)
-    assert (chasm.row, chasm.col) in room.mist_cells, 'precondition: under mist'
+    assert (chasm.row, chasm.col) in room.underwater_cells, 'precondition: under mist'
     monkeypatch.setattr(main.time, 'sleep', lambda *a, **k: None)
     monkeypatch.setattr(Terminal, 'height', property(lambda self: 45))
     monkeypatch.setattr(Terminal, 'width', property(lambda self: 120))
@@ -260,6 +260,6 @@ def test_misted_text_wears_the_haze(seed, monkeypatch, capsys):
                      _dungeon=dungeon)
     frame = capsys.readouterr().out
     # The first chasm glyph ('m' of 'my', row 1 col 8) must carry mist slate.
-    hazed = (C.mist_bg() + C.rune_ancient() + 'm' + C.normal_fg())
+    hazed = (C.underwater_bg() + C.rune_ancient() + 'm' + C.normal_fg())
     assert hazed in frame, 'the chasm verse must render wearing the haze'
 

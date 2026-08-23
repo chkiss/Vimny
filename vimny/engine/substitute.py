@@ -440,12 +440,12 @@ def substitute(room, player, lo, hi, spec, *, confirm=None,
     # Descending so a \r line-split (which inserts rows below) never reindexes a
     # row we have yet to visit.
     _fog  = getattr(room, 'fog_cells', set())
-    _mist = getattr(room, 'mist_cells', set())
+    _sunken = getattr(room, 'underwater_cells', set())
     for row in range(hi, lo - 1, -1):
         text, l0, l1, kinds = _read_line(room, row)
         # You cannot rewrite what you cannot read: a plain-fogged row is skipped
-        # (misted text is seen-through-haze and stays fair game).
-        if text and (row, l0) in _fog and (row, l0) not in _mist:
+        # (sunken text is seen-through-water and stays fair game).
+        if text and (row, l0) in _fog and (row, l0) not in _sunken:
             continue
         dkind = line_kind(room, row)
         if confirming:
@@ -474,7 +474,7 @@ def substitute(room, player, lo, hi, spec, *, confirm=None,
         c = _first_glyph_col(room, last_changed)
         if room.is_passable(last_changed, c):    # the avatar has feet: a ranged
             player.row = last_changed            # :s onto unwalkable ground (a
-            player.col = c                       # misted ledger) never ferries it
+            player.col = c                       # sunken ledger) never ferries it
 
     if count_only:
         return f'{n_subs} matches on {n_lines} lines', n_subs, n_lines
@@ -595,7 +595,7 @@ def run_global(room, player, lo, hi, rest, *, confirm=None,
     _dm = _G_DEL_RE.match(subcmd)
     if _dm:
         # The UNSEEN-LINE LAW binds :g/:v deletes too: you cannot cull a
-        # line whose glyphs the dark still hides (misted rows read fine).
+        # line whose glyphs the dark still hides (sunken rows read fine).
         for row in marked:
             if _rows_unseen(room, row, row):
                 return _UNSEEN_MSG, 0, 0
@@ -690,14 +690,14 @@ _UNSEEN_MSG = 'The dark still holds those lines — bring light before you judge
 
 def _rows_unseen(room, lo: int, hi: int) -> bool:
     """The UNSEEN-LINE LAW: a ranged command may not act on a row whose glyphs
-    the fog hides UN-misted (misted text is seen-through-haze and fair game;
+    the fog hides UNSUNKEN (sunken text is seen-through-water and fair game;
     plain-fogged text is unread, and you cannot judge what you cannot read).
     This bars blind culling of a still-dark ledger."""
     for r in range(lo, hi + 1):
         for ru in room._char_runs_by_row.get(r, []):
             for i in range(len(ru.symbols)):
                 cell = (r, ru.col + i)
-                if cell in room.fog_cells and cell not in room.mist_cells:
+                if cell in room.fog_cells and cell not in room.underwater_cells:
                     return True
     return False
 
@@ -709,11 +709,11 @@ def _rows_parried(room, lo: int, hi: int) -> bool:
 
 
 def _snapshot_rows(room, lo: int, hi: int) -> list:
-    """Full structural copies of rows lo..hi: cells, glyphs, fog/mist columns,
+    """Full structural copies of rows lo..hi: cells, glyphs, fog/water columns,
     and the row's live non-immune creatures (cloned; landmarks excluded — an
     exit/entry marker's position side effects must not fire twice).
-    :m/:t are ROW SURGERY, not a reflow paste — a fogged (misted-chasm) line
-    moves with its terrain and its mist, so it arrives exactly as it stood
+    :m/:t are ROW SURGERY, not a reflow paste — a fogged (sunken-chasm) line
+    moves with its terrain and its water, so it arrives exactly as it stood
     (a reflow capture would read a fogged row as empty: line_extent is
     passability-based by design). edit_immune occupants are left out on both
     axes: their row parries :m outright, and :t must not mint a boss copy."""
@@ -728,7 +728,7 @@ def _snapshot_rows(room, lo: int, hi: int) -> list:
             [(ru.col, tuple(ru.symbols), ru.kind)
              for ru in room._char_runs_by_row.get(r, [])],
             {c for (fr, c) in room.fog_cells if fr == r},
-            {c for (fr, c) in room.mist_cells if fr == r},
+            {c for (fr, c) in room.underwater_cells if fr == r},
             riders,
         ))
     return snap
@@ -752,12 +752,12 @@ def _lay_rows_below(room, player, snap: list, dest: int) -> int:
     _shift_rows(room, player, lambda r: r >= at, +n)
     if at <= player.row:
         player.row = min(player.row + n, room.rows - 1)
-    for k, (cells_row, runs, fogc, mistc, riders) in enumerate(snap):
+    for k, (cells_row, runs, fogc, sunkenc, riders) in enumerate(snap):
         room.cells[at + k] = list(cells_row)
         for (col, syms, kind) in runs:
             room.char_runs.append(_CR(at + k, col, syms, kind))
         room.fog_cells  |= {(at + k, c) for c in fogc}
-        room.mist_cells |= {(at + k, c) for c in mistc}
+        room.underwater_cells |= {(at + k, c) for c in sunkenc}
         for e in riders:
             room.add_entity(_clone(e, row=at + k))   # fresh uid already minted at snapshot
     room.rebuild_indexes()

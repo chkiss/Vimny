@@ -44,7 +44,8 @@ import re
 from dataclasses import dataclass, field, replace
 
 from vimny.engine import tape as _tape
-from vimny.engine.editor import _CELL_CODE, _CODE_CELL, _MIST_CODE, _ENTITY_FIELDS
+from vimny.engine.editor import (_CELL_CODE, _CODE_CELL, _UNDERWATER_CODE,
+                                 _ENTITY_FIELDS)
 from vimny.engine.motion import apply_stone_fog
 from vimny.engine.world import (CellType, CharRun, DROPPABLE, Entity,
                           Room as LiveRoom, RoomType,
@@ -154,13 +155,15 @@ class Room:
     #: — it is the level handing out its clue in instalments, and only the
     #: author knows the instalments. Listed as [row, col] pairs.
     veiled:     list  = field(default_factory=list)
-    #: MIST off the water: permanent scenic haze over terrain that is not a
-    #: river cell. The `M` cell code says mist-on-WATER inline; this list says
-    #: the rest — [row, col] pairs, unioned with whatever the `M`s said, so an
-    #: author may write haze either way and a captured room writes back exactly
-    #: what it carried. (Walls want `veiled`, not mist: mist is weather over
-    #: ground, veiling is a carving not legible yet.)
-    mist:       list  = field(default_factory=list)
+    #: UNDERWATER ground off the water: permanent sunken terrain over cells
+    #: that are not a river cell. The `M` cell code says water-under-haze
+    #: inline; this list says the rest — [row, col] pairs, unioned with
+    #: whatever the `M`s said, so an author may write it either way and a
+    #: captured room writes back exactly what it carried. (Walls want
+    #: `veiled`: underwater is ground you cannot stand on, veiling is a
+    #: carving not legible yet.) The file key was `mist` until 2026-08-23 and
+    #: is still read under that name — a format never orphans its own files.
+    underwater: list  = field(default_factory=list)
     #: Where this room's keys live in the FILE. Carried on it so that every
     #: message about it — parser, validator, forge — names the place the author
     #: has to go and edit, rather than a room number they never wrote down.
@@ -189,7 +192,7 @@ class Level:
     wrap:        bool = False                         # see Room.wrap
     wrap_width:  int  = 0
     veiled:      list = field(default_factory=list)   # see Room.veiled
-    mist:        list = field(default_factory=list)   # see Room.mist
+    underwater:  list = field(default_factory=list)   # see Room.underwater
     fills:       list = field(default_factory=list)   # list[Fill]
     seals:       list = field(default_factory=list)   # list[world.Seal]
     char_runs:   list = field(default_factory=list)   # explicit text
@@ -211,7 +214,7 @@ class Level:
         return [Room(rows=self.rows, cols=self.cols, cells=self.cells,
                      spawn=self.spawn, exit=self.exit,
                      wrap=self.wrap, wrap_width=self.wrap_width,
-                     veiled=self.veiled, mist=self.mist, fills=self.fills,
+                     veiled=self.veiled, underwater=self.underwater, fills=self.fills,
                      seals=self.seals, char_runs=self.char_runs,
                      entities=self.entities), *self.then]
 
@@ -250,7 +253,7 @@ def parse(data: dict) -> Level:
     unknown = set(data) - {'schema', 'name', 'author', 'seed', 'teaches',
                            'requires', 'no_horse', 'alternate', 'geometry',
                            'fill', 'seals', 'char_runs', 'entities', 'veiled',
-                           'mist',
+                           'underwater', 'mist',   # mist: the pre-2026-08-23 name
                            'then', 'vocabulary', 'solution', 'intro'}
     if unknown:
         # Refuse rather than ignore: a silently-dropped key is a level that
@@ -277,7 +280,11 @@ def parse(data: dict) -> Level:
         wrap=bool(geo.get('wrap', False)),
         wrap_width=int(geo.get('wrap_width', 0)),
         veiled=_parse_cells_list(data.get('veiled', []), 'veiled', 'veiled'),
-        mist=_parse_cells_list(data.get('mist', []), 'mist', 'mist'),
+        # Both names read, and union: `underwater` is canonical, `mist` is
+        # what every file written before 2026-08-23 says.
+        underwater=(_parse_cells_list(data.get('underwater', []),
+                                      'underwater', 'underwater')
+                    + _parse_cells_list(data.get('mist', []), 'mist', 'mist')),
         fills=[_parse_fill(f, i) for i, f in enumerate(data.get('fill', []))],
         seals=[_parse_seal(s, i) for i, s in enumerate(data.get('seals', []))],
         char_runs=list(data.get('char_runs', [])),
@@ -461,9 +468,9 @@ def _parse_seal(s: dict, i: int, at: str = 'seals') -> Seal:
 
 
 def _parse_cells_list(pairs, at: str, what: str) -> list:
-    """A room-level coordinate layer (`veiled`, `mist`): a list of [row, col]
-    pairs. Refused rather than coerced — a silently-dropped cell is a level
-    that plays differently from the one its author tested."""
+    """A room-level coordinate layer (`veiled`, `underwater`): a list of
+    [row, col] pairs. Refused rather than coerced — a silently-dropped cell is
+    a level that plays differently from the one its author tested."""
     if not isinstance(pairs, (list, tuple)):
         raise LevelFormatError(f'{at}: must be a list of [row, col] pairs')
     out = []
@@ -491,7 +498,7 @@ def _parse_then(rooms) -> list:
         if not isinstance(h, dict):
             raise LevelFormatError(f'{at}: must be an object')
         unknown = set(h) - {'geometry', 'fill', 'seals', 'char_runs',
-                            'entities', 'veiled', 'mist'}
+                            'entities', 'veiled', 'underwater', 'mist'}
         if unknown:
             # Deliberately narrower than the top level: a room is geometry
             # and content, and everything else — the tape, the seed, what the
@@ -511,7 +518,9 @@ def _parse_then(rooms) -> list:
             wrap=bool(geo.get('wrap', False)),
             wrap_width=int(geo.get('wrap_width', 0)),
             veiled=_parse_cells_list(h.get('veiled', []), f'{at}.veiled', 'veiled'),
-            mist=_parse_cells_list(h.get('mist', []), f'{at}.mist', 'mist'),
+            underwater=(_parse_cells_list(h.get('underwater', []),
+                                          f'{at}.underwater', 'underwater')
+                        + _parse_cells_list(h.get('mist', []), f'{at}.mist', 'mist')),
             fills=[_parse_fill(f, j, f'{at}.fill')
                    for j, f in enumerate(h.get('fill', []))],
             seals=[_parse_seal(s, j, f'{at}.seals')
@@ -536,19 +545,20 @@ def loads(text: str) -> Level:
 
 # ── Cell grids ────────────────────────────────────────────────────────────────
 
-def expand_row_mist(row: str, cols: int, lineno: int,
-                    where: str = 'geometry') -> tuple:
-    """One `cells` row → (list of CellTypes, the columns that carry mist).
+def expand_row_underwater(row: str, cols: int, lineno: int,
+                          where: str = 'geometry') -> tuple:
+    """One `cells` row → (list of CellTypes, the columns that carry water).
 
     Accepts both the plain form (`WFFFW`) and the run-length form (`W3F60W`),
     because a 200-column room of mostly stone is unreadable written out in full
     and unreviewable in a pull request.
 
-    `M` is water with permanent mist over it. It expands to WATER here and the
-    haze comes back as a column number, because mist is not a cell type — see
-    `_MIST_CODE`.
+    `M` is ground with permanent haze over it. It expands to WATER here and
+    the haze comes back as a column number, because being underwater is not a
+    cell type — see `_UNDERWATER_CODE`. (The code was named `_MIST_CODE`; the
+    glyph is 'M' for history.)
     """
-    out, mist = [], []
+    out, underwater = [], []
     pos = 0
     for m in _RLE.finditer(row):
         if m.start() != pos:
@@ -562,14 +572,14 @@ def expand_row_mist(row: str, cols: int, lineno: int,
             # allocate first and only then fail the length check below.
             raise LevelFormatError(
                 f'{where}.cells[{lineno}]: run of {count} {code!r} runs past {cols} columns')
-        if code == _MIST_CODE:
-            mist.extend(range(len(out), len(out) + count))
+        if code == _UNDERWATER_CODE:
+            underwater.extend(range(len(out), len(out) + count))
             out.extend([CellType.WATER] * count)
             continue
         if code not in _CODE_CELL:
             raise LevelFormatError(
                 f'{where}.cells[{lineno}]: unknown cell code {code!r}; '
-                f'known codes are {"".join(sorted(set(_CODE_CELL) | {_MIST_CODE}))}')
+                f'known codes are {"".join(sorted(set(_CODE_CELL) | {_UNDERWATER_CODE}))}')
         out.extend([_CODE_CELL[code]] * count)
     if pos != len(row):
         raise LevelFormatError(
@@ -577,21 +587,21 @@ def expand_row_mist(row: str, cols: int, lineno: int,
     if len(out) != cols:
         raise LevelFormatError(
             f'{where}.cells[{lineno}]: expands to {len(out)} cells, expected {cols}')
-    return out, mist
+    return out, underwater
 
 
 def expand_row(row: str, cols: int, lineno: int,
                where: str = 'geometry') -> list:
-    """One `cells` row → a list of CellTypes, mist discarded."""
-    return expand_row_mist(row, cols, lineno, where)[0]
+    """One `cells` row → a list of CellTypes, the water discarded."""
+    return expand_row_underwater(row, cols, lineno, where)[0]
 
 
-def encode_row(cells: list, mist_cols=()) -> str:
-    """The inverse of expand_row_mist, run-length encoded."""
+def encode_row(cells: list, underwater_cols=()) -> str:
+    """The inverse of expand_row_underwater, run-length encoded."""
     out, run, prev = [], 0, None
-    mist_cols = set(mist_cols)
+    underwater_cols = set(underwater_cols)
     for i, ct in enumerate(cells):
-        code = _MIST_CODE if i in mist_cols and ct == CellType.WATER else _CELL_CODE[ct]
+        code = _UNDERWATER_CODE if i in underwater_cols and ct == CellType.WATER else _CELL_CODE[ct]
         if code == prev:
             run += 1
         else:
@@ -634,7 +644,7 @@ def crop(lvl: Level) -> Level:
         rows=first.rows, cols=first.cols, cells=first.cells,
         spawn=first.spawn, exit=first.exit,
         wrap=first.wrap, wrap_width=first.wrap_width, veiled=first.veiled,
-        mist=first.mist,
+        underwater=first.underwater,
         fills=first.fills,
         seals=first.seals, char_runs=first.char_runs, entities=first.entities,
         then=rooms[1:],
@@ -683,13 +693,13 @@ def _crop_room(h: Room) -> Room:
     def _mv(pos):
         return (int(pos[0]) - r1, int(pos[1]) - c1)
 
-    mist = {(r, c) for r, row in enumerate(h.cells)
-            for c in expand_row_mist(row, h.cols, r, h.where)[1]}
+    sunken = {(r, c) for r, row in enumerate(h.cells)
+              for c in expand_row_underwater(row, h.cols, r, h.where)[1]}
     return replace(
         h,
         rows=r2 - r1 + 1, cols=c2 - c1 + 1,
         cells=[encode_row(grid[r][c1:c2 + 1],
-                          [c - c1 for (mr, c) in mist if mr == r])
+                          [c - c1 for (mr, c) in sunken if mr == r])
                for r in range(r1, r2 + 1)],
         spawn=_mv(h.spawn), exit=_mv(h.exit),
         char_runs=[{**ru, 'row': int(ru['row']) - r1, 'col': int(ru['col']) - c1}
@@ -738,13 +748,13 @@ def resize(lvl: Level, rows: int, cols: int) -> Level:
                 f'the level reaches row {used[0]}, column {used[1]} — '
                 f'a smaller canvas would cut it')
     grid = [expand_row(row, h.cols, i, h.where) for i, row in enumerate(h.cells)]
-    mist = {(r, c) for r, row in enumerate(h.cells)
-            for c in expand_row_mist(row, h.cols, r, h.where)[1]}
+    sunken = {(r, c) for r, row in enumerate(h.cells)
+              for c in expand_row_underwater(row, h.cols, r, h.where)[1]}
     stone = [CellType.WALL] * cols
     out   = []
     for r in range(rows):
         row = (grid[r][:cols] + stone[h.cols:cols]) if r < h.rows else stone
-        out.append(encode_row(row, [c for (mr, c) in mist if mr == r and c < cols]))
+        out.append(encode_row(row, [c for (mr, c) in sunken if mr == r and c < cols]))
     return replace(lvl, rows=rows, cols=cols, cells=out)
 
 
@@ -752,7 +762,7 @@ def paste(level: Level, into: Level, at: tuple) -> Level:
     """Stamp a single-room level onto another level's canvas.
 
     The fragment's top-left cell lands on `at = (row, col)`. Everything
-    positional moves with it — the cells (and the mist encoded inside them),
+    positional moves with it — the cells (and the water encoded inside them),
     fills, seals, char runs, entities and veiled plaques — and the host keeps
     its own name, spawn, exit, seed and curriculum identity. A fragment is
     geometry and content, no doors: its `spawn`/`exit` are ignored, because
@@ -802,9 +812,9 @@ def paste(level: Level, into: Level, at: tuple) -> Level:
             f'row {dr + src.rows - 1}, column {dc + src.cols - 1}, past the '
             f'host canvas of {dst.rows}x{dst.cols} — resize(into, …) first')
 
-    grid = [expand_row_mist(row, dst.cols, i, dst.where)
+    grid = [expand_row_underwater(row, dst.cols, i, dst.where)
             for i, row in enumerate(dst.cells)]
-    frag = [expand_row_mist(row, src.cols, i, src.where)
+    frag = [expand_row_underwater(row, src.cols, i, src.where)
             for i, row in enumerate(src.cells)]
     for r in range(dr, dr + src.rows):
         dcells = grid[r][0]
@@ -815,16 +825,16 @@ def paste(level: Level, into: Level, at: tuple) -> Level:
                     f'{r}, column {c} — paste stamps stone onto stone only')
 
     out = []
-    for r, (dcells, dmist) in enumerate(grid):
+    for r, (dcells, dsunken) in enumerate(grid):
         if dr <= r < dr + src.rows:
             row = list(dcells)
-            fr, fmist = frag[r - dr]
+            fr, fsunken = frag[r - dr]
             row[dc:dc + src.cols] = fr
-            # Host mist outside the footprint keeps its column; the
-            # footprint's mist comes from the fragment, offset in.
-            mist = {c for c in dmist if not (dc <= c < dc + src.cols)}
-            mist |= {c + dc for c in fmist}
-            out.append(encode_row(row, mist))
+            # Host water outside the footprint keeps its column; the
+            # footprint's comes from the fragment, offset in.
+            sunken = {c for c in dsunken if not (dc <= c < dc + src.cols)}
+            sunken |= {c + dc for c in fsunken}
+            out.append(encode_row(row, sunken))
         else:
             out.append(dst.cells[r])
 
@@ -849,8 +859,8 @@ def paste(level: Level, into: Level, at: tuple) -> Level:
         {**e, 'at': list(_mv(e['at']))} for e in src.entities]
     veiled = ([tuple(v) for v in into.veiled] +
               [(int(v[0]) + dr, int(v[1]) + dc) for v in src.veiled])
-    mist = ([tuple(v) for v in into.mist] +
-            [(int(v[0]) + dr, int(v[1]) + dc) for v in src.mist])
+    underwater = ([tuple(v) for v in into.underwater] +
+            [(int(v[0]) + dr, int(v[1]) + dc) for v in src.underwater])
     # A fragment whose fills draw on its OWN vocabulary brings those words:
     # without the union its fills resolve against a pool that does not exist.
     vocabulary = list(into.vocabulary)
@@ -862,7 +872,7 @@ def paste(level: Level, into: Level, at: tuple) -> Level:
 
     return replace(into, cells=out, fills=fills, seals=seals,
                    char_runs=char_runs, entities=entities, veiled=veiled,
-                   mist=mist, vocabulary=vocabulary)
+                   underwater=underwater, vocabulary=vocabulary)
 
 
 def _content_extent(h: Room) -> tuple[int, int] | None:
@@ -970,19 +980,19 @@ def _build_room(spec: Room, lvl: Level, rng: random.Random,
         raise LevelFormatError(
             f'{spec.where}.cells: {len(spec.cells)} rows, {spec.where}.rows says '
             f'{spec.rows}')
-    grid = [expand_row_mist(row, spec.cols, i, spec.where)
+    grid = [expand_row_underwater(row, spec.cols, i, spec.where)
             for i, row in enumerate(spec.cells)]
     cells = [g[0] for g in grid]
-    mist  = {(r, c) for r, (_, cols) in enumerate(grid) for c in cols}
-    # Mist said as a coordinate list unions with whatever the `M` codes said:
-    # inline M is water shorthand, the list is every other terrain. Both are
-    # the author's haze; neither overrides the other.
-    mist |= {(int(a), int(b)) for a, b in getattr(spec, 'mist', ())}
+    underwater  = {(r, c) for r, (_, cols) in enumerate(grid) for c in cols}
+    # Ground said as a coordinate list unions with whatever the `M` codes
+    # said: inline M is water shorthand, the list is every other terrain.
+    # Both are the author's water; neither overrides the other.
+    underwater |= {(int(a), int(b)) for a, b in getattr(spec, 'underwater', ())}
 
     room = LiveRoom(room_type=RoomType.ENTRY, rows=spec.rows, cols=spec.cols)
     room.cells     = cells
-    room.mist_cells = set(mist)
-    room.fog_cells  = set(mist)      # mist is always a subset of the fog
+    room.underwater_cells = set(underwater)
+    room.fog_cells  = set(underwater)  # water is always a subset of the fog
     room.seed      = lvl.seed
     room.spawn_pos = tuple(spec.spawn)
     room.exit_pos  = tuple(spec.exit)
@@ -1041,10 +1051,10 @@ def _build_room(spec: Room, lvl: Level, rng: random.Random,
     # is DERIVED here rather than stored in the file, so it can never disagree
     # with the walls an author painted — move a wall in the forge and the fog
     # moves with it, with nothing to remember and nothing to re-run.
-    # A level file has no scripts, so the only fog it can carry is MIST — which
-    # is permanent by being mist, not by holding the reveal back. So a built
-    # level always re-reveals: walk in, and the pocket lights as sight crosses
-    # the opened seal, while the mist stays hazy for ever.
+    # A level file has no scripts, so the only fog it can carry is the
+    # UNDERWATER kind — permanent by being drowned ground, not by holding the
+    # reveal back. So a built level always re-reveals: walk in, and the pocket
+    # lights as sight crosses the opened seal, while sunken cells stay hazy.
     # …and the indexes BEFORE the law, not after: an `opaque` door is a thing
     # standing on a cell, so the law has to be able to ask what is standing
     # there. Indexed after, `entity_at` answered None and a door an author
@@ -1210,8 +1220,8 @@ def _dump_content(h: Room) -> dict:
     data = {}
     if h.veiled:
         data['veiled'] = [list(v) for v in h.veiled]
-    if h.mist:
-        data['mist'] = [list(v) for v in h.mist]
+    if h.underwater:
+        data['underwater'] = [list(v) for v in h.underwater]
     if h.fills:
         data['fill'] = [{'region': list(f.region), 'pool': f.pool,
                          'length': list(f.length), 'spacing': f.spacing,
@@ -1296,7 +1306,8 @@ def from_room(room, name: str, author: str = '', solution: str = '',
         alternate=alternate, intro=intro,
         rows=h.rows, cols=h.cols, cells=h.cells,
         spawn=h.spawn, exit=h.exit,
-        wrap=h.wrap, wrap_width=h.wrap_width, veiled=h.veiled, mist=h.mist,
+        wrap=h.wrap, wrap_width=h.wrap_width, veiled=h.veiled,
+        underwater=h.underwater,
         fills=h.fills, seals=h.seals,
         char_runs=h.char_runs, entities=h.entities,
         then=list(then),
@@ -1329,25 +1340,25 @@ def capture_room(room, *, fills=None, seals=None,
     # solved. `build` shuts them again on load too; both ends hold the same line
     # so neither depends on the other having done it.
     grid = [list(row) for row in room.cells]
-    _mist_by_row = {}
-    for r, c in getattr(room, 'mist_cells', ()):
+    _sunken_by_row = {}
+    for r, c in getattr(room, 'underwater_cells', ()):
         if room.cells[r][c] != CellType.WATER:      # water rides the M code
-            _mist_by_row.setdefault('list', []).append((r, c))
+            _sunken_by_row.setdefault('list', []).append((r, c))
         else:
-            _mist_by_row.setdefault(r, set()).add(c)
+            _sunken_by_row.setdefault(r, set()).add(c)
     for s in seals:
         for r, c in s.opens:
             if 0 <= r < room.rows and 0 <= c < room.cols:
                 grid[r][c] = CellType.WALL
     return Room(
         rows=room.rows, cols=room.cols,
-        cells=[encode_row(row, _mist_by_row.get(r, ()))
+        cells=[encode_row(row, _sunken_by_row.get(r, ()))
                for r, row in enumerate(grid)],
         spawn=tuple(room.spawn_pos), exit=tuple(room.exit_pos or (1, 1)),
         wrap=bool(getattr(room, 'wrap_buffer', False)),
         wrap_width=int(getattr(room, 'wrap_width', 0) or 0),
         veiled=sorted(getattr(room, 'veiled_cells', ()) or ()),
-        mist=sorted(_mist_by_row.get('list', ())),
+        underwater=sorted(_sunken_by_row.get('list', ())),
         fills=list(fills), seals=list(seals),
         char_runs=[{'row': ru.row, 'col': ru.col,
                     'symbols': list(ru.symbols), 'kind': ru.kind}

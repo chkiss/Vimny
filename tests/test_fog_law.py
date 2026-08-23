@@ -153,6 +153,6 @@ def test_mist_survives_the_re_reveal():
                   cells=['12W', 'W10FW', 'W3F4M3FW', 'W10FW', '12W'],
                   spawn=(1, 1), exit=(3, 10))
     room = F.build(lvl).room
-    assert room.mist_cells, 'the row of M is misted water'
+    assert room.underwater_cells, 'the row of M is misted water'
     auto_fog_tick(room, 1, 1)                     # stand and look at it
-    assert room.mist_cells <= room.fog_cells, 'the haze did not burn off'
+    assert room.underwater_cells <= room.fog_cells, 'the haze did not burn off'

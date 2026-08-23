@@ -855,9 +855,9 @@ def _range_cells(room, player) -> list:
 def _paint_name(room, r: int, c: int) -> str:
     """What `:paint` would call the cell at (r, c)."""
     ct     = room.cells[r][c]
-    misted = (r, c) in getattr(room, 'mist_cells', ())
-    for name, (kind_ct, kind_mist, _) in PAINT_KINDS.items():
-        if kind_ct == ct and kind_mist == misted:
+    sunken = (r, c) in getattr(room, 'underwater_cells', ())
+    for name, (kind_ct, kind_sunken, _) in PAINT_KINDS.items():
+        if kind_ct == ct and kind_sunken == sunken:
             return name
     return ct.name.lower()
 
@@ -2294,7 +2294,7 @@ def _base_snapshot(room, player, budget, row, col, spent, ap, ad) -> dict:
         'exit_pos': room.exit_pos,
         'spawn_pos': room.spawn_pos,
         'fog_cells': set(room.fog_cells),
-        'mist_cells': set(room.mist_cells),
+        'underwater_cells': set(room.underwater_cells),
         'answer_pos':      ap,
         'answer_diverged': ad,
     }
@@ -2332,8 +2332,8 @@ def _pop_history_step(src: list, dst: list, room, player, budget, is_redo: bool 
             room.exit_pos = item['exit_pos']
             room.spawn_pos = item['spawn_pos']
         room.fog_cells = item['fog_cells']
-        if 'mist_cells' in item:
-            room.mist_cells = item['mist_cells']
+        if 'underwater_cells' in item:
+            room.underwater_cells = item['underwater_cells']
         if 'wm_state' in item:                   # the Manifold's boss ward state
             for k in _WM_UNDO_ATTRS:
                 if k in item['wm_state']:
@@ -4026,7 +4026,7 @@ _LEVEL_INTROS = {
     'joiners_gate':        ('The Joiner\'s Gate — the old inscriptions were split, line from line, and scattered down the stacks. What was one line must be one line again; the plaques remember how each read whole.', 70),
     'alignment_halls':     ('The Alignment Halls — a plumb line falls through the hall, and every word has slid from its station. The plaques remember where each belongs.', 70),
     'indentation_sanctum': ('The Indentation Sanctum — the law presides from the lintel, and the verses below have slid from their stations.', 70),
-    'sentence_corridor': ('The Sentence Corridor — two verses parted by still water, and a mist that clings to the pool. The far shore reads clear, but you can\'t reliably jump to the far wall from here.', 70),
+    'sentence_corridor': ('The Sentence Corridor — two verses parted by still water that clings to the pool like fog. The far shore reads clear, but you can\'t reliably jump to the far wall from here.', 70),
     'sight_sanctum': ('The Sight Sanctum — old sayings interrupted mid-breath by rot no single stroke can span. You know how each one should finish. The keepers of this place had one law: first behold, then strike.', 70),
     'selection_halls': ('The Selection Halls — a gallery of corrupt panels: some rotted whole lines at a time, some down a single seam. The restorers here took each span in one grasp.', 70),
     'word_enclosure': ('The Word Enclosure — old sayings hang in these bays, every one spoken wrong. You know how they truly run. The wardens here did not aim their cuts; they named the shape, and the shape was taken whole.', 70),
@@ -4184,8 +4184,8 @@ def _goblin_substitute(cmd: str, room, player, push) -> bool:
     if len(pat) != 1:                                # single-glyph patterns only
         return False
     rows = range(room.rows) if whole == '%' else (player.row,)
-    _fog  = getattr(room, 'fog_cells', set())
-    _mist = getattr(room, 'mist_cells', set())
+    _fog    = getattr(room, 'fog_cells', set())
+    _sunken = getattr(room, 'underwater_cells', set())
     # ONE unified match: every transformable creature by its CURRENT glyph, so
     # :s/g/…, :s/G/…, :s/d/…, :s/Z/…, :s/e/…, :s/$/…, :s/W/… all target the right
     # beasts (case-sensitive, Vim-true). Fogged cells are skipped — you cannot
@@ -4193,7 +4193,7 @@ def _goblin_substitute(cmd: str, room, player, push) -> bool:
     gobs = [e for e in room.entities if e.alive and e.row in rows
             and e.kind in _EGG_CREATURE_KINDS
             and entity_letter(e) == pat
-            and ((e.row, e.col) not in _fog or (e.row, e.col) in _mist)]
+            and ((e.row, e.col) not in _fog or (e.row, e.col) in _sunken)]
     if not gobs:
         return False                                 # no matching creatures → normal :s
     if not (getattr(player, 'hat_worn', False) or 'admin' in player.known_commands):
@@ -5624,8 +5624,8 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
 
     def _ledger_check():
         """The Culling Ledger (v3). Each tick, statelessly:
-        1. once door ONE is open, part the mist — the dark ledger becomes
-           misted — readable, still unwalkable. This is design, not an engine
+        1. once door ONE is open, part the water — the dark ledger goes
+           underwater — readable, still unwalkable. This is design, not an engine
            rule: nothing stops a fogged line being culled, so the ledger is
            revealed first to keep the :v cull a reading task, not a guess;
         2. once the ledger reads EXACTLY its true lines, in order, the cold
@@ -5655,32 +5655,33 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
                     if not getattr(room, '_cl_ledge_told', False):
                         room._cl_ledge_told = True
                         _push('The void swallows the false ledge!')
-        _chasm_remist()                 # a :t/:m'd row must never become footing
+        _chasm_resubmerge()             # a :t/:m'd row must never become footing
         cor = _subst._last_standable_row(room)     # the corridor rides up
         door1_shut = any(e.kind == 'locked_door' and e.alive
                          and e.col < _dg._CL_BRZ_COL
                          for e in room.entities)
         lit = getattr(room, '_ledger_lit', None)
         if not door1_shut:
-            # THE MIST PARTS (stateless, re-asserted every tick — the unlock's
-            # own reveal flood strips too much): everything ABOVE the stone
-            # course turns misted (readable, unwalkable); the corridor lights
-            # up to the boss door; past it stays dark until the brazier burns.
+            # THE WATER PARTS (stateless, re-asserted every tick — the
+            # unlock's own reveal flood strips too much): everything ABOVE the
+            # stone course goes underwater (readable, unwalkable); the
+            # corridor lights up to the boss door; past it stays dark until
+            # the brazier burns.
             for fr in range(1, cor - 1):
                 for fc in range(room.cols):
                     if room.cells[fr][fc] in (CellType.FLOOR, CellType.WATER):
                         room.fog_cells.add((fr, fc))
-                        room.mist_cells.add((fr, fc))
+                        room.underwater_cells.add((fr, fc))
             sd_col = _dg._CL_SEALDOOR[1]
             for fc in range(room.cols):
                 cell = (cor, fc)
                 if fc < sd_col:
                     room.fog_cells.discard(cell)   # lit corridor, up to the seal
-                    room.mist_cells.discard(cell)
+                    room.underwater_cells.discard(cell)
                 elif not lit and room.cells[cor][fc] in (CellType.FLOOR,
                                                          CellType.CORRIDOR):
                     room.fog_cells.add(cell)       # the dark holds past the seal
-                    room.mist_cells.discard(cell)
+                    room.underwater_cells.discard(cell)
             # (No message: the reveal is on screen — narration would only
             # distract from what the player can already see.)
         if lit is not False:
@@ -5707,9 +5708,9 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
         room.rebuild_indexes()
         _push('The braziers answer as one — firelight finds the way out!')
 
-    def _chasm_remist():
+    def _chasm_resubmerge():
         """The chasm law, stateless: any BARE floor above the gallery (a row a
-        :t/:m just shelved arrives unfogged) is re-mist ed each turn — the far
+        :t/:m just shelved arrives unfogged) is re-sunken each turn — the far
         bank never becomes footing."""
         gal = _subst._last_standable_row(room)
         for r in range(1, gal - 1):     # gal-1 = the wall/water course (its gap
@@ -5719,10 +5720,10 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
                     if (room.cells[r][c] == CellType.FLOOR
                             and (r, c) not in room.fog_cells):
                         room.fog_cells.add((r, c))
-                        room.mist_cells.add((r, c))
+                        room.underwater_cells.add((r, c))
 
     def _shelving_tick():
-        """The Shelving Room: re-mist fresh shelf rows; each mended misfiling
+        """The Shelving Room: re-submerge fresh shelf rows; each mended misfiling
         grinds back its own gallery bolt (STATELESS, any order); the seal
         parts once the whole round reads true — indent included, blank rows
         ignored. No plaque: the round is an echo, and the shelf's own sound
@@ -5731,7 +5732,7 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
         targets = getattr(room, '_shr_targets', None)
         if targets is None:
             return
-        _chasm_remist()
+        _chasm_resubmerge()
         gal = _subst._last_standable_row(room)
         lines = []                       # (indent, stripped text), shelf order
         for r in range(1, gal - 1):
@@ -5769,17 +5770,17 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
         _unveil = {(fr, fc) for (fr, fc) in room.fog_cells
                    if fr == gal and fc > sc}
         room.fog_cells -= _unveil                  # unveil the pocket —
-        room.mist_cells -= _unveil                 # its haze lifts with it
+        room.underwater_cells -= _unveil                 # its haze lifts with it
         room._shr_seal_col = None
         _push('The round sings in order, echo under call. The way opens!')
 
     def _refrain_tick():
-        """The Refrain Vault (London Bridge): re-mist the torn-line chasm, then
+        """The Refrain Vault (London Bridge): re-submerge the torn chasm, then
         open the seal once the song below the water reads EXACTLY as it should
         — every "falling up" mended to "falling down", the build and key
         verses untouched ("up" is TRUE there: a blanket :%s wrecks them), and
         the torn final line laid down on walkable floor (a :t'd chasm slab
-        arrives misted and cannot serve). Blank rows are ignored."""
+        arrives sunken and cannot serve). Blank rows are ignored."""
         true_song = getattr(room, '_rv_true', None)
         if true_song is None:
             return
@@ -5792,7 +5793,7 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
                     if (room.cells[r][cc] == CellType.FLOOR
                             and (r, cc) not in room.fog_cells):
                         room.fog_cells.add((r, cc))
-                        room.mist_cells.add((r, cc))
+                        room.underwater_cells.add((r, cc))
         if getattr(room, '_rv_seal_col', None) is None or wtr is None:
             return
         # Band the shut seal as stonework; derived here rather than at build
@@ -6183,9 +6184,9 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
         elif level == 'culling_ledger':
             _ledger_check()                      # open the seal once the ledger reads true
         elif level == 'shelving_room':
-            _shelving_tick()                     # re-mist, bolts, seal check
+            _shelving_tick()                     # re-submerge, bolts, seal check
         elif level == 'refrain_vault':
-            _refrain_tick()                      # re-mist the chasm, seal check
+            _refrain_tick()                      # re-submerge the chasm, seal check
 
         # ── The elf's shitty trade (from :s/g/e/) awaits a y/n ────────────────
         # Only y/n resolve it; every other key (x to attack the elf, a step away)
@@ -6565,7 +6566,7 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
                         and edit_mode and player_name == 'admin':
                     # `:paint <kind>` lays terrain down by NAME, where `s` used to
                     # walk a fixed ring. A ring can only reach what someone
-                    # remembered to thread onto it — misted water was in the
+                    # remembered to thread onto it — sunken water was in the
                     # engine, drawn by the renderer, reachable by no key — and it
                     # cannot answer "what else is there?". A name can, and takes
                     # the `'<,'>` range the way `:fill` does, so a river is one

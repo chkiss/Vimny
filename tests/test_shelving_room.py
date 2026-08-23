@@ -150,7 +150,7 @@ def test_shelf_is_misted_sightlined_and_unwalkable(seed):
     visible = _vision_flood(r, *r.spawn_pos)
     for row in range(1, 8):
         for c in range(*_SHR_BAND):
-            assert (row, c) in r.fog_cells and (row, c) in r.mist_cells
+            assert (row, c) in r.fog_cells and (row, c) in r.underwater_cells
             assert not r.is_passable(row, c)
             assert (row, c) in visible                   # the stone law, earned
     seen = {r.spawn_pos}
@@ -290,7 +290,7 @@ def test_the_shelf_lines_are_readable_through_the_mist(
     dungeon = build_dungeon_shelving_room(seed)
     room = dungeon.rooms[0]
     line1 = next(ru for ru in room.char_runs if ru.row == 1)
-    assert (line1.row, line1.col) in room.mist_cells, 'precondition: under mist'
+    assert (line1.row, line1.col) in room.underwater_cells, 'precondition: under mist'
     monkeypatch.setattr(main.time, 'sleep', lambda *a, **k: None)
     monkeypatch.setattr(Terminal, 'height', property(lambda self: 45))
     monkeypatch.setattr(Terminal, 'width', property(lambda self: 120))
@@ -319,7 +319,7 @@ def test_one_open_bolt_never_unblinds_the_pocket(seed):
     r = _room(seed)
     gal = 9
     pocket = [(gal, c) for c in range(62, 71)]
-    assert all((gal, c) in r.mist_cells for (gal, c) in pocket), \
+    assert all((gal, c) in r.underwater_cells for (gal, c) in pocket), \
         'precondition: the pocket rides the mist'
     # One bolt grinds back — exactly what the stateless tick does.
     from vimny.engine.world import CellType
@@ -328,7 +328,7 @@ def test_one_open_bolt_never_unblinds_the_pocket(seed):
     motion.auto_fog_tick(r, *r.spawn_pos)
     assert all((gal, c) in r.fog_cells for (gal, c) in pocket), \
         'an open bolt must not unveil the pocket past the shut ones'
-    assert all((gal, c) in r.mist_cells for (gal, c) in pocket)
+    assert all((gal, c) in r.underwater_cells for (gal, c) in pocket)
     # Every jump/scan stays west of the pocket; the one OPEN bolt is itself
     # lawful footing ($ parks there), but nothing beyond it is reachable.
     from vimny.engine.player import Player

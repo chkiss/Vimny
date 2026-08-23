@@ -248,7 +248,7 @@ def test_plugh_sleeps_until_the_pocket_is_entered(seed):
               for i in range(len(_WP_WORD2))}
     assert fogged <= room.fog_cells
     assert fogged == room._wp_plugh_fog
-    assert not (fogged & room.mist_cells)          # liftable — NOT mist
+    assert not (fogged & room.underwater_cells)          # liftable — NOT mist
     # every plugh stands where designed, nowhere else
     assert _positions(room, _WP_WORD2) == sorted(
         [_WP_W2_POCKET1, _WP_W2_POCKET2] + _WP_W2_DECOYS)

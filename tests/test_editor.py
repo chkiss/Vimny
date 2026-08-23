@@ -273,26 +273,26 @@ class TestEdPaint:
             assert _ed_paint(room, 3, 5, name) is True
             assert room.cells[3][5] == ct, name
 
-    def test_mist_is_water_under_permanent_fog(self):
+    def test_underwater_is_water_under_permanent_fog(self):
         room = _make_room()
-        _ed_paint(room, 3, 5, 'mist')
+        _ed_paint(room, 3, 5, 'underwater')
         assert room.cells[3][5] == CellType.WATER
-        assert (3, 5) in room.mist_cells
-        # The renderer reads the haze off fog_cells first — mist that is not
-        # also fogged simply draws as open water.
+        assert (3, 5) in room.underwater_cells
+        # The renderer reads the haze off fog_cells first — sunken ground that
+        # is not also fogged simply draws as open water.
         assert (3, 5) in room.fog_cells
 
-    def test_painting_over_mist_clears_the_haze_too(self):
+    def test_painting_over_underwater_clears_the_haze_too(self):
         room = _make_room()
-        _ed_paint(room, 3, 5, 'mist')
+        _ed_paint(room, 3, 5, 'underwater')
         _ed_paint(room, 3, 5, 'floor')
-        assert (3, 5) not in room.mist_cells
+        assert (3, 5) not in room.underwater_cells
         assert (3, 5) not in room.fog_cells
 
-    def test_mist_keeps_waters_glyph(self):
-        """A channel under haze is still a channel. Mist is separated from open
-        water by its background and by never animating — not by wearing a
-        different glyph, which read as rubble."""
+    def test_underwater_keeps_waters_glyph(self):
+        """A channel under haze is still a channel. Underwater ground is
+        separated from open water by its background and by never animating —
+        not by wearing a different glyph, which read as rubble."""
         from vimny.render import symbols as S
         assert S.MIST == '~'
 

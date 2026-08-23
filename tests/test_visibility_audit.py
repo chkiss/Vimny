@@ -80,7 +80,7 @@ def _row_snapshot(room) -> dict:
     A glyph cell is HIDDEN when the fog holds it without mist over it (plain
     fog draws blank until revealed) or when a veil covers it. Misted glyphs
     render through the haze — ink shows through weather — so they are seen."""
-    fog, mist = room.fog_cells, room.mist_cells
+    fog, mist = room.fog_cells, room.underwater_cells
     veiled = getattr(room, 'veiled_cells', ())
     out: dict[int, tuple[str, tuple]] = {}
     for ru in room.char_runs:

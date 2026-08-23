@@ -59,9 +59,9 @@ def _flood_reachable(room, start_r: int, start_c: int) -> set:
             if not (0 <= nr < room.rows and 0 <= nc < room.cols
                     and room.cells[nr][nc] in _FOGGABLE_CELLS):
                 continue
-            if (nr, nc) in room.mist_cells:
-                continue      # MIST: permanent haze is never reached NOR
-                              # revealed — light stops at it, so a misted
+            if (nr, nc) in room.underwater_cells:
+                continue      # UNDERWATER: permanent haze is never reached NOR
+                              # revealed — light stops at it, so a submerged
                               # channel can't ladder a fog flood (nor a
                               # reveal) past a gate. Ordinary fogged water
                               # (a pool inside a to-be-revealed region)
@@ -180,14 +180,15 @@ def auto_fog_tick(room, player_r: int, player_c: int) -> None:
     """Re-reveal for auto_fog rooms: lift fog from every cell now visible
     from the player (walls-only sight). Called each tick by the main loop.
 
-    MIST is never lifted. The two fogs are different things wearing one field:
-    stone fog is ignorance, and looking cures it; mist is weather, and standing
-    next to it does not. Without this a misted level that also auto-reveals
-    would clear its own haze on turn one.
+    UNDERWATER ground is never lifted. The two fogs are different things
+    wearing one field: stone fog is ignorance, and looking cures it;
+    submerged ground is drowned, and standing next to it does not. Without
+    this a level that is both sunken and auto-revealing would clear its own
+    water on turn one.
     """
     if getattr(room, 'auto_fog', False) and room.fog_cells:
         room.fog_cells -= (_vision_flood(room, player_r, player_c)
-                           - (room.mist_cells or set()))
+                           - (room.underwater_cells or set()))
 
 
 def unhide_region(room, cells) -> None:

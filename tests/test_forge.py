@@ -1310,11 +1310,11 @@ def test_painted_mist_survives_the_round_trip():
     reason it could not be painted is the same reason it could not be SAVED: the
     grid had no code for it. `M` is water plus its permanent haze."""
     d = DRAFT.new('Probe', rows=8, cols=30)
-    _forge_session(d, 'jll:paint mist\r:w\r:q!\r')
+    _forge_session(d, 'jll:paint underwater\r:w\r:q!\r')
     assert 'M' in d.level.cells[2]
     room = F.build(d.level).room
     assert room.cells[2][3] == CellType.WATER
-    assert (2, 3) in room.mist_cells
+    assert (2, 3) in room.underwater_cells
     assert (2, 3) in room.fog_cells
 
 

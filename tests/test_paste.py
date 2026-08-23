@@ -140,7 +140,7 @@ def test_mist_rides_inside_footprint_and_host_mist_stands():
         'WFFAMFW',
         'WWWWWWW'])
     host_cells = ['W' * 25] * 12
-    host_cells[1] = 'W' + 'MA' + 'W' * 22          # host mist OUTSIDE any footprint
+    host_cells[1] = 'W' + 'MA' + 'W' * 22          # host water OUTSIDE any footprint
     host = Level(name='H', rows=12, cols=25, cells=host_cells)
 
     out = paste(frag, host, (5, 10))

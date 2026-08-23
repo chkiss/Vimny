@@ -224,10 +224,10 @@ def test_jail_doors_draw_vertical():
 
 
 def test_mist_is_a_subset_of_fog():
-    """`mist_cells` is documented as a subset of `fog_cells` — reveals skip it."""
+    """`underwater_cells` is documented as a subset of `fog_cells` — reveals skip it."""
     room = build_dungeon_dummy(SEED).room
-    assert room.mist_cells, "no misted water in the dummy dungeon"
-    assert room.mist_cells <= room.fog_cells
+    assert room.underwater_cells, "no misted water in the dummy dungeon"
+    assert room.underwater_cells <= room.fog_cells
 
 
 def test_sealed_gate_present():
@@ -308,6 +308,6 @@ def test_paint_can_reach_every_cell_type():
 def test_paint_reaches_the_misted_water_the_cycle_never_could():
     room = build_dungeon_dummy(SEED).room
     r, c = SCRATCH
-    _ed_paint(room, r, c, 'mist')
+    _ed_paint(room, r, c, 'underwater')
     assert room.cells[r][c] == CellType.WATER
-    assert (r, c) in room.mist_cells
+    assert (r, c) in room.underwater_cells
