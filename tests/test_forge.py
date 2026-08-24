@@ -1910,3 +1910,18 @@ def test_painting_underwater_over_floor_keeps_the_floor():
     assert room.cells[2][1] == CellType.FLOOR
     assert (2, 1) in room.underwater_cells and (2, 1) in room.fog_cells
     assert not room.is_passable(2, 1)
+
+
+def test_painting_veil_hides_a_carving_and_rides_the_save():
+    """`:paint veil` completes the darkness palette: fog derives, underwater
+    paints, and now veils too — a carving on stone that is not legible yet.
+    The veil rides the file in the `veiled` coordinate list and comes back as
+    bare stone until something reveals it."""
+    d = DRAFT.new('Probe', rows=8, cols=30)
+    # row 0 is the border wall; walk up onto it (edit mode lets you) and carve
+    _forge_session(d, 'k:paint veil\r' + 'l' * 0 + ':w\r:q!\r')
+    assert sorted(map(tuple, d.level.veiled)) == [(0, 1)]
+    _fresh = DRAFT.load(d.path)
+    assert _fresh.ok, _fresh.error
+    room = F.build(_fresh.level).rooms[0]
+    assert (0, 1) in room.veiled_cells

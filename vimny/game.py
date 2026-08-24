@@ -857,8 +857,10 @@ def _paint_name(room, r: int, c: int) -> str:
     ct = room.cells[r][c]
     if (r, c) in getattr(room, 'underwater_cells', ()):
         return 'underwater'          # the smart kind keeps any terrain
-    for name, (kind_ct, kind_sunken, _) in PAINT_KINDS.items():
-        if kind_ct is not None and kind_ct == ct and not kind_sunken:
+    if (r, c) in getattr(room, 'veiled_cells', ()):
+        return 'veil'                # a carving not legible yet
+    for name, (kind_ct, layer, _) in PAINT_KINDS.items():
+        if kind_ct is not None and kind_ct == ct and layer is None:
             return name
     return ct.name.lower()
 

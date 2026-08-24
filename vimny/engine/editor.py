@@ -23,7 +23,7 @@ from vimny.engine.world import (
     normalize_row_word_kinds,
 )
 
-#: What `:paint` can lay down, name → (cell type, submerged, one-line description).
+#: What `:paint` can lay down, name → (cell type, layer, one-line description).
 #:
 #: This is the whole vocabulary of the terrain, in one place, because the thing
 #: it replaced — the `s` cycle — could only ever be as complete as whoever last
@@ -34,13 +34,17 @@ from vimny.engine.world import (
 #:
 #: UNDERWATER is not a sixth CellType — it is water (or floor) under permanent
 #: fog, which is a pair of facts about a cell, so it is spelled as one paint.
+#: VEIL is the third layer: a carving on stone that is not legible yet — same
+#: shape, different sense. `None` in the layer column means plain terrain; the
+#: cell type `None` means "keep whatever ground this touches".
 PAINT_KINDS = {
-    'floor':    (CellType.FLOOR,     False, 'open ground'),
-    'corridor': (CellType.CORRIDOR,  False, 'walkable, drawn as passage'),
-    'wall':     (CellType.WALL,      False, 'stone — blocks feet, bounds a line'),
-    'wood':     (CellType.WOOD_WALL, False, 'destructible wall — two hits of x'),
-    'water':    (CellType.WATER,     False, 'unwalkable; line motions cross it'),
-    'underwater': (None,             True,  'permanent haze over the ground — never footing, lit, or searched'),
+    'floor':    (CellType.FLOOR,     None,         'open ground'),
+    'corridor': (CellType.CORRIDOR,  None,         'walkable, drawn as passage'),
+    'wall':     (CellType.WALL,      None,         'stone — blocks feet, bounds a line'),
+    'wood':     (CellType.WOOD_WALL, None,         'destructible wall — two hits of x'),
+    'water':    (CellType.WATER,     None,         'unwalkable; line motions cross it'),
+    'underwater': (None,             'underwater', 'permanent haze over the ground — never footing, lit, or searched'),
+    'veil':     (None,               'veil',       'hidden carving on stone — legible when the level reveals it'),
 }
 
 
@@ -229,7 +233,14 @@ def _ed_paint(room, r, c, kind: str) -> bool:
     """
     if in_fill(room, r, c):
         return False                 # a fill owns this cell — see in_fill
-    ct, sunken, _ = PAINT_KINDS[kind]
+    ct, layer, _ = PAINT_KINDS[kind]
+    if layer == 'veil':
+        # A veil lives on STONE: it is a carving not legible yet, and there is
+        # nothing to carve into open ground. The terrain keeps whatever it was.
+        if room.cells[r][c] not in (CellType.WALL, CellType.WOOD_WALL):
+            return False
+        room.veiled_cells.add((r, c))
+        return True
     if ct is None:
         # The smart kind: `underwater` keeps whatever ground it touches and
         # adds the permanent haze. Stone is refused — walls are not foggable
@@ -241,7 +252,8 @@ def _ed_paint(room, r, c, kind: str) -> bool:
         room.fog_cells.add((r, c))
         return True
     room.cells[r][c] = ct
-    if sunken:
+    room.veiled_cells.discard((r, c))    # new ground: any old carving is gone
+    if layer == 'underwater':
         # Underwater ground is a subset of the fog, always: the renderer reads
         # the haze off `fog_cells` first and only then asks whether it is the
         # permanent kind.

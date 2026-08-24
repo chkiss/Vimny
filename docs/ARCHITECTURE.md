@@ -296,9 +296,10 @@ The per-level `_par_<slug>` solvers compute each dungeon's minimum-keystroke par
 ## Open work
 The agreed six-phase **port** — one materialiser instead of two, so the forge is
 complete by construction rather than by assurance. Phases 0–5 landed, and the
-round-trip probe is now FULLY lossless: `KNOWN_GAPS` in `tests/test_round_trip.py`
-is empty (68/68 passing, checked 2026-08-21) — every shipped level rebuilds from
-its own file giving nothing back. Landing a format-affecting change still means
+round-trip probe (`tests/test_round_trip.py`) now walks every shipped level
+through `from_room → dumps → loads → build` with a written verdict for whatever
+differs: **56 of 60 whole as of 2026-08-23**, the four standing exceptions each
+working as designed (see the gap inventory bullet above). Landing a format-affecting change still means
 keeping that table empty (or newly justified) in the same commit — a stale
 exemption is an audit passing vacuously.
 

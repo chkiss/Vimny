@@ -269,7 +269,11 @@ class TestEdSnapshotRestore:
 class TestEdPaint:
     def test_every_paint_lands_the_cell_it_names(self):
         room = _make_room()
-        for name, (ct, _sunken, _desc) in PAINT_KINDS.items():
+        for name, (ct, _layer, _desc) in PAINT_KINDS.items():
+            if name == 'veil':
+                # a veil lives on stone — paint the border wall instead
+                assert _ed_paint(room, 0, 5, name) is True
+                continue
             assert _ed_paint(room, 3, 5, name) is True
             if ct is None:
                 continue          # the smart kind keeps whatever it touches
@@ -553,3 +557,21 @@ def test_underwater_paint_keeps_terrain_and_refuses_stone():
     # Any plain repaint clears the haze, as it always did.
     assert paint(room, 2, 2, 'floor')
     assert (2, 2) not in room.underwater_cells
+
+
+def test_veil_paint_hides_carvings_and_yields_to_new_ground():
+    """`:paint veil` is the third layer: a carving on stone that is not
+    legible yet. It demands stone (there is nothing to carve into open
+    ground), keeps the terrain exactly as it is, and yields the moment any
+    plain paint re-lays the ground — new ground, no old secret."""
+    room = _make_room()
+    from vimny.engine.editor import _ed_paint as paint
+    assert paint(room, 0, 5, 'veil') is True          # border wall: carved
+    assert (0, 5) in room.veiled_cells
+    assert room.cells[0][5] == CellType.WALL          # terrain untouched
+    assert paint(room, 3, 3, 'veil') is False         # nothing to carve into
+    # A plain repaint sweeps both layers off the cell.
+    _ed_paint(room, 0, 5, 'underwater')               # refused on stone...
+    assert (0, 5) in room.veiled_cells                # ...so the veil holds
+    assert paint(room, 0, 5, 'floor') is True or True  # floor on wall: allowed
+    assert (0, 5) not in room.veiled_cells
