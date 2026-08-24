@@ -40,7 +40,8 @@ PAINT_KINDS = {
     'wall':     (CellType.WALL,      False, 'stone — blocks feet, bounds a line'),
     'wood':     (CellType.WOOD_WALL, False, 'destructible wall — two hits of x'),
     'water':    (CellType.WATER,     False, 'unwalkable; line motions cross it'),
-    'underwater': (CellType.WATER,   True,  'sunken ground — hazy, never lit or crossed'),
+    'underwater': (CellType.WATER,   True,  'sunken channel — hazy, never lit or crossed'),
+    'drowned':    (CellType.FLOOR,   True,  'sunken floor — text lies readable, never footing'),
 }
 
 

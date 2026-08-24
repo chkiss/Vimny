@@ -1863,3 +1863,49 @@ def test_two_doors_cannot_share_one_stone():
     d = DRAFT.new('Probe', rows=8, cols=30)
     _forge_session(d, ':seal alpha\r:bolt\r:final\r:q!\r')
     assert len(d.level.seals) == 1
+
+
+def test_painting_underwater_sinks_cells_and_rides_the_save():
+    """`underwater` joined `:paint`'s palette when the layer got its honest
+    name (it was `mist`). Painting lays WATER under permanent haze; the save
+    writes it the compact way — the `M` cell code, since painted sunken ground
+    is always a channel — and a rebuild comes back impassable, unfog-liftable,
+    and search-opaque exactly like every shipped channel."""
+    d = DRAFT.new('Probe', rows=8, cols=30)
+    _forge_session(d, 'jv' + 'l' * 4 + ':paint underwater\r'
+                      ':w\r:q!\r')
+    # Water-borne haze rides the grid as M codes, not the coordinate list.
+    assert d.level.underwater == []
+    assert d.level.cells[2].startswith('W5M'), d.level.cells[2]  # RLE'd haze
+    # And it plays sunken: not footing, permanently hazed.
+    from vimny.engine.world import CellType
+    room = d.build().rooms[0]
+    assert room.cells[2][1] == CellType.WATER
+    assert (2, 1) in room.underwater_cells and (2, 1) in room.fog_cells
+    assert not room.is_passable(2, 1)
+    # Reload the SAVED draft and nothing changed.
+    _fresh = DRAFT.load(d.path)
+    assert _fresh.ok, _fresh.error
+    back = F.build(_fresh.level).rooms[0]
+    assert back.cells[2][1] == CellType.WATER
+    assert (2, 1) in back.underwater_cells
+    assert 'M' in _fresh.level.cells[2]
+
+
+def test_painting_drowned_floor_sinks_the_ground_but_keeps_it_floor():
+    """`drowned` is the floor twin of `underwater`: same permanent haze, same
+    barred feet and scans, but the terrain stays FLOOR — which is what lets a
+    verse lie readable across an unstandable band (the Refrain's chasm, the
+    Shelving Room's shelf). Because it is not water, the save carries it in
+    the `underwater` coordinate list rather than M codes."""
+    d = DRAFT.new('Probe', rows=8, cols=30)
+    _forge_session(d, 'jv' + 'l' * 4 + ':paint drowned\r'
+                      ':w\r:q!\r')
+    assert sorted(map(tuple, d.level.underwater)) \
+        == [(2, 1), (2, 2), (2, 3), (2, 4), (2, 5)]
+    assert 'M' not in d.level.cells[2], 'floor keeps floor codes; no M shorthand'
+    from vimny.engine.world import CellType
+    room = d.build().rooms[0]
+    assert room.cells[2][1] == CellType.FLOOR
+    assert (2, 1) in room.underwater_cells and (2, 1) in room.fog_cells
+    assert not room.is_passable(2, 1)
