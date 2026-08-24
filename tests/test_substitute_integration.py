@@ -146,5 +146,6 @@ def test_snapshot_excludes_landmarks_and_edit_immune_occupants():
     r.entities.append(Entity(kind='exit', row=0, col=3))
     r.rebuild_indexes()
     snap = _snapshot_rows(r, 0, 0)
-    riders = snap[0][4]
+    riders = snap[0][5]
     assert [e.kind for e in riders] == ['gold']
+    assert snap[0][4] == set(), 'a row with no veils snapshots an empty veil set'

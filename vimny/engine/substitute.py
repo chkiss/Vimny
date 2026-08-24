@@ -729,6 +729,7 @@ def _snapshot_rows(room, lo: int, hi: int) -> list:
              for ru in room._char_runs_by_row.get(r, [])],
             {c for (fr, c) in room.fog_cells if fr == r},
             {c for (fr, c) in room.underwater_cells if fr == r},
+            {c for (fv, c) in room.veiled_cells if fv == r},
             riders,
         ))
     return snap
@@ -752,12 +753,13 @@ def _lay_rows_below(room, player, snap: list, dest: int) -> int:
     _shift_rows(room, player, lambda r: r >= at, +n)
     if at <= player.row:
         player.row = min(player.row + n, room.rows - 1)
-    for k, (cells_row, runs, fogc, sunkenc, riders) in enumerate(snap):
+    for k, (cells_row, runs, fogc, sunkenc, veiledc, riders) in enumerate(snap):
         room.cells[at + k] = list(cells_row)
         for (col, syms, kind) in runs:
             room.char_runs.append(_CR(at + k, col, syms, kind))
         room.fog_cells  |= {(at + k, c) for c in fogc}
         room.underwater_cells |= {(at + k, c) for c in sunkenc}
+        room.veiled_cells |= {(at + k, c) for c in veiledc}
         for e in riders:
             room.add_entity(_clone(e, row=at + k))   # fresh uid already minted at snapshot
     room.rebuild_indexes()

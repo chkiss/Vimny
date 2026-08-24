@@ -199,6 +199,7 @@ def _ed_snapshot(room, player) -> dict:
         'spawn_pos':   room.spawn_pos,
         'wood_damage': dict(room.wood_damage),
         'underwater_cells':  set(room.underwater_cells),
+        'veiled_cells':      set(room.veiled_cells),
         'fog_cells':   set(room.fog_cells),
         'pr':          player.row,
         'pc':          player.col,
@@ -217,6 +218,8 @@ def _ed_restore(room, player, snap: dict) -> None:
     if 'underwater_cells' in snap:
         room.underwater_cells = set(snap['underwater_cells'])
         room.fog_cells  = set(snap['fog_cells'])
+    if 'veiled_cells' in snap:
+        room.veiled_cells = set(snap['veiled_cells'])
     player.row       = snap['pr']
     player.col       = snap['pc']
     room.rebuild_indexes()
