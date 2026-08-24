@@ -275,8 +275,12 @@ def test_the_water_runs_bank_to_bank_and_the_pool_shows_with_the_course(seed):
     renders as ink, never as a swallowed wave."""
     room = cached_room('build_dungeon_refrain_vault', seed)
     from vimny.engine.world import CellType
-    for c in range(1, _RV_CTX + 2):
-        assert room.cells[_RV_WTR][c] == CellType.WATER
+    lo, hi = _RV_BAND
+    assert room.cells[_RV_WTR][lo] == CellType.WATER
+    assert room.cells[_RV_WTR][hi - 1] == CellType.WATER
+    assert room.cells[_RV_WTR][lo - 1] != CellType.WATER, 'west of the sheet'
+    assert room.cells[_RV_WTR][hi] != CellType.WATER, 'east of the sheet'
+    for c in range(lo, hi):
         assert (_RV_WTR, c) in room.underwater_cells
     assert room.cells[2][6] == CellType.WATER
     assert room.cells[2][24] == CellType.WATER
