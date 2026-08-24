@@ -9619,8 +9619,12 @@ def build_dungeon_spellwrights_forge(seed: int) -> Dungeon:
 # :1y carries it, p lays it where the reprise goes without one (a :t of
 # the chasm line arrives still sunken: text off the floor never serves).
 _RV_ROWS, _RV_COLS = 18, 60
-_RV_CTX  = 8                          # chasm band head col
-_RV_BAND = (8, 42)                    # sunken torn-line band, rows 1-2
+_RV_CTX  = 8                          # water course head col (the sight-line
+                                      # starts here; the chasm band reaches west
+                                      # past it to the song's own margin)
+_RV_BAND = (2, 42)                    # sunken torn-line band, rows 1-2 — from
+                                      # _RV_TX, so the torn verse left-aligns
+                                      # with every carved line of the song
 _RV_WTR  = 3                          # the water course (sight-line)
 _RV_TX   = 2                          # song text head col (= the line start:
                                       # everything left-aligned, so a pasted
@@ -9690,8 +9694,9 @@ def build_dungeon_refrain_vault(seed: int) -> Dungeon:
             col += len(wd) + 1
 
     runs: list = []
-    lay(runs, 1, _RV_CTX, 'my fair', 'ancient')    # the torn refrain — the ONLY
-    lay(runs, 2, _RV_CTX, 'lady.', 'ancient')      # "my fair lady." anywhere
+    lay(runs, 1, _RV_TX, 'my fair', 'ancient')     # the torn refrain — the ONLY
+    lay(runs, 2, _RV_TX, 'lady.', 'ancient')       # "my fair lady." anywhere,
+                                                   # flush with the carved song
     carved = [t for t in _RV_TRUE if t != _RV_LADY]
     for i, true_line in enumerate(carved):         # the carved song, rows 4..15
         r = _RV_SONG[0] + i
