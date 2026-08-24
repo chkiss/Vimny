@@ -289,3 +289,24 @@ def test_the_water_runs_bank_to_bank_and_the_pool_shows_with_the_course(seed):
     # shoreline ('my fair' / 'lady.' both live up here with it).
     assert room._char_runs_by_row.get(1)
     assert all((1, c) in room.underwater_cells for c in range(16, 35))
+
+
+@pytest.mark.parametrize("seed", SEEDS)
+def test_the_bar_law_chains_whatever_vim_allows(seed):
+    """`:1j|1y` was always legal; the :bar law is GENERAL — any statement
+    count chains, each riding its own turn through the ordinary pipeline
+    (gates, ticks, messages), and the whole line pays for itself once. So
+    the mending can be said three ways for the same par: split lines, the
+    shipped two-command bar, or one long chain."""
+    head = ':set<Space>nu<CR> '
+    tail = ' p 3j p 3j p 3j p j $'
+    forms = [
+        ':13,15s/up/down/g<CR> :4,6&&<CR> :1j|1y<CR>',   # the shipped route
+        ':13,15s/up/down/g|4,6&&|1j|1y<CR>',             # one long chain
+        ':13,15s/up/down/g<CR> :4,6&&<CR> :1j<CR>:1y<CR>',  # all split
+    ]
+    from vimny.sharing.replay import replay_tape
+    for form in forms:
+        res = replay_tape(build_dungeon_refrain_vault(seed),
+                          'refrain_vault', head + form + tail)
+        assert res.won and res.spent == _RV_PAR, (form, res.won, res.spent)

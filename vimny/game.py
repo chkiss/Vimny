@@ -6341,6 +6341,44 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
                     # back at replay time.
                     _reg_record(player, ':', cmd)
 
+                # THE :bar LAW — one line, several statements (`:1j|1y`). The
+                # head runs this turn through the ordinary dispatch; every
+                # statement after it queues as its own `:` line on the macro
+                # queue, so each rides the very same pipeline it would alone —
+                # its gates, its ticks, its messages, its undo — instead of the
+                # chain being re-implemented here. :g/:v own their bars (pattern
+                # and body may contain one), so a global never splits. The LINE
+                # pays for itself once, here, whatever the statement count —
+                # typed keys are the cost model, and this line typed what it
+                # typed — so the two charge sites below stand down this turn.
+                _bar_paid = False
+                if ('|' in cmd and not edit_mode
+                        and not _subst._bar_exempt(cmd, room, player)
+                        and (_subst.looks_like_ex_range(cmd, room, player)
+                             or _subst.looks_like_sg(cmd, room, player))):
+                    # The law chains the EDITOR command family — the same
+                    # statements run_ex has always chained. Other dialects
+                    # that read a literal `|` (:seal's pin flag, forge args)
+                    # pass through untouched.
+                    _head, _rest = _subst._split_bar(cmd)
+                    if _rest is not None and _head.strip():
+                        parts, seg = [], _rest
+                        while seg is not None:
+                            if _subst._bar_exempt(seg, room, player):
+                                parts.append(seg)
+                                seg = None
+                            else:
+                                h2, seg = _subst._split_bar(seg)
+                                parts.append(h2)
+                        parts = [p for p in parts if p.strip()]
+                        if parts:
+                            if not edit_mode:
+                                budget.spend(len(cmd) + 1)   # the line, once
+                            _bar_paid = True
+                            for p in parts:                  # FIFO: top to bottom
+                                macro_pending.extend(':' + p + '\r')
+                            cmd, _rcmd = _head, _head
+
                 if level == 'warden_pathfinder' and cmd == 'e wardenverse':
                     if getattr(room, 'verse_collapsed', False):
                         _push('The wardenverse has collapsed — there is nothing left to enter.')
@@ -7694,7 +7732,8 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
                                              game_h=term.height - 8)
                         if moved and not edit_mode:
                             _record_jump(player, _gn_from)
-                            budget.spend(len(cmd) + 1)
+                            if not _bar_paid:
+                                budget.spend(len(cmd) + 1)
                             undo_stack.append((_gn_from[0], _gn_from[1], _gn_spent,
                                                cmd_start_ans[0], cmd_start_ans[1]))
                             redo_stack.clear()
@@ -7727,7 +7766,7 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
                         if _sg_h and (_ns or _nl):
                             undo_stack.append(_pre)
                             redo_stack.clear()
-                            if not edit_mode:
+                            if not edit_mode and not _bar_paid:
                                 budget.spend(len(cmd) + 1)
                             room.rebuild_indexes()
                             _animate_reflow_falls()      # :> can shove glyphs off the brink
