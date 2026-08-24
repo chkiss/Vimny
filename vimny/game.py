@@ -2630,8 +2630,29 @@ def _seal_reads_true(room, seal, truths=(), rows=None) -> bool:
         # Snuffing one (a cut darkens a brazier, it is not carried off) leaves it
         # standing but cold, so `all(lit)` fails and the bolt re-bars — the run is
         # lost until it is relit. An empty region never opens (nothing to light).
+        #
+        # Two kinds of brazier share this mode. The ENTITY braziers carry a
+        # live `.lit`; the GLYPH braziers (the Wet Ink's kind) are painted
+        # runs — a pedestal shows embers until a flame is pasted over it — so
+        # a region with no brazier entity reads its painted flame instead.
         brz = _braziers_in(room, seal.region)
-        if not brz or not all(e.lit for e in brz):
+        if brz:
+            ok = all(e.lit for e in brz)
+        else:
+            r1, c1, r2, c2 = seal.region
+            cells = [(r, c) for r in range(r1, r2 + 1)
+                     for c in range(c1, c2 + 1)
+                     if 0 <= r < room.rows and 0 <= c < room.cols
+                     and room.cells[r][c] != CellType.WALL]
+            if not cells:
+                return False
+
+            def _glyph_lit(rc):
+                ru = room.char_run_at(*rc)
+                return (ru is not None
+                        and ru.symbols[rc[1] - ru.col] == _dg._QM_FLAME)
+            ok = all(_glyph_lit(rc) for rc in cells)
+        if not ok:
             return False
         return all(truths[i] for i in seal.requires if i < len(truths))
     if seal.mode == 'gone':
@@ -3984,8 +4005,7 @@ def _wet_ink_tick(room, player) -> list:
         k+1, one-way (what the fire has shown cannot be unseen)."""
     msgs = []
     words = getattr(room, '_wi_words', None)
-    seg_fog = getattr(room, '_wi_seg_fog', None)
-    if not words or not seg_fog:
+    if not words:
         return msgs
     braziers = _dg._WI_BRAZIERS
 
@@ -4011,16 +4031,10 @@ def _wet_ink_tick(room, player) -> list:
         if room.is_passable(r, c) and room.char_run_at(r, c) is None:
             room.add_char_run(CharRun(r, c, (_dg._QM_EMBERS,), 'pedestal'))
 
-    # Firelight: brazier k reveals quarter k+1.
-    for k, rc in enumerate(braziers, start=1):
-        if lit(*rc) and room.veiled_cells & seg_fog[k - 1]:
-            unhide_region(room, seg_fog[k - 1])
-            # Only the FIRST brazier gets a line. The reveal is on screen; after
-            # one telling, the rule is learned and the render says the rest.
-            if not getattr(room, '_qm_firelight_told', False):
-                room._qm_firelight_told = True
-                msgs.append('The firelight spills up the stone — more of the '
-                            'inscription wakes.')
+    # Firelight used to live here — brazier k revealing quarter k+1 — but it
+    # is a bolt now: three unveil-seals declared in the builder read their
+    # painted flame and lift the veil themselves (see _WI_BRAZIERS). The tick
+    # keeps only the fuel gate and the embers.
     return msgs
 
 

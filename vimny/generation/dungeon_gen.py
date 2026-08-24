@@ -6774,6 +6774,18 @@ def build_dungeon_wet_ink(seed: int) -> Dungeon:
         'opens': [list(_WI_EXIT)],
     }, len(seals)))
 
+    # FIRELIGHT, said as data: brazier k burning lifts the veil on plaque
+    # quarter k+1. The `braziers` mode reads the painted flame (glyph braziers
+    # — no entities here), and `unveils` is the one-way reveal. The tick keeps
+    # only the fuel gate and the embers; the reveal is a bolt now.
+    for k, (br, bc) in enumerate(_WI_BRAZIERS, start=1):
+        seals.append(_parse_seal({
+            'mode': 'braziers',
+            'region': [br, bc, br, bc],
+            'unveils': [list(cell) for cell in sorted(
+                (_WI_LEDGE, _WI_PLQ_COL + 5 * k - 1 + i) for i in range(5))],
+        }, len(seals)))
+
     level = _Level(
         name='The Wet Ink', seed=seed,
         rows=R, cols=C,
@@ -6788,6 +6800,14 @@ def build_dungeon_wet_ink(seed: int) -> Dungeon:
     dungeon = _fmt_build(level, par=_WI_PAR)
     _seal_banners(dungeon)
     room = dungeon.rooms[0]
+    # The three firelight bolts get their own banner (the old one-telling
+    # line); they sit AFTER the final seal, which is why the generic helper's
+    # *bolts/last split cannot reach them.
+    from dataclasses import replace as _dc_replace
+    _fire = ('The firelight spills up the stone — more of the inscription '
+             'wakes.')
+    room.seals = tuple(
+        _dc_replace(s, message=_fire) if s.unveils else s for s in room.seals)
     room._wi_words = ws
     # The fuel gate starts source-only; _wet_ink_tick widens it as the
     # quarters are written (read by _flame_paste_blocked).

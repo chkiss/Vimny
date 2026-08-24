@@ -290,24 +290,51 @@ def test_the_banding_follows_the_gate_too():
 
 # ── the shipped chassis, said as data ─────────────────────────────────────────
 
+def test_wet_ink_gate_is_a_chained_pair_plus_firelight_bolts():
+    """The Wet Ink's shape, said precisely: a text bolt opens the gate's west
+    half; a pure predicate requiring it opens the east half; and three
+    firelight bolts unveil the plaque quarters while their brazier burns.
+    No final reads-all seal — the exit IS the chained pair."""
+    room = main._build_dungeon('wet_ink', 4242).rooms[0]
+    s0, s1, *fires = room.seals
+    assert s0.match and s0.opens and not s0.requires
+    assert not s1.match and s1.requires == (0,) and len(s1.opens) == 1
+    assert len(fires) == 3
+    for f in fires:
+        assert f.mode == 'braziers' and f.unveils and not f.opens
+        assert not f.requires
+    assert all(room.cells[r][c] == CellType.WALL
+               for s in (s0, s1) for (r, c) in s.opens)
+
+
 @pytest.mark.parametrize('slug', [
     'sight_sanctum', 'selection_halls', 'word_enclosure', 'bracket_enclosure',
     'brace_square_enclosure', 'quote_enclosure', 'tag_enclosure',
-    'sentence_enclosure', 'stair_rail', 'wet_ink',
+    'sentence_enclosure', 'stair_rail',
     'whole_line_annex', 'change_extension', 'overwrite_halls', 'case_chambers',
     'joiners_gate', 'g_sanctum', 'buried_word'])
 def test_every_chassis_level_is_bolts_then_a_final_seal(slug):
     """Seventeen levels, one shape: doors that read text, then an exit that
-    reads the doors. No level keeps a private tick any more."""
+    reads the doors. After the exit, a level may also carry UNVEIL seals —
+    conditions that reveal carvings rather than open doors (the Wet Ink's
+    firelight). No level keeps a private tick any more."""
     room = main._build_dungeon(slug, 4242).rooms[0]
-    *bolts, final = room.seals
-    assert bolts, f'{slug} has no doors'
-    assert all(s.match and s.scope == 'anyrow' and not s.requires for s in bolts)
+    *rest, final = room.seals
     assert not final.match, 'the final seal reads no text of its own'
-    assert final.requires == tuple(range(len(bolts))), 'it reads every bolt'
+    # The final seal reads EVERY statement before it — text bolts, chained
+    # pure predicates (a second door cell that wants the first phrase), and
+    # unveil seals alike — by index, earlier-only.
+    assert final.requires == tuple(range(len(rest))), 'it reads every bolt'
     assert final.opens == (tuple(room.exit_pos),)
+    for s in rest:
+        if s.unveils:
+            # an unveiling bolt: condition + carvings, no door of its own
+            assert not s.opens and not s.match and s.mode in ('braziers',)
+        else:
+            assert s.scope == 'anyrow' and s.anchor == 'exit_row'
+    assert any(s.match for s in rest), f'{slug} has no doors'
     assert all(s.anchor == 'exit_row' for s in room.seals)
-    # and every one of them starts shut, so nothing is walkable on turn zero
+    # and every door starts shut, so nothing is walkable on turn zero
     assert all(room.cells[r][c] == CellType.WALL
                for s in room.seals for (r, c) in s.opens)
 
