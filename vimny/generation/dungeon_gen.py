@@ -10632,7 +10632,8 @@ def build_dungeon_quartermaster(seed: int) -> Dungeon:
     """
     R, C = _QM_ROWS, _QM_COLS
     from vimny.engine.editor import _CELL_CODE
-    from vimny.sharing.format import Level as _Level, build as _fmt_build
+    from vimny.sharing.format import (Level as _Level, build as _fmt_build,
+                                      _parse_seal)
     cells = [[CellType.WALL] * C for _ in range(R)]
     for c in range(_QM_HALL_LO, _QM_HALL_HI + 1):
         cells[_QM_HALL_ROW][c] = CellType.FLOOR
@@ -10659,12 +10660,51 @@ def build_dungeon_quartermaster(seed: int) -> Dungeon:
         spawn=_QM_SPAWN,
         exit=_QM_EXIT,
         char_runs=runs,
+        seals=[
+            # The chain, as PER-BRAZIER predicates chained by requires: every
+            # region is exactly one brazier cell, so a snuffed flame takes its
+            # own predicate false the moment the run darkens — embers relayed
+            # or not, no slot can fall out of consideration. Doors hang off
+            # the predicates they need; the exit needs everything.
+            _parse_seal({'mode': 'braziers',
+                         'region': [_QM_SOURCE[0], _QM_SOURCE[1],
+                                    _QM_SOURCE[0], _QM_SOURCE[1]]}, 0),
+            _parse_seal({'requires': [0],
+                         'opens': [[_QM_HALL_ROW, _QM_BOLT_COLS[0]]]}, 1),
+            _parse_seal({'mode': 'braziers',
+                         'region': [_QM_PED1[0], _QM_PED1[1],
+                                    _QM_PED1[0], _QM_PED1[1]],
+                         'requires': [0]}, 2),
+            _parse_seal({'requires': [0, 2],
+                         'opens': [[_QM_HALL_ROW, _QM_BOLT_COLS[1]]]}, 3),
+        ] + [
+            _parse_seal({'mode': 'braziers',
+                         'region': [_QM_BRAZIER_ROW + k, c,
+                                    _QM_BRAZIER_ROW + k, c],
+                         'requires': [3]}, 4 + k * 3 + j)
+            for k in range(3) for j, c in enumerate(_QM_BRAZIER_COLS)
+        ] + [
+            _parse_seal({'requires': [3] + list(range(4, 13)),
+                         'opens': [[_QM_EXIT[0], _QM_SEAL_COL]]}, 13),
+        ],
         entities=[{'kind': 'exit', 'at': [_QM_EXIT[0], _QM_EXIT[1]],
                    'edit_immune': True}],   # nor its row dd-collapsible
         solution='w yl w P G 3P yy p P k 0')
 
     dungeon = _fmt_build(level, par=_QM_PAR)
     room = dungeon.rooms[0]
+    # Hand the door banners back (Seal.message is engine-only data).
+    from dataclasses import replace as _dc_replace
+    _qm_banners = (
+        '',                                          # the source predicate
+        'The flame takes — the bolt grinds back!',   # chain bolt A
+        '',                                          # hall brazier predicate
+        'The flame takes — the bolt grinds back!',   # chain bolt B
+    ) + ('',) * 9 + (                                # the nine tier predicates
+        'The beacon burns in three tiers — the seal draws open!',  # the seal
+    )
+    room.seals = tuple(_dc_replace(s, message=m)
+                       for s, m in zip(room.seals, _qm_banners))
     # Anchors read by main._quartermaster_tick (stored coordinates, the Cipher
     # Cell convention — a self-inflicted dd/linewise shift above them desyncs
     # the doors until u, which is the established recoverable failure mode).
@@ -11020,6 +11060,23 @@ def build_dungeon_warden_manifold(seed: int) -> Dungeon:
     _lay_dark(room, _WM_PODIUMS)
     _lay_dark(room, hall_fog)
     _lay_dark(room, _WM_POCKET)
+    # THE RITUAL GATE, said as data: four PER-BRAZIER predicates (one region
+    # = one brazier cell), then a ritual seal requiring all four — it floors
+    # the gate and unveils the great hall's darkness (fog and veils both).
+    # The pocket reveal stays in the tick — it rides the warden's death,
+    # which also gutters his copies.
+    from vimny.engine.world import Seal as _Seal
+    base_idx = len(room.seals)
+    _preds = tuple(_Seal(
+        region=(b[0], b[1], b[0], b[1]), mode='braziers', match=())
+        for b in _WM_BRAZIERS)
+    _ritual = _Seal(
+        mode='exact', match=(), requires=tuple(range(base_idx, base_idx + 4)),
+        opens=(tuple(_WM_GATE),),
+        unveils=tuple(sorted(hall_fog)),
+        message=('Five flames burn as one — the gate draws, and the '
+                 'fog of the great hall parts!'))
+    room.seals = (*room.seals, *_preds, _ritual)
 
     def lay(row, col, text, kind):
         c = col
@@ -12811,6 +12868,14 @@ def build_dungeon_warden_scrivener(seed: int) -> Dungeon:
     _lay_dark(room, _WSC_ALCOVES)
     _lay_dark(room, hall_fog)
     _lay_dark(room, _WSC_POCKET)
+    # THE THRESHOLD, said as data: while the lintel's word stands on any floor
+    # row, the gate is open and the great page's carvings are legible.
+    from vimny.engine.world import Seal as _Seal
+    room.seals = (*room.seals, _Seal(
+        scope='anyrow', mode='contains', match=(threshold,),
+        opens=(tuple(_WSC_GATE),),
+        unveils=tuple(sorted(hall_fog)),
+        message='The threshold word stands in fresh ink — the gate draws!'))
 
     def lay(row, col, text, kind):
         c = col

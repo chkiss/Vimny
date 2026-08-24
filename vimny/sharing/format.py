@@ -64,6 +64,7 @@ MAX_ENTITIES       = 400
 MAX_FILLS          = 64
 MAX_SEALS          = 32
 MAX_SEAL_CELLS     = 64           # cells one seal may open — a door, not a demolition
+MAX_SEAL_UNVEILS   = 4096        # cells one seal may reveal — a whole hall is fine
 MAX_SEAL_MATCH     = 200          # a password, not a paragraph (and ≤ MAX_COLS)
 MAX_VOCAB_WORDS    = 500
 MAX_WORD_LEN       = 20
@@ -474,9 +475,9 @@ def _parse_seal(s: dict, i: int, at: str = 'seals') -> Seal:
     if not isinstance(unveils_in, (list, tuple)):
         raise LevelFormatError(
             f'{at}[{i}].unveils: must be [row, col] or a list of them')
-    if len(unveils_in) > MAX_SEAL_CELLS:
+    if len(unveils_in) > MAX_SEAL_UNVEILS:
         raise LevelFormatError(
-            f'{at}[{i}].unveils: at most {MAX_SEAL_CELLS} cells')
+            f'{at}[{i}].unveils: at most {MAX_SEAL_UNVEILS} cells')
     unveiled = []
     for j, cell in enumerate(unveils_in):
         if not (isinstance(cell, (list, tuple)) and len(cell) == 2):
@@ -1033,9 +1034,17 @@ def _build_room(spec: Room, lvl: Level, rng: random.Random,
     # A seal's UNVEIL cells are not doors — they are veiled carvings, already
     # stone (or whatever the author kept), and the tick lifts their veil; they
     # must not be walled here, or the reveal would re-hide behind new rock.
-    room.veiled_cells |= {(int(r), int(c))
-                          for _s in spec.seals for (r, c) in _s.unveils
-                          if 0 <= r < room.rows and 0 <= c < room.cols}
+    from vimny.engine.motion import _FOGGABLE_CELLS as _FC
+    for _s in spec.seals:
+        for (r, c) in _s.unveils:
+            if not (0 <= r < room.rows and 0 <= c < room.cols):
+                continue
+            # An unveil cell's DARKNESS is seeded by terrain: stone keeps a
+            # veil (the carving is not legible yet), open ground keeps fog.
+            if room.cells[r][c] in (CellType.WALL, CellType.WOOD_WALL):
+                room.veiled_cells.add((r, c))
+            elif room.cells[r][c] in _FC:
+                room.fog_cells.add((r, c))
     for _s in spec.seals:
         for _r, _c in _s.opens:
             if 0 <= _r < room.rows and 0 <= _c < room.cols:

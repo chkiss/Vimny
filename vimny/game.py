@@ -2639,19 +2639,22 @@ def _seal_reads_true(room, seal, truths=(), rows=None) -> bool:
         if brz:
             ok = all(e.lit for e in brz)
         else:
+            # GLYPH braziers: every cell in the region that CARRIES A RUN is
+            # a brazier — pedestal (cold) or flame (lit). Bare floor between
+            # them is just floor.
             r1, c1, r2, c2 = seal.region
-            cells = [(r, c) for r in range(r1, r2 + 1)
-                     for c in range(c1, c2 + 1)
-                     if 0 <= r < room.rows and 0 <= c < room.cols
-                     and room.cells[r][c] != CellType.WALL]
-            if not cells:
+            bcells = []
+            for rr in range(max(0, r1), min(room.rows - 1, r2) + 1):
+                for cc in range(max(0, c1), min(room.cols - 1, c2) + 1):
+                    if room.char_run_at(rr, cc) is not None:
+                        bcells.append((rr, cc))
+            if not bcells:
                 return False
 
             def _glyph_lit(rc):
                 ru = room.char_run_at(*rc)
-                return (ru is not None
-                        and ru.symbols[rc[1] - ru.col] == _dg._QM_FLAME)
-            ok = all(_glyph_lit(rc) for rc in cells)
+                return ru.symbols[rc[1] - ru.col] == _dg._QM_FLAME
+            ok = all(_glyph_lit(rc) for rc in bcells)
         if not ok:
             return False
         return all(truths[i] for i in seal.requires if i < len(truths))
@@ -2738,17 +2741,23 @@ def _seal_tick(room, player) -> list:
                 room.cells[r][c] = CellType.WALL
         if opened:
             msgs.append(seal.message or SEAL_OPENED)
-        # The same condition can lift VEILS: a carving becomes legible while
-        # the seal reads true, and re-hides when it does not (the veil is the
-        # door here — `u` un-mends the verse, the secret goes dark again).
+        # The same condition can REVEAL: an unveils cell's DARKNESS — both the
+        # veil on a carved wall and the fog over hidden floor — lifts while the
+        # seal reads true. On false, stone re-veils (the carving is the door
+        # here: `u` un-mends the verse, the secret goes dark again); floor
+        # never re-fogs, because light once let through open ground cannot be
+        # unseen — the level's auto-reveal keeps it lit from there on.
         unveiled = False
         for (r, c) in _seal_unveils(room, seal):
+            if not (0 <= r < room.rows and 0 <= c < room.cols):
+                continue
             if true_now:
-                if (r, c) in room.veiled_cells:
+                if ((r, c) in room.veiled_cells
+                        or (r, c) in room.fog_cells):
                     room.veiled_cells.discard((r, c))
+                    room.fog_cells.discard((r, c))
                     unveiled = True
             elif (r, c) not in room.veiled_cells \
-                    and 0 <= r < room.rows and 0 <= c < room.cols \
                     and room.cells[r][c] in (CellType.WALL, CellType.WOOD_WALL):
                 # Re-veil only stone — if ground was re-laid over the cell,
                 # the carving is gone for good and there is nothing to hide.
@@ -3618,24 +3627,9 @@ def _warden_scrivener_tick(room, player, spent: int = 0) -> list:
     alcove and stamps the next passage. The ward counter and the rot timer
     ride the undo snapshot (the Manifold convention)."""
     msgs = []
-    # Band the threshold gate + the final seal as stonework (the live alcove
-    # bolt joins below, once the warden it derives from is known).
-    room.sealed_cells = {c for c in (getattr(room, '_wsc_gate', None),
-                                     getattr(room, '_wsc_seal', None)) if c}
-
-    # ── the threshold: the lintel's word, written on the desk ──
-    word = getattr(room, '_wsc_threshold', '')
-    if word:
-        written = any(word in _wla_floor_text(room, r) for r in range(room.rows))
-        gr, gc = room._wsc_gate
-        gate_open = room.cells[gr][gc] != CellType.WALL
-        if written and not gate_open:
-            room.cells[gr][gc] = CellType.FLOOR
-            unhide_region(room, getattr(room, '_wsc_hall_fog', frozenset()))
-            msgs.append('The threshold word stands in fresh ink — the gate '
-                        'draws, and the fog of the great page parts!')
-        elif not written and gate_open and (player.row, player.col) != (gr, gc):
-            room.cells[gr][gc] = CellType.WALL
+    # The threshold (lintel word → gate + the page's carvings) is an
+    # anyrow-contains unveil BOLT now — declared in the builder. The ward
+    # machine below owns everything that follows.
 
     warden = next((e for e in room.entities
                    if e.kind == 'warden' and e.tag == 'scrivener' and e.alive),
@@ -3755,7 +3749,9 @@ def _warden_manifold_tick(room, player, spent: int = 0) -> list:
     room.sealed_cells = {c for c in (getattr(room, '_wm_gate', None),
                                      getattr(room, '_wm_seal', None)) if c}
 
-    # ── the opening ritual: four braziers → the gate + the hall's fog ──
+    # The opening ritual (four braziers → the gate + the hall's carvings)
+    # is a braziers-mode unveil BOLT now — declared in the builder. The tick
+    # keeps only the ember dressing for the ward machines below.
     braziers = getattr(room, '_wm_braziers', ())
     if braziers:
         def lit(r, c):
@@ -3768,15 +3764,6 @@ def _warden_manifold_tick(room, player, spent: int = 0) -> list:
         for (r, c) in unlit:
             if room.is_passable(r, c) and room.char_run_at(r, c) is None:
                 room.add_char_run(CharRun(r, c, (_dg._QM_EMBERS,), 'pedestal'))
-        gr, gc = room._wm_gate
-        gate_open = room.cells[gr][gc] != CellType.WALL
-        if not unlit and not gate_open:
-            room.cells[gr][gc] = CellType.FLOOR
-            unhide_region(room, getattr(room, '_wm_hall_fog', frozenset()))
-            msgs.append('Five flames burn as one — the gate draws, and the '
-                        'fog of the great hall parts!')
-        elif unlit and gate_open and (player.row, player.col) != (gr, gc):
-            room.cells[gr][gc] = CellType.WALL
 
     warden = next((e for e in room.entities
                    if e.kind == 'warden' and e.tag == 'manifold' and e.alive),
@@ -3950,44 +3937,16 @@ def _quartermaster_tick(room, player) -> list:
         if room.is_passable(r, c) and room.char_run_at(r, c) is None:
             room.add_char_run(CharRun(r, c, (_dg._QM_EMBERS,), 'pedestal'))
 
-    # Chain bolts (cumulative) on the hall row.
-    hall_row = chain[0][0]
-    # Band the shut chain bolts as stonework (the seal joins below). Derived
-    # here because the hall row and the seal both ride the exit's row.
-    room.sealed_cells = {(hall_row, bc)
-                         for bc in getattr(room, '_qm_bolt_cols', ())}
-    burning  = [lit(r, c) for r, c in chain]
-    for i, bc in enumerate(getattr(room, '_qm_bolt_cols', ())):
-        open_ = all(burning[:i + 1])
-        cur_open = room.cells[hall_row][bc] != CellType.WALL
-        if open_ and not cur_open:
-            room.cells[hall_row][bc] = CellType.FLOOR
-            msgs.append('The flame takes — the bolt grinds back!')
-        elif not open_ and cur_open and (player.row, player.col) != (hall_row, bc):
-            room.cells[hall_row][bc] = CellType.WALL
-            msgs.append('The chain is broken — the bolts grind shut!')
-
-    # The seal: same row as the exit (the exit rides any row shift with it).
-    exit_e = next((e for e in room.entities if e.kind == 'exit'), None)
-    if exit_e is not None:
-        base  = braziers[0][0]
-        tiers = all(lit(base + k, c) for k in (0, 1, 2) for (_, c) in braziers)
-        sr, sc = exit_e.row, getattr(room, '_qm_seal_col', exit_e.col - 1)
-        room.sealed_cells.add((sr, sc))
-        open_ = tiers and all(burning)
-        cur_open = room.cells[sr][sc] != CellType.WALL
-        if open_ and not cur_open:
-            room.cells[sr][sc] = CellType.FLOOR
-            msgs.append('The beacon burns in three tiers — the seal draws open!')
-        elif not open_ and cur_open and (player.row, player.col) != (sr, sc):
-            room.cells[sr][sc] = CellType.WALL
-        # One-shot nudge: the beacon row burns, but one tier alone is no beacon.
-        # Deliberately names no command — the cold does the teaching.
-        if (not open_ and all(lit(r, c) for r, c in braziers)
-                and not getattr(room, '_qm_tier_hinted', False)):
-            room._qm_tier_hinted = True
-            msgs.append('The seal seems to be melting, but needs more heat! '
-                        'Alas, there are no more braziers...')
+    # The chain doors and the tiered seal are BOLTS now — declared in the
+    # builder as braziers-mode seals (chain-prefix regions; the seal reads
+    # the three-tier block and requires bolt B, which is the whole chain).
+    # This tick keeps only the embers dressing and the one-shot nudge.
+    _tiers_lit = all(lit(r, c) for r, c in braziers)
+    if (_tiers_lit and not all(lit(r, c) for r, c in chain)
+            and not getattr(room, '_qm_tier_hinted', False)):
+        room._qm_tier_hinted = True
+        msgs.append('The seal seems to be melting, but needs more heat! '
+                    'Alas, there are no more braziers...')
     return list(dict.fromkeys(msgs))
 
 

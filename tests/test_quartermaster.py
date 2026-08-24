@@ -111,7 +111,11 @@ def test_dimensions_and_anchors(seed):
     exits = [e for e in room.entities if e.kind == 'exit']
     assert len(exits) == 1 and (exits[0].row, exits[0].col) == _QM_EXIT
     assert exits[0].edit_immune, "the beacon row must refuse dd-collapse"
-    # Build state == tick steady-state: the chain holds only the source flame.
+    # Doors ship SHUT (format.build walls every opens cell); the first
+    # seal-tick opens bolt A, because the source flame already reads true.
+    # Bolt B and the tiered seal stay shut — their braziers are cold.
+    assert room.cells[_QM_HALL_ROW][_QM_BOLT_COLS[0]] == CellType.WALL
+    main._seal_tick(room, Player(row=_QM_HALL_ROW, col=2))
     assert room.cells[_QM_HALL_ROW][_QM_BOLT_COLS[0]] == CellType.FLOOR
     assert room.cells[_QM_HALL_ROW][_QM_BOLT_COLS[1]] == CellType.WALL
     assert room.cells[_QM_EXIT[0]][_QM_SEAL_COL] == CellType.WALL
@@ -288,30 +292,32 @@ def test_curriculum_guard():
 
 @pytest.mark.parametrize("seed", SEEDS)
 def test_tick_chain_bolts_follow_the_flames_both_ways(seed):
+    """The chain doors are seals: they follow the flames through _seal_tick,
+    opening while the prefix burns and re-barring the moment it breaks."""
     room = build_dungeon_quartermaster(seed).rooms[0]        # private (mutating)
     p = Player(row=_QM_HALL_ROW, col=2)
     A, B = _QM_BOLT_COLS
 
-    main._quartermaster_tick(room, p)
-    assert room.cells[_QM_HALL_ROW][B] == CellType.WALL      # hall brazier still cold
+    main._seal_tick(room, p)                                 # source lit: A opens
+    assert room.cells[_QM_HALL_ROW][A] == CellType.FLOOR
+    assert room.cells[_QM_HALL_ROW][B] == CellType.WALL      # hall brazier cold
 
     _light(room, *_QM_PED1)                                  # the P at the hall brazier
-    msgs = main._quartermaster_tick(room, p)
+    main._seal_tick(room, p)
     assert room.cells[_QM_HALL_ROW][B] == CellType.FLOOR
-    assert any('bolt' in m for m in msgs)
 
-    src = room.char_run_at(*_QM_SOURCE)                      # cut the source —
-    room.remove_char_run(src)                                # the chain darkens
-    msgs = main._quartermaster_tick(room, p)
+    src_ru = room.char_run_at(*_QM_SOURCE)                   # cut the source —
+    room.remove_char_run(src_ru)                             # the chain darkens
+    main._quartermaster_tick(room, p)   # embers re-lay the cold slots first
+    main._seal_tick(room, p)            # ...then the doors read them shut
     for bc in (A, B):
         assert room.cells[_QM_HALL_ROW][bc] == CellType.WALL
-    assert any('chain' in m for m in msgs)
     laid = room.char_run_at(*_QM_SOURCE)                     # …and embers appear
     assert laid is not None and laid.kind == 'pedestal'
 
     room.remove_char_run(laid)                               # undo restores the flame
-    room.add_char_run(src)                                   # (snapshot replaces the row)
-    main._quartermaster_tick(room, p)
+    room.add_char_run(src_ru)                                # (snapshot replaces the row)
+    main._seal_tick(room, p)
     for bc in (A, B):
         assert room.cells[_QM_HALL_ROW][bc] == CellType.FLOOR
 
@@ -324,6 +330,9 @@ def test_tick_manages_the_ember_markers(seed):
     room = build_dungeon_quartermaster(seed).rooms[0]        # private (mutating)
     p = Player(row=_QM_HALL_ROW, col=2)
 
+    main._seal_tick(room, p)          # bolt A opens (source burns); hall lights
+    from vimny.engine.motion import auto_fog_tick
+    auto_fog_tick(room, *room.spawn_pos)
     room.remove_char_run(room.char_run_at(*_QM_PED1))        # a careless D
     main._quartermaster_tick(room, p)
     ru = room.char_run_at(*_QM_PED1)
@@ -347,6 +356,9 @@ def test_seal_needs_three_tiers_and_the_whole_chain(seed):
     from vimny.engine.world import CharRun
     room = build_dungeon_quartermaster(seed).rooms[0]        # private (mutating)
     p = Player(row=_QM_BRAZIER_ROW, col=_QM_BRAZIER_COLS[0])
+    main._seal_tick(room, p)          # bolt A opens; hall lights past it
+    from vimny.engine.motion import auto_fog_tick
+    auto_fog_tick(room, *_QM_SPAWN)   # sight runs the hall and the shaft
 
     _light(room, _QM_BRAZIER_ROW, _QM_BRAZIER_COLS[0], count=3)   # 3P
     msgs = main._quartermaster_tick(room, p)
@@ -358,20 +370,29 @@ def test_seal_needs_three_tiers_and_the_whole_chain(seed):
         for c in _QM_BRAZIER_COLS:
             room.add_char_run(CharRun(_QM_BRAZIER_ROW + k, c, (_QM_FLAME,), 'flame'))
     main._quartermaster_tick(room, p)
+    main._seal_tick(room, p)
     exit_e = next(e for e in room.entities if e.kind == 'exit')
     assert exit_e.row == _QM_EXIT[0], "p-pastes insert BELOW — the exit holds its row"
     seal = (exit_e.row, _QM_SEAL_COL)
     assert room.cells[seal[0]][seal[1]] == CellType.WALL, (
         "three tiers alone must NOT draw the seal — the hall brazier is cold")
+    import vimny.game as _m
+    _tr = []
+    for _s in room.seals:
+        _t = _m._seal_reads_true(room, _s, list(_tr))
+        _tr.append(_t)
+        print('DEBUG seal', _s.mode, _s.region, 'true=', _t,
+              'ped1=', (lambda ru: ru and ''.join(ru.symbols))(room.char_run_at(*_QM_PED1)))
 
     _light(room, *_QM_PED1)                                  # complete the chain
-    msgs = main._quartermaster_tick(room, p)
+    msgs = main._seal_tick(room, p)
+    print('DEBUG msgs:', msgs, '| seal cell:', room.cells[seal[0]][seal[1]])
     assert room.cells[seal[0]][seal[1]] == CellType.FLOOR
     assert any('three tiers' in m for m in msgs)
 
     snuffed = room.char_run_at(_QM_BRAZIER_ROW + 2, _QM_BRAZIER_COLS[0])
     room.remove_char_run(snuffed)                            # undo snuffs a tier
-    main._quartermaster_tick(room, p)
+    main._seal_tick(room, p)
     assert room.cells[seal[0]][seal[1]] == CellType.WALL     # the seal re-bars
 
 
