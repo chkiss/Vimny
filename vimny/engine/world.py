@@ -135,6 +135,12 @@ class Seal:
                            # its first glyph exactly at this column, whatever
                            # sits west of it (the plumb-line family: Alignment
                            # Halls' register). -1 = unpinned.
+    unveils:  tuple = ()   # ((row, col), ...) — VEILED cells whose carving
+                           # becomes legible while true. The same condition
+                           # that floors `opens` can instead (or also) lift
+                           # veils, so an author's hidden carvings answer the
+                           # full bolt vocabulary — text-match, extinction,
+                           # requires-chains — without a scripted tick.
 
     def __post_init__(self):
         if isinstance(self.match, str):
@@ -146,6 +152,8 @@ class Seal:
         else:
             object.__setattr__(self, 'match', tuple(self.match))
         object.__setattr__(self, 'opens', tuple(tuple(c) for c in self.opens))
+        object.__setattr__(self, 'unveils',
+                           tuple(tuple(c) for c in self.unveils))
         object.__setattr__(self, 'requires', tuple(int(i) for i in self.requires))
 
 def gate_row_seals(doors, exit_pos, *, mode: str = 'exact',

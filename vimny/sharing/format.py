@@ -331,7 +331,7 @@ def _parse_seal(s: dict, i: int, at: str = 'seals') -> Seal:
     """
     if not isinstance(s, dict):
         raise LevelFormatError(f'{at}[{i}]: must be an object')
-    unknown = set(s) - {'region', 'match', 'opens', 'mode', 'scope',
+    unknown = set(s) - {'region', 'match', 'opens', 'unveils', 'mode', 'scope',
                         'requires', 'anchor', 'head', 'at'}
     if unknown:
         raise LevelFormatError(f'{at}[{i}]: unknown key(s) {sorted(unknown)}')
@@ -462,7 +462,28 @@ def _parse_seal(s: dict, i: int, at: str = 'seals') -> Seal:
         if not (isinstance(cell, (list, tuple)) and len(cell) == 2):
             raise LevelFormatError(f'{at}[{i}].opens[{j}]: must be [row, col]')
         cells.append((int(cell[0]), int(cell[1])))
-    return Seal(region=region, match=tuple(match), opens=tuple(cells), mode=mode,
+    # `unveils` — the same shape as opens, a different effect: these are
+    # VEILED cells whose carving becomes legible while the seal reads true.
+    # A seal may open, unveil, both, or (as a pure predicate) neither; what
+    # it may never be is nothing at all — the match/requires guard above
+    # already refuses a seal with no condition.
+    unveils_in = s.get('unveils') or []
+    if (isinstance(unveils_in, (list, tuple)) and len(unveils_in) == 2
+            and all(isinstance(v, int) for v in unveils_in)):
+        unveils_in = [unveils_in]
+    if not isinstance(unveils_in, (list, tuple)):
+        raise LevelFormatError(
+            f'{at}[{i}].unveils: must be [row, col] or a list of them')
+    if len(unveils_in) > MAX_SEAL_CELLS:
+        raise LevelFormatError(
+            f'{at}[{i}].unveils: at most {MAX_SEAL_CELLS} cells')
+    unveiled = []
+    for j, cell in enumerate(unveils_in):
+        if not (isinstance(cell, (list, tuple)) and len(cell) == 2):
+            raise LevelFormatError(f'{at}[{i}].unveils[{j}]: must be [row, col]')
+        unveiled.append((int(cell[0]), int(cell[1])))
+    return Seal(region=region, match=tuple(match), opens=tuple(cells),
+                unveils=tuple(unveiled), mode=mode,
                 scope=scope, requires=tuple(requires), anchor=anchor,
                 head=head, at=pin)
 
@@ -1009,6 +1030,12 @@ def _build_room(spec: Room, lvl: Level, rng: random.Random,
     # from growing a word onto a door cell. The tick opens the door on turn one if
     # the text really does read true, so nothing legitimate is lost.
     room.seals = tuple(spec.seals)
+    # A seal's UNVEIL cells are not doors — they are veiled carvings, already
+    # stone (or whatever the author kept), and the tick lifts their veil; they
+    # must not be walled here, or the reveal would re-hide behind new rock.
+    room.veiled_cells |= {(int(r), int(c))
+                          for _s in spec.seals for (r, c) in _s.unveils
+                          if 0 <= r < room.rows and 0 <= c < room.cols}
     for _s in spec.seals:
         for _r, _c in _s.opens:
             if 0 <= _r < room.rows and 0 <= _c < room.cols:
@@ -1233,6 +1260,8 @@ def _dump_content(h: Room) -> dict:
         out = []
         for s in h.seals:
             d = {'opens': [list(c) for c in s.opens], 'mode': s.mode}
+            if s.unveils:
+                d['unveils'] = [list(c) for c in s.unveils]
             if s.region:
                 d['region'] = list(s.region)
             if s.match:

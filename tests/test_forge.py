@@ -1925,3 +1925,33 @@ def test_painting_veil_hides_a_carving_and_rides_the_save():
     assert _fresh.ok, _fresh.error
     room = F.build(_fresh.level).rooms[0]
     assert (0, 1) in room.veiled_cells
+
+
+def test_a_bolt_on_a_veiled_cell_unveils_it_through_save_and_replay():
+    """The unveiling bolt end-to-end: carve two secrets onto the border wall,
+    arm a condition bare (anyrow), and :bolt each veil in turn. The selection
+    of one splits by kind — the veiled wall cells become `unveils`, not doors
+    — and after a save/reload the built room comes back dark, waiting for its
+    verse."""
+    import uuid
+    d = DRAFT.new(f'ProbeVeil{uuid.uuid4().hex[:6]}', rows=8, cols=30)
+    try:
+        _run_veil_roundtrip(d)
+    finally:
+        d.path.unlink(missing_ok=True)
+
+
+def _run_veil_roundtrip(d):
+    _forge_session(d, ':seal open sesame\r'             # arm bare (anyrow)
+                      'k:paint veil\rl:paint veil\r'   # carve two secrets
+                      'h:bolt\rl:bolt\r'                # bolt each veil
+                      ':w\r:q!\r')
+    assert len(d.level.seals) == 1
+    s = d.level.seals[0]
+    assert sorted(map(tuple, s.unveils)) == [(0, 1), (0, 2)]
+    assert s.opens == (), 'a reveal-only bolt lays no door'
+    _fresh = DRAFT.load(d.path)
+    assert _fresh.ok, _fresh.error
+    room = F.build(_fresh.level).rooms[0]
+    assert {(0, 1), (0, 2)} <= room.veiled_cells
+    assert room.seals[0].unveils == ((0, 1), (0, 2))

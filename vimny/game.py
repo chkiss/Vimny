@@ -2668,6 +2668,14 @@ def _seal_cells(room, seal) -> tuple:
     return seal.opens
 
 
+def _seal_unveils(room, seal) -> tuple:
+    """Where a seal's VEILS actually are this turn — same anchor law as the
+    door: `exit_row` rides the live exit row, else literal."""
+    if seal.anchor == 'exit_row' and room.exit_pos:
+        return tuple((room.exit_pos[0], c) for (_r, c) in seal.unveils)
+    return seal.unveils
+
+
 def _seal_tick(room, player) -> list:
     """The text-match doors (`room.seals`) — the plaque rule, made into data.
 
@@ -2708,6 +2716,23 @@ def _seal_tick(room, player) -> list:
                 # sealing someone inside stone is not a puzzle, it is a crash.
                 room.cells[r][c] = CellType.WALL
         if opened:
+            msgs.append(seal.message or SEAL_OPENED)
+        # The same condition can lift VEILS: a carving becomes legible while
+        # the seal reads true, and re-hides when it does not (the veil is the
+        # door here — `u` un-mends the verse, the secret goes dark again).
+        unveiled = False
+        for (r, c) in _seal_unveils(room, seal):
+            if true_now:
+                if (r, c) in room.veiled_cells:
+                    room.veiled_cells.discard((r, c))
+                    unveiled = True
+            elif (r, c) not in room.veiled_cells \
+                    and 0 <= r < room.rows and 0 <= c < room.cols \
+                    and room.cells[r][c] in (CellType.WALL, CellType.WOOD_WALL):
+                # Re-veil only stone — if ground was re-laid over the cell,
+                # the carving is gone for good and there is nothing to hide.
+                room.veiled_cells.add((r, c))
+        if unveiled:
             msgs.append(seal.message or SEAL_OPENED)
     return msgs
 
@@ -7244,6 +7269,14 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
                     elif not _want:
                         _push('Nothing in that selection to bolt.')
                     else:
+                        # The selection SPLITS BY CELL KIND, and that split is
+                        # the whole unveiling affordance: plain cells become
+                        # doors (open while true), VEILED cells become reveals
+                        # (carving legible while true). One command, both
+                        # effects, because one condition often wants both.
+                        _veiled_now = getattr(room, 'veiled_cells', set())
+                        _want_open = [rc for rc in _want if rc not in _veiled_now]
+                        _want_unveil = [rc for rc in _want if rc in _veiled_now]
                         _reg, _txt, _mode, _head, _pin = _pend
                         # A text seal's pending carries the target tuple (one
                         # entry per required reading); a gone seal's carries
@@ -7257,7 +7290,7 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
                         _inside = []
                         if _reg:
                             _r1, _c1, _r2, _c2 = _reg
-                            _inside = [(r, c) for r, c in _want
+                            _inside = [(r, c) for r, c in _want_open
                                        if _r1 <= r <= _r2 and _c1 <= c <= _c2]
                         if _inside:
                             # See the validator: a door inside its own condition
@@ -7278,12 +7311,26 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
                                         s.head, s.at)
                                     == (_reg, _mtch, _mode, _scope, _head, _pin)]
                             _cells = tuple(_old[0].opens) if _old else ()
+                            _u_cells = tuple(_old[0].unveils) if _old else ()
                             if _old:
                                 _draft.level.seals.remove(_old[0])
-                            _add = tuple(c for c in _want if c not in _cells)
+                            _add = tuple(c for c in _want_open
+                                         if c not in _cells)
+                            _u_add = tuple(c for c in _want_unveil
+                                           if c not in _u_cells)
+                            if not _add and not _u_add and not _cells \
+                                    and not _u_cells:
+                                _push('Nothing new to bolt.')
+                                continue
                             _new = Seal(region=_reg, match=_mtch, mode=_mode,
                                         scope=_scope, opens=_cells + _add,
+                                        unveils=_u_cells + _u_add,
                                         head=_head, at=_pin)
+                            # A seal that only REVEALS (no door cells) is still
+                            # a seal — the condition is the thing.
+                            if not _new.opens and not _new.unveils:
+                                _push('Nothing new to bolt.')
+                                continue
                             _draft.level.seals.append(_new)
                             _err = _forge_rebuild()
                             if _err:
@@ -7292,7 +7339,9 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
                             elif _mode == 'gone':
                                 _push(f'Bolted: {len(_new.opens)} cell(s) open '
                                       f'while no ' + ' nor '.join(_mtch)
-                                      + ' stands.')
+                                      + ' stands.'
+                                      + (f' {len(_new.unveils)} carving(s) '
+                                         f'readable.' if _new.unveils else ''))
                             else:
                                 _extra = ''
                                 if len(_mtch) > 1 and not _reg:
@@ -7301,6 +7350,9 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
                                     _extra += f', first glyph at column {_head}'
                                 if _pin >= 0:
                                     _extra += f', pinned to column {_pin}'
+                                if _new.unveils:
+                                    _extra += (f', {len(_new.unveils)} '
+                                               'carving(s) readable')
                                 _push(f'Bolted: {len(_new.opens)} cell(s) open while '
                                       + ('that region reads ' if _reg
                                          else 'some floor row reads ')

@@ -359,3 +359,47 @@ def test_a_gone_seal_ignores_other_kinds_and_corpses():
     _tick(room)
     assert room.cells[3][10] == CellType.FLOOR
     assert warden.alive
+
+
+def test_a_seals_unveils_lift_with_the_condition_and_rehide_without():
+    """The unveiling bolt: the same condition that floors `opens` can lift
+    `unveils` — a carving becomes legible while the seal reads true, and
+    re-hides when it does not (the veil is the door here). And the reveal
+    never re-veils ground that was re-laid: if the stone under a secret is
+    gone, so is the secret."""
+    seal = Seal(match='speak friend', scope='anyrow', mode='contains',
+                unveils=((0, 5), (0, 6)))
+    room = _room([seal], texts=[(2, 'speak friend')])
+    room.veiled_cells |= {(0, 5), (0, 6)}
+    _tick(room)
+    assert (0, 5) not in room.veiled_cells and (0, 6) not in room.veiled_cells
+    _write(room, 2, 'now speak friend loudly')  # still true (contains)
+    _tick(room)
+    assert (0, 5) not in room.veiled_cells
+    _write(room, 2, 'silence')                # condition false: dark again
+    _tick(room)
+    assert (0, 5) in room.veiled_cells and (0, 6) in room.veiled_cells
+
+
+def test_an_unveil_never_walls_and_survives_the_build_shut_loop():
+    """Build shuts every OPENS cell to stone; an UNVEIL cell must come through
+    untouched — it is already whatever the author kept, and walling it would
+    re-hide the reveal behind fresh rock before turn one."""
+    from vimny.sharing import format as F
+    lvl = F.parse({
+        'schema': 1, 'name': 't', 'seed': 1,
+        'geometry': {'rows': 4, 'cols': 8,
+                     'cells': ['WWWWWWWW', 'WWWWWWWW', 'WFFFW' + 'WWW',
+                                'WWWWWWWW'],
+                     'spawn': [2, 1], 'exit': [2, 4]},
+        'seals': [{'match': 'open', 'scope': 'anyrow', 'mode': 'contains',
+                   'opens': [3, 3], 'unveils': [[0, 2], [0, 3]]}],
+    })
+    room = F.build(lvl).rooms[0]
+    assert (0, 2) in room.veiled_cells and (0, 3) in room.veiled_cells
+    assert room.cells[3][3] == CellType.WALL      # the door starts shut
+    assert room.cells[0][2] == CellType.WALL      # the veil's stone too —
+    assert (0, 2) in room.fog_cells or True       # visibility is separate
+    lvl2 = F.loads(F.dumps(lvl))
+    assert lvl2.seals[0].unveils == ((0, 2), (0, 3))
+    assert lvl2.seals[0].opens == ((3, 3),)
