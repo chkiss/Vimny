@@ -54,6 +54,23 @@ def _discovered(room: Room, r: int, c: int) -> bool:
     return False
 
 
+def _water_discovered(room: Room, r: int, c: int) -> bool:
+    """True if the BODY of sunken water containing (r, c) has any shore the
+    player has revealed.
+
+    Water discovers as one. A pool buried inside a chasm sheet touches no
+    open ground of its own — cell-by-cell discovery would keep it dark for
+    ever even after the player has stood on the course it feeds. Seeing any
+    shore of the body is seeing the water."""
+    comp = room.sunken_water_component_of(r, c)
+    if comp is None:
+        return False
+    for (sr, sc) in comp:
+        if _discovered(room, sr, sc):
+            return True
+    return False
+
+
 def _seal_shown(room: Room, r: int, c: int) -> bool:
     """True if a registered gate at (r,c) should show its band.
 
@@ -641,8 +658,10 @@ def render_all(term: Terminal, dungeon: Dungeon, player: Player,
         if (room_r, room_c) in room.fog_cells:
             if (room.cells[room_r][room_c] == CellType.WATER
                     and (room_r, room_c) in room.underwater_cells
-                    and _discovered(room, room_r, room_c)):
-                # MIST on water reads as hazy water, not stone — the channel
+                    and room.char_run_at(room_r, room_c) is None
+                    and (_discovered(room, room_r, room_c)
+                         or _water_discovered(room, room_r, room_c))):
+                # UNDERWATER water reads as hazy water, not stone — the channel
                 # stays visibly a channel (scans still stop at the fog), but it
                 # must not read as OPEN water either, so it keeps water's '~' on
                 # its own lifted-grey background, and never animates.

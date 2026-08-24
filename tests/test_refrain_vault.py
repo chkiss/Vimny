@@ -36,6 +36,7 @@ from vimny.generation.dungeon_gen import (
     build_dungeon_refrain_vault,
     _RV_ROWS, _RV_COLS, _RV_BAND, _RV_WTR, _RV_SONG, _RV_CORRUPT,
     _RV_SEAL_ROW, _RV_SEAL_COL, _RV_EXIT_COL, _RV_TRUE, _RV_PAR, _RV_BUDGET,
+    _RV_CTX,
 )
 from tests import SEEDS, cached_room
 from vimny.engine.tape import to_keys
@@ -263,3 +264,29 @@ def test_misted_text_wears_the_haze(seed, monkeypatch, capsys):
     hazed = (C.underwater_bg() + C.rune_ancient() + 'm' + C.normal_fg())
     assert hazed in frame, 'the chasm verse must render wearing the haze'
 
+
+
+@pytest.mark.parametrize("seed", SEEDS)
+def test_the_water_runs_bank_to_bank_and_the_pool_shows_with_the_course(seed):
+    """Row 3's course reaches col 1, and a decorative pool fills row 2's east
+    sheet (cols 6-24). Water discovers as ONE: the pool has no open shore of
+    its own, but it feeds the course the player sees at spawn — so the whole
+    body shows together. And a glyph at the waterline ('.' of 'lady.') still
+    renders as ink, never as a swallowed wave."""
+    room = cached_room('build_dungeon_refrain_vault', seed)
+    from vimny.engine.world import CellType
+    for c in range(1, _RV_CTX + 2):
+        assert room.cells[_RV_WTR][c] == CellType.WATER
+        assert (_RV_WTR, c) in room.underwater_cells
+    assert room.cells[2][6] == CellType.WATER
+    assert room.cells[2][24] == CellType.WATER
+    assert room.cells[2][5] == CellType.FLOOR, 'the pool starts where asked'
+    # One body: pool cell shares a component with the visible course...
+    comp = room.sunken_water_component_of(2, 12)
+    assert (_RV_WTR, 10) in comp
+    # ...and once the course is discovered, the pool draws its wave.
+    import vimny.render.renderer as R
+    room.fog_cells.discard((4, 2))              # an open revealed shore nearby
+    assert R._water_discovered(room, 2, 12)
+    assert not R._water_discovered(room, 1, 30), \
+        'the FLOOR half of the sheet is ink-gated, not component-gated'
