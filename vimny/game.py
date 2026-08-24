@@ -854,10 +854,11 @@ def _range_cells(room, player) -> list:
 
 def _paint_name(room, r: int, c: int) -> str:
     """What `:paint` would call the cell at (r, c)."""
-    ct     = room.cells[r][c]
-    sunken = (r, c) in getattr(room, 'underwater_cells', ())
+    ct = room.cells[r][c]
+    if (r, c) in getattr(room, 'underwater_cells', ()):
+        return 'underwater'          # the smart kind keeps any terrain
     for name, (kind_ct, kind_sunken, _) in PAINT_KINDS.items():
-        if kind_ct == ct and kind_sunken == sunken:
+        if kind_ct is not None and kind_ct == ct and not kind_sunken:
             return name
     return ct.name.lower()
 

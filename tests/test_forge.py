@@ -1310,7 +1310,7 @@ def test_painted_mist_survives_the_round_trip():
     reason it could not be painted is the same reason it could not be SAVED: the
     grid had no code for it. `M` is water plus its permanent haze."""
     d = DRAFT.new('Probe', rows=8, cols=30)
-    _forge_session(d, 'jll:paint underwater\r:w\r:q!\r')
+    _forge_session(d, 'jll:paint water\rgv:paint underwater\r:w\r:q!\r')
     assert 'M' in d.level.cells[2]
     room = F.build(d.level).room
     assert room.cells[2][3] == CellType.WATER
@@ -1865,15 +1865,15 @@ def test_two_doors_cannot_share_one_stone():
     assert len(d.level.seals) == 1
 
 
-def test_painting_underwater_sinks_cells_and_rides_the_save():
-    """`underwater` joined `:paint`'s palette when the layer got its honest
-    name (it was `mist`). Painting lays WATER under permanent haze; the save
-    writes it the compact way — the `M` cell code, since painted sunken ground
-    is always a channel — and a rebuild comes back impassable, unfog-liftable,
-    and search-opaque exactly like every shipped channel."""
+def test_painting_underwater_over_water_sinks_the_channel():
+    """`underwater` is the SMART kind: it keeps whatever ground it touches and
+    adds the permanent haze. Over water, the save writes it the compact way —
+    the `M` cell code, since a sunken channel is water — and a rebuild comes
+    back impassable, unfog-liftable, and search-opaque exactly like every
+    shipped channel."""
     d = DRAFT.new('Probe', rows=8, cols=30)
-    _forge_session(d, 'jv' + 'l' * 4 + ':paint underwater\r'
-                      ':w\r:q!\r')
+    _forge_session(d, 'jv' + 'l' * 4 + ':paint water\r'
+                      'gv:paint underwater\r:w\r:q!\r')
     # Water-borne haze rides the grid as M codes, not the coordinate list.
     assert d.level.underwater == []
     assert d.level.cells[2].startswith('W5M'), d.level.cells[2]  # RLE'd haze
@@ -1892,14 +1892,15 @@ def test_painting_underwater_sinks_cells_and_rides_the_save():
     assert 'M' in _fresh.level.cells[2]
 
 
-def test_painting_drowned_floor_sinks_the_ground_but_keeps_it_floor():
-    """`drowned` is the floor twin of `underwater`: same permanent haze, same
-    barred feet and scans, but the terrain stays FLOOR — which is what lets a
-    verse lie readable across an unstandable band (the Refrain's chasm, the
-    Shelving Room's shelf). Because it is not water, the save carries it in
-    the `underwater` coordinate list rather than M codes."""
+def test_painting_underwater_over_floor_keeps_the_floor():
+    """Over FLOOR, the same paint sinks the ground without retyping it: the
+    terrain stays floor — which is what lets a verse lie readable across an
+    unstandable band (the Refrain's chasm, the Shelving Room's shelf) — and
+    because it is not water, the save carries it in the `underwater`
+    coordinate list rather than M codes. Stone refuses: walls are not
+    foggable, and veiling is how stone hides things."""
     d = DRAFT.new('Probe', rows=8, cols=30)
-    _forge_session(d, 'jv' + 'l' * 4 + ':paint drowned\r'
+    _forge_session(d, 'jv' + 'l' * 4 + ':paint underwater\r'
                       ':w\r:q!\r')
     assert sorted(map(tuple, d.level.underwater)) \
         == [(2, 1), (2, 2), (2, 3), (2, 4), (2, 5)]

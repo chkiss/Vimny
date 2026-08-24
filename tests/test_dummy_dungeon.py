@@ -305,9 +305,12 @@ def test_paint_can_reach_every_cell_type():
     )
 
 
-def test_paint_reaches_the_misted_water_the_cycle_never_could():
+def test_paint_reaches_the_sunken_water_the_cycle_never_could():
+    """The scratch cell is FLOOR, and the smart paint keeps it: the haze lands,
+    the terrain does not change. (`:paint water` first for a sunken CHANNEL.)"""
     room = build_dungeon_dummy(SEED).room
     r, c = SCRATCH
+    assert room.cells[r][c] == CellType.FLOOR
     _ed_paint(room, r, c, 'underwater')
-    assert room.cells[r][c] == CellType.WATER
+    assert room.cells[r][c] == CellType.FLOOR      # kept, not retyped
     assert (r, c) in room.underwater_cells

@@ -269,14 +269,17 @@ class TestEdSnapshotRestore:
 class TestEdPaint:
     def test_every_paint_lands_the_cell_it_names(self):
         room = _make_room()
-        for name, (ct, _mist, _desc) in PAINT_KINDS.items():
+        for name, (ct, _sunken, _desc) in PAINT_KINDS.items():
             assert _ed_paint(room, 3, 5, name) is True
+            if ct is None:
+                continue          # the smart kind keeps whatever it touches
             assert room.cells[3][5] == ct, name
 
-    def test_underwater_is_water_under_permanent_fog(self):
+    def test_underwater_keeps_terrain_under_permanent_fog(self):
         room = _make_room()
+        _ed_paint(room, 3, 5, 'water')          # make it a channel first
         _ed_paint(room, 3, 5, 'underwater')
-        assert room.cells[3][5] == CellType.WATER
+        assert room.cells[3][5] == CellType.WATER   # terrain kept
         assert (3, 5) in room.underwater_cells
         # The renderer reads the haze off fog_cells first — sunken ground that
         # is not also fogged simply draws as open water.
@@ -530,3 +533,23 @@ class TestSerializeRoom:
         room.exit_pos = None
         d = _serialize_room(room)
         assert d['exit_pos'] is None
+
+
+def test_underwater_paint_keeps_terrain_and_refuses_stone():
+    """The smart kind: same paint over floor, corridor or water keeps that
+    ground and adds the haze; over stone it is REFUSED, because walls are not
+    foggable — veiling is how stone hides things."""
+    room = _make_room()
+    from vimny.engine.editor import _ed_paint as paint
+    assert paint(room, 2, 2, 'underwater')          # floor stays floor
+    assert room.cells[2][2] == CellType.FLOOR
+    assert (2, 2) in room.underwater_cells
+    assert paint(room, 3, 3, 'water')               # a channel first...
+    assert paint(room, 3, 3, 'underwater')          # ...then the haze
+    assert room.cells[3][3] == CellType.WATER       # terrain kept
+    assert (3, 3) in room.underwater_cells
+    assert paint(room, 0, 5, 'underwater') is False # stone: nothing to sink
+    assert (0, 5) not in room.underwater_cells
+    # Any plain repaint clears the haze, as it always did.
+    assert paint(room, 2, 2, 'floor')
+    assert (2, 2) not in room.underwater_cells

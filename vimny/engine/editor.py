@@ -40,8 +40,7 @@ PAINT_KINDS = {
     'wall':     (CellType.WALL,      False, 'stone — blocks feet, bounds a line'),
     'wood':     (CellType.WOOD_WALL, False, 'destructible wall — two hits of x'),
     'water':    (CellType.WATER,     False, 'unwalkable; line motions cross it'),
-    'underwater': (CellType.WATER,   True,  'sunken channel — hazy, never lit or crossed'),
-    'drowned':    (CellType.FLOOR,   True,  'sunken floor — text lies readable, never footing'),
+    'underwater': (None,             True,  'permanent haze over the ground — never footing, lit, or searched'),
 }
 
 
@@ -231,6 +230,16 @@ def _ed_paint(room, r, c, kind: str) -> bool:
     if in_fill(room, r, c):
         return False                 # a fill owns this cell — see in_fill
     ct, sunken, _ = PAINT_KINDS[kind]
+    if ct is None:
+        # The smart kind: `underwater` keeps whatever ground it touches and
+        # adds the permanent haze. Stone is refused — walls are not foggable
+        # (veiling is how stone hides things), so there is nothing to sink.
+        if room.cells[r][c] not in (CellType.FLOOR, CellType.CORRIDOR,
+                                    CellType.WATER):
+            return False
+        room.underwater_cells.add((r, c))
+        room.fog_cells.add((r, c))
+        return True
     room.cells[r][c] = ct
     if sunken:
         # Underwater ground is a subset of the fog, always: the renderer reads
