@@ -58,7 +58,17 @@ def _run(level, keys, *, player_name='admin', dungeon=None):
     def cap(t, dn, pl, bg, message='', *a, **k):
         seen.append(message)
     main.render_all = cap
-    res = main.run_dungeon(term, level, {}, player_name=player_name, _dungeon=dungeon)
+    # Pin the screen height: the route uses `M`, whose landing row depends on
+    # the terminal's size. A real shell and an xdist worker disagree — and a
+    # half-mended route must not accidentally complete just because the test
+    # ran beside a taller terminal.
+    saved_h = Terminal.height
+    Terminal.height = property(lambda self: 45)
+    try:
+        res = main.run_dungeon(term, level, {}, player_name=player_name,
+                               _dungeon=dungeon)
+    finally:
+        Terminal.height = saved_h
     return res, [m for m in seen if m]
 
 

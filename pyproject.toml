@@ -38,6 +38,13 @@ Issues        = "https://github.com/chkiss/Vimny/issues"
 [project.scripts]
 vimny = "vimny.game:main"
 
+[tool.pytest.ini_options]
+# Parallel by default (pytest-xdist): the suite is ~3.5 min serial and ~1 min
+# on four cores. `--dist loadfile` keeps each test file whole on one worker,
+# which preserves file-local ordering (conftest's stub-hygiene fixtures are
+# per-test, so cross-file isolation is already handled).
+addopts = "-n auto --dist loadfile"
+
 [tool.setuptools]
 # Vimny runs from a checkout (`python main.py`); the package list is here so an
 # install is possible and `pip install .` does something sensible rather than
