@@ -9679,9 +9679,11 @@ def build_dungeon_refrain_vault(seed: int) -> Dungeon:
     for col in range(*_RV_BAND):                   # the water course (sight):
         cells[_RV_WTR][col] = CellType.WATER       # exactly the chasm's span
         underwater.add((_RV_WTR, col))             # — no wider than the sheet
-    for col in range(6, 25):                       # a pool in the chasm sheet,
-        cells[2][col] = CellType.WATER             # purely decorative — the
-        underwater.add((2, col))                   # kind of thing you can see
+    for col in range(16, 35):                      # a pool in the chasm sheet,
+        cells[1][col] = CellType.WATER             # on the JOIN'S SURVIVOR: the
+        underwater.add((1, col))                   # :1j consumes row 2 (rows
+                                                   # collapse whole), so decor
+                                                   # lives where mending cannot eat it
     for r in range(_RV_SONG[0], _RV_SONG[1] + 1):
         for col in range(2, _RV_SEAL_COL):
             cells[r][col] = CellType.FLOOR         # the workroom

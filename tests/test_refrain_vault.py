@@ -282,15 +282,10 @@ def test_the_water_runs_bank_to_bank_and_the_pool_shows_with_the_course(seed):
     assert room.cells[_RV_WTR][hi] != CellType.WATER, 'east of the sheet'
     for c in range(lo, hi):
         assert (_RV_WTR, c) in room.underwater_cells
-    assert room.cells[2][6] == CellType.WATER
-    assert room.cells[2][24] == CellType.WATER
-    assert room.cells[2][5] == CellType.FLOOR, 'the pool starts where asked'
-    # One body: pool cell shares a component with the visible course...
-    comp = room.sunken_water_component_of(2, 12)
-    assert (_RV_WTR, 10) in comp
-    # ...and once the course is discovered, the pool draws its wave.
-    import vimny.render.renderer as R
-    room.fog_cells.discard((4, 2))              # an open revealed shore nearby
-    assert R._water_discovered(room, 2, 12)
-    assert not R._water_discovered(room, 1, 30), \
-        'the FLOOR half of the sheet is ink-gated, not component-gated'
+    assert all(room.cells[1][c] == CellType.WATER for c in range(16, 35))
+    assert room.cells[1][15] == CellType.FLOOR, 'the pool starts where asked'
+    assert room.cells[2][6] == CellType.FLOOR, 'row 2 stays floor: the join eats it'
+    # The pool renders because its row carries ink — the verse IS its
+    # shoreline ('my fair' / 'lady.' both live up here with it).
+    assert room._char_runs_by_row.get(1)
+    assert all((1, c) in room.underwater_cells for c in range(16, 35))

@@ -321,7 +321,10 @@ def _shift_rows(room, player, moves, delta: int) -> None:
     if room.underwater_cells:                 # sunken ground rides its rows too
         room.underwater_cells = {((r + delta) if moves(r) else r, c)
                                  for (r, c) in room.underwater_cells}
-    if player is not None:
+    if getattr(room, 'sealed_cells', None):   # gate bands ride, or a paste
+        room.sealed_cells = {((r + delta) if moves(r) else r, c)   # leaves the
+                             for (r, c) in room.sealed_cells}      # bolt above
+    if player is not None:                    # its own unlocked door
         for nm, (r, c) in list(player.marks.items()):
             if moves(r):
                 player.marks[nm] = (r + delta, c)
@@ -416,6 +419,9 @@ def remove_row(room, at_row: int, player=None) -> bool:
             room._on_entity_destroyed(e)
     room.fog_cells = {(r, c) for (r, c) in room.fog_cells if r != at_row}
     room.underwater_cells = {(r, c) for (r, c) in room.underwater_cells
+                             if r != at_row}
+    if getattr(room, 'sealed_cells', None):
+        room.sealed_cells = {(r, c) for (r, c) in room.sealed_cells
                              if r != at_row}
     _shift_rows(room, player, lambda r: r > at_row, -1)
     room.rebuild_indexes()

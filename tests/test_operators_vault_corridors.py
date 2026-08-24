@@ -137,6 +137,8 @@ def test_every_corridor_is_beaten_only_by_its_own_operator(seed):
     """The audit. For each corridor, splice in every other d-motion and drive
     the whole route; nothing may win for par or less except the real lesson."""
     segs = _segments()
+    # Par is derived from the canonical tape, so it is identical for every
+    # build of a seed — build ONCE for the number, not once per substitution.
     par = dg.build_dungeon_operators_vault(seed).rooms[0].par
 
     for k, seg in enumerate(segs, 1):

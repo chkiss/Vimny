@@ -45,29 +45,45 @@ def _flood_reachable(room, start_r: int, start_c: int) -> set:
     """BFS flood of fog-visible cells (FLOOR/CORRIDOR/WATER) from a start cell.
     A closed door entity blocks the spread — its own cell is reached (visible)
     but the flood does not expand through it. Returns the reachable (r, c) set."""
+    # Hot path: called per reveal per turn. Everything hot is bound local —
+    # attribute lookups and tuple-pair arithmetic dominate otherwise.
+    cells = room.cells
+    rows, cols = room.rows, room.cols
+    entity_at = room.entity_at
+    underwater = room.underwater_cells
     reachable = {(start_r, start_c)}
     q = deque([(start_r, start_c)])
+    pop = q.popleft
+    push = q.append
     while q:
-        r, c = q.popleft()
-        ent = room.entity_at(r, c)
+        r, c = pop()
+        ent = entity_at(r, c)
         if ent and ent.kind in _FOG_BLOCK_KINDS:
             continue
-        for dr, dc in ((-1, 0), (1, 0), (0, -1), (0, 1)):
-            nr, nc = r + dr, c + dc
-            if (nr, nc) in reachable:
-                continue
-            if not (0 <= nr < room.rows and 0 <= nc < room.cols
-                    and room.cells[nr][nc] in _FOGGABLE_CELLS):
-                continue
-            if (nr, nc) in room.underwater_cells:
-                continue      # UNDERWATER: permanent haze is never reached NOR
-                              # revealed — light stops at it, so a submerged
-                              # channel can't ladder a fog flood (nor a
-                              # reveal) past a gate. Ordinary fogged water
-                              # (a pool inside a to-be-revealed region)
-                              # still conducts and clears normally.
-            reachable.add((nr, nc))
-            q.append((nr, nc))
+        row = cells[r]
+        for nc in (c - 1, c + 1):
+            if 0 <= nc < cols:
+                nxt = (r, nc)
+                if nxt not in reachable and row[nc] in _FOGGABLE_CELLS \
+                        and nxt not in underwater:
+                    reachable.add(nxt)
+                    push(nxt)
+        if r:
+            nr = r - 1
+            for_check = cells[nr]
+            nxt = (nr, c)
+            if nxt not in reachable and for_check[c] in _FOGGABLE_CELLS \
+                    and nxt not in underwater:
+                reachable.add(nxt)
+                push(nxt)
+        nr = r + 1
+        if nr < rows:
+            down = cells[nr]
+            nxt = (nr, c)
+            if nxt not in reachable and down[c] in _FOGGABLE_CELLS \
+                    and nxt not in underwater:
+                reachable.add(nxt)
+                push(nxt)
     return reachable
 
 
@@ -103,21 +119,37 @@ def _vision_flood(room, start_r: int, start_c: int) -> set:
     re-laid — so stepping onto the door reveals nothing new, and stepping PAST it
     onto plain floor is what opens the pocket up to the next closed door."""
     stone = (CellType.WALL, CellType.WOOD_WALL)
+    cells = room.cells
+    rows, cols = room.rows, room.cols
+    entity_at = room.entity_at
     seen = {(start_r, start_c)}
     q = deque([(start_r, start_c)])
+    pop = q.popleft
+    push = q.append
+    add = seen.add
     while q:
-        r, c = q.popleft()
-        ent = room.entity_at(r, c)
+        r, c = pop()
+        ent = entity_at(r, c)
         if ent is not None and ent.opaque:
             continue                       # seen, but the eye stops here
-        for dr, dc in ((-1, 0), (1, 0), (0, -1), (0, 1)):
-            nr, nc = r + dr, c + dc
-            if (nr, nc) in seen:
-                continue
-            if (0 <= nr < room.rows and 0 <= nc < room.cols
-                    and room.cells[nr][nc] not in stone):
-                seen.add((nr, nc))
-                q.append((nr, nc))
+        row = cells[r]
+        for nc in (c - 1, c + 1):
+            if 0 <= nc < cols:
+                nxt = (r, nc)
+                if nxt not in seen and row[nc] not in stone:
+                    add(nxt)
+                    push(nxt)
+        if r:
+            nxt = (r - 1, c)
+            if nxt not in seen and cells[r - 1][c] not in stone:
+                add(nxt)
+                push(nxt)
+        nr = r + 1
+        if nr < rows:
+            nxt = (nr, c)
+            if nxt not in seen and cells[nr][c] not in stone:
+                add(nxt)
+                push(nxt)
     return seen
 
 

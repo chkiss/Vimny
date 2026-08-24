@@ -9431,6 +9431,10 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
                                  + _register_prefix_cost(action))
                     spawned = next((ed['tmpl']['kind'] for ed in clip_entities), None)
                     _push(_PASTE_SPAWN_MSG[spawned] if spawned in _PASTE_SPAWN_MSG else 'Pasted.')
+                    # A linewise paste is an EDIT like any other: a verse laid
+                    # down can complete a gate THIS turn (the Refrain's last
+                    # refrain opens its seal here — no extra step to wake it).
+                    _content_ticks()
                 else:
                     undo_stack.pop()
                     _push('Nothing pasted (no room).')

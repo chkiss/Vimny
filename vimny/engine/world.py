@@ -437,42 +437,6 @@ class Room:
 
     # ── Spatial index ──────────────────────────────────────────────────────────
 
-    def sunken_water_component_of(self, r: int, c: int) -> frozenset | None:
-        """The connected body of sunken WATER containing (r, c), or None.
-
-        Water discovers as one: seeing any shore of a pool means seeing the
-        pool. Components are 4-connected over `underwater_cells` whose terrain
-        is WATER, computed lazily and cached — the layer is immutable per
-        level, so the cache never goes stale (paint in the forge rebuilds the
-        room wholesale)."""
-        cache = getattr(self, '_sunken_components', None)
-        if cache is None or cache[0] != len(self.underwater_cells):
-            comps: list[frozenset] = []
-            comp_of: dict = {}
-            water = {(rr, cc) for (rr, cc) in self.underwater_cells
-                     if self.cells[rr][cc] == CellType.WATER}
-            seen: set = set()
-            for cell in water:
-                if cell in seen:
-                    continue
-                comp, queue = set(), [cell]
-                seen.add(cell)
-                while queue:
-                    cur = queue.pop()
-                    comp.add(cur)
-                    comp_of[cur] = len(comps)
-                    cr, cc = cur
-                    for dr, dc in ((-1, 0), (1, 0), (0, -1), (0, 1)):
-                        nxt = (cr + dr, cc + dc)
-                        if nxt in water and nxt not in seen:
-                            seen.add(nxt)
-                            queue.append(nxt)
-                comps.append(frozenset(comp))
-            cache = (len(self.underwater_cells), comps, comp_of)
-            self._sunken_components = cache
-        idx = cache[2].get((r, c))
-        return cache[1][idx] if idx is not None else None
-
     def rebuild_indexes(self) -> None:
         """Rebuild O(1) lookup dicts from the current character and entity lists.
 
