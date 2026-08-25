@@ -6777,6 +6777,17 @@ def build_dungeon_wet_ink(seed: int) -> Dungeon:
         'opens': [list(_WI_EXIT)],
     }, len(seals)))
 
+    # THE PROGRESSIVE FUEL GATE, said as data: quarter k written makes
+    # brazier k pasteable. Each predicate carries `fuels` — one brazier cell
+    # its truth permits — and the paste law unions them while true.
+    for j in range(1, len(_WI_BRAZIERS) + 1):   # word 4 has no gate — it
+                                                # completes the final phrase
+        seals.append(_parse_seal({
+            'scope': 'anyrow', 'mode': 'contains',
+            'match': [' '.join(ws[:j])],
+            'fuels': [list(_WI_BRAZIERS[j - 1])],
+        }, len(seals)))
+
     # FIRELIGHT, said as data: brazier k burning lifts the veil on plaque
     # quarter k+1. The `braziers` mode reads the painted flame (glyph braziers
     # — no entities here), and `unveils` is the one-way reveal. The tick keeps

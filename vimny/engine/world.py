@@ -135,6 +135,11 @@ class Seal:
                            # its first glyph exactly at this column, whatever
                            # sits west of it (the plumb-line family: Alignment
                            # Halls' register). -1 = unpinned.
+    fuels:    tuple = ()   # ((row, col), ...) — brazier cells made PASTEABLE
+                           # for flames while this seal reads true. A level
+                           # with any fuels-carrying seal switches its paste
+                           # law to fuels-only: a flame lands only where some
+                           # true seal says it may (the Wet Ink's prefix gate).
     unveils:  tuple = ()   # ((row, col), ...) — VEILED cells whose carving
                            # becomes legible while true. The same condition
                            # that floors `opens` can instead (or also) lift
@@ -154,6 +159,7 @@ class Seal:
         object.__setattr__(self, 'opens', tuple(tuple(c) for c in self.opens))
         object.__setattr__(self, 'unveils',
                            tuple(tuple(c) for c in self.unveils))
+        object.__setattr__(self, 'fuels', tuple(tuple(c) for c in self.fuels))
         object.__setattr__(self, 'requires', tuple(int(i) for i in self.requires))
 
 def gate_row_seals(doors, exit_pos, *, mode: str = 'exact',

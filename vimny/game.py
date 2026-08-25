@@ -2623,8 +2623,19 @@ def _braziers_in(room, region) -> list:
             and r1 <= e.row <= r2 and c1 <= e.col <= c2]
 
 
-def _seal_reads_true(room, seal, truths=(), rows=None) -> bool:
+def _seal_reads_true(room, seal, truths=(), rows=None, player=None) -> bool:
     """Every target reads true, AND every seal this one requires does too."""
+    if seal.mode == 'zone':
+        # The ZONE gate: true while the PLAYER stands inside the rectangle.
+        # The one condition that reads a person instead of a buffer — and the
+        # reason the reader now knows who is asking. Reversible by law: step
+        # out and an unveils list goes dark again (floor fog stays lifted —
+        # light once let through open ground cannot be unseen).
+        if player is None or seal.region == ():
+            return False
+        r1, c1, r2, c2 = seal.region
+        return (r1 <= player.row <= r2 and c1 <= player.col <= c2) \
+            and all(truths[i] for i in seal.requires if i < len(truths))
     if seal.mode == 'braziers':
         # The brazier gate: open only while EVERY brazier in the region burns.
         # Snuffing one (a cut darkens a brazier, it is not carried off) leaves it
@@ -2720,7 +2731,7 @@ def _seal_tick(room, player) -> list:
     room.sealed_cells = {rc for s in room.seals for rc in _seal_cells(room, s)}
     truths = []
     for seal in room.seals:
-        true_now = _seal_reads_true(room, seal, truths, rows)
+        true_now = _seal_reads_true(room, seal, truths, rows, player=player)
         truths.append(true_now)
         opened  = False
         for (r, c) in _seal_cells(room, seal):
@@ -3863,16 +3874,26 @@ def _flame_paste_blocked(room, player, clip, before: bool, count: int) -> bool:
     stand in for three tiers: the beacon row only has three braziers).
     True = block; the caller makes it a FREE no-op (no budget, no undo,
     no register change). Mirrors op_paste's landing arithmetic."""
-    # Two gates share this law: a PROGRESSIVE chain (the Wet Ink — the allowed
-    # set widens as prefixes read true, `_qm_chain`) and a plain LOCATION gate
-    # (flames land only on declared braziers, `room.braziers`). Either alone;
-    # never both.
+    # Two gates share this law: a PROGRESSIVE chain (the Wet Ink — said as
+    # `fuels` on predicate seals now; the legacy `_qm_chain` attr still works)
+    # and a plain LOCATION gate (flames land only on declared braziers).
     chain    = getattr(room, '_qm_chain', None)
     declared = getattr(room, 'braziers', ())
-    if (chain is None and not declared) or not clip \
-            or clip.get('linewise') or not clip.get('rows'):
+    fuel_seals = [s for s in getattr(room, 'seals', ())
+                  if getattr(s, 'fuels', ())]
+    if not clip or clip.get('linewise') or not clip.get('rows'):
         return False
-    allowed = set(chain) if chain is not None else set(declared or ())
+    if fuel_seals:
+        # FUELS-ONLY: a flame lands where some TRUE statement says it may.
+        # Declared braziers are drawing metadata here, not permission.
+        allowed = set()
+        for _s in fuel_seals:
+            if _seal_reads_true(room, _s, player=player):
+                allowed |= {tuple(c) for c in _s.fuels}
+    elif chain is not None:
+        allowed = set(chain)
+    else:
+        allowed = set(declared or ())
     rclip = clip['rows'][0]
     width = max(rclip.get('width', 0), 1)
     base  = player.col if before else player.col + 1
@@ -3938,44 +3959,6 @@ def _quartermaster_tick(room, player) -> list:
         msgs.append('The seal seems to be melting, but needs more heat! '
                     'Alas, there are no more braziers...')
     return list(dict.fromkeys(msgs))
-
-
-def _wet_ink_tick(room, player) -> list:
-    """The Wet Ink braziers — the inscription reveals by FIRELIGHT.
-    STATELESS (the vault-tick principle): recomputed from the text each
-    turn. Three laws:
-      the fuel gate — a cold brazier joins the paste-allowed set
-        (room._qm_chain, read by _flame_paste_blocked) only once the
-        quarters BEFORE its own read true on the ledge, so the scribe
-        must write, walk, light, and gi back — no lighting ahead;
-      embers       — every unlit brazier shows … (kind='pedestal'),
-        laid/swept here so lighting reads as embers → flame;
-      firelight    — brazier k burning lifts the fog on plaque quarter
-        k+1, one-way (what the fire has shown cannot be unseen)."""
-    msgs = []
-    words = getattr(room, '_wi_words', None)
-    if not words:
-        return msgs
-    braziers = _dg._WI_BRAZIERS
-
-    def lit(r, c):
-        ru = room.char_run_at(r, c)
-        return ru is not None and ru.symbols[c - ru.col] == _dg._QM_FLAME
-
-    ledge = _wla_floor_text(room, _dg._WI_LEDGE).strip()
-
-    # The fuel gate: the source always holds; brazier k opens with its prefix.
-    allowed = [_dg._WI_SOURCE]
-    for k, rc in enumerate(braziers, start=1):
-        if lit(*rc) or ledge.startswith(' '.join(words[:k])):
-            allowed.append(rc)
-    room._qm_chain = tuple(allowed)
-
-    # Firelight used to live here — brazier k revealing quarter k+1 — but it
-    # is a bolt now: three unveil-seals declared in the builder read their
-    # painted flame and lift the veil themselves (see _WI_BRAZIERS). The tick
-    # keeps only the fuel gate and the embers.
-    return msgs
 
 
 def _spawn_goblin(room, row, col, summoner_uid: int = 0) -> Entity | None:
@@ -5441,9 +5424,6 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
                     and _dg._WP_PKT1_SPAN[0] <= player.col <= _dg._WP_PKT1_SPAN[1]):
                 room.fog_cells -= _pf
                 _push('In the pocket\'s shadow, a second word wakes.')
-        if level == 'wet_ink':
-            for _m in _wet_ink_tick(room, player):    # braziers, fuel gate, fog
-                _push(_m)
         if level == 'warden_eternal':
             for _m in _warden_eternal_tick(room, player):
                 _push(_m)

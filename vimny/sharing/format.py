@@ -324,7 +324,7 @@ def _parse_fill(f: dict, i: int, at: str = 'fill') -> Fill:
                 kind=str(f.get('kind', 'ancient')))
 
 
-_SEAL_MODES  = ('exact', 'contains', 'braziers', 'gone')
+_SEAL_MODES  = ('exact', 'contains', 'braziers', 'gone', 'zone')
 _SEAL_SCOPES = ('region', 'anyrow')
 
 
@@ -338,8 +338,8 @@ def _parse_seal(s: dict, i: int, at: str = 'seals') -> Seal:
     """
     if not isinstance(s, dict):
         raise LevelFormatError(f'{at}[{i}]: must be an object')
-    unknown = set(s) - {'region', 'match', 'opens', 'unveils', 'mode', 'scope',
-                        'requires', 'anchor', 'head', 'at', 'message'}
+    unknown = set(s) - {'region', 'match', 'opens', 'unveils', 'fuels', 'mode',
+                        'scope', 'requires', 'anchor', 'head', 'at', 'message'}
     if unknown:
         raise LevelFormatError(f'{at}[{i}]: unknown key(s) {sorted(unknown)}')
     scope = str(s.get('scope', 'region'))
@@ -365,6 +365,18 @@ def _parse_seal(s: dict, i: int, at: str = 'seals') -> Seal:
         if not (isinstance(region, (list, tuple)) and len(region) == 4):
             raise LevelFormatError(f'{at}[{i}].region: a mode="braziers" seal needs '
                                    f'[r1, c1, r2, c2] naming the braziers to light')
+        region = tuple(int(x) for x in region)
+        match = []
+    elif mode == 'zone':
+        # A `zone` seal reads the PLAYER: true while they stand inside its
+        # rectangle. It wants a region and refuses a `match` — the player is
+        # the only thing it reads.
+        if match:
+            raise LevelFormatError(f'{at}[{i}].match: a mode="zone" seal reads '
+                                   f'the player, not text — leave `match` empty')
+        if not (isinstance(region, (list, tuple)) and len(region) == 4):
+            raise LevelFormatError(f'{at}[{i}].region: a mode="zone" seal needs '
+                                   f'[r1, c1, r2, c2] naming where the player stands')
         region = tuple(int(x) for x in region)
         match = []
     elif mode == 'gone':
@@ -410,7 +422,9 @@ def _parse_seal(s: dict, i: int, at: str = 'seals') -> Seal:
         # not been taken yet, which is a rule nobody can debug.
         raise LevelFormatError(f'{at}[{i}].requires: must name seals BEFORE '
                                f'this one (0..{i - 1})')
-    if not match and not requires and mode != 'braziers':
+    if (not match and not requires
+            and mode not in ('braziers', 'zone')
+            and not s.get('unveils') and not s.get('fuels')):
         raise LevelFormatError(f'{at}[{i}]: has nothing to read — give it a '
                                f'`match`, or `requires` naming earlier seals')
     anchor = str(s.get('anchor', ''))
@@ -489,12 +503,36 @@ def _parse_seal(s: dict, i: int, at: str = 'seals') -> Seal:
         if not (isinstance(cell, (list, tuple)) and len(cell) == 2):
             raise LevelFormatError(f'{at}[{i}].unveils[{j}]: must be [row, col]')
         unveiled.append((int(cell[0]), int(cell[1])))
+    # `fuels` — brazier cells this statement makes PASTEABLE while true (the
+    # progressive fuel gate, said as data). Same shape as opens.
+    fuels_in = s.get('fuels') or []
+    if (isinstance(fuels_in, (list, tuple)) and len(fuels_in) == 2
+            and all(isinstance(v, int) for v in fuels_in)):
+        fuels_in = [fuels_in]
+    if not isinstance(fuels_in, (list, tuple)):
+        raise LevelFormatError(
+            f'{at}[{i}].fuels: must be [row, col] or a list of them')
+    fueled = []
+    for j, cell in enumerate(fuels_in):
+        if not (isinstance(cell, (list, tuple)) and len(cell) == 2):
+            raise LevelFormatError(f'{at}[{i}].fuels[{j}]: must be [row, col]')
+        fueled.append((int(cell[0]), int(cell[1])))
+    if mode == 'zone':
+        # A zone reads the PLAYER against its rectangle: no text targets.
+        if match:
+            raise LevelFormatError(
+                f'{at}[{i}]: a mode="zone" seal reads the player, not text — '
+                f'leave `match` empty')
+        if region == ():
+            raise LevelFormatError(
+                f'{at}[{i}]: a mode="zone" seal needs a `region` to stand in')
     # The banner shown when this statement transitions to true — AUTHOR DATA
     # since 2026-08-24 (it used to be engine-only). Capped and flattened: it
     # is one status line, not a letter.
     msg = ' '.join(str(s.get('message', ''))[:200].split())
     return Seal(region=region, match=tuple(match), opens=tuple(cells),
-                unveils=tuple(unveiled), mode=mode, message=msg,
+                unveils=tuple(unveiled), fuels=tuple(fueled), mode=mode,
+                message=msg,
                 scope=scope, requires=tuple(requires), anchor=anchor,
                 head=head, at=pin)
 
@@ -1285,6 +1323,8 @@ def _dump_content(h: Room) -> dict:
         out = []
         for s in h.seals:
             d = {'opens': [list(c) for c in s.opens], 'mode': s.mode}
+            if getattr(s, 'fuels', ()):
+                d['fuels'] = [list(c) for c in s.fuels]
             if getattr(s, 'message', ''):
                 d['message'] = s.message
             if s.unveils:

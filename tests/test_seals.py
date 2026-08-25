@@ -296,10 +296,14 @@ def test_wet_ink_gate_is_a_chained_pair_plus_firelight_bolts():
     firelight bolts unveil the plaque quarters while their brazier burns.
     No final reads-all seal — the exit IS the chained pair."""
     room = main._build_dungeon('wet_ink', 4242).rooms[0]
-    s0, s1, *fires = room.seals
+    s0, s1, *rest = room.seals
     assert s0.match and s0.opens and not s0.requires
     assert not s1.match and s1.requires == (0,) and len(s1.opens) == 1
-    assert len(fires) == 3
+    # The progressive fuel gate is three prefix predicates carrying `fuels`
+    # (one brazier each); the firelight bolts are the three unveil-seals.
+    preds = [s for s in rest if s.fuels and not s.unveils]
+    fires = [s for s in rest if s.unveils and not s.fuels]
+    assert len(preds) == 3 and len(fires) == 3
     for f in fires:
         assert f.mode == 'braziers' and f.unveils and not f.opens
         assert not f.requires
