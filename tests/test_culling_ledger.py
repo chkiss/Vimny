@@ -152,7 +152,9 @@ def test_dimensions_doors_and_braziers(seed):
 
 
 @pytest.mark.parametrize("seed", SEEDS)
-def test_ledger_starts_dark_and_keeps_are_ordered(seed):
+def test_ledger_starts_underwater_and_keeps_are_ordered(seed):
+    """The ledger starts SUNKEN from turn one — readable but never footing.
+    No delayed veil; no door-one darkness addition."""
     r = _room(seed)
     keeps = r._ledger_keeps
     assert len(keeps) == 6
@@ -163,12 +165,13 @@ def test_ledger_starts_dark_and_keeps_are_ordered(seed):
         for ru in r._char_runs_by_row.get(row, []):
             for i in range(len(ru.symbols)):
                 cell = (row, ru.col + i)
-                assert cell in r.fog_cells
-                assert cell not in r.underwater_cells    # DARK until door one opens
+                assert cell in r.underwater_cells   # readable, unwalkable
+                assert cell in r.fog_cells          # fog rides with water
                 assert not r.is_passable(*cell)
-    for row in list(_CL_GAPS) + [_CL_SEP]:         # the water sleeps dark too
+    for row in list(_CL_GAPS) + [_CL_SEP]:         # the water course sleeps too
         for c in range(2, 54):
-            assert (row, c) in r.fog_cells and (row, c) not in r.underwater_cells
+            if (row, c) in r.underwater_cells or room_cells_are_water(r, row, c):
+                assert (row, c) in r.fog_cells
     for c in range(_CL_DOOR1[1] + 1, 50):          # and the corridor past door one
         assert (_CL_COR, c) in r.fog_cells
     # THE HOUSE THAT JACK BUILT: every stanza-III keep bears the chain-word
@@ -212,16 +215,16 @@ def test_walk_stops_at_door_one(seed):
 
 # ── the unseen-line law ───────────────────────────────────────────────────────
 
-def test_blind_cull_is_refused():
-    # The ledger is dark: ranged deletes are refused until the mist parts.
+def test_blind_cull_works_on_underwater_text():
+    # The ledger starts sunken (readable): ranged deletes work immediately.
     d = _fresh(0)
     r = d.rooms[0]
     from vimny.engine.player import Player
     p = Player(name='t')
     p.row, p.col = r.spawn_pos
     handled, msg, _ns, nl = S.run_ex('2d', r, p)
-    assert handled and nl == 0 and 'dark' in msg
-    assert r.rows == _CL_ROWS
+    assert handled, f'unexpected refusal: {msg}'
+    assert nl > 0
 
 
 def test_key_chest_gives_only_a_key(monkeypatch):
@@ -234,21 +237,20 @@ def test_key_chest_gives_only_a_key(monkeypatch):
     assert not called
 
 
-def test_door_one_parts_the_mist(monkeypatch):
-    # Opening door one: the ledger and water turn misted (readable, still
-    # unwalkable), the corridor lights up to the boss door, and past it the
-    # dark holds until the brazier burns.
+def test_ledger_stays_underwater_after_door_one(monkeypatch):
+    # The underwater status is there from BUILD; opening door one changes nothing.
     d = _fresh(0)
     r = d.rooms[0]
+    pre = set(r.underwater_cells)
     _drive(d, _K('2lx$p'), monkeypatch, finish=':q!\r')
     for row in _CONTENT_ROWS:
         for ru in r._char_runs_by_row.get(row, []):
             if ru.kind == 'void':
                 continue
             cell = (row, ru.col)
-            assert cell in r.fog_cells and cell in r.underwater_cells
+            assert cell in r.underwater_cells            # unchanged by play
             assert not r.is_passable(*cell)
-    assert (_CL_SEP, 20) in r.underwater_cells           # the water shows, hazy
+    assert pre == set(r.underwater_cells)                # identical sets
     assert (_CL_COR, _CL_BRZ_COL) not in r.fog_cells   # the cold brazier, lit
     assert (_CL_COR, 45) in r.fog_cells            # past the boss door: dark
     assert any(e.kind == 'seal_door' and e.alive for e in r.entities)
@@ -351,17 +353,16 @@ def test_blackhole_register_needs_no_space(monkeypatch):
     assert result['won'] and result['stars'] == 2
 
 
-def test_blind_global_cull_is_refused():
-    # The unseen-line law binds :g/:v deletes too: with the ledger still
-    # dark, the wide :v is refused outright — nothing culled, no light.
+def test_blind_global_cull_works_on_sunken_text():
+    # The ledger starts sunken (readable): even the widest :v cull works.
     d = _fresh(0)
     r = d.rooms[0]
     from vimny.engine.player import Player
     p = Player(name='t')
     p.row, p.col = r.spawn_pos
     handled, msg, _ns, nl = S.run_ex('2,19v/that/d _', r, p)
-    assert handled and nl == 0 and 'dark' in msg
-    assert r.rows == _CL_ROWS
+    assert handled, f'unexpected refusal: {msg}'
+    assert nl > 0
 
 
 # ── rivals ────────────────────────────────────────────────────────────────────
@@ -403,3 +404,7 @@ def test_curriculum_entry():
     assert 'ex_range' in known and 'subst' in known
     assert 'setnum' in known                       # :set nu is guaranteed here
     assert 'q' not in known                        # macros come later
+
+
+def room_cells_are_water(room, row, col):
+    return room.cells[row][col] == __import__('vimny.engine.world', fromlist=['CellType']).CellType.WATER

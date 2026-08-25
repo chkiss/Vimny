@@ -5521,46 +5521,8 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
                 return ch
 
     def _forge_check():
-        """The Spellwright's Forge: dissolve the sanctum seal once the spellwork RINGS
-        TRUE across all three chambers — every line that must REMAIN reads its exact text
-        (Chamber A mended old→new with /g, Chamber B's two verses mended pale→pure, B's
-        TRUE pale line untouched, Chamber C's sacred lines intact) AND no cursed line
-        survives.  Testing for the exact text (not merely the absence of 'old'/'cursed')
-        is deliberate: it forbids the snip mangle (`:%s/l//g` …) that once satisfied a bare
-        substring check for pennies, and it makes a whole-buffer `:%s/pale/pure/g` self-
-        defeating — it would wreck B's protected line, so its exact text would go missing."""
-        seal = getattr(room, '_forge_seal', None)
-        if seal is None:
-            return
-        texts  = [_subst.line_text(room, r)[0] for r in range(room.rows)]
-        mended = getattr(room, '_forge_mended', None) or []
-        # The WHOLE phrase must appear (substring tolerates the line's leading indent); a
-        # one-letter mangle ('the od gods…') or a half-mended /g-less ward can never match.
-        #
-        # ONE LINE CANNOT ANSWER TWO DEMANDS. Chamber B's verses are 'the mouse
-        # ran up the clock' and 'the mouse ran up the clock again' — the first is
-        # a SUBSTRING of the second, so a bare `any()` let the mended second
-        # verse satisfy both and the first verse never had to be touched at all.
-        # That is what made `&` skippable on the level whose whole job is
-        # `:s` / `&` / `:g` (found by `sharing jumpgolf`, closed 2026-08-03).
-        # Each demand must claim its OWN line: longest first, because a longer
-        # phrase can only be housed by the longer line, and letting it choose
-        # first is what leaves the right line for the shorter one.
-        unclaimed = list(texts)
-        for m in sorted(mended, key=len, reverse=True):
-            hit = next((i for i, t in enumerate(unclaimed) if m in t), None)
-            if hit is None:
-                return                                # a line is unmended, mangled, or wrecked
-            unclaimed.pop(hit)
-        purge = getattr(room, '_forge_purge', 'curse')
-        if any(purge in t for t in texts):
-            return                                    # a purge line still stands
-        sr, sc = seal
-        if room.cells[sr][sc] == CellType.WALL:
-            room.cells[sr][sc] = CellType.FLOOR
-        room._forge_seal = None
-        _push('The wards dissolve — the spellwork rings true. The way opens!')
-
+        """The Spellwright's Forge gate is DATA now (eight anyrow-exact bolts
+        + a final requiring-seal). Nothing to tick."""
     def _ledger_check():
         """The Culling Ledger (v3). Each tick, statelessly:
         1. once door ONE is open, part the water — the dark ledger goes
@@ -5596,33 +5558,7 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
                         _push('The void swallows the false ledge!')
         _chasm_resubmerge()             # a :t/:m'd row must never become footing
         cor = _subst._last_standable_row(room)     # the corridor rides up
-        door1_shut = any(e.kind == 'locked_door' and e.alive
-                         and e.col < _dg._CL_BRZ_COL
-                         for e in room.entities)
         lit = getattr(room, '_ledger_lit', None)
-        if not door1_shut:
-            # THE WATER PARTS (stateless, re-asserted every tick — the
-            # unlock's own reveal flood strips too much): everything ABOVE the
-            # stone course goes underwater (readable, unwalkable); the
-            # corridor lights up to the boss door; past it stays dark until
-            # the brazier burns.
-            for fr in range(1, cor - 1):
-                for fc in range(room.cols):
-                    if room.cells[fr][fc] in (CellType.FLOOR, CellType.WATER):
-                        room.fog_cells.add((fr, fc))
-                        room.underwater_cells.add((fr, fc))
-            sd_col = _dg._CL_SEALDOOR[1]
-            for fc in range(room.cols):
-                cell = (cor, fc)
-                if fc < sd_col:
-                    room.fog_cells.discard(cell)   # lit corridor, up to the seal
-                    room.underwater_cells.discard(cell)
-                elif not lit and room.cells[cor][fc] in (CellType.FLOOR,
-                                                         CellType.CORRIDOR):
-                    room.fog_cells.add(cell)       # the dark holds past the seal
-                    room.underwater_cells.discard(cell)
-            # (No message: the reveal is on screen — narration would only
-            # distract from what the player can already see.)
         if lit is not False:
             return                                 # already lit (or not this level)
         texts = []

@@ -9575,7 +9575,8 @@ def _par_spellwrights_forge():
 
 def build_dungeon_spellwrights_forge(seed: int) -> Dungeon:
     from vimny.engine.editor import _CELL_CODE
-    from vimny.sharing.format import Level as _Level, build as _fmt_build
+    from vimny.sharing.format import (Level as _Level, build as _fmt_build,
+                                      _parse_seal)
     ROWS, COLS, W = _FORGE_ROWS, _FORGE_COLS, _FORGE_DIV
 
     cells = [[CellType.WALL] * COLS for _ in range(ROWS)]
@@ -9603,10 +9604,26 @@ def build_dungeon_spellwrights_forge(seed: int) -> Dungeon:
     for r, txt in _FORGE_C_KEEP:                  # the sacred lines (keep)
         forge_text(runs, r, 2, txt, 'verdant')
 
+    forge_seals = []
+    for j, phrase in enumerate(sorted(
+            [t.replace('moo', 'quack') for _, t in _FORGE_A_WARDS]
+          + [t.replace('down', 'up') for _, t in _FORGE_B_CORRUPT]
+          + [_FORGE_B_KEEP[1]]
+          + [t for _, t in _FORGE_C_KEEP],
+            key=len, reverse=True)):
+        forge_seals.append(_parse_seal({
+            'scope': 'anyrow', 'mode': 'exact', 'match': [phrase],
+        }, j))
+    forge_seals.append(_parse_seal({
+        'requires': list(range(len(forge_seals))),
+        'opens': [[_FORGE_DOOR, W]],
+    }, len(forge_seals)))
+
     level = _Level(
         name="The Spellwright's Forge", seed=seed,
         rows=ROWS, cols=COLS,
         cells=[''.join(_CELL_CODE[c] for c in row) for row in cells],
+        seals=forge_seals,
         spawn=(_FORGE_DOOR, 1),
         exit=(_FORGE_DOOR, COLS - 2),
         char_runs=runs,
@@ -13598,6 +13615,11 @@ def build_dungeon_culling_ledger(seed: int) -> Dungeon:
         name='The Culling Ledger', seed=seed,
         rows=R, cols=C,
         cells=[''.join(_CELL_CODE[c] for c in row) for row in cells],
+        # The ledger starts UNDERWATER from turn one — readable but never
+        # footing. No delayed veil; no darkness-adding tick.
+        underwater=[(r, c) for r in range(1, _CL_SEP)
+                    for c in range(1, C - 1)
+                    if cells[r][c] == CellType.FLOOR],
         spawn=(_CL_COR, 2),
         exit=_CL_EXIT,
         char_runs=runs,
