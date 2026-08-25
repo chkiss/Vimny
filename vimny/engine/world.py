@@ -401,6 +401,10 @@ class Room:
     #: be water (the `M` code) or floor (a drowned band, a torn chasm).
     #: Called "mist" until 2026-08-23; the name now says what it plays like.
     underwater_cells: set       = field(default_factory=set)  # subset of fog_cells
+    braziers: tuple             = ()     # ((row, col), ...) — declared brazier
+                                         # cells. The renderer draws an ember on
+                                         # any that carry no flame run; paste law
+                                         # (where present) allows flames only here.
     seals: tuple                = ()     # Seal objects — declarative text-match doors.
                                          # Empty for every shipped level today; the
                                          # five hardcoded families keep their own ticks

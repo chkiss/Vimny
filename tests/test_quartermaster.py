@@ -312,39 +312,10 @@ def test_tick_chain_bolts_follow_the_flames_both_ways(seed):
     main._seal_tick(room, p)            # ...then the doors read them shut
     for bc in (A, B):
         assert room.cells[_QM_HALL_ROW][bc] == CellType.WALL
-    laid = room.char_run_at(*_QM_SOURCE)                     # …and embers appear
-    assert laid is not None and laid.kind == 'pedestal'
-
-    room.remove_char_run(laid)                               # undo restores the flame
-    room.add_char_run(src_ru)                                # (snapshot replaces the row)
+    room.add_char_run(src_ru)                                # undo restores the flame
     main._seal_tick(room, p)
     for bc in (A, B):
         assert room.cells[_QM_HALL_ROW][bc] == CellType.FLOOR
-
-
-@pytest.mark.parametrize("seed", SEEDS)
-def test_tick_manages_the_ember_markers(seed):
-    """Embers are fixtures: deleted dots are relaid; dots shoved aside by a
-    paste's open_gap are swept the same turn (and the pasted flame must NOT
-    repaint them — the pinned-kind rule in normalize_row_word_kinds)."""
-    room = build_dungeon_quartermaster(seed).rooms[0]        # private (mutating)
-    p = Player(row=_QM_HALL_ROW, col=2)
-
-    main._seal_tick(room, p)          # bolt A opens (source burns); hall lights
-    from vimny.engine.motion import auto_fog_tick
-    auto_fog_tick(room, *room.spawn_pos)
-    room.remove_char_run(room.char_run_at(*_QM_PED1))        # a careless D
-    main._quartermaster_tick(room, p)
-    ru = room.char_run_at(*_QM_PED1)
-    assert ru is not None and ru.kind == 'pedestal'          # relaid
-
-    _light(room, *_QM_PED1)                                  # open_gap shoves the dots
-    r, c = _QM_PED1
-    shoved = room.char_run_at(r, c + 1)
-    assert shoved is not None and shoved.kind == 'pedestal'  # kind survived the merge
-    main._quartermaster_tick(room, p)
-    assert _glyph(room, r, c) == _QM_FLAME                   # lit
-    assert room.char_run_at(r, c + 1) is None                # stray swept
 
 
 @pytest.mark.parametrize("seed", SEEDS)

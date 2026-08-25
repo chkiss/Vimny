@@ -706,6 +706,13 @@ def render_all(term: Terminal, dungeon: Dungeon, player: Player,
         # own tick lifts the veil (firelight, a ritual) by discarding the cell.
         if (room_r, room_c) in getattr(room, 'veiled_cells', ()):
             ru = None
+        elif ((room_r, room_c) in getattr(room, 'braziers', ())
+              and room.char_run_at(room_r, room_c) is None):
+            # A declared brazier with no flame run shows its EMBERS — derived
+            # here rather than laid as runs by a tick, so there is nothing to
+            # sweep, shove, or lose. Lighting pastes a flame over the spot.
+            return (floor_bg + C.rune_pedestal() + '…'
+                    + C.normal_fg())
         else:
             ru = room.char_run_at(room_r, room_c)
         if ru:

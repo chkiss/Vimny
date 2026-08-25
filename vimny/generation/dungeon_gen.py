@@ -6698,7 +6698,10 @@ _WI_BRAZIERS = ((_WI_BRZ_ROW, 8), (_WI_BRZ_ROW, 13), (_WI_BRZ_ROW, 18))
 _WI_GATE   = 6
 _WI_BOLT   = 23
 _WI_EXIT   = (6, 24)
-_WI_PAR    = 39                       # i{w1} M yl w P gi<Space>{w2} M 2w P
+_WI_PAR    = 37                       # i{w1} M yl w P gi<Space>{w2} M 2w P
+                                  # (was 39: the paste-tick fix opens the fuel
+                                  # gate the same turn the quarter is written,
+                                  # so each gi return lands on a WARM chain)
                                       # gi<Space>{w3} M 3w P gi<Space>{w4} G $ (pinned)
 #: The descent was written `2+` until 2026-08-02, and `M` does it in one key.
 #: The gallery is the MIDDLE of this room's five standable rows (ledge 2, spine
@@ -6790,6 +6793,8 @@ def build_dungeon_wet_ink(seed: int) -> Dungeon:
         name='The Wet Ink', seed=seed,
         rows=R, cols=C,
         cells=[''.join(_CELL_CODE[c] for c in row) for row in grid],
+        braziers=[list(c) for c in
+                  ((_WI_SOURCE,) + _WI_BRAZIERS)],
         spawn=(_WI_LEDGE, _WI_INK0), exit=_WI_EXIT,
         char_runs=runs, seals=seals,
         entities=[{'kind': 'exit', 'at': [_WI_EXIT[0], _WI_EXIT[1]],
@@ -10687,6 +10692,10 @@ def build_dungeon_quartermaster(seed: int) -> Dungeon:
             _parse_seal({'requires': [3] + list(range(4, 13)),
                          'opens': [[_QM_EXIT[0], _QM_SEAL_COL]]}, 13),
         ],
+        braziers=sorted({_QM_SOURCE, _QM_PED1,
+                         *((_QM_BRAZIER_ROW + k, c)
+                           for k in range(3)
+                           for c in _QM_BRAZIER_COLS)}),
         entities=[{'kind': 'exit', 'at': [_QM_EXIT[0], _QM_EXIT[1]],
                    'edit_immune': True}],   # nor its row dd-collapsible
         solution='w yl w P G 3P yy p P k 0')
@@ -10708,9 +10717,7 @@ def build_dungeon_quartermaster(seed: int) -> Dungeon:
     # Anchors read by main._quartermaster_tick (stored coordinates, the Cipher
     # Cell convention — a self-inflicted dd/linewise shift above them desyncs
     # the doors until u, which is the established recoverable failure mode).
-    room._qm_chain     = (_QM_SOURCE, _QM_PED1)
     room._qm_bolt_cols = _QM_BOLT_COLS
-    room._qm_braziers  = tuple((_QM_BRAZIER_ROW, c) for c in _QM_BRAZIER_COLS)
     room._qm_seal_col  = _QM_SEAL_COL
     return dungeon
 
@@ -11152,9 +11159,10 @@ def build_dungeon_warden_manifold(seed: int) -> Dungeon:
     room.spawn_pos = _WM_SPAWN
     room.exit_pos  = _WM_EXIT
     # The Beacon Tiers' fuel rule, reused: charwise flames lie only in
-    # braziers — so the R4 grid can only be built by copying his flame ROW
-    # (linewise paste is exempt; a yanked row's flames sit where they sat).
-    room._qm_chain = (_WM_FLAME, *_WM_BRAZIERS)
+    # braziers — declared here, so the paste law reads them straight from
+    # `room.braziers` (linewise paste is exempt; a yanked row's flames sit
+    # where they sat).
+    room.braziers = tuple(_WM_BRAZIERS)
 
     room.rebuild_indexes()
     room.par    = None                   # boss: no keystroke par (1-star win)

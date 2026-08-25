@@ -3757,14 +3757,6 @@ def _warden_manifold_tick(room, player, spent: int = 0) -> list:
         def lit(r, c):
             ru = room.char_run_at(r, c)
             return ru is not None and ru.symbols[c - ru.col] == _dg._QM_FLAME
-        unlit = {rc for rc in braziers if not lit(*rc)}
-        for ru in [ru for ru in room.char_runs if ru.kind == 'pedestal']:
-            if (ru.row, ru.col) not in unlit:
-                room.remove_char_run(ru)
-        for (r, c) in unlit:
-            if room.is_passable(r, c) and room.char_run_at(r, c) is None:
-                room.add_char_run(CharRun(r, c, (_dg._QM_EMBERS,), 'pedestal'))
-
     warden = next((e for e in room.entities
                    if e.kind == 'warden' and e.tag == 'manifold' and e.alive),
                   None)
@@ -3871,11 +3863,16 @@ def _flame_paste_blocked(room, player, clip, before: bool, count: int) -> bool:
     stand in for three tiers: the beacon row only has three braziers).
     True = block; the caller makes it a FREE no-op (no budget, no undo,
     no register change). Mirrors op_paste's landing arithmetic."""
+    # Two gates share this law: a PROGRESSIVE chain (the Wet Ink — the allowed
+    # set widens as prefixes read true, `_qm_chain`) and a plain LOCATION gate
+    # (flames land only on declared braziers, `room.braziers`). Either alone;
+    # never both.
     chain    = getattr(room, '_qm_chain', None)
-    braziers = getattr(room, '_qm_braziers', None)
-    if not chain or not clip or clip.get('linewise') or not clip.get('rows'):
+    declared = getattr(room, 'braziers', ())
+    if (chain is None and not declared) or not clip \
+            or clip.get('linewise') or not clip.get('rows'):
         return False
-    allowed = set(chain) | set(braziers or ())
+    allowed = set(chain) if chain is not None else set(declared or ())
     rclip = clip['rows'][0]
     width = max(rclip.get('width', 0), 1)
     base  = player.col if before else player.col + 1
@@ -3917,10 +3914,10 @@ def _quartermaster_tick(room, player) -> list:
         (yy + paste ×2) AND the whole depot chain burns.
     """
     msgs = []
-    chain    = getattr(room, '_qm_chain', ())
-    braziers = getattr(room, '_qm_braziers', ())
-    if not chain or not braziers:
+    braziers = getattr(room, 'braziers', ())
+    if not braziers:
         return msgs
+    _chain_cells = (_dg._QM_SOURCE, _dg._QM_PED1)
 
     def lit(r, c):
         if not (0 <= r < room.rows and 0 <= c < room.cols):
@@ -3928,21 +3925,14 @@ def _quartermaster_tick(room, player) -> list:
         ru = room.char_run_at(r, c)
         return ru is not None and ru.symbols[c - ru.col] == _dg._QM_FLAME
 
-    # Embers: lay at every unlit brazier, sweep strays.
-    unlit = {rc for rc in (*chain, *braziers) if not lit(*rc)}
-    for ru in [ru for ru in room.char_runs if ru.kind == 'pedestal']:
-        if (ru.row, ru.col) not in unlit:
-            room.remove_char_run(ru)
-    for (r, c) in unlit:
-        if room.is_passable(r, c) and room.char_run_at(r, c) is None:
-            room.add_char_run(CharRun(r, c, (_dg._QM_EMBERS,), 'pedestal'))
-
     # The chain doors and the tiered seal are BOLTS now — declared in the
     # builder as braziers-mode seals (chain-prefix regions; the seal reads
     # the three-tier block and requires bolt B, which is the whole chain).
     # This tick keeps only the embers dressing and the one-shot nudge.
-    _tiers_lit = all(lit(r, c) for r, c in braziers)
-    if (_tiers_lit and not all(lit(r, c) for r, c in chain)
+    _tier_cells = [rc for rc in braziers
+                    if rc[0] == _dg._QM_BRAZIER_ROW]
+    _tiers_lit = all(lit(r, c) for r, c in _tier_cells)
+    if (_tiers_lit and not all(lit(r, c) for r, c in _chain_cells)
             and not getattr(room, '_qm_tier_hinted', False)):
         room._qm_tier_hinted = True
         msgs.append('The seal seems to be melting, but needs more heat! '
@@ -3980,15 +3970,6 @@ def _wet_ink_tick(room, player) -> list:
         if lit(*rc) or ledge.startswith(' '.join(words[:k])):
             allowed.append(rc)
     room._qm_chain = tuple(allowed)
-
-    # Embers: lay at every unlit brazier, sweep strays.
-    unlit = {rc for rc in braziers if not lit(*rc)}
-    for ru in [ru for ru in room.char_runs if ru.kind == 'pedestal']:
-        if (ru.row, ru.col) not in unlit:
-            room.remove_char_run(ru)
-    for (r, c) in unlit:
-        if room.is_passable(r, c) and room.char_run_at(r, c) is None:
-            room.add_char_run(CharRun(r, c, (_dg._QM_EMBERS,), 'pedestal'))
 
     # Firelight used to live here — brazier k revealing quarter k+1 — but it
     # is a bolt now: three unveil-seals declared in the builder read their

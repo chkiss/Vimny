@@ -164,6 +164,7 @@ class Room:
     #: `veiled`: underwater is ground you cannot stand on, veiling is a
     #: carving not legible yet.) The file key was `mist` until 2026-08-23 and
     #: is still read under that name — a format never orphans its own files.
+    braziers:   list  = field(default_factory=list)
     underwater: list  = field(default_factory=list)
     #: Where this room's keys live in the FILE. Carried on it so that every
     #: message about it — parser, validator, forge — names the place the author
@@ -194,6 +195,7 @@ class Level:
     wrap_width:  int  = 0
     veiled:      list = field(default_factory=list)   # see Room.veiled
     underwater:  list = field(default_factory=list)   # see Room.underwater
+    braziers:    list = field(default_factory=list)   # see Room.braziers
     fills:       list = field(default_factory=list)   # list[Fill]
     seals:       list = field(default_factory=list)   # list[world.Seal]
     char_runs:   list = field(default_factory=list)   # explicit text
@@ -215,7 +217,8 @@ class Level:
         return [Room(rows=self.rows, cols=self.cols, cells=self.cells,
                      spawn=self.spawn, exit=self.exit,
                      wrap=self.wrap, wrap_width=self.wrap_width,
-                     veiled=self.veiled, underwater=self.underwater, fills=self.fills,
+                     veiled=self.veiled, underwater=self.underwater,
+                     braziers=self.braziers, fills=self.fills,
                      seals=self.seals, char_runs=self.char_runs,
                      entities=self.entities), *self.then]
 
@@ -254,6 +257,7 @@ def parse(data: dict) -> Level:
     unknown = set(data) - {'schema', 'name', 'author', 'seed', 'teaches',
                            'requires', 'no_horse', 'alternate', 'geometry',
                            'fill', 'seals', 'char_runs', 'entities', 'veiled',
+                           'braziers',
                            'underwater', 'mist',   # mist: the pre-2026-08-23 name
                            'then', 'vocabulary', 'solution', 'intro'}
     if unknown:
@@ -281,6 +285,8 @@ def parse(data: dict) -> Level:
         wrap=bool(geo.get('wrap', False)),
         wrap_width=int(geo.get('wrap_width', 0)),
         veiled=_parse_cells_list(data.get('veiled', []), 'veiled', 'veiled'),
+        braziers=_parse_cells_list(data.get('braziers', []),
+                                   'braziers', 'braziers'),
         # Both names read, and union: `underwater` is canonical, `mist` is
         # what every file written before 2026-08-23 says.
         underwater=(_parse_cells_list(data.get('underwater', []),
@@ -544,6 +550,8 @@ def _parse_then(rooms) -> list:
             wrap=bool(geo.get('wrap', False)),
             wrap_width=int(geo.get('wrap_width', 0)),
             veiled=_parse_cells_list(h.get('veiled', []), f'{at}.veiled', 'veiled'),
+            braziers=_parse_cells_list(h.get('braziers', []),
+                                   f'{at}.braziers', 'braziers'),
             underwater=(_parse_cells_list(h.get('underwater', []),
                                           f'{at}.underwater', 'underwater')
                         + _parse_cells_list(h.get('mist', []), f'{at}.mist', 'mist')),
@@ -1018,6 +1026,8 @@ def _build_room(spec: Room, lvl: Level, rng: random.Random,
     room = LiveRoom(room_type=RoomType.ENTRY, rows=spec.rows, cols=spec.cols)
     room.cells     = cells
     room.underwater_cells = set(underwater)
+    room.braziers = tuple(tuple(int(x) for x in cell)
+                          for cell in getattr(spec, 'braziers', ()))
     room.fog_cells  = set(underwater)  # water is always a subset of the fog
     room.seed      = lvl.seed
     room.spawn_pos = tuple(spec.spawn)
@@ -1262,6 +1272,8 @@ def _dump_content(h: Room) -> dict:
         data['veiled'] = [list(v) for v in h.veiled]
     if h.underwater:
         data['underwater'] = [list(v) for v in h.underwater]
+    if getattr(h, 'braziers', None):
+        data['braziers'] = [list(v) for v in h.braziers]
     if h.fills:
         data['fill'] = [{'region': list(f.region), 'pool': f.pool,
                          'length': list(f.length), 'spacing': f.spacing,
@@ -1351,7 +1363,7 @@ def from_room(room, name: str, author: str = '', solution: str = '',
         rows=h.rows, cols=h.cols, cells=h.cells,
         spawn=h.spawn, exit=h.exit,
         wrap=h.wrap, wrap_width=h.wrap_width, veiled=h.veiled,
-        underwater=h.underwater,
+        underwater=h.underwater, braziers=h.braziers,
         fills=h.fills, seals=h.seals,
         char_runs=h.char_runs, entities=h.entities,
         then=list(then),
@@ -1402,6 +1414,7 @@ def capture_room(room, *, fills=None, seals=None,
         wrap=bool(getattr(room, 'wrap_buffer', False)),
         wrap_width=int(getattr(room, 'wrap_width', 0) or 0),
         veiled=sorted(getattr(room, 'veiled_cells', ()) or ()),
+        braziers=sorted(getattr(room, 'braziers', ()) or ()),
         underwater=sorted(_sunken_by_row.get('list', ())),
         fills=list(fills), seals=list(seals),
         char_runs=[{'row': ru.row, 'col': ru.col,
