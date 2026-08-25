@@ -7544,12 +7544,17 @@ def build_dungeon_waypoint_sanctum(seed: int) -> 'Dungeon':
         entities=entities,
         solution=_WP_ANSWER)
 
+    # THE WAKING STONE, said as data: a zone seal whose region is pocket 1
+    # (row 2, cols 29-40) and whose unveils are the two `plugh` words' cells.
+    # While the player stands inside the pocket, the words are legible and
+    # searchable; one-way, so they stay that way after they leave.
+    from vimny.engine.world import Seal as _Seal
+    level.seals = (*level.seals, _Seal(
+        mode='zone', region=(2, _WP_PKT1_SPAN[0], 2, _WP_PKT1_SPAN[1]),
+        unveils=tuple(sorted(_plugh_fog)),
+        message="In the pocket's shadow, a second word wakes."))
+
     dungeon = _fmt_build(level, par=_WP_PAR)
-    room = dungeon.rooms[0]
-    # Scripted plugh fog (the Wet Ink pattern) — NOT underwater: the tick lifts it,
-    # and underwater_cells would make the reveal skip it.
-    room.fog_cells |= _plugh_fog
-    room._wp_plugh_fog = _plugh_fog
     return dungeon
 
 

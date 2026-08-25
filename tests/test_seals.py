@@ -392,24 +392,21 @@ def test_a_gone_seal_ignores_other_kinds_and_corpses():
     assert warden.alive
 
 
-def test_a_seals_unveils_lift_with_the_condition_and_rehide_without():
+def test_a_seals_unveils_lift_one_way():
     """The unveiling bolt: the same condition that floors `opens` can lift
-    `unveils` — a carving becomes legible while the seal reads true, and
-    re-hides when it does not (the veil is the door here). And the reveal
-    never re-veils ground that was re-laid: if the stone under a secret is
-    gone, so is the secret."""
+    `unveils` — a carving becomes legible the first time the seal reads true,
+    and STAYS legible. ONE-WAY, like every reveal this engine has ever had:
+    what the light has shown cannot be unseen."""
     seal = Seal(match='speak friend', scope='anyrow', mode='contains',
                 unveils=((0, 5), (0, 6)))
     room = _room([seal], texts=[(2, 'speak friend')])
     room.veiled_cells |= {(0, 5), (0, 6)}
     _tick(room)
     assert (0, 5) not in room.veiled_cells and (0, 6) not in room.veiled_cells
-    _write(room, 2, 'now speak friend loudly')  # still true (contains)
+    # Still lifted after the condition goes false — one-way.
+    _write(room, 2, 'silence')
     _tick(room)
     assert (0, 5) not in room.veiled_cells
-    _write(room, 2, 'silence')                # condition false: dark again
-    _tick(room)
-    assert (0, 5) in room.veiled_cells and (0, 6) in room.veiled_cells
 
 
 def test_an_unveil_never_walls_and_survives_the_build_shut_loop():

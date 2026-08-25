@@ -43,6 +43,7 @@ from vimny.engine.player import Player
 from vimny.engine.motion import apply_motion, _first_non_blank_col
 from vimny.engine.search import find_next
 from vimny.engine.tape import ENTER as TAPE_ENTER
+import vimny.game as main
 
 SEEDS = [1, 42, 999, 12345, 2 ** 20 + 7]
 
@@ -125,12 +126,9 @@ def _simulate(answer, room):
             n = int(tok[:i]) if i else 1
             apply_motion(p, tok[i:], n, room, count_given=(i > 0))
             spent += (len(tok[:i]) + 1) if i else 1
-        # The waking stone (the main-loop tick, mimicked): landing inside
-        # pocket 1 lifts plugh's scripted fog.
-        pf = getattr(room, '_wp_plugh_fog', set())
-        if (pf and room.fog_cells & pf and p.row == _WP_W2_POCKET1[0]
-                and _WP_PKT1_SPAN[0] <= p.col <= _WP_PKT1_SPAN[1]):
-            room.fog_cells -= pf
+        # The waking stone (now a zone seal): landing inside pocket 1 lifts
+        # plugh's fog — same one-way reveal, said as data instead of a tick.
+        main._seal_tick(room, p)
     return (p.row, p.col), spent, (p.row, p.col) == _WP_EXIT, got_scroll
 
 
@@ -247,7 +245,7 @@ def test_plugh_sleeps_until_the_pocket_is_entered(seed):
     fogged = {(r, c + i) for (r, c) in (_WP_W2_POCKET1, _WP_W2_POCKET2)
               for i in range(len(_WP_WORD2))}
     assert fogged <= room.fog_cells
-    assert fogged == room._wp_plugh_fog
+    assert fogged <= room.fog_cells  # already checked; the attr is gone
     assert not (fogged & room.underwater_cells)          # liftable — NOT mist
     # every plugh stands where designed, nowhere else
     assert _positions(room, _WP_WORD2) == sorted(

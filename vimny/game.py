@@ -2753,26 +2753,17 @@ def _seal_tick(room, player) -> list:
         if opened:
             msgs.append(seal.message or SEAL_OPENED)
         # The same condition can REVEAL: an unveils cell's DARKNESS — both the
-        # veil on a carved wall and the fog over hidden floor — lifts while the
-        # seal reads true. On false, stone re-veils (the carving is the door
-        # here: `u` un-mends the verse, the secret goes dark again); floor
-        # never re-fogs, because light once let through open ground cannot be
-        # unseen — the level's auto-reveal keeps it lit from there on.
+        # veil on a carved wall and the fog over hidden floor — lifts the first
+        # time the seal reads true, and stays lifted. ONE-WAY, like every
+        # reveal this engine has ever had (unhide_region, firelight, the old
+        # waypoint tick): what the light has shown cannot be unseen.
         unveiled = False
         for (r, c) in _seal_unveils(room, seal):
-            if not (0 <= r < room.rows and 0 <= c < room.cols):
-                continue
-            if true_now:
-                if ((r, c) in room.veiled_cells
-                        or (r, c) in room.fog_cells):
-                    room.veiled_cells.discard((r, c))
-                    room.fog_cells.discard((r, c))
-                    unveiled = True
-            elif (r, c) not in room.veiled_cells \
-                    and room.cells[r][c] in (CellType.WALL, CellType.WOOD_WALL):
-                # Re-veil only stone — if ground was re-laid over the cell,
-                # the carving is gone for good and there is nothing to hide.
-                room.veiled_cells.add((r, c))
+            if true_now and ((r, c) in room.veiled_cells
+                             or (r, c) in room.fog_cells):
+                room.veiled_cells.discard((r, c))
+                room.fog_cells.discard((r, c))
+                unveiled = True
         if unveiled:
             msgs.append(seal.message or SEAL_OPENED)
     return msgs
@@ -5415,15 +5406,6 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
         if level == 'paragraph_enclosure':
             for _m in _paragraph_enclosure_tick(room, player):
                 _push(_m)
-        if level == 'waypoint_sanctum':
-            # The waking stone: plugh's scripted fog lifts when the ? leg
-            # lands the player inside pocket 1 (fogged text is unsearchable,
-            # so ?plugh from the spawn finds nothing until then).
-            _pf = getattr(room, '_wp_plugh_fog', None)
-            if (_pf and room.fog_cells & _pf and player.row == 2
-                    and _dg._WP_PKT1_SPAN[0] <= player.col <= _dg._WP_PKT1_SPAN[1]):
-                room.fog_cells -= _pf
-                _push('In the pocket\'s shadow, a second word wakes.')
         if level == 'warden_eternal':
             for _m in _warden_eternal_tick(room, player):
                 _push(_m)

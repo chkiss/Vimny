@@ -79,10 +79,6 @@ KNOWN_GAPS: dict[str, tuple[tuple[str, ...], str]] = {
     # mist does not stop the eye. Broken into corridor-row stubs, the whole
     # vault derives. The last one standing hides ten cells of TEXT, which is a
     # thing no geometry can say.
-    'waypoint_sanctum':     (('fog',), "the two `plugh` words are held dark so "
-                             "`?plugh` cannot find them from the spawn; `xyzzy` "
-                             "shares their pocket and MUST stay searchable, so "
-                             "no rule about walls or mist can separate them"),
 
     # ── mist off the water ───────────────────────────────────────────────────
     # HEALED 2026-08-23: `shelving_room` and `refrain_vault` haze plain floor,
@@ -91,7 +87,7 @@ KNOWN_GAPS: dict[str, tuple[tuple[str, ...], str]] = {
     # both builders now ride it; inline `M` remains water shorthand, unioned
     # with the list on parse. The shelving POCKET rides the mist too (its
     # darkness is weather until the scripted tick unveils it at seal-open),
-    # so that level healed outright — 56 of 60.
+    # so that level healed outright — 57 of 60.
 
     # ── a room with no way out ───────────────────────────────────────────────
     # Several rooms are sayable since phase 4 (`then`), and the Sanctum's two
@@ -197,12 +193,12 @@ def test_no_exemption_is_stale(slug):
 
 
 def test_the_gap_is_a_number_that_only_goes_down():
-    """The headline. 56 of 60 shipped levels survive the trip whole.
+    """The headline. 57 of 60 shipped levels survive the trip whole.
 
     If this fails downward, something regressed. If it fails upward, a phase of
     the port landed — raise the floor in the same commit so it cannot slide
     back.
     """
     lossless = [s for s in SLUGS if s not in KNOWN_GAPS]
-    assert len(lossless) >= 56, (
+    assert len(lossless) >= 57, (
         f'only {len(lossless)}/{len(SLUGS)} levels round-trip losslessly')
