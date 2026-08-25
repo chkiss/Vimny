@@ -3865,24 +3865,19 @@ def _flame_paste_blocked(room, player, clip, before: bool, count: int) -> bool:
     stand in for three tiers: the beacon row only has three braziers).
     True = block; the caller makes it a FREE no-op (no budget, no undo,
     no register change). Mirrors op_paste's landing arithmetic."""
-    # Two gates share this law: a PROGRESSIVE chain (the Wet Ink — said as
-    # `fuels` on predicate seals now; the legacy `_qm_chain` attr still works)
-    # and a plain LOCATION gate (flames land only on declared braziers).
-    chain    = getattr(room, '_qm_chain', None)
+    # Two gates share this law: FUELS-ONLY (a seal whose `fuels` list names
+    # brazier cells pasteable while its condition reads true — the progressive
+    # gate) and LOCATION-ONLY (flames land only on declared braziers).
     declared = getattr(room, 'braziers', ())
     fuel_seals = [s for s in getattr(room, 'seals', ())
                   if getattr(s, 'fuels', ())]
     if not clip or clip.get('linewise') or not clip.get('rows'):
         return False
     if fuel_seals:
-        # FUELS-ONLY: a flame lands where some TRUE statement says it may.
-        # Declared braziers are drawing metadata here, not permission.
         allowed = set()
         for _s in fuel_seals:
             if _seal_reads_true(room, _s, player=player):
                 allowed |= {tuple(c) for c in _s.fuels}
-    elif chain is not None:
-        allowed = set(chain)
     else:
         allowed = set(declared or ())
     rclip = clip['rows'][0]
