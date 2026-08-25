@@ -91,7 +91,10 @@ def test_builder_structure():
     d = dg.build_dungeon_spellwrights_forge(1)
     r = d.room
     assert (r.rows, r.cols) == (dg._FORGE_ROWS, dg._FORGE_COLS)
-    assert r._forge_seal == (dg._FORGE_DOOR, dg._FORGE_DIV)
+    # The gate is DATA now: the final seal opens the forge door cell.
+    door_seal = [s for s in r.seals if s.opens]
+    assert len(door_seal) == 1
+    assert tuple(door_seal[0].opens[0]) == (dg._FORGE_DOOR, dg._FORGE_DIV)
     assert not _seal_open(r)                          # sealed shut at the start
     kinds = {e.kind for e in r.entities}
     assert 'exit' in kinds

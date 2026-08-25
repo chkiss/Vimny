@@ -6777,6 +6777,15 @@ def build_dungeon_wet_ink(seed: int) -> Dungeon:
         'opens': [list(_WI_EXIT)],
     }, len(seals)))
 
+    # THE FULL SONG, said as data: every nonempty stripped line in the
+    # workroom must read the true song, in order. Blank rows are skipped;
+    # pasted refrain lines are included because they ARE part of the song.
+    seals.append(_parse_seal({
+        'scope': 'region', 'mode': 'lines',
+        'region': [4, 2, _RV_ROWS - 3, C - 4],
+        'match': ['my fair lady.'] + list(_RV_TRUE),   # chasm + song = the full page
+    }, len(seals)))
+
     # THE PROGRESSIVE FUEL GATE, said as data: quarter k written makes
     # brazier k pasteable. Each predicate carries `fuels` — one brazier cell
     # its truth permits — and the paste law unions them while true.
@@ -9636,24 +9645,6 @@ def build_dungeon_spellwrights_forge(seed: int) -> Dungeon:
 
     dungeon = _fmt_build(level)
     room = dungeon.rooms[0]
-    # The seal: the divider cell on the corridor row.  main._forge_check opens it once the
-    # incantations RING TRUE — every line that should REMAIN must read its exact text
-    # (Chamber A mended old→new with /g, Chamber B's two verses mended pale→pure, B's TRUE
-    # pale line untouched, Chamber C's sacred lines intact) AND no 'cursed' line survives.
-    # Demanding the exact text (not the mere absence of 'old'/'cursed') forbids the snip
-    # mangle (`:%s/l//g` etc.) that once satisfied a bare substring check for pennies.
-    room._forge_seal = (_FORGE_DOOR, W)
-    # Band the shut seal as stonework. Registered at build: the divider cell is
-    # fixed for the level's lifetime.
-    room.sealed_cells = {(_FORGE_DOOR, W)}
-    # Every phrase that must be present when the rite is true (mended or deliberately kept):
-    room._forge_mended = (
-        [t.replace('moo', 'quack') for _r, t in _FORGE_A_WARDS]     # A: /g-mended wards
-        + [t.replace('down', 'up') for _r, t in _FORGE_B_CORRUPT]   # B: surgically mended
-        + [_FORGE_B_KEEP[1]]                                        # B: the protected true line
-        + [t for _r, t in _FORGE_C_KEEP]                            # C: the famous 2-liner
-    )
-    room._forge_purge = 'krzzt'          # no line of static may survive
 
     # par is the true keystroke floor of the three rites + the walk out; measured by replay
     # across seeds (content is fixed, so par is constant).  See tests/test_spellwrights_forge.
@@ -9725,7 +9716,8 @@ _RV_BUDGET = 60    # generous: the double ranged-:s longhand (~52) wins 1★
 
 def build_dungeon_refrain_vault(seed: int) -> Dungeon:
     from vimny.engine.editor import _CELL_CODE
-    from vimny.sharing.format import Level as _Level, build as _fmt_build
+    from vimny.sharing.format import (Level as _Level, build as _fmt_build,
+                                      _parse_seal)
     R, C = _RV_ROWS, _RV_COLS
 
     cells = [[CellType.WALL] * C for _ in range(R)]
@@ -9771,9 +9763,20 @@ def build_dungeon_refrain_vault(seed: int) -> Dungeon:
         rows=R, cols=C,
         cells=[''.join(_CELL_CODE[c] for c in row) for row in cells],
         underwater=sorted(underwater),                   # haze over floor AND water,
-        spawn=(5, 2),                              # said in the file since the
-        exit=(_RV_SEAL_ROW, _RV_EXIT_COL),         # format learned the layer
+        spawn=(5, 2),
+        exit=(_RV_SEAL_ROW, _RV_EXIT_COL),
         char_runs=runs,
+        seals=(
+            _parse_seal({'scope': 'region', 'mode': 'lines', 'anchor': 'exit_row',
+                         'region': [0, 2, 200, C - 2],   # generous: covers post-paste layouts
+                         'match': ['my fair lady.'] + list(_RV_TRUE),   # chasm + song = the full page
+                         'opens': [[_RV_SEAL_ROW, _RV_SEAL_COL]],
+                         'unveils': [[_RV_SEAL_ROW, c]
+                                     for c in range(_RV_SEAL_COL + 1,
+                                                    _RV_EXIT_COL + 1)],
+                         'message': 'The song stands whole — the way opens!',
+             }, 0),
+        ),
         entities=[{'kind': 'exit', 'at': [_RV_SEAL_ROW, _RV_EXIT_COL]},
                   {'kind': 'chest_scroll', 'at': [_RV_SEAL_ROW, _RV_CHEST_COL]}],
         solution=(':set<Space>nu<CR> :13,15s/up/down/g<CR> :4,6&&<CR> '
@@ -13696,7 +13699,8 @@ _SHR_BUDGET = 40                     # generous: the movers invite exploration
 
 def build_dungeon_shelving_room(seed: int) -> Dungeon:
     from vimny.engine.editor import _CELL_CODE
-    from vimny.sharing.format import Level as _Level, build as _fmt_build
+    from vimny.sharing.format import (Level as _Level, build as _fmt_build,
+                                      _parse_seal)
     R, C = _SHR_ROWS, _SHR_COLS
     targets = [(' ' * _SHR_INDENTS[i]) + _SHR_CALLS[i // 2] for i in range(8)]
 
@@ -13736,6 +13740,18 @@ def build_dungeon_shelving_room(seed: int) -> Dungeon:
         spawn=(_SHR_GAL, _SHR_TX - 1),             # the sealed POCKET rides the
         exit=(_SHR_GAL, _SHR_EXIT_COL),            # water too: its darkness is
         char_runs=runs,                            # weather, not ignorance — one
+        seals=[
+            # THE FULL ROUND, said as data: every nonempty stripped line in
+            _parse_seal({'scope': 'region', 'mode': 'lines', 'anchor': 'exit_row',
+                         'region': [1, 2, 200, C - 2],
+                         'match': [t.rstrip() for t in targets],
+                         'opens': [[_SHR_GAL, _SHR_SEAL_COL]],
+                         'unveils': [[_SHR_GAL, c] for c in
+                                     range(_SHR_SEAL_COL + 1,
+                                           _SHR_EXIT_COL + 1)],
+                         'message': 'The round sings in order — the way opens!',
+             }, 8),
+        ],
         entities=[{'kind': 'exit', 'at': [_SHR_GAL, _SHR_EXIT_COL]},   # bolt
                   {'kind': 'chest_scroll', 'at': [_SHR_GAL, _SHR_CHEST_COL]}],
         solution=':set<Space>nu<CR> :6m3<CR> :6<<CR> :7t7<CR> :8><CR> $')

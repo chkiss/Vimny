@@ -324,7 +324,7 @@ def _parse_fill(f: dict, i: int, at: str = 'fill') -> Fill:
                 kind=str(f.get('kind', 'ancient')))
 
 
-_SEAL_MODES  = ('exact', 'contains', 'braziers', 'gone', 'zone')
+_SEAL_MODES  = ('exact', 'contains', 'braziers', 'gone', 'zone', 'lines')
 _SEAL_SCOPES = ('region', 'anyrow')
 
 
@@ -367,6 +367,17 @@ def _parse_seal(s: dict, i: int, at: str = 'seals') -> Seal:
                                    f'[r1, c1, r2, c2] naming the braziers to light')
         region = tuple(int(x) for x in region)
         match = []
+    elif mode == 'lines':
+        # Reads every nonempty STRIPPED line inside the region as an ORDERED
+        # SEQUENCE and demands exact equality with `match`. Blank rows are
+        # skipped; content rows must appear in order with exact text.
+        if not match:
+            raise LevelFormatError(f'{at}[{i}]: a mode="lines" seal needs '
+                                   f'match entries naming each line in order')
+        if not (isinstance(region, (list, tuple)) and len(region) == 4):
+            raise LevelFormatError(f'{at}[{i}].region: a mode="lines" seal '
+                                   f'needs [r1, c1, r2, c2] covering the lines')
+        region = tuple(int(x) for x in region)
     elif mode == 'zone':
         # A `zone` seal reads the PLAYER: true while they stand inside its
         # rectangle. It wants a region and refuses a `match` — the player is

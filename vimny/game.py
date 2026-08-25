@@ -2683,7 +2683,19 @@ def _seal_reads_true(room, seal, truths=(), rows=None, player=None) -> bool:
     # Row-agnostic on purpose: charwise edits do not shift rows, but `dd`,
     # `J`, `o` and `p` all do, and a door that named a row number would be
     # undone by the first line removed above it.
-    if seal.scope == 'anyrow':
+    if seal.mode == 'lines':
+        # Read every nonempty STRIPPED line inside the region as an ORDERED
+        # SEQUENCE and demand exact equality with `match`. Blank rows are
+        # skipped; content rows must appear in order with exact text.
+        r1, c1, r2, c2 = seal.region
+        lines = []
+        for r in range(max(0, r1), min(room.rows - 1, r2 + 1)):
+            t = _subst.line_text(room, r)[0].rstrip()
+            if t.strip():
+                lines.append(t)
+        if lines != list(seal.match):
+            return False
+    elif seal.scope == 'anyrow':
         if not _seal_anyrow_reads(seal, rows):
             return False
     else:
@@ -5520,9 +5532,6 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
             if ch in 'ynaql':
                 return ch
 
-    def _forge_check():
-        """The Spellwright's Forge gate is DATA now (eight anyrow-exact bolts
-        + a final requiring-seal). Nothing to tick."""
     def _ledger_check():
         """The Culling Ledger (v3). Each tick, statelessly:
         1. once door ONE is open, part the water — the dark ledger goes
@@ -5630,24 +5639,9 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
             is_open = room.cells[gal][dc] != CellType.WALL
             if ok and not is_open:
                 room.cells[gal][dc] = CellType.FLOOR
-                _push('A voice finds its shelf — a bolt grinds back!')
+                _push('A voice finds its shelf \u2014 a bolt grinds back!')
             elif not ok and is_open and (player.row, player.col) != (gal, dc):
-                room.cells[gal][dc] = CellType.WALL    # undone — it re-bars
-        if getattr(room, '_shr_seal_col', None) is None:
-            return
-        full = [t.rstrip() for r in range(1, gal - 1)
-                for t in (_subst.line_text(room, r)[0],) if t.rstrip()]
-        if full != list(targets):
-            return
-        sc = room._shr_seal_col
-        if room.cells[gal][sc] == CellType.WALL:
-            room.cells[gal][sc] = CellType.FLOOR
-        _unveil = {(fr, fc) for (fr, fc) in room.fog_cells
-                   if fr == gal and fc > sc}
-        room.fog_cells -= _unveil                  # unveil the pocket —
-        room.underwater_cells -= _unveil                 # its haze lifts with it
-        room._shr_seal_col = None
-        _push('The round sings in order, echo under call. The way opens!')
+                room.cells[gal][dc] = CellType.WALL    # undone \u2014 it re-bars
 
     def _refrain_tick():
         """The Refrain Vault (London Bridge): re-submerge the torn chasm, then
@@ -5669,28 +5663,8 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
                             and (r, cc) not in room.fog_cells):
                         room.fog_cells.add((r, cc))
                         room.underwater_cells.add((r, cc))
-        if getattr(room, '_rv_seal_col', None) is None or wtr is None:
-            return
-        # Band the shut seal as stonework; derived here rather than at build
-        # because its row rides exit_pos through the :t row inserts.
-        room.sealed_cells = {(room.exit_pos[0], room._rv_seal_col)}
-        sung = []
-        for r in range(wtr + 1, room.rows - 1):
-            t = _subst.line_text(room, r)[0].strip()
-            if t:
-                sung.append((t, any(room.is_passable(r, cc)
-                                    for cc in range(room.cols))))
-        if [t for t, _ in sung] != list(true_song):
-            return
-        if not all(on_floor for _, on_floor in sung):
-            return                              # sung, but not on the floor
-        sr, sc = room.exit_pos[0], room._rv_seal_col
-        if room.cells[sr][sc] == CellType.WALL:
-            room.cells[sr][sc] = CellType.FLOOR
-        room.fog_cells = {(fr, fc) for (fr, fc) in room.fog_cells
-                          if not (fr == sr and fc > sc)}   # unveil the pocket
-        room._rv_seal_col = None
-        _push('The song stands whole, verse for verse. The way opens!')
+        # The full-song gate + pocket unveil are a 'lines'-mode seal now —
+        # declared in the builder, checked by _seal_tick like every other bolt.
 
     def _advance_answer(tok: str):
         """Admin karaoke: advance the answer tape by one typed key.
@@ -6054,9 +6028,7 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
         # these ticks scan every row and column, and idling on a finished ledger
         # used to burn CPU ten times a second. A key arrived, so an action may
         # have changed what the seals read.
-        if level == 'spellwrights_forge':
-            _forge_check()                       # open the sanctum seal once the rites are true
-        elif level == 'culling_ledger':
+        if level == 'culling_ledger':
             _ledger_check()                      # open the seal once the ledger reads true
         elif level == 'shelving_room':
             _shelving_tick()                     # re-submerge, bolts, seal check
