@@ -7226,6 +7226,23 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
                             _push(f'The final seal stands: this door wants '
                                   f'all {_n} bolt(s) open first.')
 
+                elif (_draft is not None and edit_mode
+                      and (_rcmd == 'on-open' or _rcmd.startswith('on-open ')
+                           or _rcmd.rstrip('?') == 'on-open?')):
+                    # Author the banner the next :bolt shows when it opens.
+                    # Bare `:on-open` (or `?`) reads the armed one; `:on-open`
+                    # with no argument after arming clears it. The text rides
+                    # the seal into the FILE (`message:`) — author data now,
+                    # not an engine secret.
+                    if _rcmd.endswith('?'):
+                        cur = getattr(_draft, '_pending_msg', '')
+                        _push(cur or 'No custom banner armed.'
+                                  '  :on-open <text> arms one.')
+                    else:
+                        _txt2 = _rcmd[len('on-open'):].strip()
+                        _draft._pending_msg = _txt2
+                        _push(f'Banner armed: {cur_txt if (cur_txt := _txt2) else "(cleared)"}')
+
                 elif _draft is not None and edit_mode and _rcmd == 'bolt':
                     # Attach cells to the armed seal. The cursor cell on its own,
                     # or — with the `'<,'>` range — every cell of the selection,
@@ -7251,6 +7268,7 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
                         _want_open = [rc for rc in _want if rc not in _veiled_now]
                         _want_unveil = [rc for rc in _want if rc in _veiled_now]
                         _reg, _txt, _mode, _head, _pin = _pend
+                        _msg = getattr(_draft, '_pending_msg', '')
                         # A text seal's pending carries the target tuple (one
                         # entry per required reading); a gone seal's carries
                         # the kind tuple as-is.
@@ -7298,7 +7316,8 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
                             _new = Seal(region=_reg, match=_mtch, mode=_mode,
                                         scope=_scope, opens=_cells + _add,
                                         unveils=_u_cells + _u_add,
-                                        head=_head, at=_pin)
+                                        head=_head, at=_pin, message=_msg)
+                            _draft._pending_msg = ''
                             # A seal that only REVEALS (no door cells) is still
                             # a seal — the condition is the thing.
                             if not _new.opens and not _new.unveils:

@@ -25,8 +25,44 @@ state into every alphabetically-later file. These autouse fixtures snapshot
 the pristine module/class state at import time and put it back after each
 test, making order-of-run irrelevant regardless of how a test patches.
 """
+import os
+import tempfile
+
 import pytest
 from blessed import Terminal
+
+
+def pytest_configure(config):
+    """Point every Vimny persistence path at a scratch home BEFORE any test
+    module (and therefore any vimny import) is collected.
+
+    The suite drives real `run_dungeon` sessions as real players — including
+    `admin` — and a session that reaches any save point writes
+    `~/.Vimny/saves/<player>.json`. Under xdist those writes happen from
+    several processes at once; even serially, an admin replay can overwrite a
+    real player's progress. One scratch home per worker makes the entire run
+    touch nothing but temp files. Set VIMNY_HOME manually to opt out."""
+    if os.environ.get('VIMNY_HOME'):
+        return                      # an explicit home wins — no redirection
+    worker = os.environ.get('PYTEST_XDIST_WORKER', 'master')
+    base = os.path.join(tempfile.gettempdir(), 'vimny-test-home', worker)
+    os.makedirs(base, exist_ok=True)
+    os.environ['VIMNY_HOME'] = base
+    # vimny.save.save_manager may already be imported (conftest imports game);
+    # recompute its directory constants against the scratch home.
+    try:
+        from vimny.save import save_manager as _sm
+        _sm._reset_paths()
+        _sm.SAVE_DIR.mkdir(parents=True, exist_ok=True)
+        # Refresh the by-value snapshots other modules took at import.
+        import vimny.sharing.draft as _draft
+        _draft.DRAFTS_DIR = _sm.DRAFTS_DIR
+        import vimny.sharing.library as _lib
+        _lib.LEVELS_DIR = _sm.SAVE_DIR / 'levels'
+        _draft.LEVELS_DIR = _lib.LEVELS_DIR
+    except Exception:
+        pass                        # not imported yet — env alone is enough
+
 
 import vimny.game as main
 

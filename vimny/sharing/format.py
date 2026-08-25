@@ -333,7 +333,7 @@ def _parse_seal(s: dict, i: int, at: str = 'seals') -> Seal:
     if not isinstance(s, dict):
         raise LevelFormatError(f'{at}[{i}]: must be an object')
     unknown = set(s) - {'region', 'match', 'opens', 'unveils', 'mode', 'scope',
-                        'requires', 'anchor', 'head', 'at'}
+                        'requires', 'anchor', 'head', 'at', 'message'}
     if unknown:
         raise LevelFormatError(f'{at}[{i}]: unknown key(s) {sorted(unknown)}')
     scope = str(s.get('scope', 'region'))
@@ -483,8 +483,12 @@ def _parse_seal(s: dict, i: int, at: str = 'seals') -> Seal:
         if not (isinstance(cell, (list, tuple)) and len(cell) == 2):
             raise LevelFormatError(f'{at}[{i}].unveils[{j}]: must be [row, col]')
         unveiled.append((int(cell[0]), int(cell[1])))
+    # The banner shown when this statement transitions to true — AUTHOR DATA
+    # since 2026-08-24 (it used to be engine-only). Capped and flattened: it
+    # is one status line, not a letter.
+    msg = ' '.join(str(s.get('message', ''))[:200].split())
     return Seal(region=region, match=tuple(match), opens=tuple(cells),
-                unveils=tuple(unveiled), mode=mode,
+                unveils=tuple(unveiled), mode=mode, message=msg,
                 scope=scope, requires=tuple(requires), anchor=anchor,
                 head=head, at=pin)
 
@@ -1269,6 +1273,8 @@ def _dump_content(h: Room) -> dict:
         out = []
         for s in h.seals:
             d = {'opens': [list(c) for c in s.opens], 'mode': s.mode}
+            if getattr(s, 'message', ''):
+                d['message'] = s.message
             if s.unveils:
                 d['unveils'] = [list(c) for c in s.unveils]
             if s.region:

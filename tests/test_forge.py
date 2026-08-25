@@ -1955,3 +1955,20 @@ def _run_veil_roundtrip(d):
     room = F.build(_fresh.level).rooms[0]
     assert {(0, 1), (0, 2)} <= room.veiled_cells
     assert room.seals[0].unveils == ((0, 1), (0, 2))
+
+
+def test_on_open_arms_the_bolts_banner_and_the_file_carries_it():
+    """`:on-open <text>` authors the banner the next :bolt shows when its
+    condition opens — designer data, riding the seal into the file."""
+    import uuid
+    d = DRAFT.new(f'ProbeMsg{uuid.uuid4().hex[:6]}', rows=8, cols=30)
+    try:
+        _forge_session(d, ':seal open sesame\r'
+                          ':on-open the shelf swings wide\r'
+                          'j:bolt\r:w\r:q!\r')
+        assert len(d.level.seals) == 1
+        assert d.level.seals[0].message == 'the shelf swings wide'
+        _fresh = DRAFT.load(d.path)
+        assert _fresh.level.seals[0].message == 'the shelf swings wide'
+    finally:
+        d.path.unlink(missing_ok=True)

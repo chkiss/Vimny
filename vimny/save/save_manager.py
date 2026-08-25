@@ -27,6 +27,12 @@ except ImportError:                   # pragma: no cover - platform-dependent
 
 
 def _home() -> Path:
+    # Test/isolation hook: an explicit VIMNY_HOME wins over everything, so a
+    # test run can point saves/drafts/scrolls at a scratch directory and never
+    # touch a real player's files. Checked first, before sudo resolution.
+    env = os.environ.get('VIMNY_HOME')
+    if env:
+        return Path(env)
     # Under sudo/doas, Path.home() is root's — resolve the invoking user's home
     # instead so saves don't land in /root. Windows has neither pwd nor sudo,
     # so the lookup is skipped and Path.home() is already correct there.
@@ -55,6 +61,21 @@ SAVES_DIR   = SAVE_DIR / 'saves'
 LAYOUTS_DIR = SAVE_DIR / 'layouts'
 SCROLLS_DIR = SAVE_DIR / 'scrolls'
 DRAFTS_DIR  = SAVE_DIR / 'drafts'    # levels being authored, in the shipping format
+
+
+def _reset_paths() -> None:
+    """Recompute the directory constants from the current environment.
+
+    Test-isolation hook: conftest sets VIMNY_HOME before test modules import,
+    then calls this, so an entire run's saves/drafts/scrolls land in a scratch
+    home and no player's real files are ever touched. Also handy for anyone
+    who wants a portable second install."""
+    global SAVE_DIR, SAVES_DIR, LAYOUTS_DIR, SCROLLS_DIR, DRAFTS_DIR
+    SAVE_DIR    = _home() / '.Vimny'
+    SAVES_DIR   = SAVE_DIR / 'saves'
+    LAYOUTS_DIR = SAVE_DIR / 'layouts'
+    SCROLLS_DIR = SAVE_DIR / 'scrolls'
+    DRAFTS_DIR  = SAVE_DIR / 'drafts'
 
 
 def _slug(name: str) -> str:

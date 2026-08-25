@@ -589,3 +589,23 @@ def test_the_legacy_mist_key_still_loads_and_dumps_as_underwater():
     # What we write is always the new name.
     file = json.loads(F.dumps(F.parse(legacy)))
     assert 'underwater' in file and 'mist' not in file
+
+
+def test_a_seals_banner_is_author_data_now():
+    """`message` used to be engine-only — a text channel the format refused
+    to carry. Designers author unlock banners now: it parses (capped and
+    flattened), rides the file, and comes back unchanged."""
+    spec = {'schema': 1, 'name': 't', 'seed': 1,
+            'geometry': {'rows': 4, 'cols': 8, 'cells': ['W' * 8] * 4,
+                         'spawn': [1, 1], 'exit': [2, 2]},
+            'seals': [{'match': 'verse', 'scope': 'anyrow',
+                       'opens': [2, 2],
+                       'message': '  the shelf\n swings wide  '}]}
+    lvl = F.parse(spec)
+    assert lvl.seals[0].message == 'the shelf swings wide'
+    file = json.loads(F.dumps(lvl))
+    assert file['seals'][0]['message'] == 'the shelf swings wide'
+    # No message key -> no default written; the engine's generic banner shows.
+    plain = json.loads(F.dumps(F.parse({**spec, 'seals': [
+        {'match': 'verse', 'scope': 'anyrow', 'opens': [2, 2]}]})))
+    assert 'message' not in plain['seals'][0]

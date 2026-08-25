@@ -43,9 +43,16 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from vimny.engine.world import CellType
-from vimny.save.save_manager import DRAFTS_DIR, _slug, atomic_write
+from vimny.save import save_manager as _sm
+from vimny.save.save_manager import _slug, atomic_write
+
+# Snapshot at import, REFRESHED by the test harness when VIMNY_HOME
+# redirects the save tree — these are module globals precisely so that
+# tests can monkeypatch them.
+DRAFTS_DIR = _sm.DRAFTS_DIR
+LEVELS_DIR = None          # set once vimny.sharing.library is importable
 from vimny.sharing import format as F
-from vimny.sharing.library import LEVELS_DIR
+from vimny.sharing import library as _lib
 from vimny.sharing.validate import Report, validate
 
 #: A new draft's room — a CANVAS, not a level. You cannot select a region larger
@@ -175,6 +182,14 @@ def sync(draft: Draft, room) -> None:
         vocabulary=lvl.vocabulary, intro=lvl.intro, alternate=lvl.alternate,
         seed=lvl.seed, then=lvl.then)
 
+
+# LEVELS_DIR needs vimny.sharing.library, which imports this module's
+# siblings — resolve it here, after the Draft dataclass exists.
+try:
+    from vimny.sharing.library import levels_dir as _levels_dir_fn
+    LEVELS_DIR = _levels_dir_fn()
+except Exception:
+    pass
 
 # ── Rooms ─────────────────────────────────────────────────────────────────────
 # A level is a DESCENT: room 1, then room 2, and the exit of each is the door

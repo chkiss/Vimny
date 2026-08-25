@@ -40,11 +40,17 @@ import random
 from dataclasses import dataclass
 from pathlib import Path
 
-from vimny.save.save_manager import SAVE_DIR
+from vimny.save import save_manager as _sm
 from vimny.sharing import format as F
 from vimny.sharing.validate import Report, validate
 
-LEVELS_DIR = SAVE_DIR / 'levels'
+def levels_dir():
+    """The shelf directory, resolved late so VIMNY_HOME (test isolation)
+    redirects it along with every other path."""
+    return _sm.SAVE_DIR / 'levels'
+
+
+LEVELS_DIR = levels_dir()   # historical constant; prefer levels_dir()
 
 _MAX_BYTES = 512 * 1024   # same cap sharing.remote applies to downloads — a level file is never larger
 
