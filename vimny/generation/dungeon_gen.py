@@ -13654,8 +13654,8 @@ def build_dungeon_culling_ledger(seed: int) -> Dungeon:
 # is an echo — every voice sings twice, the echo a step deeper than its
 # call — so the true shelf is known by SENSE; the shelf's own sound pairs
 # show the convention. Each mended misfiling grinds back its own gallery
-# bolt, IN ANY ORDER (`_SHR_BOLT_COLS`, main's _shelving_tick conditions);
-# the seal parts when the whole round reads true, indent included. No cell
+# bolt, IN ANY ORDER (`_SHR_BOLT_COLS`, sealed by per-line row_offset seals);
+# the exit gate parts when the whole round reads true, indent included. No cell
 # on a shelf row is passable (underwater floor band), so the only movers are
 # the ranged ex commands: :m reorders, :t shelves the missing copy, :> :<
 # set the depth. A fresh :t/:m row is born unfogged — the tick re-submerges
@@ -13719,7 +13719,7 @@ def build_dungeon_shelving_room(seed: int) -> Dungeon:
         cells[_SHR_GAL][c] = CellType.FLOOR        # nothing to walk there)
     for c in _SHR_BOLT_COLS:                       # the per-misfiling bolts
         cells[_SHR_GAL][c] = CellType.WALL
-    # (_SHR_GAL, _SHR_SEAL_COL) stays WALL until _shelving_tick opens it.
+    # (_SHR_GAL, _SHR_SEAL_COL) stays WALL until the full-round seal opens it.
 
     def lay(runs, r, col, text, kind):
         for wd in text.split(' '):
@@ -13742,8 +13742,8 @@ def build_dungeon_shelving_room(seed: int) -> Dungeon:
         char_runs=runs,                            # weather, not ignorance — one
         seals=[
             # EIGHT PER-LINE BOLTS: each pins its phrase at the exact column
-            # and row relative to the first line. Read-only predicates — the
-            # bespoke tick in _shelving_tick maintains the gallery floor.
+            # and row relative to the first line. Read-only predicates —
+            # _chasm_resubmerge maintains the gallery floor.
             # The char_run text has no leading spaces (indent is positional),
             # so per-line targets are lstrip'd.
             *[_parse_seal({'scope': 'anyrow', 'mode': 'exact',
@@ -13778,7 +13778,6 @@ def build_dungeon_shelving_room(seed: int) -> Dungeon:
     dungeon = _fmt_build(level, par=_SHR_PAR)
     room = dungeon.rooms[0]
     room._shr_targets  = tuple(targets)
-    room._shr_seal_col = _SHR_SEAL_COL
     # Band the shut gallery bolts + seal as stonework. Registered at build: the
     # gallery row and its bolt columns are fixed for the level's lifetime.
     # _base_sealed_cells preserves them across _seal_tick's rebuild.

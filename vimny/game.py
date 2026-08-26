@@ -2703,13 +2703,15 @@ def _seal_reads_true(room, seal, truths=(), rows=None, player=None) -> bool:
         # Read every nonempty STRIPPED line inside the region as an ORDERED
         # SEQUENCE and demand exact equality with `match`. Blank rows are
         # skipped; content rows must appear in order with exact text.
+        # Extra content lines past the targets are ignored — the seal pins
+        # the EXPECTED lines, not the total count.
         r1, c1, r2, c2 = seal.region
         lines = []
         for r in range(max(0, r1), min(room.rows - 1, r2 + 1)):
             t = _subst.line_text(room, r)[0].rstrip()
             if t.strip():
                 lines.append(t)
-        if lines != list(seal.match):
+        if lines[:len(seal.match)] != list(seal.match):
             return False
     elif seal.scope == 'anyrow':
         if not _seal_anyrow_reads(seal, rows):
@@ -5625,16 +5627,6 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
                         room.fog_cells.add((r, c))
                         room.underwater_cells.add((r, c))
 
-    def _shelving_tick():
-        """The Shelving Room: re-submerge fresh shelf rows each turn (the chasm
-        law, stateless). The gallery bolts and exit gate are now pure seal
-        territory — eight per-line row_offset predicates pin each phrase, and
-        the full-round 'lines' seal parts when the whole round reads true."""
-        targets = getattr(room, '_shr_targets', None)
-        if targets is None:
-            return
-        _chasm_resubmerge()
-
     def _refrain_tick():
         """The Refrain Vault (London Bridge): re-submerge the torn chasm, then
         open the seal once the song below the water reads EXACTLY as it should
@@ -6023,9 +6015,15 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
         if level == 'culling_ledger':
             _ledger_check()                      # open the seal once the ledger reads true
         elif level == 'shelving_room':
-            _shelving_tick()                     # re-submerge, bolts, seal check
+            _chasm_resubmerge()
         elif level == 'refrain_vault':
             _refrain_tick()                      # re-submerge the chasm, seal check
+
+        # ── content-gate ticks (declarative seals, plaques, level-specific) ────
+        # Runs for EVERY level so bolts open on the turn the text reads true —
+        # no one-Normal-action lag.  Shelving room included: its seals drive
+        # the gallery bolts.
+        _content_ticks()
 
         # ── The elf's shitty trade (from :s/g/e/) awaits a y/n ────────────────
         # Only y/n resolve it; every other key (x to attack the elf, a step away)
