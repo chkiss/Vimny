@@ -2597,6 +2597,22 @@ def _seal_anyrow_reads(seal, rows) -> bool:
     read exactly as they always did."""
     if not seal.match:
         return True          # pure conjunction; only its requires speaks
+    # ROW-OFFSET: the target's row is anchor_row + row_offset, not any row.
+    # Anchor is the first non-wall content row (row 0 = the first standable
+    # line in the buffer).  Only meaningful with mode='exact' + at >= 0.
+    if seal.row_offset >= 0:
+        anchor = None
+        for i, raw in enumerate(rows):
+            if raw.strip():
+                anchor = i
+                break
+        if anchor is None:
+            return False
+        target_row = anchor + seal.row_offset
+        if target_row >= len(rows):
+            return False
+        return all(_seal_row_reads_true(seal, t, rows[target_row])
+                   for t in seal.match)
     cand = [[i for i, raw in enumerate(rows)
              if _seal_row_reads_true(seal, t, raw)] for t in seal.match]
     # A system of distinct representatives: assign targets to rows so no two

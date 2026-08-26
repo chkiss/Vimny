@@ -135,6 +135,13 @@ class Seal:
                            # its first glyph exactly at this column, whatever
                            # sits west of it (the plumb-line family: Alignment
                            # Halls' register). -1 = unpinned.
+    row_offset: int = -1   # anyrow + exact + at only: the target's row is
+                           # anchor_row + row_offset, where anchor_row is the
+                           # first non-wall content row. -1 = any row (the
+                           # default). The shelving room's per-line bolts pin
+                           # each phrase to its expected row relative to the
+                           # first line — `:6m3` shifts content between rows,
+                           # and only a row-relative check tracks it.
     fuels:    tuple = ()   # ((row, col), ...) — brazier cells made PASTEABLE
                            # for flames while this seal reads true. A level
                            # with any fuels-carrying seal switches its paste

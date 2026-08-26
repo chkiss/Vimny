@@ -13741,6 +13741,16 @@ def build_dungeon_shelving_room(seed: int) -> Dungeon:
         exit=(_SHR_GAL, _SHR_EXIT_COL),            # water too: its darkness is
         char_runs=runs,                            # weather, not ignorance — one
         seals=[
+            # EIGHT PER-LINE BOLTS: each pins its phrase at the exact column
+            # and row relative to the first line. Read-only predicates — the
+            # bespoke tick in _shelving_tick maintains the gallery floor.
+            # The char_run text has no leading spaces (indent is positional),
+            # so per-line targets are lstrip'd.
+            *[_parse_seal({'scope': 'anyrow', 'mode': 'exact',
+                            'match': [targets[i].lstrip()],
+                            'at': _SHR_TX + _SHR_INDENTS[i],
+                            'row_offset': i},
+                           i) for i in range(8)],
             # THE FULL ROUND, said as data: every nonempty stripped line in
             _parse_seal({'scope': 'region', 'mode': 'lines', 'anchor': 'exit_row',
                          'region': [1, 2, 200, C - 2],

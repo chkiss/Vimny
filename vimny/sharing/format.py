@@ -339,7 +339,8 @@ def _parse_seal(s: dict, i: int, at: str = 'seals') -> Seal:
     if not isinstance(s, dict):
         raise LevelFormatError(f'{at}[{i}]: must be an object')
     unknown = set(s) - {'region', 'match', 'opens', 'unveils', 'fuels', 'mode',
-                        'scope', 'requires', 'anchor', 'head', 'at', 'message'}
+                        'scope', 'requires', 'anchor', 'head', 'at',
+                        'row_offset', 'message'}
     if unknown:
         raise LevelFormatError(f'{at}[{i}]: unknown key(s) {sorted(unknown)}')
     scope = str(s.get('scope', 'region'))
@@ -474,6 +475,26 @@ def _parse_seal(s: dict, i: int, at: str = 'seals') -> Seal:
         raise LevelFormatError(f'{at}[{i}].at: needs scope="anyrow" — a region '
                                f'seal reads its rectangle as one collapsed '
                                f'page, with no columns left to pin')
+    # `row_offset` pins the TARGET ROW relative to the first content row: the
+    # target stands at (anchor_row + row_offset), column `at`.  Only meaningful
+    # with scope='anyrow', mode='exact', and a pin (`at`): a region seal strips
+    # its lines and has no single row to offset, `contains` searches substrings
+    # not whole lines, and without a column pin the offset would float.
+    row_offset = s.get('row_offset', -1)
+    if row_offset is None:
+        row_offset = -1
+    if not isinstance(row_offset, int) or isinstance(row_offset, bool) \
+            or row_offset < -1:
+        raise LevelFormatError(f'{at}[{i}].row_offset: must be an integer '
+                               f'(>= 0) naming the row offset from the first '
+                               f'content row, or -1 for any row')
+    if row_offset >= 0 and scope != 'anyrow':
+        raise LevelFormatError(f'{at}[{i}].row_offset: needs scope="anyrow"')
+    if row_offset >= 0 and mode != 'exact':
+        raise LevelFormatError(f'{at}[{i}].row_offset: needs mode="exact"')
+    if row_offset >= 0 and pin < 0:
+        raise LevelFormatError(f'{at}[{i}].row_offset: needs `at` to pin '
+                               f'the column')
     opens = s.get('opens') or []
     # A single [row, col] is allowed and is by far the common case: most doors
     # are one cell, and making an author write [[9, 40]] to say so is a papercut
@@ -545,7 +566,7 @@ def _parse_seal(s: dict, i: int, at: str = 'seals') -> Seal:
                 unveils=tuple(unveiled), fuels=tuple(fueled), mode=mode,
                 message=msg,
                 scope=scope, requires=tuple(requires), anchor=anchor,
-                head=head, at=pin)
+                head=head, at=pin, row_offset=row_offset)
 
 
 def _parse_cells_list(pairs, at: str, what: str) -> list:
