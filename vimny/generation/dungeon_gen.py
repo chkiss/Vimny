@@ -13751,17 +13751,25 @@ def build_dungeon_shelving_room(seed: int) -> Dungeon:
                             'at': _SHR_TX + _SHR_INDENTS[i],
                             'row_offset': i},
                            i) for i in range(8)],
+            # FOUR GALLERY BOLTS: each opens when its voice pair (call + echo)
+            # is correctly placed.  `requires` chains to the per-line seals.
+            # `anchor='exit_row'` so opens ride the live gallery row (which
+            # shifts when :t inserts a buffer line).
+            *[_parse_seal({'scope': 'anyrow', 'mode': 'exact', 'anchor': 'exit_row',
+                            'match': [], 'opens': [[_SHR_GAL, dc]],
+                            'requires': [2 * i, 2 * i + 1]},
+                           8 + i)
+              for i, dc in enumerate(_SHR_BOLT_COLS)],
             # THE FULL ROUND, said as data: every nonempty stripped line in
             _parse_seal({'scope': 'region', 'mode': 'lines', 'anchor': 'exit_row',
                          'region': [1, 2, 200, C - 2],
                          'match': [t.rstrip() for t in targets],
-                         'opens': [[_SHR_GAL, _SHR_SEAL_COL],
-                                   *[[ _SHR_GAL, dc] for dc in _SHR_BOLT_COLS]],
+                         'opens': [[_SHR_GAL, _SHR_SEAL_COL]],
                          'unveils': [[_SHR_GAL, c] for c in
                                      range(_SHR_SEAL_COL + 1,
                                            _SHR_EXIT_COL + 1)],
                          'message': 'The round sings in order — the way opens!',
-             }, 8),
+             }, 12),
         ],
         entities=[{'kind': 'exit', 'at': [_SHR_GAL, _SHR_EXIT_COL]},   # bolt
                   {'kind': 'chest_scroll', 'at': [_SHR_GAL, _SHR_CHEST_COL]}],

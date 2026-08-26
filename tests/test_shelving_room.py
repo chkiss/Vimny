@@ -208,21 +208,38 @@ def test_fresh_rows_stay_misted(monkeypatch):
 
 # ── the orderless bolts ───────────────────────────────────────────────────────
 
-def test_bolts_open_only_when_round_is_complete(monkeypatch):
-    # The per-line seals are read-only predicates; the full-round 'lines' seal
-    # opens all four gallery bolts + the exit gate at once.  A single fix in
-    # isolation does NOT open any bolt — only the completed round does.
-    fixes = (':6m3<CR>',      # the stray echo rejoins its pair
-             ':5<<CR>',       # the Sonnez echo un-deepens
-             ':7t7<CR>')      # the last echo shelved
-    for tape in fixes:
-        d = _fresh(0)
-        r = d.rooms[0]
-        _drive(d, _K(tape), monkeypatch, finish=':q!\r')
-        gal = S._last_standable_row(r)
-        for i, dc in enumerate(_SHR_BOLT_COLS):
-            assert r.cells[gal][dc] == CellType.WALL, (tape, i)
-    # All three + :8> + $ → bolts and seal open
+def test_each_voice_pair_opens_its_bolt(monkeypatch):
+    """Each gallery bolt opens when its voice pair's two per-line seals fire.
+
+    The per-line seals are position-only predicates: they check that each
+    phrase sits at its target column and row.  The row_offset means each
+    phrase must be at its FINAL row — so a partial fix like ``:5<<`` alone
+    doesn't open its bolt (the Sonnez lines haven't shifted into place yet);
+    it takes both ``:6m3`` (shifts lines into correct rows) and ``:5<<``
+    (fixes indent) to satisfy the Sonnez pair."""
+    # From fresh: all bolts WALL (no seal tick yet)
+    d = _fresh(0)
+    r = d.rooms[0]
+    gal = S._last_standable_row(r)
+    for dc in _SHR_BOLT_COLS:
+        assert r.cells[gal][dc] == CellType.WALL
+    # :6m3 rejoins Dormez-vous pair → bolts 0 AND 1 open
+    d = _fresh(0)
+    r = d.rooms[0]
+    _drive(d, _K(':6m3<CR>'), monkeypatch, finish=':q!\r')
+    gal = S._last_standable_row(r)
+    assert r.cells[gal][_SHR_BOLT_COLS[0]] == CellType.FLOOR  # Frère pair
+    assert r.cells[gal][_SHR_BOLT_COLS[1]] == CellType.FLOOR  # Dormez pair
+    assert r.cells[gal][_SHR_BOLT_COLS[2]] == CellType.WALL   # Sonnez not yet
+    assert r.cells[gal][_SHR_BOLT_COLS[3]] == CellType.WALL   # Ding not yet
+    # :6m3 + :6<< fixes Sonnez indent → bolt 2 opens
+    d = _fresh(0)
+    r = d.rooms[0]
+    _drive(d, _K(':6m3<CR>:6<<CR>'), monkeypatch, finish=':q!\r')
+    gal = S._last_standable_row(r)
+    assert r.cells[gal][_SHR_BOLT_COLS[2]] == CellType.FLOOR  # Sonnez pair
+    assert r.cells[gal][_SHR_BOLT_COLS[3]] == CellType.WALL   # Ding not yet
+    # Full solution: all bolts + seal open
     d = _fresh(0)
     r = d.rooms[0]
     _drive(d, _K(':6m3<CR>:6<<CR>:7t7<CR>:8><CR>$'), monkeypatch)
