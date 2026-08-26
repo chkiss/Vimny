@@ -208,19 +208,27 @@ def test_fresh_rows_stay_misted(monkeypatch):
 
 # ── the orderless bolts ───────────────────────────────────────────────────────
 
-def test_each_fix_grinds_its_own_bolt(monkeypatch):
-    # From fresh, one fix in isolation opens exactly its bolt.
-    fixes = ((':6m3<CR>', 0),      # the stray echo rejoins its pair → order
-             (':5<<CR>',  1),      # the Sonnez echo un-deepens → its step
-             (':7t7<CR>', 2))      # the last echo shelved → duplication
-    for tape, want in fixes:
+def test_bolts_open_only_when_round_is_complete(monkeypatch):
+    # The per-line seals are read-only predicates; the full-round 'lines' seal
+    # opens all four gallery bolts + the exit gate at once.  A single fix in
+    # isolation does NOT open any bolt — only the completed round does.
+    fixes = (':6m3<CR>',      # the stray echo rejoins its pair
+             ':5<<CR>',       # the Sonnez echo un-deepens
+             ':7t7<CR>')      # the last echo shelved
+    for tape in fixes:
         d = _fresh(0)
         r = d.rooms[0]
         _drive(d, _K(tape), monkeypatch, finish=':q!\r')
-        gal = S._last_standable_row(r)      # :t grows the buffer — re-find it
+        gal = S._last_standable_row(r)
         for i, dc in enumerate(_SHR_BOLT_COLS):
-            state = CellType.FLOOR if i == want else CellType.WALL
-            assert r.cells[gal][dc] == state, (tape, i)
+            assert r.cells[gal][dc] == CellType.WALL, (tape, i)
+    # All three + :8> + $ → bolts and seal open
+    d = _fresh(0)
+    r = d.rooms[0]
+    _drive(d, _K(':6m3<CR>:6<<CR>:7t7<CR>:8><CR>$'), monkeypatch)
+    gal = S._last_standable_row(r)
+    for dc in _SHR_BOLT_COLS:
+        assert r.cells[gal][dc] == CellType.FLOOR
 
 
 def test_fixes_in_any_order_still_win_at_par(monkeypatch):

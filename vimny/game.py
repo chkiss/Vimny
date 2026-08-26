@@ -2756,7 +2756,10 @@ def _seal_tick(room, player) -> list:
     rows = [_wla_floor_text(room, r) for r in range(room.rows)]
     # Band every seal cell so a shut bolt reads as stonework rather than blank
     # wall. Derived each tick, never authoritative — see Room.sealed_cells.
-    room.sealed_cells = {rc for s in room.seals for rc in _seal_cells(room, s)}
+    # Merge any builder-pinned base sealed cells (the shelving room's gallery
+    # bolts stay stonework until the full-round seal fires).
+    room.sealed_cells = ({rc for s in room.seals for rc in _seal_cells(room, s)}
+                         | getattr(room, '_base_sealed_cells', set()))
     truths = []
     for seal in room.seals:
         true_now = _seal_reads_true(room, seal, truths, rows, player=player)
@@ -5623,41 +5626,14 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
                         room.underwater_cells.add((r, c))
 
     def _shelving_tick():
-        """The Shelving Room: re-submerge fresh shelf rows; each mended misfiling
-        grinds back its own gallery bolt (STATELESS, any order); the seal
-        parts once the whole round reads true — indent included, blank rows
-        ignored. No plaque: the round is an echo, and the shelf's own sound
-        pairs carry the convention (every voice twice, the echo a step
-        deep)."""
+        """The Shelving Room: re-submerge fresh shelf rows each turn (the chasm
+        law, stateless). The gallery bolts and exit gate are now pure seal
+        territory — eight per-line row_offset predicates pin each phrase, and
+        the full-round 'lines' seal parts when the whole round reads true."""
         targets = getattr(room, '_shr_targets', None)
         if targets is None:
             return
         _chasm_resubmerge()
-        gal = _subst._last_standable_row(room)
-        lines = []                       # (indent, stripped text), shelf order
-        for r in range(1, gal - 1):
-            t = _subst.line_text(room, r)[0].rstrip()
-            if t.strip():
-                lines.append((len(t) - len(t.lstrip()), t.strip()))
-        calls = _dg._SHR_CALLS
-        texts = [t for _, t in lines]
-
-        def paired(call):                # the voice's rows read call-then-echo
-            return tuple(i for i, t in lines if t == call) == (0, 2)
-
-        collapsed = [t for i, t in enumerate(texts)
-                     if i == 0 or texts[i - 1] != t]
-        conds = (collapsed == list(calls),        # voices adjacent, song order
-                 paired(calls[2]),                # the Sonnez echo at its step
-                 texts.count(calls[3]) == 2,      # the last echo shelved
-                 paired(calls[3]))                # ...and at its step
-        for ok, dc in zip(conds, _dg._SHR_BOLT_COLS):
-            is_open = room.cells[gal][dc] != CellType.WALL
-            if ok and not is_open:
-                room.cells[gal][dc] = CellType.FLOOR
-                _push('A voice finds its shelf \u2014 a bolt grinds back!')
-            elif not ok and is_open and (player.row, player.col) != (gal, dc):
-                room.cells[gal][dc] = CellType.WALL    # undone \u2014 it re-bars
 
     def _refrain_tick():
         """The Refrain Vault (London Bridge): re-submerge the torn chasm, then

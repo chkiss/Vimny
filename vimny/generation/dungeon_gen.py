@@ -13755,7 +13755,8 @@ def build_dungeon_shelving_room(seed: int) -> Dungeon:
             _parse_seal({'scope': 'region', 'mode': 'lines', 'anchor': 'exit_row',
                          'region': [1, 2, 200, C - 2],
                          'match': [t.rstrip() for t in targets],
-                         'opens': [[_SHR_GAL, _SHR_SEAL_COL]],
+                         'opens': [[_SHR_GAL, _SHR_SEAL_COL],
+                                   *[[ _SHR_GAL, dc] for dc in _SHR_BOLT_COLS]],
                          'unveils': [[_SHR_GAL, c] for c in
                                      range(_SHR_SEAL_COL + 1,
                                            _SHR_EXIT_COL + 1)],
@@ -13772,8 +13773,10 @@ def build_dungeon_shelving_room(seed: int) -> Dungeon:
     room._shr_seal_col = _SHR_SEAL_COL
     # Band the shut gallery bolts + seal as stonework. Registered at build: the
     # gallery row and its bolt columns are fixed for the level's lifetime.
-    room.sealed_cells = {(_SHR_GAL, c)
-                         for c in (*_SHR_BOLT_COLS, _SHR_SEAL_COL)}
+    # _base_sealed_cells preserves them across _seal_tick's rebuild.
+    room._base_sealed_cells = {(_SHR_GAL, c)
+                               for c in (*_SHR_BOLT_COLS, _SHR_SEAL_COL)}
+    room.sealed_cells = set(room._base_sealed_cells)
     # The water (shelf band, water course, AND the sealed pocket) rides the
     # file; what stays a pin is the FOG arrangement: the pocket is hidden by
     # position behind a seal the scripted tick opens, and the level wants
