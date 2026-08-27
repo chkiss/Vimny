@@ -13757,7 +13757,8 @@ def build_dungeon_shelving_room(seed: int) -> Dungeon:
             # shifts when :t inserts a buffer line).
             *[_parse_seal({'scope': 'anyrow', 'mode': 'exact', 'anchor': 'exit_row',
                             'match': [], 'opens': [[_SHR_GAL, dc]],
-                            'requires': [2 * i, 2 * i + 1]},
+                            'requires': [2 * i, 2 * i + 1],
+                            'message': 'You hear a hidden bolt grind back.'},
                            8 + i)
               for i, dc in enumerate(_SHR_BOLT_COLS)],
             # THE FULL ROUND, said as data: every nonempty stripped line in
