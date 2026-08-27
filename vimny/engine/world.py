@@ -65,7 +65,7 @@ def canonical_kind(kind: str) -> str:
 
 #: The banner a seal shows when it grinds back, if it names no other.
 SEAL_OPENED      = 'The words read true — a bolt grinds back!'
-SEAL_OPENED_FAR  = 'The words read true — you hear a bolt grind back in the distance!'
+SEAL_OPENED_FAR  = 'You hear a bolt grind back in the distance!'
 SEAL_CLOSED      = 'A bolt grinds shut.'
 SEAL_CLOSED_FAR  = 'You hear a bolt grind shut in the distance.'
 
