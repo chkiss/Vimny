@@ -130,9 +130,7 @@ def _label_gate(doors, exit_pos):
     """
     return gate_row_seals(
         [(target, col) for target, (_row, col) in doors], exit_pos,
-        mode='contains',
-        bolt_message='The label reads true — the bolt grinds back!',
-        final_message='Every label reads true — the final seal parts!')
+        mode='contains')
 
 
 # ── Par-solver toolkit ────────────────────────────────────────────────────────
@@ -6537,9 +6535,7 @@ def build_dungeon_g_sanctum(seed: int) -> Dungeon:
         solution=' '.join([f'j g_ r{f[0]}'] + [f'+ g_ r{fx}' for fx in f[1:]]) + ' G')
 
     dungeon = _fmt_build(level, par=_GS_PAR)   # STANDARD: the counted-e walk wins at 1★
-    _seal_banners(dungeon,
-                  bolt='The label reads true — the bolt grinds back!',
-                  final='Every label reads true — the final seal parts!')
+    _seal_banners(dungeon)
     dungeon.rooms[0]._gs_words = words
     return dungeon
 
@@ -6671,9 +6667,7 @@ def build_dungeon_buried_word(seed: int) -> Dungeon:
                   f'l n h r{words["fixes"][1]} l n h r{words["fixes"][2]} G $'))
 
     dungeon = _fmt_build(level, par=_BW_PAR)
-    _seal_banners(dungeon,
-                  bolt='The label reads true — the bolt grinds back!',
-                  final='Every label reads true — the final seal parts!')
+    _seal_banners(dungeon)
     dungeon.rooms[0]._bw_words = words
     return dungeon
 
@@ -12570,9 +12564,7 @@ def build_dungeon_alignment_halls(seed: int) -> Dungeon:
     room = dungeon.rooms[0]
     room._ah_register_col = _AH_REGISTER
     room._ah_lessons      = tuple(lessons)
-    _seal_banners(dungeon,
-                  bolt='The word sits true on the line — the bolt grinds back!',
-                  final='Every word stands on the register — the final seal parts!')
+    _seal_banners(dungeon)
     return dungeon
 
 
@@ -13272,7 +13264,6 @@ def build_dungeon_gauntlet(seed: int) -> Dungeon:
     # Every bolt anchors to the exit row, so o/O/Y-p drag bolts and exit home
     # together. Messages are engine-only and re-attach post-build.
     seals = []
-    _bolt_msg = 'A proof holds — a bolt grinds back!'
 
     def door(kind, target):
         col = _GNT_BOLT0 + len(seals)
@@ -13457,8 +13448,7 @@ def build_dungeon_gauntlet(seed: int) -> Dungeon:
     dungeon = _fmt_build(level, par=_GNT_PAR)
     room = dungeon.rooms[0]
     room._gnt_band = gnt_band
-    _seal_banners(dungeon, bolt=_bolt_msg,
-                  final='Sixteen proofs stand together — the last seal parts!')
+    _seal_banners(dungeon)
     return dungeon
 
 
