@@ -64,7 +64,10 @@ def canonical_kind(kind: str) -> str:
 
 
 #: The banner a seal shows when it grinds back, if it names no other.
-SEAL_OPENED = 'The words read true — a bolt grinds back!'
+SEAL_OPENED      = 'The words read true — a bolt grinds back!'
+SEAL_OPENED_FAR  = 'The words read true — you hear a bolt grind back in the distance!'
+SEAL_CLOSED      = 'A bolt grinds shut.'
+SEAL_CLOSED_FAR  = 'You hear a bolt grind shut in the distance.'
 
 
 @dataclass(frozen=True)
@@ -127,9 +130,10 @@ class Seal:
     scope:    str   = 'region'
     requires: tuple = ()    # indices of earlier seals that must also read true
     anchor:   str   = ''    # '' | 'exit_row'
-    message:  str   = ''    # the banner when it opens; '' → SEAL_OPENED
-    closed_message: str = '' # the banner when it closes (visible); '' = silent
-    closed_message_far: str = '' # ...when it closes (off-screen); '' = silent
+    message:  str   = ''    # the banner when it opens (visible); '' → SEAL_OPENED
+    message_far: str = ''   # ...when it opens (off-screen); '' → SEAL_OPENED_FAR
+    closed_message: str = '' # the banner when it closes (visible); '' → SEAL_CLOSED
+    closed_message_far: str = '' # ...when it closes (off-screen); '' → SEAL_CLOSED_FAR
     head:     int   = -1   # anyrow only: a matched row's first glyph must sit
                            # exactly at this column (the left-align law). -1 =
                            # any margin. The Gauntlet's cit door needs its <<.

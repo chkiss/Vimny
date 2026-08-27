@@ -50,7 +50,8 @@ from vimny.engine.command_guard import (action_allowed as _action_allowed_raw,
                                   guard_message as _guard_message_raw,
                                   _MOTION_GUARD as _MOTION_GUARD_TABLE)
 from vimny.engine.world import (DROPPABLE, Entity, CellType, CharRun, Dungeon, Seal,
-                          SEAL_OPENED, canonical_kind, clone_entity,
+                          SEAL_OPENED, SEAL_OPENED_FAR, SEAL_CLOSED,
+                          SEAL_CLOSED_FAR, canonical_kind, clone_entity,
                           entity_letter, strike_disguise)
 from vimny.engine.motion import (apply_motion, _apply_esc, _reveal_from,
                            _first_non_blank_col, auto_fog_tick as _auto_fog_tick,
@@ -2785,15 +2786,19 @@ def _seal_tick(room, player) -> list:
                 # sealing someone inside stone is not a puzzle, it is a crash.
                 room.cells[r][c] = CellType.WALL
                 closed = True
-        if opened:
-            msgs.append(seal.message or SEAL_OPENED)
-        if closed and (seal.closed_message or seal.closed_message_far):
-            # "Visible" = the bolt sits close to the player (roughly on-screen);
-            # far away gets the distant variant.
+        if opened or closed:
             _bolt_row = _seal_cells(room, seal)[0][0] if _seal_cells(room, seal) else -1
             _bolt_visible = abs(_bolt_row - player.row) < 20
-            msgs.append(seal.closed_message if _bolt_visible
-                         else seal.closed_message_far)
+        if opened:
+            if _bolt_visible:
+                msgs.append(seal.message or SEAL_OPENED)
+            else:
+                msgs.append(seal.message_far or SEAL_OPENED_FAR)
+        if closed:
+            if _bolt_visible:
+                msgs.append(seal.closed_message or SEAL_CLOSED)
+            else:
+                msgs.append(seal.closed_message_far or SEAL_CLOSED_FAR)
         # The same condition can REVEAL: an unveils cell's DARKNESS — both the
         # veil on a carved wall and the fog over hidden floor — lifts the first
         # time the seal reads true, and stays lifted. ONE-WAY, like every
@@ -2807,7 +2812,11 @@ def _seal_tick(room, player) -> list:
                 room.fog_cells.discard((r, c))
                 unveiled = True
         if unveiled:
-            msgs.append(seal.message or SEAL_OPENED)
+            _u_row = _seal_unveils(room, seal)[0][0] if _seal_unveils(room, seal) else -1
+            if abs(_u_row - player.row) < 20:
+                msgs.append(seal.message or SEAL_OPENED)
+            else:
+                msgs.append(seal.message_far or SEAL_OPENED_FAR)
     return msgs
 
 
