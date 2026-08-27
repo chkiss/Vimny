@@ -2767,6 +2767,7 @@ def _seal_tick(room, player) -> list:
         true_now = _seal_reads_true(room, seal, truths, rows, player=player)
         truths.append(true_now)
         opened  = False
+        closed  = False
         for (r, c) in _seal_cells(room, seal):
             if not (0 <= r < room.rows and 0 <= c < room.cols):
                 continue
@@ -2783,8 +2784,16 @@ def _seal_tick(room, player) -> list:
                 # doors have carried this guard since they were written, because
                 # sealing someone inside stone is not a puzzle, it is a crash.
                 room.cells[r][c] = CellType.WALL
+                closed = True
         if opened:
             msgs.append(seal.message or SEAL_OPENED)
+        if closed and (seal.closed_message or seal.closed_message_far):
+            # "Visible" = the bolt sits close to the player (roughly on-screen);
+            # far away gets the distant variant.
+            _bolt_row = _seal_cells(room, seal)[0][0] if _seal_cells(room, seal) else -1
+            _bolt_visible = abs(_bolt_row - player.row) < 20
+            msgs.append(seal.closed_message if _bolt_visible
+                         else seal.closed_message_far)
         # The same condition can REVEAL: an unveils cell's DARKNESS — both the
         # veil on a carved wall and the fog over hidden floor — lifts the first
         # time the seal reads true, and stays lifted. ONE-WAY, like every

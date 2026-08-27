@@ -128,6 +128,8 @@ class Seal:
     requires: tuple = ()    # indices of earlier seals that must also read true
     anchor:   str   = ''    # '' | 'exit_row'
     message:  str   = ''    # the banner when it opens; '' → SEAL_OPENED
+    closed_message: str = '' # the banner when it closes (visible); '' = silent
+    closed_message_far: str = '' # ...when it closes (off-screen); '' = silent
     head:     int   = -1   # anyrow only: a matched row's first glyph must sit
                            # exactly at this column (the left-align law). -1 =
                            # any margin. The Gauntlet's cit door needs its <<.

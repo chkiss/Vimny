@@ -340,7 +340,8 @@ def _parse_seal(s: dict, i: int, at: str = 'seals') -> Seal:
         raise LevelFormatError(f'{at}[{i}]: must be an object')
     unknown = set(s) - {'region', 'match', 'opens', 'unveils', 'fuels', 'mode',
                         'scope', 'requires', 'anchor', 'head', 'at',
-                        'row_offset', 'message'}
+                        'row_offset', 'message', 'closed_message',
+                        'closed_message_far'}
     if unknown:
         raise LevelFormatError(f'{at}[{i}]: unknown key(s) {sorted(unknown)}')
     scope = str(s.get('scope', 'region'))
@@ -562,9 +563,11 @@ def _parse_seal(s: dict, i: int, at: str = 'seals') -> Seal:
     # since 2026-08-24 (it used to be engine-only). Capped and flattened: it
     # is one status line, not a letter.
     msg = ' '.join(str(s.get('message', ''))[:200].split())
+    cmsg = ' '.join(str(s.get('closed_message', ''))[:200].split())
+    cmsg_far = ' '.join(str(s.get('closed_message_far', ''))[:200].split())
     return Seal(region=region, match=tuple(match), opens=tuple(cells),
                 unveils=tuple(unveiled), fuels=tuple(fueled), mode=mode,
-                message=msg,
+                message=msg, closed_message=cmsg, closed_message_far=cmsg_far,
                 scope=scope, requires=tuple(requires), anchor=anchor,
                 head=head, at=pin, row_offset=row_offset)
 
@@ -1359,6 +1362,10 @@ def _dump_content(h: Room) -> dict:
                 d['fuels'] = [list(c) for c in s.fuels]
             if getattr(s, 'message', ''):
                 d['message'] = s.message
+            if getattr(s, 'closed_message', ''):
+                d['closed_message'] = s.closed_message
+            if getattr(s, 'closed_message_far', ''):
+                d['closed_message_far'] = s.closed_message_far
             if s.unveils:
                 d['unveils'] = [list(c) for c in s.unveils]
             if s.region:
