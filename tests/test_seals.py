@@ -431,3 +431,96 @@ def test_an_unveil_never_walls_and_survives_the_build_shut_loop():
     lvl2 = F.loads(F.dumps(lvl))
     assert lvl2.seals[0].unveils == ((0, 2), (0, 3))
     assert lvl2.seals[0].opens == ((3, 3),)
+
+
+# ── forbids: a bolt on a sayable negation ─────────────────────────────────────
+
+def test_a_forbids_seal_reads_false_when_the_named_seal_reads_true():
+    """`requires`' mirror: a seal with `forbids` opens only while the named
+    earlier seal reads FALSE — and re-bars the moment that seal reads true.
+    The Fortress-launch axis no level could say before this."""
+    doorway = Seal(match='ash', scope='anyrow', opens=((3, 10),))
+    reverse = Seal(opens=((4, 10),), forbids=(0,))
+    room = _room([doorway, reverse], texts=[(1, 'ash')])
+    _tick(room)
+    assert room.cells[3][10] == CellType.FLOOR    # 'ash' stands — the door opens
+    assert room.cells[4][10] == CellType.WALL     # ...and the negation stays shut
+    _write(room, 1, 'dust')
+    _tick(room)
+    assert room.cells[3][10] == CellType.WALL
+    assert room.cells[4][10] == CellType.FLOOR    # the negation now reads true
+    _write(room, 1, 'ash')
+    _tick(room)
+    assert room.cells[4][10] == CellType.WALL     # and it snaps back, exactly
+    assert room.cells[3][10] == CellType.FLOOR    # a river re-crossed both ways
+
+
+def test_a_forbids_seal_may_also_require():
+    """The Beacon Tiers' too-cold nudge, in miniature: a seal may name BOTH
+    axes — `requires` the doors that must be open, `forbids` the door that
+    must stay shut. The conjunction is one forward pass, like `requires`."""
+    source = Seal(match='ash', scope='anyrow', opens=((3, 8),))
+    chain  = Seal(match='oak', scope='anyrow', requires=(0,), opens=((3, 9),))
+    nudge  = Seal(opens=((4, 9),), requires=(0,), forbids=(1,))
+    room = _room([source, chain, nudge], texts=[(1, 'ash')])
+    _tick(room)
+    assert room.cells[3][8] == CellType.FLOOR     # the source stands
+    assert room.cells[3][9] == CellType.WALL      # the chain is cold
+    assert room.cells[4][9] == CellType.FLOOR, \
+        'the nudge reads true: requires the source, forbids the chain'
+    _write(room, 2, 'oak')                        # the chain lights
+    _tick(room)
+    assert room.cells[3][9] == CellType.FLOOR
+    assert room.cells[4][9] == CellType.WALL, 're-bars the instant the chain burns'
+    _write(room, 2, '')
+    _tick(room)
+    assert room.cells[4][9] == CellType.FLOOR     # ...and returns when it chills
+
+
+def test_a_forbids_reading_keeps_the_earlier_only_law():
+    with pytest.raises(F.LevelFormatError, match='BEFORE'):
+        F._parse_seal({'forbids': [1], 'opens': [4, 18]}, 0)
+
+
+def test_a_forbids_seal_may_stand_alone_in_a_file():
+    """A forbids-only reading passes the nothing-to-read guard: it is a pure
+    negative condition, exact mirror of a requires-only pure conjunction."""
+    s = F._parse_seal({'forbids': [2], 'opens': [4, 18]}, 3)
+    assert s.forbids == (2,)
+
+
+def test_forbids_round_trips_through_the_file():
+    lvl = F.parse({
+        'schema': 1, 'name': 'n', 'seed': 1,
+        'geometry': {'rows': 4, 'cols': 8,
+                     'cells': ['WWWWWWWW', 'WWWWWWWW', 'WFFFW' + 'WWW',
+                               'WWWWWWWW'],
+                     'spawn': [2, 1], 'exit': [2, 4]},
+        'seals': [{'match': 'open', 'scope': 'anyrow', 'mode': 'contains',
+                   'opens': [3, 3]},
+                  {'forbids': [0], 'opens': [2, 5]}],
+    })
+    room = F.build(lvl).rooms[0]
+    assert room.seals[1].forbids == (0,)
+    lvl2 = F.loads(F.dumps(lvl))
+    assert lvl2.seals[1].forbids == (0,)
+    assert lvl2.seals[1].opens == ((2, 5),)
+
+
+# ── the hint: a pure predicate that speaks once ──────────────────────────────
+
+def test_a_message_predicate_hints_once_per_room():
+    """A seal with nothing to OPEN but a message to say is a HINT: while it
+    reads true it speaks ONCE per room, then stays quiet — even after the
+    condition flickers and holds again. The Beacon Tiers' too-cold nudge."""
+    source = Seal(match='ash', scope='anyrow', opens=((3, 8),))
+    hint = Seal(requires=(0,), message='still cold!')
+    room = _room([source, hint], texts=[(1, 'ash')])
+    msgs = _tick(room)
+    assert any('still cold' in m for m in msgs), msgs
+    assert not any('still cold' in m for m in _tick(room)), 'latched after one fire'
+    _write(room, 1, 'dust')                        # the condition goes false...
+    _tick(room)
+    _write(room, 1, 'ash')                         # ...and true again
+    assert not any('still cold' in m
+                   for m in _tick(room)), 'one-shot per ROOM, not per truth'

@@ -10662,8 +10662,9 @@ def build_dungeon_quartermaster(seed: int) -> Dungeon:
     (the tick keeps one there every turn) and the exit entity itself is
     CARET_TRANSPARENT — no jump lands in the pocket. The shaft rows hold
     no glyphs, so jumps there land on the shaft itself. Geometry is fixed
-    (seed-invariant); all doors run through main._quartermaster_tick —
-    stateless and undo-safe.
+    (seed-invariant); every door is a SEAL (braziers regions chained by
+    `requires`, plus the too-cold hint and the final seal) — stateless
+    and undo-safe, with no bespoke tick left to fall out of step.
     """
     R, C = _QM_ROWS, _QM_COLS
     from vimny.engine.editor import _CELL_CODE
@@ -10705,22 +10706,40 @@ def build_dungeon_quartermaster(seed: int) -> Dungeon:
                          'region': [_QM_SOURCE[0], _QM_SOURCE[1],
                                     _QM_SOURCE[0], _QM_SOURCE[1]]}, 0),
             _parse_seal({'requires': [0],
-                         'opens': [[_QM_HALL_ROW, _QM_BOLT_COLS[0]]]}, 1),
+                         'opens': [[_QM_HALL_ROW, _QM_BOLT_COLS[0]]],
+                         'message': 'The flame takes — the bolt grinds back!'}, 1),
             _parse_seal({'mode': 'braziers',
                          'region': [_QM_PED1[0], _QM_PED1[1],
-                                    _QM_PED1[0], _QM_PED1[1]],
-                         'requires': [0]}, 2),
+                                    _QM_PED1[0], _QM_PED1[1]]}, 2),
             _parse_seal({'requires': [0, 2],
-                         'opens': [[_QM_HALL_ROW, _QM_BOLT_COLS[1]]]}, 3),
+                         'opens': [[_QM_HALL_ROW, _QM_BOLT_COLS[1]]],
+                         'message': 'The flame takes — the bolt grinds back!'}, 3),
         ] + [
+            # The nine TIER predicates (4..12): one per beacon-brazier cell,
+            # a pure read of that brazier — deliberately NO `requires`, so a
+            # tier can read true while the chain is cold and the too-cold
+            # hint can name them. The whole chain is bolted onto the final
+            # seal instead, which is what the chain ever needed.
             _parse_seal({'mode': 'braziers',
                          'region': [_QM_BRAZIER_ROW + k, c,
-                                    _QM_BRAZIER_ROW + k, c],
-                         'requires': [3]}, 4 + k * 3 + j)
+                                    _QM_BRAZIER_ROW + k, c]}, 4 + k * 3 + j)
             for k in range(3) for j, c in enumerate(_QM_BRAZIER_COLS)
         ] + [
+            # The too-cold HINT (13): a tier burns but the depot chain is
+            # cold. A pure predicate with a message and no door — `_seal_tick`
+            # fires its piece ONCE per room while it reads true (the
+            # "no more braziers" nudge that used to live in a bespoke tick).
+            _parse_seal({'requires': [4, 5, 6],
+                         'forbids': [3],
+                         'message': 'The seal seems to be melting, but needs '
+                                    'more heat! Alas, there are no more '
+                                    'braziers...'}, 13),
+            # The final seal (14): the beacon burns in three tiers AND the
+            # whole depot chain burns (seal 3 = bolt B = source ∧ ped1).
             _parse_seal({'requires': [3] + list(range(4, 13)),
-                         'opens': [[_QM_EXIT[0], _QM_SEAL_COL]]}, 13),
+                         'opens': [[_QM_EXIT[0], _QM_SEAL_COL]],
+                         'message': 'The beacon burns in three tiers — the '
+                                    'seal draws open!'}, 14),
         ],
         braziers=sorted({_QM_SOURCE, _QM_PED1,
                          *((_QM_BRAZIER_ROW + k, c)
@@ -10730,26 +10749,7 @@ def build_dungeon_quartermaster(seed: int) -> Dungeon:
                    'edit_immune': True}],   # nor its row dd-collapsible
         solution='w yl w P G 3P yy p P k 0')
 
-    dungeon = _fmt_build(level, par=_QM_PAR)
-    room = dungeon.rooms[0]
-    # Hand the door banners back (Seal.message is engine-only data).
-    from dataclasses import replace as _dc_replace
-    _qm_banners = (
-        '',                                          # the source predicate
-        'The flame takes — the bolt grinds back!',   # chain bolt A
-        '',                                          # hall brazier predicate
-        'The flame takes — the bolt grinds back!',   # chain bolt B
-    ) + ('',) * 9 + (                                # the nine tier predicates
-        'The beacon burns in three tiers — the seal draws open!',  # the seal
-    )
-    room.seals = tuple(_dc_replace(s, message=m)
-                       for s, m in zip(room.seals, _qm_banners))
-    # Anchors read by main._quartermaster_tick (stored coordinates, the Cipher
-    # Cell convention — a self-inflicted dd/linewise shift above them desyncs
-    # the doors until u, which is the established recoverable failure mode).
-    room._qm_bolt_cols = _QM_BOLT_COLS
-    room._qm_seal_col  = _QM_SEAL_COL
-    return dungeon
+    return _fmt_build(level, par=_QM_PAR)
 
 
 # ── The Echo Vault — . (dot-repeat) ───────────────────────────────────────────
@@ -12662,7 +12662,8 @@ def build_dungeon_indentation_sanctum(seed: int) -> Dungeon:
     rng = random.Random(seed)
     R, C = _IS_ROWS, _IS_COLS
     from vimny.engine.editor import _CELL_CODE
-    from vimny.sharing.format import Level as _Level, build as _fmt_build
+    from vimny.sharing.format import (Level as _Level, build as _fmt_build,
+                                      _parse_seal)
     cells = [[CellType.WALL] * C for _ in range(R)]
     hall_rows = _IS_G1_ROWS + _IS_G2_ROWS + _IS_RITE_ROWS + _IS_BLANK_ROWS
     for r in hall_rows:                                  # one open hall
@@ -12723,17 +12724,35 @@ def build_dungeon_indentation_sanctum(seed: int) -> Dungeon:
         spawn=(_IS_G1_ROWS[0], _IS_COL_S),               # atop gallery one
         exit=_IS_EXIT,
         char_runs=runs,
+        seals=[
+            # The two GALLERY bolts as seals: every noun seated with its FIRST
+            # glyph exactly on the plumb register (`at` = 16, the Alignment
+            # pin law) on any floor row. `>}`/`<}` shove a gallery onto the
+            # line; `=` RAZES it to the wall instead (the markdown trap). The
+            # RITE bolt and the final seal stay bespoke in the tick: the rite
+            # reads `law_column` per row, which a fixed pin cannot say.
+            _parse_seal({'scope': 'anyrow', 'at': _IS_REGISTER,
+                         'match': list(g1_words),
+                         'opens': [[_IS_GATE_ROW, _IS_GATE_COL0]],
+                         'message': 'The bay stands as the law reads — the '
+                                    'bolt grinds back!'}, 0),
+            _parse_seal({'scope': 'anyrow', 'at': _IS_REGISTER,
+                         'match': list(g2_words),
+                         'opens': [[_IS_GATE_ROW, _IS_GATE_COL0 + 1]],
+                         'message': 'The bay stands as the law reads — the '
+                                    'bolt grinds back!'}, 1),
+        ],
         entities=[{'kind': 'exit', 'at': [_IS_EXIT[0], _IS_EXIT[1]],
                    'edit_immune': True}],
         solution=_IS_ANSWER)
 
     dungeon = _fmt_build(level, par=_IS_PAR)
     room = dungeon.rooms[0]
-    room._is_g1_words    = tuple(g1_words)
-    room._is_g2_words    = tuple(g2_words)
-    room._is_rite_texts  = tuple(rite_texts)
-    room._is_register    = _IS_REGISTER
-    room._is_bolts       = tuple(_IS_GATE_COL0 + i for i in range(_IS_TRIGGERS))
+    room._is_g1_words       = tuple(g1_words)
+    room._is_g2_words       = tuple(g2_words)
+    room._is_rite_texts     = tuple(rite_texts)
+    room._is_bolts          = tuple(_IS_GATE_COL0 + i for i in range(_IS_TRIGGERS))
+    room._is_gallery_seals  = (room.seals[0], room.seals[1])
     return dungeon
 
 

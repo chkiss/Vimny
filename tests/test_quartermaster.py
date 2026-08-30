@@ -39,9 +39,10 @@ unreachable by walking from any direction but through the drawn seal
 side), and unreachable by line jumps (G/{n}G/H/M/L land on a row's first
 non-blank = always a brazier's dots/flame; the exit is CARET_TRANSPARENT).
 
-All doors run through main._quartermaster_tick — stateless and undo-safe
-(the vault-tick principle), anchored on stored build coordinates (the Cipher
-Cell convention; a self-inflicted dd/linewise shift desyncs until u).
+Every door is a SEAL now (braziers-mode regions chained by requires/forbids,
+with the too-cold nudge a forbids HINT) — stateless and undo-safe; the
+coordinates live in the seal declarations, so there is no bespoke tick left
+to fall out of step.
 """
 from collections import deque
 
@@ -308,8 +309,7 @@ def test_tick_chain_bolts_follow_the_flames_both_ways(seed):
 
     src_ru = room.char_run_at(*_QM_SOURCE)                   # cut the source —
     room.remove_char_run(src_ru)                             # the chain darkens
-    main._quartermaster_tick(room, p)   # embers re-lay the cold slots first
-    main._seal_tick(room, p)            # ...then the doors read them shut
+    main._seal_tick(room, p)            # the doors read them shut
     for bc in (A, B):
         assert room.cells[_QM_HALL_ROW][bc] == CellType.WALL
     room.add_char_run(src_ru)                                # undo restores the flame
@@ -332,32 +332,25 @@ def test_seal_needs_three_tiers_and_the_whole_chain(seed):
     auto_fog_tick(room, *_QM_SPAWN)   # sight runs the hall and the shaft
 
     _light(room, _QM_BRAZIER_ROW, _QM_BRAZIER_COLS[0], count=3)   # 3P
-    msgs = main._quartermaster_tick(room, p)
+    msgs = main._seal_tick(room, p)
     assert any('no more braziers' in m for m in msgs), \
         "the one-shot too-cold nudge fires when one tier stands alone (no command named)"
     assert not any('yy' in m for m in msgs), "the nudge must not name the command"
+    assert not any('no more braziers' in m for m in main._seal_tick(room, p)), \
+        "the hint is latched — it fires once per room, not every turn"
     for k in (1, 2):                                         # the two linewise pastes
         _insert_blank_row(room, _QM_BRAZIER_ROW + k, _QM_BRAZIER_ROW, p)
         for c in _QM_BRAZIER_COLS:
             room.add_char_run(CharRun(_QM_BRAZIER_ROW + k, c, (_QM_FLAME,), 'flame'))
-    main._quartermaster_tick(room, p)
     main._seal_tick(room, p)
     exit_e = next(e for e in room.entities if e.kind == 'exit')
     assert exit_e.row == _QM_EXIT[0], "p-pastes insert BELOW — the exit holds its row"
     seal = (exit_e.row, _QM_SEAL_COL)
     assert room.cells[seal[0]][seal[1]] == CellType.WALL, (
         "three tiers alone must NOT draw the seal — the hall brazier is cold")
-    import vimny.game as _m
-    _tr = []
-    for _s in room.seals:
-        _t = _m._seal_reads_true(room, _s, list(_tr))
-        _tr.append(_t)
-        print('DEBUG seal', _s.mode, _s.region, 'true=', _t,
-              'ped1=', (lambda ru: ru and ''.join(ru.symbols))(room.char_run_at(*_QM_PED1)))
 
     _light(room, *_QM_PED1)                                  # complete the chain
     msgs = main._seal_tick(room, p)
-    print('DEBUG msgs:', msgs, '| seal cell:', room.cells[seal[0]][seal[1]])
     assert room.cells[seal[0]][seal[1]] == CellType.FLOOR
     assert any('three tiers' in m for m in msgs)
 

@@ -339,7 +339,7 @@ def _parse_seal(s: dict, i: int, at: str = 'seals') -> Seal:
     if not isinstance(s, dict):
         raise LevelFormatError(f'{at}[{i}]: must be an object')
     unknown = set(s) - {'region', 'match', 'opens', 'unveils', 'fuels', 'mode',
-                        'scope', 'requires', 'anchor', 'head', 'at',
+                        'scope', 'requires', 'forbids', 'anchor', 'head', 'at',
                         'row_offset', 'message', 'message_far',
                         'closed_message', 'closed_message_far'}
     if unknown:
@@ -435,11 +435,22 @@ def _parse_seal(s: dict, i: int, at: str = 'seals') -> Seal:
         # not been taken yet, which is a rule nobody can debug.
         raise LevelFormatError(f'{at}[{i}].requires: must name seals BEFORE '
                                f'this one (0..{i - 1})')
-    if (not match and not requires
+    forbids = s.get('forbids', [])
+    if not isinstance(forbids, (list, tuple)) or not all(
+            isinstance(k, int) for k in forbids):
+        raise LevelFormatError(f'{at}[{i}].forbids: must be a list of the '
+                               f'indices of earlier seals')
+    if any(not 0 <= k < i for k in forbids):
+        # `forbids` is `requires`' mirror and keeps the same earlier-only law:
+        # a seal opens on negatives of readings that have already been taken.
+        raise LevelFormatError(f'{at}[{i}].forbids: must name seals BEFORE '
+                               f'this one (0..{i - 1})')
+    if (not match and not requires and not forbids
             and mode not in ('braziers', 'zone')
             and not s.get('unveils') and not s.get('fuels')):
         raise LevelFormatError(f'{at}[{i}]: has nothing to read — give it a '
-                               f'`match`, or `requires` naming earlier seals')
+                               f'`match`, or `requires`/`forbids` naming '
+                               f'earlier seals')
     anchor = str(s.get('anchor', ''))
     if anchor not in ('', 'exit_row'):
         raise LevelFormatError(f'{at}[{i}].anchor: must be "" or "exit_row", '
@@ -571,7 +582,8 @@ def _parse_seal(s: dict, i: int, at: str = 'seals') -> Seal:
                 message=msg, message_far=msg_far,
                 closed_message=cmsg, closed_message_far=cmsg_far,
                 scope=scope, requires=tuple(requires), anchor=anchor,
-                head=head, at=pin, row_offset=row_offset)
+                head=head, at=pin, row_offset=row_offset,
+                forbids=tuple(forbids))
 
 
 def _parse_cells_list(pairs, at: str, what: str) -> list:
@@ -1380,6 +1392,8 @@ def _dump_content(h: Room) -> dict:
                 d['scope'] = s.scope
             if s.requires:
                 d['requires'] = list(s.requires)
+            if s.forbids:
+                d['forbids'] = list(s.forbids)
             if s.anchor:
                 d['anchor'] = s.anchor
             if s.head >= 0:

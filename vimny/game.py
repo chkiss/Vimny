@@ -2640,6 +2640,14 @@ def _braziers_in(room, region) -> list:
             and r1 <= e.row <= r2 and c1 <= e.col <= c2]
 
 
+def _seal_predicates_hold(seal, truths) -> bool:
+    """The one-pass conjunction a seal names: every `requires` seal reads true
+    and every `forbids` seal reads false. Both axes name EARLIER seals only, so
+    the whole chain stays acyclic and can be walked in a single sweep."""
+    return (all(truths[i] for i in seal.requires if i < len(truths))
+            and all(not truths[i] for i in seal.forbids if i < len(truths)))
+
+
 def _seal_reads_true(room, seal, truths=(), rows=None, player=None) -> bool:
     """Every target reads true, AND every seal this one requires does too."""
     if seal.mode == 'zone':
@@ -2652,7 +2660,7 @@ def _seal_reads_true(room, seal, truths=(), rows=None, player=None) -> bool:
             return False
         r1, c1, r2, c2 = seal.region
         return (r1 <= player.row <= r2 and c1 <= player.col <= c2) \
-            and all(truths[i] for i in seal.requires if i < len(truths))
+            and _seal_predicates_hold(seal, truths)
     if seal.mode == 'braziers':
         # The brazier gate: open only while EVERY brazier in the region burns.
         # Snuffing one (a cut darkens a brazier, it is not carried off) leaves it
@@ -2685,7 +2693,7 @@ def _seal_reads_true(room, seal, truths=(), rows=None, player=None) -> bool:
             ok = all(_glyph_lit(rc) for rc in bcells)
         if not ok:
             return False
-        return all(truths[i] for i in seal.requires if i < len(truths))
+        return _seal_predicates_hold(seal, truths)
     if seal.mode == 'gone':
         # The legion gate: open only while NO live entity of a named kind
         # stands anywhere in the room. Like the brazier gate it reads the
@@ -2694,7 +2702,7 @@ def _seal_reads_true(room, seal, truths=(), rows=None, player=None) -> bool:
         for kind in seal.match:
             if any(e.alive for e in room._entity_by_kind.get(kind, ())):
                 return False
-        return all(truths[i] for i in seal.requires if i < len(truths))
+        return _seal_predicates_hold(seal, truths)
     if rows is None:
         rows = [_wla_floor_text(room, r) for r in range(room.rows)]
     # Row-agnostic on purpose: charwise edits do not shift rows, but `dd`,
@@ -2724,7 +2732,7 @@ def _seal_reads_true(room, seal, truths=(), rows=None, player=None) -> bool:
             ok = (want in have) if seal.mode == 'contains' else (have == want)
             if not ok:
                 return False
-    return all(truths[i] for i in seal.requires if i < len(truths))
+    return _seal_predicates_hold(seal, truths)
 
 
 def _seal_cells(room, seal) -> tuple:
@@ -2769,7 +2777,8 @@ def _seal_tick(room, player) -> list:
         truths.append(true_now)
         opened  = False
         closed  = False
-        for (r, c) in _seal_cells(room, seal):
+        cells = _seal_cells(room, seal)
+        for (r, c) in cells:
             if not (0 <= r < room.rows and 0 <= c < room.cols):
                 continue
             if true_now and room.cells[r][c] != CellType.FLOOR:
@@ -2787,7 +2796,7 @@ def _seal_tick(room, player) -> list:
                 room.cells[r][c] = CellType.WALL
                 closed = True
         if opened or closed:
-            _bolt_row = _seal_cells(room, seal)[0][0] if _seal_cells(room, seal) else -1
+            _bolt_row = cells[0][0] if cells else -1
             _bolt_visible = abs(_bolt_row - player.row) < 20
         if opened:
             if _bolt_visible:
@@ -2799,6 +2808,17 @@ def _seal_tick(room, player) -> list:
                 msgs.append(seal.closed_message or SEAL_CLOSED)
             else:
                 msgs.append(seal.closed_message_far or SEAL_CLOSED_FAR)
+        # A pure PREDICATE that carries a message and opens nothing is a HINT:
+        # while it reads true it says its piece ONCE per room, then is latched —
+        # the Beacon Tiers' too-cold nudge, which is `tiers burn AND the chain
+        # is still cold` (a forbids reading). Without the latch it would nag
+        # every single turn the condition held.
+        if (not cells and not _seal_unveils(room, seal) and not seal.fuels
+                and (seal.message or seal.message_far) and true_now
+                and id(seal) not in getattr(room, '_seal_hinted', ())):
+            room._seal_hinted = frozenset(getattr(room, '_seal_hinted', ())
+                                          ) | {id(seal)}
+            msgs.append(seal.message or seal.message_far)
         # The same condition can REVEAL: an unveils cell's DARKNESS — both the
         # veil on a carved wall and the fog over hidden floor — lifts the first
         # time the seal reads true, and stays lifted. ONE-WAY, like every
@@ -3289,18 +3309,15 @@ def _gauntlet_tick(room, player) -> list:
 
 
 def _indentation_sanctum_tick(room, player) -> list:
-    """The Indentation Sanctum bolts. Gallery bolts are the Alignment rule (a
-    noun seated at the plumb register, exact col, any floor row). The RITE
-    bolt calls the SAME `law_column` the `=` operator applies — every rite
-    row's text intact and standing exactly where the law reads — so the
-    solver and the judge can never drift. Row-agnostic via the rite's anchor
-    line, STATELESS + FINAL SEAL (the hardened-chassis pattern)."""
+    """The Indentation Sanctum RITE bolt and the final seal. The GALLERY
+    bolts are SEALS now (anyrow + `at` = the plumb register, declared in the
+    builder, driven by `_seal_tick`); what is left here is the rite, which
+    calls the SAME `law_column` the `=` operator applies — every rite row's
+    text intact and standing exactly where the law reads — so the solver and
+    the judge can never drift. Row-agnostic via the rite's anchor line,
+    STATELESS + FINAL SEAL (the hardened-chassis pattern)."""
     msgs = []
-    reg = room._is_register
     floor_rows = [_wla_floor_text(room, r) for r in range(room.rows)]
-
-    def seated(word):
-        return any(t[reg:reg + len(word)] == word for t in floor_rows)
 
     def rite_lawful():
         texts = room._is_rite_texts
@@ -3320,19 +3337,22 @@ def _indentation_sanctum_tick(room, player) -> list:
 
     gr = room.exit_pos[0]
     # Band the live bolts + final seal as stonework. Derived here rather than at
-    # build time because `gr` rides the rite's row shifts.
+    # build time because `gr` rides the rite's row shifts; the gallery bolts
+    # are seals, so _seal_tick bands them too — this set is the same shape.
     room.sealed_cells = {(gr, dc) for dc in room._is_bolts}
     room.sealed_cells.add(room.exit_pos)
-    conditions = (all(seated(w) for w in room._is_g1_words),
-                  all(seated(w) for w in room._is_g2_words),
+    conditions = (*(_seal_reads_true(room, s, rows=floor_rows)
+                   for s in (room.seals[0], room.seals[1])),
                   rite_lawful())
-    for ok, dc in zip(conditions, room._is_bolts):
-        is_open = room.cells[gr][dc] != CellType.WALL
-        if ok and not is_open:
-            room.cells[gr][dc] = CellType.FLOOR
-            msgs.append('The bay stands as the law reads — the bolt grinds back!')
-        elif not ok and is_open and (player.row, player.col) != (gr, dc):
-            room.cells[gr][dc] = CellType.WALL     # disturbed — the bolt re-bars
+    # Drive only the RITE bolt (the third) and the final seal: the gallery
+    # bolts belong to _seal_tick now.
+    rc = room._is_bolts[2]
+    is_open = room.cells[gr][rc] != CellType.WALL
+    if conditions[2] and not is_open:
+        room.cells[gr][rc] = CellType.FLOOR
+        msgs.append('The bay stands as the law reads — the bolt grinds back!')
+    elif not conditions[2] and is_open and (player.row, player.col) != (gr, rc):
+        room.cells[gr][rc] = CellType.WALL     # disturbed — the bolt re-bars
     er, ec = room.exit_pos
     seal_open = room.cells[er][ec] != CellType.WALL
     if all(conditions) and not seal_open:
@@ -3951,51 +3971,6 @@ def _clip_is_fire(clip) -> bool:
     moving the brazier, and p/P sets that light onto a cold brazier. Carrying a
     light is therefore a normal yank, not a special verb."""
     return bool(clip and clip.get('fire'))
-
-
-def _quartermaster_tick(room, player) -> list:
-    """The Beacon Tiers' doors — every cold brazier shows … embers; feed
-    each one a flame. STATELESS, hence undo-safe (the vault-tick principle):
-    everything is recomputed from the text each turn. Anchors are the stored
-    build coordinates (the Cipher Cell convention) — a self-inflicted dd or
-    linewise paste above them desyncs the doors until u.
-
-    Three door families:
-      chain bolts — bolt k stands open while braziers 0..k ALL burn
-        (cut the source and the hall darkens: copy, don't cut);
-      embers      — every unlit brazier shows … (kind='pedestal'), laid/swept
-        here so a paste's open_gap can only shove them aside for one turn and
-        lighting one reads as embers → flame;
-      the seal    — on the LAST row, with the exit at the row's far end, so
-        every line jump (G/{n}G/H/M/L lands on a first non-blank) arrives
-        WEST of it; draws open while the beacon burns in three tiers
-        (yy + paste ×2) AND the whole depot chain burns.
-    """
-    msgs = []
-    braziers = getattr(room, 'braziers', ())
-    if not braziers:
-        return msgs
-    _chain_cells = (_dg._QM_SOURCE, _dg._QM_PED1)
-
-    def lit(r, c):
-        if not (0 <= r < room.rows and 0 <= c < room.cols):
-            return False
-        ru = room.char_run_at(r, c)
-        return ru is not None and ru.symbols[c - ru.col] == _dg._QM_FLAME
-
-    # The chain doors and the tiered seal are BOLTS now — declared in the
-    # builder as braziers-mode seals (chain-prefix regions; the seal reads
-    # the three-tier block and requires bolt B, which is the whole chain).
-    # This tick keeps only the embers dressing and the one-shot nudge.
-    _tier_cells = [rc for rc in braziers
-                    if rc[0] == _dg._QM_BRAZIER_ROW]
-    _tiers_lit = all(lit(r, c) for r, c in _tier_cells)
-    if (_tiers_lit and not all(lit(r, c) for r, c in _chain_cells)
-            and not getattr(room, '_qm_tier_hinted', False)):
-        room._qm_tier_hinted = True
-        msgs.append('The seal seems to be melting, but needs more heat! '
-                    'Alas, there are no more braziers...')
-    return list(dict.fromkeys(msgs))
 
 
 def _spawn_goblin(room, row, col, summoner_uid: int = 0) -> Entity | None:
@@ -5414,9 +5389,6 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
             _push(_m)
         for _m in _seal_tick(room, player):
             _push(_m)
-        if level == 'quartermaster':
-            for _m in _quartermaster_tick(room, player):
-                _push(_m)
         if level == 'warden_manifold':
             for _m in _warden_manifold_tick(room, player, budget.spent):
                 _push(_m)

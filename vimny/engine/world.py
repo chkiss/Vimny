@@ -88,7 +88,8 @@ class Seal:
     `u` re-shuts a door instead of leaving a level permanently solved by an edit
     the player took back.
 
-    Four axes, which between them are everything the seven were doing:
+    The axes described below, which between them are everything the seven were
+    doing:
 
     `scope` — WHERE to read. `region` reads one rectangle of the buffer, which is
     what an author who selected a strip and typed a password means. `anyrow`
@@ -115,6 +116,11 @@ class Seal:
     and a non-empty `requires` is pure conjunction; a seal with empty `opens` is
     a pure predicate that other seals can name.
 
+    `forbids` — `requires`' mirror: indices of EARLIER seals that must read
+    FALSE. The one conjunction no level could say before this: "open while
+    that bolt is still SHUT" — the Beacon Tiers' too-cold nudge is
+    `tiers-burn AND NOT chain`. Same earlier-only rule, same one pass.
+
     `anchor` — where `opens` really is. `''` means the coordinates are literal.
     `'exit_row'` replaces the ROW of every opened cell with the room's live
     `exit_pos[0]`, because `J` and `dd` slide everything below a cut upwards and
@@ -129,6 +135,10 @@ class Seal:
     mode:     str   = 'exact'
     scope:    str   = 'region'
     requires: tuple = ()    # indices of earlier seals that must also read true
+    forbids:  tuple = ()    # indices of earlier seals that must read FALSE
+                            # (`requires`' mirror — a door held open while the
+                            # named seals are shut, the negation a level could
+                            # not say: the Beacon Tiers' too-cold nudge)
     anchor:   str   = ''    # '' | 'exit_row'
     message:  str   = ''    # the banner when it opens (visible); '' → SEAL_OPENED
     message_far: str = ''   # ...when it opens (off-screen); '' → SEAL_OPENED_FAR
@@ -174,6 +184,7 @@ class Seal:
                            tuple(tuple(c) for c in self.unveils))
         object.__setattr__(self, 'fuels', tuple(tuple(c) for c in self.fuels))
         object.__setattr__(self, 'requires', tuple(int(i) for i in self.requires))
+        object.__setattr__(self, 'forbids', tuple(int(i) for i in self.forbids))
 
 def gate_row_seals(doors, exit_pos, *, mode: str = 'exact',
                    head: int = -1,
