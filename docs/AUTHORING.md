@@ -400,6 +400,54 @@ rectangle would be undone by the first line the player removed above it. With
 half-cleared row read false); with `"contains"` the words merely have to appear
 on some row. An `anyrow` seal takes no `region`.
 
+#### Reading one run exactly
+
+```json
+{"scope": "run", "run": 3, "match": "the scribe remembers every debt",
+ "anchor": "run_end", "opens": [7, 40]}
+```
+
+`"scope": "run"` reads the buffer's **k-th run** — the k-th contiguous block
+of non-blank rows counting from the top, `"run"` being zero-based. It demands
+the run's whole text read exactly and in order (`"mode"` must be `"exact"`
+and there is no `region`), so a chamber whose law is "all of those lines must
+still stand, line for line" is one seal. The index re-derives from the live
+buffer every turn — cut or join rows above it and the same seal still names
+that chamber — and `"anchor": "run_end"` sets the door in the stone band just
+beneath that run rather than at the exit, which is the Hall of Echoes' rule:
+each chamber gated at its own bottom edge.
+
+#### A sigil of entities
+
+```json
+{"mode": "shape", "kind": "brazier",
+ "match": [[0, 0], [1, -1], [1, 1], [2, -2], [2, 0], [2, 2]],
+ "opens": [6, 40]}
+```
+
+`"mode": "shape"` reads no text at all. It lays the **live entities of
+`"kind"`** out as a template: `match` is a list of `[row, col]` offsets from
+the template's top-left-most member, and the seal reads true only while the
+standing entities land on exactly those offsets and nothing else. The first
+offset must be `[0, 0]` — the crown, which anchors the whole template. This is
+how the Paragraph Enclosure's six-flames sigil is said as data: six braziers
+at six offsets, no flame extra, no flame missing. `region` is refused here —
+the sigil is shapeless, the room is the page.
+
+#### Asking for an extinction
+
+```json
+{"mode": "gone", "match": "goblin", "opens": [13, 22]}
+```
+
+`"mode": "gone"`, sibling of `shape`, reads true while **no live entity of any
+kind it names** stands anywhere in the room. `match` is a list of kind names,
+killed kind by kind, and it recomputes every turn — so `u` revives the patrol
+and re-bars the door. Where `shape` demands a layout, `gone` demands an
+absence. If the thing the player must preserve is a run's rows as well, give
+the chamber two seals — a `gone` and a `scope: "run"` — and `requires` the
+second on the first, or list both in a final seal.
+
 #### A seal that waits for other seals
 
 ```json
@@ -420,7 +468,11 @@ can be cut or joined need it, or the gate is left behind on the row it was built
 on while the exit slides away.
 
 Seventeen shipped levels are built out of exactly these four pieces — see
-`world.gate_row_seals`, which is the whole chassis in nine lines.
+`world.gate_row_seals`, which is the whole chassis in nine lines. The `run`
+scope and the `shape`/`gone` modes above are the vocabulary's later additions:
+they retired the last two bespoke content ticks, and the levels that use them
+(the Hall of Echoes' chambers, the Paragraph Enclosure's sigil) ride the file
+format just like the seventeen.
 
 Two things a seal deliberately will not do. It **only reads walkable stone** —
 text written in wall cells never counts, which is what lets you set the password

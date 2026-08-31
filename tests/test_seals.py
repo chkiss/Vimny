@@ -524,3 +524,164 @@ def test_a_message_predicate_hints_once_per_room():
     _write(room, 1, 'ash')                         # ...and true again
     assert not any('still cold' in m
                    for m in _tick(room)), 'one-shot per ROOM, not per truth'
+
+
+# ── scope: run — a gauntlet chamber is a RUN of non-blank rows ──────────────
+
+def test_a_run_seal_reads_the_kth_run_strip_exact():
+    """A `scope="run"` seal reads the buffer's k-th contiguous block of
+    non-blank rows and demands it read as the exact whole self, in order —
+    the gauntlet law: chambers are the SPLITS, and which run is which moves
+    with every cut and join."""
+    texts = [(1, 'a'), (2, 'b'), (3, ''), (4, 'c')]
+    seal = Seal(scope='run', run=0, match=('a', 'b'), opens=((3, 10),))
+    room = _room([seal], texts=texts)
+    _tick(room)
+    assert room.cells[3][10] == CellType.FLOOR
+    _write(room, 2, 'wrong')                       # the chamber misreads —
+    _tick(room)
+    assert room.cells[3][10] == CellType.WALL      # ...the gate re-bars
+
+
+def test_a_run_seal_reads_the_second_run_when_rows_slide():
+    """The run INDEX re-derives as rows shift: a `J` that collapses the split —
+    or a blank row that opens a new one — hands run k to a different block,
+    and the seal follows it, because its law is the split, not the row."""
+    texts = [(1, 'one'), (3, 'two'), (4, 'three')]
+    seal = Seal(scope='run', run=1, match=('two', 'three'), opens=((3, 10),))
+    room = _room([seal], texts=texts)              # run 1 = rows 3..4
+    _tick(room)
+    assert room.cells[3][10] == CellType.FLOOR
+    _write(room, 2, 'between')                     # run 1 now = rows 2..4
+    _tick(room)
+    assert room.cells[3][10] == CellType.WALL      # a shifted chamber is not it
+    _write(room, 2, '')                            # split restored
+    _tick(room)
+    assert room.cells[3][10] == CellType.FLOOR
+
+
+def test_a_run_seal_swallowed_run_reads_false():
+    """A chamber whose run was deleted, or whose run count fell short of the
+    index, has no k-th run — read false, never crashed, gate stays barred."""
+    seal = Seal(scope='run', run=2, match=('x',), opens=((3, 10),))
+    room = _room([seal], texts=[(1, 'a'), (3, 'b')])   # only two runs
+    _tick(room)
+    assert room.cells[3][10] == CellType.WALL
+
+
+def test_run_end_anchor_belts_the_gate_below_the_live_run():
+    """`anchor="run_end"` puts the door on the row just below the seal's OWN
+    run — the stone band beneath it, FOUND LIVE rather than named, so the belt
+    travels as the run grows and shrinks. A stale band is not re-sealed; it
+    is simply no longer the gate, and the true end carries the seal."""
+    texts = [(1, 'a'), (2, 'b')]                   # run 0 = rows 1..2
+    seal = Seal(scope='run', run=0, match=('a', 'b'), anchor='run_end',
+                opens=((0, 10),))
+    room = _room([seal], texts=texts)
+    _tick(room)
+    assert room.cells[3][10] == CellType.FLOOR     # the band right beneath the run
+    _write(room, 3, 'z')                           # the run GROWS a row
+    _tick(room)
+    assert room.cells[4][10] == CellType.WALL, "the belt rode DOWN to the run's end"
+    _write(room, 3, '')                            # the run shrinks again
+    _tick(room)
+    assert room.cells[3][10] == CellType.FLOOR     # ...and the belt came back with it
+
+
+def test_a_run_seal_keeps_the_earlier_only_and_needs_exact_mode():
+    with pytest.raises(F.LevelFormatError, match='scope="run" seal needs'):
+        F._parse_seal({'scope': 'run', 'match': ['a']}, 0)
+    with pytest.raises(F.LevelFormatError, match='needs scope="run"'):
+        F._parse_seal({'scope': 'anyrow', 'run': 0, 'match': ['a']}, 0)
+    with pytest.raises(F.LevelFormatError, match='mode="exact"'):
+        F._parse_seal({'scope': 'run', 'run': 0, 'mode': 'contains',
+                       'match': ['a']}, 0)
+    with pytest.raises(F.LevelFormatError, match='needs scope="run"'):
+        F._parse_seal({'scope': 'region', 'match': ['a'], 'region': [1, 1, 2, 2],
+                       'anchor': 'run_end'}, 0)
+
+
+def test_a_run_seal_round_trips_through_the_file():
+    lvl = F.parse({
+        'schema': 1, 'name': 'n', 'seed': 1,
+        'geometry': {'rows': 4, 'cols': 8,
+                     'cells': ['WWWWWWWW', 'WWWWWWWW', 'WFFFW' + 'WWW',
+                               'WWWWWWWW'],
+                     'spawn': [2, 1], 'exit': [2, 4]},
+        'seals': [{'scope': 'run', 'run': 1, 'match': ['two', 'three'],
+                   'anchor': 'run_end', 'opens': [2, 5]}],
+    })
+    room = F.build(lvl).rooms[0]
+    assert room.seals[0].run == 1 and room.seals[0].anchor == 'run_end'
+    lvl2 = F.loads(F.dumps(lvl))
+    assert lvl2.seals[0].run == 1
+    assert lvl2.seals[0].match == ('two', 'three')
+    assert lvl2.seals[0].anchor == 'run_end'
+
+
+# ── mode: shape — a sigil of entity flames ───────────────────────────────────
+
+def _braziers(room, *cells):
+    from vimny.engine.world import Entity
+    for rc in cells:
+        room.add_entity(Entity(kind='brazier', row=rc[0], col=rc[1],
+                               hp=1, max_hp=1, lit=True))
+
+
+def test_a_shape_seal_reads_an_entity_shape_from_the_crown():
+    """The SIGIL law: the live entities of `kind` must stand EXACTLY at the
+    template's offsets from the crown (their top-left-most). All of them, at
+    once — six of the six, nothing standing extra."""
+    seal = Seal(mode='shape', match=((0, 0), (1, -1), (1, 1)))
+    room = _room([seal], texts=[])
+    _braziers(room, (2, 5), (3, 4), (3, 6))
+    _tick(room)                            # no opens — a pure predicate
+    assert main._seal_reads_true(room, room.seals[0])
+
+
+def test_a_shape_seal_extra_or_fewer_flames_reads_false():
+    """The whole six: a shape with a flame standing extra, or one missing, is
+    not the sign. The crown follows the top-left-most live flame, so a wrong
+    row that shifts the geometry AND the anchor reads false."""
+    seal = Seal(mode='shape', match=((0, 0), (1, -1), (1, 1)))
+
+    room = _room([seal], texts=[])
+    _braziers(room, (2, 5), (3, 5), (4, 5))          # one column, not the pyramid
+    assert not main._seal_reads_true(room, seal)
+
+    room = _room([seal], texts=[])
+    _braziers(room, (2, 5), (3, 4), (3, 6), (5, 9))  # a stray flame outside the sign
+    assert not main._seal_reads_true(room, seal)
+
+    room = _room([seal], texts=[])
+    _braziers(room, (2, 5), (3, 4))                  # a missing flame
+    assert not main._seal_reads_true(room, seal)
+
+
+def test_a_shape_seal_round_trips_kind_and_offsets():
+    lvl = F.parse({
+        'schema': 1, 'name': 'n', 'seed': 1,
+        'geometry': {'rows': 4, 'cols': 8,
+                     'cells': ['WWWWWWWW', 'WWWWWWWW', 'WFFFW' + 'WWW',
+                               'WWWWWWWW'],
+                     'spawn': [2, 1], 'exit': [2, 4]},
+        'seals': [{'mode': 'shape', 'kind': 'brazier',
+                   'match': [[0, 0], [1, -1], [1, 1], [2, -2], [2, 0], [2, 2]]}],
+    })
+    room = F.build(lvl).rooms[0]
+    assert room.seals[0].mode == 'shape'
+    assert room.seals[0].match == ((0, 0), (1, -1), (1, 1), (2, -2), (2, 0), (2, 2))
+    lvl2 = F.loads(F.dumps(lvl))
+    assert lvl2.seals[0].kind == 'brazier'
+    assert lvl2.seals[0].match == ((0, 0), (1, -1), (1, 1), (2, -2), (2, 0), (2, 2))
+
+
+def test_a_shape_seal_needs_the_crown_and_reads_whole_rooms():
+    with pytest.raises(F.LevelFormatError, match='crown'):
+        F._parse_seal({'mode': 'shape', 'match': [[1, 0], [2, 1]]}, 0)
+    with pytest.raises(F.LevelFormatError, match='whole room'):
+        F._parse_seal({'mode': 'shape', 'region': [1, 1, 2, 2],
+                       'match': [[0, 0]]}, 0)
+    with pytest.raises(F.LevelFormatError, match='only a mode="shape"'):
+        F._parse_seal({'match': ['x'], 'region': [1, 1, 2, 2],
+                       'kind': 'brazier'}, 0)

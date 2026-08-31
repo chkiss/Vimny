@@ -116,9 +116,9 @@ class Room:
     buys a level anybody has wanted to write.
 
     ROOM, not "chamber" and not "hall". A CHAMBER is a part of one map joined
-    to the rest of it by a hallway or a door — what `main._hall_of_echoes_tick`
-    calls its segments, all of them inside a single grid you can walk across.
-    These are not that: each one is its own grid, and they are what
+    to the rest of it by a hallway or a door — what the Hall of Echoes' run
+    seals call their segments, all of them inside a single grid you can walk
+    across. These are not that: each one is its own grid, and they are what
     `dungeon.rooms` already holds, so "room" is the word the engine was using
     for them all along. ("Hall" is worse than either: six shipped levels are
     NAMED Halls and one of them is a slug.)
@@ -324,8 +324,8 @@ def _parse_fill(f: dict, i: int, at: str = 'fill') -> Fill:
                 kind=str(f.get('kind', 'ancient')))
 
 
-_SEAL_MODES  = ('exact', 'contains', 'braziers', 'gone', 'zone', 'lines')
-_SEAL_SCOPES = ('region', 'anyrow')
+_SEAL_MODES  = ('exact', 'contains', 'braziers', 'gone', 'zone', 'lines', 'shape')
+_SEAL_SCOPES = ('region', 'anyrow', 'run')
 
 
 def _parse_seal(s: dict, i: int, at: str = 'seals') -> Seal:
@@ -340,7 +340,7 @@ def _parse_seal(s: dict, i: int, at: str = 'seals') -> Seal:
         raise LevelFormatError(f'{at}[{i}]: must be an object')
     unknown = set(s) - {'region', 'match', 'opens', 'unveils', 'fuels', 'mode',
                         'scope', 'requires', 'forbids', 'anchor', 'head', 'at',
-                        'row_offset', 'message', 'message_far',
+                        'row_offset', 'run', 'kind', 'message', 'message_far',
                         'closed_message', 'closed_message_far'}
     if unknown:
         raise LevelFormatError(f'{at}[{i}]: unknown key(s) {sorted(unknown)}')
@@ -392,6 +392,31 @@ def _parse_seal(s: dict, i: int, at: str = 'seals') -> Seal:
                                    f'[r1, c1, r2, c2] naming where the player stands')
         region = tuple(int(x) for x in region)
         match = []
+    elif mode == 'shape':
+        # The SIGIL gate: an ENTITY layout. `match` is a template of [dr, dc]
+        # offsets read against the live entities of `kind`, so a shape seal's
+        # `match` is geometry, not text — [[0, 0], [1, -1], ...] naming where
+        # each flame stands relative to the crown (the top-left-most of the
+        # live entities). Reads the whole room: refuse a `region`.
+        if not (isinstance(match, (list, tuple)) and all(
+                isinstance(off, (list, tuple)) and len(off) == 2
+                and all(isinstance(x, int) and not isinstance(x, bool)
+                        for x in off) for off in match)):
+            raise LevelFormatError(f'{at}[{i}].match: a mode="shape" seal is a '
+                                   f'template of [dr, dc] offsets, e.g. '
+                                   f'[[0, 0], [1, -1], [1, 1]]')
+        if region is not None:
+            raise LevelFormatError(f'{at}[{i}].region: a mode="shape" seal reads '
+                                   f'the whole room — leave `region` empty')
+        shape = tuple(tuple(int(x) for x in off) for off in match)
+        if (0, 0) not in shape:
+            # The crown anchors the reading. A sign with no crown would have no
+            # fixed point to normalize against, and a shape that cannot be
+            # anchored always reads false — refused rather than mysteriously dead.
+            raise LevelFormatError(f'{at}[{i}].match: a mode="shape" seal must '
+                                   f'include the crown offset (0, 0)')
+        match = shape
+        region = ()
     elif mode == 'gone':
         # A `gone` seal reads no TEXT either: its `match` names ENTITY KINDS,
         # and it stands open while no live entity of any named kind remains —
@@ -410,6 +435,12 @@ def _parse_seal(s: dict, i: int, at: str = 'seals') -> Seal:
         if not (isinstance(region, (list, tuple)) and len(region) == 4):
             raise LevelFormatError(f'{at}[{i}].region: must be [r1, c1, r2, c2]')
         region = tuple(int(x) for x in region)
+    elif scope == 'run':
+        if region is not None:
+            raise LevelFormatError(f'{at}[{i}].region: a scope="run" seal reads '
+                                   f'the buffer\'s whole runs — leave `region` '
+                                   f'empty')
+        region = ()
     elif region:
         raise LevelFormatError(
             f'{at}[{i}].region: this seal reads no region — '
@@ -418,11 +449,22 @@ def _parse_seal(s: dict, i: int, at: str = 'seals') -> Seal:
                'a seal with no `match` reads only the seals it requires'))
     else:
         region = ()
-    if not isinstance(match, (list, tuple)) or not all(
-            isinstance(m, str) and m.strip() for m in match):
+    # `kind` names the entities a shape seal reads. Only shape uses it (the
+    # other entity modes carry their kinds in `match`); a kind on a text seal
+    # would be a promise about entities a text seal never reads.
+    kind_given = s.get('kind')
+    if mode != 'shape' and kind_given is not None:
+        raise LevelFormatError(f'{at}[{i}].kind: only a mode="shape" seal reads '
+                               f'entities by kind — leave `kind` empty')
+    kind = str(kind_given) if kind_given is not None else 'brazier'
+    if not kind.strip():
+        raise LevelFormatError(f'{at}[{i}].kind: must name the entity kind the '
+                               f'shape reads, e.g. "brazier"')
+    if mode != 'shape' and (not isinstance(match, (list, tuple)) or not all(
+            isinstance(m, str) and m.strip() for m in match)):
         raise LevelFormatError(f'{at}[{i}].match: must be the text the seal has '
                                f'to read, or a list of texts, none of them empty')
-    if any(len(m) > MAX_SEAL_MATCH for m in match):
+    if mode != 'shape' and any(len(m) > MAX_SEAL_MATCH for m in match):
         raise LevelFormatError(f'{at}[{i}].match: at most {MAX_SEAL_MATCH} characters')
     requires = s.get('requires', [])
     if not isinstance(requires, (list, tuple)) or not all(
@@ -452,9 +494,31 @@ def _parse_seal(s: dict, i: int, at: str = 'seals') -> Seal:
                                f'`match`, or `requires`/`forbids` naming '
                                f'earlier seals')
     anchor = str(s.get('anchor', ''))
-    if anchor not in ('', 'exit_row'):
-        raise LevelFormatError(f'{at}[{i}].anchor: must be "" or "exit_row", '
-                               f'got {anchor!r}')
+    if anchor not in ('', 'exit_row', 'run_end'):
+        raise LevelFormatError(f'{at}[{i}].anchor: must be "", "exit_row" or '
+                               f'"run_end", got {anchor!r}')
+    if anchor == 'run_end' and scope != 'run':
+        raise LevelFormatError(f'{at}[{i}].anchor: "run_end" rides a seal\'s '
+                               f'own run — needs scope="run"')
+    # `run` — scope='run' only: WHICH run of the buffer this seal reads.
+    # Runs are the contiguous blocks of non-blank rows, split by blank rows,
+    # re-derived live: run 0 is the first block, run 1 the second, and so on.
+    run = s.get('run', -1)
+    if run is None:
+        run = -1
+    if not isinstance(run, int) or isinstance(run, bool) or run < -1:
+        raise LevelFormatError(f'{at}[{i}].run: must be an integer naming the '
+                               f'run to read (0 = the first), or -1 for none')
+    if run >= 0 and scope != 'run':
+        raise LevelFormatError(f'{at}[{i}].run: names a run the seal does not '
+                               f'read — needs scope="run"')
+    if scope == 'run':
+        if run < 0:
+            raise LevelFormatError(f'{at}[{i}].run: a scope="run" seal needs '
+                                   f'`run` (0 = the first run of non-blank rows)')
+        if mode != 'exact':
+            raise LevelFormatError(f'{at}[{i}].mode: a scope="run" seal needs '
+                                   f'mode="exact" — a run reads as its whole self')
     # `head` is the left-align law made declarative: under anyrow scope, a
     # matched row's first glyph must sit exactly at this column. It names a
     # MARGIN, and only the row reader has one — the region reader strips each
@@ -483,10 +547,11 @@ def _parse_seal(s: dict, i: int, at: str = 'seals') -> Seal:
     if pin >= 0 and head >= 0:
         raise LevelFormatError(f'{at}[{i}].at: a seal may name a margin '
                                f'(`head`) or a pin (`at`), not both')
-    if pin >= 0 and scope != 'anyrow':
-        raise LevelFormatError(f'{at}[{i}].at: needs scope="anyrow" — a region '
-                               f'seal reads its rectangle as one collapsed '
-                               f'page, with no columns left to pin')
+    if pin >= 0 and scope not in ('anyrow', 'run'):
+        raise LevelFormatError(f'{at}[{i}].at: needs scope="anyrow" or '
+                               f'scope="run" — a region seal reads its '
+                               f'rectangle as one collapsed page, with no '
+                               f'columns left to pin')
     # `row_offset` pins the TARGET ROW relative to the first content row: the
     # target stands at (anchor_row + row_offset), column `at`.  Only meaningful
     # with scope='anyrow', mode='exact', and a pin (`at`): a region seal strips
@@ -583,7 +648,7 @@ def _parse_seal(s: dict, i: int, at: str = 'seals') -> Seal:
                 closed_message=cmsg, closed_message_far=cmsg_far,
                 scope=scope, requires=tuple(requires), anchor=anchor,
                 head=head, at=pin, row_offset=row_offset,
-                forbids=tuple(forbids))
+                run=run, kind=kind, forbids=tuple(forbids))
 
 
 def _parse_cells_list(pairs, at: str, what: str) -> list:
@@ -1387,7 +1452,10 @@ def _dump_content(h: Room) -> dict:
             if s.region:
                 d['region'] = list(s.region)
             if s.match:
-                d['match'] = s.match[0] if len(s.match) == 1 else list(s.match)
+                if s.mode == 'shape':
+                    d['match'] = [list(off) for off in s.match]
+                else:
+                    d['match'] = s.match[0] if len(s.match) == 1 else list(s.match)
             if s.scope != 'region':
                 d['scope'] = s.scope
             if s.requires:
@@ -1400,6 +1468,10 @@ def _dump_content(h: Room) -> dict:
                 d['head'] = s.head
             if s.at >= 0:
                 d['at'] = s.at
+            if getattr(s, 'run', -1) >= 0:
+                d['run'] = s.run
+            if getattr(s, 'kind', 'brazier') != 'brazier':
+                d['kind'] = s.kind
             out.append(d)
         data['seals'] = out
     if h.char_runs:

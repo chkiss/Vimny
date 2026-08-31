@@ -5618,7 +5618,7 @@ def build_dungeon_paragraph_enclosure(seed: int) -> Dungeon:
     """The Paragraph Enclosure (slug `paragraph_enclosure`): ip ap — the
     blank-row-bounded block under your hand, from anywhere inside it."""
     from vimny.engine.editor import _CELL_CODE
-    from vimny.sharing.format import Level as _Level, build as _fmt_build
+    from vimny.sharing.format import Level as _Level, _parse_seal, build as _fmt_build
     rng = random.Random(seed)
     words = _pe_draw_words(rng)
 
@@ -5673,10 +5673,30 @@ def build_dungeon_paragraph_enclosure(seed: int) -> Dungeon:
         cells=[''.join(_CELL_CODE[c] for c in row) for row in grid],
         spawn=_PE_SPAWN, exit=_PE_EXIT,
         char_runs=runs, entities=entities,
-        solution='j dip j dap $')
+        solution='j dip j dap $',
+        seals=[
+            # The WARDEN'S SIGIL (shape, index 0) — a pure predicate, no door:
+            # the six flames must stand as the sign. Reads the LIVE brazier
+            # entities, anchored at the crown (their top-left-most), so a cut
+            # that shears a wrong row extinguishes ITS flames AND shifts the
+            # survivors — a sign is the whole six, not the survivors' subset.
+            _parse_seal({'mode': 'shape',
+                         'match': [list(t) for t in _PE_SIGIL]}, 0),
+            # The LEGION (gone, index 1): no goblin draws breath. The sigil is
+            # the survivors' sign over a fallen watch, so the exit waits on
+            # both.
+            _parse_seal({'mode': 'gone', 'match': ['goblin']}, 1),
+            # The final seal (index 2): the exit cell, stone until the sigil
+            # stands AND the legion is gone. Its ROW rides `exit_row` — the
+            # hall collapses to three rows under the cuts, and the gate
+            # travels down with the exit instead of being left 25 rows away.
+            _parse_seal({'requires': [0, 1], 'anchor': 'exit_row',
+                         'opens': [[0, _PE_EXIT[1]]],
+                         'message': 'The legion is fallen and the six flames '
+                                    'stand as one sign — the seal parts!'}, 2),
+        ])
 
     dungeon = _fmt_build(level, par=_PE_PAR)
-    dungeon.rooms[0]._pe_words = words
     return dungeon
 
 
@@ -6208,8 +6228,37 @@ def _he_gauntlet_map(chambers, seed) -> 'Dungeon':
     first run (top of the map); a chamber's plaques (the Echo Vault's true
     readings) sit wall-embedded in the stone band directly above its run."""
     from vimny.engine.editor import _CELL_CODE
-    from vimny.sharing.format import Level as _Level, build as _fmt_build
-    chain = tuple((ch['done'], None, ch.get('combat', False)) for ch in chambers)
+    from vimny.sharing.format import Level as _Level, _parse_seal, build as _fmt_build
+    # One seal per chamber. The text chambers are RUN seals: the k-th run of
+    # the buffer must read as that chamber's done verses (strip-exact, in
+    # order) — chambers are runs, and the RUN INDEX is the one that survives
+    # cuts and joins, which is exactly what the gauntlet is testing. Each
+    # text chamber's run-end band carries its west gate. The Goblin Lair is
+    # the LAST chamber: it owns no band, and its truth has two parts — the
+    # lair run must still stand ('lair') AND no goblin may draw breath (the
+    # whole-room `gone` law; the lair is the only goblin chamber, so it is
+    # the same verdict as the row-scoped one the tick used). The final seal
+    # waits on every chamber, in order, and floors the exit cell.
+    seals = []
+    for k, ch in enumerate(chambers):
+        if ch.get('combat'):
+            seals.append(_parse_seal({'mode': 'gone',
+                                      'match': ['goblin']}, len(seals)))
+            seals.append(_parse_seal({'scope': 'run', 'run': k,
+                                      'match': list(ch['done'])}, len(seals)))
+        else:
+            seals.append(_parse_seal({'scope': 'run', 'run': k,
+                                      'match': list(ch['done']),
+                                      'anchor': 'run_end',
+                                      'opens': [[0, _HE_GATE_COL]],
+                                      'message': 'The chamber rings true — the '
+                                                 'way south grinds open!'}, len(seals)))
+    final = len(seals)
+    seals.append(_parse_seal({'requires': list(range(final)),
+                              'anchor': 'exit_row',
+                              'opens': [[0, _HE_GATE_COL]],
+                              'message': 'Every hall rings true — the last seal '
+                                         'parts!'}, final))
     ROWS = 2 + sum(len(ch['rows']) for ch in chambers) + len(chambers)
     C = _HE_COLS
     grid = [[CellType.WALL] * C for _ in range(ROWS)]
@@ -6248,11 +6297,11 @@ def _he_gauntlet_map(chambers, seed) -> 'Dungeon':
         exit=(ROWS - 1, _HE_GATE_COL),              # in the last band
         char_runs=runs,
         entities=ents + [{'kind': 'exit',
-                          'at': [ROWS - 1, _HE_GATE_COL], 'edit_immune': True}])
+                          'at': [ROWS - 1, _HE_GATE_COL], 'edit_immune': True}],
+        seals=seals)
 
     dungeon = _fmt_build(level)
     room = dungeon.rooms[0]
-    room._heg_chain = chain
     room._he_poem  = chambers[0].get('poem')        # the poem hall's rhyme name
     room.answer = ' '.join(ch['tape'] for ch in chambers)
     return dungeon

@@ -2640,6 +2640,33 @@ def _braziers_in(room, region) -> list:
             and r1 <= e.row <= r2 and c1 <= e.col <= c2]
 
 
+def _seal_run(room, seal):
+    """The buffer's seal.run-th run of non-blank rows, as `(row, text)` pairs —
+    or None when the buffer has fewer runs than the seal asks for.
+
+    Runs are the contiguous blocks of non-blank rows, split by blank rows,
+    derived from the live buffer every call. A run INDEX never hardcodes rows:
+    `dd`/`J` move lines up and `o` inserts them, and the chambers shift with
+    them. If a run was split or swallowed, the k-th run is a different thing
+    than the seal expects and reads false — which is the GAUNTLET law that the
+    runs must answer in order as each whole self."""
+    k = seal.run
+    n = 0
+    cur = []
+    for r in range(room.rows):
+        t = _wla_floor_text(room, r)
+        if t.strip():
+            cur.append((r, t))
+        elif cur:
+            if n == k:
+                return cur
+            n += 1
+            cur = []
+    if cur and n == k:
+        return cur
+    return None
+
+
 def _seal_predicates_hold(seal, truths) -> bool:
     """The one-pass conjunction a seal names: every `requires` seal reads true
     and every `forbids` seal reads false. Both axes name EARLIER seals only, so
@@ -2703,6 +2730,39 @@ def _seal_reads_true(room, seal, truths=(), rows=None, player=None) -> bool:
             if any(e.alive for e in room._entity_by_kind.get(kind, ())):
                 return False
         return _seal_predicates_hold(seal, truths)
+    if seal.mode == 'shape':
+        # The SIGIL gate: an entity SHAPE. `match` is a template of (dr, dc)
+        # offsets; the live entities of `kind` must stand EXACTLY at those
+        # offsets from the crown (their top-left-most member, the alphabetical
+        # minimum — the Warden Sigil's single top flame). The whole-set law is
+        # the point: six of the six, nothing standing extra, or the sign is
+        # not the sign. Reading the ENTITY layer (a cut removes the row's
+        # flames) and recomputed each turn, so `u` resurrecting a cut row
+        # restores the shape and the bolt un-bars.
+        live = sorted((e.row, e.col)
+                      for e in room._entity_by_kind.get(seal.kind, ()) if e.alive)
+        if len(live) != len(seal.match):
+            return False
+        r0, c0 = live[0]
+        if {(r - r0, c - c0) for r, c in live} != set(seal.match):
+            return False
+        return _seal_predicates_hold(seal, truths)
+    if seal.scope == 'run':
+        # The GAUNTLET gate: the buffer's k-th run of non-blank rows must read
+        # as the seal's exact whole self AND (when `at` is set) every line's
+        # first glyph must stand at that column. `_seal_run` re-derives the
+        # run each turn, so `dd`, `J`, `o` and `p` slide the chambers around
+        # without ever stranding a gate — and a chamber whose run was split or
+        # swallowed simply no longer has a k-th run, read false, stays barred.
+        run = _seal_run(room, seal)
+        if run is None:
+            return False
+        if tuple(t.strip() for _r, t in run) != tuple(seal.match):
+            return False
+        if seal.at >= 0 and not all(
+                len(t) - len(t.lstrip()) == seal.at for _r, t in run):
+            return False
+        return _seal_predicates_hold(seal, truths)
     if rows is None:
         rows = [_wla_floor_text(room, r) for r in range(room.rows)]
     # Row-agnostic on purpose: charwise edits do not shift rows, but `dd`,
@@ -2739,14 +2799,25 @@ def _seal_cells(room, seal) -> tuple:
     """Where a seal's door actually IS this turn — see `Seal.anchor`."""
     if seal.anchor == 'exit_row' and room.exit_pos:
         return tuple((room.exit_pos[0], c) for (_r, c) in seal.opens)
+    if seal.anchor == 'run_end':
+        run = _seal_run(room, seal)
+        if run is None:
+            return ()
+        return tuple((run[-1][0] + 1, c) for (_r, c) in seal.opens)
     return seal.opens
 
 
 def _seal_unveils(room, seal) -> tuple:
     """Where a seal's VEILS actually are this turn — same anchor law as the
-    door: `exit_row` rides the live exit row, else literal."""
+    door: `exit_row` rides the live exit row, `run_end` sits just below the
+    seal's own run, else literal."""
     if seal.anchor == 'exit_row' and room.exit_pos:
         return tuple((room.exit_pos[0], c) for (_r, c) in seal.unveils)
+    if seal.anchor == 'run_end':
+        run = _seal_run(room, seal)
+        if run is None:
+            return ()
+        return tuple((run[-1][0] + 1, c) for (_r, c) in seal.unveils)
     return seal.unveils
 
 
@@ -2981,112 +3052,6 @@ def _codex_feed(player, key):
         pane.search('', backward=True)
     elif k == ':':
         pane.cmd_input = ''
-
-
-def _hall_of_echoes_tick(room, player) -> list:
-    """The Hall of Echoes gauntlet — chambers are RUNS of text rows split by
-    stone bands. `room._heg_chain` holds one (done-texts, head-col) spec per
-    chamber, in map order; each intermediate band's west gate grinds open
-    while its chamber reads true, and the final seal (room.exit_pos)
-    demands EVERY chamber true. STATELESS + undo-aware; runs are re-derived
-    each tick, so J-collapses and dd-culls ride correctly (rows shift, the
-    bands shift with them)."""
-    chain = getattr(room, '_heg_chain', None)
-    if chain is None:
-        return []
-    msgs = []
-    runs, cur = [], []
-    for r in range(room.rows):
-        t = _wla_floor_text(room, r)
-        if t.strip():
-            cur.append((r, t))
-        elif cur:
-            runs.append(cur)
-            cur = []
-    if cur:
-        runs.append(cur)
-    oks = []
-    for k, spec in enumerate(chain):
-        texts, colreq = spec[0], spec[1]
-        combat = spec[2] if len(spec) > 2 else False
-        if k >= len(runs):
-            oks.append(False)
-            continue
-        if combat:
-            # the goblin lair reads true when every foe on its row is felled
-            rows_k = {r for r, _t in runs[k]}
-            ok = not any(e.alive and e.kind == 'goblin' and e.row in rows_k
-                         for e in room.entities)
-        else:
-            got = tuple(t.strip() for _r, t in runs[k])
-            ok = got == tuple(texts)
-            if ok and colreq is not None:
-                ok = all(len(t) - len(t.lstrip()) == colreq for _r, t in runs[k])
-        oks.append(ok)
-    gcol = _dg._HE_GATE_COL
-    # Band the live gates as stonework. Derived here, not at build: the bands
-    # ride the row shifts, so each gate row is re-read from the live runs.
-    room.sealed_cells = set()
-    for k in range(min(len(chain) - 1, len(runs))):    # intermediate gates
-        gr = runs[k][-1][0] + 1
-        if gr >= room.rows - 1:
-            continue
-        room.sealed_cells.add((gr, gcol))
-        is_open = room.cells[gr][gcol] != CellType.WALL
-        if oks[k] and not is_open:
-            room.cells[gr][gcol] = CellType.FLOOR
-            msgs.append('The chamber rings true — the way south grinds open!')
-        elif not oks[k] and is_open and (player.row, player.col) != (gr, gcol):
-            room.cells[gr][gcol] = CellType.WALL       # undone — it re-bars
-    er, ec = room.exit_pos
-    if not (0 <= er < room.rows):
-        return msgs                    # a mangled buffer — never crash the tick
-    room.sealed_cells.add((er, ec))                     # the final seal
-    all_ok = len(runs) == len(chain) and all(oks)
-    is_open = room.cells[er][ec] != CellType.WALL
-    if all_ok and not is_open:
-        room.cells[er][ec] = CellType.FLOOR
-        msgs.append('Every hall rings true — the last seal parts!')
-    elif not all_ok and is_open and (player.row, player.col) != (er, ec):
-        room.cells[er][ec] = CellType.WALL             # undone — it returns
-    return msgs
-
-
-def _paragraph_enclosure_tick(room, player) -> list:
-    """The Warden's Sigil — the Paragraph Enclosure's seal. Six brazier
-    flames ride the three rows that must survive (spawn row · the rest
-    between the cantos · the gate row); when exactly the right paragraphs
-    fall, the survivors stack into the sigil (▲ / ▲ ▲ / ▲ ▲ ▲) and the
-    seal parts, provided no goblin still stands. The win condition is
-    VISIBLE: a cut through a wrong row extinguishes its flames — the cut
-    itself succeeds (no un-Vim parrying), the hole in the sigil shows what
-    went wrong, and undo relights it. STATELESS + undo-aware (the seal
-    re-walls), the hardened-chassis pattern; entity rows shift with the
-    collapses, so the check is pure geometry on live positions."""
-    msgs = []
-    legion = any(e.alive for e in room._entity_by_kind.get('goblin', []))
-    flames = [e for e in room._entity_by_kind.get('brazier', []) if e.alive]
-    sigil = False
-    if len(flames) == 6:
-        tops = [e for e in flames if e.row == min(f.row for f in flames)]
-        if len(tops) == 1:
-            r0, c0 = tops[0].row, tops[0].col
-            from vimny.generation.dungeon_gen import _PE_SIGIL
-            sigil = ({(e.row, e.col) for e in flames}
-                     == {(r0 + dr, c0 + dc) for dr, dc in _PE_SIGIL})
-    all_true = sigil and not legion
-    er, ec = room.exit_pos
-    # Band the shut seal as stonework; derived here because exit_pos rides the
-    # paragraph collapses.
-    room.sealed_cells = {(er, ec)}
-    seal_open = room.cells[er][ec] != CellType.WALL
-    if all_true and not seal_open:
-        room.cells[er][ec] = CellType.FLOOR
-        msgs.append('The legion is fallen and the six flames stand as one '
-                    'sign — the seal parts!')
-    elif not all_true and seal_open and (player.row, player.col) != (er, ec):
-        room.cells[er][ec] = CellType.WALL         # undone — the seal returns
-    return msgs
 
 
 def _grandmasters_arena_tick(room, player) -> list:
@@ -5405,8 +5370,6 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
             for _m in _indentation_sanctum_tick(room, player):
                 _push(_m)
         if level == 'hall_of_echoes':
-            for _m in _hall_of_echoes_tick(room, player):  # per-room south seal
-                _push(_m)
             # Through an open seal: the gauntlet advances to the next chamber.
             if ((player.row, player.col) == tuple(room.exit_pos)
                     and dungeon.current_room < len(dungeon.rooms) - 1
@@ -5421,9 +5384,6 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
                 # keep separate undo stacks, so the one behind you is now final.
                 _push('The passage closes behind you — that chamber is past '
                       'mending.')
-        if level == 'paragraph_enclosure':
-            for _m in _paragraph_enclosure_tick(room, player):
-                _push(_m)
         if level == 'warden_eternal':
             for _m in _warden_eternal_tick(room, player):
                 _push(_m)

@@ -96,14 +96,19 @@ class Seal:
     reads every floor row and is satisfied if ANY of them answers, which is what
     the chassis levels need: charwise edits do not shift rows but `dd`, `J`, `o`
     and `p` do, and a door that named a row number would be undone by the first
-    line the player removed above it.
+    line the player removed above it. `run` reads the buffer's k-th contiguous
+    block of non-blank rows (`run` below) and demands it read as the seal's
+    exact whole self — the gauntlet rule, where the ORDER of the runs is the law.
 
     `mode` — HOW to compare. `exact` against the whole (stripped) text, which is
     what prices a level whose kept words must SURVIVE the strike; `contains` for
-    the looser substring rule the label doors use. Two modes read no text at
-    all: `braziers` opens while every brazier in its region burns, and `gone`
-    names ENTITY KINDS in `match` and opens while no live entity of any named
-    kind stands anywhere in the room — the legion rule.
+    the looser substring rule the label doors use. Three modes read no text at
+    all: `braziers` opens while every brazier in its region burns; `gone` names
+    ENTITY KINDS in `match` and opens while no live entity of any named kind
+    stands anywhere in the room — the legion rule; and `shape` lays out that
+    same law in space, reading the LIVE entities of `kind` as a template of
+    (dr, dc) offsets from the top-left-most of them — the Warden's Sigil, whose
+    six flames must stand as the sign the survivors carve over a fallen watch.
 
     `match` — a tuple of targets, ALL of which must read true. One door, several
     words: a chamber holds its bolt only while every one of its sayings still
@@ -126,7 +131,22 @@ class Seal:
     `exit_pos[0]`, because `J` and `dd` slide everything below a cut upwards and
     `_shift_rows` keeps `exit_pos` true: the gate rides with the exit instead of
     being left behind on the row it was built on. Columns are never shifted, so
-    they stay literal.
+    they stay literal. `'run_end'` replaces the ROW of every opened cell with
+    the row just below the seal's OWN run (the `run` index's current extent) —
+    the Hall of Echoes' band gates: a chamber's west gate sits in the stone band
+    directly beneath its live run, and the run re-derives as rows cut and join.
+
+    `run` — scope='run' only: WHICH run the seal reads. Runs are the buffer's
+    contiguous blocks of non-blank floor rows, split by blank rows, re-derived
+    every turn — `dd`/`J` move lines up and a hardcoded row number would be
+    left behind. `run` is the index (0 = the first run), so each gauntlet
+    chamber is its own seal and the pivotal law is that the k-th run must read
+    as its exact whole self, in order.
+
+    `kind` — mode='shape' only: WHICH entities the template reads. Default
+    `'brazier'` — the only flame kind a shape seal wants. The sigil law: the
+    live entities of this kind must stand exactly at `match`'s (dr, dc) offsets
+    from the crown (the top-left-most of them).
     """
     region:   tuple = ()    # (r1, c1, r2, c2) — the cells read under scope='region'
     match:    tuple = ()    # targets, ALL of which must read true (a bare str is
@@ -139,7 +159,7 @@ class Seal:
                             # (`requires`' mirror — a door held open while the
                             # named seals are shut, the negation a level could
                             # not say: the Beacon Tiers' too-cold nudge)
-    anchor:   str   = ''    # '' | 'exit_row'
+    anchor:   str   = ''    # '' | 'exit_row' | 'run_end'
     message:  str   = ''    # the banner when it opens (visible); '' → SEAL_OPENED
     message_far: str = ''   # ...when it opens (off-screen); '' → SEAL_OPENED_FAR
     closed_message: str = '' # the banner when it closes (visible); '' → SEAL_CLOSED
@@ -158,6 +178,11 @@ class Seal:
                            # each phrase to its expected row relative to the
                            # first line — `:6m3` shifts content between rows,
                            # and only a row-relative check tracks it.
+    run:      int   = -1   # scope='run' only: WHICH run this seal reads (0 = the
+                           # first run of non-blank rows). Re-derived each turn,
+                           # so cuts and joins never strand the gate. -1 = none.
+    kind:     str   = 'brazier'  # mode='shape' only: which entities the template
+                           # reads — the flame kind a sigil is made of.
     fuels:    tuple = ()   # ((row, col), ...) — brazier cells made PASTEABLE
                            # for flames while this seal reads true. A level
                            # with any fuels-carrying seal switches its paste
@@ -185,6 +210,7 @@ class Seal:
         object.__setattr__(self, 'fuels', tuple(tuple(c) for c in self.fuels))
         object.__setattr__(self, 'requires', tuple(int(i) for i in self.requires))
         object.__setattr__(self, 'forbids', tuple(int(i) for i in self.forbids))
+        object.__setattr__(self, 'run', int(self.run))
 
 def gate_row_seals(doors, exit_pos, *, mode: str = 'exact',
                    head: int = -1,
