@@ -23,7 +23,7 @@ plaque (the round is an echo — the true shelf is known by sense). Each
 mended misfiling grinds back its own gallery bolt, in any order; the seal
 parts when the whole round reads true. Canonical :set nu + :6m3 + :6< +
 :7t7 + :8> + $, par 15. :m/:t are structural row surgery (fog and mist
-ride along); _shelving_tick re-mists any bare shelf floor each turn."""
+ride along); _chasm_resubmerge re-mists any bare shelf floor each turn."""
 from collections import deque
 
 import math

@@ -13819,6 +13819,7 @@ def build_dungeon_shelving_room(seed: int) -> Dungeon:
                            8 + i)
               for i, dc in enumerate(_SHR_BOLT_COLS)],
             # THE FULL ROUND, said as data: every nonempty stripped line in
+            # the shelf band must read the mended sequence, in order.
             _parse_seal({'scope': 'region', 'mode': 'lines', 'anchor': 'exit_row',
                          'region': [1, 2, 200, C - 2],
                          'match': [t.rstrip() for t in targets],
