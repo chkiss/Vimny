@@ -6,6 +6,7 @@ dist/
 *.egg-info/
 .claude/
 .claudeignore
+.hermes/
 CLAUDE.md
 agents/
 *.swp
