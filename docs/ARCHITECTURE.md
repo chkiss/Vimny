@@ -314,7 +314,7 @@ exemption is an audit passing vacuously.
 | 0–4 | ✅ done (`5d07dcd`, `9cb7678`, `6a5bdb8`, 3 commits, `0ebb392`+`3ae5436`) | round-trip probe; derived fog; `Seal` generalised over 17 slugs; slot refs + forge affordances; rooms (`then`) |
 | 5 | ✅ done — `paste(level, into, at)` in `vimny/sharing/format.py`, tested by `tests/test_paste.py` (16 tests incl. a driven two-chamber macro gauntlet composed only from pasted fragments) | `hall_of_echoes`; the forge gains level import |
 | 6 | **wave 1 done** — 29 levels converted (2026-08-22): all eleven enclosure/gate-family levels, the mid-tier solvers (line/rune/cataracts/forge/vaults), the bonus rooms (reliquary, wet_ink, buried_word, binders_reliquary, seekers_labyrinth, bracket_vaults, stair_rail, g_sanctum), the act boss grandmasters_sanctum (first TWO-room level: each room its own Level; build()'s derived exit stripped where a transit cell must not be a door), hall_of_echoes, and dummy (stone-fog law re-laid post-build where it disagrees with derived fog by design). Every conversion proven seed-identical across 24 seeds. Standing idioms: SOLVED-par builders materialise first, then pin `par`/`budget`/`answer` from their solver; engine-only state re-attaches post-build (`_seal_banners`, designed fog/mist, `seal_door`, fuel-gate attrs) | one materialiser |
-| — | **wave-1 tail done** — the last 24 converted (2026-08-22): alignment_halls, joiners_gate, wardens_keep, lineheads, overwrite_halls, sculpting_chambers, shelving_room, case_chambers, spellwrights_forge, refrain_vault, indentation_sanctum, quartermaster, culling_ledger (event-driven reveals hold dark without hand fog lists), runic_archives, whole_line_annex, change_extension (`_label_gate` seals ride in the file), echo_vault (2026-08-22, post-parity: its three bespoke bolts retired into region/exact `Seal`s riding in the file — behavior identical), cipher_cell (2026-08-22, post-parity: same treatment, four region/exact bolts; `_cc_bolts` + its tick gone — see the STILL-BESPOKE audit list above for what remains), inscription_halls (2026-08-22, post-parity: the bespoke tick retired into `gate_row_seals` bolts — lesson words west→east in walking order, bridge-word eastmost, final seal on the exit; the reorder is a deliberate behavior change, so its proof is `tests/test_inscription_halls.py`, not seed identity), sentence_corridor + waypoint_sanctum + gauntlet (misted water as `M` cells), operators_vault (`fancy_door`s declared `opaque`; `entity_word_stops=False` pinned post-build — engine-only), goblin_gauntlet. Every conversion proven seed-identical across 24 seeds against the pre-conversion builders by a deep A/B (full room state after `enforce_fog_law`, all Entity fields but uid, private attrs minus caches); full suite green. Idioms held: bespoke-tick door specs stay private attrs pinned post-build (`_gnt_doors`); scripted plugh fog stays a post-build pin (the KNOWN_GAP stands) | one materialiser |
+| — | **wave-1 tail done** — the last 24 converted (2026-08-22): alignment_halls, joiners_gate, wardens_keep, lineheads, overwrite_halls, sculpting_chambers, shelving_room, case_chambers, spellwrights_forge, refrain_vault, indentation_sanctum, quartermaster, culling_ledger (event-driven reveals hold dark without hand fog lists), runic_archives, whole_line_annex, change_extension (`_label_gate` seals ride in the file), echo_vault (2026-08-22, post-parity: its three bespoke bolts retired into region/exact `Seal`s riding in the file — behavior identical), cipher_cell (2026-08-22, post-parity: same treatment, four region/exact bolts; `_cc_bolts` + its tick gone — see the STILL-BESPOKE audit list above for what remains), inscription_halls (2026-08-22, post-parity: the bespoke tick retired into `gate_row_seals` bolts — lesson words west→east in walking order, bridge-word eastmost, final seal on the exit; the reorder is a deliberate behavior change, so its proof is `tests/test_inscription_halls.py`, not seed identity), sentence_corridor + waypoint_sanctum + gauntlet (misted water as `M` cells), operators_vault (`fancy_door`s declared `opaque`; `entity_word_stops=False` pinned post-build — engine-only), goblin_gauntlet. Every conversion proven seed-identical across 24 seeds against the pre-conversion builders by a deep A/B (full room state after `enforce_fog_law`, all Entity fields but uid, private attrs minus caches); full suite green. Idioms held: bespoke-tick door specs stay private attrs pinned post-build (`_gnt_doors`); scripted plugh fog rides the zone seal's `unveils` (see the port-gap line) | one materialiser |
 | — | excepted, by agreement | `archivists_library`, warden combat AI + warden arena rooms (`warden_surveyor/pathfinder/manifold/scrivener/eternal`), `screen_vault` |
 
 Also open:
@@ -332,18 +332,22 @@ Also open:
   whole. Now compared — and saying `wrap` in the file healed
   `archivists_library`'s `runs` gap for free, because a rebuilt buffer that had
   lost the flag got its regions colour-merged on the way back in.
-- **ONE fog exemption left: `waypoint_sanctum`.** 105 of its 115 cells are
-  already mist on water, which the file CAN say. The other **10** are the two
-  `plugh` words, held dark so `?plugh` from the spawn finds nothing (a fogged
-  word is unsearchable). No geometry can say it: `xyzzy` and `plugh` share one
-  pocket and need OPPOSITE visibility — the search must find one and not the
-  other — and making mist opaque would fog 445 cells too many and blind
-  `?xyzzy` as well. It is ten cells of TEXT, not of terrain.
-  **MIST DOES NOT STOP THE EYE** is the fact behind all of this: feet treat it
-  as impassable, sight does not, because it is weather. That asymmetry is
-  deliberate (the Sanctum's pockets are misted precisely so they stay visible
-  and searchable while being foot-proof) and it is what made an unbroken misted
-  seep a sightline through The Operator's Vault.
+- **MIST DOES NOT STOP THE EYE** — the fog law's one deliberate asymmetry,
+  and the reason the Sanctum's pockets work at all: feet treat misted water as
+  impassable, sight does not, because it is weather. That is why the Sanctum's
+  pockets are misted (they stay visible and searchable while being
+  foot-proof), and it is what made an unbroken misted seep a sightline through
+  The Operator's Vault. The one fog exemption that textbook was written to
+  justify — the 10 `plugh` cells in `waypoint_sanctum` — **HEALED 2026-08-24**,
+  so there is no fog exemption left. Those ten cells were dark so `?plugh`
+  from the spawn finds nothing; they share pit storerooms with `xyzzy` and
+  `?xyzzy` must find it, which no pure geometry says (making mist opaque would
+  fog hundreds of extra cells and blind `?xyzzy` too). The waking stone is a
+  **zone** seal — `mode='zone'`, region = pocket 1, `unveils` = exactly those
+  ten cells — so darkness is now a seal's unveiled state, rideable in the file,
+  and `_build_room` re-seeds each unveiled cell's darkness from its own
+  terrain on rebuild (open ground → `fog_cells`), which is what makes the trip
+  round-trip. See the port-gap line above and the level's own test suite.
 - **Exits that are not doors — POST-LAUNCH (user, 2026-07-31).** The format says
   a room ends at its exit cell. The Wardenverse ends by killing the Warden in
   it (`exit_pos = None`), which is why `warden_pathfinder` still lists `exit`.

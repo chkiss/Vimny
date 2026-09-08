@@ -4,7 +4,7 @@
 
 The floor is made of characters. Walls are the ends of lines. A door opens for the word you cut out of the floor and carried there.
 
-Every room has a **keystroke budget** to enforce efficiency, and a **par**: the cheapest route that exists. Finishing wins the room; finishing *at par* means you found the way a fluent Vim user would have and fully learned the lesson taught at each dungeon.
+Every room has a **keystroke budget** to enforce efficiency, and a **par**: the cheapest route that exists. Finishing wins the room; finishing *at par* means you found the way a fluent Vim user plays.
 
 ![A terminal playing The Character Cataracts. The dungeon floor is written text, "Most files you encounter will be scribed in letters so you can jump quite easily to anything you can type!", split by rivers of water. The cursor hops from character to character with f, F, t and T, aims at the wrong letter, presses u to snap back (and watches the keystroke count go down again), then reaches the exit at 21 keystrokes against a par of 19.](docs/media/character-cataracts.gif)
 
@@ -41,7 +41,7 @@ Editing reflows the line exactly as Vim does: insert, delete or paste and the re
 
 Requirements are just Python 3.9+ and a terminal at least 80 columns wide, on Linux, macOS, or Windows Terminal. The playfield grows with the window up to 189 columns, which the overworld and The Archivist's Library use, and stops widening there.
 
-Any monospace font works, though a few runes (`⛧ ⛤ ⚞ ⚌ ☶`) live outside most of them and will show as boxes unless your system can fall back to something like [Symbola](https://dn-works.com/ufas/) or Noto Sans Symbols 2. A box is still a perfectly good thing to aim `w` at, so nothing breaks either way.
+Any monospace font works, though a few runes (`⛧ ⛤ ⚞ ⚌ ☶`) live outside most of them and will show as boxes unless your system can fall back to something like [Symbola](https://dn-works.com/ufas/) or Noto Sans Symbols 2.
 
 ```bash
 uvx vimny
@@ -90,7 +90,7 @@ intend to send a pull request.
 
 The main sequence of sixty levels is complete. The curriculum runs from `hjkl` through motions and counts, operators and text objects, visual mode, search and macros, registers, marks and jumps, to Ex commands (`:s`, `:g`), with boss levels that make you use the lot at once, and a bonus wing for the corners of Vim that don't fit a straight line.
 
-Each level teaches one thing and is built so that thing is the *cheapest* way through, not merely the intended one.
+Each level teaches one thing and is built so that thing is the *cheapest* way through.
 
 <details>
 <summary>The full curriculum: all 60 levels</summary>
@@ -307,7 +307,7 @@ The full command reference (also the hint-bar source) is `vimny/render/vim_comma
 Vimny aims for Vim-faithfulness in everything it *does* implement, but some commands are deliberately out of scope:
 
 - **Scrolling & viewport**: `zz` `zt` `zb` `<C-d>` `<C-u>` `<C-f>` `<C-b>` `<C-e>` `<C-y>`: dungeons fit the screen; there is no viewport-scroll model (`H`/`M`/`L` are the only screen-relative commands).
-- **`U` (vi's line-undo)**: `u` and the redo scroll (`<C-r>`) cover the undo story; a third undo channel would complicate it for a key modern Vim users rarely reach for.
+- **`U` (vi's line-undo)**: `u` and the redo scroll (`<C-r>`) already cover undo. A third undo channel would complicate a key modern Vim users rarely reach for.
 - **Window/tab/buffer management**: Vimny is a single buffer by design; each dungeon *is* the file. On the roadmap, not in the curriculum.
 - **Insert-mode editing keys**: `<C-w>`, `<C-u>`, `<C-o>`, `<C-r>{reg}` are implemented and can be found as scrolls, but no level *teaches* them. They are priced to be free (`<C-w>` and `<C-u>` cost nothing; `<C-r>` charges per pasted character, exactly what typing the text would cost), so no puzzle can force them at par. Pricing them by keystroke would make a register paste cheaper than typing and hand every text-entry level a shortcut.
 - **Completion, plugins, ex-mode scripting**: out of scope.
@@ -420,7 +420,7 @@ Full guide: [docs/AUTHORING.md](docs/AUTHORING.md).
 ## Design principles
 
 - **Vim fidelity above all else.** Commands behave exactly as they do in Vim.
-- **Efficiency is enforced by par and budget.** The keystroke budget makes Vim's core value proposition central, and the par encourages the player to strive for perfect execution efficiency.
+- **Efficiency is enforced by par and budget.** Being over budget fails a room, however you reach the exit; par rewards the cheapest route.
 - **Everything is a buffer.** Dungeons are files; the overworld is a directory; `:w`, `:q`, `:e` are real mechanics.
 
 See [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) if you want to work on the engine: it is the canonical reference for the architecture, the laws the levels are held to, and the conventions. `docs/LEVELS_PLAN.md` is what's planned next, and `docs/SPEC.md` the design vision & UI.
