@@ -107,12 +107,13 @@ def _seal_banners(dungeon,
                   final='Every chamber reads true — the final seal parts!'):
     """Re-apply the gate banners to a format-built room.
 
-    `Seal.message` is deliberately not file-format data — an author-supplied
-    banner is a text channel onto another player's screen — so a room built by
-    `format.build()` carries seals whose banner fell back to the generic
-    SEAL_OPENED wording. The shipped chassis gates hand their banners back
-    here, post-materialisation, which is the whole answer Phase 6 owes the
-    open-work table on engine-only seal messages."""
+    `Seal.message` has ridden the level file since 2026-08-24 — parse, dumps
+    and `from_room` round-trip the four banner strings, pinned by
+    `tests/test_sharing.py` — so a file that says its messages never falls
+    back. But a seal that leaves one unset surfaces the generic SEAL_OPENED
+    wording; the shipped gates hand their banners back here,
+    post-materialisation, which is the whole answer Phase 6 owed the
+    open-work table on engine-side banner defaults."""
     from dataclasses import replace as _dc_replace
     room = dungeon.rooms[0]
     *bolts, last = room.seals
