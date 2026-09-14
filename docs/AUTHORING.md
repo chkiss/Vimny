@@ -36,6 +36,9 @@ always have, plus the level's own properties:
 | `:fill!` | drop the fill under the cursor, keeping its words as text you own |
 | `:entity [kind] [field=value …]` | place or retune the entity under the cursor (`:entity` alone opens the palette; `:entity?` reads it back; `:entity!` removes it) |
 | `:seal <text>` | arm a text-match door on the last VISUAL selection |
+| `:gone <kind\|group>…` | arm a seal that reads true while no live entity of any named kind/group stands in the room |
+| `:shape [kind]` | arm a sigil seal from the room's live entities of that kind, in their current layout |
+| `:fuel` | name the selected cells as held fire — a flame may be pasted there while the armed seal reads true |
 | `:bolt` | make the cell you are standing on — or every wall cell of a `'<,'>` selection — open while that seal reads true |
 | `:room [n\|new]` | move between the level's rooms, or add one (`:room` alone says where you are; `:room!` removes the one you are in) |
 | `:name` `:author` `:teaches` `:requires` `:intro` `:alternate` `:vocab` | the metadata block |
@@ -502,6 +505,33 @@ wall ends up with a hole in it nobody put there.
 
 `:seal *word` arms the looser `contains` reading — the glob sense of `*` — and
 `:seal!` removes the seal bolting the cell you are on.
+
+**`:gone <kind|group>`** arms the sigil's sibling: the bolt stands open while no
+live entity of the named kinds stands anywhere in the room. No selection is read
+— extinction is a whole-room fact, like `shape`'s layout — and a `group` name
+(`:entity goblin group=patrol`) arms one condition over every kind marching in
+it. `:gone?` lists the kinds and groups currently on the floor.
+
+**`:shape [kind]`** arms the sigil seal itself — the same `mode: "shape"` the
+Paragraph Enclosure ships. It reads the room's **live entities of `kind`**
+(default `brazier`) right now and stores their `(dr, dc)` offsets from the
+crown (the top-left-most of them) as the template. Place the flames with
+`:entity brazier` first — the room's whole set of the kind, **all** of it, is
+the template, so a brazier you mean for the sign must be down before you arm,
+and a decorative brazier anywhere else in the room is part of the sign whether
+you meant it to be or not. `:shape?` lists what stands; `:shape!` removes the
+seal bolting the cell under the cursor, like `:seal!`.
+
+**`:fuel`** names **held fire**. The one paste exception in Vimny is the fuel
+rule: a flame laid down with `p` lands only where the room allows, and a level
+whose any seal carries `fuels` switches to **fuels-only** — a flame rests only
+on the cells some true seal makes pasteable. Arm the condition first (`:seal`,
+`:gone` or `:shape`), select the cells the flame may land on, `:fuel`, then
+`:bolt` wires them to the seal along with the door. The selection is **cells**,
+not entity braziers as such — a painted pedestal is a run, not an entity, and
+the list is exactly the author's say-so of where fire may rest. A second
+`:fuel` over more cells adds to the list; `:fuel!` clears it; `:fuel?` reads it
+back.
 
 ### `requires` and `teaches`
 

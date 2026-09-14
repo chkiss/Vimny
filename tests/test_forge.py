@@ -1788,6 +1788,95 @@ def test_a_gone_seal_refuses_a_kind_nothing_answers_to():
     assert not [s for s in d.level.seals if s.mode == 'gone']
 
 
+def test_the_forge_arms_a_shape_seal_and_bolts_it():
+    """`:shape` catches the room's live braziers in their current layout — a
+    template of (dr, dc) offsets from the crown (the top-left-most of them) —
+    and :bolt then arms the door, exactly as :seal and :bolt already do for a
+    text match. Place the sigil first: the room's whole set of the kind, all
+    of it, IS the template."""
+    d = DRAFT.new('Probe', rows=8, cols=30)
+    # a caret of three flames — crown (2,3); not quite a sigil on purpose
+    _forge_session(d, 'jll:entity brazier\r'       # (2,3)
+                      + 'll:entity brazier\r'       # (2,5)
+                      + 'jh:entity brazier\r'      # (3,4)
+                      + ':shape\r'
+                      + 'jjjlll:bolt\r:w\r:q!\r')   # the door at (6,7)
+    assert len(d.level.seals) == 1
+    s = d.level.seals[0]
+    assert s.mode == 'shape'
+    assert s.match == ((0, 0), (0, 2), (1, 1))
+    assert (s.region, s.scope, s.kind) == ((), 'region', 'brazier')
+    assert s.opens == ((6, 7),)
+
+
+def test_a_shape_seal_reads_the_whole_room_and_rebars_on_a_lost_flame():
+    """The sigil law is whole-room and recomputed every turn: lose one of its
+    flames and the bolt bolts itself shut again — the reader never remembers
+    the layout, only reads it."""
+    import vimny.game as main
+    d = DRAFT.new('Probe', rows=8, cols=30)
+    _forge_session(d, 'jll:entity brazier\r'
+                      + 'll:entity brazier\r'
+                      + 'jh:entity brazier\r'
+                      + ':shape\r'
+                      + 'jjjlll:bolt\r:w\r:q!\r')
+    room = F.build(d.level).room
+    p = _player_at(3, 1)
+    main._seal_tick(room, p)
+    assert room.cells[6][7] == CellType.FLOOR
+    next(e for e in room.entities if e.kind == 'brazier').alive = False
+    main._seal_tick(room, p)
+    assert room.cells[6][7] == CellType.WALL, 'a lost flame re-bars the bolt'
+
+
+def test_the_forge_fuels_the_armed_condition():
+    """`:fuel` over a selection names the cells a flame may land on while the
+    armed condition reads true; :bolt writes them home as `fuels` on the seal
+    — the beacon fuel list, said as an author's gesture."""
+    d = DRAFT.new('Probe', rows=8, cols=30)
+    # seal over row 2, fuel over (5,5)-(5,7), bolt a door at (5,7)
+    _forge_session(d, 'jv' + 'l' * 3 + T.ESC + 'jjlll:seal open sesame\r'
+                      + 'jl' + 'v' + 'll:fuel\r:bolt\r:w\r:q!\r')
+    s = d.level.seals[0]
+    assert s.fuels == ((5, 5), (5, 6), (5, 7))
+    assert s.opens == ((5, 7),)
+    assert s.mode == 'exact'
+
+
+def test_a_shape_seal_carries_fuel_for_the_beacon_tiers():
+    """Both new verbs in the piece that wants them: a sigil gating a beacon
+    row — :shape for the condition, :fuel for the resting cells, one :bolt."""
+    d = DRAFT.new('Probe', rows=8, cols=30)
+    _forge_session(d, 'jll:entity brazier\r'
+                      + 'll:entity brazier\r'
+                      + 'jh:entity brazier\r'
+                      + ':shape\r'
+                      + 'jjl' + 'v' + 'll:fuel\r:bolt\r:w\r:q!\r')
+    s = d.level.seals[0]
+    assert s.mode == 'shape'
+    assert s.match == ((0, 0), (0, 2), (1, 1))
+    assert s.fuels == ((5, 5), (5, 6), (5, 7))
+    assert s.kind == 'brazier'
+
+
+def test_fuel_rides_only_an_armed_condition():
+    """Fuel without a condition to ride is refused, not silently dropped —
+    the list would otherwise hang out in a void no seal ever reads."""
+    d = DRAFT.new('Probe', rows=8, cols=30)
+    _forge_session(d, 'jv' + 'l' * 2 + ':fuel\r:bolt\r:w\r:q!\r')
+    assert d.level.seals == []
+
+
+def test_a_shape_seal_with_fuel_survives_the_file():
+    """The new stamp in the ground: a drafted shape seal rides fuels into the
+    FILE and comes back byte-identical — the same round trip the shipped
+    Paragraph Enclosure sigil and the Wet Ink's fuel list already make."""
+    d = DRAFT.new('Probe', rows=8, cols=30)
+    _forge_session(d, 'jll:entity brazier\rll:entity brazier\rjh:entity brazier\r'
+                      + ':shape\rjjl' + 'v' + 'll:fuel\r:bolt\r:w\r:q!\r')
+    assert F.loads(F.dumps(d.level)).seals == d.level.seals
+
+
 def test_a_seal_without_a_selection_reads_any_floor_row():
     """The Gauntlet chassis in the forge: no VISUAL selection means the whole
     floor is the page — some row, wherever dd / J / o / p leave it — never a

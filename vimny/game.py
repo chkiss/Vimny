@@ -6981,6 +6981,61 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
                                   + ' nor '.join(_want)
                                   + ' may stand. Stand on the door and :bolt.')
 
+                elif _draft is not None and edit_mode and (
+                        _rcmd.rstrip('?!') == 'shape'
+                        or _rcmd.startswith('shape ')):
+                    # `:shape [kind]` arms the SIGIL condition: the bolt stands
+                    # open while the LIVE entities of `kind` (default brazier)
+                    # stand exactly as the room's do right now — the template of
+                    # (dr, dc) offsets from the crown (the top-left-most of
+                    # them, ever the alphabetical minimum), with nothing
+                    # standing extra. Place the flames with :entity brazier
+                    # first — the whole room's set of the kind, all of it, IS
+                    # the template, so any brazier meant for the sign must be
+                    # down before you arm. No selection is read: like :gone, a
+                    # shape is a whole-room law, not a rectangle.
+                    _kinds = sorted({e.kind for e in room.entities})
+                    if _rcmd.endswith('?'):
+                        _push(':shape [kind] arms the sigil — the live '
+                              'entities of that kind, all of them, standing in '
+                              "exactly today's layout; :bolt then arms the "
+                              'door itself. Here now — kinds: '
+                              + (', '.join(_kinds) or '(none)') + '.')
+                    elif _rcmd.endswith('!'):
+                        _ss = [s for s in getattr(room, 'seals', ())
+                               if (player.row, player.col) in s.opens]
+                        if not _ss:
+                            _push('No seal bolts this cell.')
+                        else:
+                            DRAFT.sync(_draft, room)
+                            for _s in _ss:
+                                _draft.level.seals.remove(_s)
+                            _forge_rebuild()
+                            _push(f'Seal removed — {len(_ss)} condition(s) gone.')
+                    else:
+                        _kindx = _rcmd[6:].strip() or 'brazier'
+                        if _kindx not in _kinds:
+                            _push(f'Nothing here is called {_kindx!r} — a shape '
+                                  'seal reads the entities you place. Kinds: '
+                                  + (', '.join(_kinds) or '(none)') + '.')
+                        else:
+                            _live = sorted((e.row, e.col) for e in room.entities
+                                           if e.kind == _kindx and e.alive)
+                            if not _live:
+                                _push(f'No live {_kindx} stands yet — '
+                                      f':entity {_kindx} puts the sigil down '
+                                      'first.')
+                            else:
+                                _r0, _c0 = _live[0]
+                                _offs = tuple((r - _r0, c - _c0)
+                                              for r, c in _live)
+                                _draft._pending_seal = ((), _offs, 'shape', -1, -1)
+                                _draft._pending_shape_kind = _kindx
+                                _push(f'Sigil armed: {len(_live)} live {_kindx} '
+                                      'at '
+                                      + ' '.join(f'{dr},{dc}' for dr, dc in _offs)
+                                      + ' — stand on the door and :bolt.')
+
                 elif _draft is not None and edit_mode and _rcmd.rstrip('?!') == 'final':
                     # THE FINAL SEAL — the Gauntlet's last door, made into a
                     # gesture. Individual bolts open one proof at a time; the
@@ -7029,6 +7084,60 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
                         _draft._pending_msg = _txt2
                         _push(f'Banner armed: {cur_txt if (cur_txt := _txt2) else "(cleared)"}')
 
+                elif _draft is not None and edit_mode and (
+                        _rcmd.rstrip('?!') == 'fuel'
+                        or _rcmd.startswith('fuel ')):
+                    # `:fuel` over a visual selection names the cells a flame
+                    # may be pasted onto while the ARMED condition reads true —
+                    # the fuels-only paste law an author now declares (the Wet
+                    # Ink's `fuels:` cells). Arm a condition first (:seal text,
+                    # :gone kind, or :shape [kind]), select the resting-cells,
+                    # :fuel, then :bolt — the same split of condition and
+                    # effect that :seal and :bolt already make for doors. The
+                    # selection is CELLS, not entity braziers as such, because a
+                    # painted pedestal is a run, not an entity — the list is
+                    # exactly the author's say-so of where fire may rest. A
+                    # second :fuel adds cells; :fuel! clears them.
+                    _fa, _fb = player.last_visual_anchor, player.last_visual_cursor
+                    if _rcmd.endswith('!'):
+                        _draft._pending_fuel = ()
+                        _push('Fuel cells cleared.')
+                    elif _rcmd.endswith('?'):
+                        _held = getattr(_draft, '_pending_fuel', ())
+                        _push('Armed fuel: '
+                              + (' '.join(f'{r},{c}' for r, c in _held)
+                                 if _held else '(none — select the cells '
+                                               'and :fuel)'))
+                    elif _fa is None or _fb is None:
+                        _push('Usage: :fuel over a VISUAL selection names the '
+                              'cells a flame may land on while the armed '
+                              'condition reads true — then :bolt. Arm the '
+                              'condition first (:seal/:gone/:shape).')
+                    elif getattr(_draft, '_pending_seal', None) is None:
+                        _push('Nothing armed — :fuel rides a condition you '
+                              'have not armed yet (:seal <text>, :gone <kind>, '
+                              'or :shape [kind]).')
+                    else:
+                        if player.last_visual_mode == Mode.VISUAL_LINE:
+                            _c1, _c2 = 0, room.cols - 1
+                        else:
+                            _c1, _c2 = (min(_fa[1], _fb[1]),
+                                        max(_fa[1], _fb[1]))
+                        _cells = [(r, c)
+                                  for r in range(min(_fa[0], _fb[0]),
+                                                 max(_fa[0], _fb[0]) + 1)
+                                  for c in range(_c1, _c2 + 1)]
+                        _held = set(getattr(_draft, '_pending_fuel', ()))
+                        _add = [c for c in _cells if c not in _held]
+                        if not _add:
+                            _push('Those cells are already fuel.')
+                        else:
+                            _draft._pending_fuel = tuple(sorted(_held | set(_add)))
+                            _push(f'Fuel armed: {len(_add)} more cell(s) a '
+                                  f'flame may land on '
+                                  f'({len(_draft._pending_fuel)} total) — '
+                                  ':bolt drives the seal home.')
+
                 elif _draft is not None and edit_mode and _rcmd == 'bolt':
                     # Attach cells to the armed seal. The cursor cell on its own,
                     # or — with the `'<,'>` range — every cell of the selection,
@@ -7055,14 +7164,19 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
                         _want_unveil = [rc for rc in _want if rc in _veiled_now]
                         _reg, _txt, _mode, _head, _pin = _pend
                         _msg = getattr(_draft, '_pending_msg', '')
+                        _kind = getattr(_draft, '_pending_shape_kind', 'brazier')
                         # A text seal's pending carries the target tuple (one
                         # entry per required reading); a gone seal's carries
-                        # the kind tuple as-is.
+                        # the kind tuple as-is; a shape seal's carries the
+                        # (dr, dc) offsets template (a tuple of pairs) as-is.
                         _mtch = _txt if isinstance(_txt, tuple) else (_txt,)
                         # An empty region means a WHOLE-FLOOR door — the
                         # anyrow scope, which reads floor rows wherever they
                         # now stand instead of pinning a rectangle of stone.
-                        _scope = ('gone' if _mode == 'gone'
+                        # A shape seal is a whole-room law too, but its own:
+                        # it reads live entities, never floor rows.
+                        _scope = ('region' if _mode == 'shape'
+                                  else 'gone' if _mode == 'gone'
                                   else 'anyrow' if not _reg else 'region')
                         _inside = []
                         if _reg:
@@ -7089,21 +7203,27 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
                                     == (_reg, _mtch, _mode, _scope, _head, _pin)]
                             _cells = tuple(_old[0].opens) if _old else ()
                             _u_cells = tuple(_old[0].unveils) if _old else ()
+                            _fuels = tuple(_old[0].fuels) if _old else ()
                             if _old:
                                 _draft.level.seals.remove(_old[0])
                             _add = tuple(c for c in _want_open
                                          if c not in _cells)
                             _u_add = tuple(c for c in _want_unveil
                                            if c not in _u_cells)
+                            _f_add = tuple(c for c in getattr(
+                                _draft, '_pending_fuel', ())
+                                if c not in _fuels)
                             if not _add and not _u_add and not _cells \
-                                    and not _u_cells:
+                                    and not _u_cells and not _f_add:
                                 _push('Nothing new to bolt.')
                                 continue
                             _new = Seal(region=_reg, match=_mtch, mode=_mode,
                                         scope=_scope, opens=_cells + _add,
                                         unveils=_u_cells + _u_add,
-                                        head=_head, at=_pin, message=_msg)
+                                        head=_head, at=_pin, message=_msg,
+                                        kind=_kind, fuels=_fuels + _f_add)
                             _draft._pending_msg = ''
+                            _draft._pending_fuel = ()
                             # A seal that only REVEALS (no door cells) is still
                             # a seal — the condition is the thing.
                             if not _new.opens and not _new.unveils:
@@ -7120,6 +7240,14 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
                                       + ' stands.'
                                       + (f' {len(_new.unveils)} carving(s) '
                                          f'readable.' if _new.unveils else ''))
+                            elif _mode == 'shape':
+                                _push(f'Bolted: {len(_new.opens)} cell(s) open '
+                                      f'while the {_kind} sigil stands'
+                                      + (f', {len(_new.unveils)} carving(s) '
+                                         f'readable.' if _new.unveils else '')
+                                      + (f' {len(_new.fuels)} fuel cell(s).'
+                                         if _new.fuels else '')
+                                      + '.')
                             else:
                                 _extra = ''
                                 if len(_mtch) > 1 and not _reg:
