@@ -679,9 +679,13 @@ def test_a_shape_seal_round_trips_kind_and_offsets():
 def test_a_shape_seal_needs_the_crown_and_reads_whole_rooms():
     with pytest.raises(F.LevelFormatError, match='crown'):
         F._parse_seal({'mode': 'shape', 'match': [[1, 0], [2, 1]]}, 0)
-    with pytest.raises(F.LevelFormatError, match='whole room'):
-        F._parse_seal({'mode': 'shape', 'region': [1, 1, 2, 2],
-                       'match': [[0, 0]]}, 0)
+    # A `region` now marks the SIGIL'S BOX: the parse keeps it, the reading
+    # bounds itself to the template, and a decorative flame elsewhere in the
+    # level cannot un-sign the survivors.
+    s = F._parse_seal({'mode': 'shape', 'region': [3, 2, 5, 8],
+                       'match': [[0, 0], [1, -1], [1, 1]]}, 0)
+    assert s.region == (3, 2, 5, 8)
+    assert s.match == ((0, 0), (1, -1), (1, 1))
     with pytest.raises(F.LevelFormatError, match='only a mode="shape"'):
         F._parse_seal({'match': ['x'], 'region': [1, 1, 2, 2],
                        'kind': 'brazier'}, 0)

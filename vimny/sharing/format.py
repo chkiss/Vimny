@@ -397,7 +397,13 @@ def _parse_seal(s: dict, i: int, at: str = 'seals') -> Seal:
         # offsets read against the live entities of `kind`, so a shape seal's
         # `match` is geometry, not text — [[0, 0], [1, -1], ...] naming where
         # each flame stands relative to the crown (the top-left-most of the
-        # live entities). Reads the whole room: refuse a `region`.
+        # live entities). The box is OPTIONAL: no `region` reads the whole room
+        # (every entity of the kind, anywhere, IS the template — the shipped
+        # sigils' stern law); with `region` the box marks which entities were
+        # captured and at read time only what stands INSIDE the template's own
+        # extent is held against the sign, so a decorative flame elsewhere in
+        # the level cannot un-sign it. Either way `match` stays a crown-relative
+        # template of offsets; the box travels with the survivors.
         if not (isinstance(match, (list, tuple)) and all(
                 isinstance(off, (list, tuple)) and len(off) == 2
                 and all(isinstance(x, int) and not isinstance(x, bool)
@@ -405,9 +411,6 @@ def _parse_seal(s: dict, i: int, at: str = 'seals') -> Seal:
             raise LevelFormatError(f'{at}[{i}].match: a mode="shape" seal is a '
                                    f'template of [dr, dc] offsets, e.g. '
                                    f'[[0, 0], [1, -1], [1, 1]]')
-        if region is not None:
-            raise LevelFormatError(f'{at}[{i}].region: a mode="shape" seal reads '
-                                   f'the whole room — leave `region` empty')
         shape = tuple(tuple(int(x) for x in off) for off in match)
         if (0, 0) not in shape:
             # The crown anchors the reading. A sign with no crown would have no
@@ -416,7 +419,12 @@ def _parse_seal(s: dict, i: int, at: str = 'seals') -> Seal:
             raise LevelFormatError(f'{at}[{i}].match: a mode="shape" seal must '
                                    f'include the crown offset (0, 0)')
         match = shape
-        region = ()
+        if region is not None:
+            if not (isinstance(region, (list, tuple)) and len(region) == 4):
+                raise LevelFormatError(f'{at}[{i}].region: must be [r1, c1, r2, c2]')
+            region = tuple(int(x) for x in region)
+        else:
+            region = ()
     elif mode == 'gone':
         # A `gone` seal reads no TEXT either: its `match` names ENTITY KINDS,
         # and it stands open while no live entity of any named kind remains —

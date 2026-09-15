@@ -37,7 +37,7 @@ always have, plus the level's own properties:
 | `:entity [kind] [field=value …]` | place or retune the entity under the cursor (`:entity` alone opens the palette; `:entity?` reads it back; `:entity!` removes it) |
 | `:seal <text>` | arm a text-match door on the last VISUAL selection |
 | `:gone <kind\|group>…` | arm a seal that reads true while no live entity of any named kind/group stands in the room |
-| `:shape [kind]` | arm a sigil seal from the room's live entities of that kind, in their current layout |
+| `:shape [kind]` | arm a sigil seal from the live entities of that kind in their current layout — a VISUAL selection bounds the sign to what you selected (`text` in front also captures the selection's floor text) |
 | `:fuel` | name the selected cells as held fire — a flame may be pasted there while the armed seal reads true |
 | `:bolt` | make the cell you are standing on — or every wall cell of a `'<,'>` selection — open while that seal reads true |
 | `:room [n\|new]` | move between the level's rooms, or add one (`:room` alone says where you are; `:room!` removes the one you are in) |
@@ -434,8 +434,13 @@ the template's top-left-most member, and the seal reads true only while the
 standing entities land on exactly those offsets and nothing else. The first
 offset must be `[0, 0]` — the crown, which anchors the whole template. This is
 how the Paragraph Enclosure's six-flames sigil is said as data: six braziers
-at six offsets, no flame extra, no flame missing. `region` is refused here —
-the sigil is shapeless, the room is the page.
+at six offsets, no flame extra, no flame missing. With no `region` the sigil
+is shapeless — the room is the page, and every entity of the kind anywhere is
+part of the sign. A `region` marks the **sigil's box**: only what stands
+inside the template's own extent is read, so a decorative flame elsewhere in
+the level cannot un-sign it (as the whole-room law would). The box re-derives
+from wherever the survivors now stand, because `dip`/`dap` move the survivors
+and the sign with them.
 
 #### Asking for an extinction
 
@@ -516,10 +521,30 @@ it. `:gone?` lists the kinds and groups currently on the floor.
 Paragraph Enclosure ships. It reads the room's **live entities of `kind`**
 (default `brazier`) right now and stores their `(dr, dc)` offsets from the
 crown (the top-left-most of them) as the template. Place the flames with
-`:entity brazier` first — the room's whole set of the kind, **all** of it, is
-the template, so a brazier you mean for the sign must be down before you arm,
-and a decorative brazier anywhere else in the room is part of the sign whether
-you meant it to be or not. `:shape?` lists what stands; `:shape!` removes the
+`:entity brazier` first: a brazier you mean for the sign must be down before
+you arm, or the template is the sign with a hole in it.
+
+**A visual selection draws the sign's box.** With `v` highlighting the
+flames, `:shape [kind]` captures *only the entities inside the selection* and
+records the rectangle on the seal. The reading then bounds itself to the
+template's own extent — a decorative flame anywhere else in the level cannot
+un-sign it, where the whole-room law would. The box travels with the
+survivors, so `dip` cutting the rows above still leaves the sign readable
+where it now stands. Without a selection, `:shape` keeps the strict
+whole-room law: every entity of the kind, **anywhere**, is part of the sign
+(the shipped sigils' rule, and the one the Paragraph Enclosure ships). A
+**bare `:shape`** (no kind) with a selection open asks what the selection
+should capture, and the picker composes its own command back.
+
+A leading **`text`** token over a selection — `:shape text brazier` — also
+captures the selection's **floor text** as a second `exact`-region seal bolted
+behind the same door: the door wants the right entities *and* the right page.
+The page rides the rectangle as drawn, as absolute rows, so it must survive
+the solution's cuts for the text seal to read; the sigil itself rows-shift
+with the survivors. The `text` stamp is refused when nothing readable stands
+in the selection, and — like `:seal` — refuses a door cell inside the text
+seal's own region (a door inside a `shape` seal's box is fine: the sign reads
+entities, never text). `:shape?` lists what stands; `:shape!` removes the
 seal bolting the cell under the cursor, like `:seal!`.
 
 **`:fuel`** names **held fire**. The one paste exception in Vimny is the fuel

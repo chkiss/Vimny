@@ -2735,12 +2735,39 @@ def _seal_reads_true(room, seal, truths=(), rows=None, player=None) -> bool:
         # offsets; the live entities of `kind` must stand EXACTLY at those
         # offsets from the crown (their top-left-most member, the alphabetical
         # minimum — the Warden Sigil's single top flame). The whole-set law is
-        # the point: six of the six, nothing standing extra, or the sign is
-        # not the sign. Reading the ENTITY layer (a cut removes the row's
+        # the point: nothing standing extra INSIDE THE SIGN'S BOX, or the sign
+        # is not the sign. Reading the ENTITY layer (a cut removes the row's
         # flames) and recomputed each turn, so `u` resurrecting a cut row
         # restores the shape and the bolt un-bars.
+        #
+        # The box is the template's own extent — a seal crafted over a forge
+        # selection carries a `region` simply to mark that it IS boxed, and the
+        # reading then re-derives the box from the survivors' own crown each
+        # turn. Anything standing OUTSIDE the box cannot break the sign, so a
+        # decorative flame elsewhere in the level un-signs nothing. Plain shape
+        # (no `region`) keeps the shipped sigils' stern whole-room law: every
+        # entity of the kind, anywhere, IS the template. Either way `dip`/`dap`
+        # move the survivors and the sign with them, and the reading re-anchors
+        # on the survivors rather than a printed row.
         live = sorted((e.row, e.col)
                       for e in room._entity_by_kind.get(seal.kind, ()) if e.alive)
+        if not live:
+            return False
+        if seal.region:
+            # Each live entity is a candidate crown: the sign must read exactly
+            # at its offsets inside the box that nestles around it. A candidate
+            # whose box holds the whole template IS the sign — so a decorative
+            # flame northwest of the true sign (outside the box the true crown
+            # opens) can never fake it, and the box travels wherever the
+            # survivors now stand.
+            h = max(dr for dr, _ in seal.match)
+            w = max(dc for _, dc in seal.match)
+            for r0, c0 in live:
+                inside = [(r, c) for r, c in live
+                          if r0 <= r <= r0 + h and c0 <= c <= c0 + w]
+                if {(r - r0, c - c0) for r, c in inside} == set(seal.match):
+                    return _seal_predicates_hold(seal, truths)
+            return False
         if len(live) != len(seal.match):
             return False
         r0, c0 = live[0]
@@ -6989,17 +7016,37 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
                     # stand exactly as the room's do right now — the template of
                     # (dr, dc) offsets from the crown (the top-left-most of
                     # them, ever the alphabetical minimum), with nothing
-                    # standing extra. Place the flames with :entity brazier
-                    # first — the whole room's set of the kind, all of it, IS
-                    # the template, so any brazier meant for the sign must be
-                    # down before you arm. No selection is read: like :gone, a
-                    # shape is a whole-room law, not a rectangle.
+                    # standing extra inside the sign's box. Place the flames
+                    # with :entity brazier first.
+                    #
+                    # A VISUAL SELECTION draws the sign's box. Without one, the
+                    # whole room is the law (every brazier in the level IS the
+                    # sign — the shipped sigils' rule). With one, only the
+                    # entities inside the selection are captured, and the
+                    # reading bounds itself to the template's own extent: a
+                    # decorative flame elsewhere in the level cannot un-sign
+                    # it. The box travels with the survivors, so `dip` cutting
+                    # the rows above still leaves the sign readable where it
+                    # now stands.
+                    #
+                    # A leading `text` token (e.g. `:shape text brazier`) also
+                    # captures the selection's FLOOR TEXT as a second exact-
+                    # region seal, so the door wants the right entities AND the
+                    # right page — and it rides the selection as drawn, so the
+                    # page's rectangle must survive the solution's cuts for it
+                    # to read.
+                    #
+                    # A bare `:shape` (no kind, no flags) with a selection
+                    # opens the capture picker — same menu law as :entity.
                     _kinds = sorted({e.kind for e in room.entities})
                     if _rcmd.endswith('?'):
                         _push(':shape [kind] arms the sigil — the live '
-                              'entities of that kind, all of them, standing in '
-                              "exactly today's layout; :bolt then arms the "
-                              'door itself. Here now — kinds: '
+                              'entities of that kind standing in today\'s '
+                              "layout (the whole room) OR, draw a VISUAL "
+                              "selection and the sign is only what you "
+                              "selected; add a leading 'text ' to also "
+                              "capture the selection's floor text. :bolt then "
+                              'arms the door itself. Kinds: '
                               + (', '.join(_kinds) or '(none)') + '.')
                     elif _rcmd.endswith('!'):
                         _ss = [s for s in getattr(room, 'seals', ())
@@ -7013,28 +7060,107 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
                             _forge_rebuild()
                             _push(f'Seal removed — {len(_ss)} condition(s) gone.')
                     else:
-                        _kindx = _rcmd[6:].strip() or 'brazier'
-                        if _kindx not in _kinds:
+                        # The selection, when there is one: the same last-visual
+                        # rectangle `:seal` and `:fuel` read. A selection is
+                        # exactly the author drawing the sign's box.
+                        _sel = None
+                        _sa, _sb = player.last_visual_anchor, player.last_visual_cursor
+                        if _sa is not None and _sb is not None:
+                            _sr1_, _sr2_ = min(_sa[0], _sb[0]), max(_sa[0], _sb[0])
+                            if player.last_visual_mode == Mode.VISUAL_LINE:
+                                _sc1_, _sc2_ = 0, room.cols - 1
+                            else:
+                                _sc1_, _sc2_ = min(_sa[1], _sb[1]), max(_sa[1], _sb[1])
+                            _sel = (_sr1_, _sc1_, _sr2_, _sc2_)
+                        _via_echo = ''
+                        _rest = _rcmd[6:].strip()
+                        _menu_open = False
+                        if not _rest and _sel is not None:
+                            # Bare `:shape` with the box drawn: ask what to
+                            # capture. The menu answers in its own grammar, so
+                            # it teaches the command that unneeds it.
+                            _selkinds = sorted({e.kind for e in room.entities
+                                                if e.alive
+                                                and _sr1_ <= e.row <= _sr2_
+                                                and _sc1_ <= e.col <= _sc2_})
+                            if _selkinds:
+                                _menu_open = True
+                                _opts = []
+                                for _k2 in _selkinds:
+                                    _opts.append(
+                                        (_k2, f'the selection\'s live {_k2} as '
+                                              'the sign — entities only'))
+                                for _k2 in _selkinds:
+                                    _opts.append(
+                                        (f'text {_k2}', 'the selection\'s live '
+                                         f'{_k2} AND its floor text'))
+                                _rest = _pick_one(
+                                    term, _iw(term), term.height - 8,
+                                    'shape the sigil — what the selection holds',
+                                    _opts) or ''
+                                if _rest:
+                                    _via_echo = f'   (:shape {_rest})'
+                        if _menu_open and not _rest:
+                            _push('')          # backed out of the capture picker
+                            continue
+                        _tokens = _rest.split()
+                        _with_text = False
+                        if _tokens and _tokens[0] == 'text' and 'text' not in _kinds:
+                            _with_text = True
+                            _tokens = _tokens[1:]
+                        _kindx = ' '.join(_tokens).strip() or 'brazier'
+                        if _with_text and _sel is None:
+                            _push('The `text` stamp rides a VISUAL selection — '
+                                  'draw the box around the sign first (or type '
+                                  f':shape {_kindx} for the whole-room sigil).')
+                        elif _kindx not in _kinds:
                             _push(f'Nothing here is called {_kindx!r} — a shape '
                                   'seal reads the entities you place. Kinds: '
                                   + (', '.join(_kinds) or '(none)') + '.')
                         else:
-                            _live = sorted((e.row, e.col) for e in room.entities
-                                           if e.kind == _kindx and e.alive)
+                            _live = sorted(
+                                (e.row, e.col) for e in room.entities
+                                if e.kind == _kindx and e.alive and (
+                                    _sel is None or (
+                                        _sr1_ <= e.row <= _sr2_
+                                        and _sc1_ <= e.col <= _sc2_)))
                             if not _live:
-                                _push(f'No live {_kindx} stands yet — '
-                                      f':entity {_kindx} puts the sigil down '
-                                      'first.')
+                                _push((f'No live {_kindx} stands in that '
+                                       'selection yet — :entity '
+                                       f'{_kindx} puts the sigil down inside '
+                                       'it first.' if _sel is not None else
+                                       f'No live {_kindx} stands yet — '
+                                       f':entity {_kindx} puts the sigil down '
+                                       'first.'))
                             else:
                                 _r0, _c0 = _live[0]
                                 _offs = tuple((r - _r0, c - _c0)
                                               for r, c in _live)
-                                _draft._pending_seal = ((), _offs, 'shape', -1, -1)
-                                _draft._pending_shape_kind = _kindx
-                                _push(f'Sigil armed: {len(_live)} live {_kindx} '
-                                      'at '
-                                      + ' '.join(f'{dr},{dc}' for dr, dc in _offs)
-                                      + ' — stand on the door and :bolt.')
+                                _ptxt = None
+                                if _with_text:
+                                    _ptxt = _seal_region_text(
+                                        room, Seal(region=_sel)).strip()
+                                if _with_text and not _ptxt:
+                                    _push('Nothing readable on the floor of that '
+                                          'selection — the `text` stamp rides '
+                                          'glyphs, not walls. Draw the box over '
+                                          f'floor text, or plain :shape {_kindx} '
+                                          'for the entities alone.')
+                                else:
+                                    _draft._pending_seal = (
+                                        _sel or (), _offs, 'shape', -1, -1)
+                                    _draft._pending_shape_kind = _kindx
+                                    _where = ('the selection' if _sel
+                                              else 'the whole room')
+                                    if _ptxt:
+                                        _draft._pending_shape_text = (_sel, _ptxt)
+                                    _push(f'Sigil armed over {_where}: '
+                                          f'{len(_live)} live {_kindx} at '
+                                          + ' '.join(f'{dr},{dc}' for dr, dc in _offs)
+                                          + (f', and its text {_ptxt!r}' if _ptxt
+                                             else '')
+                                          + ' — stand on the door and :bolt.'
+                                          + _via_echo)
 
                 elif _draft is not None and edit_mode and _rcmd.rstrip('?!') == 'final':
                     # THE FINAL SEAL — the Gauntlet's last door, made into a
@@ -7179,7 +7305,13 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
                                   else 'gone' if _mode == 'gone'
                                   else 'anyrow' if not _reg else 'region')
                         _inside = []
-                        if _reg:
+                        if _reg and _mode != 'shape':
+                            # A shape seal reads ENTITIES, never text, and its
+                            # reading re-derives from wherever the sign now
+                            # stands: a door inside the sigil box opens, becomes
+                            # walkable, and the box still re-anchors on the
+                            # sign — there is no write-on-and-re-shut loop. (See
+                            # the validator, which exempts shape the same way.)
                             _r1, _c1, _r2, _c2 = _reg
                             _inside = [(r, c) for r, c in _want_open
                                        if _r1 <= r <= _r2 and _c1 <= c <= _c2]
@@ -7229,10 +7361,27 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
                             if not _new.opens and not _new.unveils:
                                 _push('Nothing new to bolt.')
                                 continue
+                            # A shape seal armed with the `text` stamp rides a
+                            # SECOND exact-region seal: the door wants the sign
+                            # AND its page. Built and bolted atomically — if
+                            # either cannot stand, neither does.
+                            _tseal = None
+                            if _mode == 'shape' and getattr(
+                                    _draft, '_pending_shape_text', None):
+                                _tpartial, _ttxt = _draft._pending_shape_text
+                                _tseal = Seal(region=_tpartial, match=(_ttxt,),
+                                              mode='exact', scope='region',
+                                              opens=_cells + _add,
+                                              unveils=_u_cells + _u_add)
+                                _draft._pending_shape_text = None
                             _draft.level.seals.append(_new)
+                            if _tseal is not None:
+                                _draft.level.seals.append(_tseal)
                             _err = _forge_rebuild()
                             if _err:
                                 _draft.level.seals.remove(_new)
+                                if _tseal is not None:
+                                    _draft.level.seals.remove(_tseal)
                                 _push(f'Bolt refused — {_err}')
                             elif _mode == 'gone':
                                 _push(f'Bolted: {len(_new.opens)} cell(s) open '
@@ -7243,6 +7392,8 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
                             elif _mode == 'shape':
                                 _push(f'Bolted: {len(_new.opens)} cell(s) open '
                                       f'while the {_kind} sigil stands'
+                                      + (f' with its text as captured'
+                                         if _tseal is not None else '')
                                       + (f', {len(_new.unveils)} carving(s) '
                                          f'readable.' if _new.unveils else '')
                                       + (f' {len(_new.fuels)} fuel cell(s).'

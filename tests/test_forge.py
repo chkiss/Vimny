@@ -1829,6 +1829,120 @@ def test_a_shape_seal_reads_the_whole_room_and_rebars_on_a_lost_flame():
     assert room.cells[6][7] == CellType.WALL, 'a lost flame re-bars the bolt'
 
 
+def _boxed_sigil_draft():
+    """A caret of three flames inside a selection box, plus one DECORATIVE
+    flame far away at (7, 21), and a door bolted at (5, 6)."""
+    d = DRAFT.new('Probe', rows=8, cols=30)
+    _forge_session(d, 'jll:entity brazier\r'          # (2,3)
+                      + 'll:entity brazier\r'          # (2,5)
+                      + 'jh:entity brazier\r'          # (3,4)
+                      + 'jjjj' + 'l' * 17              # to (7,21)
+                      + ':entity brazier\r'            # the DECORATIVE flame
+                      + 'k' * 5 + 'h' * 18             # back to (2,3)
+                      + 'vjll' + T.ESC                 # select (2,3)-(3,5)
+                      + ':shape brazier\r'
+                      + 'jjjlll:bolt\r'                # the door at (5,6)
+                      + ':w\r:q!\r')
+    return d
+
+
+def test_the_forge_shapes_a_sigil_over_a_selection():
+    """A VISUAL SELECTION draws the sigil's BOX: only the entities inside it
+    are captured, and the seal records the rectangle — the whole-room form's
+    empty `region`, made explicit."""
+    d = _boxed_sigil_draft()
+    assert len(d.level.seals) == 1
+    s = d.level.seals[0]
+    assert (s.mode, s.kind) == ('shape', 'brazier')
+    assert s.match == ((0, 0), (0, 2), (1, 1))
+    assert s.region == (2, 3, 3, 5)                 # the box the author drew
+    assert s.opens == ((5, 6),)
+    # the box survives the file: an authored boxed sigil ships as exactly that
+    lvl2 = F.loads(F.dumps(d.level))
+    assert lvl2.seals[0].region == (2, 3, 3, 5)
+    assert lvl2.seals[0].match == ((0, 0), (0, 2), (1, 1))
+
+
+def test_a_boxed_sigil_reads_its_box_not_the_room():
+    """The boxed reading: anything standing OUTSIDE the template's extent is
+    invisible to the sign — a decorative flame cannot un-sign it, where the
+    whole-room law would — but an extra entity inside the box, or a lost
+    flame, still breaks the shape and re-bars the bolt."""
+    import vimny.game as main
+    d = _boxed_sigil_draft()
+    room = F.build(d.level).room
+    s = room.seals[0]
+    assert main._seal_reads_true(room, s)            # deco (7,21) outside
+    deco = next(e for e in room.entities if (e.row, e.col) == (7, 21))
+    deco.row, deco.col = 3, 3                          # inside the box
+    assert not main._seal_reads_true(room, s)          # in-box extras re-bar
+    deco.row, deco.col = 7, 21
+    next(e for e in room.entities if (e.row, e.col) == (2, 3)).alive = False
+    assert not main._seal_reads_true(room, s)          # a lost flame re-bars
+
+
+def test_the_forge_captures_the_selection_text_with_the_sigil():
+    """A leading `text` token also captures the selection's FLOOR TEXT as a
+    second exact-region seal bolted behind the same door — the sign AND its
+    page. Both ride through the file."""
+    d = DRAFT.new('Probe', rows=8, cols=30)
+    d.level.char_runs = [{'row': 3, 'col': 5, 'symbols': ['x'],
+                          'kind': 'ancient'}]
+    _forge_session(d, 'jll:entity brazier\r'          # (2,3)
+                      + 'll:entity brazier\r'          # (2,5)
+                      + 'jh:entity brazier\r'          # (3,4)
+                      + 'kh'                           # back to (2,3)
+                      + 'vjll' + T.ESC                 # select (2,3)-(3,5)
+                      + ':shape text brazier\r'
+                      + 'jjjlll:bolt\r'                # the door at (5,6)
+                      + ':w\r:q!\r')
+    assert len(d.level.seals) == 2
+    s, t = d.level.seals
+    assert (s.mode, s.kind) == ('shape', 'brazier')
+    assert s.match == ((0, 0), (0, 2), (1, 1)) and s.region == (2, 3, 3, 5)
+    assert (t.mode, t.scope) == ('exact', 'region')
+    assert t.region == (2, 3, 3, 5)
+    assert t.match == ('x',)
+    assert t.opens == s.opens == ((5, 6),)
+    lvl2 = F.loads(F.dumps(d.level))
+    assert lvl2.seals[1].match == ('x',)
+    assert lvl2.seals[1].region == (2, 3, 3, 5)
+
+
+def test_the_text_stamp_refuses_a_selection_with_no_floor_text():
+    """The `text` stamp rides glyphs: a selection with nothing readable on the
+    floor arms nothing — better refused while the author can see why."""
+    d = DRAFT.new('Probe', rows=8, cols=30)
+    _forge_session(d, 'jll:entity brazier\r'
+                      + 'll:entity brazier\r'
+                      + 'jh:entity brazier\r'
+                      + 'vjll' + T.ESC
+                      + ':shape text brazier\r'
+                      + ':w\r:q!\r')
+    assert not d.level.seals
+
+
+def test_the_capture_picker_drives_a_shape_command():
+    """A bare `:shape` with a selection opens the capture picker, and the menu
+    composes its own command — pick the `text` option and both stamps ride."""
+    d = DRAFT.new('Probe', rows=8, cols=30)
+    d.level.char_runs = [{'row': 3, 'col': 5, 'symbols': ['x'],
+                          'kind': 'ancient'}]
+    _forge_session(d, 'jll:entity brazier\r'          # (2,3)
+                      + 'll:entity brazier\r'          # (2,5)
+                      + 'jh:entity brazier\r'          # (3,4)
+                      + 'kh'                           # back to (2,3)
+                      + 'vjll' + T.ESC                 # select (2,3)-(3,5)
+                      + ':shape\r' + 'j' + '\r'        # pick 'text brazier'
+                      + 'jjjlll:bolt\r'                # the door at (5,6)
+                      + ':w\r:q!\r')
+    assert len(d.level.seals) == 2
+    s, t = d.level.seals
+    assert (s.mode, t.mode, t.scope) == ('shape', 'exact', 'region')
+    assert s.region == (2, 3, 3, 5)
+    assert t.match == ('x',)
+
+
 def test_the_forge_fuels_the_armed_condition():
     """`:fuel` over a selection names the cells a flame may land on while the
     armed condition reads true; :bolt writes them home as `fuels` on the seal

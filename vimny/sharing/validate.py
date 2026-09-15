@@ -195,6 +195,12 @@ def _check_room_bounds(h: F.Room, lvl: F.Level, rep: Report) -> None:
         _in_range(f'{_seal_at}[{i}].region end', (r2, c2))
         for j, cell in enumerate(s.opens):
             _in_range(f'{_seal_at}[{i}].opens[{j}]', cell)
+            if s.mode == 'shape':
+                # A shape seal reads the ENTITY layer, never text: a door
+                # inside the sigil box opens, becomes walkable, and the box
+                # re-derives from wherever the live sign now stands — there is
+                # no write-on-and-re-shut loop to refuse.
+                continue
             if min(r1, r2) <= cell[0] <= max(r1, r2) and \
                min(c1, c2) <= cell[1] <= max(c1, c2):
                 # A door inside its own condition is a door that opens, becomes

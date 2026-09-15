@@ -146,9 +146,15 @@ class Seal:
     `kind` — mode='shape' only: WHICH entities the template reads. Default
     `'brazier'` — the only flame kind a shape seal wants. The sigil law: the
     live entities of this kind must stand exactly at `match`'s (dr, dc) offsets
-    from the crown (the top-left-most of them).
+    from the crown (the top-left-most of them). Plain shape widens the law to
+    the WHOLE room; a seal that carries a `region` captures only the entities
+    that stood inside it, and the reading then bounds itself to the template's
+    own extent — anything standing beyond the box cannot break the sign.
     """
-    region:   tuple = ()    # (r1, c1, r2, c2) — the cells read under scope='region'
+    region:   tuple = ()    # (r1, c1, r2, c2) — the cells read under scope='region';
+                            # on a mode='shape' seal it marks the SIGIL'S BOX:
+                            # which entities were captured, so the reading stays
+                            # bounded to the template instead of the whole room
     match:    tuple = ()    # targets, ALL of which must read true (a bare str is
                             # accepted and wrapped — one target is the common case)
     opens:    tuple = ()    # ((row, col), ...) — cells that stand FLOOR while true
