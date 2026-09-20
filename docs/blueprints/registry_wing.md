@@ -127,6 +127,31 @@ Two chambers.
   rotate) to *retrieve* it, no plaque decreeing which line was first. Forcing: no
   non-numbered register reaches a superseded delete.
 
+**Geometry settled 2026-09-20 (engine floor is in: the ring, `"0` and `"-` all
+ship; `vimny/content/proverbs.py:STANZAS` supplies the verse).** Two cheeses
+have to be designed out, and both come from where the lines LAND:
+
+- *Ask for one line back and the player never pastes.* If the wanted line may
+  stay where it is, deleting the other two is the whole solve. So the chamber's
+  read is: the scrambled rows must end **blank**, and the verse must read true
+  **somewhere else**.
+- *Let them land where they started and it is a sort, not a retrieval.* Three
+  scrambled lines re-sorted in place is `dd` + `P` — about seven keys, no
+  register named. So the destinations are **three separated pedestals**, one
+  line each, far enough apart that the delete-walk-paste-walk-back shuttle
+  (the ring-free route) pays for every trip.
+
+That gives the read for free, with no new engine work: each pedestal is its own
+`scope='run', mode='exact'` seal, and the run indices re-derive live — so a
+scrambled line left un-cut becomes an extra run, shifts every index below it,
+and reads every pedestal false. The deletion is enforced by the same seals that
+check the order, and nothing has to count rows.
+
+Delete top-down, scrambled order `L2 L3 L1`: the ring then holds `"1`=L1,
+`"2`=L3, `"3`=L2, and the pedestals want `"1p`, `"3p`, `"2p` — the player knows
+which is which because they know the rhyme. Chamber A rides above it and is the
+`"0` half, sharing the walk.
+
 ### III — The Small Cut (`"-`)
 Charwise deletes < one line land in `"-` (and `""`); a **linewise** delete pushes the
 numbered ring and evicts `""`. Puzzle: make a small charwise cut (`x`/`dw`), then a

@@ -22,7 +22,7 @@ Puzzle texts are famous PUBLIC-DOMAIN proverbs the player knows by heart:
 a level corrupts one, and the cure is the word everyone knows — the door's
 "true reading" needs no plaque to decree it.
 
-Two shapes:
+Three shapes:
 
 - ``PLAIN``: canonical proverbs, as word tuples.  Used by INTRUDER doors —
   a seeded junk word is laid into the saying and the lesson deletes it
@@ -34,6 +34,13 @@ Two shapes:
   ONE word wrong (``wrong_words[idx]``), and the famous word that cures it.
   Used by CHANGE doors (ciw/ce/R/…).  Pool entries are grouped by cure
   length because the cure is TYPED — par counts its characters.
+
+- ``STANZAS``: the opening lines of a nursery rhyme or verse, in their TRUE
+  order, as a tuple of lines.  Used by doors that want a line ORDER rather
+  than a word: the level scrambles the lines and the player, who knows the
+  rhyme, knows which one belongs where — no plaque may decree it.  Three
+  lines is the floor, because a level that wants "the oldest" of the cuts
+  needs at least three to make old mean anything.
 
 Builders draw per seed and filter geometrically (prefix must fit west of
 the slot column, tail east of it); keep every entry universally known and
@@ -88,6 +95,43 @@ MISQUOTES = (
     (('practice', 'makes', 'flawless'), 2, 'perfect'),
     (('honesty', 'is', 'the', 'best', 'excuse'), 4, 'policy'),
 )
+
+
+# Verses whose LINE ORDER everyone knows — the cue a register level needs when
+# the thing being retrieved is a whole line rather than a word.  Lower case and
+# unpunctuated like the rest of the pool: these are carved into stone floors,
+# not printed.  Every one is a nursery rhyme or a folk verse centuries out of
+# copyright.
+STANZAS = (
+    ('twinkle twinkle little star',
+     'how i wonder what you are',
+     'up above the world so high'),
+    ('jack and jill went up the hill',
+     'to fetch a pail of water',
+     'jack fell down and broke his crown'),
+    ('humpty dumpty sat on a wall',
+     'humpty dumpty had a great fall',
+     'all the kings horses and all the kings men'),
+    ('mary had a little lamb',
+     'its fleece was white as snow',
+     'and everywhere that mary went'),
+    ('hickory dickory dock',
+     'the mouse ran up the clock',
+     'the clock struck one and down he run'),
+    ('row row row your boat',
+     'gently down the stream',
+     'merrily merrily merrily merrily'),
+)
+
+
+def stanzas_of_width(lo, hi):
+    """The stanzas whose every line is between ``lo`` and ``hi`` chars wide.
+
+    A floor is a fixed width, so a builder picks its verse by what fits — and
+    filtering by the WIDEST line keeps the draw geometric, which is what keeps
+    par seed-invariant (the column-anchor law)."""
+    return tuple(s for s in STANZAS
+                 if all(lo <= len(line) <= hi for line in s))
 
 
 def misquotes_by_cure_len(length):
