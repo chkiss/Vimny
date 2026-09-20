@@ -72,7 +72,7 @@ def _cmd_validate(args) -> int:
 def _cmd_golf(args) -> int:
     """Replay a proposed tape against a shipped level."""
     import vimny.generation.dungeon_gen as dg
-    from vimny.content.levels import known_commands
+    from vimny.content.levels import known_commands, replay_progress
 
     builder = getattr(dg, f'build_dungeon_{args.slug}', None)
     if builder is None:
@@ -81,7 +81,8 @@ def _cmd_golf(args) -> int:
     tape = args.tape if args.tape else Path(args.tape_file).read_text(encoding='utf-8').strip()
     par  = builder(args.seed).room.par
     res  = replay_tape(builder(args.seed), args.slug, tape,
-                       known=known_commands(args.slug))
+                       known=known_commands(args.slug),
+                       progress=replay_progress(args.slug))
 
     if res.error:
         print(f'{args.slug}[{args.seed}]: the tape did not finish — {res.error}')
@@ -161,7 +162,7 @@ def _cmd_jumpgolf(args) -> int:
 def _cmd_audit(args) -> int:
     """Every shipped level's own tape against its own par."""
     import vimny.generation.dungeon_gen as dg
-    from vimny.content.levels import LEVELS, known_commands
+    from vimny.content.levels import LEVELS, known_commands, replay_progress
 
     bad = 0
     for lv in LEVELS:
@@ -178,7 +179,8 @@ def _cmd_audit(args) -> int:
             print(f'{slug:26} — no tape (combat/arena level); pinned by its own test')
             continue
         res = replay_tape(builder(args.seed), slug, room.answer,
-                          known=known_commands(slug))
+                          known=known_commands(slug),
+                          progress=replay_progress(slug))
         if res.error or not res.won:
             print(f'{slug:26} FAIL  tape does not win: {res.error or "no win"}')
             bad = 1

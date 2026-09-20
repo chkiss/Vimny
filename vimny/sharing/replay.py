@@ -125,12 +125,16 @@ def _headless(main):
 
 def replay_tape(dungeon, slug: str, tape: str, *,
                 known: list | None = None,
+                progress: dict | None = None,
                 player_name: str = 'Normand') -> ReplayResult:
     """Play `tape` through the real game loop and report what happened.
 
     `dungeon` is consumed — the loop mutates it — so pass a fresh build, never a
     cached one. `known` overrides the learned-command set for a community level,
-    which has no curriculum position to derive one from.
+    which has no curriculum position to derive one from. `progress` is the save
+    the tape plays against — blank for the main chain, but a wing that only
+    opens on an earlier reward needs that reward in hand, or the tape is audited
+    against a level no player can reach (`content.levels.replay_progress`).
 
     A tape that neither wins nor quits is the interesting failure: the route
     stranded, or an unterminated insert swallowed the trailing `:wq` as text. It
@@ -160,7 +164,8 @@ def replay_tape(dungeon, slug: str, tape: str, *,
 
     with _headless(main):
         try:
-            result = main.run_dungeon(term, slug, {}, player_name=player_name,
+            result = main.run_dungeon(term, slug, dict(progress or {}),
+                                      player_name=player_name,
                                       _dungeon=dungeon, _known=known)
         except _TapeExhausted:
             return ReplayResult(

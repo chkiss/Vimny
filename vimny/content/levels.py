@@ -138,6 +138,7 @@ LEVELS = [
     # is adopted (progress['horse_name']). Off the main teaching chain.
     {'display': 'R1',   'slug': 'register_unnamed_hold',  'name': 'The Unnamed Hold',           'commands': '""  y  p', 'wing': 'registry', 'teaches': []},
     {'display': 'R2',   'slug': 'register_named_vault',   'name': 'The Named Vault',            'commands': '"ay  "by  "aP  "bP', 'wing': 'registry', 'teaches': []},
+    {'display': 'R3',   'slug': 'register_delete_ring',   'name': 'The Delete Ring',            'commands': '"0p  "1p  "2p  "3p', 'wing': 'registry', 'teaches': ['reg_numbered']},
     {'display': '99',   'slug': 'dummy',                 'name': 'Dummy Dungeon',              'commands': 'sandbox', 'admin_only': True, 'teaches': []},
 ]
 
@@ -247,3 +248,30 @@ def is_unlocked(slug: str, progress: dict, player_name: str = '') -> bool:
     if target is None:                       # first_cave / no prerequisite
         return True
     return progress.get(target, {}).get('complete', False)
+
+
+#: The lesson tokens whose registers ride in the horse's saddle — they exist
+#: only while he is in the room (engine.command_guard.is_saddle_register).
+SADDLE_TOKENS = frozenset({'reg_numbered', 'reg_small_delete', 'reg_blackhole',
+                           'reg_search', 'reg_readonly', 'reg_expr',
+                           'reg_selection'})
+
+
+def replay_progress(slug: str) -> dict:
+    """The progress a REPLAY of `slug`'s own tape needs for the level to exist.
+
+    A tape is replayed against a blank save, which is right everywhere but the
+    levels whose lesson is a SADDLE register: those keys work only while the
+    horse is in the room, and he only follows a player who has beaten the last
+    Warden and adopted him.  Auditing such a tape against an empty progress
+    audits a level no player can reach — it fails on a gate the real player
+    never meets.  The wing's other levels stay blank-save on purpose: their
+    routes were authored without a horse standing in the room, and he is an
+    obstacle like any other.  See docs/blueprints/registry_wing.md.
+    """
+    teaches = set((_BY_SLUG.get(slug) or {}).get('teaches', ()))
+    if teaches & SADDLE_TOKENS:
+        # Both halves are load-bearing: the horse only follows once the last
+        # Warden is down, and he only has a name once you have adopted him.
+        return {'warden_eternal': {'complete': True}, 'horse_name': 'Artax'}
+    return {}
