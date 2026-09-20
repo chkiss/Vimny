@@ -90,7 +90,14 @@ def _token_ks_cost(token: str) -> int:
         return 0 if token[0] == 'q' else len(token)
     m = _CNT_RE.match(token)
     if m:
-        return len(m.group(1)) + 1
+        # A count pays for its digits and then for whatever it counts. For a
+        # one-key motion that is the old `len(digits) + 1` exactly; for an
+        # OPERATOR it is not — `3dd` is three keys, not two, because `dd` is
+        # two of its own (vimny/game.py `_keystroke_cost`). Recursing says both
+        # in one rule instead of pricing the motion case and forgetting the
+        # other. ('{n}@a' and the g-/f-family counts are priced above.)
+        rest = token[len(m.group(1)):]
+        return len(m.group(1)) + (_token_ks_cost(rest) if rest else 1)
     if len(token) == 3 and token[0] in 'dyc' and token[1] in 'ia':
         return 3      # operator + text object ('dip', 'das', 'yi('): three keys
     if len(token) == 3 and token[0] in 'dyc' and token[1] in 'fFtT':
@@ -365,7 +372,12 @@ def _drive_to_win(builder, seed):
             f"stranded, or left in a non-NORMAL mode so :wq was typed as text)."
         )
     term.inkey = _inkey
-    return main.run_dungeon(term, slug, {}, player_name='Normand', _dungeon=dungeon)
+    # A blank save is right for the main chain and wrong for a SADDLE-register
+    # lesson: those keys exist only while the horse is in the room, so replaying
+    # one against {} audits a level no player can reach (levels.replay_progress).
+    from vimny.content.levels import replay_progress
+    return main.run_dungeon(term, slug, replay_progress(slug),
+                            player_name='Normand', _dungeon=dungeon)
 
 
 @pytest.mark.parametrize("builder,seed", _all_builder_params())
