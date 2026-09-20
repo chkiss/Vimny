@@ -451,6 +451,12 @@ POEMS: list[tuple[str | None, str, list[str]]] = [
         '"by in the door marked b — and both keep,',
         'so you walk the long room once, not twice.',
     ]),
+    ('register_delete_ring', 'the delete ring', [  # The Register III — "0 "1-"9
+        'A yank keeps its word past every cut:',
+        '"0 never hears the deletes at all.',
+        'And a cut is not lost, only pushed back—',
+        '"1 is the last, "3 the one before.',
+    ]),
     ('warden_eternal', 'warden eternal', [     # The Warden Eternal (final boss)
         'The last Warden is every Warden.',
         'No key remains for me to give—',

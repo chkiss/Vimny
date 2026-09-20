@@ -157,6 +157,7 @@ Each level teaches one thing and is built so that thing is the *cheapest* way th
 | 48.1 | The Warden Eternal | (boss) |
 | R1 | The Unnamed Hold | `""  y  p` |
 | R2 | The Named Vault | `"ay  "by  "aP  "bP` |
+| R3 | The Delete Ring | `"0p  "1p  "2p  "3p` |
 <!-- END GENERATED LEVELS TABLE -->
 
 </details>

@@ -34,7 +34,8 @@ _AFTER_MACROS = [l for l in LEVELS[[l['slug'] for l in LEVELS].index(_MACRO_SLUG
                  if not l.get('admin_only')]
 
 # Levels whose par tape must itself use a macro, because their work repeats.
-_MUST_MACRO = ('hall_of_echoes', 'gauntlet', 'register_named_vault')
+_MUST_MACRO = ('hall_of_echoes', 'gauntlet', 'register_named_vault',
+               'register_delete_ring')
 
 
 def test_macros_are_taught_exactly_once_and_late():

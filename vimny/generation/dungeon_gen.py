@@ -4467,6 +4467,149 @@ def build_dungeon_register_named_vault(seed: int) -> Dungeon:
     return dungeon
 
 
+# ── The Register III — The Delete Ring ("0 and "1-"9) ────────────────────────
+# TWO CHAMBERS, ONE WALK.  The upper chamber is `"0` (a yank outlives every
+# delete that follows it); the lower one is the numbered ring (a delete
+# outlives the deletes that follow IT).  Both say the same thing from opposite
+# ends — the unnamed register is the only one you can lose — which is why they
+# share a level rather than sitting in two.
+#
+#   spawn ─ QUARRY (the lone word) ─ three SPOIL rows ─ BAY (saying + junk)
+#         ─ three LOOSE verse lines, SCRAMBLED ─ three pedestal gaps ─ seal
+#
+# CHAMBER A, `"0`.  Yank the quarry word, cut the three spoil rows on the way
+# down (each `dd` takes ""), then heal the bay: `$ b diw` — which takes "" a
+# FOURTH time — and `"0P`.  The yank register never moved.  A player without
+# it must climb back to the quarry after the cut and come down again, and the
+# quarry word is long enough (>4) that typing it beats neither.
+#
+# CHAMBER B, the ring.  The three verse lines are the level's own read: the
+# chamber must end BLANK and the verse must stand, one line to a pedestal, in
+# the order everyone knows.  Deleted top-down from a scramble of `L2 L3 L1`,
+# the ring holds "1=L1, "2=L3, "3=L2 — so the pedestals want `"1p`, `"3p`,
+# `"2p`, and which is which is a thing the player knows by heart, not a thing
+# a plaque decrees.  `""` reaches exactly one of the three.
+#
+# THE READ IS FOUR RUN SEALS AND NOTHING ELSE.  Chamber A is run 0 and must
+# read as the quarry word then the healed saying — which is what forces the
+# spoil rows to go, with no seal of their own.  Each pedestal is its own run,
+# so a verse line left un-cut becomes an extra run, shifts every index below
+# it, and reads every pedestal false.  Run indices re-derive live, and `dd`
+# and `p` are exactly the two things that move rows, so nothing here may count
+# a row.
+_R3_ROWS, _R3_COLS = 21, 56
+_R3_SPINE = 2
+_R3_BAY_W, _R3_BAY_E = 3, 50
+_R3_QUARRY_ROW = 3
+_R3_SPOIL_ROWS = (4, 5, 6)            # each `dd` here takes the unnamed register
+_R3_BAY_ROW    = 7
+_R3_LOOSE_ROWS = (9, 10, 11)          # the verse, scrambled
+_R3_GATE       = 19
+_R3_EXIT       = (19, 3)
+_R3_SPAWN      = (2, 2)
+_R3_TEXTCOL    = 3
+_R3_JUNK       = 'dust'               # the wrong word the bay ends on
+_R3_SAYING     = ('practice', 'makes', 'perfect')
+_R3_QUARRY_WORD = _R3_SAYING[-1]      # LONG on purpose: typing it must lose
+_R3_STUB        = _R3_SAYING[:-1] + (_R3_JUNK,)
+_R3_SPOIL      = ('here lies the spoil of the ring',
+                  'and here the spoil of the ring again',
+                  'and here the last of it')
+#: The scramble, as indices into the verse — fixed, never seeded, because the
+#: ring positions the pedestals ask for are read off it.
+_R3_SCRAMBLE = (1, 2, 0)
+_R3_PAR = 38                          # the driven OPTIMUM tape; test-pinned
+
+
+def _r3_verse(seed: int) -> tuple:
+    """The three verse lines in their TRUE order, drawn to fit the bays."""
+    from vimny.content.proverbs import stanzas_of_width
+    rng = random.Random(seed * 7919 + 3)
+    fits = stanzas_of_width(12, _R3_BAY_E - _R3_TEXTCOL)
+    return tuple(rng.choice(fits)[:3])
+
+
+def _r3_ring_slot(k: int) -> int:
+    """Which numbered register holds verse line `k` once the scramble has been
+    cut top-down: the ring counts BACKWARDS from the newest cut, so a line cut
+    i-th of three sits at "(3 - i)."""
+    return len(_R3_SCRAMBLE) - _R3_SCRAMBLE.index(k)
+
+
+def build_dungeon_register_delete_ring(seed: int) -> Dungeon:
+    """The Register III — The Delete Ring ("0, "1-"9).  See the section header."""
+    from vimny.content.proverbs import text_of
+    from vimny.engine.editor import _CELL_CODE
+    from vimny.sharing.format import Level as _Level, _parse_seal, build as _fmt_build
+    R, C = _R3_ROWS, _R3_COLS
+    verse = _r3_verse(seed)
+    grid = [[CellType.WALL] * C for _ in range(R)]
+    for r in range(2, _R3_GATE + 1):                     # the spine
+        grid[r][_R3_SPINE] = CellType.FLOOR
+    for r in range(2, _R3_GATE + 1):                     # every row, fully open:
+        for c in range(_R3_BAY_W, _R3_BAY_E + 1):        # the pedestals are gaps
+            grid[r][c] = CellType.FLOOR                  # in the floor, not rooms
+
+    runs: list = []
+
+    def lay(r, col, words_seq):
+        for w in words_seq:
+            runs.append({'row': r, 'col': col, 'symbols': w, 'kind': 'ancient'})
+            col += len(w) + 1
+
+    lay(_R3_QUARRY_ROW, _R3_TEXTCOL, (_R3_QUARRY_WORD,))
+    for srow, line in zip(_R3_SPOIL_ROWS, _R3_SPOIL):
+        lay(srow, _R3_TEXTCOL, line.split())
+    lay(_R3_BAY_ROW, _R3_TEXTCOL, _R3_STUB)
+    for lrow, k in zip(_R3_LOOSE_ROWS, _R3_SCRAMBLE):
+        lay(lrow, _R3_TEXTCOL, verse[k].split())
+
+    bay_target = text_of(_R3_SAYING)
+
+    # PAR IS THE OPTIMUM, and the optimum golfs both cuts — differently, which
+    # is the level's own argument made in keystrokes:
+    #   j w ye        4  the quarry, into "" AND "0
+    #   j 3dd         4  the spoil goes in ONE cut: nobody wants it back, so a
+    #                    count is free here and saves three keys
+    #   $ b diw "0P   8  the bay healed from the register the deletes never saw
+    #   2j qq dd q 2@q  7  the scramble must be cut ONE LINE AT A TIME — `3dd`
+    #                    would take all three into a single clip and the ring
+    #                    would hold the scramble, not the lines — so the saving
+    #                    here is a macro over the repeat, not a count
+    #   "1p j j "3p j j "2p  13  the verse re-laid, one line to a pedestal
+    #   G l           2
+    solution = ' '.join(['j w ye',
+                         'j 3dd',
+                         '$ b diw "0P',
+                         '2j qq dd q 2@q',
+                         # one token per COMMAND (the tape-grouping law): two
+                         # steps down are `j j`, never `jj`.
+                         '"%dp j j "%dp j j "%dp' % tuple(_r3_ring_slot(k)
+                                                          for k in range(3)),
+                         'G l'])
+
+    level = _Level(
+        name='The Delete Ring', seed=seed,
+        rows=R, cols=C,
+        cells=[''.join(_CELL_CODE[c] for c in row) for row in grid],
+        spawn=_R3_SPAWN, exit=_R3_EXIT,
+        char_runs=runs,
+        entities=[{'kind': 'exit', 'at': [_R3_EXIT[0], _R3_EXIT[1]],
+                   'edit_immune': True}],
+        seals=([_parse_seal({'scope': 'run', 'run': 0,
+                             'match': [_R3_QUARRY_WORD, bay_target]}, 0)]
+               + [_parse_seal({'scope': 'run', 'run': k + 1,
+                               'match': [verse[k]]}, k + 1)
+                  for k in range(3)]
+               + [_parse_seal({'requires': [0, 1, 2, 3], 'anchor': 'exit_row',
+                               'opens': [list(_R3_EXIT)],
+                               'message': 'The ring gives up its oldest — '
+                                          'the seal parts.'}, 4)]),
+        solution=solution)
+
+    return _fmt_build(level, par=_R3_PAR)
+
+
 # ── The Bracket Enclosure (i( a() ────────────────────────────────────────────────
 # GEM SETTINGS, BY SENSE (the design law): every bay is a
 # famous proverb whose parenthesized aside has gone wrong — a junk stone set

@@ -62,7 +62,7 @@ ordering a player needs; each level's *name* is its own, not a numeral.
 | # | Overworld name | Register(s) | New token | Status |
 |---|---|---|---|---|
 | I    | The Unnamed Hold     | `""`                 | reuses `register`   | refresher · **shipped (`R1`)** |
-| II   | The Delete Ring      | `"0`, `"1`–`"9`      | `reg_numbered`      | new · core |
+| II   | The Delete Ring      | `"0`, `"1`–`"9`      | `reg_numbered`      | new · core · **shipped (`R3`)** |
 | III  | The Small Cut        | `"-`                 | `reg_small_delete`  | new |
 | IV   | The Named Vault      | `"a`–`"z`, `"A` append | reuses `reg_named` | deepen · **shipped (`R2`)** |
 | V    | The Clerk's Ledger   | `":` `".` `"%` `"#`  | `reg_readonly`      | new |
@@ -112,45 +112,8 @@ texts universally known and long out of copyright; refuse copyrighted lyrics.
 
 ## Per-level design
 
-> Levels I (The Unnamed Hold) and II (The Named Vault) have shipped; their
-> sections were deleted. The laws they established live in `docs/ARCHITECTURE.md`.
-
-### (later) The Delete Ring (`"0`, `"1`–`"9`) — richest level in the wing
-Two chambers.
-- **Yank survives delete:** yank the key word, then clear three obstacle-words with
-  `dd` (each overwrites `""`). The door needs the key word — only `"0p` (the yank
-  register, untouched by deletes) still holds it. Old route: re-yank after the
-  deletes → detour → over par.
-- **The ring (poem-as-ring):** three lines of a stanza the player knows are deleted
-  in sequence; the gate wants the **oldest**. Because it's a remembered poem, its
-  line order is known — `"1p`/`"2p`/`"3p` walk the delete ring (or `"1p` then `.` to
-  rotate) to *retrieve* it, no plaque decreeing which line was first. Forcing: no
-  non-numbered register reaches a superseded delete.
-
-**Geometry settled 2026-09-20 (engine floor is in: the ring, `"0` and `"-` all
-ship; `vimny/content/proverbs.py:STANZAS` supplies the verse).** Two cheeses
-have to be designed out, and both come from where the lines LAND:
-
-- *Ask for one line back and the player never pastes.* If the wanted line may
-  stay where it is, deleting the other two is the whole solve. So the chamber's
-  read is: the scrambled rows must end **blank**, and the verse must read true
-  **somewhere else**.
-- *Let them land where they started and it is a sort, not a retrieval.* Three
-  scrambled lines re-sorted in place is `dd` + `P` — about seven keys, no
-  register named. So the destinations are **three separated pedestals**, one
-  line each, far enough apart that the delete-walk-paste-walk-back shuttle
-  (the ring-free route) pays for every trip.
-
-That gives the read for free, with no new engine work: each pedestal is its own
-`scope='run', mode='exact'` seal, and the run indices re-derive live — so a
-scrambled line left un-cut becomes an extra run, shifts every index below it,
-and reads every pedestal false. The deletion is enforced by the same seals that
-check the order, and nothing has to count rows.
-
-Delete top-down, scrambled order `L2 L3 L1`: the ring then holds `"1`=L1,
-`"2`=L3, `"3`=L2, and the pedestals want `"1p`, `"3p`, `"2p` — the player knows
-which is which because they know the rhyme. Chamber A rides above it and is the
-`"0` half, sharing the walk.
+> Levels I (The Unnamed Hold), II (The Named Vault) and III (The Delete
+> Ring) have shipped; their sections were deleted. The laws they established live in `docs/ARCHITECTURE.md`.
 
 ### III — The Small Cut (`"-`)
 Charwise deletes < one line land in `"-` (and `""`); a **linewise** delete pushes the
