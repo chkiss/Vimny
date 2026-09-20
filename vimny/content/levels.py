@@ -33,6 +33,9 @@ Per level:
   type      — 'dungeon' (default) | 'boss' | 'reliquary'
   after     — for boss/reliquary sub-levels: the slug they hang off (→ 'x.1')
   admin_only— hidden sandbox
+  wing      — a bonus wing's name (e.g. 'registry'); absent on the main chain
+  playtest  — 'pending' while the level has never been PLAYED by a person; the
+              key is absent once it has (see playtest_pending)
 
 known_commands unions `teaches` in curriculum (list) order, so reordering LEVELS
 reorders the curriculum with no per-level renumbering. Renumbering is just
@@ -138,7 +141,8 @@ LEVELS = [
     # is adopted (progress['horse_name']). Off the main teaching chain.
     {'display': 'R1',   'slug': 'register_unnamed_hold',  'name': 'The Unnamed Hold',           'commands': '""  y  p', 'wing': 'registry', 'teaches': []},
     {'display': 'R2',   'slug': 'register_named_vault',   'name': 'The Named Vault',            'commands': '"ay  "by  "aP  "bP', 'wing': 'registry', 'teaches': []},
-    {'display': 'R3',   'slug': 'register_delete_ring',   'name': 'The Delete Ring',            'commands': '"0p  "1p  "2p  "3p', 'wing': 'registry', 'teaches': ['reg_numbered']},
+    # `playtest: 'pending'` — built and green, never PLAYED. See playtest_pending().
+    {'display': 'R3',   'slug': 'register_delete_ring',   'name': 'The Delete Ring',            'commands': '"0p  "1p  "2p  "3p', 'wing': 'registry', 'teaches': ['reg_numbered'], 'playtest': 'pending'},
     {'display': '99',   'slug': 'dummy',                 'name': 'Dummy Dungeon',              'commands': 'sandbox', 'admin_only': True, 'teaches': []},
 ]
 
@@ -255,6 +259,22 @@ def is_unlocked(slug: str, progress: dict, player_name: str = '') -> bool:
 SADDLE_TOKENS = frozenset({'reg_numbered', 'reg_small_delete', 'reg_blackhole',
                            'reg_search', 'reg_readonly', 'reg_expr',
                            'reg_selection'})
+
+
+def playtest_pending() -> list:
+    """The slugs that are BUILT and green but have never been played by a person.
+
+    A green suite says a level is solvable at par by the tape its own builder
+    wrote; it cannot say the level is legible, that its verse reads as a cue
+    rather than a riddle, that the walk feels like one walk, or that the second
+    chamber lands as the same lesson from the other side. Only a person can say
+    those, and until one has, the level's design is a claim rather than a fact.
+
+    Clear a slug's `playtest` key when it has actually been played — and if the
+    play turns up something, fix the level in the same commit as the clearing,
+    so the key never reads "pending" for a level nobody intends to sit with.
+    """
+    return [lv['slug'] for lv in LEVELS if lv.get('playtest') == 'pending']
 
 
 def replay_progress(slug: str) -> dict:

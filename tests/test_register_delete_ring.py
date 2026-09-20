@@ -252,6 +252,19 @@ def test_the_wings_horseless_levels_keep_the_blank_save():
     assert replay_progress('first_cave') == {}
 
 
+def test_the_level_is_marked_unplayed():
+    """Green is not played. Every claim this file makes is a claim about the
+    tape; whether the verse reads as a cue, whether the two chambers land as one
+    lesson, and whether the walk feels like one walk are things only a person
+    can answer. The marker comes off when someone has actually sat with it."""
+    from vimny.content.levels import playtest_pending
+    pending = playtest_pending()
+    assert 'register_delete_ring' in pending, (
+        'clear the playtest key only when the level has been PLAYED — and fix '
+        'whatever the play turned up in the same commit')
+    assert set(pending) <= {l['slug'] for l in LEVELS}, pending
+
+
 def test_the_verse_is_drawn_from_the_stanza_pool():
     verse = _r3_verse(0)
     assert any(tuple(s[:3]) == verse for s in pv.STANZAS), verse

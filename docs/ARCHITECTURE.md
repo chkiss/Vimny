@@ -299,6 +299,15 @@ BRAZIERS ARE DATA NOW (`Room.braziers`, key `braziers:`): declared flame-holding
 - When verifying, grep RAW (`grep -rw NAME` over the whole repo, no `-v` filters): a filtered count once missed `T.keystroke_cost` — attribute-style access from tests reads exactly like noise until the suite falls over. Anything documented in this file (e.g. `POOL_OF`) is API whether or not the tree imports it.
 - Complement with the produce/consume check for entity `kind` strings: a kind consumed (`.kind == 'x'`, `_entity_by_kind.get('x')`) but never produced (`Entity(kind='x')`) is dead dispatch — this is how the orphaned `keystone` mechanism was found.
 
+## Playtest pending
+**Built and green, never PLAYED.** The list is data, not prose: `playtest: 'pending'` on the level's `LEVELS` entry, read by `content.levels.playtest_pending()`, asserted by the level's own test file. A green suite says a level is solvable at par by the tape its builder wrote and that its rivals lose — it cannot say the level is legible, that its text reads as a cue rather than a riddle, that the walk feels like one walk, or that a two-chamber level lands as one lesson from both sides. Until a person has sat with it, that half of the design is a claim.
+
+| Level | Shipped | What a play has to answer |
+|---|---|---|
+| `register_delete_ring` (R3, The Delete Ring) | 2026-09-20 | Does the scrambled verse read as a cue — does a player who knows the rhyme *see* which pedestal wants which line, with no plaque? Do the two chambers land as the same lesson from opposite ends, or as two levels sharing a floor? Par 38 leaves the best `"0`-free route at 40: two keys is a thin margin to *feel*, and if it does not, the forcing wants widening, not re-pinning. |
+
+Clear the key when the level has actually been played, and fix whatever the play turned up in the same commit — a slug that sits "pending" for a level nobody intends to sit with is worse than no marker.
+
 ## Open work
 The agreed six-phase **port** — one materialiser instead of two, so the forge is
 complete by construction rather than by assurance. Phases 0–5 landed, and the
