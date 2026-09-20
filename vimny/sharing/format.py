@@ -341,7 +341,8 @@ def _parse_seal(s: dict, i: int, at: str = 'seals') -> Seal:
     unknown = set(s) - {'region', 'match', 'opens', 'unveils', 'fuels', 'mode',
                         'scope', 'requires', 'forbids', 'anchor', 'head', 'at',
                         'row_offset', 'run', 'kind', 'message', 'message_far',
-                        'closed_message', 'closed_message_far'}
+                        'closed_message', 'closed_message_far',
+                        'strict', 'ignore'}
     if unknown:
         raise LevelFormatError(f'{at}[{i}]: unknown key(s) {sorted(unknown)}')
     scope = str(s.get('scope', 'region'))
@@ -352,6 +353,23 @@ def _parse_seal(s: dict, i: int, at: str = 'seals') -> Seal:
     if mode not in _SEAL_MODES:
         raise LevelFormatError(f'{at}[{i}].mode: must be one of '
                                f'{", ".join(_SEAL_MODES)}, got {mode!r}')
+    # `strict` tightens a mode="lines" seal from "these lines, in order" to
+    # "THESE and nothing else" (the Culling Ledger's nothing-else law);
+    # `ignore` is a string of characters stripped from each line before the
+    # count — the marker glyphs a round dresses its own lines in. Both ride
+    # the lines reader and nowhere else.
+    strict = s.get('strict', False)
+    if strict not in (False, True):
+        raise LevelFormatError(f'{at}[{i}].strict: must be a boolean — '
+                               f'{strict!r} is not yes or no')
+    ignore = s.get('ignore', '') or ''
+    if not isinstance(ignore, str):
+        raise LevelFormatError(f'{at}[{i}].ignore: must be a string of '
+                               f'characters to strip before comparing')
+    if (strict or ignore) and mode != 'lines':
+        raise LevelFormatError(f'{at}[{i}]: `strict`/`ignore` ride a '
+                               f'mode="lines" seal — the only reader with a '
+                               f'whole-sequence reading to tighten')
     # `match` may be one string or several, ALL of which must read true. A door
     # that wants a room's three sayings held at once is one seal, not three.
     match = s.get('match', [])
@@ -656,7 +674,8 @@ def _parse_seal(s: dict, i: int, at: str = 'seals') -> Seal:
                 closed_message=cmsg, closed_message_far=cmsg_far,
                 scope=scope, requires=tuple(requires), anchor=anchor,
                 head=head, at=pin, row_offset=row_offset,
-                run=run, kind=kind, forbids=tuple(forbids))
+                run=run, kind=kind, forbids=tuple(forbids),
+                strict=strict, ignore=ignore)
 
 
 def _parse_cells_list(pairs, at: str, what: str) -> list:
@@ -1476,6 +1495,10 @@ def _dump_content(h: Room) -> dict:
                 d['head'] = s.head
             if s.at >= 0:
                 d['at'] = s.at
+            if s.strict:
+                d['strict'] = True
+            if s.ignore:
+                d['ignore'] = s.ignore
             if getattr(s, 'run', -1) >= 0:
                 d['run'] = s.run
             if getattr(s, 'kind', 'brazier') != 'brazier':

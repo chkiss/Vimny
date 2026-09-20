@@ -619,6 +619,85 @@ def test_a_run_seal_round_trips_through_the_file():
     assert lvl2.seals[0].anchor == 'run_end'
 
 
+# ── mode: lines — a whole page read in order ─────────────────────────────────
+
+def test_a_lines_seal_reads_the_region_in_order():
+    """The whole-song law: the nonblank lines inside the rectangle, in order,
+    must begin with `match`. Extra content PAST the targets is ignored — the
+    seal pins the expected lines, not the total count."""
+    texts = [(1, 'alpha'), (2, 'beta'), (3, 'gamma')]
+    seal = Seal(mode='lines', region=(0, 0, 4, 8), match=('alpha', 'beta'),
+                opens=((3, 10),))
+    room = _room([seal], texts=texts, rows=6)
+    _tick(room)
+    assert room.cells[3][10] == CellType.FLOOR, "the tail line past the targets is ignored"
+    _tick(room)
+    _write(room, 1, 'bogus')                     # a foreign line BETWEEN them
+    _tick(room)
+    assert room.cells[3][10] == CellType.WALL, "order is the law"
+
+
+def test_a_strict_lines_seal_lets_nothing_else_survive():
+    """`strict` tightens the reading from "these lines, in order" to "THESE
+    and nothing more": a surviving foreign line past the last target re-bars —
+    the Culling Ledger's nothing-else law, where the whole room must canonise."""
+    loose = Seal(mode='lines', region=(0, 0, 4, 8), match=('alpha', 'beta'),
+                 opens=((3, 10),))
+    strict = Seal(mode='lines', strict=True, region=(0, 0, 4, 8),
+                  match=('alpha', 'beta'), opens=((4, 10),))
+    room = _room([loose, strict], texts=[(1, 'alpha'), (2, 'beta')], rows=5)
+    _tick(room)
+    assert room.cells[3][10] == CellType.FLOOR
+    assert room.cells[4][10] == CellType.FLOOR, "both read true on the two keeps"
+    _write(room, 3, 'gamma')                     # a survivor past the keeps
+    _tick(room)
+    assert room.cells[4][10] == CellType.WALL, "strict re-bars on the survivor"
+    assert room.cells[3][10] == CellType.FLOOR, "the loose reading still holds"
+
+
+def test_ignore_strips_marker_glyphs_and_glyph_only_rows_are_blank():
+    """A round dressing its own lines in markers can tell the seal the glyphs
+    are window-dressing: they come off every line before the count, and a
+    line that held only glyphs is blank, not a foreign line."""
+    texts = [(1, '○ alpha'), (2, '○'), (3, 'beta 🜂')]
+    seal = Seal(mode='lines', strict=True, ignore='○🜂',
+                region=(0, 0, 4, 8), match=('alpha', 'beta'), opens=((3, 10),))
+    room = _room([seal], texts=texts, rows=6)
+    _tick(room)
+    assert room.cells[3][10] == CellType.FLOOR, "glyphs ignored, glyph-only row blank"
+    _write(room, 1, '○ alpha'); _write(room, 2, '○'); _write(room, 3, 'beta')
+    _write(room, 4, '○ foreign')                 # a survivor even dressed in ○
+    _tick(room)
+    assert room.cells[3][10] == CellType.WALL, "strict counts what ignore cannot erase"
+
+
+def test_strict_and_ignore_round_trip_and_refuse_bad_hosts():
+    lvl = F.parse({
+        'schema': 1, 'name': 'n', 'seed': 1,
+        'geometry': {'rows': 4, 'cols': 8,
+                     'cells': ['WWWWWWWW', 'WFFFW' + 'WWW',
+                               'WFFFW' + 'WWW', 'WWWWWWWW'],
+                     'spawn': [1, 1], 'exit': [1, 4]},
+        'seals': [{'mode': 'lines', 'strict': True, 'ignore': '○🜂',
+                   'region': [0, 0, 3, 8], 'match': ['a', 'b'],
+                   'opens': [1, 5]}],
+    })
+    room = F.build(lvl).rooms[0]
+    assert room.seals[0].strict is True
+    assert room.seals[0].ignore == '○🜂'
+    lvl2 = F.loads(F.dumps(lvl))
+    assert lvl2.seals[0].strict is True
+    assert lvl2.seals[0].ignore == '○🜂'
+    with pytest.raises(F.LevelFormatError, match='a mode="lines" seal'):
+        F._parse_seal({'mode': 'exact', 'strict': True, 'match': ['a']}, 0)
+    with pytest.raises(F.LevelFormatError, match='must be a boolean'):
+        F._parse_seal({'mode': 'lines', 'strict': 'yes', 'region': [0, 0, 1, 1],
+                       'match': ['a']}, 0)
+    with pytest.raises(F.LevelFormatError, match='must be a string'):
+        F._parse_seal({'mode': 'lines', 'ignore': ['○'], 'region': [0, 0, 1, 1],
+                       'match': ['a']}, 0)
+
+
 # ── mode: shape — a sigil of entity flames ───────────────────────────────────
 
 def _braziers(room, *cells):

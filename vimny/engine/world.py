@@ -114,6 +114,16 @@ class Seal:
     words: a chamber holds its bolt only while every one of its sayings still
     stands somewhere on the floor.
 
+    `mode` also holds `lines` (with `scope='region'`): read every nonempty line
+    inside the rectangle as an ORDERED SEQUENCE and demand it equal `match` —
+    the whole-song law, where blank rows are skipped and what order the verses
+    stand in is the gate. A `strict` `lines` seal tightens the reading from
+    "these lines, in order" to "THESE and nothing else": a surviving foreign
+    line past the last target re-bars, the Culling Ledger's nothing-else law.
+    An `ignore` string strips a set of characters (the `○`/flame/ember marker
+    glyphs) from each line before comparing, so the seal sees through the very
+    dressing the round itself uses.
+
     `requires` — indices of EARLIER seals in the same room that must also read
     true. This is the FINAL SEAL, said as data: an exit that is stone until
     every bolt before it has opened. Earlier-only, so the conjunction can never
@@ -200,6 +210,14 @@ class Seal:
                            # veils, so an author's hidden carvings answer the
                            # full bolt vocabulary — text-match, extinction,
                            # requires-chains — without a scripted tick.
+    strict:   bool  = False  # mode='lines' only: demand the WHOLE region read
+                             # as `match` — a surviving foreign line past the
+                             # targets re-bars, instead of being ignored. The
+                             # Culling Ledger's nothing-else law, said as data.
+    ignore:   str   = ''     # mode='lines' only: characters stripped from each
+                             # line before comparing — the `○`/flame/ember
+                             # marker glyphs a round uses as its own dressing,
+                             # which the seal must see through, not count.
 
     def __post_init__(self):
         if isinstance(self.match, str):

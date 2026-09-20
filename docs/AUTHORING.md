@@ -420,6 +420,37 @@ that chamber — and `"anchor": "run_end"` sets the door in the stone band just
 beneath that run rather than at the exit, which is the Hall of Echoes' rule:
 each chamber gated at its own bottom edge.
 
+#### Reading a whole page in order
+
+```json
+{"mode": "lines", "region": [2, 0, 19, 60],
+ "match": ["the first keep", "the second keep"], "opens": [7, 40]}
+```
+
+`"mode": "lines"` reads the **non-blank lines inside the rectangle as an
+ordered sequence** and demands they begin with `match`, line for line. Blank
+rows are skipped, so a route that blanks a line with `:s` rather than cutting
+it stays lawful; content past the last target is ignored, because the seal
+pins the lines it expects, not the room's total.
+
+Two keys tighten that reading, and ride `"mode": "lines"` only:
+
+```json
+{"mode": "lines", "strict": true, "ignore": "○",
+ "region": [0, 0, 23, 60], "match": ["…the six keeps…"], "opens": [7, 40]}
+```
+
+`"strict": true` turns "these lines, in order" into **these and nothing
+else**: one surviving foreign line past the last target re-bars the door.
+That is the Culling Ledger's nothing-else law — a level whose lesson is the
+cull itself cannot accept a page that merely *starts* right.
+
+`"ignore"` is a string of **characters stripped from every line before the
+comparison** — the marker glyphs a round dresses its own lines in. A line
+left empty once its glyphs come off counts as blank, not as a survivor, so a
+seal can see through the level's own decoration without that decoration
+having to be cut.
+
 #### A sigil of entities
 
 ```json
