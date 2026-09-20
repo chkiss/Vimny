@@ -71,9 +71,8 @@ def _push_ring(regs, clip) -> None:
     """Shift the delete ring: "1→"2→…→"9, "9 falls off the end, `clip` becomes "1.
 
     Vim pushes the ring for LINEWISE deletes only; a charwise cut smaller than a
-    line goes to the small-delete register "- instead (The Small Cut, level III of
-    the registry wing — until that ships, small deletes simply leave the ring
-    alone, which is the vim-true half of the behaviour).
+    line goes to the small-delete register "- instead (`_small_delete`, the other
+    half of the same law — The Small Cut, level III of the registry wing).
     """
     for n in range(RING, 1, -1):
         older = regs.get(str(n - 1))
@@ -92,8 +91,15 @@ def write_register(player, reg: str, clip, is_delete: bool = False) -> None:
     # The ring records what you THREW AWAY, so it fills on any linewise delete —
     # including one aimed at a named register ("add pushes the ring AND fills "a).
     # This is the whole reason "1p can retrieve a cut that "" has long since lost.
-    if is_delete and clip.get('linewise'):
-        _push_ring(regs, clip)
+    if is_delete:
+        # A delete goes into the ring or into the small-delete slot, never both:
+        # linewise cuts are the ring's, everything shorter than a line is "-'s.
+        # Both record what was THROWN AWAY, so both fill even when the cut was
+        # aimed at a named register — the same law, said twice.
+        if clip.get('linewise'):
+            _push_ring(regs, clip)
+        else:
+            regs['-'] = clip          # the small cut, kept past the next `dd`
     if reg and reg.isalpha() and reg.isupper():     # "A — append to "a
         low = reg.lower()
         regs[low] = _append_clip(regs.get(low), clip)

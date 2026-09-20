@@ -49,11 +49,16 @@ _MOTION_GUARD: dict[str, str] = {
 def _register_token(reg) -> str:
     """The lesson token that grants register `reg`.
 
-    The numbered ring ("0-"9) is the Delete Ring's own lesson; every other named
-    register still rides on reg_named. The remaining symbol registers ("- "_ "/ …)
-    keep reg_named for now AND stay behind the horse gate — each gets its own token
-    when its level in the registry wing ships (docs/blueprints/registry_wing.md)."""
-    return 'reg_numbered' if (reg or '').isdigit() else 'reg_named'
+    The numbered ring ("0-"9) is the Delete Ring's own lesson and the small-delete
+    slot ("-) is The Small Cut's; every other named register still rides on
+    reg_named. The remaining symbol registers ("_ "/ …) keep reg_named for now AND
+    stay behind the horse gate — each gets its own token when its level in the
+    registry wing ships (docs/blueprints/registry_wing.md)."""
+    if (reg or '').isdigit():
+        return 'reg_numbered'
+    if reg == '-':
+        return 'reg_small_delete'
+    return 'reg_named'
 
 
 def is_saddle_register(reg) -> bool:
