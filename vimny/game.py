@@ -2800,14 +2800,29 @@ def _seal_reads_true(room, seal, truths=(), rows=None, player=None) -> bool:
         # SEQUENCE and demand exact equality with `match`. Blank rows are
         # skipped; content rows must appear in order with exact text.
         # Extra content lines past the targets are ignored — the seal pins
-        # the EXPECTED lines, not the total count.
+        # the EXPECTED lines, not the total count. A `strict` seal instead
+        # demands the WHOLE region read as `match` (the Culling Ledger's
+        # nothing-else law): any surviving foreign line re-bars, and
+        # `ignore`'s characters come off each line first, so a marker glyph
+        # the round itself dresses its lines in is never counted.
         r1, c1, r2, c2 = seal.region
         lines = []
         for r in range(max(0, r1), min(room.rows - 1, r2 + 1)):
             t = _subst.line_text(room, r)[0].rstrip()
             if t.strip():
                 lines.append(t)
-        if lines[:len(seal.match)] != list(seal.match):
+        if getattr(seal, 'strict', False):
+            got = []
+            for t in lines:
+                t = t.strip()
+                if seal.ignore:
+                    t = ''.join(ch for ch in t if ch not in seal.ignore)
+                t = t.strip()
+                if t:
+                    got.append(t)
+            if got != list(seal.match):
+                return False
+        elif lines[:len(seal.match)] != list(seal.match):
             return False
     elif seal.scope == 'anyrow':
         if not _seal_anyrow_reads(seal, rows):
@@ -5532,19 +5547,25 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
 
     def _ledger_check():
         """The Culling Ledger (v3). Each tick, statelessly:
-        1. once door ONE is open, part the water — the dark ledger goes
-           underwater — readable, still unwalkable. This is design, not an engine
-           rule: nothing stops a fogged line being culled, so the ledger is
-           revealed first to keep the :v cull a reading task, not a guess;
-        2. once the ledger reads EXACTLY its true lines, in order, the cold
-           corridor brazier catches the verdant lines' fire and its light
-           unveils the exit pocket (door TWO still wants the key).
+        1. no ledge below the corridor — a linewise paste there would clone
+           the corridor WITHOUT its doors (a bridge around door two), so the
+           void swallows any false ledge and the paster snaps back;
+        2. once the DECLARED strict 'lines' seal reads true — the room holds
+           EXACTLY the six keeps, marker glyphs ignored — the cold corridor
+           brazier catches the verdant lines' fire and the boss seal_door
+           burns open. The READ is the seal's (`mode='lines'` + `strict`) and
+           the banner is the seal's message; a reading cannot purge a blocking
+           entity, rekindle terrain, or lift darkness that was never a veil,
+           so those three are what remains hand-written. (The light is NOT the
+           seal's `unveils`: an unveil cell is seeded dark at build, and this
+           room's darkness is its doors' — the stone law.)
         (Key stashing is dead GLOBALLY: a key pasted anywhere but onto a
         locked door is lost — see the keys-are-slippery paste law.)
         Blank residue rows are ignored — the :s-blanking longhand stays a
-        lawful 1★ route; forcing is by PAR."""
-        keeps = getattr(room, '_ledger_keeps', None)
-        if keeps is None:
+        lawful 1★ route; strict means NOTHING else may survive the six, so
+        the canonical :2,19v/that/d _ is the read that satisfies it; forcing
+        is by PAR."""
+        if getattr(room, '_ledger_keeps', None) is None:
             return
         # No ledge below the corridor: a linewise paste there clones the
         # corridor WITHOUT its doors — a bridge around door two. The void
@@ -5565,17 +5586,11 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
                         _push('The void swallows the false ledge!')
         _chasm_resubmerge()             # a :t/:m'd row must never become footing
         cor = _subst._last_standable_row(room)     # the corridor rides up
-        lit = getattr(room, '_ledger_lit', None)
-        if lit is not False:
+        if getattr(room, '_ledger_lit', None) is not False:
             return                                 # already lit (or not this level)
-        texts = []
-        for r in range(room.rows):
-            t = _subst.line_text(room, r)[0]
-            for junk in ('○', _dg._QM_FLAME, _dg._QM_EMBERS):
-                t = t.replace(junk, '')
-            if t.strip():
-                texts.append(t.strip())
-        if texts != list(keeps):
+        seal = next((s for s in room.seals if s.mode == 'lines'
+                     and getattr(s, 'strict', False)), None)
+        if seal is None or not _seal_reads_true(room, seal, []):
             return
         room._ledger_lit = True
         for ru in list(room._char_runs_by_row.get(cor, [])):
@@ -5588,14 +5603,31 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
         room.fog_cells = {(fr, fc) for (fr, fc) in room.fog_cells
                           if fr != cor}            # firelight unveils the way
         room.rebuild_indexes()
-        _push('The braziers answer as one — firelight finds the way out!')
 
-    def _chasm_resubmerge():
-        """The chasm law, stateless: any BARE floor above the gallery (a row a
-        :t/:m just shelved arrives unfogged) is re-sunken each turn — the far
-        bank never becomes footing."""
-        gal = _subst._last_standable_row(room)
-        for r in range(1, gal - 1):     # gal-1 = the wall/water course (its gap
+    def _refrain_maintain():
+        """The Refrain Vault's terrain half: re-submerge the torn chasm band —
+        the rows ABOVE the water course — so a :t/:m'd row never becomes
+        footing. The carved song BELOW the water is lawful floor and is not
+        touched. The full-song gate is a 'lines' seal now (2026-08-23); this
+        is rain on the bank, not a gate."""
+        wtr = next((r for r in range(room.rows)
+                    if any(room.cells[r][cc] == CellType.WATER
+                           for cc in range(room.cols))), None)
+        if wtr is None:
+            return
+        _chasm_resubmerge(wtr)
+
+    def _chasm_resubmerge(stop: int | None = None):
+        """The chasm law, stateless: any BARE floor above the water course (a
+        row a :t/:m just shelved arrives unfogged) is re-sunken each turn — the
+        far bank never becomes footing. `stop` bounds the sweep (row-exclusive);
+        None sweeps to the last standable row — the corridor chassis the Culling
+        Ledger and the Shelving Room share, whose whole ledger band may float.
+        The Refrain Vault passes its water course's top, because the carved song
+        BELOW the water stays lawful footing."""
+        if stop is None:
+            stop = _subst._last_standable_row(room) - 1
+        for r in range(1, stop):
             if any(room.cells[r][c] in (CellType.FLOOR, CellType.CORRIDOR)  # perch
                    for c in range(room.cols)):      # stays lawful footing)
                 for c in range(room.cols):
@@ -5603,29 +5635,6 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
                             and (r, c) not in room.fog_cells):
                         room.fog_cells.add((r, c))
                         room.underwater_cells.add((r, c))
-
-    def _refrain_tick():
-        """The Refrain Vault (London Bridge): re-submerge the torn chasm, then
-        open the seal once the song below the water reads EXACTLY as it should
-        — every "falling up" mended to "falling down", the build and key
-        verses untouched ("up" is TRUE there: a blanket :%s wrecks them), and
-        the torn final line laid down on walkable floor (a :t'd chasm slab
-        arrives sunken and cannot serve). Blank rows are ignored."""
-        true_song = getattr(room, '_rv_true', None)
-        if true_song is None:
-            return
-        wtr = next((r for r in range(room.rows)
-                    if any(room.cells[r][cc] == CellType.WATER
-                           for cc in range(room.cols))), None)
-        if wtr:
-            for r in range(1, wtr):
-                for cc in range(room.cols):
-                    if (room.cells[r][cc] == CellType.FLOOR
-                            and (r, cc) not in room.fog_cells):
-                        room.fog_cells.add((r, cc))
-                        room.underwater_cells.add((r, cc))
-        # The full-song gate + pocket unveil are a 'lines'-mode seal now —
-        # declared in the builder, checked by _seal_tick like every other bolt.
 
     def _advance_answer(tok: str):
         """Admin karaoke: advance the answer tape by one typed key.
@@ -5994,7 +6003,7 @@ def run_dungeon(term: Terminal, level: str, progress: dict,
         elif level == 'shelving_room':
             _chasm_resubmerge()
         elif level == 'refrain_vault':
-            _refrain_tick()                      # re-submerge the chasm, seal check
+            _refrain_maintain()                  # re-submerge the torn chasm band
 
         # ── content-gate ticks (declarative seals, plaques, level-specific) ────
         # Runs for EVERY level so bolts open on the turn the text reads true —

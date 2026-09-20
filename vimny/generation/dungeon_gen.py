@@ -13618,7 +13618,8 @@ _CL_JUNK = (                               # scattered through stanza III
 
 def build_dungeon_culling_ledger(seed: int) -> Dungeon:
     from vimny.engine.editor import _CELL_CODE
-    from vimny.sharing.format import Level as _Level, build as _fmt_build
+    from vimny.sharing.format import (Level as _Level, _parse_seal,
+                                      build as _fmt_build)
     R, C, TX = _CL_ROWS, _CL_COLS, _CL_TX
 
     cells = [[CellType.WALL] * C for _ in range(R)]
@@ -13627,8 +13628,8 @@ def build_dungeon_culling_ledger(seed: int) -> Dungeon:
         cells[r][_CL_CATCH] = CellType.FLOOR       # the ○ marker's floor cell
     # Water bands at the stanza gaps and above the stone course: they conduct
     # the vision flood between stanzas once revealed. Dark like everything
-    # else until door one opens (_ledger_check runs the whole choreography —
-    # reveals are event-driven, so the darkness holds on its own).
+    # else until door one opens (the corridor's firelight is the strict
+    # seal's `unveils` now — the reveal is data, one-way like every light).
     for r in list(_CL_GAPS) + [_CL_SEP]:
         for c in range(2, 54):
             cells[r][c] = CellType.WATER
@@ -13685,6 +13686,29 @@ def build_dungeon_culling_ledger(seed: int) -> Dungeon:
         spawn=(_CL_COR, 2),
         exit=_CL_EXIT,
         char_runs=runs,
+        seals=(
+            _parse_seal({
+                # THE READ IS DATA: mode="lines" + strict — the room must hold
+                # EXACTLY the six keeps and nothing else (a surviving foreign
+                # line re-bars), with ignore stripping the ○/flame/ember markers
+                # the round dresses its lines in before the count. The banner
+                # rides the seal's own message. What stays bespoke in
+                # `_ledger_check` is the ACTION half — purging a blocking
+                # seal_door entity, rekindling the pedestal run, and lifting
+                # the corridor's darkness — which no reading, strict or not,
+                # can perform. The corridor light is deliberately NOT the
+                # seal's `unveils`: an unveil cell is seeded dark AT BUILD,
+                # and this room's darkness is its doors' (the stone law,
+                # `tests/test_fog_law.py`), which a pre-declared veil breaks.
+                'mode': 'lines',
+                'strict': True,
+                'ignore': '○' + _QM_FLAME + _QM_EMBERS,
+                'region': [0, 0, R - 1, C - 1],
+                'match': list(_CL_KEEPS),
+                'message': 'The braziers answer as one — '
+                           'firelight finds the way out!',
+            }, 0),
+        ),
         entities=[
             {'kind': 'exit',         'at': [_CL_EXIT[0], _CL_EXIT[1]]},
             {'kind': 'chest_scroll', 'at': [_CL_CHEST[0], _CL_CHEST[1]]},
